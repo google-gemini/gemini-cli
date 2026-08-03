@@ -1083,6 +1083,7 @@ describe('useGeminiStream', () => {
     ];
 
     const client = new MockedGeminiClientClass(mockConfig);
+    const mockConsumeUserHint = vi.fn(() => 'switch to the nprd database');
 
     let capturedOnComplete:
       | ((completedTools: TrackedToolCall[]) => Promise<void>)
@@ -1119,6 +1120,8 @@ describe('useGeminiStream', () => {
         () => {},
         80,
         24,
+        false,
+        mockConsumeUserHint,
       ),
     );
 
@@ -1131,13 +1134,16 @@ describe('useGeminiStream', () => {
 
     await waitFor(() => {
       expect(mockMarkToolsAsSubmitted).toHaveBeenCalledWith(['call1']);
-      // The tool response must be paired with its functionCall in history...
+      // The tool response must be paired with its functionCall in history,
+      // with no steering-hint text ahead of it...
       expect(client.addHistory).toHaveBeenCalledWith({
         role: 'user',
         parts: responseParts,
       });
-      // ...but the turn must NOT auto-continue on the fallback model.
+      // ...the turn must NOT auto-continue on the fallback model...
       expect(mockSendMessageStream).not.toHaveBeenCalled();
+      // ...and the pending hint is left for the next real submit.
+      expect(mockConsumeUserHint).not.toHaveBeenCalled();
     });
   });
 

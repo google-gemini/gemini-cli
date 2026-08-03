@@ -573,8 +573,9 @@ export class ChatRecordingService {
   }
 
   /**
-   * Rewrites the session file from an in-memory record, atomically (temp file
-   * + rename) so a partial write never clobbers the existing file.
+   * Rewrites the session file from an in-memory record. Any existing
+   * (unreadable) file is preserved alongside rather than destroyed, and the
+   * new file is written atomically (temp file + rename).
    */
   private rewriteConversationFile(conversation: ConversationRecord): void {
     if (!this.conversationFile) return;
@@ -596,6 +597,25 @@ export class ChatRecordingService {
 
     try {
       fs.mkdirSync(path.dirname(this.conversationFile), { recursive: true });
+
+      // The existing file was unreadable, but it may have been only
+      // transiently so (a lock or I/O blip) rather than truly corrupt. Keep
+      // its bytes rather than destroying them.
+      if (fs.existsSync(this.conversationFile)) {
+        const backup = `${this.conversationFile}.unreadable-${Date.now()}`;
+        try {
+          fs.renameSync(this.conversationFile, backup);
+          debugLogger.warn(
+            `Preserved the unreadable session file at ${backup}.`,
+          );
+        } catch (backupError) {
+          debugLogger.error(
+            'Failed to preserve the unreadable session file.',
+            backupError,
+          );
+        }
+      }
+
       const tempFile = `${this.conversationFile}.tmp-${process.pid}`;
       fs.writeFileSync(tempFile, content);
       fs.renameSync(tempFile, this.conversationFile);

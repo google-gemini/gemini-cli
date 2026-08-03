@@ -2110,6 +2110,27 @@ export const useGeminiStream = (
         (toolCall) => toolCall.response.responseParts,
       );
 
+      const callIdsToMarkAsSubmitted = geminiTools.map(
+        (toolCall) => toolCall.request.callId,
+      );
+
+      markToolsAsSubmitted(callIdsToMarkAsSubmitted);
+
+      // Don't continue if model was switched due to quota error, but still
+      // record the responses: the matching functionCall is already in history,
+      // and leaving it unpaired corrupts every subsequent request. Any pending
+      // steering hint is deliberately left unconsumed so it rides along with
+      // the next query the user actually submits.
+      if (modelSwitchedFromQuotaError) {
+        if (geminiClient && responsesToSend.length > 0) {
+          await geminiClient.addHistory({
+            role: 'user',
+            parts: responsesToSend,
+          });
+        }
+        return;
+      }
+
       if (consumeUserHint) {
         const userHint = consumeUserHint();
         if (userHint && userHint.trim().length > 0) {
@@ -2120,31 +2141,9 @@ export const useGeminiStream = (
         }
       }
 
-      const callIdsToMarkAsSubmitted = geminiTools.map(
-        (toolCall) => toolCall.request.callId,
-      );
-
       const prompt_ids = geminiTools.map(
         (toolCall) => toolCall.request.prompt_id,
       );
-
-      markToolsAsSubmitted(callIdsToMarkAsSubmitted);
-
-      // Don't continue if model was switched due to quota error, but still
-      // record the responses: the matching functionCall is already in history,
-      // and leaving it unpaired corrupts every subsequent request.
-      if (modelSwitchedFromQuotaError) {
-        const combinedParts = geminiTools.flatMap(
-          (toolCall) => toolCall.response.responseParts,
-        );
-        if (geminiClient && combinedParts.length > 0) {
-          await geminiClient.addHistory({
-            role: 'user',
-            parts: combinedParts,
-          });
-        }
-        return;
-      }
 
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
       submitQuery(

@@ -356,6 +356,44 @@ describe('ChatRecordingService', () => {
       expect(reloaded.projectHash).toBe('resumed-project-hash');
       expect(reloaded.messages).toHaveLength(1);
     });
+
+    it('should preserve an unreadable session file instead of destroying it', async () => {
+      // The reload may have failed only transiently, so the original bytes
+      // must survive the recovery rewrite.
+      const chatsDir = path.join(testTempDir, 'chats');
+      fs.mkdirSync(chatsDir, { recursive: true });
+      const sessionFile = path.join(chatsDir, 'unreadable.jsonl');
+
+      // No usable metadata line => loadConversationRecord() returns null.
+      const originalBytes = '{"not":"a valid metadata line"}\n';
+      fs.writeFileSync(sessionFile, originalBytes);
+
+      await chatRecordingService.initialize({
+        filePath: sessionFile,
+        conversation: {
+          sessionId: 'recovered-session-id',
+          projectHash: 'recovered-project-hash',
+          startTime: new Date().toISOString(),
+          lastUpdated: new Date().toISOString(),
+          messages: [],
+        } as unknown as ConversationRecord,
+      });
+
+      // The rewritten file is loadable again...
+      const reloaded = (await loadConversationRecord(
+        sessionFile,
+      )) as ConversationRecord;
+      expect(reloaded.sessionId).toBe('recovered-session-id');
+
+      // ...and the original bytes were kept alongside it.
+      const preserved = fs
+        .readdirSync(chatsDir)
+        .filter((f) => f.startsWith('unreadable.jsonl.unreadable-'));
+      expect(preserved).toHaveLength(1);
+      expect(fs.readFileSync(path.join(chatsDir, preserved[0]), 'utf-8')).toBe(
+        originalBytes,
+      );
+    });
   });
 
   describe('recordMessage', () => {
