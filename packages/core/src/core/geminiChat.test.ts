@@ -1927,6 +1927,56 @@ describe('GeminiChat', () => {
       );
     });
 
+    it('should preserve system instruction and tools from resolved model config', async () => {
+      const configuredTools = [
+        { functionDeclarations: [{ name: 'configured_tool' }] },
+      ];
+      vi.mocked(
+        mockConfig.modelConfigService.getResolvedConfig,
+      ).mockReturnValue(
+        makeResolvedModelConfig('test-model', {
+          systemInstruction: 'Configured system instruction',
+          tools: configuredTools,
+        }),
+      );
+      chat.setSystemInstruction('Chat system instruction');
+      chat.setTools([{ functionDeclarations: [{ name: 'chat_tool' }] }]);
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: { parts: [{ text: 'response' }], role: 'model' },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'test-model' },
+        'hello',
+        'prompt-resolved-config',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            systemInstruction: 'Configured system instruction',
+            tools: configuredTools,
+          }),
+        }),
+        'prompt-resolved-config',
+        LlmRole.MAIN,
+      );
+    });
+
     it('should use thinkingLevel and remove thinkingBudget for gemini-3 models', async () => {
       const response = (async function* () {
         yield {
@@ -3514,19 +3564,41 @@ describe('GeminiChat', () => {
         activeModel = model;
       });
 
+      const modelATools = [
+        { functionDeclarations: [{ name: 'model_a_tool' }] },
+      ];
+      const modelBTools = [
+        { functionDeclarations: [{ name: 'model_b_tool' }] },
+      ];
+
       // Different configs per model
       vi.mocked(
         mockConfig.modelConfigService.getResolvedConfig,
       ).mockImplementation((key) => {
         if (key.model === 'model-a') {
-          return makeResolvedModelConfig('model-a', { temperature: 0.1 });
+          return makeResolvedModelConfig('model-a', {
+            temperature: 0.1,
+            systemInstruction: 'Model A instruction',
+            tools: modelATools,
+          });
         }
         if (key.model === 'model-b') {
-          return makeResolvedModelConfig('model-b', { temperature: 0.9 });
+          return makeResolvedModelConfig('model-b', {
+            temperature: 0.9,
+            systemInstruction: 'Model B instruction',
+            tools: modelBTools,
+          });
         }
         // Default for the initial requested model in this test
-        return makeResolvedModelConfig('model-a', { temperature: 0.1 });
+        return makeResolvedModelConfig('model-a', {
+          temperature: 0.1,
+          systemInstruction: 'Model A instruction',
+          tools: modelATools,
+        });
       });
+
+      chat.setSystemInstruction('Chat instruction');
+      chat.setTools([{ functionDeclarations: [{ name: 'chat_tool' }] }]);
 
       // First attempt uses model-a, then simulate availability switching to model-b
       mockRetryWithBackoff.mockImplementation(async (apiCall) => {
@@ -3580,6 +3652,8 @@ describe('GeminiChat', () => {
           model: 'model-a',
           config: expect.objectContaining({
             temperature: 0.1,
+            systemInstruction: 'Model A instruction',
+            tools: modelATools,
           }),
         }),
         expect.any(String),
@@ -3593,6 +3667,8 @@ describe('GeminiChat', () => {
           model: 'model-b',
           config: expect.objectContaining({
             temperature: 0.9,
+            systemInstruction: 'Model B instruction',
+            tools: modelBTools,
           }),
         }),
         expect.any(String),
