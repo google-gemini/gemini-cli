@@ -333,6 +333,19 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
   protected override validateToolParamValues(
     params: GlobToolParams,
   ): string | null {
+    // execute() passes params.pattern straight to glob() with `cwd:
+    // searchDir`; the glob package does not confine '..' segments or
+    // absolute patterns to cwd, so an unvalidated pattern (e.g.
+    // '../../etc/*' or '/etc/*') can list files outside every directory
+    // validated below.
+    if (
+      typeof params.pattern === 'string' &&
+      (path.isAbsolute(params.pattern) ||
+        params.pattern.split(/[\\/]/).includes('..'))
+    ) {
+      return "The 'pattern' parameter cannot be absolute or contain directory traversal sequences.";
+    }
+
     // When dir_path is omitted, execute() searches every workspace
     // directory, so validation must cover the same set rather than just
     // getTargetDir().

@@ -319,6 +319,26 @@ describe('GlobTool', () => {
       );
     });
 
+    it('should return error if pattern contains a directory traversal sequence', () => {
+      const params: GlobToolParams = { pattern: '../../etc/*' };
+      expect(globTool.validateToolParams(params)).toContain(
+        'cannot be absolute or contain directory traversal sequences',
+      );
+    });
+
+    it('should return error if pattern is an absolute path', () => {
+      const params: GlobToolParams = { pattern: '/etc/*' };
+      expect(globTool.validateToolParams(params)).toContain(
+        'cannot be absolute or contain directory traversal sequences',
+      );
+    });
+
+    it('should not flag ".." when it is only part of a longer segment name', () => {
+      // e.g. 'foo..bar' must not be mistaken for a '..' traversal segment.
+      const params: GlobToolParams = { pattern: 'foo..bar/*.txt' };
+      expect(globTool.validateToolParams(params)).toBeNull();
+    });
+
     it('should return error if specified search path does not exist', () => {
       const params: GlobToolParams = {
         pattern: '*',
