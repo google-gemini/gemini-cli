@@ -7,6 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as vscode from 'vscode';
 import { activate } from './extension.js';
+import { IDEServer } from './ide-server.js';
 import {
   IDE_DEFINITIONS,
   detectIdeFromEnv,
@@ -84,6 +85,10 @@ describe('activate', () => {
   let context: vscode.ExtensionContext;
 
   beforeEach(() => {
+    // activate() calls ideServer.start(), which normally binds a real HTTP
+    // server (app.listen in ide-server.ts). Stub it out so these unit tests
+    // don't leak live servers/ports.
+    vi.spyOn(IDEServer.prototype, 'start').mockResolvedValue(undefined);
     vi.mocked(vscode.window.showInformationMessage).mockResolvedValue(
       undefined,
     );
