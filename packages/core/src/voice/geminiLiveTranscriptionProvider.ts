@@ -94,6 +94,7 @@ export class GeminiLiveTranscriptionProvider
       });
       const socket = this.ws;
       let isSettled = false;
+      let connectionTimeout: NodeJS.Timeout | undefined = undefined;
       let resolveConnection: () => void = () => {};
       let rejectConnection: (error: Error) => void = () => {};
       let handleOpen: () => void = () => {};
@@ -210,7 +211,7 @@ export class GeminiLiveTranscriptionProvider
       };
       socket.once('open', handleOpen);
 
-      const connectionTimeout = setTimeout(() => {
+      connectionTimeout = setTimeout(() => {
         const error = new Error(
           `Gemini Live setup did not complete within ${CONNECTION_TIMEOUT_MS / 1000} seconds`,
         );
