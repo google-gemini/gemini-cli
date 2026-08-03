@@ -43,16 +43,24 @@ vi.mock('vscode', () => ({
   },
   workspace: {
     workspaceFolders: [],
-    onDidCloseTextDocument: vi.fn(),
-    registerTextDocumentContentProvider: vi.fn(),
-    onDidChangeWorkspaceFolders: vi.fn(),
-    onDidGrantWorkspaceTrust: vi.fn(),
+    onDidCloseTextDocument: vi.fn(() => ({
+      __disposableName: 'onDidCloseTextDocument',
+    })),
+    registerTextDocumentContentProvider: vi.fn(() => ({
+      __disposableName: 'registerTextDocumentContentProvider',
+    })),
+    onDidChangeWorkspaceFolders: vi.fn(() => ({
+      __disposableName: 'onDidChangeWorkspaceFolders',
+    })),
+    onDidGrantWorkspaceTrust: vi.fn(() => ({
+      __disposableName: 'onDidGrantWorkspaceTrust',
+    })),
     getConfiguration: vi.fn(() => ({
       get: vi.fn(),
     })),
   },
   commands: {
-    registerCommand: vi.fn(),
+    registerCommand: vi.fn((name: string) => ({ __disposableName: name })),
     executeCommand: vi.fn(),
   },
   Uri: {
@@ -129,6 +137,32 @@ describe('activate', () => {
   it('should register a handler for onDidGrantWorkspaceTrust', async () => {
     await activate(context);
     expect(vscode.workspace.onDidGrantWorkspaceTrust).toHaveBeenCalled();
+  });
+
+  it('should push every registered disposable into context.subscriptions', async () => {
+    await activate(context);
+
+    const subscriptionNames = context.subscriptions.map(
+      (disposable) =>
+        (disposable as unknown as { __disposableName: string })
+          .__disposableName,
+    );
+
+    // Regression test for a comma-operator bug where two pairs of
+    // registrations were wrapped in an extra set of parentheses, turning
+    // them into comma expressions. That caused only the last disposable of
+    // each pair (`gemini.diff.cancel`, `onDidGrantWorkspaceTrust`) to reach
+    // `context.subscriptions.push()`, silently leaking the others.
+    expect(subscriptionNames).toEqual([
+      'onDidCloseTextDocument',
+      'registerTextDocumentContentProvider',
+      'gemini.diff.accept',
+      'gemini.diff.cancel',
+      'onDidChangeWorkspaceFolders',
+      'onDidGrantWorkspaceTrust',
+      'gemini-cli.runGeminiCLI',
+      'gemini-cli.showNotices',
+    ]);
   });
 
   it('should launch the Gemini CLI when the user clicks the button', async () => {
