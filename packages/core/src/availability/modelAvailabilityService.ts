@@ -39,13 +39,13 @@ export interface ModelSelectionResult {
   }>;
 }
 
-import { normalizeModelId } from '../utils/modelUtils.js';
+import { getCanonicalModelAlias } from '../utils/modelUtils.js';
 
 export class ModelAvailabilityService {
   private readonly health = new Map<ModelId, HealthState>();
 
   markTerminal(modelId: ModelId, reason: TerminalUnavailabilityReason) {
-    const model = normalizeModelId(modelId);
+    const model = getCanonicalModelAlias(modelId);
     this.setState(model, {
       status: 'terminal',
       reason,
@@ -53,12 +53,12 @@ export class ModelAvailabilityService {
   }
 
   markHealthy(modelId: ModelId) {
-    const model = normalizeModelId(modelId);
+    const model = getCanonicalModelAlias(modelId);
     this.clearState(model);
   }
 
   markRetryOncePerTurn(modelId: ModelId, attempts: number = 1) {
-    const model = normalizeModelId(modelId);
+    const model = getCanonicalModelAlias(modelId);
     const currentState = this.health.get(model);
     // Do not override a terminal failure with a transient one.
     if (currentState?.status === 'terminal') {
@@ -81,7 +81,7 @@ export class ModelAvailabilityService {
   }
 
   consumeStickyAttempt(modelId: ModelId) {
-    const model = normalizeModelId(modelId);
+    const model = getCanonicalModelAlias(modelId);
     const state = this.health.get(model);
     if (state?.status === 'sticky_retry') {
       this.setState(model, { ...state, consumed: true });
@@ -89,7 +89,7 @@ export class ModelAvailabilityService {
   }
 
   snapshot(modelId: ModelId): ModelAvailabilitySnapshot {
-    const model = normalizeModelId(modelId);
+    const model = getCanonicalModelAlias(modelId);
     const state = this.health.get(model);
 
     if (!state) {
@@ -111,7 +111,7 @@ export class ModelAvailabilityService {
     const skipped: ModelSelectionResult['skipped'] = [];
 
     for (const modelId of modelIds) {
-      const model = normalizeModelId(modelId);
+      const model = getCanonicalModelAlias(modelId);
       const snapshot = this.snapshot(model);
       if (snapshot.available) {
         const state = this.health.get(model);

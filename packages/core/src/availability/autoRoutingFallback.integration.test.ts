@@ -8,7 +8,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import { FakeContentGenerator } from '../core/fakeContentGenerator.js';
 import { Config } from '../config/config.js';
-import { RetryableQuotaError } from '../utils/googleQuotaErrors.js';
+import {
+  RetryableQuotaError,
+  TerminalQuotaError,
+} from '../utils/googleQuotaErrors.js';
 import {
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
@@ -495,5 +498,93 @@ describe('Auto Routing Fallback Integration', () => {
     // Verify session ID has been rotated
     expect(config.getSessionId()).not.toBe(originalSessionId);
     expect(config.getSessionId()).toBeDefined();
+  });
+
+  it('should reproduce GCA fallback mismatch on gemini-3.1-pro-preview when getGemini31LaunchedSync is false', async () => {
+    config = new Config({
+      sessionId: 'test-session-gca-mismatch',
+      targetDir: '/test',
+      debugMode: false,
+      cwd: '/test',
+      model: 'gemini-3.1-pro-preview',
+    });
+
+    vi.spyOn(config, 'isInteractive').mockReturnValue(true);
+    vi.spyOn(config, 'getGemini31LaunchedSync').mockReturnValue(false);
+
+    client = new BaseLlmClient(
+      fakeGenerator,
+      config,
+      AuthType.LOGIN_WITH_GOOGLE,
+    );
+
+    let attemptsPro = 0;
+
+    const mockGoogleApiError = {
+      code: 429,
+      message:
+        'No capacity available for model gemini-3.1-pro-preview on the server',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo' as const,
+          reason: 'MODEL_CAPACITY_EXHAUSTED',
+          domain: 'cloudcode-pa.googleapis.com',
+          metadata: { model: 'gemini-3.1-pro-preview' },
+        },
+      ],
+    };
+
+    vi.spyOn(fakeGenerator, 'generateContent').mockImplementation(
+      async (params) => {
+        if (
+          params.model === 'gemini-3.1-pro-preview' ||
+          params.model === 'gemini-3-pro-preview'
+        ) {
+          attemptsPro++;
+          if (attemptsPro > 3) {
+            throw new Error(
+              'Detected infinite fallback loop retrying the same failed model',
+            );
+          }
+          throw new TerminalQuotaError(
+            'MODEL_CAPACITY_EXHAUSTED',
+            mockGoogleApiError,
+            undefined,
+            'MODEL_CAPACITY_EXHAUSTED',
+          );
+        } else if (params.model === 'gemini-3-flash-preview') {
+          return {
+            candidates: [
+              {
+                content: {
+                  role: 'model',
+                  parts: [{ text: 'Flash fallback success' }],
+                },
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        }
+        throw new Error(`Unexpected model: ${params.model}`);
+      },
+    );
+
+    config.setFallbackModelHandler(
+      async (_failed, _fallback, _error): Promise<FallbackIntent | null> =>
+        'retry_always',
+    );
+
+    const promise = client.generateContent({
+      modelConfigKey: { model: 'gemini-3.1-pro-preview', isChatModel: true },
+      contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
+      abortSignal: new AbortController().signal,
+      promptId: 'test-prompt',
+      role: LlmRole.UTILITY_TOOL,
+    });
+
+    await vi.runAllTimersAsync();
+    const result = await promise;
+    expect(result.candidates?.[0]?.content?.parts?.[0]?.text).toBe(
+      'Flash fallback success',
+    );
   });
 });

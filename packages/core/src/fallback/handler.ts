@@ -12,6 +12,7 @@ import {
 } from '../utils/secure-browser-launcher.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getErrorMessage } from '../utils/errors.js';
+import { getCanonicalModelAlias } from '../utils/modelUtils.js';
 import type { FallbackIntent, FallbackRecommendation } from './types.js';
 import { classifyFailureKind } from '../availability/errorClassification.js';
 import {
@@ -64,12 +65,15 @@ export async function handleFallback(
     const selectedFallbackModel =
       selection.selectedModel ?? lastResortPolicy?.model;
     const selectedPolicy = candidates.find(
-      (policy) => policy.model === selectedFallbackModel,
+      (policy) =>
+        getCanonicalModelAlias(policy.model) ===
+        getCanonicalModelAlias(selectedFallbackModel ?? ''),
     );
 
     if (
       !selectedFallbackModel ||
-      selectedFallbackModel === failedModel ||
+      getCanonicalModelAlias(selectedFallbackModel) ===
+        getCanonicalModelAlias(failedModel) ||
       !selectedPolicy
     ) {
       return null;

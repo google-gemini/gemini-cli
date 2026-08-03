@@ -28,7 +28,10 @@ import {
   isGemini3Model,
   resolveModel,
 } from '../config/models.js';
-import { normalizeModelId } from '../utils/modelUtils.js';
+import {
+  normalizeModelId,
+  getCanonicalModelAlias,
+} from '../utils/modelUtils.js';
 import type { ModelSelectionResult } from './modelAvailabilityService.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { ApprovalMode } from '../policy/types.js';
@@ -177,9 +180,9 @@ function applyDynamicSlicing(
   resolvedModel: string,
   wrapsAround: boolean,
 ): ModelPolicyChain {
-  const normalizedResolved = normalizeModelId(resolvedModel);
+  const normalizedResolved = getCanonicalModelAlias(resolvedModel);
   const activeIndex = chain.findIndex(
-    (policy) => normalizeModelId(policy.model) === normalizedResolved,
+    (policy) => getCanonicalModelAlias(policy.model) === normalizedResolved,
   );
   if (activeIndex !== -1) {
     return wrapsAround
@@ -207,9 +210,9 @@ export function buildFallbackPolicyContext(
   failedPolicy?: ModelPolicy;
   candidates: ModelPolicy[];
 } {
-  const normalizedFailed = normalizeModelId(failedModel);
+  const normalizedFailed = getCanonicalModelAlias(failedModel);
   const index = chain.findIndex(
-    (policy) => normalizeModelId(policy.model) === normalizedFailed,
+    (policy) => getCanonicalModelAlias(policy.model) === normalizedFailed,
   );
   if (index === -1) {
     return { failedPolicy: undefined, candidates: chain };
@@ -249,7 +252,11 @@ export function createAvailabilityContextProvider(
 
     // Resolve the chain for the specific model we are attempting.
     const chain = resolvePolicyChain(config, currentModel);
-    const policy = chain.find((p) => p.model === currentModel);
+    const policy = chain.find(
+      (p) =>
+        getCanonicalModelAlias(p.model) ===
+        getCanonicalModelAlias(currentModel),
+    );
 
     return policy ? { service, policy } : undefined;
   };
@@ -313,7 +320,10 @@ export function applyModelSelection(
   }
 
   const chain = resolvePolicyChain(config, finalModel);
-  const policy = chain.find((p) => p.model === finalModel);
+  const policy = chain.find(
+    (p) =>
+      getCanonicalModelAlias(p.model) === getCanonicalModelAlias(finalModel),
+  );
 
   return {
     model: finalModel,
