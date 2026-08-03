@@ -368,6 +368,64 @@ describe('sandbox', () => {
       );
     });
 
+    it.each([
+      'permissive-open',
+      'permissive-closed',
+      'permissive-proxied',
+      'restrictive-open',
+      'restrictive-closed',
+      'restrictive-proxied',
+      'strict-open',
+      'strict-proxied',
+    ])(
+      'should fall back to embedded content successfully for profile "%s"',
+      async (profile) => {
+        vi.mocked(os.platform).mockReturnValue('darwin');
+        // Mock existsSync to return false for the profile file but true for temp directories
+        vi.mocked(fs.existsSync).mockImplementation((p) =>
+          String(p).includes('gemini-sandbox-macos-'),
+        );
+
+        vi.stubEnv('SEATBELT_PROFILE', profile);
+
+        const config: SandboxConfig = createMockSandboxConfig({
+          command: 'sandbox-exec',
+          image: 'some-image',
+        });
+
+        interface MockProcess extends EventEmitter {
+          stdout: EventEmitter;
+          stderr: EventEmitter;
+        }
+        const mockSpawnProcess = new EventEmitter() as MockProcess;
+        mockSpawnProcess.stdout = new EventEmitter();
+        mockSpawnProcess.stderr = new EventEmitter();
+        vi.mocked(spawn).mockReturnValue(
+          mockSpawnProcess as unknown as ReturnType<typeof spawn>,
+        );
+
+        const promise = start_sandbox(config, [], undefined, ['arg1']);
+
+        setTimeout(() => {
+          mockSpawnProcess.emit('close', 0);
+        }, 10);
+
+        await expect(promise).resolves.toBe(0);
+
+        // Verify fs.writeFileSync was called with the correct file mode and content for the profile
+        expect(fs.writeFileSync).toHaveBeenCalledWith(
+          expect.stringContaining(`gemini-sandbox-macos-${profile}-`),
+          expect.stringContaining('deny default'),
+          expect.objectContaining({
+            encoding: 'utf8',
+            mode: 0o600,
+          }),
+        );
+
+        vi.unstubAllEnvs();
+      },
+    );
+
     it('should handle Docker execution', async () => {
       const config: SandboxConfig = createMockSandboxConfig({
         command: 'docker',

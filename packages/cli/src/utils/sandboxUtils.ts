@@ -15,8 +15,10 @@ export const SANDBOX_NETWORK_NAME = 'gemini-cli-sandbox';
 export const SANDBOX_PROXY_NAME = 'gemini-cli-sandbox-proxy';
 export const BUILTIN_SEATBELT_PROFILES = [
   'permissive-open',
+  'permissive-closed',
   'permissive-proxied',
   'restrictive-open',
+  'restrictive-closed',
   'restrictive-proxied',
   'strict-open',
   'strict-proxied',

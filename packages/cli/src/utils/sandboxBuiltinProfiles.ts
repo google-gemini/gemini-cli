@@ -547,3 +547,9 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
 (allow network-inbound (local ip "localhost:9229"))
 (allow network-outbound (remote tcp "localhost:8877"))`,
 };
+
+// Map standard 'closed' profiles to their strict counterparts for backward compatibility and fallback support
+BUILTIN_SEATBELT_PROFILE_CONTENTS['permissive-closed'] =
+  BUILTIN_SEATBELT_PROFILE_CONTENTS['strict-open'];
+BUILTIN_SEATBELT_PROFILE_CONTENTS['restrictive-closed'] =
+  BUILTIN_SEATBELT_PROFILE_CONTENTS['strict-proxied'];
