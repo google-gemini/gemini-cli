@@ -56,6 +56,51 @@ describe('fetchJson', () => {
     });
   });
 
+  it('should reject malformed JSON with response context', async () => {
+    getMock.mockImplementationOnce((_url, _options, callback) => {
+      const res = new EventEmitter() as IncomingMessage;
+      res.statusCode = 200;
+      (callback as (res: IncomingMessage) => void)(res);
+      res.emit('data', Buffer.from('{"truncated":'));
+      res.emit('end');
+      return new EventEmitter() as ClientRequest;
+    });
+
+    await expect(fetchJson('https://api.github.com/releases')).rejects.toThrow(
+      'Failed to parse GitHub response from https://api.github.com/releases (status 200)',
+    );
+  });
+
+  it('should reject response stream errors with response context', async () => {
+    getMock.mockImplementationOnce((_url, _options, callback) => {
+      const res = new EventEmitter() as IncomingMessage;
+      res.statusCode = 200;
+      (callback as (res: IncomingMessage) => void)(res);
+      res.emit('data', Buffer.from('{"partial":'));
+      res.emit('error', new Error('connection reset'));
+      return new EventEmitter() as ClientRequest;
+    });
+
+    await expect(fetchJson('https://api.github.com/releases')).rejects.toThrow(
+      'Failed to read GitHub response from https://api.github.com/releases (status 200): connection reset',
+    );
+  });
+
+  it('should reject aborted responses with response context', async () => {
+    getMock.mockImplementationOnce((_url, _options, callback) => {
+      const res = new EventEmitter() as IncomingMessage;
+      res.statusCode = 200;
+      (callback as (res: IncomingMessage) => void)(res);
+      res.emit('data', Buffer.from('{"partial":'));
+      res.emit('aborted');
+      return new EventEmitter() as ClientRequest;
+    });
+
+    await expect(fetchJson('https://api.github.com/releases')).rejects.toThrow(
+      'GitHub response was aborted for https://api.github.com/releases (status 200)',
+    );
+  });
+
   it('should handle redirects (301 and 302)', async () => {
     // Test 302
     getMock.mockImplementationOnce((_url, _options, callback) => {
@@ -107,17 +152,19 @@ describe('fetchJson', () => {
   });
 
   it('should reject on non-200/30x status code', async () => {
+    const resume = vi.fn();
     getMock.mockImplementationOnce((_url, _options, callback) => {
       const res = new EventEmitter() as IncomingMessage;
       res.statusCode = 404;
+      res.resume = resume;
       (callback as (res: IncomingMessage) => void)(res);
-      res.emit('end');
       return new EventEmitter() as ClientRequest;
     });
 
     await expect(fetchJson('https://example.com/error')).rejects.toThrow(
       'Request failed with status code 404',
     );
+    expect(resume).toHaveBeenCalledOnce();
   });
 
   it('should reject on request error', async () => {
@@ -164,6 +211,37 @@ describe('fetchJson', () => {
       await expect(fetchJson('https://api.github.com/user')).resolves.toEqual({
         foo: 'bar',
       });
+    });
+
+    it('should strip Authorization on cross-origin redirects', async () => {
+      getMock.mockImplementationOnce((_url, options, callback) => {
+        expect(options.headers).toEqual({
+          'User-Agent': 'gemini-cli',
+          Authorization: 'token my-secret-token',
+        });
+        const res = new EventEmitter() as IncomingMessage;
+        res.statusCode = 302;
+        res.headers = { location: 'https://downloads.example.com/release' };
+        res.resume = vi.fn();
+        (callback as (res: IncomingMessage) => void)(res);
+        return new EventEmitter() as ClientRequest;
+      });
+      getMock.mockImplementationOnce((url, options, callback) => {
+        expect(url).toBe('https://downloads.example.com/release');
+        expect(options.headers).toEqual({
+          'User-Agent': 'gemini-cli',
+        });
+        const res = new EventEmitter() as IncomingMessage;
+        res.statusCode = 200;
+        (callback as (res: IncomingMessage) => void)(res);
+        res.emit('data', Buffer.from('{"redirected": true}'));
+        res.emit('end');
+        return new EventEmitter() as ClientRequest;
+      });
+
+      await expect(
+        fetchJson('https://api.github.com/releases'),
+      ).resolves.toEqual({ redirected: true });
     });
   });
 
