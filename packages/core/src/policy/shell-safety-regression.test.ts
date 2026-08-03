@@ -4,18 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { PolicyEngine } from './policy-engine.js';
 import { PolicyDecision, ApprovalMode } from './types.js';
-import { initializeShellParsers } from '../utils/shell-utils.js';
 import { buildArgsPatterns } from './utils.js';
 
 describe('PolicyEngine - Shell Safety Regression Suite', () => {
   let engine: PolicyEngine;
-
-  beforeAll(async () => {
-    await initializeShellParsers();
-  });
 
   const setupEngine = (allowedCommands: string[]) => {
     const rules = allowedCommands.map((cmd) => ({

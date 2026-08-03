@@ -20,7 +20,6 @@ vi.mock('../../utils/shell-utils.js', async (importOriginal) => {
   return {
     ...actual,
     spawnAsync: vi.fn(),
-    initializeShellParsers: vi.fn(),
     isStrictlyApproved: vi.fn().mockResolvedValue(true),
   };
 });

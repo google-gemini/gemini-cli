@@ -39,11 +39,7 @@ import {
 import { isErrnoException } from '../utils/fsUtils.js';
 import { handleReadWriteCommands } from '../utils/sandboxReadWriteUtils.js';
 import { buildBwrapArgs } from './bwrapArgsBuilder.js';
-import {
-  getCommandRoots,
-  initializeShellParsers,
-  stripShellWrapper,
-} from '../../utils/shell-utils.js';
+import { getCommandRoots, stripShellWrapper } from '../../utils/shell-utils.js';
 
 let cachedBpfPath: string | undefined;
 
@@ -222,7 +218,6 @@ export class LinuxSandboxManager implements SandboxManager {
       args = ['-c', 'cat > "$1"', '_', ...args];
     }
 
-    await initializeShellParsers();
     const fullCmd = [command, ...args].join(' ');
     const stripped = stripShellWrapper(fullCmd);
     const roots = getCommandRoots(stripped).filter(

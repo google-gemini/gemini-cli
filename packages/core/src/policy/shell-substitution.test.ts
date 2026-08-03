@@ -4,10 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { expect, describe, it, beforeAll, vi } from 'vitest';
+import { expect, describe, it, vi } from 'vitest';
 import { PolicyEngine } from './policy-engine.js';
 import { PolicyDecision } from './types.js';
-import { initializeShellParsers } from '../utils/shell-utils.js';
 
 // Mock node:os to ensure shell-utils logic always thinks it's on a POSIX-like system.
 // This ensures that internal calls to getShellConfiguration() and isWindows()
@@ -40,10 +39,6 @@ vi.mock('../utils/shell-utils.js', async (importOriginal) => {
 });
 
 describe('PolicyEngine Command Substitution Validation', () => {
-  beforeAll(async () => {
-    await initializeShellParsers();
-  });
-
   const setupEngine = (blockedCmd: string) =>
     new PolicyEngine({
       defaultDecision: PolicyDecision.ALLOW,

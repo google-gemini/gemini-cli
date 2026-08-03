@@ -28,7 +28,6 @@ import { debugLogger } from '../../utils/debugLogger.js';
 import {
   spawnAsync,
   getCommandName,
-  initializeShellParsers,
   getCommandRoots,
   stripShellWrapper,
 } from '../../utils/shell-utils.js';
@@ -267,7 +266,6 @@ export class WindowsSandboxManager implements SandboxManager {
       this.options.modeConfig?.network ?? req.policy?.networkAccess ?? false;
     const networkAccess = defaultNetwork || mergedAdditional.network;
 
-    await initializeShellParsers();
     const fullCmd = [command, ...args].join(' ');
     const stripped = stripShellWrapper(fullCmd);
     const roots = getCommandRoots(stripped).filter(

@@ -4,20 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  expect,
-  describe,
-  it,
-  beforeEach,
-  beforeAll,
-  vi,
-  afterEach,
-} from 'vitest';
+import { expect, describe, it, beforeEach, vi, afterEach } from 'vitest';
 import {
   escapeShellArg,
   getCommandRoots,
   getShellConfiguration,
-  initializeShellParsers,
   parseCommandDetails,
   splitCommands,
   stripShellWrapper,
@@ -75,11 +66,6 @@ vi.mock('./debugLogger.js', () => ({
 
 const isWindowsRuntime = process.platform === 'win32';
 const describeWindowsOnly = isWindowsRuntime ? describe : describe.skip;
-
-beforeAll(async () => {
-  mockPlatform.mockReturnValue('linux');
-  await initializeShellParsers();
-});
 
 beforeEach(() => {
   mockPlatform.mockReturnValue('linux');
@@ -153,6 +139,32 @@ describe('getCommandRoots', () => {
     expect(result).toEqual(['a', 'b', 'c', 'd', 'e', 'f']);
   });
 
+  it('should not treat test syntax as an executable command', () => {
+    const result = getCommandRoots('if [[ -f package.json ]]; then npm ci; fi');
+    expect(result).toEqual(['npm']);
+  });
+
+  it('should return the command inside a named coprocess', () => {
+    const result = getCommandRoots('coproc mycop { sleep 1; }');
+    expect(result).toEqual(['sleep']);
+  });
+
+  it('should include command substitutions inside arithmetic syntax', () => {
+    expect(getCommandRoots('echo $((1 + $(danger)))')).toEqual([
+      'echo',
+      'danger',
+    ]);
+    expect(getCommandRoots('((x=$(danger)))')).toEqual(['danger']);
+    expect(
+      getCommandRoots('for ((i=$(init); i<$(limit); i++)); do echo "$i"; done'),
+    ).toEqual(['init', 'limit', 'echo']);
+  });
+
+  it('should fail closed on parse errors inside command substitutions', () => {
+    const result = getCommandRoots('echo "$(if true; then echo ok)"');
+    expect(result).toEqual([]);
+  });
+
   it('should correctly parse a chained command with quotes', () => {
     const result = getCommandRoots('echo "hello" && git commit -m "feat"');
     expect(result).toEqual(['echo', 'git']);
@@ -202,48 +214,6 @@ describe('getCommandRoots', () => {
     expect(getCommandRoots('cat < input.txt')).toEqual(['cat']);
     expect(getCommandRoots('ls 2> error.log')).toEqual(['ls']);
     expect(getCommandRoots('exec 3<&0')).toEqual(['exec']);
-  });
-
-  it('should handle parser initialization failures gracefully', async () => {
-    // Reset modules to clear singleton state
-    vi.resetModules();
-
-    // Mock fileUtils to fail Wasm loading
-    vi.doMock('./fileUtils.js', () => ({
-      loadWasmBinary: vi.fn().mockRejectedValue(new Error('Wasm load failed')),
-    }));
-
-    // Re-import shell-utils with mocked dependencies
-    const shellUtils = await import('./shell-utils.js');
-
-    // Should catch the error and not throw
-    await expect(shellUtils.initializeShellParsers()).resolves.not.toThrow();
-
-    // Fallback: splitting commands depends on parser, so if parser fails, it returns empty
-    const roots = shellUtils.getCommandRoots('ls -la');
-    expect(roots).toEqual([]);
-  });
-
-  it('should handle bash parser timeouts', () => {
-    const nowSpy = vi.spyOn(performance, 'now');
-    // Mock performance.now() to trigger timeout:
-    // 1st call: start time = 0. deadline = 0 + 1000ms.
-    // 2nd call (and onwards): inside progressCallback, return 2000ms.
-    nowSpy.mockReturnValueOnce(0).mockReturnValue(2000);
-
-    // Use a very complex command to ensure progressCallback is triggered at least once
-    const complexCommand =
-      'ls -la && ' + Array(100).fill('echo "hello"').join(' && ');
-    const roots = getCommandRoots(complexCommand);
-    expect(roots).toEqual([]);
-    expect(nowSpy).toHaveBeenCalled();
-
-    expect(mockDebugLogger.error).toHaveBeenCalledWith(
-      'Bash command parsing timed out for command:',
-      complexCommand,
-    );
-
-    nowSpy.mockRestore();
   });
 });
 
@@ -341,8 +311,6 @@ describe('splitCommands', () => {
 
     // Heredoc/Herestring
     expect(splitCommands('cat << EOF\nhello\nEOF')).toEqual(['cat']);
-    // Note: The Tree-sitter bash parser includes the herestring in the main
-    // command node's text, unlike standard redirections which are siblings.
     expect(splitCommands('grep "foo" <<< "foobar"')).toEqual([
       'grep "foo" <<< "foobar"',
     ]);

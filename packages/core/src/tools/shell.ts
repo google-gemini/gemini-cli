@@ -36,7 +36,6 @@ import { formatBytes } from '../utils/formatters.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
   getCommandRoots,
-  initializeShellParsers,
   stripShellWrapper,
   parseCommandDetails,
   hasRedirection,
@@ -1097,9 +1096,6 @@ export class ShellTool extends BaseDeclarativeTool<
     private readonly context: AgentLoopContext,
     messageBus: MessageBus,
   ) {
-    void initializeShellParsers().catch(() => {
-      // Errors are surfaced when parsing commands.
-    });
     const definition = getShellDefinition(
       context.config.isInteractiveShellEnabled(),
       context.config.getEnableShellOutputEfficiency(),

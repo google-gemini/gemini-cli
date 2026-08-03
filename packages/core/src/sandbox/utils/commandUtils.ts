@@ -7,7 +7,6 @@
 import { type SandboxRequest } from '../../services/sandboxManager.js';
 import {
   getCommandRoots,
-  initializeShellParsers,
   splitCommands,
   stripShellWrapper,
 } from '../../utils/shell-utils.js';
@@ -22,8 +21,6 @@ export async function isStrictlyApproved(
   if (!approvedTools || approvedTools.length === 0) {
     return false;
   }
-
-  await initializeShellParsers();
 
   const fullCmd = [req.command, ...req.args].join(' ');
   const stripped = stripShellWrapper(fullCmd);
@@ -50,7 +47,6 @@ export async function isStrictlyApproved(
 }
 
 export async function getCommandName(req: SandboxRequest): Promise<string> {
-  await initializeShellParsers();
   const fullCmd = [req.command, ...req.args].join(' ');
   const stripped = stripShellWrapper(fullCmd);
   const roots = getCommandRoots(stripped).filter(

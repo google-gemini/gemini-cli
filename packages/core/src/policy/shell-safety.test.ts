@@ -6,7 +6,6 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-// Mock shell-utils to avoid relying on tree-sitter WASM which is flaky in CI on Windows
 vi.mock('../utils/shell-utils.js', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('../utils/shell-utils.js')>();
@@ -58,7 +57,6 @@ vi.mock('../utils/shell-utils.js', async (importOriginal) => {
 
   return {
     ...actual,
-    initializeShellParsers: vi.fn(),
     parseCommandDetails: (command: string) => {
       if (Object.prototype.hasOwnProperty.call(commandMap, command)) {
         const subcommands = commandMap[command];

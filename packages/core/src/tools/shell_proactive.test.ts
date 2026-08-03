@@ -4,23 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  vi,
-  describe,
-  it,
-  expect,
-  beforeEach,
-  beforeAll,
-  afterEach,
-} from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import os from 'node:os';
 import type _fs from 'node:fs';
 import { ShellTool } from './shell.js';
 import { type Config } from '../config/config.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import * as proactivePermissions from '../sandbox/utils/proactivePermissions.js';
-
-import { initializeShellParsers } from '../utils/shell-utils.js';
 
 vi.mock('node:fs', async (importOriginal) => {
   const original = await importOriginal<typeof import('node:fs')>();
@@ -54,10 +44,6 @@ const mockPlatform = (platform: string) => {
 describe('ShellTool Proactive Expansion', () => {
   let mockConfig: Config;
   let shellTool: ShellTool;
-
-  beforeAll(async () => {
-    await initializeShellParsers();
-  });
 
   afterEach(() => {
     vi.unstubAllGlobals();

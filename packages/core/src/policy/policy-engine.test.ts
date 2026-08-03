@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PolicyEngine } from './policy-engine.js';
 import {
   PolicyDecision,
@@ -20,10 +20,7 @@ import {
 import type { FunctionCall } from '@google/genai';
 import { SafetyCheckDecision } from '../safety/protocol.js';
 import type { CheckerRunner } from '../safety/checker-runner.js';
-import {
-  initializeShellParsers,
-  parseCommandDetails,
-} from '../utils/shell-utils.js';
+import { parseCommandDetails } from '../utils/shell-utils.js';
 import { buildArgsPatterns } from './utils.js';
 import {
   NoopSandboxManager,
@@ -38,7 +35,6 @@ vi.mock('../utils/shell-utils.js', async (importOriginal) => {
     await importOriginal<typeof import('../utils/shell-utils.js')>();
   return {
     ...actual,
-    initializeShellParsers: vi.fn().mockResolvedValue(undefined),
     splitCommands: vi.fn().mockImplementation((command: string) => {
       // Simple mock splitting logic for test cases
       if (command.includes('&&')) {
@@ -123,10 +119,6 @@ vi.mock('../tools/tool-names.js', async (importOriginal) => {
 describe('PolicyEngine', () => {
   let engine: PolicyEngine;
   let mockCheckerRunner: CheckerRunner;
-
-  beforeAll(async () => {
-    await initializeShellParsers();
-  });
 
   beforeEach(() => {
     mockCheckerRunner = {
@@ -1762,7 +1754,6 @@ describe('PolicyEngine', () => {
       engine = new PolicyEngine({ rules });
 
       // In this case, we mock splitCommands to keep the redirection in the sub-command
-      vi.mocked(initializeShellParsers).mockResolvedValue(undefined);
       const { splitCommands } = await import('../utils/shell-utils.js');
       vi.mocked(splitCommands).mockReturnValueOnce([
         'mkdir bar',

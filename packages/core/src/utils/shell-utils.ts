@@ -9,6 +9,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { quote, parse, type ParseEntry } from 'shell-quote';
 import {
+  parse as parseBash,
+  type ArithmeticExpression,
+  type Command as BashCommand,
+  type Node as BashNode,
+  type Redirect,
+  type TestExpression,
+  type Word,
+  type WordPart,
+} from 'unbash';
+import {
   spawn,
   spawnSync,
   type SpawnOptionsWithoutStdio,
@@ -26,7 +36,6 @@ export async function getCommandName(
   command: string,
   args: string[],
 ): Promise<string> {
-  await initializeShellParsers();
   const fullCmd = [command, ...args].join(' ');
   const stripped = stripShellWrapper(fullCmd);
   const roots = getCommandRoots(stripped).filter(
@@ -49,8 +58,6 @@ export function extractStringFromParseEntry(entry: ParseEntry): string {
   return '';
 }
 import * as readline from 'node:readline';
-import { Language, Parser, Query, type Node, type Tree } from 'web-tree-sitter';
-import { loadWasmBinary } from './fileUtils.js';
 import { debugLogger } from './debugLogger.js';
 import type { SandboxManager } from '../services/sandboxManager.js';
 import { NoopSandboxManager } from '../services/sandboxManager.js';
@@ -106,76 +113,6 @@ export function resolveExecutable(exe: string): string | undefined {
   return undefined;
 }
 
-let bashLanguage: Language | null = null;
-let treeSitterInitialization: Promise<void> | null = null;
-let treeSitterInitializationError: Error | null = null;
-
-class ShellParserInitializationError extends Error {
-  constructor(cause: Error) {
-    super(`Failed to initialize bash parser: ${cause.message}`, { cause });
-    this.name = 'ShellParserInitializationError';
-  }
-}
-
-function toError(value: unknown): Error {
-  if (value instanceof Error) {
-    return value;
-  }
-  if (typeof value === 'string') {
-    return new Error(value);
-  }
-  return new Error('Unknown tree-sitter initialization error', {
-    cause: value,
-  });
-}
-
-async function loadBashLanguage(): Promise<void> {
-  try {
-    treeSitterInitializationError = null;
-    const [treeSitterBinary, bashBinary] = await Promise.all([
-      loadWasmBinary(
-        () =>
-          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-          // @ts-ignore resolved by esbuild-plugin-wasm during bundling
-          import('web-tree-sitter/tree-sitter.wasm?binary'),
-        'web-tree-sitter/tree-sitter.wasm',
-      ),
-      loadWasmBinary(
-        () =>
-          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-          // @ts-ignore resolved by esbuild-plugin-wasm during bundling
-          import('tree-sitter-bash/tree-sitter-bash.wasm?binary'),
-        'tree-sitter-bash/tree-sitter-bash.wasm',
-      ),
-    ]);
-
-    await Parser.init({ wasmBinary: treeSitterBinary });
-    bashLanguage = await Language.load(bashBinary);
-  } catch (error) {
-    bashLanguage = null;
-    const normalized = toError(error);
-    const initializationError =
-      normalized instanceof ShellParserInitializationError
-        ? normalized
-        : new ShellParserInitializationError(normalized);
-    treeSitterInitializationError = initializationError;
-    throw initializationError;
-  }
-}
-
-export async function initializeShellParsers(): Promise<void> {
-  if (!treeSitterInitialization) {
-    treeSitterInitialization = loadBashLanguage().catch((error) => {
-      treeSitterInitialization = null;
-      // Log the error but don't throw, allowing the application to fall back to safe defaults (ASK_USER)
-      // or regex checks where appropriate.
-      debugLogger.debug('Failed to initialize shell parsers:', error);
-    });
-  }
-
-  await treeSitterInitialization;
-}
-
 export interface ParsedCommandDetail {
   name: string;
   text: string;
@@ -190,7 +127,6 @@ interface CommandParseResult {
 }
 
 const POWERSHELL_COMMAND_ENV = '__GCLI_POWERSHELL_COMMAND__';
-const PARSE_TIMEOUT_MICROS = 1000 * 1000; // 1 second
 
 // Encode the parser script as UTF-16LE base64 so we can pass it via PowerShell's -EncodedCommand flag;
 // this avoids brittle quoting/escaping when spawning PowerShell and ensures the script is received byte-for-byte.
@@ -252,58 +188,6 @@ export const REDIRECTION_NAMES = new Set([
   'subshell',
 ]);
 
-function createParser(): Parser | null {
-  if (!bashLanguage) {
-    if (treeSitterInitializationError) {
-      throw treeSitterInitializationError;
-    }
-    return null;
-  }
-
-  try {
-    const parser = new Parser();
-    parser.setLanguage(bashLanguage);
-    return parser;
-  } catch {
-    return null;
-  }
-}
-
-function parseCommandTree(
-  command: string,
-  timeoutMicros: number = PARSE_TIMEOUT_MICROS,
-): Tree | null {
-  const parser = createParser();
-  if (!parser || !command.trim()) {
-    return null;
-  }
-
-  const deadline = performance.now() + timeoutMicros / 1000;
-  let timedOut = false;
-
-  try {
-    const tree = parser.parse(command, null, {
-      progressCallback: () => {
-        if (performance.now() > deadline) {
-          timedOut = true;
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          return true as unknown as void; // Returning true cancels parsing, but type says void
-        }
-      },
-    });
-
-    if (timedOut) {
-      debugLogger.error('Bash command parsing timed out for command:', command);
-      // Returning a partial tree could be risky so we return null to be safe.
-      return null;
-    }
-
-    return tree;
-  } catch {
-    return null;
-  }
-}
-
 function normalizeCommandName(raw: string): string {
   if (raw.length >= 2) {
     const first = raw[0];
@@ -329,196 +213,363 @@ export function normalizeCommand(commandName: string): string {
   return base.toLowerCase().replace(/\.exe$/, '');
 }
 
-function extractNameFromNode(node: Node): string | null {
-  switch (node.type) {
-    case 'command': {
-      const nameNode = node.childForFieldName('name');
-      if (!nameNode) {
-        return null;
-      }
-      return normalizeCommandName(nameNode.text);
-    }
-    case 'declaration_command':
-    case 'unset_command':
-    case 'test_command': {
-      const firstChild = node.child(0);
-      if (!firstChild) {
-        return null;
-      }
-      return normalizeCommandName(firstChild.text);
-    }
-    case 'file_redirect': {
-      // The first child might be a file descriptor (e.g., '2>').
-      // We iterate to find the actual operator token.
-      for (let i = 0; i < node.childCount; i++) {
-        const child = node.child(i);
-        if (child && child.text.includes('<')) {
-          return 'redirection (<)';
-        }
-        if (child && child.text.includes('>')) {
-          return 'redirection (>)';
-        }
-      }
-      return 'redirection (>)';
-    }
-    case 'heredoc_redirect':
-      return 'heredoc (<<)';
-    case 'herestring_redirect':
-      return 'herestring (<<<)';
-    case 'command_substitution':
-      return 'command substitution';
-    case 'backtick_substitution':
-      return 'backtick substitution';
-    case 'process_substitution':
-      return 'process substitution';
-    case 'subshell':
-      return 'subshell';
-    default:
-      return null;
-  }
+interface BashCollection {
+  details: ParsedCommandDetail[];
+  hasParseError: boolean;
+  hasPromptCommandTransform: boolean;
+  hasRedirection: boolean;
 }
 
-function collectCommandDetails(
-  root: Node,
+type ParsedBashScript = ReturnType<typeof parseBash>;
+
+function collectScript(
+  script: ParsedBashScript | undefined,
   source: string,
-): ParsedCommandDetail[] {
-  const stack: Node[] = [root];
-  const details: ParsedCommandDetail[] = [];
-
-  while (stack.length > 0) {
-    const current = stack.pop()!;
-
-    const name = extractNameFromNode(current);
-    if (name) {
-      const detail: ParsedCommandDetail = {
-        name,
-        text: source.slice(current.startIndex, current.endIndex).trim(),
-        startIndex: current.startIndex,
-      };
-
-      if (current.type === 'command') {
-        const args: string[] = [];
-        const nameNode = current.childForFieldName('name');
-        for (let i = 0; i < current.childCount; i += 1) {
-          const child = current.child(i);
-          if (
-            child &&
-            child.type === 'word' &&
-            child.startIndex !== nameNode?.startIndex
-          ) {
-            args.push(child.text);
-          }
-        }
-        if (args.length > 0) {
-          detail.args = args;
-        }
-      }
-
-      details.push(detail);
-    }
-
-    // Traverse all children to find all sub-components (commands, redirections, etc.)
-    for (let i = current.childCount - 1; i >= 0; i -= 1) {
-      const child = current.child(i);
-      if (child) {
-        stack.push(child);
-      }
-    }
+  result: BashCollection,
+): void {
+  if (!script) return;
+  if (script.errors?.length) result.hasParseError = true;
+  for (const statement of script.commands) {
+    collectBashNode(statement, source, result);
   }
-
-  return details;
 }
 
-function hasPromptCommandTransform(root: Node): boolean {
-  const stack: Node[] = [root];
+function collectSubstitution(
+  name: string,
+  text: string,
+  script: ParsedBashScript | undefined,
+  startIndex: number,
+  source: string,
+  result: BashCollection,
+): void {
+  result.details.push({ name, text, startIndex });
+  collectScript(script, source, result);
+}
 
-  while (stack.length > 0) {
-    const current = stack.pop();
-    if (!current) {
-      continue;
+function collectArithmeticExpression(
+  expression: ArithmeticExpression | undefined,
+  source: string,
+  result: BashCollection,
+): void {
+  if (!expression) return;
+  switch (expression.type) {
+    case 'ArithmeticBinary':
+      collectArithmeticExpression(expression.left, source, result);
+      collectArithmeticExpression(expression.right, source, result);
+      return;
+    case 'ArithmeticUnary':
+      collectArithmeticExpression(expression.operand, source, result);
+      return;
+    case 'ArithmeticTernary':
+      collectArithmeticExpression(expression.test, source, result);
+      collectArithmeticExpression(expression.consequent, source, result);
+      collectArithmeticExpression(expression.alternate, source, result);
+      return;
+    case 'ArithmeticGroup':
+      collectArithmeticExpression(expression.expression, source, result);
+      return;
+    case 'ArithmeticCommandExpansion':
+      collectSubstitution(
+        expression.text.startsWith('`')
+          ? 'backtick substitution'
+          : 'command substitution',
+        expression.text,
+        expression.script,
+        expression.pos,
+        source,
+        result,
+      );
+      return;
+    case 'ArithmeticWord':
+    default:
+      return;
+  }
+}
+
+function collectWordPart(
+  part: WordPart,
+  word: Word,
+  source: string,
+  result: BashCollection,
+): void {
+  switch (part.type) {
+    case 'CommandExpansion': {
+      const startIndex = part.script
+        ? part.script.pos - (part.text.startsWith('`') ? 1 : 2)
+        : word.pos;
+      collectSubstitution(
+        part.text.startsWith('`')
+          ? 'backtick substitution'
+          : 'command substitution',
+        part.text,
+        part.script,
+        startIndex,
+        source,
+        result,
+      );
+      return;
     }
-
-    if (current.type === 'expansion') {
-      for (let i = 0; i < current.childCount - 1; i += 1) {
-        const operatorNode = current.child(i);
-        const transformNode = current.child(i + 1);
-
-        if (
-          operatorNode?.text === '@' &&
-          transformNode?.text?.toLowerCase() === 'p'
-        ) {
-          return true;
-        }
+    case 'ProcessSubstitution':
+      collectSubstitution(
+        'process substitution',
+        part.text,
+        part.script,
+        part.script ? part.script.pos - 2 : word.pos,
+        source,
+        result,
+      );
+      return;
+    case 'ArithmeticExpansion':
+      collectArithmeticExpression(part.expression, source, result);
+      return;
+    case 'ParameterExpansion':
+      if (part.operator === '@' && part.operand?.value.toLowerCase() === 'p') {
+        result.hasPromptCommandTransform = true;
       }
-    }
-
-    for (let i = current.namedChildCount - 1; i >= 0; i -= 1) {
-      const child = current.namedChild(i);
-      if (child) {
-        stack.push(child);
+      collectWord(part.operand, source, result);
+      collectWord(part.slice?.offset, source, result);
+      collectWord(part.slice?.length, source, result);
+      collectWord(part.replace?.pattern, source, result);
+      collectWord(part.replace?.replacement, source, result);
+      return;
+    case 'DoubleQuoted':
+    case 'LocaleString':
+      for (const child of part.parts) {
+        collectWordPart(child, word, source, result);
       }
-    }
+      return;
+    case 'Literal':
+    case 'SingleQuoted':
+    case 'AnsiCQuoted':
+    case 'SimpleExpansion':
+    case 'ExtendedGlob':
+    case 'BraceExpansion':
+    default:
+      return;
+  }
+}
+
+function collectWord(
+  word: Word | undefined,
+  source: string,
+  result: BashCollection,
+): void {
+  if (!word) return;
+  for (const part of word.parts ?? []) {
+    collectWordPart(part, word, source, result);
+  }
+}
+
+function collectTestExpression(
+  expression: TestExpression,
+  source: string,
+  result: BashCollection,
+): void {
+  switch (expression.type) {
+    case 'TestUnary':
+      collectWord(expression.operand, source, result);
+      return;
+    case 'TestBinary':
+      collectWord(expression.left, source, result);
+      collectWord(expression.right, source, result);
+      return;
+    case 'TestLogical':
+      collectTestExpression(expression.left, source, result);
+      collectTestExpression(expression.right, source, result);
+      return;
+    case 'TestNot':
+      collectTestExpression(expression.operand, source, result);
+      return;
+    case 'TestGroup':
+      collectTestExpression(expression.expression, source, result);
+      return;
+    default:
+      return;
+  }
+}
+
+function redirectName(redirect: Redirect): string {
+  if (redirect.operator === '<<' || redirect.operator === '<<-') {
+    return 'heredoc (<<)';
+  }
+  if (redirect.operator === '<<<') return 'herestring (<<<)';
+  return redirect.operator.includes('<')
+    ? 'redirection (<)'
+    : 'redirection (>)';
+}
+
+function collectRedirect(
+  redirect: Redirect,
+  source: string,
+  result: BashCollection,
+): void {
+  result.hasRedirection = true;
+  result.details.push({
+    name: redirectName(redirect),
+    text: source.slice(redirect.pos, redirect.end).trim(),
+    startIndex: redirect.pos,
+  });
+  collectWord(redirect.target, source, result);
+  collectWord(redirect.body, source, result);
+}
+
+function commandText(command: BashCommand, source: string): string {
+  const redirects = command.redirects
+    .filter((redirect) => redirect.operator !== '<<<')
+    .sort((a, b) => a.pos - b.pos);
+  if (redirects.length === 0) {
+    return source.slice(command.pos, command.end).trim();
   }
 
-  return false;
+  let text = '';
+  let pos = command.pos;
+  for (const redirect of redirects) {
+    text += source.slice(pos, redirect.pos);
+    pos = redirect.end;
+  }
+  return (text + source.slice(pos, command.end)).trim();
+}
+
+function collectCommand(
+  command: BashCommand,
+  source: string,
+  result: BashCollection,
+): void {
+  if (command.name) {
+    const detail: ParsedCommandDetail = {
+      name: normalizeCommandName(command.name.text),
+      text: commandText(command, source),
+      startIndex: command.pos,
+    };
+    if (command.suffix.length > 0) {
+      detail.args = command.suffix.map((word) => word.text);
+    }
+    result.details.push(detail);
+  }
+
+  collectWord(command.name, source, result);
+  for (const prefix of command.prefix) {
+    collectWord(prefix.value, source, result);
+    for (const word of prefix.array ?? []) collectWord(word, source, result);
+  }
+  for (const word of command.suffix) collectWord(word, source, result);
+  for (const redirect of command.redirects) {
+    collectRedirect(redirect, source, result);
+  }
+}
+
+function collectBashNode(
+  node: BashNode | undefined,
+  source: string,
+  result: BashCollection,
+): void {
+  if (!node) return;
+  switch (node.type) {
+    case 'Command':
+      collectCommand(node, source, result);
+      return;
+    case 'Statement':
+      collectBashNode(node.command, source, result);
+      for (const redirect of node.redirects) {
+        collectRedirect(redirect, source, result);
+      }
+      return;
+    case 'Pipeline':
+    case 'AndOr':
+    case 'CompoundList':
+      for (const child of node.commands) {
+        collectBashNode(child, source, result);
+      }
+      return;
+    case 'If':
+      collectBashNode(node.clause, source, result);
+      collectBashNode(node.then, source, result);
+      collectBashNode(node.else, source, result);
+      return;
+    case 'For':
+    case 'Select':
+      for (const word of node.wordlist) collectWord(word, source, result);
+      collectBashNode(node.body, source, result);
+      return;
+    case 'ArithmeticFor':
+      collectArithmeticExpression(node.initialize, source, result);
+      collectArithmeticExpression(node.test, source, result);
+      collectArithmeticExpression(node.update, source, result);
+      collectBashNode(node.body, source, result);
+      return;
+    case 'While':
+      collectBashNode(node.clause, source, result);
+      collectBashNode(node.body, source, result);
+      return;
+    case 'Function':
+      collectBashNode(node.body, source, result);
+      for (const redirect of node.redirects) {
+        collectRedirect(redirect, source, result);
+      }
+      return;
+    case 'Subshell':
+      result.details.push({
+        name: 'subshell',
+        text: source.slice(node.pos, node.end).trim(),
+        startIndex: node.pos,
+      });
+      collectBashNode(node.body, source, result);
+      return;
+    case 'BraceGroup':
+      collectBashNode(node.body, source, result);
+      return;
+    case 'Case':
+      collectWord(node.word, source, result);
+      for (const item of node.items) {
+        for (const word of item.pattern) collectWord(word, source, result);
+        collectBashNode(item.body, source, result);
+      }
+      return;
+    case 'Coproc':
+      collectBashNode(node.body, source, result);
+      for (const redirect of node.redirects) {
+        collectRedirect(redirect, source, result);
+      }
+      return;
+    case 'TestCommand':
+      collectTestExpression(node.expression, source, result);
+      return;
+    case 'ArithmeticCommand':
+      collectArithmeticExpression(node.expression, source, result);
+      return;
+    default:
+      return;
+  }
 }
 
 export function parseBashCommandDetails(
   command: string,
 ): CommandParseResult | null {
-  if (treeSitterInitializationError) {
-    debugLogger.debug(
-      'Bash parser not initialized:',
-      treeSitterInitializationError,
-    );
+  let script: ReturnType<typeof parseBash>;
+  try {
+    script = parseBash(command);
+  } catch (error) {
+    debugLogger.debug('Failed to parse Bash command:', error);
     return null;
   }
 
-  if (!bashLanguage) {
-    initializeShellParsers().catch(() => {
-      // The failure path is surfaced via treeSitterInitializationError.
-    });
-    return null;
-  }
-
-  const tree = parseCommandTree(command);
-  if (!tree) {
-    return null;
-  }
-
-  const details = collectCommandDetails(tree.rootNode, command);
+  const result: BashCollection = {
+    details: [],
+    hasParseError: false,
+    hasPromptCommandTransform: false,
+    hasRedirection: false,
+  };
+  collectScript(script, command, result);
 
   const hasError =
-    tree.rootNode.hasError ||
-    details.length === 0 ||
-    hasPromptCommandTransform(tree.rootNode);
+    result.hasParseError ||
+    result.details.length === 0 ||
+    result.hasPromptCommandTransform;
 
-  if (hasError) {
-    let query = null;
-    try {
-      query = new Query(bashLanguage, '(ERROR) @error (MISSING) @missing');
-      const captures = query.captures(tree.rootNode);
-      const syntaxErrors = captures.map((capture) => {
-        const { node, name } = capture;
-        const type = name === 'missing' ? 'Missing' : 'Error';
-        return `${type} node: "${node.text}" at ${node.startPosition.row}:${node.startPosition.column}`;
-      });
-
-      debugLogger.log(
-        'Bash command parsing error detected for command:',
-        command,
-        'Syntax Errors:',
-        syntaxErrors,
-      );
-    } catch {
-      // Ignore query errors
-    } finally {
-      query?.delete();
-    }
-  }
   return {
-    details: details.sort((a, b) => a.startIndex - b.startIndex),
+    details: result.details.sort((a, b) => a.startIndex - b.startIndex),
     hasError,
+    hasRedirection: result.hasRedirection,
   };
 }
 
@@ -768,27 +819,11 @@ export function hasRedirection(command: string): boolean {
       : fallbackCheck();
   }
 
-  if (configuration.shell === 'bash' && bashLanguage) {
-    const tree = parseCommandTree(command);
-    if (!tree) return fallbackCheck();
-
-    const stack: Node[] = [tree.rootNode];
-    while (stack.length > 0) {
-      const current = stack.pop()!;
-      if (
-        current.type === 'redirected_statement' ||
-        current.type === 'file_redirect' ||
-        current.type === 'heredoc_redirect' ||
-        current.type === 'herestring_redirect'
-      ) {
-        return true;
-      }
-      for (let i = current.childCount - 1; i >= 0; i -= 1) {
-        const child = current.child(i);
-        if (child) stack.push(child);
-      }
-    }
-    return false;
+  if (configuration.shell === 'bash') {
+    const parsed = parseBashCommandDetails(command);
+    return parsed && !parsed.hasError
+      ? !!parsed.hasRedirection
+      : fallbackCheck();
   }
 
   return fallbackCheck();

@@ -9,7 +9,6 @@ import {
   describe,
   it,
   expect,
-  beforeAll,
   beforeEach,
   afterEach,
   type Mock,
@@ -44,7 +43,6 @@ vi.mock('node:os', async (importOriginal) => {
 vi.mock('crypto');
 vi.mock('../utils/summarizer.js');
 
-import { initializeShellParsers } from '../utils/shell-utils.js';
 import {
   ShellTool,
   OUTPUT_UPDATE_INTERVAL_MS,
@@ -91,10 +89,6 @@ const originalComSpec = process.env['ComSpec'];
 const itWindowsOnly = process.platform === 'win32' ? it : it.skip;
 
 describe('ShellTool', () => {
-  beforeAll(async () => {
-    await initializeShellParsers();
-  });
-
   let shellTool: ShellTool;
   let mockConfig: Config;
   let mockSandboxManager: SandboxManager;

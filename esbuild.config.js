@@ -8,7 +8,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { writeFileSync } from 'node:fs';
-import { wasmLoader } from 'esbuild-plugin-wasm';
 
 let esbuild;
 try {
@@ -22,37 +21,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
 const pkg = require(path.resolve(__dirname, 'package.json'));
-
-function createWasmPlugins() {
-  const wasmBinaryPlugin = {
-    name: 'wasm-binary',
-    setup(build) {
-      build.onResolve({ filter: /\.wasm\?binary$/ }, (args) => {
-        const specifier = args.path.replace(/\?binary$/, '');
-        const resolveDir = args.resolveDir || '';
-        const isBareSpecifier =
-          !path.isAbsolute(specifier) &&
-          !specifier.startsWith('./') &&
-          !specifier.startsWith('../');
-
-        let resolvedPath;
-        if (isBareSpecifier) {
-          resolvedPath = require.resolve(specifier, {
-            paths: resolveDir ? [resolveDir, __dirname] : [__dirname],
-          });
-        } else {
-          resolvedPath = path.isAbsolute(specifier)
-            ? specifier
-            : path.join(resolveDir, specifier);
-        }
-
-        return { path: resolvedPath, namespace: 'wasm-embedded' };
-      });
-    },
-  };
-
-  return [wasmBinaryPlugin, wasmLoader({ mode: 'embedded' })];
-}
 
 const external = [
   '@lydell/node-pty',
@@ -98,7 +66,6 @@ const cliConfig = {
     ),
     'process.env.DEV': JSON.stringify(process.env.DEV || 'false'),
   },
-  plugins: createWasmPlugins(),
   alias: {
     'is-in-ci': path.resolve(__dirname, 'packages/cli/src/patches/is-in-ci.ts'),
     'https-proxy-agent': path.resolve(
@@ -137,7 +104,6 @@ const workerConfig = {
       process.env.NODE_ENV || 'production',
     ),
   },
-  plugins: createWasmPlugins(),
   alias: commonAliases,
 };
 
@@ -157,7 +123,6 @@ const a2aServerConfig = {
     ),
     'process.env.DEV': JSON.stringify(process.env.DEV || 'false'),
   },
-  plugins: createWasmPlugins(),
   alias: commonAliases,
 };
 

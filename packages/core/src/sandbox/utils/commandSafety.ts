@@ -7,7 +7,6 @@ import path from 'node:path';
 import { parse as shellParse } from 'shell-quote';
 import {
   extractStringFromParseEntry,
-  initializeShellParsers,
   splitCommands,
   stripShellWrapper,
 } from '../../utils/shell-utils.js';
@@ -46,8 +45,6 @@ export async function isStrictlyApproved(
   approvedTools?: string[],
 ): Promise<boolean> {
   const tools = approvedTools ?? [];
-
-  await initializeShellParsers();
 
   const fullCmd = [command, ...args].join(' ');
   const stripped = stripShellWrapper(fullCmd);

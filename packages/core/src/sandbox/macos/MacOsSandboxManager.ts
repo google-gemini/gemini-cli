@@ -22,11 +22,7 @@ import {
   getSecureSanitizationConfig,
 } from '../../services/environmentSanitization.js';
 import { buildSeatbeltProfile } from './seatbeltArgsBuilder.js';
-import {
-  initializeShellParsers,
-  getCommandRoots,
-  stripShellWrapper,
-} from '../../utils/shell-utils.js';
+import { getCommandRoots, stripShellWrapper } from '../../utils/shell-utils.js';
 import {
   isKnownSafeCommand,
   isDangerousCommand,
@@ -74,7 +70,6 @@ export class MacOsSandboxManager implements SandboxManager {
   }
 
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
-    await initializeShellParsers();
     const sanitizationConfig = getSecureSanitizationConfig(
       req.policy?.sanitizationConfig,
     );

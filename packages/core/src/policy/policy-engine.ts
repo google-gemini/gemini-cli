@@ -8,7 +8,6 @@ import { type FunctionCall } from '@google/genai';
 import {
   SHELL_TOOL_NAMES,
   REDIRECTION_NAMES,
-  initializeShellParsers,
   parseCommandDetails,
   stripShellWrapper,
   hasRedirection,
@@ -307,7 +306,6 @@ export class PolicyEngine {
     command: string,
     decision: PolicyDecision,
   ): Promise<PolicyDecision> {
-    await initializeShellParsers();
     try {
       const parsedObjArgs = shellParse(command);
       const parsedArgs = parsedObjArgs.map(extractStringFromParseEntry);
@@ -359,7 +357,6 @@ export class PolicyEngine {
       };
     }
 
-    await initializeShellParsers();
     const parsed = parseCommandDetails(command);
     const subCommands = parsed?.details ?? [];
 
