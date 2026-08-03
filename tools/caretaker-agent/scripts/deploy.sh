@@ -70,6 +70,21 @@ if [[ "${TARGETS}" =~ " all " ]] || [[ "${TARGETS}" =~ " egress " ]]; then
         --region "${REGION}" \
         --project "${PROJECT_ID}"
 fi
+# 4. Deploy Triage Eval Runner Cloud Run Job
+if [[ "${TARGETS}" =~ " all " ]] || [[ "${TARGETS}" =~ " evals " ]]; then
+    echo ""
+    echo "--> Deploying Triage Eval Runner Job..."
+    gcloud run jobs deploy eval-runner \
+        --source "${ROOT_DIR}" \
+        --service-account "triage-eval-runner-sa@${PROJECT_ID}.iam.gserviceaccount.com" \
+        --memory 2Gi \
+        --cpu 1 \
+        --tasks 1 \
+        --task-timeout 1h \
+        --max-retries 0 \
+        --region "${REGION}" \
+        --project "${PROJECT_ID}"
+fi
 
 echo ""
 echo "=================================================="
