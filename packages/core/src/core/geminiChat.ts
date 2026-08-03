@@ -55,7 +55,11 @@ import {
 } from '../telemetry/types.js';
 import { handleFallback } from '../fallback/handler.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
-import { scrubHistory, scrubContents } from '../utils/historyHardening.js';
+import {
+  hardenHistory,
+  scrubHistory,
+  scrubContents,
+} from '../utils/historyHardening.js';
 import {
   partListUnionToString,
   ensureStableToolIds,
@@ -712,11 +716,13 @@ export class GeminiChat {
     role: LlmRole,
     apiHistoryOverride?: Content[],
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
-    // Last mile scrubbing to remove internal tracking properties (e.g. callIndex)
-    // before sending to the Gemini API. This whitelists only standard Gemini fields.
-    let scrubbedHistory = this.context.config.isContextManagementEnabled()
-      ? scrubHistory([...requestHistory])
-      : [...requestHistory];
+    // Last mile hardening and scrubbing to ensure absolute compliance with Gemini API invariants
+    // and remove internal tracking properties (e.g. callIndex).
+    let scrubbedHistory = hardenHistory([...requestHistory]);
+
+    scrubbedHistory = this.context.config.isContextManagementEnabled()
+      ? scrubHistory(scrubbedHistory)
+      : scrubbedHistory;
 
     // Always coalesce consecutive roles to prevent 400 Bad Request errors
     scrubbedHistory = coalesceConsecutiveRoles(scrubbedHistory);

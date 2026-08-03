@@ -2132,6 +2132,12 @@ export const useGeminiStream = (
 
       // Don't continue if model was switched due to quota error
       if (modelSwitchedFromQuotaError) {
+        if (geminiClient && responsesToSend.length > 0) {
+          await geminiClient.addHistory({
+            role: 'user',
+            parts: responsesToSend,
+          });
+        }
         return;
       }
 

@@ -4360,4 +4360,108 @@ describe('useGeminiStream', () => {
     });
     expect(spanMetadata.input).toBe('telemetry test query');
   });
+
+  describe('Quota Error fallback', () => {
+    it('should add tool responses to geminiClient history if modelSwitchedFromQuotaError is true', async () => {
+      const completedToolCalls: TrackedCompletedToolCall[] = [
+        {
+          request: {
+            callId: 'call1',
+            name: 'tool1',
+            args: {},
+            isClientInitiated: false,
+            prompt_id: 'prompt-id-1',
+          },
+          status: CoreToolCallStatus.Success,
+          responseSubmittedToGemini: false,
+          response: {
+            callId: 'call1',
+            responseParts: [
+              {
+                functionResponse: {
+                  name: 'tool1',
+                  id: 'call1',
+                  response: { success: true },
+                },
+              },
+            ],
+            errorType: undefined,
+          },
+          tool: {
+            name: 'tool1',
+            displayName: 'tool1',
+            description: 'desc1',
+            build: vi.fn(),
+            isOutputMarkdown: false,
+          } as any,
+          invocation: {
+            getDescription: () => 'desc1',
+          } as any,
+        } as unknown as TrackedCompletedToolCall,
+      ];
+      const client = new MockedGeminiClientClass(mockConfig);
+
+      let capturedOnComplete:
+        | ((completedTools: TrackedToolCall[]) => Promise<void>)
+        | null = null;
+
+      mockUseToolScheduler.mockImplementation((onComplete) => {
+        capturedOnComplete = onComplete;
+        return [
+          [],
+          mockScheduleToolCalls,
+          mockMarkToolsAsSubmitted,
+          vi.fn(),
+          mockCancelAllToolCalls,
+          0,
+        ];
+      });
+
+      await renderHookWithProviders(() =>
+        useGeminiStream(
+          client,
+          [],
+          mockAddItem,
+          mockConfig,
+          mockLoadedSettings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          true, // modelSwitchedFromQuotaError is true
+          () => {},
+          () => {},
+          () => {},
+          80,
+          24,
+        ),
+      );
+
+      // Trigger the onComplete callback with completed tools
+      await act(async () => {
+        if (capturedOnComplete) {
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          await capturedOnComplete(completedToolCalls);
+        }
+      });
+
+      await waitFor(() => {
+        expect(mockMarkToolsAsSubmitted).toHaveBeenCalledWith(['call1']);
+        expect(client.addHistory).toHaveBeenCalledWith({
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'tool1',
+                id: 'call1',
+                response: { success: true },
+              },
+            },
+          ],
+        });
+      });
+    });
+  });
 });
