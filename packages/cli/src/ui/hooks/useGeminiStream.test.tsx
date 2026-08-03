@@ -1046,6 +1046,101 @@ describe('useGeminiStream', () => {
     });
   });
 
+  it('should record tool responses in history when the model was switched due to a quota error', async () => {
+    // Regression test: returning early on a quota-triggered model switch
+    // without recording the responses leaves the already-recorded
+    // functionCall unpaired, which corrupts all subsequent requests.
+    const responseParts: Part[] = [
+      {
+        functionResponse: {
+          name: 'testTool',
+          id: 'call1',
+          response: { output: 'tool result' },
+        },
+      },
+    ];
+    const completedToolCalls: TrackedToolCall[] = [
+      {
+        request: {
+          callId: 'call1',
+          name: 'testTool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-quota',
+        },
+        status: CoreToolCallStatus.Success,
+        responseSubmittedToGemini: false,
+        response: {
+          callId: 'call1',
+          responseParts,
+          errorType: undefined,
+        },
+        tool: { displayName: 'MockTool' },
+        invocation: {
+          getDescription: () => `Mock description`,
+        } as unknown as AnyToolInvocation,
+      } as TrackedCompletedToolCall,
+    ];
+
+    const client = new MockedGeminiClientClass(mockConfig);
+
+    let capturedOnComplete:
+      | ((completedTools: TrackedToolCall[]) => Promise<void>)
+      | null = null;
+
+    mockUseToolScheduler.mockImplementation((onComplete) => {
+      capturedOnComplete = onComplete;
+      return [
+        [],
+        mockScheduleToolCalls,
+        mockMarkToolsAsSubmitted,
+        vi.fn(),
+        mockCancelAllToolCalls,
+        0,
+      ];
+    });
+
+    await renderHookWithProviders(() =>
+      useGeminiStream(
+        client,
+        [],
+        mockAddItem,
+        mockConfig,
+        mockLoadedSettings,
+        mockOnDebugMessage,
+        mockHandleSlashCommand,
+        false,
+        () => 'vscode' as EditorType,
+        () => {},
+        () => Promise.resolve(),
+        true, // modelSwitchedFromQuotaError
+        () => {},
+        () => {},
+        () => {},
+        80,
+        24,
+      ),
+    );
+
+    await act(async () => {
+      if (capturedOnComplete) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        await capturedOnComplete(completedToolCalls);
+      }
+    });
+
+    await waitFor(() => {
+      expect(mockMarkToolsAsSubmitted).toHaveBeenCalledWith(['call1']);
+      // The tool response must be paired with its functionCall in history...
+      expect(client.addHistory).toHaveBeenCalledWith({
+        role: 'user',
+        parts: responseParts,
+      });
+      // ...but the turn must NOT auto-continue on the fallback model.
+      expect(mockSendMessageStream).not.toHaveBeenCalled();
+    });
+  });
+
   it('should NOT stop responding when only update_topic is called', async () => {
     const topicToolCalls: TrackedToolCall[] = [
       {

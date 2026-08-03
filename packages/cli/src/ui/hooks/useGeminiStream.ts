@@ -2130,8 +2130,19 @@ export const useGeminiStream = (
 
       markToolsAsSubmitted(callIdsToMarkAsSubmitted);
 
-      // Don't continue if model was switched due to quota error
+      // Don't continue if model was switched due to quota error, but still
+      // record the responses: the matching functionCall is already in history,
+      // and leaving it unpaired corrupts every subsequent request.
       if (modelSwitchedFromQuotaError) {
+        const combinedParts = geminiTools.flatMap(
+          (toolCall) => toolCall.response.responseParts,
+        );
+        if (geminiClient && combinedParts.length > 0) {
+          await geminiClient.addHistory({
+            role: 'user',
+            parts: combinedParts,
+          });
+        }
         return;
       }
 
