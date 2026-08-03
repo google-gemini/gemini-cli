@@ -290,6 +290,7 @@ export class GeminiCliSession {
       const toolCallsToSchedule: ToolCallRequestInfo[] = [];
       const pendingToolResponses: Array<{
         callId: string;
+        name: string;
         errorResponse?: Part;
       }> = [];
 
@@ -297,6 +298,9 @@ export class GeminiCliSession {
         yield event;
         if (event.type === GeminiEventType.ToolCallRequest) {
           const toolCall = event.value;
+          const responseName = toolCall.name.trim()
+            ? toolCall.name
+            : 'generic_tool';
           const { args, error } = parseToolArguments(
             toolCall.name,
             toolCall.args,
@@ -304,10 +308,11 @@ export class GeminiCliSession {
           if (error) {
             pendingToolResponses.push({
               callId: toolCall.callId,
+              name: responseName,
               errorResponse: {
                 functionResponse: {
                   id: toolCall.callId,
-                  name: toolCall.name,
+                  name: responseName,
                   response: { error },
                 },
               },
@@ -320,7 +325,10 @@ export class GeminiCliSession {
             isClientInitiated: false,
             prompt_id: sessionId,
           });
-          pendingToolResponses.push({ callId: toolCall.callId });
+          pendingToolResponses.push({
+            callId: toolCall.callId,
+            name: responseName,
+          });
         }
       }
 
@@ -372,10 +380,18 @@ export class GeminiCliSession {
       }
 
       const functionResponses = pendingToolResponses.flatMap(
-        ({ callId, errorResponse }) =>
+        ({ callId, name, errorResponse }) =>
           errorResponse
             ? [errorResponse]
-            : (completedResponses.get(callId) ?? []),
+            : (completedResponses.get(callId) ?? [
+                {
+                  functionResponse: {
+                    id: callId,
+                    name,
+                    response: { error: 'Tool execution failed to complete.' },
+                  },
+                },
+              ]),
       );
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion

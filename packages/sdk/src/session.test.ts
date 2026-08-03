@@ -22,6 +22,12 @@ const mockClient = {
   updateSystemInstruction: vi.fn(),
 };
 
+const mockToolRegistry = {
+  clone: vi.fn(() => ({
+    getTool: vi.fn().mockReturnValue(null),
+  })),
+};
+
 // Mutable mock config so individual tests can spy on setUserMemory etc.
 const mockConfig = {
   initialize: vi.fn().mockResolvedValue(undefined),
@@ -38,6 +44,7 @@ const mockConfig = {
   getMessageBus: vi.fn().mockReturnValue({}),
   getGeminiClient: vi.fn().mockReturnValue(mockClient),
   geminiClient: mockClient,
+  toolRegistry: mockToolRegistry,
   getSessionId: vi.fn().mockReturnValue('mock-session-id'),
   getWorkingDir: vi.fn().mockReturnValue('/tmp'),
   setUserMemory: vi.fn(),
@@ -251,6 +258,48 @@ describe('GeminiCliSession malformed tool arguments', () => {
       ]);
     },
   );
+
+  it('returns a fallback response when a scheduled call has no result', async () => {
+    const { GeminiEventType } = await import('@google/gemini-cli-core');
+    let callCount = 0;
+    mockClient.sendMessageStream.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        return (async function* () {
+          yield {
+            type: GeminiEventType.ToolCallRequest,
+            value: {
+              callId: 'missing-result-call',
+              name: '   ',
+              args: {},
+            },
+          } as unknown as ServerGeminiStreamEvent;
+        })();
+      }
+      return (async function* () {})();
+    });
+
+    const session = new GeminiCliSession(
+      baseOptions,
+      'session-missing-result',
+      mockAgent,
+    );
+    for await (const _event of session.sendStream('Use the tool')) {
+      // Consume the stream.
+    }
+
+    expect(mockScheduleAgentTools).toHaveBeenCalledOnce();
+    expect(mockClient.sendMessageStream).toHaveBeenCalledTimes(2);
+    expect(mockClient.sendMessageStream.mock.calls[1]?.[0]).toEqual([
+      {
+        functionResponse: {
+          id: 'missing-result-call',
+          name: 'generic_tool',
+          response: { error: 'Tool execution failed to complete.' },
+        },
+      },
+    ]);
+  });
 });
 
 // TODO(#24999): Update the remaining sendStream mocks and re-enable this suite.
