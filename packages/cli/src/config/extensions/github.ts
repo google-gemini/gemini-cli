@@ -569,10 +569,20 @@ async function downloadResponse(
     if (!response.headers.location) {
       throw new Error('Redirect response missing Location header');
     }
+    const currentUrl = new URL(url);
+    const redirectUrl = new URL(response.headers.location, currentUrl);
+    const redirectHeaders = { ...headers };
+    if (currentUrl.origin !== redirectUrl.origin) {
+      for (const header of Object.keys(redirectHeaders)) {
+        if (header.toLowerCase() === 'authorization') {
+          delete redirectHeaders[header];
+        }
+      }
+    }
     return downloadResponse(
-      response.headers.location,
+      redirectUrl.toString(),
       temporaryDest,
-      headers,
+      redirectHeaders,
       redirectCount + 1,
     );
   }

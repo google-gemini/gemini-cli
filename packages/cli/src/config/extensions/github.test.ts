@@ -23,7 +23,7 @@ import * as https from 'node:https';
 import * as tar from 'tar';
 import * as extract from 'extract-zip';
 import type { ExtensionManager } from '../extension-manager.js';
-import { fetchJson } from './github_fetch.js';
+import { fetchJson, getGitHubToken } from './github_fetch.js';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import type {
@@ -591,10 +591,11 @@ describe('github.ts', () => {
     });
 
     it('should follow redirects', async () => {
+      vi.mocked(getGitHubToken).mockReturnValue('github-token');
       const mockReq = new EventEmitter();
       const mockResRedirect = Object.assign(new PassThrough(), {
         statusCode: 302,
-        headers: { location: 'new-url' },
+        headers: { location: '/new-url' },
       }) as unknown as PassThrough & import('node:http').IncomingMessage;
 
       const mockResSuccess = Object.assign(new PassThrough(), {
@@ -617,14 +618,68 @@ describe('github.ts', () => {
       const mockStream = new PassThrough() as unknown as fs.WriteStream;
       vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
 
-      const promise = downloadFile('url', '/dest');
+      const promise = downloadFile('https://api.github.com/releases', '/dest');
       mockResSuccess.end('archive');
 
       await expect(promise).resolves.toBeUndefined();
       expect(https.get).toHaveBeenCalledTimes(2);
       expect(https.get).toHaveBeenLastCalledWith(
-        'new-url',
+        'https://api.github.com/new-url',
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: 'token github-token',
+          }),
+        }),
         expect.anything(),
+      );
+    });
+
+    it('should strip authorization when redirecting to another origin', async () => {
+      vi.mocked(getGitHubToken).mockReturnValue('github-token');
+      const mockReq = new EventEmitter();
+      const mockResRedirect = Object.assign(new PassThrough(), {
+        statusCode: 302,
+        headers: { location: 'https://downloads.example.com/archive' },
+      }) as unknown as PassThrough & import('node:http').IncomingMessage;
+      const mockResSuccess = Object.assign(new PassThrough(), {
+        statusCode: 200,
+        headers: {},
+      }) as unknown as PassThrough & import('node:http').IncomingMessage;
+      vi.mocked(https.get)
+        .mockImplementationOnce((_url, _options, callback) => {
+          callback?.(mockResRedirect);
+          return mockReq as unknown as import('node:http').ClientRequest;
+        })
+        .mockImplementationOnce((_url, _options, callback) => {
+          callback?.(mockResSuccess);
+          return mockReq as unknown as import('node:http').ClientRequest;
+        });
+      vi.mocked(fs.createWriteStream).mockReturnValue(
+        new PassThrough() as unknown as fs.WriteStream,
+      );
+
+      const promise = downloadFile('https://api.github.com/releases', '/dest');
+      mockResSuccess.end('archive');
+      await promise;
+
+      expect(https.get).toHaveBeenNthCalledWith(
+        1,
+        'https://api.github.com/releases',
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: 'token github-token',
+          }),
+        }),
+        expect.anything(),
+      );
+      expect(https.get).toHaveBeenNthCalledWith(
+        2,
+        'https://downloads.example.com/archive',
+        expect.objectContaining({
+          headers: expect.not.objectContaining({
+            Authorization: expect.any(String),
+          }),
+        }),
         expect.anything(),
       );
     });
@@ -634,7 +689,7 @@ describe('github.ts', () => {
       mockReq.setMaxListeners(20);
       const mockResRedirect = Object.assign(new PassThrough(), {
         statusCode: 302,
-        headers: { location: 'new-url' },
+        headers: { location: 'https://example.com/new-url' },
       }) as unknown as PassThrough & import('node:http').IncomingMessage;
 
       vi.mocked(https.get).mockImplementation((url, options, cb) => {
@@ -643,9 +698,9 @@ describe('github.ts', () => {
         return mockReq as unknown as import('node:http').ClientRequest;
       });
 
-      await expect(downloadFile('url', '/dest')).rejects.toThrow(
-        'Too many redirects',
-      );
+      await expect(
+        downloadFile('https://example.com/start', '/dest'),
+      ).rejects.toThrow('Too many redirects');
     }, 10000); // Increase timeout for this test if needed, though with mocks it should be fast
 
     it('should fail if redirect location is missing', async () => {
