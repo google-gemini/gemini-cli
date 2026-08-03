@@ -110,6 +110,7 @@ describe('fetchJson', () => {
     getMock.mockImplementationOnce((_url, _options, callback) => {
       const res = new EventEmitter() as IncomingMessage;
       res.statusCode = 404;
+      res.resume = vi.fn();
       (callback as (res: IncomingMessage) => void)(res);
       res.emit('end');
       return new EventEmitter() as ClientRequest;
@@ -130,6 +131,49 @@ describe('fetchJson', () => {
 
     await expect(fetchJson('https://example.com/error')).rejects.toThrow(
       'Network error',
+    );
+  });
+
+  it('should reject on malformed JSON', async () => {
+    getMock.mockImplementationOnce((_url, _options, callback) => {
+      const res = new EventEmitter() as IncomingMessage;
+      res.statusCode = 200;
+      (callback as (res: IncomingMessage) => void)(res);
+      res.emit('data', Buffer.from('{invalid'));
+      res.emit('end');
+      return new EventEmitter() as ClientRequest;
+    });
+
+    await expect(fetchJson('https://example.com/data.json')).rejects.toThrow(
+      'Failed to parse JSON from https://example.com/data.json',
+    );
+  });
+
+  it('should reject on response stream error', async () => {
+    getMock.mockImplementationOnce((_url, _options, callback) => {
+      const res = new EventEmitter() as IncomingMessage;
+      res.statusCode = 200;
+      (callback as (res: IncomingMessage) => void)(res);
+      res.emit('error', new Error('Stream broken'));
+      return new EventEmitter() as ClientRequest;
+    });
+
+    await expect(fetchJson('https://example.com/data.json')).rejects.toThrow(
+      'Response stream error while fetching',
+    );
+  });
+
+  it('should reject on response aborted', async () => {
+    getMock.mockImplementationOnce((_url, _options, callback) => {
+      const res = new EventEmitter() as IncomingMessage;
+      res.statusCode = 200;
+      (callback as (res: IncomingMessage) => void)(res);
+      res.emit('aborted');
+      return new EventEmitter() as ClientRequest;
+    });
+
+    await expect(fetchJson('https://example.com/data.json')).rejects.toThrow(
+      'Response aborted while fetching',
     );
   });
 

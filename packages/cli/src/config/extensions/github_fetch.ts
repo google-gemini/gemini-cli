@@ -22,6 +22,13 @@ export async function fetchJson<T>(
     headers.Authorization = `token ${token}`;
   }
   return new Promise((resolve, reject) => {
+    const rejectStreamError = (err: Error): void => {
+      reject(
+        new Error(
+          `Response stream error while fetching ${url}: ${err.message}`,
+        ),
+      );
+    };
     https
       .get(url, { headers }, (res) => {
         if (res.statusCode === 302 || res.statusCode === 301) {
@@ -41,16 +48,29 @@ export async function fetchJson<T>(
           return;
         }
         if (res.statusCode !== 200) {
+          res.resume();
           return reject(
             new Error(`Request failed with status code ${res.statusCode}`),
           );
         }
         const chunks: Buffer[] = [];
         res.on('data', (chunk) => chunks.push(chunk));
+        res.on('error', rejectStreamError);
+        res.on('aborted', () => {
+          reject(new Error(`Response aborted while fetching ${url}`));
+        });
         res.on('end', () => {
           const data = Buffer.concat(chunks).toString();
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          resolve(JSON.parse(data) as T);
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            resolve(JSON.parse(data) as T);
+          } catch (err) {
+            reject(
+              new Error(
+                `Failed to parse JSON from ${url} (status ${res.statusCode}): ${err instanceof Error ? err.message : String(err)}`,
+              ),
+            );
+          }
         });
       })
       .on('error', reject);
