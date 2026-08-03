@@ -10,6 +10,7 @@ import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import type { ReadableStream as NodeReadableStream } from 'node:stream/web';
 import { homedir, GEMINI_DIR } from '../utils/paths.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
@@ -30,29 +31,6 @@ const ALLOWED_MODELS = [
   'ggml-large-v3-turbo-q5_0.bin',
   'ggml-large-v3-turbo-q8_0.bin',
 ];
-
-async function* readResponseBody(
-  body: ReadableStream<Uint8Array>,
-): AsyncGenerator<Uint8Array> {
-  const reader = body.getReader();
-  let completed = false;
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
-        completed = true;
-        return;
-      }
-      yield value;
-    }
-  } finally {
-    if (!completed) {
-      await reader.cancel().catch(() => undefined);
-    }
-    reader.releaseLock();
-  }
-}
 
 /**
  * Manages Whisper models (checking existence, downloading).
@@ -104,6 +82,10 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
     if (!response.body) {
       throw new Error('Response body is not readable');
     }
+    // TypeScript's DOM ReadableStream omits Node's values() extension, but
+    // fetch returns the same runtime Web Streams API consumed by fromWeb().
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const responseBody = response.body as NodeReadableStream;
 
     const progressTracker = new Transform({
       transform: (chunk: Buffer, _encoding, callback) => {
@@ -123,7 +105,7 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
 
     try {
       await pipeline(
-        Readable.from(readResponseBody(response.body), { objectMode: false }),
+        Readable.fromWeb(responseBody),
         progressTracker,
         fs.createWriteStream(temporaryDestination, { flags: 'wx' }),
       );
