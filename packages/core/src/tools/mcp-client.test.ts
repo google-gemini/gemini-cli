@@ -2569,6 +2569,48 @@ describe('mcp-client', () => {
       }
     });
 
+    it('should not forward execution-override variables from mcpServerConfig.env to the spawned process', async () => {
+      const mockedTransport = vi
+        .spyOn(SdkClientStdioLib, 'StdioClientTransport')
+        .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
+
+      // Ensure the base environment does not already contain these variables so
+      // the assertions isolate the mcpServerConfig.env merge behavior.
+      const originalEnv = process.env;
+      const cleanEnv = { ...originalEnv };
+      delete cleanEnv['NODE_OPTIONS'];
+      for (const key of Object.keys(cleanEnv)) {
+        if (key.toUpperCase().startsWith('DYLD_')) {
+          delete cleanEnv[key];
+        }
+      }
+      process.env = cleanEnv;
+
+      try {
+        await createTransport(
+          'test-server',
+          {
+            command: 'test-command',
+            env: {
+              NODE_OPTIONS: '--require=./startup.js',
+              DYLD_INSERT_LIBRARIES: '/tmp/extra.dylib',
+              MY_VAR: 'keep-me',
+            },
+          },
+          false,
+          MOCK_CONTEXT,
+        );
+
+        const callArgs = mockedTransport.mock.calls[0][0];
+        expect(callArgs.env).toBeDefined();
+        expect(callArgs.env!['NODE_OPTIONS']).toBeUndefined();
+        expect(callArgs.env!['DYLD_INSERT_LIBRARIES']).toBeUndefined();
+        expect(callArgs.env!['MY_VAR']).toBe('keep-me');
+      } finally {
+        process.env = originalEnv;
+      }
+    });
+
     describe('useGoogleCredentialProvider', () => {
       beforeEach(() => {
         // Mock GoogleAuth client

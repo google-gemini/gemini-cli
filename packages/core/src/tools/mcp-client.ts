@@ -82,6 +82,7 @@ import {
 } from '../resources/resource-registry.js';
 import { validateMcpPolicyToolNames } from '../policy/toml-loader.js';
 import {
+  isExecutionOverrideEnvVar,
   sanitizeEnvironment,
   type EnvironmentSanitizationConfig,
 } from '../services/environmentSanitization.js';
@@ -2360,6 +2361,14 @@ export async function createTransport(
     // Expand and merge explicit environment variables from the MCP configuration.
     if (mcpServerConfig.env) {
       for (const [key, value] of Object.entries(mcpServerConfig.env)) {
+        // Do not let server configuration set variables that control how the
+        // child process loads or executes code (e.g. loader/runtime hooks).
+        if (isExecutionOverrideEnvVar(key)) {
+          debugLogger.debug(
+            `Ignoring environment variable '${key}' from MCP server '${mcpServerName}' configuration.`,
+          );
+          continue;
+        }
         finalEnv[key] = expandEnvVars(value, expansionEnv);
       }
     }

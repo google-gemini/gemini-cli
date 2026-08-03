@@ -7,9 +7,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   ALWAYS_ALLOWED_ENVIRONMENT_VARIABLES,
+  EXECUTION_OVERRIDE_ENV_VAR_NAMES,
   NEVER_ALLOWED_ENVIRONMENT_VARIABLES,
   NEVER_ALLOWED_NAME_PATTERNS,
   NEVER_ALLOWED_VALUE_PATTERNS,
+  isExecutionOverrideEnvVar,
   sanitizeEnvironment,
   getSecureSanitizationConfig,
 } from './environmentSanitization.js';
@@ -448,5 +450,40 @@ describe('getSecureSanitizationConfig', () => {
     const config = getSecureSanitizationConfig(requestedConfig);
 
     expect(config.enableEnvironmentVariableRedaction).toBe(false);
+  });
+});
+
+describe('isExecutionOverrideEnvVar', () => {
+  it('should return true for each blocklisted name', () => {
+    for (const name of EXECUTION_OVERRIDE_ENV_VAR_NAMES) {
+      expect(isExecutionOverrideEnvVar(name)).toBe(true);
+    }
+  });
+
+  it('should be case-insensitive for blocklisted names', () => {
+    expect(isExecutionOverrideEnvVar('node_options')).toBe(true);
+    expect(isExecutionOverrideEnvVar('Node_Options')).toBe(true);
+    expect(isExecutionOverrideEnvVar('ld_preload')).toBe(true);
+    expect(isExecutionOverrideEnvVar('Ld_Library_Path')).toBe(true);
+  });
+
+  it('should return true for variables with the DYLD_ prefix', () => {
+    expect(isExecutionOverrideEnvVar('DYLD_INSERT_LIBRARIES')).toBe(true);
+    expect(isExecutionOverrideEnvVar('DYLD_LIBRARY_PATH')).toBe(true);
+    expect(isExecutionOverrideEnvVar('Dyld_Insert_Libraries')).toBe(true);
+  });
+
+  it('should return false for benign variables', () => {
+    expect(isExecutionOverrideEnvVar('PATH')).toBe(false);
+    expect(isExecutionOverrideEnvVar('FOO')).toBe(false);
+    expect(isExecutionOverrideEnvVar('HOME')).toBe(false);
+    expect(isExecutionOverrideEnvVar('MY_NODE_OPTION')).toBe(false);
+    expect(isExecutionOverrideEnvVar('DYLD')).toBe(false);
+  });
+
+  it('should ensure all execution-override names are capitalized', () => {
+    for (const name of EXECUTION_OVERRIDE_ENV_VAR_NAMES) {
+      expect(name).toBe(name.toUpperCase());
+    }
   });
 });

@@ -140,6 +140,40 @@ export const NEVER_ALLOWED_VALUE_PATTERNS = [
   /xox[abpr]-[a-zA-Z0-9-]+/i,
 ] as const;
 
+/**
+ * Environment variable names that instruct a runtime or dynamic loader to load
+ * and run additional code before the target program starts (e.g. Node's
+ * `--require` hook or the ELF dynamic linker preloading a shared object). To
+ * keep spawned child processes predictable, these are not forwarded from
+ * external configuration into a child's environment.
+ */
+export const EXECUTION_OVERRIDE_ENV_VAR_NAMES: ReadonlySet<string> = new Set([
+  'NODE_OPTIONS',
+  'LD_PRELOAD',
+  'LD_LIBRARY_PATH',
+]);
+
+/**
+ * Case-insensitive prefixes for environment variables in the same class as
+ * {@link EXECUTION_OVERRIDE_ENV_VAR_NAMES}. `DYLD_` covers the macOS dynamic
+ * loader variables such as `DYLD_INSERT_LIBRARIES` and `DYLD_LIBRARY_PATH`.
+ */
+export const EXECUTION_OVERRIDE_ENV_VAR_PREFIXES: readonly string[] = ['DYLD_'];
+
+/**
+ * Returns true if `key` names an environment variable that can override how a
+ * spawned process loads or executes code. The comparison is case-insensitive.
+ */
+export function isExecutionOverrideEnvVar(key: string): boolean {
+  const upperKey = key.toUpperCase();
+  if (EXECUTION_OVERRIDE_ENV_VAR_NAMES.has(upperKey)) {
+    return true;
+  }
+  return EXECUTION_OVERRIDE_ENV_VAR_PREFIXES.some((prefix) =>
+    upperKey.startsWith(prefix),
+  );
+}
+
 function shouldRedactEnvironmentVariable(
   key: string,
   value: string | undefined,

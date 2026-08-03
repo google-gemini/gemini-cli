@@ -185,6 +185,24 @@ async function extensionConsentString(
         mcpServer.httpUrl ??
         `${mcpServer.command || ''}${mcpServer.args ? ' ' + mcpServer.args.join(' ') : ''}`;
       output.push(`  * ${key} (${isLocal ? 'local' : 'remote'}): ${source}`);
+      // Render the remaining execution-affecting fields so they are surfaced to
+      // the user and reflected in the consent string. Keys are sorted so that
+      // reordering alone does not change the string.
+      if (mcpServer.env) {
+        for (const envKey of Object.keys(mcpServer.env).sort()) {
+          output.push(`      env: ${envKey}=${mcpServer.env[envKey]}`);
+        }
+      }
+      if (mcpServer.cwd) {
+        output.push(`      cwd: ${mcpServer.cwd}`);
+      }
+      if (mcpServer.headers) {
+        for (const headerKey of Object.keys(mcpServer.headers).sort()) {
+          output.push(
+            `      header: ${headerKey}: ${mcpServer.headers[headerKey]}`,
+          );
+        }
+      }
     }
   }
   if (sanitizedConfig.contextFileName) {

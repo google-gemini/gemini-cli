@@ -257,6 +257,149 @@ describe('consent', () => {
         expect(requestConsent).toHaveBeenCalledTimes(1);
       });
 
+      it('should render mcp server env, cwd, and headers in the consent string', async () => {
+        const config: ExtensionConfig = {
+          ...baseConfig,
+          mcpServers: {
+            local: {
+              command: 'node',
+              args: ['server.js'],
+              env: {
+                NODE_OPTIONS: '--inspect',
+                API_BASE: 'https://example.com',
+              },
+              cwd: '/srv/app',
+            },
+            remote: {
+              httpUrl: 'https://remote.com',
+              headers: { Authorization: 'Bearer token', 'X-Trace': '1' },
+            },
+          },
+        };
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          config,
+          requestConsent,
+          false,
+          undefined,
+        );
+
+        expect(requestConsent).toHaveBeenCalledTimes(1);
+        const consentString = requestConsent.mock.calls[0][0] as string;
+        await expectConsentSnapshot(consentString);
+      });
+
+      it('should request consent if an mcp server env is added on update', async () => {
+        const prevConfig: ExtensionConfig = {
+          ...baseConfig,
+          mcpServers: { server1: { command: 'node', args: ['server.js'] } },
+        };
+        const newConfig: ExtensionConfig = {
+          ...baseConfig,
+          mcpServers: {
+            server1: {
+              command: 'node',
+              args: ['server.js'],
+              env: { NODE_OPTIONS: '--require=./startup.js' },
+            },
+          },
+        };
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          newConfig,
+          requestConsent,
+          false,
+          prevConfig,
+          false,
+        );
+        expect(requestConsent).toHaveBeenCalledTimes(1);
+      });
+
+      it('should request consent if an mcp server cwd changes on update', async () => {
+        const prevConfig: ExtensionConfig = {
+          ...baseConfig,
+          mcpServers: { server1: { command: 'node', args: ['server.js'] } },
+        };
+        const newConfig: ExtensionConfig = {
+          ...baseConfig,
+          mcpServers: {
+            server1: { command: 'node', args: ['server.js'], cwd: '/new/dir' },
+          },
+        };
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          newConfig,
+          requestConsent,
+          false,
+          prevConfig,
+          false,
+        );
+        expect(requestConsent).toHaveBeenCalledTimes(1);
+      });
+
+      it('should request consent if an mcp server header changes on update', async () => {
+        const prevConfig: ExtensionConfig = {
+          ...baseConfig,
+          mcpServers: { server1: { httpUrl: 'https://remote.com' } },
+        };
+        const newConfig: ExtensionConfig = {
+          ...baseConfig,
+          mcpServers: {
+            server1: {
+              httpUrl: 'https://remote.com',
+              headers: { Authorization: 'Bearer token' },
+            },
+          },
+        };
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          newConfig,
+          requestConsent,
+          false,
+          prevConfig,
+          false,
+        );
+        expect(requestConsent).toHaveBeenCalledTimes(1);
+      });
+
+      it('should not request consent for a version-only bump with unchanged exec-affecting fields', async () => {
+        const prevConfig: ExtensionConfig = {
+          ...baseConfig,
+          version: '1.0.0',
+          mcpServers: {
+            server1: {
+              command: 'node',
+              args: ['server.js'],
+              env: { ALPHA: '1', BETA: '2' },
+              cwd: '/srv',
+            },
+          },
+        };
+        const newConfig: ExtensionConfig = {
+          ...baseConfig,
+          version: '1.0.1',
+          mcpServers: {
+            server1: {
+              command: 'node',
+              args: ['server.js'],
+              // Same entries in a different insertion order to confirm that
+              // deterministic key ordering avoids a spurious re-prompt.
+              env: { BETA: '2', ALPHA: '1' },
+              cwd: '/srv',
+            },
+          },
+        };
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          newConfig,
+          requestConsent,
+          false,
+          prevConfig,
+          false,
+        );
+        expect(requestConsent).not.toHaveBeenCalled();
+      });
+
       it('should request consent if contextFileName changes', async () => {
         const prevConfig: ExtensionConfig = { ...baseConfig };
         const newConfig: ExtensionConfig = {
