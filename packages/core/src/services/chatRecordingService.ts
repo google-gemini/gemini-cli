@@ -462,7 +462,16 @@ export class ChatRecordingService {
           // Update the session ID in the existing file
           this.updateMetadata({ sessionId: this.sessionId });
         } else {
-          throw new Error('Failed to load resumed session data from file');
+          // The file could not be reloaded (missing, corrupt metadata, or an
+          // I/O error). Fall back to the in-memory conversation we were handed
+          // rather than failing the caller, and rewrite a clean file from it.
+          debugLogger.warn(
+            'Failed to reload resumed session data from file; falling back ' +
+              'to the in-memory conversation.',
+          );
+          this.cachedConversation = resumedSessionData.conversation;
+          this.projectHash = this.cachedConversation.projectHash;
+          this.rewriteConversationFile(this.cachedConversation);
         }
       } else {
         // Create new session
@@ -553,6 +562,43 @@ export class ChatRecordingService {
       const line = JSON.stringify(record) + '\n';
       fs.mkdirSync(path.dirname(this.conversationFile), { recursive: true });
       fs.appendFileSync(this.conversationFile, line);
+    } catch (error) {
+      if (isNodeError(error) && error.code === 'ENOSPC') {
+        this.conversationFile = null;
+        debugLogger.warn(ENOSPC_WARNING_MESSAGE);
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * Rewrites the session file from an in-memory record, atomically (temp file
+   * + rename) so a partial write never clobbers the existing file.
+   */
+  private rewriteConversationFile(conversation: ConversationRecord): void {
+    if (!this.conversationFile) return;
+
+    // Normalize legacy `.json` paths to the `.jsonl` format we write.
+    if (this.conversationFile.endsWith('.json')) {
+      this.conversationFile = this.conversationFile + 'l';
+    }
+
+    const { messages, memoryScratchpad, ...metadata } = conversation;
+    const lines: string[] = [JSON.stringify(metadata)];
+    for (const msg of messages) {
+      lines.push(JSON.stringify(msg));
+    }
+    if (memoryScratchpad) {
+      lines.push(JSON.stringify({ $set: { memoryScratchpad } }));
+    }
+    const content = lines.join('\n') + '\n';
+
+    try {
+      fs.mkdirSync(path.dirname(this.conversationFile), { recursive: true });
+      const tempFile = `${this.conversationFile}.tmp-${process.pid}`;
+      fs.writeFileSync(tempFile, content);
+      fs.renameSync(tempFile, this.conversationFile);
     } catch (error) {
       if (isNodeError(error) && error.code === 'ENOSPC') {
         this.conversationFile = null;

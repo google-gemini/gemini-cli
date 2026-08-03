@@ -308,6 +308,54 @@ describe('ChatRecordingService', () => {
       )) as ConversationRecord;
       expect(conversation.sessionId).toBe('old-session-id');
     });
+
+    it('should fall back to the in-memory conversation when the file cannot be reloaded', async () => {
+      // Regression test for the `/compress` "Failed to load resumed session
+      // data from file" bug: when resuming with a filePath that cannot be
+      // loaded from disk, initialize must NOT throw. It should adopt the
+      // in-memory conversation it was handed and rewrite a clean file.
+      const chatsDir = path.join(testTempDir, 'chats');
+      fs.mkdirSync(chatsDir, { recursive: true });
+      const missingFile = path.join(chatsDir, 'missing-session.jsonl');
+      expect(fs.existsSync(missingFile)).toBe(false);
+
+      const inMemoryConversation = {
+        sessionId: 'resumed-session-id',
+        projectHash: 'resumed-project-hash',
+        startTime: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
+        messages: [
+          {
+            id: 'msg-1',
+            type: 'user',
+            timestamp: new Date().toISOString(),
+            content: 'hello from memory',
+          },
+        ],
+      } as unknown as ConversationRecord;
+
+      await expect(
+        chatRecordingService.initialize({
+          filePath: missingFile,
+          conversation: inMemoryConversation,
+        }),
+      ).resolves.not.toThrow();
+
+      // The in-memory conversation is adopted.
+      expect(chatRecordingService.getConversation()?.sessionId).toBe(
+        'resumed-session-id',
+      );
+
+      // A clean, loadable file is rewritten from the in-memory copy so future
+      // loads and appends succeed.
+      const reloaded = (await loadConversationRecord(
+        missingFile,
+      )) as ConversationRecord;
+      expect(reloaded).not.toBeNull();
+      expect(reloaded.sessionId).toBe('resumed-session-id');
+      expect(reloaded.projectHash).toBe('resumed-project-hash');
+      expect(reloaded.messages).toHaveLength(1);
+    });
   });
 
   describe('recordMessage', () => {
