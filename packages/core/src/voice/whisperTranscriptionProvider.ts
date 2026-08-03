@@ -79,7 +79,7 @@ export class WhisperTranscriptionProvider
         // whisper-stream -m <model_path> -t <threads> --step 0 --length <length> -vth 0.6
         // Setting step == 0 enables sliding window mode with VAD, which outputs
         // non-overlapping transcription blocks suitable for appending.
-        this.process = spawn('whisper-stream', [
+        const proc = spawn('whisper-stream', [
           '-m',
           modelPath,
           '-t',
@@ -91,12 +91,16 @@ export class WhisperTranscriptionProvider
           '-vth',
           '0.6',
         ]);
+        this.process = proc;
 
-        this.process.stdout.on('data', (data: Buffer) => {
-          this.consumeOutput(data);
+        proc.stdout.on('data', (data: Buffer) => {
+          if (this.process === proc) {
+            this.consumeOutput(data);
+          }
         });
 
-        this.process.stderr.on('data', (data: Buffer) => {
+        proc.stderr.on('data', (data: Buffer) => {
+          if (this.process !== proc) return;
           const msg = data.toString();
           if (msg.includes('error')) {
             debugLogger.error(`[WhisperTranscription] stderr: ${msg}`);
@@ -115,7 +119,8 @@ export class WhisperTranscriptionProvider
           }
         });
 
-        this.process.on('error', (err) => {
+        proc.on('error', (err) => {
+          if (this.process !== proc) return;
           debugLogger.error('[WhisperTranscription] Process error:', err);
           this.emit('error', err);
           if (!isResolved) {
@@ -124,13 +129,14 @@ export class WhisperTranscriptionProvider
           }
         });
 
-        this.process.on('close', (code) => {
+        proc.on('close', (code) => {
+          if (this.process !== proc) return;
           this.flushOutput();
           debugLogger.debug(
             `[WhisperTranscription] Process closed with code ${code}`,
           );
-          this.emit('close');
           this.process = null;
+          this.emit('close');
         });
 
         // Fallback timeout in case "main: processing" is never seen

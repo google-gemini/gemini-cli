@@ -146,4 +146,44 @@ describe('WhisperTranscriptionProvider', () => {
 
     expect(transcription).toHaveBeenCalledWith('Final words.');
   });
+
+  it('should ignore late data and close events from a replaced process', async () => {
+    const firstProcess = createMockProcess();
+    const provider = new WhisperTranscriptionProvider({
+      modelPath: 'test-model.bin',
+    });
+    const transcription = vi.fn();
+    const closed = vi.fn();
+    provider.on('transcription', transcription);
+    provider.on('close', closed);
+    const firstConnection = provider.connect();
+    await vi.advanceTimersByTimeAsync(0);
+    firstProcess.stderr.emit('data', Buffer.from('main: processing'));
+    await firstConnection;
+    firstProcess.stdout.emit(
+      'data',
+      Buffer.from('[00:00:00.000 --> 00:00:01.000] Stale'),
+    );
+
+    provider.disconnect();
+    const secondProcess = createMockProcess();
+    const secondConnection = provider.connect();
+    await vi.advanceTimersByTimeAsync(0);
+    secondProcess.stderr.emit('data', Buffer.from('main: processing'));
+    await secondConnection;
+
+    firstProcess.stdout.emit('data', Buffer.from(' transcription.\n'));
+    firstProcess.emit('close', 0);
+    secondProcess.stdout.emit(
+      'data',
+      Buffer.from('[00:00:00.000 --> 00:00:01.000] Current.\n'),
+    );
+
+    expect(transcription).toHaveBeenCalledOnce();
+    expect(transcription).toHaveBeenCalledWith('Current.');
+    expect(closed).not.toHaveBeenCalled();
+
+    provider.disconnect();
+    expect(secondProcess.kill).toHaveBeenCalledWith('SIGTERM');
+  });
 });
