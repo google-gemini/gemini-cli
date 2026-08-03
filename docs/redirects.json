@@ -5,6 +5,7 @@
   "/docs/cli/index": "/docs",
   "/docs/cli/keyboard-shortcuts": "/docs/reference/keyboard-shortcuts",
   "/docs/cli/uninstall": "/docs/resources/uninstall",
+  "/docs/cli/authentication": "/docs/get-started/authentication",
   "/docs/core/concepts": "/docs",
   "/docs/core/memport": "/docs/reference/memport",
   "/docs/core/policy-engine": "/docs/reference/policy-engine",
