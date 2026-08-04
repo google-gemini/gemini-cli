@@ -172,7 +172,8 @@ export async function createContentGeneratorConfig(
   // (WSL/SSH/Docker/CI) keytar can block indefinitely on its functional probe.
   if (
     authType === AuthType.LOGIN_WITH_GOOGLE ||
-    authType === AuthType.COMPUTE_ADC
+    authType === AuthType.COMPUTE_ADC ||
+    authType === AuthType.SGLANG
   ) {
     return contentGeneratorConfig;
   }

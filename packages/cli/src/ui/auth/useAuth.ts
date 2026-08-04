@@ -29,8 +29,12 @@ export async function validateAuthMethodWithSettings(
   if (settings.merged.security.auth.useExternal) {
     return null;
   }
-  // If using Gemini API key, we don't validate it here as we might need to prompt for it.
-  if (authType === AuthType.USE_GEMINI) {
+  // If using Gemini API key or SGLang, we don't validate it here as we might need to prompt for it.
+  if (
+    authType === AuthType.USE_GEMINI ||
+    authType === AuthType.SGLANG ||
+    (authType as string) === 'sglang'
+  ) {
     return null;
   }
   return validateAuthMethod(authType);
