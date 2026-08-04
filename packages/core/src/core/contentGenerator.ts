@@ -187,14 +187,20 @@ export async function createContentGeneratorConfig(
     return contentGeneratorConfig;
   }
 
-  if (
-    authType === AuthType.USE_VERTEX_AI &&
-    (googleApiKey || (googleCloudProject && googleCloudLocation))
-  ) {
-    contentGeneratorConfig.apiKey = googleApiKey;
-    contentGeneratorConfig.vertexai = true;
+  if (authType === AuthType.USE_VERTEX_AI) {
+    if (geminiApiKey && !googleApiKey && !(googleCloudProject && googleCloudLocation)) {
+      throw new Error(
+        'Authentication failed: You are attempting to use the Vertex AI endpoint with a standard Gemini API key. ' +
+        'Vertex AI requires Google Cloud credentials. Please authenticate using standard Google Cloud methods ' +
+        '(e.g., `gcloud auth application-default login`) or switch your auth type to standard.'
+      );
+    }
+    if (googleApiKey || (googleCloudProject && googleCloudLocation)) {
+      contentGeneratorConfig.apiKey = googleApiKey;
+      contentGeneratorConfig.vertexai = true;
 
-    return contentGeneratorConfig;
+      return contentGeneratorConfig;
+    }
   }
 
   if (authType === AuthType.GATEWAY) {

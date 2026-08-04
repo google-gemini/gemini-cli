@@ -1526,4 +1526,17 @@ describe('createContentGeneratorConfig', () => {
     expect(config.apiKey).toBe('');
     expect(config.vertexai).toBe(false);
   });
+  it('throws an error when using Vertex AI with only a standard Gemini API key', async () => {
+    vi.stubEnv('GEMINI_API_KEY', 'test-gemini-key');
+    vi.stubEnv('GOOGLE_API_KEY', '');
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', '');
+    await expect(
+      createContentGeneratorConfig(
+        mockConfig, 
+        AuthType.USE_VERTEX_AI
+      )
+    ).rejects.toThrow(
+      'Authentication failed: You are attempting to use the Vertex AI endpoint with a standard Gemini API key.'
+    );
+  });
 });
