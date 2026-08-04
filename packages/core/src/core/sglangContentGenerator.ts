@@ -17,6 +17,30 @@ import type {
 import type { ContentGenerator } from './contentGenerator.js';
 import type { LlmRole } from '../telemetry/types.js';
 
+function cleanSchema(schema: unknown): unknown {
+  if (!schema || typeof schema !== 'object') return schema;
+  if (Array.isArray(schema)) {
+    return schema.map(cleanSchema);
+  }
+  const obj = { ...(schema as Record<string, unknown>) };
+  if (typeof obj['type'] === 'string') {
+    obj['type'] = obj['type'].toLowerCase();
+  }
+  if (obj['properties'] && typeof obj['properties'] === 'object') {
+    const props: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(
+      obj['properties'] as Record<string, unknown>,
+    )) {
+      props[k] = cleanSchema(v);
+    }
+    obj['properties'] = props;
+  }
+  if (obj['items']) {
+    obj['items'] = cleanSchema(obj['items']);
+  }
+  return obj;
+}
+
 export class SglangContentGenerator implements ContentGenerator {
   private baseUrl: string;
   private defaultModel: string;
@@ -111,6 +135,10 @@ export class SglangContentGenerator implements ContentGenerator {
       }
     }
 
+    if (messages.length === 0) {
+      messages.push({ role: 'user', content: 'Hello' });
+    }
+
     return messages;
   }
 
@@ -123,7 +151,7 @@ export class SglangContentGenerator implements ContentGenerator {
       function: {
         name: string;
         description?: string;
-        parameters?: Record<string, unknown>;
+        parameters?: unknown;
       };
     }> = [];
 
@@ -133,7 +161,7 @@ export class SglangContentGenerator implements ContentGenerator {
           functionDeclarations?: Array<{
             name: string;
             description?: string;
-            parameters?: Record<string, unknown>;
+            parameters?: unknown;
           }>;
         }
       ).functionDeclarations;
@@ -144,7 +172,7 @@ export class SglangContentGenerator implements ContentGenerator {
             function: {
               name: fd.name,
               description: fd.description,
-              parameters: fd.parameters,
+              parameters: cleanSchema(fd.parameters),
             },
           });
         }
@@ -171,7 +199,7 @@ export class SglangContentGenerator implements ContentGenerator {
       max_tokens: request.config?.maxOutputTokens ?? 4096,
       stream: false,
     };
-    if (tools) {
+    if (tools && tools.length > 0) {
       payload['tools'] = tools;
     }
 
@@ -183,13 +211,15 @@ export class SglangContentGenerator implements ContentGenerator {
         body: JSON.stringify(payload),
       });
     } catch (err) {
-      throw new Error(
-        `Failed to reach SGLang server at ${this.baseUrl}/chat/completions. Is kubectl port-forward running? (${err instanceof Error ? err.message : String(err)})`,
-      );
+      const msg = `Failed to reach SGLang server at ${this.baseUrl}/chat/completions. Is kubectl port-forward running? (${err instanceof Error ? err.message : String(err)})`;
+      console.error(msg);
+      throw new Error(msg);
     }
 
     if (!res.ok) {
-      throw new Error(`SGLang server error (${res.status}): ${await res.text()}`);
+      const errText = await res.text();
+      console.error(`SGLang HTTP error ${res.status}:`, errText);
+      throw new Error(`SGLang server error (${res.status}): ${errText}`);
     }
 
     const data = await res.json();
@@ -254,7 +284,7 @@ export class SglangContentGenerator implements ContentGenerator {
       max_tokens: request.config?.maxOutputTokens ?? 4096,
       stream: true,
     };
-    if (tools) {
+    if (tools && tools.length > 0) {
       payload['tools'] = tools;
     }
 
@@ -266,13 +296,15 @@ export class SglangContentGenerator implements ContentGenerator {
         body: JSON.stringify(payload),
       });
     } catch (err) {
-      throw new Error(
-        `Failed to reach SGLang server at ${this.baseUrl}/chat/completions. Is kubectl port-forward running? (${err instanceof Error ? err.message : String(err)})`,
-      );
+      const msg = `Failed to reach SGLang server at ${this.baseUrl}/chat/completions. Is kubectl port-forward running? (${err instanceof Error ? err.message : String(err)})`;
+      console.error(msg);
+      throw new Error(msg);
     }
 
     if (!res.ok || !res.body) {
-      throw new Error(`SGLang stream error (${res.status}): ${await res.text()}`);
+      const errText = await res.text();
+      console.error(`SGLang HTTP stream error ${res.status}:`, errText);
+      throw new Error(`SGLang stream error (${res.status}): ${errText}`);
     }
 
     const reader = res.body.getReader();
