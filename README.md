@@ -25,6 +25,7 @@ Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
 - **🔌 Extensible**: MCP (Model Context Protocol) support for custom
   integrations.
 - **💻 Terminal-first**: Designed for developers who live in the command line.
+- **⚡ SGLang Inference Server**: Direct connection to local or remote SGLang servers (Kimi-K3, DeepSeek, Qwen). See [SGLang Setup Guide](docs/sglang.md).
 - **🛡️ Open source**: Apache 2.0 licensed.
 
 ## 📦 Installation
