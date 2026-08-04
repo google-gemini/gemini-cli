@@ -104,6 +104,45 @@ describe('IdeClient', () => {
     vi.restoreAllMocks();
   });
 
+  describe('getInstance', () => {
+    beforeEach(() => {
+      // Reset the cached singleton so getInstance re-races the timeout.
+      (
+        IdeClient as unknown as { instancePromise: Promise<IdeClient> | null }
+      ).instancePromise = null;
+    });
+    afterEach(() => {
+      // Clear the cached promise so downstream tests' outer beforeEach
+      // rebuilds the singleton with the default getIdeProcessInfo mock.
+      (
+        IdeClient as unknown as { instancePromise: Promise<IdeClient> | null }
+      ).instancePromise = null;
+      vi.mocked(getIdeProcessInfo).mockResolvedValue({
+        pid: 12345,
+        command: 'test-ide',
+      });
+      vi.mocked(detectIde).mockReturnValue(IDE_DEFINITIONS.vscode);
+    });
+
+    it('falls back to a no-IDE client when getIdeProcessInfo hangs (#21477)', async () => {
+      // Simulate the process-tree traversal never resolving (a bare-terminal
+      // hang). getInstance must not block forever - it races against a
+      // timeout and resolves with a client that has no IDE process info.
+      vi.mocked(getIdeProcessInfo).mockReturnValue(
+        new Promise(() => {
+          // never resolves
+        }),
+      );
+      // No IDE detected when the process info is absent.
+      vi.mocked(detectIde).mockReturnValue(null);
+
+      const client = await IdeClient.getInstance();
+
+      expect(client.ideProcessInfo).toBeUndefined();
+      expect(client.currentIde).toBeNull();
+    });
+  });
+
   describe('connect', () => {
     it('should connect using HTTP when port is provided in config file', async () => {
       const config = { port: '8080' };
