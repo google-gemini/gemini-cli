@@ -107,7 +107,7 @@ export class SglangContentGenerator implements ContentGenerator {
               id: `call_${Math.random().toString(36).substring(2, 9)}`,
               type: 'function',
               function: {
-                name: part.functionCall.name,
+                name: part.functionCall.name || '',
                 arguments: JSON.stringify(part.functionCall.args || {}),
               },
             });
@@ -118,7 +118,7 @@ export class SglangContentGenerator implements ContentGenerator {
               content: JSON.stringify(part.functionResponse.response || {}),
               tool_call_id:
                 (part.functionResponse as { id?: string }).id ||
-                `call_${part.functionResponse.name}`,
+                `call_${part.functionResponse.name || 'tool'}`,
             });
           }
         }
@@ -266,11 +266,11 @@ export class SglangContentGenerator implements ContentGenerator {
     } as GenerateContentResponse;
   }
 
-  async *generateContentStream(
+  async generateContentStream(
     request: GenerateContentParameters,
     _userPromptId: string,
     _role: LlmRole,
-  ): AsyncGenerator<GenerateContentResponse> {
+  ): Promise<AsyncGenerator<GenerateContentResponse>> {
     const messages = this.convertContentsToMessages(
       request.contents as Content[] | string,
       request.config?.systemInstruction as Content | string,
@@ -309,96 +309,101 @@ export class SglangContentGenerator implements ContentGenerator {
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
-    let buffer = '';
-    let hasSentFinishReason = false;
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
+    async function* makeStream(): AsyncGenerator<GenerateContentResponse> {
+      let buffer = '';
+      let hasSentFinishReason = false;
 
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || !trimmed.startsWith('data: ')) continue;
-        if (trimmed === 'data: [DONE]') {
-          if (!hasSentFinishReason) {
-            hasSentFinishReason = true;
-            yield {
-              candidates: [
-                {
-                  content: { parts: [{ text: '' }], role: 'model' },
-                  finishReason: 'STOP',
-                },
-              ],
-            } as GenerateContentResponse;
-          }
-          return;
-        }
-        try {
-          const json = JSON.parse(trimmed.slice(6));
-          const choice = json.choices?.[0];
-          const delta = choice?.delta;
-          const finishReason = choice?.finish_reason;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
 
-          const parts: Part[] = [];
-          if (delta?.reasoning_content) {
-            parts.push({ text: delta.reasoning_content, thought: true });
-          }
-          if (delta?.content) {
-            parts.push({ text: delta.content, thought: false });
-          }
-          if (delta?.tool_calls && Array.isArray(delta.tool_calls)) {
-            for (const tc of delta.tool_calls) {
-              let args = {};
-              try {
-                args = JSON.parse(tc.function?.arguments || '{}');
-              } catch {
-                // ignore
-              }
-              parts.push({
-                functionCall: {
-                  name: tc.function?.name,
-                  args,
-                },
-              });
-            }
-          }
-
-          if (parts.length > 0 || finishReason) {
-            if (finishReason) {
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || !trimmed.startsWith('data: ')) continue;
+          if (trimmed === 'data: [DONE]') {
+            if (!hasSentFinishReason) {
               hasSentFinishReason = true;
+              yield {
+                candidates: [
+                  {
+                    content: { parts: [{ text: '' }], role: 'model' },
+                    finishReason: 'STOP',
+                  },
+                ],
+              } as GenerateContentResponse;
             }
-            yield {
-              candidates: [
-                {
-                  content: { parts, role: 'model' },
-                  finishReason: finishReason
-                    ? finishReason === 'stop'
-                      ? 'STOP'
-                      : 'MAX_TOKENS'
-                    : undefined,
-                },
-              ],
-            } as GenerateContentResponse;
+            return;
           }
-        } catch {
-          // ignore partial chunks
+          try {
+            const json = JSON.parse(trimmed.slice(6));
+            const choice = json.choices?.[0];
+            const delta = choice?.delta;
+            const finishReason = choice?.finish_reason;
+
+            const parts: Part[] = [];
+            if (delta?.reasoning_content) {
+              parts.push({ text: delta.reasoning_content, thought: true });
+            }
+            if (delta?.content) {
+              parts.push({ text: delta.content, thought: false });
+            }
+            if (delta?.tool_calls && Array.isArray(delta.tool_calls)) {
+              for (const tc of delta.tool_calls) {
+                let args = {};
+                try {
+                  args = JSON.parse(tc.function?.arguments || '{}');
+                } catch {
+                  // ignore
+                }
+                parts.push({
+                  functionCall: {
+                    name: tc.function?.name,
+                    args,
+                  },
+                });
+              }
+            }
+
+            if (parts.length > 0 || finishReason) {
+              if (finishReason) {
+                hasSentFinishReason = true;
+              }
+              yield {
+                candidates: [
+                  {
+                    content: { parts, role: 'model' },
+                    finishReason: finishReason
+                      ? finishReason === 'stop'
+                        ? 'STOP'
+                        : 'MAX_TOKENS'
+                      : undefined,
+                  },
+                ],
+              } as GenerateContentResponse;
+            }
+          } catch {
+            // ignore partial chunks
+          }
         }
+      }
+
+      if (!hasSentFinishReason) {
+        yield {
+          candidates: [
+            {
+              content: { parts: [{ text: '' }], role: 'model' },
+              finishReason: 'STOP',
+            },
+          ],
+        } as GenerateContentResponse;
       }
     }
 
-    if (!hasSentFinishReason) {
-      yield {
-        candidates: [
-          {
-            content: { parts: [{ text: '' }], role: 'model' },
-            finishReason: 'STOP',
-          },
-        ],
-      } as GenerateContentResponse;
-    }
+    return makeStream();
   }
 
   async countTokens(_request: CountTokensParameters): Promise<CountTokensResponse> {
@@ -406,6 +411,6 @@ export class SglangContentGenerator implements ContentGenerator {
   }
 
   async embedContent(_request: EmbedContentParameters): Promise<EmbedContentResponse> {
-    return { embedding: { values: [] } };
+    return { embeddings: [{ values: [] }] };
   }
 }
