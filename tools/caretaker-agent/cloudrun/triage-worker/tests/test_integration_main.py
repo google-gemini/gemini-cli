@@ -13,7 +13,7 @@ import json
 import base64
 from db.issues_store import IssuesStore, ClaimAction, ReleaseAction
 import main as main_module
-from main import main
+from main import main, NEEDS_INFO_FOOTER
 
 VALID_WORKABLE_SPEC = {
     "issue_id": "owner/repo#42",
@@ -205,6 +205,7 @@ class TestIntegrationMain(unittest.TestCase):
         )
         expected_comment = (
             INTEGRATION_NEEDS_INFO_PAYLOAD["triage_metadata"]["comment"]
+            + NEEDS_INFO_FOOTER
         )
         mock_send_comment.assert_called_once_with(
             "owner", "repo", 42, expected_comment

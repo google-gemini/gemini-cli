@@ -11,7 +11,7 @@ import os
 import json
 import base64
 
-from main import main
+from main import main, NEEDS_INFO_FOOTER
 from db.issues_store import ClaimAction, ReleaseAction
 
 VALID_SPEC = {
@@ -129,7 +129,7 @@ class TestMainExecutionLoop(unittest.TestCase):
 
         self.assertEqual(ctx.exception.code, 0)
         mock_send_comment.assert_called_once_with(
-            "owner", "repo", 42, "Please provide logs."
+            "owner", "repo", 42, "Please provide logs." + NEEDS_INFO_FOOTER
         )
         self.mock_store.release_lock.assert_called_once_with(
             "owner", "repo", 42, "exec-123", success=True, status="NEEDS_INFO"
