@@ -718,14 +718,7 @@ export class GeminiChat {
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     // Last mile hardening and scrubbing to ensure absolute compliance with Gemini API invariants
     // and remove internal tracking properties (e.g. callIndex).
-    let scrubbedHistory = hardenHistory([...requestHistory]);
-
-    scrubbedHistory = this.context.config.isContextManagementEnabled()
-      ? scrubHistory(scrubbedHistory)
-      : scrubbedHistory;
-
-    // Always coalesce consecutive roles to prevent 400 Bad Request errors
-    scrubbedHistory = coalesceConsecutiveRoles(scrubbedHistory);
+    const scrubbedHistory = hardenHistory([...requestHistory]);
 
     const scrubbedContents = scrubbedHistory.map((h) => h.content);
 
