@@ -67,12 +67,10 @@ describe.sequential('mcp_resources', () => {
       'mock_mcp_server.js': MOCK_MCP_SERVER_CODE,
     },
     configOverrides: {
-      settings: {
-        mcpServers: {
-          'mock-server': {
-            command: 'node',
-            args: ['./mock_mcp_server.js'],
-          },
+      mcpServers: {
+        'mock-server': {
+          command: 'node',
+          args: ['./mock_mcp_server.js'],
         },
       },
     },
@@ -105,12 +103,10 @@ describe.sequential('mcp_resources', () => {
       'mock_mcp_server.js': MOCK_MCP_SERVER_CODE,
     },
     configOverrides: {
-      settings: {
-        mcpServers: {
-          'mock-server': {
-            command: 'node',
-            args: ['./mock_mcp_server.js'],
-          },
+      mcpServers: {
+        'mock-server': {
+          command: 'node',
+          args: ['./mock_mcp_server.js'],
         },
       },
     },
