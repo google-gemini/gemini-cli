@@ -50,11 +50,22 @@ EVALUATE ACROSS THESE 4 GOLDEN-SPEC MATCH CRITERIA (Score 0, 1, or 2 for each):
    identify that no automated test file is needed if the Golden Spec specifies
    N/A)?
 
+FINAL OVERALL ASSESSMENT STEP: 5. human_pr_match: High-level evaluation
+measuring practical agent triage effectiveness.
+
+- 1 (Match): The candidate spec accurately diagnoses the defect and proposes an
+  effective, actionable fix matching the core intent of the human PR. (Award a
+  Match if the spec provides an effective solution, even if implementation steps
+  or target file paths vary slightly).
+- 0 (No Match): The candidate spec fails to address the underlying bug, proposes
+  an ineffective or unworkable fix strategy, or targets completely irrelevant
+  files.
+
 Output ONLY a raw JSON object with concise explanations per criterion: {
 "target_files_score": <0|1|2>, "root_cause_and_summary_score": <0|1|2>,
 "implementation_plan_score": <0|1|2>, "testing_strategy_score": <0|1|2>,
-"reasoning": { "target_files": "<Concise 1-sentence explanation of
-target_files_score>", "root_cause": "<Concise 1-sentence explanation of
-root_cause_and_summary_score>", "implementation_plan": "<Concise 1-sentence
-explanation of implementation_plan_score>", "testing_strategy": "<Concise
-1-sentence explanation of testing_strategy_score>" } }
+"human_pr_match": <0|1>, "reasoning": { "target_files": "<Concise 1-sentence
+explanation of target_files_score>", "root_cause": "<Concise 1-sentence
+explanation of root_cause_and_summary_score>", "implementation_plan": "<Concise
+1-sentence explanation of implementation_plan_score>", "testing_strategy":
+"<Concise 1-sentence explanation of testing_strategy_score>" } }

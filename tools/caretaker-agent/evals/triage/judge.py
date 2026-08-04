@@ -87,6 +87,7 @@ def judge_workable_spec(predicted_spec: Dict[str, Any], golden_spec: Dict[str, A
             "root_cause_and_summary_score": 0,
             "implementation_plan_score": 0,
             "testing_strategy_score": 0,
+            "human_pr_match": 0,
             "total_points": 0,
             "max_points": 8,
             "spec_score_pct": 0.0,
@@ -111,6 +112,7 @@ Predicted Candidate Spec:
                 "root_cause_and_summary_score": {"type": "INTEGER"},
                 "implementation_plan_score": {"type": "INTEGER"},
                 "testing_strategy_score": {"type": "INTEGER"},
+                "human_pr_match": {"type": "INTEGER"},
                 "reasoning": {
                     "type": "OBJECT",
                     "properties": {
@@ -127,6 +129,7 @@ Predicted Candidate Spec:
                 "root_cause_and_summary_score",
                 "implementation_plan_score",
                 "testing_strategy_score",
+                "human_pr_match",
                 "reasoning",
             ],
         }
@@ -147,6 +150,7 @@ Predicted Candidate Spec:
         rcs = int(res.get("root_cause_and_summary_score", 0))
         ips = int(res.get("implementation_plan_score", 0))
         tss = int(res.get("testing_strategy_score", 0))
+        hpm = int(res.get("human_pr_match", 0))
 
         total_points = tfs + rcs + ips + tss
         max_points = 8
@@ -160,6 +164,7 @@ Predicted Candidate Spec:
         res["root_cause_and_summary_score"] = rcs
         res["implementation_plan_score"] = ips
         res["testing_strategy_score"] = tss
+        res["human_pr_match"] = hpm
         res["total_points"] = total_points
         res["max_points"] = max_points
         res["spec_score_pct"] = score_pct
@@ -173,6 +178,7 @@ Predicted Candidate Spec:
             "root_cause_and_summary_score": 0,
             "implementation_plan_score": 0,
             "testing_strategy_score": 0,
+            "human_pr_match": 0,
             "total_points": 0,
             "max_points": 8,
             "spec_score_pct": 0.0,

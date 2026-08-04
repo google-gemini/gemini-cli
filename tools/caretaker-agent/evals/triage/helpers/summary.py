@@ -92,6 +92,10 @@ def _write_markdown(run_summary: Dict[str, Any], results: List[Dict[str, Any]], 
     valid_kept_open_count = run_summary.get("valid_kept_open_count", 0)
     valid_kept_open_expected = run_summary.get("expected_active_count", 0)
 
+    human_pr_match_count = run_summary.get("human_pr_match_count", 0)
+    human_pr_match_total = run_summary.get("human_pr_match_total", 0)
+    human_pr_match_rate_pct = run_summary.get("human_pr_match_rate_pct", 0.0)
+
     workable_spec_count = run_summary.get("workable_spec_count", 0)
     workable_spec_pass_rate = run_summary.get("avg_workable_spec_pass_rate_pct", 0)
     avg_execution_time_seconds = run_summary.get("avg_execution_time_seconds", 0)
@@ -120,9 +124,15 @@ def _write_markdown(run_summary: Dict[str, Any], results: List[Dict[str, Any]], 
             f"{valid_kept_open_count}/{valid_kept_open_expected}",
             f"**{valid_kept_open_pct:.1f}%**"
         ])
+    if human_pr_match_total > 0:
+        summary_rows.append([
+            "**Human PR Match Rate**",
+            f"{human_pr_match_count}/{human_pr_match_total}",
+            f"**{human_pr_match_rate_pct:.1f}%**"
+        ])
     if workable_spec_count > 0:
         summary_rows.append([
-            "**Workable Spec Pass Rate**",
+            "**Workable Spec Quality Score**",
             f"{workable_spec_count} specs evaluated",
             f"**{workable_spec_pass_rate:.1f}%**"
         ])
@@ -159,7 +169,7 @@ def _write_markdown(run_summary: Dict[str, Any], results: List[Dict[str, Any]], 
 
             if "error" in r:
                 clean_err = " ".join(str(r.get("error", "")).split())[:35]
-                detail_rows.append([f"#{issue_num}", title, ver_str, f"CRASHED ({clean_err}...)", "-", "-", "-"])
+                detail_rows.append([f"#{issue_num}", title, ver_str, f"CRASHED ({clean_err}...)", "-", "-", "-", "-"])
                 continue
 
             cat_eval = r.get("categorization", {})
@@ -174,19 +184,30 @@ def _write_markdown(run_summary: Dict[str, Any], results: List[Dict[str, Any]], 
             pred_e = cat_eval.get("predicted_effort", "")
             effort_str = f"{exp_e} → {pred_e}" + ("" if cat_eval.get("effort_match") else " ❌") if exp_q == "OK" else "-"
 
+            hpm_val = spec_grade.get("human_pr_match")
+            if hpm_val == 1:
+                pr_match_str = "✅"
+            elif hpm_val == 0 and exp_q == "OK":
+                pr_match_str = "❌"
+            else:
+                pr_match_str = "-"
+
             spec_score_val = spec_grade.get("spec_score_pct", "")
             spec_score_str = f"{spec_score_val}%" if spec_score_val != "" else "-"
 
             reasons = spec_grade.get("reasoning", {})
             if isinstance(reasons, dict) and reasons:
-                lines = [f"<b>{k}</b>: {str(v).replace('|', '\\|').replace('\n', ' ')}" for k, v in reasons.items()]
+                lines = []
+                for k, v in reasons.items():
+                    val_str = str(v).replace('|', '\\|').replace('\n', ' ')
+                    lines.append(f"<b>{k}</b>: {val_str}")
                 critique = f"<small>{'<br>'.join(lines)}</small>"
             else:
                 critique = "-"
 
-            detail_rows.append([f"#{issue_num}", title, ver_str, quality_str, effort_str, spec_score_str, critique])
+            detail_rows.append([f"#{issue_num}", title, ver_str, quality_str, effort_str, pr_match_str, spec_score_str, critique])
 
-        table_headers = ["Issue", "Title", "Version (Target → Actual)", "Quality (Exp → Pred)", "Effort (Exp → Pred)", "Spec Score", "Judge Critique"]
+        table_headers = ["Issue", "Title", "Version (Target → Actual)", "Quality (Exp → Pred)", "Effort (Exp → Pred)", "PR Match", "Spec Score", "Judge Critique"]
         table_builder.table(table_headers, detail_rows)
         doc.details("🔍 Click to expand detailed issue-by-issue results", table_builder.render())
 
@@ -231,6 +252,8 @@ def calc_summary(
     total_expected_autoclose = 0
     correct_autoclose = 0
     predicted_autoclose = 0
+    human_pr_match_count = 0
+    human_pr_match_total = 0
 
     for r in successful_results:
         cat = r.get("categorization", {})
@@ -250,6 +273,11 @@ def calc_summary(
                 correct_autoclose += 1
         if pred_quality in AUTOCLOSE_TYPES:
             predicted_autoclose += 1
+
+        judge = r.get("judge_evaluation", {})
+        if isinstance(judge, dict) and "human_pr_match" in judge:
+            human_pr_match_count += int(judge.get("human_pr_match", 0))
+            human_pr_match_total += 1
 
     total_expected_active = total_tested - total_expected_autoclose
     false_autoclose = predicted_autoclose - correct_autoclose
@@ -285,6 +313,9 @@ def calc_summary(
         "expected_active_count": total_expected_active,
         "valid_kept_open_count": valid_kept_open,
         "valid_kept_open_rate": valid_kept_open / total_expected_active if total_expected_active else 0,
+        "human_pr_match_count": human_pr_match_count,
+        "human_pr_match_total": human_pr_match_total,
+        "human_pr_match_rate_pct": round((human_pr_match_count / human_pr_match_total) * 100.0, 1) if human_pr_match_total else 0.0,
         "avg_workable_spec_pass_rate_pct": avg_spec_pass_rate,
         "avg_execution_time_seconds": avg_exec_time
     }
