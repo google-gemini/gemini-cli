@@ -77,14 +77,37 @@ export function getRedirectUri(
   config: { redirectUri?: string },
   redirectPort: number,
 ): string {
-  if (config.redirectUri) {
-    return config.redirectUri;
-  }
   if (
     process.env['GOOGLE_CLOUD_WORKSTATIONS'] === 'true' &&
     process.env['WEB_HOST']
   ) {
+    let port = redirectPort;
+    let pathname = REDIRECT_PATH;
+
+    if (config.redirectUri) {
+      try {
+        const parsed = new URL(config.redirectUri);
+        if (
+          parsed.hostname === 'localhost' ||
+          parsed.hostname === '127.0.0.1'
+        ) {
+          if (parsed.port) {
+            port = parseInt(parsed.port, 10);
+          }
+          pathname = parsed.pathname;
+          return `https://${port}-${process.env['WEB_HOST']}${pathname}`;
+        }
+      } catch {
+        // Fall back to returning config.redirectUri as-is if parsing fails
+      }
+      return config.redirectUri;
+    }
+
     return `https://${redirectPort}-${process.env['WEB_HOST']}${REDIRECT_PATH}`;
+  }
+
+  if (config.redirectUri) {
+    return config.redirectUri;
   }
   return `http://localhost:${redirectPort}${REDIRECT_PATH}`;
 }

@@ -223,6 +223,76 @@ describe('oauth-flow', () => {
         `https://3000-my-workstation.cluster.workstations.cloud.google.com${REDIRECT_PATH}`,
       );
     });
+
+    it('should convert explicitly configured localhost URL to Workstations proxy URL', () => {
+      vi.stubEnv('GOOGLE_CLOUD_WORKSTATIONS', 'true');
+      vi.stubEnv(
+        'WEB_HOST',
+        'my-workstation.cluster.workstations.cloud.google.com',
+      );
+
+      const config: OAuthFlowConfig = {
+        ...baseConfig,
+        redirectUri: 'http://localhost:8080/custom/callback',
+      };
+      const url = buildAuthorizationUrl(config, basePkceParams, 3000);
+      const parsed = new URL(url);
+      expect(parsed.searchParams.get('redirect_uri')).toBe(
+        'https://8080-my-workstation.cluster.workstations.cloud.google.com/custom/callback',
+      );
+    });
+
+    it('should convert explicitly configured 127.0.0.1 URL to Workstations proxy URL', () => {
+      vi.stubEnv('GOOGLE_CLOUD_WORKSTATIONS', 'true');
+      vi.stubEnv(
+        'WEB_HOST',
+        'my-workstation.cluster.workstations.cloud.google.com',
+      );
+
+      const config: OAuthFlowConfig = {
+        ...baseConfig,
+        redirectUri: 'http://127.0.0.1:4000/oauth2callback',
+      };
+      const url = buildAuthorizationUrl(config, basePkceParams, 3000);
+      const parsed = new URL(url);
+      expect(parsed.searchParams.get('redirect_uri')).toBe(
+        'https://4000-my-workstation.cluster.workstations.cloud.google.com/oauth2callback',
+      );
+    });
+
+    it('should leave external explicitly configured redirect URIs untouched under Cloud Workstations', () => {
+      vi.stubEnv('GOOGLE_CLOUD_WORKSTATIONS', 'true');
+      vi.stubEnv(
+        'WEB_HOST',
+        'my-workstation.cluster.workstations.cloud.google.com',
+      );
+
+      const config: OAuthFlowConfig = {
+        ...baseConfig,
+        redirectUri: 'https://external-domain.com/callback',
+      };
+      const url = buildAuthorizationUrl(config, basePkceParams, 3000);
+      const parsed = new URL(url);
+      expect(parsed.searchParams.get('redirect_uri')).toBe(
+        'https://external-domain.com/callback',
+      );
+    });
+
+    it('should handle invalid redirect URIs gracefully by returning them as-is', () => {
+      vi.stubEnv('GOOGLE_CLOUD_WORKSTATIONS', 'true');
+      vi.stubEnv(
+        'WEB_HOST',
+        'my-workstation.cluster.workstations.cloud.google.com',
+      );
+
+      const config: OAuthFlowConfig = {
+        ...baseConfig,
+        redirectUri: 'not-a-valid-url',
+      };
+      const url = buildAuthorizationUrl(config, basePkceParams, 3000);
+      const parsed = new URL(url);
+      expect(parsed.searchParams.get('redirect_uri')).toBe('not-a-valid-url');
+    });
   });
 
   describe('startCallbackServer', () => {
