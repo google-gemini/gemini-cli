@@ -41,6 +41,26 @@ function cleanSchema(schema: unknown): unknown {
   return obj;
 }
 
+function mapFinishReason(
+  reason?: string,
+): 'STOP' | 'MAX_TOKENS' | 'SAFETY' | undefined {
+  if (!reason) return undefined;
+  if (
+    reason === 'stop' ||
+    reason === 'tool_calls' ||
+    reason === 'function_call'
+  ) {
+    return 'STOP';
+  }
+  if (reason === 'length') {
+    return 'MAX_TOKENS';
+  }
+  if (reason === 'content_filter') {
+    return 'SAFETY';
+  }
+  return 'STOP';
+}
+
 export class SglangContentGenerator implements ContentGenerator {
   private baseUrl: string;
   private defaultModel: string;
@@ -255,7 +275,7 @@ export class SglangContentGenerator implements ContentGenerator {
       candidates: [
         {
           content: { parts, role: 'model' },
-          finishReason: choice?.finish_reason === 'stop' ? 'STOP' : 'STOP',
+          finishReason: mapFinishReason(choice?.finish_reason) || 'STOP',
         },
       ],
       usageMetadata: {
@@ -313,6 +333,10 @@ export class SglangContentGenerator implements ContentGenerator {
     async function* makeStream(): AsyncGenerator<GenerateContentResponse> {
       let buffer = '';
       let hasSentFinishReason = false;
+      const accumulatedToolCalls: Map<
+        number,
+        { id?: string; name?: string; arguments: string }
+      > = new Map();
 
       while (true) {
         const { done, value } = await reader.read();
@@ -325,12 +349,31 @@ export class SglangContentGenerator implements ContentGenerator {
           const trimmed = line.trim();
           if (!trimmed || !trimmed.startsWith('data: ')) continue;
           if (trimmed === 'data: [DONE]') {
-            if (!hasSentFinishReason) {
+            const finalParts: Part[] = [];
+            for (const tc of accumulatedToolCalls.values()) {
+              if (tc.name) {
+                let args = {};
+                try {
+                  args = JSON.parse(tc.arguments || '{}');
+                } catch {
+                  // ignore
+                }
+                finalParts.push({
+                  functionCall: {
+                    name: tc.name,
+                    args,
+                  },
+                });
+              }
+            }
+            accumulatedToolCalls.clear();
+
+            if (!hasSentFinishReason || finalParts.length > 0) {
               hasSentFinishReason = true;
               yield {
                 candidates: [
                   {
-                    content: { parts: [{ text: '' }], role: 'model' },
+                    content: { parts: finalParts, role: 'model' },
                     finishReason: 'STOP',
                   },
                 ],
@@ -338,6 +381,7 @@ export class SglangContentGenerator implements ContentGenerator {
             }
             return;
           }
+
           try {
             const json = JSON.parse(trimmed.slice(6));
             const choice = json.choices?.[0];
@@ -353,34 +397,52 @@ export class SglangContentGenerator implements ContentGenerator {
             }
             if (delta?.tool_calls && Array.isArray(delta.tool_calls)) {
               for (const tc of delta.tool_calls) {
-                let args = {};
-                try {
-                  args = JSON.parse(tc.function?.arguments || '{}');
-                } catch {
-                  // ignore
-                }
-                parts.push({
-                  functionCall: {
-                    name: tc.function?.name,
-                    args,
-                  },
-                });
+                const idx = tc.index ?? 0;
+                const existing = accumulatedToolCalls.get(idx) || {
+                  arguments: '',
+                };
+                if (tc.id) existing.id = tc.id;
+                if (tc.function?.name) existing.name = tc.function.name;
+                if (tc.function?.arguments)
+                  existing.arguments += tc.function.arguments;
+                accumulatedToolCalls.set(idx, existing);
               }
             }
 
-            if (parts.length > 0 || finishReason) {
-              if (finishReason) {
+            if (
+              finishReason === 'tool_calls' ||
+              finishReason === 'function_call'
+            ) {
+              for (const tc of accumulatedToolCalls.values()) {
+                if (tc.name) {
+                  let args = {};
+                  try {
+                    args = JSON.parse(tc.arguments || '{}');
+                  } catch {
+                    // ignore
+                  }
+                  parts.push({
+                    functionCall: {
+                      name: tc.name,
+                      args,
+                    },
+                  });
+                }
+              }
+              accumulatedToolCalls.clear();
+            }
+
+            const mappedReason = mapFinishReason(finishReason);
+
+            if (parts.length > 0 || mappedReason) {
+              if (mappedReason) {
                 hasSentFinishReason = true;
               }
               yield {
                 candidates: [
                   {
                     content: { parts, role: 'model' },
-                    finishReason: finishReason
-                      ? finishReason === 'stop'
-                        ? 'STOP'
-                        : 'MAX_TOKENS'
-                      : undefined,
+                    finishReason: mappedReason,
                   },
                 ],
               } as GenerateContentResponse;
@@ -391,11 +453,30 @@ export class SglangContentGenerator implements ContentGenerator {
         }
       }
 
-      if (!hasSentFinishReason) {
+      const trailingParts: Part[] = [];
+      for (const tc of accumulatedToolCalls.values()) {
+        if (tc.name) {
+          let args = {};
+          try {
+            args = JSON.parse(tc.arguments || '{}');
+          } catch {
+            // ignore
+          }
+          trailingParts.push({
+            functionCall: {
+              name: tc.name,
+              args,
+            },
+          });
+        }
+      }
+      accumulatedToolCalls.clear();
+
+      if (!hasSentFinishReason || trailingParts.length > 0) {
         yield {
           candidates: [
             {
-              content: { parts: [{ text: '' }], role: 'model' },
+              content: { parts: trailingParts, role: 'model' },
               finishReason: 'STOP',
             },
           ],
