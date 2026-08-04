@@ -128,7 +128,15 @@ export class SglangContentGenerator implements ContentGenerator {
     }> = [];
 
     for (const t of toolsConfig.tools) {
-      const functionDeclarations = (t as { functionDeclarations?: Array<{ name: string; description?: string; parameters?: Record<string, unknown> }> }).functionDeclarations;
+      const functionDeclarations = (
+        t as {
+          functionDeclarations?: Array<{
+            name: string;
+            description?: string;
+            parameters?: Record<string, unknown>;
+          }>;
+        }
+      ).functionDeclarations;
       if (Array.isArray(functionDeclarations)) {
         for (const fd of functionDeclarations) {
           tools.push({
@@ -167,11 +175,18 @@ export class SglangContentGenerator implements ContentGenerator {
       payload['tools'] = tools;
     }
 
-    const res = await fetch(`${this.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+    let res: Response;
+    try {
+      res = await fetch(`${this.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      throw new Error(
+        `Failed to reach SGLang server at ${this.baseUrl}/chat/completions. Is kubectl port-forward running? (${err instanceof Error ? err.message : String(err)})`,
+      );
+    }
 
     if (!res.ok) {
       throw new Error(`SGLang server error (${res.status}): ${await res.text()}`);
@@ -182,6 +197,9 @@ export class SglangContentGenerator implements ContentGenerator {
     const message = choice?.message;
     const parts: Part[] = [];
 
+    if (message?.reasoning_content) {
+      parts.push({ text: message.reasoning_content });
+    }
     if (message?.content) {
       parts.push({ text: message.content });
     }
@@ -192,7 +210,7 @@ export class SglangContentGenerator implements ContentGenerator {
         try {
           args = JSON.parse(tc.function?.arguments || '{}');
         } catch {
-          // ignore argument parse error
+          // ignore parse error
         }
         parts.push({
           functionCall: {
@@ -240,11 +258,18 @@ export class SglangContentGenerator implements ContentGenerator {
       payload['tools'] = tools;
     }
 
-    const res = await fetch(`${this.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+    let res: Response;
+    try {
+      res = await fetch(`${this.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      throw new Error(
+        `Failed to reach SGLang server at ${this.baseUrl}/chat/completions. Is kubectl port-forward running? (${err instanceof Error ? err.message : String(err)})`,
+      );
+    }
 
     if (!res.ok || !res.body) {
       throw new Error(`SGLang stream error (${res.status}): ${await res.text()}`);
@@ -268,11 +293,12 @@ export class SglangContentGenerator implements ContentGenerator {
         try {
           const json = JSON.parse(trimmed.slice(6));
           const delta = json.choices?.[0]?.delta;
-          if (delta?.content) {
+          const textChunk = delta?.content || delta?.reasoning_content || '';
+          if (textChunk) {
             yield {
               candidates: [
                 {
-                  content: { parts: [{ text: delta.content }], role: 'model' },
+                  content: { parts: [{ text: textChunk }], role: 'model' },
                 },
               ],
             } as GenerateContentResponse;
