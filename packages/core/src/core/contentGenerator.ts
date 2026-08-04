@@ -425,13 +425,24 @@ export async function createContentGenerator(
         process.env['SGLANG_BASE_URL'] ||
         process.env['OPENAI_BASE_URL'] ||
         'http://127.0.0.1:30100/v1';
+      validateBaseUrl(baseUrl);
+      // Prefer an explicitly configured served-model name; never forward
+      // internal gemini-* aliases to the SGLang server.
+      const configuredModel = (
+        gcConfig as { getModel?: () => string }
+      ).getModel?.();
+      const isServedModelName = (m?: string): m is string =>
+        !!m &&
+        m !== 'auto' &&
+        m !== 'none' &&
+        !m.startsWith('gemini') &&
+        !m.startsWith('gemma');
       const modelName =
-        (gcConfig as { getModel?: () => string }).getModel?.() ||
         process.env['SGLANG_MODEL'] ||
-        process.env['GEMINI_MODEL'] ||
+        (isServedModelName(configuredModel) ? configuredModel : undefined) ||
         'moonshotai/Kimi-K3';
       return new LoggingContentGenerator(
-        new SglangContentGenerator(baseUrl, modelName) as never,
+        new SglangContentGenerator(baseUrl, modelName),
         gcConfig,
       );
     }
