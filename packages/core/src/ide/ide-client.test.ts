@@ -125,21 +125,31 @@ describe('IdeClient', () => {
     });
 
     it('falls back to a no-IDE client when getIdeProcessInfo hangs (#21477)', async () => {
-      // Simulate the process-tree traversal never resolving (a bare-terminal
-      // hang). getInstance must not block forever - it races against a
-      // timeout and resolves with a client that has no IDE process info.
-      vi.mocked(getIdeProcessInfo).mockReturnValue(
-        new Promise(() => {
-          // never resolves
-        }),
-      );
-      // No IDE detected when the process info is absent.
-      vi.mocked(detectIde).mockReturnValue(null);
+      // Fake timers are scoped to this test only (try/finally) so the MCP
+      // client/connect tests below are not affected by the mocked clock.
+      vi.useFakeTimers();
+      try {
+        // Simulate the process-tree traversal never resolving (a bare-terminal
+        // hang). getInstance must not block forever - it races against a
+        // timeout and resolves with a client that has no IDE process info.
+        vi.mocked(getIdeProcessInfo).mockReturnValue(
+          new Promise(() => {
+            // never resolves
+          }),
+        );
+        // No IDE detected when the process info is absent.
+        vi.mocked(detectIde).mockReturnValue(null);
 
-      const client = await IdeClient.getInstance();
+        const clientPromise = IdeClient.getInstance();
+        // Advance past the IDE_PROCESS_INFO_TIMEOUT_MS deadline.
+        await vi.advanceTimersByTimeAsync(3_000);
+        const client = await clientPromise;
 
-      expect(client.ideProcessInfo).toBeUndefined();
-      expect(client.currentIde).toBeNull();
+        expect(client.ideProcessInfo).toBeUndefined();
+        expect(client.currentIde).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
