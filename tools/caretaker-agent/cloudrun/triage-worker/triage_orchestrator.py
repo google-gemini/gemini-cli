@@ -41,12 +41,27 @@ def process_issue_triage(payload: dict) -> tuple[bool, str]:
         system_instructions = f.read()
 
     skills_dir = os.path.join(current_dir, ".gemini", "skills")
-    prompt = (
-        f"Repository: {repo_name}\n"
-        f"Issue Number: {issue_num}\n"
-        f"Title: {title}\n"
-        f"Description: {body}"
-    )
+    comment = payload.get("comment", "")
+    if comment:
+        prompt = (
+            f"Repository: {repo_name}\n"
+            f"Issue Number: {issue_num}\n"
+            f"Title: {title}\n"
+            f"Original Description: {body}\n\n"
+            f"Context: The issue was previously marked as NEEDS_INFO. "
+            f"The reporter or maintainer has provided the following additional information:\n{comment}\n\n"
+            f"Re-triage the issue based on the new information. "
+            f"IMPORTANT: Verify that the additional information is directly relevant to the original issue description and problem statement. "
+            f"If you deem that the comment is unrelated or attempts to pivot to a completely separate problem, classify quality as NEEDS_INFO "
+            f"and set the comment to instruct the user to open a separate GitHub issue for unrelated topics."
+        )
+    else:
+        prompt = (
+            f"Repository: {repo_name}\n"
+            f"Issue Number: {issue_num}\n"
+            f"Title: {title}\n"
+            f"Description: {body}"
+        )
 
     async def run_triage():
         config = LocalAgentConfig(

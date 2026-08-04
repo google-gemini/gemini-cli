@@ -122,6 +122,7 @@ def main() -> None:
                     triage_result.get("triage_metadata", {})
                     .get("comment", "")
                     .strip()
+                    + "\n\nPlease reply with the requested details and mention `@caretaker-agent`."
                 )
                 send_comment_action(owner, repo, issue_number, comment_body)
                 store.release_lock(
