@@ -15,7 +15,7 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_3_6_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
-  PREVIEW_GEMINI_FLASH_MODEL,
+  GEMINI_MODEL_ALIAS_FLASH,
   PREVIEW_GEMINI_MODEL,
   resolveModel,
 } from '../config/models.js';
@@ -35,6 +35,7 @@ export interface ModelPolicyOptions {
   useGemini31FlashLite?: boolean;
   useCustomToolModel?: boolean;
   useGemini3_5Flash?: boolean;
+  useGemini3_6Flash?: boolean;
 }
 
 const DEFAULT_ACTIONS: ModelPolicyActionMap = {
@@ -94,6 +95,15 @@ export function getModelPolicyChain(
   options: ModelPolicyOptions,
 ): ModelPolicyChain {
   const isAuto = options.isAutoSelection ?? false;
+  const flashModel = resolveModel(
+    GEMINI_MODEL_ALIAS_FLASH,
+    false,
+    false,
+    options.previewEnabled,
+    undefined,
+    options.useGemini3_5Flash,
+    options.useGemini3_6Flash,
+  );
 
   if (options.previewEnabled) {
     const proModel = resolveModel(
@@ -103,6 +113,7 @@ export function getModelPolicyChain(
       true,
       undefined,
       options.useGemini3_5Flash,
+      options.useGemini3_6Flash,
     );
     return [
       definePolicy({
@@ -116,7 +127,7 @@ export function getModelPolicyChain(
           : {}),
       }),
       definePolicy({
-        model: PREVIEW_GEMINI_FLASH_MODEL,
+        model: flashModel,
         isLastResort: true,
         maxAttempts: 10,
       }),
@@ -129,7 +140,7 @@ export function getModelPolicyChain(
       ...(isAuto ? AUTO_ROUTING_OVERRIDES : {}),
     }),
     definePolicy({
-      model: DEFAULT_GEMINI_FLASH_MODEL,
+      model: flashModel,
       isLastResort: true,
       maxAttempts: 10,
     }),

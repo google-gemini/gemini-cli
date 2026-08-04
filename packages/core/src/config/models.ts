@@ -151,8 +151,11 @@ export function getAutoModelDescription(
  *
  * @param requestedModel The model alias or concrete model name requested by the user.
  * @param useGemini3_1 Whether to use Gemini 3.1 Pro Preview for auto/pro aliases.
- * @param useGemini3_5Flash Whether to use Gemini 3.5 Flash GA.
+ * @param useCustomToolModel Whether to use the custom tool model.
  * @param hasAccessToPreview Whether the user has access to preview models.
+ * @param config Optional config object for dynamic model configuration.
+ * @param useGemini3_5Flash Whether to use Gemini 3.5 Flash GA.
+ * @param useGemini3_6Flash Whether to use Gemini 3.6 Flash for Flash aliases.
  * @returns The resolved concrete model name.
  */
 export function resolveModel(
@@ -162,6 +165,7 @@ export function resolveModel(
   hasAccessToPreview: boolean = true,
   config?: ModelCapabilityContext,
   useGemini3_5Flash: boolean = false,
+  useGemini3_6Flash: boolean = false,
 ): string {
   // Defensive check against non-string inputs at runtime
   const normalizedModel = Array.isArray(requestedModel)
@@ -176,6 +180,7 @@ export function resolveModel(
       useCustomTools: useCustomToolModel,
       hasAccessToPreview,
       useGemini3_5Flash,
+      useGemini3_6Flash,
     });
 
     if (!hasAccessToPreview && isPreviewModel(resolved, config)) {
@@ -218,9 +223,11 @@ export function resolveModel(
       break;
     }
     case GEMINI_MODEL_ALIAS_FLASH: {
-      resolved = useGemini3_5Flash
-        ? DEFAULT_GEMINI_FLASH_MODEL
-        : PREVIEW_GEMINI_FLASH_MODEL;
+      resolved = useGemini3_6Flash
+        ? DEFAULT_GEMINI_3_6_FLASH_MODEL
+        : useGemini3_5Flash
+          ? DEFAULT_GEMINI_FLASH_MODEL
+          : PREVIEW_GEMINI_FLASH_MODEL;
       break;
     }
     case GEMINI_MODEL_ALIAS_FLASH_LITE: {
@@ -239,6 +246,7 @@ export function resolveModel(
 
   if (
     useGemini3_5Flash &&
+    !useGemini3_6Flash &&
     isFlashModel(resolved) &&
     normalizedModel !== PREVIEW_GEMINI_FLASH_MODEL
   ) {
@@ -288,7 +296,10 @@ function isFlashModel(model: string): boolean {
  * @param modelAlias The alias selected by the classifier ('flash' or 'pro').
  * @param useGemini3_1 Whether to use Gemini 3.1 Pro Preview.
  * @param useCustomToolModel Whether to use the custom tool model.
+ * @param hasAccessToPreview Whether the user has access to preview models.
  * @param config Optional config object for dynamic model configuration.
+ * @param useGemini3_5Flash Whether to use Gemini 3.5 Flash GA.
+ * @param useGemini3_6Flash Whether to use Gemini 3.6 Flash for Flash aliases.
  * @returns The resolved concrete model name.
  */
 export function resolveClassifierModel(
@@ -299,6 +310,7 @@ export function resolveClassifierModel(
   hasAccessToPreview: boolean = true,
   config?: ModelCapabilityContext,
   useGemini3_5Flash: boolean = false,
+  useGemini3_6Flash: boolean = false,
 ): string {
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     return config.modelConfigService.resolveClassifierModelId(
@@ -309,11 +321,15 @@ export function resolveClassifierModel(
         useCustomTools: useCustomToolModel,
         hasAccessToPreview,
         useGemini3_5Flash,
+        useGemini3_6Flash,
       },
     );
   }
 
   if (modelAlias === GEMINI_MODEL_ALIAS_FLASH) {
+    if (useGemini3_6Flash) {
+      return DEFAULT_GEMINI_3_6_FLASH_MODEL;
+    }
     if (
       requestedModel === DEFAULT_GEMINI_MODEL_AUTO ||
       requestedModel === DEFAULT_GEMINI_MODEL
@@ -339,6 +355,7 @@ export function resolveClassifierModel(
       hasAccessToPreview,
       config,
       useGemini3_5Flash,
+      useGemini3_6Flash,
     );
   }
   return resolveModel(
@@ -348,6 +365,7 @@ export function resolveClassifierModel(
     hasAccessToPreview,
     config,
     useGemini3_5Flash,
+    useGemini3_6Flash,
   );
 }
 

@@ -770,6 +770,46 @@ describe('Code Assist model mappings', () => {
   });
 });
 
+describe('resolveModel Gemini 3.6 Flash', () => {
+  it.each([
+    ['legacy', undefined],
+    ['dynamic', dynamicConfig],
+  ])('resolves the Flash alias when enabled in %s mode', (_mode, config) => {
+    expect(
+      resolveModel(
+        GEMINI_MODEL_ALIAS_FLASH,
+        false,
+        false,
+        true,
+        config,
+        true,
+        true,
+      ),
+    ).toBe(DEFAULT_GEMINI_3_6_FLASH_MODEL);
+  });
+
+  it.each([
+    ['legacy', undefined],
+    ['dynamic', dynamicConfig],
+  ])(
+    'resolves a classifier-selected Flash model when enabled in %s mode',
+    (_mode, config) => {
+      expect(
+        resolveClassifierModel(
+          GEMINI_MODEL_ALIAS_AUTO,
+          GEMINI_MODEL_ALIAS_FLASH,
+          false,
+          false,
+          true,
+          config,
+          true,
+          true,
+        ),
+      ).toBe(DEFAULT_GEMINI_3_6_FLASH_MODEL);
+    },
+  );
+});
+
 describe('resolveModel Gemini 3.5 Flash GA', () => {
   it('should resolve all but preview flash models to DEFAULT_GEMINI_FLASH_MODEL when useGemini3_5Flash is true (legacy)', () => {
     expect(

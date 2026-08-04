@@ -163,6 +163,7 @@ export class ModelConfigService {
     const shouldShowPreviewModels = context.hasAccessToPreview ?? false;
     const useGemini31 = context.useGemini3_1 ?? false;
     const useGemini3_5Flash = context.useGemini3_5Flash ?? false;
+    const useGemini3_6Flash = context.useGemini3_6Flash ?? false;
 
     const mainOptions = Object.entries(definitions)
       .filter(([_, m]) => {
@@ -178,6 +179,7 @@ export class ModelConfigService {
             shouldShowPreviewModels,
             useGemini31,
             useGemini3_5Flash,
+            useGemini3_6Flash,
           );
         } else if (id === 'auto-gemini-3' && useGemini31) {
           description = description.replace('gemini-3-pro', 'gemini-3.1-pro');

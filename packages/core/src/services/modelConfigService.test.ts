@@ -10,6 +10,7 @@ import {
   type ModelConfigAlias,
   type ModelConfigServiceConfig,
 } from './modelConfigService.js';
+import { DEFAULT_MODEL_CONFIGS } from '../config/defaultModelConfigs.js';
 
 describe('ModelConfigService', () => {
   it('should resolve a basic alias to its model and settings', () => {
@@ -1156,6 +1157,19 @@ describe('ModelConfigService', () => {
 });
 
 describe('ModelConfigService Gemini 3.5+ compatibility', () => {
+  it('describes Gemini 3.6 Flash when the independent rollout is enabled', () => {
+    const service = new ModelConfigService(DEFAULT_MODEL_CONFIGS);
+
+    const auto = service
+      .getAvailableModelOptions({
+        hasAccessToPreview: true,
+        useGemini3_6Flash: true,
+      })
+      .find((option) => option.modelId === 'auto');
+
+    expect(auto?.description).toContain('gemini-3.6-flash');
+  });
+
   it.each(['gemini-3.6-flash', 'gemini-3.5-flash-lite'])(
     'removes unsupported sampling parameters for %s',
     (model) => {
