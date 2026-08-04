@@ -46,7 +46,7 @@ export class SglangContentGenerator implements ContentGenerator {
   private defaultModel: string;
 
   constructor(
-    baseUrl: string = 'http://localhost:30100/v1',
+    baseUrl: string = 'http://127.0.0.1:30100/v1',
     defaultModel: string = 'moonshotai/Kimi-K3',
   ) {
     this.baseUrl = baseUrl.replace(/\/$/, '');

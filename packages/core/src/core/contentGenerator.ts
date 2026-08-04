@@ -424,7 +424,7 @@ export async function createContentGenerator(
         config.baseUrl ||
         process.env['SGLANG_BASE_URL'] ||
         process.env['OPENAI_BASE_URL'] ||
-        'http://localhost:30100/v1';
+        'http://127.0.0.1:30100/v1';
       const modelName =
         (gcConfig as { getModel?: () => string }).getModel?.() ||
         process.env['SGLANG_MODEL'] ||
