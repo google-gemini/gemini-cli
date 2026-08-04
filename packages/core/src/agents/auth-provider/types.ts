@@ -84,7 +84,12 @@ export interface OAuth2AuthConfig extends BaseAuthConfig {
   registration_url?: string;
 }
 
-/** Client config corresponding to OpenIdConnectSecurityScheme. */
+/**
+ * Client config corresponding to OpenIdConnectSecurityScheme.
+ *
+ * Reserved for future use: no provider is implemented yet, so configuring this
+ * type is rejected during auth validation. See `A2AAuthProviderFactory.create`.
+ */
 export interface OpenIdConnectAuthConfig extends BaseAuthConfig {
   type: 'openIdConnect';
   issuer_url: string;

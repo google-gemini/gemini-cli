@@ -256,7 +256,10 @@ describe('A2AAuthProviderFactory', () => {
     });
 
     describe('openIdConnect scheme matching', () => {
-      it('should match openIdConnect config with openIdConnect scheme', () => {
+      it('should reject openIdConnect config because no provider exists yet', () => {
+        // create() has no openIdConnect branch, so validation must not report
+        // this config as usable; otherwise the failure lands later, when the
+        // agent is connected.
         const authConfig: A2AAuthConfig = {
           type: 'openIdConnect',
           issuer_url: 'https://auth.example.com',
@@ -275,7 +278,36 @@ describe('A2AAuthProviderFactory', () => {
           securitySchemes,
         );
 
-        expect(result).toEqual({ valid: true });
+        expect(result.valid).toBe(false);
+        expect(result.diff?.missingConfig).toContain(
+          "Scheme 'oidcAuth' requires OpenID Connect authentication (not yet supported)",
+        );
+      });
+
+      it('should not report a config as valid that create() cannot construct', async () => {
+        const authConfig: A2AAuthConfig = {
+          type: 'openIdConnect',
+          issuer_url: 'https://auth.example.com',
+          client_id: 'client-id',
+        };
+        const securitySchemes: Record<string, SecurityScheme> = {
+          oidcAuth: {
+            type: 'openIdConnect',
+            openIdConnectUrl:
+              'https://auth.example.com/.well-known/openid-configuration',
+          },
+        };
+
+        const validation = A2AAuthProviderFactory.validateAuthConfig(
+          authConfig,
+          securitySchemes,
+        );
+        const create = A2AAuthProviderFactory.createFromConfig(authConfig);
+
+        await expect(create).rejects.toThrow(
+          'openIdConnect auth provider not yet implemented',
+        );
+        expect(validation.valid).toBe(false);
       });
 
       it('should not match google-credentials for openIdConnect scheme', () => {
@@ -297,7 +329,7 @@ describe('A2AAuthProviderFactory', () => {
 
         expect(result.valid).toBe(false);
         expect(result.diff?.missingConfig).toContain(
-          "Scheme 'oidcAuth' requires OpenID Connect authentication",
+          "Scheme 'oidcAuth' requires OpenID Connect authentication (not yet supported)",
         );
       });
     });

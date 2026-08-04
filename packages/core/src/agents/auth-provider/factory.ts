@@ -201,12 +201,12 @@ export class A2AAuthProviderFactory {
           );
           break;
 
+        // Reported as unsupported rather than matched: create() has no
+        // openIdConnect branch, so matching here would let configuration pass
+        // validation and then fail when the agent is actually connected.
         case 'openIdConnect':
-          if (authConfig.type === 'openIdConnect') {
-            return { matched: true, missingConfig: [] };
-          }
           missingConfig.push(
-            `Scheme '${schemeName}' requires OpenID Connect authentication`,
+            `Scheme '${schemeName}' requires OpenID Connect authentication (not yet supported)`,
           );
           break;
 
