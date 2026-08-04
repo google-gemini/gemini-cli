@@ -46,7 +46,10 @@ export {
   getSettingsSchema,
 };
 
-import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
+import {
+  resolveEnvVarsInObject,
+  resolveEnvVarsInString,
+} from '../utils/envVarResolver.js';
 import { customDeepMerge } from '../utils/deepMerge.js';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
 import {
@@ -679,17 +682,7 @@ export function loadEnvironment(
 
   const envFilePath = findEnvFile(workspaceDir, isTrusted, shouldIgnoreEnv);
 
-  // Cloud Shell environment variable handling
-  if (process.env['CLOUD_SHELL'] === 'true') {
-    const selectedAuthType = settings.security?.auth?.selectedType;
-    setUpCloudShellEnvironment(
-      envFilePath,
-      isTrusted,
-      isSandboxed,
-      selectedAuthType,
-    );
-  }
-
+  // 1. Load variables from `.env` file first so they are available in process.env
   if (envFilePath) {
     // Manually parse and load environment variables to handle exclusions correctly.
     // This avoids modifying environment variables that were already set from the shell.
@@ -727,6 +720,22 @@ export function loadEnvironment(
     } catch {
       // Errors are ignored to match the behavior of `dotenv.config({ quiet: true })`.
     }
+  }
+
+  // 2. Now that process.env is fully populated, expand the selected auth type
+  const rawAuthType = settings.security?.auth?.selectedType;
+  const selectedAuthType = rawAuthType
+    ? resolveEnvVarsInString(rawAuthType)
+    : undefined;
+
+  // 3. Cloud Shell environment variable handling (using the fully expanded auth type)
+  if (process.env['CLOUD_SHELL'] === 'true') {
+    setUpCloudShellEnvironment(
+      envFilePath,
+      isTrusted,
+      isSandboxed,
+      selectedAuthType,
+    );
   }
 }
 
@@ -778,7 +787,7 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
 
   const load = (
     filePath: string,
-  ): { settings: Settings; rawSettings: Settings; rawJson?: string } => {
+  ): { rawSettings: Settings; rawJson?: string } => {
     try {
       if (fs.existsSync(filePath)) {
         const content = fs.readFileSync(filePath, 'utf-8');
@@ -794,43 +803,11 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
             path: filePath,
             severity: 'error',
           });
-          return { settings: {}, rawSettings: {} };
+          return { rawSettings: {} };
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const settingsObject = rawSettings as Record<string, unknown>;
-
-        // Expand environment variables
-        const expandedSettings = resolveEnvVarsInObject(
-          settingsObject as Settings,
-        );
-
-        // Validate settings structure with Zod after environment variable expansion
-        const validationResult = validateSettings(expandedSettings);
-        if (!validationResult.success && validationResult.error) {
-          const errorMessage = formatValidationError(
-            validationResult.error,
-            filePath,
-          );
-          settingsErrors.push({
-            message: errorMessage,
-            path: filePath,
-            severity: 'warning',
-          });
-          return {
-            settings: expandedSettings,
-            rawSettings: settingsObject as Settings,
-            rawJson: content,
-          };
-        }
-
-        // Return the successfully cast and validated data
         return {
-          // Since we've successfully validated expandedSettings against settingsZodSchema,
-          // it's safe to cast the resulting data to the Settings type.
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          settings: (validationResult.data as Settings) ?? expandedSettings,
-          rawSettings: settingsObject as Settings,
+          rawSettings: rawSettings as Settings,
           rawJson: content,
         };
       }
@@ -841,42 +818,136 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
         severity: 'error',
       });
     }
-    return { settings: {}, rawSettings: {} };
+    return { rawSettings: {} };
   };
 
-  const systemResult = load(systemSettingsPath);
-  const systemDefaultsResult = load(systemDefaultsPath);
-  const userResult = load(USER_SETTINGS_PATH);
+  const systemRawResult = load(systemSettingsPath);
+  const systemDefaultsRawResult = load(systemDefaultsPath);
+  const userRawResult = load(USER_SETTINGS_PATH);
 
-  let workspaceResult: {
-    settings: Settings;
+  let workspaceRawResult: {
     rawSettings: Settings;
     rawJson?: string;
   } = {
-    settings: {} as Settings,
     rawSettings: {} as Settings,
     rawJson: undefined,
   };
   if (!storage.isWorkspaceHomeDir()) {
-    workspaceResult = load(workspaceSettingsPath);
+    workspaceRawResult = load(workspaceSettingsPath);
   }
 
-  const systemOriginalSettings = structuredClone(systemResult.rawSettings);
+  // Support legacy theme names in the raw settings
+  if (userRawResult.rawSettings.ui?.theme === 'VS') {
+    userRawResult.rawSettings.ui.theme = DefaultLight.name;
+  } else if (userRawResult.rawSettings.ui?.theme === 'VS2015') {
+    userRawResult.rawSettings.ui.theme = DefaultDark.name;
+  }
+  if (workspaceRawResult.rawSettings.ui?.theme === 'VS') {
+    workspaceRawResult.rawSettings.ui.theme = DefaultLight.name;
+  } else if (workspaceRawResult.rawSettings.ui?.theme === 'VS2015') {
+    workspaceRawResult.rawSettings.ui.theme = DefaultDark.name;
+  }
+
+  // Helper to expand environment variables and coerce types using Zod schema validation
+  const expandAndCast = (settings: Settings): Settings => {
+    const expanded = resolveEnvVarsInObject(settings);
+    const validated = validateSettings(expanded);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    return (validated.data as Settings) ?? expanded;
+  };
+
+  // For the initial trust check, we can only use user and system settings.
+  const initialTrustCheckSettings = expandAndCast(
+    customDeepMerge(
+      getMergeStrategyForPath,
+      getDefaultsFromSchema(),
+      systemDefaultsRawResult.rawSettings,
+      userRawResult.rawSettings,
+      systemRawResult.rawSettings,
+    ) as Settings,
+  );
+  const isTrusted =
+    isWorkspaceTrusted(initialTrustCheckSettings, workspaceDir).isTrusted ??
+    false;
+
+  // Create a temporary merged settings object to pass to loadEnvironment.
+  const tempMergedSettings = expandAndCast(
+    mergeSettings(
+      systemRawResult.rawSettings,
+      systemDefaultsRawResult.rawSettings,
+      userRawResult.rawSettings,
+      workspaceRawResult.rawSettings,
+      isTrusted,
+    ),
+  );
+
+  // loadEnvironment depends on settings so we have to create a temp version of
+  // the settings to avoid a cycle. This loads environment variables from .env files!
+  loadEnvironment(tempMergedSettings, workspaceDir);
+
+  // Now process (expand environment variables and validate) each settings scope
+  const resolveAndValidate = (
+    filePath: string,
+    rawSettings: Settings,
+    rawJson?: string,
+  ): Settings => {
+    if (!rawJson) {
+      return {} as Settings;
+    }
+
+    // Expand environment variables (now with .env files fully loaded in process.env!)
+    const expandedSettings = resolveEnvVarsInObject(rawSettings);
+
+    // Validate settings structure with Zod after environment variable expansion
+    const validationResult = validateSettings(expandedSettings);
+    if (!validationResult.success && validationResult.error) {
+      const errorMessage = formatValidationError(
+        validationResult.error,
+        filePath,
+      );
+      settingsErrors.push({
+        message: errorMessage,
+        path: filePath,
+        severity: 'warning',
+      });
+      return expandedSettings;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    return (validationResult.data as Settings) ?? expandedSettings;
+  };
+
+  systemSettings = resolveAndValidate(
+    systemSettingsPath,
+    systemRawResult.rawSettings,
+    systemRawResult.rawJson,
+  );
+  systemDefaultSettings = resolveAndValidate(
+    systemDefaultsPath,
+    systemDefaultsRawResult.rawSettings,
+    systemDefaultsRawResult.rawJson,
+  );
+  userSettings = resolveAndValidate(
+    USER_SETTINGS_PATH,
+    userRawResult.rawSettings,
+    userRawResult.rawJson,
+  );
+  workspaceSettings = resolveAndValidate(
+    workspaceSettingsPath,
+    workspaceRawResult.rawSettings,
+    workspaceRawResult.rawJson,
+  );
+
+  const systemOriginalSettings = structuredClone(systemRawResult.rawSettings);
   const systemDefaultsOriginalSettings = structuredClone(
-    systemDefaultsResult.rawSettings,
+    systemDefaultsRawResult.rawSettings,
   );
-  const userOriginalSettings = structuredClone(userResult.rawSettings);
+  const userOriginalSettings = structuredClone(userRawResult.rawSettings);
   const workspaceOriginalSettings = structuredClone(
-    workspaceResult.rawSettings,
+    workspaceRawResult.rawSettings,
   );
 
-  // Environment variables for runtime use are already resolved and validated in load()
-  systemSettings = systemResult.settings;
-  systemDefaultSettings = systemDefaultsResult.settings;
-  userSettings = userResult.settings;
-  workspaceSettings = workspaceResult.settings;
-
-  // Support legacy theme names
+  // Support legacy theme names in processed settings
   if (userSettings.ui?.theme === 'VS') {
     userSettings.ui.theme = DefaultLight.name;
   } else if (userSettings.ui?.theme === 'VS2015') {
@@ -887,31 +958,6 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
   } else if (workspaceSettings.ui?.theme === 'VS2015') {
     workspaceSettings.ui.theme = DefaultDark.name;
   }
-
-  // For the initial trust check, we can only use user and system settings.
-  const initialTrustCheckSettings = customDeepMerge(
-    getMergeStrategyForPath,
-    getDefaultsFromSchema(),
-    systemDefaultSettings,
-    userSettings,
-    systemSettings,
-  );
-  const isTrusted =
-    isWorkspaceTrusted(initialTrustCheckSettings as Settings, workspaceDir)
-      .isTrusted ?? false;
-
-  // Create a temporary merged settings object to pass to loadEnvironment.
-  const tempMergedSettings = mergeSettings(
-    systemSettings,
-    systemDefaultSettings,
-    userSettings,
-    workspaceSettings,
-    isTrusted,
-  );
-
-  // loadEnvironment depends on settings so we have to create a temp version of
-  // the settings to avoid a cycle
-  loadEnvironment(tempMergedSettings, workspaceDir);
 
   // Check for any fatal errors before proceeding
   const fatalErrors = settingsErrors.filter((e) => e.severity === 'error');
@@ -929,28 +975,28 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
       path: systemSettingsPath,
       settings: systemSettings,
       originalSettings: systemOriginalSettings,
-      rawJson: systemResult.rawJson,
+      rawJson: systemRawResult.rawJson,
       readOnly: true,
     },
     {
       path: systemDefaultsPath,
       settings: systemDefaultSettings,
       originalSettings: systemDefaultsOriginalSettings,
-      rawJson: systemDefaultsResult.rawJson,
+      rawJson: systemDefaultsRawResult.rawJson,
       readOnly: true,
     },
     {
       path: USER_SETTINGS_PATH,
       settings: userSettings,
       originalSettings: userOriginalSettings,
-      rawJson: userResult.rawJson,
+      rawJson: userRawResult.rawJson,
       readOnly: false,
     },
     {
       path: storage.isWorkspaceHomeDir() ? '' : workspaceSettingsPath,
       settings: workspaceSettings,
       originalSettings: workspaceOriginalSettings,
-      rawJson: workspaceResult.rawJson,
+      rawJson: workspaceRawResult.rawJson,
       readOnly: storage.isWorkspaceHomeDir(),
     },
     isTrusted,

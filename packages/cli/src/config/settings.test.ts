@@ -1378,6 +1378,44 @@ describe('Settings Loading and Merging', () => {
       delete process.env['TEST_API_KEY'];
     });
 
+    it('should resolve environment variables loaded from .env files', () => {
+      vi.stubEnv('TEST_VAR_FROM_DOT_ENV', undefined);
+
+      const workspaceEnvPath = path.join(MOCK_WORKSPACE_DIR, '.env');
+      const userSettingsContent: TestSettings = {
+        apiKey: '$TEST_VAR_FROM_DOT_ENV',
+      };
+
+      (mockFsExistsSync as Mock).mockImplementation((p: fs.PathLike) => {
+        const normalized = normalizePath(p);
+        return (
+          normalized === normalizePath(USER_SETTINGS_PATH) ||
+          normalized === normalizePath(workspaceEnvPath)
+        );
+      });
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          const normalized = normalizePath(p);
+          if (normalized === normalizePath(USER_SETTINGS_PATH)) {
+            return JSON.stringify(userSettingsContent);
+          }
+          if (normalized === normalizePath(workspaceEnvPath)) {
+            return 'TEST_VAR_FROM_DOT_ENV=resolved_from_dot_env';
+          }
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect((settings.user.settings as TestSettings)['apiKey']).toBe(
+        'resolved_from_dot_env',
+      );
+      expect((settings.merged as TestSettings)['apiKey']).toBe(
+        'resolved_from_dot_env',
+      );
+    });
+
     it('should resolve environment variables in workspace settings', () => {
       process.env['WORKSPACE_ENDPOINT'] = 'workspace_endpoint_from_env';
       const workspaceSettingsContent: TestSettings = {
@@ -2103,6 +2141,38 @@ describe('Settings Loading and Merging', () => {
 
       expect(settings.merged.tools?.sandbox).toBe(false); // User setting
       expect(settings.merged.context?.fileName).toBe('USER.md'); // User setting
+    });
+
+    it('should resolve environment variables in security settings using pre-existing process.env before checking trust', () => {
+      vi.stubEnv('ENABLE_FOLDER_TRUST', 'false');
+
+      const spyIsWorkspaceTrusted = vi.spyOn(
+        trustedFolders,
+        'isWorkspaceTrusted',
+      );
+
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const userSettingsContent = {
+        security: {
+          folderTrust: {
+            enabled: '$ENABLE_FOLDER_TRUST',
+          },
+        },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (normalizePath(p) === normalizePath(USER_SETTINGS_PATH))
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(spyIsWorkspaceTrusted).toHaveBeenCalled();
+      const passedSettings = spyIsWorkspaceTrusted.mock.calls[0][0];
+      expect(passedSettings.security?.folderTrust?.enabled).toBe(false);
     });
   });
 
@@ -3528,6 +3598,51 @@ MALICIOUS_VAR=allowed-because-trusted
         expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe(
           'attacker-projectinject',
         );
+      });
+
+      it('should resolve placeholders in selected auth type during loadSettings and skip Cloud Shell override', () => {
+        vi.stubEnv('CLOUD_SHELL', 'true');
+        vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'my-vertex-project');
+        vi.stubEnv('MOCK_AUTH_TYPE', undefined);
+
+        vi.mocked(isWorkspaceTrusted).mockReturnValue({
+          isTrusted: true,
+          source: 'file',
+        });
+
+        const workspaceEnvPath = path.join(MOCK_WORKSPACE_DIR, '.env');
+        (mockFsExistsSync as Mock).mockImplementation((p: fs.PathLike) => {
+          const norm = normalizePath(p);
+          return (
+            norm === normalizePath(USER_SETTINGS_PATH) ||
+            norm === normalizePath(workspaceEnvPath)
+          );
+        });
+
+        const userSettingsContent = {
+          security: {
+            auth: {
+              selectedType: '$MOCK_AUTH_TYPE',
+            },
+          },
+        };
+
+        (fs.readFileSync as Mock).mockImplementation(
+          (p: fs.PathOrFileDescriptor) => {
+            const norm = normalizePath(p);
+            if (norm === normalizePath(USER_SETTINGS_PATH)) {
+              return JSON.stringify(userSettingsContent);
+            }
+            if (norm === normalizePath(workspaceEnvPath)) {
+              return 'MOCK_AUTH_TYPE=vertex-ai';
+            }
+            return '{}';
+          },
+        );
+
+        loadSettings(MOCK_WORKSPACE_DIR);
+
+        expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe('my-vertex-project');
       });
     });
   });
