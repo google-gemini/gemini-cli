@@ -121,6 +121,25 @@ export function startCallbackServer(
   const responsePromise = new Promise<OAuthAuthorizationResponse>(
     (resolve, reject) => {
       let serverPort: number;
+      let cleanedUp = false;
+      const abortController = new AbortController();
+
+      const cleanup = () => {
+        if (cleanedUp) return;
+        cleanedUp = true;
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = undefined;
+        }
+        abortController.signal.removeEventListener('abort', onAbort);
+        server.close();
+      };
+
+      const onAbort = () => {
+        cleanup();
+        reject(abortController.signal.reason);
+      };
+      abortController.signal.addEventListener('abort', onAbort, { once: true });
 
       const server = http.createServer(
         async (req: http.IncomingMessage, res: http.ServerResponse) => {
@@ -149,7 +168,7 @@ export function startCallbackServer(
                 </body>
               </html>
             `);
-              server.close();
+              cleanup();
               reject(new Error(`OAuth error: ${error}`));
               return;
             }
@@ -163,7 +182,7 @@ export function startCallbackServer(
             if (state !== expectedState) {
               res.writeHead(400);
               res.end('Invalid state parameter');
-              server.close();
+              cleanup();
               reject(new Error('State mismatch - possible CSRF attack'));
               return;
             }
@@ -180,16 +199,17 @@ export function startCallbackServer(
             </html>
           `);
 
-            server.close();
+            cleanup();
             resolve({ code, state });
           } catch (error) {
-            server.close();
+            cleanup();
             reject(error);
           }
         },
       );
 
       server.on('error', (error) => {
+        cleanup();
         portReject(error);
         reject(error);
       });
@@ -204,6 +224,7 @@ export function startCallbackServer(
           const error = new Error(
             `Invalid value for OAUTH_CALLBACK_PORT: "${portStr}"`,
           );
+          cleanup();
           portReject(error);
           reject(error);
           return;
@@ -223,7 +244,6 @@ export function startCallbackServer(
         portResolve(serverPort); // Resolve port promise immediately
       });
 
-      const abortController = new AbortController();
       timeoutId = setTimeout(
         () => {
           abortController.abort(new Error('OAuth callback timeout'));
@@ -232,14 +252,8 @@ export function startCallbackServer(
       );
       timeoutId.unref();
 
-      const onAbort = () => {
-        server.close();
-        reject(abortController.signal.reason);
-      };
-      abortController.signal.addEventListener('abort', onAbort, { once: true });
-
       server.on('close', () => {
-        abortController.signal.removeEventListener('abort', onAbort);
+        cleanup();
       });
     },
   );

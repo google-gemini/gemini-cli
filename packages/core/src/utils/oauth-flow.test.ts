@@ -327,6 +327,38 @@ describe('oauth-flow', () => {
         vi.useRealTimers();
       }
     });
+
+    it('should clear the timeout on successful callback', async () => {
+      const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
+      const server = startCallbackServer('test-state');
+      const port = await server.port;
+
+      await realFetch(
+        `http://localhost:${port}${REDIRECT_PATH}?code=abc&state=test-state`,
+      );
+      await server.response;
+
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+      clearTimeoutSpy.mockRestore();
+    });
+
+    it('should clear the timeout on callback state mismatch', async () => {
+      const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
+      const server = startCallbackServer('expected-state');
+      const port = await server.port;
+
+      const responseResult = server.response.catch((e: Error) => e);
+
+      await realFetch(
+        `http://localhost:${port}${REDIRECT_PATH}?code=abc&state=wrong-state`,
+      ).catch(() => {});
+
+      const error = await responseResult;
+      expect(error.message).toContain('State mismatch - possible CSRF attack');
+
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+      clearTimeoutSpy.mockRestore();
+    });
   });
 
   describe('exchangeCodeForToken', () => {
