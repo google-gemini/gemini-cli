@@ -28,15 +28,17 @@ enum GoogleApiType {
 export class TerminalQuotaError extends Error {
   retryDelayMs?: number;
   reason?: string;
+  status?: number;
 
   constructor(
     message: string,
-    override readonly cause: GoogleApiError,
+    override readonly cause?: GoogleApiError,
     retryDelaySeconds?: number,
     reason?: string,
   ) {
     super(message);
     this.name = 'TerminalQuotaError';
+    this.status = cause?.code;
     this.retryDelayMs = retryDelaySeconds
       ? retryDelaySeconds * 1000
       : undefined;
@@ -53,14 +55,16 @@ export class TerminalQuotaError extends Error {
  */
 export class RetryableQuotaError extends Error {
   retryDelayMs?: number;
+  status?: number;
 
   constructor(
     message: string,
-    override readonly cause: GoogleApiError,
+    override readonly cause?: GoogleApiError,
     retryDelaySeconds?: number,
   ) {
     super(message);
     this.name = 'RetryableQuotaError';
+    this.status = cause?.code;
     this.retryDelayMs = retryDelaySeconds
       ? retryDelaySeconds * 1000
       : undefined;
@@ -217,6 +221,20 @@ function classifyValidationRequiredError(
  * @returns A classified error or the original `unknown` error.
  */
 export function classifyGoogleError(error: unknown): unknown {
+  if (
+    error instanceof TerminalQuotaError ||
+    error instanceof RetryableQuotaError ||
+    error instanceof ValidationRequiredError ||
+    (typeof error === 'object' &&
+      error !== null &&
+      'name' in error &&
+      (error.name === 'TerminalQuotaError' ||
+        error.name === 'RetryableQuotaError' ||
+        error.name === 'ValidationRequiredError'))
+  ) {
+    return error;
+  }
+
   const googleApiError = parseGoogleApiError(error);
   const status = googleApiError?.code ?? getErrorStatus(error);
   const errorMessage = googleApiError?.message || extractErrorMessage(error);
