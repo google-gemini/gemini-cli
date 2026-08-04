@@ -21,7 +21,7 @@ import {
   buildAuthorizationUrl,
   exchangeCodeForToken,
   refreshAccessToken as refreshAccessTokenShared,
-  REDIRECT_PATH,
+  getRedirectUri,
   type OAuthFlowConfig,
   type OAuthTokenResponse,
 } from '../utils/oauth-flow.js';
@@ -99,8 +99,7 @@ export class MCPOAuthProvider {
     config: MCPOAuthConfig,
     redirectPort: number,
   ): Promise<OAuthClientRegistrationResponse> {
-    const redirectUri =
-      config.redirectUri || `http://localhost:${redirectPort}${REDIRECT_PATH}`;
+    const redirectUri = getRedirectUri(config, redirectPort);
 
     const registrationRequest: OAuthClientRegistrationRequest = {
       client_name: 'Gemini CLI MCP Client',

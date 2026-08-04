@@ -209,6 +209,20 @@ describe('oauth-flow', () => {
       const parsed = new URL(url);
       expect(parsed.searchParams.has('resource')).toBe(false);
     });
+
+    it('should use the Cloud Workstations proxy callback URL when running inside Cloud Workstations', () => {
+      vi.stubEnv('GOOGLE_CLOUD_WORKSTATIONS', 'true');
+      vi.stubEnv(
+        'WEB_HOST',
+        'my-workstation.cluster.workstations.cloud.google.com',
+      );
+
+      const url = buildAuthorizationUrl(baseConfig, basePkceParams, 3000);
+      const parsed = new URL(url);
+      expect(parsed.searchParams.get('redirect_uri')).toBe(
+        `https://3000-my-workstation.cluster.workstations.cloud.google.com${REDIRECT_PATH}`,
+      );
+    });
   });
 
   describe('startCallbackServer', () => {
@@ -491,6 +505,29 @@ describe('oauth-flow', () => {
         (mockFetch.mock.calls[0] as [string, RequestInit])[1].body as string,
       );
       expect(body.get('redirect_uri')).toBe('https://custom.example.com/cb');
+    });
+
+    it('should use the Cloud Workstations proxy callback URL when running inside Cloud Workstations', async () => {
+      vi.stubEnv('GOOGLE_CLOUD_WORKSTATIONS', 'true');
+      vi.stubEnv(
+        'WEB_HOST',
+        'my-workstation.cluster.workstations.cloud.google.com',
+      );
+
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse(
+          JSON.stringify({ access_token: 'tok', token_type: 'Bearer' }),
+        ),
+      );
+
+      await exchangeCodeForToken(baseConfig, 'code', 'verifier', 3000);
+
+      const body = new URLSearchParams(
+        (mockFetch.mock.calls[0] as [string, RequestInit])[1].body as string,
+      );
+      expect(body.get('redirect_uri')).toBe(
+        `https://3000-my-workstation.cluster.workstations.cloud.google.com${REDIRECT_PATH}`,
+      );
     });
 
     it('should default token_type to Bearer when missing from JSON response', async () => {

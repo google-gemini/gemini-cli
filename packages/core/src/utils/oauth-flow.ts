@@ -70,6 +70,25 @@ export interface OAuthTokenResponse {
 /** The path the local callback server listens on. */
 export const REDIRECT_PATH = '/oauth/callback';
 
+/**
+ * Helper to determine the redirect URI, taking Google Cloud Workstations proxy into account.
+ */
+export function getRedirectUri(
+  config: { redirectUri?: string },
+  redirectPort: number,
+): string {
+  if (config.redirectUri) {
+    return config.redirectUri;
+  }
+  if (
+    process.env['GOOGLE_CLOUD_WORKSTATIONS'] === 'true' &&
+    process.env['WEB_HOST']
+  ) {
+    return `https://${redirectPort}-${process.env['WEB_HOST']}${REDIRECT_PATH}`;
+  }
+  return `http://localhost:${redirectPort}${REDIRECT_PATH}`;
+}
+
 const HTTP_OK = 200;
 
 /**
@@ -291,8 +310,7 @@ export function buildAuthorizationUrl(
   redirectPort: number,
   resource?: string,
 ): string {
-  const redirectUri =
-    config.redirectUri || `http://localhost:${redirectPort}${REDIRECT_PATH}`;
+  const redirectUri = getRedirectUri(config, redirectPort);
 
   const params = new URLSearchParams({
     client_id: config.clientId,
@@ -446,8 +464,7 @@ export async function exchangeCodeForToken(
   redirectPort: number,
   resource?: string,
 ): Promise<OAuthTokenResponse> {
-  const redirectUri =
-    config.redirectUri || `http://localhost:${redirectPort}${REDIRECT_PATH}`;
+  const redirectUri = getRedirectUri(config, redirectPort);
 
   const params = new URLSearchParams({
     grant_type: 'authorization_code',
