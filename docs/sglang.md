@@ -11,18 +11,84 @@ This integration leverages OpenAI-compatible `/v1/chat/completions` endpoints wi
 
 ---
 
-## 1. Quick Start
+## 1. Prerequisites on Linux (Debian / Ubuntu / COS)
 
-### Step 1: Start your SGLang Server
+Before building, ensure you have **Node.js 20+**, **npm**, and build essentials installed on your Linux machine:
 
-Ensure your SGLang server is running and accessible (e.g. via `kubectl port-forward` or direct IP):
+### Install Node.js 20 and Build Tools
 
 ```bash
-# Example port-forward for GKE SGLang deployment
-kubectl port-forward -n <namespace> pod/<sglang-leader-pod> 30100:30100 &
+# Update package lists
+sudo apt-get update
+
+# Install git, curl, and native compilation tools
+sudo apt-get install -y git curl build-essential python3
+
+# Install Node.js 20.x LTS via NodeSource
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Verify versions
+node -v   # Should be v20.x or higher
+npm -v    # Should be 10.x or higher
 ```
 
-Verify that the endpoint responds:
+### Install GKE / Kubernetes Client Tools (If running on GKE)
+
+```bash
+# Install kubectl and GKE auth plugin
+sudo apt-get install -y kubectl google-cloud-cli-gke-gcloud-auth-plugin
+
+# Configure cluster credentials
+gcloud container clusters get-credentials <CLUSTER_NAME> \
+  --region <REGION> \
+  --project <PROJECT_ID>
+```
+
+---
+
+## 2. Building `feat/sglang-support` from Source
+
+Clone the repository, switch to the `feat/sglang-support` branch, install dependencies, and compile:
+
+```bash
+# 1. Clone the repository and checkout the feat/sglang-support branch
+git clone -b feat/sglang-support https://github.com/shivajid/gemini-cli.git
+cd gemini-cli
+
+# 2. Install workspace dependencies
+npm install
+
+# 3. Compile all packages (including @google/gemini-cli-core)
+npm run build
+
+# 4. Generate the standalone CLI binary bundle
+npm run bundle
+
+# 5. Link globally so the `gemini` command is available system-wide
+npm link
+```
+
+> **Tip for updating**: To pull future updates, simply run:
+> ```bash
+> git pull origin feat/sglang-support
+> npm run build && npm run bundle && npm link
+> ```
+
+---
+
+## 3. Quick Start & Connecting to SGLang
+
+### Step 1: Start SGLang Port-Forwarding
+
+If your SGLang server is running in Kubernetes / GKE, forward the API port to your local machine:
+
+```bash
+# Forward port 30100 from your SGLang leader pod
+kubectl port-forward -n <NAMESPACE> pod/<SGLANG_LEADER_POD> 30100:30100 &
+```
+
+Verify that the server is reachable:
 
 ```bash
 curl http://127.0.0.1:30100/v1/models
@@ -30,9 +96,7 @@ curl http://127.0.0.1:30100/v1/models
 
 ---
 
-### Step 2: Configure Environment Variables
-
-Export the base URL and the served model name:
+### Step 2: Set Environment Variables
 
 ```bash
 export SGLANG_BASE_URL="http://127.0.0.1:30100/v1"
@@ -40,15 +104,17 @@ export GEMINI_MODEL="moonshotai/Kimi-K3"
 export GEMINI_DEFAULT_AUTH_TYPE="sglang"
 ```
 
-> **Note**: Use `http://127.0.0.1:30100/v1` instead of `localhost` on container/Linux environments to avoid DNS resolution latency or missing `/etc/hosts` aliases.
+> **Note**: Always use `http://127.0.0.1:30100/v1` instead of `localhost` on Linux containers to avoid DNS resolution issues.
 
 ---
 
-### Step 3: Configure `~/.gemini/settings.json` (Optional)
+### Step 3: Configure Settings (Optional)
 
-You can persist SGLang authentication in your user settings:
+Create or update `~/.gemini/settings.json` to persist the SGLang authentication:
 
-```json
+```bash
+mkdir -p ~/.gemini
+cat << 'EOF' > ~/.gemini/settings.json
 {
   "general": {
     "enableAutoUpdateNotification": false
@@ -59,27 +125,30 @@ You can persist SGLang authentication in your user settings:
     }
   }
 }
+EOF
 ```
 
 ---
 
-### Step 4: Launch Gemini CLI
+### Step 4: Run Gemini CLI
+
+Start an interactive chat session:
 
 ```bash
 gemini
 ```
 
-Or run a single prompt:
+Or pass an immediate prompt:
 
 ```bash
-gemini "Hello Kimi-K3! Explain what files are in this project."
+gemini "Hello Kimi-K3! List the files in this directory."
 ```
 
 ---
 
-## 2. Interactive Authentication
+## 4. Interactive Authentication Menu
 
-If you launch `gemini` without predefined settings, or type `/auth` inside the interactive session, choose:
+If you run `gemini` without predefined settings, or type `/auth` inside an active session:
 
 ```
 ? How would you like to authenticate for this project?
@@ -89,51 +158,32 @@ If you launch `gemini` without predefined settings, or type `/auth` inside the i
   4. Vertex AI
 ```
 
-Press **Enter** on **SGLang Server**. Gemini CLI will connect directly without requiring a Google account or API key.
+Select **`1. SGLang Server (Local / Remote Kimi-K3)`** to bypass Google credentials and route traffic directly to your SGLang endpoint.
 
 ---
 
-## 3. Supported Configuration Options
+## 5. Configuration Reference
 
-| Environment Variable | Description | Default |
+| Variable / Setting | Description | Default |
 |---|---|---|
-| `SGLANG_BASE_URL` | Base URL of the SGLang OpenAI-compatible API endpoint | `http://127.0.0.1:30100/v1` |
-| `OPENAI_BASE_URL` | Fallback URL if `SGLANG_BASE_URL` is not set | `http://127.0.0.1:30100/v1` |
-| `GEMINI_MODEL` / `SGLANG_MODEL` | Model identifier matching the `--served-model-name` | `moonshotai/Kimi-K3` |
+| `SGLANG_BASE_URL` | Base URL of the OpenAI-compatible SGLang server | `http://127.0.0.1:30100/v1` |
+| `OPENAI_BASE_URL` | Secondary fallback base URL | `http://127.0.0.1:30100/v1` |
+| `GEMINI_MODEL` / `SGLANG_MODEL` | Served model name on SGLang | `moonshotai/Kimi-K3` |
 | `GEMINI_DEFAULT_AUTH_TYPE` | Default auth method (`sglang`, `oauth-personal`, `gemini-api-key`) | `oauth-personal` |
+| `enableAutoUpdateNotification` | Set to `false` in `settings.json` to hide git update banners | `true` |
 
 ---
 
-## 4. Architecture & Implementation Details
+## 6. Troubleshooting
 
-1. **`SglangContentGenerator`** ([`packages/core/src/core/sglangContentGenerator.ts`](../packages/core/src/core/sglangContentGenerator.ts)):
-   - Implements the core `ContentGenerator` interface.
-   - Converts Gemini's `Content[]` structure (parts, function responses, and system instructions) to OpenAI `messages` format.
-   - Translates tool schemas into valid JSON schemas with lowercase types (`object`, `string`, `array`, `number`, `boolean`).
-   - Accumulates streaming tool calls and emits `functionCall` events to Gemini's tool dispatcher.
-   - Streams `reasoning_content` with `thought: true` metadata.
+### 1. `socket.gaierror: [Errno -2] Name or service not known`
+- **Cause**: Linux environment does not resolve `localhost` in `/etc/hosts`.
+- **Fix**: Use numeric IP `http://127.0.0.1:30100/v1`.
 
-2. **Model Resolution & Whitelist** ([`packages/core/src/config/models.ts`](../packages/core/src/config/models.ts)):
-   - Adds custom models (such as `moonshotai/Kimi-K3`) to active model checks to prevent fallback errors.
+### 2. `Connection refused`
+- **Cause**: SGLang server is initializing or `kubectl port-forward` terminated.
+- **Fix**: Check `kubectl get pods -n <namespace>` and restart port-forwarding.
 
-3. **Authentication Validation** ([`packages/cli/src/config/auth.ts`](../packages/cli/src/config/auth.ts)):
-   - Accepts `AuthType.SGLANG` (`sglang`) without demanding external Google Cloud or Gemini API credentials.
-
----
-
-## 5. Troubleshooting
-
-### `Name or service not known`
-- **Cause**: The container/VM does not have `localhost` defined in `/etc/hosts`.
-- **Fix**: Set `export SGLANG_BASE_URL="http://127.0.0.1:30100/v1"` using the numeric IP.
-
-### `Connection refused`
-- **Cause**: SGLang server is not running, or `kubectl port-forward` process terminated.
-- **Fix**: Verify SGLang pod status with `kubectl get pods -n <namespace>` and restart port-forwarding:
-  ```bash
-  kubectl port-forward -n <namespace> pod/<pod-name> 30100:30100 &
-  ```
-
-### `Model not found`
-- **Cause**: Gemini CLI defaulted to `gemini-api-key` or `oauth-personal` stored in `~/.gemini/settings.json`.
-- **Fix**: Run `/auth` in the CLI and select `SGLang Server`, or update `~/.gemini/settings.json` with `"selectedType": "sglang"`.
+### 3. `Model "moonshotai/Kimi-K3" was not found`
+- **Cause**: Saved setting in `~/.gemini/settings.json` is still set to Google API (`gemini-api-key` or `oauth-personal`).
+- **Fix**: Run `/auth` and select **SGLang Server**, or set `"selectedType": "sglang"` in `~/.gemini/settings.json`.

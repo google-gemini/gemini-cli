@@ -72,6 +72,29 @@ conda activate gemini_env
 npm install -g @google/gemini-cli
 ```
 
+#### Build from Source with SGLang Support (Linux / macOS)
+
+To connect Gemini CLI to local or remote SGLang / OpenAI inference servers (e.g., Moonshot Kimi-K3):
+
+```bash
+# 1. Clone the branch
+git clone -b feat/sglang-support https://github.com/shivajid/gemini-cli.git
+cd gemini-cli
+
+# 2. Install dependencies & build binary bundle
+npm install
+npm run build
+npm run bundle
+npm link
+
+# 3. Configure and run with SGLang
+export SGLANG_BASE_URL="http://127.0.0.1:30100/v1"
+export GEMINI_MODEL="moonshotai/Kimi-K3"
+gemini
+```
+
+See the [SGLang Setup Guide](docs/sglang.md) for full Linux prerequisites and troubleshooting.
+
 ## Release Channels
 
 See [Releases](https://www.geminicli.com/docs/changelogs) for more details.
