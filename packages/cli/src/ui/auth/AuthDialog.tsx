@@ -44,6 +44,11 @@ export function AuthDialog({
   const [exiting, setExiting] = useState(false);
   let items = [
     {
+      label: 'SGLang Server (Local / Remote Kimi-K3)',
+      value: AuthType.SGLANG,
+      key: AuthType.SGLANG,
+    },
+    {
       label: 'Sign in with Google',
       value: AuthType.LOGIN_WITH_GOOGLE,
       key: AuthType.LOGIN_WITH_GOOGLE,

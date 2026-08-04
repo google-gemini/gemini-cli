@@ -32,6 +32,7 @@ import { getVersion, resolveModel } from '../../index.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
 import { ModelMappingContentGenerator } from './modelMappingContentGenerator.js';
 import { CCPA_AI_MODEL_MAPPINGS } from '../config/models.js';
+import { SglangContentGenerator } from './sglangContentGenerator.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -67,17 +68,22 @@ export enum AuthType {
   LEGACY_CLOUD_SHELL = 'cloud-shell',
   COMPUTE_ADC = 'compute-default-credentials',
   GATEWAY = 'gateway',
+  SGLANG = 'sglang',
 }
 
 /**
  * Detects the best authentication type based on environment variables.
  *
  * Checks in order:
- * 1. GOOGLE_GENAI_USE_GCA=true -> LOGIN_WITH_GOOGLE
- * 2. GOOGLE_GENAI_USE_VERTEXAI=true -> USE_VERTEX_AI
- * 3. GEMINI_API_KEY -> USE_GEMINI
+ * 1. SGLANG_BASE_URL or OPENAI_BASE_URL -> SGLANG
+ * 2. GOOGLE_GENAI_USE_GCA=true -> LOGIN_WITH_GOOGLE
+ * 3. GOOGLE_GENAI_USE_VERTEXAI=true -> USE_VERTEX_AI
+ * 4. GEMINI_API_KEY -> USE_GEMINI
  */
 export function getAuthTypeFromEnv(): AuthType | undefined {
+  if (process.env['SGLANG_BASE_URL'] || process.env['OPENAI_BASE_URL']) {
+    return AuthType.SGLANG;
+  }
   if (process.env['GOOGLE_GENAI_USE_GCA'] === 'true') {
     return AuthType.LOGIN_WITH_GOOGLE;
   }
@@ -408,6 +414,22 @@ export async function createContentGenerator(
         }),
       });
       return new LoggingContentGenerator(googleGenAI.models, gcConfig);
+    }
+    if (config.authType === AuthType.SGLANG) {
+      const baseUrl =
+        config.baseUrl ||
+        process.env['SGLANG_BASE_URL'] ||
+        process.env['OPENAI_BASE_URL'] ||
+        'http://localhost:30100/v1';
+      const modelName =
+        gcConfig.getModel?.() ||
+        process.env['SGLANG_MODEL'] ||
+        process.env['GEMINI_MODEL'] ||
+        'moonshotai/Kimi-K3';
+      return new LoggingContentGenerator(
+        new SglangContentGenerator(baseUrl, modelName) as never,
+        gcConfig,
+      );
     }
     throw new Error(
       `Error creating contentGenerator: Unsupported authType: ${config.authType}`,

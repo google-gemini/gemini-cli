@@ -84,6 +84,7 @@ export const PREVIEW_GEMINI_FLASH_LITE_MODEL = 'none';
 
 export const GEMMA_4_31B_IT_MODEL = 'gemma-4-31b-it';
 export const GEMMA_4_26B_A4B_IT_MODEL = 'gemma-4-26b-a4b-it';
+export const KIMI_K3_MODEL = 'moonshotai/Kimi-K3';
 
 export const VALID_GEMINI_MODELS = new Set([
   PREVIEW_GEMINI_MODEL,
@@ -99,6 +100,7 @@ export const VALID_GEMINI_MODELS = new Set([
 
   GEMMA_4_31B_IT_MODEL,
   GEMMA_4_26B_A4B_IT_MODEL,
+  KIMI_K3_MODEL,
 ]);
 
 /** @deprecated Use GEMINI_MODEL_ALIAS_AUTO instead. */
@@ -549,6 +551,9 @@ export function isActiveModel(
   useCustomToolModel: boolean = false,
   experimentalGemma: boolean = true,
 ): boolean {
+  if (model === KIMI_K3_MODEL || model.startsWith('moonshotai/') || model.includes('kimi')) {
+    return true;
+  }
   if (!VALID_GEMINI_MODELS.has(model) || model === 'none') {
     return false;
   }
