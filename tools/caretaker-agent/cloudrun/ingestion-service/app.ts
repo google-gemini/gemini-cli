@@ -188,7 +188,10 @@ app.post('/webhook', limiter, async (req, res) => {
       const isMaintainer = ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(
         payload.comment?.author_association || '',
       );
-      const isReporter = payload.sender?.login === payload.issue.user?.login;
+      const isReporter =
+        Boolean(payload.sender?.login) &&
+        Boolean(payload.issue.user?.login) &&
+        payload.sender?.login === payload.issue.user?.login;
 
       // Only Maintainer OR (comment mention AND reporter) allowed
       if (!isMaintainer && (isTriage || !isReporter)) {

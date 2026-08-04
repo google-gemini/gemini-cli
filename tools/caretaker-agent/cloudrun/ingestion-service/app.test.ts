@@ -388,6 +388,7 @@ describe('Webhook Server Endpoint', () => {
       });
 
       const res = await postComment({
+        id: 100,
         body: '@caretaker-agent info',
         author_association: 'NONE',
       });

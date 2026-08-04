@@ -121,6 +121,7 @@ export function isGitHubWebhookPayload(
   // 3. Validate 'comment' (if present for issue_comment events)
   if (o.comment) {
     if (
+      typeof o.comment.id !== 'number' ||
       typeof o.comment.body !== 'string' ||
       typeof o.comment.author_association !== 'string'
     ) {
