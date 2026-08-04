@@ -319,6 +319,41 @@ describe('Session', () => {
     expect(result).toMatchObject({ stopReason: 'end_turn' });
   });
 
+  it.each([
+    { type: 'MAX_TOKENS_EXCEEDED', reason: 'MAX_TOKENS' },
+    { type: 'SAFETY_BLOCKED', reason: 'SAFETY' },
+    { type: 'RECITATION_BLOCKED', reason: 'RECITATION' },
+    { type: 'OTHER_BLOCKED', reason: 'OTHER' },
+    { type: 'THINKING_ONLY_RESPONSE', reason: 'STOP' },
+  ])(
+    'should gracefully handle InvalidStreamError with type $type in ACP session',
+    async ({ type, reason }) => {
+      const error = new InvalidStreamError(
+        `Stream failed with ${reason}`,
+        type as InvalidStreamError['type'],
+      );
+      mockSendMessageStream.mockImplementation(() => {
+        async function* errorGen(): AsyncGenerator<
+          ServerGeminiStreamEvent,
+          void,
+          unknown
+        > {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          yield* [] as any;
+          throw error;
+        }
+        return errorGen();
+      });
+
+      const result = await session.prompt({
+        sessionId: 'session-1',
+        prompt: [{ type: 'text', text: 'Hi' }],
+      });
+
+      expect(result).toMatchObject({ stopReason: 'end_turn' });
+    },
+  );
+
   it('should handle /memory command', async () => {
     const handleCommandSpy = vi
       .spyOn(
