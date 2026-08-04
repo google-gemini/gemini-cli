@@ -188,13 +188,6 @@ export async function createContentGeneratorConfig(
   }
 
   if (authType === AuthType.USE_VERTEX_AI) {
-    if (geminiApiKey && !googleApiKey && !(googleCloudProject && googleCloudLocation)) {
-      throw new Error(
-        'Authentication failed: You are attempting to use the Vertex AI endpoint with a standard Gemini API key. ' +
-        'Vertex AI requires Google Cloud credentials. Please authenticate using standard Google Cloud methods ' +
-        '(e.g., `gcloud auth application-default login`) or switch your auth type to standard.'
-      );
-    }
     if (googleApiKey || (googleCloudProject && googleCloudLocation)) {
       contentGeneratorConfig.apiKey = googleApiKey;
       contentGeneratorConfig.vertexai = true;
@@ -388,6 +381,13 @@ export async function createContentGenerator(
         : undefined;
       const useVertex =
         config.vertexai ?? config.authType === AuthType.USE_VERTEX_AI;
+
+      // 1. Save original key and temporarily remove it for Vertex AI so ADC works correctly
+      const originalGeminiApiKey = process.env['GEMINI_API_KEY'];
+      if (config.authType === AuthType.USE_VERTEX_AI) {
+        delete process.env['GEMINI_API_KEY'];
+      }
+
       const googleGenAI = new GoogleGenAI({
         apiKey:
           config.authType === AuthType.GATEWAY
@@ -413,6 +413,11 @@ export async function createContentGenerator(
           },
         }),
       });
+
+      if (config.authType === AuthType.USE_VERTEX_AI && originalGeminiApiKey !== undefined) {
+        process.env['GEMINI_API_KEY'] = originalGeminiApiKey;
+      }
+
       return new LoggingContentGenerator(googleGenAI.models, gcConfig);
     }
     throw new Error(
