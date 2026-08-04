@@ -15,6 +15,20 @@ import {
   type AdminControlsSettings,
 } from '@google/gemini-cli-core';
 
+// Signals a supervising process (ACP client, systemd, container runtime)
+// may send to the bootstrap parent. Without forwarding, the parent dies on
+// its default disposition while the spawned child is reparented to PID 1
+// and keeps running - holding the OAuth session and allocated heap until
+// killed manually. See #25590.
+const FORWARDED_SIGNALS: readonly NodeJS.Signals[] = [
+  'SIGTERM',
+  'SIGHUP',
+  'SIGINT',
+  'SIGQUIT',
+  'SIGUSR1',
+  'SIGUSR2',
+];
+
 export async function relaunchOnExitCode(runner: () => Promise<number>) {
   while (true) {
     try {
@@ -71,9 +85,38 @@ export async function relaunchAppInChildProcess(
       }
     });
 
+    // Forward termination signals to the child so a supervised parent
+    // (kill -TERM <bootstrap-pid>) takes the child down with it instead of
+    // orphaning it. Use a Map of {signal -> handler} for precise cleanup on
+    // close/error; removeAllListeners would disturb unrelated subscribers,
+    // and leaking a handler per relaunch iteration trips
+    // MaxListenersExceededWarning after ~10 relaunches. #25590.
+    const forwarders = new Map<NodeJS.Signals, () => void>();
+    for (const sig of FORWARDED_SIGNALS) {
+      const handler = () => {
+        try {
+          child.kill(sig);
+        } catch {
+          // The child may have already exited; ignore the race.
+        }
+      };
+      forwarders.set(sig, handler);
+      process.on(sig, handler);
+    }
+    const removeForwarders = () => {
+      for (const [sig, handler] of forwarders) {
+        process.off(sig, handler);
+      }
+      forwarders.clear();
+    };
+
     return new Promise<number>((resolve, reject) => {
-      child.on('error', reject);
+      child.on('error', (err) => {
+        removeForwarders();
+        reject(err);
+      });
       child.on('close', (code) => {
+        removeForwarders();
         // Resume stdin before the parent process exits.
         process.stdin.resume();
         resolve(code ?? 1);
