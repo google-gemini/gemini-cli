@@ -101,7 +101,11 @@ export async function relaunchAppInChildProcess(
         }
       };
       forwarders.set(sig, handler);
-      process.on(sig, handler);
+      // Use once() so the first signal is forwarded to the child for a
+      // graceful shutdown, and a second signal (e.g. a second Ctrl+C while
+      // the child is hung) takes the default disposition and force-quits the
+      // parent instead of being silently forwarded again.
+      process.once(sig, handler);
     }
     const removeForwarders = () => {
       for (const [sig, handler] of forwarders) {
