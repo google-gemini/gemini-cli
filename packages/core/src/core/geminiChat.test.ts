@@ -228,6 +228,16 @@ describe('GeminiChat', () => {
 
     // Disable 429 simulation for tests
     setSimulate429(false);
+
+    // The mid-stream retry loop sleeps on a real timer (1s + 2s + 4s) between
+    // attempts, which exceeds the default 5s test timeout and silently killed
+    // every InvalidStreamError test before it reached its assertions. Run those
+    // delays instantly.
+    vi.spyOn(globalThis, 'setTimeout').mockImplementation(((fn: () => void) => {
+      fn();
+      return 0;
+    }) as unknown as typeof globalThis.setTimeout);
+
     // Reset history for each test by creating a new instance
     chat = new GeminiChat(mockConfig);
     mockConfig.getHookSystem = vi.fn().mockReturnValue(undefined);
@@ -997,6 +1007,92 @@ describe('GeminiChat', () => {
       expect(chat.agentHistory.length).toBe(initialHistoryLength + 1);
       const lastTurn = chat.agentHistory.get()[chat.agentHistory.length - 1];
       expect(lastTurn.content.parts?.[0]?.functionResponse).toBeDefined();
+    });
+
+    it('should not fuse the next user message into a preserved tool-response turn', async () => {
+      // Regression: when a stream fails mid tool-loop the tool response is
+      // deliberately preserved (see the test above), which leaves history
+      // ending on a user turn. The user's next message was then coalesced into
+      // that same turn as [functionResponse, text]. The model reads the
+      // trailing text as a continuation of the tool result and completes the
+      // sentence instead of answering it.
+      chat.agentHistory.push({
+        id: 'model-turn-1',
+        content: {
+          role: 'model',
+          parts: [{ functionCall: { name: 'test_tool', args: {} } }],
+        },
+      });
+
+      // 1. Tool response goes back, model returns nothing -> InvalidStreamError.
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        (async function* () {
+          yield {
+            candidates: [
+              { content: { role: 'model', parts: [] }, finishReason: 'STOP' },
+            ],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+      const failingStream = await chat.sendMessageStream(
+        { model: 'gemini-2.0-flash' },
+        [
+          {
+            functionResponse: {
+              name: 'test_tool',
+              response: { success: true },
+            },
+          },
+        ],
+        'prompt-id-fusion-setup',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      await expect(
+        (async () => {
+          for await (const _ of failingStream) {
+            // consume
+          }
+        })(),
+      ).rejects.toThrow(InvalidStreamError);
+
+      // 2. The user types a brand new instruction.
+      let capturedContents: Content[] = [];
+      vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
+        async (req) => {
+          capturedContents = req.contents as Content[];
+          return (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: { role: 'model', parts: [{ text: 'ok' }] },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })();
+        },
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-2.0-flash' },
+        'are you done?',
+        'prompt-id-fusion-check',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of stream) {
+        // consume
+      }
+
+      const fusedTurn = capturedContents.find(
+        (c) =>
+          c.role === 'user' &&
+          !!c.parts?.some((p) => !!p.functionResponse) &&
+          !!c.parts?.some((p) => p.text?.includes('are you done?')),
+      );
+      expect(fusedTurn).toBeUndefined();
     });
 
     it('should preserve mixed multimodal function responses during rollback when InvalidStreamError is thrown (regression)', async () => {

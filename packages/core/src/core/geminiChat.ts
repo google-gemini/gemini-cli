@@ -109,6 +109,13 @@ const MID_STREAM_RETRY_OPTIONS: MidStreamRetryOptions = {
 export const SYNTHETIC_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
 
 /**
+ * Stands in for a model turn that never arrived because the stream failed
+ * after a tool response was already committed to history.
+ */
+export const INTERRUPTED_RESPONSE_PLACEHOLDER =
+  '[The previous response was interrupted before it completed.]';
+
+/**
  * Internal interface for parts that carry the magic 'callIndex' property
  * used during model response consolidation.
  */
@@ -408,6 +415,16 @@ export class GeminiChat {
 
     let userContent = createUserContent(message);
     const isOriginalFunctionResponse = isFunctionResponse(userContent);
+
+    // A turn can end leaving history on an unanswered tool response: a stream
+    // error after the response was committed, or a cancelled tool call. Close
+    // it before recording a genuinely new user message, otherwise the two user
+    // turns are coalesced into one and the model continues the trailing text
+    // instead of answering it.
+    if (!isOriginalFunctionResponse) {
+      this.closeUnansweredToolResponseTurn();
+    }
+
     const { model } =
       this.context.config.modelConfigService.getResolvedConfig(modelConfigKey);
 
@@ -681,6 +698,28 @@ export class GeminiChat {
     };
 
     return streamWithRetries.call(this);
+  }
+
+  /**
+   * Appends a closing model turn when history ends with an unanswered tool
+   * response, so the next user message stays a turn of its own.
+   */
+  private closeUnansweredToolResponseTurn(): void {
+    const turns = this.agentHistory.get();
+    const last = turns[turns.length - 1];
+    if (
+      last?.content.role !== 'user' ||
+      !last.content.parts?.some((part) => !!part.functionResponse)
+    ) {
+      return;
+    }
+    this.agentHistory.push({
+      id: randomUUID(),
+      content: {
+        role: 'model',
+        parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+      },
+    });
   }
 
   private extractBinaryInjections(
