@@ -416,14 +416,17 @@ export async function createContentGenerator(
       });
       return new LoggingContentGenerator(googleGenAI.models, gcConfig);
     }
-    if (config.authType === AuthType.SGLANG) {
+    if (
+      config.authType === AuthType.SGLANG ||
+      String(config.authType).toLowerCase() === 'sglang'
+    ) {
       const baseUrl =
         config.baseUrl ||
         process.env['SGLANG_BASE_URL'] ||
         process.env['OPENAI_BASE_URL'] ||
         'http://localhost:30100/v1';
       const modelName =
-        gcConfig.getModel?.() ||
+        (gcConfig as { getModel?: () => string }).getModel?.() ||
         process.env['SGLANG_MODEL'] ||
         process.env['GEMINI_MODEL'] ||
         'moonshotai/Kimi-K3';
