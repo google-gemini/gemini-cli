@@ -49,6 +49,15 @@ from db.db_interface import (
 from preflight_filter import PreflightFilter
 
 
+def _remove_readonly(func: Any, path: str, exc_info: Any) -> None:
+    """Error handler to change read-only file permissions during rmtree."""
+    try:
+        os.chmod(path, 0o777)
+        func(path)
+    except Exception:
+        pass
+
+
 class OrchestrationError(Exception):
     """Raised when the orchestration loop encounters an unrecoverable failure."""
 
@@ -84,10 +93,11 @@ class Orchestrator:
         logging.info("Cleaning up evaluation repository path: %s", self.config.eval_dir)
         if os.path.exists(self.config.eval_dir):
             try:
-                shutil.rmtree(self.config.eval_dir)
+                shutil.rmtree(self.config.eval_dir, onerror=_remove_readonly)
             except OSError as e:
-                logging.warning("Failed to remove evaluation directory: %s. Overwriting.", e)
-            os.makedirs(self.config.eval_dir, exist_ok=True)
+                logging.error("Failed to remove evaluation directory: %s", e)
+                raise OrchestrationError(f"Failed to clean eval directory: {e}") from e
+        os.makedirs(self.config.eval_dir, exist_ok=True)
 
     def _sync_or_clone_repository(self) -> None:
         """Clones the target git repo or synchronizes it back to clean main branch."""
