@@ -228,10 +228,10 @@ export class SglangContentGenerator implements ContentGenerator {
     const parts: Part[] = [];
 
     if (message?.reasoning_content) {
-      parts.push({ text: message.reasoning_content });
+      parts.push({ text: message.reasoning_content, thought: true });
     }
     if (message?.content) {
-      parts.push({ text: message.content });
+      parts.push({ text: message.content, thought: false });
     }
 
     if (message?.tool_calls && Array.isArray(message.tool_calls)) {
@@ -255,7 +255,7 @@ export class SglangContentGenerator implements ContentGenerator {
       candidates: [
         {
           content: { parts, role: 'model' },
-          finishReason: choice?.finish_reason === 'stop' ? 'STOP' : 'MAX_TOKENS',
+          finishReason: choice?.finish_reason === 'stop' ? 'STOP' : 'STOP',
         },
       ],
       usageMetadata: {
@@ -310,6 +310,7 @@ export class SglangContentGenerator implements ContentGenerator {
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    let hasSentFinishReason = false;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -321,16 +322,63 @@ export class SglangContentGenerator implements ContentGenerator {
       for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed || !trimmed.startsWith('data: ')) continue;
-        if (trimmed === 'data: [DONE]') return;
-        try {
-          const json = JSON.parse(trimmed.slice(6));
-          const delta = json.choices?.[0]?.delta;
-          const textChunk = delta?.content || delta?.reasoning_content || '';
-          if (textChunk) {
+        if (trimmed === 'data: [DONE]') {
+          if (!hasSentFinishReason) {
+            hasSentFinishReason = true;
             yield {
               candidates: [
                 {
-                  content: { parts: [{ text: textChunk }], role: 'model' },
+                  content: { parts: [{ text: '' }], role: 'model' },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as GenerateContentResponse;
+          }
+          return;
+        }
+        try {
+          const json = JSON.parse(trimmed.slice(6));
+          const choice = json.choices?.[0];
+          const delta = choice?.delta;
+          const finishReason = choice?.finish_reason;
+
+          const parts: Part[] = [];
+          if (delta?.reasoning_content) {
+            parts.push({ text: delta.reasoning_content, thought: true });
+          }
+          if (delta?.content) {
+            parts.push({ text: delta.content, thought: false });
+          }
+          if (delta?.tool_calls && Array.isArray(delta.tool_calls)) {
+            for (const tc of delta.tool_calls) {
+              let args = {};
+              try {
+                args = JSON.parse(tc.function?.arguments || '{}');
+              } catch {
+                // ignore
+              }
+              parts.push({
+                functionCall: {
+                  name: tc.function?.name,
+                  args,
+                },
+              });
+            }
+          }
+
+          if (parts.length > 0 || finishReason) {
+            if (finishReason) {
+              hasSentFinishReason = true;
+            }
+            yield {
+              candidates: [
+                {
+                  content: { parts, role: 'model' },
+                  finishReason: finishReason
+                    ? finishReason === 'stop'
+                      ? 'STOP'
+                      : 'MAX_TOKENS'
+                    : undefined,
                 },
               ],
             } as GenerateContentResponse;
@@ -339,6 +387,17 @@ export class SglangContentGenerator implements ContentGenerator {
           // ignore partial chunks
         }
       }
+    }
+
+    if (!hasSentFinishReason) {
+      yield {
+        candidates: [
+          {
+            content: { parts: [{ text: '' }], role: 'model' },
+            finishReason: 'STOP',
+          },
+        ],
+      } as GenerateContentResponse;
     }
   }
 
