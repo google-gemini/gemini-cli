@@ -15,6 +15,7 @@ import {
   type ServerGeminiStreamEvent,
   type GeminiClient,
   type Content,
+  type Part,
   scheduleAgentTools,
   getAuthTypeFromEnv,
   type ToolRegistry,
@@ -25,6 +26,7 @@ import {
 } from '@google/gemini-cli-core';
 
 import { type Tool, SdkTool } from './tool.js';
+import { parseToolCallArguments } from './toolArguments.js';
 import { SdkAgentFilesystem } from './fs.js';
 import { SdkAgentShell } from './shell.js';
 import type {
@@ -246,15 +248,29 @@ export class GeminiCliSession {
       const stream = client.sendMessageStream(request, abortSignal, sessionId);
 
       const toolCallsToSchedule: ToolCallRequestInfo[] = [];
+      // Responses for calls we could not schedule because the model's arguments
+      // did not parse. These are sent back with the scheduled calls' responses
+      // so the model can correct itself, instead of the parse error escaping
+      // this generator and ending the session.
+      const malformedArgumentResponses: Part[] = [];
 
       for await (const event of stream) {
         yield event;
         if (event.type === GeminiEventType.ToolCallRequest) {
           const toolCall = event.value;
-          let args = toolCall.args;
-          if (typeof args === 'string') {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-            args = JSON.parse(args);
+          const { args, error } = parseToolCallArguments(
+            toolCall.name,
+            toolCall.args,
+          );
+          if (error) {
+            malformedArgumentResponses.push({
+              functionResponse: {
+                name: toolCall.name,
+                id: toolCall.callId,
+                response: { error },
+              },
+            });
+            continue;
           }
           toolCallsToSchedule.push({
             ...toolCall,
@@ -265,7 +281,10 @@ export class GeminiCliSession {
         }
       }
 
-      if (toolCallsToSchedule.length === 0) {
+      if (
+        toolCallsToSchedule.length === 0 &&
+        malformedArgumentResponses.length === 0
+      ) {
         break;
       }
 
@@ -293,19 +312,19 @@ export class GeminiCliSession {
         return tool;
       };
 
-      const completedCalls = await scheduleAgentTools(
-        this.config,
-        toolCallsToSchedule,
-        {
-          schedulerId: sessionId,
-          toolRegistry: scopedRegistry,
-          signal: abortSignal,
-        },
-      );
+      const completedCalls =
+        toolCallsToSchedule.length > 0
+          ? await scheduleAgentTools(this.config, toolCallsToSchedule, {
+              schedulerId: sessionId,
+              toolRegistry: scopedRegistry,
+              signal: abortSignal,
+            })
+          : [];
 
-      const functionResponses = completedCalls.flatMap(
-        (call) => call.response.responseParts,
-      );
+      const functionResponses = [
+        ...malformedArgumentResponses,
+        ...completedCalls.flatMap((call) => call.response.responseParts),
+      ];
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       request = functionResponses as unknown as Parameters<
