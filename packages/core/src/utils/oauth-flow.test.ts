@@ -260,6 +260,42 @@ describe('oauth-flow', () => {
       );
     });
 
+    it('should convert explicitly configured [::1] IPv6 loopback URL to Workstations proxy URL', () => {
+      vi.stubEnv('GOOGLE_CLOUD_WORKSTATIONS', 'true');
+      vi.stubEnv(
+        'WEB_HOST',
+        'my-workstation.cluster.workstations.cloud.google.com',
+      );
+
+      const config: OAuthFlowConfig = {
+        ...baseConfig,
+        redirectUri: 'http://[::1]:9090/oauth2callback',
+      };
+      const url = buildAuthorizationUrl(config, basePkceParams, 3000);
+      const parsed = new URL(url);
+      expect(parsed.searchParams.get('redirect_uri')).toBe(
+        'https://9090-my-workstation.cluster.workstations.cloud.google.com/oauth2callback',
+      );
+    });
+
+    it('should preserve query parameters and hashes from the configured redirectUri', () => {
+      vi.stubEnv('GOOGLE_CLOUD_WORKSTATIONS', 'true');
+      vi.stubEnv(
+        'WEB_HOST',
+        'my-workstation.cluster.workstations.cloud.google.com',
+      );
+
+      const config: OAuthFlowConfig = {
+        ...baseConfig,
+        redirectUri: 'http://localhost:5050/callback?tenant=123#token=abc',
+      };
+      const url = buildAuthorizationUrl(config, basePkceParams, 3000);
+      const parsed = new URL(url);
+      expect(parsed.searchParams.get('redirect_uri')).toBe(
+        'https://5050-my-workstation.cluster.workstations.cloud.google.com/callback?tenant=123#token=abc',
+      );
+    });
+
     it('should leave external explicitly configured redirect URIs untouched under Cloud Workstations', () => {
       vi.stubEnv('GOOGLE_CLOUD_WORKSTATIONS', 'true');
       vi.stubEnv(

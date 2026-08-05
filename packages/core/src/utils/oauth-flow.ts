@@ -81,21 +81,19 @@ export function getRedirectUri(
     process.env['GOOGLE_CLOUD_WORKSTATIONS'] === 'true' &&
     process.env['WEB_HOST']
   ) {
-    let port = redirectPort;
-    let pathname = REDIRECT_PATH;
-
     if (config.redirectUri) {
       try {
         const parsed = new URL(config.redirectUri);
         if (
           parsed.hostname === 'localhost' ||
-          parsed.hostname === '127.0.0.1'
+          parsed.hostname === '127.0.0.1' ||
+          parsed.hostname === '[::1]'
         ) {
-          if (parsed.port) {
-            port = parseInt(parsed.port, 10);
-          }
-          pathname = parsed.pathname;
-          return `https://${port}-${process.env['WEB_HOST']}${pathname}`;
+          const port = parsed.port || String(redirectPort);
+          parsed.protocol = 'https:';
+          parsed.hostname = `${port}-${process.env['WEB_HOST']}`;
+          parsed.port = '';
+          return parsed.toString();
         }
       } catch {
         // Fall back to returning config.redirectUri as-is if parsing fails
