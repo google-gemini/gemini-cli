@@ -19,7 +19,8 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { getResponseText } from '../utils/partUtils.js';
-import { fetchWithTimeout, isPrivateIp, isPrivateIpAsync } from '../utils/fetch.js';
+//Updated references from fetchWithTimeout to the new fetchWithSafeDns function in both the fallback (executeFallbackForUrl) and experimental (executeExperimental) fetch code paths.
+import { isPrivateIpAsync, fetchWithSafeDns } from '../utils/fetch.js';
 import { truncateString, wrapUntrusted } from '../utils/textUtils.js';
 import { convert } from 'html-to-text';
 import {
@@ -300,7 +301,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
 
     const response = await retryWithBackoff(
       async () => {
-        const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS, {
+        const res = await fetchWithSafeDns(url, URL_FETCH_TIMEOUT_MS, {
           signal,
           headers: {
             'User-Agent': USER_AGENT,
@@ -591,7 +592,7 @@ ${aggregatedContent}
         totalLength += value.length;
         if (totalLength > limit) {
           // Attempt to cancel the reader to stop the stream
-          await reader.cancel().catch(() => { });
+          await reader.cancel().catch(() => {});
           throw new Error(`Content exceeds size limit of ${limit} bytes`);
         }
         chunks.push(value);
@@ -649,7 +650,7 @@ ${aggregatedContent}
     try {
       const response = await retryWithBackoff(
         async () => {
-          const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS, {
+          const res = await fetchWithSafeDns(url, URL_FETCH_TIMEOUT_MS, {
             signal,
             headers: {
               Accept:

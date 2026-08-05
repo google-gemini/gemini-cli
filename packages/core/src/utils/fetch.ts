@@ -9,6 +9,7 @@ import { URL } from 'node:url';
 import { Agent, EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
 import ipaddr from 'ipaddr.js';
 import { lookup } from 'node:dns/promises';
+import dns from 'node:dns';
 
 export class FetchError extends Error {
   constructor(
@@ -40,6 +41,8 @@ setGlobalDispatcher(
   }),
 );
 
+let safeDispatcher: Agent | EnvHttpProxyAgent | undefined = undefined;
+
 export function updateGlobalFetchTimeouts(timeoutMs: number) {
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
     throw new RangeError(
@@ -58,6 +61,7 @@ export function updateGlobalFetchTimeouts(timeoutMs: number) {
       }),
     );
   }
+  safeDispatcher = undefined;
 }
 
 /**
@@ -246,4 +250,120 @@ export function setGlobalProxy(proxy: string) {
       bodyTimeout: defaultBodyTimeout,
     }),
   );
+  /* 
+1. Created a secure lookup wrapper safeDnsLookup that resolves hostnames and enforces isAddressPrivate checks on the resolved addresses.
+
+2. Introduced a function getSafeDispatcher() that creates/caches an undici.Agent or undici.EnvHttpProxyAgent configured with the connect.lookup option pointing to safeDnsLookup.
+
+3. Exposed a fetchWithSafeDns() function that uses this safe dispatcher.
+
+4. Updated setGlobalProxy to clear/recreate the safe dispatcher when proxy configurations are updated */
+  safeDispatcher = undefined;
+}
+
+export function safeDnsLookup(
+  hostname: string,
+  options: dns.LookupOptions,
+  callback: (
+    err: Error | null,
+    address: string | dns.LookupAddress[],
+    family?: number,
+  ) => void,
+): void {
+  dns.lookup(hostname, options, (err, address, family) => {
+    if (err) {
+      return callback(err, address, family);
+    }
+
+    if (Array.isArray(address)) {
+      const hasPrivate = address.some(
+        (addr) => addr && addr.address && isAddressPrivate(addr.address),
+      );
+      if (hasPrivate) {
+        return callback(new PrivateIpError(), []);
+      }
+      return callback(null, address);
+    }
+
+    if (typeof address === 'string' && isAddressPrivate(address)) {
+      return callback(new PrivateIpError(), '', family);
+    }
+
+    callback(null, address, family);
+  });
+}
+function getSafeDispatcher() {
+  if (safeDispatcher) {
+    return safeDispatcher;
+  }
+  /* [SECURITY NOTE]: When a proxy is configured via EnvHttpProxyAgent,
+  safeDnsLookup protects direct connections. Proxied CONNECT requests
+  resolve DNS on the proxy server itself. */
+  const connectOptions = {
+    lookup: safeDnsLookup,
+  };
+
+  if (currentProxy) {
+    const noProxy = (
+      process.env['NO_PROXY'] ??
+      process.env['no_proxy'] ??
+      ''
+    )?.trim();
+    safeDispatcher = new EnvHttpProxyAgent({
+      httpProxy: currentProxy,
+      httpsProxy: currentProxy,
+      noProxy,
+      headersTimeout: defaultHeadersTimeout,
+      bodyTimeout: defaultBodyTimeout,
+      connect: connectOptions,
+    });
+  } else {
+    safeDispatcher = new Agent({
+      headersTimeout: defaultHeadersTimeout,
+      bodyTimeout: defaultBodyTimeout,
+      connect: connectOptions,
+    });
+  }
+
+  return safeDispatcher;
+}
+
+export async function fetchWithSafeDns(
+  url: string,
+  timeout: number,
+  options?: RequestInit,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  if (options?.signal) {
+    if (options.signal.aborted) {
+      controller.abort();
+    } else {
+      options.signal.addEventListener('abort', () => controller.abort(), {
+        once: true,
+      });
+    }
+  }
+
+  try {
+    const dispatcher = getSafeDispatcher();
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+      // @ts-expect-error dispatcher is supported by undici-backed fetch in Node.js
+      dispatcher,
+    });
+    return response;
+  } catch (error) {
+    if (isAbortError(error)) {
+      if (options?.signal?.aborted) {
+        throw options.signal.reason ?? error;
+      }
+      throw new FetchError(`Request timed out after ${timeout}ms`, 'ETIMEDOUT');
+    }
+    throw new FetchError(getErrorMessage(error), undefined, { cause: error });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
