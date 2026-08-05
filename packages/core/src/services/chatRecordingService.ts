@@ -462,7 +462,16 @@ export class ChatRecordingService {
           // Update the session ID in the existing file
           this.updateMetadata({ sessionId: this.sessionId });
         } else {
-          throw new Error('Failed to load resumed session data from file');
+          // The file could not be reloaded (missing, corrupt metadata, or an
+          // I/O error). Fall back to the in-memory conversation we were handed
+          // rather than failing the caller, and rewrite a clean file from it.
+          debugLogger.warn(
+            'Failed to reload resumed session data from file; falling back ' +
+              'to the in-memory conversation.',
+          );
+          this.cachedConversation = resumedSessionData.conversation;
+          this.projectHash = this.cachedConversation.projectHash;
+          this.rewriteConversationFile(this.cachedConversation);
         }
       } else {
         // Create new session
@@ -553,6 +562,73 @@ export class ChatRecordingService {
       const line = JSON.stringify(record) + '\n';
       fs.mkdirSync(path.dirname(this.conversationFile), { recursive: true });
       fs.appendFileSync(this.conversationFile, line);
+    } catch (error) {
+      if (isNodeError(error) && error.code === 'ENOSPC') {
+        this.conversationFile = null;
+        debugLogger.warn(ENOSPC_WARNING_MESSAGE);
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * Rewrites the session file from an in-memory record. Any existing
+   * (unreadable) file is preserved alongside rather than destroyed, and the
+   * new file is written atomically (temp file + rename).
+   */
+  private rewriteConversationFile(conversation: ConversationRecord): void {
+    if (!this.conversationFile) return;
+
+    // Normalize legacy `.json` paths to the `.jsonl` format we write.
+    if (this.conversationFile.endsWith('.json')) {
+      this.conversationFile = this.conversationFile + 'l';
+    }
+
+    const { messages, memoryScratchpad, ...metadata } = conversation;
+    const lines: string[] = [JSON.stringify(metadata)];
+    for (const msg of messages) {
+      lines.push(JSON.stringify(msg));
+    }
+    if (memoryScratchpad) {
+      lines.push(JSON.stringify({ $set: { memoryScratchpad } }));
+    }
+    const content = lines.join('\n') + '\n';
+
+    try {
+      fs.mkdirSync(path.dirname(this.conversationFile), { recursive: true });
+
+      // The existing file was unreadable, but it may have been only
+      // transiently so (a lock or I/O blip) rather than truly corrupt. Keep
+      // its bytes rather than destroying them.
+      if (fs.existsSync(this.conversationFile)) {
+        const backup = `${this.conversationFile}.unreadable-${Date.now()}`;
+        try {
+          fs.renameSync(this.conversationFile, backup);
+          debugLogger.warn(
+            `Preserved the unreadable session file at ${backup}.`,
+          );
+        } catch (backupError) {
+          debugLogger.error(
+            'Failed to preserve the unreadable session file.',
+            backupError,
+          );
+        }
+      }
+
+      const tempFile = `${this.conversationFile}.tmp-${process.pid}`;
+      try {
+        fs.writeFileSync(tempFile, content);
+        fs.renameSync(tempFile, this.conversationFile);
+      } catch (error) {
+        // The rename did not complete, so the temp file would be left behind.
+        try {
+          fs.unlinkSync(tempFile);
+        } catch {
+          // Ignore cleanup errors so the original failure still surfaces.
+        }
+        throw error;
+      }
     } catch (error) {
       if (isNodeError(error) && error.code === 'ENOSPC') {
         this.conversationFile = null;
