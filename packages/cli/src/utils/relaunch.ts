@@ -20,11 +20,14 @@ import {
 // its default disposition while the spawned child is reparented to PID 1
 // and keeps running - holding the OAuth session and allocated heap until
 // killed manually. See #25590.
+// SIGINT/SIGQUIT are intentionally NOT forwarded: when running
+// interactively, the TTY delivers them to the whole foreground process
+// group (parent and child), so forwarding would deliver them twice and
+// could interrupt the child's graceful-shutdown handler. Supervisors use
+// SIGTERM for programmatic termination, which is forwarded.
 const FORWARDED_SIGNALS: readonly NodeJS.Signals[] = [
   'SIGTERM',
   'SIGHUP',
-  'SIGINT',
-  'SIGQUIT',
   'SIGUSR1',
   'SIGUSR2',
 ];
