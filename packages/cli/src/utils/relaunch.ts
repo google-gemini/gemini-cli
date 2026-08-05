@@ -132,7 +132,10 @@ export async function relaunchAppInChildProcess(
         if (signal) {
           try {
             process.kill(process.pid, signal);
-            return;
+            // Do NOT return here: a non-fatal signal (e.g. SIGUSR1) does not
+            // terminate this process, so we must still resolve the promise
+            // below. If the signal IS fatal, this process exits before
+            // resolve runs - which is the desired outcome.
           } catch {
             // Fall back to exit code 1 if the signal cannot be re-raised.
           }
