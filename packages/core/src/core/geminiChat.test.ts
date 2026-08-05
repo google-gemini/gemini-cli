@@ -1095,6 +1095,69 @@ describe('GeminiChat', () => {
       expect(fusedTurn).toBeUndefined();
     });
 
+    it('should not fuse the next user message into a cancelled tool response', async () => {
+      // Same defect reached by a different trigger: cancelling a tool call
+      // records its response via addHistory then returns without submitting,
+      // leaving history on an unanswered user turn just like a stream failure.
+      chat.agentHistory.push({
+        id: 'model-turn-cancel',
+        content: {
+          role: 'model',
+          parts: [
+            { functionCall: { id: 'c1', name: 'run_shell_command', args: {} } },
+          ],
+        },
+      });
+      chat.addHistory({
+        role: 'user',
+        parts: [
+          {
+            functionResponse: {
+              id: 'c1',
+              name: 'run_shell_command',
+              response: { error: '[Operation Cancelled]' },
+            },
+          },
+        ],
+      });
+
+      let capturedContents: Content[] = [];
+      vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
+        async (req) => {
+          capturedContents = req.contents as Content[];
+          return (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: { role: 'model', parts: [{ text: 'ok' }] },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })();
+        },
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-2.0-flash' },
+        "you're querying local database, I meant nprd",
+        'prompt-id-cancel-fusion',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of stream) {
+        // consume
+      }
+
+      const fusedCancelTurn = capturedContents.find(
+        (c) =>
+          c.role === 'user' &&
+          !!c.parts?.some((p) => !!p.functionResponse) &&
+          !!c.parts?.some((p) => p.text?.includes('I meant nprd')),
+      );
+      expect(fusedCancelTurn).toBeUndefined();
+    });
+
     it('should preserve mixed multimodal function responses during rollback when InvalidStreamError is thrown (regression)', async () => {
       // 1. Setup history ending with a model turn containing functionCall
       chat.agentHistory.push({
