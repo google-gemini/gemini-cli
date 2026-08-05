@@ -398,7 +398,9 @@ function fromCauseError(errorObj: object): ErrorShape | undefined {
   const fallbackCode =
     typeof rawCode === 'number'
       ? rawCode
-      : typeof rawCode === 'string' && !isNaN(Number(rawCode))
+      : typeof rawCode === 'string' &&
+          rawCode.trim() !== '' &&
+          !isNaN(Number(rawCode))
         ? Number(rawCode)
         : undefined;
 

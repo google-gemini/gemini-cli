@@ -533,6 +533,16 @@ describe('parseGoogleApiError', () => {
     expect(parsed).toBeNull();
   });
 
+  it('should return null for empty or whitespace-only string status codes from outer error', () => {
+    const mockError = {
+      status: '   ',
+      cause: new Error('Quota exceeded'),
+    };
+
+    const parsed = parseGoogleApiError(mockError);
+    expect(parsed).toBeNull();
+  });
+
   it('should parse an error where cause is a plain string and propagate outer status', () => {
     const mockError = {
       status: 429,
