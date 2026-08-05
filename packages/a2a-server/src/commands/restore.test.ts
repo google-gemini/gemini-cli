@@ -105,6 +105,33 @@ describe('RestoreCommand', () => {
       'An unexpected error occurred during restore.',
     );
   });
+
+  it('should reject a checkpoint name containing directory traversal', async () => {
+    const command = new RestoreCommand();
+    const result = await command.execute(mockConfig, [
+      '../../../../etc/some-secret.json',
+    ]);
+    expect(result.data).toEqual({
+      type: 'message',
+      messageType: 'error',
+      content: 'Invalid checkpoint name: ../../../../etc/some-secret.json',
+    });
+    // The traversal must be rejected before ever touching the filesystem.
+    expect(mockFs.readFile).not.toHaveBeenCalled();
+  });
+
+  it('should reject a checkpoint name with a path separator even without ".json"', async () => {
+    const command = new RestoreCommand();
+    const result = await command.execute(mockConfig, [
+      '../sibling-project/checkpoints/leaked',
+    ]);
+    expect(result.data).toEqual({
+      type: 'message',
+      messageType: 'error',
+      content: 'Invalid checkpoint name: ../sibling-project/checkpoints/leaked',
+    });
+    expect(mockFs.readFile).not.toHaveBeenCalled();
+  });
 });
 
 describe('ListCheckpointsCommand', () => {

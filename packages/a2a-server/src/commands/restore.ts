@@ -45,9 +45,24 @@ export class RestoreCommand implements Command {
         };
       }
 
-      const selectedFile = argsStr.endsWith('.json')
+      const requestedName = argsStr.endsWith('.json')
         ? argsStr
         : `${argsStr}.json`;
+
+      // Checkpoint filenames are always flat (see generateCheckpointFileName),
+      // so reject anything containing directory components to prevent
+      // reading files outside checkpointDir via a "../" traversal.
+      const selectedFile = path.basename(requestedName);
+      if (selectedFile !== requestedName) {
+        return {
+          name: this.name,
+          data: {
+            type: 'message',
+            messageType: 'error',
+            content: `Invalid checkpoint name: ${argsStr}`,
+          },
+        };
+      }
 
       const checkpointDir = config.storage.getProjectTempCheckpointsDir();
       const filePath = path.join(checkpointDir, selectedFile);

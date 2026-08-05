@@ -4,15 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { timingSafeEqual } from 'node:crypto';
 import express, { type Request } from 'express';
 
-import type { AgentCard, Message } from '@a2a-js/sdk';
+import { AGENT_CARD_PATH, type AgentCard, type Message } from '@a2a-js/sdk';
 import {
   type TaskStore,
   DefaultRequestHandler,
   InMemoryTaskStore,
   DefaultExecutionEventBus,
   type AgentExecutionEvent,
+  type User,
   UnauthenticatedUser,
 } from '@a2a-js/sdk/server';
 import { A2AExpressApp, type UserBuilder } from '@a2a-js/sdk/server/express'; // Import server components
@@ -93,34 +95,83 @@ export function updateCoderAgentCardUrl(port: number) {
   coderAgentCard.url = `http://localhost:${port}/`;
 }
 
+// Constant-time comparison to avoid leaking credential length/content via timing.
+function safeCompare(actual: string, expected: string): boolean {
+  const actualBuf = Buffer.from(actual);
+  const expectedBuf = Buffer.from(expected);
+  if (actualBuf.length !== expectedBuf.length) {
+    // Still run a same-length comparison so failure timing doesn't reveal length.
+    timingSafeEqual(actualBuf, actualBuf);
+    return false;
+  }
+  return timingSafeEqual(actualBuf, expectedBuf);
+}
+
 const customUserBuilder: UserBuilder = async (req: Request) => {
   const auth = req.headers['authorization'];
-  if (auth) {
-    const scheme = auth.split(' ')[0];
-    logger.info(
-      `[customUserBuilder] Received Authorization header with scheme: ${scheme}`,
-    );
-  }
   if (!auth) return new UnauthenticatedUser();
 
+  const expectedToken = process.env['CODER_AGENT_BEARER_TOKEN'];
+  const expectedUser = process.env['CODER_AGENT_BASIC_USERNAME'];
+  const expectedPassword = process.env['CODER_AGENT_BASIC_PASSWORD'];
+
   // 1. Bearer Auth
-  if (auth.startsWith('Bearer ')) {
+  if (auth.startsWith('Bearer ') && expectedToken) {
     const token = auth.substring(7);
-    if (token === 'valid-token') {
+    if (safeCompare(token, expectedToken)) {
       return { userName: 'bearer-user', isAuthenticated: true };
     }
   }
 
   // 2. Basic Auth
-  if (auth.startsWith('Basic ')) {
-    const credentials = Buffer.from(auth.substring(6), 'base64').toString();
-    if (credentials === 'admin:password') {
-      return { userName: 'basic-user', isAuthenticated: true };
+  if (auth.startsWith('Basic ') && expectedUser && expectedPassword) {
+    const decoded = Buffer.from(auth.substring(6), 'base64').toString();
+    const separatorIndex = decoded.indexOf(':');
+    if (separatorIndex !== -1) {
+      const user = decoded.slice(0, separatorIndex);
+      const password = decoded.slice(separatorIndex + 1);
+      if (
+        safeCompare(user, expectedUser) &&
+        safeCompare(password, expectedPassword)
+      ) {
+        return { userName: 'basic-user', isAuthenticated: true };
+      }
     }
   }
 
   return new UnauthenticatedUser();
 };
+
+const wellKnownAgentCardPath = `/${AGENT_CARD_PATH}`;
+
+/**
+ * Enforces authentication on every request except the public agent card
+ * (metadata only, meant to be fetched without credentials per the A2A
+ * client convention). The SDK's own request handler only checks
+ * `user.isAuthenticated` for the authenticated-extended-card method, not for
+ * task-driving RPCs like message/send, so this must be enforced here for
+ * every route -- including the custom /tasks, /executeCommand, /listCommands,
+ * and /tasks/:taskId/metadata routes below, which are plain Express routes
+ * the SDK never sees at all.
+ */
+function requireAuthentication(userBuilder: UserBuilder) {
+  return async (
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction,
+  ) => {
+    if (req.path === wellKnownAgentCardPath) {
+      next();
+      return;
+    }
+    const user: User = await userBuilder(req);
+    if (!user.isAuthenticated) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    next();
+  };
+}
 
 async function handleExecuteCommand(
   req: express.Request,
@@ -222,6 +273,9 @@ export async function createApp() {
       'GOOGLE_APPLICATION_CREDENTIALS',
       'GOOGLE_CLOUD_PROJECT',
       'GEMINI_CLI_USE_COMPUTE_ADC',
+      'CODER_AGENT_BEARER_TOKEN',
+      'CODER_AGENT_BASIC_USERNAME',
+      'CODER_AGENT_BASIC_PASSWORD',
     ];
     for (const key of allowedServerKeys) {
       if (globalEnv[key] !== undefined) {
@@ -276,6 +330,7 @@ export async function createApp() {
     expressApp.use((req, res, next) => {
       requestStorage.run({ req }, next);
     });
+    expressApp.use(requireAuthentication(customUserBuilder));
 
     const appBuilder = new A2AExpressApp(requestHandler, customUserBuilder);
     expressApp = appBuilder.setupRoutes(expressApp, '');
