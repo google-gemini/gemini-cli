@@ -3433,6 +3433,75 @@ describe('GeminiChat', () => {
       expect(turns[0].content.parts![0].text).toBe('Question 1');
       expect(turns[0].content.parts![1].text).toBe('Question 2');
     });
+
+    it('should inject a synthetic thoughtSignature onto a functionCall left signature-less after stripping a thought part that carried it (regression test for #28604)', () => {
+      vi.mocked(mockConfig.isContextManagementEnabled).mockReturnValue(false);
+      vi.mocked(mockConfig.getModel).mockReturnValue('gemini-2.5-pro');
+
+      chat.setHistory([
+        { role: 'user', parts: [{ text: 'activate the skill' }] },
+        {
+          role: 'model',
+          parts: [
+            {
+              text: 'internal monologue',
+              thought: true,
+              thoughtSignature: 'real-sig-from-api',
+            } as unknown as Part,
+            {
+              functionCall: { name: 'activate_skill', args: {} },
+            },
+          ],
+        },
+        {
+          role: 'user',
+          parts: [
+            { functionResponse: { name: 'activate_skill', response: {} } },
+          ],
+        },
+      ]);
+
+      const turns = chat.getHistoryTurns(true);
+
+      const modelTurn = turns[1];
+      expect(modelTurn.content.parts).toHaveLength(1);
+      expect(modelTurn.content.parts![0].functionCall?.name).toBe(
+        'activate_skill',
+      );
+      expect(modelTurn.content.parts![0].thoughtSignature).toBe(
+        SYNTHETIC_THOUGHT_SIGNATURE,
+      );
+    });
+
+    it('should leave an existing thoughtSignature on a functionCall untouched when stripping thoughts', () => {
+      vi.mocked(mockConfig.isContextManagementEnabled).mockReturnValue(false);
+      vi.mocked(mockConfig.getModel).mockReturnValue('gemini-2.5-pro');
+
+      chat.setHistory([
+        { role: 'user', parts: [{ text: 'activate the skill' }] },
+        {
+          role: 'model',
+          parts: [
+            {
+              text: 'internal monologue',
+              thought: true,
+              thoughtSignature: 'real-sig-from-api',
+            } as unknown as Part,
+            {
+              functionCall: { name: 'activate_skill', args: {} },
+              thoughtSignature: 'existing-sig-on-call',
+            },
+          ],
+        },
+      ]);
+
+      const turns = chat.getHistoryTurns(true);
+
+      const modelTurn = turns[1];
+      expect(modelTurn.content.parts![0].thoughtSignature).toBe(
+        'existing-sig-on-call',
+      );
+    });
   });
 
   describe('ensureActiveLoopHasThoughtSignatures', () => {
