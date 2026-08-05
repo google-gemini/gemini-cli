@@ -485,6 +485,18 @@ export class AppRig {
     return this.toolCalls;
   }
 
+  async waitForCompletedToolCall(toolName: string, timeout = 10000) {
+    await this.waitUntil(
+      () => this.toolCalls.some(
+          (call) => call.request.name === toolName && call.status === 'success',
+        ),
+      {
+        timeout,
+        message: `Timed out waiting for tool call "${toolName}" to complete with success status`,
+      },
+    );
+  }
+
   private async waitUntil(
     predicate: () => boolean | Promise<boolean>,
     options: { timeout?: number; interval?: number; message?: string } = {},
@@ -707,6 +719,36 @@ export class AppRig {
   getStaticOutput() {
     if (!this.renderResult) return '';
     return stripAnsi(this.renderResult.stdout.lastFrame() || '');
+  }
+
+  getModelTextResponses(): string[] {
+    if (!this.config) return [];
+    try {
+      const client = this.config.getGeminiClient();
+      const history = client.getHistory();
+      const modelTexts: string[] = [];
+      for (const turn of history) {
+        if (turn.role === 'model' && turn.parts) {
+          for (const part of turn.parts) {
+            if (
+              'text' in part &&
+              typeof part.text === 'string' &&
+              part.text.trim()
+            ) {
+              modelTexts.push(part.text);
+            }
+          }
+        }
+      }
+      return modelTexts;
+    } catch {
+      return [];
+    }
+  }
+
+  getLastModelTextResponse(): string {
+    const texts = this.getModelTextResponses();
+    return texts.length > 0 ? texts[texts.length - 1] : '';
   }
 
   async waitForOutput(pattern: string | RegExp, timeout = 30000) {
