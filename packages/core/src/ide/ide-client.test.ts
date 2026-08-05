@@ -137,8 +137,10 @@ describe('IdeClient', () => {
             // never resolves
           }),
         );
-        // No IDE detected when the process info is absent.
-        vi.mocked(detectIde).mockReturnValue(null);
+        // No IDE detected when the process info is absent - detectIde is
+        // called with undefined process info, so currentIde is undefined
+        // (not null).
+        vi.mocked(detectIde).mockReturnValue(undefined);
 
         const clientPromise = IdeClient.getInstance();
         // Advance past the IDE_PROCESS_INFO_TIMEOUT_MS deadline.
@@ -146,7 +148,7 @@ describe('IdeClient', () => {
         const client = await clientPromise;
 
         expect(client.ideProcessInfo).toBeUndefined();
-        expect(client.currentIde).toBeNull();
+        expect(client.currentIde).toBeUndefined();
       } finally {
         vi.useRealTimers();
       }
