@@ -394,6 +394,39 @@ describe('ChatRecordingService', () => {
         originalBytes,
       );
     });
+
+    it('should not leave a temp file behind when the rewrite fails', async () => {
+      const chatsDir = path.join(testTempDir, 'chats');
+      fs.mkdirSync(chatsDir, { recursive: true });
+      const sessionFile = path.join(chatsDir, 'rewrite-fails.jsonl');
+
+      // Fail the rename that publishes the temp file, leaving it orphaned.
+      const realRename = fs.renameSync;
+      vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+        if (String(from).includes('.tmp-')) {
+          throw new Error('simulated rename failure');
+        }
+        return realRename(from, to);
+      });
+
+      await expect(
+        chatRecordingService.initialize({
+          filePath: sessionFile,
+          conversation: {
+            sessionId: 'temp-cleanup-session',
+            projectHash: 'temp-cleanup-hash',
+            startTime: new Date().toISOString(),
+            lastUpdated: new Date().toISOString(),
+            messages: [],
+          } as unknown as ConversationRecord,
+        }),
+      ).rejects.toThrow('simulated rename failure');
+
+      const leftovers = fs
+        .readdirSync(chatsDir)
+        .filter((f) => f.includes('.tmp-'));
+      expect(leftovers).toEqual([]);
+    });
   });
 
   describe('recordMessage', () => {

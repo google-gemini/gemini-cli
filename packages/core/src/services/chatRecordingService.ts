@@ -617,8 +617,18 @@ export class ChatRecordingService {
       }
 
       const tempFile = `${this.conversationFile}.tmp-${process.pid}`;
-      fs.writeFileSync(tempFile, content);
-      fs.renameSync(tempFile, this.conversationFile);
+      try {
+        fs.writeFileSync(tempFile, content);
+        fs.renameSync(tempFile, this.conversationFile);
+      } catch (error) {
+        // The rename did not complete, so the temp file would be left behind.
+        try {
+          fs.unlinkSync(tempFile);
+        } catch {
+          // Ignore cleanup errors so the original failure still surfaces.
+        }
+        throw error;
+      }
     } catch (error) {
       if (isNodeError(error) && error.code === 'ENOSPC') {
         this.conversationFile = null;
