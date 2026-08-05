@@ -133,7 +133,7 @@ describe('IdeClient', () => {
         // hang). getInstance must not block forever - it races against a
         // timeout and resolves with a client that has no IDE process info.
         vi.mocked(getIdeProcessInfo).mockReturnValue(
-          new Promise(() => {
+          new Promise<{ pid: number; command: string }>(() => {
             // never resolves
           }),
         );
