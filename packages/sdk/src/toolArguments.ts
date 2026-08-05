@@ -46,9 +46,14 @@ export function parseToolCallArguments(
     }
     // A valid JSON document that isn't an object (array, string, number, null)
     // carries no named arguments, so it degrades to "no arguments" rather than
-    // being spread into the call.
+    // being spread into the call. The spread also means the caller owns this
+    // object outright, since we just created it by parsing.
     return { args: isPlainObject(parsed) ? { ...parsed } : {} };
   }
 
+  // Already-structured arguments are returned by reference, matching what core's
+  // `parseToolArguments` does. Copying here would diverge from that path and
+  // would silently drop any non-enumerable or prototype state the caller relied
+  // on, so ownership deliberately stays with the caller.
   return { args: isPlainObject(rawArgs) ? rawArgs : {} };
 }

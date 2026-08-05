@@ -42,10 +42,19 @@ describe('parseToolCallArguments', () => {
     });
   });
 
-  it('copies parsed arguments so callers cannot mutate shared state', () => {
+  it('gives the caller its own object when arguments were parsed from JSON', () => {
     const first = parseToolCallArguments('t', '{"a":1}');
     first.args['a'] = 2;
     expect(parseToolCallArguments('t', '{"a":1}').args).toEqual({ a: 1 });
+  });
+
+  it('returns already-structured arguments by reference', () => {
+    // Deliberate, and matching core's parseToolArguments: an object the model
+    // layer already built is not copied, so ownership stays with the caller.
+    const structured = { path: 'a.txt' };
+    expect(parseToolCallArguments('write_file', structured).args).toBe(
+      structured,
+    );
   });
 
   it.each([
