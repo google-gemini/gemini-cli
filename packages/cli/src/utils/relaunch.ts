@@ -104,11 +104,11 @@ export async function relaunchAppInChildProcess(
         }
       };
       forwarders.set(sig, handler);
-      // Use once() so the first signal is forwarded to the child for a
-      // graceful shutdown, and a second signal (e.g. a second Ctrl+C while
-      // the child is hung) takes the default disposition and force-quits the
-      // parent instead of being silently forwarded again.
-      process.once(sig, handler);
+      // Use on() so that if the child is slow to shut down and a second
+      // signal is received, it is still forwarded rather than killing the
+      // parent immediately and orphaning the child. The listeners are
+      // removed on child close/error anyway. #25590.
+      process.on(sig, handler);
     }
     const removeForwarders = () => {
       for (const [sig, handler] of forwarders) {
@@ -122,10 +122,21 @@ export async function relaunchAppInChildProcess(
         removeForwarders();
         reject(err);
       });
-      child.on('close', (code) => {
+      child.on('close', (code, signal) => {
         removeForwarders();
         // Resume stdin before the parent process exits.
         process.stdin.resume();
+        // Propagate the child's signal termination so supervisors (systemd,
+        // Kubernetes) see a clean signal exit rather than an unexpected code
+        // 1 crash. #25590.
+        if (signal) {
+          try {
+            process.kill(process.pid, signal);
+            return;
+          } catch {
+            // Fall back to exit code 1 if the signal cannot be re-raised.
+          }
+        }
         resolve(code ?? 1);
       });
     });
