@@ -1158,6 +1158,70 @@ describe('GeminiChat', () => {
       expect(fusedCancelTurn).toBeUndefined();
     });
 
+    it('should close a dangling tool response restored from a resumed session', async () => {
+      // The guard runs when a new user message arrives rather than when the
+      // turn fails, so it does not depend on a placeholder having been
+      // persisted. A session resumed from disk that ends on an unanswered tool
+      // response is repaired on the next message just the same.
+      chat.setHistory([
+        { role: 'user', parts: [{ text: 'run the tests' }] },
+        {
+          role: 'model',
+          parts: [
+            { functionCall: { id: 'c1', name: 'run_shell_command', args: {} } },
+          ],
+        },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                id: 'c1',
+                name: 'run_shell_command',
+                response: { output: 'ok' },
+              },
+            },
+          ],
+        },
+      ]);
+
+      let capturedContents: Content[] = [];
+      vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
+        async (req) => {
+          capturedContents = req.contents as Content[];
+          return (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: { role: 'model', parts: [{ text: 'ok' }] },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })();
+        },
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-2.0-flash' },
+        'are you done?',
+        'prompt-id-resumed-fusion',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of stream) {
+        // consume
+      }
+
+      const fusedResumedTurn = capturedContents.find(
+        (c) =>
+          c.role === 'user' &&
+          !!c.parts?.some((p) => !!p.functionResponse) &&
+          !!c.parts?.some((p) => p.text?.includes('are you done?')),
+      );
+      expect(fusedResumedTurn).toBeUndefined();
+    });
+
     it('should preserve mixed multimodal function responses during rollback when InvalidStreamError is thrown (regression)', async () => {
       // 1. Setup history ending with a model turn containing functionCall
       chat.agentHistory.push({
