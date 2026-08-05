@@ -89,7 +89,7 @@ export function getRedirectUri(
           parsed.hostname === '127.0.0.1' ||
           parsed.hostname === '[::1]'
         ) {
-          const port = parsed.port || String(redirectPort);
+          const port = String(redirectPort);
           parsed.protocol = 'https:';
           parsed.hostname = `${port}-${process.env['WEB_HOST']}`;
           parsed.port = '';

@@ -238,7 +238,7 @@ describe('oauth-flow', () => {
       const url = buildAuthorizationUrl(config, basePkceParams, 3000);
       const parsed = new URL(url);
       expect(parsed.searchParams.get('redirect_uri')).toBe(
-        'https://8080-my-workstation.cluster.workstations.cloud.google.com/custom/callback',
+        'https://3000-my-workstation.cluster.workstations.cloud.google.com/custom/callback',
       );
     });
 
@@ -256,7 +256,7 @@ describe('oauth-flow', () => {
       const url = buildAuthorizationUrl(config, basePkceParams, 3000);
       const parsed = new URL(url);
       expect(parsed.searchParams.get('redirect_uri')).toBe(
-        'https://4000-my-workstation.cluster.workstations.cloud.google.com/oauth2callback',
+        'https://3000-my-workstation.cluster.workstations.cloud.google.com/oauth2callback',
       );
     });
 
@@ -274,7 +274,7 @@ describe('oauth-flow', () => {
       const url = buildAuthorizationUrl(config, basePkceParams, 3000);
       const parsed = new URL(url);
       expect(parsed.searchParams.get('redirect_uri')).toBe(
-        'https://9090-my-workstation.cluster.workstations.cloud.google.com/oauth2callback',
+        'https://3000-my-workstation.cluster.workstations.cloud.google.com/oauth2callback',
       );
     });
 
@@ -292,7 +292,7 @@ describe('oauth-flow', () => {
       const url = buildAuthorizationUrl(config, basePkceParams, 3000);
       const parsed = new URL(url);
       expect(parsed.searchParams.get('redirect_uri')).toBe(
-        'https://5050-my-workstation.cluster.workstations.cloud.google.com/callback?tenant=123#token=abc',
+        'https://3000-my-workstation.cluster.workstations.cloud.google.com/callback?tenant=123#token=abc',
       );
     });
 
