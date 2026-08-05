@@ -171,8 +171,15 @@ export class LoadedTrustedFolders {
       const normalizedEffectivePath = normalizePath(realEffectivePath);
 
       if (isSubpath(normalizedEffectivePath, normalizedLocation)) {
-        if (rulePath.length > longestMatchLen) {
-          longestMatchLen = rulePath.length;
+        // Compare by the effective (post-dirname-for-TRUST_PARENT) path
+        // length, not the raw configured rulePath length -- a TRUST_PARENT
+        // rule's own path is always one segment deeper than the boundary it
+        // actually applies (its parent directory), so scoring it by its own
+        // length overstates its specificity and can let it win over a more
+        // specific, unrelated rule (e.g. an explicit DO_NOT_TRUST) that sits
+        // exactly at that parent boundary.
+        if (normalizedEffectivePath.length > longestMatchLen) {
+          longestMatchLen = normalizedEffectivePath.length;
           longestMatchTrust = trustLevel;
         }
       }

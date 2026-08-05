@@ -90,6 +90,37 @@ describe('Trust Utility (Core)', () => {
     expect(folders.isPathTrusted(path.resolve('/other'))).toBeUndefined();
   });
 
+  it('should not let a TRUST_PARENT rule override a more specific sibling rule with a shorter path', () => {
+    // Regression test: the "longest match wins" specificity comparison must
+    // use the rule's *effective* boundary (dirname(rulePath) for
+    // TRUST_PARENT), not the raw configured rulePath length -- otherwise an
+    // unrelated TRUST_PARENT rule whose own path string happens to be longer
+    // can silently override a more specific, explicit DO_NOT_TRUST rule that
+    // sits exactly at that parent boundary.
+    const config = {
+      [path.resolve('/home/victim/repos/some-long-legit-project-name')]:
+        TrustLevel.TRUST_PARENT,
+      [path.resolve('/home/victim/repos/evil')]: TrustLevel.DO_NOT_TRUST,
+    };
+    fs.writeFileSync(trustedFoldersPath, JSON.stringify(config));
+
+    const folders = loadTrustedFolders();
+
+    expect(folders.isPathTrusted(path.resolve('/home/victim/repos/evil'))).toBe(
+      false,
+    );
+    expect(
+      folders.isPathTrusted(
+        path.resolve('/home/victim/repos/evil/nested/file.txt'),
+      ),
+    ).toBe(false);
+    // Sibling folders not covered by the more specific DO_NOT_TRUST rule
+    // should still inherit the TRUST_PARENT grant.
+    expect(
+      folders.isPathTrusted(path.resolve('/home/victim/repos/some-other-dir')),
+    ).toBe(true);
+  });
+
   it('should handle TRUST_PARENT', () => {
     const config = {
       [path.resolve('/project/.gemini')]: TrustLevel.TRUST_PARENT,
