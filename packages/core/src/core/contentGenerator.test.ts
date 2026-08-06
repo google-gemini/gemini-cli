@@ -1029,6 +1029,7 @@ describe('createContentGenerator', () => {
     vi.stubEnv('GOOGLE_VERTEX_BASE_URL', 'https://vertex.test.local');
     vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'my-project');
     vi.stubEnv('GOOGLE_CLOUD_LOCATION', 'us-central1');
+    vi.stubEnv('GOOGLE_API_KEY', '');
 
     const config = await createContentGeneratorConfig(
       mockConfig,
@@ -1061,6 +1062,7 @@ describe('createContentGenerator', () => {
     vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
     vi.stubEnv('GOOGLE_GEMINI_BASE_URL', 'https://gemini.test.local');
     vi.stubEnv('GOOGLE_VERTEX_BASE_URL', 'https://vertex.test.local');
+    vi.stubEnv('GOOGLE_API_KEY', '');
 
     await createContentGenerator(
       {

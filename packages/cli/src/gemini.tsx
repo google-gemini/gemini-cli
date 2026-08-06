@@ -17,6 +17,7 @@ import {
   createSessionId,
   logUserPrompt,
   AuthType,
+  getAuthTypeFromEnv,
   UserPromptEvent,
   coreEvents,
   CoreEvent,
@@ -510,20 +511,16 @@ export async function main() {
   let initialAuthFailed = false;
   if (!settings.merged.security.auth.useExternal && !argv.isCommand) {
     try {
-      if (
-        partialConfig.isInteractive() &&
-        settings.merged.security.auth.selectedType
-      ) {
-        const err = await validateAuthMethod(
-          settings.merged.security.auth.selectedType,
-        );
+      const effectiveAuthType =
+        getAuthTypeFromEnv() || settings.merged.security.auth.selectedType;
+
+      if (partialConfig.isInteractive() && effectiveAuthType) {
+        const err = await validateAuthMethod(effectiveAuthType);
         if (err) {
           throw new Error(err);
         }
 
-        await partialConfig.refreshAuth(
-          settings.merged.security.auth.selectedType,
-        );
+        await partialConfig.refreshAuth(effectiveAuthType);
       } else if (!partialConfig.isInteractive()) {
         const authType = await validateNonInteractiveAuth(
           settings.merged.security.auth.selectedType,

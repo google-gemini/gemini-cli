@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "2.0",
+  "projectName": "gemini-cli-claude",
+  "taskObjective": "Verify model selection, structured API response metadata, and gateway endpoint routing for BOTH Claude Sonnet 5 and Claude Opus 5 in gemini-cli-claude using deterministic API metadata (x-litellm-model-group header, usageMetadata, and response.modelVersion).",
+  "backgroundContext": "Relies on deterministic, structured API response metadata provided by the provider and LiteLLM gateway (x-litellm-model-group headers, response.modelVersion, and usageMetadata token counts) to verify model routing for BOTH Claude Sonnet 5 and Claude Opus 5 without system prompt identity steering.",
+  "views": [
+    {
+      "name": "Claude Sonnet 5 Structured API Response Metadata",
+      "type": "api",
+      "route": "http://127.0.0.1:4000/v1beta/models/claude-sonnet-5:generateContent",
+      "assertions": [
+        "Header 'x-litellm-model-group' equals 'claude-sonnet-5'",
+        "HTTP 200 OK response with non-empty candidates array",
+        "usageMetadata contains promptTokenCount, candidatesTokenCount, and totalTokenCount"
+      ]
+    },
+    {
+      "name": "Claude Opus 5 Structured API Response Metadata",
+      "type": "api",
+      "route": "http://127.0.0.1:4000/v1beta/models/claude-opus-5:generateContent",
+      "assertions": [
+        "Header 'x-litellm-model-group' equals 'claude-opus-5'",
+        "HTTP 200 OK response with non-empty candidates array",
+        "usageMetadata contains promptTokenCount, candidatesTokenCount, and totalTokenCount"
+      ]
+    },
+    {
+      "name": "CLI Model Picker UI Menu Options (Sonnet & Opus)",
+      "type": "cli",
+      "command": "gemini-claude",
+      "selectors": ["ModelDialog", "Claude Opus 5", "Claude Sonnet 5"],
+      "assertions": [
+        "ModelDialog renders 'Claude Opus 5' and 'Claude Sonnet 5' directly in top-level options on main view",
+        "Selecting 'Claude Sonnet 5' in ModelDialog updates active model to 'claude-sonnet-5'",
+        "Selecting 'Claude Opus 5' in ModelDialog updates active model to 'claude-opus-5'"
+      ]
+    },
+    {
+      "name": "Gateway Traffic Log Audit (Sonnet & Opus)",
+      "type": "log_audit",
+      "logFile": "/Users/rzager/Local_Code/LiteLLM/logs/litellm.log",
+      "command": "tail -n 50 /Users/rzager/Local_Code/LiteLLM/logs/litellm.log",
+      "assertions": [
+        "Log records active POST request to /v1beta/models/claude-sonnet-5 with HTTP 200 OK",
+        "Log records active POST request to /v1beta/models/claude-opus-5 with HTTP 200 OK"
+      ]
+    }
+  ]
+}

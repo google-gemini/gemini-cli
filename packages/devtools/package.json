@@ -27,6 +27,13 @@
     "react-dom": "19.2.4"
   },
   "dependencies": {
-    "ws": "8.16.0"
+    "@google-cloud/logging": "11.4.0",
+    "@grpc/grpc-js": "1.14.4",
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "@opentelemetry/exporter-metrics-otlp-grpc": "0.221.0",
+    "ajv": "8.20.0",
+    "js-yaml": "4.3.1",
+    "picomatch": "4.0.5",
+    "ws": "^8.21.2"
   }
 }

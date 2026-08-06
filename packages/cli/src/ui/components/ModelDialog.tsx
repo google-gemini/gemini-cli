@@ -20,6 +20,8 @@ import {
   GEMINI_MODEL_ALIAS_AUTO,
   GEMMA_4_31B_IT_MODEL,
   GEMMA_4_26B_A4B_IT_MODEL,
+  CLAUDE_OPUS_5_MODEL,
+  CLAUDE_SONNET_5_MODEL,
   ModelSlashCommandEvent,
   logModelSlashCommand,
   getDisplayString,
@@ -87,6 +89,8 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     }
 
     const manualModels = [
+      CLAUDE_OPUS_5_MODEL,
+      CLAUDE_SONNET_5_MODEL,
       DEFAULT_GEMINI_MODEL,
       DEFAULT_GEMINI_FLASH_MODEL,
       DEFAULT_GEMINI_FLASH_LITE_MODEL,
@@ -136,14 +140,26 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
           hasAccessToProModel,
         });
 
-      const list = allOptions
-        .filter((o) => o.tier === 'auto')
+      const claudeOptions = allOptions
+        .filter((o) => o.modelId.includes('claude'))
         .map((o) => ({
           value: o.modelId,
           title: o.name,
           description: o.description,
           key: o.modelId,
         }));
+
+      const list = [
+        ...claudeOptions,
+        ...allOptions
+          .filter((o) => o.tier === 'auto')
+          .map((o) => ({
+            value: o.modelId,
+            title: o.name,
+            description: o.description,
+            key: o.modelId,
+          })),
+      ];
 
       list.push({
         value: 'Manual',
@@ -158,6 +174,18 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
 
     // --- LEGACY PATH ---
     const list = [
+      {
+        value: CLAUDE_OPUS_5_MODEL,
+        title: getDisplayString(CLAUDE_OPUS_5_MODEL),
+        description: 'Claude Opus 5 model via LiteLLM',
+        key: CLAUDE_OPUS_5_MODEL,
+      },
+      {
+        value: CLAUDE_SONNET_5_MODEL,
+        title: getDisplayString(CLAUDE_SONNET_5_MODEL),
+        description: 'Claude Sonnet 5 model via LiteLLM',
+        key: CLAUDE_SONNET_5_MODEL,
+      },
       {
         value: GEMINI_MODEL_ALIAS_AUTO,
         title: getDisplayString(GEMINI_MODEL_ALIAS_AUTO),
@@ -232,6 +260,16 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         value: DEFAULT_GEMINI_FLASH_MODEL,
         title: getDisplayString(DEFAULT_GEMINI_FLASH_MODEL),
         key: DEFAULT_GEMINI_FLASH_MODEL,
+      },
+      {
+        value: CLAUDE_OPUS_5_MODEL,
+        title: getDisplayString(CLAUDE_OPUS_5_MODEL),
+        key: CLAUDE_OPUS_5_MODEL,
+      },
+      {
+        value: CLAUDE_SONNET_5_MODEL,
+        title: getDisplayString(CLAUDE_SONNET_5_MODEL),
+        key: CLAUDE_SONNET_5_MODEL,
       },
     ];
 

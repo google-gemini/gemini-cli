@@ -586,6 +586,7 @@ export async function createPolicyEngineConfig(
   // Priority: ALLOWED_MCP_SERVER_PRIORITY (user tier - persistent general server allows)
   if (settings.mcp?.allowed) {
     for (const serverName of settings.mcp.allowed) {
+      if (!serverName) continue;
       rules.push({
         toolName:
           serverName === '*'

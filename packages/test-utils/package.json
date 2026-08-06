@@ -10,11 +10,23 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@google-cloud/logging": "11.4.0",
     "@google/gemini-cli-core": "file:../core",
+    "@grpc/grpc-js": "1.14.4",
     "@lydell/node-pty": "1.1.0",
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "@opentelemetry/exporter-metrics-otlp-grpc": "0.221.0",
+    "@vitest/coverage-v8": "^3.2.7",
+    "ajv": "8.20.0",
     "asciichart": "1.5.25",
+    "js-yaml": "4.3.1",
+    "picomatch": "4.0.5",
+    "shell-quote": "1.10.0",
+    "simple-git": "3.36.0",
     "strip-ansi": "7.1.2",
-    "vitest": "3.2.4"
+    "undici": "7.29.0",
+    "vitest": "3.2.4",
+    "ws": "8.21.2"
   },
   "devDependencies": {
     "typescript": "5.8.3"

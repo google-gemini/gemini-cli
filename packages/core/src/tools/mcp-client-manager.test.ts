@@ -53,7 +53,7 @@ describe('McpClientManager', () => {
         .mockReturnValue({ setResourcesForServer: vi.fn() }),
       getDebugMode: () => false,
       getWorkspaceContext: () => ({ getDirectories: () => [] }),
-      getAllowedMcpServers: vi.fn().mockReturnValue([]),
+      getAllowedMcpServers: vi.fn().mockReturnValue(undefined),
       getBlockedMcpServers: vi.fn().mockReturnValue([]),
       getExcludedMcpServers: vi.fn().mockReturnValue([]),
       getMcpServerCommand: vi.fn().mockReturnValue(''),
@@ -226,6 +226,18 @@ describe('McpClientManager', () => {
       'test-server': { command: 'node' },
     });
     mockConfig.getBlockedMcpServers.mockReturnValue(['test-server']);
+    const manager = setupManager(new McpClientManager('0.0.1', mockConfig));
+    await manager.startConfiguredMcpServers();
+    expect(mockedMcpClient.connect).not.toHaveBeenCalled();
+    expect(mockedMcpClient.discoverInto).not.toHaveBeenCalled();
+  });
+
+  it('should block all servers if allow list is empty array', async () => {
+    mockConfig.getMcpServers.mockReturnValue({
+      'test-server': { command: 'node' },
+      'another-server': { command: 'node' },
+    });
+    mockConfig.getAllowedMcpServers.mockReturnValue([]);
     const manager = setupManager(new McpClientManager('0.0.1', mockConfig));
     await manager.startConfiguredMcpServers();
     expect(mockedMcpClient.connect).not.toHaveBeenCalled();

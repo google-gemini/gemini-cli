@@ -1,0 +1,23 @@
+[
+  {
+    "timestamp": "2026-08-05T22:43:00-07:00",
+    "commitHash": "latest",
+    "verdict": "FAIL",
+    "summary": "Audited both Claude Sonnet 5 and Claude Opus 5. Structured API metadata (View 1 & View 2) and gateway logs (View 4) passed cleanly. View 3 (ModelPicker UI) failed/blocked on PTY TUI capture timing.",
+    "findingsCount": 1,
+    "orchestratorFeedback": {
+      "verdict": "FAIL",
+      "rootCauses": [
+        "Interactive CLI PTY runner timed out during TUI ModelDialog capture in non-interactive subagent context"
+      ],
+      "codeReferences": [
+        "packages/cli/src/ui/components/ModelDialog.tsx",
+        "packages/core/src/config/models.ts"
+      ],
+      "remediationSteps": [
+        "Add Ink component render test for ModelDialog in ModelDialog.test.tsx",
+        "Add PTY automated driver for TUI screen captures"
+      ]
+    }
+  }
+]

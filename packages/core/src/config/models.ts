@@ -84,6 +84,8 @@ export const PREVIEW_GEMINI_FLASH_LITE_MODEL = 'none';
 
 export const GEMMA_4_31B_IT_MODEL = 'gemma-4-31b-it';
 export const GEMMA_4_26B_A4B_IT_MODEL = 'gemma-4-26b-a4b-it';
+export const CLAUDE_OPUS_5_MODEL = 'claude-opus-5';
+export const CLAUDE_SONNET_5_MODEL = 'claude-sonnet-5';
 
 export const VALID_GEMINI_MODELS = new Set([
   PREVIEW_GEMINI_MODEL,
@@ -99,6 +101,8 @@ export const VALID_GEMINI_MODELS = new Set([
 
   GEMMA_4_31B_IT_MODEL,
   GEMMA_4_26B_A4B_IT_MODEL,
+  CLAUDE_OPUS_5_MODEL,
+  CLAUDE_SONNET_5_MODEL,
 ]);
 
 /** @deprecated Use GEMINI_MODEL_ALIAS_AUTO instead. */
@@ -364,6 +368,10 @@ export function getDisplayString(
       return GEMMA_4_31B_IT_MODEL;
     case GEMMA_4_26B_A4B_IT_MODEL:
       return GEMMA_4_26B_A4B_IT_MODEL;
+    case CLAUDE_OPUS_5_MODEL:
+      return 'Claude Opus 5';
+    case CLAUDE_SONNET_5_MODEL:
+      return 'Claude Sonnet 5';
     case GEMINI_MODEL_ALIAS_PRO:
       return PREVIEW_GEMINI_MODEL;
     case GEMINI_MODEL_ALIAS_FLASH:
@@ -577,4 +585,11 @@ export function isActiveModel(
 
 export const CCPA_AI_MODEL_MAPPINGS: Record<string, string> = {
   [DEFAULT_GEMINI_3_5_FLASH_MODEL]: SECONDARY_GEMINI_3_5_FLASH_MODEL,
+  [CLAUDE_OPUS_5_MODEL]: CLAUDE_OPUS_5_MODEL,
+  [CLAUDE_SONNET_5_MODEL]: CLAUDE_SONNET_5_MODEL,
+};
+
+export const VERTEX_AI_MODEL_MAPPINGS: Record<string, string> = {
+  [CLAUDE_OPUS_5_MODEL]: CLAUDE_OPUS_5_MODEL,
+  [CLAUDE_SONNET_5_MODEL]: CLAUDE_SONNET_5_MODEL,
 };

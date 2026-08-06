@@ -35,6 +35,9 @@ import {
   isProModel,
   GEMMA_4_31B_IT_MODEL,
   GEMMA_4_26B_A4B_IT_MODEL,
+  CLAUDE_OPUS_5_MODEL,
+  VALID_GEMINI_MODELS,
+  CCPA_AI_MODEL_MAPPINGS,
   getAutoModelDescription,
 } from './models.js';
 import type { Config } from './config.js';
@@ -1047,6 +1050,24 @@ describe('resolveModel Gemini 3.5 Flash GA', () => {
           true, // useGemini3_5Flash
         ),
       ).toBe(PREVIEW_GEMINI_MODEL);
+    });
+  });
+
+  describe('claude-opus-5 Routing & Capability Resolution', () => {
+    it('should resolve claude-opus-5 model string directly', () => {
+      expect(resolveModel(CLAUDE_OPUS_5_MODEL)).toBe('claude-opus-5');
+    });
+
+    it('should identify claude-opus-5 as a custom model and modern feature capable', () => {
+      expect(isCustomModel(CLAUDE_OPUS_5_MODEL)).toBe(true);
+      expect(supportsModernFeatures(CLAUDE_OPUS_5_MODEL)).toBe(true);
+    });
+
+    it('should include claude-opus-5 in VALID_GEMINI_MODELS and CCPA_AI_MODEL_MAPPINGS', () => {
+      expect(VALID_GEMINI_MODELS.has(CLAUDE_OPUS_5_MODEL)).toBe(true);
+      expect(CCPA_AI_MODEL_MAPPINGS[CLAUDE_OPUS_5_MODEL]).toBe(
+        CLAUDE_OPUS_5_MODEL,
+      );
     });
   });
 });

@@ -143,6 +143,7 @@ export class PromptProvider {
         preamble: this.withSection('preamble', () => ({
           interactive: interactiveMode,
           approvalMode,
+          model: context.config.getActiveModel(),
         })),
         coreMandates: this.withSection('coreMandates', () => ({
           interactive: interactiveMode,

@@ -991,10 +991,11 @@ export async function loadCliConfig(
     agents: settings.agents,
     adminSkillsEnabled,
     allowedMcpServers: mcpEnabled
-      ? (argv.allowedMcpServerNames ??
-        (loadedSettings
+      ? argv.allowedMcpServerNames
+        ? argv.allowedMcpServerNames.filter((s) => s.trim() !== '')
+        : loadedSettings
           ? loadedSettings.getConsolidatedAllowedMcpServers()
-          : settings.mcp?.allowed))
+          : settings.mcp?.allowed
       : undefined,
     blockedMcpServers: mcpEnabled
       ? argv.allowedMcpServerNames

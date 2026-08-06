@@ -1565,7 +1565,7 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
     process.argv = ['node', 'script.js', '--allowed-mcp-server-names', ''];
     const argv = await parseArguments(createTestMergedSettings());
     const config = await loadCliConfig(baseSettings, 'test-session', argv);
-    expect(config.getAllowedMcpServers()).toEqual(['']);
+    expect(config.getAllowedMcpServers()).toEqual([]);
   });
 
   it('should read allowMCPServers from settings', async () => {

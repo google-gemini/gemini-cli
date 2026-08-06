@@ -29,6 +29,7 @@ import {
 import {
   BatchLogRecordProcessor,
   ConsoleLogRecordExporter,
+  type LogRecordExporter,
 } from '@opentelemetry/sdk-logs';
 import {
   ConsoleMetricExporter,
@@ -334,7 +335,10 @@ export async function initializeTelemetry(
 
   // Store processor references for manual flushing
   spanProcessor = new BatchSpanProcessor(spanExporter);
-  logRecordProcessor = new BatchLogRecordProcessor(logExporter);
+  logRecordProcessor = new BatchLogRecordProcessor({
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    exporter: logExporter as unknown as LogRecordExporter,
+  });
 
   sdk = new NodeSDK({
     resource,

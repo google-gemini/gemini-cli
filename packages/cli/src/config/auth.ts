@@ -13,7 +13,8 @@ export async function validateAuthMethod(
   loadEnvironment(loadSettings().merged, process.cwd());
   if (
     authMethod === AuthType.LOGIN_WITH_GOOGLE ||
-    authMethod === AuthType.COMPUTE_ADC
+    authMethod === AuthType.COMPUTE_ADC ||
+    authMethod === AuthType.GATEWAY
   ) {
     return null;
   }

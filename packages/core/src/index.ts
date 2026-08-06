@@ -4,6 +4,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { setGlobalDispatcher, Agent, fetch as undiciFetch } from 'undici';
+
+try {
+  const agent = new Agent({
+    headersTimeout: 300000,
+    bodyTimeout: 300000,
+  });
+  setGlobalDispatcher(agent);
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  (globalThis as unknown as Record<symbol, unknown>)[
+    Symbol.for('undici.globalDispatcher.1')
+  ] = agent;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  globalThis.fetch = undiciFetch as unknown as typeof globalThis.fetch;
+} catch {
+  // Ignore if dispatcher setting fails in non-Node environments
+}
+
 // Export config
 export * from './config/config.js';
 export * from './config/agent-loop-context.js';

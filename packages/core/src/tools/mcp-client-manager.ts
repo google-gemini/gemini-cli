@@ -259,11 +259,7 @@ export class McpClientManager {
    */
   private isBlockedBySettings(name: string): boolean {
     const allowedNames = this.cliConfig.getAllowedMcpServers();
-    if (
-      allowedNames &&
-      allowedNames.length > 0 &&
-      !allowedNames.includes(name)
-    ) {
+    if (allowedNames !== undefined && !allowedNames.includes(name)) {
       return true;
     }
     const blockedNames = this.cliConfig.getBlockedMcpServers();

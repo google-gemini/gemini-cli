@@ -42,12 +42,15 @@ export class ModelMappingContentGenerator implements ContentGenerator {
   private mapModel<T extends { model?: string }>(req: T): T {
     if (req.model) {
       const normalizedModel = normalizeModelId(req.model);
-      if (this.mappings[normalizedModel]) {
+      const targetModel = this.mappings[normalizedModel];
+      if (targetModel) {
+        let mappedModel = targetModel;
+        if (req.model.startsWith('models/') && !targetModel.includes('/')) {
+          mappedModel = `models/${targetModel}`;
+        }
         return {
           ...req,
-          model: req.model.startsWith('models/')
-            ? `models/${this.mappings[normalizedModel]}`
-            : this.mappings[normalizedModel],
+          model: mappedModel,
         };
       }
     }

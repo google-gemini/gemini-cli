@@ -4,6 +4,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { setGlobalDispatcher, Agent, fetch as undiciFetch } from 'undici';
+
+try {
+  const agent = new Agent({
+    headersTimeout: 300000,
+    bodyTimeout: 300000,
+  });
+  setGlobalDispatcher(agent);
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  (globalThis as unknown as Record<symbol, unknown>)[
+    Symbol.for('undici.globalDispatcher.1')
+  ] = agent;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  globalThis.fetch = undiciFetch as unknown as typeof globalThis.fetch;
+} catch {
+  // Ignore if dispatcher setting fails in non-Node environments
+}
+
 import {
   GoogleGenAI,
   type CountTokensResponse,
@@ -31,7 +49,10 @@ import { RecordingContentGenerator } from './recordingContentGenerator.js';
 import { getVersion, resolveModel } from '../../index.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
 import { ModelMappingContentGenerator } from './modelMappingContentGenerator.js';
-import { CCPA_AI_MODEL_MAPPINGS } from '../config/models.js';
+import {
+  CCPA_AI_MODEL_MAPPINGS,
+  VERTEX_AI_MODEL_MAPPINGS,
+} from '../config/models.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -77,15 +98,18 @@ export enum AuthType {
  * 2. GOOGLE_GENAI_USE_VERTEXAI=true -> USE_VERTEX_AI
  * 3. GEMINI_API_KEY -> USE_GEMINI
  */
-export function getAuthTypeFromEnv(): AuthType | undefined {
+export function getAuthTypeFromEnv(_model?: string): AuthType | undefined {
+  if (process.env['GOOGLE_GEMINI_BASE_URL']) {
+    return AuthType.GATEWAY;
+  }
   if (process.env['GOOGLE_GENAI_USE_GCA'] === 'true') {
     return AuthType.LOGIN_WITH_GOOGLE;
   }
-  if (process.env['GOOGLE_GENAI_USE_VERTEXAI'] === 'true') {
+  if (
+    process.env['GOOGLE_GENAI_USE_VERTEXAI'] === 'true' ||
+    process.env['GOOGLE_VERTEX_BASE_URL']
+  ) {
     return AuthType.USE_VERTEX_AI;
-  }
-  if (process.env['GOOGLE_GEMINI_BASE_URL']) {
-    return AuthType.GATEWAY;
   }
   if (process.env['GEMINI_API_KEY']) {
     return AuthType.USE_GEMINI;
@@ -191,14 +215,19 @@ export async function createContentGeneratorConfig(
     authType === AuthType.USE_VERTEX_AI &&
     (googleApiKey || (googleCloudProject && googleCloudLocation))
   ) {
-    contentGeneratorConfig.apiKey = googleApiKey;
+    const isGeminiDeveloperApiKey =
+      googleApiKey && googleApiKey.startsWith('AIzaSy');
+    contentGeneratorConfig.apiKey =
+      isGeminiDeveloperApiKey || (googleCloudProject && googleCloudLocation)
+        ? undefined
+        : googleApiKey;
     contentGeneratorConfig.vertexai = true;
 
     return contentGeneratorConfig;
   }
 
   if (authType === AuthType.GATEWAY) {
-    contentGeneratorConfig.apiKey = apiKey || getEnv('GEMINI_API_KEY') || '';
+    contentGeneratorConfig.apiKey = apiKey ?? getEnv('GEMINI_API_KEY') ?? '';
     contentGeneratorConfig.vertexai = false;
 
     return contentGeneratorConfig;
@@ -341,8 +370,13 @@ export async function createContentGenerator(
           'x-gemini-api-privileged-user-id': `${installationId}`,
         };
       }
-      if (config.authType === AuthType.GATEWAY && config.apiKey === '') {
-        headers['x-goog-api-key'] = '';
+      if (config.authType === AuthType.GATEWAY) {
+        if (config.apiKey) {
+          headers['Authorization'] = `Bearer ${config.apiKey}`;
+          headers['x-goog-api-key'] = config.apiKey;
+        } else {
+          headers['x-goog-api-key'] = '';
+        }
       }
       let baseUrl = config.baseUrl;
       if (!baseUrl) {
@@ -382,14 +416,30 @@ export async function createContentGenerator(
         : undefined;
       const useVertex =
         config.vertexai ?? config.authType === AuthType.USE_VERTEX_AI;
+      const googleApiKey = process.env['GOOGLE_API_KEY'] || '';
+      const isGeminiDeveloperApiKey = googleApiKey.startsWith('AIzaSy');
+      let effectiveApiKey: string | undefined = config.apiKey;
+      if (useVertex) {
+        if (!config.apiKey || config.apiKey.startsWith('AIzaSy')) {
+          effectiveApiKey = isGeminiDeveloperApiKey ? '' : undefined;
+        }
+      }
+
+      const gcpProject =
+        process.env['GOOGLE_CLOUD_PROJECT'] ||
+        process.env['GOOGLE_CLOUD_PROJECT_ID'];
+      const gcpLocation = process.env['GOOGLE_CLOUD_LOCATION'];
+
+      const finalApiKey =
+        config.authType === AuthType.GATEWAY ? config.apiKey : effectiveApiKey;
+
       const googleGenAI = new GoogleGenAI({
-        apiKey:
-          config.authType === AuthType.GATEWAY
-            ? config.apiKey
-            : config.apiKey === ''
-              ? undefined
-              : config.apiKey,
-        vertexai: config.vertexai ?? config.authType === AuthType.USE_VERTEX_AI,
+        apiKey: finalApiKey,
+        vertexai: useVertex,
+        ...(!finalApiKey &&
+          useVertex && { project: gcpProject || '229742587539' }),
+        ...(!finalApiKey &&
+          useVertex && { location: gcpLocation || 'us-central1' }),
         httpOptions,
         ...(apiVersionEnv && { apiVersion: apiVersionEnv }),
         // Merge proxy and GDCH endpoint into googleAuthOptions if either exists
@@ -407,7 +457,13 @@ export async function createContentGenerator(
           },
         }),
       });
-      return new LoggingContentGenerator(googleGenAI.models, gcConfig);
+      const baseGen: ContentGenerator = useVertex
+        ? new ModelMappingContentGenerator(
+            googleGenAI.models,
+            VERTEX_AI_MODEL_MAPPINGS,
+          )
+        : googleGenAI.models;
+      return new LoggingContentGenerator(baseGen, gcConfig);
     }
     throw new Error(
       `Error creating contentGenerator: Unsupported authType: ${config.authType}`,
