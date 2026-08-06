@@ -110,12 +110,20 @@ export async function relaunchAppInChildProcess(
           // The child may have already exited; ignore the race.
         }
       };
-      forwarders.set(sig, handler);
-      // Use on() so that if the child is slow to shut down and a second
-      // signal is received, it is still forwarded rather than killing the
-      // parent immediately and orphaning the child. The listeners are
-      // removed on child close/error anyway. #25590.
-      process.on(sig, handler);
+      // Register only signals the runtime supports - some POSIX-only signals
+      // (e.g. SIGUSR1/SIGUSR2 on Windows) throw in process.on(). Register
+      // first and only track successful listeners in the Map, since
+      // removeForwarders calls process.off on every entry. #25590.
+      try {
+        // Use on() so that if the child is slow to shut down and a second
+        // signal is received, it is still forwarded rather than killing the
+        // parent immediately and orphaning the child. The listeners are
+        // removed on child close/error anyway. #25590.
+        process.on(sig, handler);
+        forwarders.set(sig, handler);
+      } catch {
+        // Signal unsupported on this platform; skip forwarding for it.
+      }
     }
     // No-op handlers for the interactive interrupt signals the TTY delivers to
     // the whole foreground process group. The parent must survive long enough
@@ -127,8 +135,12 @@ export async function relaunchAppInChildProcess(
       // Reuse the same handler reference for both the Map and the listener so
       // removeForwarders can process.off() it on close.
       const handler = () => {};
-      forwarders.set(sig, handler);
-      process.on(sig, handler);
+      try {
+        process.on(sig, handler);
+        forwarders.set(sig, handler);
+      } catch {
+        // Signal unsupported on this platform (e.g. SIGQUIT on Windows).
+      }
     }
     const removeForwarders = () => {
       for (const [sig, handler] of forwarders) {
