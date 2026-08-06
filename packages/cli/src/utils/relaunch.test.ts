@@ -379,6 +379,36 @@ describe('relaunchAppInChildProcess', () => {
       expect(process.listenerCount('SIGTERM')).toBe(before);
     });
 
+    it('keeps the parent alive on SIGINT (no-op) and removes it on close (#25590)', async () => {
+      process.argv = ['/usr/bin/node', '/app/cli.js'];
+
+      const mockChild = createMockChildProcess(0, false);
+      mockedSpawn.mockImplementation(() => mockChild);
+
+      const before = process.listenerCount('SIGINT');
+      const killSpy = mockChild.kill as ReturnType<typeof vi.fn>;
+
+      const promise = relaunchAppInChildProcess([], []);
+      await new Promise((r) => setImmediate(r));
+
+      // A no-op keepalive handler for SIGINT was installed on the parent.
+      expect(process.listenerCount('SIGINT')).toBe(before + 1);
+
+      // Emulate the TTY delivering SIGINT to the whole process group: the
+      // handler must NOT forward it to the child (it already received it).
+      const handler = process.listeners('SIGINT').at(-1) as
+        | (() => void)
+        | undefined;
+      expect(handler).toBeDefined();
+      handler!();
+      expect(killSpy).not.toHaveBeenCalledWith('SIGINT');
+
+      // Closing the child must remove the keepalive handler (no listener leak).
+      mockChild.emit('close', 0);
+      await expect(promise).rejects.toThrow('PROCESS_EXIT_CALLED');
+      expect(process.listenerCount('SIGINT')).toBe(before);
+    });
+
     it('propagates the child signal termination to the parent process (#25590)', async () => {
       process.argv = ['/usr/bin/node', '/app/cli.js'];
 

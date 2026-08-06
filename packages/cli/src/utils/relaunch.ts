@@ -20,17 +20,24 @@ import {
 // its default disposition while the spawned child is reparented to PID 1
 // and keeps running - holding the OAuth session and allocated heap until
 // killed manually. See #25590.
-// SIGINT/SIGQUIT are intentionally NOT forwarded: when running
-// interactively, the TTY delivers them to the whole foreground process
-// group (parent and child), so forwarding would deliver them twice and
-// could interrupt the child's graceful-shutdown handler. Supervisors use
-// SIGTERM for programmatic termination, which is forwarded.
 const FORWARDED_SIGNALS: readonly NodeJS.Signals[] = [
   'SIGTERM',
   'SIGHUP',
   'SIGUSR1',
   'SIGUSR2',
 ];
+
+// SIGINT/SIGQUIT are intentionally NOT forwarded: when running
+// interactively, the TTY delivers them to the whole foreground process
+// group (parent and child), so forwarding would deliver them twice and
+// could interrupt the child's graceful-shutdown handler. Instead the parent
+// registers a no-op handler (KEEPALIVE_SIGNALS) so it does NOT die on its
+// default disposition before the child finishes shutting down - which would
+// orphan the child and return the shell prompt early with mixed output. The
+// child receives the signal directly from the TTY; when it exits, the no-op
+// handler is removed and the child's exit signal is re-raised on the parent.
+// Supervisors use SIGTERM for programmatic termination, which is forwarded.
+const KEEPALIVE_SIGNALS: readonly NodeJS.Signals[] = ['SIGINT', 'SIGQUIT'];
 
 export async function relaunchOnExitCode(runner: () => Promise<number>) {
   while (true) {
@@ -108,6 +115,19 @@ export async function relaunchAppInChildProcess(
       // signal is received, it is still forwarded rather than killing the
       // parent immediately and orphaning the child. The listeners are
       // removed on child close/error anyway. #25590.
+      process.on(sig, handler);
+    }
+    // No-op handlers for the interactive interrupt signals the TTY delivers to
+    // the whole foreground process group. The parent must survive long enough
+    // for the child to finish its graceful shutdown; otherwise it dies on the
+    // default disposition and the child is orphaned. The no-op is removed in
+    // the close handler before the child's exit signal is re-raised, so the
+    // re-raise still terminates the parent. #25590.
+    for (const sig of KEEPALIVE_SIGNALS) {
+      // Reuse the same handler reference for both the Map and the listener so
+      // removeForwarders can process.off() it on close.
+      const handler = () => {};
+      forwarders.set(sig, handler);
       process.on(sig, handler);
     }
     const removeForwarders = () => {
