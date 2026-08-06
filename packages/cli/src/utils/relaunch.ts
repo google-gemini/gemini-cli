@@ -152,10 +152,15 @@ export async function relaunchAppInChildProcess(
         if (signal) {
           try {
             process.kill(process.pid, signal);
-            // Do NOT return here: a non-fatal signal (e.g. SIGUSR1) does not
-            // terminate this process, so we must still resolve the promise
-            // below. If the signal IS fatal, this process exits before
-            // resolve runs - which is the desired outcome.
+            // process.kill schedules the signal on the event loop; it does NOT
+            // terminate synchronously when a JS handler is registered (e.g. by
+            // the app or a supervisor integration), so deferring resolve gives
+            // the loop a tick to deliver the re-raised signal before
+            // relaunchOnExitCode calls process.exit(). A fatal signal
+            // terminates the process here; a non-fatal one (e.g. SIGUSR1) falls
+            // through to resolve below. #25590.
+            setTimeout(() => resolve(code ?? 1), 0);
+            return;
           } catch {
             // Fall back to exit code 1 if the signal cannot be re-raised.
           }
