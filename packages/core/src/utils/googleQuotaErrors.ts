@@ -289,16 +289,23 @@ export function classifyGoogleError(error: unknown): unknown {
         return new RetryableQuotaError(errorMessage, cause, retryDelaySeconds);
       }
     } else if (status === 429 || status === 499 || status === 503) {
-      // Fallback: If it is a 429, 499, or 503 but doesn't have a specific "retry in" message,
-      // assume it is a temporary rate limit and retry.
-      return new RetryableQuotaError(
-        errorMessage,
-        googleApiError ?? {
-          code: status,
-          message: errorMessage,
-          details: [],
-        },
-      );
+      const cause = googleApiError ?? {
+        code: status,
+        message: errorMessage,
+        details: [],
+      };
+
+      // If the error message indicates capacity exhaustion, classify as TerminalQuotaError
+      if (
+        /exhausted your capacity|capacity exceeded|MODEL_CAPACITY_EXHAUSTED/i.test(
+          errorMessage,
+        )
+      ) {
+        return new TerminalQuotaError(errorMessage, cause);
+      }
+
+      // Fallback: assume it is a temporary rate limit and retry.
+      return new RetryableQuotaError(errorMessage, cause);
     }
 
     return error; // Not a retryable error we can handle with structured details or a parsable retry message.
@@ -338,6 +345,19 @@ export function classifyGoogleError(error: unknown): unknown {
   }
 
   if (errorInfo) {
+    // Always treat capacity exhaustion as terminal error to trigger immediate model fallback
+    if (
+      errorInfo.reason === 'MODEL_CAPACITY_EXHAUSTED' ||
+      errorInfo.reason === 'MODEL_CAPACITY_EXCEEDED'
+    ) {
+      return new TerminalQuotaError(
+        googleApiError.message,
+        googleApiError,
+        delaySeconds,
+        errorInfo.reason,
+      );
+    }
+
     // INSUFFICIENT_G1_CREDITS_BALANCE is always terminal, regardless of domain
     if (errorInfo.reason === 'INSUFFICIENT_G1_CREDITS_BALANCE') {
       return new TerminalQuotaError(
@@ -348,28 +368,19 @@ export function classifyGoogleError(error: unknown): unknown {
       );
     }
 
-    if (
-      errorInfo.reason === 'MODEL_CAPACITY_EXHAUSTED' ||
-      errorInfo.reason === 'MODEL_CAPACITY_EXCEEDED'
-    ) {
-      // If no server backoff delay is specified, treat capacity exhaustion as a terminal error
-      // to trigger immediate model fallback without retrying on the same exhausted model.
-      if (delaySeconds === undefined) {
-        return new TerminalQuotaError(
-          googleApiError.message,
-          googleApiError,
-          delaySeconds,
-          errorInfo.reason,
-        );
-      }
-      // Otherwise, fall through to RetryableQuotaError to honor the server's requested delay.
-    }
-
     // New Cloud Code API quota handling
     if (errorInfo.domain) {
       if (isCloudCodeDomain(errorInfo.domain)) {
         if (errorInfo.reason === 'RATE_LIMIT_EXCEEDED') {
-          const effectiveDelay = delaySeconds ?? 10;
+          if (delaySeconds === undefined) {
+            return new TerminalQuotaError(
+              googleApiError.message,
+              googleApiError,
+              undefined,
+              errorInfo.reason,
+            );
+          }
+          const effectiveDelay = delaySeconds;
           if (effectiveDelay > MAX_RETRYABLE_DELAY_SECONDS) {
             return new TerminalQuotaError(
               googleApiError.message,
@@ -435,6 +446,15 @@ export function classifyGoogleError(error: unknown): unknown {
         60,
       );
     }
+  }
+
+  // If the error message indicates capacity exhaustion, classify as TerminalQuotaError
+  if (
+    /exhausted your capacity|capacity exceeded|MODEL_CAPACITY_EXHAUSTED/i.test(
+      errorMessage,
+    )
+  ) {
+    return new TerminalQuotaError(errorMessage, googleApiError);
   }
 
   // If we reached this point, the status is 429, 499, or 503 and we have details,
