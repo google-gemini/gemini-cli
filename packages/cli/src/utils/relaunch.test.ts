@@ -378,6 +378,29 @@ describe('relaunchAppInChildProcess', () => {
       await expect(promise).rejects.toThrow('PROCESS_EXIT_CALLED');
       expect(process.listenerCount('SIGTERM')).toBe(before);
     });
+
+    it('propagates the child signal termination to the parent process (#25590)', async () => {
+      process.argv = ['/usr/bin/node', '/app/cli.js'];
+
+      const mockChild = createMockChildProcess(0, false);
+      mockedSpawn.mockImplementation(() => mockChild);
+
+      // Mock process.kill so the re-raised signal does not terminate the
+      // Vitest runner; assert the parent re-raises the child's exit signal.
+      const processKillSpy = vi
+        .spyOn(process, 'kill')
+        .mockImplementation(() => true);
+
+      const promise = relaunchAppInChildProcess([], []);
+      await new Promise((r) => setImmediate(r));
+
+      // Child exits with a signal: the parent must re-raise it.
+      mockChild.emit('close', null, 'SIGTERM');
+      await expect(promise).rejects.toThrow('PROCESS_EXIT_CALLED');
+      expect(processKillSpy).toHaveBeenCalledWith(process.pid, 'SIGTERM');
+
+      processKillSpy.mockRestore();
+    });
   });
 });
 
