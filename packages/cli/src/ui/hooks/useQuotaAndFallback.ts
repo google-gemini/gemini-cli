@@ -121,18 +121,34 @@ export function useQuotaAndFallback({
         }
 
         // Default: Show existing ProQuotaDialog (for overageStrategy: 'never' or non-G1 users)
-        const messageLines = [
-          `Usage limit reached for ${usageLimitReachedModel}.`,
-          error.retryDelayMs
-            ? `Access resets at ${getResetTimeMessage(error.retryDelayMs)}.`
-            : null,
-          `/stats model for usage details`,
-          `/model to switch models.`,
-          contentGeneratorConfig?.authType === AuthType.LOGIN_WITH_GOOGLE
-            ? `/auth to switch to API key.`
-            : null,
-        ].filter(Boolean);
-        message = messageLines.join('\n');
+        const isCapacityExceeded =
+          error.reason === 'MODEL_CAPACITY_EXHAUSTED' ||
+          error.reason === 'MODEL_CAPACITY_EXCEEDED';
+
+        if (isCapacityExceeded) {
+          const messageLines = [
+            `We are currently experiencing high demand for ${usageLimitReachedModel}.`,
+            'We apologize and appreciate your patience.',
+            error.retryDelayMs
+              ? `Access resets at ${getResetTimeMessage(error.retryDelayMs)}.`
+              : null,
+            `/model to switch models.`,
+          ].filter(Boolean);
+          message = messageLines.join('\n');
+        } else {
+          const messageLines = [
+            `Usage limit reached for ${usageLimitReachedModel}.`,
+            error.retryDelayMs
+              ? `Access resets at ${getResetTimeMessage(error.retryDelayMs)}.`
+              : null,
+            `/stats model for usage details`,
+            `/model to switch models.`,
+            contentGeneratorConfig?.authType === AuthType.LOGIN_WITH_GOOGLE
+              ? `/auth to switch to API key.`
+              : null,
+          ].filter(Boolean);
+          message = messageLines.join('\n');
+        }
       } else if (error instanceof ModelNotFoundError) {
         isModelNotFoundError = true;
         if (

@@ -222,6 +222,42 @@ describe('useQuotaAndFallback', () => {
       await promise!;
     });
 
+    it('should show high demand message for MODEL_CAPACITY_EXHAUSTED', async () => {
+      const { result } = await renderHook(() =>
+        useQuotaAndFallback({
+          config: mockConfig,
+          historyManager: mockHistoryManager,
+          userTier: UserTierId.FREE,
+          setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          onShowAuthSelection: mockOnShowAuthSelection,
+          paidTier: null,
+          settings: mockSettings,
+        }),
+      );
+
+      const handler = setFallbackHandlerSpy.mock
+        .calls[0][0] as FallbackModelHandler;
+
+      const error = new TerminalQuotaError(
+        'pro capacity exhausted',
+        mockGoogleApiError,
+        undefined,
+        'MODEL_CAPACITY_EXHAUSTED',
+      );
+
+      act(() => {
+        void handler('gemini-pro', 'gemini-flash', error);
+      });
+
+      expect(result.current.proQuotaRequest).not.toBeNull();
+      expect(result.current.proQuotaRequest?.message).toContain(
+        'We are currently experiencing high demand',
+      );
+      expect(result.current.proQuotaRequest?.message).not.toContain(
+        'Usage limit reached',
+      );
+    });
+
     describe('Interactive Fallback', () => {
       it('should set an interactive request for a terminal quota error', async () => {
         const { result } = await renderHook(() =>
