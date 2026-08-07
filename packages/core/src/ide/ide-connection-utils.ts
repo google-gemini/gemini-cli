@@ -223,22 +223,22 @@ export async function getConnectionConfigFromFile(
     // valid connection config file(s), return the best-sorted config.
     // This lets downstream connection logic raise a helpful, detailed
     // "Directory mismatch" warning instead of a generic connection error.
-    const nonNullableContents = parsedContents.filter(
-      (
-        content,
-      ): content is ConnectionConfig & {
-        workspacePath?: string;
-        ideInfo?: IdeInfo;
-      } => !!content,
-    );
-    if (nonNullableContents.length > 0) {
-      const selected = nonNullableContents[0];
-      const fileIndex = parsedContents.indexOf(selected);
-      if (fileIndex !== -1) {
-        logger.debug(
-          `Selected best mismatched IDE connection file: ${matchingFiles[fileIndex]}`,
-        );
-      }
+    let fileIndex = -1;
+    const portFromEnv = getPortFromEnv();
+    if (portFromEnv) {
+      fileIndex = parsedContents.findIndex(
+        (content) => !!content && String(content.port) === portFromEnv,
+      );
+    }
+    if (fileIndex === -1) {
+      fileIndex = parsedContents.findIndex((content) => !!content);
+    }
+
+    if (fileIndex !== -1) {
+      const selected = parsedContents[fileIndex]!;
+      logger.debug(
+        `Selected best mismatched IDE connection file: ${matchingFiles[fileIndex]}`,
+      );
       return selected;
     }
     return undefined;

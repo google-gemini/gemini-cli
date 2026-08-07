@@ -459,6 +459,36 @@ describe('ide-connection-utils', () => {
 
       expect(result).toEqual(invalidConfig1);
     });
+
+    it('should prioritize the config matching the port from the environment variable when all found config files are mismatched/invalid workspaces', async () => {
+      vi.stubEnv('GEMINI_CLI_IDE_SERVER_PORT', '2222');
+      const invalidConfig1 = {
+        port: '1111',
+        workspacePath: '/invalid/workspace1',
+      };
+      const invalidConfig2 = {
+        port: '2222',
+        workspacePath: '/invalid/workspace2',
+      };
+      vi.mocked(fs.promises.readFile).mockRejectedValueOnce(
+        new Error('not found'),
+      );
+      (
+        vi.mocked(fs.promises.readdir) as Mock<
+          (path: fs.PathLike) => Promise<string[]>
+        >
+      ).mockResolvedValue([
+        'gemini-ide-server-12345-111.json',
+        'gemini-ide-server-12345-222.json',
+      ]);
+      vi.mocked(fs.promises.readFile)
+        .mockResolvedValueOnce(JSON.stringify(invalidConfig1))
+        .mockResolvedValueOnce(JSON.stringify(invalidConfig2));
+
+      const result = await getConnectionConfigFromFile(12345);
+
+      expect(result).toEqual(invalidConfig2);
+    });
   });
 
   describe('validateWorkspacePath', () => {
