@@ -40,6 +40,23 @@ export interface GlobPath {
 }
 
 /**
+ * Reports whether `candidate` resolves to `root` or somewhere beneath it.
+ *
+ * Both paths are expected to be absolute already. This is a pure containment
+ * check on the resolved paths, so it is unaffected by however the pattern that
+ * produced `candidate` was written (brace expansion, escapes, `..` segments).
+ */
+function isPathContainedIn(candidate: string, root: string): boolean {
+  const relative = path.relative(root, candidate);
+  return (
+    relative === '' ||
+    (!relative.startsWith(`..${path.sep}`) &&
+      relative !== '..' &&
+      !path.isAbsolute(relative))
+  );
+}
+
+/**
  * Sorts file entries based on recency and then alphabetically.
  * Recent files (modified within recencyThresholdMs) are listed first, newest to oldest.
  * Older files are listed after recent ones, sorted alphabetically by path.
@@ -192,6 +209,13 @@ class GlobToolInvocation extends BaseToolInvocation<
 
         const entries = (await glob(pattern, {
           cwd: searchDir,
+          // Resolve absolute patterns (e.g. '/etc/*') against the search
+          // directory instead of the filesystem root. Without this, glob
+          // honours the leading '/' literally and walks outside the
+          // workspace. Note that 'root' does not constrain '..' segments --
+          // glob documents that a pattern can still traverse out of 'root' --
+          // so the containment check below remains the actual boundary.
+          root: searchDir,
           withFileTypes: true,
           nodir: true,
           stat: true,
@@ -201,6 +225,36 @@ class GlobToolInvocation extends BaseToolInvocation<
           follow: false,
           signal,
         })) as GlobPath[];
+
+        // Enforce the workspace boundary on results rather than on the
+        // pattern string. Inspecting the pattern is not sufficient: brace
+        // expansion happens before glob splits path segments, so forms like
+        // '{..,..}/secret/*' or '..{/,/}secret/*' smuggle a traversal past
+        // any naive '..'-segment check. Checking where each match actually
+        // landed is immune to that.
+        const escapedEntry = entries.find(
+          (entry) => !isPathContainedIn(entry.fullpath(), searchDir),
+        );
+        if (escapedEntry) {
+          // Deliberately does not echo the matched path: confirming which
+          // out-of-workspace file the pattern hit would leak the existence of
+          // that file, which is the thing being prevented.
+          const message =
+            `Pattern "${this.params.pattern}" resolved outside the search ` +
+            `directory ${searchDir} and was rejected.`;
+          debugLogger.debug(
+            () =>
+              `[GlobTool] rejected out-of-workspace match: ${escapedEntry.fullpath()}`,
+          );
+          return {
+            llmContent: message,
+            returnDisplay: 'Path not in workspace.',
+            error: {
+              message,
+              type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
+            },
+          };
+        }
 
         allEntries.push(...entries);
       }
@@ -333,11 +387,12 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
   protected override validateToolParamValues(
     params: GlobToolParams,
   ): string | null {
-    // execute() passes params.pattern straight to glob() with `cwd:
-    // searchDir`; the glob package does not confine '..' segments or
-    // absolute patterns to cwd, so an unvalidated pattern (e.g.
-    // '../../etc/*' or '/etc/*') can list files outside every directory
-    // validated below.
+    // Best-effort early rejection of patterns that plainly point outside the
+    // workspace, so the obvious cases fail here with a clear message instead
+    // of after a filesystem walk. This is deliberately NOT the security
+    // boundary: brace expansion runs before glob splits path segments, so a
+    // pattern like '{..,..}/secret/*' slips past a string check. execute()
+    // enforces containment on the resolved matches, which is authoritative.
     if (
       typeof params.pattern === 'string' &&
       (path.isAbsolute(params.pattern) ||

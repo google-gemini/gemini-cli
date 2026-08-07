@@ -390,6 +390,83 @@ describe('GlobTool', () => {
     });
   });
 
+  // Brace expansion happens before glob splits the pattern into path
+  // segments, so a '..'-segment check on the raw pattern string can be
+  // smuggled past. execute() therefore enforces containment on the resolved
+  // matches; these cases all bypass validateToolParams and must still fail.
+  describe('pattern traversal containment', () => {
+    let outsideDir: string;
+
+    beforeEach(async () => {
+      outsideDir = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'glob-tool-outside-'),
+      );
+      await fs.writeFile(path.join(outsideDir, 'secret.txt'), 'top secret');
+    });
+
+    afterEach(async () => {
+      await fs.rm(outsideDir, { recursive: true, force: true });
+    });
+
+    const traversalForms = [
+      (name: string) => `{..,..}/${name}/*`,
+      (name: string) => `{.,..}/${name}/*`,
+      (name: string) => `..{/,/}${name}/*`,
+    ];
+
+    for (const buildPattern of traversalForms) {
+      const label = buildPattern('OUTSIDE');
+      it(`should reject a brace-smuggled traversal using "${label}"`, async () => {
+        const fullPattern = buildPattern(path.basename(outsideDir));
+
+        // The string-level guard cannot see these, which is the point.
+        expect(
+          globTool.validateToolParams({ pattern: fullPattern }),
+        ).toBeNull();
+
+        const result = await globTool
+          .build({ pattern: fullPattern })
+          .execute({ abortSignal });
+
+        expect(result.error?.type).toBe(ToolErrorType.PATH_NOT_IN_WORKSPACE);
+        expect(partListUnionToString(result.llmContent)).not.toContain(
+          'secret.txt',
+        );
+      }, 30000);
+    }
+
+    it('should not resolve a brace-smuggled absolute pattern outside the search directory', async () => {
+      const fullPattern = `{${outsideDir},${outsideDir}}/*`;
+
+      expect(globTool.validateToolParams({ pattern: fullPattern })).toBeNull();
+
+      const result = await globTool
+        .build({ pattern: fullPattern })
+        .execute({ abortSignal });
+
+      // The 'root' option re-anchors the leading '/' to the search directory,
+      // so this matches nothing rather than leaking the outside directory.
+      expect(partListUnionToString(result.llmContent)).not.toContain(
+        'secret.txt',
+      );
+      expect(partListUnionToString(result.llmContent)).toContain(
+        'No files found',
+      );
+    }, 30000);
+
+    it('should still match ordinary patterns inside the workspace', async () => {
+      const result = await globTool
+        .build({ pattern: 'sub/**/*.md' })
+        .execute({ abortSignal });
+
+      const content = partListUnionToString(result.llmContent);
+      expect(result.error).toBeUndefined();
+      expect(content).toContain('Found 2 file(s)');
+      expect(content).toContain('fileC.md');
+      expect(content).toContain('FileD.MD');
+    }, 30000);
+  });
+
   describe('workspace boundary validation', () => {
     it('should validate search paths are within workspace boundaries', () => {
       expect(globTool.validateToolParams({ pattern: '*' })).toBeNull();
