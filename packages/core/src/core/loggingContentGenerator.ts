@@ -584,6 +584,27 @@ export class LoggingContentGenerator implements ContentGenerator {
     } catch (error) {
       spanMetadata.error = error;
       const durationMs = Date.now() - startTime;
+      // An aborted stream is not an API error, so `_logApiError` deliberately
+      // ignores it. That left usage the provider had already reported — and
+      // already billed — discarded along with the cancellation, because the
+      // success flush below is the only place `lastUsageMetadata` was recorded.
+      // Record it here instead, so a cancelled turn still accounts for the
+      // tokens it actually consumed.
+      if (isAbortError(error) && lastUsageMetadata) {
+        this._logApiResponse(
+          requestContents,
+          durationMs,
+          responses[0]?.modelVersion || req.model,
+          userPromptId,
+          role,
+          responses[0]?.responseId,
+          responses.flatMap((response) => response.candidates || []),
+          lastUsageMetadata,
+          undefined,
+          req.config,
+          serverDetails,
+        );
+      }
       this._logApiError(
         durationMs,
         error,

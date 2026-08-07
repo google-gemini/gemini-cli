@@ -579,6 +579,99 @@ describe('LoggingContentGenerator', () => {
       expect(errorEvent.duration_ms).toBe(1000);
     });
 
+    it('records usage already received when the stream is aborted mid-flight', async () => {
+      // The provider bills for tokens it streamed before the abort. `_logApiError`
+      // deliberately ignores AbortError, so without an explicit flush the usage
+      // captured per-chunk is discarded and the cancelled turn accounts for
+      // nothing.
+      const req = {
+        contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
+        model: 'gemini-pro',
+      };
+      const userPromptId = 'prompt-abort-usage';
+      const abortError = new Error('Aborted');
+      abortError.name = 'AbortError';
+
+      async function* createAsyncGenerator() {
+        yield {
+          candidates: [
+            { content: { role: 'model', parts: [{ text: 'partial' }] } },
+          ],
+          usageMetadata: {
+            promptTokenCount: 11,
+            candidatesTokenCount: 7,
+            totalTokenCount: 18,
+          },
+          responseId: 'resp-abort',
+          modelVersion: 'gemini-pro',
+        } as unknown as GenerateContentResponse;
+        throw abortError;
+      }
+
+      vi.mocked(wrapped.generateContentStream).mockResolvedValue(
+        createAsyncGenerator(),
+      );
+
+      const stream = await loggingContentGenerator.generateContentStream(
+        req,
+        userPromptId,
+        LlmRole.MAIN,
+      );
+
+      await expect(async () => {
+        for await (const _ of stream) {
+          // drain until the abort
+        }
+      }).rejects.toThrow(abortError);
+
+      // Still not an API error.
+      expect(logApiError).not.toHaveBeenCalled();
+
+      expect(logApiResponse).toHaveBeenCalled();
+      const responseEvent = vi.mocked(logApiResponse).mock.calls[0][1];
+      expect(responseEvent.usage.input_token_count).toBe(11);
+      expect(responseEvent.usage.output_token_count).toBe(7);
+      expect(responseEvent.usage.total_token_count).toBe(18);
+    });
+
+    it('does not record a usage event when the stream aborts before any usage arrives', async () => {
+      const req = {
+        contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
+        model: 'gemini-pro',
+      };
+      const abortError = new Error('Aborted');
+      abortError.name = 'AbortError';
+
+      async function* createAsyncGenerator() {
+        yield {
+          candidates: [
+            { content: { role: 'model', parts: [{ text: 'partial' }] } },
+          ],
+        } as unknown as GenerateContentResponse;
+        throw abortError;
+      }
+
+      vi.mocked(wrapped.generateContentStream).mockResolvedValue(
+        createAsyncGenerator(),
+      );
+
+      const stream = await loggingContentGenerator.generateContentStream(
+        req,
+        'prompt-abort-no-usage',
+        LlmRole.MAIN,
+      );
+
+      await expect(async () => {
+        for await (const _ of stream) {
+          // drain until the abort
+        }
+      }).rejects.toThrow(abortError);
+
+      // Nothing was reported, so nothing is invented.
+      expect(logApiResponse).not.toHaveBeenCalled();
+      expect(logApiError).not.toHaveBeenCalled();
+    });
+
     it('should NOT log error on AbortError during connection phase', async () => {
       const req = {
         contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
