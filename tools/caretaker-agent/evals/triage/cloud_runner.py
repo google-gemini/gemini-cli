@@ -13,6 +13,8 @@ def main() -> None:
     config_str = os.environ.get("EVAL_CONFIG", "{}")
     try:
         cfg = json.loads(config_str) if config_str else {}
+        if not isinstance(cfg, dict):
+            raise ValueError(f"EVAL_CONFIG must be a JSON object, got {type(cfg).__name__}")
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid EVAL_CONFIG JSON: {e}") from e
 
