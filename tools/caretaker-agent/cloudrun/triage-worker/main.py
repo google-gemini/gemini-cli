@@ -7,6 +7,7 @@ from google.cloud import firestore
 from triage_orchestrator import process_issue_triage
 from utils.validator import validate_triage_result
 from utils.egress import send_label_action, send_comment_action
+from utils.events import publish_issue_ready_for_code
 from db.issues_store import IssuesStore, ClaimAction, ReleaseAction
 
 FEATURE_CLOSED_COMMENT = (
@@ -84,12 +85,14 @@ def main() -> None:
         sys.exit(0)
         
     print(f"[WORKER] Starting triage for issue #{issue_number}...")
+    target_cwd = os.environ.get("TARGET_CWD", "/opt/gemini-cli")
     try:
-        success, raw_output = process_issue_triage(payload)
+        success, raw_output = process_issue_triage(payload, target_cwd)
     except Exception as e:
         print(f"[WORKER] Triage process failed with exception: {e}")
-        success, raw_output = False, ""
+        success, raw_output = False, f"Exception during triage execution: {e}"
     
+    error_message = None
     if success:
         try:
             triage_result = json.loads(raw_output)
@@ -144,6 +147,9 @@ def main() -> None:
                 send_label_action(
                     owner, repo, issue_number, [f"effort/{effort.lower()}"]
                 )
+                publish_issue_ready_for_code(
+                    owner, repo, issue_number, workable_spec
+                )
                 store.release_lock(
                     owner,
                     repo,
@@ -158,13 +164,15 @@ def main() -> None:
                 
         except Exception as e:
             print(f"[WORKER] Validation failed: {e}")
-            success = False
+            success, error_message = False, f"Validation Error: {e}"
+    else:
+        error_message = raw_output
     
     # If an exception happens in json.loads or validate_triage_result 
     # If LLM inference itself fails inside process_issue_triage
     if not success:
         release_action = store.release_lock(
-            owner, repo, issue_number, lock_holder, success=False
+            owner, repo, issue_number, lock_holder, success=False, error=error_message
         )
         sys.exit(1 if release_action == ReleaseAction.RETRY else 0)
 

@@ -18,6 +18,24 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.54.0 - 2026-08-06
+
+- **PR Automation & Antigravity Agent:** Integrated the Antigravity agent runner
+  with dual-locking Firestore concurrency controls to secure the PR generator
+  ([#28434](https://github.com/google-gemini/gemini-cli/pull/28434),
+  [#28432](https://github.com/google-gemini/gemini-cli/pull/28432) by
+  @joneba-google).
+- **Caretaker Triaging & Security:** Enhanced caretaker triage to post comments
+  prior to auto-closing issues and sanitized issue titles under untrusted
+  context ([#28411](https://github.com/google-gemini/gemini-cli/pull/28411),
+  [#28352](https://github.com/google-gemini/gemini-cli/pull/28352) by @chadd28).
+- **Security and Session Robustness:** Prevented cleartext credential leakage by
+  enforcing HTTPS, rotated session IDs on model fallbacks, and skipped merged
+  function-response turns in active loops
+  ([#28517](https://github.com/google-gemini/gemini-cli/pull/28517) by
+  @amelidev, [#28565](https://github.com/google-gemini/gemini-cli/pull/28565) by
+  @adamfweidman).
+
 ## Announcements: v0.53.0 - 2026-07-28
 
 - **Caretaker Triage Orchestration:** Implemented an LLM triage orchestrator and
