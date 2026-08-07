@@ -82,7 +82,8 @@ class TestIntegrationMain(unittest.TestCase):
             }).encode("utf-8")).decode("utf-8"),
             "WORKFLOW_EXECUTION_ID": "test-workflow-exec-101",
             "PROJECT_ID": "test-gcp-project",
-            "EGRESS_TOPIC_ID": "test-egress-actions"
+            "EGRESS_TOPIC_ID": "test-egress-actions",
+            "READY_FOR_CODE_TOPIC_ID": "test-ready-topic"
         })
         self.env_patcher.start()
 
@@ -140,7 +141,10 @@ class TestIntegrationMain(unittest.TestCase):
 
     @patch("main.process_issue_triage")
     @patch("main.send_label_action")
-    def test_ok_quality_flow(self, mock_send_label, mock_triage):
+    @patch("main.publish_issue_ready_for_code")
+    def test_ok_quality_flow(
+        self, mock_publish_event, mock_send_label, mock_triage
+    ):
         """Verifies end-to-end flow for OK quality issues."""
         self.stored_data = {
             "status": "UNTRIAGED",
@@ -167,6 +171,9 @@ class TestIntegrationMain(unittest.TestCase):
         )
         mock_send_label.assert_called_once_with(
             "owner", "repo", 42, ["effort/small"]
+        )
+        mock_publish_event.assert_called_once_with(
+            "owner", "repo", 42, INTEGRATION_OK_PAYLOAD["workable_spec"]
         )
 
         # Verify state transition in store data
@@ -276,7 +283,12 @@ class TestIntegrationMain(unittest.TestCase):
             "owner", "repo", 42, "test-workflow-exec-101"
         )
         self.mock_store.release_lock.assert_called_once_with(
-            "owner", "repo", 42, "test-workflow-exec-101", success=False
+            "owner",
+            "repo",
+            42,
+            "test-workflow-exec-101",
+            success=False,
+            error="Validation Error: Invalid or missing 'effort_estimate': HUGE",
         )
         self.assertEqual(self.stored_data["status"], "UNTRIAGED")
         self.assertIsNone(self.stored_data["lock"]["holder"])
