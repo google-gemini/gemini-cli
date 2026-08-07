@@ -362,8 +362,15 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     const toFetch: string[] = [];
     const skipped: string[] = [];
 
-    for (const url of uniqueUrls) {
-      if (await this.isBlockedHost(url)) {
+    const validations = await Promise.all(
+      uniqueUrls.map(async (url) => {
+        const isBlocked = await this.isBlockedHost(url);
+        return { url, isBlocked };
+      }),
+    );
+
+    for (const { url, isBlocked } of validations) {
+      if (isBlocked) {
         debugLogger.warn(
           `[WebFetchTool] Skipped private or local host: ${url}`,
         );
