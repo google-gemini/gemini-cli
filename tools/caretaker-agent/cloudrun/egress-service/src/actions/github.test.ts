@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const mockCreateComment = vi.fn();
 const mockAddLabels = vi.fn();
 const mockRemoveLabel = vi.fn();
+const mockCreateForIssueComment = vi.fn();
 
 vi.mock('@octokit/rest', () => ({
   Octokit: vi.fn().mockImplementation(() => ({
@@ -17,6 +18,9 @@ vi.mock('@octokit/rest', () => ({
         createComment: mockCreateComment,
         addLabels: mockAddLabels,
         removeLabel: mockRemoveLabel,
+      },
+      reactions: {
+        createForIssueComment: mockCreateForIssueComment,
       },
     },
   })),
@@ -147,6 +151,27 @@ describe('GitHub Actions Handler', () => {
       repo: 'gemini-cli',
       issue_number: 10,
       name: 'need-triage',
+    });
+  });
+
+  it('should call createForIssueComment for REACTION action', async () => {
+    mockCreateForIssueComment.mockResolvedValueOnce({});
+    await handleEgressEvent({
+      action: 'REACTION',
+      payload: {
+        owner: 'google-gemini',
+        repo: 'gemini-cli',
+        issueNumber: 10,
+        commentId: 12345,
+        reaction: 'eyes',
+      },
+    });
+
+    expect(mockCreateForIssueComment).toHaveBeenCalledWith({
+      owner: 'google-gemini',
+      repo: 'gemini-cli',
+      comment_id: 12345,
+      content: 'eyes',
     });
   });
 
