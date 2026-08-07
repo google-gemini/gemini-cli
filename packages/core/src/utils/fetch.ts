@@ -153,7 +153,7 @@ export async function isPrivateIpAsync(url: string): Promise<boolean> {
     const hostname = parsedUrl.hostname;
 
     if (isLoopbackHost(hostname)) {
-      return false;
+      return true;
     }
 
     const addresses = await lookup(hostname, { all: true });
