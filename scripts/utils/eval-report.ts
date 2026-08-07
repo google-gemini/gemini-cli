@@ -37,7 +37,20 @@ export interface ReportSummaryResult {
  */
 export function findReportFiles(dir: string): string[] {
   const reports: string[] = [];
+  if (!dir || dir.includes('\0')) return reports;
   if (!fs.existsSync(dir)) return reports;
+
+  try {
+    const stat = fs.statSync(dir);
+    if (stat.isFile()) {
+      if (path.basename(dir) === 'report.json') {
+        return [dir];
+      }
+      return reports;
+    }
+  } catch {
+    return reports;
+  }
 
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   for (const entry of entries) {
@@ -94,10 +107,19 @@ export async function summarizeReports(
       const data = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
       if (data && Array.isArray(data.testResults)) {
         for (const fileResult of data.testResults) {
+          if (!fileResult || typeof fileResult.name !== 'string') {
+            continue;
+          }
           const filePath = fileResult.name;
+          if (filePath.includes('\0')) {
+            continue;
+          }
           const normalizedPath = path.resolve(filePath).replace(/\\/g, '/');
           if (Array.isArray(fileResult.assertionResults)) {
             for (const assertion of fileResult.assertionResults) {
+              if (!assertion || typeof assertion.title !== 'string') {
+                continue;
+              }
               const testName = assertion.title;
               const compoundKey = `${normalizedPath}::${testName}`;
               if (!testCasesMap.has(compoundKey)) {

@@ -50,6 +50,20 @@ describe('eval-report utility', () => {
       );
       expect(found.sort()).toEqual(['sub1', 'sub2']);
     });
+
+    it('returns the file itself if passed a direct path to a report.json file', () => {
+      const reportFile = path.join(tmpDir, 'report.json');
+      fs.writeFileSync(reportFile, '{}');
+      expect(findReportFiles(reportFile)).toEqual([reportFile]);
+    });
+
+    it('returns empty array if passed an invalid path string or non-report file', () => {
+      const otherFile = path.join(tmpDir, 'other.txt');
+      fs.writeFileSync(otherFile, '{}');
+      expect(findReportFiles(otherFile)).toEqual([]);
+      expect(findReportFiles('')).toEqual([]);
+      expect(findReportFiles('invalid\0path')).toEqual([]);
+    });
   });
 
   describe('getModelFromPath', () => {
@@ -165,6 +179,37 @@ describe('eval-report utility', () => {
       expect(cases[1].passed).toBe(1);
       expect(cases[1].total).toBe(1);
       expect(cases[1].passRate).toBe(1.0);
+    });
+
+    it('safely ignores malformed or null file results and assertions', async () => {
+      const modelDir = path.join(tmpDir, 'eval-logs-gemini-2.5-flash-100');
+      fs.mkdirSync(modelDir);
+
+      const malformedReport = {
+        testResults: [
+          null,
+          { name: 123 },
+          { name: 'invalid\0path' },
+          {
+            name: '/repo/evals/test-valid.eval.ts',
+            assertionResults: [
+              null,
+              { title: 456 },
+              { title: 'valid test', status: 'passed' },
+            ],
+          },
+        ],
+      };
+
+      fs.writeFileSync(
+        path.join(modelDir, 'report.json'),
+        JSON.stringify(malformedReport),
+      );
+
+      const result = await summarizeReports(modelDir);
+      expect(result.models.length).toBe(1);
+      expect(result.models[0].cases.length).toBe(1);
+      expect(result.models[0].cases[0].name).toBe('valid test');
     });
 
     it('does not collide test cases with duplicate names in different files', async () => {

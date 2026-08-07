@@ -1,4 +1,4 @@
-﻿# Behavioral Evaluations & EDK Guide
+# Behavioral Evaluations & EDK Guide
 
 This guide introduces the **Eval Development Kit (EDK)** and details how to
 write, validate, run, and report on **behavioral evaluations** in the Gemini CLI
@@ -22,8 +22,7 @@ Evaluating agent behavior is critical because:
 3. We must enforce safety boundaries (e.g., preventing execution of raw shell
    commands when safe alternatives exist).
 
-All behavioral evaluations are stored under the
-[evals/](file:///c:/coding/gemini-cli/evals/) directory.
+All behavioral evaluations are stored under the `evals/` directory.
 
 ---
 
