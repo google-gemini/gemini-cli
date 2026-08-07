@@ -219,6 +219,28 @@ export async function getConnectionConfigFromFile(
   );
 
   if (validWorkspaces.length === 0) {
+    // If no workspace matches the current CWD, but we found and parsed
+    // valid connection config file(s), return the best-sorted config.
+    // This lets downstream connection logic raise a helpful, detailed
+    // "Directory mismatch" warning instead of a generic connection error.
+    const nonNullableContents = parsedContents.filter(
+      (
+        content,
+      ): content is ConnectionConfig & {
+        workspacePath?: string;
+        ideInfo?: IdeInfo;
+      } => !!content,
+    );
+    if (nonNullableContents.length > 0) {
+      const selected = nonNullableContents[0];
+      const fileIndex = parsedContents.indexOf(selected);
+      if (fileIndex !== -1) {
+        logger.debug(
+          `Selected best mismatched IDE connection file: ${matchingFiles[fileIndex]}`,
+        );
+      }
+      return selected;
+    }
     return undefined;
   }
 
