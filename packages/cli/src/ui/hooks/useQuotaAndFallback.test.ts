@@ -250,6 +250,7 @@ describe('useQuotaAndFallback', () => {
       });
 
       expect(result.current.proQuotaRequest).not.toBeNull();
+      expect(result.current.proQuotaRequest?.isCapacityExceeded).toBe(true);
       expect(result.current.proQuotaRequest?.message).toContain(
         'We are currently experiencing high demand',
       );

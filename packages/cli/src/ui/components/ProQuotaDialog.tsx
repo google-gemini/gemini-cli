@@ -17,6 +17,7 @@ interface ProQuotaDialogProps {
   message: string;
   isTerminalQuotaError: boolean;
   isModelNotFoundError?: boolean;
+  isCapacityExceeded?: boolean;
   authType?: AuthType;
   tierName?: string;
   onChoice: (
@@ -30,6 +31,7 @@ export function ProQuotaDialog({
   message,
   isTerminalQuotaError,
   isModelNotFoundError,
+  isCapacityExceeded,
   authType,
   tierName,
   onChoice,
@@ -49,7 +51,10 @@ export function ProQuotaDialog({
         key: 'retry_later',
       },
     ];
-  } else if (isModelNotFoundError || isTerminalQuotaError) {
+  } else if (
+    isModelNotFoundError ||
+    (isTerminalQuotaError && !isCapacityExceeded)
+  ) {
     const isUltra = isUltraTier(tierName);
 
     // free users and out of quota users on G1 pro and Cloud Console gets an option to upgrade

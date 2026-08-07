@@ -79,12 +79,16 @@ export function useQuotaAndFallback({
       let message: string;
       let isTerminalQuotaError = false;
       let isModelNotFoundError = false;
+      let isCapacityExceeded = false;
       const usageLimitReachedModel = isProModel(failedModel)
         ? 'all Pro models'
         : failedModel;
 
       if (error instanceof TerminalQuotaError) {
         isTerminalQuotaError = true;
+        isCapacityExceeded =
+          error.reason === 'MODEL_CAPACITY_EXHAUSTED' ||
+          error.reason === 'MODEL_CAPACITY_EXCEEDED';
 
         const isInsufficientCredits = error.isInsufficientCredits;
 
@@ -121,10 +125,6 @@ export function useQuotaAndFallback({
         }
 
         // Default: Show existing ProQuotaDialog (for overageStrategy: 'never' or non-G1 users)
-        const isCapacityExceeded =
-          error.reason === 'MODEL_CAPACITY_EXHAUSTED' ||
-          error.reason === 'MODEL_CAPACITY_EXCEEDED';
-
         if (isCapacityExceeded) {
           const messageLines = [
             `We are currently experiencing high demand for ${usageLimitReachedModel}.`,
@@ -213,6 +213,7 @@ export function useQuotaAndFallback({
             message,
             isTerminalQuotaError,
             isModelNotFoundError,
+            isCapacityExceeded,
             authType: contentGeneratorConfig?.authType,
           });
         },
