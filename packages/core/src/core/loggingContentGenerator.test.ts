@@ -634,6 +634,58 @@ describe('LoggingContentGenerator', () => {
       expect(responseEvent.usage.total_token_count).toBe(18);
     });
 
+    it('also carries the aborted usage onto the dev trace span', async () => {
+      // The logged response and the trace must agree about the same turn; the
+      // success path sets these attributes, so the abort path has to as well.
+      const req = {
+        contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
+        model: 'gemini-pro',
+      };
+      const abortError = new Error('Aborted');
+      abortError.name = 'AbortError';
+
+      async function* createAsyncGenerator() {
+        yield {
+          candidates: [
+            { content: { role: 'model', parts: [{ text: 'partial' }] } },
+          ],
+          usageMetadata: {
+            promptTokenCount: 11,
+            candidatesTokenCount: 7,
+            totalTokenCount: 18,
+          },
+        } as unknown as GenerateContentResponse;
+        throw abortError;
+      }
+
+      vi.mocked(wrapped.generateContentStream).mockResolvedValue(
+        createAsyncGenerator(),
+      );
+      await loggingContentGenerator.generateContentStream(
+        req,
+        'prompt-abort-span',
+        LlmRole.MAIN,
+      );
+
+      const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
+      const fn = spanArgs[1];
+      const metadata: SpanMetadata = { name: '', attributes: {} };
+
+      vi.mocked(wrapped.generateContentStream).mockResolvedValue(
+        createAsyncGenerator(),
+      );
+      const spanStream = await fn({ metadata });
+
+      await expect(async () => {
+        for await (const _ of spanStream) {
+          // drain until the abort
+        }
+      }).rejects.toThrow(abortError);
+
+      expect(metadata.attributes[GEN_AI_USAGE_INPUT_TOKENS]).toBe(11);
+      expect(metadata.attributes[GEN_AI_USAGE_OUTPUT_TOKENS]).toBe(7);
+    });
+
     it('does not record a usage event when the stream aborts before any usage arrives', async () => {
       const req = {
         contents: [{ role: 'user', parts: [{ text: 'hello' }] }],

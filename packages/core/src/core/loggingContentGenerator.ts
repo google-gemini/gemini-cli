@@ -591,6 +591,12 @@ export class LoggingContentGenerator implements ContentGenerator {
       // Record it here instead, so a cancelled turn still accounts for the
       // tokens it actually consumed.
       if (isAbortError(error) && lastUsageMetadata) {
+        // Mirror the success path's span attributes too, so the trace and the
+        // logged response agree about the same aborted turn.
+        spanMetadata.attributes[GEN_AI_USAGE_INPUT_TOKENS] =
+          lastUsageMetadata.promptTokenCount ?? 0;
+        spanMetadata.attributes[GEN_AI_USAGE_OUTPUT_TOKENS] =
+          lastUsageMetadata.candidatesTokenCount ?? 0;
         this._logApiResponse(
           requestContents,
           durationMs,
