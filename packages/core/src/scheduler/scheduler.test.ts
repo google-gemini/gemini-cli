@@ -630,8 +630,8 @@ describe('Scheduler (Orchestrator)', () => {
         CoreToolCallStatus.Cancelled,
         'Operation cancelled by user',
       );
-      // finalizeCall is handled by the processing loop, not synchronously by cancelAll
-      // expect(mockStateManager.finalizeCall).toHaveBeenCalledWith('call-1');
+      // finalizeCall is called synchronously by cancelAll to ensure completedBatch is populated and isActive is updated immediately
+      expect(mockStateManager.finalizeCall).toHaveBeenCalledWith('call-1');
       expect(mockStateManager.cancelAllQueued).toHaveBeenCalledWith(
         'Operation cancelled by user',
       );

@@ -18,10 +18,11 @@ export type IssueStatus =
   | 'NEEDS_INFO'
   | 'TRIAGED'
   | 'NEEDS_HUMAN'
-  | 'LOW_QUALITY';
+  | 'AUTO_CLOSE';
 
 export interface IssueDocument {
   status: IssueStatus;
+  error?: string | null;
   triage_attempts: number;
   // The ingestion layer does not enforce the schema of workable_spec
   workable_spec: Record<string, unknown>;
@@ -36,6 +37,7 @@ export interface IssueDocument {
     repo: string;
     issue_number: number;
     title: string;
+    pr_number?: number | null;
   };
 }
 
@@ -74,6 +76,7 @@ export class IssuesStore {
         if (!snapshot.exists) {
           const newIssue: IssueDocument = {
             status: 'UNTRIAGED',
+            error: null,
             triage_attempts: 0,
             workable_spec: {},
             lock: {
@@ -87,6 +90,7 @@ export class IssuesStore {
               repo,
               issue_number: issueNumber,
               title,
+              pr_number: null,
             },
           };
 
