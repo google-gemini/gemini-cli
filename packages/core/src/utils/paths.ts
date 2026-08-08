@@ -443,7 +443,8 @@ function robustRealpath(p: string, visited = new Set<string>()): string {
       (e.code === 'ENOENT' ||
         e.code === 'EISDIR' ||
         e.code === 'ENAMETOOLONG' ||
-        e.code === 'ENOTDIR')
+        e.code === 'ENOTDIR' ||
+        e.code === 'EACCES')
     ) {
       try {
         const stat = fs.lstatSync(p);
@@ -454,7 +455,7 @@ function robustRealpath(p: string, visited = new Set<string>()): string {
         }
       } catch (lstatError: unknown) {
         // Not a symlink, or lstat failed. Re-throw if it's not an expected
-        // ENOENT (e.g., a permissions error), otherwise resolve parent.
+        // ENOENT/EACCES (e.g., a permissions error), otherwise resolve parent.
         if (
           !(
             lstatError &&
@@ -463,7 +464,8 @@ function robustRealpath(p: string, visited = new Set<string>()): string {
             (lstatError.code === 'ENOENT' ||
               lstatError.code === 'EISDIR' ||
               lstatError.code === 'ENAMETOOLONG' ||
-              lstatError.code === 'ENOTDIR')
+              lstatError.code === 'ENOTDIR' ||
+              lstatError.code === 'EACCES')
           )
         ) {
           throw lstatError;
