@@ -190,6 +190,30 @@ export const TRACKER_VISUALIZE_TOOL_NAME = 'tracker_visualize';
 
 export const AGENT_TOOL_NAME = 'invoke_agent';
 
+/**
+ * Wildcard entry usable in an agent's `tools` list to grant it access to every
+ * registered agent. `invoke_agent` is accepted as an equivalent spelling.
+ */
+export const ALL_AGENTS_WILDCARD = 'agent_*';
+
+/**
+ * Shape of an agent name. Kept in sync with the `nameSchema` slug rule used by
+ * the agent frontmatter loader.
+ */
+const AGENT_NAME_PATTERN = /^[a-z0-9-_]+$/;
+
+/**
+ * Returns true if `name` could refer to a subagent when it appears in an
+ * agent's `tools` list, i.e. either the "all agents" wildcard or an
+ * agent-name-shaped slug.
+ *
+ * This is a purely syntactic check; callers resolve the name against the agent
+ * registry to find out whether such an agent actually exists.
+ */
+export function isAgentReferenceName(name: string): boolean {
+  return name === ALL_AGENTS_WILDCARD || AGENT_NAME_PATTERN.test(name);
+}
+
 // Tool Display Names
 export const WRITE_FILE_DISPLAY_NAME = 'WriteFile';
 export const EDIT_DISPLAY_NAME = 'Edit';
@@ -299,10 +323,15 @@ export const PLAN_MODE_TOOLS = [
 /**
  * Validates if a tool name is syntactically valid.
  * Checks against built-in tools, discovered tools, and MCP naming conventions.
+ *
+ * @param options.allowWildcards Accept policy wildcards such as `*` and `mcp_*`.
+ * @param options.allowAgentNames Accept subagent references (a bare agent name
+ *   or {@link ALL_AGENTS_WILDCARD}). Only meaningful where the name is later
+ *   resolved against the agent registry, e.g. an agent's own `tools` list.
  */
 export function isValidToolName(
   name: string,
-  options: { allowWildcards?: boolean } = {},
+  options: { allowWildcards?: boolean; allowAgentNames?: boolean } = {},
 ): boolean {
   // Built-in tools
   if ((ALL_BUILTIN_TOOL_NAMES as readonly string[]).includes(name)) {
@@ -362,6 +391,13 @@ export function isValidToolName(
     }
 
     return false;
+  }
+
+  // Subagent references. Checked after the MCP branch so that malformed MCP
+  // names (e.g. `mcp__tool`) are still rejected rather than being mistaken for
+  // an agent name.
+  if (options.allowAgentNames && isAgentReferenceName(name)) {
+    return true;
   }
 
   return false;

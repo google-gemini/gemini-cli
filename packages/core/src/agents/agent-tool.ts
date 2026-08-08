@@ -34,6 +34,36 @@ import {
 import { AGENT_TOOL_NAME } from '../tools/tool-names.js';
 
 /**
+ * Maximum number of nested agent levels. A top-level (user-facing) turn is at
+ * depth 0, the agent it invokes runs at depth 1, and so on. Once an agent is
+ * running at this depth it can no longer invoke further agents.
+ */
+export const MAX_AGENT_DEPTH = 3;
+
+/** Optional restrictions applied to an {@link AgentTool} instance. */
+export interface AgentToolOptions {
+  /**
+   * The only agents this tool may invoke. Omit to allow every registered
+   * agent (the behaviour of the top-level tool).
+   */
+  readonly allowedAgentNames?: readonly string[];
+}
+
+function buildAgentNameSchema(allowedAgentNames?: readonly string[]): object {
+  if (!allowedAgentNames) {
+    return {
+      type: 'string',
+      description: 'Name of the subagent to invoke',
+    };
+  }
+  return {
+    type: 'string',
+    description: `Name of the subagent to invoke. Must be one of: ${allowedAgentNames.join(', ')}.`,
+    enum: [...allowedAgentNames],
+  };
+}
+
+/**
  * A unified tool for invoking subagents.
  *
  * Handles looking up the subagent, validating its eligibility,
@@ -46,10 +76,13 @@ export class AgentTool extends BaseDeclarativeTool<
 > {
   static readonly Name = AGENT_TOOL_NAME;
 
+  private readonly allowedAgentNames?: readonly string[];
+
   constructor(
     private readonly context: AgentLoopContext,
     messageBus: MessageBus,
     private readonly onAgentEvent?: (event: AgentEvent) => void,
+    options?: AgentToolOptions,
   ) {
     super(
       AGENT_TOOL_NAME,
@@ -59,10 +92,7 @@ export class AgentTool extends BaseDeclarativeTool<
       {
         type: 'object',
         properties: {
-          agent_name: {
-            type: 'string',
-            description: 'Name of the subagent to invoke',
-          },
+          agent_name: buildAgentNameSchema(options?.allowedAgentNames),
           prompt: {
             type: 'string',
             description:
@@ -75,6 +105,7 @@ export class AgentTool extends BaseDeclarativeTool<
       /* isOutputMarkdown */ true,
       /* canUpdateOutput */ true,
     );
+    this.allowedAgentNames = options?.allowedAgentNames;
   }
 
   protected createInvocation(
@@ -83,6 +114,26 @@ export class AgentTool extends BaseDeclarativeTool<
     _toolName?: string,
     _toolDisplayName?: string,
   ): ToolInvocation<{ agent_name: string; prompt: string }, ToolResult> {
+    const depth = this.context.agentDepth ?? 0;
+    if (depth >= MAX_AGENT_DEPTH) {
+      throw new Error(
+        `Maximum agent nesting depth (${MAX_AGENT_DEPTH}) reached; ` +
+          `'${params.agent_name}' cannot be invoked from here. ` +
+          `Complete the task directly instead of delegating further.`,
+      );
+    }
+
+    if (
+      this.allowedAgentNames &&
+      !this.allowedAgentNames.includes(params.agent_name)
+    ) {
+      const available = this.allowedAgentNames.join(', ') || '(none)';
+      throw new Error(
+        `Subagent '${params.agent_name}' is not available to this agent. ` +
+          `Available subagents: ${available}.`,
+      );
+    }
+
     const registry = this.context.config.getAgentRegistry();
     const definition = registry.getDefinition(params.agent_name);
 
