@@ -564,24 +564,27 @@ describe('resolveToRealPath', () => {
     expect(resolveToRealPath(input)).toBe(expected);
   });
 
-  it('should return decoded path even if fs.realpathSync fails with EACCES', () => {
-    vi.spyOn(fs, 'realpathSync').mockImplementationOnce(() => {
-      const err = new Error('Permission denied') as NodeJS.ErrnoException;
-      err.code = 'EACCES';
-      throw err;
-    });
-    vi.spyOn(fs, 'lstatSync').mockImplementationOnce(() => {
-      const err = new Error('Permission denied') as NodeJS.ErrnoException;
-      err.code = 'EACCES';
-      throw err;
-    });
+  it.each(['EACCES', 'EPERM'])(
+    'should return decoded path even if fs.realpathSync fails with %s',
+    (code) => {
+      vi.spyOn(fs, 'realpathSync').mockImplementationOnce(() => {
+        const err = new Error('Permission denied') as NodeJS.ErrnoException;
+        err.code = code;
+        throw err;
+      });
+      vi.spyOn(fs, 'lstatSync').mockImplementationOnce(() => {
+        const err = new Error('Permission denied') as NodeJS.ErrnoException;
+        err.code = code;
+        throw err;
+      });
 
-    const p = path.resolve('path', 'to', 'New Project');
-    const input = pathToFileURL(p).toString();
-    const expected = p;
+      const p = path.resolve('path', 'to', 'New Project');
+      const input = pathToFileURL(p).toString();
+      const expected = p;
 
-    expect(resolveToRealPath(input)).toBe(expected);
-  });
+      expect(resolveToRealPath(input)).toBe(expected);
+    },
+  );
 
   it('should recursively resolve symlinks for non-existent child paths', () => {
     const parentPath = path.resolve('/some/parent/path');
