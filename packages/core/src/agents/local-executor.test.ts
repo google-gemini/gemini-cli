@@ -1012,7 +1012,66 @@ describe('LocalAgentExecutor', () => {
         const nestedContext = agentTool['context'];
         expect(nestedContext.agentDepth).toBe(1);
         expect(nestedContext.config).toBe(mockConfig);
-        expect(nestedContext.toolRegistry).toBe(parentToolRegistry);
+      });
+
+      it('should nest the message bus and isolated registries for the child', async () => {
+        stubAgentRegistry(['code-reviewer']);
+
+        const definition = createTestDefinition([
+          LS_TOOL_NAME,
+          'code-reviewer',
+        ]);
+        const executor = await LocalAgentExecutor.create(
+          definition,
+          mockConfig,
+          onActivity,
+        );
+
+        const agentTool = executor['toolRegistry'].getTool(
+          AGENT_TOOL_NAME,
+        ) as AgentTool;
+        const nestedContext = agentTool['context'];
+
+        // Publishing through this agent's derived bus is what attributes the
+        // child's confirmations as `parent/child` rather than `child`.
+        expect(nestedContext.messageBus).toBe(
+          executor['toolRegistry'].getMessageBus(),
+        );
+        expect(nestedContext.messageBus).not.toBe(
+          parentToolRegistry.getMessageBus(),
+        );
+        expect(nestedContext.promptRegistry).toBe(executor['promptRegistry']);
+        expect(nestedContext.resourceRegistry).toBe(
+          executor['resourceRegistry'],
+        );
+      });
+
+      it('should let a delegated agent resolve tools its caller does not have', async () => {
+        // A coordinator listing only another agent has no file tools of its
+        // own, but its delegates must still resolve theirs.
+        stubAgentRegistry(['code-reviewer']);
+
+        const definition = createTestDefinition(['code-reviewer']);
+        const executor = await LocalAgentExecutor.create(
+          definition,
+          mockConfig,
+          onActivity,
+        );
+
+        expect(executor['toolRegistry'].getTool(LS_TOOL_NAME)).toBeUndefined();
+        expect(
+          executor['toolRegistry'].getTool(READ_FILE_TOOL_NAME),
+        ).toBeUndefined();
+
+        const agentTool = executor['toolRegistry'].getTool(
+          AGENT_TOOL_NAME,
+        ) as AgentTool;
+        const nestedContext = agentTool['context'];
+
+        expect(nestedContext.toolRegistry.getTool(LS_TOOL_NAME)).toBeDefined();
+        expect(
+          nestedContext.toolRegistry.getTool(READ_FILE_TOOL_NAME),
+        ).toBeDefined();
       });
 
       it('should stop granting agent access at the maximum nesting depth', async () => {

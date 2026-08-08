@@ -34,18 +34,14 @@ import {
 import { AGENT_TOOL_NAME } from '../tools/tool-names.js';
 
 /**
- * Maximum number of nested agent levels. A top-level (user-facing) turn is at
- * depth 0, the agent it invokes runs at depth 1, and so on. Once an agent is
- * running at this depth it can no longer invoke further agents.
+ * Maximum number of nested agent levels. A user-facing turn is at depth 0, the
+ * agent it invokes at depth 1, and so on; an agent at this depth cannot
+ * invoke further agents.
  */
 export const MAX_AGENT_DEPTH = 3;
 
-/** Optional restrictions applied to an {@link AgentTool} instance. */
 export interface AgentToolOptions {
-  /**
-   * The only agents this tool may invoke. Omit to allow every registered
-   * agent (the behaviour of the top-level tool).
-   */
+  /** The only agents this tool may invoke. Omit to allow every agent. */
   readonly allowedAgentNames?: readonly string[];
 }
 

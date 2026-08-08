@@ -192,14 +192,11 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     const parentToolRegistry = context.toolRegistry;
     const agentRegistry = context.config.getAgentRegistry();
 
-    // Agents this agent is explicitly allowed to invoke. Populated from the
-    // agent references in `toolConfig.tools`; an empty set means this agent
-    // gets no `invoke_agent` tool at all.
+    // Agents named in `toolConfig.tools`. Empty means no `invoke_agent` tool.
     const allowedAgentNames = new Set<string>();
 
     const registerToolInstance = (tool: AnyDeclarativeTool) => {
-      // Agent tools are never inherited wholesale: an agent only gets an
-      // `invoke_agent` tool scoped to the agents it explicitly lists.
+      // Agent tools are never inherited; delegation is granted explicitly below.
       if (tool.kind === Kind.Agent) {
         return;
       }
@@ -260,8 +257,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         return;
       }
 
-      // Not a tool: it may name another agent (or this agent itself), in which
-      // case the agent gets an `invoke_agent` tool scoped to it.
+      // Not a tool, so it may name another agent (or this agent itself).
       if (agentRegistry?.getDefinition(toolName)) {
         allowedAgentNames.add(toolName);
         return;
@@ -288,8 +284,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       }
     } else {
       // If no tools are explicitly configured, default to all available tools.
-      // Agent delegation stays opt-in: it has to be requested explicitly via an
-      // agent name, `agent_*` or `invoke_agent` in `toolConfig.tools`.
+      // Delegation stays opt-in, so agent tools are not inherited here.
       for (const toolName of parentToolRegistry.getAllToolNames()) {
         if (toolName === AGENT_TOOL_NAME) {
           continue;
@@ -298,9 +293,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       }
     }
 
-    // Give the agent an `invoke_agent` tool scoped to the agents it listed, so
-    // it can delegate to (or recurse into) them. Nesting is bounded by
-    // MAX_AGENT_DEPTH to keep agent-calls-agent from running away.
+    // Grant an `invoke_agent` tool scoped to the agents this one listed.
     const nestedDepth = (context.agentDepth ?? 0) + 1;
     if (allowedAgentNames.size > 0) {
       if (nestedDepth >= MAX_AGENT_DEPTH) {
@@ -313,10 +306,15 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           config: context.config,
           promptId: context.promptId,
           parentSessionId: context.parentSessionId,
+          // Resolution source for the child's own declared tools. Narrowing it
+          // to this agent's registry would intersect the child's toolset with
+          // its caller's, leaving a coordinator's delegates nothing to resolve.
           toolRegistry: context.toolRegistry,
-          promptRegistry: context.promptRegistry,
-          resourceRegistry: context.resourceRegistry,
-          messageBus: context.messageBus,
+          // The rest nests, keeping the child inside this agent's isolation
+          // boundary and its confirmations attributed `parent/child`.
+          promptRegistry: agentPromptRegistry,
+          resourceRegistry: agentResourceRegistry,
+          messageBus: subagentMessageBus,
           geminiClient: context.geminiClient,
           sandboxManager: context.sandboxManager,
           agentDepth: nestedDepth,

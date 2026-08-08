@@ -430,6 +430,14 @@ Each subagent runs in its own isolated context loop. This means:
   with an explicit error. Each level is independently bounded by its own
   `max_turns` and `timeout_mins`.
 
+When one agent delegates to another, each agent's tools always come from its
+**own** `tools` list — a delegate is never handed its caller's tools, and is
+never narrowed to them either. This keeps an agent definition meaning the same
+thing however it was reached, so a thin coordinator that lists only other agents
+still works. Tool confirmations from a delegate are routed through its caller's
+message bus and attributed as `caller/delegate`, so nested tool calls stay
+sanitized and correctly labelled in the UI.
+
 ## Subagent tool isolation
 
 Subagent tool isolation moves Gemini CLI away from a single global tool
