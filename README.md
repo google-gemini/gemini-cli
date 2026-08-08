@@ -353,6 +353,95 @@ See the
 [MCP Server Integration guide](https://www.geminicli.com/docs/tools/mcp-server)
 for setup instructions.
 
+## Running from Source
+
+To build and run Gemini CLI (including the custom-endpoint features in this
+fork) from a local clone instead of installing the published package:
+
+**Prerequisites:**
+
+- **Node.js** `>=20.0.0`. For development, use Node.js `~20.19.0` (required due
+  to an upstream development dependency issue). Use a tool like
+  [nvm](https://github.com/nvm-sh/nvm) to manage versions.
+- **Git**
+- **Docker** (only if you use an OpenAI-compatible custom endpoint)
+
+**Setup:**
+
+```bash
+git clone https://github.com/codenamerey/gemini-cli.git
+cd gemini-cli
+npm install
+npm run build
+```
+
+`npm install` installs dependencies for the root project and all `packages/`
+workspaces. `npm run build` compiles TypeScript, bundles assets, and prepares
+the packages for execution.
+
+**Start the CLI:**
+
+```bash
+npm start
+```
+
+Or run the production build:
+
+```bash
+npm run start:prod
+```
+
+**Sandboxing (recommended):** To also build the sandbox container used for
+secure tool execution, run `npm run build:all` instead of `npm run build`. See
+the [CONTRIBUTING.md](./CONTRIBUTING.md) development setup section for details
+on sandboxing, debugging, and running outside the source folder.
+
+### Custom (OpenAI-compatible) endpoints
+
+This fork adds support for OpenAI-compatible endpoints with secret redaction.
+Before the first call to a custom endpoint, complete the following setup:
+
+**1. Start the Presidio PII sidecar (required for custom endpoints)**
+
+Every prompt and tool result sent to an OpenAI-compatible endpoint is run
+through a local Microsoft Presidio Analyzer, which redacts detected PII into
+restorable tokens. Redaction is fail-closed: if the analyzer is unreachable, the
+request is stopped rather than sent unredacted. Start the bundled sidecar before
+selecting a custom endpoint:
+
+```bash
+npm run presidio:start
+```
+
+This runs `docker compose -f docker-compose.presidio.yml up -d` and listens on
+`127.0.0.1:5002`. Stop it later with `npm run presidio:stop`.
+
+To point at a different analyzer, set its `/analyze` endpoint:
+
+```bash
+export GEMINI_PRESIDIO_ANALYZER_URL=http://127.0.0.1:5002/analyze
+```
+
+See
+[docs/get-started/presidio-sidecar.md](./docs/get-started/presidio-sidecar.md)
+for details.
+
+**2. Configure the endpoint credentials**
+
+Select the OpenAI-compatible auth option on first run and enter the base URL,
+API key (optional for local providers), and model, or set them in your
+environment before launching:
+
+```bash
+export OPENAI_BASE_URL=https://api.openai.com/v1
+export OPENAI_API_KEY="YOUR_API_KEY"
+export OPENAI_MODEL=gpt-4.1
+gemini
+```
+
+Credentials entered interactively are stored securely in your system keychain
+and validated against the endpoint's `/models` list.
+
 ## 🤝 Contributing
 
 We welcome contributions! Gemini CLI is fully open source (Apache 2.0), and we
