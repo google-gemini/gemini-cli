@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { beforeEach, describe, it, expect } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import {
   clearRestorableSecretStore,
   restoreRedactedSecrets,
@@ -12,11 +12,16 @@ import {
   sanitizeToolArgs,
   sanitizeThoughtContent,
   sanitizeModelContent,
+  sanitizeModelContentWithPresidio,
 } from './agent-sanitization-utils.js';
 
 describe('agent-sanitization-utils', () => {
   beforeEach(() => {
     clearRestorableSecretStore();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   describe('sanitizeErrorMessage', () => {
@@ -118,6 +123,76 @@ describe('agent-sanitization-utils', () => {
 
       expect(result).toMatch(/^Please inspect \[REDACTED:[^\]]+\]$/);
       expect(restoreRedactedSecrets(result)).toBe(`Please inspect ${secret}`);
+    });
+  });
+
+  describe('sanitizeModelContentWithPresidio', () => {
+    it('redacts and restores names detected by Presidio', async () => {
+      const input = 'Ask Ada Lovelace to review this.';
+      const start = input.indexOf('Ada Lovelace');
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(
+          new Response(
+            JSON.stringify([
+              {
+                entity_type: 'PERSON',
+                start,
+                end: start + 'Ada Lovelace'.length,
+                score: 0.93,
+              },
+            ]),
+            { status: 200 },
+          ),
+        ),
+      );
+
+      const result = await sanitizeModelContentWithPresidio(input);
+
+      expect(result).not.toContain('Ada Lovelace');
+      expect(result).toMatch(/^Ask \[REDACTED:[^\]]+\] to review this\.$/);
+      expect(restoreRedactedSecrets(result)).toBe(input);
+    });
+
+    it('fails closed when the analyzer cannot be reached', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+
+      await expect(
+        sanitizeModelContentWithPresidio('Contact Ada Lovelace'),
+      ).rejects.toThrow('Presidio Analyzer is required');
+    });
+
+    it('converts Presidio code-point offsets for text containing emoji', async () => {
+      const input = 'Wave 👋 to Ada Lovelace.';
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(
+          new Response(
+            JSON.stringify([
+              {
+                entity_type: 'PERSON',
+                start: 10,
+                end: 22,
+                score: 0.93,
+              },
+            ]),
+            { status: 200 },
+          ),
+        ),
+      );
+
+      const result = await sanitizeModelContentWithPresidio(input);
+
+      expect(result).toMatch(/^Wave 👋 to \[REDACTED:[^\]]+\]\.$/);
+      expect(restoreRedactedSecrets(result)).toBe(input);
+    });
+
+    it('can be disabled explicitly for isolated callers and tests', async () => {
+      expect(
+        await sanitizeModelContentWithPresidio('Ada Lovelace', {
+          enabled: false,
+        }),
+      ).toBe('Ada Lovelace');
     });
   });
 });

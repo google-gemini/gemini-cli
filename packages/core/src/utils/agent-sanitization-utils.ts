@@ -32,10 +32,45 @@ const restoreRedact: RestoreRedact = loaded;
 
 const RESTORABLE_REDACTION_TOKEN_RE =
   /\[REDACTED:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\]/g;
+const RESTORABLE_REDACTION_TOKEN_PREFIX = '[REDACTED:';
 const EXACT_RESTORABLE_REDACTION_TOKEN_RE =
   /^\[REDACTED:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\]$/;
 const localRedactionStore = new Map<string, unknown>();
 const localValueToToken = new Map<string, string>();
+const DEFAULT_PRESIDIO_ANALYZER_URL = 'http://127.0.0.1:5002/analyze';
+const DEFAULT_PRESIDIO_ENTITIES = [
+  'PERSON',
+  'EMAIL_ADDRESS',
+  'PHONE_NUMBER',
+  'LOCATION',
+  'CREDIT_CARD',
+  'CRYPTO',
+  'IBAN_CODE',
+  'IP_ADDRESS',
+  'MEDICAL_LICENSE',
+  'NRP',
+  'US_BANK_NUMBER',
+  'US_DRIVER_LICENSE',
+  'US_ITIN',
+  'US_PASSPORT',
+  'US_SSN',
+];
+
+interface PresidioAnalyzerResult {
+  entity_type: string;
+  start: number;
+  end: number;
+  score: number;
+}
+
+export interface PresidioSanitizationOptions {
+  enabled?: boolean;
+  analyzerUrl?: string;
+  entities?: string[];
+  language?: string;
+  scoreThreshold?: number;
+  timeoutMs?: number;
+}
 
 /**
  * Sensitive key patterns used for redaction.
@@ -93,6 +128,61 @@ function tokenForValue(value: unknown): string {
   localRedactionStore.set(id, value);
   localValueToToken.set(key, token);
   return token;
+}
+
+function isPresidioAnalyzerResult(
+  value: unknown,
+): value is PresidioAnalyzerResult {
+  if (value === null || typeof value !== 'object') return false;
+  const result = value as Partial<PresidioAnalyzerResult>;
+  return (
+    typeof result.entity_type === 'string' &&
+    typeof result.start === 'number' &&
+    Number.isInteger(result.start) &&
+    typeof result.end === 'number' &&
+    Number.isInteger(result.end) &&
+    typeof result.score === 'number'
+  );
+}
+
+function redactPresidioSpans(
+  text: string,
+  results: PresidioAnalyzerResult[],
+): string {
+  const codeUnitOffsets = [0];
+  for (const character of text) {
+    codeUnitOffsets.push(
+      codeUnitOffsets[codeUnitOffsets.length - 1] + character.length,
+    );
+  }
+  const validResults = results
+    .filter(
+      (result) =>
+        result.start >= 0 &&
+        result.end > result.start &&
+        result.end < codeUnitOffsets.length,
+    )
+    .map((result) => ({
+      ...result,
+      start: codeUnitOffsets[result.start],
+      end: codeUnitOffsets[result.end],
+    }))
+    .sort((a, b) => b.start - a.start || b.end - a.end);
+
+  let sanitized = text;
+  let earliestAppliedStart = text.length;
+  for (const result of validResults) {
+    // Prefer the longer/rightmost result when Presidio returns overlapping
+    // recognizer matches for the same text.
+    if (result.end > earliestAppliedStart) continue;
+    const value = text.slice(result.start, result.end);
+    sanitized =
+      sanitized.slice(0, result.start) +
+      tokenForValue(value) +
+      sanitized.slice(result.end);
+    earliestAppliedStart = result.start;
+  }
+  return sanitized;
 }
 
 function redactPemBlocks(text: string): string {
@@ -263,6 +353,56 @@ export function restoreRedactedSecrets(data: unknown): unknown {
   return restoreRedact.restore(restoreLocalRedactions(data));
 }
 
+/**
+ * Restores model output while retaining suffixes that may be a redaction token
+ * split across streaming chunks.
+ */
+export class StreamingRedactionRestorer {
+  private pending = '';
+
+  push(chunk: string): string {
+    this.pending += chunk;
+    const safeEnd = this.findSafeEnd();
+    const safeText = this.pending.slice(0, safeEnd);
+    this.pending = this.pending.slice(safeEnd);
+    return restoreRedactedSecrets(safeText);
+  }
+
+  flush(): string {
+    const remaining = restoreRedactedSecrets(this.pending);
+    this.pending = '';
+    return remaining;
+  }
+
+  hasPending(): boolean {
+    return this.pending.length > 0;
+  }
+
+  private findSafeEnd(): number {
+    const tokenStart = this.pending.lastIndexOf(
+      RESTORABLE_REDACTION_TOKEN_PREFIX,
+    );
+    if (tokenStart >= 0 && this.pending.indexOf(']', tokenStart) === -1) {
+      return tokenStart;
+    }
+
+    const maxPrefixLength = Math.min(
+      RESTORABLE_REDACTION_TOKEN_PREFIX.length - 1,
+      this.pending.length,
+    );
+    for (let length = maxPrefixLength; length > 0; length--) {
+      if (
+        RESTORABLE_REDACTION_TOKEN_PREFIX.startsWith(
+          this.pending.slice(-length),
+        )
+      ) {
+        return this.pending.length - length;
+      }
+    }
+    return this.pending.length;
+  }
+}
+
 export function clearRestorableSecretStore(): void {
   restoreRedact.clear();
   localRedactionStore.clear();
@@ -392,4 +532,85 @@ export function sanitizeThoughtContent(text: string): string {
 /** Sanitizes text immediately before it is sent to an external model. */
 export function sanitizeModelContent(text: string): string {
   return redactRestorableSecrets(text);
+}
+
+/**
+ * Sanitizes model-bound text with local secret detection followed by a
+ * Presidio Analyzer sidecar. Failure is intentionally fatal so custom model
+ * requests cannot silently bypass PII redaction.
+ */
+export async function sanitizeModelContentWithPresidio(
+  text: string,
+  options: PresidioSanitizationOptions = {},
+): Promise<string> {
+  const secretSanitized = sanitizeModelContent(text);
+  if (!secretSanitized) return secretSanitized;
+  if (options.enabled === false) return secretSanitized;
+
+  const analyzerUrl =
+    options.analyzerUrl ??
+    process.env['GEMINI_PRESIDIO_ANALYZER_URL'] ??
+    DEFAULT_PRESIDIO_ANALYZER_URL;
+  const timeoutMs = options.timeoutMs ?? 5000;
+
+  let response: Response;
+  try {
+    response = await fetch(analyzerUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: secretSanitized,
+        language: options.language ?? 'en',
+        entities: options.entities ?? DEFAULT_PRESIDIO_ENTITIES,
+        score_threshold: options.scoreThreshold ?? 0.5,
+      }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (error) {
+    throw new Error(
+      `Presidio Analyzer is required for custom endpoints but could not be reached at ${analyzerUrl}`,
+      { cause: error },
+    );
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `Presidio Analyzer rejected the request: ${response.status} ${response.statusText}`,
+    );
+  }
+
+  const payload: unknown = await response.json();
+  if (!Array.isArray(payload) || !payload.every(isPresidioAnalyzerResult)) {
+    throw new Error('Presidio Analyzer returned an invalid response');
+  }
+
+  return redactPresidioSpans(secretSanitized, payload);
+}
+
+/** Recursively applies Presidio to strings in model-bound structured data. */
+export async function sanitizeModelDataWithPresidio(
+  data: unknown,
+  options: PresidioSanitizationOptions = {},
+): Promise<unknown> {
+  const secretSanitized = redactRestorableSecrets(data);
+  if (typeof secretSanitized === 'string') {
+    return sanitizeModelContentWithPresidio(secretSanitized, options);
+  }
+  if (Array.isArray(secretSanitized)) {
+    return Promise.all(
+      secretSanitized.map((entry) =>
+        sanitizeModelDataWithPresidio(entry, options),
+      ),
+    );
+  }
+  if (secretSanitized !== null && typeof secretSanitized === 'object') {
+    const entries = await Promise.all(
+      Object.entries(secretSanitized).map(async ([key, value]) => [
+        key,
+        await sanitizeModelDataWithPresidio(value, options),
+      ]),
+    );
+    return Object.fromEntries(entries);
+  }
+  return secretSanitized;
 }

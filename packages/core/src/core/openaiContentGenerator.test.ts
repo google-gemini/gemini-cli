@@ -8,6 +8,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { OpenAIContentGenerator } from './openaiContentGenerator.js';
 import { LlmRole } from '../telemetry/types.js';
 import { Type, type GenerateContentParameters } from '@google/genai';
+import {
+  clearRestorableSecretStore,
+  redactRestorableSecrets,
+} from '../utils/agent-sanitization-utils.js';
 
 function makeRequest(
   overrides: Partial<GenerateContentParameters> = {},
@@ -47,20 +51,90 @@ describe('OpenAIContentGenerator', () => {
   const fetchMock = vi.fn<typeof fetch>();
 
   beforeEach(() => {
+    clearRestorableSecretStore();
     vi.stubGlobal('fetch', fetchMock);
     generator = new OpenAIContentGenerator({
       baseUrl: 'https://api.openai.com/v1',
       apiKey: 'test-key',
       model: 'gpt-4',
+      presidio: { enabled: false },
     });
   });
 
   afterEach(() => {
+    clearRestorableSecretStore();
     vi.unstubAllGlobals();
     vi.clearAllMocks();
   });
 
   describe('generateContent - text round trip', () => {
+    it('restores redacted tokens in assistant text', async () => {
+      const name = 'Ada Lovelace';
+      const redacted = redactRestorableSecrets({ password: name }) as {
+        password: string;
+      };
+      fetchMock.mockResolvedValue(
+        makeJsonResponse({
+          choices: [
+            {
+              message: { content: `Hello, ${redacted.password}.` },
+              finish_reason: 'stop',
+            },
+          ],
+        }),
+      );
+
+      const result = await generator.generateContent(
+        makeRequest(),
+        'pid',
+        LlmRole.MAIN,
+      );
+
+      expect(result.candidates?.[0]?.content?.parts?.[0]?.text).toBe(
+        `Hello, ${name}.`,
+      );
+    });
+
+    it('redacts Presidio-detected names before sending them upstream', async () => {
+      const presidioUrl = 'http://127.0.0.1:5002/analyze';
+      const input = 'Ask Ada Lovelace to review this.';
+      const nameStart = input.indexOf('Ada Lovelace');
+      const gen = new OpenAIContentGenerator({
+        baseUrl: 'https://api.openai.com/v1',
+        presidio: { analyzerUrl: presidioUrl },
+      });
+      fetchMock.mockImplementation(async (url) => {
+        if (url === presidioUrl) {
+          return makeJsonResponse([
+            {
+              entity_type: 'PERSON',
+              start: nameStart,
+              end: nameStart + 'Ada Lovelace'.length,
+              score: 0.98,
+            },
+          ]);
+        }
+        return makeJsonResponse({
+          choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
+        });
+      });
+
+      await gen.generateContent(
+        makeRequest({
+          contents: [{ role: 'user', parts: [{ text: input }] }],
+        }),
+        'pid',
+        LlmRole.MAIN,
+      );
+
+      const upstreamCall = fetchMock.mock.calls.find(
+        ([url]) => url !== presidioUrl,
+      );
+      const body = String(upstreamCall?.[1]?.body);
+      expect(body).not.toContain('Ada Lovelace');
+      expect(body).toMatch(/\[REDACTED:[^\]]+\]/);
+    });
+
     it('redacts standalone secret tokens before sending them upstream', async () => {
       fetchMock.mockResolvedValue(
         makeJsonResponse({
@@ -113,11 +187,15 @@ describe('OpenAIContentGenerator', () => {
       const sentBody = JSON.parse((init as RequestInit).body as string) as {
         messages: Array<{ role: string; content: string }>;
       };
-      expect(sentBody.messages[0]).toEqual({
+      expect(sentBody.messages[0]).toMatchObject({
+        role: 'system',
+        content: expect.stringContaining('opaque references'),
+      });
+      expect(sentBody.messages[1]).toEqual({
         role: 'system',
         content: 'Be helpful',
       });
-      expect(sentBody.messages[1]).toMatchObject({ role: 'user' });
+      expect(sentBody.messages[2]).toMatchObject({ role: 'user' });
 
       expect(result.candidates?.[0]?.content?.parts?.[0]?.text).toBe('World');
       expect(result.usageMetadata?.promptTokenCount).toBe(10);
@@ -140,6 +218,7 @@ describe('OpenAIContentGenerator', () => {
     it('does not send Authorization header when apiKey is absent', async () => {
       const gen = new OpenAIContentGenerator({
         baseUrl: 'http://localhost:11434/v1',
+        presidio: { enabled: false },
       });
       fetchMock.mockResolvedValue(
         makeJsonResponse({
@@ -245,13 +324,69 @@ describe('OpenAIContentGenerator', () => {
           content?: string;
         }>;
       };
-      expect(body.messages[0].role).toBe('tool');
-      expect(body.messages[0].tool_call_id).toBe('call_abc');
-      expect(body.messages[0].content).toBe(JSON.stringify({ result: 42 }));
+      const toolMessage = body.messages.find(
+        (message) => message.role === 'tool',
+      );
+      expect(toolMessage?.tool_call_id).toBe('call_abc');
+      expect(toolMessage?.content).toBe(JSON.stringify({ result: 42 }));
     });
   });
 
   describe('generateContentStream - SSE text deltas', () => {
+    it('restores a redaction token split across SSE chunks', async () => {
+      const name = 'Ada Lovelace';
+      const redacted = redactRestorableSecrets({ password: name }) as {
+        password: string;
+      };
+      const token = redacted.password;
+      const sseLines = [
+        'data: ' +
+          JSON.stringify({
+            choices: [
+              {
+                delta: { content: `Hello, ${token.slice(0, 7)}` },
+                finish_reason: null,
+              },
+            ],
+          }),
+        'data: ' +
+          JSON.stringify({
+            choices: [
+              {
+                delta: { content: token.slice(7, 30) },
+                finish_reason: null,
+              },
+            ],
+          }),
+        'data: ' +
+          JSON.stringify({
+            choices: [
+              {
+                delta: { content: `${token.slice(30)}.` },
+                finish_reason: 'stop',
+              },
+            ],
+          }),
+        'data: [DONE]',
+      ];
+      fetchMock.mockResolvedValue(makeSSEStream(sseLines));
+
+      const stream = await generator.generateContentStream(
+        makeRequest(),
+        'pid',
+        LlmRole.MAIN,
+      );
+      const chunks = [];
+      for await (const chunk of stream) chunks.push(chunk);
+
+      const text = chunks
+        .flatMap((chunk) => chunk.candidates?.[0]?.content?.parts ?? [])
+        .map((part) => part.text ?? '')
+        .join('');
+      expect(text).toBe(`Hello, ${name}.`);
+      expect(chunks.at(-1)?.candidates?.[0]?.finishReason).toBe('STOP');
+    });
+
     it('yields chunks for text delta lines then stops at [DONE]', async () => {
       const sseLines = [
         'data: ' +

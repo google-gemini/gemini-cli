@@ -31,6 +31,7 @@ import {
   clearRestorableSecretStore,
   redactRestorableSecrets,
 } from '../utils/agent-sanitization-utils.js';
+import { AuthType } from '../core/contentGenerator.js';
 
 // Mock file utils
 vi.mock('../utils/fileUtils.js', () => ({
@@ -84,6 +85,7 @@ describe('ToolExecutor', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     vi.restoreAllMocks();
     clearRestorableSecretStore();
   });
@@ -157,6 +159,72 @@ describe('ToolExecutor', () => {
         endTime: expect.any(Number),
       },
     });
+  });
+
+  it('redacts every model-bound tool result for custom endpoints', async () => {
+    vi.spyOn(config, 'getContentGeneratorConfig').mockReturnValue({
+      authType: AuthType.USE_OPENAI,
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async (_url, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as { text: string };
+        const value = 'Ada Lovelace';
+        const start = body.text.indexOf(value);
+        return new Response(
+          JSON.stringify(
+            start >= 0
+              ? [
+                  {
+                    entity_type: 'PERSON',
+                    start,
+                    end: start + value.length,
+                    score: 0.99,
+                  },
+                ]
+              : [],
+          ),
+          { status: 200 },
+        );
+      }),
+    );
+
+    const mockTool = new MockTool({
+      name: 'read_or_extension_tool',
+      description: 'Returns sensitive text',
+    });
+    const invocation = mockTool.build({});
+    vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockResolvedValue({
+      llmContent: 'Owner: Ada Lovelace',
+      returnDisplay: 'Owner: Ada Lovelace',
+    } as ToolResult);
+
+    const result = await executor.execute({
+      call: {
+        status: CoreToolCallStatus.Scheduled,
+        request: {
+          callId: 'call-sensitive-output',
+          name: 'read_or_extension_tool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-sensitive-output',
+        },
+        tool: mockTool,
+        invocation: invocation as unknown as AnyToolInvocation,
+        startTime: Date.now(),
+      },
+      signal: new AbortController().signal,
+      onUpdateToolCall: vi.fn(),
+    });
+
+    expect(result.status).toBe(CoreToolCallStatus.Success);
+    if (result.status === CoreToolCallStatus.Success) {
+      const response = result.response.responseParts[0]?.functionResponse
+        ?.response as { output: string };
+      expect(response.output).not.toContain('Ada Lovelace');
+      expect(response.output).toMatch(/Owner: \[REDACTED:[^\]]+\]/);
+      expect(result.response.resultDisplay).toBe('Owner: Ada Lovelace');
+    }
   });
 
   it('restores redacted placeholders only for the invocation being executed', async () => {

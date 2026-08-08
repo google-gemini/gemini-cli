@@ -46,7 +46,10 @@ import {
 import {
   hasRestorableRedactions,
   restoreRedactedSecrets,
+  sanitizeModelContentWithPresidio,
+  sanitizeModelDataWithPresidio,
 } from '../utils/agent-sanitization-utils.js';
+import { AuthType } from '../core/contentGenerator.js';
 
 export interface ToolExecutionContext {
   call: ToolCall;
@@ -60,6 +63,47 @@ export class ToolExecutor {
 
   private get config(): Config {
     return this.context.config;
+  }
+
+  private shouldSanitizeModelBoundToolOutput(): boolean {
+    return (
+      this.config.getContentGeneratorConfig()?.authType === AuthType.USE_OPENAI
+    );
+  }
+
+  private async sanitizeModelBoundToolOutput(
+    content: PartListUnion,
+  ): Promise<PartListUnion> {
+    if (!this.shouldSanitizeModelBoundToolOutput()) return content;
+    if (typeof content === 'string') {
+      return sanitizeModelContentWithPresidio(content);
+    }
+    if (Array.isArray(content)) {
+      return Promise.all(
+        content.map((part) => this.sanitizeModelBoundToolPart(part)),
+      );
+    }
+    return this.sanitizeModelBoundToolPart(content);
+  }
+
+  private async sanitizeModelBoundToolPart(
+    part: Part | string,
+  ): Promise<Part | string> {
+    if (typeof part === 'string') {
+      return sanitizeModelContentWithPresidio(part);
+    }
+    // Binary and referenced media are passed through without sending their
+    // encoded contents or local URI to the text analyzer.
+    if (part.inlineData || part.fileData) return part;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    return (await sanitizeModelDataWithPresidio(part)) as Part;
+  }
+
+  private async sanitizeModelBoundError(error: Error): Promise<Error> {
+    if (!this.shouldSanitizeModelBoundToolOutput()) return error;
+    return new Error(await sanitizeModelContentWithPresidio(error.message), {
+      cause: error,
+    });
   }
 
   async execute(context: ToolExecutionContext): Promise<CompletedToolCall> {
@@ -164,7 +208,9 @@ export class ToolExecutor {
                 : undefined;
             completedToolCall = this.createErrorResult(
               call,
-              new Error(toolResult.error.message),
+              await this.sanitizeModelBoundError(
+                new Error(toolResult.error.message),
+              ),
               toolResult.error.type,
               displayText,
               toolResult.tailToolCallRequest,
@@ -192,7 +238,7 @@ export class ToolExecutor {
                 : new Error(String(executionError));
             completedToolCall = this.createErrorResult(
               call,
-              error,
+              await this.sanitizeModelBoundError(error),
               ToolErrorType.UNHANDLED_EXCEPTION,
             );
           }
@@ -323,8 +369,9 @@ export class ToolExecutor {
     if (toolResult?.llmContent) {
       // Attempt to truncate and save output if we have content, even in cancellation case
       // This is to handle cases where the tool may have produced output before cancellation
-      const { truncatedContent: output, outputFile: truncatedOutputFile } =
+      const { truncatedContent: rawOutput, outputFile: truncatedOutputFile } =
         await this.truncateOutputIfNeeded(call, toolResult?.llmContent);
+      const output = await this.sanitizeModelBoundToolOutput(rawOutput);
 
       outputFile = truncatedOutputFile;
       responseParts = convertToFunctionResponse(
@@ -379,8 +426,9 @@ export class ToolExecutor {
     call: ToolCall,
     toolResult: ToolResult,
   ): Promise<SuccessfulToolCall> {
-    const { truncatedContent: content, outputFile } =
+    const { truncatedContent: rawContent, outputFile } =
       await this.truncateOutputIfNeeded(call, toolResult.llmContent);
+    const content = await this.sanitizeModelBoundToolOutput(rawContent);
 
     const toolName = call.request.originalRequestName || call.request.name;
     const callId = call.request.callId;

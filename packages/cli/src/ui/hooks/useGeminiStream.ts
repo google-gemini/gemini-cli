@@ -46,7 +46,7 @@ import {
   UPDATE_TOPIC_TOOL_NAME,
   UPDATE_TOPIC_DISPLAY_NAME,
   AuthType,
-  sanitizeModelContent,
+  sanitizeModelContentWithPresidio,
 } from '@google/gemini-cli-core';
 import type {
   Config,
@@ -963,7 +963,7 @@ export const useGeminiStream = (
         const trimmedQuery = query.trim();
         const promptForModel =
           config.getContentGeneratorConfig()?.authType === AuthType.USE_OPENAI
-            ? sanitizeModelContent(trimmedQuery)
+            ? await sanitizeModelContentWithPresidio(trimmedQuery)
             : trimmedQuery;
         await logger?.logMessage(MessageSenderType.USER, promptForModel);
 
@@ -1604,7 +1604,7 @@ export const useGeminiStream = (
           spanMetadata.input =
             config.getContentGeneratorConfig()?.authType ===
               AuthType.USE_OPENAI && typeof query === 'string'
-              ? sanitizeModelContent(query)
+              ? await sanitizeModelContentWithPresidio(query)
               : query;
 
           if (
@@ -1679,7 +1679,7 @@ export const useGeminiStream = (
               const displayQuery =
                 config.getContentGeneratorConfig()?.authType ===
                   AuthType.USE_OPENAI && typeof query === 'string'
-                  ? sanitizeModelContent(query)
+                  ? queryToSend
                   : query;
               const stream = geminiClient.sendMessageStream(
                 queryToSend,

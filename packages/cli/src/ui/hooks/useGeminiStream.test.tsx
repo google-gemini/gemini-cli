@@ -165,6 +165,9 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     recordToolCallInteractions: vi.fn().mockResolvedValue(undefined),
     getCodeAssistServer: vi.fn().mockReturnValue(undefined),
     runInDevTraceSpan: mockRunInDevTraceSpan,
+    sanitizeModelContentWithPresidio: vi.fn(async (text: string) =>
+      actualCoreModule.sanitizeModelContent(text),
+    ),
   };
 });
 

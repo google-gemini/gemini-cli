@@ -19,8 +19,11 @@ import type { ContentGenerator } from './contentGenerator.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
 import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
 import {
-  sanitizeModelContent,
-  sanitizeToolArgs,
+  restoreRedactedSecrets,
+  sanitizeModelContentWithPresidio,
+  sanitizeModelDataWithPresidio,
+  StreamingRedactionRestorer,
+  type PresidioSanitizationOptions,
 } from '../utils/agent-sanitization-utils.js';
 
 interface OpenAIMessage {
@@ -74,8 +77,15 @@ interface OpenAIChatChunk {
   usage?: OpenAIUsage;
 }
 
-function toOpenAIMessages(request: GenerateContentParameters): OpenAIMessage[] {
-  const messages: OpenAIMessage[] = [];
+const REDACTION_TOKEN_SYSTEM_INSTRUCTION = `Redaction tokens such as [REDACTED:uuid] are opaque references to sensitive values held by the local tool executor. You cannot and must not reveal, infer, or alter their underlying values. When the user requests an authorized operation involving one, copy the complete token unchanged into the appropriate tool argument. The local executor restores the value immediately before tool execution, so do not refuse an operation solely because its input is redacted. Never reproduce a token in ordinary assistant text unless needed to explain an error.`;
+
+async function toOpenAIMessages(
+  request: GenerateContentParameters,
+  presidioOptions: PresidioSanitizationOptions,
+): Promise<OpenAIMessage[]> {
+  const messages: OpenAIMessage[] = [
+    { role: 'system', content: REDACTION_TOKEN_SYSTEM_INSTRUCTION },
+  ];
 
   if (request.config?.systemInstruction) {
     const si = request.config.systemInstruction;
@@ -93,7 +103,10 @@ function toOpenAIMessages(request: GenerateContentParameters): OpenAIMessage[] {
         .join('\n');
     }
     if (text) {
-      messages.push({ role: 'system', content: sanitizeModelContent(text) });
+      messages.push({
+        role: 'system',
+        content: await sanitizeModelContentWithPresidio(text, presidioOptions),
+      });
     }
   }
 
@@ -154,30 +167,41 @@ function toOpenAIMessages(request: GenerateContentParameters): OpenAIMessage[] {
         messages.push({
           role: 'tool',
           tool_call_id: fr.id ?? fr.name ?? 'unknown',
-          content: sanitizeModelContent(JSON.stringify(fr.response ?? {})),
+          content: await sanitizeModelContentWithPresidio(
+            JSON.stringify(fr.response ?? {}),
+            presidioOptions,
+          ),
         });
       }
       continue;
     }
 
     if (funcCallParts.length > 0) {
-      const toolCalls: OpenAIToolCall[] = funcCallParts.map((part, idx) => {
+      const toolCalls: OpenAIToolCall[] = [];
+      for (const [idx, part] of funcCallParts.entries()) {
         const fc = part.functionCall!;
-        return {
+        toolCalls.push({
           id: fc.id ?? `call_${fc.name}_${idx}`,
           type: 'function',
           function: {
             name: fc.name ?? '',
-            arguments: JSON.stringify(sanitizeToolArgs(fc.args ?? {})),
+            arguments: JSON.stringify(
+              await sanitizeModelDataWithPresidio(
+                fc.args ?? {},
+                presidioOptions,
+              ),
+            ),
           },
-        };
-      });
+        });
+      }
       const mixedText = textParts
         .map((p) => (typeof p.text === 'string' ? p.text : ''))
         .join('\n');
       messages.push({
         role: 'assistant',
-        content: mixedText ? sanitizeModelContent(mixedText) : null,
+        content: mixedText
+          ? await sanitizeModelContentWithPresidio(mixedText, presidioOptions)
+          : null,
         tool_calls: toolCalls,
       });
       continue;
@@ -187,7 +211,10 @@ function toOpenAIMessages(request: GenerateContentParameters): OpenAIMessage[] {
       .map((p) => (typeof p.text === 'string' ? p.text : ''))
       .join('\n');
 
-    messages.push({ role, content: sanitizeModelContent(text) });
+    messages.push({
+      role,
+      content: await sanitizeModelContentWithPresidio(text, presidioOptions),
+    });
   }
 
   return messages;
@@ -231,12 +258,13 @@ function toOpenAITools(request: GenerateContentParameters):
   return tools.length > 0 ? tools : undefined;
 }
 
-function buildRequestBody(
+async function buildRequestBody(
   request: GenerateContentParameters,
   model: string | undefined,
   stream: boolean,
-): Record<string, unknown> {
-  const messages = toOpenAIMessages(request);
+  presidioOptions: PresidioSanitizationOptions,
+): Promise<Record<string, unknown>> {
+  const messages = await toOpenAIMessages(request, presidioOptions);
   const tools = toOpenAITools(request);
 
   const body: Record<string, unknown> = {
@@ -278,7 +306,7 @@ function buildResponseFromOpenAI(
   const parts: Part[] = [];
 
   if (choice.message.content) {
-    parts.push({ text: choice.message.content });
+    parts.push({ text: restoreRedactedSecrets(choice.message.content) });
   }
 
   if (choice.message.tool_calls) {
@@ -327,6 +355,7 @@ export class OpenAIContentGenerator implements ContentGenerator {
       apiKey?: string;
       model?: string;
       headers?: Record<string, string>;
+      presidio?: PresidioSanitizationOptions;
     },
   ) {}
 
@@ -350,7 +379,12 @@ export class OpenAIContentGenerator implements ContentGenerator {
     _userPromptId: string,
     _role: LlmRole,
   ): Promise<GenerateContentResponse> {
-    const body = buildRequestBody(request, this.options.model, false);
+    const body = await buildRequestBody(
+      request,
+      this.options.model,
+      false,
+      this.options.presidio ?? {},
+    );
     const resp = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: this.buildHeaders(),
@@ -374,7 +408,12 @@ export class OpenAIContentGenerator implements ContentGenerator {
     _userPromptId: string,
     _role: LlmRole,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
-    const body = buildRequestBody(request, this.options.model, true);
+    const body = await buildRequestBody(
+      request,
+      this.options.model,
+      true,
+      this.options.presidio ?? {},
+    );
     const resp = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: this.buildHeaders(),
@@ -402,6 +441,7 @@ export class OpenAIContentGenerator implements ContentGenerator {
     const reader = stream.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    const redactionRestorer = new StreamingRedactionRestorer();
 
     const accumulatedToolCalls: Map<
       number,
@@ -454,10 +494,37 @@ export class OpenAIContentGenerator implements ContentGenerator {
       }
     }
 
+    function createTextResponse(
+      text: string,
+      finishReason?: FinishReason,
+    ): GenerateContentResponse {
+      const response = new GenerateContentResponse();
+      response.candidates = [
+        {
+          index: 0,
+          content: { role: 'model', parts: [{ text }] },
+          finishReason,
+        },
+      ];
+      if (usageMetadata) response.usageMetadata = usageMetadata;
+      return response;
+    }
+
+    function* flushRestoredText(): Generator<GenerateContentResponse> {
+      const text = redactionRestorer.flush();
+      if (!text) return;
+      const finishReason = pendingFinishReason
+        ? mapFinishReason(pendingFinishReason)
+        : undefined;
+      if (finishReason !== undefined) finishReasonDelivered = true;
+      yield createTextResponse(text, finishReason);
+    }
+
     try {
       while (true) {
         const { done, value } = await reader.read();
         if (done) {
+          yield* flushRestoredText();
           yield* flushPending();
           break;
         }
@@ -470,6 +537,7 @@ export class OpenAIContentGenerator implements ContentGenerator {
           if (!line.startsWith('data: ')) continue;
           const data = line.slice(6).trim();
           if (data === '[DONE]') {
+            yield* flushRestoredText();
             yield* flushPending();
             return;
           }
@@ -521,24 +589,17 @@ export class OpenAIContentGenerator implements ContentGenerator {
           }
 
           if (delta.content) {
-            const mappedFinish = choice.finish_reason
-              ? mapFinishReason(choice.finish_reason)
-              : undefined;
+            const restoredContent = redactionRestorer.push(delta.content);
+            const mappedFinish =
+              choice.finish_reason && !redactionRestorer.hasPending()
+                ? mapFinishReason(choice.finish_reason)
+                : undefined;
             if (mappedFinish !== undefined) {
               finishReasonDelivered = true;
             }
-            const chunkResponse = new GenerateContentResponse();
-            chunkResponse.candidates = [
-              {
-                index: 0,
-                content: { role: 'model', parts: [{ text: delta.content }] },
-                finishReason: mappedFinish,
-              },
-            ];
-            if (usageMetadata) {
-              chunkResponse.usageMetadata = usageMetadata;
+            if (restoredContent) {
+              yield createTextResponse(restoredContent, mappedFinish);
             }
-            yield chunkResponse;
           }
         }
       }
