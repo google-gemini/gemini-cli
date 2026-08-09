@@ -75,15 +75,20 @@ jobs:
 
       - name: 'Save PR metadata'
         if: "steps.detect.outputs.SHOULD_RUN == 'true'"
+        env:
+          PR_NUMBER: '${{ github.event.pull_request.number }}'
+          STEERING_DETECTED: '${{ steps.detect.outputs.STEERING_DETECTED }}'
+          PR_HEAD_SHA: '${{ github.event.pull_request.head.sha }}'
+          PR_ACTOR: '${{ github.actor }}'
         run: |
-          echo '${{ github.event.pull_request.number }}' > pr_number.txt
-          echo '${{ steps.detect.outputs.STEERING_DETECTED }}' > steering_detected.txt
-          echo '${{ github.event.pull_request.head.sha }}' > pr_head_sha.txt
-          echo '${{ github.actor }}' > pr_actor.txt
+          echo "$PR_NUMBER" > pr_number.txt
+          echo "$STEERING_DETECTED" > steering_detected.txt
+          echo "$PR_HEAD_SHA" > pr_head_sha.txt
+          echo "$PR_ACTOR" > pr_actor.txt
 
       - name: 'Upload build artifacts'
         if: "steps.detect.outputs.SHOULD_RUN == 'true'"
-        uses: 'actions/upload-artifact@v4'
+        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
         with:
           name: 'eval-build-${{ github.event.pull_request.number }}'
           path: |

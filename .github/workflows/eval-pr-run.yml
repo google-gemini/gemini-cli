@@ -1,6 +1,7 @@
 name: 'Evals: PR Evaluation (Trusted)'
 
 on:
+  # zizmor: ignore[dangerous-triggers]
   workflow_run:
     workflows: ['Evals: PR Build (Untrusted Code)']
     types: ['completed']
@@ -74,13 +75,14 @@ jobs:
         id: 'analysis'
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          PR_ACTOR: '${{ steps.metadata.outputs.PR_ACTOR }}'
         run: |
           EVAL_CHANGES=$(git diff --name-only origin/main...HEAD | grep "^evals/" || true)
           if [ -z "$EVAL_CHANGES" ]; then
             echo "MISSING_EVALS=true" >> "$GITHUB_OUTPUT"
           fi
           USER_PERMISSION=$(gh api \
-            "repos/${{ github.repository }}/collaborators/${{ steps.metadata.outputs.PR_ACTOR }}/permission" \
+            "repos/${{ github.repository }}/collaborators/$PR_ACTOR/permission" \
             --jq '.permission' 2>/dev/null || echo "none")
           if [[ "$USER_PERMISSION" == "admin" || "$USER_PERMISSION" == "write" ]]; then
             echo "IS_MAINTAINER=true" >> "$GITHUB_OUTPUT"
@@ -106,6 +108,8 @@ jobs:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           PR_NUMBER: '${{ steps.metadata.outputs.PR_NUMBER }}'
           STEERING_DETECTED: '${{ steps.metadata.outputs.STEERING_DETECTED }}'
+          MISSING_EVALS: '${{ steps.analysis.outputs.MISSING_EVALS }}'
+          IS_MAINTAINER: '${{ steps.analysis.outputs.IS_MAINTAINER }}'
         run: |
           {
             if [[ -f eval_regression_report.md ]]; then
@@ -119,11 +123,11 @@ jobs:
               echo "This PR modifies files that affect the model's behavior (prompts, tools, or instructions)."
               echo ""
 
-              if [[ "${{ steps.analysis.outputs.MISSING_EVALS }}" == "true" ]]; then
+              if [[ "$MISSING_EVALS" == "true" ]]; then
                 echo "- ⚠️ **Consider adding Evals:** No behavioral evaluations (\`evals/*.eval.ts\`) were added or updated in this PR. Consider [adding a test case](https://github.com/google-gemini/gemini-cli/blob/main/evals/README.md#creating-an-evaluation) to verify the new behavior and prevent regressions."
               fi
 
-              if [[ "${{ steps.analysis.outputs.IS_MAINTAINER }}" == "true" ]]; then
+              if [[ "$IS_MAINTAINER" == "true" ]]; then
                 echo "- 🚀 **Maintainer Reminder:** Please ensure that these changes do not regress results on benchmark evals before merging."
               fi
             fi
