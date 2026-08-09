@@ -1,5 +1,5 @@
 ---
-name: code_explorer
+name: code-explorer
 description: Explores the repository to locate primary source files, coupled UI components, and test files for bug reports or feature requests.
 ---
 
