@@ -7,9 +7,35 @@
 import { StreamingState } from '../types.js';
 import { useTimer } from './useTimer.js';
 import { usePhraseCycler } from './usePhraseCycler.js';
-import { useState, useEffect, useRef } from 'react'; // Added useRef
+import { useState, useEffect, useRef } from 'react';
+import {
+  getDisplayString,
+  type RetryAttemptPayload,
+} from '@google/gemini-cli-core';
 
-export const useLoadingIndicator = (streamingState: StreamingState) => {
+const LOW_VERBOSITY_RETRY_HINT_ATTEMPT_THRESHOLD = 2;
+
+export interface UseLoadingIndicatorProps {
+  streamingState: StreamingState;
+  shouldShowFocusHint: boolean;
+  retryStatus: RetryAttemptPayload | null;
+  showTips?: boolean;
+  showWit?: boolean;
+  customWittyPhrases?: string[];
+  errorVerbosity?: 'low' | 'full';
+  maxLength?: number;
+}
+
+export const useLoadingIndicator = ({
+  streamingState,
+  shouldShowFocusHint,
+  retryStatus,
+  showTips = true,
+  showWit = false,
+  customWittyPhrases,
+  errorVerbosity = 'full',
+  maxLength,
+}: UseLoadingIndicatorProps) => {
   const [timerResetKey, setTimerResetKey] = useState(0);
   const isTimerActive = streamingState === StreamingState.Responding;
 
@@ -17,9 +43,15 @@ export const useLoadingIndicator = (streamingState: StreamingState) => {
 
   const isPhraseCyclingActive = streamingState === StreamingState.Responding;
   const isWaiting = streamingState === StreamingState.WaitingForConfirmation;
-  const currentLoadingPhrase = usePhraseCycler(
+
+  const { currentTip, currentWittyPhrase } = usePhraseCycler(
     isPhraseCyclingActive,
     isWaiting,
+    shouldShowFocusHint,
+    showTips,
+    showWit,
+    customWittyPhrases,
+    maxLength,
   );
 
   const [retainedElapsedTime, setRetainedElapsedTime] = useState(0);
@@ -47,11 +79,22 @@ export const useLoadingIndicator = (streamingState: StreamingState) => {
     prevStreamingStateRef.current = streamingState;
   }, [streamingState, elapsedTimeFromTimer]);
 
+  const retryPhrase =
+    streamingState === StreamingState.Responding && retryStatus
+      ? errorVerbosity === 'low'
+        ? retryStatus.attempt >= LOW_VERBOSITY_RETRY_HINT_ATTEMPT_THRESHOLD
+          ? "This is taking a bit longer, we're still on it."
+          : null
+        : `Trying to reach ${getDisplayString(retryStatus.model)} (Attempt ${retryStatus.attempt + 1}/${retryStatus.maxAttempts})`
+      : null;
+
   return {
     elapsedTime:
       streamingState === StreamingState.WaitingForConfirmation
         ? retainedElapsedTime
         : elapsedTimeFromTimer,
-    currentLoadingPhrase,
+    currentLoadingPhrase: retryPhrase || currentTip || currentWittyPhrase,
+    currentTip,
+    currentWittyPhrase,
   };
 };

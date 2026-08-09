@@ -14,6 +14,7 @@
  * - VS Code: Configures keybindings.json to send \\\r\n
  * - Cursor: Configures keybindings.json to send \\\r\n (VS Code fork)
  * - Windsurf: Configures keybindings.json to send \\\r\n (VS Code fork)
+ * - Antigravity: Configures keybindings.json to send \\\r\n (VS Code fork)
  *
  * For VS Code and its forks:
  * - Shift+Enter: Sends \\\r\n (backslash followed by CRLF)
@@ -28,8 +29,18 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
-import { isKittyProtocolEnabled } from './kittyProtocolDetector.js';
-import { VSCODE_SHIFT_ENTER_SEQUENCE } from './platformConstants.js';
+import { terminalCapabilityManager } from './terminalCapabilityManager.js';
+
+import { debugLogger, homedir } from '@google/gemini-cli-core';
+import { useEffect } from 'react';
+import { persistentState } from '../../utils/persistentState.js';
+import { requestConsentInteractive } from '../../config/extensions/consent.js';
+import type { ConfirmationRequest } from '../types.js';
+import type { UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
+
+type AddItemFn = UseHistoryManagerReturn['addItem'];
+
+export const VSCODE_SHIFT_ENTER_SEQUENCE = '\\\r\n';
 
 const execAsync = promisify(exec);
 
@@ -48,10 +59,59 @@ export interface TerminalSetupResult {
   requiresRestart?: boolean;
 }
 
-type SupportedTerminal = 'vscode' | 'cursor' | 'windsurf';
+type SupportedTerminal = 'vscode' | 'cursor' | 'windsurf' | 'antigravity';
 
-// Terminal detection
-async function detectTerminal(): Promise<SupportedTerminal | null> {
+/**
+ * Terminal metadata used for configuration.
+ */
+interface TerminalData {
+  terminalName: string;
+  appName: string;
+}
+const TERMINAL_DATA: Record<SupportedTerminal, TerminalData> = {
+  vscode: { terminalName: 'VS Code', appName: 'Code' },
+  cursor: { terminalName: 'Cursor', appName: 'Cursor' },
+  windsurf: { terminalName: 'Windsurf', appName: 'Windsurf' },
+  antigravity: { terminalName: 'Antigravity', appName: 'Antigravity' },
+};
+
+/**
+ * Maps a supported terminal ID to its display name and config folder name.
+ */
+function getSupportedTerminalData(
+  terminal: SupportedTerminal,
+): TerminalData | null {
+  return TERMINAL_DATA[terminal] || null;
+}
+
+type Keybinding = {
+  key?: string;
+  command?: string;
+  args?: { text?: string };
+};
+
+function isKeybinding(kb: unknown): kb is Keybinding {
+  return typeof kb === 'object' && kb !== null;
+}
+
+/**
+ * Checks if a keybindings array contains our specific binding for a given key.
+ */
+function hasOurBinding(
+  keybindings: unknown[],
+  key: 'shift+enter' | 'ctrl+enter',
+): boolean {
+  return keybindings.some((kb) => {
+    if (!isKeybinding(kb)) return false;
+    return (
+      kb.key === key &&
+      kb.command === 'workbench.action.terminal.sendSequence' &&
+      kb.args?.text === VSCODE_SHIFT_ENTER_SEQUENCE
+    );
+  });
+}
+
+export function getTerminalProgram(): SupportedTerminal | null {
   const termProgram = process.env['TERM_PROGRAM'];
 
   // Check VS Code and its forks - check forks first to avoid false positives
@@ -68,9 +128,26 @@ async function detectTerminal(): Promise<SupportedTerminal | null> {
   ) {
     return 'windsurf';
   }
+  // Check for Antigravity-specific indicators
+  if (
+    process.env['VSCODE_GIT_ASKPASS_MAIN']
+      ?.toLowerCase()
+      .includes('antigravity')
+  ) {
+    return 'antigravity';
+  }
   // Check VS Code last since forks may also set VSCODE env vars
   if (termProgram === 'vscode' || process.env['VSCODE_GIT_IPC_HANDLE']) {
     return 'vscode';
+  }
+  return null;
+}
+
+// Terminal detection
+async function detectTerminal(): Promise<SupportedTerminal | null> {
+  const envTerminal = getTerminalProgram();
+  if (envTerminal) {
+    return envTerminal;
   }
 
   // Check parent process name
@@ -82,13 +159,18 @@ async function detectTerminal(): Promise<SupportedTerminal | null> {
       // Check forks before VS Code to avoid false positives
       if (parentName.includes('windsurf') || parentName.includes('Windsurf'))
         return 'windsurf';
+      if (
+        parentName.includes('antigravity') ||
+        parentName.includes('Antigravity')
+      )
+        return 'antigravity';
       if (parentName.includes('cursor') || parentName.includes('Cursor'))
         return 'cursor';
       if (parentName.includes('code') || parentName.includes('Code'))
         return 'vscode';
     } catch (error) {
       // Continue detection even if process check fails
-      console.debug('Parent process detection failed:', error);
+      debugLogger.debug('Parent process detection failed:', error);
     }
   }
 
@@ -103,7 +185,7 @@ async function backupFile(filePath: string): Promise<void> {
     await fs.copyFile(filePath, backupPath);
   } catch (error) {
     // Log backup errors but continue with operation
-    console.warn(`Failed to create backup of ${filePath}:`, error);
+    debugLogger.warn(`Failed to create backup of ${filePath}:`, error);
   }
 }
 
@@ -113,7 +195,7 @@ function getVSCodeStyleConfigDir(appName: string): string | null {
 
   if (platform === 'darwin') {
     return path.join(
-      os.homedir(),
+      homedir(),
       'Library',
       'Application Support',
       appName,
@@ -125,7 +207,7 @@ function getVSCodeStyleConfigDir(appName: string): string | null {
     }
     return path.join(process.env['APPDATA'], appName, 'User');
   } else {
-    return path.join(os.homedir(), '.config', appName, 'User');
+    return path.join(homedir(), '.config', appName, 'User');
   }
 }
 
@@ -154,6 +236,7 @@ async function configureVSCodeStyle(
       await backupFile(keybindingsFile);
       try {
         const cleanContent = stripJsonComments(content);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const parsedContent = JSON.parse(cleanContent);
         if (!Array.isArray(parsedContent)) {
           return {
@@ -179,92 +262,103 @@ async function configureVSCodeStyle(
       // File doesn't exist, will create new one
     }
 
-    const shiftEnterBinding = {
-      key: 'shift+enter',
-      command: 'workbench.action.terminal.sendSequence',
-      when: 'terminalFocus',
-      args: { text: VSCODE_SHIFT_ENTER_SEQUENCE },
-    };
+    const targetBindings = [
+      {
+        key: 'shift+enter',
+        command: 'workbench.action.terminal.sendSequence',
+        when: 'terminalFocus',
+        args: { text: VSCODE_SHIFT_ENTER_SEQUENCE },
+      },
+      {
+        key: 'ctrl+enter',
+        command: 'workbench.action.terminal.sendSequence',
+        when: 'terminalFocus',
+        args: { text: VSCODE_SHIFT_ENTER_SEQUENCE },
+      },
+      {
+        key: 'cmd+z',
+        command: 'workbench.action.terminal.sendSequence',
+        when: 'terminalFocus',
+        args: { text: '\u001b[122;9u' },
+      },
+      {
+        key: 'alt+z',
+        command: 'workbench.action.terminal.sendSequence',
+        when: 'terminalFocus',
+        args: { text: '\u001b[122;3u' },
+      },
+      {
+        key: 'shift+cmd+z',
+        command: 'workbench.action.terminal.sendSequence',
+        when: 'terminalFocus',
+        args: { text: '\u001b[122;10u' },
+      },
+      {
+        key: 'shift+alt+z',
+        command: 'workbench.action.terminal.sendSequence',
+        when: 'terminalFocus',
+        args: { text: '\u001b[122;4u' },
+      },
+    ];
 
-    const ctrlEnterBinding = {
-      key: 'ctrl+enter',
-      command: 'workbench.action.terminal.sendSequence',
-      when: 'terminalFocus',
-      args: { text: VSCODE_SHIFT_ENTER_SEQUENCE },
-    };
+    const results = targetBindings.map((target) => {
+      const hasOurBinding = keybindings.some((kb) => {
+        if (!isKeybinding(kb)) return false;
+        return (
+          kb.key === target.key &&
+          kb.command === target.command &&
+          kb.args?.text === target.args.text
+        );
+      });
 
-    // Check if ANY shift+enter or ctrl+enter bindings already exist
-    const existingShiftEnter = keybindings.find((kb) => {
-      const binding = kb as { key?: string };
-      return binding.key === 'shift+enter';
-    });
+      const existingBinding = keybindings.find((kb) => {
+        if (!isKeybinding(kb)) return false;
+        return kb.key === target.key;
+      });
 
-    const existingCtrlEnter = keybindings.find((kb) => {
-      const binding = kb as { key?: string };
-      return binding.key === 'ctrl+enter';
-    });
-
-    if (existingShiftEnter || existingCtrlEnter) {
-      const messages: string[] = [];
-      if (existingShiftEnter) {
-        messages.push(`- Shift+Enter binding already exists`);
-      }
-      if (existingCtrlEnter) {
-        messages.push(`- Ctrl+Enter binding already exists`);
-      }
       return {
-        success: false,
-        message:
-          `Existing keybindings detected. Will not modify to avoid conflicts.\n` +
-          messages.join('\n') +
-          '\n' +
-          `Please check and modify manually if needed: ${keybindingsFile}`,
+        target,
+        hasOurBinding,
+        conflict: !!existingBinding && !hasOurBinding,
+        conflictMessage: `- ${target.key.charAt(0).toUpperCase() + target.key.slice(1)} binding already exists`,
       };
-    }
-
-    // Check if our specific bindings already exist
-    const hasOurShiftEnter = keybindings.some((kb) => {
-      const binding = kb as {
-        command?: string;
-        args?: { text?: string };
-        key?: string;
-      };
-      return (
-        binding.key === 'shift+enter' &&
-        binding.command === 'workbench.action.terminal.sendSequence' &&
-        binding.args?.text === '\\\r\n'
-      );
     });
 
-    const hasOurCtrlEnter = keybindings.some((kb) => {
-      const binding = kb as {
-        command?: string;
-        args?: { text?: string };
-        key?: string;
-      };
-      return (
-        binding.key === 'ctrl+enter' &&
-        binding.command === 'workbench.action.terminal.sendSequence' &&
-        binding.args?.text === '\\\r\n'
-      );
-    });
-
-    if (!hasOurShiftEnter || !hasOurCtrlEnter) {
-      if (!hasOurShiftEnter) keybindings.unshift(shiftEnterBinding);
-      if (!hasOurCtrlEnter) keybindings.unshift(ctrlEnterBinding);
-
-      await fs.writeFile(keybindingsFile, JSON.stringify(keybindings, null, 4));
-      return {
-        success: true,
-        message: `Added Shift+Enter and Ctrl+Enter keybindings to ${terminalName}.\nModified: ${keybindingsFile}`,
-        requiresRestart: true,
-      };
-    } else {
+    if (results.every((r) => r.hasOurBinding)) {
       return {
         success: true,
         message: `${terminalName} keybindings already configured.`,
       };
     }
+
+    const conflicts = results.filter((r) => r.conflict);
+    if (conflicts.length > 0) {
+      return {
+        success: false,
+        message:
+          `Existing keybindings detected. Will not modify to avoid conflicts.\n` +
+          conflicts.map((c) => c.conflictMessage).join('\n') +
+          '\n' +
+          `Please check and modify manually if needed: ${keybindingsFile}`,
+      };
+    }
+
+    for (const { hasOurBinding, target } of results) {
+      if (!hasOurBinding) {
+        keybindings.unshift(target);
+      }
+    }
+
+    await fs.writeFile(keybindingsFile, JSON.stringify(keybindings, null, 4));
+    return {
+      success: true,
+      message: `Added ${targetBindings
+        .map((b) => b.key.charAt(0).toUpperCase() + b.key.slice(1))
+        .join(
+          ', ',
+        )} keybindings to ${terminalName}.\nModified: ${keybindingsFile}`,
+      requiresRestart: true,
+    };
   } catch (error) {
     return {
       success: false,
@@ -273,18 +367,57 @@ async function configureVSCodeStyle(
   }
 }
 
-// Terminal-specific configuration functions
+/**
+ * Determines whether it is useful to prompt the user to run /terminal-setup
+ * in the current environment.
+ *
+ * Returns true when:
+ * - Kitty/modifyOtherKeys keyboard protocol is not already enabled, and
+ * - We're running inside a supported terminal (VS Code, Cursor, Windsurf, Antigravity), and
+ * - The keybindings file either does not exist or does not already contain both
+ *   of our Shift+Enter and Ctrl+Enter bindings.
+ */
+export async function shouldPromptForTerminalSetup(): Promise<boolean> {
+  if (terminalCapabilityManager.isKittyProtocolEnabled()) {
+    return false;
+  }
 
-async function configureVSCode(): Promise<TerminalSetupResult> {
-  return configureVSCodeStyle('VS Code', 'Code');
-}
+  const terminal = await detectTerminal();
+  if (!terminal) {
+    return false;
+  }
 
-async function configureCursor(): Promise<TerminalSetupResult> {
-  return configureVSCodeStyle('Cursor', 'Cursor');
-}
+  const terminalData = getSupportedTerminalData(terminal);
+  if (!terminalData) {
+    return false;
+  }
 
-async function configureWindsurf(): Promise<TerminalSetupResult> {
-  return configureVSCodeStyle('Windsurf', 'Windsurf');
+  const configDir = getVSCodeStyleConfigDir(terminalData.appName);
+  if (!configDir) {
+    return false;
+  }
+
+  const keybindingsFile = path.join(configDir, 'keybindings.json');
+
+  try {
+    const content = await fs.readFile(keybindingsFile, 'utf8');
+    const cleanContent = stripJsonComments(content);
+    const parsedContent: unknown = JSON.parse(cleanContent) as unknown;
+
+    if (!Array.isArray(parsedContent)) {
+      return true;
+    }
+
+    const hasOurShiftEnter = hasOurBinding(parsedContent, 'shift+enter');
+    const hasOurCtrlEnter = hasOurBinding(parsedContent, 'ctrl+enter');
+
+    return !(hasOurShiftEnter && hasOurCtrlEnter);
+  } catch (error) {
+    debugLogger.debug(
+      `Failed to read or parse keybindings, assuming prompt is needed: ${error}`,
+    );
+    return true;
+  }
 }
 
 /**
@@ -308,7 +441,7 @@ async function configureWindsurf(): Promise<TerminalSetupResult> {
  */
 export async function terminalSetup(): Promise<TerminalSetupResult> {
   // Check if terminal already has optimal keyboard support
-  if (isKittyProtocolEnabled()) {
+  if (terminalCapabilityManager.isKittyProtocolEnabled()) {
     return {
       success: true,
       message:
@@ -322,21 +455,82 @@ export async function terminalSetup(): Promise<TerminalSetupResult> {
     return {
       success: false,
       message:
-        'Could not detect terminal type. Supported terminals: VS Code, Cursor, and Windsurf.',
+        'Could not detect terminal type. Supported terminals: VS Code, Cursor, Windsurf, and Antigravity.',
     };
   }
 
-  switch (terminal) {
-    case 'vscode':
-      return configureVSCode();
-    case 'cursor':
-      return configureCursor();
-    case 'windsurf':
-      return configureWindsurf();
-    default:
-      return {
-        success: false,
-        message: `Terminal "${terminal}" is not supported yet.`,
-      };
+  const terminalData = getSupportedTerminalData(terminal);
+  if (!terminalData) {
+    return {
+      success: false,
+      message: `Terminal "${terminal}" is not supported yet.`,
+    };
   }
+
+  return configureVSCodeStyle(terminalData.terminalName, terminalData.appName);
+}
+
+export const TERMINAL_SETUP_CONSENT_MESSAGE =
+  'Gemini CLI works best with Shift+Enter/Ctrl+Enter for multiline input. ' +
+  'Would you like to automatically configure your terminal keybindings?';
+
+export function formatTerminalSetupResultMessage(
+  result: TerminalSetupResult,
+): string {
+  let content = result.message;
+  if (result.requiresRestart) {
+    content +=
+      '\n\nPlease restart your terminal for the changes to take effect.';
+  }
+  return content;
+}
+
+interface UseTerminalSetupPromptParams {
+  addConfirmUpdateExtensionRequest: (request: ConfirmationRequest) => void;
+  addItem: AddItemFn;
+}
+
+/**
+ * Hook that shows a one-time prompt to run /terminal-setup when it would help.
+ */
+export function useTerminalSetupPrompt({
+  addConfirmUpdateExtensionRequest,
+  addItem,
+}: UseTerminalSetupPromptParams): void {
+  useEffect(() => {
+    const hasBeenPrompted = persistentState.get('terminalSetupPromptShown');
+    if (hasBeenPrompted) {
+      return;
+    }
+    let cancelled = false;
+
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    (async () => {
+      const shouldPrompt = await shouldPromptForTerminalSetup();
+      if (!shouldPrompt || cancelled) return;
+
+      persistentState.set('terminalSetupPromptShown', true);
+
+      const confirmed = await requestConsentInteractive(
+        TERMINAL_SETUP_CONSENT_MESSAGE,
+        addConfirmUpdateExtensionRequest,
+      );
+
+      if (!confirmed || cancelled) return;
+
+      const result = await terminalSetup();
+      if (cancelled) return;
+      addItem(
+        {
+          type: result.success ? 'info' : 'error',
+          text: formatTerminalSetupResultMessage(result),
+        },
+        Date.now(),
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [addConfirmUpdateExtensionRequest, addItem]);
 }

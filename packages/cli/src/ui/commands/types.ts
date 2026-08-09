@@ -4,13 +4,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type ReactNode } from 'react';
-import type { Content, PartListUnion } from '@google/genai';
-import type { HistoryItemWithoutId, HistoryItem } from '../types.js';
-import type { Config, GitService, Logger } from '@google/gemini-cli-core';
+import type { ReactNode } from 'react';
+import type {
+  HistoryItemWithoutId,
+  HistoryItem,
+  ConfirmationRequest,
+} from '../types.js';
+import type {
+  GitService,
+  Logger,
+  CommandActionReturn,
+  AgentDefinition,
+  AgentLoopContext,
+} from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../../config/settings.js';
 import type { UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
+import type {
+  ExtensionUpdateAction,
+  ExtensionUpdateStatus,
+} from '../state/extensions.js';
 
 // Grouped dependencies for clarity and easier mocking
 export interface CommandContext {
@@ -26,7 +39,7 @@ export interface CommandContext {
   // Core services and configuration
   services: {
     // TODO(abhipatel12): Ensure that config is never null.
-    config: Config | null;
+    agentContext: AgentLoopContext | null;
     settings: LoadedSettings;
     git: GitService | undefined;
     logger: Logger;
@@ -54,13 +67,32 @@ export interface CommandContext {
      * Loads a new set of history items, replacing the current history.
      *
      * @param history The array of history items to load.
+     * @param postLoadInput Optional text to set in the input buffer after loading history.
      */
-    loadHistory: UseHistoryManagerReturn['loadHistory'];
+    loadHistory: (history: HistoryItem[], postLoadInput?: string) => void;
     /** Toggles a special display mode. */
     toggleCorgiMode: () => void;
+    toggleVoiceMode: () => void;
+    toggleDebugProfiler: () => void;
     toggleVimEnabled: () => Promise<boolean>;
-    setGeminiMdFileCount: (count: number) => void;
     reloadCommands: () => void;
+    openAgentConfigDialog: (
+      name: string,
+      displayName: string,
+      definition: AgentDefinition,
+    ) => void;
+    extensionsUpdateState: Map<string, ExtensionUpdateStatus>;
+    dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
+    addConfirmUpdateExtensionRequest: (value: ConfirmationRequest) => void;
+    /**
+     * Sets a confirmation request to be displayed to the user.
+     *
+     * @param value The confirmation request details.
+     */
+    setConfirmationRequest: (value: ConfirmationRequest | null) => void;
+    removeComponent: () => void;
+    toggleBackgroundTasks: () => void;
+    toggleShortcutsHelp: () => void;
   };
   // Session-specific data
   session: {
@@ -72,29 +104,12 @@ export interface CommandContext {
   overwriteConfirmed?: boolean;
 }
 
-/**
- * The return type for a command action that results in scheduling a tool call.
- */
-export interface ToolActionReturn {
-  type: 'tool';
-  toolName: string;
-  toolArgs: Record<string, unknown>;
-}
-
 /** The return type for a command action that results in the app quitting. */
 export interface QuitActionReturn {
   type: 'quit';
   messages: HistoryItem[];
-}
-
-/**
- * The return type for a command action that results in a simple message
- * being displayed to the user.
- */
-export interface MessageActionReturn {
-  type: 'message';
-  messageType: 'info' | 'error';
-  content: string;
+  /** When true, the current session's history and temporary files will be deleted on exit. */
+  deleteSession?: boolean;
 }
 
 /**
@@ -102,27 +117,20 @@ export interface MessageActionReturn {
  */
 export interface OpenDialogActionReturn {
   type: 'dialog';
+  props?: Record<string, unknown>;
 
-  dialog: 'help' | 'auth' | 'theme' | 'editor' | 'privacy' | 'settings';
-}
-
-/**
- * The return type for a command action that results in replacing
- * the entire conversation history.
- */
-export interface LoadHistoryActionReturn {
-  type: 'load_history';
-  history: HistoryItemWithoutId[];
-  clientHistory: Content[]; // The history for the generative client
-}
-
-/**
- * The return type for a command action that should immediately submit
- * content as a prompt to the Gemini model.
- */
-export interface SubmitPromptActionReturn {
-  type: 'submit_prompt';
-  content: PartListUnion;
+  dialog:
+    | 'help'
+    | 'auth'
+    | 'theme'
+    | 'editor'
+    | 'privacy'
+    | 'settings'
+    | 'sessionBrowser'
+    | 'model'
+    | 'voice-model'
+    | 'agentConfig'
+    | 'permissions';
 }
 
 /**
@@ -149,20 +157,36 @@ export interface ConfirmActionReturn {
   };
 }
 
+export interface OpenCustomDialogActionReturn {
+  type: 'custom_dialog';
+  component: ReactNode;
+}
+
+/**
+ * The return type for a command action that specifically handles logout logic,
+ * signaling the application to explicitly transition to an unauthenticated state.
+ */
+export interface LogoutActionReturn {
+  type: 'logout';
+}
+
 export type SlashCommandActionReturn =
-  | ToolActionReturn
-  | MessageActionReturn
+  | CommandActionReturn<HistoryItemWithoutId[]>
   | QuitActionReturn
   | OpenDialogActionReturn
-  | LoadHistoryActionReturn
-  | SubmitPromptActionReturn
   | ConfirmShellCommandsActionReturn
-  | ConfirmActionReturn;
+  | ConfirmActionReturn
+  | OpenCustomDialogActionReturn
+  | LogoutActionReturn;
 
 export enum CommandKind {
   BUILT_IN = 'built-in',
-  FILE = 'file',
+  USER_FILE = 'user-file',
+  WORKSPACE_FILE = 'workspace-file',
+  EXTENSION_FILE = 'extension-file',
   MCP_PROMPT = 'mcp-prompt',
+  AGENT = 'agent',
+  SKILL = 'skill',
 }
 
 // The standardized contract for any command in the system.
@@ -170,11 +194,34 @@ export interface SlashCommand {
   name: string;
   altNames?: string[];
   description: string;
+  hidden?: boolean;
+  /**
+   * Optional grouping label for slash completion UI sections.
+   * Commands with the same label are rendered under one separator.
+   */
+  suggestionGroup?: string;
 
   kind: CommandKind;
 
+  /**
+   * Controls whether the command auto-executes when selected with Enter.
+   *
+   * If true, pressing Enter on the suggestion will execute the command immediately.
+   * If false or undefined, pressing Enter will autocomplete the command into the prompt window.
+   */
+  autoExecute?: boolean;
+
+  /**
+   * Whether this command can be safely executed while the agent is busy (e.g. streaming a response).
+   */
+  isSafeConcurrent?: boolean;
+
   // Optional metadata for extension commands
   extensionName?: string;
+  extensionId?: string;
+
+  // Optional metadata for MCP commands
+  mcpServerName?: string;
 
   // The action to run. Optional for parent commands that only group sub-commands.
   action?: (
@@ -185,11 +232,26 @@ export interface SlashCommand {
     | SlashCommandActionReturn
     | Promise<void | SlashCommandActionReturn>;
 
-  // Provides argument completion (e.g., completing a tag for `/chat resume <tag>`).
+  // Provides argument completion (e.g., completing a tag for `/resume resume <tag>`).
   completion?: (
     context: CommandContext,
     partialArg: string,
-  ) => Promise<string[]>;
+  ) => Promise<string[]> | string[];
+
+  /**
+   * Whether to show the loading indicator while fetching completions.
+   * Defaults to true. Set to false for fast completions to avoid flicker.
+   */
+  showCompletionLoading?: boolean;
+
+  /**
+   * Whether the command expects arguments.
+   * If false, and the command is a subcommand, the command parser may treat
+   * any following text as arguments for the parent command instead of this subcommand,
+   * provided the parent command has an action.
+   * Defaults to true.
+   */
+  takesArgs?: boolean;
 
   subCommands?: SlashCommand[];
 }

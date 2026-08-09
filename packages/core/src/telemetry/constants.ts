@@ -5,34 +5,34 @@
  */
 
 export const SERVICE_NAME = 'gemini-cli';
+export const SERVICE_DESCRIPTION =
+  'Gemini CLI is an open-source AI agent that brings the power of Gemini directly into your terminal. It is designed to be a terminal-first, extensible, and powerful tool for developers, engineers, SREs, and beyond.';
 
-export const EVENT_USER_PROMPT = 'gemini_cli.user_prompt';
-export const EVENT_TOOL_CALL = 'gemini_cli.tool_call';
-export const EVENT_API_REQUEST = 'gemini_cli.api_request';
-export const EVENT_API_ERROR = 'gemini_cli.api_error';
-export const EVENT_API_RESPONSE = 'gemini_cli.api_response';
-export const EVENT_CLI_CONFIG = 'gemini_cli.config';
-export const EVENT_FLASH_FALLBACK = 'gemini_cli.flash_fallback';
-export const EVENT_NEXT_SPEAKER_CHECK = 'gemini_cli.next_speaker_check';
-export const EVENT_SLASH_COMMAND = 'gemini_cli.slash_command';
-export const EVENT_IDE_CONNECTION = 'gemini_cli.ide_connection';
-export const EVENT_CONVERSATION_FINISHED = 'gemini_cli.conversation_finished';
-export const EVENT_CHAT_COMPRESSION = 'gemini_cli.chat_compression';
-export const EVENT_MALFORMED_JSON_RESPONSE =
-  'gemini_cli.malformed_json_response';
-export const EVENT_INVALID_CHUNK = 'gemini_cli.chat.invalid_chunk';
-export const EVENT_CONTENT_RETRY = 'gemini_cli.chat.content_retry';
-export const EVENT_CONTENT_RETRY_FAILURE =
-  'gemini_cli.chat.content_retry_failure';
+// Gemini CLI specific semantic conventions
+// https://opentelemetry.io/docs/specs/semconv/registry/attributes/gen-ai/#genai-attributes
+export const GEN_AI_OPERATION_NAME = 'gen_ai.operation.name';
+export const GEN_AI_AGENT_NAME = 'gen_ai.agent.name';
+export const GEN_AI_AGENT_DESCRIPTION = 'gen_ai.agent.description';
+export const GEN_AI_INPUT_MESSAGES = 'gen_ai.input.messages';
+export const GEN_AI_OUTPUT_MESSAGES = 'gen_ai.output.messages';
+export const GEN_AI_REQUEST_MODEL = 'gen_ai.request.model';
+export const GEN_AI_RESPONSE_MODEL = 'gen_ai.response.model';
+export const GEN_AI_PROMPT_NAME = 'gen_ai.prompt.name';
+export const GEN_AI_TOOL_NAME = 'gen_ai.tool.name';
+export const GEN_AI_TOOL_CALL_ID = 'gen_ai.tool.call_id';
+export const GEN_AI_TOOL_DESCRIPTION = 'gen_ai.tool.description';
+export const GEN_AI_USAGE_INPUT_TOKENS = 'gen_ai.usage.input_tokens';
+export const GEN_AI_USAGE_OUTPUT_TOKENS = 'gen_ai.usage.output_tokens';
+export const GEN_AI_SYSTEM_INSTRUCTIONS = 'gen_ai.system_instructions';
+export const GEN_AI_TOOL_DEFINITIONS = 'gen_ai.tool.definitions';
+export const GEN_AI_CONVERSATION_ID = 'gen_ai.conversation.id';
 
-export const METRIC_TOOL_CALL_COUNT = 'gemini_cli.tool.call.count';
-export const METRIC_TOOL_CALL_LATENCY = 'gemini_cli.tool.call.latency';
-export const METRIC_API_REQUEST_COUNT = 'gemini_cli.api.request.count';
-export const METRIC_API_REQUEST_LATENCY = 'gemini_cli.api.request.latency';
-export const METRIC_TOKEN_USAGE = 'gemini_cli.token.usage';
-export const METRIC_SESSION_COUNT = 'gemini_cli.session.count';
-export const METRIC_FILE_OPERATION_COUNT = 'gemini_cli.file.operation.count';
-export const METRIC_INVALID_CHUNK_COUNT = 'gemini_cli.chat.invalid_chunk.count';
-export const METRIC_CONTENT_RETRY_COUNT = 'gemini_cli.chat.content_retry.count';
-export const METRIC_CONTENT_RETRY_FAILURE_COUNT =
-  'gemini_cli.chat.content_retry_failure.count';
+// Gemini CLI specific operations
+export enum GeminiCliOperation {
+  ToolCall = 'tool_call',
+  LLMCall = 'llm_call',
+  UserPrompt = 'user_prompt',
+  SystemPrompt = 'system_prompt',
+  AgentCall = 'agent_call',
+  ScheduleToolCalls = 'schedule_tool_calls',
+}

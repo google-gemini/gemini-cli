@@ -1,0 +1,140 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { useState, useRef, useEffect, useCallback } from 'react';
+import {
+  writeToStdout,
+  disableMouseEvents,
+  enableMouseEvents,
+  enterAlternateScreen,
+  exitAlternateScreen,
+  enableLineWrapping,
+  disableLineWrapping,
+} from '@google/gemini-cli-core';
+import process from 'node:process';
+import {
+  cleanupTerminalOnExit,
+  terminalCapabilityManager,
+} from '../utils/terminalCapabilityManager.js';
+import { WARNING_PROMPT_DURATION_MS } from '../constants.js';
+import { formatCommand } from '../key/keybindingUtils.js';
+import { Command } from '../key/keyBindings.js';
+
+interface UseSuspendProps {
+  handleWarning: (message: string) => void;
+  setRawMode: (mode: boolean) => void;
+  shouldUseAlternateScreen: boolean;
+}
+
+export function useSuspend({
+  handleWarning,
+  setRawMode,
+  shouldUseAlternateScreen,
+}: UseSuspendProps) {
+  const [ctrlZPressCount, setCtrlZPressCount] = useState(0);
+  const ctrlZTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const onResumeHandlerRef = useRef<(() => void) | null>(null);
+
+  useEffect(
+    () => () => {
+      if (ctrlZTimerRef.current) {
+        clearTimeout(ctrlZTimerRef.current);
+        ctrlZTimerRef.current = null;
+      }
+      if (onResumeHandlerRef.current) {
+        process.off('SIGCONT', onResumeHandlerRef.current);
+        onResumeHandlerRef.current = null;
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (ctrlZTimerRef.current) {
+      clearTimeout(ctrlZTimerRef.current);
+      ctrlZTimerRef.current = null;
+    }
+    const suspendKey = formatCommand(Command.SUSPEND_APP);
+    if (ctrlZPressCount > 1) {
+      setCtrlZPressCount(0);
+      if (process.platform === 'win32') {
+        handleWarning(`${suspendKey} suspend is not supported on Windows.`);
+        return;
+      }
+
+      if (shouldUseAlternateScreen) {
+        // Leave alternate buffer before suspension so the shell stays usable.
+        exitAlternateScreen();
+        enableLineWrapping();
+        writeToStdout('\x1b[2J\x1b[H');
+      }
+
+      // Cleanup before suspend.
+      writeToStdout('\x1b[?25h'); // Show cursor
+      disableMouseEvents();
+      cleanupTerminalOnExit();
+
+      if (process.stdin.isTTY) {
+        process.stdin.setRawMode(false);
+      }
+      setRawMode(false);
+
+      const onResume = () => {
+        try {
+          // Restore terminal state.
+          if (process.stdin.isTTY) {
+            process.stdin.setRawMode(true);
+            process.stdin.resume();
+            process.stdin.ref();
+          }
+          setRawMode(true);
+
+          if (shouldUseAlternateScreen) {
+            enterAlternateScreen();
+            disableLineWrapping();
+            writeToStdout('\x1b[2J\x1b[H');
+          }
+
+          terminalCapabilityManager.enableSupportedModes();
+          writeToStdout('\x1b[?25l'); // Hide cursor
+          if (shouldUseAlternateScreen) {
+            enableMouseEvents();
+          }
+
+          // Force Ink to do a complete repaint without remounting the app.
+          process.stdout.emit('resize');
+        } finally {
+          if (onResumeHandlerRef.current === onResume) {
+            onResumeHandlerRef.current = null;
+          }
+        }
+      };
+
+      if (onResumeHandlerRef.current) {
+        process.off('SIGCONT', onResumeHandlerRef.current);
+      }
+      onResumeHandlerRef.current = onResume;
+      process.once('SIGCONT', onResume);
+
+      process.kill(0, 'SIGTSTP');
+    } else if (ctrlZPressCount > 0) {
+      const undoKey = formatCommand(Command.UNDO);
+      handleWarning(
+        `Press ${suspendKey} again to suspend. Undo has moved to ${undoKey}.`,
+      );
+      ctrlZTimerRef.current = setTimeout(() => {
+        setCtrlZPressCount(0);
+        ctrlZTimerRef.current = null;
+      }, WARNING_PROMPT_DURATION_MS);
+    }
+  }, [ctrlZPressCount, handleWarning, setRawMode, shouldUseAlternateScreen]);
+
+  const handleSuspend = useCallback(() => {
+    setCtrlZPressCount((prev) => prev + 1);
+  }, []);
+
+  return { handleSuspend };
+}

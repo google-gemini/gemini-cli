@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/* eslint-disable no-console */
+
 import util from 'node:util';
 import type { ConsoleMessageItem } from '../types.js';
 
@@ -11,6 +13,7 @@ interface ConsolePatcherParams {
   onNewMessage?: (message: Omit<ConsoleMessageItem, 'id'>) => void;
   debugMode: boolean;
   stderr?: boolean;
+  interactive?: boolean;
 }
 
 export class ConsolePatcher {
@@ -27,11 +30,11 @@ export class ConsolePatcher {
   }
 
   patch() {
-    console.log = this.patchConsoleMethod('log', this.originalConsoleLog);
-    console.warn = this.patchConsoleMethod('warn', this.originalConsoleWarn);
-    console.error = this.patchConsoleMethod('error', this.originalConsoleError);
-    console.debug = this.patchConsoleMethod('debug', this.originalConsoleDebug);
-    console.info = this.patchConsoleMethod('info', this.originalConsoleInfo);
+    console.log = this.patchConsoleMethod('log');
+    console.warn = this.patchConsoleMethod('warn');
+    console.error = this.patchConsoleMethod('error');
+    console.debug = this.patchConsoleMethod('debug');
+    console.info = this.patchConsoleMethod('info');
   }
 
   cleanup = () => {
@@ -45,21 +48,21 @@ export class ConsolePatcher {
   private formatArgs = (args: unknown[]): string => util.format(...args);
 
   private patchConsoleMethod =
-    (
-      type: 'log' | 'warn' | 'error' | 'debug' | 'info',
-      originalMethod: (...args: unknown[]) => void,
-    ) =>
+    (type: 'log' | 'warn' | 'error' | 'debug' | 'info') =>
     (...args: unknown[]) => {
-      if (this.params.stderr) {
-        if (type !== 'debug' || this.params.debugMode) {
+      // When it is non interactive mode, do not show info logging unless
+      // it is debug mode. default to true if it is undefined.
+      if (this.params.interactive === false) {
+        if ((type === 'info' || type === 'log') && !this.params.debugMode) {
+          return;
+        }
+      }
+      // When it is in the debug mode, redirect console output to stderr
+      // depending on if it is stderr only mode.
+      if (type !== 'debug' || this.params.debugMode) {
+        if (this.params.stderr) {
           this.originalConsoleError(this.formatArgs(args));
-        }
-      } else {
-        if (this.params.debugMode) {
-          originalMethod.apply(console, args);
-        }
-
-        if (type !== 'debug' || this.params.debugMode) {
+        } else {
           this.params.onNewMessage?.({
             type,
             content: this.formatArgs(args),

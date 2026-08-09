@@ -4,14 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Config } from '@google/gemini-cli-core';
-import { getErrorMessage, getMCPServerPrompts } from '@google/gemini-cli-core';
-import type {
-  CommandContext,
-  SlashCommand,
-  SlashCommandActionReturn,
+import {
+  getErrorMessage,
+  getMCPServerPrompts,
+  type Config,
+} from '@google/gemini-cli-core';
+import {
+  CommandKind,
+  type CommandContext,
+  type SlashCommand,
+  type SlashCommandActionReturn,
 } from '../ui/commands/types.js';
-import { CommandKind } from '../ui/commands/types.js';
 import type { ICommandLoader } from './types.js';
 import type { PromptArgument } from '@modelcontextprotocol/sdk/types.js';
 
@@ -34,15 +37,18 @@ export class McpPromptLoader implements ICommandLoader {
     if (!this.config) {
       return Promise.resolve([]);
     }
-    const mcpServers = this.config.getMcpServers() || {};
+    const mcpServers = this.config.getMcpClientManager()?.getMcpServers() || {};
     for (const serverName in mcpServers) {
       const prompts = getMCPServerPrompts(this.config, serverName) || [];
       for (const prompt of prompts) {
-        const commandName = `${prompt.name}`;
+        // Sanitize prompt names to ensure they are valid slash commands (e.g. "Prompt Name" -> "Prompt-Name")
+        const commandName = `${prompt.name}`.trim().replace(/\s+/g, '-');
         const newPromptCommand: SlashCommand = {
           name: commandName,
           description: prompt.description || `Invoke prompt ${prompt.name}`,
           kind: CommandKind.MCP_PROMPT,
+          mcpServerName: serverName,
+          autoExecute: !prompt.arguments || prompt.arguments.length === 0,
           subCommands: [
             {
               name: 'help',
@@ -101,7 +107,8 @@ export class McpPromptLoader implements ICommandLoader {
             }
 
             try {
-              const mcpServers = this.config.getMcpServers() || {};
+              const mcpServers =
+                this.config.getMcpClientManager()?.getMcpServers() || {};
               const mcpServerConfig = mcpServers[serverName];
               if (!mcpServerConfig) {
                 return {
@@ -120,7 +127,8 @@ export class McpPromptLoader implements ICommandLoader {
                 };
               }
 
-              if (!result.messages?.[0]?.content?.['text']) {
+              const maybeContent = result.messages?.[0]?.content;
+              if (maybeContent.type !== 'text') {
                 return {
                   type: 'message',
                   messageType: 'error',
@@ -131,7 +139,7 @@ export class McpPromptLoader implements ICommandLoader {
 
               return {
                 type: 'submit_prompt',
-                content: JSON.stringify(result.messages[0].content.text),
+                content: JSON.stringify(maybeContent.text),
               };
             } catch (error) {
               return {
@@ -141,23 +149,68 @@ export class McpPromptLoader implements ICommandLoader {
               };
             }
           },
-          completion: async (_: CommandContext, partialArg: string) => {
-            if (!prompt || !prompt.arguments) {
+          completion: async (
+            commandContext: CommandContext,
+            partialArg: string,
+          ) => {
+            const invocation = commandContext.invocation;
+            if (!prompt || !prompt.arguments || !invocation) {
               return [];
             }
+            const indexOfFirstSpace = invocation.raw.indexOf(' ') + 1;
+            const parsedInputs =
+              indexOfFirstSpace === 0
+                ? {}
+                : this.parseArgs(
+                    invocation.raw.substring(indexOfFirstSpace),
+                    prompt.arguments,
+                  );
+            const promptInputs =
+              parsedInputs instanceof Error ? {} : parsedInputs;
 
-            const suggestions: string[] = [];
-            const usedArgNames = new Set(
-              (partialArg.match(/--([^=]+)/g) || []).map((s) => s.substring(2)),
-            );
+            const providedArgNames = Object.keys(promptInputs);
+            const unusedArguments =
+              prompt.arguments
+                .filter((arg) => {
+                  // If this arguments is not in the prompt inputs
+                  // add it to unusedArguments
+                  if (!providedArgNames.includes(arg.name)) {
+                    return true;
+                  }
 
-            for (const arg of prompt.arguments) {
-              if (!usedArgNames.has(arg.name)) {
-                suggestions.push(`--${arg.name}=""`);
+                  // The parseArgs method assigns the value
+                  // at the end of the prompt as a final value
+                  // The argument should still be suggested
+                  // Example /add --numberOne="34" --num
+                  // numberTwo would be assigned a value of --num
+                  // numberTwo should still be considered unused
+                  const argValue = promptInputs[arg.name];
+                  return argValue === partialArg;
+                })
+                .map((argument) => `--${argument.name}="`) || [];
+
+            const exactlyMatchingArgumentAtTheEnd = prompt.arguments
+              .map((argument) => `--${argument.name}="`)
+              .filter((flagArgument) => {
+                const regex = new RegExp(`${flagArgument}[^"]*$`);
+                return regex.test(invocation.raw);
+              });
+
+            if (exactlyMatchingArgumentAtTheEnd.length === 1) {
+              if (exactlyMatchingArgumentAtTheEnd[0] === partialArg) {
+                return [`${partialArg}"`];
               }
+              if (partialArg.endsWith('"')) {
+                return [partialArg];
+              }
+              return [`${partialArg}"`];
             }
 
-            return suggestions;
+            const matchingArguments = unusedArguments.filter((flagArgument) =>
+              flagArgument.startsWith(partialArg),
+            );
+
+            return matchingArguments;
           },
         };
         promptCommands.push(newPromptCommand);

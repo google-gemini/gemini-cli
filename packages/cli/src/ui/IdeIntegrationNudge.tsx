@@ -4,12 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { DetectedIde } from '@google/gemini-cli-core';
-import { getIdeInfo } from '@google/gemini-cli-core';
+import type { IdeInfo } from '@google/gemini-cli-core';
 import { Box, Text } from 'ink';
-import type { RadioSelectItem } from './components/shared/RadioButtonSelect.js';
-import { RadioButtonSelect } from './components/shared/RadioButtonSelect.js';
+import {
+  RadioButtonSelect,
+  type RadioSelectItem,
+} from './components/shared/RadioButtonSelect.js';
 import { useKeypress } from './hooks/useKeypress.js';
+import { theme } from './semantic-colors.js';
 
 export type IdeIntegrationNudgeResult = {
   userSelection: 'yes' | 'no' | 'dismiss';
@@ -17,7 +19,7 @@ export type IdeIntegrationNudgeResult = {
 };
 
 interface IdeIntegrationNudgeProps {
-  ide: DetectedIde;
+  ide: IdeInfo;
   onComplete: (result: IdeIntegrationNudgeResult) => void;
 }
 
@@ -32,12 +34,14 @@ export function IdeIntegrationNudge({
           userSelection: 'no',
           isExtensionPreInstalled: false,
         });
+        return true;
       }
+      return false;
     },
     { isActive: true },
   );
 
-  const { displayName: ideName } = getIdeInfo(ide);
+  const { displayName: ideName } = ide;
   // Assume extension is already installed if the env variables are set.
   const isExtensionPreInstalled =
     !!process.env['GEMINI_CLI_IDE_SERVER_PORT'] &&
@@ -50,6 +54,7 @@ export function IdeIntegrationNudge({
         userSelection: 'yes',
         isExtensionPreInstalled,
       },
+      key: 'Yes',
     },
     {
       label: 'No (esc)',
@@ -57,6 +62,7 @@ export function IdeIntegrationNudge({
         userSelection: 'no',
         isExtensionPreInstalled,
       },
+      key: 'No (esc)',
     },
     {
       label: "No, don't ask again",
@@ -64,6 +70,7 @@ export function IdeIntegrationNudge({
         userSelection: 'dismiss',
         isExtensionPreInstalled,
       },
+      key: "No, don't ask again",
     },
   ];
 
@@ -79,17 +86,17 @@ export function IdeIntegrationNudge({
     <Box
       flexDirection="column"
       borderStyle="round"
-      borderColor="yellow"
+      borderColor={theme.status.warning}
       padding={1}
       width="100%"
       marginLeft={1}
     >
       <Box marginBottom={1} flexDirection="column">
         <Text>
-          <Text color="yellow">{'> '}</Text>
+          <Text color={theme.status.warning}>{'> '}</Text>
           {`Do you want to connect ${ideName ?? 'your editor'} to Gemini CLI?`}
         </Text>
-        <Text dimColor>{installText}</Text>
+        <Text color={theme.text.secondary}>{installText}</Text>
       </Box>
       <RadioButtonSelect items={OPTIONS} onSelect={onComplete} />
     </Box>

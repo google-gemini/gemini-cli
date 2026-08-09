@@ -5,194 +5,181 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
+import { INFORMATIVE_TIPS } from '../constants/tips.js';
+import { WITTY_LOADING_PHRASES } from '../constants/wittyPhrases.js';
 
-export const WITTY_LOADING_PHRASES = [
-  "I'm Feeling Lucky",
-  'Shipping awesomeness... ',
-  'Painting the serifs back on...',
-  'Navigating the slime mold...',
-  'Consulting the digital spirits...',
-  'Reticulating splines...',
-  'Warming up the AI hamsters...',
-  'Asking the magic conch shell...',
-  'Generating witty retort...',
-  'Polishing the algorithms...',
-  "Don't rush perfection (or my code)...",
-  'Brewing fresh bytes...',
-  'Counting electrons...',
-  'Engaging cognitive processors...',
-  'Checking for syntax errors in the universe...',
-  'One moment, optimizing humor...',
-  'Shuffling punchlines...',
-  'Untangling neural nets...',
-  'Compiling brilliance...',
-  'Loading wit.exe...',
-  'Summoning the cloud of wisdom...',
-  'Preparing a witty response...',
-  "Just a sec, I'm debugging reality...",
-  'Confuzzling the options...',
-  'Tuning the cosmic frequencies...',
-  'Crafting a response worthy of your patience...',
-  'Compiling the 1s and 0s...',
-  'Resolving dependencies... and existential crises...',
-  'Defragmenting memories... both RAM and personal...',
-  'Rebooting the humor module...',
-  'Caching the essentials (mostly cat memes)...',
-  'Optimizing for ludicrous speed',
-  "Swapping bits... don't tell the bytes...",
-  'Garbage collecting... be right back...',
-  'Assembling the interwebs...',
-  'Converting coffee into code...',
-  'Updating the syntax for reality...',
-  'Rewiring the synapses...',
-  'Looking for a misplaced semicolon...',
-  "Greasin' the cogs of the machine...",
-  'Pre-heating the servers...',
-  'Calibrating the flux capacitor...',
-  'Engaging the improbability drive...',
-  'Channeling the Force...',
-  'Aligning the stars for optimal response...',
-  'So say we all...',
-  'Loading the next great idea...',
-  "Just a moment, I'm in the zone...",
-  'Preparing to dazzle you with brilliance...',
-  "Just a tick, I'm polishing my wit...",
-  "Hold tight, I'm crafting a masterpiece...",
-  "Just a jiffy, I'm debugging the universe...",
-  "Just a moment, I'm aligning the pixels...",
-  "Just a sec, I'm optimizing the humor...",
-  "Just a moment, I'm tuning the algorithms...",
-  'Warp speed engaged...',
-  'Mining for more Dilithium crystals...',
-  "Don't panic...",
-  'Following the white rabbit...',
-  'The truth is in here... somewhere...',
-  'Blowing on the cartridge...',
-  'Loading... Do a barrel roll!',
-  'Waiting for the respawn...',
-  'Finishing the Kessel Run in less than 12 parsecs...',
-  "The cake is not a lie, it's just still loading...",
-  'Fiddling with the character creation screen...',
-  "Just a moment, I'm finding the right meme...",
-  "Pressing 'A' to continue...",
-  'Herding digital cats...',
-  'Polishing the pixels...',
-  'Finding a suitable loading screen pun...',
-  'Distracting you with this witty phrase...',
-  'Almost there... probably...',
-  'Our hamsters are working as fast as they can...',
-  'Giving Cloudy a pat on the head...',
-  'Petting the cat...',
-  'Rickrolling my boss...',
-  'Never gonna give you up, never gonna let you down...',
-  'Slapping the bass...',
-  'Tasting the snozberries...',
-  "I'm going the distance, I'm going for speed...",
-  'Is this the real life? Is this just fantasy?...',
-  "I've got a good feeling about this...",
-  'Poking the bear...',
-  'Doing research on the latest memes...',
-  'Figuring out how to make this more witty...',
-  'Hmmm... let me think...',
-  'What do you call a fish with no eyes? A fsh...',
-  'Why did the computer go to therapy? It had too many bytes...',
-  "Why don't programmers like nature? It has too many bugs...",
-  'Why do programmers prefer dark mode? Because light attracts bugs...',
-  'Why did the developer go broke? Because they used up all their cache...',
-  "What can you do with a broken pencil? Nothing, it's pointless...",
-  'Applying percussive maintenance...',
-  'Searching for the correct USB orientation...',
-  'Ensuring the magic smoke stays inside the wires...',
-  'Rewriting in Rust for no particular reason...',
-  'Trying to exit Vim...',
-  'Spinning up the hamster wheel...',
-  "That's not a bug, it's an undocumented feature...",
-  'Engage.',
-  "I'll be back... with an answer.",
-  'My other process is a TARDIS...',
-  'Communing with the machine spirit...',
-  'Letting the thoughts marinate...',
-  'Just remembered where I put my keys...',
-  'Pondering the orb...',
-  "I've seen things you people wouldn't believe... like a user who reads loading messages.",
-  'Initiating thoughtful gaze...',
-  "What's a computer's favorite snack? Microchips.",
-  "Why do Java developers wear glasses? Because they don't C#.",
-  'Charging the laser... pew pew!',
-  'Dividing by zero... just kidding!',
-  'Looking for an adult superviso... I mean, processing.',
-  'Making it go beep boop.',
-  'Buffering... because even AIs need a moment.',
-  'Entangling quantum particles for a faster response...',
-  'Polishing the chrome... on the algorithms.',
-  'Are you not entertained? (Working on it!)',
-  'Summoning the code gremlins... to help, of course.',
-  'Just waiting for the dial-up tone to finish...',
-  'Recalibrating the humor-o-meter.',
-  'My other loading screen is even funnier.',
-  "Pretty sure there's a cat walking on the keyboard somewhere...",
-  'Enhancing... Enhancing... Still loading.',
-  "It's not a bug, it's a feature... of this loading screen.",
-  'Have you tried turning it off and on again? (The loading screen, not me.)',
-  'Constructing additional pylons...',
-  'New line? That’s Ctrl+J.',
-];
-
-export const PHRASE_CHANGE_INTERVAL_MS = 15000;
+export const PHRASE_CHANGE_INTERVAL_MS = 10000;
+export const WITTY_PHRASE_CHANGE_INTERVAL_MS = 5000;
+export const INTERACTIVE_SHELL_WAITING_PHRASE =
+  '! Shell awaiting input (Tab to focus)';
 
 /**
  * Custom hook to manage cycling through loading phrases.
  * @param isActive Whether the phrase cycling should be active.
  * @param isWaiting Whether to show a specific waiting phrase.
+ * @param shouldShowFocusHint Whether to show the shell focus hint.
+ * @param showTips Whether to show informative tips.
+ * @param showWit Whether to show witty phrases.
+ * @param customPhrases Optional list of custom phrases to use instead of built-in witty phrases.
+ * @param maxLength Optional maximum length for the selected phrase.
  * @returns The current loading phrase.
  */
-export const usePhraseCycler = (isActive: boolean, isWaiting: boolean) => {
-  const [currentLoadingPhrase, setCurrentLoadingPhrase] = useState(
-    WITTY_LOADING_PHRASES[0],
+export const usePhraseCycler = (
+  isActive: boolean,
+  isWaiting: boolean,
+  shouldShowFocusHint: boolean,
+  showTips: boolean = true,
+  showWit: boolean = true,
+  customPhrases?: string[],
+  maxLength?: number,
+) => {
+  const [currentTipState, setCurrentTipState] = useState<string | undefined>(
+    undefined,
   );
-  const phraseIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [currentWittyPhraseState, setCurrentWittyPhraseState] = useState<
+    string | undefined
+  >(undefined);
+
+  const tipIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const wittyIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastTipChangeTimeRef = useRef<number>(0);
+  const lastWittyChangeTimeRef = useRef<number>(0);
+  const lastSelectedTipRef = useRef<string | undefined>(undefined);
+  const lastSelectedWittyPhraseRef = useRef<string | undefined>(undefined);
+  const MIN_TIP_DISPLAY_TIME_MS = 10000;
+  const MIN_WIT_DISPLAY_TIME_MS = 5000;
 
   useEffect(() => {
-    if (isWaiting) {
-      setCurrentLoadingPhrase('Waiting for user confirmation...');
-      if (phraseIntervalRef.current) {
-        clearInterval(phraseIntervalRef.current);
-        phraseIntervalRef.current = null;
+    // Always clear on re-run
+    const clearTimers = () => {
+      if (tipIntervalRef.current) {
+        clearInterval(tipIntervalRef.current);
+        tipIntervalRef.current = null;
       }
-    } else if (isActive) {
-      if (phraseIntervalRef.current) {
-        clearInterval(phraseIntervalRef.current);
-      }
-      // Select an initial random phrase
-      const initialRandomIndex = Math.floor(
-        Math.random() * WITTY_LOADING_PHRASES.length,
-      );
-      setCurrentLoadingPhrase(WITTY_LOADING_PHRASES[initialRandomIndex]);
-
-      phraseIntervalRef.current = setInterval(() => {
-        // Select a new random phrase
-        const randomIndex = Math.floor(
-          Math.random() * WITTY_LOADING_PHRASES.length,
-        );
-        setCurrentLoadingPhrase(WITTY_LOADING_PHRASES[randomIndex]);
-      }, PHRASE_CHANGE_INTERVAL_MS);
-    } else {
-      // Idle or other states, clear the phrase interval
-      // and reset to the first phrase for next active state.
-      if (phraseIntervalRef.current) {
-        clearInterval(phraseIntervalRef.current);
-        phraseIntervalRef.current = null;
-      }
-      setCurrentLoadingPhrase(WITTY_LOADING_PHRASES[0]);
-    }
-
-    return () => {
-      if (phraseIntervalRef.current) {
-        clearInterval(phraseIntervalRef.current);
-        phraseIntervalRef.current = null;
+      if (wittyIntervalRef.current) {
+        clearInterval(wittyIntervalRef.current);
+        wittyIntervalRef.current = null;
       }
     };
-  }, [isActive, isWaiting]);
 
-  return currentLoadingPhrase;
+    clearTimers();
+
+    if (shouldShowFocusHint || isWaiting) {
+      // These are handled by the return value directly for immediate feedback
+      return clearTimers;
+    }
+
+    if (!isActive || (!showTips && !showWit)) {
+      return clearTimers;
+    }
+
+    const wittyPhrasesList =
+      customPhrases && customPhrases.length > 0
+        ? customPhrases
+        : WITTY_LOADING_PHRASES;
+
+    const setRandomTip = (force: boolean = false) => {
+      if (!showTips) {
+        setCurrentTipState(undefined);
+        lastSelectedTipRef.current = undefined;
+        return;
+      }
+
+      const now = Date.now();
+      if (
+        !force &&
+        now - lastTipChangeTimeRef.current < MIN_TIP_DISPLAY_TIME_MS &&
+        lastSelectedTipRef.current
+      ) {
+        setCurrentTipState(lastSelectedTipRef.current);
+        return;
+      }
+
+      const filteredTips =
+        maxLength !== undefined
+          ? INFORMATIVE_TIPS.filter((p) => p.length <= maxLength)
+          : INFORMATIVE_TIPS;
+
+      if (filteredTips.length > 0) {
+        // codeql[js/insecure-randomness] false positive: used for non-sensitive UI flavor text (tips)
+        const selected =
+          filteredTips[Math.floor(Math.random() * filteredTips.length)];
+        setCurrentTipState(selected);
+        lastSelectedTipRef.current = selected;
+        lastTipChangeTimeRef.current = now;
+      }
+    };
+
+    const setRandomWitty = (force: boolean = false) => {
+      if (!showWit) {
+        setCurrentWittyPhraseState(undefined);
+        lastSelectedWittyPhraseRef.current = undefined;
+        return;
+      }
+
+      const now = Date.now();
+      if (
+        !force &&
+        now - lastWittyChangeTimeRef.current < MIN_WIT_DISPLAY_TIME_MS &&
+        lastSelectedWittyPhraseRef.current
+      ) {
+        setCurrentWittyPhraseState(lastSelectedWittyPhraseRef.current);
+        return;
+      }
+
+      const filteredWitty =
+        maxLength !== undefined
+          ? wittyPhrasesList.filter((p) => p.length <= maxLength)
+          : wittyPhrasesList;
+
+      if (filteredWitty.length > 0) {
+        // codeql[js/insecure-randomness] false positive: used for non-sensitive UI flavor text (witty phrases)
+        const selected =
+          filteredWitty[Math.floor(Math.random() * filteredWitty.length)];
+        setCurrentWittyPhraseState(selected);
+        lastSelectedWittyPhraseRef.current = selected;
+        lastWittyChangeTimeRef.current = now;
+      }
+    };
+
+    // Select initial random phrases or resume previous ones
+    setRandomTip(false);
+    setRandomWitty(false);
+
+    if (showTips) {
+      tipIntervalRef.current = setInterval(() => {
+        setRandomTip(true);
+      }, PHRASE_CHANGE_INTERVAL_MS);
+    }
+
+    if (showWit) {
+      wittyIntervalRef.current = setInterval(() => {
+        setRandomWitty(true);
+      }, WITTY_PHRASE_CHANGE_INTERVAL_MS);
+    }
+
+    return clearTimers;
+  }, [
+    isActive,
+    isWaiting,
+    shouldShowFocusHint,
+    showTips,
+    showWit,
+    customPhrases,
+    maxLength,
+  ]);
+
+  let currentTip = undefined;
+  let currentWittyPhrase = undefined;
+
+  if (shouldShowFocusHint) {
+    currentTip = INTERACTIVE_SHELL_WAITING_PHRASE;
+  } else if (isWaiting) {
+    currentTip = 'Waiting for user confirmation...';
+  } else if (isActive) {
+    currentTip = currentTipState;
+    currentWittyPhrase = currentWittyPhraseState;
+  }
+
+  return { currentTip, currentWittyPhrase };
 };

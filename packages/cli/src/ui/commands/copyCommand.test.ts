@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Mock } from 'vitest';
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, type Mock } from 'vitest';
 import { copyCommand } from './copyCommand.js';
 import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
@@ -30,10 +29,10 @@ describe('copyCommand', () => {
 
     mockContext = createMockCommandContext({
       services: {
-        config: {
-          getGeminiClient: () => ({
+        agentContext: {
+          geminiClient: {
             getChat: mockGetChat,
-          }),
+          },
         },
       },
     });
@@ -125,6 +124,7 @@ describe('copyCommand', () => {
 
     expect(mockCopyToClipboard).toHaveBeenCalledWith(
       'Hi there! How can I help you?',
+      expect.anything(),
     );
   });
 
@@ -143,7 +143,10 @@ describe('copyCommand', () => {
 
     const result = await copyCommand.action(mockContext, '');
 
-    expect(mockCopyToClipboard).toHaveBeenCalledWith('Part 1: Part 2: Part 3');
+    expect(mockCopyToClipboard).toHaveBeenCalledWith(
+      'Part 1: Part 2: Part 3',
+      expect.anything(),
+    );
     expect(result).toEqual({
       type: 'message',
       messageType: 'info',
@@ -170,7 +173,10 @@ describe('copyCommand', () => {
 
     const result = await copyCommand.action(mockContext, '');
 
-    expect(mockCopyToClipboard).toHaveBeenCalledWith('Text part more text');
+    expect(mockCopyToClipboard).toHaveBeenCalledWith(
+      'Text part more text',
+      expect.anything(),
+    );
     expect(result).toEqual({
       type: 'message',
       messageType: 'info',
@@ -201,7 +207,10 @@ describe('copyCommand', () => {
 
     const result = await copyCommand.action(mockContext, '');
 
-    expect(mockCopyToClipboard).toHaveBeenCalledWith('Second AI response');
+    expect(mockCopyToClipboard).toHaveBeenCalledWith(
+      'Second AI response',
+      expect.anything(),
+    );
     expect(result).toEqual({
       type: 'message',
       messageType: 'info',
@@ -230,6 +239,11 @@ describe('copyCommand', () => {
       messageType: 'error',
       content: `Failed to copy to the clipboard. ${clipboardError.message}`,
     });
+
+    expect(mockCopyToClipboard).toHaveBeenCalledWith(
+      'AI response',
+      expect.anything(),
+    );
   });
 
   it('should handle non-Error clipboard errors', async () => {
@@ -253,6 +267,11 @@ describe('copyCommand', () => {
       messageType: 'error',
       content: `Failed to copy to the clipboard. ${rejectedValue}`,
     });
+
+    expect(mockCopyToClipboard).toHaveBeenCalledWith(
+      'AI response',
+      expect.anything(),
+    );
   });
 
   it('should return info message when no text parts found in AI message', async () => {
@@ -282,7 +301,7 @@ describe('copyCommand', () => {
     if (!copyCommand.action) throw new Error('Command has no action');
 
     const nullConfigContext = createMockCommandContext({
-      services: { config: null },
+      services: { agentContext: null },
     });
 
     const result = await copyCommand.action(nullConfigContext, '');

@@ -1,0 +1,163 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { render } from '../../test-utils/render.js';
+import { SuggestionsDisplay } from './SuggestionsDisplay.js';
+import { describe, it, expect } from 'vitest';
+import { CommandKind } from '../commands/types.js';
+
+describe('SuggestionsDisplay', () => {
+  const mockSuggestions = [
+    { label: 'Command 1', value: 'command1', description: 'Description 1' },
+    { label: 'Command 2', value: 'command2', description: 'Description 2' },
+    { label: 'Command 3', value: 'command3', description: 'Description 3' },
+  ];
+
+  it('renders loading state', async () => {
+    const { lastFrame } = await render(
+      <SuggestionsDisplay
+        suggestions={[]}
+        activeIndex={0}
+        isLoading={true}
+        width={80}
+        scrollOffset={0}
+        userInput=""
+        mode="reverse"
+      />,
+    );
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('renders nothing when empty and not loading', async () => {
+    const { lastFrame } = await render(
+      <SuggestionsDisplay
+        suggestions={[]}
+        activeIndex={0}
+        isLoading={false}
+        width={80}
+        scrollOffset={0}
+        userInput=""
+        mode="reverse"
+      />,
+    );
+    expect(lastFrame({ allowEmpty: true })).toBe('');
+  });
+
+  it('renders suggestions list', async () => {
+    const { lastFrame } = await render(
+      <SuggestionsDisplay
+        suggestions={mockSuggestions}
+        activeIndex={0}
+        isLoading={false}
+        width={80}
+        scrollOffset={0}
+        userInput=""
+        mode="reverse"
+      />,
+    );
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('highlights active item', async () => {
+    // This test relies on visual inspection or implementation details (colors)
+    // For now, we just ensure it renders without error and contains the item
+    const { lastFrame } = await render(
+      <SuggestionsDisplay
+        suggestions={mockSuggestions}
+        activeIndex={1}
+        isLoading={false}
+        width={80}
+        scrollOffset={0}
+        userInput=""
+        mode="reverse"
+      />,
+    );
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('handles scrolling', async () => {
+    const manySuggestions = Array.from({ length: 20 }, (_, i) => ({
+      label: `Cmd ${i}`,
+      value: `Cmd ${i}`,
+      description: `Description ${i}`,
+    }));
+
+    const { lastFrame } = await render(
+      <SuggestionsDisplay
+        suggestions={manySuggestions}
+        activeIndex={10}
+        isLoading={false}
+        width={80}
+        scrollOffset={5}
+        userInput=""
+        mode="reverse"
+      />,
+    );
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('renders MCP tag for MCP prompts', async () => {
+    const mcpSuggestions = [
+      {
+        label: 'MCP Tool',
+        value: 'mcp-tool',
+        commandKind: CommandKind.MCP_PROMPT,
+      },
+    ];
+
+    const { lastFrame } = await render(
+      <SuggestionsDisplay
+        suggestions={mcpSuggestions}
+        activeIndex={0}
+        isLoading={false}
+        width={80}
+        scrollOffset={0}
+        userInput=""
+        mode="reverse"
+      />,
+    );
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('renders command section separators for slash mode', async () => {
+    const groupedSuggestions = [
+      {
+        label: 'list',
+        value: 'list',
+        description: 'Browse auto-saved chats',
+        sectionTitle: 'auto',
+      },
+      {
+        label: 'list',
+        value: 'list',
+        description: 'List checkpoints',
+        sectionTitle: 'checkpoints',
+      },
+      {
+        label: 'save',
+        value: 'save',
+        description: 'Save checkpoint',
+        sectionTitle: 'checkpoints',
+      },
+    ];
+
+    const { lastFrame } = await render(
+      <SuggestionsDisplay
+        suggestions={groupedSuggestions}
+        activeIndex={0}
+        isLoading={false}
+        width={100}
+        scrollOffset={0}
+        userInput="/resume"
+        mode="slash"
+      />,
+    );
+
+    const frame = lastFrame();
+    expect(frame).toContain('-- auto --');
+    expect(frame).toContain('-- checkpoints --');
+  });
+});

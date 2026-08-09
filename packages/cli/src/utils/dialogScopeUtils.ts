@@ -4,9 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { LoadedSettings } from '../config/settings.js';
-import { SettingScope } from '../config/settings.js';
-import { settingExistsInScope } from './settingsUtils.js';
+import {
+  isLoadableSettingScope,
+  SettingScope,
+  type LoadableSettingScope,
+  type Settings,
+} from '../config/settings.js';
+import { isInSettingsScope } from './settingsUtils.js';
 
 /**
  * Shared scope labels for dialog components that need to display setting scopes
@@ -20,7 +24,10 @@ export const SCOPE_LABELS = {
 /**
  * Helper function to get scope items for radio button selects
  */
-export function getScopeItems() {
+export function getScopeItems(): Array<{
+  label: string;
+  value: LoadableSettingScope;
+}> {
   return [
     { label: SCOPE_LABELS[SettingScope.User], value: SettingScope.User },
     {
@@ -36,16 +43,18 @@ export function getScopeItems() {
  */
 export function getScopeMessageForSetting(
   settingKey: string,
-  selectedScope: SettingScope,
-  settings: LoadedSettings,
+  selectedScope: LoadableSettingScope,
+  settings: {
+    forScope: (scope: LoadableSettingScope) => { settings: Settings };
+  },
 ): string {
-  const otherScopes = Object.values(SettingScope).filter(
-    (scope) => scope !== selectedScope,
-  );
+  const otherScopes = Object.values(SettingScope)
+    .filter(isLoadableSettingScope)
+    .filter((scope) => scope !== selectedScope);
 
   const modifiedInOtherScopes = otherScopes.filter((scope) => {
     const scopeSettings = settings.forScope(scope).settings;
-    return settingExistsInScope(settingKey, scopeSettings);
+    return isInSettingsScope(settingKey, scopeSettings);
   });
 
   if (modifiedInOtherScopes.length === 0) {
@@ -54,7 +63,7 @@ export function getScopeMessageForSetting(
 
   const modifiedScopesStr = modifiedInOtherScopes.join(', ');
   const currentScopeSettings = settings.forScope(selectedScope).settings;
-  const existsInCurrentScope = settingExistsInScope(
+  const existsInCurrentScope = isInSettingsScope(
     settingKey,
     currentScopeSettings,
   );

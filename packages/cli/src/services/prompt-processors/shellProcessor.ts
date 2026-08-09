@@ -5,12 +5,11 @@
  */
 
 import {
-  ApprovalMode,
-  checkCommandPermissions,
   escapeShellArg,
   getShellConfiguration,
   ShellExecutionService,
   flatMapTextParts,
+  PolicyDecision,
 } from '@google/gemini-cli-core';
 
 import type { CommandContext } from '../../ui/commands/types.js';
@@ -20,6 +19,7 @@ import {
   SHORTHAND_ARGS_PLACEHOLDER,
 } from './types.js';
 import { extractInjections, type Injection } from './injectionParser.js';
+import { themeManager } from '../../ui/themes/theme-manager.js';
 
 export class ConfirmationRequiredError extends Error {
   constructor(
@@ -74,13 +74,12 @@ export class ShellProcessor implements IPromptProcessor {
       ];
     }
 
-    const config = context.services.config;
+    const config = context.services.agentContext?.config;
     if (!config) {
       throw new Error(
         `Security configuration not loaded. Cannot verify shell command permissions for '${this.commandName}'. Aborting.`,
       );
     }
-    const { sessionShellAllowlist } = context.session;
 
     const injections = extractInjections(
       prompt,
@@ -120,21 +119,25 @@ export class ShellProcessor implements IPromptProcessor {
 
       if (!command) continue;
 
+      if (context.session.sessionShellAllowlist?.has(command)) {
+        continue;
+      }
+
       // Security check on the final, escaped command string.
-      const { allAllowed, disallowedCommands, blockReason, isHardDenial } =
-        checkCommandPermissions(command, config, sessionShellAllowlist);
+      const { decision } = await config.getPolicyEngine().check(
+        {
+          name: 'run_shell_command',
+          args: { command },
+        },
+        undefined,
+      );
 
-      if (!allAllowed) {
-        if (isHardDenial) {
-          throw new Error(
-            `${this.commandName} cannot be run. Blocked command: "${command}". Reason: ${blockReason || 'Blocked by configuration.'}`,
-          );
-        }
-
-        // If not a hard denial, respect YOLO mode and auto-approve.
-        if (config.getApprovalMode() !== ApprovalMode.YOLO) {
-          disallowedCommands.forEach((uc) => commandsToConfirm.add(uc));
-        }
+      if (decision === PolicyDecision.DENY) {
+        throw new Error(
+          `${this.commandName} cannot be run. Blocked command: "${command}". Reason: Blocked by policy.`,
+        );
+      } else if (decision === PolicyDecision.ASK_USER) {
+        commandsToConfirm.add(command);
       }
     }
 
@@ -159,12 +162,19 @@ export class ShellProcessor implements IPromptProcessor {
 
       // Execute the resolved command (which already has ESCAPED input).
       if (injection.resolvedCommand) {
+        const activeTheme = themeManager.getActiveTheme();
+        const shellExecutionConfig = {
+          ...config.getShellExecutionConfig(),
+          defaultFg: activeTheme.colors.Foreground,
+          defaultBg: activeTheme.colors.Background,
+        };
         const { result } = await ShellExecutionService.execute(
           injection.resolvedCommand,
           config.getTargetDir(),
           () => {},
           new AbortController().signal,
-          config.getShouldUseNodePtyShell(),
+          config.getEnableInteractiveShell(),
+          shellExecutionConfig,
         );
 
         const executionResult = await result;

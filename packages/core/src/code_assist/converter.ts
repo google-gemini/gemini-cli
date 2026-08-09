@@ -4,35 +4,38 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  Content,
-  ContentListUnion,
-  ContentUnion,
-  GenerateContentConfig,
-  GenerateContentParameters,
-  CountTokensParameters,
-  CountTokensResponse,
-  GenerationConfigRoutingConfig,
-  MediaResolution,
-  Candidate,
-  ModelSelectionConfig,
-  GenerateContentResponsePromptFeedback,
-  GenerateContentResponseUsageMetadata,
-  Part,
-  SafetySetting,
-  PartUnion,
-  SpeechConfigUnion,
-  ThinkingConfig,
-  ToolListUnion,
-  ToolConfig,
+import {
+  GenerateContentResponse,
+  type Content,
+  type ContentListUnion,
+  type ContentUnion,
+  type GenerateContentConfig,
+  type GenerateContentParameters,
+  type CountTokensParameters,
+  type CountTokensResponse,
+  type GenerationConfigRoutingConfig,
+  type MediaResolution,
+  type Candidate,
+  type ModelSelectionConfig,
+  type GenerateContentResponsePromptFeedback,
+  type GenerateContentResponseUsageMetadata,
+  type Part,
+  type SafetySetting,
+  type PartUnion,
+  type SpeechConfigUnion,
+  type ThinkingConfig,
+  type ToolListUnion,
+  type ToolConfig,
 } from '@google/genai';
-import { GenerateContentResponse } from '@google/genai';
+import { debugLogger } from '../utils/debugLogger.js';
+import type { Credits } from './types.js';
 
 export interface CAGenerateContentRequest {
   model: string;
   project?: string;
   user_prompt_id?: string;
   request: VertexGenerateContentRequest;
+  enabled_credit_types?: string[];
 }
 
 interface VertexGenerateContentRequest {
@@ -72,14 +75,18 @@ interface VertexGenerationConfig {
 }
 
 export interface CaGenerateContentResponse {
-  response: VertexGenerateContentResponse;
+  response?: VertexGenerateContentResponse;
+  traceId?: string;
+  consumedCredits?: Credits[];
+  remainingCredits?: Credits[];
 }
 
 interface VertexGenerateContentResponse {
-  candidates: Candidate[];
+  candidates?: Candidate[];
   automaticFunctionCallingHistory?: Content[];
   promptFeedback?: GenerateContentResponsePromptFeedback;
   usageMetadata?: GenerateContentResponseUsageMetadata;
+  modelVersion?: string;
 }
 
 export interface CaCountTokenRequest {
@@ -92,7 +99,7 @@ interface VertexCountTokenRequest {
 }
 
 export interface CaCountTokenResponse {
-  totalTokens: number;
+  totalTokens?: number;
 }
 
 export function toCountTokenRequest(
@@ -109,8 +116,13 @@ export function toCountTokenRequest(
 export function fromCountTokenResponse(
   res: CaCountTokenResponse,
 ): CountTokensResponse {
+  if (res.totalTokens === undefined) {
+    debugLogger.warn(
+      'Warning: Code Assist API did not return totalTokens. Defaulting to 0.',
+    );
+  }
   return {
-    totalTokens: res.totalTokens,
+    totalTokens: res.totalTokens ?? 0,
   };
 }
 
@@ -119,24 +131,32 @@ export function toGenerateContentRequest(
   userPromptId: string,
   project?: string,
   sessionId?: string,
+  enabledCreditTypes?: string[],
 ): CAGenerateContentRequest {
   return {
     model: req.model,
     project,
     user_prompt_id: userPromptId,
     request: toVertexGenerateContentRequest(req, sessionId),
+    enabled_credit_types: enabledCreditTypes,
   };
 }
 
 export function fromGenerateContentResponse(
   res: CaGenerateContentResponse,
 ): GenerateContentResponse {
-  const inres = res.response;
   const out = new GenerateContentResponse();
-  out.candidates = inres.candidates;
+  out.responseId = res.traceId;
+  const inres = res.response;
+  if (!inres) {
+    out.candidates = [];
+    return out;
+  }
+  out.candidates = inres.candidates ?? [];
   out.automaticFunctionCallingHistory = inres.automaticFunctionCallingHistory;
   out.promptFeedback = inres.promptFeedback;
   out.usageMetadata = inres.usageMetadata;
+  out.modelVersion = inres.modelVersion;
   return out;
 }
 
@@ -173,6 +193,16 @@ function maybeToContent(content?: ContentUnion): Content | undefined {
   return toContent(content);
 }
 
+function isPart(c: ContentUnion): c is PartUnion {
+  return (
+    typeof c === 'object' &&
+    c !== null &&
+    !Array.isArray(c) &&
+    !('parts' in c) &&
+    !('role' in c)
+  );
+}
+
 function toContent(content: ContentUnion): Content {
   if (Array.isArray(content)) {
     // it's a PartsUnion[]
@@ -188,7 +218,7 @@ function toContent(content: ContentUnion): Content {
       parts: [{ text: content }],
     };
   }
-  if ('parts' in content) {
+  if (!isPart(content)) {
     // it's a Content - process parts to handle thought filtering
     return {
       ...content,
@@ -200,11 +230,11 @@ function toContent(content: ContentUnion): Content {
   // it's a Part
   return {
     role: 'user',
-    parts: [toPart(content as Part)],
+    parts: [toPart(content)],
   };
 }
 
-function toParts(parts: PartUnion[]): Part[] {
+export function toParts(parts: PartUnion[]): Part[] {
   return parts.map(toPart);
 }
 
@@ -279,5 +309,18 @@ function toVertexGenerationConfig(
     speechConfig: config.speechConfig,
     audioTimestamp: config.audioTimestamp,
     thinkingConfig: config.thinkingConfig,
+  };
+}
+
+export function fromGenerateContentResponseUsage(
+  metadata?: GenerateContentResponseUsageMetadata,
+): GenerateContentResponseUsageMetadata | undefined {
+  if (!metadata) {
+    return undefined;
+  }
+  return {
+    promptTokenCount: metadata.promptTokenCount,
+    candidatesTokenCount: metadata.candidatesTokenCount,
+    totalTokenCount: metadata.totalTokenCount,
   };
 }

@@ -7,22 +7,34 @@
 import type React from 'react';
 import { useCallback, useState } from 'react';
 import { Box, Text } from 'ink';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
+import { pickDefaultThemeName, type Theme } from '../themes/theme.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { DiffRenderer } from './messages/DiffRenderer.js';
 import { colorizeCode } from '../utils/CodeColorizer.js';
-import type { LoadedSettings } from '../../config/settings.js';
+import type {
+  LoadableSettingScope,
+  LoadedSettings,
+} from '../../config/settings.js';
 import { SettingScope } from '../../config/settings.js';
-import {
-  getScopeItems,
-  getScopeMessageForSetting,
-} from '../../utils/dialogScopeUtils.js';
+import { getScopeMessageForSetting } from '../../utils/dialogScopeUtils.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+import { ScopeSelector } from './shared/ScopeSelector.js';
+import { useUIState } from '../contexts/UIStateContext.js';
+import { ColorsDisplay } from './ColorsDisplay.js';
+import { isDevelopment } from '../../utils/installationInfo.js';
 
 interface ThemeDialogProps {
   /** Callback function when a theme is selected */
-  onSelect: (themeName: string | undefined, scope: SettingScope) => void;
+  onSelect: (
+    themeName: string,
+    scope: LoadableSettingScope,
+  ) => void | Promise<void>;
+
+  /** Callback function when the dialog is cancelled */
+  onCancel: () => void;
 
   /** Callback function when a theme is highlighted */
   onHighlight: (themeName: string | undefined) => void;
@@ -32,62 +44,118 @@ interface ThemeDialogProps {
   terminalWidth: number;
 }
 
+import { resolveColor } from '../themes/color-utils.js';
+
+function generateThemeItem(
+  name: string,
+  typeDisplay: string,
+  fullTheme: Theme | undefined,
+  terminalBackgroundColor: string | undefined,
+) {
+  const isCompatible = fullTheme
+    ? themeManager.isThemeCompatible(fullTheme, terminalBackgroundColor)
+    : true;
+
+  const themeBackground = fullTheme
+    ? resolveColor(fullTheme.colors.Background)
+    : undefined;
+
+  const isBackgroundMatch =
+    terminalBackgroundColor &&
+    themeBackground &&
+    terminalBackgroundColor.toLowerCase() === themeBackground.toLowerCase();
+
+  return {
+    label: name,
+    value: name,
+    themeNameDisplay: name,
+    themeTypeDisplay: typeDisplay,
+    themeWarning: isCompatible ? '' : ' (Incompatible)',
+    themeMatch: isBackgroundMatch ? ' (Matches terminal)' : '',
+    key: name,
+    isCompatible,
+  };
+}
+
+import {
+  DIALOG_PADDING,
+  PREVIEW_PANE_FIXED_VERTICAL_SPACE,
+  PREVIEW_PANE_WIDTH_PERCENTAGE,
+  PREVIEW_PANE_WIDTH_SAFETY_MARGIN,
+  SELECTION_PANE_WIDTH_PERCENTAGE,
+  TAB_TO_SELECT_HEIGHT,
+  TOTAL_HORIZONTAL_PADDING,
+} from './ThemeDialog.constants.js';
+
 export function ThemeDialog({
   onSelect,
+  onCancel,
   onHighlight,
   settings,
   availableTerminalHeight,
   terminalWidth,
 }: ThemeDialogProps): React.JSX.Element {
-  const [selectedScope, setSelectedScope] = useState<SettingScope>(
+  const isAlternateBuffer = useAlternateBuffer();
+  const { terminalBackgroundColor } = useUIState();
+  const [selectedScope, setSelectedScope] = useState<LoadableSettingScope>(
     SettingScope.User,
   );
 
   // Track the currently highlighted theme name
-  const [highlightedThemeName, setHighlightedThemeName] = useState<
-    string | undefined
-  >(settings.merged.ui?.theme || DEFAULT_THEME.name);
+  const [highlightedThemeName, setHighlightedThemeName] = useState<string>(
+    () => {
+      // If a theme is already set, use it.
+      if (settings.merged.ui.theme) {
+        return settings.merged.ui.theme;
+      }
 
-  // Generate theme items filtered by selected scope
-  const customThemes =
-    selectedScope === SettingScope.User
-      ? settings.user.settings.ui?.customThemes || {}
-      : settings.merged.ui?.customThemes || {};
-  const builtInThemes = themeManager
-    .getAvailableThemes()
-    .filter((theme) => theme.type !== 'custom');
-  const customThemeNames = Object.keys(customThemes);
+      // Otherwise, try to pick a theme that matches the terminal background.
+      return pickDefaultThemeName(
+        terminalBackgroundColor,
+        themeManager.getAllThemes(),
+        DEFAULT_THEME.name,
+        'Default Light',
+      );
+    },
+  );
+
   const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
   // Generate theme items
-  const themeItems = [
-    ...builtInThemes.map((theme) => ({
-      label: theme.name,
-      value: theme.name,
-      themeNameDisplay: theme.name,
-      themeTypeDisplay: capitalize(theme.type),
-    })),
-    ...customThemeNames.map((name) => ({
-      label: name,
-      value: name,
-      themeNameDisplay: name,
-      themeTypeDisplay: 'Custom',
-    })),
-  ];
-  const [selectInputKey, setSelectInputKey] = useState(Date.now());
+  const themeItems = themeManager
+    .getAvailableThemes()
+    .map((theme) => {
+      const fullTheme = themeManager.getTheme(theme.name);
+      const capitalizedType = capitalize(theme.type);
+      const typeDisplay = theme.name.endsWith(capitalizedType)
+        ? ''
+        : capitalizedType;
+
+      return generateThemeItem(
+        theme.name,
+        typeDisplay,
+        fullTheme,
+        terminalBackgroundColor,
+      );
+    })
+    .sort((a, b) => {
+      // Show compatible themes first
+      if (a.isCompatible && !b.isCompatible) return -1;
+      if (!a.isCompatible && b.isCompatible) return 1;
+      // Then sort by name
+      return a.label.localeCompare(b.label);
+    });
 
   // Find the index of the selected theme, but only if it exists in the list
-  const selectedThemeName = settings.merged.ui?.theme || DEFAULT_THEME.name;
   const initialThemeIndex = themeItems.findIndex(
-    (item) => item.value === selectedThemeName,
+    (item) => item.value === highlightedThemeName,
   );
   // If not found, fall back to the first theme
   const safeInitialThemeIndex = initialThemeIndex >= 0 ? initialThemeIndex : 0;
 
-  const scopeItems = getScopeItems();
-
   const handleThemeSelect = useCallback(
-    (themeName: string) => {
-      onSelect(themeName, selectedScope);
+    async (themeName: string) => {
+      await onSelect(themeName, selectedScope);
     },
     [onSelect, selectedScope],
   );
@@ -97,31 +165,30 @@ export function ThemeDialog({
     onHighlight(themeName);
   };
 
-  const handleScopeHighlight = useCallback((scope: SettingScope) => {
+  const handleScopeHighlight = useCallback((scope: LoadableSettingScope) => {
     setSelectedScope(scope);
-    setSelectInputKey(Date.now());
   }, []);
 
   const handleScopeSelect = useCallback(
-    (scope: SettingScope) => {
-      handleScopeHighlight(scope);
-      setFocusedSection('theme'); // Reset focus to theme section
+    async (scope: LoadableSettingScope) => {
+      await onSelect(highlightedThemeName, scope);
     },
-    [handleScopeHighlight],
+    [onSelect, highlightedThemeName],
   );
 
-  const [focusedSection, setFocusedSection] = useState<'theme' | 'scope'>(
-    'theme',
-  );
+  const [mode, setMode] = useState<'theme' | 'scope'>('theme');
 
   useKeypress(
     (key) => {
       if (key.name === 'tab') {
-        setFocusedSection((prev) => (prev === 'theme' ? 'scope' : 'theme'));
+        setMode((prev) => (prev === 'theme' ? 'scope' : 'theme'));
+        return true;
       }
       if (key.name === 'escape') {
-        onSelect(undefined, selectedScope);
+        onCancel();
+        return true;
       }
+      return false;
     },
     { isActive: true },
   );
@@ -133,14 +200,6 @@ export function ThemeDialog({
     settings,
   );
 
-  // Constants for calculating preview pane layout.
-  // These values are based on the JSX structure below.
-  const PREVIEW_PANE_WIDTH_PERCENTAGE = 0.55;
-  // A safety margin to prevent text from touching the border.
-  // This is a complete hack unrelated to the 0.9 used in App.tsx
-  const PREVIEW_PANE_WIDTH_SAFETY_MARGIN = 0.9;
-  // Combined horizontal padding from the dialog and preview pane.
-  const TOTAL_HORIZONTAL_PADDING = 4;
   const colorizeCodeWidth = Math.max(
     Math.floor(
       (terminalWidth - TOTAL_HORIZONTAL_PADDING) *
@@ -150,22 +209,13 @@ export function ThemeDialog({
     1,
   );
 
-  const DIALOG_PADDING = 2;
   const selectThemeHeight = themeItems.length + 1;
-  const SCOPE_SELECTION_HEIGHT = 4; // Height for the scope selection section + margin.
-  const SPACE_BETWEEN_THEME_SELECTION_AND_APPLY_TO = 1;
-  const TAB_TO_SELECT_HEIGHT = 2;
   availableTerminalHeight = availableTerminalHeight ?? Number.MAX_SAFE_INTEGER;
   availableTerminalHeight -= 2; // Top and bottom borders.
   availableTerminalHeight -= TAB_TO_SELECT_HEIGHT;
 
-  let totalLeftHandSideHeight =
-    DIALOG_PADDING +
-    selectThemeHeight +
-    SCOPE_SELECTION_HEIGHT +
-    SPACE_BETWEEN_THEME_SELECTION_AND_APPLY_TO;
+  let totalLeftHandSideHeight = DIALOG_PADDING + selectThemeHeight;
 
-  let showScopeSelection = true;
   let includePadding = true;
 
   // Remove content from the LHS that can be omitted if it exceeds the available height.
@@ -173,19 +223,6 @@ export function ThemeDialog({
     includePadding = false;
     totalLeftHandSideHeight -= DIALOG_PADDING;
   }
-
-  if (totalLeftHandSideHeight > availableTerminalHeight) {
-    // First, try hiding the scope selection
-    totalLeftHandSideHeight -= SCOPE_SELECTION_HEIGHT;
-    showScopeSelection = false;
-  }
-
-  // Don't focus the scope selection if it is hidden due to height constraints.
-  const currentFocusedSection = !showScopeSelection ? 'theme' : focusedSection;
-
-  // Vertical space taken by elements other than the two code blocks in the preview pane.
-  // Includes "Preview" title, borders, and margin between blocks.
-  const PREVIEW_PANE_FIXED_VERTICAL_SPACE = 8;
 
   // The right column doesn't need to ever be shorter than the left column.
   availableTerminalHeight = Math.max(
@@ -206,10 +243,18 @@ export function ThemeDialog({
   // The code block is slightly longer than the diff, so give it more space.
   const codeBlockHeight = Math.ceil(availableHeightForPanes * 0.6);
   const diffHeight = Math.floor(availableHeightForPanes * 0.4);
+
+  const previewTheme =
+    themeManager.getTheme(highlightedThemeName || DEFAULT_THEME.name) ||
+    DEFAULT_THEME;
+
+  const leftColumnWidth = `${SELECTION_PANE_WIDTH_PERCENTAGE * 100}%`;
+  const rightColumnWidth = `${PREVIEW_PANE_WIDTH_PERCENTAGE * 100}%`;
+
   return (
     <Box
       borderStyle="round"
-      borderColor={Colors.Gray}
+      borderColor={theme.border.default}
       flexDirection="column"
       paddingTop={includePadding ? 1 : 0}
       paddingBottom={includePadding ? 1 : 0}
@@ -217,94 +262,143 @@ export function ThemeDialog({
       paddingRight={1}
       width="100%"
     >
-      <Box flexDirection="row">
-        {/* Left Column: Selection */}
-        <Box flexDirection="column" width="45%" paddingRight={2}>
-          <Text bold={currentFocusedSection === 'theme'} wrap="truncate">
-            {currentFocusedSection === 'theme' ? '> ' : '  '}Select Theme{' '}
-            <Text color={Colors.Gray}>{otherScopeModifiedMessage}</Text>
-          </Text>
-          <RadioButtonSelect
-            key={selectInputKey}
-            items={themeItems}
-            initialIndex={safeInitialThemeIndex}
-            onSelect={handleThemeSelect}
-            onHighlight={handleThemeHighlight}
-            isFocused={currentFocusedSection === 'theme'}
-            maxItemsToShow={8}
-            showScrollArrows={true}
-            showNumbers={currentFocusedSection === 'theme'}
-          />
-
-          {/* Scope Selection */}
-          {showScopeSelection && (
-            <Box marginTop={1} flexDirection="column">
-              <Text bold={currentFocusedSection === 'scope'} wrap="truncate">
-                {currentFocusedSection === 'scope' ? '> ' : '  '}Apply To
+      {mode === 'theme' ? (
+        <Box flexDirection="row">
+          {/* Left Column: Selection */}
+          <Box flexDirection="column" width={leftColumnWidth} paddingRight={2}>
+            <Text bold={mode === 'theme'} wrap="truncate">
+              {mode === 'theme' ? '> ' : '  '}Select Theme{' '}
+              <Text color={theme.text.secondary}>
+                {otherScopeModifiedMessage}
               </Text>
-              <RadioButtonSelect
-                items={scopeItems}
-                initialIndex={0} // Default to User Settings
-                onSelect={handleScopeSelect}
-                onHighlight={handleScopeHighlight}
-                isFocused={currentFocusedSection === 'scope'}
-                showNumbers={currentFocusedSection === 'scope'}
-              />
-            </Box>
-          )}
-        </Box>
+            </Text>
+            <RadioButtonSelect
+              items={themeItems}
+              initialIndex={safeInitialThemeIndex}
+              onSelect={handleThemeSelect}
+              onHighlight={handleThemeHighlight}
+              isFocused={mode === 'theme'}
+              maxItemsToShow={12}
+              showScrollArrows={true}
+              showNumbers={mode === 'theme'}
+              renderItem={(item, { titleColor }) => {
+                // We know item has themeWarning because we put it there, but we need to cast or access safely
+                const itemWithExtras = item as typeof item & {
+                  themeWarning?: string;
+                  themeMatch?: string;
+                  themeNameDisplay?: string;
+                  themeTypeDisplay?: string;
+                };
 
-        {/* Right Column: Preview */}
-        <Box flexDirection="column" width="55%" paddingLeft={2}>
-          <Text bold>Preview</Text>
-          {/* Get the Theme object for the highlighted theme, fall back to default if not found */}
-          {(() => {
-            const previewTheme =
-              themeManager.getTheme(
-                highlightedThemeName || DEFAULT_THEME.name,
-              ) || DEFAULT_THEME;
-            return (
-              <Box
-                borderStyle="single"
-                borderColor={Colors.Gray}
-                paddingTop={includePadding ? 1 : 0}
-                paddingBottom={includePadding ? 1 : 0}
-                paddingLeft={1}
-                paddingRight={1}
-                flexDirection="column"
-              >
-                {colorizeCode(
-                  `# function
+                if (itemWithExtras.themeNameDisplay) {
+                  const match =
+                    itemWithExtras.themeNameDisplay.match(/^(.*) \((.*)\)$/);
+                  let themeNamePart: React.ReactNode =
+                    itemWithExtras.themeNameDisplay;
+                  if (match) {
+                    themeNamePart = (
+                      <>
+                        {match[1]}{' '}
+                        <Text color={theme.text.secondary}>({match[2]})</Text>
+                      </>
+                    );
+                  }
+
+                  return (
+                    <Text color={titleColor} wrap="truncate" key={item.key}>
+                      {themeNamePart}
+                      {itemWithExtras.themeTypeDisplay ? (
+                        <>
+                          {' '}
+                          <Text color={theme.text.secondary}>
+                            {itemWithExtras.themeTypeDisplay}
+                          </Text>
+                        </>
+                      ) : null}
+                      {itemWithExtras.themeMatch && (
+                        <Text color={theme.status.success}>
+                          {itemWithExtras.themeMatch}
+                        </Text>
+                      )}
+                      {itemWithExtras.themeWarning && (
+                        <Text color={theme.status.warning}>
+                          {itemWithExtras.themeWarning}
+                        </Text>
+                      )}
+                    </Text>
+                  );
+                }
+                // Regular label display
+                return (
+                  <Text color={titleColor} wrap="truncate">
+                    {item.label}
+                  </Text>
+                );
+              }}
+            />
+          </Box>
+
+          {/* Right Column: Preview */}
+          <Box flexDirection="column" width={rightColumnWidth} paddingLeft={2}>
+            <Text bold color={theme.text.primary}>
+              Preview
+            </Text>
+            <Box
+              borderStyle="single"
+              borderColor={theme.border.default}
+              paddingTop={includePadding ? 1 : 0}
+              paddingBottom={includePadding ? 1 : 0}
+              paddingLeft={1}
+              paddingRight={1}
+              flexDirection="column"
+            >
+              {colorizeCode({
+                code: `# function
 def fibonacci(n):
     a, b = 0, 1
     for _ in range(n):
         a, b = b, a + b
     return a`,
-                  'python',
-                  codeBlockHeight,
-                  colorizeCodeWidth,
-                )}
-                <Box marginTop={1} />
-                <DiffRenderer
-                  diffContent={`--- a/util.py
+                language: 'python',
+                availableHeight:
+                  isAlternateBuffer === false ? codeBlockHeight : undefined,
+                maxWidth: colorizeCodeWidth,
+                settings,
+              })}
+              <Box marginTop={1} />
+              <DiffRenderer
+                diffContent={`--- a/util.py
 +++ b/util.py
 @@ -1,2 +1,2 @@
 - print("Hello, " + name)
 + print(f"Hello, {name}!")
 `}
-                  availableTerminalHeight={diffHeight}
-                  terminalWidth={colorizeCodeWidth}
-                  theme={previewTheme}
-                />
+                availableTerminalHeight={
+                  isAlternateBuffer === false ? diffHeight : undefined
+                }
+                terminalWidth={colorizeCodeWidth}
+                theme={previewTheme}
+              />
+            </Box>
+            {isDevelopment && (
+              <Box marginTop={1}>
+                <ColorsDisplay activeTheme={previewTheme} />
               </Box>
-            );
-          })()}
+            )}
+          </Box>
         </Box>
-      </Box>
+      ) : (
+        <ScopeSelector
+          onSelect={handleScopeSelect}
+          onHighlight={handleScopeHighlight}
+          isFocused={mode === 'scope'}
+          initialScope={selectedScope}
+        />
+      )}
       <Box marginTop={1}>
-        <Text color={Colors.Gray} wrap="truncate">
-          (Use Enter to select
-          {showScopeSelection ? ', Tab to change focus' : ''})
+        <Text color={theme.text.secondary} wrap="truncate">
+          (Use Enter to {mode === 'theme' ? 'select' : 'apply scope'}, Tab to{' '}
+          {mode === 'theme' ? 'configure scope' : 'select theme'}, Esc to close)
         </Text>
       </Box>
     </Box>

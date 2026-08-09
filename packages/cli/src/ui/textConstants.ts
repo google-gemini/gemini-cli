@@ -11,3 +11,12 @@ export const SCREEN_READER_MODEL_PREFIX = 'Model: ';
 export const SCREEN_READER_LOADING = 'loading';
 
 export const SCREEN_READER_RESPONDING = 'responding';
+
+export const REDIRECTION_WARNING_NOTE_LABEL = 'Note: ';
+export const REDIRECTION_WARNING_NOTE_TEXT =
+  'Command contains redirection which can be undesirable.';
+export const REDIRECTION_WARNING_TIP_LABEL = 'Tip:  '; // Padded to align with "Note: "
+export const getRedirectionWarningTipText = (shiftTabHint: string) =>
+  `Toggle auto-edit (${shiftTabHint}) to allow redirection in the future.`;
+
+export const GENERIC_WORKING_LABEL = 'Working...';

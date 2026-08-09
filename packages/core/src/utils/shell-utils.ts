@@ -1,16 +1,61 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { AnyToolInvocation } from '../index.js';
-import type { Config } from '../config/config.js';
 import os from 'node:os';
-import { quote } from 'shell-quote';
-import { doesToolInvocationMatch } from './tool-utils.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import { quote, parse, type ParseEntry } from 'shell-quote';
+import {
+  spawn,
+  spawnSync,
+  type SpawnOptionsWithoutStdio,
+} from 'node:child_process';
 
-const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
+/**
+ * Extracts the primary command name from a potentially wrapped shell command.
+ * Strips shell wrappers and handles shopt/set/etc.
+ *
+ * @param command - The full command string.
+ * @param args - The arguments for the command.
+ * @returns The primary command name.
+ */
+export async function getCommandName(
+  command: string,
+  args: string[],
+): Promise<string> {
+  await initializeShellParsers();
+  const fullCmd = [command, ...args].join(' ');
+  const stripped = stripShellWrapper(fullCmd);
+  const roots = getCommandRoots(stripped).filter(
+    (r) => r !== 'shopt' && r !== 'set',
+  );
+  if (roots.length > 0) {
+    return roots[0];
+  }
+  return path.basename(command);
+}
+
+/**
+ * Extracts a string representation from a shell-quote ParseEntry.
+ */
+export function extractStringFromParseEntry(entry: ParseEntry): string {
+  if (typeof entry === 'string') return entry;
+  if ('pattern' in entry) return entry.pattern;
+  if ('op' in entry) return entry.op;
+  if ('comment' in entry) return ''; // We can typically ignore comments for safety checks
+  return '';
+}
+import * as readline from 'node:readline';
+import { Language, Parser, Query, type Node, type Tree } from 'web-tree-sitter';
+import { loadWasmBinary } from './fileUtils.js';
+import { debugLogger } from './debugLogger.js';
+import type { SandboxManager } from '../services/sandboxManager.js';
+import { NoopSandboxManager } from '../services/sandboxManager.js';
+
+export const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
 
 /**
  * An identifier for the shell type.
@@ -21,7 +66,7 @@ export type ShellType = 'cmd' | 'powershell' | 'bash';
  * Defines the configuration required to execute a command string within a specific shell.
  */
 export interface ShellConfiguration {
-  /** The path or name of the shell executable (e.g., 'bash', 'cmd.exe'). */
+  /** The path or name of the shell executable (e.g., 'bash', 'powershell.exe'). */
   executable: string;
   /**
    * The arguments required by the shell to execute a subsequent string argument.
@@ -31,42 +76,621 @@ export interface ShellConfiguration {
   shell: ShellType;
 }
 
+function isExecutable(filePath: string): boolean {
+  try {
+    fs.accessSync(filePath, fs.constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function resolveExecutable(exe: string): string | undefined {
+  if (path.isAbsolute(exe)) {
+    return isExecutable(exe) ? exe : undefined;
+  }
+  const pathEnv = process.env['PATH'];
+  if (!pathEnv) {
+    return undefined;
+  }
+  const extensions =
+    os.platform() === 'win32' ? ['.exe', '.cmd', '.bat', ''] : [''];
+  for (const dir of pathEnv.split(path.delimiter)) {
+    for (const ext of extensions) {
+      const fullPath = path.join(dir, exe + ext);
+      if (isExecutable(fullPath)) {
+        return fullPath;
+      }
+    }
+  }
+  return undefined;
+}
+
+let bashLanguage: Language | null = null;
+let treeSitterInitialization: Promise<void> | null = null;
+let treeSitterInitializationError: Error | null = null;
+
+class ShellParserInitializationError extends Error {
+  constructor(cause: Error) {
+    super(`Failed to initialize bash parser: ${cause.message}`, { cause });
+    this.name = 'ShellParserInitializationError';
+  }
+}
+
+function toError(value: unknown): Error {
+  if (value instanceof Error) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    return new Error(value);
+  }
+  return new Error('Unknown tree-sitter initialization error', {
+    cause: value,
+  });
+}
+
+async function loadBashLanguage(): Promise<void> {
+  try {
+    treeSitterInitializationError = null;
+    const [treeSitterBinary, bashBinary] = await Promise.all([
+      loadWasmBinary(
+        () =>
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore resolved by esbuild-plugin-wasm during bundling
+          import('web-tree-sitter/tree-sitter.wasm?binary'),
+        'web-tree-sitter/tree-sitter.wasm',
+      ),
+      loadWasmBinary(
+        () =>
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore resolved by esbuild-plugin-wasm during bundling
+          import('tree-sitter-bash/tree-sitter-bash.wasm?binary'),
+        'tree-sitter-bash/tree-sitter-bash.wasm',
+      ),
+    ]);
+
+    await Parser.init({ wasmBinary: treeSitterBinary });
+    bashLanguage = await Language.load(bashBinary);
+  } catch (error) {
+    bashLanguage = null;
+    const normalized = toError(error);
+    const initializationError =
+      normalized instanceof ShellParserInitializationError
+        ? normalized
+        : new ShellParserInitializationError(normalized);
+    treeSitterInitializationError = initializationError;
+    throw initializationError;
+  }
+}
+
+export async function initializeShellParsers(): Promise<void> {
+  if (!treeSitterInitialization) {
+    treeSitterInitialization = loadBashLanguage().catch((error) => {
+      treeSitterInitialization = null;
+      // Log the error but don't throw, allowing the application to fall back to safe defaults (ASK_USER)
+      // or regex checks where appropriate.
+      debugLogger.debug('Failed to initialize shell parsers:', error);
+    });
+  }
+
+  await treeSitterInitialization;
+}
+
+export interface ParsedCommandDetail {
+  name: string;
+  text: string;
+  startIndex: number;
+  args?: string[];
+}
+
+interface CommandParseResult {
+  details: ParsedCommandDetail[];
+  hasError: boolean;
+  hasRedirection?: boolean;
+}
+
+const POWERSHELL_COMMAND_ENV = '__GCLI_POWERSHELL_COMMAND__';
+const PARSE_TIMEOUT_MICROS = 1000 * 1000; // 1 second
+
+// Encode the parser script as UTF-16LE base64 so we can pass it via PowerShell's -EncodedCommand flag;
+// this avoids brittle quoting/escaping when spawning PowerShell and ensures the script is received byte-for-byte.
+const POWERSHELL_PARSER_SCRIPT = Buffer.from(
+  `
+$ErrorActionPreference = 'Stop'
+$commandText = $env:${POWERSHELL_COMMAND_ENV}
+if ([string]::IsNullOrEmpty($commandText)) {
+  Write-Output '{"success":false}'
+  exit 0
+}
+$tokens = $null
+$errors = $null
+$ast = [System.Management.Automation.Language.Parser]::ParseInput($commandText, [ref]$tokens, [ref]$errors)
+if ($errors -and $errors.Count -gt 0) {
+  Write-Output '{"success":false}'
+  exit 0
+}
+$commandAsts = $ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.CommandAst] }, $true)
+$commandObjects = @()
+$hasRedirection = $false
+foreach ($commandAst in $commandAsts) {
+  if ($commandAst.Redirections.Count -gt 0) {
+    $hasRedirection = $true
+  }
+  $name = $commandAst.GetCommandName()
+  if ([string]::IsNullOrWhiteSpace($name)) {
+    continue
+  }
+  $args = @()
+  if ($commandAst.CommandElements.Count -gt 1) {
+    for ($i = 1; $i -lt $commandAst.CommandElements.Count; $i++) {
+      $args += $commandAst.CommandElements[$i].Extent.Text.Trim()
+    }
+  }
+  $commandObjects += [PSCustomObject]@{
+    name = $name
+    text = $commandAst.Extent.Text.Trim()
+    args = $args
+  }
+}
+[PSCustomObject]@{
+  success = $true
+  commands = $commandObjects
+  hasRedirection = $hasRedirection
+} | ConvertTo-Json -Compress
+`,
+  'utf16le',
+).toString('base64');
+
+export const REDIRECTION_NAMES = new Set([
+  'redirection (<)',
+  'redirection (>)',
+  'heredoc (<<)',
+  'herestring (<<<)',
+  'command substitution',
+  'backtick substitution',
+  'process substitution',
+  'subshell',
+]);
+
+function createParser(): Parser | null {
+  if (!bashLanguage) {
+    if (treeSitterInitializationError) {
+      throw treeSitterInitializationError;
+    }
+    return null;
+  }
+
+  try {
+    const parser = new Parser();
+    parser.setLanguage(bashLanguage);
+    return parser;
+  } catch {
+    return null;
+  }
+}
+
+function parseCommandTree(
+  command: string,
+  timeoutMicros: number = PARSE_TIMEOUT_MICROS,
+): Tree | null {
+  const parser = createParser();
+  if (!parser || !command.trim()) {
+    return null;
+  }
+
+  const deadline = performance.now() + timeoutMicros / 1000;
+  let timedOut = false;
+
+  try {
+    const tree = parser.parse(command, null, {
+      progressCallback: () => {
+        if (performance.now() > deadline) {
+          timedOut = true;
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          return true as unknown as void; // Returning true cancels parsing, but type says void
+        }
+      },
+    });
+
+    if (timedOut) {
+      debugLogger.error('Bash command parsing timed out for command:', command);
+      // Returning a partial tree could be risky so we return null to be safe.
+      return null;
+    }
+
+    return tree;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeCommandName(raw: string): string {
+  if (raw.length >= 2) {
+    const first = raw[0];
+    const last = raw[raw.length - 1];
+    if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+      return raw.slice(1, -1);
+    }
+  }
+  return raw.trim();
+}
+
+/**
+ * Normalizes a command name for sandbox policy lookups.
+ * Converts to lowercase and removes the .exe extension for cross-platform consistency.
+ *
+ * @param commandName - The command name to normalize.
+ * @returns The normalized command name.
+ */
+export function normalizeCommand(commandName: string): string {
+  // Split by both separators and get the last non-empty part
+  const parts = commandName.split(/[\\/]/).filter(Boolean);
+  const base = parts.length > 0 ? parts[parts.length - 1] : '';
+  return base.toLowerCase().replace(/\.exe$/, '');
+}
+
+function extractNameFromNode(node: Node): string | null {
+  switch (node.type) {
+    case 'command': {
+      const nameNode = node.childForFieldName('name');
+      if (!nameNode) {
+        return null;
+      }
+      return normalizeCommandName(nameNode.text);
+    }
+    case 'declaration_command':
+    case 'unset_command':
+    case 'test_command': {
+      const firstChild = node.child(0);
+      if (!firstChild) {
+        return null;
+      }
+      return normalizeCommandName(firstChild.text);
+    }
+    case 'file_redirect': {
+      // The first child might be a file descriptor (e.g., '2>').
+      // We iterate to find the actual operator token.
+      for (let i = 0; i < node.childCount; i++) {
+        const child = node.child(i);
+        if (child && child.text.includes('<')) {
+          return 'redirection (<)';
+        }
+        if (child && child.text.includes('>')) {
+          return 'redirection (>)';
+        }
+      }
+      return 'redirection (>)';
+    }
+    case 'heredoc_redirect':
+      return 'heredoc (<<)';
+    case 'herestring_redirect':
+      return 'herestring (<<<)';
+    case 'command_substitution':
+      return 'command substitution';
+    case 'backtick_substitution':
+      return 'backtick substitution';
+    case 'process_substitution':
+      return 'process substitution';
+    case 'subshell':
+      return 'subshell';
+    default:
+      return null;
+  }
+}
+
+function collectCommandDetails(
+  root: Node,
+  source: string,
+): ParsedCommandDetail[] {
+  const stack: Node[] = [root];
+  const details: ParsedCommandDetail[] = [];
+
+  while (stack.length > 0) {
+    const current = stack.pop()!;
+
+    const name = extractNameFromNode(current);
+    if (name) {
+      const detail: ParsedCommandDetail = {
+        name,
+        text: source.slice(current.startIndex, current.endIndex).trim(),
+        startIndex: current.startIndex,
+      };
+
+      if (current.type === 'command') {
+        const args: string[] = [];
+        const nameNode = current.childForFieldName('name');
+        for (let i = 0; i < current.childCount; i += 1) {
+          const child = current.child(i);
+          if (
+            child &&
+            child.type === 'word' &&
+            child.startIndex !== nameNode?.startIndex
+          ) {
+            args.push(child.text);
+          }
+        }
+        if (args.length > 0) {
+          detail.args = args;
+        }
+      }
+
+      details.push(detail);
+    }
+
+    // Traverse all children to find all sub-components (commands, redirections, etc.)
+    for (let i = current.childCount - 1; i >= 0; i -= 1) {
+      const child = current.child(i);
+      if (child) {
+        stack.push(child);
+      }
+    }
+  }
+
+  return details;
+}
+
+function hasPromptCommandTransform(root: Node): boolean {
+  const stack: Node[] = [root];
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current) {
+      continue;
+    }
+
+    if (current.type === 'expansion') {
+      for (let i = 0; i < current.childCount - 1; i += 1) {
+        const operatorNode = current.child(i);
+        const transformNode = current.child(i + 1);
+
+        if (
+          operatorNode?.text === '@' &&
+          transformNode?.text?.toLowerCase() === 'p'
+        ) {
+          return true;
+        }
+      }
+    }
+
+    for (let i = current.namedChildCount - 1; i >= 0; i -= 1) {
+      const child = current.namedChild(i);
+      if (child) {
+        stack.push(child);
+      }
+    }
+  }
+
+  return false;
+}
+
+export function parseBashCommandDetails(
+  command: string,
+): CommandParseResult | null {
+  if (treeSitterInitializationError) {
+    debugLogger.debug(
+      'Bash parser not initialized:',
+      treeSitterInitializationError,
+    );
+    return null;
+  }
+
+  if (!bashLanguage) {
+    initializeShellParsers().catch(() => {
+      // The failure path is surfaced via treeSitterInitializationError.
+    });
+    return null;
+  }
+
+  const tree = parseCommandTree(command);
+  if (!tree) {
+    return null;
+  }
+
+  const details = collectCommandDetails(tree.rootNode, command);
+
+  const hasError =
+    tree.rootNode.hasError ||
+    details.length === 0 ||
+    hasPromptCommandTransform(tree.rootNode);
+
+  if (hasError) {
+    let query = null;
+    try {
+      query = new Query(bashLanguage, '(ERROR) @error (MISSING) @missing');
+      const captures = query.captures(tree.rootNode);
+      const syntaxErrors = captures.map((capture) => {
+        const { node, name } = capture;
+        const type = name === 'missing' ? 'Missing' : 'Error';
+        return `${type} node: "${node.text}" at ${node.startPosition.row}:${node.startPosition.column}`;
+      });
+
+      debugLogger.log(
+        'Bash command parsing error detected for command:',
+        command,
+        'Syntax Errors:',
+        syntaxErrors,
+      );
+    } catch {
+      // Ignore query errors
+    } finally {
+      query?.delete();
+    }
+  }
+  return {
+    details: details.sort((a, b) => a.startIndex - b.startIndex),
+    hasError,
+  };
+}
+
+function parsePowerShellCommandDetails(
+  command: string,
+  executable: string,
+): CommandParseResult | null {
+  const trimmed = command.trim();
+  if (!trimmed) {
+    return {
+      details: [],
+      hasError: true,
+    };
+  }
+
+  try {
+    const result = spawnSync(
+      executable,
+      [
+        '-NoLogo',
+        '-NoProfile',
+        '-NonInteractive',
+        '-EncodedCommand',
+        POWERSHELL_PARSER_SCRIPT,
+      ],
+      {
+        env: {
+          ...process.env,
+          [POWERSHELL_COMMAND_ENV]: command,
+        },
+        encoding: 'utf-8',
+      },
+    );
+
+    if (result.error || result.status !== 0) {
+      return null;
+    }
+
+    const output = (result.stdout ?? '').toString().trim();
+    if (!output) {
+      return { details: [], hasError: true };
+    }
+
+    let parsed: {
+      success?: boolean;
+      commands?: Array<{ name?: string; text?: string; args?: string[] }>;
+      hasRedirection?: boolean;
+    } | null = null;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      parsed = JSON.parse(output);
+    } catch {
+      return { details: [], hasError: true };
+    }
+
+    if (!parsed?.success) {
+      return { details: [], hasError: true };
+    }
+
+    const details = (parsed.commands ?? [])
+      .map((commandDetail): ParsedCommandDetail | null => {
+        if (!commandDetail || typeof commandDetail.name !== 'string') {
+          return null;
+        }
+
+        const name = normalizeCommandName(commandDetail.name);
+        const text =
+          typeof commandDetail.text === 'string'
+            ? commandDetail.text.trim()
+            : command;
+
+        return {
+          name,
+          text,
+          startIndex: 0,
+          args: Array.isArray(commandDetail.args)
+            ? commandDetail.args
+            : undefined,
+        };
+      })
+      .filter((detail): detail is ParsedCommandDetail => detail !== null);
+
+    return {
+      details,
+      hasError: details.length === 0,
+      hasRedirection: parsed.hasRedirection,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function parseCommandDetails(
+  command: string,
+): CommandParseResult | null {
+  const configuration = getShellConfiguration();
+
+  if (configuration.shell === 'powershell') {
+    const result = parsePowerShellCommandDetails(
+      command,
+      configuration.executable,
+    );
+    if (!result || result.hasError) {
+      // Fallback to bash parser which is usually good enough for simple commands
+      // and doesn't rely on the host PowerShell environment restrictions (e.g., ConstrainedLanguage)
+      const bashResult = parseBashCommandDetails(command);
+      if (bashResult && !bashResult.hasError) {
+        return bashResult;
+      }
+    }
+    return result;
+  }
+
+  if (configuration.shell === 'bash') {
+    return parseBashCommandDetails(command);
+  }
+
+  return null;
+}
+
 /**
  * Determines the appropriate shell configuration for the current platform.
  *
  * This ensures we can execute command strings predictably and securely across platforms
  * using the `spawn(executable, [...argsPrefix, commandString], { shell: false })` pattern.
  *
+ * On Windows, PowerShell 7 (pwsh.exe) is preferred over Windows PowerShell 5.1
+ * (powershell.exe) when available on PATH. Windows PowerShell 5.1 silently
+ * strips embedded double quotes from arguments to native executables — see
+ * issue #25859. PowerShell 7 uses standards-compliant argument passing and
+ * does not exhibit this regression. When pwsh.exe is not installed, we fall
+ * back to powershell.exe to preserve the existing behavior and the full
+ * cmdlet surface users depend on.
+ *
  * @returns The ShellConfiguration for the current environment.
  */
 export function getShellConfiguration(): ShellConfiguration {
   if (isWindows()) {
-    const comSpec = process.env['ComSpec'] || 'cmd.exe';
-    const executable = comSpec.toLowerCase();
+    // -NonInteractive prevents PSReadLine from intercepting console input
+    // events inside the ConPTY session, which otherwise causes interactive
+    // TUI tools (e.g. pnpm create vite, vim) to receive malformed key events
+    // and exit when arrow keys are pressed.
+    const powershellArgsPrefix = ['-NoProfile', '-NonInteractive', '-Command'];
+    const comSpec = process.env['ComSpec'];
+    if (comSpec) {
+      const executable = comSpec.toLowerCase();
+      if (
+        executable.endsWith('powershell.exe') ||
+        executable.endsWith('pwsh.exe')
+      ) {
+        return {
+          executable: comSpec,
+          argsPrefix: powershellArgsPrefix,
+          shell: 'powershell',
+        };
+      }
+    }
 
-    if (
-      executable.endsWith('powershell.exe') ||
-      executable.endsWith('pwsh.exe')
-    ) {
-      // For PowerShell, the arguments are different.
-      // -NoProfile: Speeds up startup.
-      // -Command: Executes the following command.
+    const pwshPath = resolveExecutable('pwsh.exe');
+    if (pwshPath) {
       return {
-        executable: comSpec,
+        executable: pwshPath,
         argsPrefix: ['-NoProfile', '-Command'],
         shell: 'powershell',
       };
     }
 
-    // Default to cmd.exe for anything else on Windows.
-    // Flags for CMD:
-    // /d: Skip execution of AutoRun commands.
-    // /s: Modifies the treatment of the command string (important for quoting).
-    // /c: Carries out the command specified by the string and then terminates.
+    // Fall back to Windows PowerShell 5.1 when pwsh.exe is not installed.
     return {
-      executable: comSpec,
-      argsPrefix: ['/d', '/s', '/c'],
-      shell: 'cmd',
+      executable: 'powershell.exe',
+      argsPrefix: powershellArgsPrefix,
+      shell: 'powershell',
     };
   }
 
@@ -94,9 +718,17 @@ export function escapeShellArg(arg: string, shell: ShellType): string {
 
   switch (shell) {
     case 'powershell':
-      // For PowerShell, wrap in single quotes and escape internal single quotes by doubling them.
+      // For PowerShell, avoid quoting simple alphanumeric strings (like UUIDs).
+      if (/^[a-zA-Z0-9\-_.]+$/.test(arg)) {
+        return arg;
+      }
+      // Otherwise, wrap in single quotes and escape internal single quotes by doubling them.
       return `'${arg.replace(/'/g, "''")}'`;
     case 'cmd':
+      // Avoid quoting simple strings for cmd.exe as well.
+      if (/^[a-zA-Z0-9\-_.]+$/.test(arg)) {
+        return arg;
+      }
       // Simple Windows escaping for cmd.exe: wrap in double quotes and escape inner double quotes.
       return `"${arg.replace(/"/g, '""')}"`;
     case 'bash':
@@ -112,54 +744,66 @@ export function escapeShellArg(arg: string, shell: ShellType): string {
  * @param command The shell command string to parse
  * @returns An array of individual command strings
  */
-export function splitCommands(command: string): string[] {
-  const commands: string[] = [];
-  let currentCommand = '';
-  let inSingleQuotes = false;
-  let inDoubleQuotes = false;
-  let i = 0;
+/**
+ * Checks if a command contains redirection operators.
+ * Uses shell-specific parsers where possible, falling back to a broad regex check.
+ */
+export function hasRedirection(command: string): boolean {
+  const fallbackCheck = () => /[><]/.test(command);
 
-  while (i < command.length) {
-    const char = command[i];
-    const nextChar = command[i + 1];
+  // If there are no redirection characters at all, we can skip parsing.
+  if (!fallbackCheck()) {
+    return false;
+  }
 
-    if (char === '\\' && i < command.length - 1) {
-      currentCommand += char + command[i + 1];
-      i += 2;
-      continue;
-    }
+  const configuration = getShellConfiguration();
 
-    if (char === "'" && !inDoubleQuotes) {
-      inSingleQuotes = !inSingleQuotes;
-    } else if (char === '"' && !inSingleQuotes) {
-      inDoubleQuotes = !inDoubleQuotes;
-    }
+  if (configuration.shell === 'powershell') {
+    const parsed = parsePowerShellCommandDetails(
+      command,
+      configuration.executable,
+    );
+    return parsed && !parsed.hasError
+      ? !!parsed.hasRedirection
+      : fallbackCheck();
+  }
 
-    if (!inSingleQuotes && !inDoubleQuotes) {
+  if (configuration.shell === 'bash' && bashLanguage) {
+    const tree = parseCommandTree(command);
+    if (!tree) return fallbackCheck();
+
+    const stack: Node[] = [tree.rootNode];
+    while (stack.length > 0) {
+      const current = stack.pop()!;
       if (
-        (char === '&' && nextChar === '&') ||
-        (char === '|' && nextChar === '|')
+        current.type === 'redirected_statement' ||
+        current.type === 'file_redirect' ||
+        current.type === 'heredoc_redirect' ||
+        current.type === 'herestring_redirect'
       ) {
-        commands.push(currentCommand.trim());
-        currentCommand = '';
-        i++; // Skip the next character
-      } else if (char === ';' || char === '&' || char === '|') {
-        commands.push(currentCommand.trim());
-        currentCommand = '';
-      } else {
-        currentCommand += char;
+        return true;
       }
-    } else {
-      currentCommand += char;
+      for (let i = current.childCount - 1; i >= 0; i -= 1) {
+        const child = current.child(i);
+        if (child) stack.push(child);
+      }
     }
-    i++;
+    return false;
   }
 
-  if (currentCommand.trim()) {
-    commands.push(currentCommand.trim());
+  return fallbackCheck();
+}
+
+export function splitCommands(command: string): string[] {
+  const parsed = parseCommandDetails(command);
+  if (!parsed || parsed.hasError) {
+    return [];
   }
 
-  return commands.filter(Boolean); // Filter out any empty strings
+  return parsed.details
+    .filter((detail) => !REDIRECTION_NAMES.has(detail.name))
+    .map((detail) => detail.text)
+    .filter(Boolean);
 }
 
 /**
@@ -171,48 +815,57 @@ export function splitCommands(command: string): string[] {
  * @example getCommandRoot("git status && npm test") returns "git"
  */
 export function getCommandRoot(command: string): string | undefined {
-  const trimmedCommand = command.trim();
-  if (!trimmedCommand) {
+  const parsed = parseCommandDetails(command);
+  if (!parsed || parsed.hasError || parsed.details.length === 0) {
     return undefined;
   }
 
-  // This regex is designed to find the first "word" of a command,
-  // while respecting quotes. It looks for a sequence of non-whitespace
-  // characters that are not inside quotes.
-  const match = trimmedCommand.match(/^"([^"]+)"|^'([^']+)'|^(\S+)/);
-  if (match) {
-    // The first element in the match array is the full match.
-    // The subsequent elements are the capture groups.
-    // We prefer a captured group because it will be unquoted.
-    const commandRoot = match[1] || match[2] || match[3];
-    if (commandRoot) {
-      // If the command is a path, return the last component.
-      return commandRoot.split(/[\\/]/).pop();
-    }
-  }
-
-  return undefined;
+  return parsed.details[0]?.name;
 }
 
 export function getCommandRoots(command: string): string[] {
   if (!command) {
     return [];
   }
-  return splitCommands(command)
-    .map((c) => getCommandRoot(c))
-    .filter((c): c is string => !!c);
+
+  const parsed = parseCommandDetails(command);
+  if (!parsed || parsed.hasError) {
+    return [];
+  }
+
+  return parsed.details
+    .map((detail) => detail.name)
+    .filter((name) => !REDIRECTION_NAMES.has(name))
+    .filter(Boolean);
 }
 
 export function stripShellWrapper(command: string): string {
-  const pattern = /^\s*(?:sh|bash|zsh|cmd.exe)\s+(?:\/c|-c)\s+/;
+  const pattern =
+    /^\s*(?:(?:(?:\S+\/)?(?:sh|bash|zsh))\s+-c|cmd\.exe\s+\/c|powershell(?:\.exe)?\s+(?:-NoProfile\s+)?-Command|pwsh(?:\.exe)?\s+(?:-NoProfile\s+)?-Command)\s+/i;
   const match = command.match(pattern);
   if (match) {
     let newCommand = command.substring(match[0].length).trim();
     if (
-      (newCommand.startsWith('"') && newCommand.endsWith('"')) ||
-      (newCommand.startsWith("'") && newCommand.endsWith("'"))
+      newCommand.length >= 2 &&
+      ((newCommand.startsWith('"') && newCommand.endsWith('"')) ||
+        (newCommand.startsWith("'") && newCommand.endsWith("'")))
     ) {
-      newCommand = newCommand.substring(1, newCommand.length - 1);
+      const isPosixShell = match[0].trim().endsWith('-c');
+      if (isPosixShell && newCommand.startsWith('"')) {
+        try {
+          const parsed = parse(newCommand, (key) => '$' + key);
+          const firstEntry = parsed[0];
+          if (parsed.length === 1 && typeof firstEntry === 'string') {
+            newCommand = firstEntry;
+          } else {
+            newCommand = newCommand.substring(1, newCommand.length - 1);
+          }
+        } catch {
+          newCommand = newCommand.substring(1, newCommand.length - 1);
+        }
+      } else {
+        newCommand = newCommand.substring(1, newCommand.length - 1);
+      }
     }
     return newCommand;
   }
@@ -227,226 +880,6 @@ export function stripShellWrapper(command: string): string {
  * @param command The shell command string to check
  * @returns true if command substitution would be executed by bash
  */
-export function detectCommandSubstitution(command: string): boolean {
-  let inSingleQuotes = false;
-  let inDoubleQuotes = false;
-  let inBackticks = false;
-  let i = 0;
-
-  while (i < command.length) {
-    const char = command[i];
-    const nextChar = command[i + 1];
-
-    // Handle escaping - only works outside single quotes
-    if (char === '\\' && !inSingleQuotes) {
-      i += 2; // Skip the escaped character
-      continue;
-    }
-
-    // Handle quote state changes
-    if (char === "'" && !inDoubleQuotes && !inBackticks) {
-      inSingleQuotes = !inSingleQuotes;
-    } else if (char === '"' && !inSingleQuotes && !inBackticks) {
-      inDoubleQuotes = !inDoubleQuotes;
-    } else if (char === '`' && !inSingleQuotes) {
-      // Backticks work outside single quotes (including in double quotes)
-      inBackticks = !inBackticks;
-    }
-
-    // Check for command substitution patterns that would be executed
-    if (!inSingleQuotes) {
-      // $(...) command substitution - works in double quotes and unquoted
-      if (char === '$' && nextChar === '(') {
-        return true;
-      }
-
-      // <(...) process substitution - works unquoted only (not in double quotes)
-      if (char === '<' && nextChar === '(' && !inDoubleQuotes && !inBackticks) {
-        return true;
-      }
-
-      // Backtick command substitution - check for opening backtick
-      // (We track the state above, so this catches the start of backtick substitution)
-      if (char === '`' && !inBackticks) {
-        return true;
-      }
-    }
-
-    i++;
-  }
-
-  return false;
-}
-
-/**
- * Checks a shell command against security policies and allowlists.
- *
- * This function operates in one of two modes depending on the presence of
- * the `sessionAllowlist` parameter:
- *
- * 1.  **"Default Deny" Mode (sessionAllowlist is provided):** This is the
- *     strictest mode, used for user-defined scripts like custom commands.
- *     A command is only permitted if it is found on the global `coreTools`
- *     allowlist OR the provided `sessionAllowlist`. It must not be on the
- *     global `excludeTools` blocklist.
- *
- * 2.  **"Default Allow" Mode (sessionAllowlist is NOT provided):** This mode
- *     is used for direct tool invocations (e.g., by the model). If a strict
- *     global `coreTools` allowlist exists, commands must be on it. Otherwise,
- *     any command is permitted as long as it is not on the `excludeTools`
- *     blocklist.
- *
- * @param command The shell command string to validate.
- * @param config The application configuration.
- * @param sessionAllowlist A session-level list of approved commands. Its
- *   presence activates "Default Deny" mode.
- * @returns An object detailing which commands are not allowed.
- */
-export function checkCommandPermissions(
-  command: string,
-  config: Config,
-  sessionAllowlist?: Set<string>,
-): {
-  allAllowed: boolean;
-  disallowedCommands: string[];
-  blockReason?: string;
-  isHardDenial?: boolean;
-} {
-  // Disallow command substitution for security.
-  if (detectCommandSubstitution(command)) {
-    return {
-      allAllowed: false,
-      disallowedCommands: [command],
-      blockReason:
-        'Command substitution using $(), <(), or >() is not allowed for security reasons',
-      isHardDenial: true,
-    };
-  }
-
-  const normalize = (cmd: string): string => cmd.trim().replace(/\s+/g, ' ');
-  const commandsToValidate = splitCommands(command).map(normalize);
-  const invocation: AnyToolInvocation & { params: { command: string } } = {
-    params: { command: '' },
-  } as AnyToolInvocation & { params: { command: string } };
-
-  // 1. Blocklist Check (Highest Priority)
-  const excludeTools = config.getExcludeTools() || [];
-  const isWildcardBlocked = SHELL_TOOL_NAMES.some((name) =>
-    excludeTools.includes(name),
-  );
-
-  if (isWildcardBlocked) {
-    return {
-      allAllowed: false,
-      disallowedCommands: commandsToValidate,
-      blockReason: 'Shell tool is globally disabled in configuration',
-      isHardDenial: true,
-    };
-  }
-
-  for (const cmd of commandsToValidate) {
-    invocation.params['command'] = cmd;
-    if (
-      doesToolInvocationMatch('run_shell_command', invocation, excludeTools)
-    ) {
-      return {
-        allAllowed: false,
-        disallowedCommands: [cmd],
-        blockReason: `Command '${cmd}' is blocked by configuration`,
-        isHardDenial: true,
-      };
-    }
-  }
-
-  const coreTools = config.getCoreTools() || [];
-  const isWildcardAllowed = SHELL_TOOL_NAMES.some((name) =>
-    coreTools.includes(name),
-  );
-
-  // If there's a global wildcard, all commands are allowed at this point
-  // because they have already passed the blocklist check.
-  if (isWildcardAllowed) {
-    return { allAllowed: true, disallowedCommands: [] };
-  }
-
-  const disallowedCommands: string[] = [];
-
-  if (sessionAllowlist) {
-    // "DEFAULT DENY" MODE: A session allowlist is provided.
-    // All commands must be in either the session or global allowlist.
-    const normalizedSessionAllowlist = new Set(
-      [...sessionAllowlist].flatMap((cmd) =>
-        SHELL_TOOL_NAMES.map((name) => `${name}(${cmd})`),
-      ),
-    );
-
-    for (const cmd of commandsToValidate) {
-      invocation.params['command'] = cmd;
-      const isSessionAllowed = doesToolInvocationMatch(
-        'run_shell_command',
-        invocation,
-        [...normalizedSessionAllowlist],
-      );
-      if (isSessionAllowed) continue;
-
-      const isGloballyAllowed = doesToolInvocationMatch(
-        'run_shell_command',
-        invocation,
-        coreTools,
-      );
-      if (isGloballyAllowed) continue;
-
-      disallowedCommands.push(cmd);
-    }
-
-    if (disallowedCommands.length > 0) {
-      return {
-        allAllowed: false,
-        disallowedCommands,
-        blockReason: `Command(s) not on the global or session allowlist. Disallowed commands: ${disallowedCommands
-          .map((c) => JSON.stringify(c))
-          .join(', ')}`,
-        isHardDenial: false, // This is a soft denial; confirmation is possible.
-      };
-    }
-  } else {
-    // "DEFAULT ALLOW" MODE: No session allowlist.
-    const hasSpecificAllowedCommands =
-      coreTools.filter((tool) =>
-        SHELL_TOOL_NAMES.some((name) => tool.startsWith(`${name}(`)),
-      ).length > 0;
-
-    if (hasSpecificAllowedCommands) {
-      for (const cmd of commandsToValidate) {
-        invocation.params['command'] = cmd;
-        const isGloballyAllowed = doesToolInvocationMatch(
-          'run_shell_command',
-          invocation,
-          coreTools,
-        );
-        if (!isGloballyAllowed) {
-          disallowedCommands.push(cmd);
-        }
-      }
-      if (disallowedCommands.length > 0) {
-        return {
-          allAllowed: false,
-          disallowedCommands,
-          blockReason: `Command(s) not in the allowed commands list. Disallowed commands: ${disallowedCommands
-            .map((c) => JSON.stringify(c))
-            .join(', ')}`,
-          isHardDenial: false, // This is a soft denial.
-        };
-      }
-    }
-    // If no specific global allowlist exists, and it passed the blocklist,
-    // the command is allowed by default.
-  }
-
-  // If all checks for the current mode pass, the command is allowed.
-  return { allAllowed: true, disallowedCommands: [] };
-}
-
 /**
  * Determines whether a given shell command is allowed to execute based on
  * the tool's configuration including allowlists and blocklists.
@@ -458,14 +891,307 @@ export function checkCommandPermissions(
  * @param config The application configuration.
  * @returns An object with 'allowed' boolean and optional 'reason' string if not allowed.
  */
-export function isCommandAllowed(
+export const spawnAsync = async (
   command: string,
-  config: Config,
-): { allowed: boolean; reason?: string } {
-  // By not providing a sessionAllowlist, we invoke "default allow" behavior.
-  const { allAllowed, blockReason } = checkCommandPermissions(command, config);
-  if (allAllowed) {
-    return { allowed: true };
+  args: string[],
+  options?: SpawnOptionsWithoutStdio & { sandboxManager?: SandboxManager },
+): Promise<{ stdout: string; stderr: string }> => {
+  const sandboxManager = options?.sandboxManager ?? new NoopSandboxManager();
+  const prepared = await sandboxManager.prepareCommand({
+    command,
+    args,
+    cwd: options?.cwd?.toString() ?? process.cwd(),
+    env: options?.env ?? process.env,
+  });
+
+  const { program: finalCommand, args: finalArgs, env: finalEnv } = prepared;
+
+  try {
+    return await new Promise((resolve, reject) => {
+      const child = spawn(finalCommand, finalArgs, {
+        ...options,
+        env: finalEnv,
+      });
+      let stdout = '';
+      let stderr = '';
+
+      child.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+
+      child.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      child.on('close', (code) => {
+        if (code === 0) {
+          resolve({ stdout, stderr });
+        } else {
+          reject(
+            new Error(`Command failed with exit code ${code}:\n${stderr}`),
+          );
+        }
+      });
+
+      child.on('error', (err) => {
+        reject(err);
+      });
+    });
+  } finally {
+    prepared.cleanup?.();
   }
-  return { allowed: false, reason: blockReason };
+};
+
+/**
+ * Executes a command and yields lines of output as they appear.
+ * Use for large outputs where buffering is not feasible.
+ *
+ * @param command The executable to run
+ * @param args Arguments for the executable
+ * @param options Spawn options (cwd, env, etc.)
+ */
+export async function* execStreaming(
+  command: string,
+  args: string[],
+  options?: SpawnOptionsWithoutStdio & {
+    signal?: AbortSignal;
+    allowedExitCodes?: number[];
+    sandboxManager?: SandboxManager;
+  },
+): AsyncGenerator<string, void, void> {
+  const sandboxManager = options?.sandboxManager ?? new NoopSandboxManager();
+  const prepared = await sandboxManager.prepareCommand({
+    command,
+    args,
+    cwd: options?.cwd?.toString() ?? process.cwd(),
+    env: options?.env ?? process.env,
+  });
+
+  try {
+    const { program: finalCommand, args: finalArgs, env: finalEnv } = prepared;
+
+    const child = spawn(finalCommand, finalArgs, {
+      ...options,
+      env: finalEnv,
+      // ensure we don't open a window on windows if possible/relevant
+      windowsHide: true,
+    });
+
+    const rl = readline.createInterface({
+      input: child.stdout,
+      terminal: false,
+    });
+
+    const errorChunks: Buffer[] = [];
+    let stderrTotalBytes = 0;
+    const MAX_STDERR_BYTES = 20 * 1024; // 20KB limit
+
+    child.stderr.on('data', (chunk) => {
+      if (stderrTotalBytes < MAX_STDERR_BYTES) {
+        errorChunks.push(chunk);
+        stderrTotalBytes += chunk.length;
+      }
+    });
+
+    let error: Error | null = null;
+    child.on('error', (err) => {
+      error = err;
+    });
+
+    const onAbort = () => {
+      // If manually aborted by signal, we kill immediately.
+      if (!child.killed) child.kill();
+    };
+
+    if (options?.signal?.aborted) {
+      onAbort();
+    } else {
+      options?.signal?.addEventListener('abort', onAbort);
+    }
+
+    let finished = false;
+    try {
+      for await (const line of rl) {
+        if (options?.signal?.aborted) break;
+        yield line;
+      }
+      finished = true;
+    } finally {
+      rl.close();
+      options?.signal?.removeEventListener('abort', onAbort);
+
+      // Ensure process is killed when the generator is closed (consumer breaks loop)
+      let killedByGenerator = false;
+      if (!finished && child.exitCode === null && !child.killed) {
+        try {
+          child.kill();
+        } catch {
+          // ignore error if process is already dead
+        }
+        killedByGenerator = true;
+      }
+
+      // Ensure we wait for the process to exit to check codes
+      await new Promise<void>((resolve, reject) => {
+        // If an error occurred before we got here (e.g. spawn failure), reject immediately.
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        function checkExit(code: number | null) {
+          // If we aborted or killed it manually, we treat it as success (stop waiting)
+          if (options?.signal?.aborted || killedByGenerator) {
+            resolve();
+            return;
+          }
+
+          const allowed = options?.allowedExitCodes ?? [0];
+          if (code !== null && allowed.includes(code)) {
+            resolve();
+          } else {
+            // If we have an accumulated error or explicit error event
+            if (error) reject(error);
+            else {
+              const stderr = Buffer.concat(errorChunks).toString('utf8');
+              const truncatedMsg =
+                stderrTotalBytes >= MAX_STDERR_BYTES ? '...[truncated]' : '';
+              reject(
+                new Error(
+                  `Process exited with code ${code}: ${stderr}${truncatedMsg}`,
+                ),
+              );
+            }
+          }
+        }
+
+        if (child.exitCode !== null) {
+          checkExit(child.exitCode);
+        } else {
+          child.on('close', (code) => checkExit(code));
+          child.on('error', (err) => {
+            reject(err);
+          });
+        }
+      });
+    }
+  } finally {
+    prepared.cleanup?.();
+  }
+}
+
+export function detectCommandSubstitution(command: string): boolean {
+  const shell = getShellConfiguration().shell;
+  const isPowerShell =
+    typeof shell === 'string' &&
+    (shell.toLowerCase().includes('powershell') ||
+      shell.toLowerCase().includes('pwsh'));
+  if (isPowerShell) {
+    return detectPowerShellSubstitution(command);
+  }
+  return detectBashSubstitution(command);
+}
+
+function detectBashSubstitution(command: string): boolean {
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let i = 0;
+  while (i < command.length) {
+    const char = command[i];
+    if (char === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
+      i++;
+      continue;
+    }
+    if (char === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      i++;
+      continue;
+    }
+    if (inSingleQuote) {
+      i++;
+      continue;
+    }
+    if (char === '\\' && i + 1 < command.length) {
+      if (inDoubleQuote) {
+        const next = command[i + 1];
+        if (['$', '`', '"', '\\', '\n'].includes(next)) {
+          i += 2;
+          continue;
+        }
+      } else {
+        i += 2;
+        continue;
+      }
+    }
+    if (char === '$' && command[i + 1] === '(') {
+      return true;
+    }
+    if (
+      !inDoubleQuote &&
+      (char === '<' || char === '>') &&
+      command[i + 1] === '('
+    ) {
+      return true;
+    }
+    if (char === '`') {
+      return true;
+    }
+    i++;
+  }
+  return false;
+}
+
+const POWERSHELL_KEYWORD_RE =
+  /\b(if|elseif|else|foreach|for|while|do|switch|try|catch|finally|until|trap|function|filter)(\s+[-\w]+)*\s*$/i;
+
+function detectPowerShellSubstitution(command: string): boolean {
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let i = 0;
+  while (i < command.length) {
+    const char = command[i];
+
+    if (char === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
+      i++;
+      continue;
+    }
+    if (char === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      i++;
+      continue;
+    }
+
+    if (inSingleQuote) {
+      i++;
+      continue;
+    }
+    if (char === '`' && i + 1 < command.length) {
+      i += 2;
+      continue;
+    }
+    if (char === '$' && command[i + 1] === '(') {
+      return true;
+    }
+    if (!inDoubleQuote && char === '@' && command[i + 1] === '(') {
+      return true;
+    }
+    if (!inDoubleQuote && char === '(') {
+      const before = command.slice(0, i).trimEnd();
+      const prevChar = before[before.length - 1];
+      if (prevChar === '(') {
+        i++;
+        continue;
+      }
+      if (POWERSHELL_KEYWORD_RE.test(before)) {
+        i++;
+        continue;
+      }
+      return true;
+    }
+
+    i++;
+  }
+  return false;
 }

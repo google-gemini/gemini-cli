@@ -1,0 +1,20 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Table > should render headers and data correctly 1`] = `
+"ID   Name
+────────────────────────────────────────────────────────────────────────────────────────────────────
+1    Alice
+2    Bob"
+`;
+
+exports[`Table > should support custom cell rendering 1`] = `
+"Value
+────────────────────────────────────────────────────────────────────────────────────────────────────
+20"
+`;
+
+exports[`Table > should support inverse text rendering 1`] = `
+"Status
+────────────────────────────────────────────────────────────────────────────────────────────────────
+Active"
+`;

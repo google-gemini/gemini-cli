@@ -18,6 +18,7 @@ import {
   getDirectoryContextString,
 } from './environmentContext.js';
 import type { Config } from '../config/config.js';
+import type { Storage } from '../config/storage.js';
 import { getFolderStructure } from './getFolderStructure.js';
 
 vi.mock('../config/config.js');
@@ -35,6 +36,9 @@ describe('getDirectoryContextString', () => {
         getDirectories: vi.fn().mockReturnValue(['/test/dir']),
       }),
       getFileService: vi.fn(),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
+      } as unknown as Storage,
     };
     vi.mocked(getFolderStructure).mockResolvedValue('Mock Folder Structure');
   });
@@ -45,11 +49,10 @@ describe('getDirectoryContextString', () => {
 
   it('should return context string for a single directory', async () => {
     const contextString = await getDirectoryContextString(mockConfig as Config);
+    expect(contextString).toContain('- **Workspace Directories:**');
+    expect(contextString).toContain('  - /test/dir');
     expect(contextString).toContain(
-      "I'm currently working in the directory: /test/dir",
-    );
-    expect(contextString).toContain(
-      'Here is the folder structure of the current working directories:\n\nMock Folder Structure',
+      '- **Directory Structure:**\n\nMock Folder Structure',
     );
   });
 
@@ -62,11 +65,11 @@ describe('getDirectoryContextString', () => {
       .mockResolvedValueOnce('Structure 2');
 
     const contextString = await getDirectoryContextString(mockConfig as Config);
+    expect(contextString).toContain('- **Workspace Directories:**');
+    expect(contextString).toContain('  - /test/dir1');
+    expect(contextString).toContain('  - /test/dir2');
     expect(contextString).toContain(
-      "I'm currently working in the following directories:\n  - /test/dir1\n  - /test/dir2",
-    );
-    expect(contextString).toContain(
-      'Here is the folder structure of the current working directories:\n\nStructure 1\nStructure 2',
+      '- **Directory Structure:**\n\nStructure 1\nStructure 2',
     );
   });
 });
@@ -76,9 +79,6 @@ describe('getEnvironmentContext', () => {
   let mockToolRegistry: { getTool: Mock };
 
   beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2025-08-05T12:00:00Z'));
-
     mockToolRegistry = {
       getTool: vi.fn(),
     };
@@ -88,15 +88,20 @@ describe('getEnvironmentContext', () => {
         getDirectories: vi.fn().mockReturnValue(['/test/dir']),
       }),
       getFileService: vi.fn(),
-      getFullContext: vi.fn().mockReturnValue(false),
+      getIncludeDirectoryTree: vi.fn().mockReturnValue(true),
+      getEnvironmentMemory: vi.fn().mockReturnValue('Mock Environment Memory'),
+      getSessionMemory: vi.fn().mockReturnValue('Mock Session Memory'),
+
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
+      } as unknown as Storage,
     };
 
     vi.mocked(getFolderStructure).mockResolvedValue('Mock Folder Structure');
   });
 
   afterEach(() => {
-    vi.useRealTimers();
     vi.resetAllMocks();
   });
 
@@ -106,15 +111,14 @@ describe('getEnvironmentContext', () => {
     expect(parts.length).toBe(1);
     const context = parts[0].text;
 
-    expect(context).toContain("Today's date is");
-    expect(context).toContain("(formatted according to the user's locale)");
-    expect(context).toContain(`My operating system is: ${process.platform}`);
+    expect(context).toContain('<session_context>');
+    expect(context).toContain('- **Workspace Directories:**');
+    expect(context).toContain('  - /test/dir');
     expect(context).toContain(
-      "I'm currently working in the directory: /test/dir",
+      '- **Directory Structure:**\n\nMock Folder Structure',
     );
-    expect(context).toContain(
-      'Here is the folder structure of the current working directories:\n\nMock Folder Structure',
-    );
+    expect(context).toContain('Mock Session Memory');
+    expect(context).toContain('</session_context>');
     expect(getFolderStructure).toHaveBeenCalledWith('/test/dir', {
       fileService: undefined,
     });
@@ -133,41 +137,56 @@ describe('getEnvironmentContext', () => {
     expect(parts.length).toBe(1);
     const context = parts[0].text;
 
+    expect(context).toContain('<session_context>');
+    expect(context).toContain('- **Workspace Directories:**');
+    expect(context).toContain('  - /test/dir1');
+    expect(context).toContain('  - /test/dir2');
     expect(context).toContain(
-      "I'm currently working in the following directories:\n  - /test/dir1\n  - /test/dir2",
+      '- **Directory Structure:**\n\nStructure 1\nStructure 2',
     );
-    expect(context).toContain(
-      'Here is the folder structure of the current working directories:\n\nStructure 1\nStructure 2',
-    );
+    expect(context).toContain('</session_context>');
     expect(getFolderStructure).toHaveBeenCalledTimes(2);
   });
 
-  it('should include full file context when getFullContext is true', async () => {
-    mockConfig.getFullContext = vi.fn().mockReturnValue(true);
-    const mockReadManyFilesTool = {
-      build: vi.fn().mockReturnValue({
-        execute: vi
-          .fn()
-          .mockResolvedValue({ llmContent: 'Full file content here' }),
-      }),
-    };
-    mockToolRegistry.getTool.mockReturnValue(mockReadManyFilesTool);
+  it('should omit directory structure when getIncludeDirectoryTree is false', async () => {
+    (vi.mocked(mockConfig.getIncludeDirectoryTree!) as Mock).mockReturnValue(
+      false,
+    );
 
     const parts = await getEnvironmentContext(mockConfig as Config);
 
-    expect(parts.length).toBe(2);
-    expect(parts[1].text).toBe(
-      '\n--- Full File Context ---\nFull file content here',
-    );
-    expect(mockToolRegistry.getTool).toHaveBeenCalledWith('read_many_files');
-    expect(mockReadManyFilesTool.build).toHaveBeenCalledWith({
-      paths: ['**/*'],
-      useDefaultExcludes: true,
-    });
+    expect(parts.length).toBe(1);
+    const context = parts[0].text;
+
+    expect(context).toContain('<session_context>');
+    expect(context).not.toContain('Directory Structure:');
+    expect(context).not.toContain('Mock Folder Structure');
+    expect(context).toContain('Mock Session Memory');
+    expect(context).toContain('</session_context>');
+    expect(getFolderStructure).not.toHaveBeenCalled();
+  });
+
+  it('should use session memory instead of environment memory', async () => {
+    (mockConfig as Record<string, unknown>)['getSessionMemory'] = vi
+      .fn()
+      .mockReturnValue(
+        '\n<loaded_context>\n<extension_context>\nExt Memory\n</extension_context>\n<project_context>\nProj Memory\n</project_context>\n</loaded_context>',
+      );
+
+    const parts = await getEnvironmentContext(mockConfig as Config);
+
+    const context = parts[0].text;
+    expect(context).not.toContain('Mock Environment Memory');
+    expect(mockConfig.getEnvironmentMemory).not.toHaveBeenCalled();
+    expect(context).toContain('<loaded_context>');
+    expect(context).toContain('<extension_context>');
+    expect(context).toContain('Ext Memory');
+    expect(context).toContain('<project_context>');
+    expect(context).toContain('Proj Memory');
+    expect(context).toContain('</loaded_context>');
   });
 
   it('should handle read_many_files returning no content', async () => {
-    mockConfig.getFullContext = vi.fn().mockReturnValue(true);
     const mockReadManyFilesTool = {
       build: vi.fn().mockReturnValue({
         execute: vi.fn().mockResolvedValue({ llmContent: '' }),
@@ -181,26 +200,10 @@ describe('getEnvironmentContext', () => {
   });
 
   it('should handle read_many_files tool not being found', async () => {
-    mockConfig.getFullContext = vi.fn().mockReturnValue(true);
     mockToolRegistry.getTool.mockReturnValue(null);
 
     const parts = await getEnvironmentContext(mockConfig as Config);
 
     expect(parts.length).toBe(1); // No extra part added
-  });
-
-  it('should handle errors when reading full file context', async () => {
-    mockConfig.getFullContext = vi.fn().mockReturnValue(true);
-    const mockReadManyFilesTool = {
-      build: vi.fn().mockReturnValue({
-        execute: vi.fn().mockRejectedValue(new Error('Read error')),
-      }),
-    };
-    mockToolRegistry.getTool.mockReturnValue(mockReadManyFilesTool);
-
-    const parts = await getEnvironmentContext(mockConfig as Config);
-
-    expect(parts.length).toBe(2);
-    expect(parts[1].text).toBe('\n--- Error reading full file context ---');
   });
 });

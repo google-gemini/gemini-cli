@@ -1,7 +1,7 @@
 This file contains third-party software notices and license terms.
 
 ============================================================
-@modelcontextprotocol/sdk@1.15.1
+@modelcontextprotocol/sdk@1.23.0
 (git+https://github.com/modelcontextprotocol/typescript-sdk.git)
 
 MIT License
@@ -28,7 +28,7 @@ SOFTWARE.
 
 
 ============================================================
-ajv@6.12.6
+ajv@6.14.0
 (https://github.com/ajv-validator/ajv.git)
 
 The MIT License (MIT)
@@ -177,6 +177,33 @@ NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
 LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+============================================================
+ajv-formats@3.0.1
+(git+https://github.com/ajv-validator/ajv-formats.git)
+
+MIT License
+
+Copyright (c) 2020 Evgeny Poberezkin
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 
 
 ============================================================
@@ -363,8 +390,8 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 
 ============================================================
-which@2.0.2
-(git://github.com/isaacs/node-which.git)
+which@5.0.0
+(git+https://github.com/npm/node-which.git)
 
 The ISC License
 
@@ -384,24 +411,64 @@ IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 
 ============================================================
-isexe@2.0.0
-(git+https://github.com/isaacs/isexe.git)
+isexe@3.1.5
+(No repository found)
 
-The ISC License
+# Blue Oak Model License
 
-Copyright (c) Isaac Z. Schlueter and Contributors
+Version 1.0.0
 
-Permission to use, copy, modify, and/or distribute this software for any
-purpose with or without fee is hereby granted, provided that the above
-copyright notice and this permission notice appear in all copies.
+## Purpose
 
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
-ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
-ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
-IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+This license gives everyone as much permission to work with
+this software as possible, while protecting contributors
+from liability.
+
+## Acceptance
+
+In order to receive this license, you must agree to its
+rules.  The rules of this license are both obligations
+under that agreement and conditions to your license.
+You must not do anything with this software that triggers
+a rule that you cannot or will not follow.
+
+## Copyright
+
+Each contributor licenses you to do everything with this
+software that would otherwise infringe that contributor's
+copyright in it.
+
+## Notices
+
+You must ensure that everyone who gets a copy of
+any part of this software from you, with or without
+changes, also gets the text of this license or a link to
+<https://blueoakcouncil.org/license/1.0.0>.
+
+## Excuse
+
+If anyone notifies you in writing that you have not
+complied with [Notices](#notices), you can keep your
+license by taking all practical steps to comply within 30
+days after the notice.  If you do not do so, your license
+ends immediately.
+
+## Patent
+
+Each contributor licenses you to do everything with this
+software that would otherwise infringe any patent claims
+they can license or become able to license.
+
+## Reliability
+
+No contributor can revoke this license.
+
+## No Liability
+
+***As far as the law allows, this software comes as is,
+without any warranty or condition, and no contributor
+will be liable to anyone for any damages related to this
+software or this license, under any kind of legal claim.***
 
 
 ============================================================
@@ -519,7 +586,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-mime-types@3.0.1
+mime-types@3.0.2
 (No repository found)
 
 (The MIT License)
@@ -607,7 +674,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-body-parser@2.2.0
+body-parser@2.2.2
 (No repository found)
 
 (The MIT License)
@@ -665,7 +732,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-debug@4.4.1
+debug@4.4.3
 (git://github.com/debug-js/debug.git)
 
 (The MIT License)
@@ -718,7 +785,7 @@ SOFTWARE.
 
 
 ============================================================
-http-errors@2.0.0
+http-errors@2.0.1
 (No repository found)
 
 
@@ -983,7 +1050,7 @@ THE SOFTWARE.
 
 
 ============================================================
-qs@6.14.0
+qs@6.14.2
 (https://github.com/ljharb/qs.git)
 
 BSD 3-Clause License
@@ -1503,7 +1570,7 @@ SOFTWARE.
 
 
 ============================================================
-raw-body@3.0.0
+raw-body@3.0.2
 (No repository found)
 
 The MIT License (MIT)
@@ -1616,7 +1683,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-content-disposition@1.0.0
+content-disposition@1.0.1
 (No repository found)
 
 (The MIT License)
@@ -1641,33 +1708,6 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
 CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-
-============================================================
-safe-buffer@5.2.1
-(git://github.com/feross/safe-buffer.git)
-
-The MIT License (MIT)
-
-Copyright (c) Feross Aboukhadijeh
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
 
 
 ============================================================
@@ -1815,7 +1855,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-finalhandler@2.1.0
+finalhandler@2.1.1
 (No repository found)
 
 (The MIT License)
@@ -2124,7 +2164,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 ============================================================
-path-to-regexp@8.2.0
+path-to-regexp@8.4.2
 (https://github.com/pillarjs/path-to-regexp.git)
 
 The MIT License (MIT)
@@ -2151,7 +2191,7 @@ THE SOFTWARE.
 
 
 ============================================================
-send@1.2.0
+send@1.2.1
 (No repository found)
 
 (The MIT License)
@@ -2180,7 +2220,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-serve-static@2.2.0
+serve-static@2.2.1
 (No repository found)
 
 (The MIT License)
@@ -2291,7 +2331,7 @@ SOFTWARE.
 
 
 ============================================================
-zod-to-json-schema@3.24.6
+zod-to-json-schema@3.25.1
 (https://github.com/StefanTerdell/zod-to-json-schema)
 
 ISC License

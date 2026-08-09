@@ -9,63 +9,71 @@ import {
   type SlashCommand,
   CommandKind,
 } from './types.js';
-import { MessageType } from '../types.js';
+import { MessageType, type HistoryItemToolsList } from '../types.js';
+
+async function listTools(
+  context: CommandContext,
+  showDescriptions: boolean,
+): Promise<void> {
+  const toolRegistry = context.services.agentContext?.toolRegistry;
+  if (!toolRegistry) {
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: 'Could not retrieve tool registry.',
+    });
+    return;
+  }
+
+  const tools = toolRegistry.getAllTools();
+  // Filter out MCP tools by checking for the absence of a serverName property
+  const geminiTools = tools.filter((tool) => !('serverName' in tool));
+
+  const toolsListItem: HistoryItemToolsList = {
+    type: MessageType.TOOLS_LIST,
+    tools: geminiTools.map((tool) => ({
+      name: tool.name,
+      displayName: tool.displayName,
+      description: tool.description,
+    })),
+    showDescriptions,
+  };
+
+  context.ui.addItem(toolsListItem);
+}
+
+const listSubCommand: SlashCommand = {
+  name: 'list',
+  description: 'List available Gemini CLI tools.',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: true,
+  action: async (context: CommandContext): Promise<void> =>
+    listTools(context, false),
+};
+
+const descSubCommand: SlashCommand = {
+  name: 'desc',
+  altNames: ['descriptions'],
+  description: 'List available Gemini CLI tools with descriptions.',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: true,
+  action: async (context: CommandContext): Promise<void> =>
+    listTools(context, true),
+};
 
 export const toolsCommand: SlashCommand = {
   name: 'tools',
-  description: 'list available Gemini CLI tools. Usage: /tools [desc]',
+  description:
+    'List available Gemini CLI tools. Use /tools desc to include descriptions.',
   kind: CommandKind.BUILT_IN,
+  autoExecute: false,
+  subCommands: [listSubCommand, descSubCommand],
   action: async (context: CommandContext, args?: string): Promise<void> => {
     const subCommand = args?.trim();
 
-    // Default to NOT showing descriptions. The user must opt in with an argument.
-    let useShowDescriptions = false;
-    if (subCommand === 'desc' || subCommand === 'descriptions') {
-      useShowDescriptions = true;
-    }
+    // Keep backward compatibility for typed arguments while exposing subcommands in TUI.
+    const useShowDescriptions =
+      subCommand === 'desc' || subCommand === 'descriptions';
 
-    const toolRegistry = context.services.config?.getToolRegistry();
-    if (!toolRegistry) {
-      context.ui.addItem(
-        {
-          type: MessageType.ERROR,
-          text: 'Could not retrieve tool registry.',
-        },
-        Date.now(),
-      );
-      return;
-    }
-
-    const tools = toolRegistry.getAllTools();
-    // Filter out MCP tools by checking for the absence of a serverName property
-    const geminiTools = tools.filter((tool) => !('serverName' in tool));
-
-    let message = 'Available Gemini CLI tools:\n\n';
-
-    if (geminiTools.length > 0) {
-      geminiTools.forEach((tool) => {
-        if (useShowDescriptions && tool.description) {
-          message += `  - \u001b[36m${tool.displayName} (${tool.name})\u001b[0m:\n`;
-
-          const greenColor = '\u001b[32m';
-          const resetColor = '\u001b[0m';
-
-          // Handle multi-line descriptions
-          const descLines = tool.description.trim().split('\n');
-          for (const descLine of descLines) {
-            message += `      ${greenColor}${descLine}${resetColor}\n`;
-          }
-        } else {
-          message += `  - \u001b[36m${tool.displayName}\u001b[0m\n`;
-        }
-      });
-    } else {
-      message += '  No tools available\n';
-    }
-    message += '\n';
-
-    message += '\u001b[0m';
-
-    context.ui.addItem({ type: MessageType.INFO, text: message }, Date.now());
+    await listTools(context, useShowDescriptions);
   },
 };

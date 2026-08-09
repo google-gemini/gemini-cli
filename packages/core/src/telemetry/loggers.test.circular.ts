@@ -12,16 +12,18 @@ import { describe, it, expect } from 'vitest';
 import { logToolCall } from './loggers.js';
 import { ToolCallEvent } from './types.js';
 import type { Config } from '../config/config.js';
-import type { CompletedToolCall } from '../core/coreToolScheduler.js';
-import type {
-  ToolCallRequestInfo,
-  ToolCallResponseInfo,
-} from '../core/turn.js';
-import { MockTool } from '../test-utils/tools.js';
+import {
+  CoreToolCallStatus,
+  type ToolCallRequestInfo,
+  type ToolCallResponseInfo,
+  type CompletedToolCall,
+} from '../scheduler/types.js';
+import { MockTool } from '../test-utils/mock-tool.js';
 
 describe('Circular Reference Handling', () => {
   it('should handle circular references in tool function arguments', () => {
     // Create a mock config
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const mockConfig = {
       getTelemetryEnabled: () => true,
       getUsageStatisticsEnabled: () => true,
@@ -37,8 +39,10 @@ describe('Circular Reference Handling', () => {
       sockets: {},
       agent: null,
     };
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     circularObject.agent = circularObject; // Create circular reference
     circularObject.sockets['test-host'] = [
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       { _httpMessage: { agent: circularObject } },
     ];
 
@@ -46,6 +50,7 @@ describe('Circular Reference Handling', () => {
     const mockRequest: ToolCallRequestInfo = {
       callId: 'test-call-id',
       name: 'ReadFile',
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       args: circularObject, // This would cause the original error
       isClientInitiated: false,
       prompt_id: 'test-prompt-id',
@@ -59,9 +64,9 @@ describe('Circular Reference Handling', () => {
       errorType: undefined,
     };
 
-    const tool = new MockTool('mock-tool');
+    const tool = new MockTool({ name: 'mock-tool' });
     const mockCompletedToolCall: CompletedToolCall = {
-      status: 'success',
+      status: CoreToolCallStatus.Success,
       request: mockRequest,
       response: mockResponse,
       tool,
@@ -69,7 +74,6 @@ describe('Circular Reference Handling', () => {
       durationMs: 100,
     };
 
-    // Create a tool call event with circular references in function_args
     const event = new ToolCallEvent(mockCompletedToolCall);
 
     // This should not throw an error
@@ -79,6 +83,7 @@ describe('Circular Reference Handling', () => {
   });
 
   it('should handle normal objects without circular references', () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const mockConfig = {
       getTelemetryEnabled: () => true,
       getUsageStatisticsEnabled: () => true,
@@ -109,9 +114,9 @@ describe('Circular Reference Handling', () => {
       errorType: undefined,
     };
 
-    const tool = new MockTool('mock-tool');
+    const tool = new MockTool({ name: 'mock-tool' });
     const mockCompletedToolCall: CompletedToolCall = {
-      status: 'success',
+      status: CoreToolCallStatus.Success,
       request: mockRequest,
       response: mockResponse,
       tool,

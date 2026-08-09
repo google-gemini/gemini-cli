@@ -46,15 +46,19 @@ describe('createMockCommandContext', () => {
 
     const overrides = {
       services: {
-        config: mockConfig,
+        agentContext: { config: mockConfig },
       },
     };
 
     const context = createMockCommandContext(overrides);
 
-    expect(context.services.config).toBeDefined();
-    expect(context.services.config?.getModel()).toBe('gemini-pro');
-    expect(context.services.config?.getProjectRoot()).toBe('/test/project');
+    expect(context.services.agentContext).toBeDefined();
+    expect(context.services.agentContext?.config?.getModel()).toBe(
+      'gemini-pro',
+    );
+    expect(context.services.agentContext?.config?.getProjectRoot()).toBe(
+      '/test/project',
+    );
 
     // Verify a default property on the same nested object is still there
     expect(context.services.logger).toBeDefined();

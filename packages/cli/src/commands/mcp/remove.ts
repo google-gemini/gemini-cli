@@ -7,6 +7,8 @@
 // File for 'gemini mcp remove' command
 import type { CommandModule } from 'yargs';
 import { loadSettings, SettingScope } from '../../config/settings.js';
+import { debugLogger } from '@google/gemini-cli-core';
+import { exitCli } from '../utils.js';
 
 async function removeMcpServer(
   name: string,
@@ -17,13 +19,13 @@ async function removeMcpServer(
   const { scope } = options;
   const settingsScope =
     scope === 'user' ? SettingScope.User : SettingScope.Workspace;
-  const settings = loadSettings(process.cwd());
+  const settings = loadSettings();
 
   const existingSettings = settings.forScope(settingsScope).settings;
   const mcpServers = existingSettings.mcpServers || {};
 
   if (!mcpServers[name]) {
-    console.log(`Server "${name}" not found in ${scope} settings.`);
+    debugLogger.log(`Server "${name}" not found in ${scope} settings.`);
     return;
   }
 
@@ -31,7 +33,7 @@ async function removeMcpServer(
 
   settings.setValue(settingsScope, 'mcpServers', mcpServers);
 
-  console.log(`Server "${name}" removed from ${scope} settings.`);
+  debugLogger.log(`Server "${name}" removed from ${scope} settings.`);
 }
 
 export const removeCommand: CommandModule = {
@@ -53,8 +55,11 @@ export const removeCommand: CommandModule = {
         choices: ['user', 'project'],
       }),
   handler: async (argv) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     await removeMcpServer(argv['name'] as string, {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       scope: argv['scope'] as string,
     });
+    await exitCli();
   },
 };

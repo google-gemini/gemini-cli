@@ -40,6 +40,12 @@ export async function readPathFromWorkspace(
     const searchDirs = workspace.getDirectories();
     for (const dir of searchDirs) {
       const potentialPath = path.resolve(dir, pathStr);
+
+      // Security check: ensure the resolved path is actually within the workspace.
+      if (!workspace.isPathWithinWorkspace(potentialPath)) {
+        continue;
+      }
+
       try {
         await fs.access(potentialPath);
         absolutePath = potentialPath;
@@ -73,14 +79,23 @@ export async function readPathFromWorkspace(
       path.relative(config.getTargetDir(), p),
     );
     const filteredFiles = fileService.filterFiles(relativeFiles, {
-      respectGitIgnore: true,
-      respectGeminiIgnore: true,
+      respectGitIgnore: config.getFileFilteringRespectGitIgnore(),
+      respectGeminiIgnore: config.getFileFilteringRespectGeminiIgnore(),
     });
     const finalFiles = filteredFiles.map((p) =>
       path.resolve(config.getTargetDir(), p),
     );
 
     for (const filePath of finalFiles) {
+      // Defense in depth: validate each file found within the directory.
+      if (!workspace.isPathWithinWorkspace(filePath)) {
+        const relativePathForDisplay = path.relative(absolutePath, filePath);
+        allParts.push({
+          text: `--- Skipped ${relativePathForDisplay}: traverses outside workspace ---\n\n`,
+        });
+        continue;
+      }
+
       const relativePathForDisplay = path.relative(absolutePath, filePath);
       allParts.push({ text: `--- ${relativePathForDisplay} ---\n` });
       const result = await processSingleFileContent(
@@ -98,8 +113,8 @@ export async function readPathFromWorkspace(
     // It's a single file, check if it's ignored.
     const relativePath = path.relative(config.getTargetDir(), absolutePath);
     const filtered = fileService.filterFiles([relativePath], {
-      respectGitIgnore: true,
-      respectGeminiIgnore: true,
+      respectGitIgnore: config.getFileFilteringRespectGitIgnore(),
+      respectGeminiIgnore: config.getFileFilteringRespectGeminiIgnore(),
     });
 
     if (filtered.length === 0) {

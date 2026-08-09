@@ -6,6 +6,13 @@
 
 import { vi, describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { readStdin } from './readStdin.js';
+import { debugLogger } from '@google/gemini-cli-core';
+
+vi.mock('@google/gemini-cli-core', () => ({
+  debugLogger: {
+    warn: vi.fn(),
+  },
+}));
 
 // Mock process.stdin
 const mockStdin = {
@@ -14,12 +21,15 @@ const mockStdin = {
   on: vi.fn(),
   removeListener: vi.fn(),
   destroy: vi.fn(),
+  listeners: vi.fn().mockReturnValue([]),
+  listenerCount: vi.fn().mockReturnValue(0),
 };
 
 describe('readStdin', () => {
   let originalStdin: typeof process.stdin;
   let onReadableHandler: () => void;
   let onEndHandler: () => void;
+  let onErrorHandler: (err: Error) => void;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -33,10 +43,15 @@ describe('readStdin', () => {
     });
 
     // Capture event handlers
-    mockStdin.on.mockImplementation((event: string, handler: () => void) => {
-      if (event === 'readable') onReadableHandler = handler;
-      if (event === 'end') onEndHandler = handler;
-    });
+    mockStdin.on.mockImplementation(
+      (event: string, handler: (...args: unknown[]) => void) => {
+        if (event === 'readable') onReadableHandler = handler as () => void;
+        if (event === 'end') onEndHandler = handler as () => void;
+        if (event === 'error') onErrorHandler = handler as (err: Error) => void;
+      },
+    );
+    mockStdin.listeners.mockReturnValue([]);
+    mockStdin.listenerCount.mockReturnValue(0);
   });
 
   afterEach(() => {
@@ -108,5 +123,70 @@ describe('readStdin', () => {
     onEndHandler();
 
     await expect(promise).resolves.toBe('chunk1chunk2');
+  });
+
+  it('should truncate input if it exceeds MAX_STDIN_SIZE', async () => {
+    const MAX_STDIN_SIZE = 8 * 1024 * 1024;
+    const largeChunk = 'a'.repeat(MAX_STDIN_SIZE + 100);
+    mockStdin.read.mockReturnValueOnce(largeChunk).mockReturnValueOnce(null);
+
+    const promise = readStdin();
+    onReadableHandler();
+
+    await expect(promise).resolves.toBe('a'.repeat(MAX_STDIN_SIZE));
+    expect(debugLogger.warn).toHaveBeenCalledWith(
+      `Warning: stdin input truncated to ${MAX_STDIN_SIZE} bytes.`,
+    );
+    expect(mockStdin.destroy).toHaveBeenCalled();
+  });
+
+  it('should truncate multi-byte characters at byte boundary', async () => {
+    const MAX_STDIN_SIZE = 8 * 1024 * 1024;
+    // '한' is 3 bytes. 2,796,202 * 3 = 8,388,606 bytes.
+    // 2,796,203 * 3 = 8,388,609 bytes.
+    const charCount = Math.floor(MAX_STDIN_SIZE / 3) + 1;
+    const multiByteChunk = '한'.repeat(charCount);
+
+    mockStdin.read
+      .mockReturnValueOnce(multiByteChunk)
+      .mockReturnValueOnce(null);
+
+    const promise = readStdin();
+    onReadableHandler();
+
+    const result = await promise;
+    const resultBytes = Buffer.byteLength(result, 'utf8');
+
+    expect(resultBytes).toBeLessThanOrEqual(MAX_STDIN_SIZE);
+    expect(resultBytes).toBe(Math.floor(MAX_STDIN_SIZE / 3) * 3);
+    expect(result).not.toContain('\uFFFD'); // No replacement characters
+  });
+
+  it('should use byte length instead of string length for limit', async () => {
+    const MAX_STDIN_SIZE = 8 * 1024 * 1024;
+    // '한' is 3 bytes. If we use string length, we'd allow 8M characters = 24MB.
+    // We want to ensure it stops at 8MB.
+    const charCount = MAX_STDIN_SIZE; // 8M characters = 24MB
+    const multiByteChunk = '한'.repeat(charCount);
+
+    mockStdin.read
+      .mockReturnValueOnce(multiByteChunk)
+      .mockReturnValueOnce(null);
+
+    const promise = readStdin();
+    onReadableHandler();
+
+    const result = await promise;
+    expect(Buffer.byteLength(result, 'utf8')).toBeLessThanOrEqual(
+      MAX_STDIN_SIZE,
+    );
+    expect(result.length).toBeLessThan(charCount);
+  });
+
+  it('should handle stdin error', async () => {
+    const promise = readStdin();
+    const error = new Error('stdin error');
+    onErrorHandler(error);
+    await expect(promise).rejects.toThrow('stdin error');
   });
 });

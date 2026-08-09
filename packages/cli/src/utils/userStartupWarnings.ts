@@ -5,29 +5,56 @@
  */
 
 import fs from 'node:fs/promises';
-import * as os from 'node:os';
+import { homedir as osHomedir } from 'node:os';
 import path from 'node:path';
+import process from 'node:process';
+import {
+  getCompatibilityWarnings,
+  WarningPriority,
+  type StartupWarning,
+  isHeadlessMode,
+  FatalUntrustedWorkspaceError,
+} from '@google/gemini-cli-core';
+import type { Settings } from '../config/settingsSchema.js';
+import {
+  isFolderTrustEnabled,
+  isWorkspaceTrusted,
+} from '../config/trustedFolders.js';
 
 type WarningCheck = {
   id: string;
-  check: (workspaceRoot: string) => Promise<string | null>;
+  check: (workspaceRoot: string, settings: Settings) => Promise<string | null>;
+  priority: WarningPriority;
 };
 
 // Individual warning checks
 const homeDirectoryCheck: WarningCheck = {
   id: 'home-directory',
-  check: async (workspaceRoot: string) => {
+  priority: WarningPriority.Low,
+  check: async (workspaceRoot: string, settings: Settings) => {
+    if (settings.ui?.showHomeDirectoryWarning === false) {
+      return null;
+    }
+
     try {
       const [workspaceRealPath, homeRealPath] = await Promise.all([
         fs.realpath(workspaceRoot),
-        fs.realpath(os.homedir()),
+        fs.realpath(osHomedir()),
       ]);
 
-      if (workspaceRealPath === homeRealPath) {
-        return 'You are running Gemini CLI in your home directory. It is recommended to run in a project-specific directory.';
+      if (path.resolve(workspaceRealPath) === path.resolve(homeRealPath)) {
+        // If folder trust is enabled and the user trusts the home directory, don't show the warning.
+        if (
+          isFolderTrustEnabled(settings) &&
+          isWorkspaceTrusted(settings).isTrusted
+        ) {
+          return null;
+        }
+
+        return 'Warning you are running Gemini CLI in your home directory.\nThis warning can be disabled in /settings';
       }
       return null;
-    } catch (_err: unknown) {
+    } catch {
       return 'Could not verify the current directory due to a file system error.';
     }
   },
@@ -35,7 +62,8 @@ const homeDirectoryCheck: WarningCheck = {
 
 const rootDirectoryCheck: WarningCheck = {
   id: 'root-directory',
-  check: async (workspaceRoot: string) => {
+  priority: WarningPriority.High,
+  check: async (workspaceRoot: string, _settings: Settings) => {
     try {
       const workspaceRealPath = await fs.realpath(workspaceRoot);
       const errorMessage =
@@ -47,9 +75,34 @@ const rootDirectoryCheck: WarningCheck = {
       }
 
       return null;
-    } catch (_err: unknown) {
+    } catch {
       return 'Could not verify the current directory due to a file system error.';
     }
+  },
+};
+
+const folderTrustCheck: WarningCheck = {
+  id: 'folder-trust',
+  priority: WarningPriority.High,
+  check: async (workspaceRoot: string, settings: Settings) => {
+    if (!isFolderTrustEnabled(settings)) {
+      return null;
+    }
+
+    const { isTrusted } = isWorkspaceTrusted(settings, workspaceRoot);
+    if (isTrusted === true) {
+      return null;
+    }
+
+    if (isHeadlessMode()) {
+      throw new FatalUntrustedWorkspaceError(
+        'Gemini CLI is not running in a trusted directory. To proceed, either use `--skip-trust`, ' +
+          'set the `GEMINI_CLI_TRUST_WORKSPACE=true` environment variable, or trust this directory in interactive mode. ' +
+          'For more details, see https://geminicli.com/docs/cli/trusted-folders/#headless-and-automated-environments',
+      );
+    }
+
+    return null;
   },
 };
 
@@ -57,13 +110,36 @@ const rootDirectoryCheck: WarningCheck = {
 const WARNING_CHECKS: readonly WarningCheck[] = [
   homeDirectoryCheck,
   rootDirectoryCheck,
+  folderTrustCheck,
 ];
 
 export async function getUserStartupWarnings(
-  workspaceRoot: string,
-): Promise<string[]> {
+  settings: Settings,
+  workspaceRoot: string = process.cwd(),
+  options?: { isAlternateBuffer?: boolean },
+): Promise<StartupWarning[]> {
   const results = await Promise.all(
-    WARNING_CHECKS.map((check) => check.check(workspaceRoot)),
+    WARNING_CHECKS.map(async (check) => {
+      const message = await check.check(workspaceRoot, settings);
+      if (message) {
+        return {
+          id: check.id,
+          message,
+          priority: check.priority,
+        };
+      }
+      return null;
+    }),
   );
-  return results.filter((msg) => msg !== null);
+  const warnings = results.filter((w): w is StartupWarning => w !== null);
+
+  if (settings.ui?.showCompatibilityWarnings !== false) {
+    warnings.push(
+      ...getCompatibilityWarnings({
+        isAlternateBuffer: options?.isAlternateBuffer,
+      }),
+    );
+  }
+
+  return warnings;
 }

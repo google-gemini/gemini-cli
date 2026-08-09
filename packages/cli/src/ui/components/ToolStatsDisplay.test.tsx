@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
 import { describe, it, expect, vi } from 'vitest';
 import { ToolStatsDisplay } from './ToolStatsDisplay.js';
 import * as SessionContext from '../contexts/SessionContext.js';
-import type { SessionMetrics } from '../contexts/SessionContext.js';
+import { type SessionMetrics } from '../contexts/SessionContext.js';
+import { ToolCallDecision } from '@google/gemini-cli-core';
 
 // Mock the context to provide controlled data for testing
 vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
@@ -21,9 +22,10 @@ vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
 
 const useSessionStatsMock = vi.mocked(SessionContext.useSessionStats);
 
-const renderWithMockedStats = (metrics: SessionMetrics) => {
+const renderWithMockedStats = async (metrics: SessionMetrics) => {
   useSessionStatsMock.mockReturnValue({
     stats: {
+      sessionId: 'test-session-id',
       sessionStartTime: new Date(),
       metrics,
       lastPromptTokenCount: 0,
@@ -34,20 +36,30 @@ const renderWithMockedStats = (metrics: SessionMetrics) => {
     startNewPrompt: vi.fn(),
   });
 
-  return render(<ToolStatsDisplay />);
+  const result = await render(<ToolStatsDisplay />);
+  return result;
 };
 
 describe('<ToolStatsDisplay />', () => {
-  it('should render "no tool calls" message when there are no active tools', () => {
-    const { lastFrame } = renderWithMockedStats({
+  it('should render "no tool calls" message when there are no active tools', async () => {
+    const { lastFrame, unmount } = await renderWithMockedStats({
       models: {},
       tools: {
         totalCalls: 0,
         totalSuccess: 0,
         totalFail: 0,
         totalDurationMs: 0,
-        totalDecisions: { accept: 0, reject: 0, modify: 0 },
+        totalDecisions: {
+          accept: 0,
+          reject: 0,
+          modify: 0,
+          [ToolCallDecision.AUTO_ACCEPT]: 0,
+        },
         byName: {},
+      },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
       },
     });
 
@@ -55,59 +67,94 @@ describe('<ToolStatsDisplay />', () => {
       'No tool calls have been made in this session.',
     );
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
-  it('should display stats for a single tool correctly', () => {
-    const { lastFrame } = renderWithMockedStats({
+  it('should display stats for a single tool correctly', async () => {
+    const { lastFrame, unmount } = await renderWithMockedStats({
       models: {},
       tools: {
         totalCalls: 1,
         totalSuccess: 1,
         totalFail: 0,
         totalDurationMs: 100,
-        totalDecisions: { accept: 1, reject: 0, modify: 0 },
+        totalDecisions: {
+          accept: 1,
+          reject: 0,
+          modify: 0,
+          [ToolCallDecision.AUTO_ACCEPT]: 0,
+        },
         byName: {
           'test-tool': {
             count: 1,
             success: 1,
             fail: 0,
             durationMs: 100,
-            decisions: { accept: 1, reject: 0, modify: 0 },
+            decisions: {
+              accept: 1,
+              reject: 0,
+              modify: 0,
+              [ToolCallDecision.AUTO_ACCEPT]: 0,
+            },
           },
         },
+      },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
       },
     });
 
     const output = lastFrame();
     expect(output).toContain('test-tool');
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
-  it('should display stats for multiple tools correctly', () => {
-    const { lastFrame } = renderWithMockedStats({
+  it('should display stats for multiple tools correctly', async () => {
+    const { lastFrame, unmount } = await renderWithMockedStats({
       models: {},
       tools: {
         totalCalls: 3,
         totalSuccess: 2,
         totalFail: 1,
         totalDurationMs: 300,
-        totalDecisions: { accept: 1, reject: 1, modify: 1 },
+        totalDecisions: {
+          accept: 1,
+          reject: 1,
+          modify: 1,
+          [ToolCallDecision.AUTO_ACCEPT]: 0,
+        },
         byName: {
           'tool-a': {
             count: 2,
             success: 1,
             fail: 1,
             durationMs: 200,
-            decisions: { accept: 1, reject: 1, modify: 0 },
+            decisions: {
+              accept: 1,
+              reject: 1,
+              modify: 0,
+              [ToolCallDecision.AUTO_ACCEPT]: 0,
+            },
           },
           'tool-b': {
             count: 1,
             success: 1,
             fail: 0,
             durationMs: 100,
-            decisions: { accept: 0, reject: 0, modify: 1 },
+            decisions: {
+              accept: 0,
+              reject: 0,
+              modify: 1,
+              [ToolCallDecision.AUTO_ACCEPT]: 0,
+            },
           },
         },
+      },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
       },
     });
 
@@ -115,10 +162,11 @@ describe('<ToolStatsDisplay />', () => {
     expect(output).toContain('tool-a');
     expect(output).toContain('tool-b');
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
-  it('should handle large values without wrapping or overlapping', () => {
-    const { lastFrame } = renderWithMockedStats({
+  it('should handle large values without wrapping or overlapping', async () => {
+    const { lastFrame, unmount } = await renderWithMockedStats({
       models: {},
       tools: {
         totalCalls: 999999999,
@@ -129,6 +177,7 @@ describe('<ToolStatsDisplay />', () => {
           accept: 123456789,
           reject: 98765432,
           modify: 12345,
+          [ToolCallDecision.AUTO_ACCEPT]: 0,
         },
         byName: {
           'long-named-tool-for-testing-wrapping-and-such': {
@@ -140,33 +189,53 @@ describe('<ToolStatsDisplay />', () => {
               accept: 123456789,
               reject: 98765432,
               modify: 12345,
+              [ToolCallDecision.AUTO_ACCEPT]: 0,
             },
           },
         },
       },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
+      },
     });
 
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
-  it('should handle zero decisions gracefully', () => {
-    const { lastFrame } = renderWithMockedStats({
+  it('should handle zero decisions gracefully', async () => {
+    const { lastFrame, unmount } = await renderWithMockedStats({
       models: {},
       tools: {
         totalCalls: 1,
         totalSuccess: 1,
         totalFail: 0,
         totalDurationMs: 100,
-        totalDecisions: { accept: 0, reject: 0, modify: 0 },
+        totalDecisions: {
+          accept: 0,
+          reject: 0,
+          modify: 0,
+          [ToolCallDecision.AUTO_ACCEPT]: 0,
+        },
         byName: {
           'test-tool': {
             count: 1,
             success: 1,
             fail: 0,
             durationMs: 100,
-            decisions: { accept: 0, reject: 0, modify: 0 },
+            decisions: {
+              accept: 0,
+              reject: 0,
+              modify: 0,
+              [ToolCallDecision.AUTO_ACCEPT]: 0,
+            },
           },
         },
+      },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
       },
     });
 
@@ -176,5 +245,6 @@ describe('<ToolStatsDisplay />', () => {
     expect(output).toContain('Overall Agreement Rate:');
     expect(output).toContain('--');
     expect(output).toMatchSnapshot();
+    unmount();
   });
 });

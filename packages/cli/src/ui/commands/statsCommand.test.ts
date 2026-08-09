@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -10,6 +10,19 @@ import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { MessageType } from '../types.js';
 import { formatDuration } from '../utils/formatters.js';
+import type { Config } from '@google/gemini-cli-core';
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    UserAccountManager: vi.fn().mockImplementation(() => ({
+      getCachedGoogleAccount: vi.fn().mockReturnValue('mock@example.com'),
+    })),
+    getG1CreditBalance: vi.fn().mockReturnValue(undefined),
+  };
+});
 
 describe('statsCommand', () => {
   let mockContext: CommandContext;
@@ -27,20 +40,75 @@ describe('statsCommand', () => {
     mockContext.session.stats.sessionStartTime = startTime;
   });
 
-  it('should display general session stats when run with no subcommand', () => {
+  it('should display general session stats when run with no subcommand', async () => {
     if (!statsCommand.action) throw new Error('Command has no action');
 
-    statsCommand.action(mockContext, '');
+    mockContext.services.agentContext = {
+      refreshUserQuota: vi.fn(),
+      refreshAvailableCredits: vi.fn(),
+      getUserTierName: vi.fn(),
+      getUserPaidTier: vi.fn(),
+      getModel: vi.fn(),
+      get config() {
+        return this;
+      },
+    } as unknown as Config;
+
+    await statsCommand.action(mockContext, '');
 
     const expectedDuration = formatDuration(
       endTime.getTime() - startTime.getTime(),
     );
-    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-      {
-        type: MessageType.STATS,
-        duration: expectedDuration,
+    expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+      type: MessageType.STATS,
+      duration: expectedDuration,
+      selectedAuthType: '',
+      tier: undefined,
+      userEmail: 'mock@example.com',
+      currentModel: undefined,
+      creditBalance: undefined,
+    });
+  });
+
+  it('should fetch and display quota if config is available', async () => {
+    if (!statsCommand.action) throw new Error('Command has no action');
+
+    const mockQuota = { buckets: [] };
+    const mockRefreshUserQuota = vi.fn().mockResolvedValue(mockQuota);
+    const mockGetUserTierName = vi.fn().mockReturnValue('Basic');
+    const mockGetModel = vi.fn().mockReturnValue('gemini-pro');
+    const mockGetQuotaRemaining = vi.fn().mockReturnValue(85);
+    const mockGetQuotaLimit = vi.fn().mockReturnValue(100);
+    const mockGetQuotaResetTime = vi
+      .fn()
+      .mockReturnValue('2025-01-01T12:00:00Z');
+
+    mockContext.services.agentContext = {
+      refreshUserQuota: mockRefreshUserQuota,
+      getUserTierName: mockGetUserTierName,
+      getModel: mockGetModel,
+      getQuotaRemaining: mockGetQuotaRemaining,
+      getQuotaLimit: mockGetQuotaLimit,
+      getQuotaResetTime: mockGetQuotaResetTime,
+      getUserPaidTier: vi.fn(),
+      refreshAvailableCredits: vi.fn(),
+      get config() {
+        return this;
       },
-      expect.any(Number),
+    } as unknown as Config;
+
+    await statsCommand.action(mockContext, '');
+
+    expect(mockRefreshUserQuota).toHaveBeenCalled();
+    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        quotas: mockQuota,
+        tier: 'Basic',
+        currentModel: 'gemini-pro',
+        pooledRemaining: 85,
+        pooledLimit: 100,
+        pooledResetTime: '2025-01-01T12:00:00Z',
+      }),
     );
   });
 
@@ -50,14 +118,18 @@ describe('statsCommand', () => {
     );
     if (!modelSubCommand?.action) throw new Error('Subcommand has no action');
 
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     modelSubCommand.action(mockContext, '');
 
-    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-      {
-        type: MessageType.MODEL_STATS,
-      },
-      expect.any(Number),
-    );
+    expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+      type: MessageType.MODEL_STATS,
+      selectedAuthType: '',
+      tier: undefined,
+      userEmail: 'mock@example.com',
+      currentModel: undefined,
+      pooledRemaining: undefined,
+      pooledLimit: undefined,
+    });
   });
 
   it('should display tool stats when using the "tools" subcommand', () => {
@@ -66,13 +138,11 @@ describe('statsCommand', () => {
     );
     if (!toolsSubCommand?.action) throw new Error('Subcommand has no action');
 
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     toolsSubCommand.action(mockContext, '');
 
-    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-      {
-        type: MessageType.TOOL_STATS,
-      },
-      expect.any(Number),
-    );
+    expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+      type: MessageType.TOOL_STATS,
+    });
   });
 });

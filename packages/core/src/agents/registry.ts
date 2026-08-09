@@ -1,0 +1,761 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import * as crypto from 'node:crypto';
+import { Storage } from '../config/storage.js';
+import { CoreEvent, coreEvents } from '../utils/events.js';
+import type { AgentOverride, Config } from '../config/config.js';
+import {
+  type AgentDefinition,
+  type LocalAgentDefinition,
+  type AgentReloadSummary,
+} from './types.js';
+import { getAgentCardLoadOptions, getRemoteAgentTargetUrl } from './types.js';
+import { loadAgentsFromDirectory } from './agentLoader.js';
+import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
+import { CliHelpAgent } from './cli-help-agent.js';
+import { GeneralistAgent } from './generalist-agent.js';
+import { BrowserAgentDefinition } from './browser/browserAgentDefinition.js';
+import { AgentTool } from './agent-tool.js';
+import { A2AAuthProviderFactory } from './auth-provider/factory.js';
+import type { AuthenticationHandler } from '@a2a-js/sdk/client';
+import { type z } from 'zod';
+import { debugLogger } from '../utils/debugLogger.js';
+import { isAutoModel } from '../config/models.js';
+import {
+  type ModelConfig,
+  ModelConfigService,
+} from '../services/modelConfigService.js';
+import { PolicyDecision, PRIORITY_SUBAGENT_TOOL } from '../policy/types.js';
+import { A2AAgentError, AgentAuthConfigMissingError } from './a2a-errors.js';
+
+/**
+ * Returns the model config alias for a given agent definition.
+ */
+export function getModelConfigAlias<TOutput extends z.ZodTypeAny>(
+  definition: AgentDefinition<TOutput>,
+): string {
+  return `${definition.name}-config`;
+}
+
+export const DYNAMIC_RULE_SOURCE = 'AgentRegistry (Dynamic)';
+
+/**
+ * Manages the discovery, loading, validation, and registration of
+ * AgentDefinitions.
+ */
+export class AgentRegistry {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private readonly agents = new Map<string, AgentDefinition<any>>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private readonly allDefinitions = new Map<string, AgentDefinition<any>>();
+
+  private initialized = false;
+
+  constructor(private readonly config: Config) {}
+
+  /**
+   * Discovers and loads agents.
+   */
+  async initialize(): Promise<void> {
+    if (this.initialized) {
+      await this.loadAgents();
+      return;
+    }
+    this.initialized = true;
+
+    coreEvents.on(CoreEvent.ModelChanged, this.onModelChanged);
+
+    await this.loadAgents();
+  }
+
+  private onModelChanged = () => {
+    this.refreshAgents('local').catch((e) => {
+      debugLogger.error(
+        '[AgentRegistry] Failed to refresh agents on model change:',
+        e,
+      );
+    });
+  };
+
+  /**
+   * Clears the current registry and re-scans for agents.
+   */
+  async reload(): Promise<AgentReloadSummary> {
+    const previousAgents = new Map(this.agents);
+    const reloadErrors: string[] = [];
+
+    this.config.getA2AClientManager()?.clearCache();
+    await this.config.reloadAgents();
+    await this.loadAgents(reloadErrors);
+
+    const currentAgents = Array.from(this.agents.values());
+    const newAgents: string[] = [];
+    const updatedAgents: string[] = [];
+    const deletedAgents: string[] = [];
+    let localCount = 0;
+    let remoteCount = 0;
+
+    for (const agent of currentAgents) {
+      if (agent.kind === 'local') {
+        localCount++;
+      } else if (agent.kind === 'remote') {
+        remoteCount++;
+      }
+
+      const prev = previousAgents.get(agent.name);
+      if (!prev) {
+        newAgents.push(agent.name);
+      } else if (agent.metadata?.hash !== prev.metadata?.hash) {
+        updatedAgents.push(agent.name);
+      }
+    }
+
+    for (const prevName of previousAgents.keys()) {
+      if (!this.agents.has(prevName)) {
+        deletedAgents.push(prevName);
+      }
+    }
+
+    coreEvents.emitAgentsRefreshed();
+
+    return {
+      totalLoaded: currentAgents.length,
+      localCount,
+      remoteCount,
+      newAgents,
+      updatedAgents,
+      deletedAgents,
+      errors: reloadErrors,
+    };
+  }
+
+  /**
+   * Acknowledges and registers a previously unacknowledged agent.
+   */
+  async acknowledgeAgent(agent: AgentDefinition): Promise<void> {
+    const ackService = this.config.getAcknowledgedAgentsService();
+    const projectRoot = this.config.getProjectRoot();
+    if (agent.metadata?.hash) {
+      await ackService.acknowledge(
+        projectRoot,
+        agent.name,
+        agent.metadata.hash,
+      );
+      await this.registerAgent(agent);
+      coreEvents.emitAgentsRefreshed();
+    }
+  }
+
+  /**
+   * Disposes of resources and removes event listeners.
+   */
+  dispose(): void {
+    coreEvents.off(CoreEvent.ModelChanged, this.onModelChanged);
+  }
+
+  private async loadAgents(errors?: string[]): Promise<void> {
+    this.agents.clear();
+    this.allDefinitions.clear();
+    this.loadBuiltInAgents();
+
+    // Clear old dynamic rules before reloading
+    this.config.getPolicyEngine()?.removeRulesBySource(DYNAMIC_RULE_SOURCE);
+
+    if (!this.config.isAgentsEnabled()) {
+      return;
+    }
+
+    // Load project-level agents: .gemini/agents/ (relative to Project Root)
+    const folderTrustEnabled = this.config.getFolderTrust();
+    const isTrustedFolder = this.config.isTrustedFolder();
+
+    if (!folderTrustEnabled || isTrustedFolder) {
+      const projectAgentsDir = this.config.storage.getProjectAgentsDir();
+      const projectAgents = await loadAgentsFromDirectory(projectAgentsDir);
+      for (const error of projectAgents.errors) {
+        const msg = `Agent loading error: ${error.message}`;
+        errors?.push(msg);
+        coreEvents.emitFeedback('error', msg);
+      }
+
+      const ackService = this.config.getAcknowledgedAgentsService();
+      const projectRoot = this.config.getProjectRoot();
+      const unacknowledgedAgents: AgentDefinition[] = [];
+      const agentsToRegister: AgentDefinition[] = [];
+
+      for (const agent of projectAgents.agents) {
+        this.ensureRemoteAgentHash(agent);
+
+        if (!agent.metadata?.hash) {
+          agentsToRegister.push(agent);
+          continue;
+        }
+
+        const isAcknowledged = await ackService.isAcknowledged(
+          projectRoot,
+          agent.name,
+          agent.metadata.hash,
+        );
+
+        if (isAcknowledged) {
+          agentsToRegister.push(agent);
+        } else {
+          unacknowledgedAgents.push(agent);
+        }
+      }
+
+      if (unacknowledgedAgents.length > 0) {
+        coreEvents.emitAgentsDiscovered(unacknowledgedAgents);
+      }
+
+      await Promise.allSettled(
+        agentsToRegister.map(async (agent) => {
+          try {
+            await this.registerAgent(agent, errors);
+          } catch (e) {
+            const msg = `Error registering project agent "${agent.name}": ${e instanceof Error ? e.message : String(e)}`;
+            debugLogger.warn(`[AgentRegistry] ${msg}`, e);
+            errors?.push(msg);
+            coreEvents.emitFeedback('error', msg);
+          }
+        }),
+      );
+    } else {
+      coreEvents.emitFeedback(
+        'info',
+        'Skipping project agents due to untrusted folder. To enable, ensure that the project root is trusted.',
+      );
+    }
+
+    // Load user-level agents: ~/.gemini/agents/
+    const userAgentsDir = Storage.getUserAgentsDir();
+    const userAgents = await loadAgentsFromDirectory(userAgentsDir);
+    for (const error of userAgents.errors) {
+      debugLogger.warn(
+        `[AgentRegistry] Error loading user agent: ${error.message}`,
+      );
+      const msg = `Agent loading error: ${error.message}`;
+      errors?.push(msg);
+      coreEvents.emitFeedback('error', msg);
+    }
+    await Promise.allSettled(
+      userAgents.agents.map(async (agent) => {
+        try {
+          this.ensureRemoteAgentHash(agent);
+          await this.registerAgent(agent, errors);
+        } catch (e) {
+          const msg = `Error registering user agent "${agent.name}": ${e instanceof Error ? e.message : String(e)}`;
+          debugLogger.warn(`[AgentRegistry] ${msg}`, e);
+          errors?.push(msg);
+          coreEvents.emitFeedback('error', msg);
+        }
+      }),
+    );
+
+    // Load agents from extensions
+    for (const extension of this.config.getExtensions()) {
+      if (extension.isActive && extension.agents) {
+        await Promise.allSettled(
+          extension.agents.map(async (agent) => {
+            try {
+              await this.registerAgent(agent, errors);
+            } catch (e) {
+              const msg = `Error registering extension agent "${agent.name}": ${e instanceof Error ? e.message : String(e)}`;
+              debugLogger.warn(`[AgentRegistry] ${msg}`, e);
+              errors?.push(msg);
+              coreEvents.emitFeedback('error', msg);
+            }
+          }),
+        );
+      }
+    }
+
+    if (this.config.getDebugMode()) {
+      debugLogger.log(
+        `[AgentRegistry] Loaded with ${this.agents.size} agents.`,
+      );
+    }
+  }
+
+  private loadBuiltInAgents(): void {
+    this.registerLocalAgent(CodebaseInvestigatorAgent(this.config));
+    this.registerLocalAgent(CliHelpAgent(this.config));
+    this.registerLocalAgent(GeneralistAgent(this.config));
+
+    // Register the browser agent if enabled in settings.
+    // Tools are configured dynamically at invocation time via browserAgentFactory.
+    const browserConfig = this.config.getBrowserAgentConfig();
+    if (browserConfig.enabled) {
+      // In container sandboxes (Docker/Podman/gVisor/LXC), Chrome is not
+      // available inside the container. The browser agent can only work with
+      // sessionMode "existing" (connecting to a host Chrome instance).
+      const sandboxType = process.env['SANDBOX'];
+      const isContainerSandbox =
+        !!sandboxType &&
+        sandboxType !== 'sandbox-exec' &&
+        sandboxType !== 'sandbox:none';
+      const sessionMode =
+        browserConfig.customConfig.sessionMode ?? 'persistent';
+
+      if (isContainerSandbox && sessionMode !== 'existing') {
+        coreEvents.emitFeedback(
+          'info',
+          'Browser agent disabled in container sandbox. ' +
+            'To use it, set sessionMode to "existing" in settings and start Chrome ' +
+            'with --remote-debugging-port=9222 on the host.',
+        );
+      } else {
+        this.registerLocalAgent(BrowserAgentDefinition(this.config));
+      }
+    }
+  }
+
+  private async refreshAgents(
+    scope: AgentDefinition['kind'] | 'all' = 'all',
+  ): Promise<void> {
+    this.loadBuiltInAgents();
+    await Promise.allSettled(
+      Array.from(this.agents.values()).map(async (agent) => {
+        if (scope === 'all' || agent.kind === scope) {
+          await this.registerAgent(agent);
+        }
+      }),
+    );
+  }
+
+  /**
+   * Registers an agent definition. If an agent with the same name exists,
+   * it will be overwritten, respecting the precedence established by the
+   * initialization order.
+   */
+  protected async registerAgent<TOutput extends z.ZodTypeAny>(
+    definition: AgentDefinition<TOutput>,
+    errors?: string[],
+  ): Promise<void> {
+    const existing = this.agents.get(definition.name);
+    if (existing && existing !== definition) {
+      coreEvents.emitFeedback(
+        'warning',
+        `Duplicate agent name '${definition.name}' detected. ` +
+          `The later definition will be ignored. ` +
+          `Rename one of the agents to avoid this conflict.`,
+      );
+      return;
+    }
+
+    if (definition.kind === 'local') {
+      this.registerLocalAgent(definition);
+    } else if (definition.kind === 'remote') {
+      await this.registerRemoteAgent(definition, errors);
+    }
+  }
+
+  /**
+   * Registers a local agent definition synchronously.
+   */
+  protected registerLocalAgent<TOutput extends z.ZodTypeAny>(
+    definition: AgentDefinition<TOutput>,
+  ): void {
+    if (definition.kind !== 'local') {
+      return;
+    }
+
+    // Basic validation
+    if (!definition.name || !definition.description) {
+      debugLogger.warn(
+        `[AgentRegistry] Skipping invalid agent definition. Missing name or description.`,
+      );
+      return;
+    }
+
+    this.allDefinitions.set(definition.name, definition);
+
+    const settingsOverrides =
+      this.config.getAgentsSettings().overrides?.[definition.name];
+
+    if (!this.isAgentEnabled(definition, settingsOverrides)) {
+      if (this.config.getDebugMode()) {
+        debugLogger.log(
+          `[AgentRegistry] Skipping disabled agent '${definition.name}'`,
+        );
+      }
+      return;
+    }
+
+    if (this.agents.has(definition.name) && this.config.getDebugMode()) {
+      debugLogger.log(`[AgentRegistry] Overriding agent '${definition.name}'`);
+    }
+
+    const mergedDefinition = this.applyOverrides(definition, settingsOverrides);
+    this.agents.set(mergedDefinition.name, mergedDefinition);
+
+    this.registerModelConfigs(mergedDefinition);
+    this.addAgentPolicy(mergedDefinition);
+  }
+
+  private addAgentPolicy(definition: AgentDefinition<z.ZodTypeAny>): void {
+    const policyEngine = this.config.getPolicyEngine();
+    if (!policyEngine) {
+      return;
+    }
+
+    // If the user has explicitly defined a policy for this tool, respect it.
+    // ignoreDynamic=true means we only check for rules NOT added by this registry.
+    if (policyEngine.hasRuleForTool(definition.name, true)) {
+      if (this.config.getDebugMode()) {
+        debugLogger.log(
+          `[AgentRegistry] User policy exists for '${definition.name}', skipping dynamic registration.`,
+        );
+      }
+      return;
+    }
+
+    // Only add override for remote agents. Local agents are handled by blanket allow.
+    if (definition.kind === 'remote') {
+      policyEngine.addRule({
+        toolName: AgentTool.Name,
+        argsPattern: new RegExp(`"agent_name":\\s*"${definition.name}"`),
+        decision: PolicyDecision.ASK_USER,
+        priority: PRIORITY_SUBAGENT_TOOL + 0.1, // Higher priority to override blanket allow
+        source: DYNAMIC_RULE_SOURCE,
+      });
+    }
+  }
+
+  private isAgentEnabled<TOutput extends z.ZodTypeAny>(
+    definition: AgentDefinition<TOutput>,
+    overrides?: AgentOverride,
+  ): boolean {
+    const isExperimental = definition.experimental === true;
+    let isEnabled = !isExperimental;
+
+    if (overrides && overrides.enabled !== undefined) {
+      isEnabled = overrides.enabled;
+    }
+
+    return isEnabled;
+  }
+
+  /**
+   * Registers a remote agent definition asynchronously.
+   * Provides robust error handling with user-friendly messages for:
+   * - Agent card fetch failures (404, 401/403, network errors)
+   * - Missing authentication configuration
+   */
+  protected async registerRemoteAgent<TOutput extends z.ZodTypeAny>(
+    definition: AgentDefinition<TOutput>,
+    errors?: string[],
+  ): Promise<void> {
+    if (definition.kind !== 'remote') {
+      return;
+    }
+
+    // Basic validation
+    // Remote agents can have an empty description initially as it will be populated from the AgentCard
+    if (!definition.name) {
+      debugLogger.warn(
+        `[AgentRegistry] Skipping invalid agent definition. Missing name.`,
+      );
+      return;
+    }
+
+    this.allDefinitions.set(definition.name, definition);
+
+    const overrides =
+      this.config.getAgentsSettings().overrides?.[definition.name];
+
+    if (!this.isAgentEnabled(definition, overrides)) {
+      if (this.config.getDebugMode()) {
+        debugLogger.log(
+          `[AgentRegistry] Skipping disabled remote agent '${definition.name}'`,
+        );
+      }
+      return;
+    }
+
+    if (this.agents.has(definition.name) && this.config.getDebugMode()) {
+      debugLogger.log(`[AgentRegistry] Overriding agent '${definition.name}'`);
+    }
+
+    const remoteDef = definition;
+
+    // Capture the original description from the first registration
+    if (remoteDef.originalDescription === undefined) {
+      remoteDef.originalDescription = remoteDef.description;
+    }
+
+    // Load the remote A2A agent card and register.
+    try {
+      const clientManager = this.config.getA2AClientManager();
+      if (!clientManager) {
+        debugLogger.warn(
+          `[AgentRegistry] Skipping remote agent '${definition.name}': A2AClientManager is not available.`,
+        );
+        return;
+      }
+      const targetUrl = getRemoteAgentTargetUrl(remoteDef);
+      let authHandler: AuthenticationHandler | undefined;
+      if (definition.auth) {
+        const provider = await A2AAuthProviderFactory.create({
+          authConfig: definition.auth,
+          agentName: definition.name,
+          targetUrl,
+          agentCardUrl: remoteDef.agentCardUrl,
+        });
+        if (!provider) {
+          throw new Error(
+            `Failed to create auth provider for agent '${definition.name}'`,
+          );
+        }
+        authHandler = provider;
+      }
+
+      const agentCard = await clientManager.loadAgent(
+        remoteDef.name,
+        getAgentCardLoadOptions(remoteDef),
+        authHandler,
+      );
+
+      // Validate auth configuration against the agent card's security schemes.
+      if (agentCard.securitySchemes) {
+        const validation = A2AAuthProviderFactory.validateAuthConfig(
+          definition.auth,
+          agentCard.securitySchemes,
+        );
+        if (!validation.valid && validation.diff) {
+          const requiredAuth = A2AAuthProviderFactory.describeRequiredAuth(
+            agentCard.securitySchemes,
+          );
+          const authError = new AgentAuthConfigMissingError(
+            definition.name,
+            requiredAuth,
+            validation.diff.missingConfig,
+          );
+          coreEvents.emitFeedback(
+            'warning',
+            `[${definition.name}] Agent requires authentication: ${requiredAuth}`,
+          );
+          debugLogger.warn(`[AgentRegistry] ${authError.message}`);
+          // Still register the agent — the user can fix config and retry.
+        }
+      }
+
+      const userDescription = remoteDef.originalDescription;
+      const agentDescription = agentCard.description;
+      const descriptions: string[] = [];
+
+      if (userDescription?.trim()) {
+        descriptions.push(`User Description: ${userDescription.trim()}`);
+      }
+      if (agentDescription?.trim()) {
+        descriptions.push(`Agent Description: ${agentDescription.trim()}`);
+      }
+      if (agentCard.skills && agentCard.skills.length > 0) {
+        const skillsList = agentCard.skills
+          .map(
+            (skill: { name: string; description: string }) =>
+              `${skill.name}: ${skill.description || 'No description provided'}`,
+          )
+          .join('\n');
+        descriptions.push(`Skills:\n${skillsList}`);
+      }
+
+      if (descriptions.length > 0) {
+        definition.description = descriptions.join('\n');
+      }
+
+      if (this.config.getDebugMode()) {
+        debugLogger.log(
+          `[AgentRegistry] Registered remote agent '${definition.name}' with card: ${definition.agentCardUrl ?? 'inline JSON'}`,
+        );
+      }
+      this.agents.set(definition.name, definition);
+      this.addAgentPolicy(definition);
+    } catch (e) {
+      // Surface structured, user-friendly error messages for known failure modes.
+      let msg: string;
+      if (e instanceof A2AAgentError) {
+        msg = `[${definition.name}] ${e.userMessage}`;
+      } else {
+        msg = `[${definition.name}] Failed to load remote agent: ${e instanceof Error ? e.message : String(e)}`;
+      }
+      errors?.push(msg);
+      coreEvents.emitFeedback('error', msg);
+      debugLogger.warn(
+        `[AgentRegistry] Error loading A2A agent "${definition.name}":`,
+        e,
+      );
+    }
+  }
+
+  private applyOverrides<TOutput extends z.ZodTypeAny>(
+    definition: LocalAgentDefinition<TOutput>,
+    overrides?: AgentOverride,
+  ): LocalAgentDefinition<TOutput> {
+    if (definition.kind !== 'local' || !overrides) {
+      return definition;
+    }
+
+    // Preserve lazy getters on the definition object by wrapping in a new object with getters
+    const merged: LocalAgentDefinition<TOutput> = {
+      get kind() {
+        return definition.kind;
+      },
+      get name() {
+        return definition.name;
+      },
+      get displayName() {
+        return definition.displayName;
+      },
+      get description() {
+        return definition.description;
+      },
+      get experimental() {
+        return definition.experimental;
+      },
+      get metadata() {
+        return definition.metadata;
+      },
+      get inputConfig() {
+        return definition.inputConfig;
+      },
+      get outputConfig() {
+        return definition.outputConfig;
+      },
+      get promptConfig() {
+        return definition.promptConfig;
+      },
+      get toolConfig() {
+        return definition.toolConfig;
+      },
+      get processOutput() {
+        return definition.processOutput;
+      },
+      get runConfig() {
+        return overrides.runConfig
+          ? { ...definition.runConfig, ...overrides.runConfig }
+          : definition.runConfig;
+      },
+      get modelConfig() {
+        return overrides.modelConfig
+          ? ModelConfigService.merge(
+              definition.modelConfig,
+              overrides.modelConfig,
+            )
+          : definition.modelConfig;
+      },
+    };
+
+    if (overrides.tools) {
+      merged.toolConfig = {
+        tools: overrides.tools,
+      };
+    }
+
+    if (overrides.mcpServers) {
+      merged.mcpServers = {
+        ...definition.mcpServers,
+        ...overrides.mcpServers,
+      };
+    }
+
+    return merged;
+  }
+
+  private registerModelConfigs<TOutput extends z.ZodTypeAny>(
+    definition: LocalAgentDefinition<TOutput>,
+  ): void {
+    const modelConfig = definition.modelConfig;
+    let model = modelConfig.model;
+    if (model === 'inherit') {
+      model = this.config.getModel();
+    }
+
+    const agentModelConfig: ModelConfig = {
+      ...modelConfig,
+      model,
+    };
+
+    this.config.modelConfigService.registerRuntimeModelConfig(
+      getModelConfigAlias(definition),
+      {
+        modelConfig: agentModelConfig,
+      },
+    );
+
+    if (agentModelConfig.model && isAutoModel(agentModelConfig.model)) {
+      this.config.modelConfigService.registerRuntimeModelOverride({
+        match: {
+          overrideScope: definition.name,
+        },
+        modelConfig: {
+          generateContentConfig: agentModelConfig.generateContentConfig,
+        },
+      });
+    }
+  }
+
+  /**
+   * Retrieves an agent definition by name.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getDefinition(name: string): AgentDefinition<any> | undefined {
+    return this.agents.get(name);
+  }
+
+  /**
+   * Returns all active agent definitions.
+   */
+  getAllDefinitions(): AgentDefinition[] {
+    return Array.from(this.agents.values());
+  }
+
+  /**
+   * Returns a list of all registered agent names.
+   */
+  getAllAgentNames(): string[] {
+    return Array.from(this.agents.keys());
+  }
+
+  /**
+   * Returns a list of all discovered agent names, regardless of whether they are enabled.
+   */
+  getAllDiscoveredAgentNames(): string[] {
+    return Array.from(this.allDefinitions.keys());
+  }
+
+  /**
+   * Retrieves a discovered agent definition by name.
+   */
+  getDiscoveredDefinition(name: string): AgentDefinition | undefined {
+    return this.allDefinitions.get(name);
+  }
+
+  /**
+   * Ensures that remote agents have a content-based hash for trust verification and change detection.
+   */
+  private ensureRemoteAgentHash(agent: AgentDefinition): void {
+    if (agent.kind !== 'remote') {
+      return;
+    }
+
+    if (!agent.metadata) {
+      agent.metadata = {};
+    }
+
+    // To avoid a breaking change for existing users, we continue to use
+    // the raw URL as the hash for URL-based remote agents.
+    if (agent.agentCardUrl) {
+      agent.metadata.hash = agent.agentCardUrl;
+    } else if (agent.agentCardJson) {
+      agent.metadata.hash = crypto
+        .createHash('sha256')
+        .update(agent.agentCardJson)
+        .digest('hex');
+    }
+  }
+}

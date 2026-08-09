@@ -8,14 +8,25 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { aboutCommand } from './aboutCommand.js';
 import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import * as versionUtils from '../../utils/version.js';
 import { MessageType } from '../types.js';
+import { IdeClient, getVersion } from '@google/gemini-cli-core';
 
-import type { IdeClient } from '../../../../core/src/ide/ide-client.js';
-
-vi.mock('../../utils/version.js', () => ({
-  getCliVersion: vi.fn(),
-}));
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    IdeClient: {
+      getInstance: vi.fn().mockResolvedValue({
+        getDetectedIdeDisplayName: vi.fn().mockReturnValue('test-ide'),
+      }),
+    },
+    UserAccountManager: vi.fn().mockImplementation(() => ({
+      getCachedGoogleAccount: vi.fn().mockReturnValue('test-email@example.com'),
+    })),
+    getVersion: vi.fn(),
+  };
+});
 
 describe('aboutCommand', () => {
   let mockContext: CommandContext;
@@ -25,10 +36,12 @@ describe('aboutCommand', () => {
   beforeEach(() => {
     mockContext = createMockCommandContext({
       services: {
-        config: {
-          getModel: vi.fn(),
-          getIdeClient: vi.fn(),
-          getIdeMode: vi.fn().mockReturnValue(true),
+        agentContext: {
+          config: {
+            getModel: vi.fn(),
+            getIdeMode: vi.fn().mockReturnValue(true),
+            getUserTierName: vi.fn().mockReturnValue(undefined),
+          },
         },
         settings: {
           merged: {
@@ -45,17 +58,15 @@ describe('aboutCommand', () => {
       },
     } as unknown as CommandContext);
 
-    vi.mocked(versionUtils.getCliVersion).mockResolvedValue('test-version');
-    vi.spyOn(mockContext.services.config!, 'getModel').mockReturnValue(
-      'test-model',
-    );
+    vi.mocked(getVersion).mockResolvedValue('test-version');
+    vi.spyOn(
+      mockContext.services.agentContext!.config,
+      'getModel',
+    ).mockReturnValue('test-model');
     process.env['GOOGLE_CLOUD_PROJECT'] = 'test-gcp-project';
     Object.defineProperty(process, 'platform', {
       value: 'test-os',
     });
-    vi.spyOn(mockContext.services.config!, 'getIdeClient').mockReturnValue({
-      getDetectedIdeDisplayName: vi.fn().mockReturnValue('test-ide'),
-    } as Partial<IdeClient> as IdeClient);
   });
 
   afterEach(() => {
@@ -69,7 +80,7 @@ describe('aboutCommand', () => {
 
   it('should have the correct name and description', () => {
     expect(aboutCommand.name).toBe('about');
-    expect(aboutCommand.description).toBe('show version info');
+    expect(aboutCommand.description).toBe('Show version info');
   });
 
   it('should call addItem with all version info', async () => {
@@ -80,19 +91,18 @@ describe('aboutCommand', () => {
 
     await aboutCommand.action(mockContext, '');
 
-    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-      {
-        type: MessageType.ABOUT,
-        cliVersion: 'test-version',
-        osVersion: 'test-os',
-        sandboxEnv: 'no sandbox',
-        modelVersion: 'test-model',
-        selectedAuthType: 'test-auth',
-        gcpProject: 'test-gcp-project',
-        ideClient: 'test-ide',
-      },
-      expect.any(Number),
-    );
+    expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+      type: MessageType.ABOUT,
+      cliVersion: 'test-version',
+      osVersion: 'test-os',
+      sandboxEnv: 'no sandbox',
+      modelVersion: 'test-model',
+      selectedAuthType: 'test-auth',
+      gcpProject: 'test-gcp-project',
+      ideClient: 'test-ide',
+      userEmail: 'test-email@example.com',
+      tier: undefined,
+    });
   });
 
   it('should show the correct sandbox environment variable', async () => {
@@ -107,7 +117,6 @@ describe('aboutCommand', () => {
       expect.objectContaining({
         sandboxEnv: 'gemini-sandbox',
       }),
-      expect.any(Number),
     );
   });
 
@@ -124,16 +133,15 @@ describe('aboutCommand', () => {
       expect.objectContaining({
         sandboxEnv: 'sandbox-exec (test-profile)',
       }),
-      expect.any(Number),
     );
   });
 
   it('should not show ide client when it is not detected', async () => {
-    vi.spyOn(mockContext.services.config!, 'getIdeClient').mockReturnValue({
+    vi.mocked(IdeClient.getInstance).mockResolvedValue({
       getDetectedIdeDisplayName: vi.fn().mockReturnValue(undefined),
-    } as Partial<IdeClient> as IdeClient);
+    } as unknown as IdeClient);
 
-    process.env.SANDBOX = '';
+    process.env['SANDBOX'] = '';
     if (!aboutCommand.action) {
       throw new Error('The about command must have an action.');
     }
@@ -151,7 +159,23 @@ describe('aboutCommand', () => {
         gcpProject: 'test-gcp-project',
         ideClient: '',
       }),
-      expect.any(Number),
+    );
+  });
+
+  it('should display the tier when getUserTierName returns a value', async () => {
+    vi.mocked(
+      mockContext.services.agentContext!.config.getUserTierName,
+    ).mockReturnValue('Enterprise Tier');
+    if (!aboutCommand.action) {
+      throw new Error('The about command must have an action.');
+    }
+
+    await aboutCommand.action(mockContext, '');
+
+    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tier: 'Enterprise Tier',
+      }),
     );
   });
 });

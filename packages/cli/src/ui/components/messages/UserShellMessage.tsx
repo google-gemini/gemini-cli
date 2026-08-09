@@ -6,20 +6,42 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
-import { Colors } from '../../colors.js';
+import { theme } from '../../semantic-colors.js';
+import { HalfLinePaddedBox } from '../shared/HalfLinePaddedBox.js';
+import { useConfig } from '../../contexts/ConfigContext.js';
 
 interface UserShellMessageProps {
   text: string;
+  width: number;
 }
 
-export const UserShellMessage: React.FC<UserShellMessageProps> = ({ text }) => {
+export const UserShellMessage: React.FC<UserShellMessageProps> = ({
+  text,
+  width,
+}) => {
+  const config = useConfig();
+  const useBackgroundColorSetting = config.getUseBackgroundColor();
+  const useBackgroundColor =
+    useBackgroundColorSetting && !!theme.background.message;
+
   // Remove leading '!' if present, as App.tsx adds it for the processor.
   const commandToDisplay = text.startsWith('!') ? text.substring(1) : text;
 
   return (
-    <Box>
-      <Text color={Colors.AccentCyan}>$ </Text>
-      <Text>{commandToDisplay}</Text>
-    </Box>
+    <HalfLinePaddedBox
+      backgroundBaseColor={theme.background.message}
+      backgroundOpacity={1}
+      useBackgroundColor={useBackgroundColor}
+    >
+      <Box
+        paddingY={0}
+        marginY={useBackgroundColor ? 0 : 1}
+        paddingX={useBackgroundColor ? 1 : 0}
+        width={width}
+      >
+        <Text color={theme.ui.symbol}>$ </Text>
+        <Text color={theme.text.primary}>{commandToDisplay}</Text>
+      </Box>
+    </HalfLinePaddedBox>
   );
 };

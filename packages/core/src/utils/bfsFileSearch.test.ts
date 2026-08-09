@@ -8,8 +8,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fsPromises from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { bfsFileSearch } from './bfsFileSearch.js';
+import { bfsFileSearch, bfsFileSearchSync } from './bfsFileSearch.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
+import { GEMINI_IGNORE_FILE_NAME } from 'src/config/constants.js';
 
 describe('bfsFileSearch', () => {
   let testRootDir: string;
@@ -131,6 +132,7 @@ describe('bfsFileSearch', () => {
         fileFilteringOptions: {
           respectGitIgnore: true,
           respectGeminiIgnore: true,
+          customIgnoreFilePaths: [],
         },
       });
 
@@ -138,7 +140,7 @@ describe('bfsFileSearch', () => {
     });
 
     it('should ignore geminiignored files', async () => {
-      await createTestFile('node_modules/', 'project', '.geminiignore');
+      await createTestFile('node_modules/', 'project', GEMINI_IGNORE_FILE_NAME);
       await createTestFile('content', 'project', 'node_modules', 'target.txt');
       const targetFilePath = await createTestFile(
         'content',
@@ -154,6 +156,7 @@ describe('bfsFileSearch', () => {
         fileFilteringOptions: {
           respectGitIgnore: false,
           respectGeminiIgnore: true,
+          customIgnoreFilePaths: [],
         },
       });
 
@@ -183,6 +186,7 @@ describe('bfsFileSearch', () => {
         fileFilteringOptions: {
           respectGitIgnore: false,
           respectGeminiIgnore: false,
+          customIgnoreFilePaths: [],
         },
       });
 
@@ -228,5 +232,98 @@ describe('bfsFileSearch', () => {
     // Verify we found the exact files we created
     expect(result.length).toBe(numTargetDirs * numFilesPerDir);
     expect(result.sort()).toEqual(expectedFiles.sort());
+  });
+});
+
+describe('bfsFileSearchSync', () => {
+  let testRootDir: string;
+
+  async function createEmptyDir(...pathSegments: string[]) {
+    const fullPath = path.join(testRootDir, ...pathSegments);
+    await fsPromises.mkdir(fullPath, { recursive: true });
+    return fullPath;
+  }
+
+  async function createTestFile(content: string, ...pathSegments: string[]) {
+    const fullPath = path.join(testRootDir, ...pathSegments);
+    await fsPromises.mkdir(path.dirname(fullPath), { recursive: true });
+    await fsPromises.writeFile(fullPath, content);
+    return fullPath;
+  }
+
+  beforeEach(async () => {
+    testRootDir = await fsPromises.mkdtemp(
+      path.join(os.tmpdir(), 'bfs-file-search-sync-test-'),
+    );
+  });
+
+  afterEach(async () => {
+    await fsPromises.rm(testRootDir, { recursive: true, force: true });
+  });
+
+  it('should find a file in the root directory synchronously', async () => {
+    const targetFilePath = await createTestFile('content', 'target.txt');
+    const result = bfsFileSearchSync(testRootDir, { fileName: 'target.txt' });
+    expect(result).toEqual([targetFilePath]);
+  });
+
+  it('should find a file in a nested directory synchronously', async () => {
+    const targetFilePath = await createTestFile(
+      'content',
+      'a',
+      'b',
+      'target.txt',
+    );
+    const result = bfsFileSearchSync(testRootDir, { fileName: 'target.txt' });
+    expect(result).toEqual([targetFilePath]);
+  });
+
+  it('should respect the maxDirs limit and not find the file synchronously', async () => {
+    await createTestFile('content', 'a', 'b', 'c', 'target.txt');
+    const result = bfsFileSearchSync(testRootDir, {
+      fileName: 'target.txt',
+      maxDirs: 3,
+    });
+    expect(result).toEqual([]);
+  });
+
+  it('should ignore directories synchronously', async () => {
+    await createTestFile('content', 'ignored', 'target.txt');
+    const targetFilePath = await createTestFile(
+      'content',
+      'not-ignored',
+      'target.txt',
+    );
+    const result = bfsFileSearchSync(testRootDir, {
+      fileName: 'target.txt',
+      ignoreDirs: ['ignored'],
+    });
+    expect(result).toEqual([targetFilePath]);
+  });
+
+  it('should work with FileDiscoveryService synchronously', async () => {
+    const projectRoot = await createEmptyDir('project');
+    await createEmptyDir('project', '.git');
+    await createTestFile('node_modules/', 'project', '.gitignore');
+    await createTestFile('content', 'project', 'node_modules', 'target.txt');
+    const targetFilePath = await createTestFile(
+      'content',
+      'project',
+      'not-ignored',
+      'target.txt',
+    );
+
+    const fileService = new FileDiscoveryService(projectRoot);
+    const result = bfsFileSearchSync(projectRoot, {
+      fileName: 'target.txt',
+      fileService,
+      fileFilteringOptions: {
+        respectGitIgnore: true,
+        respectGeminiIgnore: true,
+        customIgnoreFilePaths: [],
+      },
+    });
+
+    expect(result).toEqual([targetFilePath]);
   });
 });

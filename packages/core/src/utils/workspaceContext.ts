@@ -4,12 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { isNodeError } from '../utils/errors.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import * as process from 'node:process';
+import { debugLogger } from './debugLogger.js';
+import { resolveToRealPath } from './paths.js';
 
 export type Unsubscribe = () => void;
+
+export interface AddDirectoriesResult {
+  added: string[];
+  failed: Array<{ path: string; error: Error }>;
+}
 
 /**
  * WorkspaceContext manages multiple workspace directories and validates paths
@@ -19,18 +24,20 @@ export type Unsubscribe = () => void;
 export class WorkspaceContext {
   private directories = new Set<string>();
   private initialDirectories: Set<string>;
+  private readOnlyPaths = new Set<string>();
   private onDirectoriesChangedListeners = new Set<() => void>();
 
   /**
    * Creates a new WorkspaceContext with the given initial directory and optional additional directories.
-   * @param directory The initial working directory (usually cwd)
+   * @param targetDir The initial working directory (usually cwd)
    * @param additionalDirectories Optional array of additional directories to include
    */
-  constructor(directory: string, additionalDirectories: string[] = []) {
-    this.addDirectory(directory);
-    for (const additionalDirectory of additionalDirectories) {
-      this.addDirectory(additionalDirectory);
-    }
+  constructor(
+    readonly targetDir: string,
+    additionalDirectories: string[] = [],
+  ) {
+    this.addDirectory(targetDir);
+    this.addDirectories(additionalDirectories);
     this.initialDirectories = new Set(this.directories);
   }
 
@@ -53,7 +60,9 @@ export class WorkspaceContext {
         listener();
       } catch (e) {
         // Don't let one listener break others.
-        console.error('Error in WorkspaceContext listener:', e);
+        debugLogger.warn(
+          `Error in WorkspaceContext listener: (${e instanceof Error ? e.message : String(e)})`,
+        );
       }
     }
   }
@@ -62,29 +71,69 @@ export class WorkspaceContext {
    * Adds a directory to the workspace.
    * @param directory The directory path to add (can be relative or absolute)
    * @param basePath Optional base path for resolving relative paths (defaults to cwd)
+   * @throws Error if the directory cannot be added
    */
-  addDirectory(directory: string, basePath: string = process.cwd()): void {
-    try {
-      const resolved = this.resolveAndValidateDir(directory, basePath);
-      if (this.directories.has(resolved)) {
-        return;
-      }
-      this.directories.add(resolved);
-      this.notifyDirectoriesChanged();
-    } catch (err) {
-      console.warn(
-        `[WARN] Skipping unreadable directory: ${directory} (${err instanceof Error ? err.message : String(err)})`,
-      );
+  addDirectory(directory: string): void {
+    const result = this.addDirectories([directory]);
+    if (result.failed.length > 0) {
+      throw result.failed[0].error;
     }
   }
 
-  private resolveAndValidateDir(
-    directory: string,
-    basePath: string = process.cwd(),
-  ): string {
-    const absolutePath = path.isAbsolute(directory)
-      ? directory
-      : path.resolve(basePath, directory);
+  /**
+   * Adds multiple directories to the workspace.
+   * Emits a single change event if any directories are added.
+   * @param directories The directory paths to add
+   * @returns Object containing successfully added directories and failures
+   */
+  addDirectories(directories: string[]): AddDirectoriesResult {
+    const result: AddDirectoriesResult = { added: [], failed: [] };
+    let changed = false;
+
+    for (const directory of directories) {
+      try {
+        const resolved = this.resolveAndValidateDir(directory);
+        if (!this.directories.has(resolved)) {
+          this.directories.add(resolved);
+          changed = true;
+        }
+        result.added.push(directory);
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        debugLogger.warn(
+          `[WARN] Skipping unreadable directory: ${directory} (${error.message})`,
+        );
+        result.failed.push({ path: directory, error });
+      }
+    }
+
+    if (changed) {
+      this.notifyDirectoriesChanged();
+    }
+
+    return result;
+  }
+
+  /**
+   * Adds a path to the read-only list.
+   * These paths are allowed for reading but not for writing (unless they are also in the workspace).
+   */
+  addReadOnlyPath(pathToAdd: string): void {
+    try {
+      // Check if it exists
+      if (!fs.existsSync(pathToAdd)) {
+        return;
+      }
+      // Resolve symlinks
+      const resolved = fs.realpathSync(path.resolve(this.targetDir, pathToAdd));
+      this.readOnlyPaths.add(resolved);
+    } catch (e) {
+      debugLogger.warn(`Failed to add read-only path ${pathToAdd}:`, e);
+    }
+  }
+
+  private resolveAndValidateDir(directory: string): string {
+    const absolutePath = path.resolve(this.targetDir, directory);
 
     if (!fs.existsSync(absolutePath)) {
       throw new Error(`Directory does not exist: ${absolutePath}`);
@@ -135,11 +184,62 @@ export class WorkspaceContext {
 
       for (const dir of this.directories) {
         if (this.isPathWithinRoot(fullyResolvedPath, dir)) {
+          // Check for blocked segments case-insensitively
+          const relative = path.relative(dir, fullyResolvedPath);
+          const segments = relative.split(path.sep);
+          const hasBlockedSegment = segments.some((segment) => {
+            const clean = trimTrailingSpacesAndDots(
+              segment.split(':')[0],
+            ).toLowerCase();
+            if (
+              clean === '.git' ||
+              clean === '.env' ||
+              clean === 'node_modules'
+            ) {
+              return true;
+            }
+            // Block GitHub Actions Workload Identity credentials
+            if (clean.startsWith('gha-creds-') && clean.endsWith('.json')) {
+              return true;
+            }
+            return false;
+          });
+          if (hasBlockedSegment) {
+            return false;
+          }
           return true;
         }
       }
       return false;
-    } catch (_error) {
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Checks if a path is allowed to be read.
+   * This includes workspace paths and explicitly added read-only paths.
+   * @param pathToCheck The path to validate
+   * @returns True if the path is readable, false otherwise
+   */
+  isPathReadable(pathToCheck: string): boolean {
+    if (this.isPathWithinWorkspace(pathToCheck)) {
+      return true;
+    }
+    try {
+      const fullyResolvedPath = this.fullyResolvedPath(pathToCheck);
+
+      for (const allowedPath of this.readOnlyPaths) {
+        // Allow exact matches or subpaths (if allowedPath is a directory)
+        if (
+          fullyResolvedPath === allowedPath ||
+          this.isPathWithinRoot(fullyResolvedPath, allowedPath)
+        ) {
+          return true;
+        }
+      }
+      return false;
+    } catch {
       return false;
     }
   }
@@ -150,22 +250,7 @@ export class WorkspaceContext {
    * if it did exist.
    */
   private fullyResolvedPath(pathToCheck: string): string {
-    try {
-      return fs.realpathSync(pathToCheck);
-    } catch (e: unknown) {
-      if (
-        isNodeError(e) &&
-        e.code === 'ENOENT' &&
-        e.path &&
-        // realpathSync does not set e.path correctly for symlinks to
-        // non-existent files.
-        !this.isFileSymlink(e.path)
-      ) {
-        // If it doesn't exist, e.path contains the fully resolved path.
-        return e.path;
-      }
-      throw e;
-    }
+    return resolveToRealPath(path.resolve(this.targetDir, pathToCheck));
   }
 
   /**
@@ -185,15 +270,16 @@ export class WorkspaceContext {
       !path.isAbsolute(relative)
     );
   }
+}
 
-  /**
-   * Checks if a file path is a symbolic link that points to a file.
-   */
-  private isFileSymlink(filePath: string): boolean {
-    try {
-      return !fs.readlinkSync(filePath).endsWith('/');
-    } catch (_error) {
-      return false;
-    }
+/**
+ * Trims trailing spaces and dots from a string without using regular expressions
+ * to completely eliminate any potential ReDoS (Regular Expression Denial of Service) risk.
+ */
+function trimTrailingSpacesAndDots(str: string): string {
+  let end = str.length - 1;
+  while (end >= 0 && (str[end] === ' ' || str[end] === '.')) {
+    end--;
   }
+  return str.slice(0, end + 1);
 }

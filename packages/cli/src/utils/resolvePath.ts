@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as os from 'node:os';
 import * as path from 'node:path';
+import { homedir } from '@google/gemini-cli-core';
 
 export function resolvePath(p: string): string {
   if (!p) {
@@ -13,9 +13,9 @@ export function resolvePath(p: string): string {
   }
   let expandedPath = p;
   if (p.toLowerCase().startsWith('%userprofile%')) {
-    expandedPath = os.homedir() + p.substring('%userprofile%'.length);
+    expandedPath = homedir() + p.substring('%userprofile%'.length);
   } else if (p === '~' || p.startsWith('~/')) {
-    expandedPath = os.homedir() + p.substring(1);
+    expandedPath = homedir() + p.substring(1);
   }
   return path.normalize(expandedPath);
 }

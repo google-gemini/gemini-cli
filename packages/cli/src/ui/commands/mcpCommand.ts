@@ -8,321 +8,43 @@ import type {
   SlashCommand,
   SlashCommandActionReturn,
   CommandContext,
-  MessageActionReturn,
 } from './types.js';
 import { CommandKind } from './types.js';
-import type { DiscoveredMCPPrompt } from '@google/gemini-cli-core';
+import type { MessageActionReturn } from '@google/gemini-cli-core';
 import {
   DiscoveredMCPTool,
   getMCPDiscoveryState,
   getMCPServerStatus,
   MCPDiscoveryState,
   MCPServerStatus,
-  mcpServerRequiresOAuth,
   getErrorMessage,
+  MCPOAuthTokenStorage,
+  mcpServerRequiresOAuth,
+  CoreEvent,
+  coreEvents,
 } from '@google/gemini-cli-core';
 
-const COLOR_GREEN = '\u001b[32m';
-const COLOR_YELLOW = '\u001b[33m';
-const COLOR_RED = '\u001b[31m';
-const COLOR_CYAN = '\u001b[36m';
-const COLOR_GREY = '\u001b[90m';
-const RESET_COLOR = '\u001b[0m';
-
-const getMcpStatus = async (
-  context: CommandContext,
-  showDescriptions: boolean,
-  showSchema: boolean,
-  showTips: boolean = false,
-): Promise<SlashCommandActionReturn> => {
-  const { config } = context.services;
-  if (!config) {
-    return {
-      type: 'message',
-      messageType: 'error',
-      content: 'Config not loaded.',
-    };
-  }
-
-  const toolRegistry = config.getToolRegistry();
-  if (!toolRegistry) {
-    return {
-      type: 'message',
-      messageType: 'error',
-      content: 'Could not retrieve tool registry.',
-    };
-  }
-
-  const mcpServers = config.getMcpServers() || {};
-  const serverNames = Object.keys(mcpServers);
-  const blockedMcpServers = config.getBlockedMcpServers() || [];
-
-  if (serverNames.length === 0 && blockedMcpServers.length === 0) {
-    const docsUrl = 'https://goo.gle/gemini-cli-docs-mcp';
-    return {
-      type: 'message',
-      messageType: 'info',
-      content: `No MCP servers configured. Please view MCP documentation in your browser: ${docsUrl} or use the cli /docs command`,
-    };
-  }
-
-  // Check if any servers are still connecting
-  const connectingServers = serverNames.filter(
-    (name) => getMCPServerStatus(name) === MCPServerStatus.CONNECTING,
-  );
-  const discoveryState = getMCPDiscoveryState();
-
-  let message = '';
-
-  // Add overall discovery status message if needed
-  if (
-    discoveryState === MCPDiscoveryState.IN_PROGRESS ||
-    connectingServers.length > 0
-  ) {
-    message += `${COLOR_YELLOW}⏳ MCP servers are starting up (${connectingServers.length} initializing)...${RESET_COLOR}\n`;
-    message += `${COLOR_CYAN}Note: First startup may take longer. Tool availability will update automatically.${RESET_COLOR}\n\n`;
-  }
-
-  message += 'Configured MCP servers:\n\n';
-
-  const allTools = toolRegistry.getAllTools();
-  for (const serverName of serverNames) {
-    const serverTools = allTools.filter(
-      (tool) =>
-        tool instanceof DiscoveredMCPTool && tool.serverName === serverName,
-    ) as DiscoveredMCPTool[];
-    const promptRegistry = await config.getPromptRegistry();
-    const serverPrompts = promptRegistry.getPromptsByServer(serverName) || [];
-
-    const originalStatus = getMCPServerStatus(serverName);
-    const hasCachedItems = serverTools.length > 0 || serverPrompts.length > 0;
-
-    // If the server is "disconnected" but has prompts or cached tools, display it as Ready
-    // by using CONNECTED as the display status.
-    const status =
-      originalStatus === MCPServerStatus.DISCONNECTED && hasCachedItems
-        ? MCPServerStatus.CONNECTED
-        : originalStatus;
-
-    // Add status indicator with descriptive text
-    let statusIndicator = '';
-    let statusText = '';
-    switch (status) {
-      case MCPServerStatus.CONNECTED:
-        statusIndicator = '🟢';
-        statusText = 'Ready';
-        break;
-      case MCPServerStatus.CONNECTING:
-        statusIndicator = '🔄';
-        statusText = 'Starting... (first startup may take longer)';
-        break;
-      case MCPServerStatus.DISCONNECTED:
-      default:
-        statusIndicator = '🔴';
-        statusText = 'Disconnected';
-        break;
-    }
-
-    // Get server description if available
-    const server = mcpServers[serverName];
-    let serverDisplayName = serverName;
-    if (server.extensionName) {
-      serverDisplayName += ` (from ${server.extensionName})`;
-    }
-
-    // Format server header with bold formatting and status
-    message += `${statusIndicator} \u001b[1m${serverDisplayName}\u001b[0m - ${statusText}`;
-
-    let needsAuthHint = mcpServerRequiresOAuth.get(serverName) || false;
-    // Add OAuth status if applicable
-    if (server?.oauth?.enabled) {
-      needsAuthHint = true;
-      try {
-        const { MCPOAuthTokenStorage } = await import(
-          '@google/gemini-cli-core'
-        );
-        const hasToken = await MCPOAuthTokenStorage.getToken(serverName);
-        if (hasToken) {
-          const isExpired = MCPOAuthTokenStorage.isTokenExpired(hasToken.token);
-          if (isExpired) {
-            message += ` ${COLOR_YELLOW}(OAuth token expired)${RESET_COLOR}`;
-          } else {
-            message += ` ${COLOR_GREEN}(OAuth authenticated)${RESET_COLOR}`;
-            needsAuthHint = false;
-          }
-        } else {
-          message += ` ${COLOR_RED}(OAuth not authenticated)${RESET_COLOR}`;
-        }
-      } catch (_err) {
-        // If we can't check OAuth status, just continue
-      }
-    }
-
-    // Add tool count with conditional messaging
-    if (status === MCPServerStatus.CONNECTED) {
-      const parts = [];
-      if (serverTools.length > 0) {
-        parts.push(
-          `${serverTools.length} ${serverTools.length === 1 ? 'tool' : 'tools'}`,
-        );
-      }
-      if (serverPrompts.length > 0) {
-        parts.push(
-          `${serverPrompts.length} ${
-            serverPrompts.length === 1 ? 'prompt' : 'prompts'
-          }`,
-        );
-      }
-      if (parts.length > 0) {
-        message += ` (${parts.join(', ')})`;
-      } else {
-        message += ` (0 tools)`;
-      }
-    } else if (status === MCPServerStatus.CONNECTING) {
-      message += ` (tools and prompts will appear when ready)`;
-    } else {
-      message += ` (${serverTools.length} tools cached)`;
-    }
-
-    // Add server description with proper handling of multi-line descriptions
-    if (showDescriptions && server?.description) {
-      const descLines = server.description.trim().split('\n');
-      if (descLines) {
-        message += ':\n';
-        for (const descLine of descLines) {
-          message += `    ${COLOR_GREEN}${descLine}${RESET_COLOR}\n`;
-        }
-      } else {
-        message += '\n';
-      }
-    } else {
-      message += '\n';
-    }
-
-    // Reset formatting after server entry
-    message += RESET_COLOR;
-
-    if (serverTools.length > 0) {
-      message += `  ${COLOR_CYAN}Tools:${RESET_COLOR}\n`;
-      serverTools.forEach((tool) => {
-        if (showDescriptions && tool.description) {
-          // Format tool name in cyan using simple ANSI cyan color
-          message += `  - ${COLOR_CYAN}${tool.name}${RESET_COLOR}`;
-
-          // Handle multi-line descriptions by properly indenting and preserving formatting
-          const descLines = tool.description.trim().split('\n');
-          if (descLines) {
-            message += ':\n';
-            for (const descLine of descLines) {
-              message += `      ${COLOR_GREEN}${descLine}${RESET_COLOR}\n`;
-            }
-          } else {
-            message += '\n';
-          }
-          // Reset is handled inline with each line now
-        } else {
-          // Use cyan color for the tool name even when not showing descriptions
-          message += `  - ${COLOR_CYAN}${tool.name}${RESET_COLOR}\n`;
-        }
-        const parameters =
-          tool.schema.parametersJsonSchema ?? tool.schema.parameters;
-        if (showSchema && parameters) {
-          // Prefix the parameters in cyan
-          message += `    ${COLOR_CYAN}Parameters:${RESET_COLOR}\n`;
-
-          const paramsLines = JSON.stringify(parameters, null, 2)
-            .trim()
-            .split('\n');
-          if (paramsLines) {
-            for (const paramsLine of paramsLines) {
-              message += `      ${COLOR_GREEN}${paramsLine}${RESET_COLOR}\n`;
-            }
-          }
-        }
-      });
-    }
-    if (serverPrompts.length > 0) {
-      if (serverTools.length > 0) {
-        message += '\n';
-      }
-      message += `  ${COLOR_CYAN}Prompts:${RESET_COLOR}\n`;
-      serverPrompts.forEach((prompt: DiscoveredMCPPrompt) => {
-        if (showDescriptions && prompt.description) {
-          message += `  - ${COLOR_CYAN}${prompt.name}${RESET_COLOR}`;
-          const descLines = prompt.description.trim().split('\n');
-          if (descLines) {
-            message += ':\n';
-            for (const descLine of descLines) {
-              message += `      ${COLOR_GREEN}${descLine}${RESET_COLOR}\n`;
-            }
-          } else {
-            message += '\n';
-          }
-        } else {
-          message += `  - ${COLOR_CYAN}${prompt.name}${RESET_COLOR}\n`;
-        }
-      });
-    }
-
-    if (serverTools.length === 0 && serverPrompts.length === 0) {
-      message += '  No tools or prompts available\n';
-    } else if (serverTools.length === 0) {
-      message += '  No tools available';
-      if (originalStatus === MCPServerStatus.DISCONNECTED && needsAuthHint) {
-        message += ` ${COLOR_GREY}(type: "/mcp auth ${serverName}" to authenticate this server)${RESET_COLOR}`;
-      }
-      message += '\n';
-    } else if (
-      originalStatus === MCPServerStatus.DISCONNECTED &&
-      needsAuthHint
-    ) {
-      // This case is for when serverTools.length > 0
-      message += `  ${COLOR_GREY}(type: "/mcp auth ${serverName}" to authenticate this server)${RESET_COLOR}\n`;
-    }
-    message += '\n';
-  }
-
-  for (const server of blockedMcpServers) {
-    let serverDisplayName = server.name;
-    if (server.extensionName) {
-      serverDisplayName += ` (from ${server.extensionName})`;
-    }
-    message += `🔴 \u001b[1m${serverDisplayName}\u001b[0m - Blocked\n\n`;
-  }
-
-  // Add helpful tips when no arguments are provided
-  if (showTips) {
-    message += '\n';
-    message += `${COLOR_CYAN}💡 Tips:${RESET_COLOR}\n`;
-    message += `  • Use ${COLOR_CYAN}/mcp desc${RESET_COLOR} to show server and tool descriptions\n`;
-    message += `  • Use ${COLOR_CYAN}/mcp schema${RESET_COLOR} to show tool parameter schemas\n`;
-    message += `  • Use ${COLOR_CYAN}/mcp nodesc${RESET_COLOR} to hide descriptions\n`;
-    message += `  • Use ${COLOR_CYAN}/mcp auth <server-name>${RESET_COLOR} to authenticate with OAuth-enabled servers\n`;
-    message += `  • Press ${COLOR_CYAN}Ctrl+T${RESET_COLOR} to toggle tool descriptions on/off\n`;
-    message += '\n';
-  }
-
-  // Make sure to reset any ANSI formatting at the end to prevent it from affecting the terminal
-  message += RESET_COLOR;
-
-  return {
-    type: 'message',
-    messageType: 'info',
-    content: message,
-  };
-};
+import { MessageType, type HistoryItemMcpStatus } from '../types.js';
+import {
+  McpServerEnablementManager,
+  normalizeServerId,
+  canLoadServer,
+} from '../../config/mcp/mcpServerEnablement.js';
+import { loadSettings } from '../../config/settings.js';
+import { parseSlashCommand } from '../../utils/commands.js';
 
 const authCommand: SlashCommand = {
   name: 'auth',
   description: 'Authenticate with an OAuth-enabled MCP server',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: async (
     context: CommandContext,
     args: string,
   ): Promise<MessageActionReturn> => {
     const serverName = args.trim();
-    const { config } = context.services;
-
+    const agentContext = context.services.agentContext;
+    const config = agentContext?.config;
     if (!config) {
       return {
         type: 'message',
@@ -331,15 +53,28 @@ const authCommand: SlashCommand = {
       };
     }
 
-    const mcpServers = config.getMcpServers() || {};
+    config.setUserInteractedWithMcp();
+
+    const mcpServers = config.getMcpClientManager()?.getMcpServers() ?? {};
 
     if (!serverName) {
-      // List servers that support OAuth
-      const oauthServers = Object.entries(mcpServers)
+      // List servers that support OAuth from two sources:
+      // 1. Servers with oauth.enabled in config
+      // 2. Servers detected as requiring OAuth (returned 401)
+      const configuredOAuthServers = Object.entries(mcpServers)
         .filter(([_, server]) => server.oauth?.enabled)
         .map(([name, _]) => name);
 
-      if (oauthServers.length === 0) {
+      const detectedOAuthServers = Array.from(
+        mcpServerRequiresOAuth.keys(),
+      ).filter((name) => mcpServers[name]); // Only include configured servers
+
+      // Combine and deduplicate
+      const allOAuthServers = [
+        ...new Set([...configuredOAuthServers, ...detectedOAuthServers]),
+      ];
+
+      if (allOAuthServers.length === 0) {
         return {
           type: 'message',
           messageType: 'info',
@@ -350,7 +85,7 @@ const authCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: `MCP servers with OAuth authentication:\n${oauthServers.map((s) => `  - ${s}`).join('\n')}\n\nUse /mcp auth <server-name> to authenticate.`,
+        content: `MCP servers with OAuth authentication:\n${allOAuthServers.map((s) => `  - ${s}`).join('\n')}\n\nUse /mcp auth <server-name> to authenticate.`,
       };
     }
 
@@ -366,14 +101,16 @@ const authCommand: SlashCommand = {
     // Always attempt OAuth authentication, even if not explicitly configured
     // The authentication process will discover OAuth requirements automatically
 
+    const displayListener = (message: string) => {
+      context.ui.addItem({ type: 'info', text: message });
+    };
+
+    coreEvents.on(CoreEvent.OauthDisplayMessage, displayListener);
     try {
-      context.ui.addItem(
-        {
-          type: 'info',
-          text: `Starting OAuth authentication for MCP server '${serverName}'...`,
-        },
-        Date.now(),
-      );
+      context.ui.addItem({
+        type: 'info',
+        text: `Starting OAuth authentication for MCP server '${serverName}'...`,
+      });
 
       // Import dynamically to avoid circular dependencies
       const { MCPOAuthProvider } = await import('@google/gemini-cli-core');
@@ -383,37 +120,27 @@ const authCommand: SlashCommand = {
         oauthConfig = { enabled: false };
       }
 
-      // Pass the MCP server URL for OAuth discovery
       const mcpServerUrl = server.httpUrl || server.url;
-      await MCPOAuthProvider.authenticate(
-        serverName,
-        oauthConfig,
-        mcpServerUrl,
-      );
+      const authProvider = new MCPOAuthProvider(new MCPOAuthTokenStorage());
+      await authProvider.authenticate(serverName, oauthConfig, mcpServerUrl);
 
-      context.ui.addItem(
-        {
-          type: 'info',
-          text: `✅ Successfully authenticated with MCP server '${serverName}'!`,
-        },
-        Date.now(),
-      );
+      context.ui.addItem({
+        type: 'info',
+        text: `✅ Successfully authenticated with MCP server '${serverName}'!`,
+      });
 
       // Trigger tool re-discovery to pick up authenticated server
-      const toolRegistry = config.getToolRegistry();
-      if (toolRegistry) {
-        context.ui.addItem(
-          {
-            type: 'info',
-            text: `Re-discovering tools from '${serverName}'...`,
-          },
-          Date.now(),
-        );
-        await toolRegistry.discoverToolsForServer(serverName);
+      const mcpClientManager = config.getMcpClientManager();
+      if (mcpClientManager) {
+        context.ui.addItem({
+          type: 'info',
+          text: `Restarting MCP server '${serverName}'...`,
+        });
+        await mcpClientManager.restartServer(serverName);
       }
       // Update the client with the new tools
-      const geminiClient = config.getGeminiClient();
-      if (geminiClient) {
+      const geminiClient = context.services.agentContext?.geminiClient;
+      if (geminiClient?.isInitialized()) {
         await geminiClient.setTools();
       }
 
@@ -423,7 +150,7 @@ const authCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: `Successfully authenticated and refreshed tools for '${serverName}'.`,
+        content: `Successfully authenticated and reloaded tools for '${serverName}'`,
       };
     } catch (error) {
       return {
@@ -431,52 +158,204 @@ const authCommand: SlashCommand = {
         messageType: 'error',
         content: `Failed to authenticate with MCP server '${serverName}': ${getErrorMessage(error)}`,
       };
+    } finally {
+      coreEvents.removeListener(CoreEvent.OauthDisplayMessage, displayListener);
     }
   },
   completion: async (context: CommandContext, partialArg: string) => {
-    const { config } = context.services;
+    const agentContext = context.services.agentContext;
+    const config = agentContext?.config;
     if (!config) return [];
 
-    const mcpServers = config.getMcpServers() || {};
+    const mcpServers = config.getMcpClientManager()?.getMcpServers() || {};
     return Object.keys(mcpServers).filter((name) =>
       name.startsWith(partialArg),
     );
   },
 };
 
+const listAction = async (
+  context: CommandContext,
+  showDescriptions = false,
+  showSchema = false,
+  serverNameFilter?: string,
+): Promise<void | MessageActionReturn> => {
+  const agentContext = context.services.agentContext;
+  const config = agentContext?.config;
+  if (!config) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Config not loaded.',
+    };
+  }
+
+  config.setUserInteractedWithMcp();
+
+  const toolRegistry = agentContext.toolRegistry;
+  if (!toolRegistry) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Could not retrieve tool registry.',
+    };
+  }
+
+  let mcpServers = config.getMcpClientManager()?.getMcpServers() || {};
+  const blockedMcpServers =
+    config.getMcpClientManager()?.getBlockedMcpServers() || [];
+
+  if (serverNameFilter) {
+    const filter = serverNameFilter.trim().toLowerCase();
+    if (filter) {
+      mcpServers = Object.fromEntries(
+        Object.entries(mcpServers).filter(
+          ([name]) =>
+            name.toLowerCase().includes(filter) ||
+            normalizeServerId(name).includes(filter),
+        ),
+      );
+    }
+  }
+
+  const serverNames = Object.keys(mcpServers);
+
+  const connectingServers = serverNames.filter(
+    (name) => getMCPServerStatus(name) === MCPServerStatus.CONNECTING,
+  );
+  const discoveryState = getMCPDiscoveryState();
+  const discoveryInProgress =
+    discoveryState === MCPDiscoveryState.IN_PROGRESS ||
+    connectingServers.length > 0;
+
+  const allTools = toolRegistry.getAllTools();
+  const mcpTools = allTools.filter((tool) => tool instanceof DiscoveredMCPTool);
+
+  const promptRegistry = config.getPromptRegistry();
+  const mcpPrompts = promptRegistry
+    .getAllPrompts()
+    .filter(
+      (prompt) =>
+        'serverName' in prompt && serverNames.includes(prompt.serverName),
+    );
+
+  const resourceRegistry = config.getResourceRegistry();
+  const mcpResources = resourceRegistry
+    .getAllResources()
+    .filter((entry) => serverNames.includes(entry.serverName));
+
+  const authStatus: HistoryItemMcpStatus['authStatus'] = {};
+  const tokenStorage = new MCPOAuthTokenStorage();
+  for (const serverName of serverNames) {
+    const server = mcpServers[serverName];
+    // Check auth status for servers with oauth.enabled OR detected as requiring OAuth
+    if (server.oauth?.enabled || mcpServerRequiresOAuth.has(serverName)) {
+      const creds = await tokenStorage.getCredentials(serverName);
+      if (creds) {
+        if (creds.token.expiresAt && creds.token.expiresAt < Date.now()) {
+          authStatus[serverName] = 'expired';
+        } else {
+          authStatus[serverName] = 'authenticated';
+        }
+      } else {
+        authStatus[serverName] = 'unauthenticated';
+      }
+    } else {
+      authStatus[serverName] = 'not-configured';
+    }
+  }
+
+  // Get enablement state for all servers
+  const enablementManager = McpServerEnablementManager.getInstance();
+  const enablementState: HistoryItemMcpStatus['enablementState'] = {};
+  for (const serverName of serverNames) {
+    enablementState[serverName] =
+      await enablementManager.getDisplayState(serverName);
+  }
+  const errors: Record<string, string> = {};
+  for (const serverName of serverNames) {
+    const error = config.getMcpClientManager()?.getLastError(serverName);
+    if (error) {
+      errors[serverName] = error;
+    }
+  }
+
+  const mcpStatusItem: HistoryItemMcpStatus = {
+    type: MessageType.MCP_STATUS,
+    servers: mcpServers,
+    tools: mcpTools.map((tool) => ({
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      serverName: (tool as unknown as { serverName: string }).serverName,
+      name: tool.name,
+      description: tool.description,
+      schema: tool.schema,
+    })),
+    prompts: mcpPrompts.map((prompt) => ({
+      serverName: prompt.serverName,
+      name: prompt.name,
+      description: prompt.description,
+    })),
+    resources: mcpResources.map((resource) => ({
+      serverName: resource.serverName,
+      name: resource.name,
+      uri: resource.uri,
+      mimeType: resource.mimeType,
+      description: resource.description,
+    })),
+    authStatus,
+    enablementState,
+    errors,
+    blockedServers: blockedMcpServers.map((s) => ({
+      name: s.name,
+      extensionName: s.extensionName,
+    })),
+    discoveryInProgress,
+    connectingServers,
+    showDescriptions: Boolean(showDescriptions),
+    showSchema: Boolean(showSchema),
+  };
+
+  context.ui.addItem(mcpStatusItem);
+};
 const listCommand: SlashCommand = {
   name: 'list',
+  altNames: ['ls', 'nodesc', 'nodescription'],
   description: 'List configured MCP servers and tools',
   kind: CommandKind.BUILT_IN,
-  action: async (context: CommandContext, args: string) => {
-    const lowerCaseArgs = args.toLowerCase().split(/\s+/).filter(Boolean);
-
-    const hasDesc =
-      lowerCaseArgs.includes('desc') || lowerCaseArgs.includes('descriptions');
-    const hasNodesc =
-      lowerCaseArgs.includes('nodesc') ||
-      lowerCaseArgs.includes('nodescriptions');
-    const showSchema = lowerCaseArgs.includes('schema');
-
-    // Show descriptions if `desc` or `schema` is present,
-    // but `nodesc` takes precedence and disables them.
-    const showDescriptions = !hasNodesc && (hasDesc || showSchema);
-
-    // Show tips only when no arguments are provided
-    const showTips = lowerCaseArgs.length === 0;
-
-    return getMcpStatus(context, showDescriptions, showSchema, showTips);
-  },
+  autoExecute: true,
+  action: (context, args) => listAction(context, false, false, args),
 };
 
-const refreshCommand: SlashCommand = {
-  name: 'refresh',
-  description: 'Restarts MCP servers.',
+const descCommand: SlashCommand = {
+  name: 'desc',
+  altNames: ['description'],
+  description: 'List configured MCP servers and tools with descriptions',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
+  action: (context, args) => listAction(context, true, false, args),
+};
+
+const schemaCommand: SlashCommand = {
+  name: 'schema',
+  description:
+    'List configured MCP servers and tools with descriptions and schemas',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: true,
+  action: (context, args) => listAction(context, true, true, args),
+};
+
+const reloadCommand: SlashCommand = {
+  name: 'reload',
+  altNames: ['refresh'],
+  description: 'Reloads MCP servers',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: true,
+  takesArgs: false,
   action: async (
     context: CommandContext,
-  ): Promise<SlashCommandActionReturn> => {
-    const { config } = context.services;
+  ): Promise<void | SlashCommandActionReturn> => {
+    const agentContext = context.services.agentContext;
+    const config = agentContext?.config;
     if (!config) {
       return {
         type: 'message',
@@ -485,46 +364,202 @@ const refreshCommand: SlashCommand = {
       };
     }
 
-    const toolRegistry = config.getToolRegistry();
-    if (!toolRegistry) {
+    const mcpClientManager = config.getMcpClientManager();
+    if (!mcpClientManager) {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Could not retrieve tool registry.',
+        content: 'Could not retrieve mcp client manager.',
       };
     }
 
-    context.ui.addItem(
-      {
-        type: 'info',
-        text: 'Restarting MCP servers...',
-      },
-      Date.now(),
-    );
+    context.ui.addItem({
+      type: 'info',
+      text: 'Reloading MCP servers...',
+    });
 
-    await toolRegistry.restartMcpServers();
+    await mcpClientManager.restart();
 
     // Update the client with the new tools
-    const geminiClient = config.getGeminiClient();
-    if (geminiClient) {
+    const geminiClient = agentContext.geminiClient;
+    if (geminiClient?.isInitialized()) {
       await geminiClient.setTools();
     }
 
     // Reload the slash commands to reflect the changes.
     context.ui.reloadCommands();
 
-    return getMcpStatus(context, false, false, false);
+    return listCommand.action!(context, '');
   },
+};
+
+async function handleEnableDisable(
+  context: CommandContext,
+  args: string,
+  enable: boolean,
+): Promise<MessageActionReturn> {
+  const agentContext = context.services.agentContext;
+  const config = agentContext?.config;
+  if (!config) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Config not loaded.',
+    };
+  }
+
+  config.setUserInteractedWithMcp();
+
+  const parts = args.trim().split(/\s+/);
+  const isSession = parts.includes('--session');
+  const serverName = parts.filter((p) => p !== '--session')[0];
+  const action = enable ? 'enable' : 'disable';
+
+  if (!serverName) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: `Server name required. Usage: /mcp ${action} <server-name> [--session]`,
+    };
+  }
+
+  const name = normalizeServerId(serverName);
+
+  // Validate server exists
+  const servers = config.getMcpClientManager()?.getMcpServers() || {};
+  const normalizedServerNames = Object.keys(servers).map(normalizeServerId);
+  if (!normalizedServerNames.includes(name)) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: `Server '${serverName}' not found. Use /mcp list to see available servers.`,
+    };
+  }
+
+  const manager = McpServerEnablementManager.getInstance();
+
+  if (enable) {
+    const settings = loadSettings();
+    const result = await canLoadServer(name, {
+      adminMcpEnabled: settings.merged.admin?.mcp?.enabled ?? true,
+      allowedList: settings.merged.mcp?.allowed,
+      excludedList: settings.merged.mcp?.excluded,
+    });
+    if (
+      !result.allowed &&
+      (result.blockType === 'allowlist' || result.blockType === 'excludelist')
+    ) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: result.reason ?? 'Blocked by settings.',
+      };
+    }
+    if (isSession) {
+      manager.clearSessionDisable(name);
+    } else {
+      await manager.enable(name);
+    }
+    if (result.blockType === 'admin') {
+      context.ui.addItem(
+        {
+          type: 'warning',
+          text: 'MCP disabled by admin. Will load when enabled.',
+        },
+        Date.now(),
+      );
+    }
+  } else {
+    if (isSession) {
+      manager.disableForSession(name);
+    } else {
+      await manager.disable(name);
+    }
+  }
+
+  const msg = `MCP server '${name}' ${enable ? 'enabled' : 'disabled'}${isSession ? ' for this session' : ''}.`;
+
+  const mcpClientManager = config.getMcpClientManager();
+  if (mcpClientManager) {
+    context.ui.addItem(
+      { type: 'info', text: 'Reloading MCP servers...' },
+      Date.now(),
+    );
+    await mcpClientManager.restart();
+  }
+  if (agentContext.geminiClient?.isInitialized())
+    await agentContext.geminiClient.setTools();
+  context.ui.reloadCommands();
+
+  return { type: 'message', messageType: 'info', content: msg };
+}
+
+async function getEnablementCompletion(
+  context: CommandContext,
+  partialArg: string,
+  showEnabled: boolean,
+): Promise<string[]> {
+  const agentContext = context.services.agentContext;
+  const config = agentContext?.config;
+  if (!config) return [];
+  const servers = Object.keys(
+    config.getMcpClientManager()?.getMcpServers() || {},
+  );
+  const manager = McpServerEnablementManager.getInstance();
+  const results: string[] = [];
+  for (const n of servers) {
+    const state = await manager.getDisplayState(n);
+    if (state.enabled === showEnabled && n.startsWith(partialArg)) {
+      results.push(n);
+    }
+  }
+  return results;
+}
+
+const enableCommand: SlashCommand = {
+  name: 'enable',
+  description: 'Enable a disabled MCP server',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: true,
+  action: (ctx, args) => handleEnableDisable(ctx, args, true),
+  completion: (ctx, arg) => getEnablementCompletion(ctx, arg, false),
+};
+
+const disableCommand: SlashCommand = {
+  name: 'disable',
+  description: 'Disable an MCP server',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: true,
+  action: (ctx, args) => handleEnableDisable(ctx, args, false),
+  completion: (ctx, arg) => getEnablementCompletion(ctx, arg, true),
 };
 
 export const mcpCommand: SlashCommand = {
   name: 'mcp',
-  description:
-    'list configured MCP servers and tools, or authenticate with OAuth-enabled servers',
+  description: 'Manage configured Model Context Protocol (MCP) servers',
   kind: CommandKind.BUILT_IN,
-  subCommands: [listCommand, authCommand, refreshCommand],
-  // Default action when no subcommand is provided
-  action: async (context: CommandContext, args: string) =>
-    // If no subcommand, run the list command
-    listCommand.action!(context, args),
+  autoExecute: false,
+  subCommands: [
+    listCommand,
+    descCommand,
+    schemaCommand,
+    authCommand,
+    reloadCommand,
+    enableCommand,
+    disableCommand,
+  ],
+  action: async (
+    context: CommandContext,
+    args: string,
+  ): Promise<void | SlashCommandActionReturn> => {
+    if (args) {
+      const parsed = parseSlashCommand(`/${args}`, mcpCommand.subCommands!);
+      if (parsed.commandToExecute?.action) {
+        return parsed.commandToExecute.action(context, parsed.args);
+      }
+      // If no subcommand matches, treat the whole args as a filter for list
+      return listAction(context, false, false, args);
+    }
+    return listAction(context);
+  },
 };

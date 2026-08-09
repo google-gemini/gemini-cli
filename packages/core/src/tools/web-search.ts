@@ -4,14 +4,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { WEB_SEARCH_TOOL_NAME, WEB_SEARCH_DISPLAY_NAME } from './tool-names.js';
 import type { GroundingMetadata } from '@google/genai';
-import type { ToolInvocation, ToolResult } from './tools.js';
-import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
+import {
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  Kind,
+  type ToolInvocation,
+  type ToolResult,
+  type ExecuteOptions,
+} from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 
-import { getErrorMessage } from '../utils/errors.js';
-import type { Config } from '../config/config.js';
+import { getErrorMessage, isAbortError } from '../utils/errors.js';
 import { getResponseText } from '../utils/partUtils.js';
+import { debugLogger } from '../utils/debugLogger.js';
+import { WEB_SEARCH_DEFINITION } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
+import { LlmRole } from '../telemetry/llmRole.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 interface GroundingChunkWeb {
   uri?: string;
@@ -60,24 +72,30 @@ class WebSearchToolInvocation extends BaseToolInvocation<
   WebSearchToolResult
 > {
   constructor(
-    private readonly config: Config,
+    private readonly context: AgentLoopContext,
     params: WebSearchToolParams,
+    messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ) {
-    super(params);
+    super(params, messageBus, _toolName, _toolDisplayName);
   }
 
   override getDescription(): string {
     return `Searching the web for: "${this.params.query}"`;
   }
 
-  async execute(signal: AbortSignal): Promise<WebSearchToolResult> {
-    const geminiClient = this.config.getGeminiClient();
+  async execute({
+    abortSignal: signal,
+  }: ExecuteOptions): Promise<WebSearchToolResult> {
+    const geminiClient = this.context.geminiClient;
 
     try {
       const response = await geminiClient.generateContent(
+        { model: 'web-search' },
         [{ role: 'user', parts: [{ text: this.params.query }] }],
-        { tools: [{ googleSearch: {} }] },
         signal,
+        LlmRole.UTILITY_TOOL,
       );
 
       const responseText = getResponseText(response);
@@ -85,6 +103,7 @@ class WebSearchToolInvocation extends BaseToolInvocation<
       const sources = groundingMetadata?.groundingChunks as
         | GroundingChunkItem[]
         | undefined;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const groundingSupports = groundingMetadata?.groundingSupports as
         | GroundingSupportItem[]
         | undefined;
@@ -159,10 +178,16 @@ class WebSearchToolInvocation extends BaseToolInvocation<
         sources,
       };
     } catch (error: unknown) {
+      if (isAbortError(error)) {
+        return {
+          llmContent: 'Web search was cancelled.',
+          returnDisplay: 'Search cancelled.',
+        };
+      }
       const errorMessage = `Error during web search for query "${
         this.params.query
       }": ${getErrorMessage(error)}`;
-      console.error(errorMessage, error);
+      debugLogger.warn(errorMessage, error);
       return {
         llmContent: `Error: ${errorMessage}`,
         returnDisplay: `Error performing web search.`,
@@ -182,24 +207,21 @@ export class WebSearchTool extends BaseDeclarativeTool<
   WebSearchToolParams,
   WebSearchToolResult
 > {
-  static readonly Name: string = 'google_web_search';
+  static readonly Name = WEB_SEARCH_TOOL_NAME;
 
-  constructor(private readonly config: Config) {
+  constructor(
+    private readonly context: AgentLoopContext,
+    messageBus: MessageBus,
+  ) {
     super(
       WebSearchTool.Name,
-      'GoogleSearch',
-      'Performs a web search using Google Search (via the Gemini API) and returns the results. This tool is useful for finding information on the internet based on a query.',
+      WEB_SEARCH_DISPLAY_NAME,
+      WEB_SEARCH_DEFINITION.base.description!,
       Kind.Search,
-      {
-        type: 'object',
-        properties: {
-          query: {
-            type: 'string',
-            description: 'The search query to find information on the web.',
-          },
-        },
-        required: ['query'],
-      },
+      WEB_SEARCH_DEFINITION.base.parametersJsonSchema,
+      messageBus,
+      true, // isOutputMarkdown
+      false, // canUpdateOutput
     );
   }
 
@@ -219,7 +241,20 @@ export class WebSearchTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: WebSearchToolParams,
+    messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<WebSearchToolParams, WebSearchToolResult> {
-    return new WebSearchToolInvocation(this.config, params);
+    return new WebSearchToolInvocation(
+      this.context.config,
+      params,
+      messageBus ?? this.messageBus,
+      _toolName,
+      _toolDisplayName,
+    );
+  }
+
+  override getSchema(modelId?: string) {
+    return resolveToolDeclaration(WEB_SEARCH_DEFINITION, modelId);
   }
 }

@@ -6,9 +6,12 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
+import * as fsSync from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { marked } from 'marked';
 import { processImports, validateImportPath } from './memoryImportProcessor.js';
+import { debugLogger } from './debugLogger.js';
 
 // Helper function to create platform-agnostic test paths
 function testPath(...segments: string[]): string {
@@ -31,11 +34,6 @@ function testPath(...segments: string[]): string {
 
 vi.mock('fs/promises');
 const mockedFs = vi.mocked(fs);
-
-// Mock console methods to capture warnings
-const originalConsoleWarn = console.warn;
-const originalConsoleError = console.error;
-const originalConsoleDebug = console.debug;
 
 // Helper functions using marked for parsing and validation
 const parseMarkdown = (content: string) => marked.lexer(content);
@@ -94,16 +92,13 @@ describe('memoryImportProcessor', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Mock console methods
-    console.warn = vi.fn();
-    console.error = vi.fn();
-    console.debug = vi.fn();
+    vi.spyOn(debugLogger, 'warn').mockImplementation(() => {});
+    vi.spyOn(debugLogger, 'error').mockImplementation(() => {});
+    vi.spyOn(debugLogger, 'debug').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    // Restore console methods
-    console.warn = originalConsoleWarn;
-    console.error = originalConsoleError;
-    console.debug = originalConsoleDebug;
+    vi.resetAllMocks();
   });
 
   describe('processImports', () => {
@@ -173,7 +168,7 @@ describe('memoryImportProcessor', () => {
 
       // Verify the imported content is present
       expect(result.content).toContain(importedContent);
-      expect(console.warn).not.toHaveBeenCalled();
+      expect(debugLogger.warn).not.toHaveBeenCalled();
       expect(mockedFs.readFile).toHaveBeenCalledWith(
         path.resolve(basePath, './instructions.txt'),
         'utf-8',
@@ -215,7 +210,7 @@ describe('memoryImportProcessor', () => {
       expect(result.content).toContain(
         '<!-- Import failed: ./nonexistent.md - File not found -->',
       );
-      expect(console.error).toHaveBeenCalledWith(
+      expect(debugLogger.error).toHaveBeenCalledWith(
         '[ERROR] [ImportProcessor]',
         'Failed to import ./nonexistent.md: File not found',
       );
@@ -237,7 +232,7 @@ describe('memoryImportProcessor', () => {
 
       const result = await processImports(content, basePath, true, importState);
 
-      expect(console.warn).toHaveBeenCalledWith(
+      expect(debugLogger.warn).toHaveBeenCalledWith(
         '[WARN] [ImportProcessor]',
         'Maximum import depth (1) reached. Stopping import processing.',
       );
@@ -421,6 +416,31 @@ describe('memoryImportProcessor', () => {
       expect(result.content).not.toContain(
         '<!-- Imported from: ./should-not-import.md -->',
       );
+    });
+
+    it('should not process imports in repeated inline code blocks', async () => {
+      const content = '`@noimport` and `@noimport`';
+      const projectRoot = testPath('test', 'project');
+      const basePath = testPath(projectRoot, 'src');
+
+      const result = await processImports(
+        content,
+        basePath,
+        true,
+        undefined,
+        projectRoot,
+      );
+
+      expect(result.content).toBe(content);
+    });
+
+    it('should not import when @ is inside an inline code block', async () => {
+      const content =
+        'We should not ` @import` when the symbol is inside an inline code string.';
+      const testRootDir = testPath('test', 'project');
+      const result = await processImports(content, testRootDir);
+      expect(result.content).toBe(content);
+      expect(result.importTree.imports).toBeUndefined();
     });
 
     it('should allow imports from parent and subdirectories within project root', async () => {
@@ -848,6 +868,47 @@ describe('memoryImportProcessor', () => {
         'file.md',
       );
       expect(validateImportPath(dotPath, basePath, [allowedPath])).toBe(true);
+    });
+
+    it('should reject paths that escape allowed directories via symbolic links', () => {
+      const tmpDir = fsSync.realpathSync(os.tmpdir());
+      const testRoot = fsSync.mkdtempSync(path.join(tmpDir, 'gemini-test-'));
+      const allowedDir = path.join(testRoot, 'allowed');
+      const outsideDir = path.join(testRoot, 'outside');
+      const symlinkDir = path.join(allowedDir, 'sym_outside');
+
+      try {
+        // Create real directories and files on disk
+        fsSync.mkdirSync(allowedDir, { recursive: true });
+        fsSync.mkdirSync(outsideDir, { recursive: true });
+        fsSync.writeFileSync(path.join(outsideDir, 'sensitive.md'), 'secret');
+
+        // Create a symbolic link pointing outside the allowed directory
+        try {
+          fsSync.symlinkSync(outsideDir, symlinkDir, 'dir');
+        } catch (err: unknown) {
+          if (
+            process.platform === 'win32' &&
+            err &&
+            typeof err === 'object' &&
+            'code' in err &&
+            err.code === 'EPERM'
+          ) {
+            // Skip the test if the user lacks symlink creation privileges on Windows
+            return;
+          }
+          throw err;
+        }
+
+        const importPath = 'sym_outside/sensitive.md';
+
+        expect(validateImportPath(importPath, allowedDir, [allowedDir])).toBe(
+          false,
+        );
+      } finally {
+        // Cleanup
+        fsSync.rmSync(testRoot, { recursive: true, force: true });
+      }
     });
   });
 });

@@ -1,0 +1,23 @@
+description="Injects context of all relevant cli files"
+prompt = """
+The following output contains the complete
+source code of the gemini cli library (`packages/cli`), and {packages/core} and representative test files
+(`packages/cli/src/ui/components/InputPrompt.test.tsx` and `packages/cli/src/ui/App.test.tsx`) that best conform to the project's testing standards.
+**Pay extremely close attention to these files.** They define the project's
+core architecture, component patterns, and testing standards.
+
+The source code contains the content of absolutely every source code file in
+packages/cli and packages/core. In addition to the source code, the following test files are
+included as they are test files that conform to the project's testing standards:
+`packages/cli/src/ui/components/InputPrompt.test.tsx` and `packages/cli/src/ui/App.test.tsx`.
+You should very rarely need to read any other files from packages/cli to resolve
+prompts.
+
+!{find packages/cli packages/core \\( -path packages/cli/dist -o -path packages/core/dist -o -name node_modules \\) -prune -o -type f \\( -name "*.ts" -o -name "*.tsx" \\) ! -name "*.test.ts" ! -name "*.test.tsx" ! -name "*.d.ts" -exec echo "--- {} ---" \\; -exec cat {} \\; && echo "--- packages/cli/src/ui/components/InputPrompt.test.tsx ---" && cat packages/cli/src/ui/components/InputPrompt.test.tsx && echo "--- packages/cli/src/ui/App.test.tsx ---" && cat packages/cli/src/ui/App.test.tsx}
+
+In addition to the code context, you MUST strictly adhere to the following frontend-specific development guidelines when writing code in packages/cli.
+
+!{cat .gemini/commands/strict-development-rules.md}
+
+{{args}}. 
+ """

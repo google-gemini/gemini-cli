@@ -1,0 +1,58 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import stripAnsi from 'strip-ansi';
+import type { SessionMetrics } from '../telemetry/uiTelemetry.js';
+import { getErrorType } from '../utils/errors.js';
+import type { JsonError, JsonOutput } from './types.js';
+
+export class JsonFormatter {
+  format(
+    sessionId?: string,
+    response?: string,
+    stats?: SessionMetrics,
+    error?: JsonError,
+    warnings?: string[],
+  ): string {
+    const output: JsonOutput = {};
+
+    if (sessionId) {
+      output.session_id = sessionId;
+    }
+
+    if (response !== undefined) {
+      output.response = stripAnsi(response);
+    }
+
+    if (stats) {
+      output.stats = stats;
+    }
+
+    if (error) {
+      output.error = error;
+    }
+
+    if (warnings && warnings.length > 0) {
+      output.warnings = warnings.map((w) => stripAnsi(w));
+    }
+
+    return JSON.stringify(output, null, 2);
+  }
+
+  formatError(
+    error: Error,
+    code?: string | number,
+    sessionId?: string,
+  ): string {
+    const jsonError: JsonError = {
+      type: getErrorType(error),
+      message: stripAnsi(error.message),
+      ...(code && { code }),
+    };
+
+    return this.format(sessionId, undefined, undefined, jsonError);
+  }
+}

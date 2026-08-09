@@ -70,5 +70,48 @@ if (invalidPackages.length > 0) {
   process.exitCode = 1;
 } else {
   console.log('Lockfile check passed.');
+}
+
+// Check that gaxios v7+ with stream corruption bug is NOT resolved in any workspace node_modules.
+// gaxios v7.x (versions < 7.1.6) has a bug where Array.toString() joins stream chunks with
+// commas, corrupting error response JSON at TCP chunk boundaries.
+// See: https://github.com/google-gemini/gemini-cli/pull/21884
+function isCorruptedGaxios(version) {
+  if (!version) return false;
+  const match = version.match(/^7\.(\d+)\.(\d+)/);
+  if (match) {
+    const minor = parseInt(match[1], 10);
+    const patch = parseInt(match[2], 10);
+    if (minor < 1 || (minor === 1 && patch < 6)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+const gaxiosViolations = [];
+for (const [location, details] of Object.entries(packages)) {
+  if (
+    location.match(/(^|\/)node_modules\/gaxios$/) &&
+    !location.includes('@google/genai/node_modules') &&
+    isCorruptedGaxios(details.version)
+  ) {
+    gaxiosViolations.push(`${location} (v${details.version})`);
+  }
+}
+
+if (gaxiosViolations.length > 0) {
+  console.error(
+    '\nError: gaxios versions with stream corruption bug (v7.x < 7.1.6) detected in workspace node_modules.',
+  );
+  console.error('See: https://github.com/google-gemini/gemini-cli/pull/21884');
+  gaxiosViolations.forEach((v) => console.error(`- ${v}`));
+  console.error(
+    '\nPlease ensure gaxios resolves to a version containing the fix (>= 7.1.6).',
+  );
+  process.exitCode = 1;
+}
+
+if (!process.exitCode) {
   process.exitCode = 0;
 }

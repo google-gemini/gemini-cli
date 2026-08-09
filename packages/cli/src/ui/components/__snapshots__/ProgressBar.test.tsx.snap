@@ -1,0 +1,21 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<ProgressBar /> > renders 0% correctly 1`] = `
+"▬▬▬▬▬▬▬▬▬▬
+"
+`;
+
+exports[`<ProgressBar /> > renders 50% correctly 1`] = `
+"▬▬▬▬▬▬▬▬▬▬
+"
+`;
+
+exports[`<ProgressBar /> > renders error threshold correctly at 100% 1`] = `
+"▬▬▬▬▬▬▬▬▬▬
+"
+`;
+
+exports[`<ProgressBar /> > renders warning threshold correctly 1`] = `
+"▬▬▬▬▬▬▬▬▬▬
+"
+`;

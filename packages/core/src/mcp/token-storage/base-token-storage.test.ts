@@ -70,139 +70,103 @@ describe('BaseTokenStorage', () => {
       expect(() => storage.validateCredentials(credentials)).not.toThrow();
     });
 
-    it('should throw for missing server name', () => {
-      const credentials = {
-        serverName: '',
-        token: {
-          accessToken: 'access-token',
-          tokenType: 'Bearer',
+    it.each([
+      {
+        desc: 'missing server name',
+        credentials: {
+          serverName: '',
+          token: {
+            accessToken: 'access-token',
+            tokenType: 'Bearer',
+          },
+          updatedAt: Date.now(),
         },
-        updatedAt: Date.now(),
-      } as OAuthCredentials;
-
-      expect(() => storage.validateCredentials(credentials)).toThrow(
-        'Server name is required',
-      );
-    });
-
-    it('should throw for missing token', () => {
-      const credentials = {
-        serverName: 'test-server',
-        token: null as unknown as OAuthToken,
-        updatedAt: Date.now(),
-      } as OAuthCredentials;
-
-      expect(() => storage.validateCredentials(credentials)).toThrow(
-        'Token is required',
-      );
-    });
-
-    it('should throw for missing access token', () => {
-      const credentials = {
-        serverName: 'test-server',
-        token: {
-          accessToken: '',
-          tokenType: 'Bearer',
+        expectedError: 'Server name is required',
+      },
+      {
+        desc: 'missing token',
+        credentials: {
+          serverName: 'test-server',
+          token: null as unknown as OAuthToken,
+          updatedAt: Date.now(),
         },
-        updatedAt: Date.now(),
-      } as OAuthCredentials;
-
-      expect(() => storage.validateCredentials(credentials)).toThrow(
-        'Access token is required',
-      );
-    });
-
-    it('should throw for missing token type', () => {
-      const credentials = {
-        serverName: 'test-server',
-        token: {
-          accessToken: 'access-token',
-          tokenType: '',
+        expectedError: 'Token is required',
+      },
+      {
+        desc: 'missing access token',
+        credentials: {
+          serverName: 'test-server',
+          token: {
+            accessToken: '',
+            tokenType: 'Bearer',
+          },
+          updatedAt: Date.now(),
         },
-        updatedAt: Date.now(),
-      } as OAuthCredentials;
-
-      expect(() => storage.validateCredentials(credentials)).toThrow(
-        'Token type is required',
-      );
+        expectedError: 'Access token is required',
+      },
+      {
+        desc: 'missing token type',
+        credentials: {
+          serverName: 'test-server',
+          token: {
+            accessToken: 'access-token',
+            tokenType: '',
+          },
+          updatedAt: Date.now(),
+        },
+        expectedError: 'Token type is required',
+      },
+    ])('should throw for $desc', ({ credentials, expectedError }) => {
+      expect(() =>
+        storage.validateCredentials(credentials as OAuthCredentials),
+      ).toThrow(expectedError);
     });
   });
 
   describe('isTokenExpired', () => {
-    it('should return false for tokens without expiry', () => {
+    it.each([
+      ['tokens without expiry', undefined, false],
+      ['valid tokens', Date.now() + 3600000, false],
+      ['expired tokens', Date.now() - 3600000, true],
+      [
+        'tokens within 5-minute buffer (4 minutes from now)',
+        Date.now() + 4 * 60 * 1000,
+        true,
+      ],
+    ])('should return %s for %s', (_, expiresAt, expected) => {
       const credentials: OAuthCredentials = {
         serverName: 'test-server',
         token: {
           accessToken: 'access-token',
           tokenType: 'Bearer',
+          ...(expiresAt !== undefined && { expiresAt }),
         },
         updatedAt: Date.now(),
       };
 
-      expect(storage.isTokenExpired(credentials)).toBe(false);
-    });
-
-    it('should return false for valid tokens', () => {
-      const credentials: OAuthCredentials = {
-        serverName: 'test-server',
-        token: {
-          accessToken: 'access-token',
-          tokenType: 'Bearer',
-          expiresAt: Date.now() + 3600000,
-        },
-        updatedAt: Date.now(),
-      };
-
-      expect(storage.isTokenExpired(credentials)).toBe(false);
-    });
-
-    it('should return true for expired tokens', () => {
-      const credentials: OAuthCredentials = {
-        serverName: 'test-server',
-        token: {
-          accessToken: 'access-token',
-          tokenType: 'Bearer',
-          expiresAt: Date.now() - 3600000,
-        },
-        updatedAt: Date.now(),
-      };
-
-      expect(storage.isTokenExpired(credentials)).toBe(true);
-    });
-
-    it('should apply 5-minute buffer for expiry check', () => {
-      const fourMinutesFromNow = Date.now() + 4 * 60 * 1000;
-      const credentials: OAuthCredentials = {
-        serverName: 'test-server',
-        token: {
-          accessToken: 'access-token',
-          tokenType: 'Bearer',
-          expiresAt: fourMinutesFromNow,
-        },
-        updatedAt: Date.now(),
-      };
-
-      expect(storage.isTokenExpired(credentials)).toBe(true);
+      expect(storage.isTokenExpired(credentials)).toBe(expected);
     });
   });
 
   describe('sanitizeServerName', () => {
-    it('should keep valid characters', () => {
-      expect(storage.sanitizeServerName('test-server.example_123')).toBe(
+    it.each([
+      [
+        'valid characters',
         'test-server.example_123',
-      );
-    });
-
-    it('should replace invalid characters with underscore', () => {
-      expect(storage.sanitizeServerName('test@server#example')).toBe(
+        'test-server.example_123',
+      ],
+      [
+        'invalid characters with underscore replacement',
+        'test@server#example',
         'test_server_example',
-      );
-    });
-
-    it('should handle special characters', () => {
-      expect(storage.sanitizeServerName('test server/example:123')).toBe(
+      ],
+      [
+        'special characters',
+        'test server/example:123',
         'test_server_example_123',
-      );
+      ],
+    ])('should handle %s', (_, input, expected) => {
+      expect(storage.sanitizeServerName(input)).toBe(expected);
     });
   });
 });

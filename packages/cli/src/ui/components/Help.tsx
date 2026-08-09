@@ -6,8 +6,12 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
-import { Colors } from '../colors.js';
-import type { SlashCommand } from '../commands/types.js';
+import { theme } from '../semantic-colors.js';
+import { type SlashCommand, CommandKind } from '../commands/types.js';
+import { KEYBOARD_SHORTCUTS_URL } from '../constants.js';
+import { sanitizeForDisplay } from '../utils/textUtils.js';
+import { formatCommand } from '../key/keybindingUtils.js';
+import { Command } from '../key/keyBindings.js';
 
 interface Help {
   commands: readonly SlashCommand[];
@@ -17,42 +21,42 @@ export const Help: React.FC<Help> = ({ commands }) => (
   <Box
     flexDirection="column"
     marginBottom={1}
-    borderColor={Colors.Gray}
+    borderColor={theme.border.default}
     borderStyle="round"
     padding={1}
   >
     {/* Basics */}
-    <Text bold color={Colors.Foreground}>
+    <Text bold color={theme.text.primary}>
       Basics:
     </Text>
-    <Text color={Colors.Foreground}>
-      <Text bold color={Colors.AccentPurple}>
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
         Add context
       </Text>
       : Use{' '}
-      <Text bold color={Colors.AccentPurple}>
+      <Text bold color={theme.text.accent}>
         @
       </Text>{' '}
       to specify files for context (e.g.,{' '}
-      <Text bold color={Colors.AccentPurple}>
+      <Text bold color={theme.text.accent}>
         @src/myFile.ts
       </Text>
       ) to target specific files or folders.
     </Text>
-    <Text color={Colors.Foreground}>
-      <Text bold color={Colors.AccentPurple}>
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
         Shell mode
       </Text>
       : Execute shell commands via{' '}
-      <Text bold color={Colors.AccentPurple}>
+      <Text bold color={theme.text.accent}>
         !
       </Text>{' '}
       (e.g.,{' '}
-      <Text bold color={Colors.AccentPurple}>
+      <Text bold color={theme.text.accent}>
         !npm run start
       </Text>
       ) or use natural language (e.g.{' '}
-      <Text bold color={Colors.AccentPurple}>
+      <Text bold color={theme.text.accent}>
         start server
       </Text>
       ).
@@ -61,113 +65,136 @@ export const Help: React.FC<Help> = ({ commands }) => (
     <Box height={1} />
 
     {/* Commands */}
-    <Text bold color={Colors.Foreground}>
+    <Text bold color={theme.text.primary}>
       Commands:
     </Text>
     {commands
-      .filter((command) => command.description)
+      .filter((command) => command.description && !command.hidden)
       .map((command: SlashCommand) => (
         <Box key={command.name} flexDirection="column">
-          <Text color={Colors.Foreground}>
-            <Text bold color={Colors.AccentPurple}>
+          <Text color={theme.text.primary}>
+            <Text bold color={theme.text.accent}>
               {' '}
               /{command.name}
             </Text>
-            {command.description && ' - ' + command.description}
+            {command.kind === CommandKind.MCP_PROMPT && (
+              <Text color={theme.text.secondary}> [MCP]</Text>
+            )}
+            {command.description &&
+              ' - ' + sanitizeForDisplay(command.description, 100)}
           </Text>
           {command.subCommands &&
-            command.subCommands.map((subCommand) => (
-              <Text key={subCommand.name} color={Colors.Foreground}>
-                <Text bold color={Colors.AccentPurple}>
-                  {'   '}
-                  {subCommand.name}
+            command.subCommands
+              .filter((subCommand) => !subCommand.hidden)
+              .map((subCommand) => (
+                <Text key={subCommand.name} color={theme.text.primary}>
+                  <Text bold color={theme.text.accent}>
+                    {'   '}
+                    {subCommand.name}
+                  </Text>
+                  {subCommand.description &&
+                    ' - ' + sanitizeForDisplay(subCommand.description, 100)}
                 </Text>
-                {subCommand.description && ' - ' + subCommand.description}
-              </Text>
-            ))}
+              ))}
         </Box>
       ))}
-    <Text color={Colors.Foreground}>
-      <Text bold color={Colors.AccentPurple}>
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
         {' '}
         !{' '}
       </Text>
       - shell command
     </Text>
+    <Text color={theme.text.primary}>
+      <Text color={theme.text.secondary}>[MCP]</Text> - Model Context Protocol
+      command (from external servers)
+    </Text>
 
     <Box height={1} />
 
     {/* Shortcuts */}
-    <Text bold color={Colors.Foreground}>
+    <Text bold color={theme.text.primary}>
       Keyboard Shortcuts:
     </Text>
-    <Text color={Colors.Foreground}>
-      <Text bold color={Colors.AccentPurple}>
-        Alt+Left/Right
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
+        {formatCommand(Command.MOVE_WORD_LEFT)}/
+        {formatCommand(Command.MOVE_WORD_RIGHT)}
       </Text>{' '}
       - Jump through words in the input
     </Text>
-    <Text color={Colors.Foreground}>
-      <Text bold color={Colors.AccentPurple}>
-        Ctrl+C
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
+        {formatCommand(Command.QUIT)}
       </Text>{' '}
       - Quit application
     </Text>
-    <Text color={Colors.Foreground}>
-      <Text bold color={Colors.AccentPurple}>
-        {process.platform === 'win32' ? 'Ctrl+Enter' : 'Ctrl+J'}
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
+        {formatCommand(Command.NEWLINE)}
       </Text>{' '}
-      {process.platform === 'linux'
-        ? '- New line (Alt+Enter works for certain linux distros)'
-        : '- New line'}
+      - New line
     </Text>
-    <Text color={Colors.Foreground}>
-      <Text bold color={Colors.AccentPurple}>
-        Ctrl+L
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
+        {formatCommand(Command.CLEAR_SCREEN)}
       </Text>{' '}
       - Clear the screen
     </Text>
-    <Text color={Colors.Foreground}>
-      <Text bold color={Colors.AccentPurple}>
-        {process.platform === 'darwin' ? 'Ctrl+X / Meta+Enter' : 'Ctrl+X'}
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
+        {formatCommand(Command.TOGGLE_COPY_MODE)}
+      </Text>{' '}
+      - Enter selection mode to copy text
+    </Text>
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
+        {formatCommand(Command.OPEN_EXTERNAL_EDITOR)}
       </Text>{' '}
       - Open input in external editor
     </Text>
-    <Text color={Colors.Foreground}>
-      <Text bold color={Colors.AccentPurple}>
-        Ctrl+Y
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
+        {formatCommand(Command.TOGGLE_YOLO)}
       </Text>{' '}
       - Toggle YOLO mode
     </Text>
-    <Text color={Colors.Foreground}>
-      <Text bold color={Colors.AccentPurple}>
-        Enter
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
+        {formatCommand(Command.SUBMIT)}
       </Text>{' '}
       - Send message
     </Text>
-    <Text color={Colors.Foreground}>
-      <Text bold color={Colors.AccentPurple}>
-        Esc
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
+        {formatCommand(Command.ESCAPE)}
       </Text>{' '}
       - Cancel operation / Clear input (double press)
     </Text>
-    <Text color={Colors.Foreground}>
-      <Text bold color={Colors.AccentPurple}>
-        Shift+Tab
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
+        {formatCommand(Command.PAGE_UP)}/{formatCommand(Command.PAGE_DOWN)}
+      </Text>{' '}
+      - Scroll page up/down
+    </Text>
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
+        {formatCommand(Command.CYCLE_APPROVAL_MODE)}
       </Text>{' '}
       - Toggle auto-accepting edits
     </Text>
-    <Text color={Colors.Foreground}>
-      <Text bold color={Colors.AccentPurple}>
-        Up/Down
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
+        {formatCommand(Command.HISTORY_UP)}/
+        {formatCommand(Command.HISTORY_DOWN)}
       </Text>{' '}
       - Cycle through your prompt history
     </Text>
     <Box height={1} />
-    <Text color={Colors.Foreground}>
+    <Text color={theme.text.primary}>
       For a full list of shortcuts, see{' '}
-      <Text bold color={Colors.AccentPurple}>
-        docs/keyboard-shortcuts.md
+      <Text bold color={theme.text.accent}>
+        {KEYBOARD_SHORTCUTS_URL}
       </Text>
     </Text>
   </Box>

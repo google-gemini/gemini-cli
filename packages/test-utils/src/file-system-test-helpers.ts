@@ -66,12 +66,12 @@ async function create(dir: string, structure: FileSystemStructure) {
         if (typeof item === 'string') {
           await fs.writeFile(path.join(newPath, item), '');
         } else {
-          await create(newPath, item as FileSystemStructure);
+          await create(newPath, item);
         }
       }
     } else if (typeof content === 'object' && content !== null) {
       await fs.mkdir(newPath, { recursive: true });
-      await create(newPath, content as FileSystemStructure);
+      await create(newPath, content);
     }
   }
 }
@@ -93,6 +93,25 @@ export async function createTmpDir(
  * Cleans up (deletes) a temporary directory and its contents.
  * @param dir The absolute path to the temporary directory to clean up.
  */
-export async function cleanupTmpDir(dir: string) {
-  await fs.rm(dir, { recursive: true, force: true });
+export async function cleanupTmpDir(dir: string | undefined) {
+  if (!dir) {
+    return;
+  }
+
+  try {
+    const exists = await fs
+      .access(dir)
+      .then(() => true)
+      .catch(() => false);
+
+    if (exists) {
+      if (process.platform === 'win32') {
+        // Give Windows a moment to release file handles
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  } catch {
+    // Ignore errors during cleanup (e.g., directory already deleted)
+  }
 }

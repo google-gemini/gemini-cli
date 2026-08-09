@@ -4,23 +4,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { act, renderHook } from '@testing-library/react';
+import { act } from 'react';
+import { renderHook } from '../../test-utils/render.js';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { useInputHistoryStore } from './useInputHistoryStore.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 describe('useInputHistoryStore', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('should initialize with empty input history', () => {
-    const { result } = renderHook(() => useInputHistoryStore());
+  it('should initialize with empty input history', async () => {
+    const { result } = await renderHook(() => useInputHistoryStore());
 
     expect(result.current.inputHistory).toEqual([]);
   });
 
-  it('should add input to history', () => {
-    const { result } = renderHook(() => useInputHistoryStore());
+  it('should add input to history', async () => {
+    const { result } = await renderHook(() => useInputHistoryStore());
 
     act(() => {
       result.current.addInput('test message 1');
@@ -38,8 +40,8 @@ describe('useInputHistoryStore', () => {
     ]);
   });
 
-  it('should not add empty or whitespace-only inputs', () => {
-    const { result } = renderHook(() => useInputHistoryStore());
+  it('should not add empty or whitespace-only inputs', async () => {
+    const { result } = await renderHook(() => useInputHistoryStore());
 
     act(() => {
       result.current.addInput('');
@@ -54,8 +56,8 @@ describe('useInputHistoryStore', () => {
     expect(result.current.inputHistory).toEqual([]);
   });
 
-  it('should deduplicate consecutive identical messages', () => {
-    const { result } = renderHook(() => useInputHistoryStore());
+  it('should deduplicate consecutive identical messages', async () => {
+    const { result } = await renderHook(() => useInputHistoryStore());
 
     act(() => {
       result.current.addInput('test message');
@@ -89,7 +91,7 @@ describe('useInputHistoryStore', () => {
         .mockResolvedValue(['newest', 'middle', 'oldest']),
     };
 
-    const { result } = renderHook(() => useInputHistoryStore());
+    const { result } = await renderHook(() => useInputHistoryStore());
 
     await act(async () => {
       await result.current.initializeFromLogger(mockLogger);
@@ -107,9 +109,11 @@ describe('useInputHistoryStore', () => {
         .mockRejectedValue(new Error('Logger error')),
     };
 
-    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const consoleSpy = vi
+      .spyOn(debugLogger, 'warn')
+      .mockImplementation(() => {});
 
-    const { result } = renderHook(() => useInputHistoryStore());
+    const { result } = await renderHook(() => useInputHistoryStore());
 
     await act(async () => {
       await result.current.initializeFromLogger(mockLogger);
@@ -131,7 +135,7 @@ describe('useInputHistoryStore', () => {
         .mockResolvedValue(['message1', 'message2']),
     };
 
-    const { result } = renderHook(() => useInputHistoryStore());
+    const { result } = await renderHook(() => useInputHistoryStore());
 
     // Call initializeFromLogger twice
     await act(async () => {
@@ -148,7 +152,7 @@ describe('useInputHistoryStore', () => {
   });
 
   it('should handle null logger gracefully', async () => {
-    const { result } = renderHook(() => useInputHistoryStore());
+    const { result } = await renderHook(() => useInputHistoryStore());
 
     await act(async () => {
       await result.current.initializeFromLogger(null);
@@ -157,8 +161,8 @@ describe('useInputHistoryStore', () => {
     expect(result.current.inputHistory).toEqual([]);
   });
 
-  it('should trim input before adding to history', () => {
-    const { result } = renderHook(() => useInputHistoryStore());
+  it('should trim input before adding to history', async () => {
+    const { result } = await renderHook(() => useInputHistoryStore());
 
     act(() => {
       result.current.addInput('  test message  ');
@@ -181,7 +185,7 @@ describe('useInputHistoryStore', () => {
           ]), // newest first with duplicates
       };
 
-      const { result } = renderHook(() => useInputHistoryStore());
+      const { result } = await renderHook(() => useInputHistoryStore());
 
       await act(async () => {
         await result.current.initializeFromLogger(mockLogger);
@@ -200,7 +204,7 @@ describe('useInputHistoryStore', () => {
         getPreviousUserMessages: vi.fn().mockResolvedValue(['old2', 'old1']), // newest first
       };
 
-      const { result } = renderHook(() => useInputHistoryStore());
+      const { result } = await renderHook(() => useInputHistoryStore());
 
       // Initialize with past session
       await act(async () => {
@@ -229,7 +233,7 @@ describe('useInputHistoryStore', () => {
           .mockResolvedValue(['message2', 'message1', 'message2']), // newest first with non-consecutive duplicate
       };
 
-      const { result } = renderHook(() => useInputHistoryStore());
+      const { result } = await renderHook(() => useInputHistoryStore());
 
       await act(async () => {
         await result.current.initializeFromLogger(mockLogger);
@@ -243,8 +247,8 @@ describe('useInputHistoryStore', () => {
       ]);
     });
 
-    it('should handle complex deduplication with current session', () => {
-      const { result } = renderHook(() => useInputHistoryStore());
+    it('should handle complex deduplication with current session', async () => {
+      const { result } = await renderHook(() => useInputHistoryStore());
 
       // Add multiple messages with duplicates
       act(() => {
@@ -274,7 +278,7 @@ describe('useInputHistoryStore', () => {
           .mockResolvedValue(['newest', 'middle', 'oldest']), // newest first
       };
 
-      const { result } = renderHook(() => useInputHistoryStore());
+      const { result } = await renderHook(() => useInputHistoryStore());
 
       await act(async () => {
         await result.current.initializeFromLogger(mockLogger);

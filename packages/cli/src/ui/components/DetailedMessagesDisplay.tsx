@@ -5,78 +5,127 @@
  */
 
 import type React from 'react';
+import { useRef, useCallback, useMemo } from 'react';
 import { Box, Text } from 'ink';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import type { ConsoleMessageItem } from '../types.js';
-import { MaxSizedBox } from './shared/MaxSizedBox.js';
+import {
+  ScrollableList,
+  type ScrollableListRef,
+} from './shared/ScrollableList.js';
+import { useConsoleMessages } from '../hooks/useConsoleMessages.js';
+import { useConfig } from '../contexts/ConfigContext.js';
 
 interface DetailedMessagesDisplayProps {
-  messages: ConsoleMessageItem[];
   maxHeight: number | undefined;
   width: number;
-  // debugMode is not needed here if App.tsx filters debug messages before passing them.
-  // If DetailedMessagesDisplay should handle filtering, add debugMode prop.
+  hasFocus: boolean;
 }
+
+const iconBoxWidth = 3;
 
 export const DetailedMessagesDisplay: React.FC<
   DetailedMessagesDisplayProps
-> = ({ messages, maxHeight, width }) => {
+> = ({ maxHeight, width, hasFocus }) => {
+  const scrollableListRef = useRef<ScrollableListRef<ConsoleMessageItem>>(null);
+
+  const consoleMessages = useConsoleMessages();
+  const config = useConfig();
+
+  const messages = useMemo(() => {
+    if (config.getDebugMode()) {
+      return consoleMessages;
+    }
+    return consoleMessages.filter((msg) => msg.type !== 'debug');
+  }, [consoleMessages, config]);
+
+  const borderAndPadding = 3;
+
+  const estimatedItemHeight = useCallback(
+    (index: number) => {
+      const msg = messages[index];
+      if (!msg) {
+        return 1;
+      }
+      const textWidth = width - borderAndPadding - iconBoxWidth;
+      if (textWidth <= 0) {
+        return 1;
+      }
+      const lines = Math.ceil((msg.content?.length || 1) / textWidth);
+      return Math.max(1, lines);
+    },
+    [width, messages],
+  );
+
   if (messages.length === 0) {
-    return null; // Don't render anything if there are no messages
+    return null;
   }
 
-  const borderAndPadding = 4;
   return (
     <Box
       flexDirection="column"
       marginTop={1}
       borderStyle="round"
-      borderColor={Colors.Gray}
-      paddingX={1}
+      borderColor={theme.border.default}
+      paddingLeft={1}
       width={width}
+      height={maxHeight}
+      flexShrink={0}
+      flexGrow={0}
+      overflow="hidden"
     >
       <Box marginBottom={1}>
-        <Text bold color={Colors.Foreground}>
-          Debug Console <Text color={Colors.Gray}>(ctrl+o to close)</Text>
+        <Text bold color={theme.text.primary}>
+          Debug Console <Text color={theme.text.secondary}>(F12 to close)</Text>
         </Text>
       </Box>
-      <MaxSizedBox maxHeight={maxHeight} maxWidth={width - borderAndPadding}>
-        {messages.map((msg, index) => {
-          let textColor = Colors.Foreground;
-          let icon = '\u2139'; // Information source (ℹ)
+      <Box height={maxHeight} width={width - borderAndPadding}>
+        <ScrollableList
+          ref={scrollableListRef}
+          data={messages}
+          renderItem={({ item: msg }: { item: ConsoleMessageItem }) => {
+            let textColor = theme.text.primary;
+            let icon = 'ℹ'; // Information source (ℹ)
 
-          switch (msg.type) {
-            case 'warn':
-              textColor = Colors.AccentYellow;
-              icon = '\u26A0'; // Warning sign (⚠)
-              break;
-            case 'error':
-              textColor = Colors.AccentRed;
-              icon = '\u2716'; // Heavy multiplication x (✖)
-              break;
-            case 'debug':
-              textColor = Colors.Gray; // Or Colors.Gray
-              icon = '\u{1F50D}'; // Left-pointing magnifying glass (🔍)
-              break;
-            case 'log':
-            default:
-              // Default textColor and icon are already set
-              break;
-          }
+            switch (msg.type) {
+              case 'warn':
+                textColor = theme.status.warning;
+                icon = '⚠'; // Warning sign (⚠)
+                break;
+              case 'error':
+                textColor = theme.status.error;
+                icon = '✖'; // Heavy multiplication x (✖)
+                break;
+              case 'debug':
+                textColor = theme.text.secondary; // Or theme.text.secondary
+                icon = '🔍'; // Left-pointing magnifying glass (🔍)
+                break;
+              case 'log':
+              default:
+                // Default textColor and icon are already set
+                break;
+            }
 
-          return (
-            <Box key={index} flexDirection="row">
-              <Text color={textColor}>{icon} </Text>
-              <Text color={textColor} wrap="wrap">
-                {msg.content}
-                {msg.count && msg.count > 1 && (
-                  <Text color={Colors.Gray}> (x{msg.count})</Text>
-                )}
-              </Text>
-            </Box>
-          );
-        })}
-      </MaxSizedBox>
+            return (
+              <Box flexDirection="row">
+                <Box minWidth={iconBoxWidth} flexShrink={0}>
+                  <Text color={textColor}>{icon}</Text>
+                </Box>
+                <Text color={textColor} wrap="wrap">
+                  {msg.content}
+                  {msg.count && msg.count > 1 && (
+                    <Text color={theme.text.secondary}> (x{msg.count})</Text>
+                  )}
+                </Text>
+              </Box>
+            );
+          }}
+          keyExtractor={(item, index) => `${item.content}-${index}`}
+          estimatedItemHeight={estimatedItemHeight}
+          hasFocus={hasFocus}
+          initialScrollIndex={Number.MAX_SAFE_INTEGER}
+        />
+      </Box>
     </Box>
   );
 };

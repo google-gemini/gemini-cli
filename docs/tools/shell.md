@@ -1,83 +1,178 @@
-# Shell Tool (`run_shell_command`)
+# Shell tool (`run_shell_command`)
 
-This document describes the `run_shell_command` tool for the Gemini CLI.
+The `run_shell_command` tool allows the Gemini model to execute commands
+directly on your system's shell. It is the primary mechanism for the agent to
+interact with your environment beyond simple file edits.
 
-## Description
+## Technical reference
 
-Use `run_shell_command` to interact with the underlying system, run scripts, or perform command-line operations. `run_shell_command` executes a given shell command. On Windows, the command will be executed with `cmd.exe /c`. On other platforms, the command will be executed with `bash -c`.
+On Windows, commands execute with `powershell.exe -NoProfile -Command`. On other
+platforms, they execute with `bash -c`.
 
 ### Arguments
 
-`run_shell_command` takes the following arguments:
-
 - `command` (string, required): The exact shell command to execute.
-- `description` (string, optional): A brief description of the command's purpose, which will be shown to the user.
-- `directory` (string, optional): The directory (relative to the project root) in which to execute the command. If not provided, the command runs in the project root.
+- `description` (string, optional): A brief description shown to the user for
+  confirmation.
+- `dir_path` (string, optional): The absolute path or relative path from
+  workspace root where the command runs.
+- `is_background` (boolean, optional): Whether to move the process to the
+  background immediately after starting.
 
-## How to use `run_shell_command` with the Gemini CLI
+### Policy engine shorthands
 
-When using `run_shell_command`, the command is executed as a subprocess. `run_shell_command` can start background processes using `&`. The tool returns detailed information about the execution, including:
+The [policy engine](../reference/policy-engine.md) provides two convenience
+fields for writing rules that target shell commands:
 
-- `Command`: The command that was executed.
-- `Directory`: The directory where the command was run.
-- `Stdout`: Output from the standard output stream.
-- `Stderr`: Output from the standard error stream.
-- `Error`: Any error message reported by the subprocess.
-- `Exit Code`: The exit code of the command.
-- `Signal`: The signal number if the command was terminated by a signal.
-- `Background PIDs`: A list of PIDs for any background processes started.
+- `commandPrefix`: Matches if the `command` argument starts with a given string.
+- `commandRegex`: Matches if the `command` argument matches a given regular
+  expression.
 
-Usage:
+These are syntactic sugar for combining `toolName = "run_shell_command"` with an
+`argsPattern` in a policy TOML file. They are **not** arguments of
+`run_shell_command` itself.
 
+For details on writing shell-specific policy rules, see
+[Special syntax for `run_shell_command`](../reference/policy-engine.md#special-syntax-for-run_shell_command)
+in the policy engine reference.
+
+### Return values
+
+The tool returns a JSON object containing:
+
+- `Command`: The executed string.
+- `Directory`: The execution path.
+- `Stdout` / `Stderr`: The output streams.
+- `Exit Code`: The process return code.
+- `Background PIDs`: PIDs of any started background processes.
+
+## Configuration
+
+You can configure the behavior of the `run_shell_command` tool by modifying your
+`settings.json` file or by using the `/settings` command in Gemini CLI.
+
+### Enabling interactive commands
+
+To enable interactive commands, you need to set the
+`tools.shell.enableInteractiveShell` setting to `true`. This will use `node-pty`
+for shell command execution, which allows for interactive sessions. If
+`node-pty` is not available, it will fall back to the `child_process`
+implementation, which does not support interactive commands.
+
+**Example `settings.json`:**
+
+```json
+{
+  "tools": {
+    "shell": {
+      "enableInteractiveShell": true
+    }
+  }
+}
 ```
-run_shell_command(command="Your commands.", description="Your description of the command.", directory="Your execution directory.")
+
+### Showing color in output
+
+To show color in the shell output, you need to set the `tools.shell.showColor`
+setting to `true`. This setting only applies when
+`tools.shell.enableInteractiveShell` is enabled.
+
+**Example `settings.json`:**
+
+```json
+{
+  "tools": {
+    "shell": {
+      "showColor": true
+    }
+  }
+}
 ```
 
-## `run_shell_command` examples
+### Setting the pager
 
-List files in the current directory:
+You can set a custom pager for the shell output by setting the
+`tools.shell.pager` setting. The default pager is `cat`. This setting only
+applies when `tools.shell.enableInteractiveShell` is enabled.
 
-```
-run_shell_command(command="ls -la")
+**Example `settings.json`:**
+
+```json
+{
+  "tools": {
+    "shell": {
+      "pager": "less"
+    }
+  }
+}
 ```
 
-Run a script in a specific directory:
+## Interactive commands
 
-```
-run_shell_command(command="./my_script.sh", directory="scripts", description="Run my custom script")
-```
+The `run_shell_command` tool now supports interactive commands by integrating a
+pseudo-terminal (pty). This lets you run commands that require real-time user
+input, such as text editors (`vim`, `nano`), terminal-based UIs (`htop`), and
+interactive version control operations (`git rebase -i`).
 
-Start a background server:
-
-```
-run_shell_command(command="npm run dev &", description="Start development server in background")
-```
+When an interactive command is running, you can send input to it from the Gemini
+CLI. To focus on the interactive shell, press `Tab`. The terminal output,
+including complex TUIs, will be rendered correctly.
 
 ## Important notes
 
-- **Security:** Be cautious when executing commands, especially those constructed from user input, to prevent security vulnerabilities.
-- **Interactive commands:** Avoid commands that require interactive user input, as this can cause the tool to hang. Use non-interactive flags if available (e.g., `npm init -y`).
-- **Error handling:** Check the `Stderr`, `Error`, and `Exit Code` fields to determine if a command executed successfully.
-- **Background processes:** When a command is run in the background with `&`, the tool will return immediately and the process will continue to run in the background. The `Background PIDs` field will contain the process ID of the background process.
+- **Security:** Be cautious when executing commands, especially those
+  constructed from user input, to prevent security vulnerabilities.
+- **Error handling:** Check the `Stderr`, `Error`, and `Exit Code` fields to
+  determine if a command executed successfully.
+- **Background processes:** When a command is run in the background with `&`,
+  the tool will return immediately and the process will continue to run in the
+  background. The `Background PIDs` field will contain the process ID of the
+  background process.
 
-## Environment Variables
+## Environment variables
 
-When `run_shell_command` executes a command, it sets the `GEMINI_CLI=1` environment variable in the subprocess's environment. This allows scripts or tools to detect if they are being run from within the Gemini CLI.
+When `run_shell_command` executes a command, it sets the `GEMINI_CLI=1`
+environment variable in the subprocess's environment. This allows scripts or
+tools to detect if they are being run from within Gemini CLI.
 
-## Command Restrictions
+## Command restrictions
 
-You can restrict the commands that can be executed by the `run_shell_command` tool by using the `tools.core` and `tools.exclude` settings in your configuration file.
+<!-- prettier-ignore -->
+> [!WARNING]
+> The `tools.core` setting is an **allowlist for _all_ built-in
+> tools**, not just shell commands. When you set `tools.core` to any value,
+> _only_ the tools explicitly listed will be enabled. This includes all built-in
+> tools like `read_file`, `write_file`, `glob`, `grep_search`, `list_directory`,
+> `replace`, etc.
 
-- `tools.core`: To restrict `run_shell_command` to a specific set of commands, add entries to the `core` list under the `tools` category in the format `run_shell_command(<command>)`. For example, `"tools": {"core": ["run_shell_command(git)"]}` will only allow `git` commands. Including the generic `run_shell_command` acts as a wildcard, allowing any command not explicitly blocked.
-- `tools.exclude`: To block specific commands, add entries to the `exclude` list under the `tools` category in the format `run_shell_command(<command>)`. For example, `"tools": {"exclude": ["run_shell_command(rm)"]}` will block `rm` commands.
+You can restrict the commands that can be executed by the `run_shell_command`
+tool by using the `tools.core` and `tools.exclude` settings in your
+configuration file.
+
+- `tools.core`: To restrict `run_shell_command` to a specific set of commands,
+  add entries to the `core` list under the `tools` category in the format
+  `run_shell_command(<command>)`. For example,
+  `"tools": {"core": ["run_shell_command(git)"]}` will only allow `git`
+  commands. Including the generic `run_shell_command` acts as a wildcard,
+  allowing any command not explicitly blocked.
+- `tools.exclude` [DEPRECATED]: To block specific commands, use the
+  [Policy Engine](../reference/policy-engine.md). Historically, this setting
+  allowed adding entries to the `exclude` list under the `tools` category in the
+  format `run_shell_command(<command>)`. For example,
+  `"tools": {"exclude": ["run_shell_command(rm)"]}` will block `rm` commands.
 
 The validation logic is designed to be secure and flexible:
 
-1.  **Command Chaining Disabled**: The tool automatically splits commands chained with `&&`, `||`, or `;` and validates each part separately. If any part of the chain is disallowed, the entire command is blocked.
-2.  **Prefix Matching**: The tool uses prefix matching. For example, if you allow `git`, you can run `git status` or `git log`.
-3.  **Blocklist Precedence**: The `tools.exclude` list is always checked first. If a command matches a blocked prefix, it will be denied, even if it also matches an allowed prefix in `tools.core`.
+1.  **Command chaining disabled**: The tool automatically splits commands
+    chained with `&&`, `||`, or `;` and validates each part separately. If any
+    part of the chain is disallowed, the entire command is blocked.
+2.  **Prefix matching**: The tool uses prefix matching. For example, if you
+    allow `git`, you can run `git status` or `git log`.
+3.  **Blocklist precedence**: The `tools.exclude` list is always checked first.
+    If a command matches a blocked prefix, it will be denied, even if it also
+    matches an allowed prefix in `tools.core`.
 
-### Command Restriction Examples
+### Command restriction examples
 
 **Allow only specific command prefixes**
 
@@ -114,36 +209,33 @@ To block `rm` and allow all other commands:
 
 **Blocklist takes precedence**
 
-If a command prefix is in both `tools.core` and `tools.exclude`, it will be blocked.
+If a command prefix is in both `tools.core` and `tools.exclude`, it will be
+blocked.
 
-```json
-{
-  "tools": {
-    "core": ["run_shell_command(git)"],
-    "exclude": ["run_shell_command(git push)"]
-  }
-}
-```
+- **`tools.shell.enableInteractiveShell`**: (boolean) Uses `node-pty` for
+  real-time interaction.
+- **`tools.shell.showColor`**: (boolean) Preserves ANSI colors in output.
+- **`tools.shell.inactivityTimeout`**: (number) Seconds to wait for output
+  before killing the process.
 
-- `git push origin main`: Blocked
-- `git status`: Allowed
+### Command restrictions
 
-**Block all shell commands**
+You can limit which commands the agent is allowed to request using these
+settings:
 
-To block all shell commands, add the `run_shell_command` wildcard to `tools.exclude`:
+- **`tools.core`**: An allowlist of command prefixes (for example,
+  `["git", "npm test"]`).
+- **`tools.exclude`**: A blocklist of command prefixes.
 
-```json
-{
-  "tools": {
-    "exclude": ["run_shell_command"]
-  }
-}
-```
+## Use cases
 
-- `ls -l`: Blocked
-- `any other command`: Blocked
+- Running build scripts and test suites.
+- Initializing or managing version control systems.
+- Installing project dependencies.
+- Starting development servers or background watchers.
 
-## Security Note for `excludeTools`
+## Next steps
 
-Command-specific restrictions in `excludeTools` for `run_shell_command` are based on simple string matching and can be easily bypassed. This feature is **not a security mechanism** and should not be relied upon to safely execute untrusted code. It is recommended to use `coreTools` to explicitly select commands
-that can be executed.
+- Follow the [Shell commands tutorial](../cli/tutorials/shell-commands.md) for
+  practical examples.
+- Learn about [Sandboxing](../cli/sandbox.md) to isolate command execution.

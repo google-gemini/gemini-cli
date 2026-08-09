@@ -1,0 +1,15 @@
+{
+  "experimental": {
+    "extensionReloading": true,
+    "modelSteering": true,
+    "autoMemory": true,
+    "topicUpdateNarration": true,
+    "voiceMode": true,
+    "adk": {
+      "agentSessionNoninteractiveEnabled": true
+    }
+  },
+  "general": {
+    "devtools": true
+  }
+}

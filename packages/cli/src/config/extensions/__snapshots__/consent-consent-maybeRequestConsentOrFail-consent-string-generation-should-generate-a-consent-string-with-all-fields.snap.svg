@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="207" viewBox="0 0 920 207">
+  <style>
+    text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+  </style>
+  <rect width="920" height="207" fill="#000000" />
+  <g transform="translate(10, 10)">
+    <text x="0" y="2" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">Installing extension &quot;test-ext&quot;.                                                                    </text>
+    <text x="0" y="19" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">This extension will run the following MCP servers:                                                  </text>
+    <text x="0" y="36" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">  * server1 (local): npm start                                                                      </text>
+    <text x="0" y="53" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">  * server2 (remote): https://remote.com                                                            </text>
+    <text x="0" y="70" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">This extension will append info to your gemini.md context using my-context.md                       </text>
+    <text x="0" y="87" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">This extension will exclude the following core tools: tool1,tool2                                   </text>
+    <text x="0" y="121" fill="#cdcd00" textLength="891" lengthAdjust="spacingAndGlyphs">The extension you are about to install may have been created by a third-party developer and sourced</text>
+    <text x="0" y="138" fill="#cdcd00" textLength="882" lengthAdjust="spacingAndGlyphs">from a public repository. Google does not vet, endorse, or guarantee the functionality or security</text>
+    <text x="0" y="155" fill="#cdcd00" textLength="846" lengthAdjust="spacingAndGlyphs">of extensions. Please carefully inspect any extension and its source code before installing to</text>
+    <text x="0" y="172" fill="#cdcd00" textLength="630" lengthAdjust="spacingAndGlyphs">understand the permissions it requires and the actions it may perform.</text>
+  </g>
+</svg>

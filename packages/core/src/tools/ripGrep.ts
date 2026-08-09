@@ -4,19 +4,95 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import fs from 'node:fs';
+import fsPromises from 'node:fs/promises';
 import path from 'node:path';
-import { EOL } from 'node:os';
-import { spawn } from 'node:child_process';
-import { rgPath } from '@lvce-editor/ripgrep';
-import type { ToolInvocation, ToolResult } from './tools.js';
-import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
-import { SchemaValidator } from '../utils/schemaValidator.js';
-import { makeRelative, shortenPath } from '../utils/paths.js';
+import os from 'node:os';
+import { fileURLToPath } from 'node:url';
+import {
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  Kind,
+  type ToolInvocation,
+  type ToolResult,
+  type ExecuteOptions,
+} from './tools.js';
+import { ToolErrorType } from './tool-error.js';
+import {
+  resolveToRealPath,
+  shortenPath,
+  makeRelative,
+  isTrustedSystemPath,
+} from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
+import { fileExists } from '../utils/fileUtils.js';
+import { GREP_TOOL_NAME } from './tool-names.js';
+import { debugLogger } from '../utils/debugLogger.js';
+import {
+  FileExclusions,
+  COMMON_DIRECTORY_EXCLUDES,
+} from '../utils/ignorePatterns.js';
+import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
+import { execStreaming, resolveExecutable } from '../utils/shell-utils.js';
+import {
+  DEFAULT_TOTAL_MAX_MATCHES,
+  DEFAULT_SEARCH_TIMEOUT_MS,
+} from './constants.js';
+import { RIP_GREP_DEFINITION } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
+import { type GrepMatch, formatGrepResults } from './grep-utils.js';
 
-const DEFAULT_TOTAL_MAX_MATCHES = 20000;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Resolves the path to the ripgrep binary, either bundled or system-level.
+ * Validates system binaries against trusted directories to prevent RCE.
+ */
+export async function resolveRipgrepPath(): Promise<string | null> {
+  try {
+    const platform = os.platform();
+    const arch = os.arch();
+
+    // Map to the correct bundled binary
+    const binName = `rg-${platform}-${arch}${platform === 'win32' ? '.exe' : ''}`;
+
+    const candidatePaths = [
+      // 1. SEA runtime layout (Flattened): everything is in the root dir
+      path.resolve(__dirname, binName),
+      // 2. SEA runtime layout (Subdirectory): bundled into a vendor/ripgrep dir
+      path.resolve(__dirname, 'vendor/ripgrep', binName),
+      // 3. Dev/Dist layout (Actual): dist/src/tools/ripGrep.js -> packages/core/vendor/ripgrep
+      path.resolve(__dirname, '../../../vendor/ripgrep', binName),
+      // 4. Dev/Dist layout (Assumed/Bundled): dist/tools/ripGrep.js -> packages/core/vendor/ripgrep
+      path.resolve(__dirname, '../../vendor/ripgrep', binName),
+    ];
+
+    for (const candidate of candidatePaths) {
+      if (await fileExists(candidate)) {
+        return candidate;
+      }
+    }
+
+    // 3. Fallback: check system PATH
+    const systemRg = resolveExecutable('rg');
+    if (systemRg) {
+      // Security: Validate the system executable to prevent Search Path Interruption.
+      const realPath = resolveToRealPath(systemRg);
+
+      if (isTrustedSystemPath(realPath)) {
+        // Return absolute path to prevent re-resolution risk.
+        return realPath;
+      }
+    }
+
+    return null;
+  } catch (error: unknown) {
+    debugLogger.error('Error resolving ripgrep path:', error);
+    return null;
+  }
+}
 
 /**
  * Parameters for the GrepTool
@@ -30,21 +106,62 @@ export interface RipGrepToolParams {
   /**
    * The directory to search in (optional, defaults to current directory relative to root)
    */
-  path?: string;
+  dir_path?: string;
 
   /**
    * File pattern to include in the search (e.g. "*.js", "*.{ts,tsx}")
    */
-  include?: string;
-}
+  include_pattern?: string;
 
-/**
- * Result object for a single grep match
- */
-interface GrepMatch {
-  filePath: string;
-  lineNumber: number;
-  line: string;
+  /**
+   * Optional: A regular expression pattern to exclude from the search results.
+   */
+  exclude_pattern?: string;
+
+  /**
+   * Optional: If true, only the file paths of the matches will be returned.
+   */
+  names_only?: boolean;
+
+  /**
+   * If true, searches case-sensitively. Defaults to false.
+   */
+  case_sensitive?: boolean;
+
+  /**
+   * If true, treats pattern as a literal string. Defaults to false.
+   */
+  fixed_strings?: boolean;
+
+  /**
+   * Show num lines of context around each match.
+   */
+  context?: number;
+
+  /**
+   * Show num lines after each match.
+   */
+  after?: number;
+
+  /**
+   * Show num lines before each match.
+   */
+  before?: number;
+
+  /**
+   * If true, does not respect .gitignore or default ignores (like build/dist).
+   */
+  no_ignore?: boolean;
+
+  /**
+   * Optional: Maximum number of matches to return per file. Use this to prevent being overwhelmed by repetitive matches in large files.
+   */
+  max_matches_per_file?: number;
+
+  /**
+   * Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 100 if omitted.
+   */
+  total_max_matches?: number;
 }
 
 class GrepToolInvocation extends BaseToolInvocation<
@@ -53,160 +170,183 @@ class GrepToolInvocation extends BaseToolInvocation<
 > {
   constructor(
     private readonly config: Config,
+    private readonly fileDiscoveryService: FileDiscoveryService,
     params: RipGrepToolParams,
+    messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ) {
-    super(params);
+    super(params, messageBus, _toolName, _toolDisplayName);
   }
 
-  /**
-   * Checks if a path is within the root directory and resolves it.
-   * @param relativePath Path relative to the root directory (or undefined for root).
-   * @returns The absolute path if valid and exists, or null if no path specified (to search all directories).
-   * @throws {Error} If path is outside root, doesn't exist, or isn't a directory.
-   */
-  private resolveAndValidatePath(relativePath?: string): string | null {
-    // If no path specified, return null to indicate searching all workspace directories
-    if (!relativePath) {
-      return null;
-    }
-
-    const targetPath = path.resolve(this.config.getTargetDir(), relativePath);
-
-    // Security Check: Ensure the resolved path is within workspace boundaries
-    const workspaceContext = this.config.getWorkspaceContext();
-    if (!workspaceContext.isPathWithinWorkspace(targetPath)) {
-      const directories = workspaceContext.getDirectories();
-      throw new Error(
-        `Path validation failed: Attempted path "${relativePath}" resolves outside the allowed workspace directories: ${directories.join(', ')}`,
-      );
-    }
-
-    // Check existence and type after resolving
+  async execute({ abortSignal: signal }: ExecuteOptions): Promise<ToolResult> {
     try {
-      const stats = fs.statSync(targetPath);
-      if (!stats.isDirectory()) {
-        throw new Error(`Path is not a directory: ${targetPath}`);
+      // Default to '.' if path is explicitly undefined/null.
+      // This forces CWD search instead of 'all workspaces' search by default.
+      const pathParam = this.params.dir_path || '.';
+
+      let searchDirAbs: string;
+      try {
+        searchDirAbs = resolveToRealPath(
+          path.resolve(this.config.getTargetDir(), pathParam),
+        );
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        return {
+          llmContent: errMsg,
+          returnDisplay: 'Error: Path resolution failed.',
+          error: {
+            message: errMsg,
+            type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
+          },
+        };
       }
-    } catch (error: unknown) {
-      if (isNodeError(error) && error.code !== 'ENOENT') {
-        throw new Error(`Path does not exist: ${targetPath}`);
-      }
-      throw new Error(
-        `Failed to access path stats for ${targetPath}: ${error}`,
+      const validationError = this.config.validatePathAccess(
+        searchDirAbs,
+        'read',
       );
-    }
-
-    return targetPath;
-  }
-
-  async execute(signal: AbortSignal): Promise<ToolResult> {
-    try {
-      const workspaceContext = this.config.getWorkspaceContext();
-      const searchDirAbs = this.resolveAndValidatePath(this.params.path);
-      const searchDirDisplay = this.params.path || '.';
-
-      // Determine which directories to search
-      let searchDirectories: readonly string[];
-      if (searchDirAbs === null) {
-        // No path specified - search all workspace directories
-        searchDirectories = workspaceContext.getDirectories();
-      } else {
-        // Specific path provided - search only that directory
-        searchDirectories = [searchDirAbs];
+      if (validationError) {
+        return {
+          llmContent: validationError,
+          returnDisplay: 'Error: Path not in workspace.',
+          error: {
+            message: validationError,
+            type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
+          },
+        };
       }
 
-      let allMatches: GrepMatch[] = [];
-      const totalMaxMatches = DEFAULT_TOTAL_MAX_MATCHES;
+      // Check existence and type asynchronously
+      try {
+        const stats = await fsPromises.stat(searchDirAbs);
+        if (!stats.isDirectory() && !stats.isFile()) {
+          return {
+            llmContent: `Path is not a valid directory or file: ${searchDirAbs}`,
+            returnDisplay: 'Error: Path is not a valid directory or file.',
+          };
+        }
+      } catch (error: unknown) {
+        if (isNodeError(error) && error.code === 'ENOENT') {
+          return {
+            llmContent: `Path does not exist: ${searchDirAbs}`,
+            returnDisplay: 'Error: Path does not exist.',
+            error: {
+              message: `Path does not exist: ${searchDirAbs}`,
+              type: ToolErrorType.FILE_NOT_FOUND,
+            },
+          };
+        }
+        return {
+          llmContent: `Failed to access path stats for ${searchDirAbs}: ${getErrorMessage(error)}`,
+          returnDisplay: 'Error: Failed to access path.',
+        };
+      }
 
+      const searchDirDisplay = pathParam;
+
+      const totalMaxMatches =
+        this.params.total_max_matches ?? DEFAULT_TOTAL_MAX_MATCHES;
       if (this.config.getDebugMode()) {
-        console.log(`[GrepTool] Total result limit: ${totalMaxMatches}`);
+        debugLogger.log(`[GrepTool] Total result limit: ${totalMaxMatches}`);
       }
 
-      for (const searchDir of searchDirectories) {
-        const searchResult = await this.performRipgrepSearch({
-          pattern: this.params.pattern,
-          path: searchDir,
-          include: this.params.include,
-          signal,
-        });
+      // Create a timeout controller to prevent indefinitely hanging searches
+      const timeoutController = new AbortController();
+      const configTimeout = this.config.getFileFilteringOptions().searchTimeout;
+      // If configTimeout is less than standard default, it might be too short for grep.
+      // We check if it's greater or if we should use DEFAULT_SEARCH_TIMEOUT_MS as a fallback.
+      // Let's assume the user can set it higher if they want. Using it directly if it exists, otherwise fallback.
+      const timeoutMs =
+        configTimeout && configTimeout > DEFAULT_SEARCH_TIMEOUT_MS
+          ? configTimeout
+          : DEFAULT_SEARCH_TIMEOUT_MS;
+      const timeoutId = setTimeout(() => {
+        timeoutController.abort();
+      }, timeoutMs);
 
-        if (searchDirectories.length > 1) {
-          const dirName = path.basename(searchDir);
-          searchResult.forEach((match) => {
-            match.filePath = path.join(dirName, match.filePath);
-          });
-        }
-
-        allMatches = allMatches.concat(searchResult);
-
-        if (allMatches.length >= totalMaxMatches) {
-          allMatches = allMatches.slice(0, totalMaxMatches);
-          break;
-        }
-      }
-
-      let searchLocationDescription: string;
-      if (searchDirAbs === null) {
-        const numDirs = workspaceContext.getDirectories().length;
-        searchLocationDescription =
-          numDirs > 1
-            ? `across ${numDirs} workspace directories`
-            : `in the workspace directory`;
+      // Link the passed signal to our timeout controller
+      const onAbort = () => timeoutController.abort();
+      if (signal.aborted) {
+        onAbort();
       } else {
-        searchLocationDescription = `in path "${searchDirDisplay}"`;
+        signal.addEventListener('abort', onAbort, { once: true });
       }
 
-      if (allMatches.length === 0) {
-        const noMatchMsg = `No matches found for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}.`;
-        return { llmContent: noMatchMsg, returnDisplay: `No matches found` };
+      let allMatches: GrepMatch[];
+      try {
+        allMatches = await this.performRipgrepSearch({
+          pattern: this.params.pattern,
+          path: searchDirAbs,
+          include_pattern: this.params.include_pattern,
+          exclude_pattern: this.params.exclude_pattern,
+          case_sensitive: this.params.case_sensitive,
+          fixed_strings: this.params.fixed_strings,
+          context: this.params.context,
+          after: this.params.after,
+          before: this.params.before,
+          no_ignore: this.params.no_ignore,
+          maxMatches: totalMaxMatches,
+          max_matches_per_file: this.params.max_matches_per_file,
+          signal: timeoutController.signal,
+        });
+      } catch (error) {
+        if (timeoutController.signal.aborted) {
+          throw new Error(
+            `Operation timed out after ${timeoutMs}ms. In large repositories, consider narrowing your search scope by specifying a 'dir_path' or an 'include_pattern'.`,
+          );
+        }
+        throw error;
+      } finally {
+        clearTimeout(timeoutId);
+        signal.removeEventListener('abort', onAbort);
       }
 
-      const wasTruncated = allMatches.length >= totalMaxMatches;
+      if (!this.params.no_ignore) {
+        const uniqueFiles = Array.from(
+          new Set(allMatches.map((m) => m.filePath)),
+        );
+        const absoluteFilePaths = uniqueFiles.map((f) =>
+          path.resolve(searchDirAbs, f),
+        );
+        const allowedFiles =
+          this.fileDiscoveryService.filterFiles(absoluteFilePaths);
+        const allowedSet = new Set(allowedFiles);
+        allMatches = allMatches.filter((m) =>
+          allowedSet.has(path.resolve(searchDirAbs, m.filePath)),
+        );
+      }
 
-      const matchesByFile = allMatches.reduce(
-        (acc, match) => {
-          const fileKey = match.filePath;
-          if (!acc[fileKey]) {
-            acc[fileKey] = [];
-          }
-          acc[fileKey].push(match);
-          acc[fileKey].sort((a, b) => a.lineNumber - b.lineNumber);
-          return acc;
-        },
-        {} as Record<string, GrepMatch[]>,
+      const matchCount = allMatches.filter((m) => !m.isContext).length;
+      allMatches = await this.enrichWithRipgrepAutoContext(
+        allMatches,
+        matchCount,
+        totalMaxMatches,
+        searchDirAbs,
+        timeoutController.signal,
       );
 
-      const matchCount = allMatches.length;
-      const matchTerm = matchCount === 1 ? 'match' : 'matches';
+      const searchLocationDescription = `in path "${searchDirDisplay}"`;
 
-      let llmContent = `Found ${matchCount} ${matchTerm} for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}`;
-
-      if (wasTruncated) {
-        llmContent += ` (results limited to ${totalMaxMatches} matches for performance)`;
-      }
-
-      llmContent += `:\n---\n`;
-
-      for (const filePath in matchesByFile) {
-        llmContent += `File: ${filePath}\n`;
-        matchesByFile[filePath].forEach((match) => {
-          const trimmedLine = match.line.trim();
-          llmContent += `L${match.lineNumber}: ${trimmedLine}\n`;
-        });
-        llmContent += '---\n';
-      }
-
-      let displayMessage = `Found ${matchCount} ${matchTerm}`;
-      if (wasTruncated) {
-        displayMessage += ` (limited)`;
-      }
-
+      const result = await formatGrepResults(
+        allMatches,
+        this.params,
+        searchLocationDescription,
+        totalMaxMatches,
+      );
       return {
-        llmContent: llmContent.trim(),
-        returnDisplay: displayMessage,
+        ...result,
+        display: {
+          name: this._toolDisplayName,
+          description: this.getDescription(),
+          resultSummary: result.returnDisplay.summary,
+          result: {
+            type: 'text',
+            text: result.llmContent.split('\n---\n').slice(1).join('\n---\n'),
+          },
+        },
       };
     } catch (error) {
-      console.error(`Error during GrepLogic execution: ${error}`);
+      debugLogger.warn(`Error during GrepLogic execution: ${error}`);
       const errorMessage = getErrorMessage(error);
       return {
         llmContent: `Error during grep search operation: ${errorMessage}`,
@@ -215,133 +355,239 @@ class GrepToolInvocation extends BaseToolInvocation<
     }
   }
 
-  private parseRipgrepOutput(output: string, basePath: string): GrepMatch[] {
-    const results: GrepMatch[] = [];
-    if (!output) return results;
-
-    const lines = output.split(EOL);
-
-    for (const line of lines) {
-      if (!line.trim()) continue;
-
-      const firstColonIndex = line.indexOf(':');
-      if (firstColonIndex === -1) continue;
-
-      const secondColonIndex = line.indexOf(':', firstColonIndex + 1);
-      if (secondColonIndex === -1) continue;
-
-      const filePathRaw = line.substring(0, firstColonIndex);
-      const lineNumberStr = line.substring(
-        firstColonIndex + 1,
-        secondColonIndex,
+  private async enrichWithRipgrepAutoContext(
+    allMatches: GrepMatch[],
+    matchCount: number,
+    totalMaxMatches: number,
+    searchDirAbs: string,
+    signal: AbortSignal,
+  ): Promise<GrepMatch[]> {
+    if (
+      matchCount >= 1 &&
+      matchCount <= 3 &&
+      !this.params.names_only &&
+      this.params.context === undefined &&
+      this.params.before === undefined &&
+      this.params.after === undefined
+    ) {
+      const contextLines = matchCount === 1 ? 50 : 15;
+      const uniqueFiles = Array.from(
+        new Set(allMatches.map((m) => m.absolutePath)),
       );
-      const lineContent = line.substring(secondColonIndex + 1);
 
-      const lineNumber = parseInt(lineNumberStr, 10);
+      let enrichedMatches = await this.performRipgrepSearch({
+        pattern: this.params.pattern,
+        path: uniqueFiles,
+        basePath: searchDirAbs,
+        include_pattern: this.params.include_pattern,
+        exclude_pattern: this.params.exclude_pattern,
+        case_sensitive: this.params.case_sensitive,
+        fixed_strings: this.params.fixed_strings,
+        context: contextLines,
+        no_ignore: this.params.no_ignore,
+        maxMatches: totalMaxMatches,
+        max_matches_per_file: this.params.max_matches_per_file,
+        signal,
+      });
 
-      if (!isNaN(lineNumber)) {
-        const absoluteFilePath = path.resolve(basePath, filePathRaw);
-        const relativeFilePath = path.relative(basePath, absoluteFilePath);
-
-        results.push({
-          filePath: relativeFilePath || path.basename(absoluteFilePath),
-          lineNumber,
-          line: lineContent,
-        });
+      if (!this.params.no_ignore) {
+        const allowedFiles = this.fileDiscoveryService.filterFiles(uniqueFiles);
+        const allowedSet = new Set(allowedFiles);
+        enrichedMatches = enrichedMatches.filter((m) =>
+          allowedSet.has(m.absolutePath),
+        );
       }
+
+      // Set context to prevent grep-utils from doing the JS fallback auto-context
+      this.params.context = contextLines;
+      return enrichedMatches;
     }
-    return results;
+
+    return allMatches;
   }
 
   private async performRipgrepSearch(options: {
     pattern: string;
-    path: string;
-    include?: string;
+    path: string | string[];
+    basePath?: string;
+    include_pattern?: string;
+    exclude_pattern?: string;
+    case_sensitive?: boolean;
+    fixed_strings?: boolean;
+    context?: number;
+    after?: number;
+    before?: number;
+    no_ignore?: boolean;
+    maxMatches: number;
+    max_matches_per_file?: number;
     signal: AbortSignal;
   }): Promise<GrepMatch[]> {
-    const { pattern, path: absolutePath, include } = options;
-
-    const rgArgs = [
-      '--line-number',
-      '--no-heading',
-      '--with-filename',
-      '--ignore-case',
-      '--regexp',
+    const {
       pattern,
-    ];
+      path,
+      basePath,
+      include_pattern,
+      exclude_pattern,
+      case_sensitive,
+      fixed_strings,
+      context,
+      after,
+      before,
+      no_ignore,
+      maxMatches,
+      max_matches_per_file,
+    } = options;
 
-    if (include) {
-      rgArgs.push('--glob', include);
+    const searchPaths = Array.isArray(path) ? path : [path];
+
+    const rgArgs = ['--json'];
+
+    if (!case_sensitive) {
+      rgArgs.push('--ignore-case');
     }
 
-    const excludes = [
-      '.git',
-      'node_modules',
-      'bower_components',
-      '*.log',
-      '*.tmp',
-      'build',
-      'dist',
-      'coverage',
-    ];
-    excludes.forEach((exclude) => {
-      rgArgs.push('--glob', `!${exclude}`);
-    });
+    if (fixed_strings) {
+      rgArgs.push('--fixed-strings');
+    }
 
-    rgArgs.push('--threads', '4');
-    rgArgs.push(absolutePath);
+    rgArgs.push('--regexp', pattern);
 
-    try {
-      const output = await new Promise<string>((resolve, reject) => {
-        const child = spawn(rgPath, rgArgs, {
-          windowsHide: true,
-        });
+    if (context) {
+      rgArgs.push('--context', context.toString());
+    }
+    if (after) {
+      rgArgs.push('--after-context', after.toString());
+    }
+    if (before) {
+      rgArgs.push('--before-context', before.toString());
+    }
+    if (no_ignore) {
+      rgArgs.push('--no-ignore');
+    }
 
-        const stdoutChunks: Buffer[] = [];
-        const stderrChunks: Buffer[] = [];
+    if (max_matches_per_file) {
+      rgArgs.push('--max-count', max_matches_per_file.toString());
+    }
 
-        const cleanup = () => {
-          if (options.signal.aborted) {
-            child.kill();
-          }
-        };
+    if (include_pattern) {
+      rgArgs.push('--glob', include_pattern);
+    }
 
-        options.signal.addEventListener('abort', cleanup, { once: true });
+    if (!no_ignore) {
+      if (!this.config.getFileFilteringRespectGitIgnore()) {
+        rgArgs.push('--no-ignore-vcs', '--no-ignore-exclude');
+      }
 
-        child.stdout.on('data', (chunk) => stdoutChunks.push(chunk));
-        child.stderr.on('data', (chunk) => stderrChunks.push(chunk));
-
-        child.on('error', (err) => {
-          options.signal.removeEventListener('abort', cleanup);
-          reject(
-            new Error(
-              `Failed to start ripgrep: ${err.message}. Please ensure @lvce-editor/ripgrep is properly installed.`,
-            ),
-          );
-        });
-
-        child.on('close', (code) => {
-          options.signal.removeEventListener('abort', cleanup);
-          const stdoutData = Buffer.concat(stdoutChunks).toString('utf8');
-          const stderrData = Buffer.concat(stderrChunks).toString('utf8');
-
-          if (code === 0) {
-            resolve(stdoutData);
-          } else if (code === 1) {
-            resolve(''); // No matches found
-          } else {
-            reject(
-              new Error(`ripgrep exited with code ${code}: ${stderrData}`),
-            );
-          }
-        });
+      const fileExclusions = new FileExclusions(this.config);
+      const excludes = fileExclusions.getGlobExcludes([
+        ...COMMON_DIRECTORY_EXCLUDES,
+        '*.log',
+        '*.tmp',
+      ]);
+      excludes.forEach((exclude) => {
+        rgArgs.push('--glob', `!${exclude}`);
       });
 
-      return this.parseRipgrepOutput(output, absolutePath);
+      // Add .geminiignore and custom ignore files support (if provided/mandated)
+      // (ripgrep natively handles .gitignore)
+      const geminiIgnorePaths = this.fileDiscoveryService.getIgnoreFilePaths();
+      for (const ignorePath of geminiIgnorePaths) {
+        rgArgs.push('--ignore-file', ignorePath);
+      }
+    }
+
+    rgArgs.push('--threads', '4');
+    rgArgs.push(...searchPaths);
+
+    const results: GrepMatch[] = [];
+    try {
+      const rgPath = await this.config.getRipgrepPath();
+      if (!rgPath) {
+        throw new Error('Cannot find bundled ripgrep binary.');
+      }
+      const generator = execStreaming(rgPath, rgArgs, {
+        signal: options.signal,
+        allowedExitCodes: [0, 1],
+        sandboxManager: this.config.sandboxManager,
+      });
+
+      let matchesFound = 0;
+      let excludeRegex: RegExp | null = null;
+      if (exclude_pattern) {
+        excludeRegex = new RegExp(exclude_pattern, case_sensitive ? '' : 'i');
+      }
+
+      const parseBasePath = basePath || searchPaths[0];
+
+      for await (const line of generator) {
+        const match = this.parseRipgrepJsonLine(line, parseBasePath);
+        if (match) {
+          if (excludeRegex && excludeRegex.test(match.line)) {
+            continue;
+          }
+
+          results.push(match);
+          if (!match.isContext) {
+            matchesFound++;
+          }
+          if (matchesFound >= maxMatches) {
+            break;
+          }
+        }
+      }
+
+      return results;
     } catch (error: unknown) {
-      console.error(`GrepLogic: ripgrep failed: ${getErrorMessage(error)}`);
+      debugLogger.debug(`GrepLogic: ripgrep failed: ${getErrorMessage(error)}`);
       throw error;
     }
+  }
+
+  private parseRipgrepJsonLine(
+    line: string,
+    basePath: string,
+  ): GrepMatch | null {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const json = JSON.parse(line);
+      if (json.type === 'match' || json.type === 'context') {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const data = json.data;
+        // Defensive check: ensure text properties exist (skips binary/invalid encoding)
+        if (data.path?.text && data.lines?.text) {
+          const absoluteFilePath = path.resolve(basePath, data.path.text);
+          const relativeCheck = path.relative(basePath, absoluteFilePath);
+          if (
+            relativeCheck === '..' ||
+            relativeCheck.startsWith(`..${path.sep}`) ||
+            path.isAbsolute(relativeCheck)
+          ) {
+            return null;
+          }
+
+          const relativeFilePath = path.relative(basePath, absoluteFilePath);
+
+          return {
+            absolutePath: absoluteFilePath,
+            filePath: relativeFilePath || path.basename(absoluteFilePath),
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            lineNumber: data.line_number,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            line: data.lines.text.trimEnd(),
+            isContext: json.type === 'context',
+          };
+        }
+      }
+    } catch (error) {
+      // Only log if it's not a simple empty line or widely invalid
+      if (line.trim().length > 0) {
+        debugLogger.warn(
+          `Failed to parse ripgrep JSON line: ${line.substring(0, 100)}...`,
+          error,
+        );
+      }
+    }
+    return null;
   }
 
   /**
@@ -351,33 +597,19 @@ class GrepToolInvocation extends BaseToolInvocation<
    */
   getDescription(): string {
     let description = `'${this.params.pattern}'`;
-    if (this.params.include) {
-      description += ` in ${this.params.include}`;
+    if (this.params.include_pattern) {
+      description += ` in ${this.params.include_pattern}`;
     }
-    if (this.params.path) {
-      const resolvedPath = path.resolve(
-        this.config.getTargetDir(),
-        this.params.path,
-      );
-      if (
-        resolvedPath === this.config.getTargetDir() ||
-        this.params.path === '.'
-      ) {
-        description += ` within ./`;
-      } else {
-        const relativePath = makeRelative(
-          resolvedPath,
-          this.config.getTargetDir(),
-        );
-        description += ` within ${shortenPath(relativePath)}`;
-      }
+    const pathParam = this.params.dir_path || '.';
+    const resolvedPath = path.resolve(this.config.getTargetDir(), pathParam);
+    if (resolvedPath === this.config.getTargetDir() || pathParam === '.') {
+      description += ` within ./`;
     } else {
-      // When no path is specified, indicate searching all workspace directories
-      const workspaceContext = this.config.getWorkspaceContext();
-      const directories = workspaceContext.getDirectories();
-      if (directories.length > 1) {
-        description += ` across all workspace directories`;
-      }
+      const relativePath = makeRelative(
+        resolvedPath,
+        this.config.getTargetDir(),
+      );
+      description += ` within ${shortenPath(relativePath)}`;
     }
     return description;
   }
@@ -390,77 +622,33 @@ export class RipGrepTool extends BaseDeclarativeTool<
   RipGrepToolParams,
   ToolResult
 > {
-  static readonly Name = 'search_file_content';
+  static readonly Name = GREP_TOOL_NAME;
+  private readonly fileDiscoveryService: FileDiscoveryService;
 
-  constructor(private readonly config: Config) {
+  constructor(
+    private readonly config: Config,
+    messageBus: MessageBus,
+  ) {
     super(
       RipGrepTool.Name,
       'SearchText',
-      'Searches for a regular expression pattern within the content of files in a specified directory (or current working directory). Can filter files by a glob pattern. Returns the lines containing matches, along with their file paths and line numbers. Total results limited to 20,000 matches like VSCode.',
+      RIP_GREP_DEFINITION.base.description!,
       Kind.Search,
-      {
-        properties: {
-          pattern: {
-            description:
-              "The regular expression (regex) pattern to search for within file contents (e.g., 'function\\s+myFunction', 'import\\s+\\{.*\\}\\s+from\\s+.*').",
-            type: 'string',
-          },
-          path: {
-            description:
-              'Optional: The absolute path to the directory to search within. If omitted, searches the current working directory.',
-            type: 'string',
-          },
-          include: {
-            description:
-              "Optional: A glob pattern to filter which files are searched (e.g., '*.js', '*.{ts,tsx}', 'src/**'). If omitted, searches all files (respecting potential global ignores).",
-            type: 'string',
-          },
-        },
-        required: ['pattern'],
-        type: 'object',
-      },
+      RIP_GREP_DEFINITION.base.parametersJsonSchema,
+      messageBus,
+      true, // isOutputMarkdown
+      false, // canUpdateOutput
     );
-  }
-
-  /**
-   * Checks if a path is within the root directory and resolves it.
-   * @param relativePath Path relative to the root directory (or undefined for root).
-   * @returns The absolute path if valid and exists, or null if no path specified (to search all directories).
-   * @throws {Error} If path is outside root, doesn't exist, or isn't a directory.
-   */
-  private resolveAndValidatePath(relativePath?: string): string | null {
-    // If no path specified, return null to indicate searching all workspace directories
-    if (!relativePath) {
-      return null;
-    }
-
-    const targetPath = path.resolve(this.config.getTargetDir(), relativePath);
-
-    // Security Check: Ensure the resolved path is within workspace boundaries
-    const workspaceContext = this.config.getWorkspaceContext();
-    if (!workspaceContext.isPathWithinWorkspace(targetPath)) {
-      const directories = workspaceContext.getDirectories();
-      throw new Error(
-        `Path validation failed: Attempted path "${relativePath}" resolves outside the allowed workspace directories: ${directories.join(', ')}`,
-      );
-    }
-
-    // Check existence and type after resolving
+    let targetDir = config.getTargetDir();
     try {
-      const stats = fs.statSync(targetPath);
-      if (!stats.isDirectory()) {
-        throw new Error(`Path is not a directory: ${targetPath}`);
-      }
-    } catch (error: unknown) {
-      if (isNodeError(error) && error.code !== 'ENOENT') {
-        throw new Error(`Path does not exist: ${targetPath}`);
-      }
-      throw new Error(
-        `Failed to access path stats for ${targetPath}: ${error}`,
-      );
+      targetDir = resolveToRealPath(targetDir);
+    } catch {
+      // Ignore and use raw targetDir
     }
-
-    return targetPath;
+    this.fileDiscoveryService = new FileDiscoveryService(
+      targetDir,
+      config.getFileFilteringOptions(),
+    );
   }
 
   /**
@@ -468,21 +656,68 @@ export class RipGrepTool extends BaseDeclarativeTool<
    * @param params Parameters to validate
    * @returns An error message string if invalid, null otherwise
    */
-  override validateToolParams(params: RipGrepToolParams): string | null {
-    const errors = SchemaValidator.validate(
-      this.schema.parametersJsonSchema,
-      params,
-    );
-    if (errors) {
-      return errors;
+  protected override validateToolParamValues(
+    params: RipGrepToolParams,
+  ): string | null {
+    if (!params.fixed_strings) {
+      try {
+        new RegExp(params.pattern);
+      } catch (error) {
+        return `Invalid regular expression pattern provided: ${params.pattern}. Error: ${getErrorMessage(error)}`;
+      }
+    }
+
+    if (params.exclude_pattern) {
+      try {
+        new RegExp(params.exclude_pattern);
+      } catch (error) {
+        return `Invalid exclude regular expression pattern provided: ${params.exclude_pattern}. Error: ${getErrorMessage(error)}`;
+      }
+    }
+
+    if (
+      params.max_matches_per_file !== undefined &&
+      params.max_matches_per_file < 1
+    ) {
+      return 'max_matches_per_file must be at least 1.';
+    }
+
+    if (
+      params.total_max_matches !== undefined &&
+      params.total_max_matches < 1
+    ) {
+      return 'total_max_matches must be at least 1.';
     }
 
     // Only validate path if one is provided
-    if (params.path) {
+    if (params.dir_path) {
+      let resolvedPath: string;
       try {
-        this.resolveAndValidatePath(params.path);
-      } catch (error) {
-        return getErrorMessage(error);
+        resolvedPath = resolveToRealPath(
+          path.resolve(this.config.getTargetDir(), params.dir_path),
+        );
+      } catch (err) {
+        return err instanceof Error ? err.message : String(err);
+      }
+      const validationError = this.config.validatePathAccess(
+        resolvedPath,
+        'read',
+      );
+      if (validationError) {
+        return validationError;
+      }
+
+      // Check existence and type
+      try {
+        const stats = fs.statSync(resolvedPath);
+        if (!stats.isDirectory() && !stats.isFile()) {
+          return `Path is not a valid directory or file: ${resolvedPath}`;
+        }
+      } catch (error: unknown) {
+        if (isNodeError(error) && error.code === 'ENOENT') {
+          return `Path does not exist: ${resolvedPath}`;
+        }
+        return `Failed to access path stats for ${resolvedPath}: ${getErrorMessage(error)}`;
       }
     }
 
@@ -491,7 +726,21 @@ export class RipGrepTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: RipGrepToolParams,
+    messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<RipGrepToolParams, ToolResult> {
-    return new GrepToolInvocation(this.config, params);
+    return new GrepToolInvocation(
+      this.config,
+      this.fileDiscoveryService,
+      params,
+      messageBus ?? this.messageBus,
+      _toolName,
+      _toolDisplayName,
+    );
+  }
+
+  override getSchema(modelId?: string) {
+    return resolveToolDeclaration(RIP_GREP_DEFINITION, modelId);
   }
 }

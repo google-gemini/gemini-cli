@@ -1,0 +1,10 @@
+# Default policy for subagent invocation.
+# Subagents are trusted to handle their own confirmations for destructive actions.
+# Therefore, invoking them is allowed by default.
+
+[[rule]]
+name = "Allow invoke_agent"
+toolName = "invoke_agent"
+decision = "allow"
+priority = 50
+modes = ["default", "autoEdit", "yolo"]

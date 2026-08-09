@@ -4,18 +4,31 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { GitService } from './gitService.js';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
+import {
+  GitService,
+  SHADOW_REPO_AUTHOR_NAME,
+  SHADOW_REPO_AUTHOR_EMAIL,
+} from './gitService.js';
 import { Storage } from '../config/storage.js';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
-import type { ChildProcess } from 'node:child_process';
-import { getProjectHash, GEMINI_DIR } from '../utils/paths.js';
+import { GEMINI_DIR, homedir as pathsHomedir } from '../utils/paths.js';
+import { spawnAsync } from '../utils/shell-utils.js';
 
-const hoistedMockExec = vi.hoisted(() => vi.fn());
-vi.mock('node:child_process', () => ({
-  exec: hoistedMockExec,
+const PROJECT_SLUG = 'project-slug';
+
+vi.mock('../utils/shell-utils.js', () => ({
+  spawnAsync: vi.fn(),
 }));
 
 const hoistedMockEnv = vi.hoisted(() => vi.fn());
@@ -25,6 +38,7 @@ const hoistedMockInit = vi.hoisted(() => vi.fn());
 const hoistedMockRaw = vi.hoisted(() => vi.fn());
 const hoistedMockAdd = vi.hoisted(() => vi.fn());
 const hoistedMockCommit = vi.hoisted(() => vi.fn());
+const hoistedMockStatus = vi.hoisted(() => vi.fn());
 vi.mock('simple-git', () => ({
   simpleGit: hoistedMockSimpleGit.mockImplementation(() => ({
     checkIsRepo: hoistedMockCheckIsRepo,
@@ -32,6 +46,7 @@ vi.mock('simple-git', () => ({
     raw: hoistedMockRaw,
     add: hoistedMockAdd,
     commit: hoistedMockCommit,
+    status: hoistedMockStatus,
     env: hoistedMockEnv,
   })),
   CheckRepoActions: { IS_REPO_ROOT: 'is-repo-root' },
@@ -43,7 +58,7 @@ vi.mock('../utils/gitUtils.js', () => ({
 }));
 
 const hoistedMockHomedir = vi.hoisted(() => vi.fn());
-vi.mock('os', async (importOriginal) => {
+vi.mock('node:os', async (importOriginal) => {
   const actual = await importOriginal<typeof os>();
   return {
     ...actual,
@@ -51,11 +66,27 @@ vi.mock('os', async (importOriginal) => {
   };
 });
 
+vi.mock('../utils/paths.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/paths.js')>();
+  return {
+    ...actual,
+    homedir: vi.fn(),
+  };
+});
+
+const hoistedMockDebugLogger = vi.hoisted(() => ({
+  debug: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+}));
+vi.mock('../utils/debugLogger.js', () => ({
+  debugLogger: hoistedMockDebugLogger,
+}));
+
 describe('GitService', () => {
   let testRootDir: string;
   let projectRoot: string;
   let homedir: string;
-  let hash: string;
   let storage: Storage;
 
   beforeEach(async () => {
@@ -65,20 +96,15 @@ describe('GitService', () => {
     await fs.mkdir(projectRoot, { recursive: true });
     await fs.mkdir(homedir, { recursive: true });
 
-    hash = getProjectHash(projectRoot);
-
     vi.clearAllMocks();
     hoistedIsGitRepositoryMock.mockReturnValue(true);
-    hoistedMockExec.mockImplementation((command, callback) => {
-      if (command === 'git --version') {
-        callback(null, 'git version 2.0.0');
-      } else {
-        callback(new Error('Command not mocked'));
-      }
-      return {};
+    (spawnAsync as Mock).mockResolvedValue({
+      stdout: 'git version 2.0.0',
+      stderr: '',
     });
 
     hoistedMockHomedir.mockReturnValue(homedir);
+    (pathsHomedir as Mock).mockReturnValue(homedir);
 
     hoistedMockEnv.mockImplementation(() => ({
       checkIsRepo: hoistedMockCheckIsRepo,
@@ -86,6 +112,7 @@ describe('GitService', () => {
       raw: hoistedMockRaw,
       add: hoistedMockAdd,
       commit: hoistedMockCommit,
+      status: hoistedMockStatus,
     }));
     hoistedMockSimpleGit.mockImplementation(() => ({
       checkIsRepo: hoistedMockCheckIsRepo,
@@ -93,6 +120,7 @@ describe('GitService', () => {
       raw: hoistedMockRaw,
       add: hoistedMockAdd,
       commit: hoistedMockCommit,
+      status: hoistedMockStatus,
       env: hoistedMockEnv,
     }));
     hoistedMockCheckIsRepo.mockResolvedValue(false);
@@ -118,26 +146,19 @@ describe('GitService', () => {
 
   describe('verifyGitAvailability', () => {
     it('should resolve true if git --version command succeeds', async () => {
-      const service = new GitService(projectRoot, storage);
-      await expect(service.verifyGitAvailability()).resolves.toBe(true);
+      await expect(GitService.verifyGitAvailability()).resolves.toBe(true);
+      expect(spawnAsync).toHaveBeenCalledWith('git', ['--version']);
     });
 
     it('should resolve false if git --version command fails', async () => {
-      hoistedMockExec.mockImplementation((command, callback) => {
-        callback(new Error('git not found'));
-        return {} as ChildProcess;
-      });
-      const service = new GitService(projectRoot, storage);
-      await expect(service.verifyGitAvailability()).resolves.toBe(false);
+      (spawnAsync as Mock).mockRejectedValue(new Error('git not found'));
+      await expect(GitService.verifyGitAvailability()).resolves.toBe(false);
     });
   });
 
   describe('initialize', () => {
     it('should throw an error if Git is not available', async () => {
-      hoistedMockExec.mockImplementation((command, callback) => {
-        callback(new Error('git not found'));
-        return {} as ChildProcess;
-      });
+      (spawnAsync as Mock).mockRejectedValue(new Error('git not found'));
       const service = new GitService(projectRoot, storage);
       await expect(service.initialize()).rejects.toThrow(
         'Checkpointing is enabled, but Git is not installed. Please install Git or disable checkpointing to continue.',
@@ -159,8 +180,8 @@ describe('GitService', () => {
     let repoDir: string;
     let gitConfigPath: string;
 
-    beforeEach(() => {
-      repoDir = path.join(homedir, GEMINI_DIR, 'history', hash);
+    beforeEach(async () => {
+      repoDir = path.join(homedir, GEMINI_DIR, 'history', PROJECT_SLUG);
       gitConfigPath = path.join(repoDir, '.gitconfig');
     });
 
@@ -175,8 +196,7 @@ describe('GitService', () => {
       const service = new GitService(projectRoot, storage);
       await service.setupShadowGitRepository();
 
-      const expectedConfigContent =
-        '[user]\n  name = Gemini CLI\n  email = gemini-cli@google.com\n[commit]\n  gpgsign = false\n';
+      const expectedConfigContent = `[user]\n  name = ${SHADOW_REPO_AUTHOR_NAME}\n  email = ${SHADOW_REPO_AUTHOR_EMAIL}\n[commit]\n  gpgsign = false\n`;
       const actualConfigContent = await fs.readFile(gitConfigPath, 'utf-8');
       expect(actualConfigContent).toBe(expectedConfigContent);
     });
@@ -185,7 +205,10 @@ describe('GitService', () => {
       hoistedMockCheckIsRepo.mockResolvedValue(false);
       const service = new GitService(projectRoot, storage);
       await service.setupShadowGitRepository();
-      expect(hoistedMockSimpleGit).toHaveBeenCalledWith(repoDir);
+      expect(hoistedMockSimpleGit).toHaveBeenCalledWith(
+        repoDir,
+        expect.anything(),
+      );
       expect(hoistedMockInit).toHaveBeenCalled();
     });
 
@@ -245,6 +268,221 @@ describe('GitService', () => {
       const service = new GitService(projectRoot, storage);
       await service.setupShadowGitRepository();
       expect(hoistedMockCommit).not.toHaveBeenCalled();
+    });
+
+    it('should handle checkIsRepo failure gracefully and initialize repo', async () => {
+      // Simulate checkIsRepo failing (e.g., on certain Git versions like macOS 2.39.5)
+      hoistedMockCheckIsRepo.mockRejectedValue(
+        new Error('git rev-parse --is-inside-work-tree failed'),
+      );
+      const service = new GitService(projectRoot, storage);
+      await service.setupShadowGitRepository();
+      // Should proceed to initialize the repo since checkIsRepo failed
+      expect(hoistedMockInit).toHaveBeenCalled();
+      // Should log the error using debugLogger
+      expect(hoistedMockDebugLogger.debug).toHaveBeenCalledWith(
+        expect.stringContaining('checkIsRepo failed'),
+      );
+    });
+
+    it('should configure git environment to use local gitconfig', async () => {
+      hoistedMockCheckIsRepo.mockResolvedValue(false);
+      const service = new GitService(projectRoot, storage);
+      await service.setupShadowGitRepository();
+
+      expect(hoistedMockEnv).toHaveBeenCalledWith(
+        expect.objectContaining({
+          GIT_CONFIG_GLOBAL: gitConfigPath,
+          GIT_CONFIG_SYSTEM: path.join(repoDir, '.gitconfig_system_empty'),
+          GIT_AUTHOR_NAME: SHADOW_REPO_AUTHOR_NAME,
+          GIT_AUTHOR_EMAIL: SHADOW_REPO_AUTHOR_EMAIL,
+          GIT_COMMITTER_NAME: SHADOW_REPO_AUTHOR_NAME,
+          GIT_COMMITTER_EMAIL: SHADOW_REPO_AUTHOR_EMAIL,
+        }),
+      );
+
+      const systemConfigContent = await fs.readFile(
+        path.join(repoDir, '.gitconfig_system_empty'),
+        'utf-8',
+      );
+      expect(systemConfigContent).toBe('');
+    });
+
+    describe('environment variable preservation', () => {
+      const customPath = '/custom/bin';
+      const safeHome = '/home/user';
+      const sensitiveKey = 'sk-123456789';
+
+      beforeEach(() => {
+        vi.stubEnv('PATH', customPath);
+        vi.stubEnv('HOME', safeHome);
+        vi.stubEnv('API_KEY', sensitiveKey);
+        vi.stubEnv('UNRELATED_VAR', 'some-value');
+        // Explicitly unset strict mode triggers to ensure predictable test behavior
+        // across local and CI environments.
+        vi.stubEnv('GITHUB_SHA', '');
+        vi.stubEnv('SURFACE', '');
+        hoistedMockCheckIsRepo.mockResolvedValue(false);
+      });
+
+      afterEach(() => {
+        vi.unstubAllEnvs();
+      });
+
+      it('should preserve system PATH in the Git environment', async () => {
+        const service = new GitService(projectRoot, storage);
+        await service.setupShadowGitRepository();
+
+        expect(hoistedMockEnv).toHaveBeenCalledWith(
+          expect.objectContaining({
+            PATH: customPath,
+            GIT_CONFIG_GLOBAL: expect.any(String),
+            GIT_AUTHOR_NAME: SHADOW_REPO_AUTHOR_NAME,
+          }),
+        );
+      });
+
+      it('should preserve safe environment variables like HOME', async () => {
+        const service = new GitService(projectRoot, storage);
+        await service.setupShadowGitRepository();
+
+        expect(hoistedMockEnv).toHaveBeenCalledWith(
+          expect.objectContaining({
+            HOME: safeHome,
+          }),
+        );
+      });
+
+      it('should NOT include sensitive environment variables like API_KEY', async () => {
+        const service = new GitService(projectRoot, storage);
+        await service.setupShadowGitRepository();
+
+        const callArgs = hoistedMockEnv.mock.calls[0][0];
+        expect(callArgs.API_KEY).toBeUndefined();
+      });
+
+      it('should preserve unrelated environment variables in non-strict mode', async () => {
+        const service = new GitService(projectRoot, storage);
+        await service.setupShadowGitRepository();
+
+        const callArgs = hoistedMockEnv.mock.calls[0][0];
+        expect(callArgs.UNRELATED_VAR).toBe('some-value');
+      });
+
+      it('should explicitly unset GIT_DIR and GIT_WORK_TREE to maintain isolation', async () => {
+        const service = new GitService(projectRoot, storage);
+        await service.setupShadowGitRepository();
+
+        const callArgs = hoistedMockEnv.mock.calls[0][0];
+        expect(callArgs.GIT_DIR).toBeUndefined();
+        expect(callArgs.GIT_WORK_TREE).toBeUndefined();
+      });
+    });
+
+    describe('GIT_CONFIG isolation', () => {
+      beforeEach(() => {
+        vi.stubEnv('GIT_CONFIG_GLOBAL', '/user/global/config');
+        vi.stubEnv('GIT_CONFIG_SYSTEM', '/user/system/config');
+        hoistedMockCheckIsRepo.mockResolvedValue(false);
+      });
+
+      afterEach(() => {
+        vi.unstubAllEnvs();
+      });
+
+      it('should override GIT_CONFIG environment variables from process.env', async () => {
+        const service = new GitService(projectRoot, storage);
+        await service.setupShadowGitRepository();
+
+        const expectedConfigPath = path.join(repoDir, '.gitconfig');
+        const expectedSystemPath = path.join(
+          repoDir,
+          '.gitconfig_system_empty',
+        );
+
+        expect(hoistedMockEnv).toHaveBeenCalledWith(
+          expect.objectContaining({
+            GIT_CONFIG_GLOBAL: expectedConfigPath,
+            GIT_CONFIG_SYSTEM: expectedSystemPath,
+          }),
+        );
+
+        // Ensure it's not using the values from stubbed process.env
+        const callArgs = hoistedMockEnv.mock.calls[0][0];
+        expect(callArgs.GIT_CONFIG_GLOBAL).not.toBe('/user/global/config');
+        expect(callArgs.GIT_CONFIG_SYSTEM).not.toBe('/user/system/config');
+      });
+    });
+
+    describe('shadowGitRepository prioritization', () => {
+      beforeEach(() => {
+        vi.stubEnv('GIT_DIR', '/user/fake/.git');
+        vi.stubEnv('GIT_WORK_TREE', '/user/fake/worktree');
+        hoistedMockCheckIsRepo.mockResolvedValue(true);
+      });
+
+      afterEach(() => {
+        vi.unstubAllEnvs();
+      });
+
+      it('should prioritize internal GIT_DIR and GIT_WORK_TREE over process.env', async () => {
+        const service = new GitService(projectRoot, storage);
+        // Trigger a call to shadowGitRepository (e.g., via getCurrentCommitHash)
+        hoistedMockRaw.mockResolvedValue('hash');
+        await service.getCurrentCommitHash();
+
+        const expectedRepoDir = storage.getHistoryDir();
+        const expectedGitDir = path.join(expectedRepoDir, '.git');
+
+        expect(hoistedMockEnv).toHaveBeenCalledWith(
+          expect.objectContaining({
+            GIT_DIR: expectedGitDir,
+            GIT_WORK_TREE: projectRoot,
+          }),
+        );
+
+        // Ensure user env was overridden
+        const callArgs = hoistedMockEnv.mock.calls[0][0];
+        expect(callArgs.GIT_DIR).not.toBe('/user/fake/.git');
+        expect(callArgs.GIT_WORK_TREE).not.toBe('/user/fake/worktree');
+      });
+    });
+  });
+
+  describe('createFileSnapshot', () => {
+    it('should commit with --no-verify flag', async () => {
+      hoistedMockStatus.mockResolvedValue({ isClean: () => false });
+      const service = new GitService(projectRoot, storage);
+      await service.initialize();
+      await service.createFileSnapshot('test commit');
+      expect(hoistedMockCommit).toHaveBeenCalledWith('test commit', {
+        '--no-verify': null,
+      });
+    });
+
+    it('should create a new commit if there are staged changes', async () => {
+      hoistedMockStatus.mockResolvedValue({ isClean: () => false });
+      hoistedMockCommit.mockResolvedValue({ commit: 'new-commit-hash' });
+      const service = new GitService(projectRoot, storage);
+      const commitHash = await service.createFileSnapshot('test message');
+      expect(hoistedMockAdd).toHaveBeenCalledWith('.');
+      expect(hoistedMockStatus).toHaveBeenCalled();
+      expect(hoistedMockCommit).toHaveBeenCalledWith('test message', {
+        '--no-verify': null,
+      });
+      expect(commitHash).toBe('new-commit-hash');
+    });
+
+    it('should return the current HEAD commit hash if there are no staged changes', async () => {
+      hoistedMockStatus.mockResolvedValue({ isClean: () => true });
+      hoistedMockRaw.mockResolvedValue('current-head-hash');
+      const service = new GitService(projectRoot, storage);
+      const commitHash = await service.createFileSnapshot('test message');
+      expect(hoistedMockAdd).toHaveBeenCalledWith('.');
+      expect(hoistedMockStatus).toHaveBeenCalled();
+      expect(hoistedMockCommit).not.toHaveBeenCalled();
+      expect(hoistedMockRaw).toHaveBeenCalledWith('rev-parse', 'HEAD');
+      expect(commitHash).toBe('current-head-hash');
     });
   });
 });

@@ -4,9 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Part } from '@google/genai';
+import type { Part, Content } from '@google/genai';
 import type { Config } from '../config/config.js';
 import { getFolderStructure } from './getFolderStructure.js';
+import type { HistoryTurn } from '../core/agentChatHistory.js';
+import { deriveStableId } from './cryptoUtils.js';
+
+export const INITIAL_HISTORY_LENGTH = 1;
 
 /**
  * Generates a string describing the current workspace directories and their structures.
@@ -28,17 +32,10 @@ export async function getDirectoryContextString(
   );
 
   const folderStructure = folderStructures.join('\n');
+  const dirList = workspaceDirectories.map((dir) => `  - ${dir}`).join('\n');
 
-  let workingDirPreamble: string;
-  if (workspaceDirectories.length === 1) {
-    workingDirPreamble = `I'm currently working in the directory: ${workspaceDirectories[0]}`;
-  } else {
-    const dirList = workspaceDirectories.map((dir) => `  - ${dir}`).join('\n');
-    workingDirPreamble = `I'm currently working in the following directories:\n${dirList}`;
-  }
-
-  return `${workingDirPreamble}
-Here is the folder structure of the current working directories:
+  return `- **Workspace Directories:**\n${dirList}
+- **Directory Structure:**
 
 ${folderStructure}`;
 }
@@ -58,52 +55,57 @@ export async function getEnvironmentContext(config: Config): Promise<Part[]> {
     day: 'numeric',
   });
   const platform = process.platform;
-  const directoryContext = await getDirectoryContextString(config);
+  const directoryContext = config.getIncludeDirectoryTree()
+    ? await getDirectoryContextString(config)
+    : '';
+  const tempDir = config.storage.getProjectTempDir();
+  // Tiered context model (see issue #11488):
+  // - Tier 1 (global): system instruction only
+  // - Tier 2 (extension + project): first user message (here)
+  // - Tier 3 (subdirectory): tool output (JIT)
+  const environmentMemory = config.getSessionMemory();
 
   const context = `
+<session_context>
 This is the Gemini CLI. We are setting up the context for our chat.
 Today's date is ${today} (formatted according to the user's locale).
 My operating system is: ${platform}
+The project's temporary directory is: ${tempDir}
 ${directoryContext}
-        `.trim();
+
+${environmentMemory}
+</session_context>`.trim();
 
   const initialParts: Part[] = [{ text: context }];
-  const toolRegistry = config.getToolRegistry();
 
-  // Add full file context if the flag is set
-  if (config.getFullContext()) {
-    try {
-      const readManyFilesTool = toolRegistry.getTool('read_many_files');
-      if (readManyFilesTool) {
-        const invocation = readManyFilesTool.build({
-          paths: ['**/*'], // Read everything recursively
-          useDefaultExcludes: true, // Use default excludes
-        });
+  return initialParts;
+}
 
-        // Read all files in the target directory
-        const result = await invocation.execute(AbortSignal.timeout(30000));
-        if (result.llmContent) {
-          initialParts.push({
-            text: `\n--- Full File Context ---\n${result.llmContent}`,
-          });
-        } else {
-          console.warn(
-            'Full context requested, but read_many_files returned no content.',
-          );
-        }
-      } else {
-        console.warn(
-          'Full context requested, but read_many_files tool not found.',
-        );
-      }
-    } catch (error) {
-      // Not using reportError here as it's a startup/config phase, not a chat/generation phase error.
-      console.error('Error reading full file context:', error);
-      initialParts.push({
-        text: '\n--- Error reading full file context ---',
-      });
+export async function getInitialChatHistory(
+  config: Config,
+  extraHistory?: ReadonlyArray<Content | HistoryTurn>,
+): Promise<Array<Content | HistoryTurn>> {
+  const envId = deriveStableId(['environment-context']);
+
+  if (extraHistory && extraHistory.length > 0) {
+    const first = extraHistory[0];
+    const firstId = 'id' in first ? first.id : undefined;
+    if (firstId === envId) {
+      return [...extraHistory];
     }
   }
 
-  return initialParts;
+  const envParts = await getEnvironmentContext(config);
+  const envContextString = envParts.map((part) => part.text || '').join('\n\n');
+
+  return [
+    {
+      id: deriveStableId(['environment-context']),
+      content: {
+        role: 'user',
+        parts: [{ text: envContextString }],
+      },
+    },
+    ...(extraHistory ?? []),
+  ];
 }

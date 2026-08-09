@@ -4,288 +4,224 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import fs from 'node:fs';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import fs from 'node:fs/promises';
 import path from 'node:path';
-
-vi.mock('fs', () => ({
-  default: {
-    statSync: vi.fn(),
-    readdirSync: vi.fn(),
-  },
-  statSync: vi.fn(),
-  readdirSync: vi.fn(),
-  mkdirSync: vi.fn(),
-}));
+import { isSubpath } from '../utils/paths.js';
+import os from 'node:os';
 import { LSTool } from './ls.js';
 import type { Config } from '../config/config.js';
-import type { WorkspaceContext } from '../utils/workspaceContext.js';
-import type { FileDiscoveryService } from '../services/fileDiscoveryService.js';
+import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { ToolErrorType } from './tool-error.js';
+import { WorkspaceContext } from '../utils/workspaceContext.js';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
+
+vi.mock('./jit-context.js', () => ({
+  discoverJitContext: vi.fn().mockResolvedValue(''),
+  appendJitContext: vi.fn().mockImplementation((content, context) => {
+    if (!context) return content;
+    return `${content}\n\n--- Newly Discovered Project Context ---\n${context}\n--- End Project Context ---`;
+  }),
+}));
 
 describe('LSTool', () => {
   let lsTool: LSTool;
+  let tempRootDir: string;
+  let tempSecondaryDir: string;
   let mockConfig: Config;
-  let mockWorkspaceContext: WorkspaceContext;
-  let mockFileService: FileDiscoveryService;
-  const mockPrimaryDir = '/home/user/project';
-  const mockSecondaryDir = '/home/user/other-project';
+  const abortSignal = new AbortController().signal;
 
-  beforeEach(() => {
-    vi.resetAllMocks();
+  beforeEach(async () => {
+    const realTmp = await fs.realpath(os.tmpdir());
+    tempRootDir = await fs.mkdtemp(path.join(realTmp, 'ls-tool-root-'));
+    tempSecondaryDir = await fs.mkdtemp(
+      path.join(realTmp, 'ls-tool-secondary-'),
+    );
 
-    // Mock WorkspaceContext
-    mockWorkspaceContext = {
-      getDirectories: vi
-        .fn()
-        .mockReturnValue([mockPrimaryDir, mockSecondaryDir]),
-      isPathWithinWorkspace: vi
-        .fn()
-        .mockImplementation(
-          (path) =>
-            path.startsWith(mockPrimaryDir) ||
-            path.startsWith(mockSecondaryDir),
-        ),
-      addDirectory: vi.fn(),
-    } as unknown as WorkspaceContext;
+    const mockStorage = {
+      getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+    };
 
-    // Mock FileService
-    mockFileService = {
-      shouldGitIgnoreFile: vi.fn().mockReturnValue(false),
-      shouldGeminiIgnoreFile: vi.fn().mockReturnValue(false),
-    } as unknown as FileDiscoveryService;
-
-    // Mock Config
     mockConfig = {
-      getTargetDir: vi.fn().mockReturnValue(mockPrimaryDir),
-      getWorkspaceContext: vi.fn().mockReturnValue(mockWorkspaceContext),
-      getFileService: vi.fn().mockReturnValue(mockFileService),
-      getFileFilteringOptions: vi.fn().mockReturnValue({
+      getTargetDir: () => tempRootDir,
+      getWorkspaceContext: () =>
+        new WorkspaceContext(tempRootDir, [tempSecondaryDir]),
+      getFileService: () => new FileDiscoveryService(tempRootDir),
+      getFileFilteringOptions: () => ({
         respectGitIgnore: true,
         respectGeminiIgnore: true,
       }),
+      storage: mockStorage,
+      isPathAllowed(this: Config, absolutePath: string): boolean {
+        const workspaceContext = this.getWorkspaceContext();
+        if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+          return true;
+        }
+
+        const projectTempDir = this.storage.getProjectTempDir();
+        return isSubpath(path.resolve(projectTempDir), absolutePath);
+      },
+      validatePathAccess(this: Config, absolutePath: string): string | null {
+        if (this.isPathAllowed(absolutePath)) {
+          return null;
+        }
+
+        const workspaceDirs = this.getWorkspaceContext().getDirectories();
+        const projectTempDir = this.storage.getProjectTempDir();
+        return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+      },
     } as unknown as Config;
 
-    lsTool = new LSTool(mockConfig);
+    lsTool = new LSTool(mockConfig, createMockMessageBus());
+  });
+
+  afterEach(async () => {
+    await fs.rm(tempRootDir, { recursive: true, force: true });
+    await fs.rm(tempSecondaryDir, { recursive: true, force: true });
   });
 
   describe('parameter validation', () => {
-    it('should accept valid absolute paths within workspace', () => {
-      const params = {
-        path: '/home/user/project/src',
-      };
-      vi.mocked(fs.statSync).mockReturnValue({
-        isDirectory: () => true,
-      } as fs.Stats);
-      const invocation = lsTool.build(params);
+    it('should accept valid absolute paths within workspace', async () => {
+      const testPath = path.join(tempRootDir, 'src');
+      await fs.mkdir(testPath);
+
+      const invocation = lsTool.build({ dir_path: testPath });
+
       expect(invocation).toBeDefined();
     });
 
-    it('should reject relative paths', () => {
-      const params = {
-        path: './src',
-      };
+    it('should accept relative paths', async () => {
+      const testPath = path.join(tempRootDir, 'src');
+      await fs.mkdir(testPath);
 
-      expect(() => lsTool.build(params)).toThrow(
-        'Path must be absolute: ./src',
-      );
+      const relativePath = path.relative(tempRootDir, testPath);
+      const invocation = lsTool.build({ dir_path: relativePath });
+
+      expect(invocation).toBeDefined();
     });
 
     it('should reject paths outside workspace with clear error message', () => {
-      const params = {
-        path: '/etc/passwd',
-      };
-
-      expect(() => lsTool.build(params)).toThrow(
-        'Path must be within one of the workspace directories: /home/user/project, /home/user/other-project',
+      expect(() => lsTool.build({ dir_path: '/etc/passwd' })).toThrow(
+        /Path not in workspace: Attempted path ".*" resolves outside the allowed workspace directories: .*/,
       );
     });
 
-    it('should accept paths in secondary workspace directory', () => {
-      const params = {
-        path: '/home/user/other-project/lib',
-      };
-      vi.mocked(fs.statSync).mockReturnValue({
-        isDirectory: () => true,
-      } as fs.Stats);
-      const invocation = lsTool.build(params);
+    it('should accept paths in secondary workspace directory', async () => {
+      const testPath = path.join(tempSecondaryDir, 'lib');
+      await fs.mkdir(testPath);
+
+      const invocation = lsTool.build({ dir_path: testPath });
+
       expect(invocation).toBeDefined();
     });
   });
 
   describe('execute', () => {
     it('should list files in a directory', async () => {
-      const testPath = '/home/user/project/src';
-      const mockFiles = ['file1.ts', 'file2.ts', 'subdir'];
-      const mockStats = {
-        isDirectory: vi.fn(),
-        mtime: new Date(),
-        size: 1024,
-      };
+      await fs.writeFile(path.join(tempRootDir, 'file1.txt'), 'content1');
+      await fs.mkdir(path.join(tempRootDir, 'subdir'));
+      await fs.writeFile(
+        path.join(tempSecondaryDir, 'secondary-file.txt'),
+        'secondary',
+      );
 
-      vi.mocked(fs.statSync).mockImplementation((path: any) => {
-        const pathStr = path.toString();
-        if (pathStr === testPath) {
-          return { isDirectory: () => true } as fs.Stats;
-        }
-        // For individual files
-        if (pathStr.toString().endsWith('subdir')) {
-          return { ...mockStats, isDirectory: () => true, size: 0 } as fs.Stats;
-        }
-        return { ...mockStats, isDirectory: () => false } as fs.Stats;
-      });
-
-      vi.mocked(fs.readdirSync).mockReturnValue(mockFiles as any);
-
-      const invocation = lsTool.build({ path: testPath });
-      const result = await invocation.execute(new AbortController().signal);
+      const invocation = lsTool.build({ dir_path: tempRootDir });
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.llmContent).toContain('[DIR] subdir');
-      expect(result.llmContent).toContain('file1.ts');
-      expect(result.llmContent).toContain('file2.ts');
-      expect(result.returnDisplay).toBe('Listed 3 item(s).');
+      expect(result.llmContent).toContain('file1.txt');
+      expect(result.returnDisplay).toEqual({
+        summary: 'Found 2 item(s).',
+        files: ['[DIR] subdir', 'file1.txt'],
+      });
     });
 
     it('should list files from secondary workspace directory', async () => {
-      const testPath = '/home/user/other-project/lib';
-      const mockFiles = ['module1.js', 'module2.js'];
+      await fs.writeFile(path.join(tempRootDir, 'file1.txt'), 'content1');
+      await fs.mkdir(path.join(tempRootDir, 'subdir'));
+      await fs.writeFile(
+        path.join(tempSecondaryDir, 'secondary-file.txt'),
+        'secondary',
+      );
 
-      vi.mocked(fs.statSync).mockImplementation((path: any) => {
-        if (path.toString() === testPath) {
-          return { isDirectory: () => true } as fs.Stats;
-        }
-        return {
-          isDirectory: () => false,
-          mtime: new Date(),
-          size: 2048,
-        } as fs.Stats;
+      const invocation = lsTool.build({ dir_path: tempSecondaryDir });
+      const result = await invocation.execute({ abortSignal });
+
+      expect(result.llmContent).toContain('secondary-file.txt');
+      expect(result.returnDisplay).toEqual({
+        summary: 'Found 1 item(s).',
+        files: expect.any(Array),
       });
-
-      vi.mocked(fs.readdirSync).mockReturnValue(mockFiles as any);
-
-      const invocation = lsTool.build({ path: testPath });
-      const result = await invocation.execute(new AbortController().signal);
-
-      expect(result.llmContent).toContain('module1.js');
-      expect(result.llmContent).toContain('module2.js');
-      expect(result.returnDisplay).toBe('Listed 2 item(s).');
     });
 
     it('should handle empty directories', async () => {
-      const testPath = '/home/user/project/empty';
+      const emptyDir = path.join(tempRootDir, 'empty');
+      await fs.mkdir(emptyDir);
+      const invocation = lsTool.build({ dir_path: emptyDir });
+      const result = await invocation.execute({ abortSignal });
 
-      vi.mocked(fs.statSync).mockReturnValue({
-        isDirectory: () => true,
-      } as fs.Stats);
-      vi.mocked(fs.readdirSync).mockReturnValue([]);
-
-      const invocation = lsTool.build({ path: testPath });
-      const result = await invocation.execute(new AbortController().signal);
-
-      expect(result.llmContent).toBe(
-        'Directory /home/user/project/empty is empty.',
-      );
+      expect(result.llmContent).toBe(`Directory ${emptyDir} is empty.`);
       expect(result.returnDisplay).toBe('Directory is empty.');
     });
 
     it('should respect ignore patterns', async () => {
-      const testPath = '/home/user/project/src';
-      const mockFiles = ['test.js', 'test.spec.js', 'index.js'];
-
-      vi.mocked(fs.statSync).mockImplementation((path: any) => {
-        const pathStr = path.toString();
-        if (pathStr === testPath) {
-          return { isDirectory: () => true } as fs.Stats;
-        }
-        return {
-          isDirectory: () => false,
-          mtime: new Date(),
-          size: 1024,
-        } as fs.Stats;
-      });
-      vi.mocked(fs.readdirSync).mockReturnValue(mockFiles as any);
+      await fs.writeFile(path.join(tempRootDir, 'file1.txt'), 'content1');
+      await fs.writeFile(path.join(tempRootDir, 'file2.log'), 'content1');
 
       const invocation = lsTool.build({
-        path: testPath,
-        ignore: ['*.spec.js'],
+        dir_path: tempRootDir,
+        ignore: ['*.log'],
       });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({ abortSignal });
 
-      expect(result.llmContent).toContain('test.js');
-      expect(result.llmContent).toContain('index.js');
-      expect(result.llmContent).not.toContain('test.spec.js');
-      expect(result.returnDisplay).toBe('Listed 2 item(s).');
+      expect(result.llmContent).toContain('file1.txt');
+      expect(result.llmContent).not.toContain('file2.log');
+      expect(result.returnDisplay).toEqual({
+        summary: 'Found 1 item(s).',
+        files: expect.any(Array),
+      });
     });
 
     it('should respect gitignore patterns', async () => {
-      const testPath = '/home/user/project/src';
-      const mockFiles = ['file1.js', 'file2.js', 'ignored.js'];
+      await fs.writeFile(path.join(tempRootDir, 'file1.txt'), 'content1');
+      await fs.writeFile(path.join(tempRootDir, 'file2.log'), 'content1');
+      await fs.writeFile(path.join(tempRootDir, '.git'), '');
+      await fs.writeFile(path.join(tempRootDir, '.gitignore'), '*.log');
+      const invocation = lsTool.build({ dir_path: tempRootDir });
+      const result = await invocation.execute({ abortSignal });
 
-      vi.mocked(fs.statSync).mockImplementation((path: any) => {
-        const pathStr = path.toString();
-        if (pathStr === testPath) {
-          return { isDirectory: () => true } as fs.Stats;
-        }
-        return {
-          isDirectory: () => false,
-          mtime: new Date(),
-          size: 1024,
-        } as fs.Stats;
-      });
-      vi.mocked(fs.readdirSync).mockReturnValue(mockFiles as any);
-      (mockFileService.shouldGitIgnoreFile as any).mockImplementation(
-        (path: string) => path.includes('ignored.js'),
+      expect(result.llmContent).toContain('file1.txt');
+      expect(result.llmContent).not.toContain('file2.log');
+      // .git is always ignored by default.
+      expect(result.returnDisplay).toEqual(
+        expect.objectContaining({ summary: 'Found 2 item(s). (2 ignored)' }),
       );
-
-      const invocation = lsTool.build({ path: testPath });
-      const result = await invocation.execute(new AbortController().signal);
-
-      expect(result.llmContent).toContain('file1.js');
-      expect(result.llmContent).toContain('file2.js');
-      expect(result.llmContent).not.toContain('ignored.js');
-      expect(result.returnDisplay).toBe('Listed 2 item(s). (1 git-ignored)');
     });
 
     it('should respect geminiignore patterns', async () => {
-      const testPath = '/home/user/project/src';
-      const mockFiles = ['file1.js', 'file2.js', 'private.js'];
-
-      vi.mocked(fs.statSync).mockImplementation((path: any) => {
-        const pathStr = path.toString();
-        if (pathStr === testPath) {
-          return { isDirectory: () => true } as fs.Stats;
-        }
-        return {
-          isDirectory: () => false,
-          mtime: new Date(),
-          size: 1024,
-        } as fs.Stats;
-      });
-      vi.mocked(fs.readdirSync).mockReturnValue(mockFiles as any);
-      (mockFileService.shouldGeminiIgnoreFile as any).mockImplementation(
-        (path: string) => path.includes('private.js'),
+      await fs.writeFile(path.join(tempRootDir, 'file1.txt'), 'content1');
+      await fs.writeFile(path.join(tempRootDir, 'file2.log'), 'content1');
+      await fs.writeFile(
+        path.join(tempRootDir, GEMINI_IGNORE_FILE_NAME),
+        '*.log',
       );
+      const invocation = lsTool.build({ dir_path: tempRootDir });
+      const result = await invocation.execute({ abortSignal });
 
-      const invocation = lsTool.build({ path: testPath });
-      const result = await invocation.execute(new AbortController().signal);
-
-      expect(result.llmContent).toContain('file1.js');
-      expect(result.llmContent).toContain('file2.js');
-      expect(result.llmContent).not.toContain('private.js');
-      expect(result.returnDisplay).toBe('Listed 2 item(s). (1 gemini-ignored)');
+      expect(result.llmContent).toContain('file1.txt');
+      expect(result.llmContent).not.toContain('file2.log');
+      expect(result.returnDisplay).toEqual(
+        expect.objectContaining({ summary: 'Found 2 item(s). (1 ignored)' }),
+      );
     });
 
     it('should handle non-directory paths', async () => {
-      const testPath = '/home/user/project/file.txt';
+      const testPath = path.join(tempRootDir, 'file1.txt');
+      await fs.writeFile(testPath, 'content1');
 
-      vi.mocked(fs.statSync).mockReturnValue({
-        isDirectory: () => false,
-      } as fs.Stats);
-
-      const invocation = lsTool.build({ path: testPath });
-      const result = await invocation.execute(new AbortController().signal);
+      const invocation = lsTool.build({ dir_path: testPath });
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.llmContent).toContain('Path is not a directory');
       expect(result.returnDisplay).toBe('Error: Path is not a directory.');
@@ -293,14 +229,9 @@ describe('LSTool', () => {
     });
 
     it('should handle non-existent paths', async () => {
-      const testPath = '/home/user/project/does-not-exist';
-
-      vi.mocked(fs.statSync).mockImplementation(() => {
-        throw new Error('ENOENT: no such file or directory');
-      });
-
-      const invocation = lsTool.build({ path: testPath });
-      const result = await invocation.execute(new AbortController().signal);
+      const testPath = path.join(tempRootDir, 'does-not-exist');
+      const invocation = lsTool.build({ dir_path: testPath });
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.llmContent).toContain('Error listing directory');
       expect(result.returnDisplay).toBe('Error: Failed to list directory.');
@@ -308,54 +239,38 @@ describe('LSTool', () => {
     });
 
     it('should sort directories first, then files alphabetically', async () => {
-      const testPath = '/home/user/project/src';
-      const mockFiles = ['z-file.ts', 'a-dir', 'b-file.ts', 'c-dir'];
+      await fs.writeFile(path.join(tempRootDir, 'a-file.txt'), 'content1');
+      await fs.writeFile(path.join(tempRootDir, 'b-file.txt'), 'content1');
+      await fs.mkdir(path.join(tempRootDir, 'x-dir'));
+      await fs.mkdir(path.join(tempRootDir, 'y-dir'));
 
-      vi.mocked(fs.statSync).mockImplementation((path: any) => {
-        if (path.toString() === testPath) {
-          return { isDirectory: () => true } as fs.Stats;
-        }
-        if (path.toString().endsWith('-dir')) {
-          return {
-            isDirectory: () => true,
-            mtime: new Date(),
-            size: 0,
-          } as fs.Stats;
-        }
-        return {
-          isDirectory: () => false,
-          mtime: new Date(),
-          size: 1024,
-        } as fs.Stats;
-      });
-
-      vi.mocked(fs.readdirSync).mockReturnValue(mockFiles as any);
-
-      const invocation = lsTool.build({ path: testPath });
-      const result = await invocation.execute(new AbortController().signal);
+      const invocation = lsTool.build({ dir_path: tempRootDir });
+      const result = await invocation.execute({ abortSignal });
 
       const lines = (
         typeof result.llmContent === 'string' ? result.llmContent : ''
-      ).split('\n');
-      const entries = lines.slice(1).filter((line: string) => line.trim()); // Skip header
-      expect(entries[0]).toBe('[DIR] a-dir');
-      expect(entries[1]).toBe('[DIR] c-dir');
-      expect(entries[2]).toBe('b-file.ts');
-      expect(entries[3]).toBe('z-file.ts');
+      )
+        .split('\n')
+        .filter(Boolean);
+      const entries = lines.slice(1); // Skip header
+
+      expect(entries[0]).toBe('[DIR] x-dir');
+      expect(entries[1]).toBe('[DIR] y-dir');
+      expect(entries[2]).toBe('a-file.txt (8 bytes)');
+      expect(entries[3]).toBe('b-file.txt (8 bytes)');
     });
 
     it('should handle permission errors gracefully', async () => {
-      const testPath = '/home/user/project/restricted';
+      const restrictedDir = path.join(tempRootDir, 'restricted');
+      await fs.mkdir(restrictedDir);
 
-      vi.mocked(fs.statSync).mockReturnValue({
-        isDirectory: () => true,
-      } as fs.Stats);
-      vi.mocked(fs.readdirSync).mockImplementation(() => {
-        throw new Error('EACCES: permission denied');
-      });
+      // To simulate a permission error in a cross-platform way,
+      // we mock fs.readdir to throw an error.
+      const error = new Error('EACCES: permission denied');
+      vi.spyOn(fs, 'readdir').mockRejectedValueOnce(error);
 
-      const invocation = lsTool.build({ path: testPath });
-      const result = await invocation.execute(new AbortController().signal);
+      const invocation = lsTool.build({ dir_path: restrictedDir });
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.llmContent).toContain('Error listing directory');
       expect(result.llmContent).toContain('permission denied');
@@ -363,62 +278,43 @@ describe('LSTool', () => {
       expect(result.error?.type).toBe(ToolErrorType.LS_EXECUTION_ERROR);
     });
 
-    it('should throw for invalid params at build time', async () => {
-      expect(() => lsTool.build({ path: '../outside' })).toThrow(
-        'Path must be absolute: ../outside',
-      );
-    });
-
     it('should handle errors accessing individual files during listing', async () => {
-      const testPath = '/home/user/project/src';
-      const mockFiles = ['accessible.ts', 'inaccessible.ts'];
+      await fs.writeFile(path.join(tempRootDir, 'file1.txt'), 'content1');
+      const problematicFile = path.join(tempRootDir, 'problematic.txt');
+      await fs.writeFile(problematicFile, 'content2');
 
-      vi.mocked(fs.statSync).mockImplementation((path: any) => {
-        if (path.toString() === testPath) {
-          return { isDirectory: () => true } as fs.Stats;
+      // To simulate an error on a single file in a cross-platform way,
+      // we mock fs.stat to throw for a specific file. This avoids
+      // platform-specific behavior with things like dangling symlinks.
+      const originalStat = fs.stat;
+      const statSpy = vi.spyOn(fs, 'stat').mockImplementation(async (p) => {
+        if (p.toString() === problematicFile) {
+          throw new Error('Simulated stat error');
         }
-        if (path.toString().endsWith('inaccessible.ts')) {
-          throw new Error('EACCES: permission denied');
-        }
-        return {
-          isDirectory: () => false,
-          mtime: new Date(),
-          size: 1024,
-        } as fs.Stats;
+        return originalStat(p);
       });
 
-      vi.mocked(fs.readdirSync).mockReturnValue(mockFiles as any);
+      const invocation = lsTool.build({ dir_path: tempRootDir });
+      const result = await invocation.execute({ abortSignal });
 
-      // Spy on console.error to verify it's called
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
+      // Should still list the other files
+      expect(result.llmContent).toContain('file1.txt');
+      expect(result.llmContent).not.toContain('problematic.txt');
+      expect(result.returnDisplay).toEqual({
+        summary: 'Found 1 item(s).',
+        files: expect.any(Array),
+      });
 
-      const invocation = lsTool.build({ path: testPath });
-      const result = await invocation.execute(new AbortController().signal);
-
-      // Should still list the accessible file
-      expect(result.llmContent).toContain('accessible.ts');
-      expect(result.llmContent).not.toContain('inaccessible.ts');
-      expect(result.returnDisplay).toBe('Listed 1 item(s).');
-
-      // Verify error was logged
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Error accessing'),
-      );
-
-      consoleErrorSpy.mockRestore();
+      statSpy.mockRestore();
     });
   });
 
   describe('getDescription', () => {
     it('should return shortened relative path', () => {
+      const deeplyNestedDir = path.join(tempRootDir, 'deeply', 'nested');
       const params = {
-        path: `${mockPrimaryDir}/deeply/nested/directory`,
+        dir_path: path.join(deeplyNestedDir, 'directory'),
       };
-      vi.mocked(fs.statSync).mockReturnValue({
-        isDirectory: () => true,
-      } as fs.Stats);
       const invocation = lsTool.build(params);
       const description = invocation.getDescription();
       expect(description).toBe(path.join('deeply', 'nested', 'directory'));
@@ -426,64 +322,84 @@ describe('LSTool', () => {
 
     it('should handle paths in secondary workspace', () => {
       const params = {
-        path: `${mockSecondaryDir}/lib`,
+        dir_path: path.join(tempSecondaryDir, 'lib'),
       };
-      vi.mocked(fs.statSync).mockReturnValue({
-        isDirectory: () => true,
-      } as fs.Stats);
       const invocation = lsTool.build(params);
       const description = invocation.getDescription();
-      expect(description).toBe(path.join('..', 'other-project', 'lib'));
+      const expected = path.relative(tempRootDir, params.dir_path);
+      expect(description).toBe(expected);
     });
   });
 
   describe('workspace boundary validation', () => {
-    it('should accept paths in primary workspace directory', () => {
-      const params = { path: `${mockPrimaryDir}/src` };
-      vi.mocked(fs.statSync).mockReturnValue({
-        isDirectory: () => true,
-      } as fs.Stats);
+    it('should accept paths in primary workspace directory', async () => {
+      const testPath = path.join(tempRootDir, 'src');
+      await fs.mkdir(testPath);
+      const params = { dir_path: testPath };
       expect(lsTool.build(params)).toBeDefined();
     });
 
-    it('should accept paths in secondary workspace directory', () => {
-      const params = { path: `${mockSecondaryDir}/lib` };
-      vi.mocked(fs.statSync).mockReturnValue({
-        isDirectory: () => true,
-      } as fs.Stats);
+    it('should accept paths in secondary workspace directory', async () => {
+      const testPath = path.join(tempSecondaryDir, 'lib');
+      await fs.mkdir(testPath);
+      const params = { dir_path: testPath };
       expect(lsTool.build(params)).toBeDefined();
     });
 
     it('should reject paths outside all workspace directories', () => {
-      const params = { path: '/etc/passwd' };
+      const params = { dir_path: '/etc/passwd' };
       expect(() => lsTool.build(params)).toThrow(
-        'Path must be within one of the workspace directories',
+        /Path not in workspace: Attempted path ".*" resolves outside the allowed workspace directories: .*/,
       );
     });
 
     it('should list files from secondary workspace directory', async () => {
-      const testPath = `${mockSecondaryDir}/tests`;
-      const mockFiles = ['test1.spec.ts', 'test2.spec.ts'];
+      await fs.writeFile(
+        path.join(tempSecondaryDir, 'secondary-file.txt'),
+        'secondary',
+      );
 
-      vi.mocked(fs.statSync).mockImplementation((path: any) => {
-        if (path.toString() === testPath) {
-          return { isDirectory: () => true } as fs.Stats;
-        }
-        return {
-          isDirectory: () => false,
-          mtime: new Date(),
-          size: 512,
-        } as fs.Stats;
+      const invocation = lsTool.build({ dir_path: tempSecondaryDir });
+      const result = await invocation.execute({ abortSignal });
+
+      expect(result.llmContent).toContain('secondary-file.txt');
+      expect(result.returnDisplay).toEqual({
+        summary: 'Found 1 item(s).',
+        files: expect.any(Array),
       });
+    });
+  });
 
-      vi.mocked(fs.readdirSync).mockReturnValue(mockFiles as any);
+  describe('JIT context discovery', () => {
+    it('should append JIT context to output when enabled and context is found', async () => {
+      const { discoverJitContext } = await import('./jit-context.js');
+      vi.mocked(discoverJitContext).mockResolvedValue('Use the useAuth hook.');
 
-      const invocation = lsTool.build({ path: testPath });
-      const result = await invocation.execute(new AbortController().signal);
+      await fs.writeFile(path.join(tempRootDir, 'jit-file.txt'), 'content');
 
-      expect(result.llmContent).toContain('test1.spec.ts');
-      expect(result.llmContent).toContain('test2.spec.ts');
-      expect(result.returnDisplay).toBe('Listed 2 item(s).');
+      const invocation = lsTool.build({ dir_path: tempRootDir });
+      const result = await invocation.execute({ abortSignal });
+
+      expect(discoverJitContext).toHaveBeenCalled();
+      expect(result.llmContent).toContain('Newly Discovered Project Context');
+      expect(result.llmContent).toContain('Use the useAuth hook.');
+    });
+
+    it('should not append JIT context when disabled', async () => {
+      const { discoverJitContext } = await import('./jit-context.js');
+      vi.mocked(discoverJitContext).mockResolvedValue('');
+
+      await fs.writeFile(
+        path.join(tempRootDir, 'jit-disabled-file.txt'),
+        'content',
+      );
+
+      const invocation = lsTool.build({ dir_path: tempRootDir });
+      const result = await invocation.execute({ abortSignal });
+
+      expect(result.llmContent).not.toContain(
+        'Newly Discovered Project Context',
+      );
     });
   });
 });

@@ -4,15 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-} from 'react';
-import type { LoadedSettings } from '../../config/settings.js';
+import { createContext, useCallback, useContext, useState } from 'react';
 import { SettingScope } from '../../config/settings.js';
+import { useSettingsStore } from './SettingsContext.js';
 
 export type VimMode = 'NORMAL' | 'INSERT';
 
@@ -27,37 +21,22 @@ const VimModeContext = createContext<VimModeContextType | undefined>(undefined);
 
 export const VimModeProvider = ({
   children,
-  settings,
 }: {
   children: React.ReactNode;
-  settings: LoadedSettings;
 }) => {
-  const initialVimEnabled = settings.merged.general?.vimMode ?? false;
-  const [vimEnabled, setVimEnabled] = useState(initialVimEnabled);
-  const [vimMode, setVimMode] = useState<VimMode>(
-    initialVimEnabled ? 'NORMAL' : 'INSERT',
-  );
-
-  useEffect(() => {
-    // Initialize vimEnabled from settings on mount
-    const enabled = settings.merged.general?.vimMode ?? false;
-    setVimEnabled(enabled);
-    // When vim mode is enabled, always start in NORMAL mode
-    if (enabled) {
-      setVimMode('NORMAL');
-    }
-  }, [settings.merged.general?.vimMode]);
+  const { settings, setSetting } = useSettingsStore();
+  const vimEnabled = settings.merged.general.vimMode;
+  const [vimMode, setVimMode] = useState<VimMode>('INSERT');
 
   const toggleVimEnabled = useCallback(async () => {
     const newValue = !vimEnabled;
-    setVimEnabled(newValue);
-    // When enabling vim mode, start in NORMAL mode
+    // When enabling vim mode, start in INSERT mode
     if (newValue) {
-      setVimMode('NORMAL');
+      setVimMode('INSERT');
     }
-    await settings.setValue(SettingScope.User, 'general.vimMode', newValue);
+    setSetting(SettingScope.User, 'general.vimMode', newValue);
     return newValue;
-  }, [vimEnabled, settings]);
+  }, [vimEnabled, setSetting]);
 
   const value = {
     vimEnabled,

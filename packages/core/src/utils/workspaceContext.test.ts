@@ -9,6 +9,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { WorkspaceContext } from './workspaceContext.js';
+import { debugLogger } from './debugLogger.js';
 
 describe('WorkspaceContext with real filesystem', () => {
   let tempDir: string;
@@ -68,7 +69,7 @@ describe('WorkspaceContext with real filesystem', () => {
     it('should resolve relative paths to absolute', () => {
       const workspaceContext = new WorkspaceContext(cwd);
       const relativePath = path.relative(cwd, otherDir);
-      workspaceContext.addDirectory(relativePath, cwd);
+      workspaceContext.addDirectory(relativePath);
       const directories = workspaceContext.getDirectories();
 
       expect(directories).toEqual([cwd, otherDir]);
@@ -83,18 +84,21 @@ describe('WorkspaceContext with real filesystem', () => {
       expect(directories).toHaveLength(2);
     });
 
-    it('should handle symbolic links correctly', () => {
-      const realDir = path.join(tempDir, 'real');
-      fs.mkdirSync(realDir, { recursive: true });
-      const symlinkDir = path.join(tempDir, 'symlink-to-real');
-      fs.symlinkSync(realDir, symlinkDir, 'dir');
-      const workspaceContext = new WorkspaceContext(cwd);
-      workspaceContext.addDirectory(symlinkDir);
+    it.skipIf(os.platform() === 'win32')(
+      'should handle symbolic links correctly',
+      () => {
+        const realDir = path.join(tempDir, 'real');
+        fs.mkdirSync(realDir, { recursive: true });
+        const symlinkDir = path.join(tempDir, 'symlink-to-real');
+        fs.symlinkSync(realDir, symlinkDir, 'dir');
+        const workspaceContext = new WorkspaceContext(cwd);
+        workspaceContext.addDirectory(symlinkDir);
 
-      const directories = workspaceContext.getDirectories();
+        const directories = workspaceContext.getDirectories();
 
-      expect(directories).toEqual([cwd, realDir]);
-    });
+        expect(directories).toEqual([cwd, realDir]);
+      },
+    );
   });
 
   describe('path validation', () => {
@@ -158,7 +162,7 @@ describe('WorkspaceContext with real filesystem', () => {
       );
     });
 
-    describe('with symbolic link', () => {
+    describe.skipIf(os.platform() === 'win32')('with symbolic link', () => {
       describe('in the workspace', () => {
         let realDir: string;
         let symlinkDir: string;
@@ -274,7 +278,7 @@ describe('WorkspaceContext with real filesystem', () => {
         // handle it gracefully and return false.
         expect(workspaceContext.isPathWithinWorkspace(linkA)).toBe(false);
         expect(workspaceContext.isPathWithinWorkspace(linkB)).toBe(false);
-      });
+      }, 30000);
     });
   });
 
@@ -370,6 +374,75 @@ describe('WorkspaceContext with real filesystem', () => {
       expect(dirs1).toEqual(dirs2);
     });
   });
+
+  describe('addDirectories', () => {
+    it('should add multiple directories and emit one event', () => {
+      const dir3 = path.join(tempDir, 'dir3');
+      fs.mkdirSync(dir3);
+
+      const workspaceContext = new WorkspaceContext(cwd);
+      const listener = vi.fn();
+      workspaceContext.onDirectoriesChanged(listener);
+
+      const result = workspaceContext.addDirectories([otherDir, dir3]);
+
+      expect(workspaceContext.getDirectories()).toContain(otherDir);
+      expect(workspaceContext.getDirectories()).toContain(dir3);
+      expect(listener).toHaveBeenCalledOnce();
+      expect(result.added).toHaveLength(2);
+      expect(result.failed).toHaveLength(0);
+    });
+
+    it('should handle partial failures', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+      const listener = vi.fn();
+      workspaceContext.onDirectoriesChanged(listener);
+
+      const loggerSpy = vi
+        .spyOn(debugLogger, 'warn')
+        .mockImplementation(() => {});
+
+      const nonExistent = path.join(tempDir, 'does-not-exist');
+      const result = workspaceContext.addDirectories([otherDir, nonExistent]);
+
+      expect(workspaceContext.getDirectories()).toContain(otherDir);
+      expect(workspaceContext.getDirectories()).not.toContain(nonExistent);
+      expect(listener).toHaveBeenCalledOnce();
+      expect(loggerSpy).toHaveBeenCalled();
+      expect(result.added).toEqual([otherDir]);
+      expect(result.failed).toHaveLength(1);
+      expect(result.failed[0].path).toBe(nonExistent);
+      expect(result.failed[0].error).toBeDefined();
+
+      loggerSpy.mockRestore();
+    });
+
+    it('should not emit event if no directories added', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+      const listener = vi.fn();
+      workspaceContext.onDirectoriesChanged(listener);
+      const loggerSpy = vi
+        .spyOn(debugLogger, 'warn')
+        .mockImplementation(() => {});
+
+      const nonExistent = path.join(tempDir, 'does-not-exist');
+      const result = workspaceContext.addDirectories([nonExistent]);
+
+      expect(listener).not.toHaveBeenCalled();
+      expect(result.added).toHaveLength(0);
+      expect(result.failed).toHaveLength(1);
+      loggerSpy.mockRestore();
+    });
+  });
+
+  describe('addDirectory', () => {
+    it('should throw error if directory fails to add', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+      const nonExistent = path.join(tempDir, 'does-not-exist');
+
+      expect(() => workspaceContext.addDirectory(nonExistent)).toThrow();
+    });
+  });
 });
 
 describe('WorkspaceContext with optional directories', () => {
@@ -392,7 +465,7 @@ describe('WorkspaceContext with optional directories', () => {
     fs.mkdirSync(existingDir1, { recursive: true });
     fs.mkdirSync(existingDir2, { recursive: true });
 
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(debugLogger, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -407,8 +480,8 @@ describe('WorkspaceContext with optional directories', () => {
     ]);
     const directories = workspaceContext.getDirectories();
     expect(directories).toEqual([cwd, existingDir1]);
-    expect(console.warn).toHaveBeenCalledTimes(1);
-    expect(console.warn).toHaveBeenCalledWith(
+    expect(debugLogger.warn).toHaveBeenCalledTimes(1);
+    expect(debugLogger.warn).toHaveBeenCalledWith(
       `[WARN] Skipping unreadable directory: ${nonExistentDir} (Directory does not exist: ${nonExistentDir})`,
     );
   });
@@ -417,6 +490,69 @@ describe('WorkspaceContext with optional directories', () => {
     const workspaceContext = new WorkspaceContext(cwd, [existingDir1]);
     const directories = workspaceContext.getDirectories();
     expect(directories).toEqual([cwd, existingDir1]);
-    expect(console.warn).not.toHaveBeenCalled();
+    expect(debugLogger.warn).not.toHaveBeenCalled();
+  });
+
+  describe('Security Regression: Case-Insensitive Sensitive Path Blocklist', () => {
+    it('should reject sensitive paths like .git, .env, and node_modules case-insensitively, including Windows trailing character and NTFS ADS bypasses', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+
+      const sensitivePaths = [
+        path.join(cwd, '.git', 'config'),
+        path.join(cwd, '.GIT', 'config'),
+        path.join(cwd, '.Git', 'config'),
+        path.join(cwd, '.env'),
+        path.join(cwd, '.Env'),
+        path.join(cwd, '.ENV'),
+        path.join(cwd, 'node_modules', 'package', 'index.js'),
+        path.join(cwd, 'NODE_MODULES', 'package', 'index.js'),
+        // Windows trailing character bypasses
+        path.join(cwd, '.git ', 'config'),
+        path.join(cwd, '.git.', 'config'),
+        path.join(cwd, '.env ', 'config'),
+        path.join(cwd, '.env.', 'config'),
+        path.join(cwd, 'node_modules ', 'package', 'index.js'),
+        // NTFS Alternate Data Stream bypasses
+        path.join(cwd, '.git::$DATA', 'config'),
+        path.join(cwd, '.env::$DATA'),
+        path.join(cwd, 'node_modules::$DATA', 'package', 'index.js'),
+      ];
+
+      for (const p of sensitivePaths) {
+        expect(workspaceContext.isPathWithinWorkspace(p)).toBe(false);
+      }
+    });
+
+    it('should reject GitHub Actions Workload Identity credentials', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+
+      const sensitivePaths = [
+        path.join(cwd, 'gha-creds-12345.json'),
+        path.join(cwd, 'gha-creds-abcde.json'),
+        path.join(cwd, 'GHA-CREDS-abcde.JSON'), // Case-insensitivity check
+        path.join(cwd, 'subfolder', 'gha-creds-12345.json'), // Nested
+      ];
+
+      for (const p of sensitivePaths) {
+        expect(workspaceContext.isPathWithinWorkspace(p)).toBe(false);
+      }
+    });
+
+    it('should allow standard non-sensitive paths', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+
+      const safePaths = [
+        path.join(cwd, 'src', 'index.ts'),
+        path.join(cwd, '.gitignore'),
+        path.join(cwd, '.env.example'),
+        path.join(cwd, 'package.json'),
+        path.join(cwd, 'tsconfig.json'),
+        path.join(cwd, 'gha-creds.json'), // Doesn't match the pattern
+      ];
+
+      for (const p of safePaths) {
+        expect(workspaceContext.isPathWithinWorkspace(p)).toBe(true);
+      }
+    });
   });
 });

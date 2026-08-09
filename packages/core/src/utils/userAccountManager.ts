@@ -7,6 +7,7 @@
 import path from 'node:path';
 import { promises as fsp, readFileSync } from 'node:fs';
 import { Storage } from '../config/storage.js';
+import { debugLogger } from './debugLogger.js';
 
 interface UserAccounts {
   active: string | null;
@@ -29,13 +30,15 @@ export class UserAccountManager {
       return defaultState;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const parsed = JSON.parse(content);
 
     // Inlined validation logic
     if (typeof parsed !== 'object' || parsed === null) {
-      console.log('Invalid accounts file schema, starting fresh.');
+      debugLogger.log('Invalid accounts file schema, starting fresh.');
       return defaultState;
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const { active, old } = parsed as Partial<UserAccounts>;
     const isValid =
       (active === undefined || active === null || typeof active === 'string') &&
@@ -43,12 +46,14 @@ export class UserAccountManager {
         (Array.isArray(old) && old.every((i) => typeof i === 'string')));
 
     if (!isValid) {
-      console.log('Invalid accounts file schema, starting fresh.');
+      debugLogger.log('Invalid accounts file schema, starting fresh.');
       return defaultState;
     }
 
     return {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       active: parsed.active ?? null,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       old: parsed.old ?? [],
     };
   }
@@ -66,7 +71,10 @@ export class UserAccountManager {
       ) {
         return defaultState;
       }
-      console.log('Error during sync read of accounts, starting fresh.', error);
+      debugLogger.log(
+        'Error during sync read of accounts, starting fresh.',
+        error,
+      );
       return defaultState;
     }
   }
@@ -84,7 +92,7 @@ export class UserAccountManager {
       ) {
         return defaultState;
       }
-      console.log('Could not parse accounts file, starting fresh.', error);
+      debugLogger.log('Could not parse accounts file, starting fresh.', error);
       return defaultState;
     }
   }

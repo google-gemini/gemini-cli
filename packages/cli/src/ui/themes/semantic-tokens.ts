@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { lightTheme, darkTheme, ansiTheme } from './theme.js';
+import { lightTheme, darkTheme } from './theme.js';
 
 export interface SemanticColors {
   text: {
@@ -12,9 +12,13 @@ export interface SemanticColors {
     secondary: string;
     link: string;
     accent: string;
+    response: string;
   };
   background: {
     primary: string;
+    message: string;
+    input: string;
+    focus: string;
     diff: {
       added: string;
       removed: string;
@@ -22,11 +26,13 @@ export interface SemanticColors {
   };
   border: {
     default: string;
-    focused: string;
   };
   ui: {
     comment: string;
     symbol: string;
+    active: string;
+    dark: string;
+    focus: string;
     gradient: string[] | undefined;
   };
   status: {
@@ -42,21 +48,27 @@ export const lightSemanticColors: SemanticColors = {
     secondary: lightTheme.Gray,
     link: lightTheme.AccentBlue,
     accent: lightTheme.AccentPurple,
+    response: lightTheme.Foreground,
   },
   background: {
     primary: lightTheme.Background,
+    message: lightTheme.MessageBackground!,
+    input: lightTheme.InputBackground!,
+    focus: lightTheme.FocusBackground!,
     diff: {
       added: lightTheme.DiffAdded,
       removed: lightTheme.DiffRemoved,
     },
   },
   border: {
-    default: lightTheme.Gray,
-    focused: lightTheme.AccentBlue,
+    default: lightTheme.DarkGray,
   },
   ui: {
     comment: lightTheme.Comment,
     symbol: lightTheme.Gray,
+    active: lightTheme.AccentBlue,
+    dark: lightTheme.DarkGray,
+    focus: lightTheme.AccentGreen,
     gradient: lightTheme.GradientColors,
   },
   status: {
@@ -72,56 +84,32 @@ export const darkSemanticColors: SemanticColors = {
     secondary: darkTheme.Gray,
     link: darkTheme.AccentBlue,
     accent: darkTheme.AccentPurple,
+    response: darkTheme.Foreground,
   },
   background: {
     primary: darkTheme.Background,
+    message: darkTheme.MessageBackground!,
+    input: darkTheme.InputBackground!,
+    focus: darkTheme.FocusBackground!,
     diff: {
       added: darkTheme.DiffAdded,
       removed: darkTheme.DiffRemoved,
     },
   },
   border: {
-    default: darkTheme.Gray,
-    focused: darkTheme.AccentBlue,
+    default: darkTheme.DarkGray,
   },
   ui: {
     comment: darkTheme.Comment,
     symbol: darkTheme.Gray,
+    active: darkTheme.AccentBlue,
+    dark: darkTheme.DarkGray,
+    focus: darkTheme.AccentGreen,
     gradient: darkTheme.GradientColors,
   },
   status: {
     error: darkTheme.AccentRed,
     success: darkTheme.AccentGreen,
     warning: darkTheme.AccentYellow,
-  },
-};
-
-export const ansiSemanticColors: SemanticColors = {
-  text: {
-    primary: ansiTheme.Foreground,
-    secondary: ansiTheme.Gray,
-    link: ansiTheme.AccentBlue,
-    accent: ansiTheme.AccentPurple,
-  },
-  background: {
-    primary: ansiTheme.Background,
-    diff: {
-      added: ansiTheme.DiffAdded,
-      removed: ansiTheme.DiffRemoved,
-    },
-  },
-  border: {
-    default: ansiTheme.Gray,
-    focused: ansiTheme.AccentBlue,
-  },
-  ui: {
-    comment: ansiTheme.Comment,
-    symbol: ansiTheme.Gray,
-    gradient: ansiTheme.GradientColors,
-  },
-  status: {
-    error: ansiTheme.AccentRed,
-    success: ansiTheme.AccentGreen,
-    warning: ansiTheme.AccentYellow,
   },
 };

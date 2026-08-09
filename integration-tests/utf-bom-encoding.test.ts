@@ -4,13 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { TestRig } from './test-helper.js';
-
-// Windows skip (Option A: avoid infra scope)
-const d = process.platform === 'win32' ? describe.skip : describe;
 
 // BOM encoders
 const utf8BOM = (s: string) =>
@@ -50,32 +47,26 @@ const utf32BE = (s: string) => {
   return Buffer.concat([bom, payload]);
 };
 
-// Minimal binary sentinel (PNG header only)
-const fakePng = () =>
-  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+describe('BOM end-to-end integraion', () => {
+  let rig: TestRig;
 
-let rig: TestRig;
-let dir: string;
-
-d('BOM end-to-end integration', () => {
-  beforeAll(async () => {
+  beforeEach(async () => {
     rig = new TestRig();
-    await rig.setup('bom-integration');
-    dir = rig.testDir!;
+    await rig.setup('bom-integration', {
+      settings: { tools: { core: ['read_file'] } },
+    });
   });
 
-  afterAll(async () => {
-    await rig.cleanup();
-  });
+  afterEach(async () => await rig.cleanup());
 
   async function runAndAssert(
     filename: string,
     content: Buffer,
     expectedText: string | null,
   ) {
-    writeFileSync(join(dir, filename), content);
+    writeFileSync(join(rig.testDir!, filename), content);
     const prompt = `read the file ${filename} and output its exact contents`;
-    const output = await rig.run(prompt);
+    const output = await rig.run({ args: prompt });
     await rig.waitForToolCall('read_file');
     const lower = output.toLowerCase();
     if (expectedText === null) {
@@ -124,9 +115,5 @@ d('BOM end-to-end integration', () => {
       utf32BE('BOM_OK UTF-32BE'),
       'BOM_OK UTF-32BE',
     );
-  });
-
-  it('Binary sentinel', async () => {
-    await runAndAssert('image.png', fakePng(), null);
   });
 });

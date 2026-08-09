@@ -4,118 +4,171 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export enum DetectedIde {
-  Devin = 'devin',
-  Replit = 'replit',
-  Cursor = 'cursor',
-  CloudShell = 'cloudshell',
-  Codespaces = 'codespaces',
-  FirebaseStudio = 'firebasestudio',
-  Trae = 'trae',
-  VSCode = 'vscode',
-  VSCodeFork = 'vscodefork',
-}
+export const IDE_DEFINITIONS = {
+  devin: { name: 'devin', displayName: 'Devin' },
+  replit: { name: 'replit', displayName: 'Replit' },
+  cursor: { name: 'cursor', displayName: 'Cursor' },
+  cloudshell: { name: 'cloudshell', displayName: 'Cloud Shell' },
+  codespaces: { name: 'codespaces', displayName: 'GitHub Codespaces' },
+  firebasestudio: { name: 'firebasestudio', displayName: 'Firebase Studio' },
+  trae: { name: 'trae', displayName: 'Trae' },
+  vscode: { name: 'vscode', displayName: 'VS Code' },
+  vscodefork: { name: 'vscodefork', displayName: 'IDE' },
+  positron: { name: 'positron', displayName: 'Positron' },
+  antigravity: { name: 'antigravity', displayName: 'Antigravity' },
+  sublimetext: { name: 'sublimetext', displayName: 'Sublime Text' },
+  jetbrains: { name: 'jetbrains', displayName: 'JetBrains IDE' },
+  intellijidea: { name: 'intellijidea', displayName: 'IntelliJ IDEA' },
+  webstorm: { name: 'webstorm', displayName: 'WebStorm' },
+  pycharm: { name: 'pycharm', displayName: 'PyCharm' },
+  goland: { name: 'goland', displayName: 'GoLand' },
+  androidstudio: { name: 'androidstudio', displayName: 'Android Studio' },
+  clion: { name: 'clion', displayName: 'CLion' },
+  rustrover: { name: 'rustrover', displayName: 'RustRover' },
+  datagrip: { name: 'datagrip', displayName: 'DataGrip' },
+  phpstorm: { name: 'phpstorm', displayName: 'PhpStorm' },
+  zed: { name: 'zed', displayName: 'Zed' },
+  xcode: { name: 'xcode', displayName: 'XCode' },
+} as const;
 
 export interface IdeInfo {
+  name: string;
   displayName: string;
 }
 
-export function getIdeInfo(ide: DetectedIde): IdeInfo {
-  switch (ide) {
-    case DetectedIde.Devin:
-      return {
-        displayName: 'Devin',
-      };
-    case DetectedIde.Replit:
-      return {
-        displayName: 'Replit',
-      };
-    case DetectedIde.Cursor:
-      return {
-        displayName: 'Cursor',
-      };
-    case DetectedIde.CloudShell:
-      return {
-        displayName: 'Cloud Shell',
-      };
-    case DetectedIde.Codespaces:
-      return {
-        displayName: 'GitHub Codespaces',
-      };
-    case DetectedIde.FirebaseStudio:
-      return {
-        displayName: 'Firebase Studio',
-      };
-    case DetectedIde.Trae:
-      return {
-        displayName: 'Trae',
-      };
-    case DetectedIde.VSCode:
-      return {
-        displayName: 'VS Code',
-      };
-    case DetectedIde.VSCodeFork:
-      return {
-        displayName: 'IDE',
-      };
-    default: {
-      // This ensures that if a new IDE is added to the enum, we get a compile-time error.
-      const exhaustiveCheck: never = ide;
-      return exhaustiveCheck;
-    }
-  }
+export function isCloudShell(): boolean {
+  return !!(process.env['EDITOR_IN_CLOUD_SHELL'] || process.env['CLOUD_SHELL']);
 }
 
-export function detectIdeFromEnv(): DetectedIde {
+function isJetBrains(): boolean {
+  return !!process.env['TERMINAL_EMULATOR']
+    ?.toLowerCase()
+    .includes('jetbrains');
+}
+
+export function detectIdeFromEnv(): IdeInfo {
+  if (process.env['ANTIGRAVITY_CLI_ALIAS']) {
+    return IDE_DEFINITIONS.antigravity;
+  }
   if (process.env['__COG_BASHRC_SOURCED']) {
-    return DetectedIde.Devin;
+    return IDE_DEFINITIONS.devin;
   }
   if (process.env['REPLIT_USER']) {
-    return DetectedIde.Replit;
+    return IDE_DEFINITIONS.replit;
   }
   if (process.env['CURSOR_TRACE_ID']) {
-    return DetectedIde.Cursor;
+    return IDE_DEFINITIONS.cursor;
   }
   if (process.env['CODESPACES']) {
-    return DetectedIde.Codespaces;
+    return IDE_DEFINITIONS.codespaces;
   }
-  if (process.env['EDITOR_IN_CLOUD_SHELL'] || process.env['CLOUD_SHELL']) {
-    return DetectedIde.CloudShell;
+  if (isCloudShell()) {
+    return IDE_DEFINITIONS.cloudshell;
   }
   if (process.env['TERM_PRODUCT'] === 'Trae') {
-    return DetectedIde.Trae;
+    return IDE_DEFINITIONS.trae;
   }
   if (process.env['MONOSPACE_ENV']) {
-    return DetectedIde.FirebaseStudio;
+    return IDE_DEFINITIONS.firebasestudio;
   }
-  return DetectedIde.VSCode;
+  if (process.env['POSITRON'] === '1') {
+    return IDE_DEFINITIONS.positron;
+  }
+  if (process.env['TERM_PROGRAM'] === 'sublime') {
+    return IDE_DEFINITIONS.sublimetext;
+  }
+  if (process.env['ZED_SESSION_ID'] || process.env['TERM_PROGRAM'] === 'Zed') {
+    return IDE_DEFINITIONS.zed;
+  }
+  if (process.env['XCODE_VERSION_ACTUAL']) {
+    return IDE_DEFINITIONS.xcode;
+  }
+  if (isJetBrains()) {
+    return IDE_DEFINITIONS.jetbrains;
+  }
+  return IDE_DEFINITIONS.vscode;
 }
 
 function verifyVSCode(
-  ide: DetectedIde,
+  ide: IdeInfo,
   ideProcessInfo: {
     pid: number;
     command: string;
   },
-): DetectedIde {
-  if (ide !== DetectedIde.VSCode) {
+): IdeInfo {
+  if (ide.name !== IDE_DEFINITIONS.vscode.name) {
     return ide;
   }
-  if (ideProcessInfo.command.toLowerCase().includes('code')) {
-    return DetectedIde.VSCode;
+  if (
+    !ideProcessInfo.command ||
+    ideProcessInfo.command.toLowerCase().includes('code')
+  ) {
+    return IDE_DEFINITIONS.vscode;
   }
-  return DetectedIde.VSCodeFork;
+  return IDE_DEFINITIONS.vscodefork;
 }
 
-export function detectIde(ideProcessInfo: {
-  pid: number;
-  command: string;
-}): DetectedIde | undefined {
-  // Only VSCode-based integrations are currently supported.
-  if (process.env['TERM_PROGRAM'] !== 'vscode') {
+function verifyJetBrains(
+  ide: IdeInfo,
+  ideProcessInfo: {
+    pid: number;
+    command: string;
+  },
+): IdeInfo {
+  if (ide.name !== IDE_DEFINITIONS.jetbrains.name || !ideProcessInfo.command) {
+    return ide;
+  }
+
+  const command = ideProcessInfo.command.toLowerCase();
+  const jetbrainsProducts: Array<[string, IdeInfo]> = [
+    ['idea', IDE_DEFINITIONS.intellijidea],
+    ['webstorm', IDE_DEFINITIONS.webstorm],
+    ['pycharm', IDE_DEFINITIONS.pycharm],
+    ['goland', IDE_DEFINITIONS.goland],
+    ['studio', IDE_DEFINITIONS.androidstudio],
+    ['clion', IDE_DEFINITIONS.clion],
+    ['rustrover', IDE_DEFINITIONS.rustrover],
+    ['datagrip', IDE_DEFINITIONS.datagrip],
+    ['phpstorm', IDE_DEFINITIONS.phpstorm],
+  ];
+
+  for (const [product, ideInfo] of jetbrainsProducts) {
+    if (command.includes(product)) {
+      return ideInfo;
+    }
+  }
+
+  return ide;
+}
+
+export function detectIde(
+  ideProcessInfo: {
+    pid: number;
+    command: string;
+  },
+  ideInfoFromFile?: { name?: string; displayName?: string },
+): IdeInfo | undefined {
+  if (ideInfoFromFile?.name && ideInfoFromFile.displayName) {
+    return {
+      name: ideInfoFromFile.name,
+      displayName: ideInfoFromFile.displayName,
+    };
+  }
+
+  // Only VS Code, Sublime Text, JetBrains, Zed, and XCode integrations are currently supported.
+  if (
+    process.env['TERM_PROGRAM'] !== 'vscode' &&
+    process.env['TERM_PROGRAM'] !== 'sublime' &&
+    process.env['TERM_PROGRAM'] !== 'Zed' &&
+    !process.env['ZED_SESSION_ID'] &&
+    !process.env['XCODE_VERSION_ACTUAL'] &&
+    !isJetBrains()
+  ) {
     return undefined;
   }
 
   const ide = detectIdeFromEnv();
-  return verifyVSCode(ide, ideProcessInfo);
+  return isJetBrains()
+    ? verifyJetBrains(ide, ideProcessInfo)
+    : verifyVSCode(ide, ideProcessInfo);
 }

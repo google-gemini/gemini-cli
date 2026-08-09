@@ -5,18 +5,18 @@
  */
 
 import * as fs from 'node:fs';
-import type { ExportResult } from '@opentelemetry/core';
-import { ExportResultCode } from '@opentelemetry/core';
+import { ExportResultCode, type ExportResult } from '@opentelemetry/core';
 import type { ReadableSpan, SpanExporter } from '@opentelemetry/sdk-trace-base';
 import type {
   ReadableLogRecord,
   LogRecordExporter,
 } from '@opentelemetry/sdk-logs';
-import type {
-  ResourceMetrics,
-  PushMetricExporter,
+import {
+  AggregationTemporality,
+  type ResourceMetrics,
+  type PushMetricExporter,
 } from '@opentelemetry/sdk-metrics';
-import { AggregationTemporality } from '@opentelemetry/sdk-metrics';
+import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 
 class FileExporter {
   protected writeStream: fs.WriteStream;
@@ -26,7 +26,28 @@ class FileExporter {
   }
 
   protected serialize(data: unknown): string {
-    return JSON.stringify(data, null, 2) + '\n';
+    return safeJsonStringify(data, 2) + '\n';
+  }
+
+  /**
+   * Ensures that all pending writes are flushed to the underlying stream.
+   */
+  forceFlush(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!this.writeStream.writable) {
+        resolve();
+        return;
+      }
+      // write('') will be queued after all previous writes and its callback
+      // will be called when it (and thus all previous writes) are flushed.
+      this.writeStream.write('', (err) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    });
   }
 
   shutdown(): Promise<void> {
@@ -85,9 +106,5 @@ export class FileMetricExporter
 
   getPreferredAggregationTemporality(): AggregationTemporality {
     return AggregationTemporality.CUMULATIVE;
-  }
-
-  async forceFlush(): Promise<void> {
-    return Promise.resolve();
   }
 }

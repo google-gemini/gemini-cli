@@ -6,18 +6,19 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import { type IdeContext, type MCPServerConfig } from '@google/gemini-cli-core';
-import { useTerminalSize } from '../hooks/useTerminalSize.js';
-import { isNarrowWidth } from '../utils/isNarrowWidth.js';
+import { Command } from '../key/keyMatchers.js';
+import { formatCommand } from '../key/keybindingUtils.js';
 
 interface ContextSummaryDisplayProps {
   geminiMdFileCount: number;
   contextFileNames: string[];
   mcpServers?: Record<string, MCPServerConfig>;
   blockedMcpServers?: Array<{ name: string; extensionName: string }>;
-  showToolDescriptions?: boolean;
   ideContext?: IdeContext;
+  skillCount: number;
+  backgroundProcessCount?: number;
 }
 
 export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
@@ -25,11 +26,10 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
   contextFileNames,
   mcpServers,
   blockedMcpServers,
-  showToolDescriptions,
   ideContext,
+  skillCount,
+  backgroundProcessCount = 0,
 }) => {
-  const { columns: terminalWidth } = useTerminalSize();
-  const isNarrow = isNarrowWidth(terminalWidth);
   const mcpServerCount = Object.keys(mcpServers || {}).length;
   const blockedMcpServerCount = blockedMcpServers?.length || 0;
   const openFileCount = ideContext?.workspaceState?.openFiles?.length ?? 0;
@@ -38,9 +38,11 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
     geminiMdFileCount === 0 &&
     mcpServerCount === 0 &&
     blockedMcpServerCount === 0 &&
-    openFileCount === 0
+    openFileCount === 0 &&
+    skillCount === 0 &&
+    backgroundProcessCount === 0
   ) {
-    return <Text> </Text>; // Render an empty space to reserve height
+    return null;
   }
 
   const openFilesText = (() => {
@@ -49,7 +51,7 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
     }
     return `${openFileCount} open file${
       openFileCount > 1 ? 's' : ''
-    } (ctrl+g to view)`;
+    } (${formatCommand(Command.SHOW_IDE_CONTEXT_DETAIL)} to view)`;
   })();
 
   const geminiMdText = (() => {
@@ -82,36 +84,41 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
       }
       parts.push(blockedText);
     }
-    let text = parts.join(', ');
-    // Add ctrl+t hint when MCP servers are available
-    if (mcpServers && Object.keys(mcpServers).length > 0) {
-      if (showToolDescriptions) {
-        text += ' (ctrl+t to toggle)';
-      } else {
-        text += ' (ctrl+t to view)';
-      }
-    }
-    return text;
+    return parts.join(', ');
   })();
 
-  const summaryParts = [openFilesText, geminiMdText, mcpText].filter(Boolean);
+  const skillText = (() => {
+    if (skillCount === 0) {
+      return '';
+    }
+    return `${skillCount} skill${skillCount > 1 ? 's' : ''}`;
+  })();
 
-  if (isNarrow) {
-    return (
-      <Box flexDirection="column">
-        <Text color={Colors.Gray}>Using:</Text>
-        {summaryParts.map((part, index) => (
-          <Text key={index} color={Colors.Gray}>
-            {'  '}- {part}
-          </Text>
-        ))}
-      </Box>
-    );
-  }
+  const backgroundText = (() => {
+    if (backgroundProcessCount === 0) {
+      return '';
+    }
+    return `${backgroundProcessCount} Background process${
+      backgroundProcessCount > 1 ? 'es' : ''
+    }`;
+  })();
+
+  const summaryParts = [
+    openFilesText,
+    geminiMdText,
+    mcpText,
+    skillText,
+    backgroundText,
+  ].filter(Boolean);
 
   return (
-    <Box>
-      <Text color={Colors.Gray}>Using: {summaryParts.join(' | ')}</Text>
+    <Box paddingX={1} flexDirection="row" flexWrap="wrap">
+      {summaryParts.map((part, index) => (
+        <Box key={index} flexDirection="row">
+          {index > 0 && <Text color={theme.text.secondary}>{' · '}</Text>}
+          <Text color={theme.text.secondary}>{part}</Text>
+        </Box>
+      ))}
     </Box>
   );
 };

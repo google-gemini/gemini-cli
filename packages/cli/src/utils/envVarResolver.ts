@@ -6,26 +6,56 @@
 
 /**
  * Resolves environment variables in a string.
- * Replaces $VAR_NAME and ${VAR_NAME} with their corresponding environment variable values.
- * If the environment variable is not defined, the original placeholder is preserved.
+ * Replaces $VAR_NAME, ${VAR_NAME}, and ${VAR_NAME:-DEFAULT_VALUE} with their corresponding
+ * environment variable values. If the environment variable is not defined and no default
+ * value is provided, the original placeholder is preserved.
  *
  * @param value - The string that may contain environment variable placeholders
+ * @param customEnv - Optional record of environment variables to use before process.env
  * @returns The string with environment variables resolved
  *
  * @example
  * resolveEnvVarsInString("Token: $API_KEY") // Returns "Token: secret-123"
  * resolveEnvVarsInString("URL: ${BASE_URL}/api") // Returns "URL: https://api.example.com/api"
+ * resolveEnvVarsInString("URL: ${MISSING_VAR:-https://default.com}") // Returns "URL: https://default.com"
  * resolveEnvVarsInString("Missing: $UNDEFINED_VAR") // Returns "Missing: $UNDEFINED_VAR"
  */
-export function resolveEnvVarsInString(value: string): string {
-  const envVarRegex = /\$(?:(\w+)|{([^}]+)})/g; // Find $VAR_NAME or ${VAR_NAME}
-  return value.replace(envVarRegex, (match, varName1, varName2) => {
-    const varName = varName1 || varName2;
-    if (process && process.env && typeof process.env[varName] === 'string') {
-      return process.env[varName]!;
-    }
-    return match;
-  });
+export function resolveEnvVarsInString(
+  value: string,
+  customEnv?: Record<string, string>,
+): string {
+  // Regex matches $VAR_NAME, ${VAR_NAME}, and ${VAR_NAME:-DEFAULT_VALUE}
+  const envVarRegex = /\$(?:(\w+)|{([^}]+?)(?::-([^}]*))?})/g;
+
+  return value.replace(
+    envVarRegex,
+    (
+      match: string,
+      varName1?: string,
+      varName2?: string,
+      defaultValue?: string,
+    ): string => {
+      const varName: string = varName1 || varName2 || '';
+
+      if (!varName) {
+        return match;
+      }
+
+      if (customEnv && typeof customEnv[varName] === 'string') {
+        return customEnv[varName];
+      }
+      if (process && process.env) {
+        const val = process.env[varName];
+        if (typeof val === 'string') {
+          return val;
+        }
+      }
+      if (defaultValue !== undefined) {
+        return defaultValue;
+      }
+      return match;
+    },
+  );
 }
 
 /**
@@ -47,8 +77,11 @@ export function resolveEnvVarsInString(value: string): string {
  * };
  * const resolved = resolveEnvVarsInObject(config);
  */
-export function resolveEnvVarsInObject<T>(obj: T): T {
-  return resolveEnvVarsInObjectInternal(obj, new WeakSet());
+export function resolveEnvVarsInObject<T>(
+  obj: T,
+  customEnv?: Record<string, string>,
+): T {
+  return resolveEnvVarsInObjectInternal(obj, new WeakSet(), customEnv);
 }
 
 /**
@@ -61,6 +94,7 @@ export function resolveEnvVarsInObject<T>(obj: T): T {
 function resolveEnvVarsInObjectInternal<T>(
   obj: T,
   visited: WeakSet<object>,
+  customEnv?: Record<string, string>,
 ): T {
   if (
     obj === null ||
@@ -72,22 +106,28 @@ function resolveEnvVarsInObjectInternal<T>(
   }
 
   if (typeof obj === 'string') {
-    return resolveEnvVarsInString(obj) as unknown as T;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    return resolveEnvVarsInString(obj, customEnv) as unknown as T;
   }
 
   if (Array.isArray(obj)) {
     // Check for circular reference
     if (visited.has(obj)) {
       // Return a shallow copy to break the cycle
-      return [...obj] as unknown as T;
+      const copy: unknown = [...obj];
+      const isTArray = (val: unknown): val is T => Array.isArray(val);
+      if (isTArray(copy)) return copy;
+      throw new Error('Unreachable');
     }
 
     visited.add(obj);
-    const result = obj.map((item) =>
-      resolveEnvVarsInObjectInternal(item, visited),
-    ) as unknown as T;
+    const mapped: unknown = obj.map((item: unknown) =>
+      resolveEnvVarsInObjectInternal(item, visited, customEnv),
+    );
     visited.delete(obj);
-    return result;
+    const isTArray = (val: unknown): val is T => Array.isArray(val);
+    if (isTArray(mapped)) return mapped;
+    throw new Error('Unreachable');
   }
 
   if (typeof obj === 'object') {
@@ -101,7 +141,11 @@ function resolveEnvVarsInObjectInternal<T>(
     const newObj = { ...obj } as T;
     for (const key in newObj) {
       if (Object.prototype.hasOwnProperty.call(newObj, key)) {
-        newObj[key] = resolveEnvVarsInObjectInternal(newObj[key], visited);
+        newObj[key] = resolveEnvVarsInObjectInternal(
+          newObj[key],
+          visited,
+          customEnv,
+        );
       }
     }
     visited.delete(obj as object);

@@ -13,6 +13,15 @@ export default defineConfig({
     reporters: ['default'],
     include: ['**/*.test.ts'],
     retry: 2,
-    fileParallelism: false,
+    fileParallelism: true,
+    poolOptions: {
+      threads: {
+        minThreads: 8,
+        maxThreads: 16,
+      },
+    },
+    env: {
+      GEMINI_TEST_TYPE: 'integration',
+    },
   },
 });

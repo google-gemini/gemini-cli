@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="275" viewBox="0 0 920 275">
+  <style>
+    text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+  </style>
+  <rect width="920" height="275" fill="#000000" />
+  <g transform="translate(10, 10)">
+    <text x="0" y="2" fill="#878787" textLength="900" lengthAdjust="spacingAndGlyphs">╭──────────────────────────────────────────────────────────────────────────────────────────────────╮</text>
+    <text x="0" y="19" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="19" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="36" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="27" y="36" fill="#ffffff" textLength="99" lengthAdjust="spacingAndGlyphs" font-weight="bold">&gt; Settings </text>
+    <text x="891" y="36" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="53" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="53" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="70" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="70" fill="#d7ffd7" textLength="864" lengthAdjust="spacingAndGlyphs">╭──────────────────────────────────────────────────────────────────────────────────────────────╮</text>
+    <text x="891" y="70" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="87" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="87" fill="#d7ffd7" textLength="18" lengthAdjust="spacingAndGlyphs">╰─</text>
+    <rect x="36" y="85" width="9" height="17" fill="#ffffff" />
+    <text x="36" y="87" fill="#000000" textLength="9" lengthAdjust="spacingAndGlyphs">S</text>
+    <text x="45" y="87" fill="#afafaf" textLength="135" lengthAdjust="spacingAndGlyphs">earch to filter</text>
+    <text x="180" y="87" fill="#d7ffd7" textLength="702" lengthAdjust="spacingAndGlyphs">─────────────────────────────────────────────────────────────────────────────╯</text>
+    <text x="891" y="87" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="104" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="27" y="104" fill="#afafaf" textLength="9" lengthAdjust="spacingAndGlyphs">▲</text>
+    <text x="891" y="104" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="121" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="27" y="119" width="9" height="17" fill="#005f00" />
+    <text x="27" y="121" fill="#d7ffd7" textLength="9" lengthAdjust="spacingAndGlyphs">●</text>
+    <rect x="36" y="119" width="9" height="17" fill="#005f00" />
+    <rect x="45" y="119" width="72" height="17" fill="#005f00" />
+    <text x="45" y="121" fill="#d7ffd7" textLength="72" lengthAdjust="spacingAndGlyphs">Vim Mode</text>
+    <rect x="117" y="119" width="711" height="17" fill="#005f00" />
+    <rect x="828" y="119" width="45" height="17" fill="#005f00" />
+    <text x="828" y="121" fill="#d7ffd7" textLength="45" lengthAdjust="spacingAndGlyphs">false</text>
+    <text x="891" y="121" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="138" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="27" y="138" fill="#afafaf" textLength="9" lengthAdjust="spacingAndGlyphs">▼</text>
+    <rect x="45" y="136" width="198" height="17" fill="#005f00" />
+    <text x="45" y="138" fill="#afafaf" textLength="198" lengthAdjust="spacingAndGlyphs">Enable Vim keybindings</text>
+    <text x="891" y="138" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="155" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="155" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="172" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="172" fill="#ffffff" textLength="882" lengthAdjust="spacingAndGlyphs">    Apply To                                                                                      </text>
+    <text x="891" y="172" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="189" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="27" y="187" width="9" height="17" fill="#005f00" />
+    <text x="27" y="189" fill="#d7ffd7" textLength="9" lengthAdjust="spacingAndGlyphs">●</text>
+    <rect x="36" y="187" width="9" height="17" fill="#005f00" />
+    <rect x="45" y="187" width="117" height="17" fill="#005f00" />
+    <text x="45" y="189" fill="#d7ffd7" textLength="117" lengthAdjust="spacingAndGlyphs">User Settings</text>
+    <rect x="162" y="187" width="711" height="17" fill="#005f00" />
+    <text x="891" y="189" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="206" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="27" y="206" fill="#afafaf" textLength="657" lengthAdjust="spacingAndGlyphs">(Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)</text>
+    <text x="891" y="206" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="223" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="223" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="240" fill="#878787" textLength="900" lengthAdjust="spacingAndGlyphs">╰──────────────────────────────────────────────────────────────────────────────────────────────────╯</text>
+  </g>
+</svg>

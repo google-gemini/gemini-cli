@@ -8,8 +8,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { StreamingState } from '../types.js';
 
 export interface UseMessageQueueOptions {
+  isConfigInitialized: boolean;
   streamingState: StreamingState;
   submitQuery: (query: string) => void;
+  isMcpReady: boolean;
+  isCompressing?: boolean;
 }
 
 export interface UseMessageQueueReturn {
@@ -17,6 +20,7 @@ export interface UseMessageQueueReturn {
   addMessage: (message: string) => void;
   clearQueue: () => void;
   getQueuedMessagesText: () => string;
+  popAllMessages: () => string | undefined;
 }
 
 /**
@@ -25,8 +29,11 @@ export interface UseMessageQueueReturn {
  * sends them when streaming completes.
  */
 export function useMessageQueue({
+  isConfigInitialized,
   streamingState,
   submitQuery,
+  isMcpReady,
+  isCompressing = false,
 }: UseMessageQueueOptions): UseMessageQueueReturn {
   const [messageQueue, setMessageQueue] = useState<string[]>([]);
 
@@ -49,21 +56,45 @@ export function useMessageQueue({
     return messageQueue.join('\n\n');
   }, [messageQueue]);
 
+  // Pop all messages from the queue and return them as a single string
+  const popAllMessages = useCallback(() => {
+    if (messageQueue.length === 0) {
+      return undefined;
+    }
+    const allMessages = messageQueue.join('\n\n');
+    setMessageQueue([]);
+    return allMessages;
+  }, [messageQueue]);
+
   // Process queued messages when streaming becomes idle
   useEffect(() => {
-    if (streamingState === StreamingState.Idle && messageQueue.length > 0) {
+    if (
+      isConfigInitialized &&
+      streamingState === StreamingState.Idle &&
+      !isCompressing &&
+      isMcpReady &&
+      messageQueue.length > 0
+    ) {
       // Combine all messages with double newlines for clarity
       const combinedMessage = messageQueue.join('\n\n');
       // Clear the queue and submit
       setMessageQueue([]);
       submitQuery(combinedMessage);
     }
-  }, [streamingState, messageQueue, submitQuery]);
+  }, [
+    isConfigInitialized,
+    streamingState,
+    isMcpReady,
+    messageQueue,
+    submitQuery,
+    isCompressing,
+  ]);
 
   return {
     messageQueue,
     addMessage,
     clearQueue,
     getQueuedMessagesText,
+    popAllMessages,
   };
 }

@@ -7,7 +7,7 @@
  */
 
 import path from 'node:path';
-import fs from 'node:fs';
+import * as fs from 'node:fs';
 import { spawn, execSync } from 'node:child_process';
 import {
   OTEL_DIR,
@@ -118,7 +118,7 @@ async function main() {
   try {
     execSync('pkill -f "otelcol-contrib"');
     console.log('✅ Stopped existing otelcol-contrib process.');
-  } catch (_e) {
+  } catch {
     /* no-op */
   }
   try {
@@ -132,11 +132,13 @@ async function main() {
   fs.writeFileSync(OTEL_CONFIG_FILE, getOtelConfigContent(projectId));
   console.log(`📄 Wrote OTEL collector config to ${OTEL_CONFIG_FILE}`);
 
+  const spawnEnv = { ...process.env };
+
   console.log(`🚀 Starting OTEL collector for GCP... Logs: ${OTEL_LOG_FILE}`);
   collectorLogFd = fs.openSync(OTEL_LOG_FILE, 'a');
   collectorProcess = spawn(otelcolPath, ['--config', OTEL_CONFIG_FILE], {
     stdio: ['ignore', collectorLogFd, collectorLogFd],
-    env: { ...process.env },
+    env: spawnEnv,
   });
 
   console.log(
