@@ -829,10 +829,10 @@ export class GeminiChat {
       lastModelToUse = modelToUse;
       const config: GenerateContentConfig = {
         ...currentGenerateContentConfig,
-        // TODO(12622): Ensure we don't overrwrite these when they are
-        // passed via config.
-        systemInstruction: this.systemInstruction,
-        tools: this.tools,
+        systemInstruction:
+          currentGenerateContentConfig?.systemInstruction ??
+          this.systemInstruction,
+        tools: currentGenerateContentConfig?.tools ?? this.tools,
         abortSignal,
       };
 
