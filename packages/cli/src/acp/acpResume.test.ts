@@ -136,6 +136,48 @@ describe('GeminiAgent Session Resume', () => {
     agent = new GeminiAgent(mockConfig, mockSettings, mockArgv, mockConnection);
   });
 
+  it('resumes without first starting a fresh chat for the same session id', async () => {
+    // `GeminiClient.initialize()` starts a chat with no resumed session data, which
+    // initializes chat recording for a *fresh* conversation. The recording filename
+    // is keyed on the UTC minute plus the session id prefix, so a load in the same
+    // minute the session was created appends a metadata header and a `$set`
+    // checkpoint into the session's own file, burying its conversation and dropping
+    // it from the listing. `resumeChat` already does everything `initialize()` does,
+    // so calling both is redundant as well as destructive.
+    const sessionId = 'test-session-id';
+    const sessionData = {
+      sessionId,
+      projectHash: 'hash',
+      startTime: new Date().toISOString(),
+      lastUpdated: new Date().toISOString(),
+      messages: [],
+    };
+
+    (SessionSelector as unknown as Mock).mockImplementation(() => ({
+      resolveSession: vi.fn().mockResolvedValue({
+        sessionData,
+        sessionPath: '/path/to/session.jsonl',
+      }),
+    }));
+    (convertSessionToHistoryFormats as unknown as Mock).mockReturnValue({
+      uiHistory: [],
+    });
+    (convertSessionToClientHistory as unknown as Mock).mockReturnValue([]);
+
+    const geminiClient = mockConfig.getGeminiClient();
+
+    await agent.loadSession({ sessionId, cwd: '/tmp', mcpServers: [] });
+
+    expect(geminiClient.initialize).not.toHaveBeenCalled();
+    expect(geminiClient.resumeChat).toHaveBeenCalledWith(
+      [],
+      expect.objectContaining({
+        conversation: sessionData,
+        filePath: '/path/to/session.jsonl',
+      }),
+    );
+  });
+
   it('should advertise loadSession capability', async () => {
     const response = await agent.initialize({
       protocolVersion: acp.PROTOCOL_VERSION,
