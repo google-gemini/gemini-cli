@@ -25,6 +25,10 @@ QUALITY_CLOSED_COMMENT = (
     "please feel free to open a new issue with complete reproduction details."
 )
 
+NEEDS_INFO_FOOTER = (
+    "\n\nPlease reply with the requested details and mention `@caretaker-agent`."
+)
+
 
 def main() -> None:
     """
@@ -125,6 +129,7 @@ def main() -> None:
                     triage_result.get("triage_metadata", {})
                     .get("comment", "")
                     .strip()
+                    + NEEDS_INFO_FOOTER
                 )
                 send_comment_action(owner, repo, issue_number, comment_body)
                 store.release_lock(

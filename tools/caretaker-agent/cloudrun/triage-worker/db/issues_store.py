@@ -74,6 +74,8 @@ class IssuesStore:
             transaction.update(doc_ref, {
                 "status": "NEEDS_HUMAN",
                 "error": "Max triage attempts (2) exceeded due to prior worker crash or timeout",
+                "lock.holder": None,
+                "lock.expires_at": None,
                 "updated_at": firestore.SERVER_TIMESTAMP
             })
             return ClaimAction.NEEDS_HUMAN
