@@ -645,8 +645,7 @@ export class ShellExecutionService {
         : undefined;
 
       let resolveWithoutPid:
-        | ((result: ShellExecutionResult) => void)
-        | undefined;
+        ((result: ShellExecutionResult) => void) | undefined;
       const result =
         lifecycleHandle?.result ??
         new Promise<ShellExecutionResult>((resolve) => {

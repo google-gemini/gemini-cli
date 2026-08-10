@@ -115,7 +115,6 @@ You must complete several setup steps before enabling Google Cloud telemetry.
         ```powershell
         $env:GOOGLE_APPLICATION_CREDENTIALS="C:\path\to\your\service-account.json"
         ```
-
     * **Method B: CLI Auth** (Direct export only): Simplest method for local
       users. Gemini CLI uses the same OAuth credentials you used for login. To
       enable this, set `useCliAuth: true` in your `.gemini/settings.json`:
@@ -948,7 +947,8 @@ Tracks onboarding flow from authentication to the user
   authentication flow begins.
 
 - `gemini_cli.onboarding.success` (Counter, Int): Incremented when the user
-onboarding flow completes successfully.
+  onboarding flow completes successfully.
+
 <details>
 <summary>Attributes (Success)</summary>
 

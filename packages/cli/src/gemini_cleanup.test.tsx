@@ -201,9 +201,8 @@ describe('gemini.tsx main function cleanup', () => {
   });
 
   it.skip('should log error when cleanupExpiredSessions fails', async () => {
-    const { loadCliConfig, parseArguments } = await import(
-      './config/config.js'
-    );
+    const { loadCliConfig, parseArguments } =
+      await import('./config/config.js');
     const { loadSettings } = await import('./config/settings.js');
     cleanupMockState.shouldThrow = true;
     cleanupMockState.called = false;
@@ -272,9 +271,8 @@ describe('gemini.tsx main function cleanup', () => {
   });
 
   it('should register SessionEnd hook exactly once in non-interactive mode', async () => {
-    const { loadCliConfig, parseArguments } = await import(
-      './config/config.js'
-    );
+    const { loadCliConfig, parseArguments } =
+      await import('./config/config.js');
     const { registerCleanup } = await import('./utils/cleanup.js');
 
     const mockHookSystem = {
@@ -310,9 +308,8 @@ describe('gemini.tsx main function cleanup', () => {
   it('should not register ConsolePatcher cleanup in ACP mode', async () => {
     const { registerCleanup } = await import('./utils/cleanup.js');
     const { ConsolePatcher } = await import('./ui/utils/ConsolePatcher.js');
-    const { loadCliConfig, parseArguments } = await import(
-      './config/config.js'
-    );
+    const { loadCliConfig, parseArguments } =
+      await import('./config/config.js');
     const { loadSettings } = await import('./config/settings.js');
 
     vi.mocked(parseArguments).mockResolvedValue({
@@ -364,9 +361,8 @@ describe('gemini.tsx main function cleanup', () => {
   it('should register ConsolePatcher cleanup in non-ACP mode', async () => {
     const { registerCleanup } = await import('./utils/cleanup.js');
     const { ConsolePatcher } = await import('./ui/utils/ConsolePatcher.js');
-    const { loadCliConfig, parseArguments } = await import(
-      './config/config.js'
-    );
+    const { loadCliConfig, parseArguments } =
+      await import('./config/config.js');
     const { loadSettings } = await import('./config/settings.js');
 
     vi.mocked(parseArguments).mockResolvedValue({

@@ -338,8 +338,8 @@ export class ContextWorkingBufferImpl implements ContextWorkingBuffer {
   getPristineNodes(id: string): readonly ConcreteNode[] {
     const pristineIds = this.provenanceMap.get(id);
     if (!pristineIds) return [];
-    return Array.from(pristineIds).map(
-      (pid) => this.pristineNodesMap.get(pid)!,
+    return Array.from(pristineIds).map((pid) =>
+      this.pristineNodesMap.get(pid)!,
     );
   }
 

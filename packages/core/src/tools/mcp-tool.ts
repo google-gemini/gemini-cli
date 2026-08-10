@@ -148,10 +148,7 @@ type McpResourceLinkBlock = {
 };
 
 type McpContentBlock =
-  | McpTextBlock
-  | McpMediaBlock
-  | McpResourceBlock
-  | McpResourceLinkBlock;
+  McpTextBlock | McpMediaBlock | McpResourceBlock | McpResourceLinkBlock;
 
 export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
   ToolParams,

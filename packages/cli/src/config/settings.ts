@@ -1020,8 +1020,7 @@ export function migrateDeprecatedSettings(
 
     // Migrate general settings
     const generalSettings = settings.general as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
     if (generalSettings) {
       const newGeneral = { ...generalSettings };
       let modified = false;
@@ -1057,8 +1056,7 @@ export function migrateDeprecatedSettings(
       const newUi = { ...uiSettings };
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const accessibilitySettings = newUi['accessibility'] as
-        | Record<string, unknown>
-        | undefined;
+        Record<string, unknown> | undefined;
 
       if (accessibilitySettings) {
         const newAccessibility = { ...accessibilitySettings };
@@ -1098,14 +1096,12 @@ export function migrateDeprecatedSettings(
 
     // Migrate context settings
     const contextSettings = settings.context as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
     if (contextSettings) {
       const newContext = { ...contextSettings };
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const fileFilteringSettings = newContext['fileFiltering'] as
-        | Record<string, unknown>
-        | undefined;
+        Record<string, unknown> | undefined;
 
       if (fileFilteringSettings) {
         const newFileFiltering = { ...fileFilteringSettings };
@@ -1250,8 +1246,7 @@ function migrateExperimentalSettings(
   foundDeprecated?: string[],
 ): boolean {
   const experimentalSettings = settings.experimental as
-    | Record<string, unknown>
-    | undefined;
+    Record<string, unknown> | undefined;
 
   if (experimentalSettings) {
     const agentsSettings = {
@@ -1281,8 +1276,7 @@ function migrateExperimentalSettings(
       const override = {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         ...(agentsOverrides['codebase_investigator'] as
-          | Record<string, unknown>
-          | undefined),
+          Record<string, unknown> | undefined),
       };
 
       if (old['enabled'] !== undefined) override['enabled'] = old['enabled'];
@@ -1307,14 +1301,12 @@ function migrateExperimentalSettings(
           const generateContentConfig = {
             // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             ...(modelConfig['generateContentConfig'] as
-              | Record<string, unknown>
-              | undefined),
+              Record<string, unknown> | undefined),
           };
           const thinkingConfig = {
             // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             ...(generateContentConfig['thinkingConfig'] as
-              | Record<string, unknown>
-              | undefined),
+              Record<string, unknown> | undefined),
           };
           thinkingConfig['thinkingBudget'] = old['thinkingBudget'];
           generateContentConfig['thinkingConfig'] = thinkingConfig;

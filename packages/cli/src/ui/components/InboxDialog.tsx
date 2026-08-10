@@ -384,12 +384,10 @@ export const InboxDialog: React.FC<InboxDialogProps> = ({
           const combined: InboxItem[] = [
             ...skills.map((skill): InboxItem => ({ type: 'skill', skill })),
             ...patchItems,
-            ...memoryPatches.map(
-              (memoryPatch): InboxItem => ({
-                type: 'memory-patch',
-                memoryPatch,
-              }),
-            ),
+            ...memoryPatches.map((memoryPatch): InboxItem => ({
+              type: 'memory-patch',
+              memoryPatch,
+            })),
           ];
           setItems(combined);
           setLoading(false);
@@ -796,8 +794,7 @@ export const InboxDialog: React.FC<InboxDialogProps> = ({
         skillSections: undefined as DiffSection[] | undefined,
         patchSections: undefined as DiffSection[] | undefined,
         memoryGroups: undefined as
-          | Array<[string, { isNewFile: boolean; diffs: string[] }]>
-          | undefined,
+          Array<[string, { isNewFile: boolean; diffs: string[] }]> | undefined,
         memorySections: undefined as DiffSection[] | undefined,
       };
     }

@@ -518,8 +518,7 @@ export async function listInboxPatchFiles(
 }
 
 export type ValidateInboxMemoryPatchFileResult =
-  | { valid: true }
-  | { valid: false; reason: string };
+  { valid: true } | { valid: false; reason: string };
 
 /**
  * Checks whether a memory inbox patch passes the same validation as

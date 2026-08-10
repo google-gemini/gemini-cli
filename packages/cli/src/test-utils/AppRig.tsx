@@ -91,9 +91,8 @@ vi.mock('../ui/contexts/StreamingContext.js', async (importOriginal) => {
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const original =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
-  const { MockShellExecutionService: MockService } = await import(
-    './MockShellExecutionService.js'
-  );
+  const { MockShellExecutionService: MockService } =
+    await import('./MockShellExecutionService.js');
   // Register the real execution logic so MockShellExecutionService can fall back to it
   MockService.setOriginalImplementation(original.ShellExecutionService.execute);
 

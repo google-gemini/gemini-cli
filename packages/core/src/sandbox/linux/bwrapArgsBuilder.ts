@@ -65,11 +65,7 @@ export async function buildBwrapArgs(
   );
 
   type MountType =
-    | '--bind'
-    | '--ro-bind'
-    | '--bind-try'
-    | '--ro-bind-try'
-    | '--symlink';
+    '--bind' | '--ro-bind' | '--bind-try' | '--ro-bind-try' | '--symlink';
 
   type Mount =
     | {

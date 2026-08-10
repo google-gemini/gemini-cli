@@ -329,9 +329,8 @@ async function expectSeedSessionEligible(
   fixture: Fixture,
   sessionId: string,
 ): Promise<void> {
-  const { buildSessionIndex } = await import(
-    '../packages/core/src/services/memoryService.js'
-  );
+  const { buildSessionIndex } =
+    await import('../packages/core/src/services/memoryService.js');
   const { newSessionIds } = await buildSessionIndex(
     path.join(fixture.projectTempDir, 'chats'),
     { runs: [] },
@@ -386,9 +385,8 @@ describe('Auto Memory inbox routing', () => {
   autoMemoryEval(
     'every memory patch lands in .inbox/<kind>/ for review and active files stay untouched',
     async () => {
-      const { startMemoryService } = await import(
-        '../packages/core/src/services/memoryService.js'
-      );
+      const { startMemoryService } =
+        await import('../packages/core/src/services/memoryService.js');
       const fixture = await createFixture();
       evalState.sessionFilePath = await seedSession(
         fixture,

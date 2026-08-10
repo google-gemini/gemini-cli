@@ -195,10 +195,7 @@ export type DisplayAgent = {
 };
 
 export type DisplayContent =
-  | DisplayText
-  | DisplayDiff
-  | DisplayTerminal
-  | DisplayAgent;
+  DisplayText | DisplayDiff | DisplayTerminal | DisplayAgent;
 
 export type ToolDisplayFormat =
   /**
@@ -316,8 +313,9 @@ export type ElicitationResponse = {
 
 export interface ErrorData {
   // One of https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto
-  status: // 400
-  | 'INVALID_ARGUMENT'
+  status:
+    // 400
+    | 'INVALID_ARGUMENT'
     | 'FAILED_PRECONDITION'
     | 'OUT_OF_RANGE'
     // 401

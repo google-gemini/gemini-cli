@@ -53,10 +53,7 @@ export interface ValidationDialogRequest {
 
 /** Intent for overage menu dialog */
 export type OverageMenuIntent =
-  | 'use_credits'
-  | 'use_fallback'
-  | 'manage'
-  | 'stop';
+  'use_credits' | 'use_fallback' | 'manage' | 'stop';
 
 export interface OverageMenuDialogRequest {
   failedModel: string;

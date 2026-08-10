@@ -56,8 +56,7 @@ describe('BaseToolInvocation', () => {
     );
 
     let responseHandler:
-      | ((response: ToolConfirmationResponse) => void)
-      | undefined;
+      ((response: ToolConfirmationResponse) => void) | undefined;
     vi.mocked(messageBus.subscribe).mockImplementation(
       (type: MessageBusType, handler: (message: Message) => void) => {
         if (type === MessageBusType.TOOL_CONFIRMATION_RESPONSE) {

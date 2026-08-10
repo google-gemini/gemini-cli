@@ -526,12 +526,7 @@ export interface SandboxConfig {
   includeDirectories?: string[];
   networkAccess?: boolean;
   command?:
-    | 'docker'
-    | 'podman'
-    | 'sandbox-exec'
-    | 'runsc'
-    | 'lxc'
-    | 'windows-native';
+    'docker' | 'podman' | 'sandbox-exec' | 'runsc' | 'lxc' | 'windows-native';
   image?: string;
 }
 
@@ -872,8 +867,7 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   private readonly summarizeToolOutput:
-    | Record<string, SummarizeToolOutputSettings>
-    | undefined;
+    Record<string, SummarizeToolOutputSettings> | undefined;
   private readonly acpMode: boolean = false;
   private readonly loadMemoryFromIncludeDirectories: boolean = false;
   private readonly includeDirectoryTree: boolean = true;
@@ -888,9 +882,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly useRipgrep: boolean;
   private readonly enableInteractiveShell: boolean;
   private readonly shellBackgroundCompletionBehavior:
-    | 'inject'
-    | 'notify'
-    | 'silent';
+    'inject' | 'notify' | 'silent';
   private readonly skipNextSpeakerCheck: boolean;
   private readonly useBackgroundColor: boolean;
   private readonly useAlternateBuffer: boolean;
@@ -913,8 +905,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly _messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
   private policyUpdateConfirmationRequest:
-    | PolicyUpdateConfirmationRequest
-    | undefined;
+    PolicyUpdateConfirmationRequest | undefined;
   private readonly outputSettings: OutputSettings;
 
   private readonly gemmaModelRouter: GemmaModelRouterSettings;
@@ -2739,8 +2730,7 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getPolicyUpdateConfirmationRequest():
-    | PolicyUpdateConfirmationRequest
-    | undefined {
+    PolicyUpdateConfirmationRequest | undefined {
     return this.policyUpdateConfirmationRequest;
   }
 
@@ -3131,8 +3121,7 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getSummarizeToolOutputConfig():
-    | Record<string, SummarizeToolOutputSettings>
-    | undefined {
+    Record<string, SummarizeToolOutputSettings> | undefined {
     return this.summarizeToolOutput;
   }
 

@@ -986,8 +986,7 @@ describe('mcp-client', () => {
     it('refreshes registry when resource list change notification is received', async () => {
       let listCallCount = 0;
       let resourceListHandler:
-        | ((notification: unknown) => Promise<void> | void)
-        | undefined;
+        ((notification: unknown) => Promise<void> | void) | undefined;
       const mockedClient = {
         connect: vi.fn(),
         discover: vi.fn(),
@@ -1086,8 +1085,7 @@ describe('mcp-client', () => {
     it('refreshes prompts when prompt list change notification is received', async () => {
       let listCallCount = 0;
       let promptListHandler:
-        | ((notification: unknown) => Promise<void> | void)
-        | undefined;
+        ((notification: unknown) => Promise<void> | void) | undefined;
       const mockedClient = {
         connect: vi.fn(),
         discover: vi.fn(),

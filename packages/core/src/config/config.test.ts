@@ -451,9 +451,8 @@ describe('Server Config (config.ts)', () => {
         // interactive defaults to false
       });
 
-      const { McpClientManager } = await import(
-        '../tools/mcp-client-manager.js'
-      );
+      const { McpClientManager } =
+        await import('../tools/mcp-client-manager.js');
       let mcpStarted = false;
 
       vi.mocked(McpClientManager).mockImplementation(
@@ -481,9 +480,8 @@ describe('Server Config (config.ts)', () => {
         interactive: true,
       });
 
-      const { McpClientManager } = await import(
-        '../tools/mcp-client-manager.js'
-      );
+      const { McpClientManager } =
+        await import('../tools/mcp-client-manager.js');
       let mcpStarted = false;
       let resolveMcp: (value: unknown) => void;
       const mcpPromise = new Promise((resolve) => {
