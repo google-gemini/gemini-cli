@@ -131,6 +131,38 @@ describe('activate', () => {
     expect(vscode.workspace.onDidGrantWorkspaceTrust).toHaveBeenCalled();
   });
 
+  it('should track every created Disposable in context.subscriptions', async () => {
+    const tag = (name: string) =>
+      ({ name, dispose: vi.fn() }) as unknown as vscode.Disposable;
+    vi.mocked(vscode.commands.registerCommand).mockImplementation(
+      (command: string) => tag(`command:${command}`),
+    );
+    vi.mocked(vscode.workspace.onDidChangeWorkspaceFolders).mockReturnValue(
+      tag('onDidChangeWorkspaceFolders'),
+    );
+    vi.mocked(vscode.workspace.onDidGrantWorkspaceTrust).mockReturnValue(
+      tag('onDidGrantWorkspaceTrust'),
+    );
+    vi.mocked(vscode.workspace.onDidCloseTextDocument).mockReturnValue(
+      tag('onDidCloseTextDocument'),
+    );
+    vi.mocked(
+      vscode.workspace.registerTextDocumentContentProvider,
+    ).mockReturnValue(tag('contentProvider'));
+
+    await activate(context);
+
+    const names = context.subscriptions.map(
+      (subscription) => (subscription as { name?: string }).name,
+    );
+    expect(names).toContain('command:gemini.diff.accept');
+    expect(names).toContain('command:gemini.diff.cancel');
+    expect(names).toContain('onDidChangeWorkspaceFolders');
+    expect(names).toContain('onDidGrantWorkspaceTrust');
+    expect(names).toContain('onDidCloseTextDocument');
+    expect(names).toContain('contentProvider');
+  });
+
   it('should launch the Gemini CLI when the user clicks the button', async () => {
     const showInformationMessageMock = vi
       .mocked(vscode.window.showInformationMessage)
