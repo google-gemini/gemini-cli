@@ -112,15 +112,20 @@ const IDE_SERVER_FILE_REGEX = /^gemini-ide-server-(\d+)-\d+\.json$/;
 async function verifyAndReadFile(
   filePath: string,
 ): Promise<string | undefined> {
+  let handle: fs.promises.FileHandle | undefined;
   try {
-    const realPath = await fs.promises.realpath(filePath);
-    const stat = await fs.promises.stat(realPath);
+    handle = await fs.promises.open(filePath, 'r');
+    const stat = await handle.stat();
     if (process.getuid && stat.uid !== process.getuid()) {
       return undefined;
     }
-    return await fs.promises.readFile(realPath, 'utf8');
+    return await handle.readFile('utf8');
   } catch {
     return undefined;
+  } finally {
+    if (handle) {
+      await handle.close();
+    }
   }
 }
 

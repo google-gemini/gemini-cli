@@ -35,6 +35,17 @@ vi.mock('node:fs', async (importOriginal) => {
       stat: vi.fn(() =>
         Promise.resolve({ uid: process.getuid ? process.getuid() : 1000 }),
       ),
+      open: vi.fn((filePath: string) =>
+        Promise.resolve({
+          stat: () => fs.promises.stat(filePath),
+          readFile: (options?: string | { encoding?: string }) =>
+            fs.promises.readFile(
+              filePath,
+              options as unknown as BufferEncoding | undefined,
+            ),
+          close: () => Promise.resolve(),
+        } as unknown as fs.promises.FileHandle),
+      ),
     },
     realpathSync: (p: string) => p,
     existsSync: vi.fn(() => false),
@@ -548,7 +559,7 @@ describe('ide-connection-utils', () => {
       expect(result).toEqual(config1);
     });
 
-    it('should reject and ignore config files if realpath resolution throws an error', async () => {
+    it('should reject and ignore config files if fs.promises.open throws an error', async () => {
       vi.mocked(fs.promises.readFile).mockRejectedValueOnce(
         new Error('not found'),
       );
@@ -558,7 +569,7 @@ describe('ide-connection-utils', () => {
         >
       ).mockResolvedValue(['gemini-ide-server-12345-111.json']);
 
-      vi.mocked(fs.promises.realpath).mockRejectedValueOnce(
+      vi.mocked(fs.promises.open).mockRejectedValueOnce(
         new Error('symlink loop / permission denied'),
       );
 
