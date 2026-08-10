@@ -63,5 +63,4 @@ jobs:
             Related to #25152
           branch: 'docs-audit-${{ github.run_id }}'
           base: 'main'
-          team-reviewers: 'gemini-cli-docs, gemini-cli-maintainers'
           delete-branch: true
