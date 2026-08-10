@@ -94,10 +94,10 @@ describe.sequential('tracker_queries', () => {
       const responseText = responseParts
         .map(
           (p: any) =>
-            p.functionResponse?.response?.content ??
-            p.functionResponse?.response?.llmContent ??
-            p.functionResponse?.response?.output ??
-            p.text ??
+            p?.functionResponse?.response?.content ??
+            p?.functionResponse?.response?.llmContent ??
+            p?.functionResponse?.response?.output ??
+            p?.text ??
             '',
         )
         .join('');
@@ -116,7 +116,8 @@ describe.sequential('tracker_queries', () => {
         getTaskCall,
         'Expected tracker_get_task in tool call logs',
       ).toBeDefined();
-      const args = (getTaskCall as any).request?.args;
+      const argsString = (getTaskCall as any)?.request?.args;
+      const args = argsString ? JSON.parse(argsString) : undefined;
       const requestedId = args?.taskId ?? args?.id;
       expect(
         typeof requestedId === 'string' && requestedId.length > 0,

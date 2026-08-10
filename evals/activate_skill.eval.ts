@@ -44,7 +44,9 @@ Workflow decision tree for creating, fixing, and promoting behavioral evaluation
         activateSkillCall,
         'Expected activate_skill call in tool logs',
       ).toBeDefined();
-      expect(activateSkillCall.request?.args?.name).toBe('behavioral-evals');
+      const argsString = activateSkillCall?.request?.args;
+      const args = argsString ? JSON.parse(argsString) : undefined;
+      expect(args?.name).toBe('behavioral-evals');
 
       // Resolve the tool to allow the turn to complete successfully
       await rig.resolveTool(confirmation);

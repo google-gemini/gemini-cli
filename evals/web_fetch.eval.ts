@@ -42,7 +42,8 @@ describe.sequential('web_fetch', () => {
         'Expected web_fetch call in tool logs',
       ).toBeDefined();
 
-      const args = webFetchCall.request?.args;
+      const argsString = webFetchCall?.request?.args;
+      const args = argsString ? JSON.parse(argsString) : undefined;
       const hasUrl =
         args?.url?.includes('example.com/status') ||
         args?.prompt?.includes('example.com/status');

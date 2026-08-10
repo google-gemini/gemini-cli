@@ -50,7 +50,9 @@ describe.sequential('write_todos', () => {
         writeTodosCall,
         'Expected write_todos call in tool logs',
       ).toBeDefined();
-      const todos = (writeTodosCall as any).request?.args?.todos;
+      const argsString = (writeTodosCall as any)?.request?.args;
+      const args = argsString ? JSON.parse(argsString) : undefined;
+      const todos = args?.todos;
       expect(Array.isArray(todos), 'Expected todos to be an array').toBe(true);
       expect(
         todos.length,

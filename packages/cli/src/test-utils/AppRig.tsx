@@ -487,7 +487,8 @@ export class AppRig {
 
   async waitForCompletedToolCall(toolName: string, timeout = 10000) {
     await this.waitUntil(
-      () => this.toolCalls.some(
+      () =>
+        this.toolCalls.some(
           (call) => call.request.name === toolName && call.status === 'success',
         ),
       {
@@ -731,6 +732,8 @@ export class AppRig {
         if (turn.role === 'model' && turn.parts) {
           for (const part of turn.parts) {
             if (
+              part &&
+              typeof part === 'object' &&
               'text' in part &&
               typeof part.text === 'string' &&
               part.text.trim()
