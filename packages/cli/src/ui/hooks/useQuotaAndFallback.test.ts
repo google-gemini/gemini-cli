@@ -222,6 +222,63 @@ describe('useQuotaAndFallback', () => {
       await promise!;
     });
 
+    it('should auto-retry terminal quota capacity failures in low verbosity mode', async () => {
+      const { result } = await renderHook(() =>
+        useQuotaAndFallback({
+          config: mockConfig,
+          historyManager: mockHistoryManager,
+          userTier: UserTierId.FREE,
+          setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          onShowAuthSelection: mockOnShowAuthSelection,
+          paidTier: null,
+          settings: mockSettings,
+          errorVerbosity: 'low',
+        }),
+      );
+
+      const handler = setFallbackHandlerSpy.mock
+        .calls[0][0] as FallbackModelHandler;
+      const intent = await handler(
+        'gemini-pro',
+        'gemini-flash',
+        new TerminalQuotaError(
+          'pro capacity exhausted',
+          mockGoogleApiError,
+          undefined,
+          'MODEL_CAPACITY_EXHAUSTED',
+        ),
+      );
+
+      expect(intent).toBe('retry_once');
+      expect(result.current.proQuotaRequest).toBeNull();
+    });
+
+    it('should auto-retry capacity failures matched by regex on message in low verbosity mode', async () => {
+      const { result } = await renderHook(() =>
+        useQuotaAndFallback({
+          config: mockConfig,
+          historyManager: mockHistoryManager,
+          userTier: UserTierId.FREE,
+          setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          onShowAuthSelection: mockOnShowAuthSelection,
+          paidTier: null,
+          settings: mockSettings,
+          errorVerbosity: 'low',
+        }),
+      );
+
+      const handler = setFallbackHandlerSpy.mock
+        .calls[0][0] as FallbackModelHandler;
+      const intent = await handler(
+        'gemini-pro',
+        'gemini-flash',
+        new Error('you have exhausted your capacity limit'),
+      );
+
+      expect(intent).toBe('retry_once');
+      expect(result.current.proQuotaRequest).toBeNull();
+    });
+
     it('should show high demand message for MODEL_CAPACITY_EXHAUSTED', async () => {
       const { result } = await renderHook(() =>
         useQuotaAndFallback({

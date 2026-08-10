@@ -79,16 +79,33 @@ export function useQuotaAndFallback({
       let message: string;
       let isTerminalQuotaError = false;
       let isModelNotFoundError = false;
-      let isCapacityExceeded = false;
+
+      const isObject = (val: unknown): val is Record<string, unknown> =>
+        typeof val === 'object' && val !== null;
+
+      const errorObj = isObject(error) ? error : null;
+
+      const errorReasonValue = errorObj?.['reason'];
+      const errorReason =
+        typeof errorReasonValue === 'string' ? errorReasonValue : undefined;
+
+      const errorMessageValue = errorObj?.['message'];
+      const errorMessage =
+        typeof errorMessageValue === 'string' ? errorMessageValue : undefined;
+
+      const isCapacityExceeded =
+        errorReason === 'MODEL_CAPACITY_EXHAUSTED' ||
+        errorReason === 'MODEL_CAPACITY_EXCEEDED' ||
+        (typeof errorMessage === 'string' &&
+          /exhausted your capacity|capacity exceeded|MODEL_CAPACITY_EXHAUSTED/i.test(
+            errorMessage,
+          ));
       const usageLimitReachedModel = isProModel(failedModel)
         ? 'all Pro models'
         : failedModel;
 
       if (error instanceof TerminalQuotaError) {
         isTerminalQuotaError = true;
-        isCapacityExceeded =
-          error.reason === 'MODEL_CAPACITY_EXHAUSTED' ||
-          error.reason === 'MODEL_CAPACITY_EXCEEDED';
 
         const isInsufficientCredits = error.isInsufficientCredits;
 
@@ -190,7 +207,7 @@ export function useQuotaAndFallback({
       // without interrupting with a dialog.
       if (
         errorVerbosity === 'low' &&
-        !isTerminalQuotaError &&
+        (!isTerminalQuotaError || isCapacityExceeded) &&
         !isModelNotFoundError
       ) {
         return 'retry_once';

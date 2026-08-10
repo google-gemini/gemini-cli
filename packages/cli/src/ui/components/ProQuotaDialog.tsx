@@ -51,10 +51,25 @@ export function ProQuotaDialog({
         key: 'retry_later',
       },
     ];
-  } else if (
-    isModelNotFoundError ||
-    (isTerminalQuotaError && !isCapacityExceeded)
-  ) {
+  } else if (isCapacityExceeded) {
+    items = [
+      {
+        label: 'Keep trying',
+        value: 'retry_once' as const,
+        key: 'retry_once',
+      },
+      {
+        label: `Switch to ${fallbackModel}`,
+        value: 'retry_always' as const,
+        key: 'retry_always',
+      },
+      {
+        label: 'Stop',
+        value: 'retry_later' as const,
+        key: 'retry_later',
+      },
+    ];
+  } else if (isModelNotFoundError || isTerminalQuotaError) {
     const isUltra = isUltraTier(tierName);
 
     // free users and out of quota users on G1 pro and Cloud Console gets an option to upgrade
@@ -80,7 +95,7 @@ export function ProQuotaDialog({
       },
     ];
   } else {
-    // capacity error
+    // capacity error or generic fallback
     items = [
       {
         label: 'Keep trying',
