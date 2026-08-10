@@ -45,6 +45,9 @@ interface UseQuotaAndFallbackArgs {
   errorVerbosity?: 'low' | 'full';
 }
 
+const isObject = (val: unknown): val is Record<string, unknown> =>
+  typeof val === 'object' && val !== null;
+
 export function useQuotaAndFallback({
   config,
   historyManager,
@@ -80,9 +83,6 @@ export function useQuotaAndFallback({
       let isTerminalQuotaError = false;
       let isModelNotFoundError = false;
 
-      const isObject = (val: unknown): val is Record<string, unknown> =>
-        typeof val === 'object' && val !== null;
-
       const errorObj = isObject(error) ? error : null;
 
       const errorReasonValue = errorObj?.['reason'];
@@ -99,6 +99,10 @@ export function useQuotaAndFallback({
         (typeof errorMessage === 'string' &&
           /exhausted your capacity|capacity exceeded|MODEL_CAPACITY_EXHAUSTED/i.test(
             errorMessage,
+          )) ||
+        (typeof error === 'string' &&
+          /exhausted your capacity|capacity exceeded|MODEL_CAPACITY_EXHAUSTED/i.test(
+            error,
           ));
       const usageLimitReachedModel = isProModel(failedModel)
         ? 'all Pro models'
