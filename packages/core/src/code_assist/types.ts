@@ -71,9 +71,7 @@ export interface LoadCodeAssistRequest {
 }
 
 export type LoadCodeAssistMode =
-  | 'MODE_UNSPECIFIED'
-  | 'FULL_ELIGIBILITY_CHECK'
-  | 'HEALTH_CHECK';
+  'MODE_UNSPECIFIED' | 'FULL_ELIGIBILITY_CHECK' | 'HEALTH_CHECK';
 
 /**
  * Represents LoadCodeAssistResponse proto json field

@@ -16,9 +16,8 @@ const mockReadServerProcessInfo = vi.hoisted(() => vi.fn());
 const mockResolveGemmaConfig = vi.hoisted(() => vi.fn());
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const { mockCoreDebugLogger } = await import(
-    '../../test-utils/mockDebugLogger.js'
-  );
+  const { mockCoreDebugLogger } =
+    await import('../../test-utils/mockDebugLogger.js');
   return mockCoreDebugLogger(
     await importOriginal<typeof import('@google/gemini-cli-core')>(),
     {

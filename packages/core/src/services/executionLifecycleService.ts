@@ -10,11 +10,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { sanitizeOutput } from '../utils/textUtils.js';
 
 export type ExecutionMethod =
-  | 'lydell-node-pty'
-  | 'node-pty'
-  | 'child_process'
-  | 'remote_agent'
-  | 'none';
+  'lydell-node-pty' | 'node-pty' | 'child_process' | 'remote_agent' | 'none';
 
 export interface ExecutionResult {
   rawOutput?: Buffer;

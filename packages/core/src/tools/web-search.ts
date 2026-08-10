@@ -101,12 +101,10 @@ class WebSearchToolInvocation extends BaseToolInvocation<
       const responseText = getResponseText(response);
       const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
       const sources = groundingMetadata?.groundingChunks as
-        | GroundingChunkItem[]
-        | undefined;
+        GroundingChunkItem[] | undefined;
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const groundingSupports = groundingMetadata?.groundingSupports as
-        | GroundingSupportItem[]
-        | undefined;
+        GroundingSupportItem[] | undefined;
 
       if (!responseText || !responseText.trim()) {
         return {

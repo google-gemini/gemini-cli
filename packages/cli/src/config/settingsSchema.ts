@@ -28,20 +28,10 @@ import type { SessionRetentionSettings } from './settings.js';
 import { DEFAULT_MIN_RETENTION } from '../utils/sessionCleanup.js';
 
 export type SettingsType =
-  | 'boolean'
-  | 'string'
-  | 'number'
-  | 'array'
-  | 'object'
-  | 'enum';
+  'boolean' | 'string' | 'number' | 'array' | 'object' | 'enum';
 
 export type SettingsValue =
-  | boolean
-  | string
-  | number
-  | string[]
-  | object
-  | undefined;
+  boolean | string | number | string[] | object | undefined;
 
 /**
  * Setting datatypes that "toggle" through a fixed list of options
@@ -1093,8 +1083,7 @@ const SETTINGS_SCHEMA = {
         category: 'Model',
         requiresRestart: false,
         default: undefined as
-          | Record<string, { tokenBudget?: number }>
-          | undefined,
+          Record<string, { tokenBudget?: number }> | undefined,
         description: oneLine`
           Enables or disables summarization of tool output.
           Configure per-tool token budgets (for example {"run_shell_command": {"tokenBudget": 2000}}).

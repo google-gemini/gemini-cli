@@ -21,10 +21,7 @@ export const BASE_EVAL_HELPERS = [
 export type BaseEvalHelper = (typeof BASE_EVAL_HELPERS)[number];
 export type EvalHelperName = BaseEvalHelper | string;
 export type EvalPolicy =
-  | 'ALWAYS_PASSES'
-  | 'USUALLY_PASSES'
-  | 'USUALLY_FAILS'
-  | 'unknown';
+  'ALWAYS_PASSES' | 'USUALLY_PASSES' | 'USUALLY_FAILS' | 'unknown';
 
 export interface EvalSourceLocation {
   line: number;

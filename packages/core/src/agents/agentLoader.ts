@@ -245,8 +245,7 @@ const remoteAgentSchema = z.union([
 type FrontmatterRemoteAgentDefinition = z.infer<typeof remoteAgentSchema>;
 
 type FrontmatterAgentDefinition =
-  | FrontmatterLocalAgentDefinition
-  | FrontmatterRemoteAgentDefinition;
+  FrontmatterLocalAgentDefinition | FrontmatterRemoteAgentDefinition;
 
 const agentUnionOptions = [
   { label: 'Local Agent' },

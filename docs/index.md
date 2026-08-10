@@ -124,7 +124,10 @@ Support, release history, and legal information.
 
 ## Development
 
-- **[Contribution guide](/docs/contributing):** How to contribute to Gemini CLI.
+Get started with developing on Gemini CLI, contributing to the project, and
+understanding the codebase structure.
+
+- **[Contribution guide](../CONTRIBUTING.md):** How to contribute to Gemini CLI.
 - **[Integration testing](./integration-tests.md):** Running integration tests.
 - **[Issue and PR automation](./issue-and-pr-automation.md):** Automation for
   issues and pull requests.

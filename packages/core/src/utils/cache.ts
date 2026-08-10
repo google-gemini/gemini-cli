@@ -35,8 +35,7 @@ export interface CacheOptions {
  */
 export class CacheService<K extends object | string | undefined, V> {
   private readonly storage:
-    | Map<K, CacheEntry<V>>
-    | WeakMap<WeakKey, CacheEntry<V>>;
+    Map<K, CacheEntry<V>> | WeakMap<WeakKey, CacheEntry<V>>;
   private readonly defaultTtl?: number;
   private readonly deleteOnPromiseFailure: boolean;
 

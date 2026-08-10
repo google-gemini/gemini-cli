@@ -676,8 +676,7 @@ export class PolicyEngine {
       const args = toolCall.args;
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const additionalPermissions = args?.[PARAM_ADDITIONAL_PERMISSIONS] as
-        | SandboxPermissions
-        | undefined;
+        SandboxPermissions | undefined;
 
       const fsPerms = additionalPermissions?.fileSystem;
       if (fsPerms) {

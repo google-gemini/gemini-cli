@@ -705,9 +705,8 @@ describe('ide-connection-utils', () => {
 
   describe('createProxyAwareFetch', () => {
     it('should return a proxy-aware fetcher function that respects NO_PROXY and includes ideServerHost', async () => {
-      const { createProxyAwareFetch } = await import(
-        './ide-connection-utils.js'
-      );
+      const { createProxyAwareFetch } =
+        await import('./ide-connection-utils.js');
       const { EnvHttpProxyAgent } = await import('undici');
       const ideServerHost = '127.0.0.1';
       const existingNoProxy = 'google.com,example.com';
@@ -722,9 +721,8 @@ describe('ide-connection-utils', () => {
     });
 
     it('should handle missing NO_PROXY when creating proxy-aware fetcher', async () => {
-      const { createProxyAwareFetch } = await import(
-        './ide-connection-utils.js'
-      );
+      const { createProxyAwareFetch } =
+        await import('./ide-connection-utils.js');
       const { EnvHttpProxyAgent } = await import('undici');
       const ideServerHost = 'host.docker.internal';
       vi.stubEnv('NO_PROXY', '');

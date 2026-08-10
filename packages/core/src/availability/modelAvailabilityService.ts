@@ -10,9 +10,7 @@ type TerminalUnavailabilityReason = 'quota' | 'capacity';
 export type TurnUnavailabilityReason = 'retry_once_per_turn';
 
 export type UnavailabilityReason =
-  | TerminalUnavailabilityReason
-  | TurnUnavailabilityReason
-  | 'unknown';
+  TerminalUnavailabilityReason | TurnUnavailabilityReason | 'unknown';
 
 export type ModelHealthStatus = 'terminal' | 'sticky_retry';
 

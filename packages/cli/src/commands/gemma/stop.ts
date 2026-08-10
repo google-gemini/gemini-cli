@@ -21,10 +21,7 @@ import {
 } from './platform.js';
 
 export type StopServerResult =
-  | 'stopped'
-  | 'not-running'
-  | 'unexpected-process'
-  | 'failed';
+  'stopped' | 'not-running' | 'unexpected-process' | 'failed';
 
 export async function stopServer(
   expectedPort?: number,

@@ -285,8 +285,7 @@ describe('useGeminiStream', () => {
 
   const emptyHistory: HistoryItem[] = [];
   let capturedOnComplete:
-    | ((tools: CompletedToolCall[]) => Promise<void>)
-    | null = null;
+    ((tools: CompletedToolCall[]) => Promise<void>) | null = null;
   const mockGetPreferredEditor = vi.fn(() => 'vscode' as EditorType);
   const mockOnAuthError = vi.fn();
   const mockPerformMemoryRefresh = vi.fn(() => Promise.resolve());
@@ -746,8 +745,7 @@ describe('useGeminiStream', () => {
 
     // Capture the onComplete callback
     let capturedOnComplete:
-      | ((completedTools: TrackedToolCall[]) => Promise<void>)
-      | null = null;
+      ((completedTools: TrackedToolCall[]) => Promise<void>) | null = null;
 
     mockUseToolScheduler.mockImplementation((onComplete) => {
       capturedOnComplete = onComplete;
@@ -847,8 +845,7 @@ describe('useGeminiStream', () => {
     );
 
     let capturedOnComplete:
-      | ((completedTools: TrackedToolCall[]) => Promise<void>)
-      | null = null;
+      ((completedTools: TrackedToolCall[]) => Promise<void>) | null = null;
     mockUseToolScheduler.mockImplementation((onComplete) => {
       capturedOnComplete = onComplete;
       return [
@@ -980,8 +977,7 @@ describe('useGeminiStream', () => {
 
     // Capture the onComplete callback
     let capturedOnComplete:
-      | ((completedTools: TrackedToolCall[]) => Promise<void>)
-      | null = null;
+      ((completedTools: TrackedToolCall[]) => Promise<void>) | null = null;
 
     mockUseToolScheduler.mockImplementation((onComplete) => {
       capturedOnComplete = onComplete;
@@ -1086,8 +1082,7 @@ describe('useGeminiStream', () => {
     const mockConsumeUserHint = vi.fn(() => 'switch to the nprd database');
 
     let capturedOnComplete:
-      | ((completedTools: TrackedToolCall[]) => Promise<void>)
-      | null = null;
+      ((completedTools: TrackedToolCall[]) => Promise<void>) | null = null;
 
     mockUseToolScheduler.mockImplementation((onComplete) => {
       capturedOnComplete = onComplete;
@@ -1178,8 +1173,7 @@ describe('useGeminiStream', () => {
 
     // Capture the onComplete callback
     let capturedOnComplete:
-      | ((completedTools: TrackedToolCall[]) => Promise<void>)
-      | null = null;
+      ((completedTools: TrackedToolCall[]) => Promise<void>) | null = null;
 
     mockUseToolScheduler.mockImplementation((onComplete) => {
       capturedOnComplete = onComplete;
@@ -1438,8 +1432,7 @@ describe('useGeminiStream', () => {
     const client = new MockedGeminiClientClass(mockConfig);
 
     let capturedOnComplete:
-      | ((completedTools: TrackedToolCall[]) => Promise<void>)
-      | null = null;
+      ((completedTools: TrackedToolCall[]) => Promise<void>) | null = null;
 
     mockUseToolScheduler.mockImplementation((onComplete) => {
       capturedOnComplete = onComplete;
@@ -1554,8 +1547,7 @@ describe('useGeminiStream', () => {
 
     // Capture the onComplete callback
     let capturedOnComplete:
-      | ((completedTools: TrackedToolCall[]) => Promise<void>)
-      | null = null;
+      ((completedTools: TrackedToolCall[]) => Promise<void>) | null = null;
     let currentToolCalls = initialToolCalls;
 
     mockUseToolScheduler.mockImplementation((onComplete) => {

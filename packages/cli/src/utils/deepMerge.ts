@@ -7,13 +7,7 @@
 import { MergeStrategy } from '../config/settingsSchema.js';
 
 export type Mergeable =
-  | string
-  | number
-  | boolean
-  | null
-  | undefined
-  | object
-  | Mergeable[];
+  string | number | boolean | null | undefined | object | Mergeable[];
 
 export type MergeableObject = Record<string, Mergeable>;
 

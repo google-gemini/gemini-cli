@@ -12,11 +12,7 @@ import type { OverageStrategy } from '../billing/billing.js';
 
 /** Overage menu option that can be selected by the user */
 export type OverageOption =
-  | 'use_credits'
-  | 'use_fallback'
-  | 'manage'
-  | 'stop'
-  | 'get_credits';
+  'use_credits' | 'use_fallback' | 'manage' | 'stop' | 'get_credits';
 
 // ============================================================================
 // Event: Overage Menu Shown

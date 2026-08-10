@@ -29,8 +29,7 @@ export const RESUME_LATEST = 'latest';
  * Error codes for session-related errors.
  */
 export type SessionErrorCode =
-  | 'NO_SESSIONS_FOUND'
-  | 'INVALID_SESSION_IDENTIFIER';
+  'NO_SESSIONS_FOUND' | 'INVALID_SESSION_IDENTIFIER';
 
 /**
  * Error thrown for session-related failures.
@@ -300,8 +299,7 @@ export const getAllSessionFiles = async (
 
           let fullContent: string | undefined;
           let messages:
-            | Array<{ role: 'user' | 'assistant'; content: string }>
-            | undefined;
+            Array<{ role: 'user' | 'assistant'; content: string }> | undefined;
 
           if (options.includeFullContent) {
             fullContent = content.messages

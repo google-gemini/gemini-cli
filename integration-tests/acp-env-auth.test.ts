@@ -99,8 +99,7 @@ describe.skip('ACP Environment and Auth', () => {
       ).rejects.toSatisfy((error: unknown) => {
         const acpError = error as acp.RequestError;
         const errorData = acpError.data as
-          | { error?: { message?: string } }
-          | undefined;
+          { error?: { message?: string } } | undefined;
         const message = String(errorData?.error?.message || acpError.message);
         // It should NOT be our internal "Authentication required" message
         expect(message).not.toContain('Authentication required');

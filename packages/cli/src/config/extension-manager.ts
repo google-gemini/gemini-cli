@@ -89,8 +89,7 @@ interface ExtensionManagerParams {
   settings: MergedSettings;
   requestConsent: (consent: string) => Promise<boolean>;
   requestSetting:
-    | ((setting: ExtensionSetting) => Promise<string | undefined>)
-    | null;
+    ((setting: ExtensionSetting) => Promise<string | undefined>) | null;
   workspaceDir: string;
   eventEmitter?: EventEmitter<ExtensionEvents>;
   clientVersion?: string;
@@ -108,8 +107,7 @@ export class ExtensionManager extends ExtensionLoader {
   private settings: MergedSettings;
   private requestConsent: (consent: string) => Promise<boolean>;
   private requestSetting:
-    | ((setting: ExtensionSetting) => Promise<string | undefined>)
-    | undefined;
+    ((setting: ExtensionSetting) => Promise<string | undefined>) | undefined;
   private telemetryConfig: Config;
   private workspaceDir: string;
   private loadedExtensions: GeminiCLIExtension[] | undefined;
@@ -336,8 +334,8 @@ Would you like to attempt to install via "git clone" instead?`,
         const previousSkills = previous?.skills ?? [];
         const isMigrating = Boolean(
           previous &&
-            previous.installMetadata &&
-            previous.installMetadata.source !== installMetadata.source,
+          previous.installMetadata &&
+          previous.installMetadata.source !== installMetadata.source,
         );
 
         await maybeRequestConsentOrFail(

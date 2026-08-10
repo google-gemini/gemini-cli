@@ -20,8 +20,7 @@ export class CheckerRegistry {
   ]);
 
   private static BUILT_IN_IN_PROCESS_CHECKERS:
-    | Map<string, InProcessChecker>
-    | undefined;
+    Map<string, InProcessChecker> | undefined;
 
   private static getBuiltInInProcessCheckers(): Map<string, InProcessChecker> {
     if (!CheckerRegistry.BUILT_IN_IN_PROCESS_CHECKERS) {

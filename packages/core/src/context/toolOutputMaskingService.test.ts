@@ -124,8 +124,7 @@ describe('ToolOutputMaskingService', () => {
 
   const getToolResponse = (part: Part | undefined): string => {
     const resp = part?.functionResponse?.response as
-      | { output: string }
-      | undefined;
+      { output: string } | undefined;
     return resp?.output ?? (resp as unknown as string) ?? '';
   };
 
@@ -227,9 +226,7 @@ describe('ToolOutputMaskingService', () => {
 
     mockedEstimateTokenCountSync.mockImplementation((parts: Part[]) => {
       const resp = parts[0].functionResponse?.response as
-        | { output?: string; result?: string }
-        | string
-        | undefined;
+        { output?: string; result?: string } | string | undefined;
       const content =
         typeof resp === 'string'
           ? resp

@@ -455,17 +455,15 @@ function robustRealpath(p: string, visited = new Set<string>()): string {
       } catch (lstatError: unknown) {
         // Not a symlink, or lstat failed. Re-throw if it's not an expected
         // ENOENT (e.g., a permissions error), otherwise resolve parent.
-        if (
-          !(
-            lstatError &&
-            typeof lstatError === 'object' &&
-            'code' in lstatError &&
-            (lstatError.code === 'ENOENT' ||
-              lstatError.code === 'EISDIR' ||
-              lstatError.code === 'ENAMETOOLONG' ||
-              lstatError.code === 'ENOTDIR')
-          )
-        ) {
+        if (!(
+          lstatError &&
+          typeof lstatError === 'object' &&
+          'code' in lstatError &&
+          (lstatError.code === 'ENOENT' ||
+            lstatError.code === 'EISDIR' ||
+            lstatError.code === 'ENAMETOOLONG' ||
+            lstatError.code === 'ENOTDIR')
+        )) {
           throw lstatError;
         }
       }

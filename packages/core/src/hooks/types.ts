@@ -128,12 +128,7 @@ export function getHookKey(hook: HookConfig): string {
  * Decision types for hook outputs
  */
 export type HookDecision =
-  | 'ask'
-  | 'block'
-  | 'deny'
-  | 'approve'
-  | 'allow'
-  | undefined;
+  'ask' | 'block' | 'deny' | 'approve' | 'allow' | undefined;
 
 /**
  * Base hook input - common fields for all events

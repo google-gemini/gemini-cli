@@ -483,8 +483,7 @@ Respond ONLY with a JSON object where each key is the filepath and the value is:
         // Just throw if JSON parsing fails.
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const decision = responseJson[f.filepath] as
-          | CompressionRecordJSON
-          | undefined;
+          CompressionRecordJSON | undefined;
         if (typeof decision !== 'object') continue;
         if (typeof decision === 'object' && decision && decision.level) {
           results.set(f.filepath, {
