@@ -196,27 +196,37 @@ function checkCaseNameStatic(
   return undefined;
 }
 
-const WORKSPACE_PROMPT_KEYWORDS =
-  /\b(create|write|edit|modify|delete|remove|patch|git|file|directory|folder|repo|workspace)\b/i;
+const EXEMPT_SUITE_TYPES = new Set([
+  'component-level',
+  'text',
+  'prose',
+  'steering',
+  'memory',
+]);
 
 function checkPositiveAssertion(
   evalCase: EvalCaseRecord,
   filePath: string,
 ): ValidationViolation | undefined {
   if (
-    evalCase.baseHelperName !== 'componentEvalTest' &&
-    evalCase.suiteType !== 'component-level' &&
-    evalCase.toolReferences.length === 0
+    evalCase.baseHelperName === 'componentEvalTest' ||
+    (evalCase.suiteType && EXEMPT_SUITE_TYPES.has(evalCase.suiteType))
   ) {
-    return {
-      ruleId: 'positive-assertion',
-      message:
-        'Eval case assert function does not track any tool references. Use at least one positive tool assertion.',
-      filePath,
-      location: evalCase.location,
-    };
+    return undefined;
   }
-  return undefined;
+
+  // If case has tool references or has an assertion body (e.g. negative or custom assertions), pass
+  if (evalCase.toolReferences.length > 0 || evalCase.hasAssertBody) {
+    return undefined;
+  }
+
+  return {
+    ruleId: 'positive-assertion',
+    message:
+      'Eval case assert function does not track any tool references. Use at least one positive tool assertion.',
+    filePath,
+    location: evalCase.location,
+  };
 }
 
 function checkWorkspaceSetup(
@@ -224,21 +234,27 @@ function checkWorkspaceSetup(
   filePath: string,
 ): ValidationViolation | undefined {
   if (
-    evalCase.baseHelperName !== 'componentEvalTest' &&
-    evalCase.suiteType !== 'component-level' &&
-    evalCase.prompt &&
-    WORKSPACE_PROMPT_KEYWORDS.test(evalCase.prompt) &&
-    !evalCase.hasFiles &&
-    !evalCase.hasSetup
+    evalCase.baseHelperName === 'componentEvalTest' ||
+    (evalCase.suiteType && EXEMPT_SUITE_TYPES.has(evalCase.suiteType)) ||
+    evalCase.hasFiles ||
+    evalCase.hasSetup
+  ) {
+    return undefined;
+  }
+
+  if (
+    evalCase.suiteType === 'workspace' ||
+    evalCase.suiteType === 'file-system'
   ) {
     return {
       ruleId: 'workspace-setup',
       message:
-        'Eval case prompt suggests workspace interaction (files/git), but neither "files" nor a "setup" hook is specified.',
+        'Eval case suggests workspace interaction (files/git), but neither "files" nor a "setup" hook is specified.',
       filePath,
       location: evalCase.location,
     };
   }
+
   return undefined;
 }
 

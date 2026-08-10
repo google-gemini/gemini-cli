@@ -112,6 +112,10 @@ export function buildToolRegistry(): ToolRegistry {
     ['read_background_output', 'shell'],
     ['list_background_processes', 'shell'],
     ['mutation-agent', 'agent'],
+    ['generalist', 'agent'],
+    ['generalist-agent', 'agent'],
+    ['coder-agent', 'agent'],
+    ['task-tracker-agent', 'agent'],
   ];
 
   for (const [name, category] of customTools) {

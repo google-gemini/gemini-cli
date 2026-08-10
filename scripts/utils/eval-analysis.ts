@@ -51,6 +51,7 @@ export interface EvalCaseRecord {
   hasFiles: boolean;
   hasSetup: boolean;
   hasPrompt: boolean;
+  hasAssertBody: boolean;
   prompt?: string;
   toolReferences: readonly string[];
   location: EvalSourceLocation;
@@ -165,6 +166,7 @@ export function analyzeEvalSource(
       hasFiles: hasProperty(evalCase, 'files'),
       hasSetup: hasProperty(evalCase, 'setup'),
       hasPrompt: hasProperty(evalCase, 'prompt'),
+      hasAssertBody: Boolean(assertBody),
       prompt: getStaticStringProperty(evalCase, 'prompt'),
       toolReferences: Object.freeze([...new Set(toolRefs)].sort()),
       location: getLocation(sourceFile, callExpression),
@@ -596,19 +598,32 @@ function extractFromWaitForToolCall(
   refs: { name: string; node: ts.Node }[],
 ) {
   const expr = call.expression;
+  let methodName: string | undefined;
+
+  if (ts.isPropertyAccessExpression(expr)) {
+    methodName = expr.name.text;
+  } else if (ts.isIdentifier(expr)) {
+    methodName = expr.text;
+  }
+
+  if (!methodName) return;
+
   if (
-    !ts.isPropertyAccessExpression(expr) ||
-    expr.name.text !== 'waitForToolCall'
+    methodName === 'waitForToolCall' ||
+    methodName === 'waitForPendingConfirmation'
   ) {
-    return;
-  }
-  const firstArg = call.arguments[0];
-  if (!firstArg) {
-    return;
-  }
-  const resolved = resolveStringValue(firstArg, importedConstants);
-  if (resolved) {
-    refs.push({ name: resolved, node: firstArg });
+    const firstArg = call.arguments[0];
+    if (firstArg) {
+      const resolved = resolveStringValue(firstArg, importedConstants);
+      if (resolved) {
+        refs.push({ name: resolved, node: firstArg });
+      }
+    }
+  } else if (
+    methodName === 'expectSubagentCall' ||
+    methodName === 'expectSubagent'
+  ) {
+    refs.push({ name: 'invoke_agent', node: call });
   }
 }
 

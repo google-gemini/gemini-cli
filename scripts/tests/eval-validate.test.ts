@@ -23,7 +23,7 @@ import {
   type ValidationJsonOutput,
 } from '../utils/eval-validate.js';
 import { buildToolRegistry } from '../utils/tool-registry.js';
-import type { InventoryResult } from '../utils/eval-inventory.js';
+import { type InventoryResult } from '../utils/eval-inventory.js';
 import type {
   EvalCaseRecord,
   EvalFileAnalysis,
@@ -43,6 +43,7 @@ function makeCase(overrides: Partial<EvalCaseRecord> = {}): EvalCaseRecord {
     hasFiles: false,
     hasSetup: false,
     hasPrompt: true,
+    hasAssertBody: false,
     prompt: 'Describe how the function works.',
     toolReferences: ['grep_search'],
     location: { line: 10, column: 3 },
@@ -492,6 +493,7 @@ describe('eval-validate', () => {
     it('flags workspace-setup when workspace prompt has no files or setup config', () => {
       const c = makeCase({
         prompt: 'Please edit app.ts and fix the typo.',
+        suiteType: 'workspace',
         hasFiles: false,
         hasSetup: false,
       });
@@ -556,14 +558,14 @@ describe('eval-validate', () => {
       );
     });
 
-    it('validates the real evals directory without crashing', async () => {
+    it('validates the real evals directory without any rule violations', async () => {
       const { collectInventory } = await import('../utils/eval-inventory.js');
       const repoRoot = path.resolve(import.meta.dirname, '../../');
       const inventory = await collectInventory(repoRoot);
       const result = validateInventory(inventory, registry);
       expect(result.totalFiles).toBeGreaterThanOrEqual(1);
-      expect(result.totalCases).toBeGreaterThanOrEqual(1);
-      expect(typeof result.totalViolations).toBe('number');
+      expect(result.totalViolations).toBe(0);
+      expect(result.violations).toEqual([]);
     });
   });
 
