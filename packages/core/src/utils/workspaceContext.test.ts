@@ -523,6 +523,21 @@ describe('WorkspaceContext with optional directories', () => {
       }
     });
 
+    it('should reject GitHub Actions Workload Identity credentials', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+
+      const sensitivePaths = [
+        path.join(cwd, 'gha-creds-12345.json'),
+        path.join(cwd, 'gha-creds-abcde.json'),
+        path.join(cwd, 'GHA-CREDS-abcde.JSON'), // Case-insensitivity check
+        path.join(cwd, 'subfolder', 'gha-creds-12345.json'), // Nested
+      ];
+
+      for (const p of sensitivePaths) {
+        expect(workspaceContext.isPathWithinWorkspace(p)).toBe(false);
+      }
+    });
+
     it('should allow standard non-sensitive paths', () => {
       const workspaceContext = new WorkspaceContext(cwd);
 
@@ -531,6 +546,8 @@ describe('WorkspaceContext with optional directories', () => {
         path.join(cwd, '.gitignore'),
         path.join(cwd, '.env.example'),
         path.join(cwd, 'package.json'),
+        path.join(cwd, 'tsconfig.json'),
+        path.join(cwd, 'gha-creds.json'), // Doesn't match the pattern
       ];
 
       for (const p of safePaths) {

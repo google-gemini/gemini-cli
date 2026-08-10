@@ -67,6 +67,7 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     setActiveModel: vi.fn(),
     setModel: vi.fn(),
     activateFallbackMode: vi.fn(),
+    rotateSessionId: vi.fn(),
     getModelAvailabilityService: vi.fn(() =>
       createAvailabilityServiceMock({
         selectedModel: FALLBACK_MODEL,
