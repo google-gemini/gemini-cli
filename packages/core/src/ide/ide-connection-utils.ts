@@ -109,6 +109,21 @@ export function getStdioConfigFromEnv(): StdioConfig | undefined {
 
 const IDE_SERVER_FILE_REGEX = /^gemini-ide-server-(\d+)-\d+\.json$/;
 
+async function verifyAndReadFile(
+  filePath: string,
+): Promise<string | undefined> {
+  try {
+    const realPath = await fs.promises.realpath(filePath);
+    const stat = await fs.promises.stat(realPath);
+    if (process.getuid && stat.uid !== process.getuid()) {
+      return undefined;
+    }
+    return await fs.promises.readFile(realPath, 'utf8');
+  } catch {
+    return undefined;
+  }
+}
+
 export async function getConnectionConfigFromFile(
   pid: number,
 ): Promise<
@@ -122,7 +137,10 @@ export async function getConnectionConfigFromFile(
       'ide',
       `gemini-ide-server-${pid}.json`,
     );
-    const portFileContents = await fs.promises.readFile(portFile, 'utf8');
+    const portFileContents = await verifyAndReadFile(portFile);
+    if (!portFileContents) {
+      throw new Error('Verification failed or file not found');
+    }
     const parsed: unknown = JSON.parse(portFileContents);
     type ConfigType = ConnectionConfig & {
       workspacePath?: string;
@@ -164,23 +182,21 @@ export async function getConnectionConfigFromFile(
 
   sortConnectionFiles(matchingFiles, pid);
 
-  let fileContents: string[];
-  try {
-    fileContents = await Promise.all(
-      matchingFiles.map((file) =>
-        fs.promises.readFile(path.join(portFileDir, file), 'utf8'),
-      ),
-    );
-  } catch (e) {
-    logger.debug('Failed to read IDE connection config file(s):', e);
-    return undefined;
-  }
+  const fileContents = await Promise.all(
+    matchingFiles.map((file) =>
+      verifyAndReadFile(path.join(portFileDir, file)),
+    ),
+  );
+
   const parsedContents = fileContents.map(
     (
       content,
     ):
       | (ConnectionConfig & { workspacePath?: string; ideInfo?: IdeInfo })
       | undefined => {
+      if (!content) {
+        return undefined;
+      }
       try {
         const parsed: unknown = JSON.parse(content);
         type ConfigType = ConnectionConfig & {
@@ -227,7 +243,10 @@ export async function getConnectionConfigFromFile(
     const portFromEnv = getPortFromEnv();
     if (portFromEnv) {
       fileIndex = parsedContents.findIndex(
-        (content) => !!content && String(content.port) === portFromEnv,
+        (content) =>
+          !!content &&
+          content.port !== undefined &&
+          String(content.port) === portFromEnv,
       );
     }
     if (fileIndex === -1) {
@@ -256,7 +275,8 @@ export async function getConnectionConfigFromFile(
   const portFromEnv = getPortFromEnv();
   if (portFromEnv) {
     const matchingPortIndex = validWorkspaces.findIndex(
-      (content) => String(content.port) === portFromEnv,
+      (content) =>
+        content.port !== undefined && String(content.port) === portFromEnv,
     );
     if (matchingPortIndex !== -1) {
       const selected = validWorkspaces[matchingPortIndex];

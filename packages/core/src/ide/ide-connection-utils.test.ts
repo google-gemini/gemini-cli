@@ -31,6 +31,10 @@ vi.mock('node:fs', async (importOriginal) => {
       ...actual.promises,
       readFile: vi.fn(),
       readdir: vi.fn(),
+      realpath: vi.fn((p) => Promise.resolve(p)),
+      stat: vi.fn(() =>
+        Promise.resolve({ uid: process.getuid ? process.getuid() : 1000 }),
+      ),
     },
     realpathSync: (p: string) => p,
     existsSync: vi.fn(() => false),
@@ -488,6 +492,79 @@ describe('ide-connection-utils', () => {
       const result = await getConnectionConfigFromFile(12345);
 
       expect(result).toEqual(invalidConfig2);
+    });
+
+    it('should reject and ignore config files owned by a different user UID to prevent hijacking/information disclosure', async () => {
+      const config1 = {
+        port: '1111',
+        workspacePath: '/test/workspace',
+      };
+      vi.mocked(fs.promises.readFile).mockRejectedValueOnce(
+        new Error('not found'),
+      );
+      (
+        vi.mocked(fs.promises.readdir) as Mock<
+          (path: fs.PathLike) => Promise<string[]>
+        >
+      ).mockResolvedValue(['gemini-ide-server-12345-111.json']);
+      vi.mocked(fs.promises.readFile).mockResolvedValueOnce(
+        JSON.stringify(config1),
+      );
+
+      const otherUid = (process.getuid ? process.getuid() : 1000) + 1;
+      vi.mocked(fs.promises.stat).mockResolvedValueOnce({
+        uid: otherUid,
+      } as unknown as fs.Stats);
+
+      const result = await getConnectionConfigFromFile(12345);
+
+      expect(result).toBeUndefined();
+    });
+
+    it('should accept and parse config files owned by the current user UID', async () => {
+      const config1 = {
+        port: '1111',
+        workspacePath: '/test/workspace',
+      };
+      vi.mocked(fs.promises.readFile).mockRejectedValueOnce(
+        new Error('not found'),
+      );
+      (
+        vi.mocked(fs.promises.readdir) as Mock<
+          (path: fs.PathLike) => Promise<string[]>
+        >
+      ).mockResolvedValue(['gemini-ide-server-12345-111.json']);
+      vi.mocked(fs.promises.readFile).mockResolvedValueOnce(
+        JSON.stringify(config1),
+      );
+
+      const currentUid = process.getuid ? process.getuid() : 1000;
+      vi.mocked(fs.promises.stat).mockResolvedValueOnce({
+        uid: currentUid,
+      } as unknown as fs.Stats);
+
+      const result = await getConnectionConfigFromFile(12345);
+
+      expect(result).toEqual(config1);
+    });
+
+    it('should reject and ignore config files if realpath resolution throws an error', async () => {
+      vi.mocked(fs.promises.readFile).mockRejectedValueOnce(
+        new Error('not found'),
+      );
+      (
+        vi.mocked(fs.promises.readdir) as Mock<
+          (path: fs.PathLike) => Promise<string[]>
+        >
+      ).mockResolvedValue(['gemini-ide-server-12345-111.json']);
+
+      vi.mocked(fs.promises.realpath).mockRejectedValueOnce(
+        new Error('symlink loop / permission denied'),
+      );
+
+      const result = await getConnectionConfigFromFile(12345);
+
+      expect(result).toBeUndefined();
     });
   });
 
