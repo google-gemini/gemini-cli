@@ -678,6 +678,7 @@ export interface ConfigParameters {
   truncateToolOutputThreshold?: number;
   eventEmitter?: EventEmitter;
   useWriteTodos?: boolean;
+  env?: Record<string, string>;
   workspacePoliciesDir?: string;
   policyEngineConfig?: PolicyEngineConfig;
   directWebFetch?: boolean;
@@ -896,6 +897,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly useTerminalBuffer: boolean;
   private readonly useRenderProcess: boolean;
   private shellExecutionConfig: ShellExecutionConfig;
+  readonly env?: Record<string, string>;
   private readonly extensionManagement: boolean = true;
   private readonly extensionRegistryURI: string | undefined;
   private readonly truncateToolOutputThreshold: number;
@@ -1119,6 +1121,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.checkpointing = params.checkpointing ?? false;
     this.proxy = params.proxy;
     this.cwd = params.cwd ?? process.cwd();
+    this.env = params.env;
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
     this.bugCommand = params.bugCommand;
     this.model = params.model;
@@ -1858,6 +1861,10 @@ export class Config implements McpContext, AgentLoopContext {
     }
   }
 
+  rotateSessionId(sessionId: string): void {
+    this._sessionId = sessionId;
+  }
+
   resetNewSessionState(sessionId: string): void {
     this.setSessionId(sessionId);
   }
@@ -1931,6 +1938,9 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   activateFallbackMode(model: string, failedModel?: string): void {
+    debugLogger.log(
+      `Model fallback activated: switching from ${failedModel ?? 'unknown'} to ${model}`,
+    );
     if (this.getActiveModel() !== model) {
       this.setModel(model, true);
     }
