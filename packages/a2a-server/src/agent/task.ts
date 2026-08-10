@@ -131,9 +131,11 @@ export class Task {
     this.autoExecute = autoExecute;
     this.config.setFallbackModelHandler(
       // For a2a-server, we want to automatically switch to the fallback model
-      // and retry the current request seamlessly. The 'retry_always' intent
-      // achieves this, ensuring a smooth fallback experience for the user.
-      async () => 'retry_always',
+      // for future requests without retrying the current one.
+      async (failedModel, fallbackModel) => {
+        this.config.activateFallbackMode(fallbackModel, failedModel);
+        return 'stop';
+      },
     );
   }
 
