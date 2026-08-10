@@ -439,7 +439,8 @@ describe('extensionsCommand', () => {
     }
 
     it('should return ExtensionRegistryView custom dialog when experimental.extensionRegistry is true', async () => {
-      mockContext.services.settings.merged.experimental.extensionRegistry = true;
+      mockContext.services.settings.merged.experimental.extensionRegistry =
+        true;
 
       const result = await exploreAction(mockContext, '');
 
@@ -455,7 +456,8 @@ describe('extensionsCommand', () => {
     });
 
     it('should handle onSelect and onClose in ExtensionRegistryView', async () => {
-      mockContext.services.settings.merged.experimental.extensionRegistry = true;
+      mockContext.services.settings.merged.experimental.extensionRegistry =
+        true;
 
       const result = await exploreAction(mockContext, '');
       if (result?.type !== 'custom_dialog') {
@@ -1139,8 +1141,9 @@ describe('extensionsCommand', () => {
       const prompts = (await import('prompts')).default;
       vi.mocked(prompts).mockResolvedValue({ overwrite: true });
 
-      const { getScopedEnvContents } =
-        await import('../../config/extensions/extensionSettings.js');
+      const { getScopedEnvContents } = await import(
+        '../../config/extensions/extensionSettings.js'
+      );
       vi.mocked(getScopedEnvContents).mockResolvedValue({});
     });
 

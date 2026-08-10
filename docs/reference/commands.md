@@ -10,23 +10,9 @@ Slash commands provide meta-level control over the CLI itself.
 
 ### Built-in Commands
 
-Gemini CLI provides several built-in commands for managing the CLI's state,
-extensions, and local model routing. These commands offer direct control over
-core functionality.
-
-### /about
+### `/about`
 
 - **Description:** Show version info. Share this information when filing issues.
-
-### /gemma
-
-- **Description:** Manage local Gemma model routing.
-- **Sub-commands:**
-  - **`setup`**: Sets up the local model environment.
-  - **`start`**: Starts the local model router.
-  - **`stop`**: Stops the local model router.
-  - **`status`**: Shows the status of the local model router.
-  - **`logs`**: Shows the logs for the local model router.
 
 ### `/agents`
 

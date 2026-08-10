@@ -11,7 +11,10 @@ import { theme } from '../semantic-colors.js';
 
 /** Available choices in the overage menu dialog */
 export type OverageMenuChoice =
-  'use_credits' | 'use_fallback' | 'manage' | 'stop';
+  | 'use_credits'
+  | 'use_fallback'
+  | 'manage'
+  | 'stop';
 
 interface OverageMenuDialogProps {
   /** The model that hit the quota limit */

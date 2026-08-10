@@ -26,7 +26,12 @@ export const EXTENSION_SETTINGS_FILENAME = '.env';
 export type JsonObject = { [key: string]: JsonValue };
 export type JsonArray = JsonValue[];
 export type JsonValue =
-  string | number | boolean | null | JsonObject | JsonArray;
+  | string
+  | number
+  | boolean
+  | null
+  | JsonObject
+  | JsonArray;
 
 export type VariableContext = {
   [key: string]: string | undefined;

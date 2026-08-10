@@ -2068,7 +2068,9 @@ export class StartupStatsEvent implements BaseTelemetryEvent {
 
 abstract class BaseAgentEvent implements BaseTelemetryEvent {
   abstract 'event.name':
-    'agent_start' | 'agent_finish' | 'agent_recovery_attempt';
+    | 'agent_start'
+    | 'agent_finish'
+    | 'agent_recovery_attempt';
   'event.timestamp': string;
   agent_id: string;
   agent_name: string;
@@ -2188,7 +2190,9 @@ export class RecoveryAttemptEvent extends BaseAgentEvent {
 export const EVENT_WEB_FETCH_FALLBACK_ATTEMPT =
   'gemini_cli.web_fetch_fallback_attempt';
 export type WebFetchFallbackReason =
-  'private_ip' | 'primary_failed' | 'private_ip_skipped';
+  | 'private_ip'
+  | 'primary_failed'
+  | 'private_ip_skipped';
 
 export class WebFetchFallbackAttemptEvent implements BaseTelemetryEvent {
   'event.name': 'web_fetch_fallback_attempt';

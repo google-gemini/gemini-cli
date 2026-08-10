@@ -286,7 +286,8 @@ export async function createApp() {
         const taskId = uuidv4();
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const agentSettings = req.body.agentSettings as
-          AgentSettings | undefined;
+          | AgentSettings
+          | undefined;
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const contextId = req.body.contextId || uuidv4();
         const wrapper = await agentExecutor.createTask(

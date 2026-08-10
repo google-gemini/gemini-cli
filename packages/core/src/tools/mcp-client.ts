@@ -1061,7 +1061,8 @@ async function createTransportWithOAuth(
       Authorization: `Bearer ${accessToken}`,
     };
     const transportOptions:
-      StreamableHTTPClientTransportOptions | SSEClientTransportOptions = {
+      | StreamableHTTPClientTransportOptions
+      | SSEClientTransportOptions = {
       requestInit: createTransportRequestInit(
         mcpServerConfig,
         headers,
@@ -2182,7 +2183,8 @@ function createUrlTransport(
   mcpServerName: string,
   mcpServerConfig: MCPServerConfig,
   transportOptions:
-    StreamableHTTPClientTransportOptions | SSEClientTransportOptions,
+    | StreamableHTTPClientTransportOptions
+    | SSEClientTransportOptions,
 ): StreamableHTTPClientTransport | SSEClientTransport {
   // Create a proxy-aware fetcher that respects NO_PROXY for this MCP server
   // This is especially important for local MCP servers (localhost, 127.0.0.1)
@@ -2314,7 +2316,8 @@ export async function createTransport(
     }
 
     const transportOptions:
-      StreamableHTTPClientTransportOptions | SSEClientTransportOptions = {
+      | StreamableHTTPClientTransportOptions
+      | SSEClientTransportOptions = {
       requestInit: createTransportRequestInit(
         mcpServerConfig,
         headers,

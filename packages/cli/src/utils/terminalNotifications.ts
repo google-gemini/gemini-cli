@@ -71,7 +71,8 @@ export function buildRunEventNotificationContent(
 
 export function isNotificationsEnabled(settings: LoadedSettings): boolean {
   const general = settings.merged.general as
-    { enableNotifications?: boolean } | undefined;
+    | { enableNotifications?: boolean }
+    | undefined;
 
   return general?.enableNotifications === true;
 }

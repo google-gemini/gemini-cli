@@ -956,7 +956,10 @@ export function logBrowserAgentConnection(
     headless: boolean;
     success: boolean;
     error_type?:
-      'profile_locked' | 'timeout' | 'connection_refused' | 'unknown';
+      | 'profile_locked'
+      | 'timeout'
+      | 'connection_refused'
+      | 'unknown';
     tool_count?: number;
   },
 ): void {
@@ -977,7 +980,9 @@ export function logBrowserAgentVisionStatus(
   attributes: {
     enabled: boolean;
     disabled_reason?:
-      'no_visual_model' | 'missing_visual_tools' | 'blocked_auth_type';
+      | 'no_visual_model'
+      | 'missing_visual_tools'
+      | 'blocked_auth_type';
   },
 ): void {
   ClearcutLogger.getInstance(config)?.logBrowserAgentVisionStatusEvent({

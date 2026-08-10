@@ -29,7 +29,8 @@ type FailedPathCorrection = {
  * @returns A `PathCorrectionResult` object with either a `correctedPath` or an `error`.
  */
 export type PathCorrectionResult =
-  SuccessfulPathCorrection | FailedPathCorrection;
+  | SuccessfulPathCorrection
+  | FailedPathCorrection;
 export function correctPath(
   filePath: string,
   config: Config,

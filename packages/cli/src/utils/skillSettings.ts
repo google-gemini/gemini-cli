@@ -20,10 +20,8 @@ export type SkillActionStatus = 'success' | 'no-op' | 'error';
 /**
  * Metadata representing the result of a skill settings operation.
  */
-export interface SkillActionResult extends Omit<
-  FeatureActionResult,
-  'featureName'
-> {
+export interface SkillActionResult
+  extends Omit<FeatureActionResult, 'featureName'> {
   skillName: string;
 }
 

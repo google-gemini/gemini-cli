@@ -28,7 +28,8 @@ vi.mock('./local-subagent-protocol.js');
 const MockLocalSubagentSession = vi.mocked(LocalSubagentSession);
 
 let capturedActivityCallback:
-  ((activity: SubagentActivityEvent) => void) | undefined;
+  | ((activity: SubagentActivityEvent) => void)
+  | undefined;
 
 const testDefinition: LocalAgentDefinition = {
   kind: 'local',

@@ -20,7 +20,8 @@ export interface TranscriptionEvents {
 /**
  * Common interface for all transcription backends (Cloud or Local).
  */
-export interface TranscriptionProvider extends EventEmitter<TranscriptionEvents> {
+export interface TranscriptionProvider
+  extends EventEmitter<TranscriptionEvents> {
   /** Establish connection to the transcription service. */
   connect(): Promise<void>;
   /** Send a chunk of raw audio data to the service. */

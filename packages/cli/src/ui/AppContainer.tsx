@@ -1626,9 +1626,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }, []);
   const shouldShowIdePrompt = Boolean(
     currentIDE &&
-    !config.getIdeMode() &&
-    !settings.merged.ide.hasSeenNudge &&
-    !idePromptAnswered,
+      !config.getIdeMode() &&
+      !settings.merged.ide.hasSeenNudge &&
+      !idePromptAnswered,
   );
 
   const [showErrorDetails, setShowErrorDetails] = useState<boolean>(false);
@@ -1890,8 +1890,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       if (keyMatchers[Command.SHOW_ERROR_DETAILS](key)) {
         if (settings.merged.general.devtools) {
           void (async () => {
-            const { toggleDevToolsPanel } =
-              await import('../utils/devtoolsService.js');
+            const { toggleDevToolsPanel } = await import(
+              '../utils/devtoolsService.js'
+            );
             await toggleDevToolsPanel(
               config,
               showErrorDetails,

@@ -635,8 +635,9 @@ describe('MainContent', () => {
   });
 
   it('renders a ToolConfirmationQueue without an extra line when preceded by hidden tools', async () => {
-    const { ApprovalMode, WRITE_FILE_DISPLAY_NAME } =
-      await import('@google/gemini-cli-core');
+    const { ApprovalMode, WRITE_FILE_DISPLAY_NAME } = await import(
+      '@google/gemini-cli-core'
+    );
     const hiddenToolCalls = [
       {
         callId: 'tool-hidden',
@@ -712,8 +713,9 @@ describe('MainContent', () => {
   });
 
   it('renders a spurious line when a tool group has only hidden tools and borderBottom true', async () => {
-    const { ApprovalMode, WRITE_FILE_DISPLAY_NAME } =
-      await import('@google/gemini-cli-core');
+    const { ApprovalMode, WRITE_FILE_DISPLAY_NAME } = await import(
+      '@google/gemini-cli-core'
+    );
     const uiState = {
       ...defaultMockUiState,
       history: [{ id: 1, type: 'user', text: 'Apply plan' }],

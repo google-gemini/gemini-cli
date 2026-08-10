@@ -84,8 +84,9 @@ vi.mock('../../utils/debugLogger.js', () => ({
 }));
 
 // Re-import mocked modules for assertions.
-const { MCPOAuthTokenStorage } =
-  await import('../../mcp/oauth-token-storage.js');
+const { MCPOAuthTokenStorage } = await import(
+  '../../mcp/oauth-token-storage.js'
+);
 const {
   refreshAccessToken,
   exchangeCodeForToken,

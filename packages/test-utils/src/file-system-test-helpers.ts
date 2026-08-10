@@ -45,7 +45,9 @@ import * as os from 'node:os';
  */
 export type FileSystemStructure = {
   [name: string]:
-    string | FileSystemStructure | Array<string | FileSystemStructure>;
+    | string
+    | FileSystemStructure
+    | Array<string | FileSystemStructure>;
 };
 
 /**

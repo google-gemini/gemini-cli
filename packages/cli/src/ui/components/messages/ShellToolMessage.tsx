@@ -109,10 +109,12 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
           Math.max(1, finalHeight),
         );
       } catch (e) {
-        if (!(
-          e instanceof Error &&
-          e.message.includes('Cannot resize a pty that has already exited')
-        )) {
+        if (
+          !(
+            e instanceof Error &&
+            e.message.includes('Cannot resize a pty that has already exited')
+          )
+        ) {
           throw e;
         }
       }

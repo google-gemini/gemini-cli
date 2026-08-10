@@ -220,8 +220,9 @@ describe('rewindFileOps', () => {
     });
 
     it('reverts exact match', async () => {
-      const { getFileDiffFromResultDisplay } =
-        await import('@google/gemini-cli-core');
+      const { getFileDiffFromResultDisplay } = await import(
+        '@google/gemini-cli-core'
+      );
       vi.mocked(getFileDiffFromResultDisplay).mockReturnValue({
         filePath: '/abs/path/test.ts',
         fileName: 'test.ts',
@@ -269,8 +270,9 @@ describe('rewindFileOps', () => {
     });
 
     it('deletes new file on revert', async () => {
-      const { getFileDiffFromResultDisplay } =
-        await import('@google/gemini-cli-core');
+      const { getFileDiffFromResultDisplay } = await import(
+        '@google/gemini-cli-core'
+      );
       vi.mocked(getFileDiffFromResultDisplay).mockReturnValue({
         filePath: '/abs/path/new.ts',
         fileName: 'new.ts',
@@ -315,8 +317,9 @@ describe('rewindFileOps', () => {
     });
 
     it('handles smart revert (patching) successfully', async () => {
-      const { getFileDiffFromResultDisplay } =
-        await import('@google/gemini-cli-core');
+      const { getFileDiffFromResultDisplay } = await import(
+        '@google/gemini-cli-core'
+      );
       vi.mocked(getFileDiffFromResultDisplay).mockReturnValue({
         filePath: '/abs/path/test.ts',
         fileName: 'test.ts',
@@ -366,8 +369,9 @@ describe('rewindFileOps', () => {
     });
 
     it('emits warning on smart revert failure', async () => {
-      const { getFileDiffFromResultDisplay } =
-        await import('@google/gemini-cli-core');
+      const { getFileDiffFromResultDisplay } = await import(
+        '@google/gemini-cli-core'
+      );
       vi.mocked(getFileDiffFromResultDisplay).mockReturnValue({
         filePath: '/abs/path/test.ts',
         fileName: 'test.ts',
@@ -417,8 +421,9 @@ describe('rewindFileOps', () => {
     });
 
     it('emits error if fs.readFile fails with a generic error', async () => {
-      const { getFileDiffFromResultDisplay } =
-        await import('@google/gemini-cli-core');
+      const { getFileDiffFromResultDisplay } = await import(
+        '@google/gemini-cli-core'
+      );
       vi.mocked(getFileDiffFromResultDisplay).mockReturnValue({
         filePath: '/abs/path/test.ts',
         fileName: 'test.ts',

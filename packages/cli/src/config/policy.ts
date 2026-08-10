@@ -102,7 +102,8 @@ export async function resolveWorkspacePolicyState(options: {
 
   let workspacePoliciesDir: string | undefined;
   let policyUpdateConfirmationRequest:
-    PolicyUpdateConfirmationRequest | undefined;
+    | PolicyUpdateConfirmationRequest
+    | undefined;
 
   if (trustedFolder && !disableWorkspacePolicies) {
     const storage = new Storage(cwd);

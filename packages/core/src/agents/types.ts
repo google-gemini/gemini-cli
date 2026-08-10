@@ -140,7 +140,8 @@ export function isToolActivityError(data: unknown): boolean {
  * @template TOutput The specific Zod schema for the agent's final output object.
  */
 export type AgentCardLoadOptions =
-  { type: 'url'; url: string } | { type: 'json'; json: string };
+  | { type: 'url'; url: string }
+  | { type: 'json'; json: string };
 
 /** Minimal shape needed by helper functions, avoids generic TOutput constraints. */
 interface RemoteAgentRef {
@@ -305,7 +306,8 @@ export interface RemoteAgentDefinition<
 }
 
 export type AgentDefinition<TOutput extends z.ZodTypeAny = z.ZodUnknown> =
-  LocalAgentDefinition<TOutput> | RemoteAgentDefinition<TOutput>;
+  | LocalAgentDefinition<TOutput>
+  | RemoteAgentDefinition<TOutput>;
 
 /**
  * Configures the initial prompt for the agent.

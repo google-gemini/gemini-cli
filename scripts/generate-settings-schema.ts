@@ -206,7 +206,8 @@ function buildSchemaForType(
 
 function buildEnumSchema(
   options:
-    SettingDefinition['options'] | SettingCollectionDefinition['options'],
+    | SettingDefinition['options']
+    | SettingCollectionDefinition['options'],
 ): JsonSchema {
   const values = options?.map((option) => option.value) ?? [];
   const inferred = inferTypeFromValues(values);
@@ -344,7 +345,8 @@ function ensureDefinition(ref: string, defs: Map<string, JsonSchema>): void {
     return;
   }
   const predefined = SETTINGS_SCHEMA_DEFINITIONS[ref] as
-    SettingsJsonSchemaDefinition | undefined;
+    | SettingsJsonSchemaDefinition
+    | undefined;
   if (predefined) {
     defs.set(ref, predefined as JsonSchema);
   } else {

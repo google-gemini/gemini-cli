@@ -36,7 +36,10 @@ import { classifyAgentError } from './a2a-errors.js';
  * or an incremental status/artifact update.
  */
 export type SendMessageResult =
-  Message | Task | TaskStatusUpdateEvent | TaskArtifactUpdateEvent;
+  | Message
+  | Task
+  | TaskStatusUpdateEvent
+  | TaskArtifactUpdateEvent;
 
 // Remote agents can take 10+ minutes (e.g. Deep Research).
 // Use a dedicated dispatcher so the global 5-min timeout isn't affected.

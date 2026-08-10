@@ -300,8 +300,9 @@ System using model: \${MODEL_NAME}
     });
     expect(extension.skills![0].body).toContain('Value is: first');
 
-    const { updateSetting, ExtensionSettingScope } =
-      await import('./extensions/extensionSettings.js');
+    const { updateSetting, ExtensionSettingScope } = await import(
+      './extensions/extensionSettings.js'
+    );
     const extensionConfig =
       await extensionManager.loadExtensionConfig(extensionPath);
 

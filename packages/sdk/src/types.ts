@@ -22,7 +22,8 @@ import type { GeminiCliSession } from './session.js';
  * before being included in the returned instructions to prevent prompt injection.
  */
 export type SystemInstructions =
-  string | ((context: SessionContext) => string | Promise<string>);
+  | string
+  | ((context: SessionContext) => string | Promise<string>);
 
 /**
  * Configuration options for creating a {@link GeminiCliAgent}.

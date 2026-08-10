@@ -349,12 +349,9 @@ export class SchedulerStateManager {
     tool: AnyDeclarativeTool;
     invocation: AnyToolInvocation;
   } {
-    if (!(
-      'tool' in call &&
-      call.tool &&
-      'invocation' in call &&
-      call.invocation
-    )) {
+    if (
+      !('tool' in call && call.tool && 'invocation' in call && call.invocation)
+    ) {
       throw new Error(
         `Invalid state transition: cannot transition to ${targetStatus} without tool/invocation (callId: ${call.request.callId})`,
       );
@@ -404,7 +401,8 @@ export class SchedulerStateManager {
     );
 
     let confirmationDetails:
-      ToolCallConfirmationDetails | SerializableConfirmationDetails;
+      | ToolCallConfirmationDetails
+      | SerializableConfirmationDetails;
     let correlationId: string | undefined;
 
     if (this.isEventDrivenApprovalData(data)) {

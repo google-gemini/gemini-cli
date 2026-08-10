@@ -612,8 +612,9 @@ describe('Session', () => {
   });
 
   it('should send sessionUpdate when approval mode changes', async () => {
-    const { coreEvents, CoreEvent, ApprovalMode } =
-      await import('@google/gemini-cli-core');
+    const { coreEvents, CoreEvent, ApprovalMode } = await import(
+      '@google/gemini-cli-core'
+    );
 
     coreEvents.emit(CoreEvent.ApprovalModeChanged, {
       sessionId: 'session-1',

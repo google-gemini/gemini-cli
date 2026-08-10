@@ -1131,7 +1131,8 @@ export const useGeminiStream = (
             {
               // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
               type: pendingHistoryItemRef.current?.type as
-                'gemini' | 'gemini_content',
+                | 'gemini'
+                | 'gemini_content',
               text: beforeText,
             },
             userMessageTimestamp,
@@ -1941,7 +1942,8 @@ export const useGeminiStream = (
 
             if (isTerminalState) {
               const completedOrCancelledCall = tc as
-                TrackedCompletedToolCall | TrackedCancelledToolCall;
+                | TrackedCompletedToolCall
+                | TrackedCancelledToolCall;
               return (
                 completedOrCancelledCall.response?.responseParts !== undefined
               );

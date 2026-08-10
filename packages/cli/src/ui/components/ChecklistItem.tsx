@@ -10,7 +10,11 @@ import { theme } from '../semantic-colors.js';
 import { checkExhaustive } from '@google/gemini-cli-core';
 
 export type ChecklistStatus =
-  'pending' | 'in_progress' | 'completed' | 'cancelled' | 'blocked';
+  | 'pending'
+  | 'in_progress'
+  | 'completed'
+  | 'cancelled'
+  | 'blocked';
 
 export interface ChecklistItemData {
   status: ChecklistStatus;

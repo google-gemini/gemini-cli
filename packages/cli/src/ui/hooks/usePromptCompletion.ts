@@ -135,10 +135,12 @@ export function usePromptCompletion({
         }
       }
     } catch (error) {
-      if (!(
-        signal.aborted ||
-        (error instanceof Error && error.name === 'AbortError')
-      )) {
+      if (
+        !(
+          signal.aborted ||
+          (error instanceof Error && error.name === 'AbortError')
+        )
+      ) {
         debugLogger.warn(
           `[WARN] prompt completion failed: : (${error instanceof Error ? error.message : String(error)})`,
         );

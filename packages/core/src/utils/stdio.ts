@@ -40,7 +40,8 @@ export function patchStdio(): () => void {
   process.stdout.write = (
     chunk: Uint8Array | string,
     encodingOrCb?:
-      BufferEncoding | ((err?: NodeJS.ErrnoException | null) => void),
+      | BufferEncoding
+      | ((err?: NodeJS.ErrnoException | null) => void),
     cb?: (err?: NodeJS.ErrnoException | null) => void,
   ) => {
     const encoding =
@@ -56,7 +57,8 @@ export function patchStdio(): () => void {
   process.stderr.write = (
     chunk: Uint8Array | string,
     encodingOrCb?:
-      BufferEncoding | ((err?: NodeJS.ErrnoException | null) => void),
+      | BufferEncoding
+      | ((err?: NodeJS.ErrnoException | null) => void),
     cb?: (err?: NodeJS.ErrnoException | null) => void,
   ) => {
     const encoding =

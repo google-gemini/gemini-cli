@@ -570,10 +570,12 @@ export function useShellCompletion({
       setSuggestions(results);
       setActiveStart(completionStart);
     } catch (error) {
-      if (!(
-        signal.aborted ||
-        (error instanceof Error && error.name === 'AbortError')
-      )) {
+      if (
+        !(
+          signal.aborted ||
+          (error instanceof Error && error.name === 'AbortError')
+        )
+      ) {
         debugLogger.warn(
           `[WARN] shell completion failed: ${error instanceof Error ? error.message : String(error)}`,
         );

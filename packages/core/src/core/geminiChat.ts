@@ -1237,7 +1237,8 @@ export class GeminiChat {
     const bufferedThoughts: Array<{ subject: string; description: string }> =
       [];
     let bufferedUsageMetadata:
-      GenerateContentResponse['usageMetadata'] | undefined = undefined;
+      | GenerateContentResponse['usageMetadata']
+      | undefined = undefined;
 
     // The SDK provides fully assembled FunctionCall objects in chunk.functionCalls
     // We use a Map to ensure we only keep the latest version of each call (by ID)

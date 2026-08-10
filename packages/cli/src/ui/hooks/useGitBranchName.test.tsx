@@ -195,7 +195,8 @@ describe('useGitBranchName', () => {
   it('should update branch name when .git/HEAD changes', async () => {
     vi.spyOn(fsPromises, 'access').mockResolvedValue(undefined);
     let watchCallback:
-      ((eventType: string, filename: string | null) => void) | undefined;
+      | ((eventType: string, filename: string | null) => void)
+      | undefined;
     const watchSpy = vi.spyOn(fs, 'watch').mockImplementation(((
       _path: string,
       callback: (eventType: string, filename: string | null) => void,

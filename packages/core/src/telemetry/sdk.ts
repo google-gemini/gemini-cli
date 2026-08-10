@@ -102,9 +102,11 @@ let callbackRegistered = false;
 let authListener: ((newCredentials: JWTInput) => Promise<void>) | undefined =
   undefined;
 let keychainAvailabilityListener:
-  ((event: KeychainAvailabilityEvent) => void) | undefined = undefined;
+  | ((event: KeychainAvailabilityEvent) => void)
+  | undefined = undefined;
 let tokenStorageTypeListener:
-  ((event: TokenStorageInitializationEvent) => void) | undefined = undefined;
+  | ((event: TokenStorageInitializationEvent) => void)
+  | undefined = undefined;
 const telemetryBuffer: Array<() => void | Promise<void>> = [];
 let activeTelemetryEmail: string | undefined;
 

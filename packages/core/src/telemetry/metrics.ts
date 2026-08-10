@@ -329,7 +329,10 @@ const COUNTER_DEFINITIONS = {
       session_mode: 'persistent' | 'isolated' | 'existing';
       headless: boolean;
       error_type:
-        'profile_locked' | 'timeout' | 'connection_refused' | 'unknown';
+        | 'profile_locked'
+        | 'timeout'
+        | 'connection_refused'
+        | 'unknown';
     },
   },
   [BROWSER_AGENT_TOOLS_MISSING_SEMANTIC]: {
@@ -347,7 +350,9 @@ const COUNTER_DEFINITIONS = {
     attributes: {} as {
       enabled: boolean;
       disabled_reason?:
-        'no_visual_model' | 'missing_visual_tools' | 'blocked_auth_type';
+        | 'no_visual_model'
+        | 'missing_visual_tools'
+        | 'blocked_auth_type';
     },
   },
   [BROWSER_AGENT_TASK_OUTCOME]: {
@@ -1657,7 +1662,10 @@ export function recordBrowserAgentConnection(
     headless: boolean;
     success: boolean;
     error_type?:
-      'profile_locked' | 'timeout' | 'connection_refused' | 'unknown';
+      | 'profile_locked'
+      | 'timeout'
+      | 'connection_refused'
+      | 'unknown';
     tool_count?: number;
   },
 ): void {
@@ -1714,7 +1722,9 @@ export function recordBrowserAgentVisionStatus(
   attributes: {
     enabled: boolean;
     disabled_reason?:
-      'no_visual_model' | 'missing_visual_tools' | 'blocked_auth_type';
+      | 'no_visual_model'
+      | 'missing_visual_tools'
+      | 'blocked_auth_type';
   },
 ): void {
   if (!isMetricsInitialized || !browserAgentVisionStatusCounter) return;

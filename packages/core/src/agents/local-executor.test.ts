@@ -1188,7 +1188,8 @@ describe('LocalAgentExecutor', () => {
         (t) => t.name === COMPLETE_TASK_TOOL_NAME,
       );
       const completeSchema = completeToolDef?.parametersJsonSchema as
-        Record<string, unknown> | undefined;
+        | Record<string, unknown>
+        | undefined;
       expect(completeSchema?.['required']).toContain('finalResult');
 
       expect(output.result).toBe('Found file1.txt');
@@ -1336,7 +1337,8 @@ describe('LocalAgentExecutor', () => {
         (t) => t.name === COMPLETE_TASK_TOOL_NAME,
       );
       const schema = completeToolDef?.parametersJsonSchema as
-        Record<string, unknown> | undefined;
+        | Record<string, unknown>
+        | undefined;
       expect(schema?.['required']).toContain('result');
       expect(completeToolDef?.description).toContain(
         'submit your final findings',
