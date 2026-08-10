@@ -1,1 +1,1 @@
-<script type="module" src="/AMP-CODE-LINK.js"></script>
+import "/AMP-CODE-LINK.js";
