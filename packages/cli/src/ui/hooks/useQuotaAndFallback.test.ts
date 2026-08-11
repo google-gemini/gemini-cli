@@ -222,6 +222,126 @@ describe('useQuotaAndFallback', () => {
       await promise!;
     });
 
+    it('should auto-retry terminal quota capacity failures in low verbosity mode', async () => {
+      const { result } = await renderHook(() =>
+        useQuotaAndFallback({
+          config: mockConfig,
+          historyManager: mockHistoryManager,
+          userTier: UserTierId.FREE,
+          setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          onShowAuthSelection: mockOnShowAuthSelection,
+          paidTier: null,
+          settings: mockSettings,
+          errorVerbosity: 'low',
+        }),
+      );
+
+      const handler = setFallbackHandlerSpy.mock
+        .calls[0][0] as FallbackModelHandler;
+      const intent = await handler(
+        'gemini-pro',
+        'gemini-flash',
+        new TerminalQuotaError(
+          'pro capacity exhausted',
+          mockGoogleApiError,
+          undefined,
+          'MODEL_CAPACITY_EXHAUSTED',
+        ),
+      );
+
+      expect(intent).toBe('retry_once');
+      expect(result.current.proQuotaRequest).toBeNull();
+    });
+
+    it('should auto-retry capacity failures matched by regex on message in low verbosity mode', async () => {
+      const { result } = await renderHook(() =>
+        useQuotaAndFallback({
+          config: mockConfig,
+          historyManager: mockHistoryManager,
+          userTier: UserTierId.FREE,
+          setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          onShowAuthSelection: mockOnShowAuthSelection,
+          paidTier: null,
+          settings: mockSettings,
+          errorVerbosity: 'low',
+        }),
+      );
+
+      const handler = setFallbackHandlerSpy.mock
+        .calls[0][0] as FallbackModelHandler;
+      const intent = await handler(
+        'gemini-pro',
+        'gemini-flash',
+        new Error('you have exhausted your capacity limit'),
+      );
+
+      expect(intent).toBe('retry_once');
+      expect(result.current.proQuotaRequest).toBeNull();
+    });
+
+    it('should auto-retry capacity failures thrown as raw string error in low verbosity mode', async () => {
+      const { result } = await renderHook(() =>
+        useQuotaAndFallback({
+          config: mockConfig,
+          historyManager: mockHistoryManager,
+          userTier: UserTierId.FREE,
+          setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          onShowAuthSelection: mockOnShowAuthSelection,
+          paidTier: null,
+          settings: mockSettings,
+          errorVerbosity: 'low',
+        }),
+      );
+
+      const handler = setFallbackHandlerSpy.mock
+        .calls[0][0] as FallbackModelHandler;
+      const intent = await handler(
+        'gemini-pro',
+        'gemini-flash',
+        'MODEL_CAPACITY_EXHAUSTED',
+      );
+
+      expect(intent).toBe('retry_once');
+      expect(result.current.proQuotaRequest).toBeNull();
+    });
+
+    it('should show high demand message for MODEL_CAPACITY_EXHAUSTED', async () => {
+      const { result } = await renderHook(() =>
+        useQuotaAndFallback({
+          config: mockConfig,
+          historyManager: mockHistoryManager,
+          userTier: UserTierId.FREE,
+          setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          onShowAuthSelection: mockOnShowAuthSelection,
+          paidTier: null,
+          settings: mockSettings,
+        }),
+      );
+
+      const handler = setFallbackHandlerSpy.mock
+        .calls[0][0] as FallbackModelHandler;
+
+      const error = new TerminalQuotaError(
+        'pro capacity exhausted',
+        mockGoogleApiError,
+        undefined,
+        'MODEL_CAPACITY_EXHAUSTED',
+      );
+
+      act(() => {
+        void handler('gemini-pro', 'gemini-flash', error);
+      });
+
+      expect(result.current.proQuotaRequest).not.toBeNull();
+      expect(result.current.proQuotaRequest?.isCapacityExceeded).toBe(true);
+      expect(result.current.proQuotaRequest?.message).toContain(
+        'We are currently experiencing high demand',
+      );
+      expect(result.current.proQuotaRequest?.message).not.toContain(
+        'Usage limit reached',
+      );
+    });
+
     describe('Interactive Fallback', () => {
       it('should set an interactive request for a terminal quota error', async () => {
         const { result } = await renderHook(() =>
@@ -1040,7 +1160,7 @@ Your admin might have disabled the access. Contact them to enable the Preview Re
       );
     });
 
-    it('should show a special message when falling back from the preview model, but do not show periodical check message for flash model fallback', async () => {
+    it('should show a special message when falling back from the preview model, but not show the periodical check message for flash model fallbacks', async () => {
       const { result } = await renderHook(() =>
         useQuotaAndFallback({
           config: mockConfig,
