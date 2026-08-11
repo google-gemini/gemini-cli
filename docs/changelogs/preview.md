@@ -1,6 +1,6 @@
-# Preview release: v0.55.0-preview.1
+# Preview release: v0.56.0-preview.1
 
-Released: August 06, 2026
+Released: August 11, 2026
 
 Our preview release includes the latest, new, and experimental features. This
 release may not be as stable as our [latest weekly release](latest.md).
@@ -26,6 +26,45 @@ npm install -g @google/gemini-cli@preview
 
 ## What's Changed
 
+- Changelog for v0.55.0-preview.1 by @gemini-cli-robot in
+  [#28706](https://github.com/google-gemini/gemini-cli/pull/28706)
+- chore(release): bump version to 0.56.0-nightly.20260806.g761f604c1 by
+  @gemini-cli-robot in
+  [#28707](https://github.com/google-gemini/gemini-cli/pull/28707)
+- Changelog for v0.54.0 by @gemini-cli-robot in
+  [#28708](https://github.com/google-gemini/gemini-cli/pull/28708)
+- Reclassifying Capacity Exhaustion as Terminal Error by @luisfelipe-alt in
+  [#28716](https://github.com/google-gemini/gemini-cli/pull/28716)
+- feat(caretaker): update Firestore schema with error, and pr_number fields by
+  @chadd28 in [#28467](https://github.com/google-gemini/gemini-cli/pull/28467)
+- feat(caretaker-triage): prompt hill-climbing & orchestrator updates by
+  @chadd28 in [#28524](https://github.com/google-gemini/gemini-cli/pull/28524)
+- feat(caretaker): add triage Cloud Run job workflow by @chadd28 in
+  [#28468](https://github.com/google-gemini/gemini-cli/pull/28468)
+- feat(caretaker-evals): add triage evaluation framework and judge runner by
+  @chadd28 in [#28530](https://github.com/google-gemini/gemini-cli/pull/28530)
+- feat(caretaker-evals): add local golden issue collection and firestore sync
+  tools by @chadd28 in
+  [#28532](https://github.com/google-gemini/gemini-cli/pull/28532)
+- feat(caretaker): publish workable spec event to ready-for-code Pub/Sub topic
+  by @chadd28 in
+  [#28588](https://github.com/google-gemini/gemini-cli/pull/28588)
+- feat(caretaker): add GCP deployment script for caretaker agent services by
+  @chadd28 in [#28529](https://github.com/google-gemini/gemini-cli/pull/28529)
+- feat(caretaker-evals): add Cloud Run job entrypoint for eval runner by
+  @chadd28 in [#28727](https://github.com/google-gemini/gemini-cli/pull/28727)
+- fix(caretaker): clear lock on NEEDS_HUMAN transition by @chadd28 in
+  [#28601](https://github.com/google-gemini/gemini-cli/pull/28601)
+- feat(ingestion): add issue comment handling and re-triage workflow by @chadd28
+  in [#28690](https://github.com/google-gemini/gemini-cli/pull/28690)
+- fix(core): refresh MCP OAuth tokens with the stored client ID by
+  @ParthivNaresh in
+  [#28481](https://github.com/google-gemini/gemini-cli/pull/28481)
+- fix(core,cli): resolve false model capacity exhaustion and fix core quota
+  lookup model mapping by @DavidAPierce in
+  [#28730](https://github.com/google-gemini/gemini-cli/pull/28730)
+- feat(evals): add local report command and developer documentation by @ved015
+  in [#28369](https://github.com/google-gemini/gemini-cli/pull/28369)
 - chore(release): bump version to 0.55.0-nightly.20260728.gd29268d36 by
   @gemini-cli-robot in
   [#28569](https://github.com/google-gemini/gemini-cli/pull/28569)
@@ -110,4 +149,4 @@ npm install -g @google/gemini-cli@preview
   [#28565](https://github.com/google-gemini/gemini-cli/pull/28565)
 
 **Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.53.0-preview.0...v0.55.0-preview.1
+https://github.com/google-gemini/gemini-cli/compare/v0.53.0-preview.0...v0.56.0-preview.1
