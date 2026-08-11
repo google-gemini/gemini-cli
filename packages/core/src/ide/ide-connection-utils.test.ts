@@ -505,32 +505,35 @@ describe('ide-connection-utils', () => {
       expect(result).toEqual(invalidConfig2);
     });
 
-    it('should reject and ignore config files owned by a different user UID to prevent hijacking/information disclosure', async () => {
-      const config1 = {
-        port: '1111',
-        workspacePath: '/test/workspace',
-      };
-      vi.mocked(fs.promises.readFile).mockRejectedValueOnce(
-        new Error('not found'),
-      );
-      (
-        vi.mocked(fs.promises.readdir) as Mock<
-          (path: fs.PathLike) => Promise<string[]>
-        >
-      ).mockResolvedValue(['gemini-ide-server-12345-111.json']);
-      vi.mocked(fs.promises.readFile).mockResolvedValueOnce(
-        JSON.stringify(config1),
-      );
+    it.runIf(process.getuid !== undefined)(
+      'should reject and ignore config files owned by a different user UID to prevent hijacking/information disclosure',
+      async () => {
+        const config1 = {
+          port: '1111',
+          workspacePath: '/test/workspace',
+        };
+        vi.mocked(fs.promises.readFile).mockRejectedValueOnce(
+          new Error('not found'),
+        );
+        (
+          vi.mocked(fs.promises.readdir) as Mock<
+            (path: fs.PathLike) => Promise<string[]>
+          >
+        ).mockResolvedValue(['gemini-ide-server-12345-111.json']);
+        vi.mocked(fs.promises.readFile).mockResolvedValueOnce(
+          JSON.stringify(config1),
+        );
 
-      const otherUid = (process.getuid ? process.getuid() : 1000) + 1;
-      vi.mocked(fs.promises.stat).mockResolvedValueOnce({
-        uid: otherUid,
-      } as unknown as fs.Stats);
+        const otherUid = (process.getuid ? process.getuid() : 1000) + 1;
+        vi.mocked(fs.promises.stat).mockResolvedValueOnce({
+          uid: otherUid,
+        } as unknown as fs.Stats);
 
-      const result = await getConnectionConfigFromFile(12345);
+        const result = await getConnectionConfigFromFile(12345);
 
-      expect(result).toBeUndefined();
-    });
+        expect(result).toBeUndefined();
+      },
+    );
 
     it('should accept and parse config files owned by the current user UID', async () => {
       const config1 = {
