@@ -78,6 +78,7 @@ import {
 import { coreEvents, CoreEvent } from '../utils/events.js';
 import { tokenLimit } from '../core/tokenLimits.js';
 import {
+  CLAUDE_OPUS_5_MODEL,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
@@ -1124,9 +1125,9 @@ export class Config implements McpContext, AgentLoopContext {
     this.env = params.env;
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
     this.bugCommand = params.bugCommand;
-    this.model = params.model;
+    this.model = params.model ?? CLAUDE_OPUS_5_MODEL;
     this.disableLoopDetection = params.disableLoopDetection ?? false;
-    this._activeModel = params.model;
+    this._activeModel = this.model;
     this.enableAgents = params.enableAgents ?? true;
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
