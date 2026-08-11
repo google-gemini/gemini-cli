@@ -161,6 +161,8 @@ describe('activate', () => {
     expect(names).toContain('onDidGrantWorkspaceTrust');
     expect(names).toContain('onDidCloseTextDocument');
     expect(names).toContain('contentProvider');
+    expect(names).toContain('command:gemini-cli.runGeminiCLI');
+    expect(names).toContain('command:gemini-cli.showNotices');
   });
 
   it('should launch the Gemini CLI when the user clicks the button', async () => {
