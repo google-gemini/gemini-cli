@@ -438,8 +438,7 @@ export async function createContentGenerator(
         vertexai: useVertex,
         ...(!finalApiKey &&
           useVertex && { project: gcpProject || '229742587539' }),
-        ...(!finalApiKey &&
-          useVertex && { location: gcpLocation || 'us-central1' }),
+        ...(!finalApiKey && useVertex && { location: gcpLocation || 'global' }),
         httpOptions,
         ...(apiVersionEnv && { apiVersion: apiVersionEnv }),
         // Merge proxy and GDCH endpoint into googleAuthOptions if either exists
