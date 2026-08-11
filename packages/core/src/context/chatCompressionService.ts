@@ -100,6 +100,9 @@ export function findCompressSplitPoint(
 }
 
 export function modelStringToModelConfigAlias(model: string): string {
+  if (model.includes('claude')) {
+    return model;
+  }
   switch (model) {
     case PREVIEW_GEMINI_MODEL:
     case PREVIEW_GEMINI_3_1_MODEL:
