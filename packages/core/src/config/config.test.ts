@@ -427,6 +427,26 @@ describe('Server Config (config.ts)', () => {
       await expect(config.initialize()).resolves.toBeUndefined();
     });
 
+    it('should hand resumed session data to the Gemini client', async () => {
+      const config = new Config({
+        ...baseParams,
+        checkpointing: false,
+      });
+      const resumedSessionData = {
+        conversation: { sessionId: 'resumed-session-id' },
+        filePath: '/tmp/chats/session-2024-01-01T10-00-resumed-.jsonl',
+      } as unknown as Parameters<typeof config.initialize>[0];
+
+      await config.initialize(resumedSessionData);
+
+      // The client has to know a resume is in flight before it starts a chat.
+      // Otherwise chat recording opens a second file for a session that already
+      // has one, under the same eight-character id suffix.
+      expect(config.getGeminiClient().initialize).toHaveBeenCalledWith(
+        resumedSessionData,
+      );
+    });
+
     it('should deduplicate multiple calls to initialize', async () => {
       const config = new Config({
         ...baseParams,

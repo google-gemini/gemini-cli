@@ -805,7 +805,7 @@ export async function main() {
       return;
     }
 
-    await config.initialize();
+    await config.initialize(resumedSessionData);
     startupProfiler.flush(config);
 
     // If not a TTY, read from stdin

@@ -480,7 +480,7 @@ export const AppContainer = (props: AppContainerProps) => {
       // Note: the program will not work if this fails so let errors be
       // handled by the global catch.
       if (!config.isInitialized()) {
-        await config.initialize();
+        await config.initialize(resumedSessionData);
       }
       setConfigInitialized(true);
       startupProfiler.flush(config);

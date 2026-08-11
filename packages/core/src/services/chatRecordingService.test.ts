@@ -309,6 +309,40 @@ describe('ChatRecordingService', () => {
       expect(conversation.sessionId).toBe('old-session-id');
     });
 
+    it('should not open a second file for a session that is being resumed', async () => {
+      const chatsDir = path.join(testTempDir, 'chats');
+      fs.mkdirSync(chatsDir, { recursive: true });
+      // Stored under the real naming scheme: prefix, UTC minute, and the first
+      // eight characters of the session id.
+      const sessionFile = path.join(
+        chatsDir,
+        'session-2024-01-01T10-00-test-ses.jsonl',
+      );
+      const initialData = {
+        sessionId: 'test-session-id',
+        projectHash: 'test-project-hash',
+      };
+      fs.writeFileSync(sessionFile, JSON.stringify(initialData) + '\n');
+
+      await chatRecordingService.initialize({
+        filePath: sessionFile,
+        conversation: initialData as ConversationRecord,
+      });
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'ping',
+        model: 'm',
+      });
+
+      // A second file here would share the `-test-ses` suffix with the real
+      // conversation, and startup retention cleanup expands that suffix to
+      // every matching file when it removes one of them.
+      expect(fs.readdirSync(chatsDir)).toEqual([
+        'session-2024-01-01T10-00-test-ses.jsonl',
+      ]);
+      expect(chatRecordingService.getConversationFilePath()).toBe(sessionFile);
+    });
+
     it('should fall back to the in-memory conversation when the file cannot be reloaded', async () => {
       // Regression test for the `/compress` "Failed to load resumed session
       // data from file" bug: when resuming with a filePath that cannot be

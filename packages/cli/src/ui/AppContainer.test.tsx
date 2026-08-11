@@ -1299,6 +1299,31 @@ describe('AppContainer State Management', () => {
       expect(mockResumeChat).not.toHaveBeenCalled();
       unmount();
     });
+
+    it('tells config a resume is in flight before it initializes', async () => {
+      const resumedData = {
+        conversation: {
+          sessionId: 'test-session',
+          projectHash: 'project-hash',
+          startTime: '2024-01-01T00:00:00Z',
+          lastUpdated: '2024-01-01T00:01:00Z',
+          messages: [],
+        },
+        filePath: '/tmp/chats/session-2024-01-01T00-00-test-ses.jsonl',
+      };
+
+      const { unmount } = await act(async () =>
+        renderAppContainer({
+          resumedSessionData: resumedData,
+        }),
+      );
+
+      // config.initialize() starts a chat. If it does not know a resume is
+      // coming, chat recording opens a second file for a session that already
+      // has one, under the same eight-character id suffix.
+      expect(mockConfig.initialize).toHaveBeenCalledWith(resumedData);
+      unmount();
+    });
   });
 
   describe('SessionStart Hook Rendering', () => {
