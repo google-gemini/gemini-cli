@@ -203,6 +203,7 @@ describe('MCPOAuthProvider', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   describe('authenticate', () => {
@@ -436,6 +437,100 @@ describe('MCPOAuthProvider', () => {
         expect.objectContaining({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+    });
+
+    it('should perform dynamic client registration with Cloud Workstations proxy redirect URI when running in Google Cloud Workstations', async () => {
+      vi.stubEnv('GOOGLE_CLOUD_WORKSTATIONS', 'true');
+      vi.stubEnv(
+        'WEB_HOST',
+        'my-workstation.cluster.workstations.cloud.google.com',
+      );
+
+      const configWithoutClient: MCPOAuthConfig = {
+        ...mockConfig,
+        registrationUrl: 'https://auth.example.com/register',
+      };
+      delete configWithoutClient.clientId;
+      delete configWithoutClient.redirectUri;
+
+      const mockRegistrationResponse: OAuthClientRegistrationResponse = {
+        client_id: 'dynamic_client_id',
+        client_secret: 'dynamic_client_secret',
+        redirect_uris: [
+          'https://7777-my-workstation.cluster.workstations.cloud.google.com/oauth/callback',
+        ],
+        grant_types: ['authorization_code', 'refresh_token'],
+        response_types: ['code'],
+        token_endpoint_auth_method: 'none',
+      };
+
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockRegistrationResponse),
+          json: mockRegistrationResponse,
+        }),
+      );
+
+      // Setup callback handler
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+          };
+          const mockRes = {
+            writeHead: vi.fn(),
+            end: vi.fn(),
+          };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+
+      // Mock token exchange
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockTokenResponse),
+          json: mockTokenResponse,
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      const result = await authProvider.authenticate(
+        'test-server',
+        configWithoutClient,
+      );
+
+      expect(result).toBeDefined();
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://auth.example.com/register',
+        expect.objectContaining({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            client_name: 'Gemini CLI MCP Client',
+            redirect_uris: [
+              'https://7777-my-workstation.cluster.workstations.cloud.google.com/oauth/callback',
+            ],
+            grant_types: ['authorization_code', 'refresh_token'],
+            response_types: ['code'],
+            token_endpoint_auth_method: 'none',
+            scope: 'read write',
+          }),
         }),
       );
     });
