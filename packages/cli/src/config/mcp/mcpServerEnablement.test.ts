@@ -191,14 +191,15 @@ describe('McpServerEnablementManager', () => {
     expect(allStates['server2']?.isPersistentDisabled).toBe(true);
   });
 
-  it('emits coreEvents error feedback when corruption is detected', async () => {
+  it('emits coreEvents error feedback exactly once on getAllDisplayStates with corrupt config', async () => {
     const feedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
     const configPath = path.normalize(
       '/virtual-home/.gemini/mcp-server-enablement.json',
     );
     inMemoryFs[configPath] = '{ corrupt json';
 
-    await manager.isFileEnabled('some-server');
+    await manager.getAllDisplayStates(['server1', 'server2', 'server3']);
+    expect(feedbackSpy).toHaveBeenCalledTimes(1);
     expect(feedbackSpy).toHaveBeenCalledWith(
       'error',
       'Failed to read MCP server enablement config.',

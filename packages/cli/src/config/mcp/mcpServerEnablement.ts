@@ -299,11 +299,16 @@ export class McpServerEnablementManager {
   }
 
   /**
-   * Get display state for a specific server (for UI).
+   * Helper to compute display state for a server given a loaded config.
    */
-  async getDisplayState(serverName: string): Promise<McpServerDisplayState> {
-    const isSessionDisabled = this.isSessionDisabled(serverName);
-    const isPersistentDisabled = !(await this.isFileEnabled(serverName));
+  private computeDisplayState(
+    serverId: string,
+    config: McpServerEnablementConfig | null,
+  ): McpServerDisplayState {
+    const normalizedId = normalizeServerId(serverId);
+    const isSessionDisabled = this.isSessionDisabled(normalizedId);
+    const isPersistentDisabled =
+      config === null ? true : !(config[normalizedId]?.enabled ?? true);
 
     return {
       enabled: !isSessionDisabled && !isPersistentDisabled,
@@ -313,15 +318,26 @@ export class McpServerEnablementManager {
   }
 
   /**
+   * Get display state for a specific server (for UI).
+   */
+  async getDisplayState(serverName: string): Promise<McpServerDisplayState> {
+    const config = await this.readConfig();
+    return this.computeDisplayState(serverName, config);
+  }
+
+  /**
    * Get all display states (for UI listing).
    */
   async getAllDisplayStates(
     serverIds: string[],
   ): Promise<Record<string, McpServerDisplayState>> {
+    const config = await this.readConfig();
     const result: Record<string, McpServerDisplayState> = {};
     for (const serverId of serverIds) {
-      result[normalizeServerId(serverId)] =
-        await this.getDisplayState(serverId);
+      result[normalizeServerId(serverId)] = this.computeDisplayState(
+        serverId,
+        config,
+      );
     }
     return result;
   }
@@ -358,8 +374,12 @@ export class McpServerEnablementManager {
         try {
           await this.enable(normalizedName);
           wasDisabled = true;
-        } catch {
-          // If enabling fails, do not report as enabled
+        } catch (error) {
+          coreEvents.emitFeedback(
+            'error',
+            `Failed to auto-enable server '${serverName}'.`,
+            error,
+          );
         }
       }
       if (isSessionDisabled) {
