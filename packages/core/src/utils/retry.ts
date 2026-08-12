@@ -390,6 +390,7 @@ export async function retryWithBackoff<T>(
           );
           if (silentDelayMs !== undefined) {
             retryable.retryDelayMs = silentDelayMs;
+            currentDelay = silentDelayMs;
           }
           classifiedError = retryable;
         } else {
