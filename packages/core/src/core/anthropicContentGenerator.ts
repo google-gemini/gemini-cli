@@ -285,6 +285,9 @@ export class AnthropicContentGenerator implements ContentGenerator {
         ? [request.contents]
         : [];
 
+    const seenToolUseIds = new Set<string>();
+    const toolIdMap = new Map<string, string[]>();
+
     for (const content of rawContents) {
       if (typeof content === 'string') {
         messages.push({
@@ -296,8 +299,6 @@ export class AnthropicContentGenerator implements ContentGenerator {
 
       const role = content.role === 'model' ? 'assistant' : 'user';
       const anthropicContent: Anthropic.ContentBlockParam[] = [];
-
-      const seenToolUseIds = new Set<string>();
 
       for (const part of content.parts || []) {
         if (typeof part === 'string') {
@@ -320,15 +321,20 @@ export class AnthropicContentGenerator implements ContentGenerator {
             },
           });
         } else if (part.functionCall) {
-          let toolId =
+          const origId =
             part.functionCall.id ||
             `call_${Date.now()}_${anthropicContent.length}`;
+          let toolId = origId;
           let suffixCounter = 1;
-          const baseId = toolId;
           while (seenToolUseIds.has(toolId)) {
-            toolId = `${baseId}_${suffixCounter++}`;
+            toolId = `${origId}_${suffixCounter++}`;
           }
           seenToolUseIds.add(toolId);
+          if (origId) {
+            const list = toolIdMap.get(origId) || [];
+            list.push(toolId);
+            toolIdMap.set(origId, list);
+          }
 
           anthropicContent.push({
             type: 'tool_use',
@@ -337,8 +343,10 @@ export class AnthropicContentGenerator implements ContentGenerator {
             input: (part.functionCall.args as Record<string, unknown>) || {},
           });
         } else if (part.functionResponse) {
-          const toolUseId =
+          const rawId =
             part.functionResponse.id || part.functionResponse.name || '';
+          const list = toolIdMap.get(rawId);
+          const toolUseId = list && list.length > 0 ? list.shift()! : rawId;
           const responseContent = JSON.stringify(
             part.functionResponse.response || {},
           );

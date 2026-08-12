@@ -156,6 +156,40 @@ describe('AnthropicContentGenerator verification', () => {
     expect(ids).toEqual(['dup_id', 'dup_id_1', 'dup_id_2']);
   });
 
+  it('correctly maps deduplicated tool_use IDs to matching functionResponse tool_result blocks', () => {
+    const config: ContentGeneratorConfig = { apiKey: 'fake-key' };
+    const generator = new AnthropicContentGenerator(config, 'claude-sonnet-5');
+
+    const mapped = (generator as any).mapRequestToAnthropic({
+      contents: [
+        {
+          role: 'model',
+          parts: [
+            { functionCall: { id: 'dup_id', name: 'read_file', args: {} } },
+            { functionCall: { id: 'dup_id', name: 'write_file', args: {} } },
+          ],
+        },
+        {
+          role: 'user',
+          parts: [
+            { functionResponse: { id: 'dup_id', name: 'read_file', response: { output: 'res1' } } },
+            { functionResponse: { id: 'dup_id', name: 'write_file', response: { output: 'res2' } } },
+          ],
+        },
+      ],
+    });
+
+    expect(mapped.messages).toHaveLength(2);
+    const modelBlocks = mapped.messages[0].content as any[];
+    const userBlocks = mapped.messages[1].content as any[];
+
+    expect(modelBlocks[0].id).toBe('dup_id');
+    expect(modelBlocks[1].id).toBe('dup_id_1');
+
+    expect(userBlocks[0].tool_use_id).toBe('dup_id');
+    expect(userBlocks[1].tool_use_id).toBe('dup_id_1');
+  });
+
   it('attaches remoteModelId as modelVersion to streamed chunks', async () => {
     const config: ContentGeneratorConfig = { apiKey: 'fake-key' };
     const generator = new AnthropicContentGenerator(config, 'claude-sonnet-5');

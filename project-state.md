@@ -2,9 +2,9 @@
 
 ## Status
 
-- **Last Session:** 2026-08-12 14:35
+- **Last Session:** 2026-08-12 16:37
 - **Branch:** main
-- **Last Commit:** fee21ee79 "refactor(core): implement canonical model
+- **Last Commit:** 969f59589 "fix(anthropic): deduplicate tool_use IDs and improve PTY teardown reliability"
   resolution and switch tests to Bun" quota-fallback tool response loss
   (#28672)"
 - **Deploy State:** unknown
