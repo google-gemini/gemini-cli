@@ -583,6 +583,16 @@ export function isActiveModel(
   }
 }
 
+export function isClaudeModel(modelName?: string): boolean {
+  if (!modelName) return false;
+  return (
+    modelName === CLAUDE_OPUS_5_MODEL ||
+    modelName === CLAUDE_SONNET_5_MODEL ||
+    modelName.startsWith('claude-') ||
+    modelName.includes('claude')
+  );
+}
+
 export const CCPA_AI_MODEL_MAPPINGS: Record<string, string> = {
   [DEFAULT_GEMINI_3_5_FLASH_MODEL]: SECONDARY_GEMINI_3_5_FLASH_MODEL,
   [CLAUDE_OPUS_5_MODEL]: CLAUDE_OPUS_5_MODEL,

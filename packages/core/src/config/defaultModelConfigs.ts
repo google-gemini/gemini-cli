@@ -62,7 +62,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     'gemini-3-pro-preview': {
       extends: 'chat-base-3',
       modelConfig: {
-        model: 'gemini-3-pro-preview',
+        model: 'gemini-3.1-pro',
       },
     },
     'gemini-3-flash-preview': {
@@ -246,7 +246,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     'loop-detection-double-check': {
       extends: 'base',
       modelConfig: {
-        model: 'gemini-3-pro-preview',
+        model: 'gemini-3.1-pro',
       },
     },
     'llm-edit-fixer': {
@@ -272,7 +272,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     },
     'chat-compression-3-pro': {
       modelConfig: {
-        model: 'gemini-3-pro-preview',
+        model: 'gemini-3.1-pro',
       },
     },
     'chat-compression-3-flash': {
@@ -302,7 +302,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     },
     'chat-compression-default': {
       modelConfig: {
-        model: 'gemini-3-pro-preview',
+        model: 'gemini-3.1-pro',
       },
     },
     'agent-history-provider-summarizer': {
@@ -523,7 +523,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       ],
     },
     'gemini-3-pro-preview': {
-      default: 'gemini-3-pro-preview',
+      default: 'gemini-3.1-pro',
       contexts: [
         { condition: { hasAccessToPreview: false }, target: 'gemini-2.5-pro' },
         {
@@ -537,7 +537,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       ],
     },
     auto: {
-      default: 'gemini-3-pro-preview',
+      default: 'gemini-3.1-pro',
       contexts: [
         { condition: { hasAccessToPreview: false }, target: 'gemini-2.5-pro' },
         {
@@ -551,7 +551,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       ],
     },
     pro: {
-      default: 'gemini-3-pro-preview',
+      default: 'gemini-3.1-pro',
       contexts: [
         { condition: { hasAccessToPreview: false }, target: 'gemini-2.5-pro' },
         {

@@ -213,14 +213,12 @@ export async function createContentGeneratorConfig(
 
   if (
     authType === AuthType.USE_VERTEX_AI &&
-    (googleApiKey || (googleCloudProject && googleCloudLocation))
+    (googleApiKey || googleCloudProject || googleCloudLocation)
   ) {
     const isGeminiDeveloperApiKey =
       googleApiKey && googleApiKey.startsWith('AIzaSy');
     contentGeneratorConfig.apiKey =
-      isGeminiDeveloperApiKey || (googleCloudProject && googleCloudLocation)
-        ? undefined
-        : googleApiKey;
+      isGeminiDeveloperApiKey || googleCloudProject ? undefined : googleApiKey;
     contentGeneratorConfig.vertexai = true;
 
     return contentGeneratorConfig;
@@ -429,6 +427,7 @@ export async function createContentGenerator(
         process.env['GOOGLE_CLOUD_PROJECT'] ||
         process.env['GOOGLE_CLOUD_PROJECT_ID'];
       const gcpLocation = process.env['GOOGLE_CLOUD_LOCATION'];
+      const effectiveLocation = gcpLocation || 'global';
 
       const finalApiKey =
         config.authType === AuthType.GATEWAY ? config.apiKey : effectiveApiKey;
@@ -438,7 +437,7 @@ export async function createContentGenerator(
         vertexai: useVertex,
         ...(!finalApiKey &&
           useVertex && { project: gcpProject || '229742587539' }),
-        ...(!finalApiKey && useVertex && { location: gcpLocation || 'global' }),
+        ...(!finalApiKey && useVertex && { location: effectiveLocation }),
         httpOptions,
         ...(apiVersionEnv && { apiVersion: apiVersionEnv }),
         // Merge proxy and GDCH endpoint into googleAuthOptions if either exists

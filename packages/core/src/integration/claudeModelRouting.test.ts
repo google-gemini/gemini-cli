@@ -10,10 +10,19 @@ import {
   CLAUDE_SONNET_5_MODEL,
   VERTEX_AI_MODEL_MAPPINGS,
   CCPA_AI_MODEL_MAPPINGS,
+  isClaudeModel,
 } from '../config/models.js';
 import { getAuthTypeFromEnv, AuthType } from '../core/contentGenerator.js';
 
 describe('Claude Model Routing & Fidelity Integration Test', () => {
+  it('should identify Claude models via isClaudeModel', () => {
+    expect(isClaudeModel(CLAUDE_OPUS_5_MODEL)).toBe(true);
+    expect(isClaudeModel(CLAUDE_SONNET_5_MODEL)).toBe(true);
+    expect(isClaudeModel('claude-3-5-sonnet')).toBe(true);
+    expect(isClaudeModel('gemini-2.5-pro')).toBe(false);
+    expect(isClaudeModel(undefined)).toBe(false);
+  });
+
   it('should register Vertex AI targets for Opus 5 and Sonnet 5', () => {
     expect(VERTEX_AI_MODEL_MAPPINGS[CLAUDE_OPUS_5_MODEL]).toBe(
       CLAUDE_OPUS_5_MODEL,
