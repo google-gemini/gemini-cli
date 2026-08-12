@@ -68,9 +68,9 @@ describe('getAuthTypeFromEnv', () => {
     expect(getAuthTypeFromEnv()).toBe(AuthType.USE_VERTEX_AI);
   });
 
-  it('should detect GATEWAY when GOOGLE_GEMINI_BASE_URL is present', () => {
+  it('should detect USE_GEMINI when GOOGLE_GEMINI_BASE_URL is present', () => {
     vi.stubEnv('GOOGLE_GEMINI_BASE_URL', 'https://gateway.example.com');
-    expect(getAuthTypeFromEnv()).toBe(AuthType.GATEWAY);
+    expect(getAuthTypeFromEnv()).toBe(AuthType.USE_GEMINI);
   });
 
   it('should detect USE_GEMINI when GEMINI_API_KEY is present', () => {

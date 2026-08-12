@@ -621,6 +621,55 @@ Your admin might have disabled the access. Contact them to enable the Preview Re
         expect(intent).toBe('retry_always');
       });
 
+      it('should handle ModelNotFoundError with VERTEX_CLAUDE and claude-sonnet-5 in global region', async () => {
+        vi.spyOn(mockConfig, 'getContentGeneratorConfig').mockReturnValue({
+          authType: AuthType.VERTEX_CLAUDE,
+        });
+        vi.stubEnv('GOOGLE_CLOUD_LOCATION', 'global');
+
+        const { result } = await renderHook(() =>
+          useQuotaAndFallback({
+            config: mockConfig,
+            historyManager: mockHistoryManager,
+            userTier: UserTierId.FREE,
+            setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+            onShowAuthSelection: mockOnShowAuthSelection,
+            paidTier: null,
+            settings: mockSettings,
+          }),
+        );
+
+        const handler = setFallbackHandlerSpy.mock
+          .calls[0][0] as FallbackModelHandler;
+
+        let promise: Promise<FallbackIntent | null>;
+        const error = new ModelNotFoundError('model not found', 404);
+
+        act(() => {
+          promise = handler('claude-sonnet-5', 'claude-opus-5', error);
+        });
+
+        const request = result.current.proQuotaRequest;
+        expect(request).not.toBeNull();
+        expect(request?.failedModel).toBe('claude-sonnet-5');
+        expect(request?.isModelNotFoundError).toBe(true);
+
+        const message = request!.message;
+        expect(message).toBe(
+          `Model "claude-sonnet-5" is not available in region "global".\n` +
+            `To see which models are available in this region, please visit:\n` +
+            `https://cloud.google.com/vertex-ai/generative-ai/docs/learn/locations\n` +
+            `/model to switch models.`,
+        );
+
+        act(() => {
+          result.current.handleProQuotaChoice('retry_always');
+        });
+
+        const intent = await promise!;
+        expect(intent).toBe('retry_always');
+      });
+
       it('should handle ModelNotFoundError with invalid model correctly', async () => {
         const { result } = await renderHook(() =>
           useQuotaAndFallback({

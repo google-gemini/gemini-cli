@@ -46,6 +46,8 @@
     "test": "npm run test --workspaces --if-present && npm run test:sea-launch",
     "test:ci": "npm run test:ci --workspaces --if-present && npm run test:scripts && npm run test:sea-launch",
     "test:scripts": "vitest run --config ./scripts/tests/vitest.config.ts",
+    "test:claude": "npm test -w @google/gemini-cli-core -- src/core/anthropicContentGenerator.test.ts src/utils/sessionUtils.test.ts",
+    "test:claude:pty": "python3 ./scripts/test_pty_claude.py",
     "test:sea-launch": "vitest run sea/sea-launch.test.js",
     "posttest": "npm run build",
     "postinstall": "npm run build",

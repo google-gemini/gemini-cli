@@ -2,9 +2,9 @@
 
 ## Status
 
-- **Last Session:** 2026-08-05 22:55
+- **Last Session:** 2026-08-12 13:03
 - **Branch:** main
-- **Last Commit:** 348fc35f1 "fix(core,cli): repair /compress session reload and
+- **Last Commit:** 2f9b83714 "feat(claude): standardize on gemini-claude repo name and Anthropic direct base URL routing"
   quota-fallback tool response loss (#28672)"
 - **Deploy State:** unknown
 

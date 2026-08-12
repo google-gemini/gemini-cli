@@ -14,6 +14,7 @@ import {
 } from '@google/genai';
 import type { ContentGenerator, ContentGeneratorConfig } from './contentGenerator.js';
 import type { UserTierId, GeminiUserTier } from '../code_assist/types.js';
+import { resolveVertexClaudeModel, getLatestModelId } from '../config/models.js';
 
 export class AnthropicContentGenerator implements ContentGenerator {
   private client: Anthropic | AnthropicVertex;
@@ -35,7 +36,7 @@ export class AnthropicContentGenerator implements ContentGenerator {
     const location = process.env['GOOGLE_CLOUD_LOCATION'] || 'global';
 
     if (apiKey) {
-      const baseURL = process.env['ANTHROPIC_BASE_URL'];
+      const baseURL = contentConfig.baseUrl || process.env['ANTHROPIC_BASE_URL'];
       this.client = new Anthropic({
         apiKey,
         ...(baseURL && { baseURL }),
@@ -117,7 +118,9 @@ export class AnthropicContentGenerator implements ContentGenerator {
     _userPrompt?: string,
   ): Promise<AsyncGenerator<GenerateContentResponse, void, unknown>> {
     const anthropicParams = this.mapRequestToAnthropic(request);
-    const model = this.modelName;
+    const model = this.client instanceof AnthropicVertex
+      ? resolveVertexClaudeModel(this.modelName)
+      : getLatestModelId(this.modelName);
 
     console.error(`[ANTHROPIC_DIRECT] Routing request to model: ${model} via ${this.client instanceof AnthropicVertex ? 'Vertex AI' : 'Anthropic Direct API'}`);
 
@@ -317,11 +320,41 @@ export class AnthropicContentGenerator implements ContentGenerator {
             input: (part.functionCall.args as Record<string, unknown>) || {},
           });
         } else if (part.functionResponse) {
-          anthropicContent.push({
-            type: 'tool_result',
-            tool_use_id: part.functionResponse.id || part.functionResponse.name || '',
-            content: JSON.stringify(part.functionResponse.response || {}),
-          });
+          const toolUseId =
+            part.functionResponse.id || part.functionResponse.name || '';
+          const responseContent = JSON.stringify(
+            part.functionResponse.response || {},
+          );
+
+          const existingBlock = anthropicContent.find(
+            (b): b is Anthropic.ToolResultBlockParam =>
+              b.type === 'tool_result' && b.tool_use_id === toolUseId,
+          );
+
+          if (existingBlock) {
+            try {
+              const currentData = JSON.parse(
+                typeof existingBlock.content === 'string'
+                  ? existingBlock.content
+                  : '{}',
+              );
+              const newData = part.functionResponse.response || {};
+              const merged = Array.isArray(currentData)
+                ? [...currentData, newData]
+                : [currentData, newData];
+              existingBlock.content = JSON.stringify(merged);
+            } catch {
+              if (typeof existingBlock.content === 'string') {
+                existingBlock.content = `${existingBlock.content}\n${responseContent}`;
+              }
+            }
+          } else {
+            anthropicContent.push({
+              type: 'tool_result',
+              tool_use_id: toolUseId,
+              content: responseContent,
+            });
+          }
         }
       }
 
@@ -356,7 +389,7 @@ export class AnthropicContentGenerator implements ContentGenerator {
       messages,
       system: systemInstruction || undefined,
       tools: tools.length > 0 ? tools : undefined,
-      max_tokens: request.config?.maxOutputTokens || 4096,
+      max_tokens: request.config?.maxOutputTokens || 8192,
     };
   }
 

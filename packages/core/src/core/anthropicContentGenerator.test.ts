@@ -53,4 +53,45 @@ describe('AnthropicContentGenerator verification', () => {
     expect(VALID_GEMINI_MODELS.has('claude-3-5-sonnet-v2@20241022')).toBe(true);
     expect(VALID_GEMINI_MODELS.has('claude-3-opus-20240229')).toBe(true);
   });
+
+  it('deduplicates and merges tool_result blocks with identical tool_use_id in mapRequestToAnthropic', () => {
+    const config: ContentGeneratorConfig = {
+      apiKey: undefined,
+      authType: undefined,
+    };
+    const generator = new AnthropicContentGenerator(config, 'claude-sonnet-5');
+
+    const mapped = (generator as any).mapRequestToAnthropic({
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                id: 'synth_test_123',
+                name: 'read_file',
+                response: { output: 'Part 1' },
+              },
+            },
+            {
+              functionResponse: {
+                id: 'synth_test_123',
+                name: 'read_file',
+                response: { output: 'Part 2' },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(mapped.max_tokens).toBe(8192);
+    expect(mapped.messages).toHaveLength(1);
+    const content = mapped.messages[0].content as any[];
+    expect(content).toHaveLength(1);
+    expect(content[0].type).toBe('tool_result');
+    expect(content[0].tool_use_id).toBe('synth_test_123');
+    expect(content[0].content).toContain('Part 1');
+    expect(content[0].content).toContain('Part 2');
+  });
 });

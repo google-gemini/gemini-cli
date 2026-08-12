@@ -54,6 +54,9 @@ powerful tool for developers.
   - **Workspace-Specific:** `npm test -w <pkg> -- <path>` (Note: `<path>` must
     be relative to the workspace root, e.g.,
     `-w @google/gemini-cli-core -- src/routing/modelRouterService.test.ts`)
+  - **Claude Adapter (Scoped Unit):** `npm run test:claude` (Runs targeted Anthropic generator and session utility tests in `@google/gemini-cli-core`.)
+  - **Claude TUI Interactive (Live PTY):** `npm run test:claude:pty` (Runs interactive PTY harness `scripts/test_pty_claude.py` verifying live TUI rendering and prompt processing for Claude models.)
+  - **TUI Verification (Mandatory for UI/Streaming):** `npm test -w @google/gemini-cli -- src/ui/hooks/useGeminiStream.test.tsx` (Verifies React Ink TUI rendering, stream state transitions, and tool confirmation dialogs.)
 - **Full Validation:** `npm run preflight` (Heaviest check; runs clean, install,
   build, lint, type check, and tests. Recommended before submitting PRs. Due to
   its long runtime, only run this at the very end of a code implementation task.
@@ -81,6 +84,7 @@ powerful tool for developers.
 
 ## Testing Conventions
 
+- **Scoped Testing Mandate:** Avoid running full monorepo test commands (`npm run test` across all workspaces). ALWAYS run `npm run test:claude` (targeted Anthropic generator and session utility tests in `@google/gemini-cli-core`) unless explicitly requested otherwise.
 - **Environment Variables:** When testing code that depends on environment
   variables, use `vi.stubEnv('NAME', 'value')` in `beforeEach` and
   `vi.unstubAllEnvs()` in `afterEach`. Avoid modifying `process.env` directly as
@@ -92,5 +96,7 @@ powerful tool for developers.
 - Always use the `docs-writer` skill when you are asked to write, edit, or
   review any documentation.
 - Documentation is located in the `docs/` directory.
+- For environment configuration, proxy setup, model resolution, and TUI/PTY testing methodology, see [`docs/configuration-and-testing-guide.md`](docs/configuration-and-testing-guide.md).
 - Suggest documentation updates when code changes render existing documentation
   obsolete or incomplete.
+

@@ -86,6 +86,7 @@ export const GEMMA_4_31B_IT_MODEL = 'gemma-4-31b-it';
 export const GEMMA_4_26B_A4B_IT_MODEL = 'gemma-4-26b-a4b-it';
 export const CLAUDE_OPUS_5_MODEL = 'claude-opus-5';
 export const CLAUDE_SONNET_5_MODEL = 'claude-sonnet-5';
+export const CLAUDE_HAIKU_4_5_MODEL = 'claude-haiku-4-5';
 
 export const VALID_GEMINI_MODELS = new Set([
   PREVIEW_GEMINI_MODEL,
@@ -103,6 +104,10 @@ export const VALID_GEMINI_MODELS = new Set([
   GEMMA_4_26B_A4B_IT_MODEL,
   CLAUDE_OPUS_5_MODEL,
   CLAUDE_SONNET_5_MODEL,
+  CLAUDE_HAIKU_4_5_MODEL,
+  'gemini-3.1-pro',
+  'gemini-3.6-flash',
+  'gemini-3.5-flash-lite',
   'claude-3-5-sonnet-v2@20241022',
   'claude-3-7-sonnet-20250219',
   'claude-3-opus-20240229',
@@ -620,6 +625,68 @@ export function isClaudeModel(modelName?: string): boolean {
   );
 }
 
+/**
+ * Canonical mapping of model family aliases to their latest concrete model IDs.
+ */
+export const LATEST_MODEL_FAMILIES: Record<string, string> = {
+  opus: CLAUDE_OPUS_5_MODEL,
+  sonnet: CLAUDE_SONNET_5_MODEL,
+  haiku: CLAUDE_HAIKU_4_5_MODEL,
+  pro: PREVIEW_GEMINI_3_1_MODEL,
+  flash: 'gemini-3.6-flash',
+  'flash-lite': 'gemini-3.5-flash-lite',
+  auto: 'gemini-3.6-flash',
+};
+
+/**
+ * Returns an array of all valid model IDs and family aliases.
+ */
+export function getValidModelIds(): string[] {
+  return [
+    ...Object.keys(LATEST_MODEL_FAMILIES),
+    ...Array.from(VALID_GEMINI_MODELS),
+  ];
+}
+
+/**
+ * Checks if a model ID or family alias is valid.
+ */
+export function isValidModelId(modelId: string): boolean {
+  if (!modelId || typeof modelId !== 'string') return false;
+  const trimmed = modelId.trim();
+  return VALID_GEMINI_MODELS.has(trimmed) || trimmed in LATEST_MODEL_FAMILIES;
+}
+
+/**
+ * Canonical function to resolve a model string or family alias to its latest model ID.
+ * Returns exact model IDs as passed, or maps family aliases ('opus', 'sonnet', 'haiku', 'pro', 'flash', 'flash-lite', 'auto').
+ * Throws an explicit Error listing all valid model IDs if an invalid model ID is provided.
+ */
+export function getLatestModelId(modelOrFamily: string): string {
+  if (!modelOrFamily || typeof modelOrFamily !== 'string') {
+    throw new Error(
+      `Invalid model ID: "${modelOrFamily}". Valid models and families are: ${getValidModelIds().join(', ')}`,
+    );
+  }
+
+  const normalized = modelOrFamily.trim().toLowerCase();
+
+  // 1. Family alias lookup
+  if (LATEST_MODEL_FAMILIES[normalized]) {
+    return LATEST_MODEL_FAMILIES[normalized];
+  }
+
+  // 2. Exact model ID check
+  if (isValidModelId(modelOrFamily.trim())) {
+    return modelOrFamily.trim();
+  }
+
+  // 3. Fail fast with actionable valid model list
+  throw new Error(
+    `Unrecognized model ID: "${modelOrFamily}". Valid models and families are: ${getValidModelIds().join(', ')}`,
+  );
+}
+
 export const CCPA_AI_MODEL_MAPPINGS: Record<string, string> = {
   [DEFAULT_GEMINI_3_5_FLASH_MODEL]: SECONDARY_GEMINI_3_5_FLASH_MODEL,
   [CLAUDE_OPUS_5_MODEL]: CLAUDE_OPUS_5_MODEL,
@@ -630,3 +697,22 @@ export const VERTEX_AI_MODEL_MAPPINGS: Record<string, string> = {
   [CLAUDE_OPUS_5_MODEL]: CLAUDE_OPUS_5_MODEL,
   [CLAUDE_SONNET_5_MODEL]: CLAUDE_SONNET_5_MODEL,
 };
+
+export const VERTEX_CLAUDE_MODEL_MAP: Record<string, string> = {
+  [CLAUDE_SONNET_5_MODEL]: CLAUDE_SONNET_5_MODEL,
+  [CLAUDE_OPUS_5_MODEL]: CLAUDE_OPUS_5_MODEL,
+  'claude-3-5-sonnet': CLAUDE_SONNET_5_MODEL,
+  'claude-3-opus': CLAUDE_OPUS_5_MODEL,
+  'claude-3-7-sonnet': 'claude-3-7-sonnet',
+};
+
+export function resolveVertexClaudeModel(modelName: string): string {
+  if (VERTEX_CLAUDE_MODEL_MAP[modelName]) {
+    return VERTEX_CLAUDE_MODEL_MAP[modelName];
+  }
+  if (LATEST_MODEL_FAMILIES[modelName.toLowerCase()]) {
+    return LATEST_MODEL_FAMILIES[modelName.toLowerCase()];
+  }
+  return modelName;
+}
+

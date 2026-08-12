@@ -21,58 +21,62 @@ import { deriveStableId } from './cryptoUtils.js';
 export function ensureStableToolIds(history: HistoryTurn[]): void {
   for (let i = 0; i < history.length; i++) {
     const turn = history[i];
-    const parts = turn.content.parts || [];
 
+    // Pair adjacent model function calls with user function responses
+    if (turn.content.role === 'model') {
+      const nextTurn = history[i + 1];
+      if (nextTurn?.content.role === 'user') {
+        const callsByName = new Map<string, Array<{ part: Part; idx: number }>>();
+        (turn.content.parts || []).forEach((part, partIdx) => {
+          if (part.functionCall?.name) {
+            const list = callsByName.get(part.functionCall.name) || [];
+            list.push({ part, idx: partIdx });
+            callsByName.set(part.functionCall.name, list);
+          }
+        });
+
+        const respsByName = new Map<string, Array<{ part: Part; idx: number }>>();
+        (nextTurn.content.parts || []).forEach((part, partIdx) => {
+          if (part.functionResponse?.name) {
+            const list = respsByName.get(part.functionResponse.name) || [];
+            list.push({ part, idx: partIdx });
+            respsByName.set(part.functionResponse.name, list);
+          }
+        });
+
+        for (const [name, callList] of callsByName.entries()) {
+          const respList = respsByName.get(name) || [];
+          const count = Math.max(callList.length, respList.length);
+          for (let k = 0; k < count; k++) {
+            const callPart = callList[k]?.part.functionCall;
+            const respPart = respList[k]?.part.functionResponse;
+
+            if (callPart && respPart) {
+              const targetId =
+                callPart.id ||
+                respPart.id ||
+                `synth_${name}_${deriveStableId([turn.id, i.toString(), callList[k].idx.toString()])}`;
+              callPart.id = targetId;
+              respPart.id = targetId;
+            }
+          }
+        }
+      }
+    }
+
+    // Fill in any remaining solo/unpaired tool calls or responses
+    const parts = turn.content.parts || [];
     for (let partIdx = 0; partIdx < parts.length; partIdx++) {
       const part = parts[partIdx];
 
       if (part.functionCall && !part.functionCall.id) {
-        const name = part.functionCall.name;
-        // Search ahead for a matching response in the next turn (common pattern)
-        const nextTurn = history[i + 1];
-        let pairedId: string | undefined;
-
-        if (nextTurn?.content.role === 'user') {
-          const matchingResp = nextTurn.content.parts?.find(
-            (p) =>
-              p.functionResponse &&
-              p.functionResponse.name === name &&
-              !p.functionResponse.id,
-          );
-          if (matchingResp) {
-            pairedId = `synth_${name}_${deriveStableId([turn.id, i.toString(), partIdx.toString()])}`;
-            part.functionCall.id = pairedId;
-            matchingResp.functionResponse!.id = pairedId;
-          }
-        }
-
-        if (!part.functionCall.id) {
-          // If no pairing found, generate a solo synthetic ID
-          part.functionCall.id = `synth_${name}_${deriveStableId([turn.id, i.toString(), partIdx.toString()])}`;
-        }
+        const name = part.functionCall.name || 'tool';
+        part.functionCall.id = `synth_${name}_${deriveStableId([turn.id, i.toString(), partIdx.toString()])}`;
       }
 
       if (part.functionResponse && !part.functionResponse.id) {
-        // Orphaned response handling (search backward)
-        const name = part.functionResponse.name;
-        const prevTurn = history[i - 1];
-        if (prevTurn?.content.role === 'model') {
-          const matchingCall = prevTurn.content.parts?.find(
-            (p) =>
-              p.functionCall &&
-              p.functionCall.name === name &&
-              !p.functionCall.id,
-          );
-          if (matchingCall) {
-            const pairedId = `synth_${name}_${deriveStableId([prevTurn.id, (i - 1).toString(), partIdx.toString()])}`;
-            matchingCall.functionCall!.id = pairedId;
-            part.functionResponse.id = pairedId;
-          }
-        }
-
-        if (!part.functionResponse.id) {
-          part.functionResponse.id = `synth_orph_${name}_${deriveStableId([turn.id, i.toString(), partIdx.toString()])}`;
-        }
+        const name = part.functionResponse.name || 'tool';
+        part.functionResponse.id = `synth_orph_${name}_${deriveStableId([turn.id, i.toString(), partIdx.toString()])}`;
       }
     }
   }

@@ -39,6 +39,8 @@ import {
   VALID_GEMINI_MODELS,
   CCPA_AI_MODEL_MAPPINGS,
   getAutoModelDescription,
+  resolveVertexClaudeModel,
+  getLatestModelId,
 } from './models.js';
 import type { Config } from './config.js';
 import { ModelConfigService } from '../services/modelConfigService.js';
@@ -1069,5 +1071,46 @@ describe('resolveModel Gemini 3.5 Flash GA', () => {
         CLAUDE_OPUS_5_MODEL,
       );
     });
+  });
+});
+
+describe('resolveVertexClaudeModel', () => {
+  it('should resolve claude-sonnet-5 directly', () => {
+    expect(resolveVertexClaudeModel('claude-sonnet-5')).toBe('claude-sonnet-5');
+  });
+
+  it('should resolve claude-opus-5 directly', () => {
+    expect(resolveVertexClaudeModel('claude-opus-5')).toBe('claude-opus-5');
+  });
+
+  it('should map claude-3-5-sonnet alias to claude-sonnet-5', () => {
+    expect(resolveVertexClaudeModel('claude-3-5-sonnet')).toBe('claude-sonnet-5');
+  });
+
+  it('should return unmapped model names unchanged as fallback', () => {
+    expect(resolveVertexClaudeModel('unknown-model-id')).toBe('unknown-model-id');
+  });
+});
+
+describe('getLatestModelId', () => {
+  it('maps family aliases to their latest concrete model IDs', () => {
+    expect(getLatestModelId('opus')).toBe('claude-opus-5');
+    expect(getLatestModelId('sonnet')).toBe('claude-sonnet-5');
+    expect(getLatestModelId('haiku')).toBe('claude-haiku-4-5');
+    expect(getLatestModelId('pro')).toBe('gemini-3.1-pro-preview');
+    expect(getLatestModelId('flash')).toBe('gemini-3.6-flash');
+    expect(getLatestModelId('flash-lite')).toBe('gemini-3.5-flash-lite');
+  });
+
+  it('preserves exact supported model IDs unchanged', () => {
+    expect(getLatestModelId('claude-sonnet-5')).toBe('claude-sonnet-5');
+    expect(getLatestModelId('claude-opus-5')).toBe('claude-opus-5');
+    expect(getLatestModelId('claude-haiku-4-5')).toBe('claude-haiku-4-5');
+    expect(getLatestModelId('gemini-2.5-pro')).toBe('gemini-2.5-pro');
+  });
+
+  it('throws an error listing valid model IDs for invalid inputs', () => {
+    expect(() => getLatestModelId('invalid-model-123')).toThrow(/Unrecognized model ID/);
+    expect(() => getLatestModelId('')).toThrow(/Invalid model ID/);
   });
 });

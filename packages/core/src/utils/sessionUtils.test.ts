@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { describe, it, expect } from 'vitest';
-import { convertSessionToClientHistory } from './sessionUtils.js';
+import { convertSessionToClientHistory, ensureStableToolIds } from './sessionUtils.js';
+import { type HistoryTurn } from '../core/agentChatHistory.js';
 import { type ConversationRecord } from '../services/chatRecordingService.js';
 import { CoreToolCallStatus } from '../scheduler/types.js';
 
@@ -210,5 +211,44 @@ describe('convertSessionToClientHistory', () => {
         ],
       },
     ]);
+  });
+
+  it('ensureStableToolIds pairs existing functionCall ID with missing functionResponse ID', () => {
+    const history: HistoryTurn[] = [
+      {
+        id: 'turn1',
+        content: {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                name: 'grep_search',
+                id: 'synth_0c39738b_123',
+                args: { query: 'test' },
+              },
+            },
+          ],
+        },
+      },
+      {
+        id: 'turn2',
+        content: {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'grep_search',
+                response: { output: 'result' },
+              },
+            },
+          ],
+        },
+      },
+    ];
+
+    ensureStableToolIds(history);
+
+    expect(history[0].content.parts?.[0].functionCall?.id).toBe('synth_0c39738b_123');
+    expect(history[1].content.parts?.[0].functionResponse?.id).toBe('synth_0c39738b_123');
   });
 });

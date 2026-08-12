@@ -105,7 +105,8 @@ export enum AuthType {
 export function getAuthTypeFromEnv(model?: string): AuthType | undefined {
   const isProxy = !!(
     process.env['GOOGLE_GEMINI_BASE_URL'] ||
-    process.env['GOOGLE_VERTEX_BASE_URL']
+    process.env['GOOGLE_VERTEX_BASE_URL'] ||
+    process.env['ANTHROPIC_BASE_URL']
   );
   if (isClaudeModel(model) && !isProxy) {
     if (process.env['ANTHROPIC_API_KEY']) {

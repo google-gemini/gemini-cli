@@ -136,7 +136,8 @@ export function useQuotaAndFallback({
       } else if (error instanceof ModelNotFoundError) {
         isModelNotFoundError = true;
         if (
-          contentGeneratorConfig?.authType === AuthType.USE_VERTEX_AI &&
+          (contentGeneratorConfig?.authType === AuthType.USE_VERTEX_AI ||
+            contentGeneratorConfig?.authType === AuthType.VERTEX_CLAUDE) &&
           VALID_GEMINI_MODELS.has(failedModel)
         ) {
           const location =
