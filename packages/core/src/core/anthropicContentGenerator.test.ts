@@ -132,6 +132,30 @@ describe('AnthropicContentGenerator verification', () => {
     expect(content[1].id).toBe('dup_id_1');
   });
 
+  it('handles 3+ identical tool_use IDs without secondary collisions', () => {
+    const config: ContentGeneratorConfig = { apiKey: 'fake-key' };
+    const generator = new AnthropicContentGenerator(config, 'claude-sonnet-5');
+
+    const mapped = (generator as any).mapRequestToAnthropic({
+      contents: [
+        {
+          role: 'model',
+          parts: [
+            { functionCall: { id: 'dup_id', name: 'read_file', args: {} } },
+            { functionCall: { id: 'dup_id', name: 'write_file', args: {} } },
+            { functionCall: { id: 'dup_id', name: 'edit_file', args: {} } },
+          ],
+        },
+      ],
+    });
+
+    const content = mapped.messages[0].content as any[];
+    expect(content).toHaveLength(3);
+    const ids = content.map((c) => c.id);
+    expect(new Set(ids).size).toBe(3);
+    expect(ids).toEqual(['dup_id', 'dup_id_1', 'dup_id_2']);
+  });
+
   it('attaches remoteModelId as modelVersion to streamed chunks', async () => {
     const config: ContentGeneratorConfig = { apiKey: 'fake-key' };
     const generator = new AnthropicContentGenerator(config, 'claude-sonnet-5');

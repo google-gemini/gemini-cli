@@ -323,8 +323,10 @@ export class AnthropicContentGenerator implements ContentGenerator {
           let toolId =
             part.functionCall.id ||
             `call_${Date.now()}_${anthropicContent.length}`;
-          if (seenToolUseIds.has(toolId)) {
-            toolId = `${toolId}_${anthropicContent.length}`;
+          let suffixCounter = 1;
+          const baseId = toolId;
+          while (seenToolUseIds.has(toolId)) {
+            toolId = `${baseId}_${suffixCounter++}`;
           }
           seenToolUseIds.add(toolId);
 

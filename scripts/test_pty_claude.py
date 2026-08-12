@@ -4,6 +4,7 @@
 import os
 import pty
 import select
+import signal
 import sys
 import time
 
@@ -59,9 +60,10 @@ def run_interactive_tui_claude_test(command, prompt_text, timeout=20):
         # Safely terminate child process if still running
         try:
             time.sleep(0.2)
-            os.kill(pid, 15) # SIGTERM
+            os.kill(pid, signal.SIGTERM)
             time.sleep(0.1)
-            os.kill(pid, 9)  # SIGKILL
+            os.kill(pid, 0)  # Check if still alive
+            os.kill(pid, signal.SIGKILL)
         except OSError:
             pass
 

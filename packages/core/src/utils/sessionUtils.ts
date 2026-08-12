@@ -19,13 +19,14 @@ import { deriveStableId } from './cryptoUtils.js';
  * It uses a deterministic pairing heuristic for adjacent turns to link calls and responses.
  */
 export function ensureStableToolIds(history: HistoryTurn[]): void {
+  const usedCallIds = new Set<string>();
+
   for (let i = 0; i < history.length; i++) {
     const turn = history[i];
 
     // Pair adjacent model function calls with user function responses
     if (turn.content.role === 'model') {
       const nextTurn = history[i + 1];
-      const usedCallIds = new Set<string>();
       const pairedParts = new Set<Part>();
 
       if (nextTurn?.content.role === 'user') {
