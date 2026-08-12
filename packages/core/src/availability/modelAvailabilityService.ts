@@ -17,7 +17,11 @@ export type UnavailabilityReason =
 export type ModelHealthStatus = 'terminal' | 'sticky_retry';
 
 type HealthState =
-  | { status: 'terminal'; reason: TerminalUnavailabilityReason }
+  | {
+      status: 'terminal';
+      reason: TerminalUnavailabilityReason;
+      markedAt?: number;
+    }
   | {
       status: 'sticky_retry';
       reason: TurnUnavailabilityReason;
@@ -49,6 +53,7 @@ export class ModelAvailabilityService {
     this.setState(model, {
       status: 'terminal',
       reason,
+      markedAt: Date.now(),
     });
   }
 
@@ -88,7 +93,7 @@ export class ModelAvailabilityService {
     }
   }
 
-  snapshot(modelId: ModelId): ModelAvailabilitySnapshot {
+  snapshot(modelId: ModelId, ttlMs: number = 30000): ModelAvailabilitySnapshot {
     const model = normalizeModelId(modelId);
     const state = this.health.get(model);
 
@@ -97,6 +102,14 @@ export class ModelAvailabilityService {
     }
 
     if (state.status === 'terminal') {
+      if (state.reason === 'capacity' && state.markedAt !== undefined) {
+        const elapsed = Date.now() - state.markedAt;
+        if (elapsed >= ttlMs) {
+          // TTL expired! Automatically clear state and return available
+          this.clearState(model);
+          return { available: true };
+        }
+      }
       return { available: false, reason: state.reason };
     }
 
