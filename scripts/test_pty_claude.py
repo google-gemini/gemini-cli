@@ -55,7 +55,20 @@ def run_interactive_tui_claude_test(command, prompt_text, timeout=20):
             os.close(master)
         except OSError:
             pass
-        os.waitpid(pid, 0)
+
+        # Safely terminate child process if still running
+        try:
+            time.sleep(0.2)
+            os.kill(pid, 15) # SIGTERM
+            time.sleep(0.1)
+            os.kill(pid, 9)  # SIGKILL
+        except OSError:
+            pass
+
+        try:
+            os.waitpid(pid, 0)
+        except OSError:
+            pass
 
         decoded = output_buffer.decode("utf-8", errors="replace")
         return decoded

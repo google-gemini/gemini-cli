@@ -297,6 +297,8 @@ export class AnthropicContentGenerator implements ContentGenerator {
       const role = content.role === 'model' ? 'assistant' : 'user';
       const anthropicContent: Anthropic.ContentBlockParam[] = [];
 
+      const seenToolUseIds = new Set<string>();
+
       for (const part of content.parts || []) {
         if (typeof part === 'string') {
           anthropicContent.push({
@@ -318,9 +320,17 @@ export class AnthropicContentGenerator implements ContentGenerator {
             },
           });
         } else if (part.functionCall) {
+          let toolId =
+            part.functionCall.id ||
+            `call_${Date.now()}_${anthropicContent.length}`;
+          if (seenToolUseIds.has(toolId)) {
+            toolId = `${toolId}_${anthropicContent.length}`;
+          }
+          seenToolUseIds.add(toolId);
+
           anthropicContent.push({
             type: 'tool_use',
-            id: part.functionCall.id || `call_${Date.now()}`,
+            id: toolId,
             name: part.functionCall.name || '',
             input: (part.functionCall.args as Record<string, unknown>) || {},
           });

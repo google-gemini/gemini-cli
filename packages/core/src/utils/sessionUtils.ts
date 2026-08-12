@@ -25,6 +25,9 @@ export function ensureStableToolIds(history: HistoryTurn[]): void {
     // Pair adjacent model function calls with user function responses
     if (turn.content.role === 'model') {
       const nextTurn = history[i + 1];
+      const usedCallIds = new Set<string>();
+      const pairedParts = new Set<Part>();
+
       if (nextTurn?.content.role === 'user') {
         const callsByName = new Map<string, Array<{ part: Part; idx: number }>>();
         (turn.content.parts || []).forEach((part, partIdx) => {
@@ -48,20 +51,35 @@ export function ensureStableToolIds(history: HistoryTurn[]): void {
           const respList = respsByName.get(name) || [];
           const count = Math.max(callList.length, respList.length);
           for (let k = 0; k < count; k++) {
-            const callPart = callList[k]?.part.functionCall;
-            const respPart = respList[k]?.part.functionResponse;
+            const callItem = callList[k];
+            const respItem = respList[k];
+            const callPart = callItem?.part.functionCall;
+            const respPart = respItem?.part.functionResponse;
 
             if (callPart && respPart) {
-              const targetId =
-                callPart.id ||
-                respPart.id ||
-                `synth_${name}_${deriveStableId([turn.id, i.toString(), callList[k].idx.toString()])}`;
+              let targetId = callPart.id || respPart.id;
+              if (!targetId || usedCallIds.has(targetId)) {
+                targetId = `synth_${name}_${deriveStableId([turn.id, i.toString(), callItem.idx.toString()])}`;
+              }
               callPart.id = targetId;
               respPart.id = targetId;
+              usedCallIds.add(targetId);
+              pairedParts.add(callItem.part);
             }
           }
         }
       }
+
+      // Enforce unique functionCall IDs across any remaining unpaired calls in this model turn
+      (turn.content.parts || []).forEach((part, partIdx) => {
+        if (part.functionCall && !pairedParts.has(part)) {
+          if (!part.functionCall.id || usedCallIds.has(part.functionCall.id)) {
+            const name = part.functionCall.name || 'tool';
+            part.functionCall.id = `synth_${name}_${deriveStableId([turn.id, i.toString(), partIdx.toString()])}`;
+          }
+          usedCallIds.add(part.functionCall.id);
+        }
+      });
     }
 
     // Fill in any remaining solo/unpaired tool calls or responses

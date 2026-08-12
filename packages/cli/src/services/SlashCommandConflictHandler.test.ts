@@ -191,4 +191,23 @@ describe('SlashCommandConflictHandler', () => {
       "Extension 'google-workspace' skill '/chat' was renamed to '/google-workspace.chat' because it conflicts with built-in command.",
     );
   });
+
+  it('should suppress conflict feedback when GEMINI_SUPPRESS_COMMAND_CONFLICTS is true', () => {
+    vi.stubEnv('GEMINI_SUPPRESS_COMMAND_CONFLICTS', 'true');
+
+    simulateEvent([
+      {
+        name: 'test',
+        renamedTo: 'user.test',
+        loserKind: CommandKind.USER_FILE,
+        winnerKind: CommandKind.SKILL,
+      },
+    ]);
+
+    vi.advanceTimersByTime(600);
+
+    expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
+    vi.unstubAllEnvs();
+  });
 });
+

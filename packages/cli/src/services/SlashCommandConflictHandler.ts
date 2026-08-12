@@ -84,6 +84,12 @@ export class SlashCommandConflictHandler {
     }
 
     for (const [name, commandConflicts] of grouped) {
+      if (
+        process.env['GEMINI_SUPPRESS_COMMAND_CONFLICTS'] === 'true' ||
+        process.env['GEMINI_QUIET_STARTUP'] === 'true'
+      ) {
+        continue;
+      }
       if (commandConflicts.length > 1) {
         this.emitGroupedFeedback(name, commandConflicts);
       } else {
