@@ -229,9 +229,6 @@ export class IDEServer {
             const sessionId = transport.sessionId ?? 'unknown';
             transport
               .send({ jsonrpc: '2.0', method: 'ping' })
-              .then(() => {
-                missedPings = 0;
-              })
               .catch((error) => {
                 missedPings++;
                 this.log(
@@ -242,6 +239,7 @@ export class IDEServer {
                     `Session ${sessionId} missed ${missedPings} pings. Closing connection and cleaning up interval.`,
                   );
                   clearInterval(keepAlive);
+                  void transport.close();
                 }
               });
           }, 60000); // 60 sec
@@ -404,6 +402,19 @@ export class IDEServer {
   }
 
   async stop(): Promise<void> {
+    await Promise.race([
+      Promise.allSettled(
+        Object.values(this.transports).map((transport) =>
+          Promise.resolve().then(() => transport.close()),
+        ),
+      ),
+      // Bounding the wait for a hung transport so stop() doesn't hang forever
+      new Promise<void>((resolve) => setTimeout(resolve, 1000)),
+    ]);
+
+    // Best-effort cleanup: clear transport references so lingering background closes don't contaminate server state
+    this.transports = {};
+
     if (this.server) {
       await new Promise<void>((resolve, reject) => {
         this.server!.close((err?: Error) => {
@@ -414,6 +425,7 @@ export class IDEServer {
           this.log(`IDE server shut down`);
           resolve();
         });
+        this.server!.closeAllConnections();
       });
       this.server = undefined;
     }
@@ -428,6 +440,11 @@ export class IDEServer {
         // Ignore errors if the file doesn't exist.
       }
     }
+  }
+
+  /** @internal */
+  getTransports(): Readonly<Record<string, StreamableHTTPServerTransport>> {
+    return this.transports;
   }
 }
 

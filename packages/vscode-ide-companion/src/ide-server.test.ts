@@ -347,6 +347,223 @@ describe('IDEServer', () => {
     },
   );
 
+  describe('lifecycle', () => {
+    let port: number;
+
+    beforeEach(async () => {
+      const crypto = await import('node:crypto');
+      vi.mocked(crypto.randomUUID).mockReturnValue(
+        'test-auth-token' as `${string}-${string}-${string}-${string}-${string}`,
+      );
+      await ideServer.start(mockContext);
+      port = (ideServer as unknown as { port: number }).port;
+      let counter = 0;
+      vi.mocked(crypto.randomUUID).mockImplementation(
+        () =>
+          `session-${++counter}` as `${string}-${string}-${string}-${string}-${string}`,
+      );
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+      vi.useRealTimers();
+    });
+
+    const initSession = async () => {
+      const initialCount = Object.keys(ideServer.getTransports()).length;
+      const response = await fetch(`http://localhost:${port}/mcp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json, text/event-stream',
+          Authorization: `Bearer test-auth-token`,
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'initialize',
+          params: {
+            protocolVersion: '2024-11-05',
+            capabilities: {},
+            clientInfo: { name: 'test', version: '1.0' },
+          },
+          id: 1,
+        }),
+      });
+      expect(response.status).toBe(200);
+
+      // Poll until the transport is registered in getTransports() instead of sleeping
+      const start = Date.now();
+      while (
+        Object.keys(ideServer.getTransports()).length === initialCount &&
+        Date.now() - start < 1000
+      ) {
+        await new Promise((r) => setTimeout(r, 5));
+      }
+      return response;
+    };
+
+    it('a) should resolve stop() even when transport.close() hangs', async () => {
+      const { StreamableHTTPServerTransport } = await import(
+        '@modelcontextprotocol/sdk/server/streamableHttp.js'
+      );
+      vi.spyOn(
+        StreamableHTTPServerTransport.prototype,
+        'close',
+      ).mockImplementation(() => new Promise(() => {})); // Hangs forever
+
+      await initSession();
+      expect(Object.keys(ideServer.getTransports()).length).toBe(1);
+
+      const startTime = Date.now();
+      await ideServer.stop();
+      const duration = Date.now() - startTime;
+      // Because we race with a 1000ms timeout in stop(), it should resolve in ~1000ms. We give it 1500 to be safe.
+      expect(duration).toBeLessThan(1500);
+    });
+
+    it('b) should call close on every entry in this.transports before resolving', async () => {
+      const { StreamableHTTPServerTransport } = await import(
+        '@modelcontextprotocol/sdk/server/streamableHttp.js'
+      );
+      const closeSpy = vi.spyOn(
+        StreamableHTTPServerTransport.prototype,
+        'close',
+      );
+
+      await initSession();
+      await initSession();
+
+      expect(Object.keys(ideServer.getTransports()).length).toBe(2);
+
+      await ideServer.stop();
+
+      expect(closeSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('c) keep-alive: 3 non-consecutive missed pings closes transport', async () => {
+      const { StreamableHTTPServerTransport } = await import(
+        '@modelcontextprotocol/sdk/server/streamableHttp.js'
+      );
+      let intervalCb: (() => void) | undefined;
+      vi.spyOn(global, 'setInterval').mockImplementation((cb: unknown) => {
+        intervalCb = cb as () => void;
+        return 123 as unknown as NodeJS.Timeout;
+      });
+      const clearIntervalSpy = vi.spyOn(global, 'clearInterval');
+
+      vi.spyOn(
+        StreamableHTTPServerTransport.prototype,
+        'handleRequest',
+      ).mockImplementation(async (req, res) => {
+        (res as unknown as { status: (c: number) => { end: () => void } })
+          .status(200)
+          .end();
+      }); // ensure setInterval is reached and fetch resolves
+
+      let failPing = false;
+      const sendSpy = vi
+        .spyOn(StreamableHTTPServerTransport.prototype, 'send')
+        .mockImplementation(async (message) => {
+          if ((message as { method?: string }).method === 'ping' && failPing) {
+            throw new Error('Ping failed');
+          }
+        });
+      const closeSpy = vi.spyOn(
+        StreamableHTTPServerTransport.prototype,
+        'close',
+      );
+
+      await initSession();
+      expect(intervalCb).toBeDefined();
+
+      // ping 1: success
+      failPing = false;
+      intervalCb!();
+      await new Promise(process.nextTick);
+      expect(sendSpy).toHaveBeenCalledTimes(1);
+
+      // ping 2: fail
+      failPing = true;
+      intervalCb!();
+      await new Promise(process.nextTick);
+      expect(sendSpy).toHaveBeenCalledTimes(2);
+
+      // ping 3: success
+      failPing = false;
+      intervalCb!();
+      await new Promise(process.nextTick);
+      expect(sendSpy).toHaveBeenCalledTimes(3);
+
+      // ping 4: fail
+      failPing = true;
+      intervalCb!();
+      await new Promise(process.nextTick);
+      expect(sendSpy).toHaveBeenCalledTimes(4);
+
+      // ping 5: fail -> 3rd failure total, should close
+      failPing = true;
+      intervalCb!();
+      await new Promise(process.nextTick);
+      expect(sendSpy).toHaveBeenCalledTimes(5);
+
+      expect(closeSpy).toHaveBeenCalledTimes(1);
+      expect(clearIntervalSpy).toHaveBeenCalled();
+    });
+
+    it('d) keep-alive: fewer than 3 total failures does not close transport', async () => {
+      const { StreamableHTTPServerTransport } = await import(
+        '@modelcontextprotocol/sdk/server/streamableHttp.js'
+      );
+      let intervalCb: (() => void) | undefined;
+      vi.spyOn(global, 'setInterval').mockImplementation((cb: unknown) => {
+        intervalCb = cb as () => void;
+        return 123 as unknown as NodeJS.Timeout;
+      });
+
+      vi.spyOn(
+        StreamableHTTPServerTransport.prototype,
+        'handleRequest',
+      ).mockImplementation(async (req, res) => {
+        (res as unknown as { status: (c: number) => { end: () => void } })
+          .status(200)
+          .end();
+      });
+
+      let failPing = false;
+      const sendSpy = vi
+        .spyOn(StreamableHTTPServerTransport.prototype, 'send')
+        .mockImplementation(async (message) => {
+          if ((message as { method?: string }).method === 'ping' && failPing) {
+            throw new Error('Ping failed');
+          }
+        });
+      const closeSpy = vi.spyOn(
+        StreamableHTTPServerTransport.prototype,
+        'close',
+      );
+
+      await initSession();
+      expect(intervalCb).toBeDefined();
+
+      // Fail 2 times
+      failPing = true;
+      intervalCb!();
+      await new Promise(process.nextTick);
+      intervalCb!();
+      await new Promise(process.nextTick);
+
+      // Succeed 5 times
+      failPing = false;
+      for (let i = 0; i < 5; i++) {
+        intervalCb!();
+        await new Promise(process.nextTick);
+      }
+
+      expect(sendSpy).toHaveBeenCalledTimes(7);
+      expect(closeSpy).not.toHaveBeenCalled();
+    });
+  });
+
   describe('auth token', () => {
     let port: number;
 
