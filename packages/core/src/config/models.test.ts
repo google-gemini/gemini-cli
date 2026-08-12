@@ -1097,7 +1097,7 @@ describe('getLatestModelId', () => {
     expect(getLatestModelId('opus')).toBe('claude-opus-5');
     expect(getLatestModelId('sonnet')).toBe('claude-sonnet-5');
     expect(getLatestModelId('haiku')).toBe('claude-haiku-4-5');
-    expect(getLatestModelId('pro')).toBe('gemini-3.1-pro-preview');
+    expect(getLatestModelId('pro')).toBe('gemini-3-pro-preview');
     expect(getLatestModelId('flash')).toBe('gemini-3.6-flash');
     expect(getLatestModelId('flash-lite')).toBe('gemini-3.5-flash-lite');
   });

@@ -84,7 +84,7 @@ powerful tool for developers.
 
 ## Testing Conventions
 
-- **Scoped Testing Mandate:** Avoid running full monorepo test commands (`npm run test` across all workspaces). ALWAYS run `npm run test:claude` (targeted Anthropic generator and session utility tests in `@google/gemini-cli-core`) unless explicitly requested otherwise.
+- **Targeted Testing Mandate:** ALWAYS identify and run test files directly targeted at the specific files, modules, or features modified during the session (e.g., `userStartupWarnings.test.ts` for startup warnings, `anthropicContentGenerator.test.ts` for Claude generator changes). Do NOT run generic or full monorepo test commands (`npm run test` across all workspaces) unless explicitly requested.
 - **Environment Variables:** When testing code that depends on environment
   variables, use `vi.stubEnv('NAME', 'value')` in `beforeEach` and
   `vi.unstubAllEnvs()` in `afterEach`. Avoid modifying `process.env` directly as

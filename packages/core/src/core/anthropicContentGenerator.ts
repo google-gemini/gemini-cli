@@ -141,9 +141,12 @@ export class AnthropicContentGenerator implements ContentGenerator {
     let outputTokens = 0;
     let finishReasonEmitted = false;
 
+    let remoteModelId = '';
+
     for await (const event of stream) {
       if (event.type === 'message_start') {
         inputTokens = event.message.usage?.input_tokens || 0;
+        remoteModelId = event.message.model || '';
         console.error(`[ANTHROPIC_DIRECT] Connected! Remote provider returned message model ID: ${event.message.model}`);
       } else if (event.type === 'message_delta') {
         outputTokens = event.usage?.output_tokens || outputTokens;
@@ -157,6 +160,7 @@ export class AnthropicContentGenerator implements ContentGenerator {
           };
           const finishReason = finishReasonMap[stopReason] || 'STOP';
           const rawChunk = {
+            modelVersion: remoteModelId,
             candidates: [
               {
                 finishReason,
@@ -185,6 +189,7 @@ export class AnthropicContentGenerator implements ContentGenerator {
       } else if (event.type === 'content_block_delta') {
         if (event.delta.type === 'text_delta') {
           const rawChunk = {
+            modelVersion: remoteModelId,
             candidates: [
               {
                 content: {

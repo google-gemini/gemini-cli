@@ -9,14 +9,28 @@ import { AnthropicContentGenerator } from './anthropicContentGenerator.js';
 import type { ContentGeneratorConfig } from './contentGenerator.js';
 import { resolveModel, CLAUDE_SONNET_5_MODEL, CLAUDE_OPUS_5_MODEL, VALID_GEMINI_MODELS } from '../config/models.js';
 
+const stubEnv = (key: string, val: string) => {
+  if (typeof vi !== 'undefined' && typeof vi.stubEnv === 'function') {
+    vi.stubEnv(key, val);
+  } else {
+    process.env[key] = val;
+  }
+};
+
+const unstubEnvs = () => {
+  if (typeof vi !== 'undefined' && typeof vi.unstubAllEnvs === 'function') {
+    vi.unstubAllEnvs();
+  }
+};
+
 describe('AnthropicContentGenerator verification', () => {
   beforeEach(() => {
-    vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'eat-with-images');
-    vi.stubEnv('GOOGLE_CLOUD_LOCATION', 'global');
+    stubEnv('GOOGLE_CLOUD_PROJECT', 'eat-with-images');
+    stubEnv('GOOGLE_CLOUD_LOCATION', 'global');
   });
 
   afterEach(() => {
-    vi.unstubAllEnvs();
+    unstubEnvs();
   });
 
   it('instantiates AnthropicVertex when GOOGLE_CLOUD_PROJECT is set', () => {
@@ -93,5 +107,37 @@ describe('AnthropicContentGenerator verification', () => {
     expect(content[0].tool_use_id).toBe('synth_test_123');
     expect(content[0].content).toContain('Part 1');
     expect(content[0].content).toContain('Part 2');
+  });
+
+  it('attaches remoteModelId as modelVersion to streamed chunks', async () => {
+    const config: ContentGeneratorConfig = { apiKey: 'fake-key' };
+    const generator = new AnthropicContentGenerator(config, 'claude-sonnet-5');
+
+    const fakeStream = (async function* () {
+      yield { type: 'message_start', message: { model: 'claude-3-5-sonnet-20241022', usage: { input_tokens: 10 } } };
+      yield { type: 'content_block_delta', delta: { type: 'text_delta', text: 'Hello' } };
+      yield { type: 'message_delta', usage: { output_tokens: 5 }, delta: { stop_reason: 'end_turn' } };
+    })();
+
+    const asyncIterableStream = {
+      [Symbol.asyncIterator]() {
+        return fakeStream;
+      },
+    };
+
+    (generator as any).client = {
+      messages: {
+        stream: () => asyncIterableStream,
+        create: () => Promise.resolve(asyncIterableStream),
+      },
+    };
+
+    const chunks = [];
+    for await (const chunk of await generator.generateContentStream({ model: 'claude-sonnet-5', contents: [{ role: 'user', parts: [{ text: 'hi' }] }] })) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks.length).toBeGreaterThan(0);
+    expect(chunks[0].modelVersion).toBe('claude-3-5-sonnet-20241022');
   });
 });

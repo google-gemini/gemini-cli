@@ -632,7 +632,7 @@ export const LATEST_MODEL_FAMILIES: Record<string, string> = {
   opus: CLAUDE_OPUS_5_MODEL,
   sonnet: CLAUDE_SONNET_5_MODEL,
   haiku: CLAUDE_HAIKU_4_5_MODEL,
-  pro: PREVIEW_GEMINI_3_1_MODEL,
+  pro: PREVIEW_GEMINI_MODEL,
   flash: 'gemini-3.6-flash',
   'flash-lite': 'gemini-3.5-flash-lite',
   auto: 'gemini-3.6-flash',
