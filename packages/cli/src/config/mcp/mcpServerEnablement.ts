@@ -258,7 +258,9 @@ export class McpServerEnablementManager {
     const normalizedName = normalizeServerId(serverName);
     const config = await this.readConfig();
     if (config === null) {
-      return;
+      throw new Error(
+        `Cannot modify MCP server enablement: config file at ${this.configFilePath} is corrupted. Fix or delete the file and try again.`,
+      );
     }
 
     if (normalizedName in config) {
@@ -274,7 +276,9 @@ export class McpServerEnablementManager {
   async disable(serverName: string): Promise<void> {
     const config = await this.readConfig();
     if (config === null) {
-      return;
+      throw new Error(
+        `Cannot modify MCP server enablement: config file at ${this.configFilePath} is corrupted. Fix or delete the file and try again.`,
+      );
     }
     config[normalizeServerId(serverName)] = { enabled: false };
     await this.writeConfig(config);
@@ -337,18 +341,28 @@ export class McpServerEnablementManager {
    * Returns server names that were actually re-enabled.
    */
   async autoEnableServers(serverNames: string[]): Promise<string[]> {
+    const config = await this.readConfig();
+    if (config === null) {
+      return [];
+    }
+
     const enabledServers: string[] = [];
 
     for (const serverName of serverNames) {
       const normalizedName = normalizeServerId(serverName);
-      const state = await this.getDisplayState(normalizedName);
+      const isSessionDisabled = this.isSessionDisabled(normalizedName);
+      const isPersistentDisabled = !(config[normalizedName]?.enabled ?? true);
 
       let wasDisabled = false;
-      if (state.isPersistentDisabled) {
-        await this.enable(normalizedName);
-        wasDisabled = true;
+      if (isPersistentDisabled) {
+        try {
+          await this.enable(normalizedName);
+          wasDisabled = true;
+        } catch {
+          // If enabling fails, do not report as enabled
+        }
       }
-      if (state.isSessionDisabled) {
+      if (isSessionDisabled) {
         this.clearSessionDisable(normalizedName);
         wasDisabled = true;
       }
@@ -367,8 +381,21 @@ export class McpServerEnablementManager {
   private async readConfig(): Promise<McpServerEnablementConfig | null> {
     try {
       const content = await fs.readFile(this.configFilePath, 'utf-8');
+      const parsed: unknown = JSON.parse(content);
+      if (
+        parsed === null ||
+        typeof parsed !== 'object' ||
+        Array.isArray(parsed)
+      ) {
+        coreEvents.emitFeedback(
+          'error',
+          'Failed to read MCP server enablement config.',
+          new Error('Config is not a valid JSON object'),
+        );
+        return null;
+      }
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      return JSON.parse(content) as McpServerEnablementConfig;
+      return parsed as McpServerEnablementConfig;
     } catch (error) {
       if (
         error instanceof Error &&
