@@ -48,6 +48,26 @@ import { normalizeModelId } from '../utils/modelUtils.js';
 export class ModelAvailabilityService {
   private readonly health = new Map<ModelId, HealthState>();
 
+  private getHealth(
+    model: ModelId,
+    ttlMs: number = 30000,
+  ): HealthState | undefined {
+    const state = this.health.get(model);
+    if (
+      state &&
+      state.status === 'terminal' &&
+      state.reason === 'capacity' &&
+      state.markedAt !== undefined
+    ) {
+      const elapsed = Date.now() - state.markedAt;
+      if (elapsed >= ttlMs) {
+        this.clearState(model);
+        return undefined;
+      }
+    }
+    return state;
+  }
+
   markTerminal(modelId: ModelId, reason: TerminalUnavailabilityReason) {
     const model = normalizeModelId(modelId);
     this.setState(model, {
@@ -64,7 +84,7 @@ export class ModelAvailabilityService {
 
   markRetryOncePerTurn(modelId: ModelId, attempts: number = 1) {
     const model = normalizeModelId(modelId);
-    const currentState = this.health.get(model);
+    const currentState = this.getHealth(model);
     // Do not override a terminal failure with a transient one.
     if (currentState?.status === 'terminal') {
       return;
@@ -87,7 +107,7 @@ export class ModelAvailabilityService {
 
   consumeStickyAttempt(modelId: ModelId) {
     const model = normalizeModelId(modelId);
-    const state = this.health.get(model);
+    const state = this.getHealth(model);
     if (state?.status === 'sticky_retry') {
       this.setState(model, { ...state, consumed: true });
     }
@@ -95,21 +115,13 @@ export class ModelAvailabilityService {
 
   snapshot(modelId: ModelId, ttlMs: number = 30000): ModelAvailabilitySnapshot {
     const model = normalizeModelId(modelId);
-    const state = this.health.get(model);
+    const state = this.getHealth(model, ttlMs);
 
     if (!state) {
       return { available: true };
     }
 
     if (state.status === 'terminal') {
-      if (state.reason === 'capacity' && state.markedAt !== undefined) {
-        const elapsed = Date.now() - state.markedAt;
-        if (elapsed >= ttlMs) {
-          // TTL expired! Automatically clear state and return available
-          this.clearState(model);
-          return { available: true };
-        }
-      }
       return { available: false, reason: state.reason };
     }
 
@@ -127,7 +139,7 @@ export class ModelAvailabilityService {
       const model = normalizeModelId(modelId);
       const snapshot = this.snapshot(model);
       if (snapshot.available) {
-        const state = this.health.get(model);
+        const state = this.getHealth(model);
         // A sticky model is being attempted, so note that.
         const attempts =
           state?.status === 'sticky_retry' ? state.attempts : undefined;
