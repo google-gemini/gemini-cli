@@ -225,6 +225,9 @@ export class McpServerEnablementManager {
    */
   async isFileEnabled(serverName: string): Promise<boolean> {
     const config = await this.readConfig();
+    if (config === null) {
+      return false;
+    }
     const state = config[normalizeServerId(serverName)];
     return state?.enabled ?? true;
   }
@@ -254,6 +257,9 @@ export class McpServerEnablementManager {
   async enable(serverName: string): Promise<void> {
     const normalizedName = normalizeServerId(serverName);
     const config = await this.readConfig();
+    if (config === null) {
+      return;
+    }
 
     if (normalizedName in config) {
       delete config[normalizedName];
@@ -267,6 +273,9 @@ export class McpServerEnablementManager {
    */
   async disable(serverName: string): Promise<void> {
     const config = await this.readConfig();
+    if (config === null) {
+      return;
+    }
     config[normalizeServerId(serverName)] = { enabled: false };
     await this.writeConfig(config);
   }
@@ -355,7 +364,7 @@ export class McpServerEnablementManager {
   /**
    * Read config from file asynchronously.
    */
-  private async readConfig(): Promise<McpServerEnablementConfig> {
+  private async readConfig(): Promise<McpServerEnablementConfig | null> {
     try {
       const content = await fs.readFile(this.configFilePath, 'utf-8');
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -373,7 +382,7 @@ export class McpServerEnablementManager {
         'Failed to read MCP server enablement config.',
         error,
       );
-      return {};
+      return null;
     }
   }
 

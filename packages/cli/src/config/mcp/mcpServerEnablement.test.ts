@@ -5,6 +5,7 @@
  */
 
 import fs from 'node:fs/promises';
+import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -42,7 +43,8 @@ function createMockEnablement(
 
 function setupFsMocks(): void {
   vi.spyOn(fs, 'readFile').mockImplementation(async (filePath) => {
-    const content = inMemoryFs[filePath.toString()];
+    const normPath = path.normalize(filePath.toString());
+    const content = inMemoryFs[normPath];
     if (content === undefined) {
       const error = new Error(`ENOENT: ${filePath}`);
       (error as NodeJS.ErrnoException).code = 'ENOENT';
@@ -51,7 +53,8 @@ function setupFsMocks(): void {
     return content;
   });
   vi.spyOn(fs, 'writeFile').mockImplementation(async (filePath, data) => {
-    inMemoryFs[filePath.toString()] = data.toString();
+    const normPath = path.normalize(filePath.toString());
+    inMemoryFs[normPath] = data.toString();
   });
   vi.spyOn(fs, 'mkdir').mockImplementation(async () => undefined);
 }
@@ -118,6 +121,24 @@ describe('McpServerEnablementManager', () => {
 
     expect(instance2.isSessionDisabled('test-server')).toBe(true);
     expect(instance1).toBe(instance2);
+  });
+
+  it('should fail closed and refuse to overwrite on corrupt JSON config', async () => {
+    const configPath = path.normalize(
+      '/virtual-home/.gemini/mcp-server-enablement.json',
+    );
+    inMemoryFs[configPath] = '{ invalid json syntax';
+
+    expect(await manager.isFileEnabled('some-server')).toBe(false);
+
+    const writeFileSpy = vi.spyOn(fs, 'writeFile');
+    await manager.disable('some-server');
+    expect(writeFileSpy).not.toHaveBeenCalled();
+
+    await manager.enable('some-server');
+    expect(writeFileSpy).not.toHaveBeenCalled();
+
+    expect(inMemoryFs[configPath]).toBe('{ invalid json syntax');
   });
 });
 
