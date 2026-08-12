@@ -1645,7 +1645,9 @@ export class Config implements McpContext, AgentLoopContext {
     const authType = this.contentGeneratorConfig.authType;
     if (
       authType === AuthType.USE_GEMINI ||
-      authType === AuthType.USE_VERTEX_AI
+      authType === AuthType.USE_VERTEX_AI ||
+      authType === AuthType.ANTHROPIC_DIRECT ||
+      authType === AuthType.VERTEX_CLAUDE
     ) {
       this.setHasAccessToPreviewModel(true);
     }

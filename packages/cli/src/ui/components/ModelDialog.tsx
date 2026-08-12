@@ -177,13 +177,13 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       {
         value: CLAUDE_OPUS_5_MODEL,
         title: getDisplayString(CLAUDE_OPUS_5_MODEL),
-        description: 'Claude Opus 5 model via LiteLLM',
+        description: 'Claude Opus 5 model',
         key: CLAUDE_OPUS_5_MODEL,
       },
       {
         value: CLAUDE_SONNET_5_MODEL,
         title: getDisplayString(CLAUDE_SONNET_5_MODEL),
-        description: 'Claude Sonnet 5 model via LiteLLM',
+        description: 'Claude Sonnet 5 model',
         key: CLAUDE_SONNET_5_MODEL,
       },
       {

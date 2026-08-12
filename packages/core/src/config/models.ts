@@ -103,6 +103,12 @@ export const VALID_GEMINI_MODELS = new Set([
   GEMMA_4_26B_A4B_IT_MODEL,
   CLAUDE_OPUS_5_MODEL,
   CLAUDE_SONNET_5_MODEL,
+  'claude-3-5-sonnet-v2@20241022',
+  'claude-3-7-sonnet-20250219',
+  'claude-3-opus-20240229',
+  'claude-3-opus@20240229',
+  'claude-3-5-sonnet',
+  'claude-3-opus',
 ]);
 
 /** @deprecated Use GEMINI_MODEL_ALIAS_AUTO instead. */
@@ -221,8 +227,29 @@ export function resolveModel(
       resolved = DEFAULT_GEMINI_FLASH_LITE_MODEL;
       break;
     }
+    case 'claude-sonnet-5':
+    case 'claude-3-5-sonnet':
+    case 'claude-3-5-sonnet-v2@20241022':
+    case 'claude-3-7-sonnet':
+    case 'claude-3-7-sonnet-20250219': {
+      resolved = CLAUDE_SONNET_5_MODEL;
+      break;
+    }
+    case 'claude-opus-5':
+    case 'claude-3-opus':
+    case 'claude-3-opus-20240229':
+    case 'claude-3-opus@20240229': {
+      resolved = CLAUDE_OPUS_5_MODEL;
+      break;
+    }
     default: {
-      resolved = normalizedModel;
+      if (normalizedModel.includes('sonnet')) {
+        resolved = CLAUDE_SONNET_5_MODEL;
+      } else if (normalizedModel.includes('opus')) {
+        resolved = CLAUDE_OPUS_5_MODEL;
+      } else {
+        resolved = normalizedModel;
+      }
       break;
     }
   }

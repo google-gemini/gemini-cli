@@ -46,5 +46,29 @@ export async function validateAuthMethod(
     return null;
   }
 
+  if (authMethod === AuthType.ANTHROPIC_DIRECT) {
+    const key = process.env['ANTHROPIC_API_KEY'];
+    if (!key) {
+      return (
+        'When using direct Anthropic API, you must specify the ANTHROPIC_API_KEY environment variable.\n' +
+        'Update your environment and try again!'
+      );
+    }
+    return null;
+  }
+
+  if (authMethod === AuthType.VERTEX_CLAUDE) {
+    const hasVertexProject =
+      !!process.env['GOOGLE_CLOUD_PROJECT'] ||
+      !!process.env['GOOGLE_CLOUD_PROJECT_ID'];
+    if (!hasVertexProject) {
+      return (
+        'When using direct Vertex AI for Claude, you must specify GOOGLE_CLOUD_PROJECT or ANTHROPIC_API_KEY.\n' +
+        'Update your environment and try again!'
+      );
+    }
+    return null;
+  }
+
   return 'Invalid auth method selected.';
 }

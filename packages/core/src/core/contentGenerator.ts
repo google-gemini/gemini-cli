@@ -49,9 +49,11 @@ import { RecordingContentGenerator } from './recordingContentGenerator.js';
 import { getVersion, resolveModel } from '../../index.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
 import { ModelMappingContentGenerator } from './modelMappingContentGenerator.js';
+import { AnthropicContentGenerator } from './anthropicContentGenerator.js';
 import {
   CCPA_AI_MODEL_MAPPINGS,
   VERTEX_AI_MODEL_MAPPINGS,
+  isClaudeModel,
 } from '../config/models.js';
 
 /**
@@ -88,6 +90,8 @@ export enum AuthType {
   LEGACY_CLOUD_SHELL = 'cloud-shell',
   COMPUTE_ADC = 'compute-default-credentials',
   GATEWAY = 'gateway',
+  ANTHROPIC_DIRECT = 'anthropic-direct',
+  VERTEX_CLAUDE = 'vertex-claude',
 }
 
 /**
@@ -98,9 +102,26 @@ export enum AuthType {
  * 2. GOOGLE_GENAI_USE_VERTEXAI=true -> USE_VERTEX_AI
  * 3. GEMINI_API_KEY -> USE_GEMINI
  */
-export function getAuthTypeFromEnv(_model?: string): AuthType | undefined {
+export function getAuthTypeFromEnv(model?: string): AuthType | undefined {
+  const isProxy = !!(
+    process.env['GOOGLE_GEMINI_BASE_URL'] ||
+    process.env['GOOGLE_VERTEX_BASE_URL']
+  );
+  if (isClaudeModel(model) && !isProxy) {
+    if (process.env['ANTHROPIC_API_KEY']) {
+      return AuthType.ANTHROPIC_DIRECT;
+    }
+    if (
+      process.env['GOOGLE_CLOUD_PROJECT'] ||
+      process.env['GOOGLE_CLOUD_PROJECT_ID'] ||
+      process.env['GOOGLE_GENAI_USE_VERTEXAI'] === 'true'
+    ) {
+      return AuthType.VERTEX_CLAUDE;
+    }
+    return AuthType.ANTHROPIC_DIRECT;
+  }
   if (process.env['GOOGLE_GEMINI_BASE_URL']) {
-    return AuthType.GATEWAY;
+    return AuthType.USE_GEMINI;
   }
   if (process.env['GOOGLE_GENAI_USE_GCA'] === 'true') {
     return AuthType.LOGIN_WITH_GOOGLE;
@@ -170,14 +191,6 @@ export async function createContentGeneratorConfig(
   customHeaders?: Record<string, string>,
   vertexAiRouting?: VertexAiRoutingConfig,
 ): Promise<ContentGeneratorConfig> {
-  const contentGeneratorConfig: ContentGeneratorConfig = {
-    authType,
-    proxy: config?.getProxy(),
-    baseUrl,
-    customHeaders,
-    vertexAiRouting,
-  };
-
   const getEnv = (key: string) => {
     if (config?.env && config.env[key] !== undefined) {
       return config.env[key];
@@ -185,13 +198,27 @@ export async function createContentGeneratorConfig(
     return process.env[key];
   };
 
-  // If we are using Google auth or we are in Cloud Shell, there is nothing else to validate for now.
-  // Return before touching the API-key keychain: on Linux without a Secret Service
-  // (WSL/SSH/Docker/CI) keytar can block indefinitely on its functional probe.
+  const contentGeneratorConfig: ContentGeneratorConfig = {
+    authType,
+    proxy: config?.getProxy(),
+    baseUrl:
+      baseUrl ||
+      getEnv('GOOGLE_GEMINI_BASE_URL') ||
+      getEnv('GOOGLE_VERTEX_BASE_URL'),
+    customHeaders,
+    vertexAiRouting,
+  };
+
   if (
-    authType === AuthType.LOGIN_WITH_GOOGLE ||
-    authType === AuthType.COMPUTE_ADC
+    authType === AuthType.ANTHROPIC_DIRECT ||
+    authType === AuthType.VERTEX_CLAUDE
   ) {
+    const anthropicApiKey = apiKey || getEnv('ANTHROPIC_API_KEY') || undefined;
+    contentGeneratorConfig.authType = anthropicApiKey
+      ? AuthType.ANTHROPIC_DIRECT
+      : AuthType.VERTEX_CLAUDE;
+    contentGeneratorConfig.apiKey = anthropicApiKey;
+    contentGeneratorConfig.vertexai = !anthropicApiKey;
     return contentGeneratorConfig;
   }
 
@@ -252,6 +279,24 @@ export async function createContentGenerator(
         gcConfig.fakeResponses,
       );
       return new LoggingContentGenerator(fakeGenerator, gcConfig);
+    }
+    if (
+      config.authType === AuthType.ANTHROPIC_DIRECT ||
+      config.authType === AuthType.VERTEX_CLAUDE ||
+      isClaudeModel(gcConfig.getModel())
+    ) {
+      const resolvedModel = resolveModel(
+        gcConfig.getModel(),
+        false,
+        false,
+        true,
+        gcConfig,
+      );
+      const anthropicGen = new AnthropicContentGenerator(
+        config,
+        resolvedModel,
+      );
+      return new LoggingContentGenerator(anthropicGen, gcConfig);
     }
     const version = await getVersion();
     const model = resolveModel(

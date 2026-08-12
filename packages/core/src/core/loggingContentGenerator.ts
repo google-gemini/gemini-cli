@@ -211,18 +211,17 @@ export class LoggingContentGenerator implements ContentGenerator {
 
     const genConfig = this.config.getContentGeneratorConfig();
 
-    // Case 2: Using an API key for Vertex AI.
-    if (genConfig?.vertexai) {
-      const location = process.env['GOOGLE_CLOUD_LOCATION'];
-      if (location) {
-        return { address: `${location}-aiplatform.googleapis.com`, port: 443 };
-      } else {
-        return { address: 'unknown', port: 0 };
-      }
+    // Case 2: Direct Anthropic or Vertex AI Claude
+    if (genConfig?.authType === 'anthropic-direct') {
+      return { address: 'api.anthropic.com', port: 443 };
+    }
+
+    if (genConfig?.authType === 'vertex-claude' || genConfig?.vertexai) {
+      const location = process.env['GOOGLE_CLOUD_LOCATION'] || 'global';
+      return { address: `${location}-aiplatform.googleapis.com`, port: 443 };
     }
 
     // Case 3: Default to the public Gemini API endpoint.
-    // This is used when an API key is provided but not for Vertex AI.
     return { address: `generativelanguage.googleapis.com`, port: 443 };
   }
 
