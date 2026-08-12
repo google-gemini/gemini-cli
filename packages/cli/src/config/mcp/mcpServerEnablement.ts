@@ -225,6 +225,12 @@ export class McpServerEnablementManager {
    */
   async isFileEnabled(serverName: string): Promise<boolean> {
     const config = await this.readConfig();
+    if (config === undefined) {
+      // Fail closed: a config we couldn't parse is not the same as an
+      // empty one. Treating it as empty would silently re-enable every
+      // server the user had disabled.
+      return false;
+    }
     const state = config[normalizeServerId(serverName)];
     return state?.enabled ?? true;
   }
@@ -254,6 +260,11 @@ export class McpServerEnablementManager {
   async enable(serverName: string): Promise<void> {
     const normalizedName = normalizeServerId(serverName);
     const config = await this.readConfig();
+    if (config === undefined) {
+      // Don't write while the existing file can't be read; that would
+      // overwrite whatever state it currently holds.
+      return;
+    }
 
     if (normalizedName in config) {
       delete config[normalizedName];
@@ -267,6 +278,11 @@ export class McpServerEnablementManager {
    */
   async disable(serverName: string): Promise<void> {
     const config = await this.readConfig();
+    if (config === undefined) {
+      // Don't write while the existing file can't be read; that would
+      // overwrite whatever state it currently holds.
+      return;
+    }
     config[normalizeServerId(serverName)] = { enabled: false };
     await this.writeConfig(config);
   }
@@ -354,8 +370,12 @@ export class McpServerEnablementManager {
 
   /**
    * Read config from file asynchronously.
+   *
+   * Returns `undefined` (rather than `{}`) when the file exists but could
+   * not be read or parsed, so callers can distinguish "no config yet" from
+   * "config is corrupted" instead of treating the latter as the former.
    */
-  private async readConfig(): Promise<McpServerEnablementConfig> {
+  private async readConfig(): Promise<McpServerEnablementConfig | undefined> {
     try {
       const content = await fs.readFile(this.configFilePath, 'utf-8');
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -373,7 +393,7 @@ export class McpServerEnablementManager {
         'Failed to read MCP server enablement config.',
         error,
       );
-      return {};
+      return undefined;
     }
   }
 

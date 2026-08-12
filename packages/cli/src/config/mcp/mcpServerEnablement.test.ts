@@ -110,6 +110,22 @@ describe('McpServerEnablementManager', () => {
     ).toBe(true);
   });
 
+  it('should fail closed and refuse to write when config file is corrupted', async () => {
+    await manager.disable('server-a');
+    inMemoryFs['/virtual-home/.gemini/mcp-server-enablement.json'] =
+      '{not valid json';
+
+    expect(await manager.isFileEnabled('server-a')).toBe(false);
+    expect(await manager.isFileEnabled('server-b')).toBe(false);
+
+    await manager.disable('server-b');
+    await manager.enable('server-a');
+
+    expect(inMemoryFs['/virtual-home/.gemini/mcp-server-enablement.json']).toBe(
+      '{not valid json',
+    );
+  });
+
   it('should share session state across getInstance calls', () => {
     const instance1 = McpServerEnablementManager.getInstance();
     const instance2 = McpServerEnablementManager.getInstance();
