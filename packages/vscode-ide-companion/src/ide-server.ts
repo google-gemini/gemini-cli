@@ -127,6 +127,7 @@ export class IDEServer {
   private authToken: string | undefined;
   private transports: { [sessionId: string]: StreamableHTTPServerTransport } =
     {};
+  private keepAliveIntervals: { [sessionId: string]: NodeJS.Timeout } = {};
   private openFilesManager: OpenFilesManager | undefined;
   diffManager: DiffManager;
 
@@ -222,23 +223,32 @@ export class IDEServer {
             onsessioninitialized: (newSessionId) => {
               this.log(`New session initialized: ${newSessionId}`);
               this.transports[newSessionId] = transport;
+              this.keepAliveIntervals[newSessionId] = keepAlive;
             },
           });
-          let missedPings = 0;
+          let consecutiveMissedPings = 0;
+          let totalMissedPings = 0;
           const keepAlive = setInterval(() => {
             const sessionId = transport.sessionId ?? 'unknown';
             transport
               .send({ jsonrpc: '2.0', method: 'ping' })
+              .then(() => {
+                consecutiveMissedPings = 0;
+              })
               .catch((error) => {
-                missedPings++;
+                consecutiveMissedPings++;
+                totalMissedPings++;
                 this.log(
-                  `Failed to send keep-alive ping for session ${sessionId}. Missed pings: ${missedPings}. Error: ${error.message}`,
+                  `Failed to send keep-alive ping for session ${sessionId}. Consecutive missed: ${consecutiveMissedPings}, total missed: ${totalMissedPings}. Error: ${error.message}`,
                 );
-                if (missedPings >= 3) {
+                if (consecutiveMissedPings >= 3 || totalMissedPings >= 10) {
                   this.log(
-                    `Session ${sessionId} missed ${missedPings} pings. Closing connection and cleaning up interval.`,
+                    `Session ${sessionId} reached failure threshold (consecutive: ${consecutiveMissedPings}, total: ${totalMissedPings}). Closing connection and cleaning up interval.`,
                   );
                   clearInterval(keepAlive);
+                  if (transport.sessionId) {
+                    delete this.keepAliveIntervals[transport.sessionId];
+                  }
                   void transport.close();
                 }
               });
@@ -247,6 +257,7 @@ export class IDEServer {
           transport.onclose = () => {
             clearInterval(keepAlive);
             if (transport.sessionId) {
+              delete this.keepAliveIntervals[transport.sessionId];
               this.log(`Session closed: ${transport.sessionId}`);
               sessionsWithInitialNotification.delete(transport.sessionId);
               delete this.transports[transport.sessionId];
@@ -412,6 +423,12 @@ export class IDEServer {
       new Promise<void>((resolve) => setTimeout(resolve, 1000)),
     ]);
 
+    // Clear all keep-alive intervals regardless of whether transport.close() or onclose resolved
+    for (const interval of Object.values(this.keepAliveIntervals)) {
+      clearInterval(interval);
+    }
+    this.keepAliveIntervals = {};
+
     // Best-effort cleanup: clear transport references so lingering background closes don't contaminate server state
     this.transports = {};
 
@@ -445,6 +462,11 @@ export class IDEServer {
   /** @internal */
   getTransports(): Readonly<Record<string, StreamableHTTPServerTransport>> {
     return this.transports;
+  }
+
+  /** @internal */
+  getKeepAliveIntervals(): Readonly<Record<string, NodeJS.Timeout>> {
+    return this.keepAliveIntervals;
   }
 }
 

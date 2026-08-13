@@ -402,10 +402,11 @@ describe('IDEServer', () => {
       return response;
     };
 
-    it('a) should resolve stop() even when transport.close() hangs', async () => {
+    it('a) should resolve stop() and clear keep-alive intervals even when transport.close() hangs', async () => {
       const { StreamableHTTPServerTransport } = await import(
         '@modelcontextprotocol/sdk/server/streamableHttp.js'
       );
+      const clearIntervalSpy = vi.spyOn(global, 'clearInterval');
       vi.spyOn(
         StreamableHTTPServerTransport.prototype,
         'close',
@@ -417,8 +418,9 @@ describe('IDEServer', () => {
       const startTime = Date.now();
       await ideServer.stop();
       const duration = Date.now() - startTime;
-      // Because we race with a 1000ms timeout in stop(), it should resolve in ~1000ms. We give it 1500 to be safe.
       expect(duration).toBeLessThan(1500);
+      expect(clearIntervalSpy).toHaveBeenCalled();
+      expect(Object.keys(ideServer.getKeepAliveIntervals()).length).toBe(0);
     });
 
     it('b) should call close on every entry in this.transports before resolving', async () => {
@@ -440,7 +442,7 @@ describe('IDEServer', () => {
       expect(closeSpy).toHaveBeenCalledTimes(2);
     });
 
-    it('c) keep-alive: 3 non-consecutive missed pings closes transport', async () => {
+    it('c) keep-alive: oscillating failures (5 total, never 3 consecutive) do not close transport, 3 consecutive failures do', async () => {
       const { StreamableHTTPServerTransport } = await import(
         '@modelcontextprotocol/sdk/server/streamableHttp.js'
       );
@@ -458,16 +460,17 @@ describe('IDEServer', () => {
         (res as unknown as { status: (c: number) => { end: () => void } })
           .status(200)
           .end();
-      }); // ensure setInterval is reached and fetch resolves
+      });
 
       let failPing = false;
-      const sendSpy = vi
-        .spyOn(StreamableHTTPServerTransport.prototype, 'send')
-        .mockImplementation(async (message) => {
-          if ((message as { method?: string }).method === 'ping' && failPing) {
-            throw new Error('Ping failed');
-          }
-        });
+      vi.spyOn(
+        StreamableHTTPServerTransport.prototype,
+        'send',
+      ).mockImplementation(async (message) => {
+        if ((message as { method?: string }).method === 'ping' && failPing) {
+          throw new Error('Ping failed');
+        }
+      });
       const closeSpy = vi.spyOn(
         StreamableHTTPServerTransport.prototype,
         'close',
@@ -476,41 +479,34 @@ describe('IDEServer', () => {
       await initSession();
       expect(intervalCb).toBeDefined();
 
-      // ping 1: success
-      failPing = false;
-      intervalCb!();
-      await new Promise(process.nextTick);
-      expect(sendSpy).toHaveBeenCalledTimes(1);
+      // Oscillating pattern: 5 fails total (fail, success, fail, success, fail, success, fail, success, fail)
+      for (let i = 0; i < 5; i++) {
+        failPing = true;
+        intervalCb!();
+        await new Promise(process.nextTick);
 
-      // ping 2: fail
+        failPing = false;
+        intervalCb!();
+        await new Promise(process.nextTick);
+      }
+
+      // 5 total failures, but 0 consecutive at the end -> transport should still be open
+      expect(closeSpy).not.toHaveBeenCalled();
+
+      // Now trigger 3 consecutive failures
       failPing = true;
       intervalCb!();
       await new Promise(process.nextTick);
-      expect(sendSpy).toHaveBeenCalledTimes(2);
-
-      // ping 3: success
-      failPing = false;
       intervalCb!();
       await new Promise(process.nextTick);
-      expect(sendSpy).toHaveBeenCalledTimes(3);
-
-      // ping 4: fail
-      failPing = true;
       intervalCb!();
       await new Promise(process.nextTick);
-      expect(sendSpy).toHaveBeenCalledTimes(4);
-
-      // ping 5: fail -> 3rd failure total, should close
-      failPing = true;
-      intervalCb!();
-      await new Promise(process.nextTick);
-      expect(sendSpy).toHaveBeenCalledTimes(5);
 
       expect(closeSpy).toHaveBeenCalledTimes(1);
       expect(clearIntervalSpy).toHaveBeenCalled();
     });
 
-    it('d) keep-alive: fewer than 3 total failures does not close transport', async () => {
+    it('d) keep-alive: reaching total failure limit (10 total) closes transport even without 3 consecutive', async () => {
       const { StreamableHTTPServerTransport } = await import(
         '@modelcontextprotocol/sdk/server/streamableHttp.js'
       );
@@ -530,13 +526,14 @@ describe('IDEServer', () => {
       });
 
       let failPing = false;
-      const sendSpy = vi
-        .spyOn(StreamableHTTPServerTransport.prototype, 'send')
-        .mockImplementation(async (message) => {
-          if ((message as { method?: string }).method === 'ping' && failPing) {
-            throw new Error('Ping failed');
-          }
-        });
+      vi.spyOn(
+        StreamableHTTPServerTransport.prototype,
+        'send',
+      ).mockImplementation(async (message) => {
+        if ((message as { method?: string }).method === 'ping' && failPing) {
+          throw new Error('Ping failed');
+        }
+      });
       const closeSpy = vi.spyOn(
         StreamableHTTPServerTransport.prototype,
         'close',
@@ -545,22 +542,20 @@ describe('IDEServer', () => {
       await initSession();
       expect(intervalCb).toBeDefined();
 
-      // Fail 2 times
-      failPing = true;
-      intervalCb!();
-      await new Promise(process.nextTick);
-      intervalCb!();
-      await new Promise(process.nextTick);
-
-      // Succeed 5 times
-      failPing = false;
-      for (let i = 0; i < 5; i++) {
+      // Oscillate 10 times -> 10 total failures reached
+      for (let i = 0; i < 10; i++) {
+        failPing = true;
         intervalCb!();
         await new Promise(process.nextTick);
+
+        if (i < 9) {
+          failPing = false;
+          intervalCb!();
+          await new Promise(process.nextTick);
+        }
       }
 
-      expect(sendSpy).toHaveBeenCalledTimes(7);
-      expect(closeSpy).not.toHaveBeenCalled();
+      expect(closeSpy).toHaveBeenCalledTimes(1);
     });
   });
 
