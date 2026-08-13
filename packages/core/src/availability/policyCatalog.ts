@@ -16,6 +16,10 @@ import {
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL,
+  CLAUDE_SONNET_5_MODEL,
+  CLAUDE_OPUS_5_MODEL,
+  CLAUDE_SONNET_V1_MODEL,
+  CLAUDE_OPUS_V1_MODEL,
   resolveModel,
 } from '../config/models.js';
 import type { UserTierId } from '../code_assist/types.js';
@@ -140,28 +144,30 @@ export function getFlashLitePolicyChain(): ModelPolicyChain {
 }
 
 export function getClaudePolicyChain(requestedModel: string): ModelPolicyChain {
-  if (requestedModel === 'claude-auto' || requestedModel === 'auto-claude') {
+  const isAutoChain =
+    requestedModel === 'claude-auto' || requestedModel === 'auto-claude';
+  if (isAutoChain) {
     return [
       definePolicy({
-        model: 'claude-sonnet-5',
+        model: CLAUDE_SONNET_5_MODEL,
         maxAttempts: 3,
         actions: SILENT_ACTIONS,
         stateTransitions: { ...DEFAULT_STATE, transient: 'sticky_retry' },
       }),
       definePolicy({
-        model: 'claude-opus-5',
+        model: CLAUDE_OPUS_5_MODEL,
         maxAttempts: 3,
         actions: SILENT_ACTIONS,
         stateTransitions: { ...DEFAULT_STATE, transient: 'sticky_retry' },
       }),
       definePolicy({
-        model: 'claude-3-7-sonnet',
+        model: CLAUDE_SONNET_V1_MODEL,
         maxAttempts: 3,
         actions: SILENT_ACTIONS,
         stateTransitions: { ...DEFAULT_STATE, transient: 'sticky_retry' },
       }),
       definePolicy({
-        model: 'claude-3-opus',
+        model: CLAUDE_OPUS_V1_MODEL,
         isLastResort: true,
         maxAttempts: 5,
         actions: SILENT_ACTIONS,

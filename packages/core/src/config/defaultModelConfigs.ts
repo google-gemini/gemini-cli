@@ -420,6 +420,24 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       dialogDescription: 'Claude Sonnet 5 model via LiteLLM',
       features: { thinking: true, multimodalToolUse: true },
     },
+    'claude-sonnet-4-5': {
+      displayName: 'Claude Sonnet 4.5',
+      tier: 'custom',
+      family: 'claude',
+      isPreview: false,
+      isVisible: true,
+      dialogDescription: 'Claude Sonnet 4.5 model via LiteLLM',
+      features: { thinking: true, multimodalToolUse: true },
+    },
+    'claude-opus-4-8': {
+      displayName: 'Claude Opus 4.8',
+      tier: 'custom',
+      family: 'claude',
+      isPreview: false,
+      isVisible: true,
+      dialogDescription: 'Claude Opus 4.8 model via LiteLLM',
+      features: { thinking: true, multimodalToolUse: true },
+    },
     'claude-auto': {
       displayName: 'Claude AUTO',
       tier: 'auto',
@@ -427,7 +445,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       isPreview: false,
       isVisible: true,
       dialogDescription:
-        'Claude AUTO fallback chain (Sonnet 5 -> Opus 5 -> Sonnet 3.7 -> Opus 3)',
+        'Claude AUTO fallback chain (Sonnet 5 -> Opus 5 -> Sonnet 4.5 -> Opus 4.8)',
       features: { thinking: true, multimodalToolUse: true },
     },
 

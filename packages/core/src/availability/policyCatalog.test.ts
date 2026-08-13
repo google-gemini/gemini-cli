@@ -134,8 +134,8 @@ describe('policyCatalog', () => {
     expect(chain.map((p) => p.model)).toEqual([
       'claude-sonnet-5',
       'claude-opus-5',
-      'claude-3-7-sonnet',
-      'claude-3-opus',
+      'claude-sonnet-4-5',
+      'claude-opus-4-8',
     ]);
     expect(chain[3]?.isLastResort).toBe(true);
     expect(() => validateModelPolicyChain(chain)).not.toThrow();

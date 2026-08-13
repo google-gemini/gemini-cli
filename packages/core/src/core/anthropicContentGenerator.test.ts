@@ -7,12 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AnthropicContentGenerator } from './anthropicContentGenerator.js';
 import type { ContentGeneratorConfig } from './contentGenerator.js';
-import {
-  resolveModel,
-  CLAUDE_SONNET_5_MODEL,
-  CLAUDE_OPUS_5_MODEL,
-  VALID_GEMINI_MODELS,
-} from '../config/models.js';
+import { resolveModel, VALID_GEMINI_MODELS } from '../config/models.js';
 
 import type { GenerateContentParameters } from '@google/genai';
 
@@ -80,13 +75,13 @@ describe('AnthropicContentGenerator verification', () => {
 
   it('resolves legacy and full Anthropic model IDs to canonical Claude models', () => {
     expect(resolveModel('claude-3-5-sonnet-v2@20241022')).toBe(
-      CLAUDE_SONNET_5_MODEL,
+      'claude-3-5-sonnet',
     );
     expect(resolveModel('claude-3-7-sonnet-20250219')).toBe(
-      CLAUDE_SONNET_5_MODEL,
+      'claude-3-7-sonnet',
     );
-    expect(resolveModel('claude-3-opus-20240229')).toBe(CLAUDE_OPUS_5_MODEL);
-    expect(resolveModel('claude-3-opus@20240229')).toBe(CLAUDE_OPUS_5_MODEL);
+    expect(resolveModel('claude-3-opus-20240229')).toBe('claude-3-opus');
+    expect(resolveModel('claude-3-opus@20240229')).toBe('claude-3-opus');
   });
 
   it('validates Claude model strings in VALID_GEMINI_MODELS set', () => {

@@ -87,6 +87,10 @@ export const GEMMA_4_26B_A4B_IT_MODEL = 'gemma-4-26b-a4b-it';
 export const CLAUDE_AUTO_MODEL = 'claude-auto';
 export const CLAUDE_OPUS_5_MODEL = 'claude-opus-5';
 export const CLAUDE_SONNET_5_MODEL = 'claude-sonnet-5';
+export const CLAUDE_SONNET_4_5_MODEL = 'claude-sonnet-4-5';
+export const CLAUDE_OPUS_4_8_MODEL = 'claude-opus-4-8';
+export const CLAUDE_SONNET_V1_MODEL = CLAUDE_SONNET_4_5_MODEL;
+export const CLAUDE_OPUS_V1_MODEL = CLAUDE_OPUS_4_8_MODEL;
 export const CLAUDE_HAIKU_4_5_MODEL = 'claude-haiku-4-5';
 
 export const VALID_GEMINI_MODELS = new Set([
@@ -106,16 +110,21 @@ export const VALID_GEMINI_MODELS = new Set([
   CLAUDE_AUTO_MODEL,
   CLAUDE_OPUS_5_MODEL,
   CLAUDE_SONNET_5_MODEL,
+  CLAUDE_SONNET_4_5_MODEL,
+  CLAUDE_OPUS_4_8_MODEL,
   CLAUDE_HAIKU_4_5_MODEL,
   'auto-claude',
   'gemini-3.1-pro',
   'gemini-3.6-flash',
   'gemini-3.5-flash-lite',
+  'claude-4-5-sonnet',
+  'claude-4-8-opus',
   'claude-3-5-sonnet-v2@20241022',
   'claude-3-7-sonnet-20250219',
   'claude-3-opus-20240229',
   'claude-3-opus@20240229',
   'claude-3-5-sonnet',
+  'claude-3-7-sonnet',
   'claude-3-opus',
 ]);
 
@@ -240,29 +249,42 @@ export function resolveModel(
       resolved = CLAUDE_AUTO_MODEL;
       break;
     }
-    case 'claude-sonnet-5':
-    case 'claude-3-5-sonnet':
-    case 'claude-3-5-sonnet-v2@20241022':
-    case 'claude-3-7-sonnet':
-    case 'claude-3-7-sonnet-20250219': {
+    case 'claude-sonnet-5': {
       resolved = CLAUDE_SONNET_5_MODEL;
       break;
     }
-    case 'claude-opus-5':
-    case 'claude-3-opus':
-    case 'claude-3-opus-20240229':
-    case 'claude-3-opus@20240229': {
+    case 'claude-sonnet-4-5':
+    case 'claude-4-5-sonnet': {
+      resolved = CLAUDE_SONNET_4_5_MODEL;
+      break;
+    }
+    case 'claude-3-7-sonnet':
+    case 'claude-3-7-sonnet-20250219': {
+      resolved = 'claude-3-7-sonnet';
+      break;
+    }
+    case 'claude-3-5-sonnet':
+    case 'claude-3-5-sonnet-v2@20241022': {
+      resolved = 'claude-3-5-sonnet';
+      break;
+    }
+    case 'claude-opus-5': {
       resolved = CLAUDE_OPUS_5_MODEL;
       break;
     }
+    case 'claude-opus-4-8':
+    case 'claude-4-8-opus': {
+      resolved = CLAUDE_OPUS_4_8_MODEL;
+      break;
+    }
+    case 'claude-3-opus':
+    case 'claude-3-opus-20240229':
+    case 'claude-3-opus@20240229': {
+      resolved = 'claude-3-opus';
+      break;
+    }
     default: {
-      if (normalizedModel.includes('sonnet')) {
-        resolved = CLAUDE_SONNET_5_MODEL;
-      } else if (normalizedModel.includes('opus')) {
-        resolved = CLAUDE_OPUS_5_MODEL;
-      } else {
-        resolved = normalizedModel;
-      }
+      resolved = normalizedModel;
       break;
     }
   }
@@ -703,19 +725,27 @@ export const CCPA_AI_MODEL_MAPPINGS: Record<string, string> = {
   [DEFAULT_GEMINI_3_5_FLASH_MODEL]: SECONDARY_GEMINI_3_5_FLASH_MODEL,
   [CLAUDE_OPUS_5_MODEL]: CLAUDE_OPUS_5_MODEL,
   [CLAUDE_SONNET_5_MODEL]: CLAUDE_SONNET_5_MODEL,
+  [CLAUDE_SONNET_4_5_MODEL]: CLAUDE_SONNET_4_5_MODEL,
+  [CLAUDE_OPUS_4_8_MODEL]: CLAUDE_OPUS_4_8_MODEL,
 };
 
 export const VERTEX_AI_MODEL_MAPPINGS: Record<string, string> = {
   [CLAUDE_OPUS_5_MODEL]: CLAUDE_OPUS_5_MODEL,
   [CLAUDE_SONNET_5_MODEL]: CLAUDE_SONNET_5_MODEL,
+  [CLAUDE_SONNET_4_5_MODEL]: CLAUDE_SONNET_4_5_MODEL,
+  [CLAUDE_OPUS_4_8_MODEL]: CLAUDE_OPUS_4_8_MODEL,
 };
 
 export const VERTEX_CLAUDE_MODEL_MAP: Record<string, string> = {
   [CLAUDE_SONNET_5_MODEL]: CLAUDE_SONNET_5_MODEL,
   [CLAUDE_OPUS_5_MODEL]: CLAUDE_OPUS_5_MODEL,
+  [CLAUDE_SONNET_4_5_MODEL]: CLAUDE_SONNET_4_5_MODEL,
+  [CLAUDE_OPUS_4_8_MODEL]: CLAUDE_OPUS_4_8_MODEL,
+  'claude-4-5-sonnet': CLAUDE_SONNET_4_5_MODEL,
+  'claude-4-8-opus': CLAUDE_OPUS_4_8_MODEL,
   'claude-3-5-sonnet': CLAUDE_SONNET_5_MODEL,
-  'claude-3-opus': CLAUDE_OPUS_5_MODEL,
   'claude-3-7-sonnet': 'claude-3-7-sonnet',
+  'claude-3-opus': 'claude-3-opus',
 };
 
 export function resolveVertexClaudeModel(modelName: string): string {
