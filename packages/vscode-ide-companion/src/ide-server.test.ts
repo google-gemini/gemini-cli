@@ -414,6 +414,7 @@ describe('IDEServer', () => {
 
       await initSession();
       expect(Object.keys(ideServer.getTransports()).length).toBe(1);
+      expect(Object.keys(ideServer.getKeepAliveIntervals()).length).toBe(1);
 
       const startTime = Date.now();
       await ideServer.stop();

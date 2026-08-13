@@ -218,17 +218,20 @@ export class IDEServer {
         if (sessionId && this.transports[sessionId]) {
           transport = this.transports[sessionId];
         } else if (!sessionId && isInitializeRequest(req.body)) {
+          let keepAlive: NodeJS.Timeout | undefined = undefined;
           transport = new StreamableHTTPServerTransport({
             sessionIdGenerator: () => randomUUID(),
             onsessioninitialized: (newSessionId) => {
               this.log(`New session initialized: ${newSessionId}`);
               this.transports[newSessionId] = transport;
-              this.keepAliveIntervals[newSessionId] = keepAlive;
+              if (keepAlive) {
+                this.keepAliveIntervals[newSessionId] = keepAlive;
+              }
             },
           });
           let consecutiveMissedPings = 0;
           let totalMissedPings = 0;
-          const keepAlive = setInterval(() => {
+          keepAlive = setInterval(() => {
             const sessionId = transport.sessionId ?? 'unknown';
             transport
               .send({ jsonrpc: '2.0', method: 'ping' })
@@ -245,7 +248,9 @@ export class IDEServer {
                   this.log(
                     `Session ${sessionId} reached failure threshold (consecutive: ${consecutiveMissedPings}, total: ${totalMissedPings}). Closing connection and cleaning up interval.`,
                   );
-                  clearInterval(keepAlive);
+                  if (keepAlive) {
+                    clearInterval(keepAlive);
+                  }
                   if (transport.sessionId) {
                     delete this.keepAliveIntervals[transport.sessionId];
                   }
@@ -255,7 +260,9 @@ export class IDEServer {
           }, 60000); // 60 sec
 
           transport.onclose = () => {
-            clearInterval(keepAlive);
+            if (keepAlive) {
+              clearInterval(keepAlive);
+            }
             if (transport.sessionId) {
               delete this.keepAliveIntervals[transport.sessionId];
               this.log(`Session closed: ${transport.sessionId}`);
