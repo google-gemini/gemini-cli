@@ -132,7 +132,9 @@ export function startCallbackServer(
           timeoutId = undefined;
         }
         abortController.signal.removeEventListener('abort', onAbort);
-        server.close();
+        if (server && server.listening) {
+          server.close();
+        }
       };
 
       const onAbort = () => {

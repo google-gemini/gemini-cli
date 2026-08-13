@@ -354,7 +354,10 @@ describe('oauth-flow', () => {
       ).catch(() => {});
 
       const error = await responseResult;
-      expect(error.message).toContain('State mismatch - possible CSRF attack');
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toContain(
+        'State mismatch - possible CSRF attack',
+      );
 
       expect(clearTimeoutSpy).toHaveBeenCalled();
       clearTimeoutSpy.mockRestore();
