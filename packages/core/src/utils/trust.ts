@@ -127,6 +127,25 @@ function getRealPath(location: string): string {
   return realPath;
 }
 
+/**
+ * Ranks rules that resolve to the same effective boundary. Higher wins:
+ * DO_NOT_TRUST is secure-by-default, and an explicit TRUST_FOLDER on the
+ * boundary itself is more deliberate than a TRUST_PARENT inherited from a rule
+ * one level deeper.
+ */
+function trustPrecedence(trustLevel: TrustLevel | undefined): number {
+  switch (trustLevel) {
+    case TrustLevel.DO_NOT_TRUST:
+      return 3;
+    case TrustLevel.TRUST_FOLDER:
+      return 2;
+    case TrustLevel.TRUST_PARENT:
+      return 1;
+    default:
+      return 0;
+  }
+}
+
 export class LoadedTrustedFolders {
   constructor(
     readonly user: TrustedFoldersFile,
@@ -180,6 +199,15 @@ export class LoadedTrustedFolders {
         // exactly at that parent boundary.
         if (normalizedEffectivePath.length > longestMatchLen) {
           longestMatchLen = normalizedEffectivePath.length;
+          longestMatchTrust = trustLevel;
+        } else if (
+          normalizedEffectivePath.length === longestMatchLen &&
+          trustPrecedence(trustLevel) > trustPrecedence(longestMatchTrust)
+        ) {
+          // Distinct rules can resolve to the same boundary (e.g. DO_NOT_TRUST
+          // on `/a/b` and TRUST_PARENT on `/a/b/child`). Object key order must
+          // not decide which one applies, so break the tie deterministically
+          // and secure-by-default rather than leaving it to iteration order.
           longestMatchTrust = trustLevel;
         }
       }

@@ -121,6 +121,36 @@ describe('Trust Utility (Core)', () => {
     ).toBe(true);
   });
 
+  it('should prefer DO_NOT_TRUST when a TRUST_PARENT rule resolves to the same boundary', () => {
+    // A TRUST_PARENT rule on `<dir>/.gemini` and a DO_NOT_TRUST rule on `<dir>`
+    // resolve to the exact same effective boundary, so neither is more
+    // specific than the other. The outcome must not depend on config key
+    // order: DO_NOT_TRUST wins either way.
+    const doNotTrustPath = path.resolve('/home/victim/project');
+    const trustParentPath = path.resolve('/home/victim/project/.gemini');
+
+    for (const config of [
+      {
+        [doNotTrustPath]: TrustLevel.DO_NOT_TRUST,
+        [trustParentPath]: TrustLevel.TRUST_PARENT,
+      },
+      {
+        [trustParentPath]: TrustLevel.TRUST_PARENT,
+        [doNotTrustPath]: TrustLevel.DO_NOT_TRUST,
+      },
+    ]) {
+      fs.writeFileSync(trustedFoldersPath, JSON.stringify(config));
+      resetTrustedFoldersForTesting();
+
+      const folders = loadTrustedFolders();
+
+      expect(folders.isPathTrusted(doNotTrustPath)).toBe(false);
+      expect(folders.isPathTrusted(path.join(doNotTrustPath, 'file.txt'))).toBe(
+        false,
+      );
+    }
+  });
+
   it('should handle TRUST_PARENT', () => {
     const config = {
       [path.resolve('/project/.gemini')]: TrustLevel.TRUST_PARENT,
