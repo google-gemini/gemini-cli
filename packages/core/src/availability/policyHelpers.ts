@@ -18,6 +18,7 @@ import {
   createSingleModelChain,
   getModelPolicyChain,
   getFlashLitePolicyChain,
+  getClaudePolicyChain,
   SILENT_ACTIONS,
 } from './policyCatalog.js';
 import {
@@ -25,6 +26,7 @@ import {
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
   isAutoModel,
+  isClaudeModel,
   isGemini3Model,
   resolveModel,
 } from '../config/models.js';
@@ -79,8 +81,11 @@ export function resolvePolicyChain(
   const effectiveWrapsAround =
     wrapsAround || isAutoPreferred || isAutoConfigured || isOriginallyGemini3;
 
-  // --- DYNAMIC PATH ---
-  if (config.getExperimentalDynamicModelConfiguration?.() === true) {
+  // --- CLAUDE PATH ---
+  if (isClaudeModel(modelFromConfig) || isClaudeModel(resolvedModel)) {
+    chain = getClaudePolicyChain(resolvedModel);
+    chain = applyDynamicSlicing(chain, resolvedModel, effectiveWrapsAround);
+  } else if (config.getExperimentalDynamicModelConfiguration?.() === true) {
     const context = {
       useGemini3_1: useGemini31,
       useCustomTools: useCustomToolModel,
@@ -105,7 +110,7 @@ export function resolvePolicyChain(
         const isAutoSelection = isAutoPreferred || isAutoConfigured;
         const previewEnabled =
           hasAccessToPreview &&
-          (isGemini3Model(resolvedModel, config) ||
+          (isOriginallyGemini3 ||
             normalizedPreferredModel === PREVIEW_GEMINI_MODEL_AUTO ||
             configuredModel === PREVIEW_GEMINI_MODEL_AUTO);
         const autoPrefix = isAutoSelection ? 'auto-' : '';
@@ -178,9 +183,17 @@ function applyDynamicSlicing(
   wrapsAround: boolean,
 ): ModelPolicyChain {
   const normalizedResolved = normalizeModelId(resolvedModel);
-  const activeIndex = chain.findIndex(
+  let activeIndex = chain.findIndex(
     (policy) => normalizeModelId(policy.model) === normalizedResolved,
   );
+  if (
+    activeIndex === -1 &&
+    (normalizedResolved === 'claude-auto' ||
+      normalizedResolved === 'auto-claude') &&
+    chain.length > 0
+  ) {
+    activeIndex = 0;
+  }
   if (activeIndex !== -1) {
     return wrapsAround
       ? [...chain.slice(activeIndex), ...chain.slice(0, activeIndex)]

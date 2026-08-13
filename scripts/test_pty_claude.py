@@ -8,12 +8,13 @@ import signal
 import sys
 import time
 
-def run_interactive_tui_claude_test(command, prompt_text, timeout=20):
+def run_interactive_tui_claude_test(command, prompt_text, model_name, timeout=20):
     master, slave = pty.openpty()
 
     env = os.environ.copy()
     env["GEMINI_CONFIG_DIR"] = os.path.expanduser("~/.gemini-claude-direct")
     env["GOOGLE_CLOUD_LOCATION"] = "us-east5"
+    env["GOOGLE_CLOUD_PROJECT"] = os.environ.get("GOOGLE_CLOUD_PROJECT", "cloud-dev-rel-ai-cli")
     env.pop("ANTHROPIC_BASE_URL", None)
     env.pop("GEMINI_CLI_CUSTOM_HEADERS", None)
 
@@ -32,7 +33,7 @@ def run_interactive_tui_claude_test(command, prompt_text, timeout=20):
         start_time = time.time()
 
         # Wait briefly for TUI initialization then send interactive prompt
-        time.sleep(2.5)
+        time.sleep(2.0)
         os.write(master, prompt_text.encode("utf-8") + b"\r\n")
 
         while time.time() - start_time < timeout:
@@ -44,7 +45,7 @@ def run_interactive_tui_claude_test(command, prompt_text, timeout=20):
                         break
                     output_buffer += data
                     decoded = output_buffer.decode("utf-8", errors="replace")
-                    if "TUI_OK_42" in decoded or "claude-sonnet-5" in decoded or "Routing request to model" in decoded:
+                    if "TUI_OK_42" in decoded or model_name in decoded or "claude-sonnet-5" in decoded or "Routing request to model" in decoded:
                         # Send SIGINT to exit interactive CLI loop cleanly
                         os.write(master, b"\x03")
                         time.sleep(0.5)
@@ -76,17 +77,19 @@ def run_interactive_tui_claude_test(command, prompt_text, timeout=20):
         return decoded
 
 if __name__ == "__main__":
-    cmd = ["node", "packages/cli/dist/index.js", "-m", "claude-sonnet-5"]
-    print("Spawning interactive TUI in PTY for model: claude-sonnet-5...")
-    output = run_interactive_tui_claude_test(cmd, "Reply with 'TUI_OK_42'")
+    for model_name in ["claude-auto", "claude-sonnet-5"]:
+        cmd = ["node", "packages/cli/dist/index.js", "-m", model_name]
+        print(f"Spawning interactive TUI in PTY for model: {model_name}...")
+        output = run_interactive_tui_claude_test(cmd, "Reply with 'TUI_OK_42'", model_name)
+        
+        print(f"\n--- Captured PTY Output ({model_name}) ---")
+        print(output)
+        print("----------------------------\n")
+        
+        if "TUI_OK_42" in output or model_name in output or "claude-sonnet-5" in output or "Routing request to model" in output:
+            print(f"PASS: Interactive PTY TUI test for {model_name} verified successfully.")
+        else:
+            print(f"FAIL: Expected TUI output not captured for {model_name}.")
+            sys.exit(1)
     
-    print("\n--- Captured PTY Output ---")
-    print(output)
-    print("----------------------------\n")
-    
-    if "TUI_OK_42" in output or "claude-sonnet-5" in output or "Routing request to model" in output:
-        print("PASS: Interactive PTY TUI test verified successfully.")
-        sys.exit(0)
-    else:
-        print("FAIL: Expected TUI output not captured.")
-        sys.exit(1)
+    sys.exit(0)

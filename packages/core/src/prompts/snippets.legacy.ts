@@ -5,6 +5,7 @@
  */
 
 import type { HierarchicalMemory } from '../config/memory.js';
+import { tokenLimit } from '../core/tokenLimits.js';
 import {
   ACTIVATE_SKILL_TOOL_NAME,
   ASK_USER_TOOL_NAME,
@@ -47,6 +48,7 @@ export interface SystemPromptOptions {
 
 export interface PreambleOptions {
   interactive: boolean;
+  model?: string;
 }
 
 export interface CoreMandatesOptions {
@@ -167,9 +169,20 @@ ${renderUserMemory(userMemory)}
 
 export function renderPreamble(options?: PreambleOptions): string {
   if (!options) return '';
-  return options.interactive
+  const base = options.interactive
     ? 'You are an interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and efficiently, adhering strictly to the following instructions and utilizing your available tools.'
     : 'You are a non-interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and efficiently, adhering strictly to the following instructions and utilizing your available tools.';
+
+  if (options.model) {
+    const limit = tokenLimit(options.model);
+    const formattedLimit =
+      limit >= 1_000_000
+        ? `${Math.round(limit / 1_000_000)}M`
+        : `${Math.round(limit / 1_000)}k`;
+    return `${base} You are powered by model **${options.model}** with a context window size of **${formattedLimit} tokens** (${limit.toLocaleString()} tokens).`;
+  }
+
+  return base;
 }
 
 export function renderCoreMandates(options?: CoreMandatesOptions): string {

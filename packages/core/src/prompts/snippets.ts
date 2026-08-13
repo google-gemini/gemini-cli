@@ -37,6 +37,7 @@ import {
 import type { HierarchicalMemory } from '../config/memory.js';
 import { DEFAULT_CONTEXT_FILENAME } from '../tools/memoryTool.js';
 import type { ApprovalMode } from '../policy/types.js';
+import { tokenLimit } from '../core/tokenLimits.js';
 
 // --- Options Structs ---
 
@@ -193,7 +194,18 @@ export function renderPreamble(options?: PreambleOptions): string {
     ? 'You are an interactive CLI agent specializing in software engineering tasks.'
     : 'You are an autonomous CLI agent specializing in software engineering tasks.';
 
-  return `${base} You are currently operating in **${modeStr}** mode. Your primary goal is to help users safely and effectively.`;
+  let preamble = `${base} You are currently operating in **${modeStr}** mode. Your primary goal is to help users safely and effectively.`;
+
+  if (options.model) {
+    const limit = tokenLimit(options.model);
+    const formattedLimit =
+      limit >= 1_000_000
+        ? `${Math.round(limit / 1_000_000)}M`
+        : `${Math.round(limit / 1_000)}k`;
+    preamble += ` You are powered by model **${options.model}** with a context window size of **${formattedLimit} tokens** (${limit.toLocaleString()} tokens).`;
+  }
+
+  return preamble;
 }
 
 export function renderCoreMandates(options?: CoreMandatesOptions): string {

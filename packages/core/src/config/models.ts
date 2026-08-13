@@ -84,6 +84,7 @@ export const PREVIEW_GEMINI_FLASH_LITE_MODEL = 'none';
 
 export const GEMMA_4_31B_IT_MODEL = 'gemma-4-31b-it';
 export const GEMMA_4_26B_A4B_IT_MODEL = 'gemma-4-26b-a4b-it';
+export const CLAUDE_AUTO_MODEL = 'claude-auto';
 export const CLAUDE_OPUS_5_MODEL = 'claude-opus-5';
 export const CLAUDE_SONNET_5_MODEL = 'claude-sonnet-5';
 export const CLAUDE_HAIKU_4_5_MODEL = 'claude-haiku-4-5';
@@ -102,9 +103,11 @@ export const VALID_GEMINI_MODELS = new Set([
 
   GEMMA_4_31B_IT_MODEL,
   GEMMA_4_26B_A4B_IT_MODEL,
+  CLAUDE_AUTO_MODEL,
   CLAUDE_OPUS_5_MODEL,
   CLAUDE_SONNET_5_MODEL,
   CLAUDE_HAIKU_4_5_MODEL,
+  'auto-claude',
   'gemini-3.1-pro',
   'gemini-3.6-flash',
   'gemini-3.5-flash-lite',
@@ -230,6 +233,11 @@ export function resolveModel(
     }
     case GEMINI_MODEL_ALIAS_FLASH_LITE: {
       resolved = DEFAULT_GEMINI_FLASH_LITE_MODEL;
+      break;
+    }
+    case 'claude-auto':
+    case 'auto-claude': {
+      resolved = CLAUDE_AUTO_MODEL;
       break;
     }
     case 'claude-sonnet-5':
@@ -400,6 +408,8 @@ export function getDisplayString(
       return GEMMA_4_31B_IT_MODEL;
     case GEMMA_4_26B_A4B_IT_MODEL:
       return GEMMA_4_26B_A4B_IT_MODEL;
+    case CLAUDE_AUTO_MODEL:
+      return 'Claude AUTO';
     case CLAUDE_OPUS_5_MODEL:
       return 'Claude Opus 5';
     case CLAUDE_SONNET_5_MODEL:
@@ -552,7 +562,9 @@ export function isAutoModel(
   return (
     model === GEMINI_MODEL_ALIAS_AUTO ||
     model === PREVIEW_GEMINI_MODEL_AUTO ||
-    model === DEFAULT_GEMINI_MODEL_AUTO
+    model === DEFAULT_GEMINI_MODEL_AUTO ||
+    model === CLAUDE_AUTO_MODEL ||
+    model === 'auto-claude'
   );
 }
 
@@ -715,4 +727,3 @@ export function resolveVertexClaudeModel(modelName: string): string {
   }
   return modelName;
 }
-

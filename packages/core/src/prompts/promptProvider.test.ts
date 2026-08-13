@@ -96,6 +96,15 @@ describe('PromptProvider', () => {
     vi.unstubAllEnvs();
   });
 
+  it('should include active model name and context window size in preamble', () => {
+    vi.mocked(mockConfig.getActiveModel).mockReturnValue('gemini-3.6-flash');
+    const provider = new PromptProvider();
+    const prompt = provider.getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).toContain('You are powered by model **gemini-3.6-flash**');
+    expect(prompt).toContain('context window size of **1M tokens**');
+  });
+
   it('should handle multiple context filenames in the system prompt', () => {
     vi.mocked(getAllGeminiMdFilenames).mockReturnValue([
       DEFAULT_CONTEXT_FILENAME,

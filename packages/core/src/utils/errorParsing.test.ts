@@ -109,6 +109,34 @@ describe('parseAndFormatApiError', () => {
     expect(result).toContain(vertexMessage);
   });
 
+  it('should format a standard Error instance with its message', () => {
+    const error = new Error(
+      'The model API is currently overloaded and may experience intermittent errors.',
+    );
+    expect(parseAndFormatApiError(error)).toBe(
+      '[API Error: The model API is currently overloaded and may experience intermittent errors.]',
+    );
+  });
+
+  it('should format an error object with a string status', () => {
+    const error = {
+      message: 'The model is unavailable',
+      status: 'UNAVAILABLE',
+    };
+    expect(parseAndFormatApiError(error)).toBe(
+      '[API Error: The model is unavailable]',
+    );
+  });
+
+  it('should format Anthropic overloaded_error JSON objects cleanly', () => {
+    const rawError =
+      '✕ [API Error: {"type":"error","error":{"details":null,"type":"overloaded_error","message":"Overloaded"},"request_id":"req_123"}]';
+    const result = parseAndFormatApiError(rawError);
+    expect(result).toBe(
+      '[API Error: Overloaded (overloaded_error)]\nModel API is currently overloaded. Retrying...',
+    );
+  });
+
   it('should handle an unknown error type', () => {
     const error = 12345;
     const expected = '[API Error: An unknown error occurred.]';

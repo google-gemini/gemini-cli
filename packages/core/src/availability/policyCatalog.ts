@@ -139,6 +139,48 @@ export function getFlashLitePolicyChain(): ModelPolicyChain {
   return cloneChain(FLASH_LITE_CHAIN);
 }
 
+export function getClaudePolicyChain(requestedModel: string): ModelPolicyChain {
+  if (requestedModel === 'claude-auto' || requestedModel === 'auto-claude') {
+    return [
+      definePolicy({
+        model: 'claude-sonnet-5',
+        maxAttempts: 3,
+        actions: SILENT_ACTIONS,
+        stateTransitions: { ...DEFAULT_STATE, transient: 'sticky_retry' },
+      }),
+      definePolicy({
+        model: 'claude-opus-5',
+        maxAttempts: 3,
+        actions: SILENT_ACTIONS,
+        stateTransitions: { ...DEFAULT_STATE, transient: 'sticky_retry' },
+      }),
+      definePolicy({
+        model: 'claude-3-7-sonnet',
+        maxAttempts: 3,
+        actions: SILENT_ACTIONS,
+        stateTransitions: { ...DEFAULT_STATE, transient: 'sticky_retry' },
+      }),
+      definePolicy({
+        model: 'claude-3-opus',
+        isLastResort: true,
+        maxAttempts: 5,
+        actions: SILENT_ACTIONS,
+        stateTransitions: { ...DEFAULT_STATE, transient: 'sticky_retry' },
+      }),
+    ];
+  }
+
+  return [
+    definePolicy({
+      model: requestedModel,
+      isLastResort: true,
+      maxAttempts: 5,
+      actions: SILENT_ACTIONS,
+      stateTransitions: { ...DEFAULT_STATE, transient: 'sticky_retry' },
+    }),
+  ];
+}
+
 /**
  * Provides a default policy scaffold for models not present in the catalog.
  */

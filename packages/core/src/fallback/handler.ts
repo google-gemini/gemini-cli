@@ -84,6 +84,9 @@ export async function handleFallback(
       action === 'silent' ||
       (fallbackModel === activeModel && failedModel !== activeModel)
     ) {
+      debugLogger.log(
+        `[MODEL_FALLBACK] Primary model (${failedModel}) experienced transient failure (${failureKind}). Falling back to ${fallbackModel}.`,
+      );
       applyAvailabilityTransition(getAvailabilityContext, failureKind);
       // For standard auto-routing (silent), we only update the active model, so don't pass failedModel.
       // For utility bypass, we want a hard runtime override, so pass failedModel.

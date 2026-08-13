@@ -169,7 +169,7 @@ export function getRetryErrorType(error: unknown): string {
  */
 export function isRetryableError(
   error: Error | unknown,
-  retryFetchErrors?: boolean,
+  _retryFetchErrors?: boolean,
 ): boolean {
   // Check for common network error codes
   const errorCode = getNetworkErrorCode(error);
@@ -177,12 +177,15 @@ export function isRetryableError(
     return true;
   }
 
-  if (retryFetchErrors && error instanceof Error) {
+  if (error instanceof Error) {
     const lowerMessage = error.message.toLowerCase();
-    // Check for generic fetch failed message or incomplete JSON segment (common stream error)
+    // Check for generic fetch failed message, incomplete JSON segment, or model overload errors
     if (
       lowerMessage.includes(FETCH_FAILED_MESSAGE) ||
-      lowerMessage.includes(INCOMPLETE_JSON_MESSAGE)
+      lowerMessage.includes(INCOMPLETE_JSON_MESSAGE) ||
+      lowerMessage.includes('overloaded') ||
+      lowerMessage.includes('overloaded_error') ||
+      lowerMessage.includes('529')
     ) {
       return true;
     }

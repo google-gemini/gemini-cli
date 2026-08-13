@@ -420,6 +420,16 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       dialogDescription: 'Claude Sonnet 5 model via LiteLLM',
       features: { thinking: true, multimodalToolUse: true },
     },
+    'claude-auto': {
+      displayName: 'Claude AUTO',
+      tier: 'auto',
+      family: 'claude',
+      isPreview: false,
+      isVisible: true,
+      dialogDescription:
+        'Claude AUTO fallback chain (Sonnet 5 -> Opus 5 -> Sonnet 3.7 -> Opus 3)',
+      features: { thinking: true, multimodalToolUse: true },
+    },
 
     // Aliases
     auto: {
@@ -465,6 +475,9 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       default: 'claude-opus-5',
     },
     'claude-sonnet-5': {
+      default: 'claude-sonnet-5',
+    },
+    'claude-auto': {
       default: 'claude-sonnet-5',
     },
     'gemma-4-31b-it': {

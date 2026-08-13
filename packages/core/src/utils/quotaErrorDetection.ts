@@ -38,11 +38,18 @@ export function isStructuredError(error: unknown): error is StructuredError {
   if (typeof error !== 'object' || error === null || !('message' in error)) {
     return false;
   }
-  if (typeof error.message !== 'string') {
+  if (typeof (error as { message: unknown }).message !== 'string') {
     return false;
   }
-  if ('status' in error && typeof error.status !== 'number') {
-    return false;
+  if ('status' in error) {
+    const statusType = typeof (error as { status: unknown }).status;
+    if (
+      statusType !== 'number' &&
+      statusType !== 'string' &&
+      statusType !== 'undefined'
+    ) {
+      return false;
+    }
   }
   return true;
 }

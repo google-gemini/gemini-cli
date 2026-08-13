@@ -41,7 +41,8 @@ export function parseAndFormatApiError(
 ): string {
   if (isStructuredError(error)) {
     let text = `[API Error: ${error.message}]`;
-    if (error.status === 429) {
+    const status = (error as { status?: unknown }).status;
+    if (status === 429 || status === '429') {
       text += getRateLimitMessage(authType, fallbackModel);
     }
     return text;
@@ -49,15 +50,24 @@ export function parseAndFormatApiError(
 
   // The error message might be a string containing a JSON object.
   if (typeof error === 'string') {
-    const jsonStart = error.indexOf('{');
+    let rawStr = error;
+    // Strip leading TUI/logging error prefixes if present
+    if (rawStr.startsWith('✕ [API Error: ') && rawStr.endsWith(']')) {
+      rawStr = rawStr.slice('✕ [API Error: '.length, -1);
+    } else if (rawStr.startsWith('[API Error: ') && rawStr.endsWith(']')) {
+      rawStr = rawStr.slice('[API Error: '.length, -1);
+    }
+
+    const jsonStart = rawStr.indexOf('{');
     if (jsonStart === -1) {
       return `[API Error: ${error}]`; // Not a JSON error, return as is.
     }
 
-    const jsonString = error.substring(jsonStart);
+    const jsonString = rawStr.substring(jsonStart);
 
     try {
-      const parsedError = JSON.parse(jsonString) as unknown;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const parsedError = JSON.parse(jsonString) as Record<string, unknown>;
       if (isApiError(parsedError)) {
         let finalMessage = parsedError.error.message;
         try {
@@ -72,6 +82,27 @@ export function parseAndFormatApiError(
         let text = `[API Error: ${finalMessage} (Status: ${parsedError.error.status})]`;
         if (parsedError.error.code === 429) {
           text += getRateLimitMessage(authType, fallbackModel);
+        }
+        return text;
+      }
+
+      // Handle Anthropic / Vertex error response shape: {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}
+      const rawErrorObj = parsedError['error'];
+      if (
+        typeof rawErrorObj === 'object' &&
+        rawErrorObj !== null &&
+        'message' in rawErrorObj &&
+        typeof (rawErrorObj as { message: unknown }).message === 'string'
+      ) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const errObj = rawErrorObj as { message: string; type?: string };
+        const errType = errObj.type ? ` (${errObj.type})` : '';
+        let text = `[API Error: ${errObj.message}${errType}]`;
+        if (
+          errObj.type === 'overloaded_error' ||
+          errObj.message.toLowerCase().includes('overloaded')
+        ) {
+          text += '\nModel API is currently overloaded. Retrying...';
         }
         return text;
       }

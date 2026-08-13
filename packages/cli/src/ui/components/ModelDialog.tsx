@@ -22,6 +22,7 @@ import {
   GEMMA_4_26B_A4B_IT_MODEL,
   CLAUDE_OPUS_5_MODEL,
   CLAUDE_SONNET_5_MODEL,
+  CLAUDE_AUTO_MODEL,
   ModelSlashCommandEvent,
   logModelSlashCommand,
   getDisplayString,
@@ -174,6 +175,13 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
 
     // --- LEGACY PATH ---
     const list = [
+      {
+        value: CLAUDE_AUTO_MODEL,
+        title: getDisplayString(CLAUDE_AUTO_MODEL),
+        description:
+          'Claude AUTO fallback chain (Sonnet 5 -> Opus 5 -> Sonnet 3.7 -> Opus 3)',
+        key: CLAUDE_AUTO_MODEL,
+      },
       {
         value: CLAUDE_OPUS_5_MODEL,
         title: getDisplayString(CLAUDE_OPUS_5_MODEL),

@@ -8,6 +8,7 @@ import { describe, it, expect } from 'vitest';
 import {
   createDefaultPolicy,
   getModelPolicyChain,
+  getClaudePolicyChain,
   validateModelPolicyChain,
 } from './policyCatalog.js';
 import {
@@ -15,6 +16,7 @@ import {
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_MODEL,
+  CLAUDE_SONNET_5_MODEL,
 } from '../config/models.js';
 
 describe('policyCatalog', () => {
@@ -115,5 +117,27 @@ describe('policyCatalog', () => {
     expect(policy.actions.unknown).toBe('prompt');
     expect(policy.stateTransitions.terminal).toBe('terminal');
     expect(policy.stateTransitions.unknown).toBe('terminal');
+  });
+
+  it('returns valid single-model Claude policy chain without version fallback', () => {
+    const chain = getClaudePolicyChain(CLAUDE_SONNET_5_MODEL);
+    expect(chain).toHaveLength(1);
+    expect(chain[0]?.model).toBe(CLAUDE_SONNET_5_MODEL);
+    expect(chain[0]?.actions?.transient).toBe('silent');
+    expect(chain[0]?.isLastResort).toBe(true);
+    expect(() => validateModelPolicyChain(chain)).not.toThrow();
+  });
+
+  it('returns 4-tier policy chain for claude-auto in exact fallback order', () => {
+    const chain = getClaudePolicyChain('claude-auto');
+    expect(chain).toHaveLength(4);
+    expect(chain.map((p) => p.model)).toEqual([
+      'claude-sonnet-5',
+      'claude-opus-5',
+      'claude-3-7-sonnet',
+      'claude-3-opus',
+    ]);
+    expect(chain[3]?.isLastResort).toBe(true);
+    expect(() => validateModelPolicyChain(chain)).not.toThrow();
   });
 });

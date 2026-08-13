@@ -7,7 +7,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AnthropicContentGenerator } from './anthropicContentGenerator.js';
 import type { ContentGeneratorConfig } from './contentGenerator.js';
-import { resolveModel, CLAUDE_SONNET_5_MODEL, CLAUDE_OPUS_5_MODEL, VALID_GEMINI_MODELS } from '../config/models.js';
+import {
+  resolveModel,
+  CLAUDE_SONNET_5_MODEL,
+  CLAUDE_OPUS_5_MODEL,
+  VALID_GEMINI_MODELS,
+} from '../config/models.js';
+
+import type { GenerateContentParameters } from '@google/genai';
 
 const stubEnv = (key: string, val: string) => {
   if (typeof vi !== 'undefined' && typeof vi.stubEnv === 'function') {
@@ -22,6 +29,21 @@ const unstubEnvs = () => {
     vi.unstubAllEnvs();
   }
 };
+
+interface MappedBlock {
+  type?: string;
+  id?: string;
+  tool_use_id?: string;
+  content?: string;
+}
+
+interface AnthropicContentGeneratorTestHelper {
+  mapRequestToAnthropic(req: GenerateContentParameters): {
+    max_tokens: number;
+    messages: Array<{ content: MappedBlock[] }>;
+  };
+  client: unknown;
+}
 
 describe('AnthropicContentGenerator verification', () => {
   beforeEach(() => {
@@ -57,8 +79,12 @@ describe('AnthropicContentGenerator verification', () => {
   });
 
   it('resolves legacy and full Anthropic model IDs to canonical Claude models', () => {
-    expect(resolveModel('claude-3-5-sonnet-v2@20241022')).toBe(CLAUDE_SONNET_5_MODEL);
-    expect(resolveModel('claude-3-7-sonnet-20250219')).toBe(CLAUDE_SONNET_5_MODEL);
+    expect(resolveModel('claude-3-5-sonnet-v2@20241022')).toBe(
+      CLAUDE_SONNET_5_MODEL,
+    );
+    expect(resolveModel('claude-3-7-sonnet-20250219')).toBe(
+      CLAUDE_SONNET_5_MODEL,
+    );
     expect(resolveModel('claude-3-opus-20240229')).toBe(CLAUDE_OPUS_5_MODEL);
     expect(resolveModel('claude-3-opus@20240229')).toBe(CLAUDE_OPUS_5_MODEL);
   });
@@ -74,8 +100,10 @@ describe('AnthropicContentGenerator verification', () => {
       authType: undefined,
     };
     const generator = new AnthropicContentGenerator(config, 'claude-sonnet-5');
+    const helper = generator as unknown as AnthropicContentGeneratorTestHelper;
 
-    const mapped = (generator as any).mapRequestToAnthropic({
+    const mapped = helper.mapRequestToAnthropic({
+      model: 'claude-sonnet-5',
       contents: [
         {
           role: 'user',
@@ -101,7 +129,7 @@ describe('AnthropicContentGenerator verification', () => {
 
     expect(mapped.max_tokens).toBe(16384);
     expect(mapped.messages).toHaveLength(1);
-    const content = mapped.messages[0].content as any[];
+    const content = mapped.messages[0].content;
     expect(content).toHaveLength(1);
     expect(content[0].type).toBe('tool_result');
     expect(content[0].tool_use_id).toBe('synth_test_123');
@@ -112,8 +140,10 @@ describe('AnthropicContentGenerator verification', () => {
   it('deduplicates tool_use IDs in assistant messages to satisfy Anthropic uniqueness requirement', () => {
     const config: ContentGeneratorConfig = { apiKey: 'fake-key' };
     const generator = new AnthropicContentGenerator(config, 'claude-sonnet-5');
+    const helper = generator as unknown as AnthropicContentGeneratorTestHelper;
 
-    const mapped = (generator as any).mapRequestToAnthropic({
+    const mapped = helper.mapRequestToAnthropic({
+      model: 'claude-sonnet-5',
       contents: [
         {
           role: 'model',
@@ -125,7 +155,7 @@ describe('AnthropicContentGenerator verification', () => {
       ],
     });
 
-    const content = mapped.messages[0].content as any[];
+    const content = mapped.messages[0].content;
     expect(content).toHaveLength(2);
     expect(content[0].id).toBe('dup_id');
     expect(content[1].id).not.toBe('dup_id');
@@ -135,8 +165,10 @@ describe('AnthropicContentGenerator verification', () => {
   it('handles 3+ identical tool_use IDs without secondary collisions', () => {
     const config: ContentGeneratorConfig = { apiKey: 'fake-key' };
     const generator = new AnthropicContentGenerator(config, 'claude-sonnet-5');
+    const helper = generator as unknown as AnthropicContentGeneratorTestHelper;
 
-    const mapped = (generator as any).mapRequestToAnthropic({
+    const mapped = helper.mapRequestToAnthropic({
+      model: 'claude-sonnet-5',
       contents: [
         {
           role: 'model',
@@ -149,7 +181,7 @@ describe('AnthropicContentGenerator verification', () => {
       ],
     });
 
-    const content = mapped.messages[0].content as any[];
+    const content = mapped.messages[0].content;
     expect(content).toHaveLength(3);
     const ids = content.map((c) => c.id);
     expect(new Set(ids).size).toBe(3);
@@ -159,8 +191,10 @@ describe('AnthropicContentGenerator verification', () => {
   it('correctly maps deduplicated tool_use IDs to matching functionResponse tool_result blocks', () => {
     const config: ContentGeneratorConfig = { apiKey: 'fake-key' };
     const generator = new AnthropicContentGenerator(config, 'claude-sonnet-5');
+    const helper = generator as unknown as AnthropicContentGeneratorTestHelper;
 
-    const mapped = (generator as any).mapRequestToAnthropic({
+    const mapped = helper.mapRequestToAnthropic({
+      model: 'claude-sonnet-5',
       contents: [
         {
           role: 'model',
@@ -172,16 +206,28 @@ describe('AnthropicContentGenerator verification', () => {
         {
           role: 'user',
           parts: [
-            { functionResponse: { id: 'dup_id', name: 'read_file', response: { output: 'res1' } } },
-            { functionResponse: { id: 'dup_id', name: 'write_file', response: { output: 'res2' } } },
+            {
+              functionResponse: {
+                id: 'dup_id',
+                name: 'read_file',
+                response: { output: 'res1' },
+              },
+            },
+            {
+              functionResponse: {
+                id: 'dup_id',
+                name: 'write_file',
+                response: { output: 'res2' },
+              },
+            },
           ],
         },
       ],
     });
 
     expect(mapped.messages).toHaveLength(2);
-    const modelBlocks = mapped.messages[0].content as any[];
-    const userBlocks = mapped.messages[1].content as any[];
+    const modelBlocks = mapped.messages[0].content;
+    const userBlocks = mapped.messages[1].content;
 
     expect(modelBlocks[0].id).toBe('dup_id');
     expect(modelBlocks[1].id).toBe('dup_id_1');
@@ -193,11 +239,25 @@ describe('AnthropicContentGenerator verification', () => {
   it('attaches remoteModelId as modelVersion to streamed chunks', async () => {
     const config: ContentGeneratorConfig = { apiKey: 'fake-key' };
     const generator = new AnthropicContentGenerator(config, 'claude-sonnet-5');
+    const helper = generator as unknown as AnthropicContentGeneratorTestHelper;
 
     const fakeStream = (async function* () {
-      yield { type: 'message_start', message: { model: 'claude-3-5-sonnet-20241022', usage: { input_tokens: 10 } } };
-      yield { type: 'content_block_delta', delta: { type: 'text_delta', text: 'Hello' } };
-      yield { type: 'message_delta', usage: { output_tokens: 5 }, delta: { stop_reason: 'end_turn' } };
+      yield {
+        type: 'message_start',
+        message: {
+          model: 'claude-3-5-sonnet-20241022',
+          usage: { input_tokens: 10 },
+        },
+      };
+      yield {
+        type: 'content_block_delta',
+        delta: { type: 'text_delta', text: 'Hello' },
+      };
+      yield {
+        type: 'message_delta',
+        usage: { output_tokens: 5 },
+        delta: { stop_reason: 'end_turn' },
+      };
     })();
 
     const asyncIterableStream = {
@@ -206,7 +266,7 @@ describe('AnthropicContentGenerator verification', () => {
       },
     };
 
-    (generator as any).client = {
+    helper.client = {
       messages: {
         stream: () => asyncIterableStream,
         create: () => Promise.resolve(asyncIterableStream),
@@ -214,7 +274,10 @@ describe('AnthropicContentGenerator verification', () => {
     };
 
     const chunks = [];
-    for await (const chunk of await generator.generateContentStream({ model: 'claude-sonnet-5', contents: [{ role: 'user', parts: [{ text: 'hi' }] }] })) {
+    for await (const chunk of await generator.generateContentStream({
+      model: 'claude-sonnet-5',
+      contents: [{ role: 'user', parts: [{ text: 'hi' }] }],
+    })) {
       chunks.push(chunk);
     }
 

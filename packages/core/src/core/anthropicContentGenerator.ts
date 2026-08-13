@@ -8,13 +8,24 @@ import { Anthropic } from '@anthropic-ai/sdk';
 import { AnthropicVertex } from '@anthropic-ai/vertex-sdk';
 import {
   GenerateContentResponse,
+  FinishReason,
   type GenerateContentParameters,
   type CountTokensParameters,
   type CountTokensResponse,
+  type EmbedContentParameters,
+  type EmbedContentResponse,
 } from '@google/genai';
-import type { ContentGenerator, ContentGeneratorConfig } from './contentGenerator.js';
+import type {
+  ContentGenerator,
+  ContentGeneratorConfig,
+} from './contentGenerator.js';
 import type { UserTierId, GeminiUserTier } from '../code_assist/types.js';
-import { resolveVertexClaudeModel, getLatestModelId } from '../config/models.js';
+import {
+  resolveVertexClaudeModel,
+  getLatestModelId,
+} from '../config/models.js';
+import { debugLogger } from '../utils/debugLogger.js';
+import { retryWithBackoff } from '../utils/retry.js';
 
 export class AnthropicContentGenerator implements ContentGenerator {
   private client: Anthropic | AnthropicVertex;
@@ -35,16 +46,22 @@ export class AnthropicContentGenerator implements ContentGenerator {
       process.env['GOOGLE_CLOUD_PROJECT_ID'];
     const location = process.env['GOOGLE_CLOUD_LOCATION'] || 'global';
 
-    if (apiKey) {
-      const baseURL = contentConfig.baseUrl || process.env['ANTHROPIC_BASE_URL'];
+    const maxRetriesEnv = process.env['ANTHROPIC_MAX_RETRIES'];
+    const maxRetries = maxRetriesEnv ? parseInt(maxRetriesEnv, 10) : 0;
+
+    const baseURL = contentConfig.baseUrl || process.env['ANTHROPIC_BASE_URL'];
+
+    if (baseURL || apiKey) {
       this.client = new Anthropic({
-        apiKey,
+        apiKey: apiKey || 'dummy-key',
         ...(baseURL && { baseURL }),
+        maxRetries,
       });
     } else if (project) {
       this.client = new AnthropicVertex({
         projectId: project,
         region: location,
+        maxRetries,
       });
     } else {
       throw new Error(
@@ -59,8 +76,12 @@ export class AnthropicContentGenerator implements ContentGenerator {
   ): Promise<GenerateContentResponse> {
     const stream = await this.generateContentStream(request, _userPrompt);
     let fullText = '';
-    const functionCalls: Array<{ name: string; args: Record<string, unknown>; id?: string }> = [];
-    let usageMetadata: any = undefined;
+    const functionCalls: Array<{
+      name: string;
+      args: Record<string, unknown>;
+      id?: string;
+    }> = [];
+    let usageMetadata: GenerateContentResponse['usageMetadata'] = undefined;
 
     for await (const chunk of stream) {
       const candidate = chunk.candidates?.[0];
@@ -72,6 +93,7 @@ export class AnthropicContentGenerator implements ContentGenerator {
           if (part.functionCall) {
             functionCalls.push({
               name: part.functionCall.name || '',
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
               args: (part.functionCall.args as Record<string, unknown>) || {},
               id: part.functionCall.id,
             });
@@ -83,7 +105,7 @@ export class AnthropicContentGenerator implements ContentGenerator {
       }
     }
 
-    const parts: any[] = [];
+    const parts: Array<Record<string, unknown>> = [];
     if (fullText) {
       parts.push({ text: fullText });
     }
@@ -104,7 +126,7 @@ export class AnthropicContentGenerator implements ContentGenerator {
             role: 'model',
             parts,
           },
-          finishReason: 'STOP' as any,
+          finishReason: FinishReason.STOP,
         },
       ],
       usageMetadata,
@@ -118,17 +140,28 @@ export class AnthropicContentGenerator implements ContentGenerator {
     _userPrompt?: string,
   ): Promise<AsyncGenerator<GenerateContentResponse, void, unknown>> {
     const anthropicParams = this.mapRequestToAnthropic(request);
-    const model = this.client instanceof AnthropicVertex
-      ? resolveVertexClaudeModel(this.modelName)
-      : getLatestModelId(this.modelName);
+    const model =
+      this.client instanceof AnthropicVertex
+        ? resolveVertexClaudeModel(this.modelName)
+        : getLatestModelId(this.modelName);
 
-    console.error(`[ANTHROPIC_DIRECT] Routing request to model: ${model} via ${this.client instanceof AnthropicVertex ? 'Vertex AI' : 'Anthropic Direct API'}`);
+    debugLogger.log(
+      `[ANTHROPIC_DIRECT] Routing request to model: ${model} via ${this.client instanceof AnthropicVertex ? 'Vertex AI' : 'Anthropic Direct API'}`,
+    );
 
-    const stream = await this.client.messages.create({
-      ...anthropicParams,
-      model,
-      stream: true,
-    });
+    const stream = await retryWithBackoff(
+      () =>
+        this.client.messages.create({
+          ...anthropicParams,
+          model,
+          stream: true,
+        }),
+      {
+        maxAttempts: 5,
+        initialDelayMs: 1000,
+        maxDelayMs: 20000,
+      },
+    );
 
     return this.createStreamGenerator(stream);
   }
@@ -136,7 +169,11 @@ export class AnthropicContentGenerator implements ContentGenerator {
   private async *createStreamGenerator(
     stream: AsyncIterable<Anthropic.MessageStreamEvent>,
   ): AsyncGenerator<GenerateContentResponse, void, unknown> {
-    let currentToolCall: { id: string; name: string; inputJson: string } | null = null;
+    let currentToolCall: {
+      id: string;
+      name: string;
+      inputJson: string;
+    } | null = null;
     let inputTokens = 0;
     let outputTokens = 0;
     let finishReasonEmitted = false;
@@ -147,7 +184,9 @@ export class AnthropicContentGenerator implements ContentGenerator {
       if (event.type === 'message_start') {
         inputTokens = event.message.usage?.input_tokens || 0;
         remoteModelId = event.message.model || '';
-        console.error(`[ANTHROPIC_DIRECT] Connected! Remote provider returned message model ID: ${event.message.model}`);
+        debugLogger.log(
+          `[ANTHROPIC_DIRECT] Connected! Remote provider returned message model ID: ${event.message.model}`,
+        );
       } else if (event.type === 'message_delta') {
         outputTokens = event.usage?.output_tokens || outputTokens;
         const stopReason = event.delta?.stop_reason;
@@ -212,7 +251,10 @@ export class AnthropicContentGenerator implements ContentGenerator {
         if (currentToolCall) {
           let parsedArgs: Record<string, unknown> = {};
           try {
-            parsedArgs = JSON.parse(currentToolCall.inputJson || '{}');
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            parsedArgs = JSON.parse(
+              currentToolCall.inputJson || '{}',
+            ) as Record<string, unknown>;
           } catch {
             parsedArgs = {};
           }
@@ -270,20 +312,58 @@ export class AnthropicContentGenerator implements ContentGenerator {
     request: GenerateContentParameters,
   ): Omit<Anthropic.MessageCreateParamsStreaming, 'model' | 'stream'> {
     let systemInstruction = '';
-    const sysInst = (request as any).systemInstruction || request.config?.systemInstruction;
+    const sysInst =
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      (request as unknown as Record<string, unknown>)['systemInstruction'] ||
+      request.config?.systemInstruction;
     if (sysInst) {
       const parts = Array.isArray(sysInst)
         ? sysInst
-        : sysInst.parts || [sysInst];
-      systemInstruction = parts.map((p: any) => typeof p === 'string' ? p : p.text || '').join('\n');
+        : (sysInst as { parts?: unknown[] }).parts || [sysInst];
+      systemInstruction = parts
+        .map((p: unknown) => {
+          if (typeof p === 'string') {
+            return p;
+          }
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          const pObj = p as { text?: string };
+          return pObj.text || '';
+        })
+        .join('\n');
     }
 
     const messages: Anthropic.MessageParam[] = [];
-    const rawContents: any[] = Array.isArray(request.contents)
-      ? request.contents
-      : request.contents
-        ? [request.contents]
-        : [];
+    type RawContentPart =
+      | string
+      | {
+          text?: string;
+          inlineData?: { mimeType?: string; data?: string };
+          functionCall?: {
+            id?: string;
+            name?: string;
+            args?: Record<string, unknown>;
+          };
+          functionResponse?: {
+            id?: string;
+            name?: string;
+            response?: Record<string, unknown>;
+          };
+        };
+    type RawContent =
+      | string
+      | {
+          role?: string;
+          parts?: RawContentPart[];
+        };
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const rawContents = (
+      Array.isArray(request.contents)
+        ? request.contents
+        : request.contents
+          ? [request.contents]
+          : []
+    ) as RawContent[];
 
     const seenToolUseIds = new Set<string>();
     const toolIdMap = new Map<string, string[]>();
@@ -292,7 +372,7 @@ export class AnthropicContentGenerator implements ContentGenerator {
       if (typeof content === 'string') {
         messages.push({
           role: 'user',
-          content: content,
+          content,
         });
         continue;
       }
@@ -312,11 +392,17 @@ export class AnthropicContentGenerator implements ContentGenerator {
             text: part.text,
           });
         } else if (part.inlineData) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          const mediaType = (part.inlineData.mimeType || 'image/png') as
+            | 'image/jpeg'
+            | 'image/png'
+            | 'image/gif'
+            | 'image/webp';
           anthropicContent.push({
             type: 'image',
             source: {
               type: 'base64',
-              media_type: (part.inlineData.mimeType as any) || 'image/png',
+              media_type: mediaType,
               data: part.inlineData.data || '',
             },
           });
@@ -340,7 +426,7 @@ export class AnthropicContentGenerator implements ContentGenerator {
             type: 'tool_use',
             id: toolId,
             name: part.functionCall.name || '',
-            input: (part.functionCall.args as Record<string, unknown>) || {},
+            input: part.functionCall.args || {},
           });
         } else if (part.functionResponse) {
           const rawId =
@@ -358,15 +444,16 @@ export class AnthropicContentGenerator implements ContentGenerator {
 
           if (existingBlock) {
             try {
-              const currentData = JSON.parse(
+              const currentData: unknown = JSON.parse(
                 typeof existingBlock.content === 'string'
                   ? existingBlock.content
                   : '{}',
               );
               const newData = part.functionResponse.response || {};
-              const merged = Array.isArray(currentData)
-                ? [...currentData, newData]
-                : [currentData, newData];
+              const currentArr = Array.isArray(currentData)
+                ? (currentData as unknown[])
+                : [currentData];
+              const merged = [...currentArr, newData];
               existingBlock.content = JSON.stringify(merged);
             } catch {
               if (typeof existingBlock.content === 'string') {
@@ -391,16 +478,27 @@ export class AnthropicContentGenerator implements ContentGenerator {
       }
     }
 
+    interface FunctionDecl {
+      name?: string;
+      description?: string;
+      parameters?: unknown;
+    }
+    interface ToolGroup {
+      functionDeclarations?: FunctionDecl[];
+    }
+
     const tools: Anthropic.Tool[] = [];
-    const rawTools = request.config?.tools || [];
-    for (const toolGroup of rawTools as any[]) {
-      if ('functionDeclarations' in toolGroup && toolGroup.functionDeclarations) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const rawTools = (request.config?.tools || []) as ToolGroup[];
+    for (const toolGroup of rawTools) {
+      if (Array.isArray(toolGroup.functionDeclarations)) {
         for (const fd of toolGroup.functionDeclarations) {
           if (fd.name) {
             tools.push({
               name: fd.name,
               description: fd.description || '',
-              input_schema: (fd.parameters as unknown as Anthropic.Tool.InputSchema) || {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              input_schema: (fd.parameters as Anthropic.Tool.InputSchema) || {
                 type: 'object',
                 properties: {},
               },
@@ -422,11 +520,15 @@ export class AnthropicContentGenerator implements ContentGenerator {
     request: CountTokensParameters,
   ): Promise<CountTokensResponse> {
     let charCount = 0;
-    const contents: any[] = Array.isArray(request.contents)
-      ? request.contents
-      : request.contents
-        ? [request.contents]
-        : [];
+    type ContentItem = string | { parts?: Array<string | { text?: string }> };
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const contents = (
+      Array.isArray(request.contents)
+        ? request.contents
+        : request.contents
+          ? [request.contents]
+          : []
+    ) as ContentItem[];
 
     for (const c of contents) {
       if (typeof c === 'string') {
@@ -446,8 +548,10 @@ export class AnthropicContentGenerator implements ContentGenerator {
   }
 
   async embedContent(
-    _request: any,
-  ): Promise<any> {
-    throw new Error('Embeddings are not supported by AnthropicContentGenerator.');
+    _request: EmbedContentParameters,
+  ): Promise<EmbedContentResponse> {
+    throw new Error(
+      'Embeddings are not supported by AnthropicContentGenerator.',
+    );
   }
 }
