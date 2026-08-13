@@ -244,10 +244,7 @@ export function classifyGoogleError(error: unknown): unknown {
     status === 529 ||
     /overload/i.test(lowerMessage);
 
-  if (
-    isOverloadedOrRateLimited &&
-    /limit:\s*0(?!\d|\.\d)/.test(lowerMessage)
-  ) {
+  if (isOverloadedOrRateLimited && /limit:\s*0(?!\d|\.\d)/.test(lowerMessage)) {
     const cause = googleApiError ?? {
       code: status ?? 429,
       message: errorMessage,
@@ -287,7 +284,7 @@ export function classifyGoogleError(error: unknown): unknown {
       return new RetryableQuotaError(
         errorMessage,
         googleApiError ?? {
-          code: status,
+          code: status ?? 429,
           message: errorMessage,
           details: [],
         },

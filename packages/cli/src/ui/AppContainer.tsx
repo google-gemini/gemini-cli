@@ -1888,6 +1888,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       }
 
       if (keyMatchers[Command.SHOW_ERROR_DETAILS](key)) {
+        clearErrorCount();
         if (settings.merged.general.devtools) {
           void (async () => {
             const { toggleDevToolsPanel } = await import(
@@ -2007,6 +2008,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       constrainHeight,
       setConstrainHeight,
       setShowErrorDetails,
+      clearErrorCount,
       config,
       ideContextState,
       handleCtrlCPress,
