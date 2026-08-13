@@ -62,16 +62,23 @@ function containsGitCommand(args: string[]): boolean {
     '\\n',
   ]);
   return args.some((arg, index) => {
-    if (index > 0) {
-      const prev = args[index - 1].toLowerCase();
+    const trimmed = arg.trim();
+    if (!trimmed) return false;
+    const basename = path.basename(trimmed).toLowerCase();
+    if (basename !== 'git' && basename !== 'git.exe') {
+      return false;
+    }
+    let prevIndex = index - 1;
+    while (prevIndex >= 0 && /^[a-zA-Z_][a-zA-Z0-9_]*=/.test(args[prevIndex])) {
+      prevIndex--;
+    }
+    if (prevIndex >= 0) {
+      const prev = args[prevIndex].toLowerCase();
       if (!allowedPredecessors.has(prev)) {
         return false;
       }
     }
-    const trimmed = arg.trim();
-    if (!trimmed) return false;
-    const basename = path.basename(trimmed).toLowerCase();
-    return basename === 'git' || basename === 'git.exe';
+    return true;
   });
 }
 
@@ -345,6 +352,9 @@ export class PolicyEngine {
     command: string,
     decision: PolicyDecision,
   ): Promise<PolicyDecision> {
+    if (decision === PolicyDecision.DENY) {
+      return PolicyDecision.DENY;
+    }
     await initializeShellParsers();
     try {
       const parsedObjArgs = shellParse(command);
