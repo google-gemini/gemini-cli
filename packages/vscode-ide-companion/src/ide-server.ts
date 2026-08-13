@@ -127,7 +127,7 @@ export class IDEServer {
   private authToken: string | undefined;
   private transports: { [sessionId: string]: StreamableHTTPServerTransport } =
     {};
-  private keepAliveIntervals: { [sessionId: string]: NodeJS.Timeout } = {};
+  private keepAliveIntervals: Set<NodeJS.Timeout> = new Set();
   private openFilesManager: OpenFilesManager | undefined;
   diffManager: DiffManager;
 
@@ -139,6 +139,7 @@ export class IDEServer {
   start(context: vscode.ExtensionContext): Promise<void> {
     return new Promise((resolve) => {
       this.context = context;
+      this.transports = {};
       this.authToken = randomUUID();
       const sessionsWithInitialNotification = new Set<string>();
 
@@ -218,53 +219,42 @@ export class IDEServer {
         if (sessionId && this.transports[sessionId]) {
           transport = this.transports[sessionId];
         } else if (!sessionId && isInitializeRequest(req.body)) {
-          let keepAlive: NodeJS.Timeout | undefined = undefined;
           transport = new StreamableHTTPServerTransport({
             sessionIdGenerator: () => randomUUID(),
             onsessioninitialized: (newSessionId) => {
               this.log(`New session initialized: ${newSessionId}`);
               this.transports[newSessionId] = transport;
-              if (keepAlive) {
-                this.keepAliveIntervals[newSessionId] = keepAlive;
-              }
             },
           });
-          let consecutiveMissedPings = 0;
-          let totalMissedPings = 0;
-          keepAlive = setInterval(() => {
+          let missedPings = 0;
+          const keepAlive = setInterval(() => {
             const sessionId = transport.sessionId ?? 'unknown';
             transport
               .send({ jsonrpc: '2.0', method: 'ping' })
               .then(() => {
-                consecutiveMissedPings = 0;
+                missedPings = 0;
               })
               .catch((error) => {
-                consecutiveMissedPings++;
-                totalMissedPings++;
+                missedPings++;
                 this.log(
-                  `Failed to send keep-alive ping for session ${sessionId}. Consecutive missed: ${consecutiveMissedPings}, total missed: ${totalMissedPings}. Error: ${error.message}`,
+                  `Failed to send keep-alive ping for session ${sessionId}. Missed pings: ${missedPings}. Error: ${error.message}`,
                 );
-                if (consecutiveMissedPings >= 3 || totalMissedPings >= 10) {
+                if (missedPings >= 3) {
                   this.log(
-                    `Session ${sessionId} reached failure threshold (consecutive: ${consecutiveMissedPings}, total: ${totalMissedPings}). Closing connection and cleaning up interval.`,
+                    `Session ${sessionId} missed ${missedPings} pings. Closing connection and cleaning up interval.`,
                   );
-                  if (keepAlive) {
-                    clearInterval(keepAlive);
-                  }
-                  if (transport.sessionId) {
-                    delete this.keepAliveIntervals[transport.sessionId];
-                  }
+                  clearInterval(keepAlive);
+                  this.keepAliveIntervals.delete(keepAlive);
                   void transport.close();
                 }
               });
           }, 60000); // 60 sec
+          this.keepAliveIntervals.add(keepAlive);
 
           transport.onclose = () => {
-            if (keepAlive) {
-              clearInterval(keepAlive);
-            }
+            clearInterval(keepAlive);
+            this.keepAliveIntervals.delete(keepAlive);
             if (transport.sessionId) {
-              delete this.keepAliveIntervals[transport.sessionId];
               this.log(`Session closed: ${transport.sessionId}`);
               sessionsWithInitialNotification.delete(transport.sessionId);
               delete this.transports[transport.sessionId];
@@ -430,14 +420,11 @@ export class IDEServer {
       new Promise<void>((resolve) => setTimeout(resolve, 1000)),
     ]);
 
-    // Clear all keep-alive intervals regardless of whether transport.close() or onclose resolved
-    for (const interval of Object.values(this.keepAliveIntervals)) {
+    // Clear all keep-alive intervals upfront so background timers stop regardless of transport teardown state
+    for (const interval of this.keepAliveIntervals) {
       clearInterval(interval);
     }
-    this.keepAliveIntervals = {};
-
-    // Best-effort cleanup: clear transport references so lingering background closes don't contaminate server state
-    this.transports = {};
+    this.keepAliveIntervals.clear();
 
     if (this.server) {
       await new Promise<void>((resolve, reject) => {
@@ -472,7 +459,7 @@ export class IDEServer {
   }
 
   /** @internal */
-  getKeepAliveIntervals(): Readonly<Record<string, NodeJS.Timeout>> {
+  getKeepAliveIntervals(): ReadonlySet<NodeJS.Timeout> {
     return this.keepAliveIntervals;
   }
 }

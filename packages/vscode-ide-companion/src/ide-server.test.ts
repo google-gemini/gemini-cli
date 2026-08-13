@@ -402,7 +402,8 @@ describe('IDEServer', () => {
       return response;
     };
 
-    it('a) should resolve stop() and clear keep-alive intervals even when transport.close() hangs', async () => {
+    it('should resolve stop() and clear keep-alive intervals even when transport.close() hangs', async () => {
+      vi.useFakeTimers();
       const { StreamableHTTPServerTransport } = await import(
         '@modelcontextprotocol/sdk/server/streamableHttp.js'
       );
@@ -414,17 +415,22 @@ describe('IDEServer', () => {
 
       await initSession();
       expect(Object.keys(ideServer.getTransports()).length).toBe(1);
-      expect(Object.keys(ideServer.getKeepAliveIntervals()).length).toBe(1);
+      expect(ideServer.getKeepAliveIntervals().size).toBe(1);
 
-      const startTime = Date.now();
-      await ideServer.stop();
-      const duration = Date.now() - startTime;
-      expect(duration).toBeLessThan(1500);
+      let stopResolved = false;
+      const stopPromise = ideServer.stop().then(() => {
+        stopResolved = true;
+      });
+
+      await vi.advanceTimersByTimeAsync(1000);
+      await stopPromise;
+
+      expect(stopResolved).toBe(true);
       expect(clearIntervalSpy).toHaveBeenCalled();
-      expect(Object.keys(ideServer.getKeepAliveIntervals()).length).toBe(0);
+      expect(ideServer.getKeepAliveIntervals().size).toBe(0);
     });
 
-    it('b) should call close on every entry in this.transports before resolving', async () => {
+    it('should call close on every entry in this.transports before resolving stop()', async () => {
       const { StreamableHTTPServerTransport } = await import(
         '@modelcontextprotocol/sdk/server/streamableHttp.js'
       );
@@ -443,7 +449,7 @@ describe('IDEServer', () => {
       expect(closeSpy).toHaveBeenCalledTimes(2);
     });
 
-    it('c) keep-alive: oscillating failures (5 total, never 3 consecutive) do not close transport, 3 consecutive failures do', async () => {
+    it('should reset missed pings counter on success and close transport after 3 consecutive failures', async () => {
       const { StreamableHTTPServerTransport } = await import(
         '@modelcontextprotocol/sdk/server/streamableHttp.js'
       );
@@ -505,58 +511,6 @@ describe('IDEServer', () => {
 
       expect(closeSpy).toHaveBeenCalledTimes(1);
       expect(clearIntervalSpy).toHaveBeenCalled();
-    });
-
-    it('d) keep-alive: reaching total failure limit (10 total) closes transport even without 3 consecutive', async () => {
-      const { StreamableHTTPServerTransport } = await import(
-        '@modelcontextprotocol/sdk/server/streamableHttp.js'
-      );
-      let intervalCb: (() => void) | undefined;
-      vi.spyOn(global, 'setInterval').mockImplementation((cb: unknown) => {
-        intervalCb = cb as () => void;
-        return 123 as unknown as NodeJS.Timeout;
-      });
-
-      vi.spyOn(
-        StreamableHTTPServerTransport.prototype,
-        'handleRequest',
-      ).mockImplementation(async (req, res) => {
-        (res as unknown as { status: (c: number) => { end: () => void } })
-          .status(200)
-          .end();
-      });
-
-      let failPing = false;
-      vi.spyOn(
-        StreamableHTTPServerTransport.prototype,
-        'send',
-      ).mockImplementation(async (message) => {
-        if ((message as { method?: string }).method === 'ping' && failPing) {
-          throw new Error('Ping failed');
-        }
-      });
-      const closeSpy = vi.spyOn(
-        StreamableHTTPServerTransport.prototype,
-        'close',
-      );
-
-      await initSession();
-      expect(intervalCb).toBeDefined();
-
-      // Oscillate 10 times -> 10 total failures reached
-      for (let i = 0; i < 10; i++) {
-        failPing = true;
-        intervalCb!();
-        await new Promise(process.nextTick);
-
-        if (i < 9) {
-          failPing = false;
-          intervalCb!();
-          await new Promise(process.nextTick);
-        }
-      }
-
-      expect(closeSpy).toHaveBeenCalledTimes(1);
     });
   });
 
