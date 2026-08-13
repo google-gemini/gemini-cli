@@ -93,14 +93,19 @@ export class SkillManager {
 
     // 4.1 Workspace agent skills alias (.agents/skills)
     const projectAgentSkillsDir = storage.getProjectAgentSkillsDir();
+    const userAgentSkillsDir = Storage.getUserAgentSkillsDir();
+    const isUserAgentsWorkspace =
+      path.resolve(storage.getProjectRoot()) ===
+        path.resolve(userAgentSkillsDir, '..') ||
+      path.resolve(projectAgentSkillsDir) ===
+        path.resolve(userAgentSkillsDir, '..', '.agents', 'skills');
+
     if (
       projectAgentSkillsDir &&
-      path.resolve(projectAgentSkillsDir) !==
-        path.resolve(Storage.getUserAgentSkillsDir())
+      !isUserAgentsWorkspace &&
+      path.resolve(projectAgentSkillsDir) !== path.resolve(userAgentSkillsDir)
     ) {
-      const projectAgentSkills = await loadSkillsFromDir(
-        projectAgentSkillsDir,
-      );
+      const projectAgentSkills = await loadSkillsFromDir(projectAgentSkillsDir);
       this.addSkillsWithPrecedence(projectAgentSkills);
     }
   }
