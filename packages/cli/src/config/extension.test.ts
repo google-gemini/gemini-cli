@@ -57,7 +57,9 @@ const mockGit = {
   fetch: vi.fn(),
   checkout: vi.fn(),
   listRemote: vi.fn(),
-  revparse: vi.fn(),
+  revparse: vi
+    .fn()
+    .mockResolvedValue('mock-sha-1234567890123456789012345678901234567890'),
   // Not a part of the actual API, but we need to use this to do the correct
   // file system interactions.
   path: vi.fn(),
@@ -170,6 +172,9 @@ describe('extension tests', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGit.revparse.mockResolvedValue(
+      'mock-sha-1234567890123456789012345678901234567890',
+    );
     resetSettingsCacheForTesting();
     keychainData = {};
     mockKeychainStorage = {
