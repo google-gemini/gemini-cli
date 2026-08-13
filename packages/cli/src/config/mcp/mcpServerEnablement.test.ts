@@ -117,9 +117,14 @@ describe('McpServerEnablementManager', () => {
 
     expect(await manager.isFileEnabled('server-a')).toBe(false);
     expect(await manager.isFileEnabled('server-b')).toBe(false);
+    expect(await manager.isConfigReadable()).toBe(false);
 
-    await manager.disable('server-b');
-    await manager.enable('server-a');
+    await expect(manager.disable('server-b')).rejects.toThrow(
+      'mcp-server-enablement.json',
+    );
+    await expect(manager.enable('server-a')).rejects.toThrow(
+      'mcp-server-enablement.json',
+    );
 
     expect(inMemoryFs['/virtual-home/.gemini/mcp-server-enablement.json']).toBe(
       '{not valid json',
@@ -173,6 +178,19 @@ describe('canLoadServer', () => {
       enablement: createMockEnablement(false, false),
     });
     expect(result.blockType).toBe('enablement');
+    expect(result.reason).toContain('is disabled');
+  });
+
+  it('gives a distinct reason when the config file is unreadable', async () => {
+    const result = await canLoadServer('s', {
+      adminMcpEnabled: true,
+      enablement: {
+        ...createMockEnablement(false, false),
+        isConfigReadable: () => Promise.resolve(false),
+      },
+    });
+    expect(result.blockType).toBe('enablement');
+    expect(result.reason).toContain('could not be read');
   });
 
   it('allows when admin MCP is enabled and no restrictions', async () => {

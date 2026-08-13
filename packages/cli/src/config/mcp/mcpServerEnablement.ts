@@ -40,6 +40,12 @@ export interface McpServerDisplayState {
 export interface EnablementCallbacks {
   isSessionDisabled: (serverId: string) => boolean;
   isFileEnabled: (serverId: string) => Promise<boolean>;
+  /**
+   * Whether the persistent config file could be read. Lets callers give a
+   * distinct reason when enablement state is unknown, instead of reporting
+   * the server as user-disabled.
+   */
+  isConfigReadable?: () => Promise<boolean>;
 }
 
 /**
@@ -168,9 +174,14 @@ export async function canLoadServer(
     config.enablement &&
     !(await config.enablement.isFileEnabled(normalizedId))
   ) {
+    const configReadable = config.enablement.isConfigReadable
+      ? await config.enablement.isConfigReadable()
+      : true;
     return {
       allowed: false,
-      reason: `Server '${serverId}' is disabled. Run 'gemini mcp enable ${serverId}' to enable.`,
+      reason: configReadable
+        ? `Server '${serverId}' is disabled. Run 'gemini mcp enable ${serverId}' to enable.`
+        : `Server '${serverId}' enablement state is unknown because its config file could not be read.`,
       blockType: 'enablement',
     };
   }
@@ -236,6 +247,14 @@ export class McpServerEnablementManager {
   }
 
   /**
+   * Whether the persistent config file can currently be read. Used to
+   * distinguish "server is disabled" from "enablement state is unknown".
+   */
+  async isConfigReadable(): Promise<boolean> {
+    return (await this.readConfig()) !== undefined;
+  }
+
+  /**
    * Check if server is session-disabled.
    */
   isSessionDisabled(serverName: string): boolean {
@@ -262,8 +281,11 @@ export class McpServerEnablementManager {
     const config = await this.readConfig();
     if (config === undefined) {
       // Don't write while the existing file can't be read; that would
-      // overwrite whatever state it currently holds.
-      return;
+      // overwrite whatever state it currently holds. Throw instead of
+      // silently no-op'ing, so callers don't report success.
+      throw new Error(
+        `Cannot enable '${serverName}': the MCP server enablement config at ${this.configFilePath} could not be read.`,
+      );
     }
 
     if (normalizedName in config) {
@@ -280,8 +302,11 @@ export class McpServerEnablementManager {
     const config = await this.readConfig();
     if (config === undefined) {
       // Don't write while the existing file can't be read; that would
-      // overwrite whatever state it currently holds.
-      return;
+      // overwrite whatever state it currently holds. Throw instead of
+      // silently no-op'ing, so callers don't report success.
+      throw new Error(
+        `Cannot disable '${serverName}': the MCP server enablement config at ${this.configFilePath} could not be read.`,
+      );
     }
     config[normalizeServerId(serverName)] = { enabled: false };
     await this.writeConfig(config);
@@ -336,6 +361,7 @@ export class McpServerEnablementManager {
     return {
       isSessionDisabled: (id) => this.isSessionDisabled(id),
       isFileEnabled: (id) => this.isFileEnabled(id),
+      isConfigReadable: () => this.isConfigReadable(),
     };
   }
 
