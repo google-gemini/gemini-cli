@@ -81,6 +81,15 @@ describe('classifyGoogleError', () => {
     }
   });
 
+  it('should return RetryableQuotaError for 529 or overloaded model errors', () => {
+    const originalError = new Error('Error: The model API is currently overloaded and may experience intermittent errors.');
+    const result = classifyGoogleError(originalError);
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+    if (result instanceof RetryableQuotaError) {
+      expect(result.message).toContain('overloaded');
+    }
+  });
+
   it('should return RetryableQuotaError with delay for 503 Service Unavailable with RetryInfo', () => {
     const apiError: GoogleApiError = {
       code: 503,

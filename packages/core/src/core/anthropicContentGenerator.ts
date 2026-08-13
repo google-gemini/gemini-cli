@@ -414,7 +414,7 @@ export class AnthropicContentGenerator implements ContentGenerator {
       messages,
       system: systemInstruction || undefined,
       tools: tools.length > 0 ? tools : undefined,
-      max_tokens: request.config?.maxOutputTokens || 8192,
+      max_tokens: request.config?.maxOutputTokens || 16384,
     };
   }
 

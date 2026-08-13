@@ -2,9 +2,9 @@
 
 ## Status
 
-- **Last Session:** 2026-08-12 16:37
+- **Last Session:** 2026-08-12 17:17
 - **Branch:** main
-- **Last Commit:** 969f59589 "fix(anthropic): deduplicate tool_use IDs and improve PTY teardown reliability"
+- **Last Commit:** c09c9b233 "fix(anthropic): map deduplicated tool_use IDs to matching functionResponse tool_result blocks"
   resolution and switch tests to Bun" quota-fallback tool response loss
   (#28672)"
 - **Deploy State:** unknown

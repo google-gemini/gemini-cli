@@ -236,8 +236,16 @@ export function classifyGoogleError(error: unknown): unknown {
 
   // Universal limit: 0 check (moved outside and before the fallback block)
   const lowerMessage = errorMessage.toLowerCase();
+  const isOverloadedOrRateLimited =
+    status === 429 ||
+    status === 499 ||
+    status === 502 ||
+    status === 503 ||
+    status === 529 ||
+    /overload/i.test(lowerMessage);
+
   if (
-    (status === 429 || status === 499 || status === 503) &&
+    isOverloadedOrRateLimited &&
     /limit:\s*0(?!\d|\.\d)/.test(lowerMessage)
   ) {
     const cause = googleApiError ?? {
@@ -250,9 +258,12 @@ export function classifyGoogleError(error: unknown): unknown {
 
   if (
     !googleApiError ||
-    (googleApiError.code !== 429 &&
+    (!isOverloadedOrRateLimited &&
+      googleApiError.code !== 429 &&
       googleApiError.code !== 499 &&
-      googleApiError.code !== 503) ||
+      googleApiError.code !== 502 &&
+      googleApiError.code !== 503 &&
+      googleApiError.code !== 529) ||
     googleApiError.details.length === 0
   ) {
     // Fallback: try to parse the error message for a retry delay
@@ -270,9 +281,9 @@ export function classifyGoogleError(error: unknown): unknown {
         }
         return new RetryableQuotaError(errorMessage, cause, retryDelaySeconds);
       }
-    } else if (status === 429 || status === 499 || status === 503) {
-      // Fallback: If it is a 429, 499, or 503 but doesn't have a specific "retry in" message,
-      // assume it is a temporary rate limit and retry.
+    } else if (isOverloadedOrRateLimited) {
+      // Fallback: If it is a 429, 499, 502, 503, 529, or overloaded error,
+      // assume it is temporary and retry gracefully.
       return new RetryableQuotaError(
         errorMessage,
         googleApiError ?? {

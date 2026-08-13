@@ -99,7 +99,7 @@ describe('AnthropicContentGenerator verification', () => {
       ],
     });
 
-    expect(mapped.max_tokens).toBe(8192);
+    expect(mapped.max_tokens).toBe(16384);
     expect(mapped.messages).toHaveLength(1);
     const content = mapped.messages[0].content as any[];
     expect(content).toHaveLength(1);
