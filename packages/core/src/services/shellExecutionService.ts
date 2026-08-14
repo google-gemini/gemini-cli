@@ -139,7 +139,7 @@ export interface ShellExecutionConfig {
   backgroundCompletionBehavior?: 'inject' | 'notify' | 'silent';
   originalCommand?: string;
   sessionId?: string;
-  env?: Record<string, string>;
+  env?: Record<string, string | undefined>;
 }
 
 /**
@@ -464,11 +464,9 @@ export class ShellExecutionService {
     // 2. Prepare Environment
     const sourceEnv = shellExecutionConfig.env ?? process.env;
     const gitConfigKeys: string[] = [];
-    if (!isInteractive) {
-      for (const key in sourceEnv) {
-        if (key.startsWith('GIT_CONFIG_')) {
-          gitConfigKeys.push(key);
-        }
+    for (const key in sourceEnv) {
+      if (key.startsWith('GIT_CONFIG_')) {
+        gitConfigKeys.push(key);
       }
     }
 
@@ -492,36 +490,56 @@ export class ShellExecutionService {
       GIT_PAGER: shellExecutionConfig.pager ?? 'cat',
     };
 
-    if (!isInteractive) {
-      // Ensure all GIT_CONFIG_* variables are preserved even if they were redacted
-      for (const key of gitConfigKeys) {
-        baseEnv[key] = sourceEnv[key];
-      }
-
-      const gitConfigCount = parseInt(baseEnv['GIT_CONFIG_COUNT'] || '0', 10);
-      const newKey = `GIT_CONFIG_KEY_${gitConfigCount}`;
-      const newValue = `GIT_CONFIG_VALUE_${gitConfigCount}`;
-
-      // Ensure these new keys are allowed through sanitization
-      sanitizationConfig.allowedEnvironmentVariables.push(
-        'GIT_CONFIG_COUNT',
-        newKey,
-        newValue,
-      );
-
-      Object.assign(baseEnv, {
-        GIT_TERMINAL_PROMPT: '0',
-        GIT_ASKPASS: '',
-        SSH_ASKPASS: '',
-        GH_PROMPT_DISABLED: '1',
-        GCM_INTERACTIVE: 'never',
-        DISPLAY: '',
-        DBUS_SESSION_BUS_ADDRESS: '',
-        GIT_CONFIG_COUNT: (gitConfigCount + 1).toString(),
-        [newKey]: 'credential.helper',
-        [newValue]: '',
-      });
+    // Ensure all GIT_CONFIG_* variables are preserved even if they were redacted
+    for (const key of gitConfigKeys) {
+      baseEnv[key] = sourceEnv[key];
     }
+
+    let gitConfigCount = parseInt(baseEnv['GIT_CONFIG_COUNT'] || '0', 10);
+    const devNullPath = os.platform() === 'win32' ? 'NUL' : '/dev/null';
+
+    baseEnv['GIT_CONFIG_GLOBAL'] = devNullPath;
+    baseEnv['GIT_CONFIG_SYSTEM'] = devNullPath;
+    baseEnv['GIT_CONFIG_NOSYSTEM'] = '1';
+
+    sanitizationConfig.allowedEnvironmentVariables.push(
+      'GIT_CONFIG_COUNT',
+      'GIT_CONFIG_GLOBAL',
+      'GIT_CONFIG_SYSTEM',
+      'GIT_CONFIG_NOSYSTEM',
+    );
+
+    const defaultGitOverrides: Array<[string, string]> = [
+      ['credential.helper', ''],
+      ['core.fsmonitor', ''],
+      ['core.hooksPath', ''],
+      ['core.sshCommand', ''],
+      ['core.pager', 'cat'],
+      ['core.editor', ''],
+      ['sequence.editor', ''],
+      ['diff.external', ''],
+    ];
+
+    for (const [overrideKey, overrideVal] of defaultGitOverrides) {
+      const keyVar = `GIT_CONFIG_KEY_${gitConfigCount}`;
+      const valVar = `GIT_CONFIG_VALUE_${gitConfigCount}`;
+      sanitizationConfig.allowedEnvironmentVariables.push(keyVar, valVar);
+      baseEnv[keyVar] = overrideKey;
+      baseEnv[valVar] = overrideVal;
+      gitConfigCount++;
+    }
+
+    baseEnv['GIT_CONFIG_COUNT'] = gitConfigCount.toString();
+
+    Object.assign(baseEnv, {
+      GIT_TERMINAL_PROMPT: '0',
+      GIT_ASKPASS: '',
+      SSH_ASKPASS: '',
+      GH_PROMPT_DISABLED: '1',
+      GCM_INTERACTIVE: 'never',
+      DISPLAY: '',
+      DBUS_SESSION_BUS_ADDRESS: '',
+    });
 
     // 3. Prepare Sandboxed Command
     const sandboxedCommand = await sandboxManager.prepareCommand({
