@@ -1080,7 +1080,7 @@ describe('E2E Tests', () => {
       };
       vi.spyOn(commandRegistry, 'get').mockReturnValue(mockWorkspaceCommand);
 
-      vi.stubEnv('CODER_AGENT_WORKSPACE_PATH', undefined);
+      vi.stubEnv('CODER_AGENT_WORKSPACE_PATH', '');
       const response = await request(app)
         .post('/executeCommand')
         .send({ command: 'workspace-command', args: [] });
