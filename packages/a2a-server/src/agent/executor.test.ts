@@ -442,4 +442,50 @@ describe('CoderAgentExecutor', () => {
     // Clean up the test by allowing the promise to resolve.
     await primaryPromise;
   });
+
+  it('should allow executing a task that is in a terminal state by re-activating it', async () => {
+    const taskId = 'test-task-terminal-reactivate';
+    const contextId = 'test-context';
+
+    const mockSocket = new EventEmitter();
+    (requestStorage.getStore as Mock).mockReturnValue({
+      req: { socket: mockSocket },
+    });
+
+    const requestContext = {
+      userMessage: {
+        messageId: 'msg-1',
+        taskId,
+        contextId,
+        parts: [{ kind: 'text', text: 'hi' }],
+        metadata: {
+          coderAgent: { kind: 'agent-settings', workspacePath: '/tmp' },
+        },
+      },
+    } as unknown as RequestContext;
+
+    // Create a task wrapper and set it to a terminal state in cache
+    const wrapper = await executor.createTask(
+      taskId,
+      contextId,
+      undefined,
+      mockEventBus,
+    );
+    wrapper.task.taskState = 'canceled';
+
+    // Now execute it again
+    const primaryPromise = executor.execute(requestContext, mockEventBus);
+
+    // Wait for task to be re-activated in the async execute loop
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // Verify task was re-activated to 'submitted' / 'working' and executed instead of being ignored
+    const runningWrapper = executor.getTask(taskId);
+    expect(runningWrapper).toBeDefined();
+    expect(runningWrapper!.task.taskState).not.toBe('canceled');
+
+    // Clean up the test execution loop
+    mockSocket.emit('end');
+    await primaryPromise;
+  });
 });

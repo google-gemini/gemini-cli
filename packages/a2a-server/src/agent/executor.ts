@@ -638,10 +638,10 @@ export class CoderAgentExecutor implements AgentExecutor {
           if (
             ['canceled', 'failed', 'completed'].includes(currentTask.taskState)
           ) {
-            logger.warn(
-              `[CoderAgentExecutor] Attempted to execute task ${taskId} which is already in state ${currentTask.taskState}. Ignoring.`,
+            logger.info(
+              `[CoderAgentExecutor] Re-activating task ${taskId} from terminal state ${currentTask.taskState}.`,
             );
-            return;
+            currentTask.taskState = 'submitted';
           }
 
           if (abortSignal.aborted) {
