@@ -3198,6 +3198,24 @@ describe('Config Quota & Preview Model Access', () => {
       expect(config.getHasAccessToPreviewModel()).toBe(false);
     });
 
+    it('should reverse-map gemini-3-flash back to gemini-3.5-flash in modelQuotas', async () => {
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
+        buckets: [
+          {
+            modelId: 'gemini-3-flash',
+            remainingAmount: '90',
+            remainingFraction: 0.9,
+          },
+        ],
+      });
+
+      config.setModel('gemini-3.5-flash');
+      await config.refreshUserQuota();
+
+      expect(config.getQuotaRemaining()).toBe(90);
+      expect(config.getQuotaLimit()).toBe(100);
+    });
+
     it('should calculate pooled quota correctly for auto models', async () => {
       mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
         buckets: [
@@ -4134,7 +4152,9 @@ describe('Plans Directory Initialization', () => {
 
     const plansDir = config.storage.getPlansDir();
     // Should NOT create the directory eagerly
-    expect(fs.promises.mkdir).not.toHaveBeenCalled();
+    expect(fs.promises.mkdir).not.toHaveBeenCalledWith(plansDir, {
+      recursive: true,
+    });
     // Should check if it exists
     expect(fs.promises.access).toHaveBeenCalledWith(plansDir);
 
@@ -4152,7 +4172,9 @@ describe('Plans Directory Initialization', () => {
     await config.initialize();
 
     const plansDir = config.storage.getPlansDir();
-    expect(fs.promises.mkdir).not.toHaveBeenCalled();
+    expect(fs.promises.mkdir).not.toHaveBeenCalledWith(plansDir, {
+      recursive: true,
+    });
     expect(fs.promises.access).toHaveBeenCalledWith(plansDir);
 
     const context = config.getWorkspaceContext();

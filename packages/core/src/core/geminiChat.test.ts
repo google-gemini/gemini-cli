@@ -1628,6 +1628,89 @@ describe('GeminiChat', () => {
       expect(chat.agentHistory.length).toBe(initialHistoryLength);
     });
 
+    it('should roll back the entire multi-turn request including function responses when a continuation stream is aborted/cancelled', async () => {
+      const initialHistoryLength = chat.agentHistory.length;
+      const abortController = new AbortController();
+
+      // 1. Send the first message of the prompt. This will succeed and register prompt-id-multi-turn-abort.
+      const streamFirst = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'model first response' }],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        streamFirst,
+      );
+
+      const s1 = await chat.sendMessageStream(
+        { model: 'gemini-2.0-flash' },
+        'user original prompt',
+        'prompt-id-multi-turn-abort',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of s1) {
+        // consume the stream
+      }
+
+      // Expect history to contain: user, model
+      expect(chat.agentHistory.length).toBe(initialHistoryLength + 2);
+
+      // 2. Send a continuation (functionResponse), which is cancelled mid-stream.
+      const streamSecond = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'partial model response before abort' }],
+              },
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+        abortController.abort();
+        throw new Error('User aborted a continuation stream.');
+      })();
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        streamSecond,
+      );
+
+      const s2 = await chat.sendMessageStream(
+        { model: 'gemini-2.0-flash' },
+        [
+          {
+            functionResponse: {
+              id: 'call_id_1',
+              name: 'my_tool',
+              response: { result: 'success' },
+            },
+          },
+        ],
+        'prompt-id-multi-turn-abort',
+        abortController.signal,
+        LlmRole.MAIN,
+      );
+
+      await expect(
+        (async () => {
+          for await (const _ of s2) {
+            // consume the stream to trigger abort
+          }
+        })(),
+      ).rejects.toThrow();
+
+      // Verify history has been rolled back entirely to initialHistoryLength (before the original prompt started)!
+      expect(chat.agentHistory.length).toBe(initialHistoryLength);
+    });
+
     it('should roll back the un-responded user turn from history when an ApiError is thrown', async () => {
       const initialHistoryLength = chat.agentHistory.length;
 

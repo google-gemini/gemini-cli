@@ -31,10 +31,11 @@ import {
   type ConfigParameters,
   type ExtensionLoader,
   resolveToRealPath,
+  checkPathTrust,
 } from '@google/gemini-cli-core';
 
 import { logger } from '../utils/logger.js';
-import type { Settings } from './settings.js';
+import { type Settings, loadSettings } from './settings.js';
 import { type AgentSettings, CoderAgentEvent } from '../types.js';
 
 export const envStorage = new AsyncLocalStorage<TaskEnv>();
@@ -407,12 +408,25 @@ export async function loadConfig(
 
 export function setIsTrusted(
   agentSettings: AgentSettings | undefined,
+  workspaceRoot?: string,
 ): boolean {
-  const folderTrustEnv = getEnv('GEMINI_FOLDER_TRUST');
-  if (folderTrustEnv !== undefined) {
-    return folderTrustEnv === 'true';
+  if (agentSettings?.isTrusted !== undefined) {
+    return agentSettings.isTrusted;
   }
-  return !!agentSettings?.isTrusted;
+  const cliTrustEnv = getEnv('GEMINI_CLI_TRUST_WORKSPACE');
+  if (cliTrustEnv !== undefined) {
+    return cliTrustEnv === 'true';
+  }
+  if (workspaceRoot) {
+    const initialSettings = loadSettings(workspaceRoot, false);
+    const { isTrusted } = checkPathTrust({
+      path: workspaceRoot,
+      isFolderTrustEnabled: initialSettings.folderTrust ?? true,
+      isHeadless: isHeadlessMode(),
+    });
+    return isTrusted ?? false;
+  }
+  return false;
 }
 
 export async function setTargetDir(
