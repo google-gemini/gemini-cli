@@ -4335,6 +4335,7 @@ describe('Model Persistence Bug Fix (#19864)', () => {
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining(PREVIEW_GEMINI_3_1_MODEL),
     );
+    warnSpy.mockRestore();
   });
 
   it('should persist model when user selects it with persistMode=true', () => {
