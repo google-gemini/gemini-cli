@@ -45,6 +45,9 @@ interface UseQuotaAndFallbackArgs {
   errorVerbosity?: 'low' | 'full';
 }
 
+const isObject = (val: unknown): val is Record<string, unknown> =>
+  typeof val === 'object' && val !== null;
+
 export function useQuotaAndFallback({
   config,
   historyManager,
@@ -79,6 +82,28 @@ export function useQuotaAndFallback({
       let message: string;
       let isTerminalQuotaError = false;
       let isModelNotFoundError = false;
+
+      const errorObj = isObject(error) ? error : null;
+
+      const errorReasonValue = errorObj?.['reason'];
+      const errorReason =
+        typeof errorReasonValue === 'string' ? errorReasonValue : undefined;
+
+      const errorMessageValue = errorObj?.['message'];
+      const errorMessage =
+        typeof errorMessageValue === 'string' ? errorMessageValue : undefined;
+
+      const isCapacityExceeded =
+        errorReason === 'MODEL_CAPACITY_EXHAUSTED' ||
+        errorReason === 'MODEL_CAPACITY_EXCEEDED' ||
+        (typeof errorMessage === 'string' &&
+          /exhausted your capacity|capacity exceeded|MODEL_CAPACITY_EXHAUSTED/i.test(
+            errorMessage,
+          )) ||
+        (typeof error === 'string' &&
+          /exhausted your capacity|capacity exceeded|MODEL_CAPACITY_EXHAUSTED/i.test(
+            error,
+          ));
       const usageLimitReachedModel = isProModel(failedModel)
         ? 'all Pro models'
         : failedModel;
@@ -121,18 +146,30 @@ export function useQuotaAndFallback({
         }
 
         // Default: Show existing ProQuotaDialog (for overageStrategy: 'never' or non-G1 users)
-        const messageLines = [
-          `Usage limit reached for ${usageLimitReachedModel}.`,
-          error.retryDelayMs
-            ? `Access resets at ${getResetTimeMessage(error.retryDelayMs)}.`
-            : null,
-          `/stats model for usage details`,
-          `/model to switch models.`,
-          contentGeneratorConfig?.authType === AuthType.LOGIN_WITH_GOOGLE
-            ? `/auth to switch to API key.`
-            : null,
-        ].filter(Boolean);
-        message = messageLines.join('\n');
+        if (isCapacityExceeded) {
+          const messageLines = [
+            `We are currently experiencing high demand for ${usageLimitReachedModel}.`,
+            'We apologize and appreciate your patience.',
+            error.retryDelayMs
+              ? `Access resets at ${getResetTimeMessage(error.retryDelayMs)}.`
+              : null,
+            `/model to switch models.`,
+          ].filter(Boolean);
+          message = messageLines.join('\n');
+        } else {
+          const messageLines = [
+            `Usage limit reached for ${usageLimitReachedModel}.`,
+            error.retryDelayMs
+              ? `Access resets at ${getResetTimeMessage(error.retryDelayMs)}.`
+              : null,
+            `/stats model for usage details`,
+            `/model to switch models.`,
+            contentGeneratorConfig?.authType === AuthType.LOGIN_WITH_GOOGLE
+              ? `/auth to switch to API key.`
+              : null,
+          ].filter(Boolean);
+          message = messageLines.join('\n');
+        }
       } else if (error instanceof ModelNotFoundError) {
         isModelNotFoundError = true;
         if (
@@ -174,7 +211,7 @@ export function useQuotaAndFallback({
       // without interrupting with a dialog.
       if (
         errorVerbosity === 'low' &&
-        !isTerminalQuotaError &&
+        (!isTerminalQuotaError || isCapacityExceeded) &&
         !isModelNotFoundError
       ) {
         return 'retry_once';
@@ -197,6 +234,7 @@ export function useQuotaAndFallback({
             message,
             isTerminalQuotaError,
             isModelNotFoundError,
+            isCapacityExceeded,
             authType: contentGeneratorConfig?.authType,
           });
         },

@@ -546,30 +546,40 @@ describe('loadConfig', () => {
 describe('setIsTrusted', () => {
   beforeEach(() => {
     vi.resetModules();
+    // Ensure GEMINI_CLI_TRUST_WORKSPACE is not set by default in tests to prevent leakage
+    vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', '');
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  it('should return true when GEMINI_FOLDER_TRUST env var is true', async () => {
-    vi.stubEnv('GEMINI_FOLDER_TRUST', 'true');
-    const { setIsTrusted } = await import('./config.js');
-    expect(setIsTrusted(undefined)).toBe(true);
-    expect(setIsTrusted({ isTrusted: false } as AgentSettings)).toBe(true);
-  });
-
-  it('should return false when GEMINI_FOLDER_TRUST env var is false', async () => {
-    vi.stubEnv('GEMINI_FOLDER_TRUST', 'false');
-    const { setIsTrusted } = await import('./config.js');
-    expect(setIsTrusted(undefined)).toBe(false);
-    expect(setIsTrusted({ isTrusted: true } as AgentSettings)).toBe(false);
-  });
-
-  it('should fallback to agentSettings.isTrusted if env var is undefined', async () => {
+  it('should return agentSettings.isTrusted if defined, ignoring env vars', async () => {
+    vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', 'false');
     const { setIsTrusted } = await import('./config.js');
     expect(setIsTrusted({ isTrusted: true } as AgentSettings)).toBe(true);
+
+    vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', 'true');
     expect(setIsTrusted({ isTrusted: false } as AgentSettings)).toBe(false);
+  });
+
+  it('should return true when GEMINI_CLI_TRUST_WORKSPACE env var is true and agentSettings.isTrusted is undefined', async () => {
+    vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', 'true');
+    const { setIsTrusted } = await import('./config.js');
+    expect(setIsTrusted(undefined)).toBe(true);
+    expect(setIsTrusted({} as AgentSettings)).toBe(true);
+  });
+
+  it('should return false when GEMINI_CLI_TRUST_WORKSPACE env var is false and agentSettings.isTrusted is undefined', async () => {
+    vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', 'false');
+    const { setIsTrusted } = await import('./config.js');
     expect(setIsTrusted(undefined)).toBe(false);
+    expect(setIsTrusted({} as AgentSettings)).toBe(false);
+  });
+
+  it('should fallback to false if agentSettings.isTrusted and env var are undefined and no workspaceRoot is provided', async () => {
+    const { setIsTrusted } = await import('./config.js');
+    expect(setIsTrusted(undefined)).toBe(false);
+    expect(setIsTrusted({} as AgentSettings)).toBe(false);
   });
 });

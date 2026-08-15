@@ -38,6 +38,7 @@ import {
 import { hasCycleInSchema } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
 import type { CompletedToolCall } from '../scheduler/types.js';
+import { isAbortError } from '../utils/errors.js';
 import {
   logContentRetry,
   logContentRetryFailure,
@@ -296,6 +297,9 @@ export class GeminiChat {
   private lastPromptTokenCount: number;
   private callCounter = 0;
   agentHistory: AgentChatHistory;
+  private lastPromptId?: string;
+  private promptOriginalHistoryLength?: number;
+  private promptOriginalTokenCount?: number;
 
   constructor(
     readonly context: AgentLoopContext,
@@ -406,6 +410,17 @@ export class GeminiChat {
 
     const historyLengthBefore = this.agentHistory.length;
     const baselinePromptTokenCount = this.lastPromptTokenCount;
+
+    if (this.lastPromptId && this.lastPromptId !== prompt_id) {
+      this.promptOriginalHistoryLength = undefined;
+      this.promptOriginalTokenCount = undefined;
+    }
+    this.lastPromptId = prompt_id;
+
+    if (this.promptOriginalHistoryLength === undefined) {
+      this.promptOriginalHistoryLength = historyLengthBefore;
+      this.promptOriginalTokenCount = baselinePromptTokenCount;
+    }
 
     let streamDoneResolver: () => void;
     const streamDonePromise = new Promise<void>((resolve) => {
@@ -684,7 +699,26 @@ export class GeminiChat {
           }
         }
       } catch (error) {
-        if (!isOriginalFunctionResponse) {
+        const isAborted =
+          signal?.aborted ||
+          isAbortError(error) ||
+          (error instanceof Error &&
+            (error.name === 'CanceledError' ||
+              error.name === 'FatalCancellationError'));
+        const originalLength = this.promptOriginalHistoryLength;
+        const originalTokenCount = this.promptOriginalTokenCount;
+        if (isAborted && originalLength !== undefined) {
+          this.agentHistory.rollback(originalLength);
+          this.chatRecordingService.updateMessagesFromHistory(
+            this.agentHistory.get(),
+          );
+          if (originalTokenCount !== undefined) {
+            this.lastPromptTokenCount = originalTokenCount;
+          }
+          this.promptOriginalHistoryLength = undefined;
+          this.promptOriginalTokenCount = undefined;
+          this.lastPromptId = undefined;
+        } else if (!isOriginalFunctionResponse) {
           this.agentHistory.rollback(historyLengthBefore);
           this.chatRecordingService.updateMessagesFromHistory(
             this.agentHistory.get(),

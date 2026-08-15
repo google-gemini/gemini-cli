@@ -87,6 +87,8 @@ import {
   PREVIEW_GEMINI_FLASH_MODEL,
   resolveModel,
   setFlashModels,
+  DEFAULT_GEMINI_3_5_FLASH_MODEL,
+  SECONDARY_GEMINI_3_5_FLASH_MODEL,
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
@@ -1338,6 +1340,7 @@ export class Config implements McpContext, AgentLoopContext {
         approvalMode: engineApprovalMode,
         disableAlwaysAllow: this.disableAlwaysAllow,
         sandboxManager: this._sandboxManager,
+        isTrustedFolder: () => this.isTrustedFolder(),
       },
       checkerRunner,
     );
@@ -2320,6 +2323,11 @@ export class Config implements McpContext, AgentLoopContext {
             continue;
           }
 
+          let modelId = bucket.modelId;
+          if (modelId === SECONDARY_GEMINI_3_5_FLASH_MODEL) {
+            modelId = DEFAULT_GEMINI_3_5_FLASH_MODEL;
+          }
+
           let remaining: number;
           let limit: number;
 
@@ -2328,7 +2336,7 @@ export class Config implements McpContext, AgentLoopContext {
             limit =
               bucket.remainingFraction > 0
                 ? Math.round(remaining / bucket.remainingFraction)
-                : (this.modelQuotas.get(bucket.modelId)?.limit ?? 0);
+                : (this.modelQuotas.get(modelId)?.limit ?? 0);
           } else {
             // Server only sent remainingFraction — use a normalized scale.
             limit = 100;
@@ -2336,7 +2344,7 @@ export class Config implements McpContext, AgentLoopContext {
           }
 
           if (!isNaN(remaining) && Number.isFinite(limit) && limit > 0) {
-            this.modelQuotas.set(bucket.modelId, {
+            this.modelQuotas.set(modelId, {
               remaining,
               limit,
               resetTime: bucket.resetTime,
@@ -3152,13 +3160,16 @@ export class Config implements McpContext, AgentLoopContext {
    * 'false' for untrusted.
    */
   isTrustedFolder(): boolean {
+    if (this.trustedFolder !== undefined) {
+      return this.trustedFolder;
+    }
+
     const context = ideContextStore.get();
     if (context?.workspaceState?.isTrusted !== undefined) {
       return context.workspaceState.isTrusted;
     }
 
-    // Default to untrusted if folder trust is enabled and no explicit value is set.
-    return this.folderTrust ? (this.trustedFolder ?? false) : true;
+    return this.folderTrust ? false : true;
   }
 
   setIdeMode(value: boolean): void {
