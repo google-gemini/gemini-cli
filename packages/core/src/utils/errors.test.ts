@@ -104,6 +104,16 @@ describe('isAuthenticationError', () => {
     expect(isAuthenticationError(new Error('HTTP 401'))).toBe(true);
     expect(isAuthenticationError(new Error('Status code: 401'))).toBe(true);
   });
+
+  it('should ignore 401 embedded in unrelated values', () => {
+    expect(
+      isAuthenticationError(
+        new Error('Error connecting to http://localhost:4012'),
+      ),
+    ).toBe(false);
+    expect(isAuthenticationError(new Error('exit status 4010'))).toBe(false);
+    expect(isAuthenticationError(new Error('error at line 401'))).toBe(false);
+  });
 });
 
 describe('toFriendlyError', () => {
