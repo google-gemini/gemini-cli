@@ -153,6 +153,31 @@ type McpContentBlock =
   | McpResourceBlock
   | McpResourceLinkBlock;
 
+/**
+ * Ensures a tool parameter schema has `type: 'object'` at root, as required by
+ * strict JSON Schema validators (e.g. Vertex AI in strict mode). MCP servers
+ * sometimes omit `type` or use a non-object type at root.
+ */
+export function normalizeToolSchema(schema: unknown): Record<string, unknown> {
+  if (schema && typeof schema === 'object' && !Array.isArray(schema)) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const s = schema as Record<string, unknown>;
+    const p = s['properties'];
+    const hasValidProperties =
+      p != null && typeof p === 'object' && !Array.isArray(p);
+    if (s['type'] === 'object' && hasValidProperties) {
+      return s;
+    }
+    return {
+      ...s,
+      type: 'object',
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      properties: hasValidProperties ? (p as Record<string, unknown>) : {},
+    };
+  }
+  return { type: 'object', properties: {} };
+}
+
 export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
   ToolParams,
   ToolResult

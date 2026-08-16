@@ -48,7 +48,7 @@ import {
 } from '../config/config.js';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { ServiceAccountImpersonationProvider } from '../mcp/sa-impersonation-provider.js';
-import { DiscoveredMCPTool } from './mcp-tool.js';
+import { DiscoveredMCPTool, normalizeToolSchema } from './mcp-tool.js';
 import { McpComplianceTransport } from './mcp-compliance-transport.js';
 
 import type { CallableTool, FunctionCall, Part, Tool } from '@google/genai';
@@ -1371,7 +1371,7 @@ export async function discoverTools(
           mcpServerName,
           toolDef.name,
           toolDef.description ?? '',
-          toolDef.inputSchema ?? { type: 'object', properties: {} },
+          normalizeToolSchema(toolDef.inputSchema),
           messageBus,
           mcpServerConfig.trust,
           isReadOnly,

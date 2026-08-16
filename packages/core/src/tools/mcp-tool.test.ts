@@ -19,6 +19,7 @@ import {
   DiscoveredMCPTool,
   generateValidName,
   formatMcpToolName,
+  normalizeToolSchema,
 } from './mcp-tool.js'; // Added getStringifiedResultForDisplay
 import { ToolConfirmationOutcome, type ToolResult } from './tools.js';
 import type { CallableTool, Part } from '@google/genai';
@@ -50,6 +51,42 @@ const createSdkResponse = (
     },
   },
 ];
+
+describe('normalizeToolSchema', () => {
+  it('passes through a valid {type:object} schema unchanged', () => {
+    const s = { type: 'object', properties: { x: { type: 'string' } } };
+    expect(normalizeToolSchema(s)).toBe(s);
+  });
+  it('injects type:object when type is missing', () => {
+    expect(normalizeToolSchema({ properties: {} })).toEqual({
+      properties: {},
+      type: 'object',
+    });
+  });
+  it('overrides a non-object type and ensures properties is present', () => {
+    expect(normalizeToolSchema({ type: 'string' })).toEqual({
+      type: 'object',
+      properties: {},
+    });
+  });
+  it('normalizes malformed properties to empty object', () => {
+    expect(normalizeToolSchema({ type: 'object', properties: null })).toEqual({
+      type: 'object',
+      properties: {},
+    });
+    expect(normalizeToolSchema({ type: 'object', properties: [] })).toEqual({
+      type: 'object',
+      properties: {},
+    });
+  });
+  it('returns default schema for null/undefined/array/primitive', () => {
+    const def = { type: 'object', properties: {} };
+    expect(normalizeToolSchema(null)).toEqual(def);
+    expect(normalizeToolSchema(undefined)).toEqual(def);
+    expect(normalizeToolSchema([])).toEqual(def);
+    expect(normalizeToolSchema('string')).toEqual(def);
+  });
+});
 
 describe('generateValidName', () => {
   it('should return a valid name for a simple function', () => {
