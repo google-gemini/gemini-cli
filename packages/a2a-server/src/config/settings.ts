@@ -139,12 +139,33 @@ export function loadSettings(
     }
   }
 
-  // If there are overlapping keys, the values of workspaceSettings will
-  // override values from userSettings
-  const mergedSettings = {
-    ...userSettings,
-    ...workspaceSettings,
-  };
+  // Deep-merge so workspace overrides specific nested keys without erasing
+  // sibling keys from user settings (e.g. partial fileFiltering override).
+  const mergedSettings: Settings = { ...userSettings };
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  for (const key of Object.keys(workspaceSettings) as Array<keyof Settings>) {
+    const wsVal = workspaceSettings[key];
+    const uVal = mergedSettings[key];
+    if (
+      wsVal !== null &&
+      wsVal !== undefined &&
+      uVal !== null &&
+      uVal !== undefined &&
+      typeof wsVal === 'object' &&
+      !Array.isArray(wsVal) &&
+      typeof uVal === 'object' &&
+      !Array.isArray(uVal)
+    ) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      (mergedSettings as Record<string, unknown>)[key] = {
+        ...(uVal as object),
+        ...(wsVal as object),
+      };
+    } else {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      (mergedSettings as Record<string, unknown>)[key] = wsVal;
+    }
+  }
 
   // Security: ensure policyPaths and adminPolicyPaths are only loaded from trusted, user-level
   // configuration and cannot be overridden by workspace-level settings, even if the

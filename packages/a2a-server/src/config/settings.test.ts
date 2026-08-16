@@ -128,7 +128,7 @@ describe('loadSettings', () => {
     expect(result.experimental?.enableAgents).toBe(true);
   });
 
-  it('should overwrite top-level settings from workspace (shallow merge)', () => {
+  it('should deep-merge nested settings from workspace, preserving unspecified user keys', () => {
     const userSettings = {
       showMemoryUsage: false,
       fileFiltering: {
@@ -154,9 +154,10 @@ describe('loadSettings', () => {
     // Primitive value overwritten
     expect(result.showMemoryUsage).toBe(true);
 
-    // Object value completely replaced (shallow merge behavior)
+    // Workspace partial override merged into user's nested object
     expect(result.fileFiltering?.respectGitIgnore).toBe(false);
-    expect(result.fileFiltering?.enableRecursiveFileSearch).toBeUndefined();
+    // Deep merge: user's enableRecursiveFileSearch preserved
+    expect(result.fileFiltering?.enableRecursiveFileSearch).toBe(true);
   });
 
   describe('security', () => {
