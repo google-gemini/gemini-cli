@@ -285,7 +285,7 @@ describe('AgentRegistry', () => {
 
       await registry.initialize();
 
-      // loadAgentsFromDirectory called only once (project dir == user dir, so skip user dir)
+      // loadAgentsFromDirectory called only once (project pass skipped, user pass runs)
       expect(
         vi.mocked(tomlLoader.loadAgentsFromDirectory),
       ).toHaveBeenCalledTimes(1);
