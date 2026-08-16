@@ -101,11 +101,15 @@ Slash commands provide meta-level control over the CLI itself.
 
 ### `/clear`
 
-- **Description:** Clear the terminal screen, including the visible session
-  history and scrollback within the CLI. The underlying session data (for
-  history recall) might be preserved depending on the exact implementation, but
-  the visual display is cleared.
-- **Keyboard shortcut:** Press **Ctrl+L** at any time to perform a clear action.
+- **Description:** Clear the terminal screen and start a new session. This
+  removes the visible session history and scrollback within the CLI and resets
+  the agent's conversation context, so the model no longer has access to the
+  previous conversation. Use it to start a fresh thread without context
+  pollution from earlier turns.
+- **Alias:** `/new`
+- **Keyboard shortcut:** Press **Ctrl+L** to clear the terminal screen. Unlike
+  `/clear`, this only clears the visible output and keeps the current
+  conversation context intact.
 
 ### `/commands`
 
