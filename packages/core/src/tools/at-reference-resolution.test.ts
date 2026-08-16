@@ -19,6 +19,7 @@ import { StandardFileSystemService } from '../services/fileSystemService.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { isSubpath } from '../utils/paths.js';
+import { canCreateSymlinks } from '../test-utils/environment-capabilities.js';
 
 vi.mock('../telemetry/loggers.js', () => ({
   logFileOperation: vi.fn(),
@@ -401,53 +402,59 @@ describe('Consolidated At-Reference Path Resolution Tests (b-495551283)', () => 
     ).rejects.toThrow('Path not in workspace');
   });
 
-  it('getCorrectedFileContent handles symlink loops gracefully', async () => {
-    const symlinkPath1 = path.join(tempRootDir, 'symlink1');
-    const symlinkPath2 = path.join(tempRootDir, 'symlink2');
-    await fsp.symlink(symlinkPath2, symlinkPath1);
-    await fsp.symlink(symlinkPath1, symlinkPath2);
+  it.skipIf(!canCreateSymlinks())(
+    'getCorrectedFileContent handles symlink loops gracefully',
+    async () => {
+      const symlinkPath1 = path.join(tempRootDir, 'symlink1');
+      const symlinkPath2 = path.join(tempRootDir, 'symlink2');
+      await fsp.symlink(symlinkPath2, symlinkPath1);
+      await fsp.symlink(symlinkPath1, symlinkPath2);
 
-    const result = await getCorrectedFileContent(
-      mockConfigInstance,
-      'symlink1',
-      'content',
-      abortSignal,
-    );
+      const result = await getCorrectedFileContent(
+        mockConfigInstance,
+        'symlink1',
+        'content',
+        abortSignal,
+      );
 
-    // The utility should fail gracefully with a resolution error
-    expect(result.error).toBeDefined();
-    expect(result.error?.message).toContain('Failed to resolve path');
-  });
+      // The utility should fail gracefully with a resolution error
+      expect(result.error).toBeDefined();
+      expect(result.error?.message).toContain('Failed to resolve path');
+    },
+  );
 
-  it('EditTool.getModifyContext handles symlink loops gracefully by throwing a descriptive error', async () => {
-    const symlinkPath1 = path.join(tempRootDir, 'symlink1');
-    const symlinkPath2 = path.join(tempRootDir, 'symlink2');
-    await fsp.symlink(symlinkPath2, symlinkPath1);
-    await fsp.symlink(symlinkPath1, symlinkPath2);
+  it.skipIf(!canCreateSymlinks())(
+    'EditTool.getModifyContext handles symlink loops gracefully by throwing a descriptive error',
+    async () => {
+      const symlinkPath1 = path.join(tempRootDir, 'symlink1');
+      const symlinkPath2 = path.join(tempRootDir, 'symlink2');
+      await fsp.symlink(symlinkPath2, symlinkPath1);
+      await fsp.symlink(symlinkPath1, symlinkPath2);
 
-    const editTool = new EditTool(mockConfigInstance, createMockMessageBus());
-    const modifyContext = editTool.getModifyContext(abortSignal);
+      const editTool = new EditTool(mockConfigInstance, createMockMessageBus());
+      const modifyContext = editTool.getModifyContext(abortSignal);
 
-    // The getCurrentContent method should throw a path resolution error
-    await expect(
-      modifyContext.getCurrentContent({
-        file_path: 'symlink1',
-        instruction: 'read file',
-        old_string: '',
-        new_string: '',
-      }),
-    ).rejects.toThrow('Failed to resolve path');
+      // The getCurrentContent method should throw a path resolution error
+      await expect(
+        modifyContext.getCurrentContent({
+          file_path: 'symlink1',
+          instruction: 'read file',
+          old_string: '',
+          new_string: '',
+        }),
+      ).rejects.toThrow('Failed to resolve path');
 
-    // The getProposedContent method should throw a path resolution error
-    await expect(
-      modifyContext.getProposedContent({
-        file_path: 'symlink1',
-        instruction: 'read file',
-        old_string: '',
-        new_string: '',
-      }),
-    ).rejects.toThrow('Failed to resolve path');
-  });
+      // The getProposedContent method should throw a path resolution error
+      await expect(
+        modifyContext.getProposedContent({
+          file_path: 'symlink1',
+          instruction: 'read file',
+          old_string: '',
+          new_string: '',
+        }),
+      ).rejects.toThrow('Failed to resolve path');
+    },
+  );
 
   it('getCorrectedFileContent successfully resolves paths in Plan Mode', async () => {
     const plansDir = path.join(tempRootDir, '.plans');

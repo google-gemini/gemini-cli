@@ -26,6 +26,7 @@ import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
+import { canCreateSymlinks } from '../test-utils/environment-capabilities.js';
 
 /**
  * Cross-platform command wrappers using Node.js inline scripts.
@@ -691,48 +692,51 @@ describe('SandboxManager Integration', () => {
         expect(fs.existsSync(nonExistentFile)).toBe(false);
       });
 
-      it('restricts symlinks to forbidden targets', async () => {
-        const tempWorkspace = createTempDir('workspace-');
-        const targetFile = path.join(tempWorkspace, 'target.txt');
-        const symlinkFile = path.join(tempWorkspace, 'link.txt');
+      it.skipIf(!canCreateSymlinks())(
+        'restricts symlinks to forbidden targets',
+        async () => {
+          const tempWorkspace = createTempDir('workspace-');
+          const targetFile = path.join(tempWorkspace, 'target.txt');
+          const symlinkFile = path.join(tempWorkspace, 'link.txt');
 
-        fs.writeFileSync(targetFile, 'secret data');
-        fs.symlinkSync(targetFile, symlinkFile);
+          fs.writeFileSync(targetFile, 'secret data');
+          fs.symlinkSync(targetFile, symlinkFile);
 
-        const osManager = createSandboxManager(
-          { enabled: true },
-          {
-            workspace: tempWorkspace,
-            forbiddenPaths: async () => [symlinkFile],
-          },
-        );
+          const osManager = createSandboxManager(
+            { enabled: true },
+            {
+              workspace: tempWorkspace,
+              forbiddenPaths: async () => [symlinkFile],
+            },
+          );
 
-        // Attempt to write to the target file directly
-        const { command: cmdTarget, args: argsTarget } =
-          Platform.touch(targetFile);
-        const commandTarget = await osManager.prepareCommand({
-          command: cmdTarget,
-          args: argsTarget,
-          cwd: tempWorkspace,
-          env: process.env,
-        });
+          // Attempt to write to the target file directly
+          const { command: cmdTarget, args: argsTarget } =
+            Platform.touch(targetFile);
+          const commandTarget = await osManager.prepareCommand({
+            command: cmdTarget,
+            args: argsTarget,
+            cwd: tempWorkspace,
+            env: process.env,
+          });
 
-        const resultTarget = await runCommand(commandTarget);
-        assertResult(resultTarget, commandTarget, 'failure');
+          const resultTarget = await runCommand(commandTarget);
+          assertResult(resultTarget, commandTarget, 'failure');
 
-        // Attempt to write via the symlink
-        const { command: cmdLink, args: argsLink } =
-          Platform.touch(symlinkFile);
-        const commandLink = await osManager.prepareCommand({
-          command: cmdLink,
-          args: argsLink,
-          cwd: tempWorkspace,
-          env: process.env,
-        });
+          // Attempt to write via the symlink
+          const { command: cmdLink, args: argsLink } =
+            Platform.touch(symlinkFile);
+          const commandLink = await osManager.prepareCommand({
+            command: cmdLink,
+            args: argsLink,
+            cwd: tempWorkspace,
+            env: process.env,
+          });
 
-        const resultLink = await runCommand(commandLink);
-        assertResult(resultLink, commandLink, 'failure');
-      });
+          const resultLink = await runCommand(commandLink);
+          assertResult(resultLink, commandLink, 'failure');
+        },
+      );
     });
 
     describe('Governance Files', () => {

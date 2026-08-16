@@ -16,6 +16,7 @@ import * as fs from 'node:fs';
 import os from 'node:os';
 import { validatePlanPath } from '../utils/planUtils.js';
 import * as loggers from '../telemetry/loggers.js';
+import { canCreateSymlinks } from '../test-utils/environment-capabilities.js';
 
 vi.mock('../telemetry/loggers.js', () => ({
   logPlanExecution: vi.fn(),
@@ -493,20 +494,23 @@ Ask the user for specific feedback on how to improve the plan.`,
       expect(result).toContain('Plan file does not exist');
     });
 
-    it('should reject symbolic links pointing outside the plans directory', () => {
-      const outsideFile = path.join(tempRootDir, 'outside.txt');
-      fs.writeFileSync(outsideFile, 'secret');
-      const maliciousPath = path.join(mockPlansDir, 'malicious.md');
-      fs.symlinkSync(outsideFile, maliciousPath);
+    it.skipIf(!canCreateSymlinks())(
+      'should reject symbolic links pointing outside the plans directory',
+      () => {
+        const outsideFile = path.join(tempRootDir, 'outside.txt');
+        fs.writeFileSync(outsideFile, 'secret');
+        const maliciousPath = path.join(mockPlansDir, 'malicious.md');
+        fs.symlinkSync(outsideFile, maliciousPath);
 
-      const result = tool.validateToolParams({
-        plan_filename: 'malicious.md',
-      });
+        const result = tool.validateToolParams({
+          plan_filename: 'malicious.md',
+        });
 
-      expect(result).toBe(
-        `Access denied: plan path (malicious.md) must be within the designated plans directory (${mockPlansDir}).`,
-      );
-    });
+        expect(result).toBe(
+          `Access denied: plan path (malicious.md) must be within the designated plans directory (${mockPlansDir}).`,
+        );
+      },
+    );
 
     it('should accept valid path within plans directory', () => {
       createPlanFile('valid.md', '# Content');

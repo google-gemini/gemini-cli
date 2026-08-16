@@ -9,6 +9,7 @@ import path from 'node:path';
 import * as fs from 'node:fs';
 import os from 'node:os';
 import { validatePlanPath, validatePlanContent } from './planUtils.js';
+import { canCreateSymlinks } from '../test-utils/environment-capabilities.js';
 
 describe('planUtils', () => {
   let tempRootDir: string;
@@ -45,24 +46,27 @@ describe('planUtils', () => {
       expect(result).toContain('Plan file does not exist');
     });
 
-    it('should detect path traversal via symbolic links', async () => {
-      const maliciousPath = 'malicious.md';
-      const fullMaliciousPath = path.join(plansDir, maliciousPath);
+    it.skipIf(!canCreateSymlinks())(
+      'should detect path traversal via symbolic links',
+      async () => {
+        const maliciousPath = 'malicious.md';
+        const fullMaliciousPath = path.join(plansDir, maliciousPath);
 
-      // Create a file outside the plans directory
-      const outsideFile = path.join(tempRootDir, 'outside.md');
-      fs.writeFileSync(outsideFile, 'secret content');
+        // Create a file outside the plans directory
+        const outsideFile = path.join(tempRootDir, 'outside.md');
+        fs.writeFileSync(outsideFile, 'secret content');
 
-      // Create a symbolic link pointing outside the plans directory
-      fs.symlinkSync(outsideFile, fullMaliciousPath);
+        // Create a symbolic link pointing outside the plans directory
+        fs.symlinkSync(outsideFile, fullMaliciousPath);
 
-      const result = await validatePlanPath(
-        maliciousPath,
-        plansDir,
-        tempRootDir,
-      );
-      expect(result).toContain('Access denied');
-    });
+        const result = await validatePlanPath(
+          maliciousPath,
+          plansDir,
+          tempRootDir,
+        );
+        expect(result).toContain('Access denied');
+      },
+    );
   });
 
   describe('validatePlanContent', () => {
