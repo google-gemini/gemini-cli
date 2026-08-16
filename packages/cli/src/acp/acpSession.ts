@@ -361,6 +361,8 @@ export class Session {
 
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
+    let totalCachedTokens = 0;
+    let totalThoughtTokens = 0;
     const modelUsageMap = new Map<string, { input: number; output: number }>();
 
     let currentParts: Part[] = parts;
@@ -372,6 +374,13 @@ export class Session {
       if (maxTurns >= 0 && turnCount > maxTurns) {
         return {
           stopReason: 'max_turn_requests',
+          usage: {
+            inputTokens: totalInputTokens,
+            outputTokens: totalOutputTokens,
+            cachedReadTokens: totalCachedTokens || undefined,
+            thoughtTokens: totalThoughtTokens || undefined,
+            totalTokens: totalInputTokens + totalOutputTokens,
+          },
           _meta: {
             quota: {
               token_count: {
@@ -401,6 +410,8 @@ export class Session {
       let turnModelId = this.context.config.getModel();
       let turnInputTokens = 0;
       let turnOutputTokens = 0;
+      let turnCachedTokens = 0;
+      let turnThoughtTokens = 0;
 
       try {
         const responseStream = this.context.geminiClient.sendMessageStream(
@@ -447,6 +458,10 @@ export class Session {
                 turnInputTokens = usage.promptTokenCount ?? turnInputTokens;
                 turnOutputTokens =
                   usage.candidatesTokenCount ?? turnOutputTokens;
+                turnCachedTokens =
+                  usage.cachedContentTokenCount ?? turnCachedTokens;
+                turnThoughtTokens =
+                  usage.thoughtsTokenCount ?? turnThoughtTokens;
               }
               break;
             }
@@ -521,6 +536,13 @@ export class Session {
           // Treat this as a graceful end to the model's turn rather than a crash.
           return {
             stopReason: 'end_turn',
+            usage: {
+              inputTokens: totalInputTokens,
+              outputTokens: totalOutputTokens,
+              cachedReadTokens: totalCachedTokens || undefined,
+              thoughtTokens: totalThoughtTokens || undefined,
+              totalTokens: totalInputTokens + totalOutputTokens,
+            },
             _meta: {
               quota: {
                 token_count: {
@@ -549,6 +571,8 @@ export class Session {
 
       totalInputTokens += turnInputTokens;
       totalOutputTokens += turnOutputTokens;
+      totalCachedTokens += turnCachedTokens;
+      totalThoughtTokens += turnThoughtTokens;
 
       if (turnInputTokens > 0 || turnOutputTokens > 0) {
         const existing = modelUsageMap.get(turnModelId) ?? {
@@ -563,6 +587,13 @@ export class Session {
       if (stopReason !== 'end_turn') {
         return {
           stopReason,
+          usage: {
+            inputTokens: totalInputTokens,
+            outputTokens: totalOutputTokens,
+            cachedReadTokens: totalCachedTokens || undefined,
+            thoughtTokens: totalThoughtTokens || undefined,
+            totalTokens: totalInputTokens + totalOutputTokens,
+          },
           _meta: {
             quota: {
               token_count: {
@@ -614,6 +645,13 @@ export class Session {
 
     return {
       stopReason: 'end_turn',
+      usage: {
+        inputTokens: totalInputTokens,
+        outputTokens: totalOutputTokens,
+        cachedReadTokens: totalCachedTokens || undefined,
+        thoughtTokens: totalThoughtTokens || undefined,
+        totalTokens: totalInputTokens + totalOutputTokens,
+      },
       _meta: {
         quota: {
           token_count: {
