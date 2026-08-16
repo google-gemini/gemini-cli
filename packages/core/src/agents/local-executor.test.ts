@@ -2716,7 +2716,7 @@ describe('LocalAgentExecutor', () => {
 
       const output = await executor.run({ goal: 'Turns recovery' }, signal);
 
-      expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
+      expect(output.terminate_reason).toBe(AgentTerminateMode.MAX_TURNS);
       expect(output.result).toBe('Recovered!');
       expect(mockSendMessageStream).toHaveBeenCalledTimes(MAX + 1); // 1 regular + 1 recovery
 
@@ -2904,7 +2904,7 @@ describe('LocalAgentExecutor', () => {
       const output = await runPromise;
 
       expect(mockSendMessageStream).toHaveBeenCalledTimes(2); // 1 failed + 1 recovery
-      expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
+      expect(output.terminate_reason).toBe(AgentTerminateMode.TIMEOUT);
       expect(output.result).toBe('Recovered from timeout!');
 
       expect(activities).toContainEqual(

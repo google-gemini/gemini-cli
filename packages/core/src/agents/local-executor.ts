@@ -576,6 +576,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     let turnCounter = 0;
     let terminateReason: AgentTerminateMode = AgentTerminateMode.ERROR;
     let finalResult: string | null = null;
+    let recoverySucceeded = false;
 
     const maxTimeMinutes =
       this.definition.runConfig.maxTimeMinutes ?? DEFAULT_MAX_TIME_MINUTES;
@@ -762,7 +763,13 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
         if (recoveryResult !== null) {
           // Recovery Succeeded
-          terminateReason = AgentTerminateMode.GOAL;
+          recoverySucceeded = true;
+          if (
+            terminateReason !== AgentTerminateMode.MAX_TURNS &&
+            terminateReason !== AgentTerminateMode.TIMEOUT
+          ) {
+            terminateReason = AgentTerminateMode.GOAL;
+          }
           finalResult = recoveryResult;
         } else {
           // Recovery Failed. Set the final error message based on the *original* reason.
@@ -796,7 +803,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         }
       }
 
-      if (terminateReason === AgentTerminateMode.GOAL) {
+      if (terminateReason === AgentTerminateMode.GOAL || recoverySucceeded) {
         // Save the session summary upon completion
         if (finalResult && chat) {
           try {
@@ -844,7 +851,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
           if (recoveryResult !== null) {
             // Recovery Succeeded
-            terminateReason = AgentTerminateMode.GOAL;
+            terminateReason = AgentTerminateMode.TIMEOUT;
             finalResult = recoveryResult;
 
             // Save the session summary upon successful recovery
