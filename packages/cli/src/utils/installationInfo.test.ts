@@ -177,7 +177,8 @@ describe('getInstallationInfo', () => {
     expect(info.packageManager).toBe(PackageManager.HOMEBREW);
     expect(info.isGlobal).toBe(true);
     expect(info.updateMessage).toBe(
-      'Installed via Homebrew. Please update with "brew upgrade gemini-cli".',
+      'Installed via Homebrew (deprecated in homebrew-core). ' +
+        'For the latest version, migrate to npm: npm install -g @google/gemini-cli',
     );
   });
 

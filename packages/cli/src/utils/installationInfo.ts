@@ -108,7 +108,8 @@ export function getInstallationInfo(
             packageManager: PackageManager.HOMEBREW,
             isGlobal: true,
             updateMessage:
-              'Installed via Homebrew. Please update with "brew upgrade gemini-cli".',
+              'Installed via Homebrew (deprecated in homebrew-core). ' +
+              'For the latest version, migrate to npm: npm install -g @google/gemini-cli',
           };
         }
       } catch {

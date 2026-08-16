@@ -50,6 +50,9 @@ npm install -g @google/gemini-cli
 
 #### Install globally with Homebrew (macOS/Linux)
 
+> **Note:** The `gemini-cli` formula is deprecated in `homebrew-core`. For the
+> most up-to-date version, use npm or another method above.
+
 ```bash
 brew install gemini-cli
 ```
