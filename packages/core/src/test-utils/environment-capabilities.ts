@@ -70,11 +70,16 @@ export function hasPowerShell7(): boolean {
   }
 
   return (process.env['PATH'] ?? '').split(path.delimiter).some((entry) => {
-    if (entry === '') {
+    // Windows PATH entries containing spaces are sometimes stored quoted.
+    // `path.join` would keep the quote inside the path, so the lookup would
+    // miss a pwsh that is actually installed — and a false negative here
+    // skips the tests on precisely the hosts that can run them.
+    const unquoted = entry.replace(/^"|"$/g, '');
+    if (unquoted === '') {
       return false;
     }
     try {
-      return fs.existsSync(path.join(entry, 'pwsh.exe'));
+      return fs.existsSync(path.join(unquoted, 'pwsh.exe'));
     } catch {
       return false;
     }
