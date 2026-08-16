@@ -111,20 +111,21 @@ async function readFullStructure(
       // Sort entries alphabetically by name for consistent processing order
       entries = rawEntries.sort((a, b) => a.name.localeCompare(b.name));
     } catch (error: unknown) {
-      if (
-        isNodeError(error) &&
-        (error.code === 'EACCES' ||
-          error.code === 'ENOENT' ||
-          error.code === 'EPERM')
-      ) {
-        debugLogger.warn(
-          `Warning: Could not read directory ${currentPath}: ${error.message}`,
-        );
-        if (currentPath === rootPath && error.code === 'ENOENT') {
-          return null; // Root directory itself not found
+      if (isNodeError(error)) {
+        if (error.code === 'ENOENT') {
+          if (currentPath === rootPath) {
+            return null; // Root directory itself not found
+          }
+          // Directory disappeared between readdir and descent (e.g. transient lock
+          // dirs released by proper-lockfile). This is a normal race — skip silently.
+          continue;
         }
-        // For other EACCES/ENOENT/EPERM on subdirectories, just skip them.
-        continue;
+        if (error.code === 'EACCES' || error.code === 'EPERM') {
+          debugLogger.warn(
+            `Warning: Could not read directory ${currentPath}: ${error.message}`,
+          );
+          continue;
+        }
       }
       throw error;
     }

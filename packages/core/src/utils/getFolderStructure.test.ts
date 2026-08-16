@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fsPromises from 'node:fs/promises';
 import * as os from 'node:os';
 import { getFolderStructure } from './getFolderStructure.js';
@@ -204,6 +204,41 @@ ${testRootDir}${path.sep}
     expect(structure).toContain(
       `Error: Could not read directory "${nonExistentPath}". Check path and permissions.`,
     );
+  });
+
+  it('should silently skip a subdirectory that disappears between readdir and descent', async () => {
+    await createTestFile('stable.txt');
+    await createEmptyDir('stable-folder');
+    await createEmptyDir('vanishing-folder');
+
+    const vanishingPath = path.join(testRootDir, 'vanishing-folder');
+    const originalReaddir = fsPromises.readdir;
+    const readdirSpy = vi
+      .spyOn(fsPromises, 'readdir')
+      .mockImplementation(async (p, opts) => {
+        if (String(p) === vanishingPath) {
+          const err = Object.assign(
+            new Error('ENOENT: no such file or directory'),
+            {
+              code: 'ENOENT',
+            },
+          );
+          throw err;
+        }
+        return originalReaddir(p, opts);
+      });
+
+    const warnSpy = vi.spyOn(console, 'warn');
+
+    try {
+      const structure = await getFolderStructure(testRootDir);
+      expect(structure).toContain('stable.txt');
+      expect(structure).toContain('stable-folder');
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      readdirSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
   });
 
   it('should handle deep folder structure within limits', async () => {
