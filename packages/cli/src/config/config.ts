@@ -6,6 +6,8 @@
 
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
+import { ModelConfigService } from '@google/gemini-cli-core/src/services/modelConfigService.js';
+import { DEFAULT_MODEL_CONFIGS } from '@google/gemini-cli-core/src/config/defaultModelConfigs.js';
 import process from 'node:process';
 import * as path from 'node:path';
 import { execa } from 'execa';
@@ -398,6 +400,11 @@ export async function parseArguments(
           type: 'boolean',
           description: 'List all available extensions and exit.',
         })
+        .option('list-models', {
+          type: 'boolean',
+          description:
+            'Print available models as JSON and exit. Reflects default model configurations.',
+        })
         .option('resume', {
           alias: 'r',
           type: 'string',
@@ -526,6 +533,15 @@ export async function parseArguments(
 
   // Handle help and version flags manually since we disabled exitProcess
   if (result['help'] || result['version']) {
+    await runExitCleanup();
+    process.exit(0);
+  }
+
+  if (result['list-models']) {
+    const service = new ModelConfigService(DEFAULT_MODEL_CONFIGS);
+    process.stdout.write(
+      JSON.stringify(service.getAvailableModelOptions({}), null, 2) + '\n',
+    );
     await runExitCleanup();
     process.exit(0);
   }
