@@ -4662,4 +4662,57 @@ describe('GeminiChat', () => {
       expect(stripped[0]).toHaveProperty('metadata', { some: 'value' });
     });
   });
+
+  describe('isValidContent via curated history', () => {
+    it('should strip turns with truly empty text parts and no other keys', () => {
+      const chat = new GeminiChat(mockConfig, '', [], []);
+      chat.setHistory([
+        { role: 'user', parts: [{ text: 'User prompt' }] },
+        { role: 'model', parts: [{ text: '' }] },
+      ]);
+      // Curated history should strip the invalid model turn
+      const history = chat.getHistory(true);
+      expect(history).toHaveLength(1);
+      expect(history[0].role).toBe('user');
+    });
+
+    it('should preserve turns with empty text parts that contain functionCall', () => {
+      const chat = new GeminiChat(mockConfig, '', [], []);
+      chat.setHistory([
+        { role: 'user', parts: [{ text: 'User prompt' }] },
+        {
+          role: 'model',
+          parts: [
+            {
+              text: '',
+              functionCall: { name: 'test_tool', args: {} },
+            },
+          ],
+        },
+      ]);
+      // Curated history should preserve the valid model turn because of functionCall
+      const history = chat.getHistory(true);
+      expect(history).toHaveLength(2);
+      expect(history[1].role).toBe('model');
+    });
+
+    it('should preserve turns with empty text parts that contain functionResponse, inlineData, or fileData', () => {
+      const chat = new GeminiChat(mockConfig, '', [], []);
+      chat.setHistory([
+        { role: 'user', parts: [{ text: 'User prompt' }] },
+        {
+          role: 'model',
+          parts: [
+            {
+              text: '',
+              functionResponse: { name: 'test_tool', response: {} },
+            },
+          ],
+        },
+      ]);
+      const history = chat.getHistory(true);
+      expect(history).toHaveLength(2);
+      expect(history[1].role).toBe('model');
+    });
+  });
 });
