@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import { appEvalTest } from './app-test-helper.js';
 
 describe('Model Steering Behavioral Evals', () => {
-  appEvalTest('USUALLY_PASSES', {
+  appEvalTest('ALWAYS_PASSES', {
     suiteName: 'default',
     suiteType: 'behavioral',
     name: 'Corrective Hint: Model switches task based on hint during tool turn',
@@ -51,7 +51,7 @@ describe('Model Steering Behavioral Evals', () => {
     },
   });
 
-  appEvalTest('USUALLY_PASSES', {
+  appEvalTest('ALWAYS_PASSES', {
     suiteName: 'default',
     suiteType: 'behavioral',
     name: 'Suggestive Hint: Model incorporates user guidance mid-stream',
