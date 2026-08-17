@@ -38,6 +38,8 @@ import {
   getProjectHash,
   loadConversationRecord,
   type MessageRecord,
+  OutputFormat,
+  getErrorMessage,
 } from '@google/gemini-cli-core';
 
 import { loadCliConfig, parseArguments } from './config/config.js';
@@ -84,6 +86,7 @@ import {
 import { validateAuthMethod } from './config/auth.js';
 import { runAcpClient } from './acp/acpStdioTransport.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
+import { handleError } from './utils/errors.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import {
   RESUME_LATEST,
@@ -866,7 +869,21 @@ export async function main() {
       config,
       settings,
     );
-    await config.refreshAuth(authType);
+    try {
+      await config.refreshAuth(authType);
+    } catch (error) {
+      if (config.getOutputFormat() === OutputFormat.JSON) {
+        handleError(
+          error instanceof Error ? error : new Error(String(error)),
+          config,
+          ExitCodes.FATAL_AUTHENTICATION_ERROR,
+        );
+      } else {
+        debugLogger.error(`Failed to authenticate: ${getErrorMessage(error)}`);
+        await runExitCleanup();
+        process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
+      }
+    }
 
     if (config.getDebugMode()) {
       debugLogger.log('Session ID: %s', sessionId);
