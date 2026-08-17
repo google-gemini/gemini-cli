@@ -488,4 +488,98 @@ describe('CoderAgentExecutor', () => {
     mockSocket.emit('end');
     await primaryPromise;
   });
+
+  it('should not evict or treat a new request as secondary when preceding request is canceled and winding down', async () => {
+    const taskId = 'test-repro-race-condition';
+    const contextId = 'test-context';
+
+    // Simulating real-world TaskStore save delay / I/O latency
+    vi.spyOn(mockTaskStore, 'save').mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    const mockSocket1 = new EventEmitter();
+    (requestStorage.getStore as Mock).mockReturnValue({
+      req: { socket: mockSocket1 },
+    });
+
+    const requestContext1 = {
+      userMessage: {
+        messageId: 'msg-1',
+        taskId,
+        contextId,
+        parts: [{ kind: 'text', text: 'prompt 1' }],
+        metadata: {
+          coderAgent: { kind: 'agent-settings', workspacePath: '/tmp' },
+        },
+      },
+    } as unknown as RequestContext;
+
+    const primaryPromise = executor.execute(requestContext1, mockEventBus);
+
+    // Wait for the task to be registered
+    let attempts = 0;
+    while (!executor.getTask(taskId)) {
+      if (attempts++ > 100) {
+        throw new Error('Timed out waiting for task to be registered');
+      }
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+
+    const wrapper1 = executor.getTask(taskId)!;
+    expect(wrapper1).toBeDefined();
+
+    // Mock setTaskStateAndPublishUpdate realistically to trigger the buggy eviction behavior
+    vi.spyOn(wrapper1.task, 'setTaskStateAndPublishUpdate').mockImplementation(
+      (newState) => {
+        wrapper1.task.taskState = newState;
+      },
+    );
+
+    // Cancel the task (Request 1)
+    await executor.cancelTask(taskId, mockEventBus);
+
+    // Now immediately start Request 2 with the same taskId
+    const mockSocket2 = new EventEmitter();
+    (requestStorage.getStore as Mock).mockReturnValue({
+      req: { socket: mockSocket2 },
+    });
+
+    const requestContext2 = {
+      userMessage: {
+        messageId: 'msg-2',
+        taskId,
+        contextId,
+        parts: [{ kind: 'text', text: 'prompt 2' }],
+        metadata: {
+          coderAgent: { kind: 'agent-settings', workspacePath: '/tmp' },
+        },
+      },
+    } as unknown as RequestContext;
+
+    const secondaryPromise = executor.execute(requestContext2, mockEventBus);
+
+    let secondaryResolved = false;
+    secondaryPromise.then(() => {
+      secondaryResolved = true;
+    });
+
+    // Give it a moment to initialize Request 2's task in execute loop
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    // Request 2 should NOT have resolved prematurely (it should be running as a primary loop, not secondary)
+    expect(secondaryResolved).toBe(false);
+
+    // Await primaryPromise to let Request 1 completely wind down
+    await primaryPromise;
+
+    // Verify task 2 was NOT evicted/destroyed
+    const wrapper2 = executor.getTask(taskId);
+    expect(wrapper2).toBeDefined();
+    expect(wrapper2).not.toBe(wrapper1);
+
+    // Clean up Request 2
+    mockSocket2.emit('end');
+    await secondaryPromise;
+  });
 });
