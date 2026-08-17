@@ -872,7 +872,10 @@ export async function main() {
     try {
       await config.refreshAuth(authType);
     } catch (error) {
-      if (config.getOutputFormat() === OutputFormat.JSON) {
+      if (
+        config.getOutputFormat() === OutputFormat.JSON ||
+        config.getOutputFormat() === OutputFormat.STREAM_JSON
+      ) {
         handleError(
           error instanceof Error ? error : new Error(String(error)),
           config,

@@ -1510,15 +1510,13 @@ describe('gemini.tsx main function exit codes', () => {
       networkAccess: false,
     } as unknown as CliArgs);
 
-    process.env['GEMINI_API_KEY'] = 'test-key';
+    vi.stubEnv('GEMINI_API_KEY', 'test-key');
     try {
       await main();
       expect.fail('Should have thrown MockProcessExitError');
     } catch (e) {
       expect(e).toBeInstanceOf(MockProcessExitError);
       expect((e as MockProcessExitError).code).toBe(41);
-    } finally {
-      delete process.env['GEMINI_API_KEY'];
     }
   });
 });
