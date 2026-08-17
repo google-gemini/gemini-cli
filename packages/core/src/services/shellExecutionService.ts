@@ -991,7 +991,8 @@ export class ShellExecutionService {
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       spawnedPty = ptyProcess as DestroyablePty;
-      const ptyPid = Number(ptyProcess.pid);
+      const pty = spawnedPty;
+      const ptyPid = Number(pty.pid);
 
       headlessTerminal = new Terminal({
         allowProposedApi: true,
@@ -1004,8 +1005,7 @@ export class ShellExecutionService {
       const terminal = headlessTerminal;
 
       this.activePtys.set(ptyPid, {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        ptyProcess,
+        ptyProcess: pty,
         headlessTerminal,
         maxSerializedLines: shellExecutionConfig.maxSerializedLines,
         command: shellExecutionConfig.originalCommand ?? commandToExecute,
@@ -1018,13 +1018,12 @@ export class ShellExecutionService {
           if (!ExecutionLifecycleService.isActive(ptyPid)) {
             return;
           }
-          ptyProcess.write(input);
+          pty.write(input);
         },
         kill: () => {
           killProcessGroup({
             pid: ptyPid,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-            pty: ptyProcess,
+            pty,
           }).catch(() => {});
         },
         isActive: () => {
@@ -1241,20 +1240,20 @@ export class ShellExecutionService {
         );
       };
 
-      const dataListener = spawnedPty.onData((data) => {
+      const dataListener = pty.onData((data) => {
         const bufferData = Buffer.from(data, 'utf-8');
         handleOutput(bufferData);
       });
       disposables.push(dataListener);
 
-      const exitListener = spawnedPty.onExit(({ exitCode, signal }) => {
+      const exitListener = pty.onExit(({ exitCode, signal }) => {
         exited = true;
         abortSignal.removeEventListener('abort', abortHandler);
 
         // Immediately destroy the PTY to release its master FD.
         // The headless terminal is kept alive until finalize() extracts
         // its buffer contents, then disposed to free memory.
-        ShellExecutionService.destroyPtyProcess(spawnedPty!);
+        ShellExecutionService.destroyPtyProcess(pty);
 
         const finalize = () => {
           render(true);
