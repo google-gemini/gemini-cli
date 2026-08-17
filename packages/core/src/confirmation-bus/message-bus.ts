@@ -161,6 +161,7 @@ export class MessageBus extends EventEmitter {
       }
     } catch (error) {
       this.emit('error', error);
+      throw error;
     }
   }
 
@@ -226,20 +227,19 @@ export class MessageBus extends EventEmitter {
   async request<TRequest extends Message, TResponse extends Message>(
     request: Omit<TRequest, 'correlationId'>,
     responseType: TResponse['type'],
-    timeoutMs: number = 60000,
+    timeoutMsOrOptions?: number | { timeoutMs?: number; signal?: AbortSignal },
   ): Promise<TResponse> {
     const correlationId = randomUUID();
+    const options =
+      typeof timeoutMsOrOptions === 'number'
+        ? { timeoutMs: timeoutMsOrOptions }
+        : timeoutMsOrOptions;
+    const timeoutMs = options?.timeoutMs ?? 60000;
+    const signal = options?.signal;
 
     return new Promise<TResponse>((resolve, reject) => {
-      const timeoutId = setTimeout(() => {
-        cleanup();
-        reject(new Error(`Request timed out waiting for ${responseType}`));
-      }, timeoutMs);
-
-      const cleanup = () => {
-        clearTimeout(timeoutId);
-        this.unsubscribe(responseType, responseHandler);
-      };
+      let timeoutId: NodeJS.Timeout | undefined;
+      let abortHandler: (() => void) | undefined;
 
       const responseHandler = (response: TResponse) => {
         // Check if this response matches our request
@@ -252,12 +252,47 @@ export class MessageBus extends EventEmitter {
         }
       };
 
+      const cleanup = () => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+        if (signal && abortHandler) {
+          signal.removeEventListener('abort', abortHandler);
+        }
+        this.unsubscribe(responseType, responseHandler);
+      };
+
+      if (timeoutMs > 0) {
+        timeoutId = setTimeout(() => {
+          cleanup();
+          reject(new Error(`Request timed out waiting for ${responseType}`));
+        }, timeoutMs);
+      }
+
+      if (signal) {
+        if (signal.aborted) {
+          cleanup();
+          reject(signal.reason ?? new Error('Request aborted'));
+          return;
+        }
+        abortHandler = () => {
+          cleanup();
+          reject(signal.reason ?? new Error('Request aborted'));
+        };
+        signal.addEventListener('abort', abortHandler, { once: true });
+      }
+
       // Subscribe to responses
       this.subscribe<TResponse>(responseType, responseHandler);
 
       // Publish the request with correlation ID
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises, @typescript-eslint/no-unsafe-type-assertion
-      this.publish({ ...request, correlationId } as TRequest);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      this.publish({ ...request, correlationId } as TRequest).catch(
+        (error: unknown) => {
+          cleanup();
+          reject(error);
+        },
+      );
     });
   }
 }

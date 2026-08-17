@@ -30,8 +30,10 @@ describe('MessageBus', () => {
       const errorHandler = vi.fn();
       messageBus.on('error', errorHandler);
 
-      // @ts-expect-error - Testing invalid message
-      await messageBus.publish({ invalid: 'message' });
+      await expect(
+        // @ts-expect-error - Testing invalid message
+        messageBus.publish({ invalid: 'message' }),
+      ).rejects.toThrow('Invalid message structure');
 
       expect(errorHandler).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -44,11 +46,13 @@ describe('MessageBus', () => {
       const errorHandler = vi.fn();
       messageBus.on('error', errorHandler);
 
-      // @ts-expect-error - Testing missing correlationId
-      await messageBus.publish({
-        type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
-        toolCall: { name: 'test' },
-      });
+      await expect(
+        // @ts-expect-error - Testing missing correlationId
+        messageBus.publish({
+          type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+          toolCall: { name: 'test' },
+        }),
+      ).rejects.toThrow();
 
       expect(errorHandler).toHaveBeenCalled();
     });
@@ -251,8 +255,10 @@ describe('MessageBus', () => {
         correlationId: '123',
       };
 
-      // Should not throw
-      await expect(messageBus.publish(request)).resolves.not.toThrow();
+      // Should reject and emit error
+      await expect(messageBus.publish(request)).rejects.toThrow(
+        'Policy check failed',
+      );
 
       // Should emit error
       expect(errorHandler).toHaveBeenCalledWith(
@@ -449,6 +455,81 @@ describe('MessageBus', () => {
         'abort',
         expect.any(Function),
       );
+    });
+  });
+
+  describe('request', () => {
+    it('should reject immediately if publish fails/rejects', async () => {
+      const publishError = new Error('Publish failed');
+      vi.spyOn(messageBus, 'publish').mockRejectedValue(publishError);
+
+      const request: Omit<ToolConfirmationRequest, 'correlationId'> = {
+        type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        toolCall: { name: 'test-tool', args: {} },
+      };
+
+      const requestPromise = messageBus.request<
+        ToolConfirmationRequest,
+        ToolConfirmationResponse
+      >(request, MessageBusType.TOOL_CONFIRMATION_RESPONSE, 2000);
+
+      await expect(requestPromise).rejects.toThrow('Publish failed');
+    });
+
+    it('should reject when publish throws an internal error', async () => {
+      const errorHandler = vi.fn();
+      messageBus.on('error', errorHandler);
+
+      const invalidRequest = {
+        invalid: 'structure',
+      } as unknown as Omit<ToolConfirmationRequest, 'correlationId'>;
+
+      const requestPromise = messageBus.request<
+        ToolConfirmationRequest,
+        ToolConfirmationResponse
+      >(invalidRequest, MessageBusType.TOOL_CONFIRMATION_RESPONSE, 2000);
+
+      await expect(requestPromise).rejects.toThrow('Invalid message structure');
+      expect(errorHandler).toHaveBeenCalled();
+    });
+
+    it('should reject when AbortSignal is aborted during request', async () => {
+      const controller = new AbortController();
+
+      const request: Omit<ToolConfirmationRequest, 'correlationId'> = {
+        type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        toolCall: { name: 'test-tool', args: {} },
+      };
+
+      const requestPromise = messageBus.request<
+        ToolConfirmationRequest,
+        ToolConfirmationResponse
+      >(request, MessageBusType.TOOL_CONFIRMATION_RESPONSE, {
+        signal: controller.signal,
+      });
+
+      controller.abort(new Error('Aborted by user'));
+
+      await expect(requestPromise).rejects.toThrow('Aborted by user');
+    });
+
+    it('should reject immediately if AbortSignal is already aborted', async () => {
+      const controller = new AbortController();
+      controller.abort(new Error('Already aborted'));
+
+      const request: Omit<ToolConfirmationRequest, 'correlationId'> = {
+        type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        toolCall: { name: 'test-tool', args: {} },
+      };
+
+      const requestPromise = messageBus.request<
+        ToolConfirmationRequest,
+        ToolConfirmationResponse
+      >(request, MessageBusType.TOOL_CONFIRMATION_RESPONSE, {
+        signal: controller.signal,
+      });
+
+      await expect(requestPromise).rejects.toThrow('Already aborted');
     });
   });
 });
