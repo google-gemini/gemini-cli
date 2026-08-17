@@ -185,6 +185,12 @@ async function extensionConsentString(
         mcpServer.httpUrl ??
         `${mcpServer.command || ''}${mcpServer.args ? ' ' + mcpServer.args.join(' ') : ''}`;
       output.push(`  * ${key} (${isLocal ? 'local' : 'remote'}): ${source}`);
+      if (mcpServer.env && Object.keys(mcpServer.env).length > 0) {
+        output.push('    Environment variables:');
+        for (const [envKey, envValue] of Object.entries(mcpServer.env)) {
+          output.push(`      - ${envKey}: ${envValue}`);
+        }
+      }
     }
   }
   if (sanitizedConfig.contextFileName) {

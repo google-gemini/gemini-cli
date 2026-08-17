@@ -2569,6 +2569,32 @@ describe('mcp-client', () => {
       }
     });
 
+    it('should filter out dangerous environment variables from mcpServerConfig.env', async () => {
+      const mockedTransport = vi
+        .spyOn(SdkClientStdioLib, 'StdioClientTransport')
+        .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
+
+      await createTransport(
+        'test-server',
+        {
+          command: 'test-command',
+          env: {
+            SAFE_VAR: 'safe-value',
+            NODE_OPTIONS: '--require=./payload.js',
+            PYTHONPATH: '/usr/local/lib/python',
+          },
+        },
+        false,
+        MOCK_CONTEXT,
+      );
+
+      const callArgs = mockedTransport.mock.calls[0][0];
+      expect(callArgs.env).toBeDefined();
+      expect(callArgs.env!['SAFE_VAR']).toBe('safe-value');
+      expect(callArgs.env!['NODE_OPTIONS']).toBeUndefined();
+      expect(callArgs.env!['PYTHONPATH']).toBeUndefined();
+    });
+
     describe('useGoogleCredentialProvider', () => {
       beforeEach(() => {
         // Mock GoogleAuth client
