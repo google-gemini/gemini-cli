@@ -155,4 +155,15 @@ describe('loadIgnoreRules', () => {
     const dirFilter = ignore.getDirectoryFilter();
     expect(dirFilter('.git/')).toBe(true);
   });
+
+  it('should always add .gemini to the ignore list', async () => {
+    tmpDir = await createTmpDir({});
+    const service = new FileDiscoveryService(tmpDir, {
+      respectGitIgnore: false,
+      respectGeminiIgnore: false,
+    });
+    const ignore = loadIgnoreRules(service, []);
+    const dirFilter = ignore.getDirectoryFilter();
+    expect(dirFilter('.gemini/')).toBe(true);
+  });
 });
