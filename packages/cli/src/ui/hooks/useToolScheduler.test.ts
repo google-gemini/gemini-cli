@@ -731,4 +731,44 @@ describe('useToolScheduler', () => {
       SubagentState.COMPLETED,
     );
   });
+
+  it('retains errored tool calls from non-root schedulers', async () => {
+    const { result } = await renderHook(() =>
+      useToolScheduler(
+        vi.fn().mockResolvedValue(undefined),
+        mockConfig,
+        () => undefined,
+      ),
+    );
+
+    const erroredTool = {
+      status: CoreToolCallStatus.Error as const,
+      request: {
+        callId: 'call-error',
+        name: 'invalid_tool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'p1',
+      },
+      schedulerId: 'subagent-1',
+      response: {
+        callId: 'call-error',
+        responseParts: [],
+        resultDisplay: undefined,
+        error: new Error('Tool not found'),
+        errorType: undefined,
+      },
+    } as unknown as CompletedToolCall;
+
+    act(() => {
+      void mockMessageBus.publish({
+        type: MessageBusType.TOOL_CALLS_UPDATE,
+        toolCalls: [erroredTool],
+        schedulerId: 'subagent-1',
+      } as ToolCallsUpdateMessage);
+    });
+
+    expect(result.current[0]).toHaveLength(1);
+    expect(result.current[0][0].status).toBe(CoreToolCallStatus.Error);
+  });
 });
