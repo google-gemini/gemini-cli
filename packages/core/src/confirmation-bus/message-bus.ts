@@ -160,9 +160,10 @@ export class MessageBus extends EventEmitter {
         this.emitMessage(message);
       }
     } catch (error) {
-      this.emit('error', error);
+if (this.listenerCount('error') > 0) {
+        this.emit('error', error);
+      }
       throw error;
-    }
   }
 
   subscribe<T extends Message>(
