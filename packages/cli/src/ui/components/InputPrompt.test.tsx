@@ -5394,6 +5394,41 @@ describe('InputPrompt', () => {
     });
   });
 
+  describe('ghost text wrapping', () => {
+    it('does not freeze when ghost text contains wide chars and inputWidth is narrow', async () => {
+      // Regression for #19985: when inputWidth is smaller than a wide
+      // character's rendered width, the hard-split loop must still advance.
+      // buffer.text must be non-empty so getGhostTextLines does not early-return.
+      props.inputWidth = 1;
+      props.suggestionsWidth = 1;
+      mockedUseCommandCompletion.mockReturnValue({
+        ...mockCommandCompletion,
+        promptCompletion: {
+          text: 'a' + '好'.repeat(10),
+          accept: vi.fn(),
+          clear: vi.fn(),
+          isLoading: false,
+          isActive: true,
+          markSelected: vi.fn(),
+        },
+      });
+      mockBuffer.text = 'a';
+      mockBuffer.lines = ['a'];
+      mockBuffer.cursor = [0, 1];
+
+      const { lastFrame, unmount } = await renderWithProviders(
+        <TestInputPrompt {...props} />,
+        { uiState: {} },
+      );
+
+      // Without the guard this hang pegs CPU and the wait times out.
+      await waitFor(() => {
+        expect(lastFrame()).toBeDefined();
+      });
+      unmount();
+    });
+  });
+
   describe('terminal buffer rendering', () => {
     it('does not clip the last char of a visual line whose width equals inputWidth', async () => {
       const fullLine = '1234567890'; // 10 chars, exactly props.inputWidth
