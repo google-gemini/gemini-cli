@@ -947,7 +947,7 @@ export class ShellExecutionService {
     let spawnedPty: DestroyablePty | undefined;
     let cmdCleanup: (() => void) | undefined;
     let headlessTerminal: pkg.Terminal | undefined;
-    const disposables: { dispose: () => void }[] = [];
+    const disposables: Array<{ dispose: () => void }> = [];
 
     try {
       const cols = shellExecutionConfig.terminalWidth ?? 80;
@@ -1001,7 +1001,7 @@ export class ShellExecutionService {
       });
       headlessTerminal.scrollToTop();
 
-      const terminal = headlessTerminal!;
+      const terminal = headlessTerminal;
 
       this.activePtys.set(ptyPid, {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -1107,15 +1107,10 @@ export class ShellExecutionService {
 
         let newOutput: AnsiOutput;
         if (shellExecutionConfig.showColor) {
-          newOutput = serializeTerminalToObject(
-            terminal,
-            startLine,
-            endLine,
-          );
+          newOutput = serializeTerminalToObject(terminal, startLine, endLine);
         } else {
           newOutput = (
-            serializeTerminalToObject(terminal, startLine, endLine) ||
-            []
+            serializeTerminalToObject(terminal, startLine, endLine) || []
           ).map((line) =>
             line.map((token) => {
               token.fg = '';
@@ -1246,111 +1241,113 @@ export class ShellExecutionService {
         );
       };
 
-      const dataListener = ptyProcess.onData((data: string) => {
+      const dataListener = spawnedPty.onData((data) => {
         const bufferData = Buffer.from(data, 'utf-8');
         handleOutput(bufferData);
       });
       disposables.push(dataListener);
 
-      const exitListener = ptyProcess.onExit(
-        ({ exitCode, signal }: { exitCode: number; signal?: number }) => {
-          exited = true;
-          abortSignal.removeEventListener('abort', abortHandler);
+      const exitListener = spawnedPty.onExit(({ exitCode, signal }) => {
+        exited = true;
+        abortSignal.removeEventListener('abort', abortHandler);
 
-          // Immediately destroy the PTY to release its master FD.
-          // The headless terminal is kept alive until finalize() extracts
-          // its buffer contents, then disposed to free memory.
-          ShellExecutionService.destroyPtyProcess(ptyProcess);
+        // Immediately destroy the PTY to release its master FD.
+        // The headless terminal is kept alive until finalize() extracts
+        // its buffer contents, then disposed to free memory.
+        ShellExecutionService.destroyPtyProcess(spawnedPty!);
 
-          const finalize = () => {
-            render(true);
-            cmdCleanup?.();
+        const finalize = () => {
+          render(true);
+          cmdCleanup?.();
 
-            // Explicitly dispose of all node-pty event listeners to prevent closures from leaking
-            disposables.forEach((d) => {
-              try {
-                d.dispose();
-              } catch {
-                // Ignore
-              }
-            });
-
-            const event: ShellOutputEvent = {
-              type: 'exit',
-              exitCode,
-              signal: signal ?? null,
-            };
-
-            const sessionId = shellExecutionConfig.sessionId ?? 'default';
-            const history =
-              ShellExecutionService.backgroundProcessHistory.get(sessionId);
-            const historyItem = history?.get(ptyPid);
-            if (historyItem) {
-              historyItem.status = 'exited';
-              historyItem.exitCode = exitCode;
-              historyItem.signal = signal ?? null;
-              historyItem.endTime = Date.now();
-            }
-            onOutputEvent(event);
-
-            const endLine = headlessTerminal ? headlessTerminal.buffer.active.length : 0;
-            const startLine = Math.max(
-              0,
-              endLine - (shellExecutionConfig.maxSerializedLines ?? 2000),
-            );
-            const ansiOutputSnapshot = headlessTerminal
-              ? serializeTerminalToObject(headlessTerminal, startLine, endLine)
-              : [];
-            const finalOutput = headlessTerminal ? getFullBufferText(headlessTerminal) : '';
-
-            // Dispose the headless terminal to free scrollback buffers.
-            // This must happen after getFullBufferText() extracts the output.
+          // Explicitly dispose of all node-pty event listeners to prevent closures from leaking
+          disposables.forEach((d) => {
             try {
-              headlessTerminal?.dispose();
+              d.dispose();
             } catch {
-              // Ignore errors during terminal cleanup
+              // Ignore
             }
+          });
 
-            // eslint-disable-next-line @typescript-eslint/no-floating-promises
-            ShellExecutionService.cleanupLogStream(ptyPid).then(() => {
-              ShellExecutionService.activePtys.delete(ptyPid);
-            });
-
-            ExecutionLifecycleService.completeWithResult(ptyPid, {
-              rawOutput: Buffer.from(''),
-              output: finalOutput,
-              ansiOutput: ansiOutputSnapshot,
-              exitCode,
-              signal: signal ?? null,
-              error,
-              aborted: abortSignal.aborted,
-              pid: ptyPid,
-              executionMethod: ptyInfo?.name ?? 'node-pty',
-            });
+          const event: ShellOutputEvent = {
+            type: 'exit',
+            exitCode,
+            signal: signal ?? null,
           };
 
-          if (abortSignal.aborted) {
-            finalize();
-            return;
+          const sessionId = shellExecutionConfig.sessionId ?? 'default';
+          const history =
+            ShellExecutionService.backgroundProcessHistory.get(sessionId);
+          const historyItem = history?.get(ptyPid);
+          if (historyItem) {
+            historyItem.status = 'exited';
+            historyItem.exitCode = exitCode;
+            historyItem.signal = signal ?? null;
+            historyItem.endTime = Date.now();
+          }
+          onOutputEvent(event);
+
+          const endLine = headlessTerminal
+            ? headlessTerminal.buffer.active.length
+            : 0;
+          const startLine = Math.max(
+            0,
+            endLine - (shellExecutionConfig.maxSerializedLines ?? 2000),
+          );
+          const ansiOutputSnapshot = headlessTerminal
+            ? serializeTerminalToObject(headlessTerminal, startLine, endLine)
+            : [];
+          const finalOutput = headlessTerminal
+            ? getFullBufferText(headlessTerminal)
+            : '';
+
+          // Dispose the headless terminal to free scrollback buffers.
+          // This must happen after getFullBufferText() extracts the output.
+          try {
+            headlessTerminal?.dispose();
+          } catch {
+            // Ignore errors during terminal cleanup
           }
 
-          const processingComplete = processingChain.then(() => 'processed');
-          const abortFired = new Promise<'aborted'>((res) => {
-            if (abortSignal.aborted) {
-              res('aborted');
-              return;
-            }
-            abortSignal.addEventListener('abort', () => res('aborted'), {
-              once: true,
-            });
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
+          ShellExecutionService.cleanupLogStream(ptyPid).then(() => {
+            ShellExecutionService.activePtys.delete(ptyPid);
           });
 
-          // eslint-disable-next-line @typescript-eslint/no-floating-promises
-          Promise.race([processingComplete, abortFired]).then(() => {
-            finalize();
+          ExecutionLifecycleService.completeWithResult(ptyPid, {
+            rawOutput: Buffer.from(''),
+            output: finalOutput,
+            ansiOutput: ansiOutputSnapshot,
+            exitCode,
+            signal: signal ?? null,
+            error,
+            aborted: abortSignal.aborted,
+            pid: ptyPid,
+            executionMethod: ptyInfo?.name ?? 'node-pty',
           });
-        },
-      );
+        };
+
+        if (abortSignal.aborted) {
+          finalize();
+          return;
+        }
+
+        const processingComplete = processingChain.then(() => 'processed');
+        const abortFired = new Promise<'aborted'>((res) => {
+          if (abortSignal.aborted) {
+            res('aborted');
+            return;
+          }
+          abortSignal.addEventListener('abort', () => res('aborted'), {
+            once: true,
+          });
+        });
+
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        Promise.race([processingComplete, abortFired]).then(() => {
+          finalize();
+        });
+      });
       disposables.push(exitListener);
 
       const abortHandler = async () => {
@@ -1397,7 +1394,7 @@ export class ShellExecutionService {
       const isPtyCreationFailure =
         error?.message?.includes('posix_spawnp failed') ||
         error?.message?.includes('ENXIO') ||
-        (error as any)?.code === 'ENXIO' ||
+        (isNodeError(error) && error.code === 'ENXIO') ||
         error?.message?.includes('Device not configured');
 
       if (isPtyCreationFailure) {

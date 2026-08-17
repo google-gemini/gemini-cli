@@ -1282,7 +1282,7 @@ describe('ShellExecutionService', () => {
 
       await new Promise((resolve) => process.nextTick(resolve));
       abortController.abort();
-      
+
       // Simulate PTY process exit resulting from abort/SIGKILL
       mockPtyProcess.onExit.mock.calls[0][0]({ exitCode: 1, signal: 9 });
       await handle.result;
@@ -1300,11 +1300,19 @@ describe('ShellExecutionService', () => {
       });
 
       // Mock child process fallback
-      const mockFallbackChild = new EventEmitter() as any;
-      mockFallbackChild.stdout = new EventEmitter();
-      mockFallbackChild.stderr = new EventEmitter();
-      mockFallbackChild.kill = vi.fn();
-      mockFallbackChild.pid = 9999;
+      const mockFallbackChild = new EventEmitter() as unknown as ChildProcess;
+      Object.defineProperty(mockFallbackChild, 'stdout', {
+        value: new EventEmitter(),
+      });
+      Object.defineProperty(mockFallbackChild, 'stderr', {
+        value: new EventEmitter(),
+      });
+      Object.defineProperty(mockFallbackChild, 'kill', {
+        value: vi.fn(),
+      });
+      Object.defineProperty(mockFallbackChild, 'pid', {
+        value: 9999,
+      });
       mockCpSpawn.mockReturnValueOnce(mockFallbackChild);
 
       const abortController = new AbortController();
@@ -1320,7 +1328,7 @@ describe('ShellExecutionService', () => {
       // Simulate exit of standard child process fallback to allow handle to resolve
       mockFallbackChild.emit('exit', 0, null);
       mockFallbackChild.emit('close', 0, null);
-      
+
       const result = await handle.result;
       expect(result.executionMethod).toBe('child_process');
       expect(mockCpSpawn).toHaveBeenCalled();
