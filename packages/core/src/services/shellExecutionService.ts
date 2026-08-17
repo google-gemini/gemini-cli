@@ -946,6 +946,8 @@ export class ShellExecutionService {
     }
     let spawnedPty: DestroyablePty | undefined;
     let cmdCleanup: (() => void) | undefined;
+    let headlessTerminal: pkg.Terminal | undefined;
+    const disposables: { dispose: () => void }[] = [];
 
     try {
       const cols = shellExecutionConfig.terminalWidth ?? 80;
@@ -991,13 +993,15 @@ export class ShellExecutionService {
       spawnedPty = ptyProcess as DestroyablePty;
       const ptyPid = Number(ptyProcess.pid);
 
-      const headlessTerminal = new Terminal({
+      headlessTerminal = new Terminal({
         allowProposedApi: true,
         cols,
         rows,
         scrollback: shellExecutionConfig.scrollback ?? SCROLLBACK_LIMIT,
       });
       headlessTerminal.scrollToTop();
+
+      const terminal = headlessTerminal!;
 
       this.activePtys.set(ptyPid, {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -1037,15 +1041,15 @@ export class ShellExecutionService {
             return false;
           }
         },
-        getBackgroundOutput: () => getFullBufferText(headlessTerminal),
+        getBackgroundOutput: () => getFullBufferText(terminal),
         getSubscriptionSnapshot: () => {
-          const endLine = headlessTerminal.buffer.active.length;
+          const endLine = terminal.buffer.active.length;
           const startLine = Math.max(
             0,
             endLine - (shellExecutionConfig.maxSerializedLines ?? 2000),
           );
           const bufferData = serializeTerminalToObject(
-            headlessTerminal,
+            terminal,
             startLine,
             endLine,
           );
@@ -1086,7 +1090,7 @@ export class ShellExecutionService {
 
         if (!shellExecutionConfig.disableDynamicLineTrimming) {
           if (!hasStartedOutput) {
-            const bufferText = getFullBufferText(headlessTerminal);
+            const bufferText = getFullBufferText(terminal);
             if (bufferText.trim().length === 0) {
               return;
             }
@@ -1094,7 +1098,7 @@ export class ShellExecutionService {
           }
         }
 
-        const buffer = headlessTerminal.buffer.active;
+        const buffer = terminal.buffer.active;
         const endLine = buffer.length;
         const startLine = Math.max(
           0,
@@ -1104,13 +1108,13 @@ export class ShellExecutionService {
         let newOutput: AnsiOutput;
         if (shellExecutionConfig.showColor) {
           newOutput = serializeTerminalToObject(
-            headlessTerminal,
+            terminal,
             startLine,
             endLine,
           );
         } else {
           newOutput = (
-            serializeTerminalToObject(headlessTerminal, startLine, endLine) ||
+            serializeTerminalToObject(terminal, startLine, endLine) ||
             []
           ).map((line) =>
             line.map((token) => {
@@ -1223,7 +1227,7 @@ export class ShellExecutionService {
                 }
 
                 isWriting = true;
-                headlessTerminal.write(decodedChunk, () => {
+                terminal.write(decodedChunk, () => {
                   render();
                   isWriting = false;
                   resolveChunk();
@@ -1242,12 +1246,13 @@ export class ShellExecutionService {
         );
       };
 
-      ptyProcess.onData((data: string) => {
+      const dataListener = ptyProcess.onData((data: string) => {
         const bufferData = Buffer.from(data, 'utf-8');
         handleOutput(bufferData);
       });
+      disposables.push(dataListener);
 
-      ptyProcess.onExit(
+      const exitListener = ptyProcess.onExit(
         ({ exitCode, signal }: { exitCode: number; signal?: number }) => {
           exited = true;
           abortSignal.removeEventListener('abort', abortHandler);
@@ -1260,6 +1265,15 @@ export class ShellExecutionService {
           const finalize = () => {
             render(true);
             cmdCleanup?.();
+
+            // Explicitly dispose of all node-pty event listeners to prevent closures from leaking
+            disposables.forEach((d) => {
+              try {
+                d.dispose();
+              } catch {
+                // Ignore
+              }
+            });
 
             const event: ShellOutputEvent = {
               type: 'exit',
@@ -1279,22 +1293,20 @@ export class ShellExecutionService {
             }
             onOutputEvent(event);
 
-            const endLine = headlessTerminal.buffer.active.length;
+            const endLine = headlessTerminal ? headlessTerminal.buffer.active.length : 0;
             const startLine = Math.max(
               0,
               endLine - (shellExecutionConfig.maxSerializedLines ?? 2000),
             );
-            const ansiOutputSnapshot = serializeTerminalToObject(
-              headlessTerminal,
-              startLine,
-              endLine,
-            );
-            const finalOutput = getFullBufferText(headlessTerminal);
+            const ansiOutputSnapshot = headlessTerminal
+              ? serializeTerminalToObject(headlessTerminal, startLine, endLine)
+              : [];
+            const finalOutput = headlessTerminal ? getFullBufferText(headlessTerminal) : '';
 
             // Dispose the headless terminal to free scrollback buffers.
             // This must happen after getFullBufferText() extracts the output.
             try {
-              headlessTerminal.dispose();
+              headlessTerminal?.dispose();
             } catch {
               // Ignore errors during terminal cleanup
             }
@@ -1339,6 +1351,7 @@ export class ShellExecutionService {
           });
         },
       );
+      disposables.push(exitListener);
 
       const abortHandler = async () => {
         if (ptyProcess.pid && !exited) {
@@ -1364,11 +1377,34 @@ export class ShellExecutionService {
         ShellExecutionService.destroyPtyProcess(spawnedPty);
       }
 
-      if (error?.message?.includes('posix_spawnp failed')) {
+      if (headlessTerminal) {
+        try {
+          headlessTerminal.dispose();
+        } catch {
+          // Ignore
+        }
+      }
+
+      // Dispose any registered event listeners to prevent leaks
+      disposables.forEach((d) => {
+        try {
+          d.dispose();
+        } catch {
+          // Ignore
+        }
+      });
+
+      const isPtyCreationFailure =
+        error?.message?.includes('posix_spawnp failed') ||
+        error?.message?.includes('ENXIO') ||
+        (error as any)?.code === 'ENXIO' ||
+        error?.message?.includes('Device not configured');
+
+      if (isPtyCreationFailure) {
         onOutputEvent({
           type: 'data',
           chunk:
-            '[GEMINI_CLI_WARNING] PTY execution failed, falling back to child_process. This may be due to sandbox restrictions.\n',
+            '[GEMINI_CLI_WARNING] PTY execution failed, falling back to child_process. This may be due to terminal exhaustion or sandbox restrictions.\n',
         });
         throw e;
       } else {

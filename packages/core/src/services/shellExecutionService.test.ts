@@ -1247,6 +1247,84 @@ describe('ShellExecutionService', () => {
       // The catch block must call destroy() on spawnedPty to prevent fd leak
       expect(destroySpy).toHaveBeenCalled();
     });
+
+    it('should dispose of PTY event listeners on process exit', async () => {
+      const dataDisposeSpy = vi.fn();
+      const exitDisposeSpy = vi.fn();
+
+      mockPtyProcess.onData.mockReturnValue({ dispose: dataDisposeSpy });
+      mockPtyProcess.onExit.mockReturnValue({ dispose: exitDisposeSpy });
+
+      await simulateExecution('ls -l', (pty) => {
+        pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+      });
+
+      expect(dataDisposeSpy).toHaveBeenCalled();
+      expect(exitDisposeSpy).toHaveBeenCalled();
+    });
+
+    it('should dispose of PTY event listeners on abort', async () => {
+      const dataDisposeSpy = vi.fn();
+      const exitDisposeSpy = vi.fn();
+
+      mockPtyProcess.onData.mockReturnValue({ dispose: dataDisposeSpy });
+      mockPtyProcess.onExit.mockReturnValue({ dispose: exitDisposeSpy });
+
+      const abortController = new AbortController();
+      const handle = await ShellExecutionService.execute(
+        'long-running',
+        '/test/dir',
+        onOutputEventMock,
+        abortController.signal,
+        true,
+        shellExecutionConfig,
+      );
+
+      await new Promise((resolve) => process.nextTick(resolve));
+      abortController.abort();
+      
+      // Simulate PTY process exit resulting from abort/SIGKILL
+      mockPtyProcess.onExit.mock.calls[0][0]({ exitCode: 1, signal: 9 });
+      await handle.result;
+
+      expect(dataDisposeSpy).toHaveBeenCalled();
+      expect(exitDisposeSpy).toHaveBeenCalled();
+    });
+
+    it('should fall back to child_process when PTY creation fails with ENXIO', async () => {
+      const ptyError = new Error('posix_openpt failed: Device not configured');
+      // @ts-expect-error adding custom code property
+      ptyError.code = 'ENXIO';
+      mockPtySpawn.mockImplementationOnce(() => {
+        throw ptyError;
+      });
+
+      // Mock child process fallback
+      const mockFallbackChild = new EventEmitter() as any;
+      mockFallbackChild.stdout = new EventEmitter();
+      mockFallbackChild.stderr = new EventEmitter();
+      mockFallbackChild.kill = vi.fn();
+      mockFallbackChild.pid = 9999;
+      mockCpSpawn.mockReturnValueOnce(mockFallbackChild);
+
+      const abortController = new AbortController();
+      const handle = await ShellExecutionService.execute(
+        'test-fallback',
+        '/test/dir',
+        onOutputEventMock,
+        abortController.signal,
+        true,
+        shellExecutionConfig,
+      );
+
+      // Simulate exit of standard child process fallback to allow handle to resolve
+      mockFallbackChild.emit('exit', 0, null);
+      mockFallbackChild.emit('close', 0, null);
+      
+      const result = await handle.result;
+      expect(result.executionMethod).toBe('child_process');
+      expect(mockCpSpawn).toHaveBeenCalled();
+    });
   });
 });
 
