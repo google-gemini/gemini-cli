@@ -91,6 +91,7 @@ describe('useSuspend', () => {
         handleWarning,
         setRawMode,
         shouldUseAlternateScreen: true,
+        shouldUseMouseEvents: true,
       }),
     );
 
@@ -140,12 +141,16 @@ describe('useSuspend', () => {
         handleWarning,
         setRawMode,
         shouldUseAlternateScreen: false,
+        shouldUseMouseEvents: false,
       }),
     );
 
     act(() => {
       result.current.handleSuspend();
       result.current.handleSuspend();
+    });
+
+    act(() => {
       process.emit('SIGCONT');
       vi.runAllTimers();
     });
@@ -154,6 +159,36 @@ describe('useSuspend', () => {
     expect(enterAlternateScreen).not.toHaveBeenCalled();
     expect(enableLineWrapping).not.toHaveBeenCalled();
     expect(disableLineWrapping).not.toHaveBeenCalled();
+    expect(enableMouseEvents).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('does not restore mouse events when mouse tracking is disabled', async () => {
+    const handleWarning = vi.fn();
+    const setRawMode = vi.fn();
+
+    const { result, unmount } = await renderHook(() =>
+      useSuspend({
+        handleWarning,
+        setRawMode,
+        shouldUseAlternateScreen: true,
+        shouldUseMouseEvents: false,
+      }),
+    );
+
+    act(() => {
+      result.current.handleSuspend();
+      result.current.handleSuspend();
+    });
+
+    act(() => {
+      process.emit('SIGCONT');
+      vi.runAllTimers();
+    });
+
+    expect(exitAlternateScreen).toHaveBeenCalledTimes(1);
+    expect(enterAlternateScreen).toHaveBeenCalledTimes(1);
     expect(enableMouseEvents).not.toHaveBeenCalled();
 
     unmount();
@@ -170,6 +205,7 @@ describe('useSuspend', () => {
         handleWarning,
         setRawMode,
         shouldUseAlternateScreen: true,
+        shouldUseMouseEvents: true,
       }),
     );
 

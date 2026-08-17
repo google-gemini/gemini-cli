@@ -28,6 +28,7 @@ export const BACKSLASH_ENTER_TIMEOUT = 5;
 export const ESC_TIMEOUT = 50;
 export const PASTE_TIMEOUT = 30_000;
 export const FAST_RETURN_TIMEOUT = 30;
+const RAW_CTRL_C = '\x03';
 
 export enum KeypressPriority {
   Low = -100,
@@ -879,6 +880,14 @@ export function KeypressProvider({
         old(data);
       };
     }
+
+    const parsedDataListener = dataListener;
+    dataListener = (data: string) => {
+      if (data.includes(RAW_CTRL_C)) {
+        appEvents.emit(AppEvent.EmergencyAbort);
+      }
+      parsedDataListener(data);
+    };
 
     stdin.on('data', dataListener);
     return () => {

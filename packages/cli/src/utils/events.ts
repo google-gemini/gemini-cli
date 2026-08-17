@@ -19,6 +19,7 @@ export interface TransientMessagePayload {
 export enum AppEvent {
   OpenDebugConsole = 'open-debug-console',
   Flicker = 'flicker',
+  EmergencyAbort = 'emergency-abort',
   SelectionWarning = 'selection-warning',
   PasteTimeout = 'paste-timeout',
   TerminalBackground = 'terminal-background',
@@ -29,6 +30,7 @@ export enum AppEvent {
 export interface AppEvents {
   [AppEvent.OpenDebugConsole]: never[];
   [AppEvent.Flicker]: never[];
+  [AppEvent.EmergencyAbort]: never[];
   [AppEvent.SelectionWarning]: never[];
   [AppEvent.PasteTimeout]: never[];
   [AppEvent.TerminalBackground]: [string];

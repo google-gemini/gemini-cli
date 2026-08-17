@@ -267,6 +267,13 @@ their corresponding top-level category object in your `settings.json` file.
     based on terminal background color.
   - **Default:** `true`
 
+- **`ui.mouseEvents`** (enum):
+  - **Description:** Controls terminal mouse tracking in alternate buffer mode.
+    Auto disables mouse tracking in touch-oriented terminals such as Termux.
+  - **Default:** `"auto"`
+  - **Values:** `"auto"`, `"enabled"`, `"disabled"`
+  - **Requires restart:** Yes
+
 - **`ui.terminalBackgroundPollingInterval`** (number):
 
   - **Description:** Interval in seconds to poll the terminal background color.

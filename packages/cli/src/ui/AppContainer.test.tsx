@@ -2176,12 +2176,42 @@ describe('AppContainer State Management', () => {
         unmount();
       });
 
-      it('should quit on second press', async () => {
+      it('should not quit on repeated Ctrl+C while a request is running', async () => {
+        mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
+          streamingState: 'responding',
+          cancelOngoingRequest: mockCancelOngoingRequest,
+        });
+        await setupKeypressTest();
+
+        pressKey('\x03', 2); // Ctrl+C twice
+
+        expect(mockCancelOngoingRequest).toHaveBeenCalledTimes(2);
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+        unmount();
+      });
+
+      it('should cancel ongoing request with F10 while a request is running', async () => {
+        mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
+          streamingState: 'responding',
+          cancelOngoingRequest: mockCancelOngoingRequest,
+        });
+        await setupKeypressTest();
+
+        pressKey('\x1b[21~'); // F10
+
+        expect(mockCancelOngoingRequest).toHaveBeenCalledTimes(1);
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+        unmount();
+      });
+
+      it('should quit on second press while idle', async () => {
         await setupKeypressTest();
 
         pressKey('\x03', 2); // Ctrl+C
 
-        expect(mockCancelOngoingRequest).toHaveBeenCalledTimes(2);
+        expect(mockCancelOngoingRequest).not.toHaveBeenCalled();
         expect(mockHandleSlashCommand).toHaveBeenCalledWith(
           '/quit',
           undefined,
