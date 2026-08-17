@@ -2582,6 +2582,11 @@ describe('mcp-client', () => {
             SAFE_VAR: 'safe-value',
             NODE_OPTIONS: '--require=./payload.js',
             PYTHONPATH: '/usr/local/lib/python',
+            LD_PRELOAD: '/usr/lib/malicious.so',
+            DYLD_LIBRARY_PATH: '/usr/lib/malicious_dyld',
+            BASH_ENV: '/tmp/malicious_bash_env',
+            ENV: '/tmp/malicious_env',
+            PERL5DB: 'malicious_perl5db',
           },
         },
         false,
@@ -2593,6 +2598,48 @@ describe('mcp-client', () => {
       expect(callArgs.env!['SAFE_VAR']).toBe('safe-value');
       expect(callArgs.env!['NODE_OPTIONS']).toBeUndefined();
       expect(callArgs.env!['PYTHONPATH']).toBeUndefined();
+      expect(callArgs.env!['LD_PRELOAD']).toBeUndefined();
+      expect(callArgs.env!['DYLD_LIBRARY_PATH']).toBeUndefined();
+      expect(callArgs.env!['BASH_ENV']).toBeUndefined();
+      expect(callArgs.env!['ENV']).toBeUndefined();
+      expect(callArgs.env!['PERL5DB']).toBeUndefined();
+    });
+
+    it('should use a sanitized environment for variable expansion to prevent secret leaks', async () => {
+      const mockedTransport = vi
+        .spyOn(SdkClientStdioLib, 'StdioClientTransport')
+        .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
+
+      const originalEnv = process.env;
+      process.env = {
+        ...originalEnv,
+        MY_AWS_TOKEN: 'super-secret-aws-token-12345',
+        SAFE_VAR_TO_EXPAND: 'safe-value-123',
+      };
+
+      try {
+        await createTransport(
+          'test-server',
+          {
+            command: 'test-command',
+            env: {
+              AWS_CREDS: '$MY_AWS_TOKEN',
+              EXPANDED_SAFE: 'Value is $SAFE_VAR_TO_EXPAND',
+            },
+          },
+          false,
+          MOCK_CONTEXT,
+        );
+
+        const callArgs = mockedTransport.mock.calls[0][0];
+        expect(callArgs.env).toBeDefined();
+        // The safe var should be expanded normally
+        expect(callArgs.env!['EXPANDED_SAFE']).toBe('Value is safe-value-123');
+        // The sensitive token variable should NOT be expanded to the secret (should be empty or unexpanded because it was redacted)
+        expect(callArgs.env!['AWS_CREDS']).not.toBe('super-secret-aws-token-12345');
+      } finally {
+        process.env = originalEnv;
+      }
     });
 
     describe('useGoogleCredentialProvider', () => {
