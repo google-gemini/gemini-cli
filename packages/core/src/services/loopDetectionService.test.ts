@@ -408,6 +408,40 @@ describe('LoopDetectionService', () => {
       expect(result.count).toBe(1);
       expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
     });
+
+    it('should not detect a loop for uniform content like 60+ consecutive spaces or identical characters', () => {
+      service.reset('');
+      const spacesContent = ' '.repeat(70);
+      let result = service.addAndCheck(createContentEvent(spacesContent));
+      expect(result.count).toBe(0);
+
+      service.reset('');
+      const repeatedCharContent = 'a'.repeat(70);
+      result = service.addAndCheck(createContentEvent(repeatedCharContent));
+      expect(result.count).toBe(0);
+    });
+
+    it('should reset inCodeBlock property during reset', () => {
+      service.reset('');
+      // Put service into code block state
+      service.addAndCheck(createContentEvent('```\n'));
+      // Verify we are inside code block by checking that repetitive content does not trigger loop detection
+      const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD; i++) {
+        const res = service.addAndCheck(createContentEvent(repeatedContent));
+        expect(res.count).toBe(0);
+      }
+
+      // Now, call reset()
+      service.reset('');
+
+      // Since reset should have reset inCodeBlock to false, adding repetitive content outside of code block now SHOULD detect a loop
+      let result = { count: 0 };
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD; i++) {
+        result = service.addAndCheck(createContentEvent(repeatedContent));
+      }
+      expect(result.count).toBe(1);
+    });
   });
 
   describe('Content Loop Detection with Code Blocks', () => {

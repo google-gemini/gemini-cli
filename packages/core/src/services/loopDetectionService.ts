@@ -488,6 +488,11 @@ export class LoopDetectionService {
       return false;
     }
 
+    const lastIndex = existingIndices[existingIndices.length - 1];
+    if (this.lastContentIndex - lastIndex < CONTENT_CHUNK_SIZE) {
+      return false;
+    }
+
     existingIndices.push(this.lastContentIndex);
 
     if (existingIndices.length < CONTENT_LOOP_THRESHOLD) {
@@ -751,6 +756,7 @@ export class LoopDetectionService {
     this.detectedCount = 0;
     this.lastLoopDetail = undefined;
     this.lastLoopType = undefined;
+    this.inCodeBlock = false;
   }
 
   /**
