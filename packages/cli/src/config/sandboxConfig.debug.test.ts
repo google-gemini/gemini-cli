@@ -46,7 +46,7 @@ describe('sandbox DEBUG environment normalization', () => {
     process.env = { ...originalEnv };
   });
 
-  it.each(['false', '0', 'off', 'anything']) (
+  it.each(['false', '0', 'off', 'anything'])(
     'removes unsupported DEBUG value %s before launching a sandbox',
     async (debugValue) => {
       process.env['DEBUG'] = debugValue;
@@ -58,7 +58,7 @@ describe('sandbox DEBUG environment normalization', () => {
     },
   );
 
-  it.each(['true', '1']) (
+  it.each(['true', '1'])(
     'preserves supported DEBUG value %s for the sandbox launcher',
     async (debugValue) => {
       process.env['DEBUG'] = debugValue;
