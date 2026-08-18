@@ -707,6 +707,50 @@ Hidden`,
       expect(result.agents).toHaveLength(0);
       expect(result.errors).toHaveLength(1);
     });
+
+    it('should load a symlinked agent markdown file', async () => {
+      const sourceDir = path.join(tempDir, 'source');
+      await fs.mkdir(sourceDir, { recursive: true });
+      const targetFilePath = path.join(sourceDir, 'real-agent.md');
+      await fs.writeFile(
+        targetFilePath,
+        `---
+name: symlinked-agent
+description: A symlinked agent definition
+---
+Hello from a symlinked agent!`,
+      );
+
+      const symlinkPath = path.join(tempDir, 'link-agent.md');
+      await fs.symlink(targetFilePath, symlinkPath);
+
+      const result = await loadAgentsFromDirectory(tempDir);
+      expect(result.agents).toHaveLength(1);
+      expect(result.agents[0]).toMatchObject({
+        name: 'symlinked-agent',
+        description: 'A symlinked agent definition',
+        kind: 'local',
+        promptConfig: {
+          systemPrompt: 'Hello from a symlinked agent!',
+        },
+      });
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('should report error when symlink target is a directory or non-regular file', async () => {
+      const targetDir = path.join(tempDir, 'target-directory');
+      await fs.mkdir(targetDir, { recursive: true });
+
+      const symlinkPath = path.join(tempDir, 'dir-link.md');
+      await fs.symlink(targetDir, symlinkPath);
+
+      const result = await loadAgentsFromDirectory(tempDir);
+      expect(result.agents).toHaveLength(0);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].message).toContain(
+        'Symbolic link does not point to a regular file',
+      );
+    });
   });
 
   describe('remote agent auth configuration', () => {

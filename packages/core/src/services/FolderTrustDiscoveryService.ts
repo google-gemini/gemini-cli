@@ -112,7 +112,7 @@ export class FolderTrustDiscoveryService {
         const entries = await fs.readdir(agentsDir, { withFileTypes: true });
         for (const entry of entries) {
           if (
-            entry.isFile() &&
+            (entry.isFile() || entry.isSymbolicLink()) &&
             entry.name.endsWith('.md') &&
             !entry.name.startsWith('_')
           ) {

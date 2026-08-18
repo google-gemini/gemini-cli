@@ -664,7 +664,7 @@ export async function loadAgentsFromDirectory(
 
   const files = dirEntries.filter(
     (entry) =>
-      entry.isFile() &&
+      (entry.isFile() || entry.isSymbolicLink()) &&
       !entry.name.startsWith('_') &&
       entry.name.endsWith('.md'),
   );
@@ -672,7 +672,18 @@ export async function loadAgentsFromDirectory(
   for (const entry of files) {
     const filePath = path.join(dir, entry.name);
     try {
-      const content = await fs.readFile(filePath, 'utf-8');
+      let targetPath = filePath;
+      if (entry.isSymbolicLink()) {
+        targetPath = await fs.realpath(filePath);
+        const stat = await fs.stat(targetPath);
+        if (!stat.isFile()) {
+          throw new AgentLoadError(
+            filePath,
+            'Symbolic link does not point to a regular file',
+          );
+        }
+      }
+      const content = await fs.readFile(targetPath, 'utf-8');
       const hash = crypto.createHash('sha256').update(content).digest('hex');
       const agentDefs = await parseAgentMarkdown(filePath, content);
       for (const def of agentDefs) {

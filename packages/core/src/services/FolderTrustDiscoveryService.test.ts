@@ -174,4 +174,27 @@ describe('FolderTrustDiscoveryService', () => {
       'This project contains custom agents.',
     );
   });
+
+  it('should discover custom agents when they are symbolic links', async () => {
+    const geminiDir = path.join(tempDir, GEMINI_DIR);
+    await fs.mkdir(geminiDir, { recursive: true });
+
+    const agentsDir = path.join(geminiDir, 'agents');
+    await fs.mkdir(agentsDir);
+
+    const sourceDir = path.join(tempDir, 'source');
+    await fs.mkdir(sourceDir, { recursive: true });
+    const targetFilePath = path.join(sourceDir, 'real-agent.md');
+    await fs.writeFile(targetFilePath, 'body');
+
+    const symlinkPath = path.join(agentsDir, 'symlinked-agent.md');
+    await fs.symlink(targetFilePath, symlinkPath);
+
+    const results = await FolderTrustDiscoveryService.discover(tempDir);
+
+    expect(results.agents).toContain('symlinked-agent');
+    expect(results.securityWarnings).toContain(
+      'This project contains custom agents.',
+    );
+  });
 });
