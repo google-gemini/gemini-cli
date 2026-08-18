@@ -278,7 +278,7 @@ export class CodeAssistServer implements ContentGenerator {
           currentTier: { id: UserTierId.STANDARD },
         };
       } else if (
-        isPermissionDeniedError(e) &&
+        (isPermissionDeniedError(e) || isNotFoundError(e)) &&
         req.cloudaicompanionProject === 'cloudshell-gca'
       ) {
         throw new Error(
@@ -596,5 +596,17 @@ function isPermissionDeniedError(error: unknown): boolean {
     typeof error.response === 'object' &&
     'status' in error.response &&
     error.response.status === 403
+  );
+}
+
+function isNotFoundError(error: unknown): boolean {
+  return (
+    !!error &&
+    typeof error === 'object' &&
+    'response' in error &&
+    !!error.response &&
+    typeof error.response === 'object' &&
+    'status' in error.response &&
+    error.response.status === 404
   );
 }

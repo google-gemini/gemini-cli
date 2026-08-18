@@ -666,6 +666,28 @@ describe('CodeAssistServer', () => {
     ).rejects.toThrow(/Access to the default Cloud Shell Gemini project/);
   });
 
+  it('should throw friendly error for 404 on cloudshell-gca project', async () => {
+    const { server } = createTestServer();
+    const mock404Error = {
+      response: {
+        status: 404,
+        data: {
+          error: {
+            message: 'Requested entity was not found',
+          },
+        },
+      },
+    };
+    vi.spyOn(server, 'requestPost').mockRejectedValue(mock404Error);
+
+    await expect(
+      server.loadCodeAssist({
+        cloudaicompanionProject: 'cloudshell-gca',
+        metadata: {},
+      }),
+    ).rejects.toThrow(/Access to the default Cloud Shell Gemini project/);
+  });
+
   it('should call the listExperiments endpoint with metadata', async () => {
     const { server } = createTestServer();
     const mockResponse = {
