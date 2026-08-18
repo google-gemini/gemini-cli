@@ -220,6 +220,24 @@ To set up runsc:
 2.  Configure the Docker daemon to use the runsc runtime.
 3.  Verify the installation.
 
+**Capabilities & Limitations:**
+
+- **Security Isolation**: Provides a virtualized kernel environment, completely
+  separating the container's execution and network namespaces from the host to
+  prevent malicious takeovers or unintended host access.
+- **IDE Companion Limitation**: The VSCode IDE companion extension relies on
+  HTTP over TCP communication to coordinate code actions between the host block
+  and the container environment. Because gVisor restricts raw TCP loopback/host
+  routing, the IDE companion extension cannot establish a direct connection
+  under default runsc settings.
+- **Connection Settings**: To allow the companion or other local processes to
+  resolve and communicate with host services under gVisor, Gemini CLI
+  automatically configures container TCP networking by dynamically resolving the
+  gateway IP of the active network (falling back to `172.17.0.1`) and pointing
+  `host.docker.internal` to it. If you experience connectivity issues, ensure
+  your host-side services are listening on `0.0.0.0` or the gateway IP and are
+  not blocked by the host firewall.
+
 ### 5. LXC/LXD (Linux only, experimental)
 
 Full-system container sandboxing using LXC/LXD. Unlike Docker/Podman, LXC

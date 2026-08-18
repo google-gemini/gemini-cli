@@ -406,7 +406,38 @@ export async function start_sandbox(
     }
 
     // allow access to host.docker.internal
-    args.push('--add-host', 'host.docker.internal:host-gateway');
+    if (config.command === 'runsc') {
+      let gatewayIp = '172.17.0.1';
+      try {
+        const useProxy = !!process.env['GEMINI_SANDBOX_PROXY_COMMAND'];
+        const hasNetworkAccess = config.networkAccess ?? false;
+        const networkName =
+          !hasNetworkAccess || useProxy ? SANDBOX_NETWORK_NAME : 'bridge';
+        if (networkName === SANDBOX_NETWORK_NAME) {
+          const isInternal = !hasNetworkAccess || useProxy;
+          const networkFlags = isInternal ? '--internal' : '';
+          execSync(
+            `${command} network inspect ${SANDBOX_NETWORK_NAME} || ${command} network create ${networkFlags} ${SANDBOX_NETWORK_NAME}`,
+            { stdio: 'ignore' },
+          );
+        }
+        const inspectOut = execSync(
+          `${command} network inspect ${networkName} --format "{{range .IPAM.Config}}{{.Gateway}}{{end}}"`,
+        )
+          ?.toString()
+          .trim();
+        if (inspectOut) {
+          gatewayIp = inspectOut;
+        }
+      } catch (err) {
+        debugLogger.warn(
+          `Failed to resolve gateway IP for host.docker.internal: ${err}`,
+        );
+      }
+      args.push('--add-host', `host.docker.internal:${gatewayIp}`);
+    } else {
+      args.push('--add-host', 'host.docker.internal:host-gateway');
+    }
 
     // mount current directory as working directory in sandbox (set via --workdir)
     args.push('--volume', `${workdir}:${containerWorkdir}`);

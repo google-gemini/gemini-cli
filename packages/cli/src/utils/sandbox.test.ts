@@ -1173,11 +1173,16 @@ describe('sandbox', () => {
         expect.arrayContaining(['images', '-q', 'gemini-cli-sandbox']),
       );
 
-      // Verify docker run includes --runtime=runsc
+      // Verify docker run includes --runtime=runsc and maps host.docker.internal to bridge IP 172.17.0.1
       expect(spawn).toHaveBeenNthCalledWith(
         2,
         'docker',
-        expect.arrayContaining(['run', '--runtime=runsc']),
+        expect.arrayContaining([
+          'run',
+          '--runtime=runsc',
+          '--add-host',
+          'host.docker.internal:172.17.0.1',
+        ]),
         expect.objectContaining({ stdio: 'inherit' }),
       );
     });
