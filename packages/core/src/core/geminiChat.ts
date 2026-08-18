@@ -573,6 +573,9 @@ export class GeminiChat {
     const streamWithRetries = async function* (
       this: GeminiChat,
     ): AsyncGenerator<StreamEvent, void, void> {
+      let isSuccess = false;
+      let caughtError: unknown = undefined;
+
       try {
         const maxAttempts = this.context.config.getMaxAttempts();
         let lastStreamError: unknown = undefined;
@@ -604,6 +607,7 @@ export class GeminiChat {
               yield { type: StreamEventType.CHUNK, value: chunk };
             }
 
+            isSuccess = true;
             return;
           } catch (error) {
             if (error instanceof InvalidStreamError) {
@@ -615,6 +619,7 @@ export class GeminiChat {
                 type: StreamEventType.AGENT_EXECUTION_STOPPED,
                 reason: error.reason,
               };
+              isSuccess = true;
               return; // Stop the generator
             }
 
@@ -629,6 +634,7 @@ export class GeminiChat {
                   value: error.syntheticResponse,
                 };
               }
+              isSuccess = true;
               return; // Stop the generator
             }
 
@@ -709,34 +715,37 @@ export class GeminiChat {
           }
         }
       } catch (error) {
-        const isAborted =
-          signal?.aborted ||
-          isAbortError(error) ||
-          (error instanceof Error &&
-            (error.name === 'CanceledError' ||
-              error.name === 'FatalCancellationError'));
-        const originalLength = this.promptOriginalHistoryLength;
-        const originalTokenCount = this.promptOriginalTokenCount;
-        if (isAborted && originalLength !== undefined) {
-          this.agentHistory.rollback(originalLength);
-          this.chatRecordingService.updateMessagesFromHistory(
-            this.agentHistory.get(),
-          );
-          if (originalTokenCount !== undefined) {
-            this.lastPromptTokenCount = originalTokenCount;
-          }
-          this.promptOriginalHistoryLength = undefined;
-          this.promptOriginalTokenCount = undefined;
-          this.lastPromptId = undefined;
-        } else if (!isOriginalFunctionResponse) {
-          this.agentHistory.rollback(historyLengthBefore);
-          this.chatRecordingService.updateMessagesFromHistory(
-            this.agentHistory.get(),
-          );
-          this.lastPromptTokenCount = baselinePromptTokenCount;
-        }
+        caughtError = error;
         throw error;
       } finally {
+        if (!isSuccess) {
+          const isAborted =
+            signal?.aborted ||
+            isAbortError(caughtError) ||
+            (caughtError instanceof Error &&
+              (caughtError.name === 'CanceledError' ||
+                caughtError.name === 'FatalCancellationError'));
+          const originalLength = this.promptOriginalHistoryLength;
+          const originalTokenCount = this.promptOriginalTokenCount;
+          if (isAborted && originalLength !== undefined) {
+            this.agentHistory.rollback(originalLength);
+            this.chatRecordingService.updateMessagesFromHistory(
+              this.agentHistory.get(),
+            );
+            if (originalTokenCount !== undefined) {
+              this.lastPromptTokenCount = originalTokenCount;
+            }
+            this.promptOriginalHistoryLength = undefined;
+            this.promptOriginalTokenCount = undefined;
+            this.lastPromptId = undefined;
+          } else if (!isOriginalFunctionResponse) {
+            this.agentHistory.rollback(historyLengthBefore);
+            this.chatRecordingService.updateMessagesFromHistory(
+              this.agentHistory.get(),
+            );
+            this.lastPromptTokenCount = baselinePromptTokenCount;
+          }
+        }
         streamDoneResolver!();
       }
     };

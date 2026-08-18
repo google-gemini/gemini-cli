@@ -1629,6 +1629,59 @@ describe('GeminiChat', () => {
       expect(chat.agentHistory.length).toBe(initialHistoryLength);
     });
 
+    it('should roll back the un-responded user turn from history when stream consumption is broken out of early', async () => {
+      const initialHistoryLength = chat.agentHistory.length;
+
+      // Setup: A multi-chunk stream that would succeed if fully consumed
+      const activeStream = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'chunk 1' }],
+              },
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'chunk 2' }],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        activeStream,
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-2.0-flash' },
+        'test early exit message',
+        'prompt-id-early-exit',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      // Verify the user turn WAS added during sendMessageStream
+      expect(chat.agentHistory.length).toBe(initialHistoryLength + 1);
+
+      // Consume only the first chunk and break out of the loop early!
+      for await (const chunk of stream) {
+        expect(chunk.type).toBe(StreamEventType.CHUNK);
+        break; // Trigger early exit, calling generator.return() under the hood
+      }
+
+      // Verify history has been rolled back to its initial state because of the early exit
+      expect(chat.agentHistory.length).toBe(initialHistoryLength);
+    });
+
     it('should roll back the entire multi-turn request including function responses when a continuation stream is aborted/cancelled', async () => {
       const initialHistoryLength = chat.agentHistory.length;
       const abortController = new AbortController();
