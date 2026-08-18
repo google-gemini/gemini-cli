@@ -11,6 +11,7 @@ import {
   type Content,
   type GenerateContentResponse,
   type Part,
+  Language,
 } from '@google/genai';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import {
@@ -4706,6 +4707,28 @@ describe('GeminiChat', () => {
             {
               text: '',
               functionResponse: { name: 'test_tool', response: {} },
+            },
+          ],
+        },
+      ]);
+      const history = chat.getHistory(true);
+      expect(history).toHaveLength(2);
+      expect(history[1].role).toBe('model');
+    });
+
+    it('should preserve turns with empty text parts that contain executableCode or codeExecutionResult', () => {
+      const chat = new GeminiChat(mockConfig, '', [], []);
+      chat.setHistory([
+        { role: 'user', parts: [{ text: 'User prompt' }] },
+        {
+          role: 'model',
+          parts: [
+            {
+              text: '',
+              executableCode: {
+                language: Language.PYTHON,
+                code: 'print("test")',
+              },
             },
           ],
         },

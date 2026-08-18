@@ -170,7 +170,9 @@ function isValidContent(content: Content): boolean {
       !part.functionCall &&
       !part.functionResponse &&
       !part.inlineData &&
-      !part.fileData
+      !part.fileData &&
+      !part.executableCode &&
+      !part.codeExecutionResult
     ) {
       return false;
     }
