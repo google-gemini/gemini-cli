@@ -50,7 +50,7 @@ export async function fetchJson<T>(
         res.on('error', (err) => {
           reject(
             new Error(
-              `Response stream error while fetching ${url} (status ${res.statusCode}): ${err.message}`,
+              `Response stream error while fetching ${url} (status ${res.statusCode ?? 'unknown'}): ${err.message}`,
             ),
           );
         });
@@ -62,7 +62,7 @@ export async function fetchJson<T>(
           } catch (err) {
             reject(
               new Error(
-                `Failed to parse JSON from ${url} (status ${res.statusCode}): ${
+                `Failed to parse JSON from ${url} (status ${res.statusCode ?? 'unknown'}): ${
                   err instanceof Error ? err.message : String(err)
                 }`,
               ),
