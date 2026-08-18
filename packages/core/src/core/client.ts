@@ -296,6 +296,7 @@ export class GeminiClient {
   }
 
   setHistory(history: ReadonlyArray<Content | HistoryTurn>) {
+    this.currentSequenceModel = null;
     this.getChat().setHistory(history);
     this.updateTelemetryTokenCount();
     this.forceFullIdeContext = true;
@@ -1035,6 +1036,7 @@ export class GeminiClient {
       }
     } catch (error) {
       if (signal?.aborted || isAbortError(error)) {
+        this.currentSequenceModel = null;
         yield { type: GeminiEventType.UserCancelled };
         return turn;
       }

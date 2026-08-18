@@ -849,6 +849,7 @@ export const useGeminiStream = (
 
       turnCancelledRef.current = true;
       setRetryStatus(null);
+      geminiClient.clearCurrentSequenceModel();
 
       // A full cancellation means no tools have produced a final result yet.
       // This determines if we show a generic "Request cancelled" message.
@@ -928,6 +929,7 @@ export const useGeminiStream = (
       toolCalls,
       activeShellPtyId,
       setIsResponding,
+      geminiClient,
     ],
   );
 

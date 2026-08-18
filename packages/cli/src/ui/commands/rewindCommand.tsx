@@ -44,6 +44,7 @@ async function rewindConversation(
   newText: string,
 ) {
   try {
+    client.clearCurrentSequenceModel();
     const conversation = recordingService.rewindTo(messageId);
     if (!conversation) {
       const errorMsg = 'Could not fetch conversation file';

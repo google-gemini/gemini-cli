@@ -349,6 +349,25 @@ describe('Gemini Client (client.ts)', () => {
 
       expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalled();
     });
+
+    it('should reset currentSequenceModel to null when history is set', () => {
+      client['currentSequenceModel'] = 'gemini-1.5-flash';
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'some message' }] },
+      ];
+      client.setHistory(history);
+      expect(client.getCurrentSequenceModel()).toBeNull();
+    });
+  });
+
+  describe('clearCurrentSequenceModel', () => {
+    it('should reset currentSequenceModel to null', () => {
+      client['currentSequenceModel'] = 'gemini-1.5-flash';
+      expect(client.getCurrentSequenceModel()).toBe('gemini-1.5-flash');
+
+      client.clearCurrentSequenceModel();
+      expect(client.getCurrentSequenceModel()).toBeNull();
+    });
   });
 
   describe('resumeChat', () => {
@@ -814,7 +833,8 @@ describe('Gemini Client (client.ts)', () => {
       );
     });
 
-    it('yields UserCancelled when processTurn throws AbortError', async () => {
+    it('yields UserCancelled and resets currentSequenceModel when processTurn throws AbortError', async () => {
+      client['currentSequenceModel'] = 'gemini-1.5-flash';
       const abortError = new Error('Aborted');
       abortError.name = 'AbortError';
       vi.spyOn(client['loopDetector'], 'turnStarted').mockRejectedValueOnce(
@@ -829,6 +849,7 @@ describe('Gemini Client (client.ts)', () => {
       const events = await fromAsync(stream);
 
       expect(events).toEqual([{ type: GeminiEventType.UserCancelled }]);
+      expect(client.getCurrentSequenceModel()).toBeNull();
     });
 
     it.each([
