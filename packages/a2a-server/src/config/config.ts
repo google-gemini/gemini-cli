@@ -433,8 +433,9 @@ export async function setTargetDir(
   agentSettings: AgentSettings | undefined,
 ): Promise<string> {
   const originalCWD = process.cwd();
+  const configuredWorkspacePath = getEnv('CODER_AGENT_WORKSPACE_PATH');
   const targetDir =
-    getEnv('CODER_AGENT_WORKSPACE_PATH') ??
+    configuredWorkspacePath ??
     (agentSettings?.kind === CoderAgentEvent.StateAgentSettingsEvent
       ? agentSettings.workspacePath
       : undefined);
@@ -474,9 +475,16 @@ export async function setTargetDir(
       process.argv.some((arg) => arg.includes('vitest')) ||
       resolvedPath.startsWith(resolveToRealPath(tmpdir()));
 
+    // When the launcher pins the server to a workspace, use that workspace as
+    // the default confinement root. Per-task workspace paths remain confined to
+    // the normal home-directory boundary unless an allowed root is configured.
+    const defaultAllowedRoot = configuredWorkspacePath
+      ? resolvedPath
+      : isTestEnv
+        ? path.parse(resolvedPath).root
+        : homedir();
     const allowedRoot = resolveToRealPath(
-      getEnv('CODER_AGENT_ALLOWED_ROOT') ||
-        (isTestEnv ? path.parse(resolvedPath).root : homedir()),
+      getEnv('CODER_AGENT_ALLOWED_ROOT') || defaultAllowedRoot,
     );
     const relative = path.relative(allowedRoot, resolvedPath);
     if (relative.startsWith('..') || path.isAbsolute(relative)) {
