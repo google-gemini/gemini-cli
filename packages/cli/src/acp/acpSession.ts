@@ -767,6 +767,16 @@ export class Session {
           },
         };
 
+        await this.sendUpdate({
+          sessionUpdate: 'tool_call',
+          toolCallId: callId,
+          status: 'pending',
+          title: displayTitle,
+          content,
+          locations: invocation.toolLocations(),
+          kind: toAcpToolKind(tool.kind),
+        });
+
         const output = RequestPermissionResponseSchema.parse(
           await this.connection.requestPermission(params),
         );

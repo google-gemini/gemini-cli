@@ -455,6 +455,28 @@ describe('Session', () => {
       prompt: [{ type: 'text', text: 'Call tool' }],
     });
 
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      update: expect.objectContaining({
+        sessionUpdate: 'tool_call',
+        status: 'pending',
+        toolCallId: 'call-1',
+      }),
+    });
+
+    const pendingCallIndex = mockConnection.sessionUpdate.mock.calls.findIndex(
+      (call) =>
+        call[0]?.update?.sessionUpdate === 'tool_call' &&
+        call[0]?.update?.status === 'pending',
+    );
+    expect(pendingCallIndex).toBeGreaterThanOrEqual(0);
+
+    const pendingCallInvocation =
+      mockConnection.sessionUpdate.mock.invocationCallOrder[pendingCallIndex];
+    const requestPermissionInvocation =
+      mockConnection.requestPermission.mock.invocationCallOrder[0];
+    expect(pendingCallInvocation).toBeLessThan(requestPermissionInvocation);
+
     expect(mockConnection.requestPermission).toHaveBeenCalled();
     expect(confirmationDetails.onConfirm).toHaveBeenCalled();
   });
