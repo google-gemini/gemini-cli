@@ -200,10 +200,12 @@ export class ContextGraphBuilder {
       const hasEnvHeader = msg.parts?.some(
         (p) => isTextPart(p) && p.text.trim().startsWith('<session_context>'),
       );
-      const turnSalt =
-        hasEnvHeader && turnIdx === 0
-          ? deriveStableId(['environment-context'])
-          : turn.id;
+      const envContextId = deriveStableId(['environment-context']);
+      const isTrueEnvContext =
+        hasEnvHeader &&
+        turnIdx === 0 &&
+        (turn.id === envContextId || turn.id === `turn_${envContextId}`);
+      const turnSalt = isTrueEnvContext ? envContextId : turn.id;
       const turnId = turnSalt.startsWith('turn_')
         ? turnSalt
         : `turn_${turnSalt}`;
