@@ -26,6 +26,7 @@ describe('ApprovalModeStrategy', () => {
   let mockContext: RoutingContext;
   let mockConfig: Config;
   let mockBaseLlmClient: BaseLlmClient;
+  let snapshot: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -37,6 +38,7 @@ describe('ApprovalModeStrategy', () => {
       signal: new AbortController().signal,
     };
 
+    snapshot = vi.fn().mockReturnValue({ available: true });
     mockConfig = {
       getModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
@@ -52,6 +54,7 @@ describe('ApprovalModeStrategy', () => {
       getContentGeneratorConfig: vi.fn().mockReturnValue({
         authType: AuthType.LOGIN_WITH_GOOGLE,
       }),
+      getModelAvailabilityService: vi.fn().mockReturnValue({ snapshot }),
     } as unknown as Config;
 
     mockBaseLlmClient = {} as BaseLlmClient;
@@ -102,6 +105,20 @@ describe('ApprovalModeStrategy', () => {
     });
   });
 
+  it('should return null if the PLAN-mode Pro model is unavailable', async () => {
+    vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
+    snapshot.mockReturnValue({ available: false, reason: 'not entitled' });
+
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+    );
+
+    expect(snapshot).toHaveBeenCalledWith(DEFAULT_GEMINI_MODEL);
+    expect(decision).toBeNull();
+  });
+
   it('should route to PRO model if ApprovalMode is PLAN (Gemini 3)', async () => {
     vi.mocked(mockConfig.getModel).mockReturnValue(PREVIEW_GEMINI_MODEL_AUTO);
     vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
@@ -144,6 +161,23 @@ describe('ApprovalModeStrategy', () => {
           'Routing to Flash model because an approved plan exists at /path/to/plan.md.',
       },
     });
+  });
+
+  it('should return null if the approved-plan Flash model is unavailable', async () => {
+    vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.DEFAULT);
+    vi.mocked(mockConfig.getApprovedPlanPath).mockReturnValue(
+      '/path/to/plan.md',
+    );
+    snapshot.mockReturnValue({ available: false, reason: 'not entitled' });
+
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+    );
+
+    expect(snapshot).toHaveBeenCalledWith(DEFAULT_GEMINI_FLASH_MODEL);
+    expect(decision).toBeNull();
   });
 
   it('should route to FLASH model if an approved plan exists (Gemini 3)', async () => {
