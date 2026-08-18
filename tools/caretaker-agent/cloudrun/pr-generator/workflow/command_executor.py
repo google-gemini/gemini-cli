@@ -1,3 +1,17 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Command execution and input sanitization module.
 
 Provides safe subprocess execution utilities, path traversal guards,
@@ -9,6 +23,8 @@ import os
 import re
 import shlex
 import subprocess
+
+logger = logging.getLogger("Orchestrator")
 
 
 def sanitize_relative_path(path: str | os.PathLike) -> str | None:
@@ -25,11 +41,11 @@ def sanitize_relative_path(path: str | os.PathLike) -> str | None:
     """
     if not path:
         return None
-    raw_str = str(path).replace("\x00", "").strip()
+    raw_str = str(path).replace("\x00", "").replace("\\", "/").strip()
     if not raw_str:
         return None
     clean_path = os.path.normpath(raw_str)
-    if clean_path.startswith("..") or os.path.isabs(clean_path):
+    if clean_path == ".." or clean_path.startswith("../") or os.path.isabs(clean_path):
         logging.warning("Path traversal attempt or absolute path detected: %s", path)
         return None
     return clean_path
@@ -38,7 +54,7 @@ def sanitize_relative_path(path: str | os.PathLike) -> str | None:
 def sanitize_identifier(value: str) -> str:
     """Sanitizes an untrusted string for use in branch names, tags, or CLI identifiers.
 
-    Strips null bytes and removes any character not in [a-zA-Z0-9._-].
+    Strips null bytes, removes any character not in [a-zA-Z0-9._-], and strips leading hyphens and dots.
 
     Args:
         value: Untrusted identifier string.
@@ -49,7 +65,7 @@ def sanitize_identifier(value: str) -> str:
     if not value:
         return "default"
     raw_str = str(value).replace("\x00", "")
-    sanitized = re.sub(r"[^a-zA-Z0-9._-]", "", raw_str)
+    sanitized = re.sub(r"[^a-zA-Z0-9._-]", "", raw_str).lstrip("-.")
     return sanitized or "default"
 
 
@@ -94,6 +110,8 @@ class CommandExecutor:
         """
         active_cwd = cwd or os.getcwd()
         exec_env = os.environ.copy()
+        exec_env.setdefault("GEMINI_CLI_TRUST_WORKSPACE", "true")
+        exec_env.setdefault("GEMINI_CLI_WORKSPACE_TRUSTED", "true")
         if env:
             exec_env.update(env)
 
@@ -110,8 +128,17 @@ class CommandExecutor:
         else:
             args = list(cmd)
 
+        if not args:
+            logger.error("Command execution failed: no executable command provided after parsing tokens.")
+            raise CommandExecutionError(
+                cmd=cmd,
+                returncode=-1,
+                stdout="",
+                stderr="No executable command specified to run.",
+            )
+
         cmd_str = " ".join(args)
-        logging.info("Executing command: %s (CWD: %s)", cmd_str, active_cwd)
+        logger.info("Executing command: %s (CWD: %s)", cmd_str, active_cwd)
 
         try:
             result = subprocess.run(
@@ -128,15 +155,15 @@ class CommandExecutor:
             stderr_str = result.stderr.strip() if result.stderr else ""
 
             if result.returncode != 0:
-                logging.error(
+                logger.error(
                     "Command execution failed: %s (Exit Code: %s)",
                     cmd_str,
                     result.returncode,
                 )
                 if stdout_str:
-                    logging.error("Stdout:\n%s", stdout_str)
+                    logger.error("Stdout:\n%s", stdout_str)
                 if stderr_str:
-                    logging.error("Stderr:\n%s", stderr_str)
+                    logger.error("Stderr:\n%s", stderr_str)
                 raise CommandExecutionError(
                     cmd=args,
                     returncode=result.returncode,

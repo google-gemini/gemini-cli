@@ -63,12 +63,17 @@ def test_config_repo_name_derivation(monkeypatch):
 
 def test_load_and_validate_firestore_doc_valid(monkeypatch):
     """Tests loading and validating a valid JSON FIRESTORE_DOC string."""
-    valid_doc = {"workable_spec": {"issue_id": "190"}, "status": "PENDING"}
+    valid_doc = {
+        "workable_spec": {"issue_id": "190"},
+        "github_metadata": {"owner": "google", "repo": "gemini-cli", "issue_number": 190},
+        "status": "PENDING",
+    }
     monkeypatch.setenv("FIRESTORE_DOC", json.dumps(valid_doc))
 
     cfg = Config()
     parsed = cfg.load_and_validate_firestore_doc()
     assert parsed["workable_spec"]["issue_id"] == "190"
+    assert parsed["github_metadata"]["issue_number"] == 190
     assert parsed["status"] == "PENDING"
 
 
@@ -97,3 +102,26 @@ def test_load_and_validate_firestore_doc_non_dict(monkeypatch):
     with pytest.raises(ConfigurationError) as exc_info:
         cfg.load_and_validate_firestore_doc()
     assert "Firestore document specification must be a JSON object" in str(exc_info.value)
+
+
+def test_load_and_validate_firestore_doc_missing_fields(monkeypatch):
+    """Tests error handling when FIRESTORE_DOC is missing required schema fields."""
+    incomplete_doc = {"workable_spec": {"issue_id": "190"}}
+    monkeypatch.setenv("FIRESTORE_DOC", json.dumps(incomplete_doc))
+    cfg = Config()
+    with pytest.raises(ConfigurationError) as exc_info:
+        cfg.load_and_validate_firestore_doc()
+    assert "Firestore document missing required fields: github_metadata" in str(exc_info.value)
+
+
+def test_config_secret_tokens_popped_unconditionally(monkeypatch):
+    """Tests that all secret tokens (GIT_TOKEN, GITHUB_TOKEN, GH_TOKEN) are popped unconditionally."""
+    monkeypatch.setenv("GIT_TOKEN", "token_primary")
+    monkeypatch.setenv("GITHUB_TOKEN", "token_secondary")
+    monkeypatch.setenv("GH_TOKEN", "token_tertiary")
+
+    cfg = Config()
+    assert cfg.git_token == "token_primary"
+    assert "GIT_TOKEN" not in os.environ
+    assert "GITHUB_TOKEN" not in os.environ
+    assert "GH_TOKEN" not in os.environ

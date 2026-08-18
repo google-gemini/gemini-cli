@@ -21,11 +21,14 @@ from command_executor import (
 def test_sanitize_relative_path_valid():
     """Tests that valid relative paths are normalized cleanly."""
     assert sanitize_relative_path("src/utils/file.ts") == "src/utils/file.ts"
+    assert sanitize_relative_path("src\\utils\\file.ts") == "src/utils/file.ts"
     assert sanitize_relative_path("a/b/../c/file.ts") == "a/c/file.ts"
+    assert sanitize_relative_path("..note.txt") == "..note.txt"
 
 
 def test_sanitize_relative_path_traversal():
     """Tests that path traversal attempts returning '..' are rejected."""
+    assert sanitize_relative_path("..") is None
     assert sanitize_relative_path("../secret/passwords.txt") is None
     assert sanitize_relative_path("a/../../etc/passwd") is None
 
@@ -168,3 +171,20 @@ def test_run_timeout_expired(mock_subprocess_run):
 
     with pytest.raises(subprocess.TimeoutExpired):
         CommandExecutor.run(["sleep", "100"], timeout=10.0)
+
+
+def test_run_empty_or_env_only_command_raises_error():
+    """Tests that empty commands or env-only strings raise CommandExecutionError without executing subprocess."""
+    with pytest.raises(CommandExecutionError) as exc1:
+        CommandExecutor.run("")
+    assert exc1.value.returncode == -1
+    assert "No executable command specified to run." in exc1.value.stderr
+
+    with pytest.raises(CommandExecutionError) as exc2:
+        CommandExecutor.run([])
+    assert exc2.value.returncode == -1
+
+    with pytest.raises(CommandExecutionError) as exc3:
+        CommandExecutor.run("FOO=bar")
+    assert exc3.value.returncode == -1
+    assert "No executable command specified to run." in exc3.value.stderr
