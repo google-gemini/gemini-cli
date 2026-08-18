@@ -9,10 +9,15 @@ import { authCommand } from './authCommand.js';
 import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { SettingScope } from '../../config/settings.js';
-import type { GeminiClient } from '@google/gemini-cli-core';
+import {
+  type GeminiClient,
+  clearCachedCredentialFile,
+  SessionEndReason,
+} from '@google/gemini-cli-core';
 
-vi.mock('@google/gemini-cli-core', async () => {
-  const actual = await vi.importActual('@google/gemini-cli-core');
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
     clearCachedCredentialFile: vi.fn().mockResolvedValue(undefined),
@@ -78,10 +83,6 @@ describe('authCommand', () => {
       const logoutCommand = authCommand.subCommands?.[1];
       expect(logoutCommand?.name).toBe('signout');
 
-      const { clearCachedCredentialFile } = await import(
-        '@google/gemini-cli-core'
-      );
-
       await logoutCommand!.action!(mockContext, '');
 
       expect(clearCachedCredentialFile).toHaveBeenCalledOnce();
@@ -117,6 +118,34 @@ describe('authCommand', () => {
         mockContext.services.agentContext?.geminiClient
           .stripThoughtsFromHistory,
       ).toHaveBeenCalled();
+    });
+
+    it('should fire SessionEnd event with SessionEndReason.Logout', async () => {
+      const logoutCommand = authCommand.subCommands?.[1];
+      const mockFireSessionEndEvent = vi.fn();
+      const mockHookSystem = {
+        fireSessionEndEvent: mockFireSessionEndEvent,
+      };
+
+      mockContext = createMockCommandContext({
+        services: {
+          agentContext: {
+            geminiClient: {
+              stripThoughtsFromHistory: vi.fn(),
+            },
+            config: {
+              getHookSystem: vi.fn().mockReturnValue(mockHookSystem),
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            } as any,
+          },
+        },
+      });
+
+      await logoutCommand!.action!(mockContext, '');
+
+      expect(mockFireSessionEndEvent).toHaveBeenCalledWith(
+        SessionEndReason.Logout,
+      );
     });
 
     it('should return logout action to signal explicit state change', async () => {

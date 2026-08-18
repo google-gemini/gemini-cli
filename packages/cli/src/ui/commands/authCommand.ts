@@ -10,7 +10,10 @@ import type {
   LogoutActionReturn,
 } from './types.js';
 import { CommandKind } from './types.js';
-import { clearCachedCredentialFile } from '@google/gemini-cli-core';
+import {
+  clearCachedCredentialFile,
+  SessionEndReason,
+} from '@google/gemini-cli-core';
 import { SettingScope } from '../../config/settings.js';
 
 const authLoginCommand: SlashCommand = {
@@ -40,6 +43,11 @@ const authLogoutCommand: SlashCommand = {
     );
     // Strip thoughts from history instead of clearing completely
     context.services.agentContext?.geminiClient.stripThoughtsFromHistory();
+    // Retrieve hook system and fire session end event for Logout
+    const hookSystem = context.services.agentContext?.config?.getHookSystem();
+    if (hookSystem) {
+      await hookSystem.fireSessionEndEvent(SessionEndReason.Logout);
+    }
     // Return logout action to signal explicit state change
     return {
       type: 'logout',
