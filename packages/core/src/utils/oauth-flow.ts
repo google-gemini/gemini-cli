@@ -279,10 +279,15 @@ export function startCallbackServer(
       abortController.signal.addEventListener('abort', onAbort, { once: true });
 
       server.on('close', () => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
         abortController.signal.removeEventListener('abort', onAbort);
       });
     },
   );
+
+  responsePromise.catch(() => {});
 
   return {
     port: portPromise,

@@ -447,6 +447,32 @@ describe('oauth-flow', () => {
         vi.useRealTimers();
       }
     });
+
+    it('should not produce an unhandled promise rejection on timeout, and still reject on await', async () => {
+      vi.useFakeTimers();
+      let unhandledRejectionError: unknown;
+      const onUnhandledRejection = (reason: unknown) => {
+        unhandledRejectionError = reason;
+      };
+      process.on('unhandledRejection', onUnhandledRejection);
+
+      try {
+        const server = startCallbackServer('timeout-state');
+        await server.port;
+
+        // Advance timers by 5 minutes to trigger the timeout
+        await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+
+        // Verify no unhandled promise rejection has been emitted
+        expect(unhandledRejectionError).toBeUndefined();
+
+        // Ensure awaiting server.response correctly rejects with the timeout error
+        await expect(server.response).rejects.toThrow('OAuth callback timeout');
+      } finally {
+        process.off('unhandledRejection', onUnhandledRejection);
+        vi.useRealTimers();
+      }
+    });
   });
 
   describe('exchangeCodeForToken', () => {
