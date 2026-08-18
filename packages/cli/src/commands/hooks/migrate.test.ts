@@ -489,6 +489,27 @@ describe('migrate command', () => {
     expect(migratedHooks).toHaveProperty('AfterTool');
   });
 
+  it('should transform compact matchers to compress', async () => {
+    const claudeSettings = {
+      hooks: {
+        SessionStart: [
+          {
+            matcher: 'compact',
+            hooks: [{ type: 'command', command: 'echo "test"' }],
+          },
+        ],
+      },
+    };
+
+    mockedFs.existsSync.mockReturnValue(true);
+    mockedFs.readFileSync.mockReturnValue(JSON.stringify(claudeSettings));
+
+    await handleMigrateFromClaude();
+
+    const migratedHooks = mockSetValue.mock.calls[0][2];
+    expect(migratedHooks.SessionStart[0].matcher).toBe('compress');
+  });
+
   it('should display migration instructions after successful migration', async () => {
     const claudeSettings = {
       hooks: {

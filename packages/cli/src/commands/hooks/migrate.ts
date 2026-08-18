@@ -59,6 +59,9 @@ function transformMatcher(matcher: string | undefined): string | undefined {
     );
   }
 
+  // Translate 'compact' matchers to 'compress'
+  transformed = transformed.replace(/\bcompact\b/g, 'compress');
+
   return transformed;
 }
 

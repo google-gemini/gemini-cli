@@ -608,6 +608,8 @@ export enum SessionStartSource {
   Startup = 'startup',
   Resume = 'resume',
   Clear = 'clear',
+  Compress = 'compress',
+  Compact = 'compact',
 }
 
 /**
