@@ -163,5 +163,24 @@ describe('messageInspectors', () => {
       };
       expect(isFunctionCall(content)).toBe(true);
     });
+
+    it('should return true if a functionCall has sibling thought content', () => {
+      const content = {
+        role: 'model',
+        parts: [
+          {
+            text: 'Checking that now.',
+            thought: true,
+          },
+          {
+            functionCall: {
+              name: 'read_file',
+              args: { path: 'a.txt' },
+            },
+          },
+        ],
+      };
+      expect(isFunctionCall(content)).toBe(true);
+    });
   });
 });
