@@ -814,7 +814,27 @@ describe('Gemini Client (client.ts)', () => {
       );
     });
 
-    it('yields UserCancelled when processTurn throws AbortError', async () => {
+    it('yields UserCancelled when processTurn throws AbortError with an aborted signal', async () => {
+      const abortError = new Error('Aborted');
+      abortError.name = 'AbortError';
+      vi.spyOn(client['loopDetector'], 'turnStarted').mockRejectedValueOnce(
+        abortError,
+      );
+
+      const controller = new AbortController();
+      controller.abort();
+
+      const stream = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        controller.signal,
+        'prompt-id-abort-error',
+      );
+      const events = await fromAsync(stream);
+
+      expect(events).toEqual([{ type: GeminiEventType.UserCancelled }]);
+    });
+
+    it('yields Error event and rethrows when processTurn throws AbortError with a non-aborted signal', async () => {
       const abortError = new Error('Aborted');
       abortError.name = 'AbortError';
       vi.spyOn(client['loopDetector'], 'turnStarted').mockRejectedValueOnce(
@@ -824,11 +844,26 @@ describe('Gemini Client (client.ts)', () => {
       const stream = client.sendMessageStream(
         [{ text: 'Hi' }],
         new AbortController().signal,
-        'prompt-id-abort-error',
+        'prompt-id-abort-error-non-aborted',
       );
-      const events = await fromAsync(stream);
 
-      expect(events).toEqual([{ type: GeminiEventType.UserCancelled }]);
+      const events: unknown[] = [];
+      let caughtError: unknown = null;
+      try {
+        for await (const event of stream) {
+          events.push(event);
+        }
+      } catch (err) {
+        caughtError = err;
+      }
+
+      expect(caughtError).toBe(abortError);
+      expect(events).toEqual([
+        {
+          type: GeminiEventType.Error,
+          value: { error: abortError },
+        },
+      ]);
     });
 
     it.each([
