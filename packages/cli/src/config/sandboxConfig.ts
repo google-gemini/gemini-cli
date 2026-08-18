@@ -130,7 +130,7 @@ function getSandboxCommand(
  * keep their environment untouched.
  */
 function normalizeSandboxDebugEnv(): void {
-  const debugValue = process.env['DEBUG']?.trim().toLowerCase();
+  const debugValue = process.env['DEBUG'];
   if (debugValue !== undefined && debugValue !== 'true' && debugValue !== '1') {
     delete process.env['DEBUG'];
   }
