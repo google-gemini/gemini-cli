@@ -119,6 +119,7 @@ export class TerminalCapabilityManager {
 
     return new Promise((resolve) => {
       const originalRawMode = process.stdin.isRaw;
+      const stdinWasFlowing = process.stdin.readableFlowing === true;
       if (!originalRawMode) {
         process.stdin.setRawMode(true);
       }
@@ -137,6 +138,12 @@ export class TerminalCapabilityManager {
           clearTimeout(timeoutId);
         }
         process.stdin.removeListener('data', onData);
+        // Adding a `data` listener puts a Node readable stream into flowing mode.
+        // Removing the listener does not pause it again, so stdin can otherwise
+        // discard keyboard input before Ink attaches its `readable` consumer.
+        if (!stdinWasFlowing) {
+          process.stdin.pause?.();
+        }
         if (!originalRawMode) {
           process.stdin.setRawMode(false);
         }
