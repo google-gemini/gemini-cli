@@ -709,7 +709,13 @@ export class GeminiClient {
     if (estimatedRequestTokenCount > remainingTokenCount) {
       yield {
         type: GeminiEventType.ContextWindowWillOverflow,
-        value: { estimatedRequestTokenCount, remainingTokenCount },
+        value: {
+          estimatedRequestTokenCount,
+          remainingTokenCount,
+          message:
+            'The request was blocked because the estimated token count exceeds the remaining context window limit.',
+          blocked: true,
+        },
       };
       return turn;
     }

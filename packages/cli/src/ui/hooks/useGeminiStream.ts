@@ -1402,13 +1402,14 @@ export const useGeminiStream = (
   const handleContextWindowWillOverflowEvent = useCallback(
     (estimatedRequestTokenCount: number, remainingTokenCount: number) => {
       onCancelSubmit(true);
+      setIsResponding(false);
 
       const limit = tokenLimit(config.getModel());
 
       const isMoreThan25PercentUsed =
         limit > 0 && remainingTokenCount < limit * 0.75;
 
-      let text = `Sending this message (${estimatedRequestTokenCount} tokens) might exceed the context window limit (${remainingTokenCount.toLocaleString()} tokens left).`;
+      let text = `This message was not sent because the estimated token count (${estimatedRequestTokenCount} tokens) exceeds the remaining context window limit (${remainingTokenCount.toLocaleString()} tokens left).`;
 
       if (isMoreThan25PercentUsed) {
         text +=
@@ -1420,7 +1421,7 @@ export const useGeminiStream = (
         text,
       });
     },
-    [addItem, onCancelSubmit, config],
+    [addItem, onCancelSubmit, setIsResponding, config],
   );
 
   const handleChatModelEvent = useCallback(

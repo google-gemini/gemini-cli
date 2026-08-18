@@ -2903,14 +2903,14 @@ describe('useGeminiStream', () => {
           requestTokens: 20,
           remainingTokens: 80,
           expectedMessage:
-            'Sending this message (20 tokens) might exceed the context window limit (80 tokens left).',
+            'This message was not sent because the estimated token count (20 tokens) exceeds the remaining context window limit (80 tokens left).',
         },
         {
           name: 'with suggestion when remaining tokens are < 75% of limit',
           requestTokens: 30,
           remainingTokens: 70,
           expectedMessage:
-            'Sending this message (30 tokens) might exceed the context window limit (70 tokens left). Please try reducing the size of your message or use the `/compress` command to compress the chat history.',
+            'This message was not sent because the estimated token count (30 tokens) exceeds the remaining context window limit (70 tokens left). Please try reducing the size of your message or use the `/compress` command to compress the chat history.',
         },
       ])(
         'should add message $name',
@@ -2938,6 +2938,7 @@ describe('useGeminiStream', () => {
               type: 'info',
               text: expectedMessage,
             });
+            expect(result.current.streamingState).toBe(StreamingState.Idle);
           });
         },
       );

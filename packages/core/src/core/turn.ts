@@ -100,6 +100,8 @@ export type ServerGeminiContextWindowWillOverflowEvent = {
   value: {
     estimatedRequestTokenCount: number;
     remainingTokenCount: number;
+    message?: string;
+    blocked?: boolean;
   };
 };
 
