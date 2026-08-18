@@ -47,10 +47,27 @@ export async function fetchJson<T>(
         }
         const chunks: Buffer[] = [];
         res.on('data', (chunk) => chunks.push(chunk));
+        res.on('error', (err) => {
+          reject(
+            new Error(
+              `Response stream error while fetching ${url} (status ${res.statusCode}): ${err.message}`,
+            ),
+          );
+        });
         res.on('end', () => {
           const data = Buffer.concat(chunks).toString();
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          resolve(JSON.parse(data) as T);
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            resolve(JSON.parse(data) as T);
+          } catch (err) {
+            reject(
+              new Error(
+                `Failed to parse JSON from ${url} (status ${res.statusCode}): ${
+                  err instanceof Error ? err.message : String(err)
+                }`,
+              ),
+            );
+          }
         });
       })
       .on('error', reject);
