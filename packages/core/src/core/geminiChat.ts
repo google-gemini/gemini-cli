@@ -156,6 +156,12 @@ export function isValidNonThoughtTextPart(part: Part): boolean {
 }
 
 function isValidContent(content: Content): boolean {
+  if (
+    content.role === 'model' &&
+    (content.parts === undefined || content.parts.length === 0)
+  ) {
+    return true;
+  }
   if (content.parts === undefined || content.parts.length === 0) {
     return false;
   }
@@ -163,16 +169,17 @@ function isValidContent(content: Content): boolean {
     if (part === undefined || Object.keys(part).length === 0) {
       return false;
     }
+    // Check if the part contains any keys other than 'text', 'thought', or 'callIndex'.
+    // If it has other keys, it carries an active payload (such as tools, files, or code execution)
+    // and must be preserved even if the text itself is empty, preventing history sequence corruption.
+    const nonTextKeys = Object.keys(part).filter(
+      (key) => key !== 'text' && key !== 'thought' && key !== 'callIndex',
+    );
     if (
       !part.thought &&
       part.text !== undefined &&
       part.text === '' &&
-      !part.functionCall &&
-      !part.functionResponse &&
-      !part.inlineData &&
-      !part.fileData &&
-      !part.executableCode &&
-      !part.codeExecutionResult
+      nonTextKeys.length === 0
     ) {
       return false;
     }
@@ -601,6 +608,7 @@ export class GeminiChat {
               signal,
               role,
               apiHistoryOverride,
+              isOriginalFunctionResponse,
             );
             isConnectionPhase = false;
             for await (const chunk of stream) {
@@ -803,6 +811,7 @@ export class GeminiChat {
     abortSignal: AbortSignal,
     role: LlmRole,
     apiHistoryOverride?: Content[],
+    isOriginalFunctionResponse: boolean = false,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     // Last mile scrubbing to remove internal tracking properties (e.g. callIndex)
     // before sending to the Gemini API. This whitelists only standard Gemini fields.
@@ -1067,6 +1076,7 @@ export class GeminiChat {
       lastModelToUse,
       streamResponse,
       originalRequest,
+      isOriginalFunctionResponse,
     );
   }
 
@@ -1279,6 +1289,7 @@ export class GeminiChat {
     model: string,
     streamResponse: AsyncGenerator<GenerateContentResponse>,
     originalRequest: GenerateContentParameters,
+    isOriginalFunctionResponse: boolean = false,
   ): AsyncGenerator<GenerateContentResponse> {
     const modelResponseParts: Part[] = [];
 
@@ -1495,10 +1506,12 @@ export class GeminiChat {
     // - Empty response text (e.g., only thoughts with no actual content)
     if (!hasToolCall) {
       if (!finishReason) {
-        throw new InvalidStreamError(
-          'Model stream ended without a finish reason.',
-          'NO_FINISH_REASON',
-        );
+        if (!isOriginalFunctionResponse) {
+          throw new InvalidStreamError(
+            'Model stream ended without a finish reason.',
+            'NO_FINISH_REASON',
+          );
+        }
       }
       if (finishReason === FinishReason.MALFORMED_FUNCTION_CALL) {
         throw new InvalidStreamError(
@@ -1543,10 +1556,12 @@ export class GeminiChat {
             'THINKING_ONLY_RESPONSE',
           );
         }
-        throw new InvalidStreamError(
-          'Model stream ended with empty response text.',
-          'NO_RESPONSE_TEXT',
-        );
+        if (!isOriginalFunctionResponse) {
+          throw new InvalidStreamError(
+            'Model stream ended with empty response text.',
+            'NO_RESPONSE_TEXT',
+          );
+        }
       }
     }
 

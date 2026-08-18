@@ -785,7 +785,7 @@ describe('GeminiChat', () => {
       );
     });
 
-    it('should throw an error when a tool call is followed by an empty stream response', async () => {
+    it('should succeed when a tool call is followed by an empty stream response', async () => {
       // 1. Setup: A history where the model has just made a function call.
       const initialHistory: HistoryTurn[] = [
         {
@@ -840,14 +840,19 @@ describe('GeminiChat', () => {
         LlmRole.MAIN,
       );
 
-      // 4. Assert: The stream processing should throw an InvalidStreamError.
+      // 4. Assert: The stream processing should succeed.
       await expect(
         (async () => {
           for await (const _ of stream) {
             // This loop consumes the stream to trigger the internal logic.
           }
         })(),
-      ).rejects.toThrow(InvalidStreamError);
+      ).resolves.not.toThrow();
+
+      // Verify history now ends with a successful model turn (with empty parts)
+      const lastTurn = chat.agentHistory.get()[chat.agentHistory.length - 1];
+      expect(lastTurn.content.role).toBe('model');
+      expect(lastTurn.content.parts).toEqual([]);
     });
 
     it('should succeed when there is a tool call without finish reason', async () => {
@@ -943,7 +948,7 @@ describe('GeminiChat', () => {
       expect(chat.agentHistory.length).toBe(initialHistoryLength);
     });
 
-    it('should preserve function responses during rollback when InvalidStreamError is thrown', async () => {
+    it('should preserve function responses and matching model turn when empty stream response is received', async () => {
       // 1. Setup history ending with a model turn containing functionCall
       chat.agentHistory.push({
         id: 'model-turn-1',
@@ -962,7 +967,7 @@ describe('GeminiChat', () => {
 
       const initialHistoryLength = chat.agentHistory.length;
 
-      // Setup: Stream that will throw InvalidStreamError
+      // Setup: Stream with empty parts
       const streamWithNoResponseText = (async function* () {
         yield {
           candidates: [
@@ -1002,12 +1007,16 @@ describe('GeminiChat', () => {
             // consume
           }
         })(),
-      ).rejects.toThrow(InvalidStreamError);
+      ).resolves.not.toThrow();
 
-      // Verify that history was NOT rolled back, i.e., function response is preserved!
-      expect(chat.agentHistory.length).toBe(initialHistoryLength + 1);
-      const lastTurn = chat.agentHistory.get()[chat.agentHistory.length - 1];
-      expect(lastTurn.content.parts?.[0]?.functionResponse).toBeDefined();
+      // Verify that history contains both the function response and the matched empty model response turn
+      expect(chat.agentHistory.length).toBe(initialHistoryLength + 2);
+      const turns = chat.agentHistory.get();
+      expect(
+        turns[turns.length - 2].content.parts?.[0]?.functionResponse,
+      ).toBeDefined();
+      expect(turns[turns.length - 1].content.role).toBe('model');
+      expect(turns[turns.length - 1].content.parts).toEqual([]);
     });
 
     it('should not fuse the next user message into a preserved tool-response turn', async () => {
@@ -1025,7 +1034,7 @@ describe('GeminiChat', () => {
         },
       });
 
-      // 1. Tool response goes back, model returns nothing -> InvalidStreamError.
+      // 1. Tool response goes back, model returns nothing -> succeeds under Option 2.
       vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
         (async function* () {
           yield {
@@ -1036,7 +1045,7 @@ describe('GeminiChat', () => {
         })(),
       );
 
-      const failingStream = await chat.sendMessageStream(
+      const successfulStream = await chat.sendMessageStream(
         { model: 'gemini-2.0-flash' },
         [
           {
@@ -1052,11 +1061,11 @@ describe('GeminiChat', () => {
       );
       await expect(
         (async () => {
-          for await (const _ of failingStream) {
+          for await (const _ of successfulStream) {
             // consume
           }
         })(),
-      ).rejects.toThrow(InvalidStreamError);
+      ).resolves.not.toThrow();
 
       // 2. The user types a brand new instruction.
       let capturedContents: Content[] = [];
@@ -1242,7 +1251,7 @@ describe('GeminiChat', () => {
 
       const initialHistoryLength = chat.agentHistory.length;
 
-      // Setup: Stream that will throw InvalidStreamError
+      // Setup: Stream with empty parts
       const streamWithNoResponseText = (async function* () {
         yield {
           candidates: [
@@ -1288,13 +1297,19 @@ describe('GeminiChat', () => {
             // consume
           }
         })(),
-      ).rejects.toThrow(InvalidStreamError);
+      ).resolves.not.toThrow();
 
-      // Verify that history was NOT rolled back, i.e., function response and sibling fileData are preserved!
-      expect(chat.agentHistory.length).toBe(initialHistoryLength + 1);
-      const lastTurn = chat.agentHistory.get()[chat.agentHistory.length - 1];
-      expect(lastTurn.content.parts?.[0]?.functionResponse).toBeDefined();
-      expect(lastTurn.content.parts?.[1]?.fileData).toBeDefined();
+      // Verify that history contains both the function response and the matched empty model response turn
+      expect(chat.agentHistory.length).toBe(initialHistoryLength + 2);
+      const turns = chat.agentHistory.get();
+      expect(
+        turns[turns.length - 2].content.parts?.[0]?.functionResponse,
+      ).toBeDefined();
+      expect(
+        turns[turns.length - 2].content.parts?.[1]?.fileData,
+      ).toBeDefined();
+      expect(turns[turns.length - 1].content.role).toBe('model');
+      expect(turns[turns.length - 1].content.parts).toEqual([]);
     });
 
     it('should restore the lastPromptTokenCount baseline on history rollback when InvalidStreamError is thrown', async () => {
@@ -2424,6 +2439,54 @@ describe('GeminiChat', () => {
       });
 
       expect(geminiWrite).toBeDefined();
+    });
+
+    it('should accept a completely empty response without throwing NO_RESPONSE_TEXT if the input is a tool response (isOriginalFunctionResponse is true)', async () => {
+      // Mock an empty stream response with no text/thoughts
+      const responseStream = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        responseStream,
+      );
+
+      // We send a functionResponse message so that isOriginalFunctionResponse is true
+      const stream = await chat.sendMessageStream(
+        { model: 'test-model' },
+        [
+          {
+            functionResponse: {
+              name: 'edit_file',
+              response: { success: true },
+            },
+          },
+        ],
+        'prompt-id-empty-tool-response',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      let error: unknown = undefined;
+      try {
+        for await (const _ of stream) {
+          // consume
+        }
+      } catch (err) {
+        error = err;
+      }
+
+      // It should NOT throw InvalidStreamError NO_RESPONSE_TEXT
+      expect(error).toBeUndefined();
     });
   });
 
