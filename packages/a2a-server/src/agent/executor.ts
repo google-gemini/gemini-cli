@@ -305,6 +305,7 @@ export class CoderAgentExecutor implements AgentExecutor {
           undefined,
           true,
         );
+        this.cleanupAndEvictTask(taskId, wrapper);
         try {
           await this.taskStore?.save(wrapper.toSDKTask());
           logger.info(
@@ -316,7 +317,6 @@ export class CoderAgentExecutor implements AgentExecutor {
             saveError,
           );
         }
-        this.cleanupAndEvictTask(taskId, wrapper);
       }
       return;
     }
@@ -400,11 +400,11 @@ export class CoderAgentExecutor implements AgentExecutor {
       logger.info(
         `[CoderAgentExecutor] Task ${taskId} cancellation processed. Saving state.`,
       );
+      // Cleanup listener subscriptions and evict synchronously before async save
+      this.cleanupAndEvictTask(taskId, wrapper);
+
       await this.taskStore?.save(wrapper.toSDKTask());
       logger.info(`[CoderAgentExecutor] Task ${taskId} state CANCELED saved.`);
-
-      // Cleanup listener subscriptions to avoid memory leaks.
-      this.cleanupAndEvictTask(taskId, wrapper);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
@@ -895,6 +895,13 @@ export class CoderAgentExecutor implements AgentExecutor {
             if (this.executingTasks.get(taskId) === abortController) {
               this.executingTasks.delete(taskId);
             }
+            if (
+              ['canceled', 'failed', 'completed'].includes(
+                currentTask.taskState,
+              )
+            ) {
+              this.cleanupAndEvictTask(taskId, wrapper);
+            }
             logger.info(
               `[CoderAgentExecutor] Saving final state for task ${taskId}.`,
             );
@@ -906,14 +913,6 @@ export class CoderAgentExecutor implements AgentExecutor {
                 `[CoderAgentExecutor] Failed to save task ${taskId} state in finally block:`,
                 saveError,
               );
-            }
-
-            if (
-              ['canceled', 'failed', 'completed'].includes(
-                currentTask.taskState,
-              )
-            ) {
-              this.cleanupAndEvictTask(taskId, wrapper);
             }
           }
         }

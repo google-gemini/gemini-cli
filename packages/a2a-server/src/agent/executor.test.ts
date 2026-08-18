@@ -560,9 +560,9 @@ describe('CoderAgentExecutor', () => {
     const secondaryPromise = executor.execute(requestContext2, mockEventBus);
 
     let secondaryResolved = false;
-    secondaryPromise.then(() => {
+    void secondaryPromise.then(() => {
       secondaryResolved = true;
-    });
+    }).catch(() => {});
 
     // Give it a moment to initialize Request 2's task in execute loop
     await new Promise((resolve) => setTimeout(resolve, 20));
