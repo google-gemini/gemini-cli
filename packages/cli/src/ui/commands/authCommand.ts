@@ -44,9 +44,13 @@ const authLogoutCommand: SlashCommand = {
     // Strip thoughts from history instead of clearing completely
     context.services.agentContext?.geminiClient.stripThoughtsFromHistory();
     // Retrieve hook system and fire session end event for Logout
-    const hookSystem = context.services.agentContext?.config?.getHookSystem();
-    if (hookSystem) {
-      await hookSystem.fireSessionEndEvent(SessionEndReason.Logout);
+    try {
+      const hookSystem = context.services.agentContext?.config?.getHookSystem();
+      if (hookSystem) {
+        await hookSystem.fireSessionEndEvent(SessionEndReason.Logout);
+      }
+    } catch (error) {
+      context.services.logger.error('Failed to fire SessionEnd event during logout:', error);
     }
     // Return logout action to signal explicit state change
     return {
