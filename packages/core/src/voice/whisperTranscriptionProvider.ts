@@ -76,7 +76,7 @@ export class WhisperTranscriptionProvider
         // whisper-stream -m <model_path> -t <threads> --step 0 --length <length> -vth 0.6
         // Setting step == 0 enables sliding window mode with VAD, which outputs
         // non-overlapping transcription blocks suitable for appending.
-        this.process = spawn('whisper-stream', [
+        const proc = spawn('whisper-stream', [
           '-m',
           modelPath,
           '-t',
@@ -88,13 +88,14 @@ export class WhisperTranscriptionProvider
           '-vth',
           '0.6',
         ]);
+        this.process = proc;
 
-        this.process.stdout.on('data', (data: Buffer) => {
+        proc.stdout.on('data', (data: Buffer) => {
           const output = data.toString();
           this.parseOutput(output);
         });
 
-        this.process.stderr.on('data', (data: Buffer) => {
+        proc.stderr.on('data', (data: Buffer) => {
           const msg = data.toString();
           if (msg.includes('error')) {
             debugLogger.error(`[WhisperTranscription] stderr: ${msg}`);
@@ -113,7 +114,7 @@ export class WhisperTranscriptionProvider
           }
         });
 
-        this.process.on('error', (err) => {
+        proc.on('error', (err) => {
           debugLogger.error('[WhisperTranscription] Process error:', err);
           this.emit('error', err);
           if (!isResolved) {
@@ -122,7 +123,7 @@ export class WhisperTranscriptionProvider
           }
         });
 
-        this.process.on('close', (code) => {
+        proc.on('close', (code) => {
           debugLogger.debug(
             `[WhisperTranscription] Process closed with code ${code}`,
           );
@@ -131,7 +132,9 @@ export class WhisperTranscriptionProvider
             this.parseOutput('', true);
           }
           this.emit('close');
-          this.process = null;
+          if (this.process === proc) {
+            this.process = null;
+          }
         });
 
         // Fallback timeout in case "main: processing" is never seen
