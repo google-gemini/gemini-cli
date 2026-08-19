@@ -26,11 +26,6 @@ vi.mock('@google/gemini-cli-core', async () => {
   );
   return {
     ...actual,
-    loadServerHierarchicalMemory: vi.fn().mockResolvedValue({
-      memoryContent: '',
-      fileCount: 0,
-      filePaths: [],
-    }),
     createPolicyEngineConfig: vi.fn().mockResolvedValue({
       rules: [],
       checkers: [],

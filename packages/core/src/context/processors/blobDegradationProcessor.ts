@@ -3,7 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { randomUUID } from 'node:crypto';
+import { deriveStableId } from '../../utils/cryptoUtils.js';
 import type { JSONSchemaType } from 'ajv';
 import type { ProcessArgs, ContextProcessor } from '../pipeline.js';
 import * as fs from 'node:fs/promises';
@@ -62,7 +62,8 @@ export function createBlobDegradationProcessor(
         if (payload.inlineData?.data && payload.inlineData?.mimeType) {
           await ensureDir();
           const ext = payload.inlineData.mimeType.split('/')[1] || 'bin';
-          const fileName = `blob_${Date.now()}_${randomUUID()}.${ext}`;
+          // Use a stable filename based on the node ID
+          const fileName = `blob_${deriveStableId([node.id])}.${ext}`;
           const filePath = path.join(blobOutputsDir, fileName);
 
           const buffer = Buffer.from(payload.inlineData.data, 'base64');
@@ -92,7 +93,7 @@ export function createBlobDegradationProcessor(
         if (newText && tokensSaved > 0) {
           returnedNodes.push({
             ...node,
-            id: randomUUID(),
+            id: deriveStableId([node.id, 'degraded']),
             payload: { text: newText },
             replacesId: node.id,
             turnId: node.turnId,

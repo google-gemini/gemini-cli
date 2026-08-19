@@ -180,14 +180,18 @@ describe('OAuthCredentialStorage', () => {
       expect(result).toEqual(mockCredentials);
     });
 
-    it('should throw an error if the migration file contains invalid JSON', async () => {
+    it('should return null and log a warning if the migration file contains invalid JSON', async () => {
       vi.spyOn(mockHybridTokenStorage, 'getCredentials').mockResolvedValue(
         null,
       );
       vi.spyOn(fs, 'readFile').mockResolvedValue('invalid json');
 
-      await expect(OAuthCredentialStorage.loadCredentials()).rejects.toThrow(
-        'Failed to load OAuth credentials',
+      const result = await OAuthCredentialStorage.loadCredentials();
+
+      expect(result).toBeNull();
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining('Corrupted OAuth credential file'),
       );
     });
 
@@ -239,6 +243,39 @@ describe('OAuthCredentialStorage', () => {
 
       expect(mockHybridTokenStorage.setCredentials).toHaveBeenCalledWith(
         mockMcpCredentials,
+      );
+    });
+
+    it('should merge existing refresh token when new payload lacks one', async () => {
+      const oldCredentials: OAuthCredentials = {
+        serverName: 'main-account',
+        token: {
+          accessToken: 'old-access-token',
+          refreshToken: 'persistent-refresh-token',
+          tokenType: 'Bearer',
+          expiresAt: Date.now() + 3600000,
+          scope: 'email',
+        },
+        updatedAt: Date.now(),
+      };
+      vi.spyOn(mockHybridTokenStorage, 'getCredentials').mockResolvedValue(
+        oldCredentials,
+      );
+
+      const newTokens: Credentials = {
+        access_token: 'new-access-token',
+        expiry_date: Date.now() + 3600000,
+      };
+
+      await OAuthCredentialStorage.saveCredentials(newTokens);
+
+      expect(mockHybridTokenStorage.setCredentials).toHaveBeenCalledWith(
+        expect.objectContaining({
+          token: expect.objectContaining({
+            accessToken: 'new-access-token',
+            refreshToken: 'persistent-refresh-token', // correctly merged
+          }),
+        }),
       );
     });
 

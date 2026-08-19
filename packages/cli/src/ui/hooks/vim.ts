@@ -1486,6 +1486,17 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
             // Unknown command, clear count and pending states
             dispatch({ type: 'CLEAR_PENDING_STATES' });
 
+            // Ignore unmapped Insertable keys in Normal Mode, but let
+            // modifier-key chords (ctrl/alt/cmd) fall through to other handlers.
+            if (
+              normalizedKey.insertable &&
+              !normalizedKey.ctrl &&
+              !normalizedKey.alt &&
+              !normalizedKey.cmd
+            ) {
+              return true;
+            }
+
             // Not handled by vim so allow other handlers to process it.
             return false;
           }

@@ -16,7 +16,7 @@ import type {
   AgentInterface,
 } from '@a2a-js/sdk';
 import type { SendMessageResult } from './a2a-client-manager.js';
-import type { SubagentActivityItem } from './types.js';
+import { type SubagentActivityItem, SubagentState } from './types.js';
 
 export const AUTH_REQUIRED_MSG = `[Authorization Required] The agent has indicated it requires authorization to proceed. Please follow the agent's instructions.`;
 
@@ -143,7 +143,7 @@ export class A2AResultReassembler {
         id: 'auth-required',
         type: 'thought',
         content: AUTH_REQUIRED_MSG,
-        status: 'running',
+        status: SubagentState.RUNNING,
       });
     }
 
@@ -152,7 +152,7 @@ export class A2AResultReassembler {
         id: `msg-${index}`,
         type: 'thought',
         content: msg.trim(),
-        status: 'completed',
+        status: SubagentState.COMPLETED,
       });
     });
 
@@ -161,7 +161,7 @@ export class A2AResultReassembler {
         id: 'pending',
         type: 'thought',
         content: 'Working...',
-        status: 'running',
+        status: SubagentState.RUNNING,
       });
     }
 

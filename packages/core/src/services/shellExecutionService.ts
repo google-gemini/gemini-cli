@@ -13,7 +13,6 @@ import os from 'node:os';
 import fs, { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import type { IPty } from '@lydell/node-pty';
-import { getCachedEncodingForBuffer } from '../utils/systemEncoding.js';
 import {
   getShellConfiguration,
   resolveExecutable,
@@ -38,6 +37,7 @@ import {
 } from './sandboxManager.js';
 import type { SandboxConfig } from '../config/config.js';
 import { killProcessGroup } from '../utils/process-utils.js';
+import { isNodeError } from '../utils/errors.js';
 import {
   ExecutionLifecycleService,
   type ExecutionHandle,
@@ -81,6 +81,40 @@ function ensurePromptvarsDisabled(command: string, shell: ShellType): string {
   return `${BASH_SHOPT_GUARD} ${command}`;
 }
 
+// On Windows, a new ConPTY session inherits its codepage from the system
+// OEMCP (microsoft/terminal `src/host/settings.cpp:41` defaults
+// `_uCodePage` to `Globals.uiOEMCP`, set from `GetOEMCP()` in
+// `srvinit.cpp:44`). On locales without "Beta: Use Unicode UTF-8 for
+// worldwide language support" the OEMCP is a legacy codepage (e.g. 850,
+// 866, 936, 932), and conhost converts every byte from the child via
+// `MultiByteToWideChar(gci.OutputCP, ...)` in `_stream.cpp:341-343`,
+// turning UTF-8 output from child processes (perl, python, node, ...)
+// into mojibake.
+//
+// `CreatePseudoConsole` does not accept a codepage argument
+// (microsoft/terminal#9174 — open as a feature request). The only way
+// to set the ConPTY codepage is from inside the new session via
+// `SetConsoleOutputCP` (intercepted by conhost in `getset.cpp:1144`).
+// Prefix the command with `chcp 65001` so the first thing the new
+// session does is switch its codepage to UTF-8.
+function injectUtf8CodepageForPty(
+  command: string,
+  shell: ShellType,
+  isWindows: boolean,
+  usingPty: boolean,
+): string {
+  if (!isWindows || !usingPty) {
+    return command;
+  }
+  if (shell === 'powershell') {
+    return `chcp 65001 >$null;${command}`;
+  }
+  if (shell === 'cmd') {
+    return `chcp 65001>nul&${command}`;
+  }
+  return command;
+}
+
 /** A structured result from a shell command execution. */
 export type ShellExecutionResult = ExecutionResult;
 
@@ -105,6 +139,7 @@ export interface ShellExecutionConfig {
   backgroundCompletionBehavior?: 'inject' | 'notify' | 'silent';
   originalCommand?: string;
   sessionId?: string;
+  env?: Record<string, string | undefined>;
 }
 
 /**
@@ -389,6 +424,7 @@ export class ShellExecutionService {
     cwd: string,
     shellExecutionConfig: ShellExecutionConfig,
     isInteractive: boolean,
+    usingPty: boolean,
   ): Promise<{
     program: string;
     args: string[];
@@ -414,19 +450,23 @@ export class ShellExecutionService {
       executable = 'cmd.exe';
     }
 
-    const resolvedExecutable =
-      (await resolveExecutable(executable)) ?? executable;
+    const resolvedExecutable = resolveExecutable(executable) ?? executable;
 
     const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
-    const spawnArgs = [...argsPrefix, guardedCommand];
+    const finalCommand = injectUtf8CodepageForPty(
+      guardedCommand,
+      shell,
+      isWindows,
+      usingPty,
+    );
+    const spawnArgs = [...argsPrefix, finalCommand];
 
     // 2. Prepare Environment
+    const sourceEnv = shellExecutionConfig.env ?? process.env;
     const gitConfigKeys: string[] = [];
-    if (!isInteractive) {
-      for (const key in process.env) {
-        if (key.startsWith('GIT_CONFIG_')) {
-          gitConfigKeys.push(key);
-        }
+    for (const key in sourceEnv) {
+      if (key.startsWith('GIT_CONFIG_')) {
+        gitConfigKeys.push(key);
       }
     }
 
@@ -439,7 +479,7 @@ export class ShellExecutionService {
       ],
     };
 
-    const sanitizedEnv = sanitizeEnvironment(process.env, sanitizationConfig);
+    const sanitizedEnv = sanitizeEnvironment(sourceEnv, sanitizationConfig);
 
     const baseEnv: Record<string, string | undefined> = {
       ...sanitizedEnv,
@@ -450,36 +490,56 @@ export class ShellExecutionService {
       GIT_PAGER: shellExecutionConfig.pager ?? 'cat',
     };
 
-    if (!isInteractive) {
-      // Ensure all GIT_CONFIG_* variables are preserved even if they were redacted
-      for (const key of gitConfigKeys) {
-        baseEnv[key] = process.env[key];
-      }
-
-      const gitConfigCount = parseInt(baseEnv['GIT_CONFIG_COUNT'] || '0', 10);
-      const newKey = `GIT_CONFIG_KEY_${gitConfigCount}`;
-      const newValue = `GIT_CONFIG_VALUE_${gitConfigCount}`;
-
-      // Ensure these new keys are allowed through sanitization
-      sanitizationConfig.allowedEnvironmentVariables.push(
-        'GIT_CONFIG_COUNT',
-        newKey,
-        newValue,
-      );
-
-      Object.assign(baseEnv, {
-        GIT_TERMINAL_PROMPT: '0',
-        GIT_ASKPASS: '',
-        SSH_ASKPASS: '',
-        GH_PROMPT_DISABLED: '1',
-        GCM_INTERACTIVE: 'never',
-        DISPLAY: '',
-        DBUS_SESSION_BUS_ADDRESS: '',
-        GIT_CONFIG_COUNT: (gitConfigCount + 1).toString(),
-        [newKey]: 'credential.helper',
-        [newValue]: '',
-      });
+    // Ensure all GIT_CONFIG_* variables are preserved even if they were redacted
+    for (const key of gitConfigKeys) {
+      baseEnv[key] = sourceEnv[key];
     }
+
+    let gitConfigCount = parseInt(baseEnv['GIT_CONFIG_COUNT'] || '0', 10);
+    const devNullPath = os.platform() === 'win32' ? 'NUL' : '/dev/null';
+
+    baseEnv['GIT_CONFIG_GLOBAL'] = devNullPath;
+    baseEnv['GIT_CONFIG_SYSTEM'] = devNullPath;
+    baseEnv['GIT_CONFIG_NOSYSTEM'] = '1';
+
+    sanitizationConfig.allowedEnvironmentVariables.push(
+      'GIT_CONFIG_COUNT',
+      'GIT_CONFIG_GLOBAL',
+      'GIT_CONFIG_SYSTEM',
+      'GIT_CONFIG_NOSYSTEM',
+    );
+
+    const defaultGitOverrides: Array<[string, string]> = [
+      ['credential.helper', ''],
+      ['core.fsmonitor', ''],
+      ['core.hooksPath', ''],
+      ['core.sshCommand', ''],
+      ['core.pager', 'cat'],
+      ['core.editor', ''],
+      ['sequence.editor', ''],
+      ['diff.external', ''],
+    ];
+
+    for (const [overrideKey, overrideVal] of defaultGitOverrides) {
+      const keyVar = `GIT_CONFIG_KEY_${gitConfigCount}`;
+      const valVar = `GIT_CONFIG_VALUE_${gitConfigCount}`;
+      sanitizationConfig.allowedEnvironmentVariables.push(keyVar, valVar);
+      baseEnv[keyVar] = overrideKey;
+      baseEnv[valVar] = overrideVal;
+      gitConfigCount++;
+    }
+
+    baseEnv['GIT_CONFIG_COUNT'] = gitConfigCount.toString();
+
+    Object.assign(baseEnv, {
+      GIT_TERMINAL_PROMPT: '0',
+      GIT_ASKPASS: '',
+      SSH_ASKPASS: '',
+      GH_PROMPT_DISABLED: '1',
+      GCM_INTERACTIVE: 'never',
+      DISPLAY: '',
+      DBUS_SESSION_BUS_ADDRESS: '',
+    });
 
     // 3. Prepare Sandboxed Command
     const sandboxedCommand = await sandboxManager.prepareCommand({
@@ -521,6 +581,7 @@ export class ShellExecutionService {
         cwd,
         shellExecutionConfig,
         isInteractive,
+        false,
       );
       cmdCleanup = prepared.cleanup;
 
@@ -621,14 +682,8 @@ export class ShellExecutionService {
 
       const handleOutput = (data: Buffer, stream: 'stdout' | 'stderr') => {
         if (!stdoutDecoder || !stderrDecoder) {
-          const encoding = getCachedEncodingForBuffer(data);
-          try {
-            stdoutDecoder = new TextDecoder(encoding);
-            stderrDecoder = new TextDecoder(encoding);
-          } catch {
-            stdoutDecoder = new TextDecoder('utf-8');
-            stderrDecoder = new TextDecoder('utf-8');
-          }
+          stdoutDecoder = new TextDecoder('utf-8');
+          stderrDecoder = new TextDecoder('utf-8');
         }
 
         if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
@@ -901,6 +956,7 @@ export class ShellExecutionService {
         cwd,
         shellExecutionConfig,
         true,
+        true,
       );
       cmdCleanup = prepared.cleanup;
 
@@ -911,6 +967,7 @@ export class ShellExecutionService {
         cwd: finalCwd,
       } = prepared;
 
+      const isWindowsPlatform = os.platform() === 'win32';
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const ptyProcess = ptyInfo.module.spawn(finalExecutable, finalArgs, {
         cwd: finalCwd,
@@ -918,7 +975,16 @@ export class ShellExecutionService {
         cols,
         rows,
         env: finalEnv,
-        handleFlowControl: true,
+        // handleFlowControl intercepts XON/XOFF (Ctrl+S/Q) and prevents them
+        // from reaching the child.  On Windows, the flag can interfere with
+        // ConPTY's internal input routing and cause interactive TUI tools to
+        // miss key events, so we disable it there.
+        handleFlowControl: !isWindowsPlatform,
+        // On Windows, explicitly request ConPTY (introduced in Windows 10 1809).
+        // Without this, @lydell/node-pty may silently fall back to WinPTY, which
+        // has known incompatibilities with interactive Node.js TUI applications
+        // that rely on VT-sequence-based arrow-key navigation.
+        ...(isWindowsPlatform ? { useConpty: true } : {}),
       });
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -958,6 +1024,13 @@ export class ShellExecutionService {
           }).catch(() => {});
         },
         isActive: () => {
+          // On Windows, process.kill(pid, 0) can return false negatives
+          // for ConPTY-managed shell wrappers (powershell.exe), causing
+          // writeToPty to silently discard input (including arrow keys).
+          // Check the internal activePtys map first for reliable status.
+          if (ShellExecutionService.activePtys.has(ptyPid)) {
+            return true;
+          }
           try {
             return process.kill(ptyPid, 0);
           } catch {
@@ -1116,12 +1189,7 @@ export class ShellExecutionService {
           () =>
             new Promise<void>((resolveChunk) => {
               if (!decoder) {
-                const encoding = getCachedEncodingForBuffer(data);
-                try {
-                  decoder = new TextDecoder(encoding);
-                } catch {
-                  decoder = new TextDecoder('utf-8');
-                }
+                decoder = new TextDecoder('utf-8');
               }
 
               if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
@@ -1134,7 +1202,7 @@ export class ShellExecutionService {
                 const sniffBuffer = Buffer.concat(sniffChunks);
                 sniffedBytes = sniffBuffer.length;
 
-                if (isBinary(sniffBuffer)) {
+                if (isBinary(sniffBuffer, 512, true)) {
                   isStreamingRawContent = false;
                   binaryBytesReceived = sniffBuffer.length;
                   const event: ShellOutputEvent = { type: 'binary_detected' };
@@ -1460,27 +1528,42 @@ export class ShellExecutionService {
     }
 
     const activePty = this.activePtys.get(pid);
-    if (activePty) {
-      try {
-        activePty.ptyProcess.resize(cols, rows);
-        activePty.headlessTerminal.resize(cols, rows);
-      } catch (e) {
-        // Ignore errors if the pty has already exited, which can happen
-        // due to a race condition between the exit event and this call.
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const err = e as { code?: string; message?: string };
-        const isEsrch = err.code === 'ESRCH';
-        const isWindowsPtyError = err.message?.includes(
-          'Cannot resize a pty that has already exited',
-        );
+    if (!activePty) {
+      return;
+    }
 
-        if (isEsrch || isWindowsPtyError) {
-          // On Unix, we get an ESRCH error.
-          // On Windows, we get a message-based error.
-          // In both cases, it's safe to ignore.
-        } else {
-          throw e;
+    // Skip Windows: process.kill(pid, 0) is heavy and native errors are catchable there.
+    if (process.platform !== 'win32') {
+      try {
+        process.kill(pid, 0);
+      } catch (e) {
+        // Bail only if the process is explicitly confirmed dead (ESRCH).
+        if (isNodeError(e) && e.code === 'ESRCH') {
+          return;
         }
+      }
+    }
+
+    try {
+      activePty.ptyProcess.resize(cols, rows);
+      activePty.headlessTerminal.resize(cols, rows);
+    } catch (e) {
+      // Ignore errors if the pty has already exited, which can happen
+      // due to a race condition between the exit event and this call.
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const err = e as { code?: string; message?: string };
+      const isEsrch = err.code === 'ESRCH';
+      const isEbadf = err.code === 'EBADF' || err.message?.includes('EBADF');
+      const isWindowsPtyError = err.message?.includes(
+        'Cannot resize a pty that has already exited',
+      );
+
+      if (isEsrch || isEbadf || isWindowsPtyError) {
+        // On Unix, we get an ESRCH or EBADF error.
+        // On Windows, we get a message-based error.
+        // In both cases, it's safe to ignore.
+      } else {
+        throw e;
       }
     }
 

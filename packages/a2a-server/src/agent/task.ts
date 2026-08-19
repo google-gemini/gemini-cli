@@ -89,6 +89,12 @@ export class Task {
   currentAgentMessageId = uuidv4();
   promptCount = 0;
   autoExecute: boolean;
+  usageMetadata?: {
+    promptTokenCount?: number;
+    candidatesTokenCount?: number;
+    totalTokenCount?: number;
+    cachedContentTokenCount?: number;
+  };
   private get isYoloMatch(): boolean {
     return (
       this.autoExecute || this.config.getApprovalMode() === ApprovalMode.YOLO
@@ -125,10 +131,20 @@ export class Task {
     this.autoExecute = autoExecute;
     this.config.setFallbackModelHandler(
       // For a2a-server, we want to automatically switch to the fallback model
-      // for future requests without retrying the current one. The 'stop'
-      // intent achieves this.
-      async () => 'stop',
+      // for future requests without retrying the current one.
+      async (failedModel, fallbackModel) => {
+        this.config.activateFallbackMode(fallbackModel, failedModel);
+        return 'stop';
+      },
     );
+  }
+
+  get hasPendingTools(): boolean {
+    return this.pendingToolCalls.size > 0;
+  }
+
+  get pendingToolsCount(): number {
+    return this.pendingToolCalls.size;
   }
 
   static async create(
@@ -274,6 +290,7 @@ export class Task {
       userTier?: UserTierId;
       error?: string;
       traceId?: string;
+      usageMetadata?: Task['usageMetadata'];
     } = {
       coderAgent: coderAgentMessage,
       model: this.modelInfo || this.config.getModel(),
@@ -286,6 +303,10 @@ export class Task {
 
     if (traceId) {
       metadata.traceId = traceId;
+    }
+
+    if (final && this.usageMetadata) {
+      metadata.usageMetadata = this.usageMetadata;
     }
 
     return {
@@ -647,13 +668,18 @@ export class Task {
     }
 
     try {
-      const currentContent = await fs.readFile(resolvedPath, 'utf8');
-      return this._applyReplacement(
+      const rawContent = await fs.readFile(resolvedPath, 'utf8');
+      const hasCrlf = rawContent.includes('\r\n');
+      const currentContent = rawContent.replace(/\r\n/g, '\n');
+      const normalizedOldString = old_string.replace(/\r\n/g, '\n');
+      const normalizedNewString = new_string.replace(/\r\n/g, '\n');
+      const proposedContent = this._applyReplacement(
         currentContent,
-        old_string,
-        new_string,
-        old_string === '' && currentContent === '',
+        normalizedOldString,
+        normalizedNewString,
+        normalizedOldString === '' && currentContent === '',
       );
+      return hasCrlf ? proposedContent.replace(/\n/g, '\r\n') : proposedContent;
     } catch (err) {
       if (!isNodeError(err) || err.code !== 'ENOENT') throw err;
       return '';
@@ -857,8 +883,18 @@ export class Task {
         break;
       case GeminiEventType.Finished:
         logger.info(`[Task ${this.id}] Agent finished its turn.`);
+        // Capture the usage metadata when the stream finishes
+        if (
+          event.value &&
+          typeof event.value === 'object' &&
+          'usageMetadata' in event.value
+        ) {
+          this.usageMetadata = event.value
+            .usageMetadata as typeof this.usageMetadata;
+        }
         break;
       case GeminiEventType.ModelInfo:
+        this.usageMetadata = undefined;
         this.modelInfo = event.value;
         break;
       case GeminiEventType.Retry:
@@ -1063,19 +1099,21 @@ export class Task {
     logger.info(
       `[Task] Adding ${completedTools.length} tool responses to history without generating a new response.`,
     );
-    const responsesToAdd = completedTools.flatMap(
-      (toolCall) => toolCall.response.responseParts,
-    );
-
-    for (const response of responsesToAdd) {
-      let parts: genAiPart[];
-      if (Array.isArray(response)) {
-        parts = response;
-      } else if (typeof response === 'string') {
-        parts = [{ text: response }];
-      } else {
-        parts = [response];
+    const parts: genAiPart[] = [];
+    for (const toolCall of completedTools) {
+      const response = toolCall.response?.responseParts;
+      if (!response) {
+        continue;
       }
+      if (Array.isArray(response)) {
+        parts.push(...response);
+      } else if (typeof response === 'string') {
+        parts.push({ text: response });
+      } else {
+        parts.push(response);
+      }
+    }
+    if (parts.length > 0) {
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
       this.geminiClient.addHistory({
         role: 'user',

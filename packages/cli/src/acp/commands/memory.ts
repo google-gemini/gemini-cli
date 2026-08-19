@@ -5,7 +5,6 @@
  */
 
 import {
-  addMemory,
   listInboxMemoryPatches,
   listInboxSkills,
   listInboxPatches,
@@ -19,12 +18,6 @@ import type {
   CommandExecutionResponse,
 } from './types.js';
 
-const DEFAULT_SANITIZATION_CONFIG = {
-  allowedEnvironmentVariables: [],
-  blockedEnvironmentVariables: [],
-  enableEnvironmentVariableRedaction: false,
-};
-
 export class MemoryCommand implements Command {
   readonly name = 'memory';
   readonly description = 'Manage memory.';
@@ -32,7 +25,6 @@ export class MemoryCommand implements Command {
     new ShowMemoryCommand(),
     new RefreshMemoryCommand(),
     new ListMemoryCommand(),
-    new AddMemoryCommand(),
     new InboxMemoryCommand(),
   ];
   readonly requiresWorkspace = true;
@@ -82,48 +74,6 @@ export class ListMemoryCommand implements Command {
   ): Promise<CommandExecutionResponse> {
     const result = listMemoryFiles(context.agentContext.config);
     return { name: this.name, data: result.content };
-  }
-}
-
-export class AddMemoryCommand implements Command {
-  readonly name = 'memory add';
-  readonly description = 'Add content to the memory.';
-
-  async execute(
-    context: CommandContext,
-    args: string[],
-  ): Promise<CommandExecutionResponse> {
-    const textToAdd = args.join(' ').trim();
-    const result = addMemory(textToAdd);
-    if (result.type === 'message') {
-      return { name: this.name, data: result.content };
-    }
-
-    const toolRegistry = context.agentContext.toolRegistry;
-    const tool = toolRegistry.getTool(result.toolName);
-    if (tool) {
-      const abortController = new AbortController();
-      const signal = abortController.signal;
-
-      await context.sendMessage(`Saving memory via ${result.toolName}...`);
-
-      await tool.buildAndExecute(result.toolArgs, signal, undefined, {
-        shellExecutionConfig: {
-          sanitizationConfig: DEFAULT_SANITIZATION_CONFIG,
-          sandboxManager: context.agentContext.sandboxManager,
-        },
-      });
-      await refreshMemory(context.agentContext.config);
-      return {
-        name: this.name,
-        data: `Added memory: "${textToAdd}"`,
-      };
-    } else {
-      return {
-        name: this.name,
-        data: `Error: Tool ${result.toolName} not found.`,
-      };
-    }
   }
 }
 

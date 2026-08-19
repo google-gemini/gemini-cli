@@ -21,7 +21,7 @@ import {
   buildAuthorizationUrl,
   exchangeCodeForToken,
   refreshAccessToken as refreshAccessTokenShared,
-  REDIRECT_PATH,
+  getRedirectUri,
   type OAuthFlowConfig,
   type OAuthTokenResponse,
 } from '../utils/oauth-flow.js';
@@ -99,8 +99,7 @@ export class MCPOAuthProvider {
     config: MCPOAuthConfig,
     redirectPort: number,
   ): Promise<OAuthClientRegistrationResponse> {
-    const redirectUri =
-      config.redirectUri || `http://localhost:${redirectPort}${REDIRECT_PATH}`;
+    const redirectUri = getRedirectUri(config, redirectPort);
 
     const registrationRequest: OAuthClientRegistrationRequest = {
       client_name: 'Gemini CLI MCP Client',
@@ -568,15 +567,18 @@ ${authUrl}
       return token.accessToken;
     }
 
-    // Try to refresh if we have a refresh token
-    if (token.refreshToken && config.clientId && credentials.tokenUrl) {
+    // Try to refresh if we have a refresh token. Fall back to the client ID
+    // persisted during dynamic client registration when the static config
+    // does not provide one.
+    const clientId = config.clientId ?? credentials.clientId;
+    if (token.refreshToken && clientId && credentials.tokenUrl) {
       try {
         debugLogger.log(
           `Refreshing expired token for MCP server: ${serverName}`,
         );
 
         const newTokenResponse = await this.refreshAccessToken(
-          config,
+          { ...config, clientId },
           token.refreshToken,
           credentials.tokenUrl,
           credentials.mcpServerUrl,
@@ -597,7 +599,7 @@ ${authUrl}
         await this.tokenStorage.saveToken(
           serverName,
           newToken,
-          config.clientId,
+          clientId,
           credentials.tokenUrl,
           credentials.mcpServerUrl,
         );
@@ -615,5 +617,75 @@ ${authUrl}
     }
 
     return null;
+  }
+  async getValidTokenWithMetadata(
+    serverName: string,
+    config: MCPOAuthConfig,
+  ): Promise<{
+    accessToken: string;
+    tokenType: string;
+    expiresAt?: number;
+    scope?: string;
+    refreshToken?: string;
+  } | null> {
+    const credentials = await this.tokenStorage.getCredentials(serverName);
+    if (!credentials) return null;
+
+    let current = credentials.token;
+
+    if (this.tokenStorage.isTokenExpired(current)) {
+      const clientId = config.clientId ?? credentials.clientId;
+      if (current.refreshToken && clientId && credentials.tokenUrl) {
+        try {
+          const newTokenResponse = await this.refreshAccessToken(
+            { ...config, clientId },
+            current.refreshToken,
+            credentials.tokenUrl,
+            credentials.mcpServerUrl,
+          );
+
+          const refreshed: OAuthToken = {
+            accessToken: newTokenResponse.access_token,
+            tokenType: newTokenResponse.token_type,
+            refreshToken:
+              newTokenResponse.refresh_token || current.refreshToken,
+            scope: newTokenResponse.scope || current.scope,
+          };
+
+          if (newTokenResponse.expires_in) {
+            refreshed.expiresAt =
+              Date.now() + newTokenResponse.expires_in * 1000;
+          }
+
+          await this.tokenStorage.saveToken(
+            serverName,
+            refreshed,
+            clientId,
+            credentials.tokenUrl,
+            credentials.mcpServerUrl,
+          );
+
+          current = refreshed;
+        } catch (error) {
+          coreEvents.emitFeedback(
+            'error',
+            'Failed to refresh auth token.',
+            error,
+          );
+          await this.tokenStorage.deleteCredentials(serverName);
+          return null;
+        }
+      } else {
+        return null;
+      }
+    }
+
+    return {
+      accessToken: current.accessToken,
+      tokenType: current.tokenType || 'Bearer',
+      expiresAt: current.expiresAt,
+      scope: current.scope,
+      refreshToken: current.refreshToken,
+    };
   }
 }

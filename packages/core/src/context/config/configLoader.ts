@@ -10,6 +10,7 @@ import type { ContextManagementConfig } from './types.js';
 import {
   generalistProfile,
   stressTestProfile,
+  powerUserProfile,
   type ContextProfile,
 } from './profiles.js';
 import { SchemaValidator } from '../../utils/schemaValidator.js';
@@ -78,6 +79,10 @@ export async function loadContextManagementConfig(
 ): Promise<ContextProfile> {
   if (sidecarPath === 'stressTestProfile') {
     return stressTestProfile;
+  }
+
+  if (sidecarPath === 'powerUserProfile') {
+    return powerUserProfile;
   }
 
   if (sidecarPath === 'generalistProfile') {

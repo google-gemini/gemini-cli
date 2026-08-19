@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { ContextTokenCalculator } from './contextTokenCalculator.js';
+import { StaticTokenCalculator } from './contextTokenCalculator.js';
 import { NodeBehaviorRegistry } from '../graph/behaviorRegistry.js';
 import { registerBuiltInBehaviors } from '../graph/builtinBehaviors.js';
 import { createDummyNode } from '../testing/contextTestUtils.js';
@@ -16,7 +16,7 @@ describe('ContextTokenCalculator', () => {
   const registry = new NodeBehaviorRegistry();
   registerBuiltInBehaviors(registry);
   const charsPerToken = 1; // Simplifies math for text nodes in tests
-  const calculator = new ContextTokenCalculator(charsPerToken, registry);
+  const calculator = new StaticTokenCalculator(charsPerToken, registry);
 
   it('should include structural overhead for each unique turn', () => {
     const turn1Id = 'turn-1';
@@ -28,16 +28,16 @@ describe('ContextTokenCalculator', () => {
 
     const nodes = [node1, node2, node3];
 
-    // Estimated tokens (using 0.33 per ASCII char heuristic):
-    // node1: floor(17 chars * 0.33) = 5 tokens
-    // node2: floor(17 chars * 0.33) = 5 tokens
-    // node3: floor(19 chars * 0.33) = 6 tokens
+    // Estimated tokens (using charsPerToken = 1):
+    // node1: 17 chars / 1 = 17 tokens
+    // node2: 17 chars / 1 = 17 tokens
+    // node3: 19 chars / 1 = 19 tokens
     // Turn 1 overhead: 5 tokens
     // Turn 2 overhead: 5 tokens
-    // Total: 5 + 5 + 6 + 5 + 5 = 26
+    // Total: 17 + 17 + 19 + 5 + 5 = 63
 
     const total = calculator.calculateConcreteListTokens(nodes);
-    expect(total).toBe(26);
+    expect(total).toBe(63);
   });
 
   it('should handle categorical breakdown with overhead', () => {

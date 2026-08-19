@@ -15,7 +15,6 @@ import {
 import {
   SHELL_TOOL_NAME,
   ACTIVATE_SKILL_TOOL_NAME,
-  MEMORY_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
 import type { Config } from '../config/config.js';
@@ -571,17 +570,6 @@ describe('ToolOutputMaskingService', () => {
         parts: [
           {
             functionResponse: {
-              name: MEMORY_TOOL_NAME,
-              response: { output: 'Important user preference' },
-            },
-          },
-        ],
-      },
-      {
-        role: 'user',
-        parts: [
-          {
-            functionResponse: {
               name: 'bulky_tool',
               response: { output: 'A'.repeat(60000) },
             },
@@ -613,7 +601,6 @@ describe('ToolOutputMaskingService', () => {
 
       const name = parts[0].functionResponse?.name;
       if (name === ACTIVATE_SKILL_TOOL_NAME) return 1000;
-      if (name === MEMORY_TOOL_NAME) return 500;
       if (name === 'bulky_tool') return 60000;
       if (name === 'padding') return 60000;
       return 10;
@@ -622,8 +609,8 @@ describe('ToolOutputMaskingService', () => {
     const result = await service.mask(history, mockConfig);
 
     // Both 'bulky_tool' and 'padding' should be masked.
-    // 'padding' (Index 3) crosses the 50k protection boundary immediately.
-    // ACTIVATE_SKILL and MEMORY are exempt.
+    // 'padding' crosses the 50k protection boundary immediately.
+    // ACTIVATE_SKILL is exempt.
     expect(result.maskedCount).toBe(2);
     expect(result.newHistory[0].parts?.[0].functionResponse?.name).toBe(
       ACTIVATE_SKILL_TOOL_NAME,
@@ -638,23 +625,11 @@ describe('ToolOutputMaskingService', () => {
     ).toBe('High value instructions for skill');
 
     expect(result.newHistory[1].parts?.[0].functionResponse?.name).toBe(
-      MEMORY_TOOL_NAME,
-    );
-    expect(
-      (
-        result.newHistory[1].parts?.[0].functionResponse?.response as Record<
-          string,
-          unknown
-        >
-      )['output'],
-    ).toBe('Important user preference');
-
-    expect(result.newHistory[2].parts?.[0].functionResponse?.name).toBe(
       'bulky_tool',
     );
     expect(
       (
-        result.newHistory[2].parts?.[0].functionResponse?.response as Record<
+        result.newHistory[1].parts?.[0].functionResponse?.response as Record<
           string,
           unknown
         >

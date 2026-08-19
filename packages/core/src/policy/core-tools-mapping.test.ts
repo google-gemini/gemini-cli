@@ -4,12 +4,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createPolicyEngineConfig } from './config.js';
 import { PolicyEngine } from './policy-engine.js';
 import { PolicyDecision, ApprovalMode } from './types.js';
+import { Storage } from '../config/storage.js';
 
 describe('PolicyEngine - Core Tools Mapping', () => {
+  beforeEach(() => {
+    vi.spyOn(Storage, 'getUserPoliciesDir').mockReturnValue(
+      '/mock/user/policies',
+    );
+    vi.spyOn(Storage, 'getSystemPoliciesDir').mockReturnValue(
+      '/mock/system/policies',
+    );
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('should allow tools explicitly listed in settings.tools.core', async () => {
     const settings = {
       tools: {

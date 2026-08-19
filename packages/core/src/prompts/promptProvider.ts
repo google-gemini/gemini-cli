@@ -73,10 +73,10 @@ export class PromptProvider {
     const desiredModel = resolveModel(
       context.config.getActiveModel(),
       context.config.getGemini31LaunchedSync?.() ?? false,
-      context.config.getGemini31FlashLiteLaunchedSync?.() ?? false,
       false,
       context.config.getHasAccessToPreviewModel?.() ?? true,
       context.config,
+      context.config.hasGemini35FlashGAAccess?.() ?? false,
     );
     const isModernModel = supportsModernFeatures(desiredModel);
     const activeSnippets = isModernModel ? snippets : legacySnippets;
@@ -228,13 +228,10 @@ export class PromptProvider {
               context.config.getEnableShellOutputEfficiency(),
             interactiveShellEnabled: context.config.isInteractiveShellEnabled(),
             topicUpdateNarration: isTopicUpdateNarrationEnabled,
-            memoryV2Enabled: context.config.isMemoryV2Enabled(),
-            userProjectMemoryPath: context.config.isMemoryV2Enabled()
-              ? getProjectMemoryIndexFilePath(context.config.storage)
-              : undefined,
-            globalMemoryPath: context.config.isMemoryV2Enabled()
-              ? getGlobalMemoryFilePath()
-              : undefined,
+            userProjectMemoryPath: normalizePromptPath(
+              getProjectMemoryIndexFilePath(context.config.storage),
+            ),
+            globalMemoryPath: normalizePromptPath(getGlobalMemoryFilePath()),
           }),
         ),
         sandbox: this.withSection('sandbox', () => ({
@@ -300,10 +297,10 @@ export class PromptProvider {
     const desiredModel = resolveModel(
       context.config.getActiveModel(),
       context.config.getGemini31LaunchedSync?.() ?? false,
-      context.config.getGemini31FlashLiteLaunchedSync?.() ?? false,
       false,
       context.config.getHasAccessToPreviewModel?.() ?? true,
       context.config,
+      context.config.hasGemini35FlashGAAccess?.() ?? false,
     );
     const isModernModel = supportsModernFeatures(desiredModel);
     const activeSnippets = isModernModel ? snippets : legacySnippets;
@@ -336,6 +333,10 @@ export class PromptProvider {
       fs.writeFileSync(writePath, basePrompt);
     }
   }
+}
+
+function normalizePromptPath(filePath: string): string {
+  return filePath.replaceAll('\\', '/');
 }
 
 // --- Internal Context Helpers ---

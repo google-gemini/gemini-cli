@@ -66,12 +66,12 @@ describe('BlobDegradationProcessor', () => {
 
     const node1 = createDummyNode('ep1', NodeType.USER_PROMPT, 100, {
       payload: {
-        fileData: { mimeType: 'video/mp4', fileUri: 'gs://test1' },
+        fileData: { mimeType: 'image/png', fileUri: 'gs://test1' },
       },
     });
     const node2 = createDummyNode('ep1', NodeType.USER_PROMPT, 100, {
       payload: {
-        fileData: { mimeType: 'video/mp4', fileUri: 'gs://test2' },
+        fileData: { mimeType: 'image/png', fileUri: 'gs://test2' },
       },
     });
 

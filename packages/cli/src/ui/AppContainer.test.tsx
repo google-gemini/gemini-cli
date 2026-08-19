@@ -46,9 +46,10 @@ const mockIdeClient = vi.hoisted(() => ({
   getInstance: vi.fn().mockReturnValue(new Promise(() => {})),
 }));
 
-// Mock stdout
+// Mock stdout and ink app
 const mocks = vi.hoisted(() => ({
   mockStdout: { write: vi.fn() },
+  mockRerender: vi.fn(),
 }));
 const terminalNotificationsMocks = vi.hoisted(() => ({
   notifyViaTerminal: vi.fn().mockResolvedValue(true),
@@ -113,12 +114,15 @@ import {
   type OverflowActions,
 } from './contexts/OverflowContext.js';
 
-// Mock useStdout to capture terminal title writes
+// Mock useStdout and useApp to capture terminal title writes and spy on re-renders
 vi.mock('ink', async (importOriginal) => {
   const actual = await importOriginal<typeof import('ink')>();
   return {
     ...actual,
     useStdout: () => ({ stdout: mocks.mockStdout }),
+    useApp: () => ({
+      rerender: mocks.mockRerender,
+    }),
     measureElement: vi.fn(),
   };
 });
@@ -150,6 +154,9 @@ vi.mock('./hooks/useQuotaAndFallback.js');
 vi.mock('./hooks/useHistoryManager.js');
 vi.mock('./hooks/useThemeCommand.js');
 vi.mock('./auth/useAuth.js');
+vi.mock('../config/auth.js', () => ({
+  validateAuthMethod: vi.fn().mockResolvedValue(null),
+}));
 vi.mock('./hooks/useEditorSettings.js');
 vi.mock('./hooks/useSettingsCommand.js');
 vi.mock('./hooks/useModelCommand.js');
@@ -217,6 +224,7 @@ vi.mock('../utils/cleanup.js');
 import { useHistory } from './hooks/useHistoryManager.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
 import { useAuthCommand } from './auth/useAuth.js';
+import { validateAuthMethod } from '../config/auth.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSettingsCommand } from './hooks/useSettingsCommand.js';
 import { useModelCommand } from './hooks/useModelCommand.js';
@@ -487,12 +495,12 @@ describe('AppContainer State Management', () => {
     vi.spyOn(mockConfig, 'initialize').mockResolvedValue(undefined);
     vi.spyOn(mockConfig, 'getDebugMode').mockReturnValue(false);
 
-    mockExtensionManager = vi.mockObject({
+    mockExtensionManager = {
       getExtensions: vi.fn().mockReturnValue([]),
       setRequestConsent: vi.fn(),
       setRequestSetting: vi.fn(),
       start: vi.fn(),
-    } as unknown as ExtensionManager);
+    } as unknown as MockedObject<ExtensionManager>;
     vi.spyOn(mockConfig, 'getExtensionLoader').mockReturnValue(
       mockExtensionManager,
     );
@@ -576,6 +584,36 @@ describe('AppContainer State Management', () => {
   });
 
   describe('State Initialization', () => {
+    it('calls validateAuthMethod and onAuthError if validation fails', async () => {
+      const mockOnAuthError = vi.fn();
+      mockedUseAuthCommand.mockReturnValue({
+        authState: 'authenticated',
+        setAuthState: vi.fn(),
+        authError: null,
+        onAuthError: mockOnAuthError,
+      });
+      vi.mocked(validateAuthMethod).mockResolvedValueOnce('Validation Failed');
+
+      const { unmount } = await act(async () =>
+        renderAppContainer({
+          settings: createMockSettings({
+            merged: {
+              security: {
+                auth: { selectedType: 'oauth-personal', useExternal: false },
+              },
+            },
+          }),
+        }),
+      );
+
+      await waitFor(() => {
+        expect(validateAuthMethod).toHaveBeenCalledWith('oauth-personal');
+        expect(mockOnAuthError).toHaveBeenCalledWith('Validation Failed');
+      });
+
+      unmount();
+    });
+
     it('sends a macOS notification when confirmation is pending and terminal is unfocused', async () => {
       mockedUseFocusState.mockReturnValue({
         isFocused: false,
@@ -1263,6 +1301,42 @@ describe('AppContainer State Management', () => {
 
       // Should not call resumeChat when client is not initialized
       expect(mockResumeChat).not.toHaveBeenCalled();
+      unmount();
+    });
+  });
+
+  describe('SessionStart Hook Rendering', () => {
+    it('does not render systemMessage directly (avoids duplicate with HookSystemMessage event)', async () => {
+      const mockAddItem = vi.fn();
+      mockedUseHistory.mockReturnValue({
+        history: [],
+        addItem: mockAddItem,
+        updateItem: vi.fn(),
+        clearItems: vi.fn(),
+        loadHistory: vi.fn(),
+      });
+
+      const fireSessionStartEvent = vi.fn().mockResolvedValue({
+        systemMessage: 'Hello from SessionStart hook',
+        getAdditionalContext: vi.fn(() => undefined),
+      });
+      vi.spyOn(mockConfig, 'getHookSystem').mockReturnValue({
+        fireSessionEndEvent: vi.fn().mockResolvedValue(undefined),
+        fireSessionStartEvent,
+      } as unknown as ReturnType<Config['getHookSystem']>);
+
+      const { unmount } = await act(async () => renderAppContainer());
+      await waitFor(() => expect(fireSessionStartEvent).toHaveBeenCalled());
+
+      // The direct-render path (the bug) would call addItem with the
+      // systemMessage text and no `source` field. The HookSystemMessage
+      // event-listener path (the correct one) always sets `source`.
+      const directRenderCall = mockAddItem.mock.calls.find(
+        ([item]) =>
+          item?.text === 'Hello from SessionStart hook' && !item?.source,
+      );
+      expect(directRenderCall).toBeUndefined();
+
       unmount();
     });
   });
@@ -2846,6 +2920,33 @@ describe('AppContainer State Management', () => {
         }),
         expect.any(Number),
       );
+      unmount!();
+    });
+
+    it('calls app.rerender() when ExternalEditorClosed event is received in terminalBuffer mode', async () => {
+      vi.spyOn(mockConfig, 'getUseTerminalBuffer').mockReturnValue(true);
+      vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(false);
+      vi.spyOn(mockConfig, 'getScreenReader').mockReturnValue(false);
+
+      mocks.mockRerender.mockClear();
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = await renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      const handler = mockCoreEvents.on.mock.calls.find(
+        (call: unknown[]) => call[0] === CoreEvent.ExternalEditorClosed,
+      )?.[1];
+      expect(handler).toBeDefined();
+
+      act(() => {
+        handler();
+      });
+
+      expect(mocks.mockRerender).toHaveBeenCalledTimes(1);
       unmount!();
     });
 

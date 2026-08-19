@@ -6,6 +6,7 @@
 
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import { reportError } from '../utils/errorReporting.js';
+import { randomUUID } from 'node:crypto';
 import { ApprovalMode } from '../policy/types.js';
 import { GeminiChat, StreamEventType } from '../core/geminiChat.js';
 import {
@@ -315,7 +316,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     this.parentCallId = parentCallId;
     this.cache = new LRUCache<string, string>(10);
 
-    this.agentId = Math.random().toString(36).slice(2, 8);
+    this.agentId = randomUUID();
   }
 
   /**
@@ -469,10 +470,13 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       };
 
       // We monitor both the external signal and our new grace period timeout
-      const combinedSignal = AbortSignal.any([
-        externalSignal,
-        graceTimeoutController.signal,
-      ]);
+      /* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
+      const combinedSignal = (
+        AbortSignal as unknown as {
+          any: (signals: AbortSignal[]) => AbortSignal;
+        }
+      ).any([externalSignal, graceTimeoutController.signal]);
+      /* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
 
       const turnResult = await this.executeTurn(
         chat,
@@ -592,7 +596,11 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     };
 
     // Combine the external signal with the internal timeout signal.
-    const combinedSignal = AbortSignal.any([signal, deadlineTimer.signal]);
+    /* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
+    const combinedSignal = (
+      AbortSignal as unknown as { any: (signals: AbortSignal[]) => AbortSignal }
+    ).any([signal, deadlineTimer.signal]);
+    /* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
 
     logAgentStart(
       this.context.config,
@@ -640,10 +648,14 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           );
         const formattedInitialHints = formatUserHintsForModel(initialHints);
 
-        // Inject loaded memory files (JIT + extension/project memory)
-        const environmentMemory = this.context.config.isJitContextEnabled?.()
-          ? this.context.config.getSessionMemory()
-          : this.context.config.getEnvironmentMemory();
+        // Inject loaded memory files. Some background agents opt out of
+        // extension memory while still retaining project session context.
+        const environmentMemory =
+          this.definition.includeExtensionContext === false
+            ? this.context.config.getSessionMemory({
+                includeExtensionContext: false,
+              })
+            : this.context.config.getSessionMemory();
 
         const initialParts: Part[] = [];
         if (environmentMemory) {
@@ -914,12 +926,20 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       this.hasFailedCompressionAttempt = true;
     } else if (info.compressionStatus === CompressionStatus.COMPRESSED) {
       if (newHistory) {
-        chat.setHistory(newHistory);
+        const turns = newHistory.map((c) => ({
+          id: randomUUID(),
+          content: c,
+        }));
+        chat.setHistory(turns);
         this.hasFailedCompressionAttempt = false;
       }
     } else if (info.compressionStatus === CompressionStatus.CONTENT_TRUNCATED) {
       if (newHistory) {
-        chat.setHistory(newHistory);
+        const turns = newHistory.map((c) => ({
+          id: randomUUID(),
+          content: c,
+        }));
+        chat.setHistory(turns);
         // Do NOT reset hasFailedCompressionAttempt.
         // We only truncated content because summarization previously failed.
         // We want to keep avoiding expensive summarization calls.
@@ -1287,25 +1307,29 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       }
     }
 
-    // Reconstruct toolResponseParts in the original order
+    // Ensure exactly one response per function call to satisfy the Gemini API protocol.
     const toolResponseParts: Part[] = [];
     for (const [index, functionCall] of functionCalls.entries()) {
       const callId = functionCall.id ?? `${promptId}-${index}`;
       const part = syncResults.get(callId);
+
       if (part) {
         toolResponseParts.push(part);
+        continue;
       }
-    }
 
-    // If all authorized tool calls failed (and task isn't complete), provide a generic error.
-    if (
-      functionCalls.length > 0 &&
-      toolResponseParts.length === 0 &&
-      !taskCompleted
-    ) {
-      toolResponseParts.push({
-        text: 'All tool calls failed or were unauthorized. Please analyze the errors and try an alternative approach.',
-      });
+      const isAborted = signal.aborted;
+      const isTaskComplete =
+        functionCall.name === COMPLETE_TASK_TOOL_NAME && taskCompleted;
+
+      // Safely skip missing responses if the run was interrupted or the turn won't be sent back.
+      if (isAborted || isTaskComplete) {
+        continue;
+      }
+
+      throw new Error(
+        `[LocalAgentExecutor] Critical System Failure: Tool execution result was lost/dropped by the scheduler for callId ${callId} (${functionCall.name}). This indicates an internal race condition or scheduler bug.`,
+      );
     }
 
     return {

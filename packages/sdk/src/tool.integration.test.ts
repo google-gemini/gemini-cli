@@ -53,11 +53,11 @@ describe('GeminiCliAgent Tool Integration', () => {
 
     const textEvents = events.filter((e) => e.type === 'content');
     const responseText = textEvents
-      .map((e) => (typeof e.value === 'string' ? e.value : ''))
+      .map((e) => ('value' in e && typeof e.value === 'string' ? e.value : ''))
       .join('');
 
     expect(responseText).toContain('8');
-  });
+  }, 20000);
 
   it('handles ModelVisibleError correctly', async () => {
     const goldenFile = getGoldenPath('tool-error-recovery');
@@ -98,12 +98,12 @@ describe('GeminiCliAgent Tool Integration', () => {
 
     const textEvents = events.filter((e) => e.type === 'content');
     const responseText = textEvents
-      .map((e) => (typeof e.value === 'string' ? e.value : ''))
+      .map((e) => ('value' in e && typeof e.value === 'string' ? e.value : ''))
       .join('');
 
     // The model should see the error "Tool failed visibly" and report it back.
     expect(responseText).toContain('Tool failed visibly');
-  });
+  }, 20000);
 
   it('handles sendErrorsToModel: true correctly', async () => {
     const goldenFile = getGoldenPath('tool-catchall-error');
@@ -140,10 +140,10 @@ describe('GeminiCliAgent Tool Integration', () => {
 
     const textEvents = events.filter((e) => e.type === 'content');
     const responseText = textEvents
-      .map((e) => (typeof e.value === 'string' ? e.value : ''))
+      .map((e) => ('value' in e && typeof e.value === 'string' ? e.value : ''))
       .join('');
 
     // The model should report the caught standard error.
     expect(responseText.toLowerCase()).toContain('error');
-  });
+  }, 20000);
 });

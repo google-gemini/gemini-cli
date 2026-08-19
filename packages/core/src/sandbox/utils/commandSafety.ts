@@ -3,6 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import path from 'node:path';
 import { parse as shellParse } from 'shell-quote';
 import {
   extractStringFromParseEntry,
@@ -10,6 +11,24 @@ import {
   splitCommands,
   stripShellWrapper,
 } from '../../utils/shell-utils.js';
+import { isTrustedSystemPath, resolveToRealPath } from '../../utils/paths.js';
+
+function isRipgrepCommand(cmd: string): boolean {
+  const cmdBasename = path.basename(cmd);
+  return cmdBasename === 'rg' || cmdBasename === 'rg.exe';
+}
+
+function isTrustedCommandPath(cmd: string): boolean {
+  if (!path.isAbsolute(cmd)) {
+    return false;
+  }
+  try {
+    const realPath = resolveToRealPath(cmd);
+    return isTrustedSystemPath(realPath);
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Determines if a command is strictly approved for execution on macOS.
@@ -191,7 +210,9 @@ function isSafeToCallWithExec(args: string[]): boolean {
     return !args.some((arg) => unsafeOptions.has(arg));
   }
 
-  if (cmd === 'rg') {
+  if (isRipgrepCommand(cmd)) {
+    if (!isTrustedCommandPath(cmd)) return false;
+
     const unsafeWithArgs = new Set(['--pre', '--hostname-bin']);
     const unsafeWithoutArgs = new Set(['--search-zip', '-z']);
 
@@ -453,7 +474,7 @@ export function isDangerousCommand(args: string[]): boolean {
     return args.some((arg) => unsafeOptions.has(arg));
   }
 
-  if (cmd === 'rg') {
+  if (isRipgrepCommand(cmd)) {
     const unsafeWithArgs = new Set(['--pre', '--hostname-bin']);
     const unsafeWithoutArgs = new Set(['--search-zip', '-z']);
 

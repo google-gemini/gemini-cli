@@ -8,6 +8,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Config } from '../config/config.js';
 import { bfsFileSearchSync } from './bfsFileSearch.js';
+import { resolveDefensiveToolPath } from './paths.js';
 
 type SuccessfulPathCorrection = {
   success: true;
@@ -34,8 +35,13 @@ export function correctPath(
   filePath: string,
   config: Config,
 ): PathCorrectionResult {
+  const sanitizedPath = resolveDefensiveToolPath(
+    filePath,
+    config.getTargetDir(),
+  );
+
   // Check for direct path relative to the primary target directory.
-  const directPath = path.join(config.getTargetDir(), filePath);
+  const directPath = path.join(config.getTargetDir(), sanitizedPath);
   if (fs.existsSync(directPath)) {
     return { success: true, correctedPath: directPath };
   }
@@ -43,8 +49,8 @@ export function correctPath(
   // If not found directly, search across all workspace directories for ambiguous matches.
   const workspaceContext = config.getWorkspaceContext();
   const searchPaths = workspaceContext.getDirectories();
-  const basename = path.basename(filePath);
-  const normalizedTarget = filePath.replace(/\\/g, '/');
+  const basename = path.basename(sanitizedPath);
+  const normalizedTarget = sanitizedPath.replace(/\\/g, '/');
 
   // Normalize path for matching and check if it ends with the provided relative path
   const foundFiles = searchPaths

@@ -35,12 +35,15 @@ describe('Interactive file system', () => {
     const run = await rig.runInteractive();
 
     // Step 1: Read the file
-    const readPrompt = `Read the version from ${fileName}`;
+    const readPrompt = `Read the version from ${fileName} using the read_file tool`;
     await run.type(readPrompt);
     await run.type('\r');
 
     const readCall = await rig.waitForToolCall('read_file', 30000);
     expect(readCall, 'Expected to find a read_file tool call').toBe(true);
+
+    // Wait for the CLI to finish outputting the response and show the prompt again
+    await run.expectText('Type your message', 30000);
 
     // Step 2: Write the file
     const writePrompt = `now change the version to 1.0.1 in the file`;
@@ -56,5 +59,5 @@ describe('Interactive file system', () => {
 
     // Wait for telemetry to flush and file system to sync, especially in sandboxed environments
     await rig.waitForTelemetryReady();
-  });
+  }, 60000);
 });

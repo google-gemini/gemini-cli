@@ -109,6 +109,26 @@ export function getStdioConfigFromEnv(): StdioConfig | undefined {
 
 const IDE_SERVER_FILE_REGEX = /^gemini-ide-server-(\d+)-\d+\.json$/;
 
+async function verifyAndReadFile(
+  filePath: string,
+): Promise<string | undefined> {
+  let handle: fs.promises.FileHandle | undefined;
+  try {
+    handle = await fs.promises.open(filePath, 'r');
+    const stat = await handle.stat();
+    if (process.getuid && stat.uid !== process.getuid()) {
+      return undefined;
+    }
+    return await handle.readFile('utf8');
+  } catch {
+    return undefined;
+  } finally {
+    if (handle) {
+      await handle.close();
+    }
+  }
+}
+
 export async function getConnectionConfigFromFile(
   pid: number,
 ): Promise<
@@ -122,9 +142,21 @@ export async function getConnectionConfigFromFile(
       'ide',
       `gemini-ide-server-${pid}.json`,
     );
-    const portFileContents = await fs.promises.readFile(portFile, 'utf8');
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    return JSON.parse(portFileContents);
+    const portFileContents = await verifyAndReadFile(portFile);
+    if (!portFileContents) {
+      throw new Error('Verification failed or file not found');
+    }
+    const parsed: unknown = JSON.parse(portFileContents);
+    type ConfigType = ConnectionConfig & {
+      workspacePath?: string;
+      ideInfo?: IdeInfo;
+    };
+    const isConfig = (val: unknown): val is ConfigType =>
+      typeof val === 'object' && val !== null;
+    if (isConfig(parsed)) {
+      return parsed;
+    }
+    throw new Error('Invalid connection config format');
   } catch {
     // For newer extension versions, the file name matches the pattern
     // /^gemini-ide-server-${pid}-\d+\.json$/. If multiple IDE
@@ -155,60 +187,103 @@ export async function getConnectionConfigFromFile(
 
   sortConnectionFiles(matchingFiles, pid);
 
-  let fileContents: string[];
-  try {
-    fileContents = await Promise.all(
-      matchingFiles.map((file) =>
-        fs.promises.readFile(path.join(portFileDir, file), 'utf8'),
-      ),
-    );
-  } catch (e) {
-    logger.debug('Failed to read IDE connection config file(s):', e);
-    return undefined;
-  }
-  const parsedContents = fileContents.map((content) => {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-      return JSON.parse(content);
-    } catch (e) {
-      logger.debug('Failed to parse JSON from config file: ', e);
-      return undefined;
-    }
-  });
+  const fileContents = await Promise.all(
+    matchingFiles.map((file) =>
+      verifyAndReadFile(path.join(portFileDir, file)),
+    ),
+  );
 
-  const validWorkspaces = parsedContents.filter((content) => {
-    if (!content) {
-      return false;
-    }
-    const { isValid } = validateWorkspacePath(
-      content.workspacePath,
-      process.cwd(),
-    );
-    return isValid;
-  });
+  const parsedContents = fileContents.map(
+    (
+      content,
+    ):
+      | (ConnectionConfig & { workspacePath?: string; ideInfo?: IdeInfo })
+      | undefined => {
+      if (!content) {
+        return undefined;
+      }
+      try {
+        const parsed: unknown = JSON.parse(content);
+        type ConfigType = ConnectionConfig & {
+          workspacePath?: string;
+          ideInfo?: IdeInfo;
+        };
+        const isConfig = (val: unknown): val is ConfigType =>
+          typeof val === 'object' && val !== null;
+        if (isConfig(parsed)) {
+          return parsed;
+        }
+        return undefined;
+      } catch (e) {
+        logger.debug('Failed to parse JSON from config file: ', e);
+        return undefined;
+      }
+    },
+  );
+
+  const validWorkspaces = parsedContents.filter(
+    (
+      content,
+    ): content is ConnectionConfig & {
+      workspacePath?: string;
+      ideInfo?: IdeInfo;
+    } => {
+      if (!content) {
+        return false;
+      }
+      const { isValid } = validateWorkspacePath(
+        content.workspacePath,
+        process.cwd(),
+      );
+      return isValid;
+    },
+  );
 
   if (validWorkspaces.length === 0) {
+    // If no workspace matches the current CWD, but we found and parsed
+    // valid connection config file(s), return the best-sorted config.
+    // This lets downstream connection logic raise a helpful, detailed
+    // "Directory mismatch" warning instead of a generic connection error.
+    let fileIndex = -1;
+    const portFromEnv = getPortFromEnv();
+    if (portFromEnv) {
+      fileIndex = parsedContents.findIndex(
+        (content) =>
+          !!content &&
+          content.port !== undefined &&
+          String(content.port) === portFromEnv,
+      );
+    }
+    if (fileIndex === -1) {
+      fileIndex = parsedContents.findIndex((content) => !!content);
+    }
+
+    if (fileIndex !== -1) {
+      const selected = parsedContents[fileIndex]!;
+      logger.debug(
+        `Selected best mismatched IDE connection file: ${matchingFiles[fileIndex]}`,
+      );
+      return selected;
+    }
     return undefined;
   }
 
   if (validWorkspaces.length === 1) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const selected = validWorkspaces[0];
     const fileIndex = parsedContents.indexOf(selected);
     if (fileIndex !== -1) {
       logger.debug(`Selected IDE connection file: ${matchingFiles[fileIndex]}`);
     }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return selected;
   }
 
   const portFromEnv = getPortFromEnv();
   if (portFromEnv) {
     const matchingPortIndex = validWorkspaces.findIndex(
-      (content) => String(content.port) === portFromEnv,
+      (content) =>
+        content.port !== undefined && String(content.port) === portFromEnv,
     );
     if (matchingPortIndex !== -1) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const selected = validWorkspaces[matchingPortIndex];
       const fileIndex = parsedContents.indexOf(selected);
       if (fileIndex !== -1) {
@@ -216,12 +291,10 @@ export async function getConnectionConfigFromFile(
           `Selected IDE connection file (matched port from env): ${matchingFiles[fileIndex]}`,
         );
       }
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return selected;
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const selected = validWorkspaces[0];
   const fileIndex = parsedContents.indexOf(selected);
   if (fileIndex !== -1) {
@@ -229,7 +302,6 @@ export async function getConnectionConfigFromFile(
       `Selected first valid IDE connection file: ${matchingFiles[fileIndex]}`,
     );
   }
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
   return selected;
 }
 

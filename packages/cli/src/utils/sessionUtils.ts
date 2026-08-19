@@ -140,15 +140,6 @@ export interface SessionSelectionResult {
 }
 
 /**
- * Checks if a session has at least one user or assistant (gemini) message.
- * Sessions with only system messages (info, error, warning) are considered empty.
- * @param messages - The array of message records to check
- * @returns true if the session has meaningful content
- */
-export const hasUserOrAssistantMessage = (messages: MessageRecord[]): boolean =>
-  messages.some((msg) => msg.type === 'user' || msg.type === 'gemini');
-
-/**
  * Cleans and sanitizes message content for display by:
  * - Converting newlines to spaces
  * - Collapsing multiple whitespace to single spaces
@@ -270,17 +261,27 @@ export const getAllSessionFiles = async (
           }
 
           // Validate required fields
-          if (
-            !content.sessionId ||
-            !content.startTime ||
-            !content.lastUpdated
-          ) {
+          if (!content.sessionId) {
             // Missing required fields - treat as corrupted
             return { fileName: file, sessionInfo: null };
           }
 
-          // Skip sessions that only contain system messages (info, error, warning)
-          if (!content.hasUserOrAssistantMessage) {
+          const fileTimestamp =
+            !content.startTime || !content.lastUpdated
+              ? (
+                  await fs.stat(filePath).catch(() => undefined)
+                )?.mtime.toISOString()
+              : undefined;
+          const fallbackTimestamp = fileTimestamp ?? new Date().toISOString();
+          const startTime =
+            content.startTime || content.lastUpdated || fallbackTimestamp;
+          const lastUpdated =
+            content.lastUpdated || content.startTime || fallbackTimestamp;
+
+          // Skip sessions with no resumable conversation content, including
+          // startup-only, system-only, command-only, and internal-context-only
+          // sessions.
+          if (!content.hasResumableContent) {
             return { fileName: file, sessionInfo: null };
           }
 
@@ -319,8 +320,8 @@ export const getAllSessionFiles = async (
             id: content.sessionId,
             file: file.replace(/\.jsonl?$/, ''),
             fileName: file,
-            startTime: content.startTime,
-            lastUpdated: content.lastUpdated,
+            startTime,
+            lastUpdated,
             messageCount: content.messageCount ?? content.messages.length,
             displayName: content.summary
               ? stripUnsafeCharacters(content.summary)
@@ -546,12 +547,17 @@ export class SessionSelector {
       if (!sessionData) {
         throw new Error('Failed to load session data');
       }
+      const normalizedSessionData = {
+        ...sessionData,
+        startTime: sessionData.startTime || sessionInfo.startTime,
+        lastUpdated: sessionData.lastUpdated || sessionInfo.lastUpdated,
+      };
 
       const displayInfo = `Session ${sessionInfo.index}: ${sessionInfo.firstUserMessage} (${sessionInfo.messageCount} messages, ${formatRelativeTime(sessionInfo.lastUpdated)})`;
 
       return {
         sessionPath,
-        sessionData,
+        sessionData: normalizedSessionData,
         displayInfo,
       };
     } catch (error) {
@@ -593,7 +599,16 @@ export function convertSessionToHistoryFormats(
     const contentString = partListUnionToString(msg.content);
     const uiText = displayContentString || contentString;
 
-    if (uiText.trim()) {
+    // Skip internal context messages in the UI history
+    const trimmedText = uiText.trim();
+    if (
+      trimmedText.startsWith('<session_context>') ||
+      trimmedText.startsWith('<hook_context>')
+    ) {
+      continue;
+    }
+
+    if (trimmedText) {
       let messageType: MessageType;
       switch (msg.type) {
         case 'user':

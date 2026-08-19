@@ -20,7 +20,7 @@ export async function relaunchOnExitCode(runner: () => Promise<number>) {
     try {
       const exitCode = await runner();
 
-      if (exitCode !== RELAUNCH_EXIT_CODE) {
+      if (process.platform === 'android' || exitCode !== RELAUNCH_EXIT_CODE) {
         process.exit(exitCode);
       }
     } catch (error) {

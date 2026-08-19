@@ -101,11 +101,13 @@ Slash commands provide meta-level control over the CLI itself.
 
 ### `/clear`
 
-- **Description:** Clear the terminal screen, including the visible session
-  history and scrollback within the CLI. The underlying session data (for
-  history recall) might be preserved depending on the exact implementation, but
-  the visual display is cleared.
-- **Keyboard shortcut:** Press **Ctrl+L** at any time to perform a clear action.
+- **Description:** Clear the agent conversation context (active conversation
+  history) and start a new session, in addition to clearing the visible terminal
+  screen, history, and scrollback within the CLI.
+- **Keyboard shortcut:** Press **Ctrl+L** at any time to perform a visual clear
+  action (note that **Ctrl+L** only clears the terminal display and redraws the
+  UI, preserving the active conversation context; use `/clear` to start a new
+  session).
 
 ### `/commands`
 
@@ -265,9 +267,6 @@ Slash commands provide meta-level control over the CLI itself.
 - **Description:** Manage the AI's instructional context (hierarchical memory
   loaded from `GEMINI.md` files).
 - **Sub-commands:**
-  - **`add`**:
-    - **Description:** Adds the following text to the AI's memory. Usage:
-      `/memory add <text to remember>`
   - **`list`**:
     - **Description:** Lists the paths of the GEMINI.md files in use for
       hierarchical memory.
@@ -509,6 +508,7 @@ the dedicated [Custom Commands documentation](../cli/custom-commands.md).
 These shortcuts apply directly to the input prompt for text manipulation.
 
 - **Undo:**
+
   - **Keyboard shortcut:** Press **Ctrl+z** (Windows), **Cmd+z** (macOS), or
     **Alt+z** (Linux/WSL) to undo the last action in the input prompt.
 
@@ -522,6 +522,7 @@ At commands are used to include the content of files or directories as part of
 your prompt to Gemini. These commands include git-aware filtering.
 
 - **`@<path_to_file_or_directory>`**
+
   - **Description:** Inject the content of the specified file or files into your
     current prompt. This is useful for asking questions about specific code,
     text, or collections of files.
@@ -568,6 +569,7 @@ The `!` prefix lets you interact with your system's shell directly from within
 Gemini CLI.
 
 - **`!<shell_command>`**
+
   - **Description:** Execute the given `<shell_command>` using `bash` on
     Linux/macOS or `powershell.exe -NoProfile -Command` on Windows (unless you
     override `ComSpec`). Any output or errors from the command are displayed in
@@ -577,6 +579,7 @@ Gemini CLI.
     - `!git status` (executes `git status` and returns to Gemini CLI)
 
 - **`!` (Toggle shell mode)**
+
   - **Description:** Typing `!` on its own toggles shell mode.
     - **Entering shell mode:**
       - When active, shell mode uses a different coloring and a "Shell Mode

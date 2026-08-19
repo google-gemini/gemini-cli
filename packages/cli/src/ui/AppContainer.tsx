@@ -47,7 +47,6 @@ import { MouseProvider } from './contexts/MouseContext.js';
 import { ScrollProvider } from './contexts/ScrollProvider.js';
 import {
   type StartupWarning,
-  type EditorType,
   type Config,
   type IdeInfo,
   type IdeContext,
@@ -68,9 +67,9 @@ import {
   ShellExecutionService,
   saveApiKey,
   debugLogger,
+  isValidEditorType,
   coreEvents,
   CoreEvent,
-  refreshServerHierarchicalMemory,
   flattenMemory,
   type MemoryChangedPayload,
   writeToStdout,
@@ -255,7 +254,6 @@ export const AppContainer = (props: AppContainerProps) => {
   }, [mouseMode, setOptions]);
 
   const [corgiMode, setCorgiMode] = useState(false);
-  const [forceRerenderKey, setForceRerenderKey] = useState(0);
   const [debugMessage, setDebugMessage] = useState<string>('');
   const [quittingMessages, setQuittingMessages] = useState<
     HistoryItem[] | null
@@ -497,16 +495,6 @@ export const AppContainer = (props: AppContainerProps) => {
         ?.fireSessionStartEvent(sessionStartSource);
 
       if (result) {
-        if (result.systemMessage) {
-          historyManager.addItem(
-            {
-              type: MessageType.INFO,
-              text: result.systemMessage,
-            },
-            Date.now(),
-          );
-        }
-
         const additionalContext = result.getAdditionalContext();
         const geminiClient = config.getGeminiClient();
         if (additionalContext && geminiClient) {
@@ -549,12 +537,6 @@ export const AppContainer = (props: AppContainerProps) => {
         debugLogger.error('Error during cleanup:', e),
       );
     };
-    // Disable the dependencies check here. historyManager gets flagged
-    // but we don't want to react to changes to it because each new history
-    // item, including the ones from the start session hook will cause a
-    // re-render and an error when we try to reload config.
-    //
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config, resumedSessionData]);
 
   useEffect(
@@ -626,11 +608,10 @@ export const AppContainer = (props: AppContainerProps) => {
 
   const staticAreaMaxItemHeight = Math.max(terminalHeight * 4, 100);
 
-  const getPreferredEditor = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    () => settings.merged.general.preferredEditor as EditorType,
-    [settings.merged.general.preferredEditor],
-  );
+  const getPreferredEditor = useCallback(() => {
+    const val = settings.merged.general.preferredEditor;
+    return isValidEditorType(val) ? val : undefined;
+  }, [settings.merged.general.preferredEditor]);
 
   const buffer = useTextBuffer({
     initialText: '',
@@ -682,10 +663,12 @@ export const AppContainer = (props: AppContainerProps) => {
       enableMouseEvents();
       disableLineWrapping();
       app.rerender();
+    } else if (config.getUseTerminalBuffer()) {
+      app.rerender();
     }
     terminalCapabilityManager.enableSupportedModes();
     refreshStatic();
-  }, [refreshStatic, shouldUseAlternateScreen, app]);
+  }, [refreshStatic, shouldUseAlternateScreen, app, config]);
 
   const [editorError, setEditorError] = useState<string | null>(null);
   const {
@@ -928,12 +911,22 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return;
       }
 
-      const error = validateAuthMethod(
-        settings.merged.security.auth.selectedType,
-      );
-      if (error) {
-        onAuthError(error);
-      }
+      const authMethod = settings.merged.security.auth.selectedType;
+      void (async () => {
+        try {
+          const error = await validateAuthMethod(authMethod);
+          if (
+            error &&
+            authMethod === settings.merged.security.auth.selectedType
+          ) {
+            onAuthError(error);
+          }
+        } catch (e) {
+          if (authMethod === settings.merged.security.auth.selectedType) {
+            onAuthError(getErrorMessage(e));
+          }
+        }
+      })();
     }
   }, [
     settings.merged.security.auth.selectedType,
@@ -1081,19 +1074,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       Date.now(),
     );
     try {
-      let flattenedMemory: string;
-      let fileCount: number;
-
-      if (config.isJitContextEnabled()) {
-        await config.getMemoryContextManager()?.refresh();
-        config.updateSystemInstructionIfInitialized();
-        flattenedMemory = flattenMemory(config.getUserMemory());
-        fileCount = config.getGeminiMdFileCount();
-      } else {
-        const result = await refreshServerHierarchicalMemory(config);
-        flattenedMemory = flattenMemory(result.memoryContent);
-        fileCount = result.fileCount;
-      }
+      await config.getMemoryContextManager()?.refresh();
+      config.updateSystemInstructionIfInitialized();
+      const flattenedMemory = flattenMemory(config.getUserMemory());
+      const fileCount = config.getGeminiMdFileCount();
 
       historyManager.addItem(
         {
@@ -1704,8 +1688,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     needsRestart: ideNeedsRestart,
     restartReason: ideTrustRestartReason,
   } = useIdeTrustListener();
-  const isInitialMount = useRef(true);
-
   useIncludeDirsTrust(config, isTrustedFolder, historyManager, setCustomDialog);
 
   const tabFocusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1758,8 +1740,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const { handleSuspend } = useSuspend({
     handleWarning,
     setRawMode,
-    refreshStatic,
-    setForceRerenderKey,
     shouldUseAlternateScreen,
   });
 
@@ -1769,21 +1749,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setShowIdeRestartPrompt(true);
     }
   }, [ideNeedsRestart]);
-
-  useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-
-    const handler = setTimeout(() => {
-      refreshStatic();
-    }, 300);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [terminalWidth, refreshStatic]);
 
   useEffect(() => {
     const unsubscribe = ideContextStore.subscribe(setIdeContextState);
@@ -2889,7 +2854,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
                   <ShellFocusContext.Provider value={isFocused}>
                     <MouseProvider mouseEventsEnabled={mouseMode}>
                       <ScrollProvider>
-                        <App key={`app-${forceRerenderKey}`} />
+                        <App />
                       </ScrollProvider>
                     </MouseProvider>
                   </ShellFocusContext.Provider>

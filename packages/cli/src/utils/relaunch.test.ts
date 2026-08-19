@@ -46,6 +46,14 @@ import { relaunchAppInChildProcess, relaunchOnExitCode } from './relaunch.js';
 describe('relaunchOnExitCode', () => {
   let processExitSpy: MockInstance;
   let stdinResumeSpy: MockInstance;
+  const originalPlatform = process.platform;
+
+  const setPlatform = (platform: NodeJS.Platform) => {
+    Object.defineProperty(process, 'platform', {
+      value: platform,
+      configurable: true,
+    });
+  };
 
   beforeEach(() => {
     processExitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
@@ -60,6 +68,7 @@ describe('relaunchOnExitCode', () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    setPlatform(originalPlatform);
     processExitSpy.mockRestore();
     stdinResumeSpy.mockRestore();
   });
@@ -90,6 +99,18 @@ describe('relaunchOnExitCode', () => {
 
     expect(runner).toHaveBeenCalledTimes(3);
     expect(processExitSpy).toHaveBeenCalledWith(0);
+  });
+
+  it('should not relaunch on Android when RELAUNCH_EXIT_CODE is returned', async () => {
+    setPlatform('android');
+    const runner = vi.fn().mockResolvedValue(RELAUNCH_EXIT_CODE);
+
+    await expect(relaunchOnExitCode(runner)).rejects.toThrow(
+      'PROCESS_EXIT_CALLED',
+    );
+
+    expect(runner).toHaveBeenCalledTimes(1);
+    expect(processExitSpy).toHaveBeenCalledWith(RELAUNCH_EXIT_CODE);
   });
 
   it('should handle runner errors', async () => {

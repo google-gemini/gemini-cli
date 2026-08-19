@@ -8,7 +8,10 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
-import { RipGrepTool } from '../packages/core/src/tools/ripGrep.js';
+import {
+  RipGrepTool,
+  resolveRipgrepPath,
+} from '../packages/core/src/tools/ripGrep.js';
 import { Config } from '../packages/core/src/config/config.js';
 import { WorkspaceContext } from '../packages/core/src/utils/workspaceContext.js';
 import { createMockMessageBus } from '../packages/core/src/test-utils/mock-message-bus.js';
@@ -47,6 +50,10 @@ class MockConfig {
 
   validatePathAccess() {
     return null;
+  }
+
+  async getRipgrepPath() {
+    return resolveRipgrepPath();
   }
 }
 

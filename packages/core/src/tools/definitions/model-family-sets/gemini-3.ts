@@ -21,7 +21,6 @@ import {
   WRITE_TODOS_TOOL_NAME,
   WEB_FETCH_TOOL_NAME,
   READ_MANY_FILES_TOOL_NAME,
-  MEMORY_TOOL_NAME,
   GET_INTERNAL_DOCS_TOOL_NAME,
   ASK_USER_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
@@ -60,8 +59,6 @@ import {
   READ_MANY_PARAM_EXCLUDE,
   READ_MANY_PARAM_RECURSIVE,
   READ_MANY_PARAM_USE_DEFAULT_EXCLUDES,
-  MEMORY_PARAM_FACT,
-  MEMORY_PARAM_SCOPE,
   TODOS_PARAM_TODOS,
   TODOS_ITEM_PARAM_DESCRIPTION,
   TODOS_ITEM_PARAM_STATUS,
@@ -106,12 +103,14 @@ export const GEMINI_3_SET: CoreToolSet = {
         [READ_FILE_PARAM_START_LINE]: {
           description:
             'Optional: The 1-based line number to start reading from.',
-          type: 'number',
+          type: 'integer',
+          minimum: 1,
         },
         [READ_FILE_PARAM_END_LINE]: {
           description:
             'Optional: The 1-based line number to end reading at (inclusive).',
-          type: 'number',
+          type: 'integer',
+          minimum: 1,
         },
       },
       required: [PARAM_FILE_PATH],
@@ -230,6 +229,7 @@ export const GEMINI_3_SET: CoreToolSet = {
           description:
             'Show this many lines of context around each match (equivalent to grep -C). Defaults to 0 if omitted.',
           type: 'integer',
+          minimum: 0,
         },
         [GREP_PARAM_AFTER]: {
           description:
@@ -493,29 +493,6 @@ Use this tool when the user's query implies needing the content of several files
         },
       },
       required: [READ_MANY_PARAM_INCLUDE],
-    },
-  },
-
-  save_memory: {
-    name: MEMORY_TOOL_NAME,
-    description: `Persists preferences or facts across ALL future sessions. Supports two scopes: 'global' (default) for cross-project preferences loaded in every workspace, and 'project' for facts specific to the current workspace that are private to the user (not committed to the repo). Use 'project' scope for things like local dev setup notes, project-specific workflows, or personal reminders about this codebase. CRITICAL: Do not use for session-specific context or temporary data.`,
-    parametersJsonSchema: {
-      type: 'object',
-      properties: {
-        [MEMORY_PARAM_FACT]: {
-          type: 'string',
-          description:
-            'A concise fact or preference to remember. Should be a clear, self-contained statement.',
-        },
-        [MEMORY_PARAM_SCOPE]: {
-          type: 'string',
-          enum: ['global', 'project'],
-          description:
-            "Where to save the memory. 'global' (default) saves to a file loaded in every workspace. 'project' saves to a project-specific file private to the user, not committed to the repo.",
-        },
-      },
-      required: [MEMORY_PARAM_FACT],
-      additionalProperties: false,
     },
   },
 

@@ -38,6 +38,7 @@ jobs:
         with:
           # Check out the trusted code from main for detection
           fetch-depth: 0
+          persist-credentials: false
 
       - name: 'Detect Steering Changes'
         id: 'detect'
@@ -102,6 +103,7 @@ jobs:
           # This only runs AFTER manual approval
           ref: '${{ github.event.pull_request.head.sha }}'
           fetch-depth: 0
+          persist-credentials: false
 
       - name: 'Remove Approval Notification'
         # Run even if other steps fail, to ensure we clean up the "Action Required" message

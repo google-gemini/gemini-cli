@@ -22,6 +22,7 @@ import {
   CoreEvent,
   CoreToolCallStatus,
   JsonStreamEventType,
+  TRUE_EMPTY_RESPONSE_MESSAGE,
 } from '@google/gemini-cli-core';
 import type { Part } from '@google/genai';
 import { runNonInteractive } from './nonInteractiveCli.js';
@@ -78,6 +79,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     ChatRecordingService: MockChatRecordingService,
     uiTelemetryService: {
       getMetrics: vi.fn(),
+      recordSemanticValidationError: vi.fn(),
     },
     coreEvents: mockCoreEvents,
     createWorkingStdio: vi.fn(() => ({
@@ -110,6 +112,7 @@ describe('runNonInteractive', () => {
     sendMessageStream: Mock;
     resumeChat: Mock;
     getChatRecordingService: Mock;
+    getCurrentSequenceModel: Mock;
   };
   const MOCK_SESSION_METRICS: SessionMetrics = {
     models: {},
@@ -165,6 +168,7 @@ describe('runNonInteractive', () => {
         recordMessageTokens: vi.fn(),
         recordToolCalls: vi.fn(),
       })),
+      getCurrentSequenceModel: vi.fn().mockReturnValue('gemini-2.5-flash'),
     };
 
     mockConfig = {
@@ -193,6 +197,7 @@ describe('runNonInteractive', () => {
       getRawOutput: vi.fn().mockReturnValue(false),
       getAcceptRawOutputRisk: vi.fn().mockReturnValue(false),
       getAgentSessionNoninteractiveEnabled: vi.fn().mockReturnValue(false),
+      getUsageStatisticsEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     mockSettings = {
@@ -1847,7 +1852,6 @@ describe('runNonInteractive', () => {
     };
     // @ts-expect-error - Mocking internal structure
     mockGeminiClient.getChat = vi.fn().mockReturnValue(mockChat);
-    // @ts-expect-error - Mocking internal structure
     mockGeminiClient.getCurrentSequenceModel = vi
       .fn()
       .mockReturnValue('model-1');
@@ -2325,7 +2329,13 @@ describe('runNonInteractive', () => {
 
     it('should handle InvalidStream event gracefully in TEXT mode', async () => {
       const events: ServerGeminiStreamEvent[] = [
-        { type: GeminiEventType.InvalidStream },
+        {
+          type: GeminiEventType.InvalidStream,
+          value: {
+            type: 'NO_RESPONSE_TEXT',
+            message: 'Empty response',
+          },
+        },
       ];
       mockGeminiClient.sendMessageStream.mockReturnValue(
         createStreamFromEvents(events),
@@ -2339,7 +2349,7 @@ describe('runNonInteractive', () => {
       });
 
       expect(processStderrSpy).toHaveBeenCalledWith(
-        '[ERROR] Invalid stream: The model returned an empty response or malformed tool call.\n',
+        `[ERROR] ${TRUE_EMPTY_RESPONSE_MESSAGE}\n`,
       );
       expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
     });
@@ -2352,7 +2362,13 @@ describe('runNonInteractive', () => {
         OutputFormat.STREAM_JSON,
       );
       const events: ServerGeminiStreamEvent[] = [
-        { type: GeminiEventType.InvalidStream },
+        {
+          type: GeminiEventType.InvalidStream,
+          value: {
+            type: 'NO_RESPONSE_TEXT',
+            message: 'Empty response',
+          },
+        },
       ];
       mockGeminiClient.sendMessageStream.mockReturnValue(
         createStreamFromEvents(events),
@@ -2368,9 +2384,7 @@ describe('runNonInteractive', () => {
       const output = getWrittenOutput();
       expect(output).toContain('"type":"error"');
       expect(output).toContain('"severity":"error"');
-      expect(output).toContain(
-        'Invalid stream: The model returned an empty response or malformed tool call.',
-      );
+      expect(output).toContain(TRUE_EMPTY_RESPONSE_MESSAGE);
       expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
     });
 
@@ -2382,7 +2396,13 @@ describe('runNonInteractive', () => {
         OutputFormat.JSON,
       );
       const events: ServerGeminiStreamEvent[] = [
-        { type: GeminiEventType.InvalidStream },
+        {
+          type: GeminiEventType.InvalidStream,
+          value: {
+            type: 'NO_RESPONSE_TEXT',
+            message: 'Empty response',
+          },
+        },
       ];
       mockGeminiClient.sendMessageStream.mockReturnValue(
         createStreamFromEvents(events),
@@ -2398,8 +2418,33 @@ describe('runNonInteractive', () => {
       const output = getWrittenOutput();
       expect(output).toContain('"error": {');
       expect(output).toContain('"type": "INVALID_STREAM"');
-      expect(output).toContain(
-        'Invalid stream: The model returned an empty response or malformed tool call.',
+      expect(output).toContain(TRUE_EMPTY_RESPONSE_MESSAGE);
+      expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle non-NO_RESPONSE_TEXT InvalidStream event gracefully and use message from eventValue', async () => {
+      const events: ServerGeminiStreamEvent[] = [
+        {
+          type: GeminiEventType.InvalidStream,
+          value: {
+            type: 'MALFORMED_FUNCTION_CALL',
+            message: 'Custom malformed function call message',
+          },
+        },
+      ];
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(events),
+      );
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'test invalid stream malformed',
+        prompt_id: 'prompt-id-invalid-malformed',
+      });
+
+      expect(processStderrSpy).toHaveBeenCalledWith(
+        '[ERROR] Custom malformed function call message\n',
       );
       expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
     });

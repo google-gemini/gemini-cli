@@ -141,7 +141,7 @@ describe('ToolConfirmationQueue', () => {
     expect(output).toContain('1 of 3');
     expect(output).toContain('ls'); // Tool name
     expect(output).toContain('list files'); // Tool description
-    expect(output).toContain('Allow execution of [ls]?');
+    expect(output).toContain('Allow execution of [Shell]?');
     expect(output).toMatchSnapshot();
 
     unmount();

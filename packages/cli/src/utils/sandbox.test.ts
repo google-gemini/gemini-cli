@@ -292,6 +292,140 @@ describe('sandbox', () => {
       await expect(start_sandbox(config)).rejects.toThrow(FatalSandboxError);
     });
 
+    it('should fall back to embedded profile if the .sb file is missing on disk', async () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      vi.mocked(fs.existsSync).mockImplementation((p) =>
+        String(p).includes(
+          'gemini-sandbox-macos-permissive-open-a1b2c3d4e5f6.sb',
+        ),
+      );
+
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'sandbox-exec',
+        image: 'some-image',
+      });
+
+      const onSpy = vi.spyOn(process, 'on');
+      const offSpy = vi.spyOn(process, 'off');
+
+      interface MockProcess extends EventEmitter {
+        stdout: EventEmitter;
+        stderr: EventEmitter;
+      }
+      const mockSpawnProcess = new EventEmitter() as MockProcess;
+      mockSpawnProcess.stdout = new EventEmitter();
+      mockSpawnProcess.stderr = new EventEmitter();
+      vi.mocked(spawn).mockReturnValue(
+        mockSpawnProcess as unknown as ReturnType<typeof spawn>,
+      );
+
+      const promise = start_sandbox(config, [], undefined, ['arg1']);
+
+      setTimeout(() => {
+        mockSpawnProcess.emit('close', 0);
+      }, 10);
+
+      await expect(promise).resolves.toBe(0);
+
+      // Verify fs.writeFileSync was called with the temp profile file, content, and 0o600 permissions
+      expect(fs.writeFileSync).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'gemini-sandbox-macos-permissive-open-a1b2c3d4e5f6.sb',
+        ),
+        expect.stringContaining('deny default'),
+        expect.objectContaining({
+          encoding: 'utf8',
+          mode: 0o600,
+        }),
+      );
+
+      // Verify spawn was called with the temp profile file
+      expect(spawn).toHaveBeenCalledWith(
+        'sandbox-exec',
+        expect.arrayContaining([
+          '-f',
+          expect.stringContaining(
+            'gemini-sandbox-macos-permissive-open-a1b2c3d4e5f6.sb',
+          ),
+        ]),
+        expect.objectContaining({ stdio: 'inherit' }),
+      );
+
+      // Verify process on/off hooks were called for exit, SIGINT, and SIGTERM cleanups
+      expect(onSpy).toHaveBeenCalledWith('exit', expect.any(Function));
+      expect(onSpy).toHaveBeenCalledWith('SIGINT', expect.any(Function));
+      expect(onSpy).toHaveBeenCalledWith('SIGTERM', expect.any(Function));
+
+      expect(offSpy).toHaveBeenCalledWith('exit', expect.any(Function));
+      expect(offSpy).toHaveBeenCalledWith('SIGINT', expect.any(Function));
+      expect(offSpy).toHaveBeenCalledWith('SIGTERM', expect.any(Function));
+
+      // Verify fs.unlinkSync was called to clean up the temp file
+      expect(fs.unlinkSync).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'gemini-sandbox-macos-permissive-open-a1b2c3d4e5f6.sb',
+        ),
+      );
+    });
+
+    it.each([
+      'permissive-open',
+      'permissive-closed',
+      'permissive-proxied',
+      'restrictive-open',
+      'restrictive-closed',
+      'restrictive-proxied',
+      'strict-open',
+      'strict-proxied',
+    ])(
+      'should fall back to embedded content successfully for profile "%s"',
+      async (profile) => {
+        vi.mocked(os.platform).mockReturnValue('darwin');
+        // Mock existsSync to return false for the profile file but true for temp directories
+        vi.mocked(fs.existsSync).mockImplementation((p) =>
+          String(p).includes('gemini-sandbox-macos-'),
+        );
+
+        vi.stubEnv('SEATBELT_PROFILE', profile);
+
+        const config: SandboxConfig = createMockSandboxConfig({
+          command: 'sandbox-exec',
+          image: 'some-image',
+        });
+
+        interface MockProcess extends EventEmitter {
+          stdout: EventEmitter;
+          stderr: EventEmitter;
+        }
+        const mockSpawnProcess = new EventEmitter() as MockProcess;
+        mockSpawnProcess.stdout = new EventEmitter();
+        mockSpawnProcess.stderr = new EventEmitter();
+        vi.mocked(spawn).mockReturnValue(
+          mockSpawnProcess as unknown as ReturnType<typeof spawn>,
+        );
+
+        const promise = start_sandbox(config, [], undefined, ['arg1']);
+
+        setTimeout(() => {
+          mockSpawnProcess.emit('close', 0);
+        }, 10);
+
+        await expect(promise).resolves.toBe(0);
+
+        // Verify fs.writeFileSync was called with the correct file mode and content for the profile
+        expect(fs.writeFileSync).toHaveBeenCalledWith(
+          expect.stringContaining(`gemini-sandbox-macos-${profile}-`),
+          expect.stringContaining('deny default'),
+          expect.objectContaining({
+            encoding: 'utf8',
+            mode: 0o600,
+          }),
+        );
+
+        vi.unstubAllEnvs();
+      },
+    );
+
     it('should handle Docker execution', async () => {
       const config: SandboxConfig = createMockSandboxConfig({
         command: 'docker',
@@ -336,7 +470,14 @@ describe('sandbox', () => {
       await expect(promise).resolves.toBe(0);
       expect(spawn).toHaveBeenCalledWith(
         'docker',
-        expect.arrayContaining(['run', '-i', '--rm', '--init']),
+        expect.arrayContaining([
+          'run',
+          '-i',
+          '--rm',
+          '--init',
+          '--entrypoint',
+          '',
+        ]),
         expect.objectContaining({ stdio: 'inherit' }),
       );
 
@@ -787,12 +928,67 @@ describe('sandbox', () => {
         expect.arrayContaining(['--user', 'root', '--env', 'HOME=/home/user']),
         expect.any(Object),
       );
-      // Check that the entrypoint command includes useradd/groupadd
+      // Check that the entrypoint command includes the defensive useradd check
       const args = vi.mocked(spawn).mock.calls[1][1] as string[];
       const entrypointCmd = args[args.length - 1];
-      expect(entrypointCmd).toContain('groupadd');
-      expect(entrypointCmd).toContain('useradd');
-      expect(entrypointCmd).toContain('su -p gemini');
+      expect(entrypointCmd).toContain('if command -v useradd');
+      expect(entrypointCmd).toContain('groupadd -g 1000 -o gemini');
+      expect(entrypointCmd).toContain('id 1000');
+      expect(entrypointCmd).toContain('useradd -o -u 1000');
+      expect(entrypointCmd).toContain('USER_NAME=$(id -nu 1000 2>/dev/null);');
+      expect(entrypointCmd).toContain('if [ -n "$USER_NAME" ]; then');
+      expect(entrypointCmd).toContain('su -p "$USER_NAME"');
+      expect(entrypointCmd).toContain('else');
+      expect(entrypointCmd).toContain('Error: Failed to map host UID 1000');
+      expect(entrypointCmd).toContain('exit 1');
+      expect(entrypointCmd).toContain("Error: 'useradd' not found");
+    });
+
+    it('should correctly escape home directory with spaces and special characters', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      process.env['SANDBOX_SET_UID_GID'] = 'true';
+      vi.mocked(os.platform).mockReturnValue('linux');
+
+      const specialHome = '/home/user name `$(id)`';
+      mockedHomedir.mockReturnValue(specialHome);
+      mockedGetContainerPath.mockImplementation((p: string) => p);
+
+      // Mock image check to return true
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+      await start_sandbox(config);
+
+      const args = vi.mocked(spawn).mock.calls[1][1] as string[];
+      const entrypointCmd = args[args.length - 1];
+
+      // Verify that the special home directory is properly quoted/escaped
+      // The quote tool should handle spaces and backticks
+      expect(entrypointCmd).toContain("'/home/user name `$(id)`'");
     });
 
     it('should register and unregister proxy exit handlers', async () => {

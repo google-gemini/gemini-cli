@@ -49,7 +49,7 @@ describe('GeminiCliAgent Integration', () => {
 
     const textEvents = events.filter((e) => e.type === 'content');
     const responseText = textEvents
-      .map((e) => (typeof e.value === 'string' ? e.value : ''))
+      .map((e) => ('value' in e && typeof e.value === 'string' ? e.value : ''))
       .join('');
 
     // Expect pirate speak
@@ -80,7 +80,7 @@ describe('GeminiCliAgent Integration', () => {
     }
     const responseText1 = events1
       .filter((e) => e.type === 'content')
-      .map((e) => (typeof e.value === 'string' ? e.value : ''))
+      .map((e) => ('value' in e && typeof e.value === 'string' ? e.value : ''))
       .join('');
 
     expect(responseText1).toContain('1');
@@ -93,7 +93,7 @@ describe('GeminiCliAgent Integration', () => {
     }
     const responseText2 = events2
       .filter((e) => e.type === 'content')
-      .map((e) => (typeof e.value === 'string' ? e.value : ''))
+      .map((e) => ('value' in e && typeof e.value === 'string' ? e.value : ''))
       .join('');
 
     expect(responseText2).toContain('2');
@@ -132,7 +132,7 @@ describe('GeminiCliAgent Integration', () => {
 
     const responseText = events2
       .filter((e) => e.type === 'content')
-      .map((e) => (typeof e.value === 'string' ? e.value : ''))
+      .map((e) => ('value' in e && typeof e.value === 'string' ? e.value : ''))
       .join('');
 
     expect(responseText).toContain('BANANA');

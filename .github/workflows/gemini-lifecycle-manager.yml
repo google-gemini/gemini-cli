@@ -33,6 +33,8 @@ jobs:
 
       - name: 'Checkout repository'
         uses: 'actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683' # ratchet:actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: 'Lifecycle Management'
         uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'

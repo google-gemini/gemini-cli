@@ -1330,6 +1330,7 @@ describe('LegacyAgentSession', () => {
       );
       expect(err?.message).toBe('Connection refused');
       expect(err?.fatal).toBe(true);
+      expect(err?._meta?.['stack']).toBeDefined();
 
       const streamEnd = events.find(
         (e): e is AgentEvent<'agent_end'> => e.type === 'agent_end',

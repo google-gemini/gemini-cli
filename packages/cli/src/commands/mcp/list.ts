@@ -159,12 +159,16 @@ async function getServerStatus(
   server: MCPServerConfig,
   isTrusted: boolean,
   activeSettings: MergedSettings,
+  consolidatedExcluded: string[],
+  consolidatedAllowed: string[] | undefined,
 ): Promise<MCPServerStatus> {
   const mcpEnablementManager = McpServerEnablementManager.getInstance();
+
   const loadResult = await canLoadServer(serverName, {
     adminMcpEnabled: activeSettings.admin?.mcp?.enabled ?? true,
-    allowedList: activeSettings.mcp?.allowed,
-    excludedList: activeSettings.mcp?.excluded,
+    allowedList: consolidatedAllowed,
+    excludedList:
+      consolidatedExcluded.length > 0 ? consolidatedExcluded : undefined,
     enablement: mcpEnablementManager.getEnablementCallbacks(),
   });
 
@@ -227,6 +231,10 @@ export async function listMcpServers(
     );
   }
 
+  const consolidatedExcluded =
+    loadedSettings.getConsolidatedExcludedMcpServers();
+  const consolidatedAllowed = loadedSettings.getConsolidatedAllowedMcpServers();
+
   debugLogger.log('Configured MCP servers:\n');
 
   for (const serverName of serverNames) {
@@ -237,6 +245,8 @@ export async function listMcpServers(
       server,
       loadedSettings.isTrusted,
       activeSettings,
+      consolidatedExcluded,
+      consolidatedAllowed,
     );
 
     let statusIndicator = '';
