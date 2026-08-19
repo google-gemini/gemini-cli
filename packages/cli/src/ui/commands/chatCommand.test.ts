@@ -104,7 +104,7 @@ describe('chatCommand', () => {
       'Browse auto-saved conversations and manage chat checkpoints',
     );
     expect(chatCommand.autoExecute).toBe(true);
-    expect(chatCommand.subCommands).toHaveLength(6);
+    expect(chatCommand.subCommands).toHaveLength(7);
   });
 
   describe('list subcommand', () => {
