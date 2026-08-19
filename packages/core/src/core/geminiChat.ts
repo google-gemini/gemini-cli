@@ -38,6 +38,7 @@ import {
 import { hasCycleInSchema } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
 import type { CompletedToolCall } from '../scheduler/types.js';
+import { isAbortError } from '../utils/errors.js';
 import {
   logContentRetry,
   logContentRetryFailure,
@@ -107,6 +108,13 @@ const MID_STREAM_RETRY_OPTIONS: MidStreamRetryOptions = {
 };
 
 export const SYNTHETIC_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
+
+/**
+ * Stands in for a model turn that never arrived because the stream failed
+ * after a tool response was already committed to history.
+ */
+export const INTERRUPTED_RESPONSE_PLACEHOLDER =
+  '[The previous response was interrupted before it completed.]';
 
 /**
  * Internal interface for parts that carry the magic 'callIndex' property
@@ -289,6 +297,9 @@ export class GeminiChat {
   private lastPromptTokenCount: number;
   private callCounter = 0;
   agentHistory: AgentChatHistory;
+  private lastPromptId?: string;
+  private promptOriginalHistoryLength?: number;
+  private promptOriginalTokenCount?: number;
 
   constructor(
     readonly context: AgentLoopContext,
@@ -400,6 +411,17 @@ export class GeminiChat {
     const historyLengthBefore = this.agentHistory.length;
     const baselinePromptTokenCount = this.lastPromptTokenCount;
 
+    if (this.lastPromptId && this.lastPromptId !== prompt_id) {
+      this.promptOriginalHistoryLength = undefined;
+      this.promptOriginalTokenCount = undefined;
+    }
+    this.lastPromptId = prompt_id;
+
+    if (this.promptOriginalHistoryLength === undefined) {
+      this.promptOriginalHistoryLength = historyLengthBefore;
+      this.promptOriginalTokenCount = baselinePromptTokenCount;
+    }
+
     let streamDoneResolver: () => void;
     const streamDonePromise = new Promise<void>((resolve) => {
       streamDoneResolver = resolve;
@@ -408,6 +430,16 @@ export class GeminiChat {
 
     let userContent = createUserContent(message);
     const isOriginalFunctionResponse = isFunctionResponse(userContent);
+
+    // A turn can end leaving history on an unanswered tool response: a stream
+    // error after the response was committed, or a cancelled tool call. Close
+    // it before recording a genuinely new user message, otherwise the two user
+    // turns are coalesced into one and the model continues the trailing text
+    // instead of answering it.
+    if (!isOriginalFunctionResponse) {
+      this.closeUnansweredToolResponseTurn();
+    }
+
     const { model } =
       this.context.config.modelConfigService.getResolvedConfig(modelConfigKey);
 
@@ -667,7 +699,26 @@ export class GeminiChat {
           }
         }
       } catch (error) {
-        if (!isOriginalFunctionResponse) {
+        const isAborted =
+          signal?.aborted ||
+          isAbortError(error) ||
+          (error instanceof Error &&
+            (error.name === 'CanceledError' ||
+              error.name === 'FatalCancellationError'));
+        const originalLength = this.promptOriginalHistoryLength;
+        const originalTokenCount = this.promptOriginalTokenCount;
+        if (isAborted && originalLength !== undefined) {
+          this.agentHistory.rollback(originalLength);
+          this.chatRecordingService.updateMessagesFromHistory(
+            this.agentHistory.get(),
+          );
+          if (originalTokenCount !== undefined) {
+            this.lastPromptTokenCount = originalTokenCount;
+          }
+          this.promptOriginalHistoryLength = undefined;
+          this.promptOriginalTokenCount = undefined;
+          this.lastPromptId = undefined;
+        } else if (!isOriginalFunctionResponse) {
           this.agentHistory.rollback(historyLengthBefore);
           this.chatRecordingService.updateMessagesFromHistory(
             this.agentHistory.get(),
@@ -681,6 +732,28 @@ export class GeminiChat {
     };
 
     return streamWithRetries.call(this);
+  }
+
+  /**
+   * Appends a closing model turn when history ends with an unanswered tool
+   * response, so the next user message stays a turn of its own.
+   */
+  private closeUnansweredToolResponseTurn(): void {
+    const turns = this.agentHistory.get();
+    const last = turns[turns.length - 1];
+    if (
+      last?.content.role !== 'user' ||
+      !last.content.parts?.some((part) => !!part.functionResponse)
+    ) {
+      return;
+    }
+    this.agentHistory.push({
+      id: randomUUID(),
+      content: {
+        role: 'model',
+        parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+      },
+    });
   }
 
   private extractBinaryInjections(
@@ -1648,11 +1721,34 @@ export function stripThoughts(history: HistoryTurn[]): HistoryTurn[] {
       if (!hasThought) return turn;
 
       const nonThoughtParts = turn.content.parts.filter((p) => p && !p.thought);
+
+      // The thoughtSignature the API requires on the first functionCall of a
+      // model turn is sometimes only carried by the thought part we just
+      // removed, not by the functionCall part itself. Without it, replaying
+      // this turn in a later request gets rejected with a 400 "missing
+      // thought_signature" error, so inject a synthetic one if needed.
+      let patchedFirstCall = false;
+      const finalParts =
+        turn.content.role === 'model'
+          ? nonThoughtParts.map((p) => {
+              if (!patchedFirstCall && p.functionCall) {
+                patchedFirstCall = true;
+                if (!p.thoughtSignature) {
+                  return {
+                    ...p,
+                    thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE,
+                  };
+                }
+              }
+              return p;
+            })
+          : nonThoughtParts;
+
       return {
         ...turn,
         content: {
           ...turn.content,
-          parts: nonThoughtParts,
+          parts: finalParts,
         },
       };
     })
