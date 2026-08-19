@@ -27,10 +27,12 @@ def test_sanitize_relative_path_valid():
 
 
 def test_sanitize_relative_path_traversal():
-    """Tests that path traversal attempts returning '..' are rejected."""
+    """Tests that path traversal attempts returning '..' or using backslashes are rejected."""
     assert sanitize_relative_path("..") is None
     assert sanitize_relative_path("../secret/passwords.txt") is None
     assert sanitize_relative_path("a/../../etc/passwd") is None
+    assert sanitize_relative_path("foo/..\\..\\etc\\passwd") is None
+    assert sanitize_relative_path("..\\secret\\file.txt") is None
 
 
 def test_sanitize_relative_path_absolute():
