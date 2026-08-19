@@ -13,6 +13,7 @@ import {
   parseImageName,
   ports,
   entrypoint,
+  isDebugEnvEnabled,
   shouldUseCurrentUserInSandbox,
 } from './sandboxUtils.js';
 
@@ -87,6 +88,26 @@ describe('sandboxUtils', () => {
     });
   });
 
+  describe('isDebugEnvEnabled', () => {
+    it.each(['true', '1'])('should return true when DEBUG=%s', (value) => {
+      process.env['DEBUG'] = value;
+      expect(isDebugEnvEnabled()).toBe(true);
+    });
+
+    it.each(['false', '0', ''])(
+      'should return false when DEBUG=%s',
+      (value) => {
+        process.env['DEBUG'] = value;
+        expect(isDebugEnvEnabled()).toBe(false);
+      },
+    );
+
+    it('should return false when DEBUG is unset', () => {
+      delete process.env['DEBUG'];
+      expect(isDebugEnvEnabled()).toBe(false);
+    });
+  });
+
   describe('entrypoint', () => {
     beforeEach(() => {
       vi.mocked(os.platform).mockReturnValue('linux');
@@ -123,6 +144,27 @@ describe('sandboxUtils', () => {
       const args = entrypoint('/work', ['node', 'gemini', 'arg1']);
       expect(args[2]).toContain('npm rebuild && npm run start --');
     });
+
+    it('should use the debug command when DEBUG=true', () => {
+      process.env['DEBUG'] = 'true';
+      const args = entrypoint('/work', ['node', 'gemini', 'arg1']);
+      expect(args[2]).toContain('--inspect-brk=0.0.0.0:9229');
+    });
+
+    it('should use the debug command when DEBUG=1', () => {
+      process.env['DEBUG'] = '1';
+      const args = entrypoint('/work', ['node', 'gemini', 'arg1']);
+      expect(args[2]).toContain('--inspect-brk=0.0.0.0:9229');
+    });
+
+    it.each(['false', '0', ''])(
+      'should not use the debug command when DEBUG=%s',
+      (value) => {
+        process.env['DEBUG'] = value;
+        const args = entrypoint('/work', ['node', 'gemini', 'arg1']);
+        expect(args[2]).not.toContain('--inspect-brk');
+      },
+    );
   });
 
   describe('shouldUseCurrentUserInSandbox', () => {
