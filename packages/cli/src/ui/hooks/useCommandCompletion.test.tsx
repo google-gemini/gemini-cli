@@ -308,6 +308,15 @@ describe('useCommandCompletion', () => {
         });
       });
 
+      it('should not trigger AT completion mode for an escaped @ symbol', async () => {
+        const text = 'user\\@example.com';
+        const { result } = await renderCommandCompletionHook(text);
+
+        await waitFor(() => {
+          expect(result.current.completionMode).toBe(CompletionMode.IDLE);
+        });
+      });
+
       it('should correctly identify the completion context with multiple @ symbols', async () => {
         const text = '@file1 @file2';
         const cursorOffset = 3; // @fi|le1 @file2
