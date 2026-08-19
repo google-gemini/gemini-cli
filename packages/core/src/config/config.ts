@@ -3608,7 +3608,13 @@ export class Config implements McpContext, AgentLoopContext {
    */
   hasGemini36FlashGAAccess(): boolean {
     const authType = this.contentGeneratorConfig?.authType;
-    return this.isGemini31LaunchedForAuthType(authType);
+    if (this.isGemini31LaunchedForAuthType(authType)) {
+      return true;
+    }
+    return (
+      this.experiments?.flags[ExperimentFlags.GEMINI_3_6_FLASH_GA_LAUNCHED]
+        ?.boolValue ?? false
+    );
   }
 
   /**
@@ -3616,7 +3622,13 @@ export class Config implements McpContext, AgentLoopContext {
    */
   hasGemini37FlashGAAccess(): boolean {
     const authType = this.contentGeneratorConfig?.authType;
-    return this.isGemini31LaunchedForAuthType(authType);
+    if (this.isGemini31LaunchedForAuthType(authType)) {
+      return true;
+    }
+    return (
+      this.experiments?.flags[ExperimentFlags.GEMINI_3_7_FLASH_GA_LAUNCHED]
+        ?.boolValue ?? false
+    );
   }
 
   /**
