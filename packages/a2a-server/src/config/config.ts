@@ -479,7 +479,7 @@ export async function setTargetDir(
     // the default confinement root. Per-task workspace paths remain confined to
     // the normal home-directory boundary unless an allowed root is configured.
     const defaultAllowedRoot = configuredWorkspacePath
-      ? resolvedPath
+      ? resolveToRealPath(configuredWorkspacePath)
       : isTestEnv
         ? path.parse(resolvedPath).root
         : homedir();
