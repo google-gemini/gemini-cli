@@ -91,4 +91,44 @@ describe('OverrideStrategy', () => {
     expect(decision).not.toBeNull();
     expect(decision?.model).toBe(requestedModel);
   });
+
+  it('should route to gemini-3.7-flash when specified as override model', async () => {
+    const mockConfig = {
+      getModel: () => 'gemini-3.7-flash',
+      hasGemini35FlashGAAccess: () => true,
+      hasGemini36FlashGAAccess: () => true,
+      hasGemini37FlashGAAccess: () => true,
+      getHasAccessToPreviewModel: () => true,
+    } as unknown as Config;
+
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockClient,
+      mockLocalLiteRtLmClient,
+    );
+
+    expect(decision).not.toBeNull();
+    expect(decision?.model).toBe('gemini-3.7-flash');
+  });
+
+  it('should route to gemini-3.6-flash when specified as override model', async () => {
+    const mockConfig = {
+      getModel: () => 'gemini-3.6-flash',
+      hasGemini35FlashGAAccess: () => true,
+      hasGemini36FlashGAAccess: () => true,
+      hasGemini37FlashGAAccess: () => true,
+      getHasAccessToPreviewModel: () => true,
+    } as unknown as Config;
+
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockClient,
+      mockLocalLiteRtLmClient,
+    );
+
+    expect(decision).not.toBeNull();
+    expect(decision?.model).toBe('gemini-3.6-flash');
+  });
 });

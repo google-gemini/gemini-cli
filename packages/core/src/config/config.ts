@@ -2069,6 +2069,8 @@ export class Config implements McpContext, AgentLoopContext {
       this.getHasAccessToPreviewModel(),
       this,
       this.hasGemini35FlashGAAccess(),
+      this.hasGemini36FlashGAAccess(),
+      this.hasGemini37FlashGAAccess(),
     );
 
     const isPreview = isPreviewModel(primaryModel, this);
@@ -2109,6 +2111,8 @@ export class Config implements McpContext, AgentLoopContext {
       this.getHasAccessToPreviewModel(),
       this,
       this.hasGemini35FlashGAAccess(),
+      this.hasGemini36FlashGAAccess(),
+      this.hasGemini37FlashGAAccess(),
     );
     return this.modelQuotas.get(primaryModel)?.remaining;
   }
@@ -2125,6 +2129,8 @@ export class Config implements McpContext, AgentLoopContext {
       this.getHasAccessToPreviewModel(),
       this,
       this.hasGemini35FlashGAAccess(),
+      this.hasGemini36FlashGAAccess(),
+      this.hasGemini37FlashGAAccess(),
     );
     return this.modelQuotas.get(primaryModel)?.limit;
   }
@@ -2141,6 +2147,8 @@ export class Config implements McpContext, AgentLoopContext {
       this.getHasAccessToPreviewModel(),
       this,
       this.hasGemini35FlashGAAccess(),
+      this.hasGemini36FlashGAAccess(),
+      this.hasGemini37FlashGAAccess(),
     );
     return this.modelQuotas.get(primaryModel)?.resetTime;
   }
@@ -3593,6 +3601,22 @@ export class Config implements McpContext, AgentLoopContext {
       setFlashModels('gemini-3-flash-preview', 'gemini-2.5-flash');
     }
     return hasAccess;
+  }
+
+  /**
+   * Returns whether Gemini 3.6 Flash GA has been launched.
+   */
+  hasGemini36FlashGAAccess(): boolean {
+    const authType = this.contentGeneratorConfig?.authType;
+    return this.isGemini31LaunchedForAuthType(authType);
+  }
+
+  /**
+   * Returns whether Gemini 3.7 Flash GA has been launched.
+   */
+  hasGemini37FlashGAAccess(): boolean {
+    const authType = this.contentGeneratorConfig?.authType;
+    return this.isGemini31LaunchedForAuthType(authType);
   }
 
   /**

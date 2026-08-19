@@ -30,6 +30,8 @@ export class DefaultStrategy implements TerminalStrategy {
       config.getHasAccessToPreviewModel?.() ?? true,
       config,
       config.hasGemini35FlashGAAccess?.() ?? false,
+      config.hasGemini36FlashGAAccess?.() ?? false,
+      config.hasGemini37FlashGAAccess?.() ?? false,
     );
     return {
       model: defaultModel,

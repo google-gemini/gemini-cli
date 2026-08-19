@@ -55,6 +55,8 @@ export function resolvePolicyChain(
   const useCustomToolModel = config.getUseCustomToolModelSync?.() ?? false;
   const hasAccessToPreview = config.getHasAccessToPreviewModel?.() ?? false;
   const useGemini3_5Flash = config.hasGemini35FlashGAAccess?.() ?? false;
+  const useGemini3_6Flash = config.hasGemini36FlashGAAccess?.() ?? false;
+  const useGemini3_7Flash = config.hasGemini37FlashGAAccess?.() ?? false;
 
   // Capture the original family intent before any normalization or early downgrade.
   const isOriginallyGemini3 = isGemini3Model(modelFromConfig, config);
@@ -67,6 +69,8 @@ export function resolvePolicyChain(
       hasAccessToPreview,
       config,
       useGemini3_5Flash,
+      useGemini3_6Flash,
+      useGemini3_7Flash,
     ),
   );
   const isAutoPreferred = normalizedPreferredModel

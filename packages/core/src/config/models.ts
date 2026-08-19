@@ -260,7 +260,10 @@ export function resolveModel(
     !useGemini3_6Flash &&
     !useGemini3_7Flash &&
     isFlashModel(resolved) &&
-    normalizedModel !== PREVIEW_GEMINI_FLASH_MODEL
+    normalizedModel !== PREVIEW_GEMINI_FLASH_MODEL &&
+    normalizedModel !== DEFAULT_GEMINI_3_7_FLASH_MODEL &&
+    normalizedModel !== DEFAULT_GEMINI_3_6_FLASH_MODEL &&
+    normalizedModel !== DEFAULT_GEMINI_3_5_FLASH_MODEL
   ) {
     return DEFAULT_GEMINI_FLASH_MODEL;
   }
