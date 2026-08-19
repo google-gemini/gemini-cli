@@ -1,13 +1,12 @@
 name: 'Unassign Inactive Issue Assignees'
 
 # This workflow runs daily and scans every open "help wanted" issue that has
-# one or more assignees.  For each assignee it checks whether they have a
-# non-draft pull request (open and ready for review, or already merged) that
-# is linked to the issue.  Draft PRs are intentionally excluded so that
-# contributors cannot reset the check by opening a no-op PR.  If no
-# qualifying PR is found within 7 days of assignment the assignee is
-# automatically removed and a friendly comment is posted so that other
-# contributors can pick up the work.
+# one or more assignees. For each assignee it checks whether they have a fresh,
+# non-draft pull request in this repository that is open and ready for review,
+# or a linked PR that has already merged. Draft, stale, and cross-repository PRs
+# do not indefinitely reserve an issue. If no qualifying PR is found within
+# 7 days of assignment the assignee is automatically removed and a friendly
+# comment is posted so that other contributors can pick up the work.
 # Maintainers, org members, and collaborators (anyone with write access or
 # above) are always exempted and will never be auto-unassigned.
 
@@ -60,6 +59,7 @@ jobs:
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const GRACE_PERIOD_DAYS = 7;
+            const PR_ACTIVITY_WINDOW_DAYS = 30;
             const now = new Date();
 
             let maintainerLogins = new Set();
@@ -145,6 +145,7 @@ jobs:
 
             let totalUnassigned = 0;
 
+            for (const issue of assignedIssues) {
               let timelineEvents = [];
               try {
                 timelineEvents = await github.paginate(github.rest.issues.listEventsForTimeline, {
@@ -194,6 +195,11 @@ jobs:
                 if (seenPRKeys.has(prKey)) continue;
                 seenPRKeys.add(prKey);
 
+                if (prOwner.toLowerCase() !== owner.toLowerCase() || prRepo !== repo) {
+                  core.info(`  PR ${prKey} by @${prAuthor}: ignored (not in ${owner}/${repo}).`);
+                  continue;
+                }
+
                 try {
                   const { data: pr } = await github.rest.pulls.get({
                     owner: prOwner,
@@ -201,13 +207,29 @@ jobs:
                     pull_number: prNumber,
                   });
 
-                  const isReady = (pr.state === 'open' && !pr.draft) ||
-                                  (pr.state === 'closed' && pr.merged_at !== null);
+                  const daysSincePRUpdate =
+                    (now - new Date(pr.updated_at)) / (1000 * 60 * 60 * 24);
+                  const isFreshOpen =
+                    pr.state === 'open' &&
+                    !pr.draft &&
+                    daysSincePRUpdate <= PR_ACTIVITY_WINDOW_DAYS;
+                  const isMerged = pr.state === 'closed' && pr.merged_at !== null;
+                  const isReady = isFreshOpen || isMerged;
+
+                  let reason = 'qualifies';
+                  if (!isReady) {
+                    if (pr.draft) reason = 'does NOT qualify (draft)';
+                    else if (pr.state === 'open') {
+                      reason = `does NOT qualify (no activity for ${daysSincePRUpdate.toFixed(1)} days)`;
+                    } else {
+                      reason = 'does NOT qualify (closed without merge)';
+                    }
+                  }
 
                   core.info(
                     `  PR ${prKey} by @${prAuthor}: ` +
-                    `state=${pr.state}, draft=${pr.draft}, merged=${!!pr.merged_at} → ` +
-                    (isReady ? 'qualifies' : 'does NOT qualify (draft or closed without merge)')
+                    `state=${pr.state}, draft=${pr.draft}, merged=${!!pr.merged_at}, ` +
+                    `updated=${daysSincePRUpdate.toFixed(1)} day(s) ago → ${reason}`
                   );
 
                   if (isReady) linkedPRAuthorSet.add(prAuthor);
@@ -241,7 +263,7 @@ jobs:
 
                 core.info(
                   `  @${login}: assigned ${daysSinceAssignment.toFixed(1)} day(s) ago, ` +
-                  `ready-for-review PR: ${linkedPRAuthorSet.has(login) ? 'yes' : 'no'}`
+                  `active ready-for-review PR: ${linkedPRAuthorSet.has(login) ? 'yes' : 'no'}`
                 );
 
                 if (daysSinceAssignment < GRACE_PERIOD_DAYS) {
@@ -250,11 +272,11 @@ jobs:
                 }
 
                 if (linkedPRAuthorSet.has(login)) {
-                  core.info(`    → ready-for-review PR found, keeping assignment.`);
+                  core.info(`    → active ready-for-review PR found, keeping assignment.`);
                   continue;
                 }
 
-                core.info(`    → no ready-for-review PR after ${GRACE_PERIOD_DAYS} days, will unassign.`);
+                core.info(`    → no active ready-for-review PR after ${GRACE_PERIOD_DAYS} days, will unassign.`);
                 assigneesToRemove.push(assignee.login);
               }
 
@@ -280,15 +302,15 @@ jobs:
                 const mentionList = assigneesToRemove.map((l) => `@${l}`).join(', ');
                 const commentBody =
                   `👋 ${mentionList} — it has been more than ${GRACE_PERIOD_DAYS} days since ` +
-                  `you were assigned to this issue and we could not find a pull request ` +
+                  `you were assigned to this issue and we could not find an active pull request ` +
                   `ready for review.\n\n` +
                   `To keep the backlog moving and ensure issues stay accessible to all ` +
-                  `contributors, we require a PR that is open and ready for review (not a ` +
-                  `draft) within ${GRACE_PERIOD_DAYS} days of assignment.\n\n` +
+                  `contributors, we require a PR in ${owner}/${repo} that is open, ready for review ` +
+                  `(not a draft), and updated within the last ${PR_ACTIVITY_WINDOW_DAYS} days.\n\n` +
                   `We are automatically unassigning you so that other contributors can pick ` +
                   `this up. If you are still actively working on this, please:\n` +
                   `1. Re-assign yourself by commenting \`/assign\`.\n` +
-                  `2. Open a PR (not a draft) linked to this issue (e.g. \`Fixes #${issue.number}\`) ` +
+                  `2. Open or update a PR (not a draft) linked to this issue (e.g. \`Fixes #${issue.number}\`) ` +
                   `within ${GRACE_PERIOD_DAYS} days so the automation knows real progress is being made.\n\n` +
                   `Thank you for your contribution — we hope to see a PR from you soon! 🙏`;
 
