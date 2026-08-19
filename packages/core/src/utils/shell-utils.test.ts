@@ -873,4 +873,27 @@ describe('detectCommandSubstitution', () => {
       expect(detectCommandSubstitution(cmd)).toBe(true);
     });
   });
+
+  describe('should block bash special and positional parameters', () => {
+    beforeEach(() => {
+      mockPlatform.mockReturnValue('linux');
+    });
+
+    it.each([
+      ['echo $*', '$* (all positional params)'],
+      ['echo $@', '$@ (all positional params as array)'],
+      ['echo $#', '$# (number of positional params)'],
+      ['echo $?', '$? (last exit status)'],
+      ['echo $$', '$$ (current PID)'],
+      ['echo $!', '$! (last background PID)'],
+      ['echo $0', '$0 (script name)'],
+      ['echo $1', '$1 (first positional param)'],
+      ['echo $9', '$9 (ninth positional param)'],
+      ['echo $-', '$- (shell flags)'],
+      ['curl $*', '$* in command args'],
+      ['bash $@', '$@ in command args'],
+    ])('blocks %s', (cmd) => {
+      expect(detectCommandSubstitution(cmd)).toBe(true);
+    });
+  });
 });
