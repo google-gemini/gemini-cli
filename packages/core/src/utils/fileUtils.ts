@@ -290,10 +290,29 @@ export function isWithinRoot(
       ? normalizedRootDirectory
       : normalizedRootDirectory + path.sep;
 
-  return (
+  if (
     normalizedPathToCheck === normalizedRootDirectory ||
     normalizedPathToCheck.startsWith(rootWithSeparator)
-  );
+  ) {
+    return true;
+  }
+
+  // Cross-platform check for macOS /private symlink aliases
+  try {
+    const realPathToCheck = getRealPath(normalizedPathToCheck);
+    const realRootDirectory = getRealPath(normalizedRootDirectory);
+    const realRootWithSeparator =
+      realRootDirectory === path.sep || realRootDirectory.endsWith(path.sep)
+        ? realRootDirectory
+        : realRootDirectory + path.sep;
+
+    return (
+      realPathToCheck === realRootDirectory ||
+      realPathToCheck.startsWith(realRootWithSeparator)
+    );
+  } catch {
+    return false;
+  }
 }
 
 /**

@@ -5,7 +5,7 @@
  */
 
 import * as path from 'node:path';
-import { isWithinRoot } from './fileUtils.js';
+import { isWithinRoot, getRealPath } from './fileUtils.js';
 
 /**
  * Normalizes a file path to be relative to the project root and formatted for the 'ignore' library.
@@ -28,7 +28,24 @@ export function getNormalizedRelativePath(
     return null;
   }
 
-  const relativePath = path.relative(projectRoot, absoluteFilePath);
+  let relativePath = path.relative(projectRoot, absoluteFilePath);
+
+  // Handle cross-platform root prefix discrepancies (e.g., macOS /var vs /private/var)
+  if (relativePath.startsWith('..')) {
+    try {
+      const realRoot = path.resolve(projectRoot);
+      const realAbs = path.resolve(absoluteFilePath);
+      const crossPlatformRel = path.relative(
+        getRealPath(realRoot),
+        getRealPath(realAbs),
+      );
+      if (!crossPlatformRel.startsWith('..')) {
+        relativePath = crossPlatformRel;
+      }
+    } catch {
+      // Fallback to original relativePath
+    }
+  }
 
   // Convert Windows backslashes to forward slashes for the 'ignore' library
   let normalized = relativePath.replace(/\\/g, '/');
