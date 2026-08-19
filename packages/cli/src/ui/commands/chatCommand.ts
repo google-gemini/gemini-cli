@@ -341,6 +341,49 @@ const shareCommand: SlashCommand = {
   },
 };
 
+const renameCommand: SlashCommand = {
+  name: 'rename',
+  description:
+    'Rename the current auto-saved conversation. Usage: /chat rename <title>',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: false,
+  action: (context, args): MessageActionReturn => {
+    const title = args.trim();
+    if (!title) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: 'Missing title. Usage: /chat rename <title>',
+      };
+    }
+
+    const client = context.services.agentContext?.geminiClient;
+    if (!client) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: 'No chat client available to rename conversation.',
+      };
+    }
+
+    const recordingService = client.getChatRecordingService();
+    if (!recordingService.getConversation()) {
+      return {
+        type: 'message',
+        messageType: 'info',
+        content: 'No active conversation found to rename.',
+      };
+    }
+
+    recordingService.saveSummary(title);
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: `Conversation renamed to: ${title}.`,
+    };
+  },
+};
+
 export const debugCommand: SlashCommand = {
   name: 'debug',
   description: 'Export the most recent API request as a JSON payload',
@@ -400,6 +443,7 @@ const checkpointCompatibilityCommand: SlashCommand = {
 };
 
 export const chatResumeSubCommands: SlashCommand[] = [
+  renameCommand,
   ...checkpointSubCommands.map((subCommand) => ({
     ...subCommand,
     suggestionGroup: CHECKPOINT_MENU_GROUP,
