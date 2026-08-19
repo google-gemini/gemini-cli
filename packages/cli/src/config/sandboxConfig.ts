@@ -123,19 +123,6 @@ function getSandboxCommand(
   // GEMINI_SANDBOX=lxc or sandbox: "lxc" in settings to enable it.
 }
 
-/**
- * DEBUG is a boolean Gemini CLI flag. Keep its semantics consistent with
- * sandboxUtils.ts before sandbox.ts performs truthiness checks on the value.
- * Only normalize when a sandbox will actually launch so non-sandbox callers
- * keep their environment untouched.
- */
-function normalizeSandboxDebugEnv(): void {
-  const debugValue = process.env['DEBUG'];
-  if (debugValue !== undefined && debugValue !== 'true' && debugValue !== '1') {
-    delete process.env['DEBUG'];
-  }
-}
-
 export async function loadSandboxConfig(
   settings: Settings,
   argv: SandboxCliArgs,
@@ -175,14 +162,7 @@ export async function loadSandboxConfig(
     command === 'sandbox-exec' ||
     command === 'lxc';
 
-  const config =
-    command && (image || isNative)
-      ? { enabled: true, allowedPaths, networkAccess, command, image }
-      : undefined;
-
-  if (config) {
-    normalizeSandboxDebugEnv();
-  }
-
-  return config;
+  return command && (image || isNative)
+    ? { enabled: true, allowedPaths, networkAccess, command, image }
+    : undefined;
 }
