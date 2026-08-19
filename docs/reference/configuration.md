@@ -907,7 +907,7 @@ their corresponding top-level category object in your `settings.json` file.
       },
       "agent-history-provider-summarizer": {
         "modelConfig": {
-          "model": "gemini-3.6-flash"
+          "model": "gemini-3.5-flash-lite"
         }
       }
     }

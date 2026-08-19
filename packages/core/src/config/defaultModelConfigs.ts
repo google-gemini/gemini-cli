@@ -343,7 +343,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     },
     'agent-history-provider-summarizer': {
       modelConfig: {
-        model: 'gemini-3.6-flash',
+        model: 'gemini-3.5-flash-lite',
       },
     },
   },
