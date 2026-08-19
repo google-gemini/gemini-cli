@@ -41,6 +41,7 @@ describe('sandboxUtils', () => {
 
   afterEach(() => {
     process.env = originalEnv;
+    vi.unstubAllEnvs();
   });
 
   describe('getContainerPath', () => {
@@ -90,20 +91,20 @@ describe('sandboxUtils', () => {
 
   describe('isDebugEnvEnabled', () => {
     it.each(['true', '1'])('should return true when DEBUG=%s', (value) => {
-      process.env['DEBUG'] = value;
+      vi.stubEnv('DEBUG', value);
       expect(isDebugEnvEnabled()).toBe(true);
     });
 
     it.each(['false', '0', ''])(
       'should return false when DEBUG=%s',
       (value) => {
-        process.env['DEBUG'] = value;
+        vi.stubEnv('DEBUG', value);
         expect(isDebugEnvEnabled()).toBe(false);
       },
     );
 
     it('should return false when DEBUG is unset', () => {
-      delete process.env['DEBUG'];
+      vi.stubEnv('DEBUG', '');
       expect(isDebugEnvEnabled()).toBe(false);
     });
   });
@@ -146,13 +147,13 @@ describe('sandboxUtils', () => {
     });
 
     it('should use the debug command when DEBUG=true', () => {
-      process.env['DEBUG'] = 'true';
+      vi.stubEnv('DEBUG', 'true');
       const args = entrypoint('/work', ['node', 'gemini', 'arg1']);
       expect(args[2]).toContain('--inspect-brk=0.0.0.0:9229');
     });
 
     it('should use the debug command when DEBUG=1', () => {
-      process.env['DEBUG'] = '1';
+      vi.stubEnv('DEBUG', '1');
       const args = entrypoint('/work', ['node', 'gemini', 'arg1']);
       expect(args[2]).toContain('--inspect-brk=0.0.0.0:9229');
     });
@@ -160,7 +161,7 @@ describe('sandboxUtils', () => {
     it.each(['false', '0', ''])(
       'should not use the debug command when DEBUG=%s',
       (value) => {
-        process.env['DEBUG'] = value;
+        vi.stubEnv('DEBUG', value);
         const args = entrypoint('/work', ['node', 'gemini', 'arg1']);
         expect(args[2]).not.toContain('--inspect-brk');
       },

@@ -509,7 +509,7 @@ describe('sandbox', () => {
           image: 'gemini-cli-sandbox',
         });
 
-        process.env['DEBUG'] = debugValue;
+        vi.stubEnv('DEBUG', debugValue);
 
         // Mock image check to return true (image exists)
         interface MockProcessWithStdout extends EventEmitter {
@@ -569,7 +569,7 @@ describe('sandbox', () => {
           image: 'gemini-cli-sandbox',
         });
 
-        process.env['DEBUG'] = debugValue;
+        vi.stubEnv('DEBUG', debugValue);
 
         // Mock image check to return true (image exists)
         interface MockProcessWithStdout extends EventEmitter {
