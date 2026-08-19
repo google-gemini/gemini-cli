@@ -684,6 +684,12 @@ their corresponding top-level category object in your `settings.json` file.
           "model": "gemini-3.6-flash"
         }
       },
+      "gemini-3.7-flash": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemini-3.7-flash"
+        }
+      },
       "gemini-3.5-flash-lite": {
         "extends": "chat-base-3",
         "modelConfig": {
@@ -724,6 +730,12 @@ their corresponding top-level category object in your `settings.json` file.
         "extends": "base",
         "modelConfig": {
           "model": "gemini-3.6-flash"
+        }
+      },
+      "gemini-3.7-flash-base": {
+        "extends": "base",
+        "modelConfig": {
+          "model": "gemini-3.7-flash"
         }
       },
       "gemini-3.5-flash-lite-base": {
@@ -998,6 +1010,16 @@ their corresponding top-level category object in your `settings.json` file.
           "multimodalToolUse": true
         }
       },
+      "gemini-3.7-flash": {
+        "tier": "flash",
+        "family": "gemini-3",
+        "isPreview": false,
+        "isVisible": true,
+        "features": {
+          "thinking": true,
+          "multimodalToolUse": true
+        }
+      },
       "gemini-3.5-flash-lite": {
         "tier": "flash-lite",
         "family": "gemini-3",
@@ -1196,6 +1218,9 @@ their corresponding top-level category object in your `settings.json` file.
       "gemini-3.6-flash": {
         "default": "gemini-3.6-flash"
       },
+      "gemini-3.7-flash": {
+        "default": "gemini-3.7-flash"
+      },
       "gemini-3.5-flash-lite": {
         "default": "gemini-3.5-flash-lite"
       },
@@ -1290,6 +1315,12 @@ their corresponding top-level category object in your `settings.json` file.
         "contexts": [
           {
             "condition": {
+              "useGemini3_7Flash": true
+            },
+            "target": "gemini-3.7-flash"
+          },
+          {
+            "condition": {
               "useGemini3_6Flash": true
             },
             "target": "gemini-3.6-flash"
@@ -1354,6 +1385,12 @@ their corresponding top-level category object in your `settings.json` file.
       "flash": {
         "default": "gemini-3-flash-preview",
         "contexts": [
+          {
+            "condition": {
+              "useGemini3_7Flash": true
+            },
+            "target": "gemini-3.7-flash"
+          },
           {
             "condition": {
               "useGemini3_6Flash": true

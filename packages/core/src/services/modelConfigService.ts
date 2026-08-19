@@ -102,6 +102,7 @@ export interface ResolutionContext {
   useGemini3_1FlashLite?: boolean;
   useGemini3_5Flash?: boolean;
   useGemini3_6Flash?: boolean;
+  useGemini3_7Flash?: boolean;
   useCustomTools?: boolean;
   hasAccessToPreview?: boolean;
   hasAccessToProModel?: boolean;
@@ -114,6 +115,7 @@ export interface ResolutionCondition {
   useGemini3_1FlashLite?: boolean;
   useGemini3_5Flash?: boolean;
   useGemini3_6Flash?: boolean;
+  useGemini3_7Flash?: boolean;
   useCustomTools?: boolean;
   hasAccessToPreview?: boolean;
   /** Matches if the current model is in this list. */
@@ -164,6 +166,7 @@ export class ModelConfigService {
     const useGemini31 = context.useGemini3_1 ?? false;
     const useGemini3_5Flash = context.useGemini3_5Flash ?? false;
     const useGemini3_6Flash = context.useGemini3_6Flash ?? false;
+    const useGemini3_7Flash = context.useGemini3_7Flash ?? false;
 
     const mainOptions = Object.entries(definitions)
       .filter(([_, m]) => {
@@ -180,6 +183,7 @@ export class ModelConfigService {
             useGemini31,
             useGemini3_5Flash,
             useGemini3_6Flash,
+            useGemini3_7Flash,
           );
         } else if (id === 'auto-gemini-3' && useGemini31) {
           description = description.replace('gemini-3-pro', 'gemini-3.1-pro');
@@ -265,6 +269,8 @@ export class ModelConfigService {
           return value === context.useGemini3_5Flash;
         case 'useGemini3_6Flash':
           return value === context.useGemini3_6Flash;
+        case 'useGemini3_7Flash':
+          return value === context.useGemini3_7Flash;
         case 'useCustomTools':
           return value === context.useCustomTools;
         case 'hasAccessToPreview':
@@ -601,7 +607,7 @@ export class ModelConfigService {
   }
 
   /**
-   * Gemini 3.6 Flash and Gemini 3.5 Flash-Lite reject penalties and ignore
+   * Gemini 3.7 Flash, Gemini 3.6 Flash, and Gemini 3.5 Flash-Lite reject penalties and ignore
    * custom sampling values. Remove them after all aliases and overrides have
    * been merged so settings and agent-specific overrides cannot produce an
    * invalid request.
@@ -610,7 +616,11 @@ export class ModelConfigService {
     model: string,
     config: GenerateContentConfig,
   ): GenerateContentConfig {
-    if (model !== 'gemini-3.6-flash' && model !== 'gemini-3.5-flash-lite') {
+    if (
+      model !== 'gemini-3.7-flash' &&
+      model !== 'gemini-3.6-flash' &&
+      model !== 'gemini-3.5-flash-lite'
+    ) {
       return config;
     }
 

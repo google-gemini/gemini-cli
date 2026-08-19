@@ -8,6 +8,7 @@ export interface ModelResolutionContext {
   useGemini3_1?: boolean;
   useGemini3_5Flash?: boolean;
   useGemini3_6Flash?: boolean;
+  useGemini3_7Flash?: boolean;
   useCustomTools?: boolean;
   hasAccessToPreview?: boolean;
   requestedModel?: string;
@@ -69,6 +70,7 @@ export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro';
 export let DEFAULT_GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
 export const DEFAULT_GEMINI_3_5_FLASH_MODEL = 'gemini-3.5-flash';
 export const DEFAULT_GEMINI_3_6_FLASH_MODEL = 'gemini-3.6-flash';
+export const DEFAULT_GEMINI_3_7_FLASH_MODEL = 'gemini-3.7-flash';
 // This is resolved to 3.5 Flash in backends where it is used,
 // however those backends do not expect to see the string gemini-3.5-flash
 // so we need to provide this model as an alternative name in certain instances.
@@ -99,6 +101,7 @@ export const VALID_GEMINI_MODELS = new Set([
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_3_5_FLASH_MODEL,
   DEFAULT_GEMINI_3_6_FLASH_MODEL,
+  DEFAULT_GEMINI_3_7_FLASH_MODEL,
   SECONDARY_GEMINI_3_5_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   // Retain the previous GA Flash-Lite ID for persisted user settings.
@@ -129,6 +132,7 @@ export function getAutoModelDescription(
   useGemini3_1: boolean = false,
   useGemini3_5Flash: boolean = false,
   useGemini3_6Flash: boolean = false,
+  useGemini3_7Flash: boolean = false,
 ) {
   const proModel = hasAccessToPreview
     ? useGemini3_1
@@ -136,11 +140,13 @@ export function getAutoModelDescription(
       : PREVIEW_GEMINI_MODEL
     : DEFAULT_GEMINI_MODEL;
   const flashModel = hasAccessToPreview
-    ? useGemini3_6Flash
-      ? DEFAULT_GEMINI_3_6_FLASH_MODEL
-      : useGemini3_5Flash
-        ? DEFAULT_GEMINI_3_5_FLASH_MODEL
-        : PREVIEW_GEMINI_FLASH_MODEL
+    ? useGemini3_7Flash
+      ? DEFAULT_GEMINI_3_7_FLASH_MODEL
+      : useGemini3_6Flash
+        ? DEFAULT_GEMINI_3_6_FLASH_MODEL
+        : useGemini3_5Flash
+          ? DEFAULT_GEMINI_3_5_FLASH_MODEL
+          : PREVIEW_GEMINI_FLASH_MODEL
     : DEFAULT_GEMINI_FLASH_MODEL;
   return `Let Gemini CLI decide the best model for the task: ${getDisplayString(proModel)}, ${getDisplayString(flashModel)}`;
 }
@@ -156,6 +162,7 @@ export function getAutoModelDescription(
  * @param config Optional config object for dynamic model configuration.
  * @param useGemini3_5Flash Whether to use Gemini 3.5 Flash GA.
  * @param useGemini3_6Flash Whether to use Gemini 3.6 Flash for Flash aliases.
+ * @param useGemini3_7Flash Whether to use Gemini 3.7 Flash for Flash aliases.
  * @returns The resolved concrete model name.
  */
 export function resolveModel(
@@ -166,6 +173,7 @@ export function resolveModel(
   config?: ModelCapabilityContext,
   useGemini3_5Flash: boolean = false,
   useGemini3_6Flash: boolean = false,
+  useGemini3_7Flash: boolean = false,
 ): string {
   // Defensive check against non-string inputs at runtime
   const normalizedModel = Array.isArray(requestedModel)
@@ -181,6 +189,7 @@ export function resolveModel(
       hasAccessToPreview,
       useGemini3_5Flash,
       useGemini3_6Flash,
+      useGemini3_7Flash,
     });
 
     if (!hasAccessToPreview && isPreviewModel(resolved, config)) {
@@ -223,11 +232,13 @@ export function resolveModel(
       break;
     }
     case GEMINI_MODEL_ALIAS_FLASH: {
-      resolved = useGemini3_6Flash
-        ? DEFAULT_GEMINI_3_6_FLASH_MODEL
-        : useGemini3_5Flash
-          ? DEFAULT_GEMINI_FLASH_MODEL
-          : PREVIEW_GEMINI_FLASH_MODEL;
+      resolved = useGemini3_7Flash
+        ? DEFAULT_GEMINI_3_7_FLASH_MODEL
+        : useGemini3_6Flash
+          ? DEFAULT_GEMINI_3_6_FLASH_MODEL
+          : useGemini3_5Flash
+            ? DEFAULT_GEMINI_FLASH_MODEL
+            : PREVIEW_GEMINI_FLASH_MODEL;
       break;
     }
     case GEMINI_MODEL_ALIAS_FLASH_LITE: {
@@ -247,6 +258,7 @@ export function resolveModel(
   if (
     useGemini3_5Flash &&
     !useGemini3_6Flash &&
+    !useGemini3_7Flash &&
     isFlashModel(resolved) &&
     normalizedModel !== PREVIEW_GEMINI_FLASH_MODEL
   ) {
@@ -283,6 +295,7 @@ function isFlashModel(model: string): boolean {
     model === PREVIEW_GEMINI_FLASH_MODEL ||
     model === DEFAULT_GEMINI_3_5_FLASH_MODEL ||
     model === DEFAULT_GEMINI_3_6_FLASH_MODEL ||
+    model === DEFAULT_GEMINI_3_7_FLASH_MODEL ||
     model === SECONDARY_GEMINI_3_5_FLASH_MODEL ||
     model === 'flash' ||
     model.endsWith('flash')
@@ -300,6 +313,7 @@ function isFlashModel(model: string): boolean {
  * @param config Optional config object for dynamic model configuration.
  * @param useGemini3_5Flash Whether to use Gemini 3.5 Flash GA.
  * @param useGemini3_6Flash Whether to use Gemini 3.6 Flash for Flash aliases.
+ * @param useGemini3_7Flash Whether to use Gemini 3.7 Flash for Flash aliases.
  * @returns The resolved concrete model name.
  */
 export function resolveClassifierModel(
@@ -311,6 +325,7 @@ export function resolveClassifierModel(
   config?: ModelCapabilityContext,
   useGemini3_5Flash: boolean = false,
   useGemini3_6Flash: boolean = false,
+  useGemini3_7Flash: boolean = false,
 ): string {
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     return config.modelConfigService.resolveClassifierModelId(
@@ -322,11 +337,15 @@ export function resolveClassifierModel(
         hasAccessToPreview,
         useGemini3_5Flash,
         useGemini3_6Flash,
+        useGemini3_7Flash,
       },
     );
   }
 
   if (modelAlias === GEMINI_MODEL_ALIAS_FLASH) {
+    if (useGemini3_7Flash) {
+      return DEFAULT_GEMINI_3_7_FLASH_MODEL;
+    }
     if (useGemini3_6Flash) {
       return DEFAULT_GEMINI_3_6_FLASH_MODEL;
     }
@@ -356,6 +375,7 @@ export function resolveClassifierModel(
       config,
       useGemini3_5Flash,
       useGemini3_6Flash,
+      useGemini3_7Flash,
     );
   }
   return resolveModel(
@@ -366,6 +386,7 @@ export function resolveClassifierModel(
     config,
     useGemini3_5Flash,
     useGemini3_6Flash,
+    useGemini3_7Flash,
   );
 }
 
@@ -609,5 +630,6 @@ export const CCPA_AI_MODEL_MAPPINGS: Record<string, string> = {
   // Keep the CLI's public model IDs stable while using the compatible
   // server-side variants exposed by Code Assist.
   [DEFAULT_GEMINI_3_6_FLASH_MODEL]: SECONDARY_GEMINI_3_5_FLASH_MODEL,
+  [DEFAULT_GEMINI_3_7_FLASH_MODEL]: SECONDARY_GEMINI_3_5_FLASH_MODEL,
   [DEFAULT_GEMINI_3_5_FLASH_LITE_MODEL]: 'gemini-3.1-flash-lite',
 };

@@ -13,6 +13,7 @@ import {
 import {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_3_6_FLASH_MODEL,
+  DEFAULT_GEMINI_3_7_FLASH_MODEL,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_MODEL,
@@ -58,6 +59,14 @@ describe('policyCatalog', () => {
       useGemini3_6Flash: true,
     });
     expect(chain[1]?.model).toBe(DEFAULT_GEMINI_3_6_FLASH_MODEL);
+  });
+
+  it('uses Gemini 3.7 Flash as the fallback when enabled', () => {
+    const chain = getModelPolicyChain({
+      previewEnabled: true,
+      useGemini3_7Flash: true,
+    });
+    expect(chain[1]?.model).toBe(DEFAULT_GEMINI_3_7_FLASH_MODEL);
   });
 
   it('marks preview transients as sticky retries when auto-selected', () => {
