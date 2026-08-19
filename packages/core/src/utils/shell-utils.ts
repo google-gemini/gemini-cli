@@ -1147,6 +1147,11 @@ function detectBashSubstitution(command: string): boolean {
         if (!BASH_SAFE_VARS.has(varName)) {
           return true;
         }
+      } else if (/[*@#?$!0-9-]/.test(next)) {
+        // Block special parameters like $*, $@, $#, $?, $$, $!, $1, $- etc.
+        // to prevent argument injection and information disclosure.
+        // Only $_ is allowed, which is handled by the check above.
+        return true;
       }
     }
     if (
