@@ -4,6 +4,14 @@ Gemini CLI brings the power of Gemini models directly into your terminal. Use it
 to understand code, automate tasks, and build workflows with your local project
 context.
 
+> [!IMPORTANT]
+> Gemini CLI remains supported. If you are moving an individual
+> subscription-backed terminal workflow to Antigravity CLI, see the
+> [Antigravity documentation](https://antigravity.google/docs/cli-getting-started).
+> Gemini CLI continues to support other authentication and deployment paths;
+> see [Authentication](./get-started/authentication.mdx) for the available
+> options.
+
 ## Install
 
 ```bash
