@@ -24,9 +24,9 @@ import {
   type HistoryTurn,
   coalesceConsecutiveRoles,
   stripThoughts,
+  applyRetryNudge,
   THINKING_ONLY_NUDGE_MESSAGE,
   NO_RESPONSE_TEXT_NUDGE_MESSAGE,
-  applyRetryNudge,
 } from './geminiChat.js';
 import {
   type CompletedToolCall,
@@ -2768,12 +2768,18 @@ describe('GeminiChat', () => {
         2,
       );
 
-      // First call should have original system instruction
+      // First call should have original system instruction and original user prompt
       expect(
         mockContentGenerator.generateContentStream,
       ).toHaveBeenNthCalledWith(
         1,
         expect.objectContaining({
+          contents: expect.arrayContaining([
+            expect.objectContaining({
+              role: 'user',
+              parts: [{ text: 'test' }],
+            }),
+          ]),
           config: expect.objectContaining({
             systemInstruction: 'Initial instruction',
           }),
@@ -2788,9 +2794,6 @@ describe('GeminiChat', () => {
       ).toHaveBeenNthCalledWith(
         2,
         expect.objectContaining({
-          config: expect.objectContaining({
-            systemInstruction: 'Initial instruction',
-          }),
           contents: [
             expect.objectContaining({
               role: 'user',
@@ -2800,6 +2803,9 @@ describe('GeminiChat', () => {
               ],
             }),
           ],
+          config: expect.objectContaining({
+            systemInstruction: 'Initial instruction',
+          }),
         }),
         'prompt-id-retry-nudge',
         LlmRole.MAIN,
@@ -2888,6 +2894,74 @@ describe('GeminiChat', () => {
           ],
         }),
         'prompt-id-retry-hook-modified',
+        LlmRole.MAIN,
+      );
+    });
+
+    it('should append NO_RESPONSE_TEXT nudge message to contents on retry', async () => {
+      vi.mocked(mockContentGenerator.generateContentStream)
+        .mockImplementationOnce(async () =>
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: {
+                    role: 'model',
+                    parts: [{ text: '' }],
+                  },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+        )
+        .mockImplementationOnce(async () =>
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: {
+                    parts: [{ text: 'response after empty recovery' }],
+                  },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+        );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-2.5-pro' },
+        'ping',
+        'prompt-id-retry-empty-text',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      for await (const _ of stream) {
+        // consume
+      }
+
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
+        2,
+      );
+
+      expect(
+        mockContentGenerator.generateContentStream,
+      ).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          contents: expect.arrayContaining([
+            expect.objectContaining({
+              role: 'user',
+              parts: expect.arrayContaining([
+                { text: 'ping' },
+                { text: `\n${NO_RESPONSE_TEXT_NUDGE_MESSAGE}` },
+              ]),
+            }),
+          ]),
+        }),
+        'prompt-id-retry-empty-text',
         LlmRole.MAIN,
       );
     });
@@ -5005,31 +5079,33 @@ describe('GeminiChat', () => {
       ]);
     });
 
-    it('should insert synthetic model turn and dedicated user turn if the last turn is user with functionResponse', () => {
+    it('should handle user turn with functionResponse correctly', () => {
       const contents: Content[] = [
         {
           role: 'user',
           parts: [
             {
               functionResponse: {
-                name: 'Edit',
-                response: { result: 'success' },
+                name: 'test_tool',
+                response: { output: 'result' },
               },
             },
           ],
         },
       ];
       const result = applyRetryNudge(contents, NO_RESPONSE_TEXT_NUDGE_MESSAGE);
-      expect(result).toHaveLength(3);
-      expect(result[0]).toEqual(contents[0]);
-      expect(result[1].role).toBe('model');
-      expect(result[1].parts).toEqual([
-        { text: '[Tool execution completed.]' },
-      ]);
-      expect(result[2].role).toBe('user');
-      expect(result[2].parts).toEqual([
-        { text: NO_RESPONSE_TEXT_NUDGE_MESSAGE },
-      ]);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].parts).toHaveLength(2);
+      expect(result[0].parts?.[0]).toEqual({
+        functionResponse: {
+          name: 'test_tool',
+          response: { output: 'result' },
+        },
+      });
+      expect(result[0].parts?.[1]).toEqual({
+        text: `\n${NO_RESPONSE_TEXT_NUDGE_MESSAGE}`,
+      });
     });
 
     it('should not duplicate the nudge message if it is already present in contents', () => {

@@ -275,22 +275,7 @@ export function applyRetryNudge(
   }));
 
   const clonedLastTurn = cloned[cloned.length - 1];
-  const hasFunctionResponse = clonedLastTurn?.parts?.some(
-    (p) => p.functionResponse,
-  );
-
-  if (clonedLastTurn?.role === 'user' && hasFunctionResponse) {
-    // Satisfy strict role alternation invariants of the Gemini API by inserting
-    // a neutral, synthetic model turn between the tool response and the nudge prompt.
-    cloned.push({
-      role: 'model',
-      parts: [{ text: '[Tool execution completed.]' }],
-    });
-    cloned.push({
-      role: 'user',
-      parts: [{ text: nudgeMessage }],
-    });
-  } else if (clonedLastTurn?.role === 'user') {
+  if (clonedLastTurn?.role === 'user') {
     if (!clonedLastTurn.parts) {
       clonedLastTurn.parts = [];
     }
