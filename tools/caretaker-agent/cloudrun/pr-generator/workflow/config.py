@@ -40,7 +40,10 @@ class Config:
         git_token = os.environ.pop("GIT_TOKEN", None)
         github_token = os.environ.pop("GITHUB_TOKEN", None)
         gh_token = os.environ.pop("GH_TOKEN", None)
-        self.git_token: str | None = git_token or github_token or gh_token
+        resolved_token = git_token or github_token or gh_token
+        if resolved_token:
+            Config._cached_git_token = resolved_token
+        self.git_token: str | None = getattr(Config, "_cached_git_token", None)
         self.firestore_doc_raw: str | None = os.environ.get("FIRESTORE_DOC")
         self.firestore_id: str | None = (
             os.environ.get("FIRESTORE_ID") or os.environ.get("firestore_id")

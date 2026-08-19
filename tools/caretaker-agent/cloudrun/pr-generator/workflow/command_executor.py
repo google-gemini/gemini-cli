@@ -41,12 +41,16 @@ def sanitize_relative_path(path: str | os.PathLike) -> str | None:
     """
     if not path:
         return None
-    raw_str = str(path).replace("\x00", "").replace("\\", "/").strip()
+    raw_str = str(path).replace("\x00", "").strip()
     if not raw_str:
         return None
-    clean_path = os.path.normpath(raw_str)
-    if clean_path == ".." or clean_path.startswith("../") or os.path.isabs(clean_path):
-        logging.warning("Path traversal attempt or absolute path detected: %s", path)
+    normalized = os.path.normpath(raw_str)
+    if os.path.isabs(normalized):
+        logging.warning("Absolute path detected: %s", path)
+        return None
+    clean_path = normalized.replace("\\", "/")
+    if clean_path == ".." or clean_path.startswith("../"):
+        logging.warning("Path traversal attempt detected: %s", path)
         return None
     return clean_path
 

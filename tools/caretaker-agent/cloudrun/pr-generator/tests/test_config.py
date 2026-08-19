@@ -116,6 +116,9 @@ def test_load_and_validate_firestore_doc_missing_fields(monkeypatch):
 
 def test_config_secret_tokens_popped_unconditionally(monkeypatch):
     """Tests that all secret tokens (GIT_TOKEN, GITHUB_TOKEN, GH_TOKEN) are popped unconditionally."""
+    if hasattr(Config, "_cached_git_token"):
+        delattr(Config, "_cached_git_token")
+
     monkeypatch.setenv("GIT_TOKEN", "token_primary")
     monkeypatch.setenv("GITHUB_TOKEN", "token_secondary")
     monkeypatch.setenv("GH_TOKEN", "token_tertiary")
@@ -125,3 +128,17 @@ def test_config_secret_tokens_popped_unconditionally(monkeypatch):
     assert "GIT_TOKEN" not in os.environ
     assert "GITHUB_TOKEN" not in os.environ
     assert "GH_TOKEN" not in os.environ
+
+
+def test_config_cached_token_across_instantiations(monkeypatch):
+    """Tests that subsequent Config instantiations retrieve cached token when os.environ keys were popped."""
+    if hasattr(Config, "_cached_git_token"):
+        delattr(Config, "_cached_git_token")
+
+    monkeypatch.setenv("GIT_TOKEN", "secret_token_123")
+    cfg1 = Config()
+    assert cfg1.git_token == "secret_token_123"
+
+    # Second instantiation when GIT_TOKEN is no longer in os.environ
+    cfg2 = Config()
+    assert cfg2.git_token == "secret_token_123"
