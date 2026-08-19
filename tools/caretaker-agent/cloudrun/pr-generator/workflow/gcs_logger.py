@@ -62,14 +62,18 @@ def _get_target_bucket_name() -> str:
 
 
 def upload_to_bucket(
-    blob_path: str, payload: str, content_type: str = "text/plain"
+    blob_path: str,
+    payload: str | bytes,
+    content_type: str = "text/plain",
+    client: Any = None,
 ) -> bool:
-    """Uploads a string payload directly to the designated GCS bucket.
+    """Uploads a string or bytes payload directly to the designated GCS bucket.
 
     Args:
         blob_path: Relative key path inside the GCS bucket.
-        payload: String data content to upload.
+        payload: String or bytes data content to upload.
         content_type: MIME content type string.
+        client: Optional pre-initialized storage.Client instance.
 
     Returns:
         True if successfully uploaded, False otherwise.
@@ -84,14 +88,20 @@ def upload_to_bucket(
         )
         return False
 
-    if storage is None:
+    if storage is None and client is None:
         logger.warning(
             "[GCS Logger] google.cloud.storage is not available. Skipping GCS upload."
         )
         return False
 
     try:
-        storage_client = storage.Client()
+        if client:
+            storage_client = client
+        else:
+            if not hasattr(upload_to_bucket, "_storage_client") or getattr(upload_to_bucket, "_storage_client") is None:
+                setattr(upload_to_bucket, "_storage_client", storage.Client())
+            storage_client = getattr(upload_to_bucket, "_storage_client")
+
         bucket = storage_client.bucket(bucket_name)
         blob = bucket.blob(blob_path)
         blob.upload_from_string(payload, content_type=content_type)
@@ -135,16 +145,17 @@ def serialize_chunks(resolved_chunks: list[Any]) -> str:
 
         if chunk_type == "Text":
             step_index = dumped.get("step_index")
-            text_val = dumped.get("text", "")
+            text_val = dumped.get("text") or ""
             if (
                 current_text_chunk is not None
                 and current_text_chunk.get("step_index") == step_index
             ):
-                current_text_chunk["text"] += text_val
+                current_text_chunk["text"] = (current_text_chunk.get("text") or "") + text_val
             else:
                 if current_text_chunk is not None:
                     serializable.append(current_text_chunk)
                 current_text_chunk = dumped
+                current_text_chunk["text"] = current_text_chunk.get("text") or ""
         else:
             if current_text_chunk is not None:
                 serializable.append(current_text_chunk)
@@ -189,11 +200,16 @@ def upload_agent_trajectory_log(
     if not resolved_chunks:
         return None
 
+    try:
+        safe_issue_number: int | str = int(issue_number)
+    except (ValueError, TypeError):
+        safe_issue_number = issue_number
+
     raw_turn_payload = serialize_chunks(resolved_chunks)
     chunks_data = json.loads(raw_turn_payload) if isinstance(raw_turn_payload, str) else raw_turn_payload
 
     local_trace_dir = os.environ.get("LOCAL_TRACE_DIR") or "/tmp/agent_traces"
-    local_file = os.path.join(local_trace_dir, f"issue_{issue_number}.json")
+    local_file = os.path.join(local_trace_dir, f"issue_{safe_issue_number}.json")
 
     data: dict[str, Any] = {}
     try:
@@ -202,11 +218,15 @@ def upload_agent_trajectory_log(
             try:
                 with open(local_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
-            except Exception:
+            except Exception as e:
+                logger.warning(
+                    "[GCS Logger] Failed to parse existing local trace JSON: %s. Starting with empty trace.",
+                    e,
+                )
                 data = {}
 
         if "issue_number" not in data:
-            data["issue_number"] = issue_number
+            data["issue_number"] = safe_issue_number
             data["owner"] = owner
             data["repo"] = repo
 
@@ -223,7 +243,7 @@ def upload_agent_trajectory_log(
     full_trace_payload = json.dumps(data, indent=2, default=str) if data else raw_turn_payload
 
     prefix = _get_gcs_blob_prefix(owner, repo, "agent_traces")
-    blob_path = f"{prefix}/issue_{issue_number}.json"
+    blob_path = f"{prefix}/issue_{safe_issue_number}.json"
     if upload_to_bucket(blob_path, full_trace_payload, content_type="application/json"):
         return blob_path
     return None
@@ -276,25 +296,42 @@ def upload_eval_run_artifacts(run_dir: str, run_name: str) -> None:
     run_folder = f"{run_name}_{eval_run_ts}" if eval_run_ts else run_name
     gcs_base_prefix = f"runs/{run_folder}"
 
+    storage_client = None
+    if storage is not None:
+        try:
+            storage_client = storage.Client()
+        except Exception as e:
+            logger.warning("[GCS Logger] Failed to initialize storage client for batch upload: %s", e)
+
     for root, _, files in os.walk(run_dir):
         rel_root = os.path.relpath(root, run_dir)
         for f in files:
             file_path = os.path.join(root, f)
+            if os.path.islink(file_path):
+                logger.warning("[GCS Logger] Skipping symbolic link: %s", file_path)
+                continue
+
             if rel_root == ".":
                 if f == "Results.txt" or f.endswith("_eval_score.md"):
                     blob_path = f"{gcs_base_prefix}/{f}"
                     try:
-                        with open(file_path, "r", encoding="utf-8") as file_handle:
+                        with open(file_path, "rb") as file_handle:
                             content = file_handle.read()
-                        upload_to_bucket(blob_path, content, content_type="text/markdown" if f.endswith(".md") else "text/plain")
+                        upload_to_bucket(
+                            blob_path,
+                            content,
+                            content_type="text/markdown" if f.endswith(".md") else "text/plain",
+                            client=storage_client,
+                        )
                     except Exception as e:
                         logger.warning("[GCS Logger] Failed to upload %s: %s", f, e)
             elif rel_root.startswith("outputs") or rel_root.startswith("logs"):
-                blob_path = f"{gcs_base_prefix}/{os.path.join(rel_root, f)}"
+                gcs_rel_path = os.path.join(rel_root, f).replace("\\", "/")
+                blob_path = f"{gcs_base_prefix}/{gcs_rel_path}"
                 try:
-                    with open(file_path, "r", encoding="utf-8") as file_handle:
+                    with open(file_path, "rb") as file_handle:
                         content = file_handle.read()
                     content_type = "text/markdown" if f.endswith(".md") else "text/plain"
-                    upload_to_bucket(blob_path, content, content_type=content_type)
+                    upload_to_bucket(blob_path, content, content_type=content_type, client=storage_client)
                 except Exception as e:
                     logger.warning("[GCS Logger] Failed to upload %s: %s", file_path, e)

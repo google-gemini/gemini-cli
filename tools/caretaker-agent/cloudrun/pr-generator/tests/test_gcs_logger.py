@@ -82,7 +82,7 @@ def test_upload_agent_trajectory_log_consolidates_and_uploads(mock_upload_to_buc
         owner="google-gemini",
         repo="gemini-cli",
         agent_role_folder="eval_agent",
-        issue_number=123,
+        issue_number="123",
         resolved_chunks=chunks_eval,
         attempt_index=1,
     )
@@ -91,3 +91,53 @@ def test_upload_agent_trajectory_log_consolidates_and_uploads(mock_upload_to_buc
     content_updated = json.loads(local_file.read_text())
     assert "coding_1" in content_updated
     assert "eval_1" in content_updated
+
+
+def test_serialize_chunks_handles_null_text():
+    """Tests that serialize_chunks gracefully handles Text chunks with None text values."""
+    class Text:
+        def model_dump(self):
+            return {"step_index": 1, "text": None}
+
+    res = serialize_chunks([Text()])
+    parsed = json.loads(res)
+    assert len(parsed) == 1
+    assert parsed[0]["text"] == ""
+
+
+@patch("workflow.gcs_logger.upload_to_bucket")
+def test_upload_eval_run_artifacts_binary_and_symlinks(mock_upload_to_bucket, tmp_path, monkeypatch):
+    """Tests that upload_eval_run_artifacts reads binary files and skips symlinks."""
+    from workflow.gcs_logger import upload_eval_run_artifacts
+
+    monkeypatch.delenv("DISABLE_GCS_LOGGING", raising=False)
+    mock_upload_to_bucket.return_value = True
+
+    run_dir = tmp_path / "run_test"
+    run_dir.mkdir()
+    outputs_dir = run_dir / "outputs"
+    outputs_dir.mkdir()
+
+    # Binary file
+    bin_file = outputs_dir / "image.png"
+    bin_file.write_bytes(b"\x89PNG\r\n\x1a\n\x00\x00")
+
+    # Symlink
+    outside_file = tmp_path / "outside.txt"
+    outside_file.write_text("secret")
+    symlink_file = outputs_dir / "symlink.txt"
+    try:
+        os.symlink(outside_file, symlink_file)
+    except (OSError, NotImplementedError):
+        pass
+
+    upload_eval_run_artifacts(str(run_dir), "run_test")
+
+    # Verify binary file was uploaded
+    mock_upload_to_bucket.assert_called_with(
+        "runs/run_test/outputs/image.png",
+        b"\x89PNG\r\n\x1a\n\x00\x00",
+        content_type="text/plain",
+        client=ANY,
+    )
+
