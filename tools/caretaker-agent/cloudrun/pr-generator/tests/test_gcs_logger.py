@@ -137,7 +137,7 @@ def test_upload_eval_run_artifacts_binary_and_symlinks(mock_upload_to_bucket, tm
     mock_upload_to_bucket.assert_called_with(
         "runs/run_test/outputs/image.png",
         b"\x89PNG\r\n\x1a\n\x00\x00",
-        content_type="text/plain",
+        content_type="image/png",
         client=ANY,
     )
 

@@ -203,7 +203,9 @@ def upload_agent_trajectory_log(
     try:
         safe_issue_number: int | str = int(issue_number)
     except (ValueError, TypeError):
-        safe_issue_number = issue_number
+        # Sanitize to prevent path traversal and null byte injection
+        cleaned = os.path.basename(str(issue_number)).replace("\0", "")
+        safe_issue_number = cleaned if cleaned else "unknown"
 
     raw_turn_payload = serialize_chunks(resolved_chunks)
     chunks_data = json.loads(raw_turn_payload) if isinstance(raw_turn_payload, str) else raw_turn_payload
@@ -213,30 +215,36 @@ def upload_agent_trajectory_log(
 
     data: dict[str, Any] = {}
     try:
-        os.makedirs(local_trace_dir, exist_ok=True)
-        if os.path.exists(local_file):
-            try:
-                with open(local_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-            except Exception as e:
-                logger.warning(
-                    "[GCS Logger] Failed to parse existing local trace JSON: %s. Starting with empty trace.",
-                    e,
-                )
-                data = {}
+        # Create directory with secure permissions (0o700) to prevent other users from writing to it
+        os.makedirs(local_trace_dir, mode=0o700, exist_ok=True)
 
-        if "issue_number" not in data:
-            data["issue_number"] = safe_issue_number
-            data["owner"] = owner
-            data["repo"] = repo
+        # Prevent symlink attacks in world-writable directories like /tmp
+        if os.path.islink(local_file):
+            logger.warning("[GCS Logger] Security warning: local trace file is a symlink. Skipping local write.")
+        else:
+            if os.path.exists(local_file):
+                try:
+                    with open(local_file, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                except Exception as e:
+                    logger.warning(
+                        "[GCS Logger] Failed to parse existing local trace JSON: %s. Starting with empty trace.",
+                        e,
+                    )
+                    data = {}
 
-        role_prefix = "coding" if "coding" in agent_role_folder else "eval"
-        turn_key = f"{role_prefix}_{attempt_index}"
-        data[turn_key] = chunks_data
+            if "issue_number" not in data:
+                data["issue_number"] = safe_issue_number
+                data["owner"] = owner
+                data["repo"] = repo
 
-        with open(local_file, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, default=str)
-        logger.info("[GCS Logger] Consolidated agent trace to %s (key: %s)", local_file, turn_key)
+            role_prefix = "coding" if "coding" in agent_role_folder else "eval"
+            turn_key = f"{role_prefix}_{attempt_index}"
+            data[turn_key] = chunks_data
+
+            with open(local_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, default=str)
+            logger.info("[GCS Logger] Consolidated agent trace to %s (key: %s)", local_file, turn_key)
     except Exception as e:
         logger.warning("[GCS Logger] Failed to save local trace: %s", e)
 
@@ -303,6 +311,7 @@ def upload_eval_run_artifacts(run_dir: str, run_name: str) -> None:
         except Exception as e:
             logger.warning("[GCS Logger] Failed to initialize storage client for batch upload: %s", e)
 
+    import mimetypes
     for root, _, files in os.walk(run_dir):
         rel_root = os.path.relpath(root, run_dir)
         for f in files:
@@ -317,10 +326,13 @@ def upload_eval_run_artifacts(run_dir: str, run_name: str) -> None:
                     try:
                         with open(file_path, "rb") as file_handle:
                             content = file_handle.read()
+                        content_type, _ = mimetypes.guess_type(file_path)
+                        if not content_type:
+                            content_type = "text/markdown" if f.endswith(".md") else "text/plain"
                         upload_to_bucket(
                             blob_path,
                             content,
-                            content_type="text/markdown" if f.endswith(".md") else "text/plain",
+                            content_type=content_type,
                             client=storage_client,
                         )
                     except Exception as e:
@@ -331,7 +343,9 @@ def upload_eval_run_artifacts(run_dir: str, run_name: str) -> None:
                 try:
                     with open(file_path, "rb") as file_handle:
                         content = file_handle.read()
-                    content_type = "text/markdown" if f.endswith(".md") else "text/plain"
+                    content_type, _ = mimetypes.guess_type(file_path)
+                    if not content_type:
+                        content_type = "text/markdown" if f.endswith(".md") else "text/plain"
                     upload_to_bucket(blob_path, content, content_type=content_type, client=storage_client)
                 except Exception as e:
                     logger.warning("[GCS Logger] Failed to upload %s: %s", file_path, e)
