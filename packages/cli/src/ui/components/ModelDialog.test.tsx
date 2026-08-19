@@ -15,6 +15,9 @@ import {
   GEMINI_MODEL_ALIAS_AUTO,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  DEFAULT_GEMINI_3_5_FLASH_MODEL,
+  DEFAULT_GEMINI_3_6_FLASH_MODEL,
+  DEFAULT_GEMINI_3_7_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
@@ -358,6 +361,31 @@ describe('<ModelDialog />', () => {
     const { lastFrame, unmount } = await renderComponent();
 
     expect(lastFrame()).toContain('Manual (My Custom Model Display)');
+    unmount();
+  });
+
+  it('shows Gemini 3.7 Flash in the manual view and can select it', async () => {
+    mockGetModel.mockReturnValue(DEFAULT_GEMINI_3_7_FLASH_MODEL);
+    mockGetDisplayString.mockImplementation((val: string) => val);
+    const { stdin, lastFrame, waitUntilReady, unmount } =
+      await renderComponent();
+
+    // Verify main view shows Manual (gemini-3.7-flash)
+    expect(lastFrame()).toContain(`Manual (${DEFAULT_GEMINI_3_7_FLASH_MODEL})`);
+
+    // Press enter directly since Manual is selected by default when preferredModel is manual
+    await act(async () => {
+      stdin.write('\r');
+    });
+    await waitUntilReady();
+
+    // Verify manual list contains 3.7 flash
+    await waitFor(() => {
+      expect(lastFrame()).toContain(DEFAULT_GEMINI_3_7_FLASH_MODEL);
+      expect(lastFrame()).toContain(DEFAULT_GEMINI_3_6_FLASH_MODEL);
+      expect(lastFrame()).toContain(DEFAULT_GEMINI_3_5_FLASH_MODEL);
+    });
+
     unmount();
   });
 

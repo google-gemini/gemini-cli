@@ -17,6 +17,9 @@ import {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  DEFAULT_GEMINI_3_5_FLASH_MODEL,
+  DEFAULT_GEMINI_3_6_FLASH_MODEL,
+  DEFAULT_GEMINI_3_7_FLASH_MODEL,
   GEMINI_MODEL_ALIAS_AUTO,
   GEMMA_4_31B_IT_MODEL,
   GEMMA_4_26B_A4B_IT_MODEL,
@@ -89,6 +92,9 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     const manualModels = [
       DEFAULT_GEMINI_MODEL,
       DEFAULT_GEMINI_FLASH_MODEL,
+      DEFAULT_GEMINI_3_5_FLASH_MODEL,
+      DEFAULT_GEMINI_3_6_FLASH_MODEL,
+      DEFAULT_GEMINI_3_7_FLASH_MODEL,
       DEFAULT_GEMINI_FLASH_LITE_MODEL,
       PREVIEW_GEMINI_MODEL,
       PREVIEW_GEMINI_3_1_MODEL,
@@ -131,6 +137,8 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         .getAvailableModelOptions({
           useGemini3_1: useGemini31,
           useGemini3_5Flash,
+          useGemini3_6Flash: true,
+          useGemini3_7Flash: true,
           useCustomTools: useCustomToolModel,
           hasAccessToPreview: shouldShowPreviewModels,
           hasAccessToProModel,
@@ -165,6 +173,8 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
           shouldShowPreviewModels,
           useGemini31,
           useGemini3_5Flash,
+          true,
+          true,
         ),
         key: GEMINI_MODEL_ALIAS_AUTO,
       },
@@ -200,6 +210,8 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         .getAvailableModelOptions({
           useGemini3_1: useGemini31,
           useGemini3_5Flash,
+          useGemini3_6Flash: true,
+          useGemini3_7Flash: true,
           useCustomTools: useCustomToolModel,
           hasAccessToPreview: shouldShowPreviewModels,
           hasAccessToProModel,
@@ -227,6 +239,21 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         value: DEFAULT_GEMINI_FLASH_LITE_MODEL,
         title: getDisplayString(DEFAULT_GEMINI_FLASH_LITE_MODEL),
         key: DEFAULT_GEMINI_FLASH_LITE_MODEL,
+      },
+      {
+        value: DEFAULT_GEMINI_3_7_FLASH_MODEL,
+        title: getDisplayString(DEFAULT_GEMINI_3_7_FLASH_MODEL),
+        key: DEFAULT_GEMINI_3_7_FLASH_MODEL,
+      },
+      {
+        value: DEFAULT_GEMINI_3_6_FLASH_MODEL,
+        title: getDisplayString(DEFAULT_GEMINI_3_6_FLASH_MODEL),
+        key: DEFAULT_GEMINI_3_6_FLASH_MODEL,
+      },
+      {
+        value: DEFAULT_GEMINI_3_5_FLASH_MODEL,
+        title: getDisplayString(DEFAULT_GEMINI_3_5_FLASH_MODEL),
+        key: DEFAULT_GEMINI_3_5_FLASH_MODEL,
       },
       {
         value: DEFAULT_GEMINI_FLASH_MODEL,
