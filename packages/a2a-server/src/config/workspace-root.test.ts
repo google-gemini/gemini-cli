@@ -31,8 +31,6 @@ describe('setTargetDir workspace confinement', () => {
   let homeDir: string;
   let workspaceDir: string;
   let originalArgv: string[];
-  let originalWorkspacePath: string | undefined;
-  let originalAllowedRoot: string | undefined;
 
   beforeEach(() => {
     homeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-a2a-home-'));
@@ -48,34 +46,20 @@ describe('setTargetDir workspace confinement', () => {
     process.argv = ['node', 'a2a-server'];
     vi.stubEnv('VITEST', '');
     vi.stubEnv('NODE_ENV', 'production');
-
-    originalWorkspacePath = process.env['CODER_AGENT_WORKSPACE_PATH'];
-    originalAllowedRoot = process.env['CODER_AGENT_ALLOWED_ROOT'];
-    delete process.env['CODER_AGENT_WORKSPACE_PATH'];
-    delete process.env['CODER_AGENT_ALLOWED_ROOT'];
+    vi.stubEnv('CODER_AGENT_WORKSPACE_PATH', undefined);
+    vi.stubEnv('CODER_AGENT_ALLOWED_ROOT', undefined);
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
     process.argv = originalArgv;
 
-    if (originalWorkspacePath === undefined) {
-      delete process.env['CODER_AGENT_WORKSPACE_PATH'];
-    } else {
-      process.env['CODER_AGENT_WORKSPACE_PATH'] = originalWorkspacePath;
-    }
-    if (originalAllowedRoot === undefined) {
-      delete process.env['CODER_AGENT_ALLOWED_ROOT'];
-    } else {
-      process.env['CODER_AGENT_ALLOWED_ROOT'] = originalAllowedRoot;
-    }
-
     fs.rmSync(workspaceDir, { recursive: true, force: true });
     fs.rmSync(homeDir, { recursive: true, force: true });
   });
 
   it('allows a launcher-provided workspace outside the home directory', async () => {
-    process.env['CODER_AGENT_WORKSPACE_PATH'] = workspaceDir;
+    vi.stubEnv('CODER_AGENT_WORKSPACE_PATH', workspaceDir);
 
     await expect(setTargetDir(undefined)).resolves.toBe(
       fs.realpathSync(workspaceDir),
@@ -83,8 +67,8 @@ describe('setTargetDir workspace confinement', () => {
   });
 
   it('still honors an explicitly configured allowed root', async () => {
-    process.env['CODER_AGENT_WORKSPACE_PATH'] = workspaceDir;
-    process.env['CODER_AGENT_ALLOWED_ROOT'] = homeDir;
+    vi.stubEnv('CODER_AGENT_WORKSPACE_PATH', workspaceDir);
+    vi.stubEnv('CODER_AGENT_ALLOWED_ROOT', homeDir);
 
     await expect(setTargetDir(undefined)).rejects.toThrow(
       'outside the allowed root directory',
