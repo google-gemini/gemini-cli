@@ -267,14 +267,15 @@ export class FileDiscoveryService {
         ? filePath
         : path.resolve(this.projectRoot, filePath);
 
-      const isSymlink =
-        options.isSymbolicLink ??
-        fs
-          .lstatSync(absolutePath, { throwIfNoEntry: false })
-          ?.isSymbolicLink() ??
-        false;
-
-      if (isSymlink) {
+      if (options.isSymbolicLink === undefined) {
+        const stat = fs.lstatSync(absolutePath, { throwIfNoEntry: false });
+        if (stat?.isSymbolicLink()) {
+          const realPath = resolveToRealPath(absolutePath);
+          if (this._checkIgnoreFilters(realPath, isDirectory, options)) {
+            return true;
+          }
+        }
+      } else if (options.isSymbolicLink) {
         const realPath = resolveToRealPath(absolutePath);
         if (this._checkIgnoreFilters(realPath, isDirectory, options)) {
           return true;

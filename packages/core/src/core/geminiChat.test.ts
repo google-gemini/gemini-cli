@@ -11,6 +11,7 @@ import {
   type Content,
   type GenerateContentResponse,
   type Part,
+  Language,
 } from '@google/genai';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import {
@@ -784,7 +785,7 @@ describe('GeminiChat', () => {
       );
     });
 
-    it('should throw an error when a tool call is followed by an empty stream response', async () => {
+    it('should succeed when a tool call is followed by an empty stream response', async () => {
       // 1. Setup: A history where the model has just made a function call.
       const initialHistory: HistoryTurn[] = [
         {
@@ -839,14 +840,19 @@ describe('GeminiChat', () => {
         LlmRole.MAIN,
       );
 
-      // 4. Assert: The stream processing should throw an InvalidStreamError.
+      // 4. Assert: The stream processing should succeed.
       await expect(
         (async () => {
           for await (const _ of stream) {
             // This loop consumes the stream to trigger the internal logic.
           }
         })(),
-      ).rejects.toThrow(InvalidStreamError);
+      ).resolves.not.toThrow();
+
+      // Verify history now ends with a successful model turn (with empty parts)
+      const lastTurn = chat.agentHistory.get()[chat.agentHistory.length - 1];
+      expect(lastTurn.content.role).toBe('model');
+      expect(lastTurn.content.parts).toEqual([]);
     });
 
     it('should succeed when there is a tool call without finish reason', async () => {
@@ -942,7 +948,7 @@ describe('GeminiChat', () => {
       expect(chat.agentHistory.length).toBe(initialHistoryLength);
     });
 
-    it('should preserve function responses during rollback when InvalidStreamError is thrown', async () => {
+    it('should preserve function responses and matching model turn when empty stream response is received', async () => {
       // 1. Setup history ending with a model turn containing functionCall
       chat.agentHistory.push({
         id: 'model-turn-1',
@@ -961,7 +967,7 @@ describe('GeminiChat', () => {
 
       const initialHistoryLength = chat.agentHistory.length;
 
-      // Setup: Stream that will throw InvalidStreamError
+      // Setup: Stream with empty parts
       const streamWithNoResponseText = (async function* () {
         yield {
           candidates: [
@@ -1001,12 +1007,16 @@ describe('GeminiChat', () => {
             // consume
           }
         })(),
-      ).rejects.toThrow(InvalidStreamError);
+      ).resolves.not.toThrow();
 
-      // Verify that history was NOT rolled back, i.e., function response is preserved!
-      expect(chat.agentHistory.length).toBe(initialHistoryLength + 1);
-      const lastTurn = chat.agentHistory.get()[chat.agentHistory.length - 1];
-      expect(lastTurn.content.parts?.[0]?.functionResponse).toBeDefined();
+      // Verify that history contains both the function response and the matched empty model response turn
+      expect(chat.agentHistory.length).toBe(initialHistoryLength + 2);
+      const turns = chat.agentHistory.get();
+      expect(
+        turns[turns.length - 2].content.parts?.[0]?.functionResponse,
+      ).toBeDefined();
+      expect(turns[turns.length - 1].content.role).toBe('model');
+      expect(turns[turns.length - 1].content.parts).toEqual([]);
     });
 
     it('should not fuse the next user message into a preserved tool-response turn', async () => {
@@ -1024,7 +1034,7 @@ describe('GeminiChat', () => {
         },
       });
 
-      // 1. Tool response goes back, model returns nothing -> InvalidStreamError.
+      // 1. Tool response goes back, model returns nothing -> succeeds under Option 2.
       vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
         (async function* () {
           yield {
@@ -1035,7 +1045,7 @@ describe('GeminiChat', () => {
         })(),
       );
 
-      const failingStream = await chat.sendMessageStream(
+      const successfulStream = await chat.sendMessageStream(
         { model: 'gemini-2.0-flash' },
         [
           {
@@ -1051,11 +1061,11 @@ describe('GeminiChat', () => {
       );
       await expect(
         (async () => {
-          for await (const _ of failingStream) {
+          for await (const _ of successfulStream) {
             // consume
           }
         })(),
-      ).rejects.toThrow(InvalidStreamError);
+      ).resolves.not.toThrow();
 
       // 2. The user types a brand new instruction.
       let capturedContents: Content[] = [];
@@ -1241,7 +1251,7 @@ describe('GeminiChat', () => {
 
       const initialHistoryLength = chat.agentHistory.length;
 
-      // Setup: Stream that will throw InvalidStreamError
+      // Setup: Stream with empty parts
       const streamWithNoResponseText = (async function* () {
         yield {
           candidates: [
@@ -1287,13 +1297,19 @@ describe('GeminiChat', () => {
             // consume
           }
         })(),
-      ).rejects.toThrow(InvalidStreamError);
+      ).resolves.not.toThrow();
 
-      // Verify that history was NOT rolled back, i.e., function response and sibling fileData are preserved!
-      expect(chat.agentHistory.length).toBe(initialHistoryLength + 1);
-      const lastTurn = chat.agentHistory.get()[chat.agentHistory.length - 1];
-      expect(lastTurn.content.parts?.[0]?.functionResponse).toBeDefined();
-      expect(lastTurn.content.parts?.[1]?.fileData).toBeDefined();
+      // Verify that history contains both the function response and the matched empty model response turn
+      expect(chat.agentHistory.length).toBe(initialHistoryLength + 2);
+      const turns = chat.agentHistory.get();
+      expect(
+        turns[turns.length - 2].content.parts?.[0]?.functionResponse,
+      ).toBeDefined();
+      expect(
+        turns[turns.length - 2].content.parts?.[1]?.fileData,
+      ).toBeDefined();
+      expect(turns[turns.length - 1].content.role).toBe('model');
+      expect(turns[turns.length - 1].content.parts).toEqual([]);
     });
 
     it('should restore the lastPromptTokenCount baseline on history rollback when InvalidStreamError is thrown', async () => {
@@ -1625,6 +1641,59 @@ describe('GeminiChat', () => {
       ).rejects.toThrow();
 
       // Verify history has been rolled back to its initial state
+      expect(chat.agentHistory.length).toBe(initialHistoryLength);
+    });
+
+    it('should roll back the un-responded user turn from history when stream consumption is broken out of early', async () => {
+      const initialHistoryLength = chat.agentHistory.length;
+
+      // Setup: A multi-chunk stream that would succeed if fully consumed
+      const activeStream = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'chunk 1' }],
+              },
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'chunk 2' }],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        activeStream,
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-2.0-flash' },
+        'test early exit message',
+        'prompt-id-early-exit',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      // Verify the user turn WAS added during sendMessageStream
+      expect(chat.agentHistory.length).toBe(initialHistoryLength + 1);
+
+      // Consume only the first chunk and break out of the loop early!
+      for await (const chunk of stream) {
+        expect(chunk.type).toBe(StreamEventType.CHUNK);
+        break; // Trigger early exit, calling generator.return() under the hood
+      }
+
+      // Verify history has been rolled back to its initial state because of the early exit
       expect(chat.agentHistory.length).toBe(initialHistoryLength);
     });
 
@@ -2370,6 +2439,54 @@ describe('GeminiChat', () => {
       });
 
       expect(geminiWrite).toBeDefined();
+    });
+
+    it('should accept a completely empty response without throwing NO_RESPONSE_TEXT if the input is a tool response (isOriginalFunctionResponse is true)', async () => {
+      // Mock an empty stream response with no text/thoughts
+      const responseStream = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        responseStream,
+      );
+
+      // We send a functionResponse message so that isOriginalFunctionResponse is true
+      const stream = await chat.sendMessageStream(
+        { model: 'test-model' },
+        [
+          {
+            functionResponse: {
+              name: 'edit_file',
+              response: { success: true },
+            },
+          },
+        ],
+        'prompt-id-empty-tool-response',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      let error: unknown = undefined;
+      try {
+        for await (const _ of stream) {
+          // consume
+        }
+      } catch (err) {
+        error = err;
+      }
+
+      // It should NOT throw InvalidStreamError NO_RESPONSE_TEXT
+      expect(error).toBeUndefined();
     });
   });
 
@@ -4660,6 +4777,81 @@ describe('GeminiChat', () => {
         '2026-07-23T00:00:00.000Z',
       );
       expect(stripped[0]).toHaveProperty('metadata', { some: 'value' });
+    });
+  });
+
+  describe('isValidContent via curated history', () => {
+    it('should strip turns with truly empty text parts and no other keys', () => {
+      const chat = new GeminiChat(mockConfig, '', [], []);
+      chat.setHistory([
+        { role: 'user', parts: [{ text: 'User prompt' }] },
+        { role: 'model', parts: [{ text: '' }] },
+      ]);
+      // Curated history should strip the invalid model turn
+      const history = chat.getHistory(true);
+      expect(history).toHaveLength(1);
+      expect(history[0].role).toBe('user');
+    });
+
+    it('should preserve turns with empty text parts that contain functionCall', () => {
+      const chat = new GeminiChat(mockConfig, '', [], []);
+      chat.setHistory([
+        { role: 'user', parts: [{ text: 'User prompt' }] },
+        {
+          role: 'model',
+          parts: [
+            {
+              text: '',
+              functionCall: { name: 'test_tool', args: {} },
+            },
+          ],
+        },
+      ]);
+      // Curated history should preserve the valid model turn because of functionCall
+      const history = chat.getHistory(true);
+      expect(history).toHaveLength(2);
+      expect(history[1].role).toBe('model');
+    });
+
+    it('should preserve turns with empty text parts that contain functionResponse, inlineData, or fileData', () => {
+      const chat = new GeminiChat(mockConfig, '', [], []);
+      chat.setHistory([
+        { role: 'user', parts: [{ text: 'User prompt' }] },
+        {
+          role: 'model',
+          parts: [
+            {
+              text: '',
+              functionResponse: { name: 'test_tool', response: {} },
+            },
+          ],
+        },
+      ]);
+      const history = chat.getHistory(true);
+      expect(history).toHaveLength(2);
+      expect(history[1].role).toBe('model');
+    });
+
+    it('should preserve turns with empty text parts that contain executableCode or codeExecutionResult', () => {
+      const chat = new GeminiChat(mockConfig, '', [], []);
+      chat.setHistory([
+        { role: 'user', parts: [{ text: 'User prompt' }] },
+        {
+          role: 'model',
+          parts: [
+            {
+              text: '',
+              executableCode: {
+                language: Language.PYTHON,
+                code: 'print("test")',
+              },
+            },
+          ],
+        },
+      ]);
+      const history = chat.getHistory(true);
+      expect(history).toHaveLength(2);
+      expect(history[1].role).toBe('model');
     });
   });
 });

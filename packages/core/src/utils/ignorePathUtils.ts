@@ -5,7 +5,8 @@
  */
 
 import * as path from 'node:path';
-import { isWithinRoot, getRealPath } from './fileUtils.js';
+import { isWithinRoot } from './fileUtils.js';
+import { resolveToRealPath } from './paths.js';
 
 /**
  * Normalizes a file path to be relative to the project root and formatted for the 'ignore' library.
@@ -28,7 +29,27 @@ export function getNormalizedRelativePath(
     return null;
   }
 
-  let relativePath = path.relative(projectRoot, absoluteFilePath);
+  let canonicalRoot = projectRoot;
+  let canonicalAbs = absoluteFilePath;
+  if (process.platform === 'darwin') {
+    if (canonicalRoot.startsWith('/var/')) {
+      canonicalRoot = '/private' + canonicalRoot;
+    } else if (canonicalRoot.startsWith('/tmp/')) {
+      canonicalRoot = '/private' + canonicalRoot;
+    } else if (canonicalRoot.startsWith('/etc/')) {
+      canonicalRoot = '/private' + canonicalRoot;
+    }
+
+    if (canonicalAbs.startsWith('/var/')) {
+      canonicalAbs = '/private' + canonicalAbs;
+    } else if (canonicalAbs.startsWith('/tmp/')) {
+      canonicalAbs = '/private' + canonicalAbs;
+    } else if (canonicalAbs.startsWith('/etc/')) {
+      canonicalAbs = '/private' + canonicalAbs;
+    }
+  }
+
+  let relativePath = path.relative(canonicalRoot, canonicalAbs);
 
   // Handle cross-platform root prefix discrepancies (e.g., macOS /var vs /private/var)
   if (relativePath.startsWith('..')) {
@@ -36,8 +57,8 @@ export function getNormalizedRelativePath(
       const realRoot = path.resolve(projectRoot);
       const realAbs = path.resolve(absoluteFilePath);
       const crossPlatformRel = path.relative(
-        getRealPath(realRoot),
-        getRealPath(realAbs),
+        resolveToRealPath(realRoot),
+        resolveToRealPath(realAbs),
       );
       if (!crossPlatformRel.startsWith('..')) {
         relativePath = crossPlatformRel;
