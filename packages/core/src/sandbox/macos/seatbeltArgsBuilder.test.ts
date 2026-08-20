@@ -210,7 +210,9 @@ describe.skipIf(os.platform() === 'win32')('seatbeltArgsBuilder', () => {
 
         expect(profile).toContain('(literal "/var/run/docker.sock")');
         expect(profile).toContain('(literal "/private/var/run/docker.sock")');
-        expect(profile).toContain('(regex #"^/Users/[^/]+/\\.docker/run/")');
+        expect(profile).toContain(
+          '(subpath (string-append (param "HOME_DIR") "/.docker/run"))',
+        );
         expect(profile).toContain('(literal "/usr/local/bin/docker")');
         expect(profile).toContain('(literal "/opt/homebrew/bin/docker")');
         expect(profile).toContain('(xpc-service-name-prefix "com.docker.")');

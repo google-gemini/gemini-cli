@@ -94,7 +94,9 @@ describe('macOS Seatbelt container runtime isolation', () => {
     it('denies access to Docker daemon sockets', () => {
       expect(rules).toContain('(literal "/var/run/docker.sock")');
       expect(rules).toContain('(literal "/private/var/run/docker.sock")');
-      expect(rules).toContain('(regex #"^/Users/[^/]+/\\.docker/run/")');
+      expect(rules).toContain(
+        '(subpath (string-append (param "HOME_DIR") "/.docker/run"))',
+      );
     });
 
     it('denies execution of container runtime binaries', () => {
