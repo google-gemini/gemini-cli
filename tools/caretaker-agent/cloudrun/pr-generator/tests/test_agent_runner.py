@@ -78,7 +78,11 @@ async def test_run_agent_success(tmp_path):
     mock_agent.__aenter__ = AsyncMock(return_value=mock_agent)
     mock_agent.__aexit__ = AsyncMock(return_value=None)
 
-    with patch("agent_runner.Agent", return_value=mock_agent):
+    with (
+        patch("agent_runner.Agent", return_value=mock_agent),
+        patch("agent_runner.LocalAgentConfig"),
+        patch("agent_runner.policy"),
+    ):
         output, chunks = await runner.run_agent(
             role="BugFixer",
             prompt="Fix the bug",
@@ -102,7 +106,11 @@ async def test_run_agent_timeout(tmp_path):
     mock_agent.__aenter__ = AsyncMock(return_value=mock_agent)
     mock_agent.__aexit__ = AsyncMock(return_value=None)
 
-    with patch("agent_runner.Agent", return_value=mock_agent):
+    with (
+        patch("agent_runner.Agent", return_value=mock_agent),
+        patch("agent_runner.LocalAgentConfig"),
+        patch("agent_runner.policy"),
+    ):
         with pytest.raises(AgentRunnerError) as exc_info:
             await runner.run_agent(
                 role="BugFixer",
