@@ -13,7 +13,7 @@ import {
   type ValidationIntent,
   TerminalQuotaError,
   ModelNotFoundError,
-  type UserTierId,
+  UserTierId,
   VALID_GEMINI_MODELS,
   isProModel,
   isOverageEligibleModel,
@@ -186,9 +186,13 @@ export function useQuotaAndFallback({
           ];
           message = messageLines.join('\n');
         } else if (VALID_GEMINI_MODELS.has(failedModel)) {
+          const detailMessage =
+            userTier === UserTierId.FREE
+              ? 'This model is not available for personal accounts.'
+              : 'Your admin might have disabled the access. Contact them to enable the Preview Release Channel.';
           const messageLines = [
             `It seems like you don't have access to ${getDisplayString(failedModel)}.`,
-            `Your admin might have disabled the access. Contact them to enable the Preview Release Channel.`,
+            detailMessage,
           ];
           message = messageLines.join('\n');
         } else {
