@@ -272,8 +272,13 @@ export function startCallbackServer(
       );
       timeoutId.unref();
 
-      const onAbort = () => {
+      const cleanup = () => {
+        clearTimeout(timeoutId);
         server.close();
+      };
+
+      const onAbort = () => {
+        cleanup();
         reject(abortController.signal.reason);
       };
       abortController.signal.addEventListener('abort', onAbort, { once: true });
@@ -281,6 +286,23 @@ export function startCallbackServer(
       server.on('close', () => {
         abortController.signal.removeEventListener('abort', onAbort);
       });
+
+      // Wrap resolve and reject to ensure cleanup is always called
+      const originalResolve = resolve;
+      resolve = (
+        value:
+          | OAuthAuthorizationResponse
+          | PromiseLike<OAuthAuthorizationResponse>,
+      ) => {
+        cleanup();
+        originalResolve(value);
+      };
+
+      const originalReject = reject;
+      reject = (reason?: unknown) => {
+        cleanup();
+        originalReject(reason);
+      };
     },
   );
 
