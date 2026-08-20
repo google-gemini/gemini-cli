@@ -23,7 +23,11 @@ import {
   type ShellOutputEvent,
   type ShellExecutionConfig,
 } from './shellExecutionService.js';
-import { NoopSandboxManager } from './sandboxManager.js';
+import {
+  NoopSandboxManager,
+  type SandboxManager,
+  type SandboxRequest,
+} from './sandboxManager.js';
 import { ExecutionLifecycleService } from './executionLifecycleService.js';
 import type { AnsiOutput, AnsiToken } from '../utils/terminalSerializer.js';
 
@@ -2178,6 +2182,61 @@ describe('ShellExecutionService environment variables', () => {
     await new Promise(process.nextTick);
 
     vi.unstubAllEnvs();
+  });
+
+  it('should not restore a sensitive GIT_CONFIG pair after value-first redaction', async () => {
+    const prepareCommand = vi.fn(async (request: SandboxRequest) => ({
+      program: request.command,
+      args: request.args,
+      env: request.env,
+    }));
+    const sensitiveGitConfig: ShellExecutionConfig = {
+      ...shellExecutionConfig,
+      env: {
+        ...process.env,
+        GIT_CONFIG_COUNT: '2',
+        GIT_CONFIG_KEY_0: 'url.https://github.com/.insteadOf',
+        GIT_CONFIG_VALUE_0: 'https://alice:supersecret@github.com/',
+        GIT_CONFIG_KEY_1: 'core.pager',
+        GIT_CONFIG_VALUE_1: 'less',
+      },
+      sanitizationConfig: {
+        ...shellExecutionConfig.sanitizationConfig,
+        enableEnvironmentVariableRedaction: true,
+      },
+      sandboxManager: { prepareCommand } as unknown as SandboxManager,
+    };
+
+    mockGetPty.mockResolvedValue(null);
+    await ShellExecutionService.execute(
+      'test-cp-redacted-git-config',
+      '/',
+      vi.fn(),
+      new AbortController().signal,
+      false,
+      sensitiveGitConfig,
+    );
+
+    expect(prepareCommand).toHaveBeenCalledOnce();
+    const preparedEnv = prepareCommand.mock.calls[0][0].env;
+    expect(preparedEnv['GIT_CONFIG_VALUE_0']).not.toContain('supersecret');
+    expect(preparedEnv).not.toHaveProperty(
+      'GIT_CONFIG_KEY_0',
+      'url.https://github.com/.insteadOf',
+    );
+    expect(preparedEnv).toHaveProperty('GIT_CONFIG_COUNT', '9');
+    expect(preparedEnv).toHaveProperty('GIT_CONFIG_KEY_0', 'core.pager');
+    expect(preparedEnv).toHaveProperty('GIT_CONFIG_VALUE_0', 'less');
+
+    const declaredCount = Number(preparedEnv['GIT_CONFIG_COUNT']);
+    for (let index = 0; index < declaredCount; index++) {
+      expect(preparedEnv[`GIT_CONFIG_KEY_${index}`]).toBeDefined();
+      expect(preparedEnv[`GIT_CONFIG_VALUE_${index}`]).toBeDefined();
+    }
+
+    mockChildProcess.emit('exit', 0, null);
+    mockChildProcess.emit('close', 0, null);
+    await new Promise(process.nextTick);
   });
 
   it('should ignore a non-numeric inherited GIT_CONFIG_COUNT instead of emitting a count git rejects', async () => {
