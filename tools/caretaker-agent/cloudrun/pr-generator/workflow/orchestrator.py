@@ -672,6 +672,7 @@ class Orchestrator:
     def _get_modified_files(self) -> list[str]:
         """Retrieves list of modified and added relative file paths in eval workspace."""
         modified: set[str] = set()
+        exceptions: list[Exception] = []
         try:
             diff_cmd = f"git diff --name-only {self.base_ref}...HEAD"
             out = CommandExecutor.run(diff_cmd, self.config.eval_repo_path).strip()
@@ -681,6 +682,7 @@ class Orchestrator:
                     modified.add(clean)
         except Exception as e:
             logging.warning("git diff error resolving modified files: %s", e)
+            exceptions.append(e)
 
         try:
             status_cmd = "git status --porcelain"
@@ -695,6 +697,12 @@ class Orchestrator:
                         modified.add(clean)
         except Exception as e:
             logging.warning("git status error resolving modified files: %s", e)
+            exceptions.append(e)
+
+        if not modified and exceptions:
+            raise OrchestrationError(
+                f"Failed to determine modified files. Errors: {exceptions}"
+            ) from exceptions[-1]
 
         return sorted(list(modified))
 
@@ -774,6 +782,8 @@ class Orchestrator:
         if affected_workspaces:
             logging.info("Dynamically testing affected workspaces (including downstream dependents): %s", affected_workspaces)
             for ws in affected_workspaces:
+                if ws.startswith("-") or not re.match(r"^@?[a-zA-Z0-9._-]+(/[a-zA-Z0-9._-]+)?$", ws):
+                    raise OrchestrationError(f"Invalid workspace name: {ws}")
                 ci_commands.append(f"npm test -w {ws} -- --no-coverage")
         else:
             logging.info("No package workspace code modified in PR changes. Skipping workspace unit tests.")

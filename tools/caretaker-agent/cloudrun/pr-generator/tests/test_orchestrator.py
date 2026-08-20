@@ -96,9 +96,10 @@ async def test_run_regression_checks_pass(mock_cmd_run, mock_config):
 
 
 @pytest.mark.asyncio
+@patch.object(Orchestrator, "_get_modified_files", return_value=["packages/core/src/index.ts"])
 @patch("preflight_filter.PreflightFilter.should_ignore_preflight_failure")
 @patch("command_executor.CommandExecutor.run")
-async def test_run_regression_checks_bypassed_failure(mock_cmd_run, mock_preflight_filter, mock_config):
+async def test_run_regression_checks_bypassed_failure(mock_cmd_run, mock_preflight_filter, mock_get_mod, mock_config):
     """Tests bypassing regression failures when preflight filter approves."""
     mock_cmd_run.side_effect = CommandExecutionError(
         cmd="npm run test:ci", returncode=1, stdout="FAIL src/utils/sessionCleanup.test.ts", stderr=""
@@ -111,9 +112,10 @@ async def test_run_regression_checks_bypassed_failure(mock_cmd_run, mock_preflig
 
 
 @pytest.mark.asyncio
+@patch.object(Orchestrator, "_get_modified_files", return_value=["packages/core/src/index.ts"])
 @patch("preflight_filter.PreflightFilter.should_ignore_preflight_failure")
 @patch("command_executor.CommandExecutor.run")
-async def test_run_regression_checks_unapproved_failure(mock_cmd_run, mock_preflight_filter, mock_config):
+async def test_run_regression_checks_unapproved_failure(mock_cmd_run, mock_preflight_filter, mock_get_mod, mock_config):
     """Tests handling of unapproved regression failures."""
     mock_cmd_run.side_effect = CommandExecutionError(
         cmd="npm run test:ci", returncode=1, stdout="FAIL src/auth/login.test.ts", stderr=""
@@ -127,8 +129,9 @@ async def test_run_regression_checks_unapproved_failure(mock_cmd_run, mock_prefl
 
 
 @pytest.mark.asyncio
+@patch.object(Orchestrator, "_get_modified_files", return_value=["packages/core/src/index.ts"])
 @patch("command_executor.CommandExecutor.run")
-async def test_run_regression_checks_oom_fatal_error(mock_cmd_run, mock_config):
+async def test_run_regression_checks_oom_fatal_error(mock_cmd_run, mock_get_mod, mock_config):
     """Tests that fatal JavaScript OOM crashes raise OrchestrationError."""
     from orchestrator import OrchestrationError
     mock_cmd_run.side_effect = CommandExecutionError(
@@ -142,6 +145,27 @@ async def test_run_regression_checks_oom_fatal_error(mock_cmd_run, mock_config):
     with pytest.raises(OrchestrationError) as exc_info:
         await orc._run_regression_checks()
     assert "Fatal container resource exhaustion (OOM/SIGKILL)" in str(exc_info.value)
+
+
+@patch("command_executor.CommandExecutor.run")
+def test_get_modified_files_git_failure_raises(mock_cmd_run, mock_config):
+    """Tests that _get_modified_files raises OrchestrationError when git commands fail."""
+    mock_cmd_run.side_effect = CommandExecutionError(cmd="git diff", returncode=128, stdout="", stderr="fatal error")
+    orc = Orchestrator(mock_config)
+    with pytest.raises(OrchestrationError) as exc_info:
+        orc._get_modified_files()
+    assert "Failed to determine modified files" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+@patch.object(Orchestrator, "_resolve_affected_workspaces", return_value=["--malicious-pkg"])
+@patch.object(Orchestrator, "_get_modified_files", return_value=["packages/malicious/package.json"])
+async def test_run_regression_checks_invalid_workspace_name_raises(mock_get_mod, mock_resolve_ws, mock_config):
+    """Tests that argument injection workspace names raise OrchestrationError."""
+    orc = Orchestrator(mock_config)
+    with pytest.raises(OrchestrationError) as exc_info:
+        await orc._run_regression_checks()
+    assert "Invalid workspace name" in str(exc_info.value)
 
 
 @patch("shutil.copyfile")
