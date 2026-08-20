@@ -267,17 +267,22 @@ export class FileDiscoveryService {
         ? filePath
         : path.resolve(this.projectRoot, filePath);
 
-      if (options.isSymbolicLink === undefined) {
-        const stat = fs.lstatSync(absolutePath, { throwIfNoEntry: false });
-        if (stat?.isSymbolicLink()) {
-          const realPath = resolveToRealPath(absolutePath);
-          if (this._checkIgnoreFilters(realPath, isDirectory, options)) {
-            return true;
-          }
-        }
-      } else if (options.isSymbolicLink) {
+      const isSymlink =
+        options.isSymbolicLink ??
+        fs
+          .lstatSync(absolutePath, { throwIfNoEntry: false })
+          ?.isSymbolicLink() ??
+        false;
+
+      if (isSymlink) {
         const realPath = resolveToRealPath(absolutePath);
-        if (this._checkIgnoreFilters(realPath, isDirectory, options)) {
+        let targetIsDir = isDirectory;
+        try {
+          targetIsDir = fs.statSync(realPath).isDirectory();
+        } catch {
+          // Fallback to original isDirectory status if target is inaccessible
+        }
+        if (this._checkIgnoreFilters(realPath, targetIsDir, options)) {
           return true;
         }
       }

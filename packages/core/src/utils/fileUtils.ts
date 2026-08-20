@@ -270,6 +270,21 @@ function getSupportedAudioMimeTypeForFile(
   return extensionMimeType;
 }
 
+export function canonicalizeMacosPath(p: string): string {
+  if (process.platform === 'darwin') {
+    if (p === '/var' || p.startsWith('/var/')) {
+      return '/private' + p;
+    }
+    if (p === '/tmp' || p.startsWith('/tmp/')) {
+      return '/private' + p;
+    }
+    if (p === '/etc' || p.startsWith('/etc/')) {
+      return '/private' + p;
+    }
+  }
+  return p;
+}
+
 /**
  * Checks if a path is within a given root directory.
  * @param pathToCheck The absolute path to check.
@@ -280,27 +295,12 @@ export function isWithinRoot(
   pathToCheck: string,
   rootDirectory: string,
 ): boolean {
-  let normalizedPathToCheck = path.resolve(pathToCheck);
-  let normalizedRootDirectory = path.resolve(rootDirectory);
-
-  // Fast string-based canonicalization for common macOS symlink prefixes to avoid synchronous I/O
-  if (process.platform === 'darwin') {
-    if (normalizedPathToCheck.startsWith('/var/')) {
-      normalizedPathToCheck = '/private' + normalizedPathToCheck;
-    } else if (normalizedPathToCheck.startsWith('/tmp/')) {
-      normalizedPathToCheck = '/private' + normalizedPathToCheck;
-    } else if (normalizedPathToCheck.startsWith('/etc/')) {
-      normalizedPathToCheck = '/private' + normalizedPathToCheck;
-    }
-
-    if (normalizedRootDirectory.startsWith('/var/')) {
-      normalizedRootDirectory = '/private' + normalizedRootDirectory;
-    } else if (normalizedRootDirectory.startsWith('/tmp/')) {
-      normalizedRootDirectory = '/private' + normalizedRootDirectory;
-    } else if (normalizedRootDirectory.startsWith('/etc/')) {
-      normalizedRootDirectory = '/private' + normalizedRootDirectory;
-    }
-  }
+  const normalizedPathToCheck = canonicalizeMacosPath(
+    path.resolve(pathToCheck),
+  );
+  const normalizedRootDirectory = canonicalizeMacosPath(
+    path.resolve(rootDirectory),
+  );
 
   // Ensure the rootDirectory path ends with a separator for correct startsWith comparison,
   // unless it's the root path itself (e.g., '/' or 'C:\').
@@ -318,21 +318,25 @@ export function isWithinRoot(
   }
 
   // Cross-platform check for macOS /private symlink aliases
-  try {
-    const realPathToCheck = resolveToRealPath(normalizedPathToCheck);
-    const realRootDirectory = resolveToRealPath(normalizedRootDirectory);
-    const realRootWithSeparator =
-      realRootDirectory === path.sep || realRootDirectory.endsWith(path.sep)
-        ? realRootDirectory
-        : realRootDirectory + path.sep;
+  if (process.platform === 'darwin') {
+    try {
+      const realPathToCheck = resolveToRealPath(normalizedPathToCheck);
+      const realRootDirectory = resolveToRealPath(normalizedRootDirectory);
+      const realRootWithSeparator =
+        realRootDirectory === path.sep || realRootDirectory.endsWith(path.sep)
+          ? realRootDirectory
+          : realRootDirectory + path.sep;
 
-    return (
-      realPathToCheck === realRootDirectory ||
-      realPathToCheck.startsWith(realRootWithSeparator)
-    );
-  } catch {
-    return false;
+      return (
+        realPathToCheck === realRootDirectory ||
+        realPathToCheck.startsWith(realRootWithSeparator)
+      );
+    } catch {
+      return false;
+    }
   }
+
+  return false;
 }
 
 /**

@@ -148,4 +148,20 @@ describe('FileDiscoveryService - Symlink Ignore Handling', () => {
     );
     expect(ignoredPaths).not.toContain(path.join(projectRoot, 'regular.txt'));
   });
+
+  it('should dynamically detect if a symlink target is a directory to match directory-only ignore patterns (Scenario F)', async () => {
+    await createTestFile(GEMINI_IGNORE_FILE_NAME, 'ignored_dir/\n');
+
+    // Create a directory and a symlink pointing to it
+    const targetDir = path.join(projectRoot, 'ignored_dir');
+    await fs.mkdir(targetDir, { recursive: true });
+    await createTestFile('ignored_dir/file.txt', 'content');
+    await createSymlink('ignored_dir', 'link_to_dir');
+
+    const service = new FileDiscoveryService(projectRoot);
+
+    // Even though we call shouldIgnoreFile (which passes isDirectory = false),
+    // it should dynamically detect that the target is a directory and match 'ignored_dir/'
+    expect(service.shouldIgnoreFile('link_to_dir')).toBe(true);
+  });
 });
