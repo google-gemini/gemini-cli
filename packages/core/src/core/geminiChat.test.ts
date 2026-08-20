@@ -2527,6 +2527,128 @@ describe('GeminiChat', () => {
       expect(history[0]).toEqual(turn1);
       expect(history[1]).toEqual(turn2);
     });
+
+    describe('resolved model config precedence', () => {
+      const makeSimpleStream = () =>
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: { parts: [{ text: 'ok' }], role: 'model' },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })();
+
+      it('should use systemInstruction from resolved model config when present', async () => {
+        vi.mocked(
+          mockConfig.modelConfigService.getResolvedConfig,
+        ).mockReturnValue(
+          makeResolvedModelConfig('gemini-pro', {
+            systemInstruction: 'config-level instruction',
+          }),
+        );
+        vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+          makeSimpleStream(),
+        );
+
+        const chatWithInstruction = new GeminiChat(
+          mockConfig,
+          'chat-level instruction',
+        );
+        const stream = await chatWithInstruction.sendMessageStream(
+          { model: 'gemini-pro' },
+          'hello',
+          'test-prompt-id',
+          new AbortController().signal,
+          LlmRole.MAIN,
+        );
+        for await (const _ of stream) {
+          /* consume */
+        }
+
+        expect(mockContentGenerator.generateContentStream).toHaveBeenCalledWith(
+          expect.objectContaining({
+            config: expect.objectContaining({
+              systemInstruction: 'config-level instruction',
+            }),
+          }),
+          expect.any(String),
+          expect.any(String),
+        );
+      });
+
+      it('should fall back to chat-level systemInstruction when resolved config has none', async () => {
+        vi.mocked(
+          mockConfig.modelConfigService.getResolvedConfig,
+        ).mockReturnValue(makeResolvedModelConfig('gemini-pro'));
+        vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+          makeSimpleStream(),
+        );
+
+        const chatWithInstruction = new GeminiChat(
+          mockConfig,
+          'chat-level instruction',
+        );
+        const stream = await chatWithInstruction.sendMessageStream(
+          { model: 'gemini-pro' },
+          'hello',
+          'test-prompt-id',
+          new AbortController().signal,
+          LlmRole.MAIN,
+        );
+        for await (const _ of stream) {
+          /* consume */
+        }
+
+        expect(mockContentGenerator.generateContentStream).toHaveBeenCalledWith(
+          expect.objectContaining({
+            config: expect.objectContaining({
+              systemInstruction: 'chat-level instruction',
+            }),
+          }),
+          expect.any(String),
+          expect.any(String),
+        );
+      });
+
+      it('should use tools from resolved model config when present', async () => {
+        const configTools = [
+          { functionDeclarations: [{ name: 'config_tool' }] },
+        ];
+        vi.mocked(
+          mockConfig.modelConfigService.getResolvedConfig,
+        ).mockReturnValue(
+          makeResolvedModelConfig('gemini-pro', { tools: configTools }),
+        );
+        vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+          makeSimpleStream(),
+        );
+
+        const chatWithTools = new GeminiChat(mockConfig, '');
+        const stream = await chatWithTools.sendMessageStream(
+          { model: 'gemini-pro' },
+          'hello',
+          'test-prompt-id',
+          new AbortController().signal,
+          LlmRole.MAIN,
+        );
+        for await (const _ of stream) {
+          /* consume */
+        }
+
+        expect(mockContentGenerator.generateContentStream).toHaveBeenCalledWith(
+          expect.objectContaining({
+            config: expect.objectContaining({
+              tools: configTools,
+            }),
+          }),
+          expect.any(String),
+          expect.any(String),
+        );
+      });
+    });
   });
 
   describe('sendMessageStream with retries', () => {
