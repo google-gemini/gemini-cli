@@ -258,6 +258,7 @@ export const useGeminiStream = (
   const abortControllerRef = useRef<AbortController | null>(null);
   const turnCancelledRef = useRef(false);
   const activeQueryIdRef = useRef<string | null>(null);
+  const historyLengthAfterUserPromptRef = useRef<number | undefined>(undefined);
   const previousApprovalModeRef = useRef<ApprovalMode>(
     config.getApprovalMode(),
   );
@@ -1706,6 +1707,10 @@ export const useGeminiStream = (
               return;
             }
 
+            if (geminiClient) {
+              historyLengthAfterUserPromptRef.current = geminiClient.getHistory().length;
+            }
+
             if (!options?.isContinuation) {
               if (typeof queryToSend === 'string') {
                 // logging the text prompts only for now
@@ -2086,17 +2091,13 @@ export const useGeminiStream = (
         }
         setIsResponding(false);
 
-        if (geminiClient) {
-          // We need to manually add the function responses to the history
-          // so the model knows the tools were cancelled.
-          const combinedParts = geminiTools.flatMap(
-            (toolCall) => toolCall.response.responseParts,
-          );
-          // eslint-disable-next-line @typescript-eslint/no-floating-promises
-          geminiClient.addHistory({
-            role: 'user',
-            parts: combinedParts,
-          });
+        if (geminiClient && historyLengthAfterUserPromptRef.current !== undefined) {
+          const targetLength = historyLengthAfterUserPromptRef.current;
+          if (geminiClient.getHistory().length > targetLength) {
+            geminiClient.setHistory(
+              geminiClient.getHistory().slice(0, targetLength)
+            );
+          }
         }
 
         const callIdsToMarkAsSubmitted = geminiTools.map(

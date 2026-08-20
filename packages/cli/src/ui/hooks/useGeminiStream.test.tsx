@@ -86,6 +86,11 @@ const MockedGeminiClientClass = vi.hoisted(() =>
     this.startChat = mockStartChat;
     this.sendMessageStream = mockSendMessageStream;
     this.addHistory = vi.fn();
+    let mockHistory: any[] = [];
+    this.getHistory = vi.fn().mockImplementation(() => mockHistory);
+    this.setHistory = vi.fn().mockImplementation((newHistory: any[]) => {
+      mockHistory = [...newHistory];
+    });
     this.generateContent = vi.fn().mockResolvedValue({
       candidates: [
         { content: { parts: [{ text: 'Got it. Focusing on tests only.' }] } },
@@ -927,7 +932,7 @@ describe('useGeminiStream', () => {
     });
   });
 
-  it('should handle all tool calls being cancelled', async () => {
+  it('should handle all tool calls being cancelled by rolling back the history', async () => {
     const cancelledToolCalls: TrackedToolCall[] = [
       {
         request: {
@@ -977,6 +982,9 @@ describe('useGeminiStream', () => {
       } as any,
     ];
     const client = new MockedGeminiClientClass(mockConfig);
+    client.setHistory([
+      { role: 'user', parts: [{ text: 'User prompt' }] }
+    ]);
 
     // Capture the onComplete callback
     let capturedOnComplete:
@@ -995,7 +1003,7 @@ describe('useGeminiStream', () => {
       ];
     });
 
-    await renderHookWithProviders(() =>
+    const { result } = await renderHookWithProviders(() =>
       useGeminiStream(
         client,
         [],
@@ -1017,6 +1025,18 @@ describe('useGeminiStream', () => {
       ),
     );
 
+    // Call submitQuery to populate the user turn and set historyLengthAfterUserPromptRef
+    await act(async () => {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      result.current.submitQuery('User prompt');
+    });
+
+    // Model issues a functionCall request, which appends to history
+    client.setHistory([
+      { role: 'user', parts: [{ text: 'User prompt' }] },
+      { role: 'model', parts: [{ functionCall: { name: 'testTool', args: {} } }] }
+    ]);
+
     // Trigger the onComplete callback with cancelled tools
     await act(async () => {
       if (capturedOnComplete) {
@@ -1028,21 +1048,12 @@ describe('useGeminiStream', () => {
 
     await waitFor(() => {
       expect(mockMarkToolsAsSubmitted).toHaveBeenCalledWith(['topic1', '1']);
-      expect(client.addHistory).toHaveBeenCalledWith({
-        role: 'user',
-        parts: [
-          {
-            functionResponse: {
-              name: UPDATE_TOPIC_TOOL_NAME,
-              id: 'topic1',
-              response: {},
-            },
-          },
-          { text: CoreToolCallStatus.Cancelled },
-        ],
-      });
-      // Ensure we do NOT call back to the API
-      expect(mockSendMessageStream).not.toHaveBeenCalled();
+      // Should NOT have appended cancellations via addHistory
+      expect(client.addHistory).not.toHaveBeenCalled();
+      // Should have rolled history back to pre-model length (1)
+      expect(client.getHistory().length).toBe(1);
+      // Ensure we do NOT call back to the API a second time (only the initial user turn was sent)
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -1375,7 +1386,7 @@ describe('useGeminiStream', () => {
     expect(noteIndex).toBeLessThan(stopIndex);
   });
 
-  it('should group multiple cancelled tool call responses into a single history entry', async () => {
+  it('should rollback multiple cancelled tool calls rather than appending them to history', async () => {
     const cancelledToolCall1: TrackedCancelledToolCall = {
       request: {
         callId: 'cancel-1',
@@ -1436,6 +1447,9 @@ describe('useGeminiStream', () => {
     };
     const allCancelledTools = [cancelledToolCall1, cancelledToolCall2];
     const client = new MockedGeminiClientClass(mockConfig);
+    client.setHistory([
+      { role: 'user', parts: [{ text: 'User prompt' }] }
+    ]);
 
     let capturedOnComplete:
       | ((completedTools: TrackedToolCall[]) => Promise<void>)
@@ -1453,7 +1467,7 @@ describe('useGeminiStream', () => {
       ];
     });
 
-    await renderHookWithProviders(() =>
+    const { result } = await renderHookWithProviders(() =>
       useGeminiStream(
         client,
         [],
@@ -1475,6 +1489,18 @@ describe('useGeminiStream', () => {
       ),
     );
 
+    // Call submitQuery to populate the user turn and set historyLengthAfterUserPromptRef
+    await act(async () => {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      result.current.submitQuery('User prompt');
+    });
+
+    // Model issues model turns, which appends to history
+    client.setHistory([
+      { role: 'user', parts: [{ text: 'User prompt' }] },
+      { role: 'model', parts: [{ functionCall: { name: 'toolA', args: {} } }] }
+    ]);
+
     // Trigger the onComplete callback with multiple cancelled tools
     await act(async () => {
       if (capturedOnComplete) {
@@ -1491,20 +1517,14 @@ describe('useGeminiStream', () => {
         'cancel-2',
       ]);
 
-      // Crucially, addHistory should be called only ONCE
-      expect(client.addHistory).toHaveBeenCalledTimes(1);
+      // Crucially, addHistory should NOT be called
+      expect(client.addHistory).not.toHaveBeenCalled();
 
-      // And that single call should contain BOTH function responses
-      expect(client.addHistory).toHaveBeenCalledWith({
-        role: 'user',
-        parts: [
-          ...cancelledToolCall1.response.responseParts,
-          ...cancelledToolCall2.response.responseParts,
-        ],
-      });
+      // Instead, history should be rolled back to pre-model length (1)
+      expect(client.getHistory().length).toBe(1);
 
       // No message should be sent back to the API for a turn with only cancellations
-      expect(mockSendMessageStream).not.toHaveBeenCalled();
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(1);
     });
   });
 
