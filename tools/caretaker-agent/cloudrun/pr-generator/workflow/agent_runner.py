@@ -1,3 +1,17 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Google Antigravity SDK Agent Runner and Context Management.
 
 Provides execution wrappers for executing Coding and Evaluator AI Agents using
@@ -7,9 +21,10 @@ and automatic local sandbox approvals.
 
 import asyncio
 import contextlib
+import json
 import logging
 import os
-from typing import Iterator
+from typing import Any, Iterator
 
 
 @contextlib.contextmanager
@@ -65,6 +80,9 @@ if hooks is not None:
         return "REJECT"
 
 
+logger = logging.getLogger("Orchestrator")
+
+
 class AgentRunnerError(Exception):
     """Raised when the AI Agent fails to run or complete execution loops."""
 
@@ -105,9 +123,10 @@ class AgentRunner:
         Returns:
             The text content if file exists, else None.
         """
-        path = os.path.abspath(os.path.join(self.script_dir, filename))
-        if not path.startswith(os.path.abspath(self.script_dir)):
-            logging.warning("Path traversal attempt detected in prompt loading: %s", filename)
+        script_dir_abs = os.path.abspath(self.script_dir)
+        path = os.path.abspath(os.path.join(script_dir_abs, filename))
+        if os.path.commonpath([path, script_dir_abs]) != script_dir_abs:
+            logger.warning("Path traversal attempt detected in prompt loading: %s", filename)
             return None
 
         if os.path.exists(path):
@@ -115,7 +134,7 @@ class AgentRunner:
                 with open(path, "r", encoding="utf-8") as f:
                     return f.read()
             except IOError as e:
-                logging.warning(
+                logger.warning(
                     "Failed to read prompt file '%s': %s", filename, e
                 )
         return None
@@ -126,7 +145,7 @@ class AgentRunner:
         prompt: str,
         repo_path: str,
         system_prompt_file: str | None = None,
-    ) -> str:
+    ) -> tuple[str, list[Any]]:
         """Launches and manages an asynchronous conversation with an Antigravity Agent.
 
         Args:
@@ -136,7 +155,7 @@ class AgentRunner:
             system_prompt_file: Optional filename of system prompt markdown.
 
         Returns:
-            A reconstructed single text block combining thoughts and outputs.
+            Tuple of (full_output_text, resolved_chunks_list).
 
         Raises:
             AgentRunnerError: If Agent fails to run or execution fails.
@@ -144,7 +163,7 @@ class AgentRunner:
         if Agent is None:
             raise AgentRunnerError("Google Antigravity SDK is not installed.")
 
-        logging.info("Initializing Agent '%s' inside %s", role, repo_path)
+        logger.info("Initializing Agent '%s' inside %s", role, repo_path)
 
         # Build fallback / configured system instructions
         system_instructions = f"You are the {role}. You must complete the requested tasks in the workspace."
@@ -152,12 +171,12 @@ class AgentRunner:
             loaded_instructions = self._load_prompt_file(system_prompt_file)
             if loaded_instructions:
                 system_instructions = loaded_instructions
-                logging.info(
+                logger.info(
                     "System prompt successfully loaded from %s",
                     system_prompt_file
                 )
             else:
-                logging.warning(
+                logger.warning(
                     "Requested system prompt file '%s' not found. Reverting to default instructions.",
                     system_prompt_file,
                 )
@@ -172,6 +191,7 @@ class AgentRunner:
             workspaces=[repo_path],
         )
 
+        resolved_chunks: list[Any] = []
         stdout_list: list[str] = []
         thinking_list: list[str] = []
 
@@ -186,66 +206,48 @@ class AgentRunner:
             async with AgentRunner._cwd_lock:
                 with working_directory(repo_path):
                     async with Agent(config) as agent:
-                        logging.info(
+                        logger.info(
                             "[%s] Sending initial task prompt to conversation loop...",
                             role,
                         )
-                        await agent.conversation.send(prompt)
+                        response = await asyncio.wait_for(agent.chat(prompt), timeout=1800.0)
+                        resolved_chunks = await asyncio.wait_for(response.resolve(), timeout=1800.0)
 
-                        step_contents: dict[int, str] = {}
-                        step_thoughts: dict[int, str] = {}
-                        printed_steps: set[tuple[int, str]] = set()
+                        for chunk in resolved_chunks:
+                            chunk_type = chunk.__class__.__name__
+                            try:
+                                chunk_dict = chunk.model_dump()
+                            except AttributeError:
+                                chunk_dict = getattr(chunk, "dict", lambda: {})()
+                            if isinstance(chunk_dict, dict):
+                                chunk_dict["chunk_type"] = chunk_type
+                            else:
+                                chunk_dict = {"chunk_type": chunk_type, "value": str(chunk)}
 
-                        async for step in agent.conversation.receive_steps():
-                            if step.content:
-                                step_contents[step.step_index] = step.content
+                            chunk_text = getattr(chunk, "text", None)
+                            if chunk_type == "Text" and chunk_text:
+                                stdout_list.append(chunk_text)
+                            elif chunk_type == "Thought" and chunk_text:
+                                thinking_list.append(chunk_text)
+                                logger.info("[%s Thought]:\n%s", role, chunk_text.strip())
+                            elif chunk_type == "ToolCall":
+                                tool_name = getattr(chunk, "name", "unknown")
+                                tool_args = getattr(chunk, "args", {})
+                                logger.info("[%s Tool Call]: %s with args %s", role, tool_name, tool_args)
 
-                            # Retrieve thoughts if available via standard properties
-                            thinking = getattr(step, "thinking", None) or getattr(
-                                step, "thinking_delta", None
-                            )
-                            if thinking:
-                                step_thoughts[step.step_index] = str(thinking)
+            full_output = "".join(stdout_list).strip()
+            if not full_output and stdout_list:
+                full_output = "\n".join(stdout_list)
 
-                            step_key = (step.step_index, str(step.status))
-                            if step_key not in printed_steps:
-                                printed_steps.add(step_key)
-                                logging.info(
-                                    "[%s Step %s] Type: %s (Source: %s, Status: %s)",
-                                    role,
-                                    step.step_index,
-                                    step.type,
-                                    step.source,
-                                    step.status,
-                                )
-                                if step.content:
-                                    logging.info("[%s Content]: %s", role, step.content)
-                                if thinking:
-                                    logging.debug("[%s Thinking]: %s", role, thinking)
-                                if step.tool_calls:
-                                    for call in step.tool_calls:
-                                        logging.info(
-                                            "[%s Tool Call]: %s with args %s",
-                                            role,
-                                            call.name,
-                                            call.args,
-                                        )
+            if full_output:
+                logger.info("[%s Response]:\n%s", role, full_output)
 
-                        # Accumulate outputs
-                        for step_idx in sorted(step_contents.keys()):
-                            stdout_list.append(step_contents[step_idx])
+            logger.info("Agent '%s' execution completed successfully.", role)
+            return full_output, resolved_chunks
 
-                        for step_idx in sorted(step_thoughts.keys()):
-                            thinking_list.append(step_thoughts[step_idx])
-
-            full_output = "\n".join(stdout_list)
-            if thinking_list:
-                joined_thoughts = "\n".join(thinking_list)
-                full_output += f"\nThoughts:\n{joined_thoughts}"
-
-            logging.info("Agent '%s' execution completed successfully.", role)
-            return full_output
-
+        except asyncio.TimeoutError as e:
+            logger.error("Agent '%s' execution timed out after 1800 seconds.", role)
+            raise AgentRunnerError(f"Agent '{role}' turn exceeded timeout of 1800s") from e
         except Exception as e:
-            logging.exception("Failed to execute agent loop for role: %s", role)
+            logger.exception("Failed to execute agent loop for role: %s", role)
             raise AgentRunnerError(f"Agent '{role}' execution failed: {e}") from e
