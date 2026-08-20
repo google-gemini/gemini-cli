@@ -628,7 +628,7 @@ class Orchestrator:
         linter_output_path = os.path.join(self.config.eval_repo_path, "linter_output.txt")
         
         try:
-            git_diff_cmd = f'git diff --name-only --diff-filter=d {self.base_ref} -- "*.ts" "*.tsx" "*.js" "*.jsx"'
+            git_diff_cmd = f'git diff --name-only --diff-filter=d {self.base_ref}...HEAD -- "*.ts" "*.tsx" "*.js" "*.jsx"'
             changed_files_out = CommandExecutor.run(git_diff_cmd, self.config.eval_repo_path).strip()
             changed_files = []
             for f in changed_files_out.split("\n"):
@@ -708,24 +708,34 @@ class Orchestrator:
         pkg_names: set[str] = set()
         downstream_map: dict[str, set[str]] = {}
 
+        # Force all workspaces to be tested if root-level config/dependency files are modified
+        root_trigger_files = {"package.json", "package-lock.json", "tsconfig.json"}
+        force_all = any(f in root_trigger_files for f in modified_files)
+
         for entry in os.listdir(packages_dir):
             pkg_json_path = os.path.join(packages_dir, entry, "package.json")
             if os.path.isfile(pkg_json_path):
                 try:
                     with open(pkg_json_path, "r", encoding="utf-8") as f:
                         data = json.load(f)
-                    name = data.get("name")
-                    if name:
-                        pkg_names.add(name)
-                        prefix = f"packages/{entry}/"
-                        if any(f.startswith(prefix) for f in modified_files):
-                            directly_modified.add(name)
+                    if isinstance(data, dict):
+                        name = data.get("name")
+                        if name:
+                            pkg_names.add(name)
+                            if force_all:
+                                directly_modified.add(name)
+                            else:
+                                prefix = f"packages/{entry}/"
+                                if any(f.startswith(prefix) for f in modified_files):
+                                    directly_modified.add(name)
 
-                        deps: set[str] = set()
-                        for dep_field in ("dependencies", "devDependencies", "peerDependencies"):
-                            deps.update(data.get(dep_field, {}).keys())
-                        for dep in deps:
-                            downstream_map.setdefault(dep, set()).add(name)
+                            deps: set[str] = set()
+                            for dep_field in ("dependencies", "devDependencies", "peerDependencies"):
+                                dep_dict = data.get(dep_field)
+                                if isinstance(dep_dict, dict):
+                                    deps.update(dep_dict.keys())
+                            for dep in deps:
+                                downstream_map.setdefault(dep, set()).add(name)
                 except Exception as e:
                     logging.warning("Error reading %s: %s", pkg_json_path, e)
 
@@ -750,7 +760,7 @@ class Orchestrator:
         logging.info("Executing E2E regression check pipeline...")
         ci_commands = [
             "npm run clean",
-            'NODE_OPTIONS="--max-old-space-size=4096" npm ci --no-audit --no-fund',
+            "npm ci --no-audit --no-fund",
             "npm run format",
             "npm run build",
             "npm run lint:ci",
@@ -772,10 +782,11 @@ class Orchestrator:
         if any(f.startswith("scripts/") or f == "esbuild.config.js" or f.startswith("sea/") for f in modified_files):
             ci_commands.append("npm run test:scripts")
 
+        ci_env = {**os.environ, "NODE_OPTIONS": "--max-old-space-size=4096"}
         try:
             for cmd in ci_commands:
                 logging.info("Running CI check: %s", cmd)
-                CommandExecutor.run(cmd, self.config.eval_repo_path)
+                CommandExecutor.run(cmd, self.config.eval_repo_path, env=ci_env)
 
             logging.info("All CI regression checks passed successfully.")
             return True
