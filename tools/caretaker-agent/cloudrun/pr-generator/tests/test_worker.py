@@ -41,13 +41,12 @@ def test_ignore_raw_ws_msg_filter():
 
 
 def test_setup_logging():
-    """Tests that setup_logging configures root logger and ssr application logger correctly."""
+    """Tests that setup_logging configures root logger correctly."""
     setup_logging()
-    assert logging.getLogger().level == logging.WARNING
-    orchestrator_logger = logging.getLogger("Orchestrator")
-    assert orchestrator_logger.level == logging.INFO
-    assert len(orchestrator_logger.handlers) == 1
-    assert isinstance(orchestrator_logger.handlers[0], logging.StreamHandler)
+    root_logger = logging.getLogger()
+    assert root_logger.level == logging.INFO
+    assert len(root_logger.handlers) == 1
+    assert isinstance(root_logger.handlers[0], logging.StreamHandler)
 
 
 @pytest.mark.asyncio
