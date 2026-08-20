@@ -46,7 +46,68 @@ export function sanitizeEnvironment(
     }
   }
 
-  return results;
+  return normalizeGitConfigEnvironment(results);
+}
+
+const GIT_CONFIG_SLOT_PATTERN = /^GIT_CONFIG_(?:KEY|VALUE)_(\d+)$/;
+
+/**
+ * Rebuilds the `GIT_CONFIG_COUNT` / `GIT_CONFIG_KEY_n` / `GIT_CONFIG_VALUE_n`
+ * triplets so the emitted environment is internally consistent.
+ *
+ * Redaction is value-first, so a secret-bearing `GIT_CONFIG_VALUE_n` is dropped
+ * while its `GIT_CONFIG_KEY_n` and the declared count survive. Git treats that
+ * gap as fatal (`error: missing config value GIT_CONFIG_VALUE_n` followed by
+ * `fatal: unable to parse command-line config`) and refuses to run at all, so
+ * every git invocation in the sanitized environment fails. Keep only the slots
+ * that survived intact, renumber them contiguously, and restate the count.
+ */
+function normalizeGitConfigEnvironment(
+  env: NodeJS.ProcessEnv,
+): NodeJS.ProcessEnv {
+  const declaredCount = env['GIT_CONFIG_COUNT'];
+  // Without a count git ignores the numbered slots entirely; leave them alone.
+  if (declaredCount === undefined) {
+    return env;
+  }
+
+  // Git parses the count strictly, so anything non-numeric is unusable.
+  const limit = /^\d+$/.test(declaredCount) ? Number(declaredCount) : 0;
+
+  const slotIndices = new Set<number>();
+  for (const name of Object.keys(env)) {
+    const match = GIT_CONFIG_SLOT_PATTERN.exec(name);
+    if (match) {
+      const index = Number(match[1]);
+      if (index < limit) {
+        slotIndices.add(index);
+      }
+    }
+  }
+
+  // Ascending order preserves git's "last value wins" precedence.
+  const survivors: Array<[string, string]> = [];
+  for (const index of [...slotIndices].sort((a, b) => a - b)) {
+    const key = env[`GIT_CONFIG_KEY_${index}`];
+    const value = env[`GIT_CONFIG_VALUE_${index}`];
+    if (key !== undefined && value !== undefined) {
+      survivors.push([key, value]);
+    }
+  }
+
+  for (const name of Object.keys(env)) {
+    if (GIT_CONFIG_SLOT_PATTERN.test(name)) {
+      delete env[name];
+    }
+  }
+
+  survivors.forEach(([key, value], index) => {
+    env[`GIT_CONFIG_KEY_${index}`] = key;
+    env[`GIT_CONFIG_VALUE_${index}`] = value;
+  });
+  env['GIT_CONFIG_COUNT'] = String(survivors.length);
+
+  return env;
 }
 
 export const ALWAYS_ALLOWED_ENVIRONMENT_VARIABLES: ReadonlySet<string> =

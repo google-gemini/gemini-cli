@@ -272,6 +272,173 @@ describe('sanitizeEnvironment', () => {
     });
   });
 
+  describe('GIT_CONFIG_* triplet consistency', () => {
+    it('should drop the whole pair when a GIT_CONFIG_VALUE is redacted, instead of leaving a gap git rejects', () => {
+      const env = {
+        GIT_CONFIG_COUNT: '2',
+        GIT_CONFIG_KEY_0: 'url.https://github.com/.insteadOf',
+        GIT_CONFIG_VALUE_0: 'https://alice:supersecret@github.com/',
+        GIT_CONFIG_KEY_1: 'core.pager',
+        GIT_CONFIG_VALUE_1: 'cat',
+      };
+      const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
+
+      // The surviving directive is renumbered so the slots stay contiguous.
+      expect(sanitized).toEqual({
+        GIT_CONFIG_COUNT: '1',
+        GIT_CONFIG_KEY_0: 'core.pager',
+        GIT_CONFIG_VALUE_0: 'cat',
+      });
+      expect(JSON.stringify(sanitized)).not.toContain('supersecret');
+    });
+
+    it('should drop the whole pair when a GIT_CONFIG_KEY is redacted', () => {
+      const env = {
+        GIT_CONFIG_COUNT: '2',
+        GIT_CONFIG_KEY_0: 'core.pager',
+        GIT_CONFIG_VALUE_0: 'cat',
+        GIT_CONFIG_KEY_1: 'url.https://bob:hunter2@github.com/.insteadOf',
+        GIT_CONFIG_VALUE_1: 'https://github.com/',
+      };
+      const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
+
+      expect(sanitized).toEqual({
+        GIT_CONFIG_COUNT: '1',
+        GIT_CONFIG_KEY_0: 'core.pager',
+        GIT_CONFIG_VALUE_0: 'cat',
+      });
+      expect(JSON.stringify(sanitized)).not.toContain('hunter2');
+    });
+
+    it('should leave a fully intact git config environment untouched', () => {
+      const env = {
+        GIT_CONFIG_COUNT: '2',
+        GIT_CONFIG_KEY_0: 'credential.helper',
+        GIT_CONFIG_VALUE_0: '',
+        GIT_CONFIG_KEY_1: 'core.pager',
+        GIT_CONFIG_VALUE_1: 'cat',
+      };
+      const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
+      expect(sanitized).toEqual(env);
+    });
+
+    it('should preserve relative order so git still applies the last value for a key', () => {
+      const env = {
+        GIT_CONFIG_COUNT: '3',
+        GIT_CONFIG_KEY_0: 'core.pager',
+        GIT_CONFIG_VALUE_0: 'less',
+        GIT_CONFIG_KEY_1: 'user.name',
+        GIT_CONFIG_VALUE_1: 'ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+        GIT_CONFIG_KEY_2: 'core.pager',
+        GIT_CONFIG_VALUE_2: 'cat',
+      };
+      const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
+
+      expect(sanitized).toEqual({
+        GIT_CONFIG_COUNT: '2',
+        GIT_CONFIG_KEY_0: 'core.pager',
+        GIT_CONFIG_VALUE_0: 'less',
+        GIT_CONFIG_KEY_1: 'core.pager',
+        GIT_CONFIG_VALUE_1: 'cat',
+      });
+    });
+
+    it('should reset a non-numeric GIT_CONFIG_COUNT that git would reject outright', () => {
+      const env = {
+        GIT_CONFIG_COUNT: 'NaN',
+        GIT_CONFIG_KEY_0: 'core.pager',
+        GIT_CONFIG_VALUE_0: 'cat',
+      };
+      const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
+      expect(sanitized).toEqual({ GIT_CONFIG_COUNT: '0' });
+    });
+
+    it('should repair a count that over-declares how many pairs exist', () => {
+      const env = {
+        GIT_CONFIG_COUNT: '5',
+        GIT_CONFIG_KEY_0: 'core.pager',
+        GIT_CONFIG_VALUE_0: 'cat',
+      };
+      const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
+      expect(sanitized).toEqual({
+        GIT_CONFIG_COUNT: '1',
+        GIT_CONFIG_KEY_0: 'core.pager',
+        GIT_CONFIG_VALUE_0: 'cat',
+      });
+    });
+
+    it('should drop slots that sit beyond the declared count, which git ignores', () => {
+      const env = {
+        GIT_CONFIG_COUNT: '1',
+        GIT_CONFIG_KEY_0: 'core.pager',
+        GIT_CONFIG_VALUE_0: 'cat',
+        GIT_CONFIG_KEY_7: 'core.hooksPath',
+        GIT_CONFIG_VALUE_7: '/tmp/stale',
+      };
+      const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
+      expect(sanitized).toEqual({
+        GIT_CONFIG_COUNT: '1',
+        GIT_CONFIG_KEY_0: 'core.pager',
+        GIT_CONFIG_VALUE_0: 'cat',
+      });
+    });
+
+    it('should not touch numbered slots when GIT_CONFIG_COUNT is absent', () => {
+      const env = {
+        GIT_CONFIG_KEY_0: 'core.pager',
+        GIT_CONFIG_VALUE_0: 'cat',
+      };
+      const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
+      expect(sanitized).toEqual(env);
+    });
+
+    it('should keep the other GIT_CONFIG_* variables that are not numbered slots', () => {
+      const env = {
+        GIT_CONFIG_GLOBAL: '/dev/null',
+        GIT_CONFIG_SYSTEM: '/dev/null',
+        GIT_CONFIG_NOSYSTEM: '1',
+        GIT_CONFIG_COUNT: '1',
+        GIT_CONFIG_KEY_0: 'core.pager',
+        GIT_CONFIG_VALUE_0: 'cat',
+      };
+      const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
+      expect(sanitized).toEqual(env);
+    });
+
+    it('should not rewrite the environment when redaction is disabled', () => {
+      const env = {
+        GIT_CONFIG_COUNT: '5',
+        GIT_CONFIG_KEY_0: 'core.pager',
+        GIT_CONFIG_VALUE_0: 'cat',
+      };
+      const sanitized = sanitizeEnvironment(env, {
+        allowedEnvironmentVariables: [],
+        blockedEnvironmentVariables: [],
+        enableEnvironmentVariableRedaction: false,
+      });
+      expect(sanitized).toEqual(env);
+    });
+
+    it('should keep the triplets consistent under strict GitHub sanitization', () => {
+      const env = {
+        GITHUB_SHA: 'abc123',
+        GIT_CONFIG_COUNT: '2',
+        GIT_CONFIG_KEY_0: 'http.extraheader',
+        GIT_CONFIG_VALUE_0:
+          'AUTHORIZATION: bearer eyJhbGciOiJIUzI1NiJ9.e30.ZRrHA157xAA_7962-a_3rA',
+        GIT_CONFIG_KEY_1: 'core.pager',
+        GIT_CONFIG_VALUE_1: 'cat',
+      };
+      const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
+
+      expect(sanitized).toEqual({
+        GIT_CONFIG_COUNT: '1',
+        GIT_CONFIG_KEY_0: 'core.pager',
+        GIT_CONFIG_VALUE_0: 'cat',
+      });
+    });
+  });
+
   it('should ensure all names in the sets are capitalized', () => {
     for (const name of ALWAYS_ALLOWED_ENVIRONMENT_VARIABLES) {
       expect(name).toBe(name.toUpperCase());

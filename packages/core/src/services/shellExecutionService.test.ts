@@ -2180,6 +2180,50 @@ describe('ShellExecutionService environment variables', () => {
     vi.unstubAllEnvs();
   });
 
+  it('should ignore a non-numeric inherited GIT_CONFIG_COUNT instead of emitting a count git rejects', async () => {
+    vi.resetModules();
+    vi.stubEnv('GIT_CONFIG_COUNT', 'not-a-number');
+
+    const { ShellExecutionService } = await import(
+      './shellExecutionService.js'
+    );
+
+    mockGetPty.mockResolvedValue(null); // Force child_process fallback
+    await ShellExecutionService.execute(
+      'test-cp-bogus-git-count',
+      '/',
+      vi.fn(),
+      new AbortController().signal,
+      false, // non-interactive
+      shellExecutionConfig,
+    );
+
+    expect(mockCpSpawn).toHaveBeenCalled();
+    const cpEnv = mockCpSpawn.mock.calls[0][2].env;
+
+    // A NaN index would produce GIT_CONFIG_KEY_NaN and GIT_CONFIG_COUNT=NaN,
+    // which git rejects with "bogus count in GIT_CONFIG_COUNT".
+    expect(cpEnv).not.toHaveProperty('GIT_CONFIG_KEY_NaN');
+    expect(cpEnv).not.toHaveProperty('GIT_CONFIG_VALUE_NaN');
+    expect(cpEnv['GIT_CONFIG_COUNT']).toMatch(/^\d+$/);
+
+    // The overrides restart at slot 0 and every declared slot is populated.
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_0', 'credential.helper');
+    const declaredCount = Number(cpEnv['GIT_CONFIG_COUNT']);
+    expect(declaredCount).toBeGreaterThan(0);
+    for (let i = 0; i < declaredCount; i++) {
+      expect(cpEnv[`GIT_CONFIG_KEY_${i}`]).toBeDefined();
+      expect(cpEnv[`GIT_CONFIG_VALUE_${i}`]).toBeDefined();
+    }
+
+    // Ensure child_process exits
+    mockChildProcess.emit('exit', 0, null);
+    mockChildProcess.emit('close', 0, null);
+    await new Promise(process.nextTick);
+
+    vi.unstubAllEnvs();
+  });
+
   it('should include headless git and gh environment variables in interactive fallback mode', async () => {
     vi.resetModules();
     vi.stubEnv('GIT_TERMINAL_PROMPT', undefined);
