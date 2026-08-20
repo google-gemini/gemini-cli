@@ -852,12 +852,10 @@ describe('GeminiChat', () => {
         })(),
       ).resolves.not.toThrow();
 
-      // Verify history now ends with a successful model turn containing the tool execution completed placeholder
+      // Verify history now ends with a successful model turn containing the empty parts array
       const lastTurn = chat.agentHistory.get()[chat.agentHistory.length - 1];
       expect(lastTurn.content.role).toBe('model');
-      expect(lastTurn.content.parts).toEqual([
-        { text: '[Tool execution completed.]' },
-      ]);
+      expect(lastTurn.content.parts).toEqual([]);
     });
 
     it('should succeed when there is a tool call without finish reason', async () => {
@@ -1021,9 +1019,7 @@ describe('GeminiChat', () => {
         turns[turns.length - 2].content.parts?.[0]?.functionResponse,
       ).toBeDefined();
       expect(turns[turns.length - 1].content.role).toBe('model');
-      expect(turns[turns.length - 1].content.parts).toEqual([
-        { text: '[Tool execution completed.]' },
-      ]);
+      expect(turns[turns.length - 1].content.parts).toEqual([]);
     });
 
     it('should not fuse the next user message into a preserved tool-response turn', async () => {
@@ -1316,9 +1312,7 @@ describe('GeminiChat', () => {
         turns[turns.length - 2].content.parts?.[1]?.fileData,
       ).toBeDefined();
       expect(turns[turns.length - 1].content.role).toBe('model');
-      expect(turns[turns.length - 1].content.parts).toEqual([
-        { text: '[Tool execution completed.]' },
-      ]);
+      expect(turns[turns.length - 1].content.parts).toEqual([]);
     });
 
     it('should restore the lastPromptTokenCount baseline on history rollback when InvalidStreamError is thrown', async () => {
