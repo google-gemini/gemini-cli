@@ -268,6 +268,34 @@ describe('AgentRegistry', () => {
       ).toHaveBeenCalledTimes(2);
     });
 
+    it('should load user agents only once when workspace is the home directory', async () => {
+      mockConfig = makeMockedConfig({ enableAgents: true });
+      registry = new TestableAgentRegistry(mockConfig);
+      vi.spyOn(mockConfig.storage, 'isWorkspaceHomeDir').mockReturnValue(true);
+
+      const agent = { ...MOCK_AGENT_V1, name: 'home-agent' };
+      vi.mocked(tomlLoader.loadAgentsFromDirectory).mockResolvedValueOnce({
+        agents: [agent],
+        errors: [],
+      });
+
+      const feedbackSpy = vi
+        .spyOn(coreEvents, 'emitFeedback')
+        .mockImplementation(() => {});
+
+      await registry.initialize();
+
+      // loadAgentsFromDirectory called only once (project pass skipped, user pass runs)
+      expect(
+        vi.mocked(tomlLoader.loadAgentsFromDirectory),
+      ).toHaveBeenCalledTimes(1);
+      expect(feedbackSpy).not.toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining('Duplicate agent name'),
+      );
+      expect(registry.getDefinition('home-agent')).toBeDefined();
+    });
+
     it('should NOT load TOML agents when enableAgents is false', async () => {
       const disabledConfig = makeMockedConfig({
         enableAgents: false,
