@@ -199,6 +199,14 @@ describe('loggers', () => {
         { tokens_before: 9001, tokens_after: 9000 },
       );
     });
+
+    it('wraps OTel emit and metrics inside bufferTelemetryEvent', () => {
+      logChatCompression(
+        makeFakeConfig(),
+        makeChatCompressionEvent({ tokens_before: 100, tokens_after: 50 }),
+      );
+      expect(sdk.bufferTelemetryEvent).toHaveBeenCalled();
+    });
   });
 
   describe('logCliConfiguration', () => {
