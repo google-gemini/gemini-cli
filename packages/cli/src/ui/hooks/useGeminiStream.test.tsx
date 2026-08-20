@@ -982,9 +982,7 @@ describe('useGeminiStream', () => {
       } as any,
     ];
     const client = new MockedGeminiClientClass(mockConfig);
-    client.setHistory([
-      { role: 'user', parts: [{ text: 'User prompt' }] }
-    ]);
+    client.setHistory([{ role: 'user', parts: [{ text: 'User prompt' }] }]);
 
     // Capture the onComplete callback
     let capturedOnComplete:
@@ -1034,7 +1032,10 @@ describe('useGeminiStream', () => {
     // Model issues a functionCall request, which appends to history
     client.setHistory([
       { role: 'user', parts: [{ text: 'User prompt' }] },
-      { role: 'model', parts: [{ functionCall: { name: 'testTool', args: {} } }] }
+      {
+        role: 'model',
+        parts: [{ functionCall: { name: 'testTool', args: {} } }],
+      },
     ]);
 
     // Trigger the onComplete callback with cancelled tools
@@ -1447,9 +1448,7 @@ describe('useGeminiStream', () => {
     };
     const allCancelledTools = [cancelledToolCall1, cancelledToolCall2];
     const client = new MockedGeminiClientClass(mockConfig);
-    client.setHistory([
-      { role: 'user', parts: [{ text: 'User prompt' }] }
-    ]);
+    client.setHistory([{ role: 'user', parts: [{ text: 'User prompt' }] }]);
 
     let capturedOnComplete:
       | ((completedTools: TrackedToolCall[]) => Promise<void>)
@@ -1498,7 +1497,7 @@ describe('useGeminiStream', () => {
     // Model issues model turns, which appends to history
     client.setHistory([
       { role: 'user', parts: [{ text: 'User prompt' }] },
-      { role: 'model', parts: [{ functionCall: { name: 'toolA', args: {} } }] }
+      { role: 'model', parts: [{ functionCall: { name: 'toolA', args: {} } }] },
     ]);
 
     // Trigger the onComplete callback with multiple cancelled tools

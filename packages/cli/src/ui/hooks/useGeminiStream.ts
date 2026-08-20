@@ -1708,7 +1708,8 @@ export const useGeminiStream = (
             }
 
             if (geminiClient) {
-              historyLengthAfterUserPromptRef.current = geminiClient.getHistory().length;
+              historyLengthAfterUserPromptRef.current =
+                geminiClient.getHistory().length;
             }
 
             if (!options?.isContinuation) {
@@ -2091,11 +2092,14 @@ export const useGeminiStream = (
         }
         setIsResponding(false);
 
-        if (geminiClient && historyLengthAfterUserPromptRef.current !== undefined) {
+        if (
+          geminiClient &&
+          historyLengthAfterUserPromptRef.current !== undefined
+        ) {
           const targetLength = historyLengthAfterUserPromptRef.current;
           if (geminiClient.getHistory().length > targetLength) {
             geminiClient.setHistory(
-              geminiClient.getHistory().slice(0, targetLength)
+              geminiClient.getHistory().slice(0, targetLength),
             );
           }
         }
