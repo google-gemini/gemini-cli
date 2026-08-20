@@ -67,7 +67,7 @@ def _clean_error_message(e: Exception) -> str:
                 return line.strip()
     for line in msg.splitlines():
         clean = line.strip()
-        if clean and not clean.startswith(":") and not clean.startswith("{") and "servomatic" not in clean and "rpc_idenitifer" not in clean:
+        if clean and not clean.startswith(":") and not clean.startswith("{") and "servomatic" not in clean and "rpc_identifier" not in clean:
             return clean[:200]
     return str(e)[:200]
 
@@ -648,6 +648,7 @@ class Orchestrator:
                 "0",
                 "--no-error-on-unmatched-pattern",
                 "--no-warn-ignored",
+                "--",
             ] + changed_files
             eslint_env = {**os.environ, "NODE_OPTIONS": "--max-old-space-size=4096"}
             try:
