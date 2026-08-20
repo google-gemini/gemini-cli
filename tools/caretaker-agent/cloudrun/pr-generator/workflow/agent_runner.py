@@ -194,7 +194,6 @@ class AgentRunner:
         )
 
         resolved_chunks: list[Any] = []
-        serialized_chunks: list[dict[str, Any]] = []
         stdout_list: list[str] = []
         thinking_list: list[str] = []
 
@@ -218,16 +217,6 @@ class AgentRunner:
 
                         for chunk in resolved_chunks:
                             chunk_type = chunk.__class__.__name__
-                            try:
-                                chunk_dict = chunk.model_dump()
-                            except AttributeError:
-                                chunk_dict = getattr(chunk, "dict", lambda: {})()
-                            if isinstance(chunk_dict, dict):
-                                chunk_dict["chunk_type"] = chunk_type
-                            else:
-                                chunk_dict = {"chunk_type": chunk_type, "value": str(chunk)}
-                            serialized_chunks.append(chunk_dict)
-
                             chunk_text = getattr(chunk, "text", None)
                             if chunk_type == "Text" and chunk_text:
                                 stdout_list.append(chunk_text)
@@ -248,7 +237,7 @@ class AgentRunner:
                 logger.info("[%s Response]:\n%s", role, full_output)
 
             logger.info("Agent '%s' execution completed successfully.", role)
-            return full_output, serialized_chunks
+            return full_output, resolved_chunks
 
         except asyncio.TimeoutError as e:
             logger.error("Agent '%s' execution timed out after 1800 seconds.", role)
