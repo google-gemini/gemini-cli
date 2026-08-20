@@ -47,6 +47,31 @@ from db.db_interface import (
     IssueStatus,
 )
 from preflight_filter import PreflightFilter
+from gcs_logger import (
+    upload_agent_trajectory_log,
+    upload_git_diff,
+    upload_pr_details,
+    _get_utc_timestamp,
+)
+
+
+logger = logging.getLogger("Orchestrator")
+
+
+def _clean_error_message(e: Exception) -> str:
+    """Extracts a concise, single-line error summary from AgentRunnerError, stripping protobuf dumps."""
+    msg = str(e)
+    if "request failed" in msg:
+        for line in msg.splitlines():
+            if "request failed" in line:
+                return line.strip()
+    for line in msg.splitlines():
+        clean = line.strip()
+        if clean and not clean.startswith(":") and not clean.startswith("{") and "servomatic" not in clean and "rpc_idenitifer" not in clean:
+            return clean[:200]
+    return str(e)[:200]
+
+MAX_MODIFIED_LINES_LIMIT = 500
 
 
 def _remove_readonly(func: Any, path: str, exc_info: Any) -> None:
@@ -72,6 +97,7 @@ class Orchestrator:
             config: Initialized Config instance.
         """
         self.config = config
+        self.base_ref = "origin/main"
         orchestrator_dir = os.path.dirname(os.path.abspath(__file__))
         prompts_dir = os.path.join(os.path.dirname(orchestrator_dir), "agent_prompts")
         self.agent_runner = AgentRunner(
@@ -200,7 +226,7 @@ class Orchestrator:
             self._sync_or_clone_repository()
             try:
                 # TODO: Add logic to fetch and checkout the existing branch if responding to user feedback
-                CommandExecutor.run(["git", "checkout", "-B", branch_name, "origin/main"], self.config.pr_repo_path)
+                CommandExecutor.run(["git", "checkout", "-B", branch_name, self.base_ref], self.config.pr_repo_path)
             except CommandExecutionError as e:
                 raise OrchestrationError(f"Failed to checkout feature branch {branch_name}: {e}") from e
 
@@ -224,22 +250,44 @@ class Orchestrator:
             loop_count = 0
             verdict = "NEEDS_REVISION"
             commit_line_count = 0
+            run_timestamp = _get_utc_timestamp()
 
             while loop_count < self.config.max_attempts and not approved:
                 loop_count += 1
-                logging.info("=== Starting Iteration %s/%s ===", loop_count, self.config.max_attempts)
+                commit_line_count = 0
+                logger.info("=== Starting Iteration %s/%s ===", loop_count, self.config.max_attempts)
 
                 # --- PHASE 1: CODE GENERATION ---
-                await self._run_code_generation(loop_count)
+                await self._run_code_generation(
+                    iteration=loop_count,
+                    owner=owner,
+                    repo=repo,
+                    issue_num=issue_num,
+                    timestamp=run_timestamp,
+                )
 
                 # Consolidate edits and generate diff
-                diff_content = self._prepare_iteration_commit(issue_num, loop_count)
+                diff_content = self._prepare_iteration_commit(
+                    issue_num=issue_num,
+                    iteration=loop_count,
+                    owner=owner,
+                    repo=repo,
+                    timestamp=run_timestamp,
+                )
                 if not diff_content:
                     # No changes detected in code generation
                     continue
 
                 # --- PHASE 2: EVALUATION ---
-                verdict = await self._run_evaluation(diff_content, firestore_doc)
+                verdict = await self._run_evaluation(
+                    diff_content=diff_content,
+                    firestore_doc=firestore_doc,
+                    owner=owner,
+                    repo=repo,
+                    issue_num=issue_num,
+                    timestamp=run_timestamp,
+                    iteration=loop_count,
+                )
 
                 if verdict in ["APPROVED", "PASS"]:
                     logging.info("Evaluator approved the patch. Launching deterministic regression pre-flights...")
@@ -247,7 +295,7 @@ class Orchestrator:
                     
                     if approved:
                         try:
-                            diff_stat = CommandExecutor.run("git diff --stat origin/main", self.config.pr_repo_path)
+                            diff_stat = CommandExecutor.run(f"git diff --stat {self.base_ref}", self.config.pr_repo_path)
                             logging.info("Diff Stat summary:\n%s", diff_stat)
                             lines = diff_stat.strip().split("\n")
                             last_line = lines[-1] if lines else ""
@@ -269,39 +317,54 @@ class Orchestrator:
             # --- POST LOOP RESOLUTION ---
             if approved:
                 logging.info("=== PATCH APPROVED ===")
-                if commit_line_count > 500:
+                if commit_line_count > MAX_MODIFIED_LINES_LIMIT:
                     logging.error(
-                        "Verdict: APPROVED but modified line size (%s) exceeds 500 limit. Moving to NEEDS_HUMAN.",
+                        "Verdict: APPROVED but modified line size (%s) exceeds %s limit. Moving to NEEDS_HUMAN.",
                         commit_line_count,
+                        MAX_MODIFIED_LINES_LIMIT,
                     )
                     try:
                         mark_needs_human(
                             lock_holder=execution_id,
-                            reason=f"Commit modifications ({commit_line_count} lines) exceed 500 lines limit.",
+                            reason=f"Commit modifications ({commit_line_count} lines) exceed {MAX_MODIFIED_LINES_LIMIT} lines limit.",
                             doc_id=doc_id,
                             owner=owner,
                             repo=repo,
                             issue_number=issue_num,
                         )
                     except Exception as e:
-                        logging.error("Failed to update Firestore status to NEEDS_HUMAN: %s", e)
+                        logger.error("Failed to update Firestore status to NEEDS_HUMAN: %s", e)
                     return
                 else:
                     pr_number = await self._submit_pull_request(issue_num, issue_id, branch_name)
-                    try:
-                        mark_pr_created(
-                            lock_holder=execution_id,
-                            pr_number=pr_number or "",
-                            doc_id=doc_id,
-                            owner=owner,
-                            repo=repo,
-                            issue_number=issue_num,
-                            status=IssueStatus.PR_EVALUATION_PENDING.value,
-                        )
-                    except Exception as e:
-                        logging.error("Failed to update Firestore status to PR_EVALUATION_PENDING: %s", e)
+                    if pr_number:
+                        try:
+                            mark_pr_created(
+                                lock_holder=execution_id,
+                                pr_number=pr_number,
+                                doc_id=doc_id,
+                                owner=owner,
+                                repo=repo,
+                                issue_number=issue_num,
+                                status=IssueStatus.PR_EVALUATION_PENDING.value,
+                            )
+                        except Exception as e:
+                            logger.error("Failed to update Firestore status to PR_EVALUATION_PENDING: %s", e)
+                    else:
+                        logger.warning("PR creation skipped or returned no PR number. Escalating to NEEDS_HUMAN.")
+                        try:
+                            mark_needs_human(
+                                lock_holder=execution_id,
+                                reason="PR creation skipped: GitHub token not configured or PR creation returned no PR number.",
+                                doc_id=doc_id,
+                                owner=owner,
+                                repo=repo,
+                                issue_number=issue_num,
+                            )
+                        except Exception as e:
+                            logger.error("Failed to update Firestore status to NEEDS_HUMAN: %s", e)
             else:
-                logging.error(
+                logger.error(
                     "=== PR REJECTED (Exceeded max loop attempts %s) ===",
                     self.config.max_attempts,
                 )
@@ -335,7 +398,14 @@ class Orchestrator:
                 logging.error("Failed to release lock on error: %s", db_err)
             raise
 
-    async def _run_code_generation(self, iteration: int) -> None:
+    async def _run_code_generation(
+        self,
+        iteration: int,
+        owner: str = "unknown_owner",
+        repo: str = "unknown_repo",
+        issue_num: int | str = "0",
+        timestamp: str | None = None,
+    ) -> None:
         """Runs the Google Antigravity Coding Agent to fix the bug."""
         logging.info("Starting Code Generation Agent...")
         if iteration == 1:
@@ -345,8 +415,9 @@ class Orchestrator:
                 "to apply the code modifications to the target files in implementation_plan.files_to_modify "
                 "and add the requested test assertions to testing_strategy.test_file. "
                 "Do NOT conclude your session after only viewing files or running baseline tests without making edits. "
-                "You are running in a headless sandbox environment. Execute any necessary test commands "
-                "using your run_command tool (e.g. npx vitest run <test_file>). Do NOT ask for permission in the chat."
+                "You are running in a headless sandbox environment. Execute targeted test commands only "
+                "using your run_command tool with WaitMsBeforeAsync: 10000 (e.g. npx vitest run <test_file>). "
+                "Do NOT run full package test suites. Do NOT ask for permission in the chat."
             )
             prompt_file = "bug_fixer_prompt.md"
         else:
@@ -354,49 +425,94 @@ class Orchestrator:
                 "Use the feedback in pr_feedback.md to address the remaining issues in the code and tests. "
                 "CRITICAL: You MUST apply file modifications to the codebase using replace_file_content or write_file. "
                 "Original spec is at firestore_doc.json. "
-                "You are running in a headless sandbox environment. Execute any necessary test or build commands "
-                "directly using your run_command tool. Do NOT ask for permission in the chat."
+                "You are running in a headless sandbox environment. Execute targeted test commands only "
+                "using your run_command tool with WaitMsBeforeAsync: 10000 (e.g. npx vitest run <test_file>). "
+                "Do NOT run full package test suites. Do NOT ask for permission in the chat."
             )
             prompt_file = "code_revision_prompt.md"
 
         try:
-            await self.agent_runner.run_agent(
+            _, coding_chunks = await self.agent_runner.run_agent(
                 role="Coding Agent",
                 prompt=prompt,
                 repo_path=self.config.pr_repo_path,
                 system_prompt_file=prompt_file,
             )
+            upload_agent_trajectory_log(
+                owner=owner,
+                repo=repo,
+                agent_role_folder="coding_agent",
+                issue_number=issue_num,
+                resolved_chunks=coding_chunks,
+                timestamp=timestamp,
+                attempt_index=iteration,
+            )
         except AgentRunnerError as e:
-            logging.error("Coding Agent run encountered an error: %s. Transitioning to evaluation...", e)
+            clean_err = _clean_error_message(e)
+            logger.error("Coding Agent run encountered an error: %s. Transitioning to evaluation...", clean_err)
 
-    def _prepare_iteration_commit(self, issue_num: int | str, iteration: int) -> str | None:
+    def _prepare_iteration_commit(
+        self,
+        issue_num: int | str,
+        iteration: int,
+        owner: str = "unknown_owner",
+        repo: str = "unknown_repo",
+        timestamp: str | None = None,
+    ) -> str | None:
         """Consolidates all file edits and stages a soft commit.
 
         Returns:
-            The raw diff comparison string to origin/main, or None if no changes.
+            The raw diff comparison string to base_ref, or None if no changes.
         """
         logging.info("Staging workspace modifications and soft-committing...")
         try:
             CommandExecutor.run(["git", "add", "."], self.config.pr_repo_path)
-            CommandExecutor.run(["git", "reset", "--soft", "origin/main"], self.config.pr_repo_path)
+            CommandExecutor.run(["git", "reset", "--soft", self.base_ref], self.config.pr_repo_path)
             
             git_status = CommandExecutor.run(["git", "status", "--porcelain"], self.config.pr_repo_path)
             if git_status:
                 commit_msg = f"[SSR Agent] Issue Fix: issues/{issue_num}"
                 CommandExecutor.run(["git", "commit", "-m", commit_msg, "--allow-empty", "--no-verify"], self.config.pr_repo_path)
             else:
-                logging.info("No modifications staged against origin/main in this iteration.")
-                if iteration == 1:
-                    logging.error("Failed to generate any code changes in the first iteration. Aborting.")
-                    raise OrchestrationError("Failed to generate any code changes in the first iteration.")
+                logging.info("No modifications staged against %s in iteration %s.", self.base_ref, iteration)
+                # Write feedback into pr_feedback.md so subsequent iterations guide the agent
+                feedback_msg = (
+                    "You concluded your previous session without modifying any files. "
+                    "You MUST apply the required code changes using replace_file_content or write_file."
+                )
+                try:
+                    feedback_file = os.path.join(self.config.pr_repo_path, "pr_feedback.md")
+                    with open(feedback_file, "w", encoding="utf-8") as f:
+                        f.write(feedback_msg)
+                    logging.info("Wrote no-modifications feedback to %s", feedback_file)
+                except IOError as io_err:
+                    logging.warning("Failed to write no-modifications feedback to pr_feedback.md: %s", io_err)
                 return None
 
-            return CommandExecutor.run(["git", "diff", "origin/main"], self.config.pr_repo_path)
+            diff_content = CommandExecutor.run(["git", "diff", self.base_ref], self.config.pr_repo_path)
+            if diff_content:
+                upload_git_diff(
+                    owner=owner,
+                    repo=repo,
+                    issue_number=issue_num,
+                    diff_content=diff_content,
+                    timestamp=timestamp,
+                )
+            return diff_content
         except CommandExecutionError as e:
             logging.error("Failed to stage iteration commit or generate diff: %s", e)
             return None
 
-    async def _run_evaluation(self, diff_content: str, firestore_doc: dict[str, Any]) -> str:
+    async def _run_evaluation(
+        self,
+        diff_content: str,
+        firestore_doc: dict[str, Any],
+        owner: str = "unknown_owner",
+        repo: str = "unknown_repo",
+        issue_num: int | str = "0",
+        timestamp: str | None = None,
+        iteration: int = 1,
+    ) -> str:
         """Sets up the evaluation sandbox workspace and runs the Evaluator Agent."""
         logging.info("Starting Evaluation Agent phase...")
         self._clean_eval_dir()
@@ -457,14 +573,40 @@ class Orchestrator:
         )
 
         try:
-            await self.agent_runner.run_agent(
+            _, eval_chunks = await self.agent_runner.run_agent(
                 role="Evaluator Agent",
                 prompt=eval_prompt,
                 repo_path=self.config.eval_repo_path,
                 system_prompt_file="code_evaluator_prompt.md",
             )
+            upload_agent_trajectory_log(
+                owner=owner,
+                repo=repo,
+                agent_role_folder="eval_agent",
+                issue_number=issue_num,
+                resolved_chunks=eval_chunks,
+                timestamp=timestamp,
+                attempt_index=iteration,
+            )
         except AgentRunnerError as e:
-            logging.error("Evaluator Agent execution crashed: %s", e)
+            clean_err = _clean_error_message(e)
+            logger.error("Evaluator Agent execution crashed: %s", clean_err)
+
+        # Upload PR details if created by Evaluator Agent
+        pr_details_path = os.path.join(self.config.eval_repo_path, "pr_details.md")
+        if os.path.exists(pr_details_path):
+            try:
+                with open(pr_details_path, "r", encoding="utf-8") as f:
+                    pr_details_content = f.read()
+                upload_pr_details(
+                    owner=owner,
+                    repo=repo,
+                    issue_number=issue_num,
+                    pr_details_content=pr_details_content,
+                    timestamp=timestamp,
+                )
+            except IOError as e:
+                logging.warning("Failed to read pr_details.md: %s", e)
 
         # Parse verdict output
         verdict_file = os.path.join(self.config.eval_repo_path, "verdict.json")
@@ -486,7 +628,7 @@ class Orchestrator:
         linter_output_path = os.path.join(self.config.eval_repo_path, "linter_output.txt")
         
         try:
-            git_diff_cmd = 'git diff origin/main... --name-only --diff-filter=d -- "*.ts" "*.tsx" "*.js" "*.jsx"'
+            git_diff_cmd = f'git diff --name-only --diff-filter=d {self.base_ref} -- "*.ts" "*.tsx" "*.js" "*.jsx"'
             changed_files_out = CommandExecutor.run(git_diff_cmd, self.config.eval_repo_path).strip()
             changed_files = []
             for f in changed_files_out.split("\n"):
@@ -527,29 +669,137 @@ class Orchestrator:
             except IOError as io_err:
                 logging.error("Failed to write empty ESLint output: %s", io_err)
 
+    def _get_modified_files(self) -> list[str]:
+        """Retrieves list of modified and added relative file paths in eval workspace."""
+        modified: set[str] = set()
+        try:
+            diff_cmd = f"git diff --name-only {self.base_ref}...HEAD"
+            out = CommandExecutor.run(diff_cmd, self.config.eval_repo_path).strip()
+            for line in out.splitlines():
+                clean = sanitize_relative_path(line)
+                if clean:
+                    modified.add(clean)
+        except Exception as e:
+            logging.warning("git diff error resolving modified files: %s", e)
+
+        try:
+            status_cmd = "git status --porcelain"
+            out = CommandExecutor.run(status_cmd, self.config.eval_repo_path).strip()
+            for line in out.splitlines():
+                if len(line) > 3:
+                    file_path = line[3:].strip()
+                    if " -> " in file_path:
+                        file_path = file_path.split(" -> ")[1].strip()
+                    clean = sanitize_relative_path(file_path)
+                    if clean:
+                        modified.add(clean)
+        except Exception as e:
+            logging.warning("git status error resolving modified files: %s", e)
+
+        return sorted(list(modified))
+
+    def _resolve_affected_workspaces(self, modified_files: list[str]) -> list[str]:
+        """Dynamically identifies directly modified workspaces and all downstream consumers."""
+        packages_dir = os.path.join(self.config.eval_repo_path, "packages")
+        if not os.path.exists(packages_dir):
+            return []
+
+        directly_modified: set[str] = set()
+        pkg_names: set[str] = set()
+        downstream_map: dict[str, set[str]] = {}
+
+        for entry in os.listdir(packages_dir):
+            pkg_json_path = os.path.join(packages_dir, entry, "package.json")
+            if os.path.isfile(pkg_json_path):
+                try:
+                    with open(pkg_json_path, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    name = data.get("name")
+                    if name:
+                        pkg_names.add(name)
+                        prefix = f"packages/{entry}/"
+                        if any(f.startswith(prefix) for f in modified_files):
+                            directly_modified.add(name)
+
+                        deps: set[str] = set()
+                        for dep_field in ("dependencies", "devDependencies", "peerDependencies"):
+                            deps.update(data.get(dep_field, {}).keys())
+                        for dep in deps:
+                            downstream_map.setdefault(dep, set()).add(name)
+                except Exception as e:
+                    logging.warning("Error reading %s: %s", pkg_json_path, e)
+
+        affected: set[str] = set(directly_modified)
+        queue: list[str] = list(directly_modified)
+
+        while queue:
+            curr = queue.pop(0)
+            for downstream in downstream_map.get(curr, []):
+                if downstream in pkg_names and downstream not in affected:
+                    affected.add(downstream)
+                    queue.append(downstream)
+
+        return sorted(list(affected))
+
     async def _run_regression_checks(self) -> bool:
-        """Runs deterministic E2E regression check pipeline.
+        """Runs deterministic E2E regression check pipeline with dynamically scoped package testing.
 
         Returns:
             True if all checks pass or bypass is approved, False otherwise.
         """
         logging.info("Executing E2E regression check pipeline...")
+        ci_commands = [
+            "npm run clean",
+            'NODE_OPTIONS="--max-old-space-size=4096" npm ci --no-audit --no-fund',
+            "npm run format",
+            "npm run build",
+            "npm run lint:ci",
+            "npm run typecheck",
+        ]
+
+        # Dynamically determine minimum affected packages to test
+        modified_files = self._get_modified_files()
+        affected_workspaces = self._resolve_affected_workspaces(modified_files)
+
+        if affected_workspaces:
+            logging.info("Dynamically testing affected workspaces (including downstream dependents): %s", affected_workspaces)
+            for ws in affected_workspaces:
+                ci_commands.append(f"npm test -w {ws} -- --no-coverage")
+        else:
+            logging.info("No package workspace code modified in PR changes. Skipping workspace unit tests.")
+
+        # If build/bundling scripts were modified, run scripts tests
+        if any(f.startswith("scripts/") or f == "esbuild.config.js" or f.startswith("sea/") for f in modified_files):
+            ci_commands.append("npm run test:scripts")
+
         try:
-            CommandExecutor.run("npm run clean", self.config.eval_repo_path)
-            CommandExecutor.run("npm ci --no-audit --no-fund", self.config.eval_repo_path)
-            
-            # Regression steps such as npm run build, npm run typecheck, and npm run test:ci are bypassed.
-            # To run them: CommandExecutor.run("npm run test:ci", self.config.eval_repo_path)
-            logging.info("Deterministic preflight regression checks bypassed.")
+            for cmd in ci_commands:
+                logging.info("Running CI check: %s", cmd)
+                CommandExecutor.run(cmd, self.config.eval_repo_path)
+
+            logging.info("All CI regression checks passed successfully.")
             return True
         except CommandExecutionError as preflight_error:
-            logging.warning("Regression checks failed: %s", preflight_error)
+            logger.warning("Regression checks failed on '%s': %s", preflight_error.cmd, preflight_error)
             
+            # Check for infrastructure/OOM crashes
+            combined_err = f"{preflight_error.stdout}\n{preflight_error.stderr}"
+            if (
+                "JavaScript heap out of memory" in combined_err
+                or "Allocation failed" in combined_err
+                or preflight_error.returncode in (137, 255)
+            ):
+                logger.error("Regression check encountered fatal container memory/OOM crash: %s", preflight_error.cmd)
+                raise OrchestrationError(
+                    f"Fatal container resource exhaustion (OOM/SIGKILL) during '{preflight_error.cmd}'. "
+                    f"Scale container memory allocation."
+                ) from preflight_error
+
             # Match bypass rule filter
-            if "test:ci" in preflight_error.cmd and PreflightFilter.should_ignore_preflight_failure(
+            if any(k in preflight_error.cmd for k in ("npm test", "test:ci", "vitest")) and PreflightFilter.should_ignore_preflight_failure(
                 preflight_error.stdout, preflight_error.stderr
             ):
-                logging.info("Bypassing regression failure due to privilege-bypass allowed list rules.")
+                logger.info("Bypassing regression failure due to privilege-bypass allowed list rules.")
                 return True
 
             # If unapproved regression error, save detailed log report to evaluator feedback
@@ -617,7 +867,7 @@ class Orchestrator:
 
                 # Parse recommended Commit Message (case-insensitive)
                 commit_match = re.search(
-                    r"##\s*Commit\s*Message\r?\n\s*(.+?)(?=\r?\n##|$)",
+                    r"##\s*Commit\s*Message\r?\n\s*(.+?)(?=\r?\n##\s|$)",
                     details_content,
                     re.IGNORECASE | re.DOTALL,
                 )
@@ -627,7 +877,7 @@ class Orchestrator:
 
                 # Parse recommended PR Description (case-insensitive)
                 desc_match = re.search(
-                    r"##\s*PR\s*Description\r?\n\s*(.+?)(?=\r?\n##|$)",
+                    r"##\s*PR\s*Description\r?\n\s*(.+?)(?=\r?\n##\s|$)",
                     details_content,
                     re.IGNORECASE | re.DOTALL,
                 )

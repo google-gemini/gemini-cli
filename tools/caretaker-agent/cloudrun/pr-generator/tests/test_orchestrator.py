@@ -53,6 +53,26 @@ def test_setup_workspace(mock_makedirs, mock_rmtree, mock_config):
     assert mock_makedirs.call_count >= 2
 
 
+@patch("shutil.rmtree")
+@patch("os.path.exists", return_value=True)
+@patch("os.makedirs")
+def test_clean_eval_dir_success(mock_makedirs, mock_exists, mock_rmtree, mock_config):
+    """Tests successful evaluation directory cleanup."""
+    orc = Orchestrator(mock_config)
+    orc._clean_eval_dir()
+    assert mock_rmtree.called
+    assert mock_makedirs.called
+
+
+@patch("shutil.rmtree", side_effect=OSError("Permission denied"))
+@patch("os.path.exists", return_value=True)
+def test_clean_eval_dir_failure_raises(mock_exists, mock_rmtree, mock_config):
+    """Tests that _clean_eval_dir raises OrchestrationError when rmtree fails."""
+    orc = Orchestrator(mock_config)
+    with pytest.raises(OrchestrationError, match="Failed to clean eval directory"):
+        orc._clean_eval_dir()
+
+
 @patch("command_executor.CommandExecutor.run")
 def test_sync_or_clone_repository(mock_cmd_run, mock_config):
     """Tests repository cloning and syncing."""
@@ -104,6 +124,24 @@ async def test_run_regression_checks_unapproved_failure(mock_cmd_run, mock_prefl
     with patch("builtins.open", MagicMock()):
         result = await orc._run_regression_checks()
     assert result is False
+
+
+@pytest.mark.asyncio
+@patch("command_executor.CommandExecutor.run")
+async def test_run_regression_checks_oom_fatal_error(mock_cmd_run, mock_config):
+    """Tests that fatal JavaScript OOM crashes raise OrchestrationError."""
+    from orchestrator import OrchestrationError
+    mock_cmd_run.side_effect = CommandExecutionError(
+        cmd="npm run lint:ci",
+        returncode=137,
+        stdout="FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory",
+        stderr="",
+    )
+
+    orc = Orchestrator(mock_config)
+    with pytest.raises(OrchestrationError) as exc_info:
+        await orc._run_regression_checks()
+    assert "Fatal container resource exhaustion (OOM/SIGKILL)" in str(exc_info.value)
 
 
 @patch("shutil.copyfile")
@@ -185,3 +223,44 @@ async def test_run_loop_max_attempts_exceeded(mock_sync, mock_setup, mock_cmd_ru
         await orc.run()
 
     mock_release_lock.assert_called_once()
+
+
+def test_resolve_affected_workspaces_direct_and_downstream(mock_config, tmp_path):
+    """Tests that modifying a foundational package identifies both direct and downstream packages."""
+    mock_config.eval_repo_path = str(tmp_path)
+    packages_dir = tmp_path / "packages"
+    packages_dir.mkdir()
+
+    # Setup core package
+    core_dir = packages_dir / "core"
+    core_dir.mkdir()
+    (core_dir / "package.json").write_text(json.dumps({"name": "@google/gemini-cli-core", "dependencies": {}}))
+
+    # Setup cli package depending on core
+    cli_dir = packages_dir / "cli"
+    cli_dir.mkdir()
+    (cli_dir / "package.json").write_text(json.dumps({
+        "name": "@google/gemini-cli",
+        "dependencies": {"@google/gemini-cli-core": "file:../core"}
+    }))
+
+    # Setup standalone a2a package
+    a2a_dir = packages_dir / "a2a"
+    a2a_dir.mkdir()
+    (a2a_dir / "package.json").write_text(json.dumps({"name": "@google/gemini-cli-a2a", "dependencies": {}}))
+
+    orc = Orchestrator(mock_config)
+
+    # 1. Core modification triggers core + downstream cli
+    affected = orc._resolve_affected_workspaces(["packages/core/src/index.ts"])
+    assert "@google/gemini-cli-core" in affected
+    assert "@google/gemini-cli" in affected
+    assert "@google/gemini-cli-a2a" not in affected
+
+    # 2. Leaf modification triggers only cli
+    affected_leaf = orc._resolve_affected_workspaces(["packages/cli/src/main.ts"])
+    assert affected_leaf == ["@google/gemini-cli"]
+
+    # 3. Non-workspace files trigger empty list
+    affected_docs = orc._resolve_affected_workspaces(["docs/reference/commands.md"])
+    assert affected_docs == []
