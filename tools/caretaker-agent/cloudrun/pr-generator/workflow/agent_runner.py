@@ -25,6 +25,7 @@ import json
 import logging
 import os
 from typing import Any, Iterator
+import weakref
 
 from command_executor import sanitize_relative_path
 
@@ -92,7 +93,9 @@ class AgentRunnerError(Exception):
 class AgentRunner:
     """Manages AI Agent setups and coordinates conversation execution loops."""
 
-    _cwd_lock: asyncio.Lock | None = None
+    _cwd_locks: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Lock] = (
+        weakref.WeakKeyDictionary()
+    )
 
     def __init__(
         self,
@@ -197,15 +200,17 @@ class AgentRunner:
         stdout_list: list[str] = []
         thinking_list: list[str] = []
 
-        if AgentRunner._cwd_lock is None:
-            AgentRunner._cwd_lock = asyncio.Lock()
+        loop = asyncio.get_running_loop()
+        if loop not in AgentRunner._cwd_locks:
+            AgentRunner._cwd_locks[loop] = asyncio.Lock()
+        cwd_lock = AgentRunner._cwd_locks[loop]
 
         try:
             # We change CWD to the repo workspace because the Antigravity SDK Agent
             # interacts relative to the current working process directory.
             # Since os.chdir is process-wide, we must serialize execution to prevent
-            # concurrent tasks from corrupting the CWD.
-            async with AgentRunner._cwd_lock:
+            # concurrent tasks from corrupting the CWD within this event loop.
+            async with cwd_lock:
                 with working_directory(repo_path):
                     async with Agent(config) as agent:
                         logger.info(
