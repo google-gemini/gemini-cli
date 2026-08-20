@@ -26,7 +26,7 @@ export function getSafeGitEnv(
     GIT_CONFIG_GLOBAL: devNullPath,
     GIT_CONFIG_SYSTEM: devNullPath,
     GIT_CONFIG_NOSYSTEM: '1',
-    GIT_CONFIG_COUNT: '8',
+    GIT_CONFIG_COUNT: '7',
     GIT_CONFIG_KEY_0: 'credential.helper',
     GIT_CONFIG_VALUE_0: '',
     GIT_CONFIG_KEY_1: 'core.fsmonitor',
@@ -41,8 +41,6 @@ export function getSafeGitEnv(
     GIT_CONFIG_VALUE_5: '',
     GIT_CONFIG_KEY_6: 'sequence.editor',
     GIT_CONFIG_VALUE_6: '',
-    GIT_CONFIG_KEY_7: 'diff.external',
-    GIT_CONFIG_VALUE_7: '',
   };
 }
 
