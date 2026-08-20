@@ -157,6 +157,29 @@ def test_get_modified_files_git_failure_raises(mock_cmd_run, mock_config):
     assert "Failed to determine modified files" in str(exc_info.value)
 
 
+@patch("command_executor.CommandExecutor.run")
+def test_get_modified_files_strips_quotes(mock_cmd_run, mock_config):
+    """Tests that _get_modified_files strips surrounding double quotes from diff and porcelain output."""
+    def cmd_side_effect(cmd, *args, **kwargs):
+        cmd_str = str(cmd)
+        if "diff" in cmd_str:
+            return '"packages/core/src/file with space.ts"\npackages/cli/src/normal.ts'
+        if "status" in cmd_str:
+            return ' M "packages/a2a/src/another space.ts"\nR  "old name.ts" -> "packages/core/src/renamed.ts"'
+        return ""
+
+    mock_cmd_run.side_effect = cmd_side_effect
+    orc = Orchestrator(mock_config)
+    modified = orc._get_modified_files()
+
+    assert modified == [
+        "packages/a2a/src/another space.ts",
+        "packages/cli/src/normal.ts",
+        "packages/core/src/file with space.ts",
+        "packages/core/src/renamed.ts",
+    ]
+
+
 @pytest.mark.asyncio
 @patch.object(Orchestrator, "_resolve_affected_workspaces", return_value=["--malicious-pkg"])
 @patch.object(Orchestrator, "_get_modified_files", return_value=["packages/malicious/package.json"])

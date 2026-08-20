@@ -632,7 +632,7 @@ class Orchestrator:
             changed_files_out = CommandExecutor.run(git_diff_cmd, self.config.eval_repo_path).strip()
             changed_files = []
             for f in changed_files_out.split("\n"):
-                safe_path = sanitize_relative_path(f)
+                safe_path = sanitize_relative_path(f.strip().strip('"'))
                 if safe_path:
                     changed_files.append(safe_path)
         except CommandExecutionError as e:
@@ -678,7 +678,7 @@ class Orchestrator:
             diff_cmd = f"git diff --name-only {self.base_ref}...HEAD"
             out = CommandExecutor.run(diff_cmd, self.config.eval_repo_path).strip()
             for line in out.splitlines():
-                clean = sanitize_relative_path(line)
+                clean = sanitize_relative_path(line.strip().strip('"'))
                 if clean:
                     modified.add(clean)
         except Exception as e:
@@ -693,7 +693,7 @@ class Orchestrator:
                     file_path = line[3:].strip()
                     if " -> " in file_path:
                         file_path = file_path.split(" -> ")[1].strip()
-                    clean = sanitize_relative_path(file_path)
+                    clean = sanitize_relative_path(file_path.strip('"'))
                     if clean:
                         modified.add(clean)
         except Exception as e:
