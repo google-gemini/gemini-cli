@@ -26,6 +26,8 @@ import logging
 import os
 from typing import Any, Iterator
 
+from command_executor import sanitize_relative_path
+
 
 @contextlib.contextmanager
 def working_directory(path: str | os.PathLike) -> Iterator[None]:
@@ -123,11 +125,11 @@ class AgentRunner:
         Returns:
             The text content if file exists, else None.
         """
-        script_dir_abs = os.path.abspath(self.script_dir)
-        path = os.path.abspath(os.path.join(script_dir_abs, filename))
-        if os.path.commonpath([path, script_dir_abs]) != script_dir_abs:
+        safe_filename = sanitize_relative_path(filename)
+        if not safe_filename:
             logger.warning("Path traversal attempt detected in prompt loading: %s", filename)
             return None
+        path = os.path.abspath(os.path.join(self.script_dir, safe_filename))
 
         if os.path.exists(path):
             try:
@@ -155,7 +157,7 @@ class AgentRunner:
             system_prompt_file: Optional filename of system prompt markdown.
 
         Returns:
-            Tuple of (full_output_text, resolved_chunks_list).
+            Tuple of (full_output_text, serialized_chunks_list).
 
         Raises:
             AgentRunnerError: If Agent fails to run or execution fails.
@@ -187,11 +189,12 @@ class AgentRunner:
             location=self.location,
             model=self.model_name,
             system_instructions=system_instructions,
-            policies=[policy.allow_all()],
+            policies=[policy.deny_all()],
             workspaces=[repo_path],
         )
 
         resolved_chunks: list[Any] = []
+        serialized_chunks: list[dict[str, Any]] = []
         stdout_list: list[str] = []
         thinking_list: list[str] = []
 
@@ -223,6 +226,7 @@ class AgentRunner:
                                 chunk_dict["chunk_type"] = chunk_type
                             else:
                                 chunk_dict = {"chunk_type": chunk_type, "value": str(chunk)}
+                            serialized_chunks.append(chunk_dict)
 
                             chunk_text = getattr(chunk, "text", None)
                             if chunk_type == "Text" and chunk_text:
@@ -231,7 +235,8 @@ class AgentRunner:
                                 thinking_list.append(chunk_text)
                                 logger.info("[%s Thought]:\n%s", role, chunk_text.strip())
                             elif chunk_type == "ToolCall":
-                                tool_name = getattr(chunk, "name", "unknown")
+                                raw_tool_name = getattr(chunk, "name", None)
+                                tool_name = raw_tool_name.strip() if raw_tool_name and raw_tool_name.strip() else "generic_tool"
                                 tool_args = getattr(chunk, "args", {})
                                 logger.info("[%s Tool Call]: %s with args %s", role, tool_name, tool_args)
 
@@ -243,7 +248,7 @@ class AgentRunner:
                 logger.info("[%s Response]:\n%s", role, full_output)
 
             logger.info("Agent '%s' execution completed successfully.", role)
-            return full_output, resolved_chunks
+            return full_output, serialized_chunks
 
         except asyncio.TimeoutError as e:
             logger.error("Agent '%s' execution timed out after 1800 seconds.", role)
