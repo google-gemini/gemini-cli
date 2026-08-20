@@ -212,8 +212,9 @@ development setup of this project.
 2.  **Git**
     - **Windows:** Enable long paths support (`core.longpaths=true`) to avoid
       checkout failures from snapshot files exceeding the 260-character
-      `MAX_PATH` limit. If you have already cloned the repository and are experiencing issues, run:
-      `git config core.longpaths true && git checkout -- .`
+      `MAX_PATH` limit. If you have already cloned the repository and are
+      experiencing issues, run:
+      `git config --global core.longpaths true && git checkout -- .`
 
 ### Build process
 
