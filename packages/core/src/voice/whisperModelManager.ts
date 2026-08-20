@@ -121,13 +121,33 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
       }
 
       await new Promise<void>((resolve, reject) => {
-        writer.end(() => {
-          if (writeError) reject(writeError);
-          else resolve();
-        });
+        if (writeError) {
+          reject(writeError);
+          return;
+        }
+        const onFinish = () => {
+          cleanup();
+          resolve();
+        };
+        const onError = (err: Error) => {
+          cleanup();
+          reject(err);
+        };
+        const cleanup = () => {
+          writer.off('finish', onFinish);
+          writer.off('error', onError);
+        };
+        writer.once('finish', onFinish);
+        writer.once('error', onError);
+        writer.end();
       });
     } catch (err) {
-      writer.destroy();
+      if (!writer.destroyed) {
+        await new Promise<void>((resolve) => {
+          writer.once('close', () => resolve());
+          writer.destroy();
+        });
+      }
       if (fs.existsSync(tmpPath)) {
         try {
           fs.unlinkSync(tmpPath);
