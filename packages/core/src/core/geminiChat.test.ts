@@ -47,6 +47,9 @@ import { LlmRole } from '../telemetry/types.js';
 import { BINARY_INJECTION_KEY } from '../utils/generateContentResponseUtilities.js';
 import type { ResumedSessionData } from '../services/chatRecordingTypes.js';
 
+const INTERRUPTED_RESPONSE_BOUNDARY =
+  'A previous model response was interrupted after a tool result. The content that follows is a new user message. Respond to that message directly.';
+
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
 
@@ -1105,10 +1108,7 @@ describe('GeminiChat', () => {
       expect(fusedTurn).toBeUndefined();
     });
 
-    it('should not fuse the next user message into a cancelled tool response', async () => {
-      // Same defect reached by a different trigger: cancelling a tool call
-      // records its response via addHistory then returns without submitting,
-      // leaving history on an unanswered user turn just like a stream failure.
+    it('should separate a new user message from a cancelled tool response without a model placeholder', async () => {
       chat.agentHistory.push({
         id: 'model-turn-cancel',
         content: {
@@ -1150,7 +1150,10 @@ describe('GeminiChat', () => {
 
       const stream = await chat.sendMessageStream(
         { model: 'gemini-2.0-flash' },
-        "you're querying local database, I meant nprd",
+        [
+          { text: "you're querying local database, I meant nprd" },
+          { text: 'check the target before retrying' },
+        ],
         'prompt-id-cancel-fusion',
         new AbortController().signal,
         LlmRole.MAIN,
@@ -1159,45 +1162,77 @@ describe('GeminiChat', () => {
         // consume
       }
 
-      const fusedCancelTurn = capturedContents.find(
+      const repairedTurn = capturedContents.find(
         (c) =>
           c.role === 'user' &&
           !!c.parts?.some((p) => !!p.functionResponse) &&
           !!c.parts?.some((p) => p.text?.includes('I meant nprd')),
       );
-      expect(fusedCancelTurn).toBeUndefined();
-    });
-
-    it('should close a dangling tool response restored from a resumed session', async () => {
-      // The guard runs when a new user message arrives rather than when the
-      // turn fails, so it does not depend on a placeholder having been
-      // persisted. A session resumed from disk that ends on an unanswered tool
-      // response is repaired on the next message just the same.
-      chat.setHistory([
-        { role: 'user', parts: [{ text: 'run the tests' }] },
+      expect(repairedTurn?.parts).toEqual([
         {
-          role: 'model',
-          parts: [
-            { functionCall: { id: 'c1', name: 'run_shell_command', args: {} } },
-          ],
+          functionResponse: {
+            id: 'c1',
+            name: 'run_shell_command',
+            response: { error: '[Operation Cancelled]' },
+          },
         },
-        {
-          role: 'user',
-          parts: [
-            {
-              functionResponse: {
-                id: 'c1',
-                name: 'run_shell_command',
-                response: { output: 'ok' },
-              },
-            },
-          ],
-        },
+        { text: INTERRUPTED_RESPONSE_BOUNDARY },
+        { text: "you're querying local database, I meant nprd" },
+        { text: 'check the target before retrying' },
       ]);
 
-      let capturedContents: Content[] = [];
-      vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
-        async (req) => {
+      const requestText = capturedContents
+        .flatMap((content) => content.parts ?? [])
+        .map((part) => part.text ?? '')
+        .join('\n');
+      expect(requestText).not.toContain(
+        '[The previous response was interrupted before it completed.]',
+      );
+
+      const storedText = chat.agentHistory
+        .get()
+        .flatMap((turn) => turn.content.parts ?? [])
+        .map((part) => part.text ?? '')
+        .join('\n');
+      expect(storedText).not.toContain(INTERRUPTED_RESPONSE_BOUNDARY);
+    });
+
+    it.each([{ contextManagement: false }, { contextManagement: true }])(
+      'should add a transient boundary after a dangling tool response restored from a resumed session (context management: $contextManagement)',
+      async ({ contextManagement }) => {
+        vi.mocked(mockConfig.isContextManagementEnabled).mockReturnValue(
+          contextManagement,
+        );
+
+        const history: Content[] = [
+          { role: 'user', parts: [{ text: 'run the tests' }] },
+          {
+            role: 'model',
+            parts: [
+              {
+                functionCall: { id: 'c1', name: 'run_shell_command', args: {} },
+              },
+            ],
+          },
+          {
+            role: 'user',
+            parts: [
+              {
+                functionResponse: {
+                  id: 'c1',
+                  name: 'run_shell_command',
+                  response: { output: 'ok' },
+                },
+              },
+            ],
+          },
+        ];
+        chat.setHistory(history);
+
+        let capturedContents: Content[] = [];
+        vi.mocked(
+          mockContentGenerator.generateContentStream,
+        ).mockImplementation(async (req) => {
           capturedContents = req.contents as Content[];
           return (async function* () {
             yield {
@@ -1209,28 +1244,49 @@ describe('GeminiChat', () => {
               ],
             } as unknown as GenerateContentResponse;
           })();
-        },
-      );
+        });
 
-      const stream = await chat.sendMessageStream(
-        { model: 'gemini-2.0-flash' },
-        'are you done?',
-        'prompt-id-resumed-fusion',
-        new AbortController().signal,
-        LlmRole.MAIN,
-      );
-      for await (const _ of stream) {
-        // consume
-      }
+        const stream = await chat.sendMessageStream(
+          { model: 'gemini-2.0-flash' },
+          'are you done?',
+          'prompt-id-resumed-fusion',
+          new AbortController().signal,
+          LlmRole.MAIN,
+          undefined,
+          contextManagement
+            ? [...history, { role: 'user', parts: [{ text: 'are you done?' }] }]
+            : undefined,
+        );
+        for await (const _ of stream) {
+          // consume
+        }
 
-      const fusedResumedTurn = capturedContents.find(
-        (c) =>
-          c.role === 'user' &&
-          !!c.parts?.some((p) => !!p.functionResponse) &&
-          !!c.parts?.some((p) => p.text?.includes('are you done?')),
-      );
-      expect(fusedResumedTurn).toBeUndefined();
-    });
+        const repairedTurn = capturedContents.find(
+          (c) =>
+            c.role === 'user' &&
+            !!c.parts?.some((p) => !!p.functionResponse) &&
+            !!c.parts?.some((p) => p.text?.includes('are you done?')),
+        );
+        expect(repairedTurn?.parts).toEqual([
+          {
+            functionResponse: {
+              id: 'c1',
+              name: 'run_shell_command',
+              response: { output: 'ok' },
+            },
+          },
+          { text: INTERRUPTED_RESPONSE_BOUNDARY },
+          { text: 'are you done?' },
+        ]);
+
+        const storedText = chat.agentHistory
+          .get()
+          .flatMap((turn) => turn.content.parts ?? [])
+          .map((part) => part.text ?? '')
+          .join('\n');
+        expect(storedText).not.toContain(INTERRUPTED_RESPONSE_BOUNDARY);
+      },
+    );
 
     it('should preserve mixed multimodal function responses during rollback when InvalidStreamError is thrown (regression)', async () => {
       // 1. Setup history ending with a model turn containing functionCall
