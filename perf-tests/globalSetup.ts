@@ -7,7 +7,7 @@
 import { mkdir, readdir, rm } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { canUseRipgrep } from '../packages/core/src/tools/ripGrep.js';
+import { resolveRipgrepPath } from '../packages/core/src/tools/ripGrep.js';
 import { isolateTestEnv } from '../packages/test-utils/src/env-setup.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -24,8 +24,8 @@ export async function setup() {
   isolateTestEnv(runDir);
 
   // Download ripgrep to avoid race conditions
-  const available = await canUseRipgrep();
-  if (!available) {
+  const ripgrepPath = await resolveRipgrepPath();
+  if (!ripgrepPath) {
     throw new Error('Failed to download ripgrep binary');
   }
 
