@@ -48,6 +48,8 @@ npx @google/gemini-cli
 npm install -g @google/gemini-cli
 ```
 
+> _Note: This installs the stable release channel by default._
+
 #### Install globally with Homebrew (macOS/Linux)
 
 ```bash
