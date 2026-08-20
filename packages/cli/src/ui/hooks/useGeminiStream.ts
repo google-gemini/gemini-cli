@@ -718,6 +718,16 @@ export const useGeminiStream = (
   const lastQueryRef = useRef<PartListUnion | null>(null);
   const lastPromptIdRef = useRef<string | null>(null);
   const loopDetectedRef = useRef(false);
+  const autoNudgeAttemptCountRef = useRef<number>(0);
+  const MAX_AUTO_NUDGE_ATTEMPTS = 2;
+  const submitQueryRef = useRef<
+    | ((
+        query: PartListUnion,
+        options?: { isContinuation: boolean },
+        prompt_id?: string,
+      ) => Promise<void>)
+    | null
+  >(null);
   const [
     loopDetectionConfirmationRequest,
     setLoopDetectionConfirmationRequest,
@@ -1525,6 +1535,8 @@ export const useGeminiStream = (
       stream: AsyncIterable<GeminiEvent>,
       userMessageTimestamp: number,
       signal: AbortSignal,
+      isContinuation?: boolean,
+      prompt_id?: string,
     ): Promise<StreamProcessingStatus> => {
       let geminiMessageBuffer = '';
       const toolCallRequests: ToolCallRequestInfo[] = [];
@@ -1623,6 +1635,25 @@ export const useGeminiStream = (
           setPendingHistoryItem(null);
         }
         await scheduleToolCalls(toolCallRequests, signal);
+      } else {
+        const hasVisibleText = geminiMessageBuffer.trim().length > 0;
+        if (
+          isContinuation &&
+          !hasVisibleText &&
+          autoNudgeAttemptCountRef.current < MAX_AUTO_NUDGE_ATTEMPTS
+        ) {
+          autoNudgeAttemptCountRef.current += 1;
+          const nudgeMessage =
+            '[System: You successfully executed a tool but returned an empty response. Please analyze the tool output and explain your progress or final answer.]';
+
+          // Automatically continue the query with the nudge
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
+          submitQueryRef.current?.(
+            [{ text: nudgeMessage }],
+            { isContinuation: true },
+            prompt_id,
+          );
+        }
       }
       return StreamProcessingStatus.Completed;
     },
@@ -1678,6 +1709,7 @@ export const useGeminiStream = (
 
           // Reset quota error flag when starting a new query (not a continuation)
           if (!options?.isContinuation) {
+            autoNudgeAttemptCountRef.current = 0;
             setModelSwitchedFromQuotaError(false);
             config.setQuotaErrorOccurred(false);
             config.resetBillingTurnState(
@@ -1749,6 +1781,8 @@ export const useGeminiStream = (
                 stream,
                 userMessageTimestamp,
                 abortSignal,
+                options?.isContinuation,
+                prompt_id,
               );
 
               if (processingStatus === StreamProcessingStatus.UserCancelled) {
@@ -1851,6 +1885,7 @@ export const useGeminiStream = (
       setIsResponding,
     ],
   );
+  submitQueryRef.current = submitQuery;
 
   const handleApprovalModeChange = useCallback(
     async (newApprovalMode: ApprovalMode) => {

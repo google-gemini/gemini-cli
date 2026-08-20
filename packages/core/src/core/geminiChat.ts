@@ -7,6 +7,7 @@
 // DISCLAIMER: This is a copied version of https://github.com/googleapis/js-genai/blob/main/src/chats.ts with the intention of working around a key bug
 // where function responses are not treated as "valid" responses: https://b.corp.google.com/issues/420354090
 
+// REMOVE_ME_COMMENT_1: This comment is placed here to test sequential editing of large files.
 import {
   createUserContent,
   FinishReason,
@@ -71,6 +72,7 @@ import {
 import { coreEvents } from '../utils/events.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
+// REMOVE_ME_COMMENT_2: Sequential edit comment 2.
 export enum StreamEventType {
   /** A regular content chunk from the API. */
   CHUNK = 'chunk',
@@ -101,6 +103,7 @@ interface MidStreamRetryOptions {
   useExponentialBackoff: boolean;
 }
 
+// REMOVE_ME_COMMENT_3: Sequential edit comment 3.
 const MID_STREAM_RETRY_OPTIONS: MidStreamRetryOptions = {
   maxAttempts: 4, // 1 initial call + 3 retries mid-stream
   initialDelayMs: 1000,
@@ -270,7 +273,20 @@ export function applyRetryNudge(
   }));
 
   const lastTurn = cloned[cloned.length - 1];
-  if (lastTurn?.role === 'user') {
+  const hasFunctionResponse = lastTurn?.parts?.some((p) => p.functionResponse);
+
+  if (lastTurn?.role === 'user' && hasFunctionResponse) {
+    // Satisfy strict role alternation invariants of the Gemini API by inserting
+    // a neutral, synthetic model turn between the tool response and the nudge prompt.
+    cloned.push({
+      role: 'model',
+      parts: [{ text: '[Tool execution completed.]' }],
+    });
+    cloned.push({
+      role: 'user',
+      parts: [{ text: nudgeMessage }],
+    });
+  } else if (lastTurn?.role === 'user') {
     if (!lastTurn.parts) {
       lastTurn.parts = [];
     }
@@ -1624,6 +1640,18 @@ export class GeminiChat {
       }
     }
 
+    // Ensure the model turn has a standard text part if it's an empty response to tool results,
+    // so that scrubHistory doesn't strip it, preserving proper alternating turn roles.
+    if (
+      !responseText &&
+      !hasThoughts &&
+      !hasToolCall &&
+      isOriginalFunctionResponse
+    ) {
+      consolidatedParts.push({ text: '[Tool execution completed.]' });
+      responseText = '[Tool execution completed.]';
+    }
+
     let id: string;
     // Record model response text from the collected parts.
     // Also flush when there are thoughts or a tool call (even with no text)
@@ -1790,6 +1818,7 @@ export function stripToolCallIdPrefixes(contents: Content[]): Content[] {
   });
 }
 
+// TODO: REMOVE_ME_TEST_4 - Sequential edit test comment
 export function coalesceConsecutiveRoles(
   history: HistoryTurn[],
 ): HistoryTurn[] {

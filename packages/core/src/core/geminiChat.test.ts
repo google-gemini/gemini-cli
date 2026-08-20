@@ -852,10 +852,12 @@ describe('GeminiChat', () => {
         })(),
       ).resolves.not.toThrow();
 
-      // Verify history now ends with a successful model turn (with empty parts)
+      // Verify history now ends with a successful model turn containing the tool execution completed placeholder
       const lastTurn = chat.agentHistory.get()[chat.agentHistory.length - 1];
       expect(lastTurn.content.role).toBe('model');
-      expect(lastTurn.content.parts).toEqual([]);
+      expect(lastTurn.content.parts).toEqual([
+        { text: '[Tool execution completed.]' },
+      ]);
     });
 
     it('should succeed when there is a tool call without finish reason', async () => {
@@ -1019,7 +1021,9 @@ describe('GeminiChat', () => {
         turns[turns.length - 2].content.parts?.[0]?.functionResponse,
       ).toBeDefined();
       expect(turns[turns.length - 1].content.role).toBe('model');
-      expect(turns[turns.length - 1].content.parts).toEqual([]);
+      expect(turns[turns.length - 1].content.parts).toEqual([
+        { text: '[Tool execution completed.]' },
+      ]);
     });
 
     it('should not fuse the next user message into a preserved tool-response turn', async () => {
@@ -1312,7 +1316,9 @@ describe('GeminiChat', () => {
         turns[turns.length - 2].content.parts?.[1]?.fileData,
       ).toBeDefined();
       expect(turns[turns.length - 1].content.role).toBe('model');
-      expect(turns[turns.length - 1].content.parts).toEqual([]);
+      expect(turns[turns.length - 1].content.parts).toEqual([
+        { text: '[Tool execution completed.]' },
+      ]);
     });
 
     it('should restore the lastPromptTokenCount baseline on history rollback when InvalidStreamError is thrown', async () => {
@@ -5001,6 +5007,33 @@ describe('GeminiChat', () => {
       expect(result[0]).toEqual(contents[0]);
       expect(result[1].role).toBe('user');
       expect(result[1].parts).toEqual([
+        { text: NO_RESPONSE_TEXT_NUDGE_MESSAGE },
+      ]);
+    });
+
+    it('should insert synthetic model turn and dedicated user turn if the last turn is user with functionResponse', () => {
+      const contents: Content[] = [
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'Edit',
+                response: { result: 'success' },
+              },
+            },
+          ],
+        },
+      ];
+      const result = applyRetryNudge(contents, NO_RESPONSE_TEXT_NUDGE_MESSAGE);
+      expect(result).toHaveLength(3);
+      expect(result[0]).toEqual(contents[0]);
+      expect(result[1].role).toBe('model');
+      expect(result[1].parts).toEqual([
+        { text: '[Tool execution completed.]' },
+      ]);
+      expect(result[2].role).toBe('user');
+      expect(result[2].parts).toEqual([
         { text: NO_RESPONSE_TEXT_NUDGE_MESSAGE },
       ]);
     });

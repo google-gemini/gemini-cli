@@ -766,6 +766,15 @@ describe('useGeminiStream', () => {
       ];
     });
 
+    mockSendMessageStream.mockReturnValue(
+      (async function* () {
+        yield {
+          type: ServerGeminiEventType.Content,
+          value: 'Visible response text',
+        };
+      })(),
+    );
+
     await renderHookWithProviders(() =>
       useGeminiStream(
         new MockedGeminiClientClass(mockConfig),
@@ -930,6 +939,105 @@ describe('useGeminiStream', () => {
     expect(metadata).toMatchObject({
       input: sentParts,
     });
+  });
+
+  it('should auto-nudge the model when tool execution succeeds but model stream is empty', async () => {
+    const toolCallResponseParts: Part[] = [{ text: 'tool final response' }];
+    const completedToolCalls: TrackedToolCall[] = [
+      {
+        request: {
+          callId: 'call1',
+          name: 'tool1',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-ack',
+        },
+        status: 'success',
+        responseSubmittedToGemini: false,
+        response: {
+          callId: 'call1',
+          responseParts: toolCallResponseParts,
+          errorType: undefined,
+        },
+        tool: {
+          displayName: 'MockTool',
+        },
+        invocation: {
+          getDescription: () => `Mock description`,
+        } as unknown as AnyToolInvocation,
+      } as TrackedCompletedToolCall,
+    ];
+
+    let callCount = 0;
+    mockSendMessageStream.mockImplementation(() => {
+      callCount += 1;
+      if (callCount === 1) {
+        return (async function* () {})();
+      } else {
+        return (async function* () {
+          yield {
+            type: ServerGeminiEventType.Content,
+            value:
+              'I have analyzed the empty response. Here is the final answer.',
+          };
+        })();
+      }
+    });
+
+    let capturedOnComplete:
+      | ((completedTools: TrackedToolCall[]) => Promise<void>)
+      | null = null;
+    mockUseToolScheduler.mockImplementation((onComplete) => {
+      capturedOnComplete = onComplete;
+      return [
+        [],
+        mockScheduleToolCalls,
+        mockMarkToolsAsSubmitted,
+        vi.fn(),
+        mockCancelAllToolCalls,
+        0,
+      ];
+    });
+
+    await renderHookWithProviders(() =>
+      useGeminiStream(
+        new MockedGeminiClientClass(mockConfig),
+        [],
+        mockAddItem,
+        mockConfig,
+        mockLoadedSettings,
+        mockOnDebugMessage,
+        mockHandleSlashCommand,
+        false,
+        () => 'vscode' as EditorType,
+        () => {},
+        () => Promise.resolve(),
+        false,
+        () => {},
+        () => {},
+        () => {},
+        80,
+        24,
+        undefined,
+        () => 'focus on tests only',
+      ),
+    );
+
+    await act(async () => {
+      if (capturedOnComplete) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        await capturedOnComplete(completedToolCalls);
+      }
+    });
+
+    await waitFor(() => {
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+    });
+
+    const sentParts = mockSendMessageStream.mock.calls[1][0] as Part[];
+    expect(sentParts[0].text).toContain(
+      '[System: You successfully executed a tool but returned an empty response. Please analyze the tool output and explain your progress or final answer.]',
+    );
   });
 
   it('should handle all tool calls being cancelled by rolling back the history', async () => {

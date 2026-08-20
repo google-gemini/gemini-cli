@@ -1023,7 +1023,7 @@ ${snippet}`);
       }
       if (this.params.modified_by_user) {
         llmSuccessMessageParts.push(
-          `User modified the \`new_string\` content to be: ${this.params.new_string}.`,
+          `The confirmation step modified the \`new_string\` content to be: ${this.params.new_string}.`,
         );
       }
 
