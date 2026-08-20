@@ -6,7 +6,12 @@ CLI Usage:
 """
 
 from collections import Counter
-from evals.triage.helpers.dataset import load_issues
+from evals.triage.helpers.dataset import (
+    get_expected_effort,
+    get_expected_quality,
+    get_workable_spec,
+    load_issues,
+)
 
 VALID_QUALITIES = ["OK", "SPAM", "EMPTY", "NEEDS_INFO", "FEATURE"]
 VALID_EFFORTS = ["SMALL", "MEDIUM", "LARGE"]
@@ -23,9 +28,9 @@ def _validate_spec_integrity(issues) -> bool:
     errors = []
     for data in issues:
         issue_num = data.get("issue_number", 0)
-        quality = data.get("expected_quality", "")
-        effort = data.get("expected_effort", "")
-        spec = data.get("expected_workable_spec", {})
+        quality = get_expected_quality(data)
+        effort = get_expected_effort(data)
+        spec = get_workable_spec(data)
         has_spec = bool(spec and isinstance(spec, dict) and len(spec) > 0)
 
         # 1. Quality validity check
@@ -69,8 +74,8 @@ def compute_metrics() -> bool:
     ok_efforts = Counter()
 
     for data in issues:
-        quality = data.get("expected_quality", "")
-        effort = data.get("expected_effort", "")
+        quality = get_expected_quality(data)
+        effort = get_expected_effort(data)
 
         qualities[quality] += 1
         if quality == "OK":

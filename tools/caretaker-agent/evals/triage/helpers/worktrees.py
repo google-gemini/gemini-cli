@@ -31,11 +31,30 @@ def add_worktree(worker_id: int, version: str) -> Tuple[str, str]:
     subprocess.run(["git", "worktree", "remove", "--force", worktree_dir], cwd=TARGET_REPO_DIR, capture_output=True)
 
     actual_version = version
-    res = subprocess.run(["git", "worktree", "add", "-f", worktree_dir, version], cwd=TARGET_REPO_DIR, capture_output=True, text=True)
+    res = subprocess.run(["git", "worktree", "add", "-f", "--", worktree_dir, version], cwd=TARGET_REPO_DIR, capture_output=True, text=True)
     if res.returncode != 0:
-        print(f"  [EVAL] Warning: Could not checkout commit '{version[:10]}' for worker {worker_id}. Falling back to 'main'.")
-        subprocess.run(["git", "worktree", "add", "-f", worktree_dir, "main"], cwd=TARGET_REPO_DIR, capture_output=True)
-        actual_version = "main"
+        # Attempt to fetch the explicit commit from origin with timeout before falling back
+        fetch_res = subprocess.run(
+            ["git", "fetch", "origin", "--", version],
+            cwd=TARGET_REPO_DIR,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if fetch_res.returncode == 0:
+            res = subprocess.run(["git", "worktree", "add", "-f", "--", worktree_dir, version], cwd=TARGET_REPO_DIR, capture_output=True, text=True)
+        else:
+            err_msg = fetch_res.stderr.strip() or "commit not found on origin"
+            print(f"  [EVAL WARNING] 'git fetch origin {version[:10]}' failed: {err_msg}")
+
+        if res.returncode != 0:
+            print(f"  [EVAL] Warning: Could not checkout commit '{version[:10]}' for worker {worker_id}. Falling back to 'main'.")
+            subprocess.run(["git", "worktree", "add", "-f", "--", worktree_dir, "main"], cwd=TARGET_REPO_DIR, capture_output=True)
+            actual_version = "main"
+
+    # Reset hard and clean to ensure pristine workspace at the target version
+    subprocess.run(["git", "reset", "--hard", actual_version], cwd=worktree_dir, capture_output=True)
+    subprocess.run(["git", "clean", "-fd"], cwd=worktree_dir, capture_output=True)
 
     return worktree_dir, actual_version
 

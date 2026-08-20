@@ -44,13 +44,37 @@ def load_issues(filter_issues: Optional[List[int]] = None) -> List[Dict[str, Any
     return issues
 
 
+def get_expected_quality(data: Dict[str, Any]) -> str:
+    """Extracts expected quality across legacy and unified schemas."""
+    for key in ("status", "expected_quality"):
+        val = data.get(key)
+        if val is not None and str(val).strip():
+            return str(val).strip()
+    return data.get("triage_metadata", {}).get("quality", "")
+
+
+def get_expected_effort(data: Dict[str, Any]) -> str:
+    """Extracts expected effort across schemas, preserving empty string semantics for non-OK issues."""
+    for key in ("effort", "expected_effort"):
+        val = data.get(key)
+        if val is not None:
+            return str(val).strip()
+    return data.get("triage_metadata", {}).get("effort_estimate", "")
+
+
+def get_workable_spec(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Extracts workable spec dictionary across legacy and unified schemas."""
+    spec = data.get("workable_spec") or data.get("expected_workable_spec")
+    return spec if isinstance(spec, dict) else {}
+
+
 def prep_payload(item: Dict[str, Any]) -> Dict[str, Any]:
     """Preprocesses and wraps title & body to simulate production Ingestion Layer safety encapsulation."""
-    raw_body = item.get("issue_body") or ""
+    raw_body = item.get("issue_body") or item.get("body") or ""
     escaped_body = raw_body.replace("</untrusted_context>", "\\</untrusted_context>")
     sanitized_body = f"<untrusted_context>\n{escaped_body}\n</untrusted_context>"
 
-    raw_title = item.get("issue_title") or ""
+    raw_title = item.get("issue_title") or item.get("title") or ""
     escaped_title = raw_title.replace("</untrusted_context>", "\\</untrusted_context>")
     sanitized_title = f"<untrusted_context>\n{escaped_title}\n</untrusted_context>"
 

@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from google import genai
+from evals.triage.helpers.dataset import get_expected_quality, get_expected_effort
 
 PROMPT_FILE = Path(__file__).parent / "judge.md"
 if not PROMPT_FILE.exists():
@@ -45,19 +46,19 @@ def evaluate_categorization(predicted: Dict[str, Any], expected: Dict[str, Any])
               If expected quality is non-OK (SPAM, NEEDS_INFO, FEATURE), predicted effort must be empty ("").
     """
     pred_quality = predicted.get("quality")
-    exp_quality = expected.get("expected_quality")
+    exp_quality = get_expected_quality(expected)
     
     # 1. Quality match check
     quality_match = (pred_quality == exp_quality)
 
     # 2. Effort match check
     pred_effort = predicted.get("effort_estimate")
-    exp_effort = expected.get("expected_effort")
+    exp_effort = get_expected_effort(expected)
 
     if exp_quality == "OK":
         effort_match = (pred_effort == exp_effort)
     else:
-        effort_match = (pred_effort == "")
+        effort_match = (pred_effort == "" or pred_effort is None)
 
     return {
         "quality_match": quality_match,
