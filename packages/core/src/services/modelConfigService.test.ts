@@ -1118,6 +1118,19 @@ describe('ModelConfigService', () => {
   });
 
   describe('getAvailableModelOptions', () => {
+    it('should include auto when hasAccessToPreview is false', () => {
+      const config: ModelConfigServiceConfig = {
+        modelDefinitions: {
+          auto: { isVisible: true, tier: 'auto', isPreview: false },
+        },
+      };
+      const service = new ModelConfigService(config);
+      const options = service.getAvailableModelOptions({
+        hasAccessToPreview: false,
+      });
+      expect(options.map((o) => o.modelId)).toContain('auto');
+    });
+
     it('should filter out Pro models when hasAccessToProModel is false', () => {
       const config: ModelConfigServiceConfig = {
         modelDefinitions: {
