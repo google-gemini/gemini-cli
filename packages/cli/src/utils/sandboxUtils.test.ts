@@ -13,6 +13,7 @@ import {
   parseImageName,
   ports,
   entrypoint,
+  isDebugEnvEnabled,
   shouldUseCurrentUserInSandbox,
 } from './sandboxUtils.js';
 
@@ -237,5 +238,45 @@ describe('sandboxUtils', () => {
       vi.mocked(os.platform).mockReturnValue('darwin');
       expect(await shouldUseCurrentUserInSandbox()).toBe(false);
     });
+  });
+
+  describe('isDebugEnvEnabled', () => {
+    it('should return true when DEBUG is "true"', () => {
+      vi.stubEnv('DEBUG', 'true');
+      expect(isDebugEnvEnabled()).toBe(true);
+    });
+
+    it('should return true when DEBUG is "1"', () => {
+      vi.stubEnv('DEBUG', '1');
+      expect(isDebugEnvEnabled()).toBe(true);
+    });
+
+    it('should return false when DEBUG is "false"', () => {
+      vi.stubEnv('DEBUG', 'false');
+      expect(isDebugEnvEnabled()).toBe(false);
+    });
+
+    it('should return false when DEBUG is "0"', () => {
+      vi.stubEnv('DEBUG', '0');
+      expect(isDebugEnvEnabled()).toBe(false);
+    });
+
+    it('should return false when DEBUG is an empty string', () => {
+      vi.stubEnv('DEBUG', '');
+      expect(isDebugEnvEnabled()).toBe(false);
+    });
+
+    it('should return false when DEBUG is unset', () => {
+      vi.stubEnv('DEBUG', '');
+      expect(isDebugEnvEnabled()).toBe(false);
+    });
+
+    it.each(['yes', 'on', 'TRUE', 'True', '2', 'enabled'])(
+      'should return false for non-canonical truthy value DEBUG=%s',
+      (value) => {
+        vi.stubEnv('DEBUG', value);
+        expect(isDebugEnvEnabled()).toBe(false);
+      },
+    );
   });
 });

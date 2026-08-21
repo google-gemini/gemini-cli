@@ -34,6 +34,7 @@ import {
   parseImageName,
   ports,
   entrypoint,
+  isDebugEnvEnabled,
   LOCAL_DEV_SANDBOX_IMAGE_NAME,
   SANDBOX_NETWORK_NAME,
   SANDBOX_PROXY_NAME,
@@ -51,7 +52,7 @@ export async function start_sandbox(
   cliArgs: string[] = [],
 ): Promise<number> {
   const patcher = new ConsolePatcher({
-    debugMode: cliConfig?.getDebugMode() || !!process.env['DEBUG'],
+    debugMode: cliConfig?.getDebugMode() || isDebugEnvEnabled(),
     stderr: true,
   });
   patcher.patch();
@@ -151,9 +152,9 @@ export async function start_sandbox(
           );
         }
         debugLogger.log(`using macos seatbelt (profile: ${profile}) ...`);
-        // if DEBUG is set, convert to --inspect-brk in NODE_OPTIONS
+        // if DEBUG is enabled, convert to --inspect-brk in NODE_OPTIONS
         const nodeOptions = [
-          ...(process.env['DEBUG'] ? ['--inspect-brk'] : []),
+          ...(isDebugEnvEnabled() ? ['--inspect-brk'] : []),
           ...nodeArgs,
         ].join(' ');
 
@@ -511,8 +512,8 @@ export async function start_sandbox(
     // expose env-specified ports on the sandbox
     ports().forEach((p) => args.push('--publish', `${p}:${p}`));
 
-    // if DEBUG is set, expose debugging port
-    if (process.env['DEBUG']) {
+    // if DEBUG is enabled, expose debugging port
+    if (isDebugEnvEnabled()) {
       const debugPort = process.env['DEBUG_PORT'] || '9229';
       args.push(`--publish`, `${debugPort}:${debugPort}`);
     }
@@ -1184,7 +1185,7 @@ async function pullImage(
     let stderrData = '';
 
     const onStdoutData = (data: Buffer) => {
-      if (cliConfig?.getDebugMode() || process.env['DEBUG']) {
+      if (cliConfig?.getDebugMode() || isDebugEnvEnabled()) {
         debugLogger.log(data.toString().trim()); // Show pull progress
       }
     };
