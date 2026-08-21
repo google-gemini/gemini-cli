@@ -22,6 +22,7 @@ import { ExtensionManager } from '../../config/extension-manager.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import { loadSettings } from '../../config/settings.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
+import { formatVersion } from '../../config/extension.js';
 import { exitCli } from '../utils.js';
 
 interface UpdateArgs {
@@ -58,7 +59,13 @@ export async function handleUpdate(args: UpdateArgs) {
         }
 
         const installedExtensions = extensions
-          .map((extension) => `${extension.name} (${extension.version})`)
+          .map(
+            (extension) =>
+              `${extension.name} (${formatVersion(
+                extension.version,
+                extension.packageVersion,
+              )})`,
+          )
           .join('\n');
         coreEvents.emitFeedback(
           'error',
