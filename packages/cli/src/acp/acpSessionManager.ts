@@ -180,7 +180,16 @@ export class AcpSessionManager {
     const clientHistory = convertSessionToClientHistory(sessionData.messages);
 
     const geminiClient = config.getGeminiClient();
-    await geminiClient.initialize();
+    // Resume directly. `initialize()` starts a chat with no resumed session data,
+    // which initializes chat recording for a *fresh* conversation and writes a
+    // metadata header plus a `$set` checkpoint. The recording filename is keyed on
+    // the UTC minute and the session id prefix, so when a load happens in the same
+    // minute the session was created, that append lands in the session's own file
+    // and buries its conversation in the fold: `hasResumableContent` flips false,
+    // the session drops out of the listing, and this and every later load fails
+    // with "No previous sessions found". `resumeChat` does everything
+    // `initialize()` does, including `updateTelemetryTokenCount()`, so the call
+    // was redundant as well as destructive.
     await geminiClient.resumeChat(clientHistory, {
       conversation: sessionData,
       filePath: sessionPath,
