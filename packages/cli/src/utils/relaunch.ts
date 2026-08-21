@@ -15,6 +15,30 @@ import {
   type AdminControlsSettings,
 } from '@google/gemini-cli-core';
 
+// Signals a supervising process (ACP client, systemd, container runtime)
+// may send to the bootstrap parent. Without forwarding, the parent dies on
+// its default disposition while the spawned child is reparented to PID 1
+// and keeps running - holding the OAuth session and allocated heap until
+// killed manually. See #25590.
+const FORWARDED_SIGNALS: readonly NodeJS.Signals[] = [
+  'SIGTERM',
+  'SIGHUP',
+  'SIGUSR1',
+  'SIGUSR2',
+];
+
+// SIGINT/SIGQUIT are intentionally NOT forwarded: when running
+// interactively, the TTY delivers them to the whole foreground process
+// group (parent and child), so forwarding would deliver them twice and
+// could interrupt the child's graceful-shutdown handler. Instead the parent
+// registers a no-op handler (KEEPALIVE_SIGNALS) so it does NOT die on its
+// default disposition before the child finishes shutting down - which would
+// orphan the child and return the shell prompt early with mixed output. The
+// child receives the signal directly from the TTY; when it exits, the no-op
+// handler is removed and the child's exit signal is re-raised on the parent.
+// Supervisors use SIGTERM for programmatic termination, which is forwarded.
+const KEEPALIVE_SIGNALS: readonly NodeJS.Signals[] = ['SIGINT', 'SIGQUIT'];
+
 export async function relaunchOnExitCode(runner: () => Promise<number>) {
   while (true) {
     try {
@@ -71,11 +95,88 @@ export async function relaunchAppInChildProcess(
       }
     });
 
+    // Forward termination signals to the child so a supervised parent
+    // (kill -TERM <bootstrap-pid>) takes the child down with it instead of
+    // orphaning it. Use a Map of {signal -> handler} for precise cleanup on
+    // close/error; removeAllListeners would disturb unrelated subscribers,
+    // and leaking a handler per relaunch iteration trips
+    // MaxListenersExceededWarning after ~10 relaunches. #25590.
+    const forwarders = new Map<NodeJS.Signals, () => void>();
+    for (const sig of FORWARDED_SIGNALS) {
+      const handler = () => {
+        try {
+          child.kill(sig);
+        } catch {
+          // The child may have already exited; ignore the race.
+        }
+      };
+      // Register only signals the runtime supports - some POSIX-only signals
+      // (e.g. SIGUSR1/SIGUSR2 on Windows) throw in process.on(). Register
+      // first and only track successful listeners in the Map, since
+      // removeForwarders calls process.off on every entry. #25590.
+      try {
+        // Use on() so that if the child is slow to shut down and a second
+        // signal is received, it is still forwarded rather than killing the
+        // parent immediately and orphaning the child. The listeners are
+        // removed on child close/error anyway. #25590.
+        process.on(sig, handler);
+        forwarders.set(sig, handler);
+      } catch {
+        // Signal unsupported on this platform; skip forwarding for it.
+      }
+    }
+    // No-op handlers for the interactive interrupt signals the TTY delivers to
+    // the whole foreground process group. The parent must survive long enough
+    // for the child to finish its graceful shutdown; otherwise it dies on the
+    // default disposition and the child is orphaned. The no-op is removed in
+    // the close handler before the child's exit signal is re-raised, so the
+    // re-raise still terminates the parent. #25590.
+    for (const sig of KEEPALIVE_SIGNALS) {
+      // Reuse the same handler reference for both the Map and the listener so
+      // removeForwarders can process.off() it on close.
+      const handler = () => {};
+      try {
+        process.on(sig, handler);
+        forwarders.set(sig, handler);
+      } catch {
+        // Signal unsupported on this platform (e.g. SIGQUIT on Windows).
+      }
+    }
+    const removeForwarders = () => {
+      for (const [sig, handler] of forwarders) {
+        process.off(sig, handler);
+      }
+      forwarders.clear();
+    };
+
     return new Promise<number>((resolve, reject) => {
-      child.on('error', reject);
-      child.on('close', (code) => {
+      child.on('error', (err) => {
+        removeForwarders();
+        reject(err);
+      });
+      child.on('close', (code, signal) => {
+        removeForwarders();
         // Resume stdin before the parent process exits.
         process.stdin.resume();
+        // Propagate the child's signal termination so supervisors (systemd,
+        // Kubernetes) see a clean signal exit rather than an unexpected code
+        // 1 crash. #25590.
+        if (signal) {
+          try {
+            process.kill(process.pid, signal);
+            // process.kill schedules the signal on the event loop; it does NOT
+            // terminate synchronously when a JS handler is registered (e.g. by
+            // the app or a supervisor integration), so deferring resolve gives
+            // the loop a tick to deliver the re-raised signal before
+            // relaunchOnExitCode calls process.exit(). A fatal signal
+            // terminates the process here; a non-fatal one (e.g. SIGUSR1) falls
+            // through to resolve below. #25590.
+            setTimeout(() => resolve(code ?? 1), 0);
+            return;
+          } catch {
+            // Fall back to exit code 1 if the signal cannot be re-raised.
+          }
+        }
         resolve(code ?? 1);
       });
     });
