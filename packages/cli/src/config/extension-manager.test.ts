@@ -11,7 +11,10 @@ import * as path from 'node:path';
 import { ExtensionManager } from './extension-manager.js';
 import { createTestMergedSettings, type MergedSettings } from './settings.js';
 import { createExtension } from '../test-utils/createExtension.js';
-import { EXTENSIONS_DIRECTORY_NAME } from './extensions/variables.js';
+import {
+  EXTENSIONS_DIRECTORY_NAME,
+  INSTALL_METADATA_FILENAME,
+} from './extensions/variables.js';
 import { themeManager } from '../ui/themes/theme-manager.js';
 import {
   TrustLevel,
@@ -22,7 +25,9 @@ import {
   getRealPath,
   type CustomTheme,
   IntegrityDataStatus,
+  coreEvents,
 } from '@google/gemini-cli-core';
+import chalk from 'chalk';
 
 const mockHomedir = vi.hoisted(() => vi.fn(() => '/tmp/mock-home'));
 const mockIntegrityManager = vi.hoisted(() => ({
@@ -520,6 +525,39 @@ describe('ExtensionManager', () => {
           { name: 'ext1', version: '1.0.0' },
         ),
       ).rejects.toThrow(/already installed/);
+    });
+
+    it('should be idempotent if the extension is already installed from the same source', async () => {
+      const extDir = path.join(userExtensionsDir, 'idempotent-ext');
+      fs.mkdirSync(extDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(extDir, 'gemini-extension.json'),
+        JSON.stringify({ name: 'idempotent-ext', version: '1.0.0' }),
+      );
+      const installMetadata = { type: 'local' as const, source: extDir };
+      fs.writeFileSync(
+        path.join(extDir, INSTALL_METADATA_FILENAME),
+        JSON.stringify(installMetadata),
+      );
+
+      const logSpy = vi.spyOn(coreEvents, 'emitConsoleLog');
+
+      await extensionManager.loadExtensions();
+      const first =
+        await extensionManager.installOrUpdateExtension(installMetadata);
+      const second =
+        await extensionManager.installOrUpdateExtension(installMetadata);
+
+      expect(first.name).toBe('idempotent-ext');
+      expect(second.name).toBe('idempotent-ext');
+      expect(first.id).toBe(second.id);
+
+      expect(logSpy).toHaveBeenCalledWith(
+        'log',
+        chalk.blue(
+          'Extension "idempotent-ext" is already installed. Skipping re-installation.',
+        ),
+      );
     });
   });
 
