@@ -1,0 +1,154 @@
+name: 'Assign Issue on Comment or Label'
+
+on:
+  issue_comment:
+    types:
+      - 'created'
+  issues:
+    types:
+      - 'opened'
+      - 'labeled'
+
+concurrency:
+  group: '${{ github.workflow }}-${{ github.event.issue.number }}'
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: 'bash'
+
+permissions:
+  contents: 'read'
+  id-token: 'write'
+  issues: 'write'
+  statuses: 'write'
+  packages: 'read'
+
+jobs:
+  issue-assignment:
+    if: |-
+      github.repository == 'google-gemini/gemini-cli'
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: 'Generate GitHub App Token'
+        id: 'generate_token'
+        uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b'
+        with:
+          app-id: '${{ secrets.APP_ID }}'
+          private-key: '${{ secrets.PRIVATE_KEY }}'
+          permission-issues: 'write'
+
+      - name: 'Handle assignment logic'
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token }}'
+          script: |
+            const issueNumber = context.issue.number;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const MAX_ISSUES_ASSIGNED = 3;
+            const INTENT_CHECKBOX = "- [x] I want to contribute to this issue if it is approved.";
+
+            const { data: issue } = await github.rest.issues.get({
+              owner,
+              repo,
+              issue_number: issueNumber,
+            });
+
+            const expressedInterest = issue.body?.includes(INTENT_CHECKBOX);
+            const op = issue.user.login;
+
+            async function getAssignedCount(username) {
+              const { data: assignedIssues } = await github.rest.search.issuesAndPullRequests({
+                q: `is:issue repo:${owner}/${repo} assignee:${username} is:open`,
+              });
+              return assignedIssues.total_count;
+            }
+
+            // --- Case 1: Issue Opened (Pre-flight) ---
+            if (context.eventName === 'issues' && context.payload.action === 'opened') {
+              if (expressedInterest) {
+                const count = await getAssignedCount(op);
+                if (count >= MAX_ISSUES_ASSIGNED) {
+                  await github.rest.issues.createComment({
+                    owner, repo, issue_number: issueNumber,
+                    body: `👋 @${op}, thanks for expressing interest in working on this! Just a heads-up: you're currently at the ${MAX_ISSUES_ASSIGNED}-issue limit. If this issue is approved for community contribution, you'll need to wrap up or \`/unassign\` one of your other issues before this can be assigned to you.`
+                  });
+                }
+              }
+              return;
+            }
+
+            // --- Case 2: Help Wanted Labeled (Auto-assign) ---
+            if (context.eventName === 'issues' && context.payload.action === 'labeled') {
+              if (context.payload.label.name !== 'help wanted' || !expressedInterest) return;
+
+              if (issue.assignees.length > 0) return; // Already taken
+
+              const count = await getAssignedCount(op);
+              if (count < MAX_ISSUES_ASSIGNED) {
+                await github.rest.issues.addAssignees({
+                  owner, repo, issue_number: issueNumber,
+                  assignees: [op]
+                });
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: issueNumber,
+                  body: `👋 @${op}, since you expressed interest and this issue is now marked as \`help wanted\`, you've been assigned! Thank you for taking the time to contribute. Make sure to check out our [contributing guidelines](https://github.com/google-gemini/gemini-cli/blob/main/CONTRIBUTING.md).`
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: issueNumber,
+                  body: `👋 @${op}! We saw you wanted to work on this, but you're currently at your ${MAX_ISSUES_ASSIGNED}-issue limit. This issue is now open for anyone to claim with \`/assign\`. If you free up space later, you can still claim it yourself if it's still available!`
+                });
+              }
+              return;
+            }
+
+            // --- Case 3: Manual Commands (/assign, /unassign) ---
+            if (context.eventName === 'issue_comment') {
+              const body = context.payload.comment.body.trim();
+              const commenter = context.actor;
+
+              if (body === '/assign') {
+                const hasHelpWantedLabel = issue.labels.some(label => label.name === 'help wanted');
+                if (!hasHelpWantedLabel) {
+                  await github.rest.issues.createComment({
+                    owner, repo, issue_number: issueNumber,
+                    body: `👋 @${commenter}, thanks for your interest in this issue! We're reserving self-assignment for issues that have been marked with the \`help wanted\` label. Feel free to check out our list of [issues that need attention](https://github.com/google-gemini/gemini-cli/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22).`
+                  });
+                  return;
+                }
+
+                if (issue.assignees.length > 0) {
+                  await github.rest.issues.createComment({
+                    owner, repo, issue_number: issueNumber,
+                    body: `@${commenter} Thanks for taking interest but this issue is already assigned. We'd still love to have you contribute. Check out our [Help Wanted](https://github.com/google-gemini/gemini-cli/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22help%20wanted%22) list for issues where we need some extra attention.`
+                  });
+                  return;
+                }
+
+                const count = await getAssignedCount(commenter);
+                if (count >= MAX_ISSUES_ASSIGNED) {
+                  await github.rest.issues.createComment({
+                    owner, repo, issue_number: issueNumber,
+                    body: `👋 @${commenter}! You currently have ${count} issues assigned to you. We have a ${MAX_ISSUES_ASSIGNED} max issues assigned at once policy. Once you close out an existing issue it will open up space to take another. You can also unassign yourself from an existing issue but please work on a hand-off if someone is expecting work on that issue.`
+                  });
+                  return;
+                }
+
+                await github.rest.issues.addAssignees({ owner, repo, issue_number: issueNumber, assignees: [commenter] });
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: issueNumber,
+                  body: `👋 @${commenter}, you've been assigned to this issue! Thank you for taking the time to contribute. Make sure to check out our [contributing guidelines](https://github.com/google-gemini/gemini-cli/blob/main/CONTRIBUTING.md).`
+                });
+              } else if (body === '/unassign') {
+                const isAssigned = issue.assignees.some(a => a.login === commenter);
+                if (isAssigned) {
+                  await github.rest.issues.removeAssignees({ owner, repo, issue_number: issueNumber, assignees: [commenter] });
+                  await github.rest.issues.createComment({
+                    owner, repo, issue_number: issueNumber,
+                    body: `👋 @${commenter}, you have been unassigned from this issue.`
+                  });
+                }
+              }
+            }
