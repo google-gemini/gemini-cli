@@ -229,8 +229,11 @@ export function resolveModel(
 
   if (
     useGemini3_5Flash &&
-    isFlashModel(resolved) &&
-    normalizedModel !== PREVIEW_GEMINI_FLASH_MODEL
+    normalizedModel !== PREVIEW_GEMINI_FLASH_MODEL &&
+    (resolved === DEFAULT_GEMINI_FLASH_MODEL ||
+      resolved === DEFAULT_GEMINI_3_5_FLASH_MODEL ||
+      resolved === SECONDARY_GEMINI_3_5_FLASH_MODEL ||
+      normalizedModel === GEMINI_MODEL_ALIAS_FLASH)
   ) {
     return DEFAULT_GEMINI_FLASH_MODEL;
   }
@@ -257,17 +260,6 @@ export function resolveModel(
   }
 
   return resolved;
-}
-
-function isFlashModel(model: string): boolean {
-  return (
-    model === DEFAULT_GEMINI_FLASH_MODEL ||
-    model === PREVIEW_GEMINI_FLASH_MODEL ||
-    model === DEFAULT_GEMINI_3_5_FLASH_MODEL ||
-    model === SECONDARY_GEMINI_3_5_FLASH_MODEL ||
-    model === 'flash' ||
-    model.endsWith('flash')
-  );
 }
 
 /**
