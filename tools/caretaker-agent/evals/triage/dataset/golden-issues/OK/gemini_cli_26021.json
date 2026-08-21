@@ -1,0 +1,58 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 26021,
+  "title": "MCP servers not connected in -p (non-interactive) mode",
+  "body": "",
+  "status": "OK",
+  "effort": "MEDIUM",
+  "triage_metadata": {
+    "quality": "OK",
+    "reasoning": "No source files were pruned; all PR modifications directly address the reported issue.",
+    "comment": "",
+    "effort_estimate": "MEDIUM",
+    "effort_reasoning": ""
+  },
+  "workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#26021",
+    "summary": {
+      "problem": "MCP servers configured in settings are not available in non-interactive (-p / headless) mode because tool authorization rules for configured MCP servers are not automatically registered.",
+      "root_cause": "The policy engine builder `createPolicyEngineConfig` lacked logic to add auto-allow rules for configured MCP servers in headless mode, and `PolicySettings` in `packages/core/src/policy/types.ts` did not support an explicit `autoAllowInHeadless` setting for headless auto-approval.",
+      "context": "Headless CLI execution requires pre-approved tool policy rules to enable MCP tools without interactive prompts, while maintaining security by requiring an explicit setting (`mcp.autoAllowInHeadless`)."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/core/src/policy/types.ts",
+        "packages/core/src/policy/config.ts"
+      ],
+      "steps": [
+        "In `packages/core/src/policy/types.ts`, extend the `PolicySettings` interface by adding an optional boolean property `autoAllowInHeadless` to the `mcp` object type definition.",
+        "In `packages/core/src/policy/config.ts`, inside `createPolicyEngineConfig`, add a check for non-interactive mode (`!interactive`), `settings.mcp?.autoAllowInHeadless`, and defined `settings.mcpServers`.",
+        "Iterate over `Object.keys(settings.mcpServers)` and skip any server already present in `settings.mcp.allowed`, covered by wildcard `'*'` in `settings.mcp.allowed`, or marked as `trust: true` in `settings.mcpServers[serverName]`.",
+        "For each non-duplicate server, push a policy rule to `rules` with `decision: PolicyDecision.ALLOW`, `priority: ALLOWED_MCP_SERVER_PRIORITY`, `source: 'Settings (Headless MCP Auto-Allow)'`, `modes: nonPlanModes`, `mcpName: serverName`, and `toolName` set to `${MCP_TOOL_PREFIX}*` if `serverName === '*'` or `${MCP_TOOL_PREFIX}${serverName}_*` otherwise."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "packages/core/src/policy/config.test.ts",
+      "expected_behavior": "When `autoAllowInHeadless` is enabled in non-interactive mode, configured MCP servers are granted allow policy rules automatically unless already explicitly allowed or trusted. In interactive mode or when `autoAllowInHeadless` is false, no auto-allow rules are created.",
+      "verification_steps": [
+        "Run `npm test -w @google/gemini-cli-core -- src/policy/config.test.ts` to execute unit tests.",
+        "Verify unit test checking that `createPolicyEngineConfig` in non-interactive mode does NOT automatically allow configured MCP servers by default when `autoAllowInHeadless` is not set.",
+        "Verify unit test checking that with `autoAllowInHeadless: true` in non-interactive mode, allow rules are generated for configured MCP servers with source 'Settings (Headless MCP Auto-Allow)'.",
+        "Verify unit test checking that `autoAllowInHeadless: true` does not generate allow rules when `interactive` is true.",
+        "Verify unit test checking that duplicate allow rules are skipped if an MCP server is already in `mcp.allowed`, covered by `'*'`, or has `trust: true`."
+      ],
+      "framework": "Vitest"
+    }
+  },
+  "github_metadata": {
+    "owner": "google-gemini",
+    "repo": "gemini-cli",
+    "issue_number": 26021,
+    "title": "MCP servers not connected in -p (non-interactive) mode",
+    "target_version": "85566a73f60b28d0a9a3e74e76b26cd76317793b",
+    "pr_number": 27215
+  },
+  "notes": "Created at 2026-04-26T23:23:43Z by automated generate_golden_issue.py",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue."
+}

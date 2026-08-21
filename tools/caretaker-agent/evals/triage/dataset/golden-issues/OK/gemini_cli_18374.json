@@ -1,0 +1,56 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 18374,
+  "title": "[Bug] Gemini CLI on Windows should choose pwsh over powershell by default",
+  "body": "### Bug Description\n\nOn the Windows platform, Gemini CLI fails to execute complex scripts cleanly when defaulting to traditional Windows PowerShell instead of pwsh (PowerShell 7). \n\nAdditionally, `gemini-3-pro-preview` model generates more robust and reliable PowerShell scripts compared to scripts written for Windows PowerShell.\n\n### Why is this needed?\n\nBecause Gemini CLI often fails to correctly generate scripts that can run on Windows PowerShell, but generating for PowerShell (pwsh) is much more stable, which is very important.",
+  "status": "OK",
+  "effort": "MEDIUM",
+  "triage_metadata": {
+    "quality": "OK",
+    "reasoning": "The file `packages/cli/src/ui/components/SessionSummaryDisplay.tsx` was pruned from `files_to_modify` for benchmark fairness as it is a secondary UI display component refactoring; the core shell preference logic resides entirely in the core package and its shell utilities.",
+    "comment": "",
+    "effort_estimate": "MEDIUM",
+    "effort_reasoning": ""
+  },
+  "workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#18374",
+    "summary": {
+      "problem": "On Windows platforms, Gemini CLI should default to modern PowerShell (pwsh) rather than legacy Windows PowerShell (powershell.exe) to ensure better script execution stability and compatibility.",
+      "root_cause": "`getShellConfiguration` unconditionally uses legacy `powershell.exe` as the default executable on Windows without checking if the more modern `pwsh.exe` is available in the user's `PATH`. Checking for `pwsh.exe` asynchronously was blocked because `getShellConfiguration` is synchronous, requiring `resolveExecutable` to be refactored to be synchronous.",
+      "context": "PowerShell 7 (pwsh) introduces standards-compliant argument passing (retaining embedded double-quotes) and support for chain operators like `&&` and `||`, which legacy Windows PowerShell 5.1 lacks, causing LLM-generated commands to fail."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/core/src/utils/shell-utils.ts",
+        "packages/core/src/services/shellExecutionService.ts",
+        "packages/core/src/tools/ripGrep.ts"
+      ],
+      "steps": [
+        "Convert `resolveExecutable` in `packages/core/src/utils/shell-utils.ts` to be synchronous by utilizing `fs.accessSync` with `fs.constants.X_OK` instead of `fs.promises.access`.",
+        "Modify `getShellConfiguration` in `packages/core/src/utils/shell-utils.ts` to attempt to resolve `pwsh.exe` using the synchronous `resolveExecutable` helper on Windows.",
+        "If `pwsh.exe` is successfully resolved on PATH, configure `getShellConfiguration` to use it as the `executable` while keeping the shell type as `powershell`.",
+        "Update the calling sites of `resolveExecutable` in `packages/core/src/services/shellExecutionService.ts` and `packages/core/src/tools/ripGrep.ts` to remove the `await` keyword, as the resolver is now synchronous."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "packages/core/src/services/shellExecutionService.windows.integration.test.ts",
+      "expected_behavior": "On Windows, when `pwsh.exe` is available on the system PATH, the shell execution service successfully launches it and preserves inline double quotes correctly. When `pwsh.exe` is not present, it correctly falls back to legacy `powershell.exe`.",
+      "verification_steps": [
+        "Verify `resolveExecutable` works synchronously in `packages/core/src/utils/shell-utils.test.ts` and test that `getShellConfiguration` prefers `pwsh.exe` over `powershell.exe` when mock-accessing the path.",
+        "Add an integration test block in `packages/core/src/services/shellExecutionService.windows.integration.test.ts` (skipped on non-Windows) that spawns processes to assert byte-exact preservation of embedded double-quotes."
+      ],
+      "framework": "Vitest"
+    }
+  },
+  "github_metadata": {
+    "owner": "google-gemini",
+    "repo": "gemini-cli",
+    "issue_number": 18374,
+    "title": "[Bug] Gemini CLI on Windows should choose pwsh over powershell by default",
+    "target_version": "055e0f64524217fefb1a3d7c8b0fceef7ed14867",
+    "pr_number": 25900
+  },
+  "notes": "Created at 2026-02-05T14:51:08Z by automated generate_golden_issue.py",
+  "golden_spec_rationale": "The file `packages/cli/src/ui/components/SessionSummaryDisplay.tsx` was pruned from `files_to_modify` for benchmark fairness as it is a secondary UI display component refactoring; the core shell preference logic resides entirely in the core package and its shell utilities."
+}

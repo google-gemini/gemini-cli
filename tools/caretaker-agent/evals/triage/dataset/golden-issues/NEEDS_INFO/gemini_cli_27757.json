@@ -1,0 +1,27 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 27757,
+  "title": "AI GOOGLE PRO PLAN - Confused about the reset (refresh) of my plan",
+  "body": "### What happened?\n\nWhat is my quota reset rate, 5 hours or 24 hours?\n\n\n**In Antigravity Desktop**\n\n<img width=\"684\" height=\"505\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/09761d73-fbac-48ee-9001-c34530274b53\" />\n\n**in Gemini CLI**\n\n<img width=\"1072\" height=\"204\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/7ff4b4db-8426-4151-addc-2f3006b2364b\" />\n\n### What did you expect to happen?\n\nwhat refresh time have i in AI GOGLE PLAN PRO.\n\n### Client information\n\n-\n\n### Login information\n\n_No response_\n\n### Anything else we need to know?\n\n_No response_",
+  "status": "NEEDS_INFO",
+  "effort": "",
+  "triage_metadata": {
+    "quality": "NEEDS_INFO",
+    "reasoning": "",
+    "comment": "",
+    "effort_estimate": "",
+    "effort_reasoning": ""
+  },
+  "workable_spec": {},
+  "github_metadata": {
+    "owner": "google-gemini",
+    "repo": "gemini-cli",
+    "issue_number": 27757,
+    "title": "AI GOOGLE PRO PLAN - Confused about the reset (refresh) of my plan",
+    "target_version": "0567b25a2688d6e753fa8b6061a5f6b323542712",
+    "pr_number": 0
+  },
+  "notes": "Billing/quota support question. Classified as NEEDS_INFO to politely verify if they are experiencing a UI display bug in the CLI's stats rendering. Original creation: Created at 2026-06-09T15:24:57Z by automated generate_golden_issue.py",
+  "golden_spec_rationale": ""
+}

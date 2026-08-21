@@ -1,0 +1,27 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 4,
+  "title": "a",
+  "body": "",
+  "status": "EMPTY",
+  "effort": "",
+  "triage_metadata": {
+    "quality": "EMPTY",
+    "reasoning": "",
+    "comment": "",
+    "effort_estimate": "",
+    "effort_reasoning": ""
+  },
+  "workable_spec": {},
+  "github_metadata": {
+    "owner": "google-gemini",
+    "repo": "gemini-cli",
+    "issue_number": 4,
+    "title": "a",
+    "target_version": "main",
+    "pr_number": 0
+  },
+  "notes": "Custom handcrafted EMPTY issue created by Chad. Note: Issue IDs 1-99 are custom made by Chad for benchmark testing.",
+  "golden_spec_rationale": ""
+}

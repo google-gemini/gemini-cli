@@ -1,0 +1,59 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 24591,
+  "title": "[bug]  SEA - Unknown arguments: max-old-space-size, maxOldSpaceSize",
+  "body": "",
+  "status": "OK",
+  "effort": "LARGE",
+  "triage_metadata": {
+    "quality": "OK",
+    "reasoning": "scripts/build_binary.js was pruned because its changes (setting file executable permissions on the target binary and passing '--yes' to 'npx' during postject execution) are build script adjustments and not source code required to resolve the runtime Node.js argument parsing bug in SEA mode.",
+    "comment": "",
+    "effort_estimate": "LARGE",
+    "effort_reasoning": ""
+  },
+  "workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#24591",
+    "summary": {
+      "problem": "When running Gemini CLI as a Single Executable Application (SEA), Node.js runtime arguments (such as --max-old-space-size) passed during process relaunch are treated as command-line arguments and passed to yargs, causing an 'Unknown arguments: max-old-space-size, maxOldSpaceSize' error.",
+      "root_cause": "During child process relaunch, Node.js flags like auto-configured memory flags were being appended to command-line arguments passed to spawn(process.execPath, ...). In SEA mode, process.execPath is the executable binary itself, which forwards all command-line arguments directly to the application parser (yargs) rather than consuming them as Node.js runtime flags.",
+      "context": "SEA mode requires Node.js options to be passed via the NODE_OPTIONS environment variable during relaunch rather than as CLI arguments. Additionally, relaunching SEA processes requires distinct process.argv slicing (isStandardSea vs relaunch child) and injecting process.execPath as the argv[1] script placeholder to maintain the [node, script, ...args] format and prevent argument compounding."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/cli/index.ts",
+        "packages/cli/src/utils/processUtils.ts",
+        "packages/cli/src/utils/relaunch.ts"
+      ],
+      "steps": [
+        "In packages/cli/src/utils/processUtils.ts, export functions isStandardSea(), getScriptArgs(), isSeaEnvironment(), and getSpawnConfig(nodeArgs, scriptArgs) along with the ProcessWithSea interface.",
+        "Implement isStandardSea() to return true when process.argv[0] !== process.argv[1] and either process.env.IS_BINARY === 'true' or process.isSea?.() === true.",
+        "Implement getScriptArgs() to slice process.argv starting at index 1 if isStandardSea() is true, and index 2 otherwise.",
+        "Implement getSpawnConfig(nodeArgs, scriptArgs) to detect SEA mode via isSeaEnvironment(). In SEA mode, validate nodeArgs for invalid characters (spaces, quotes, backslashes), append nodeArgs to NODE_OPTIONS in newEnv, and set spawnArgs to [process.execPath, ...scriptArgs]. In standard Node mode, set spawnArgs to [...process.execArgv, ...nodeArgs, process.argv[1], ...scriptArgs].",
+        "In packages/cli/index.ts and packages/cli/src/utils/relaunch.ts, replace custom process.argv slicing and manual child process spawn argument construction with calls to getScriptArgs() and getSpawnConfig()."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "packages/cli/src/utils/processUtils.test.ts",
+      "expected_behavior": "When relaunching in SEA binary mode, memory and runtime Node flags are passed through NODE_OPTIONS instead of command-line arguments, preventing yargs unknown argument errors and argument compounding.",
+      "verification_steps": [
+        "Add unit tests for isStandardSea, getScriptArgs, isSeaEnvironment, and getSpawnConfig covering standard Node mode and SEA mode.",
+        "Verify that getSpawnConfig populates NODE_OPTIONS when IS_BINARY is set and uses process.execPath as the script placeholder in spawnArgs.",
+        "Verify that getSpawnConfig throws an error if complex or unescaped arguments are passed to nodeArgs in SEA mode.",
+        "Run tests using Vitest to confirm processUtils and relaunch utilities pass."
+      ],
+      "framework": "Vitest"
+    }
+  },
+  "github_metadata": {
+    "owner": "google-gemini",
+    "repo": "gemini-cli",
+    "issue_number": 24591,
+    "title": "[bug]  SEA - Unknown arguments: max-old-space-size, maxOldSpaceSize",
+    "target_version": "8cfebb9e31f83a708087e7bc99e786ba32b17d97",
+    "pr_number": 26130
+  },
+  "notes": "Created at 2026-04-03T04:19:13Z by automated generate_golden_issue.py",
+  "golden_spec_rationale": "scripts/build_binary.js was pruned because its changes (setting file executable permissions on the target binary and passing '--yes' to 'npx' during postject execution) are build script adjustments and not source code required to resolve the runtime Node.js argument parsing bug in SEA mode."
+}

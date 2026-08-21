@@ -1,0 +1,27 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 7,
+  "title": "[Bug] Custom MCP tool fails schema validation on start",
+  "body": "### What happened?\n\nI added a custom MCP tool for database queries to my CLI config, but when I start Gemini CLI, it throws a schema validation error and exits.\n\n### What did you expect to happen?\n\nThe CLI should parse the custom tool schema and start the interactive session.\n\n### Client information\n\n- OS: macOS 14.2\n- CLI Version: 0.49.0\n- Node Version: 20.10.0\n\n### Login information\n\n_No response_\n\n### Anything else we need to know?\n\n_No response_",
+  "status": "NEEDS_INFO",
+  "effort": "",
+  "triage_metadata": {
+    "quality": "NEEDS_INFO",
+    "reasoning": "",
+    "comment": "",
+    "effort_estimate": "",
+    "effort_reasoning": ""
+  },
+  "workable_spec": {},
+  "github_metadata": {
+    "owner": "google-gemini",
+    "repo": "gemini-cli",
+    "issue_number": 7,
+    "title": "[Bug] Custom MCP tool fails schema validation on start",
+    "target_version": "main",
+    "pr_number": 0
+  },
+  "notes": "Custom handcrafted NEEDS_INFO issue. User reports custom MCP tool schema validation fails on start, but omits the tool definition, JSON schema, and exact error log snippet. Note: Issue IDs 1-99 are custom made for benchmark testing.",
+  "golden_spec_rationale": ""
+}

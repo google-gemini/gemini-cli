@@ -1,0 +1,59 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 25859,
+  "title": "Windows: Regression - run_shell_command strips double quotes",
+  "body": "",
+  "status": "OK",
+  "effort": "MEDIUM",
+  "triage_metadata": {
+    "quality": "OK",
+    "reasoning": "No source files were pruned; all PR modifications directly address the reported issue.",
+    "comment": "",
+    "effort_estimate": "MEDIUM",
+    "effort_reasoning": ""
+  },
+  "workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#25859",
+    "summary": {
+      "problem": "On Windows, `run_shell_command` incorrectly strips double quotes from commands, even when properly enclosed or escaped, breaking tools that require quoted arguments (such as Node.js, JDT, or JSON parsers).",
+      "root_cause": "`run_shell_command` defaults to executing commands via Windows PowerShell 5.1 (`powershell.exe`), which drops inline double quotes when passing arguments to native executables. PowerShell 7 (`pwsh.exe`) supports standards-compliant argument passing (via `$PSNativeCommandArgumentPassing = 'Windows'`) and does not exhibit this regression.",
+      "context": "The issue is resolved by updating `getShellConfiguration` in `shell-utils.ts` to prefer `pwsh.exe` from `PATH` over `powershell.exe` on Windows. To achieve this synchronously within `getShellConfiguration`, the `resolveExecutable` utility has to be refactored to run synchronously via `fs.accessSync` instead of `fs.promises.access`."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/core/src/utils/shell-utils.ts",
+        "packages/core/src/services/shellExecutionService.ts",
+        "packages/core/src/tools/ripGrep.ts"
+      ],
+      "steps": [
+        "In `packages/core/src/utils/shell-utils.ts`, refactor `resolveExecutable` from asynchronous to synchronous by replacing asynchronous `fs.promises.access` with synchronous `fs.accessSync(filePath, fs.constants.X_OK)`. Create an internal helper `isExecutable(filePath: string): boolean` to handle the try-catch block around `fs.accessSync`.",
+        "In `packages/core/src/utils/shell-utils.ts`, modify `getShellConfiguration()` on Windows to attempt to resolve `pwsh.exe` using the newly synchronous `resolveExecutable('pwsh.exe')` helper before falling back to `powershell.exe`.",
+        "If `pwsh.exe` is resolved successfully, return a `ShellConfiguration` pointing to the absolute path of `pwsh.exe` with `argsPrefix: ['-NoProfile', '-Command']` and `shell: 'powershell'`.",
+        "In `packages/core/src/services/shellExecutionService.ts`, update the reference to `resolveExecutable` to invoke it synchronously rather than awaiting its result.",
+        "In `packages/core/src/tools/ripGrep.ts`, update the reference to `resolveExecutable` inside `resolveRipgrepPath()` to invoke it synchronously rather than awaiting its result."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "packages/core/src/services/shellExecutionService.windows.integration.test.ts",
+      "expected_behavior": "When executing commands with embedded double quotes on a Windows machine where PowerShell 7 (`pwsh.exe`) is installed, the quotes are preserved exactly as intended by the model and correctly processed by child processes (e.g. `node -e`).",
+      "verification_steps": [
+        "Add synchronous environment stubbing and mock path tests in `packages/core/src/utils/shell-utils.test.ts` to verify the order of shell selection and path-extension checks on Windows.",
+        "Execute automated Integration tests in `packages/core/src/services/shellExecutionService.windows.integration.test.ts` on a Windows target, asserting that complex commands such as `node -e 'console.log(\"preserved\")'` execute successfully and output `preserved` with exit code 0.",
+        "Ensure the full unit test suite passes successfully and no regressions are introduced in other platforms.",
+        "Verify that `resolveRipgrepPath` successfully resolves system ripgrep using the synchronous `resolveExecutable` logic."
+      ],
+      "framework": "Vitest"
+    }
+  },
+  "github_metadata": {
+    "owner": "google-gemini",
+    "repo": "gemini-cli",
+    "issue_number": 25859,
+    "title": "Windows: Regression - run_shell_command strips double quotes",
+    "target_version": "055e0f64524217fefb1a3d7c8b0fceef7ed14867",
+    "pr_number": 25900
+  },
+  "notes": "Ground truth benchmark issue imported from medium_golden_issues.",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue."
+}

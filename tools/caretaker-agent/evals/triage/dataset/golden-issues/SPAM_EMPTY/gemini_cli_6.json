@@ -1,0 +1,27 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 6,
+  "title": "Error: NullPointerException in com.example.myandroidapp.MainActivity.onCreate(MainActivity.java:42)",
+  "body": "### Crash Log\n```\njava.lang.NullPointerException: Attempt to invoke virtual method 'void android.widget.TextView.setText(java.lang.CharSequence)' on a null object reference\n    at com.example.myandroidapp.MainActivity.onCreate(MainActivity.java:42)\n    at android.app.Activity.performCreate(Activity.java:7136)\n    at android.app.Instrumentation.callActivityOnCreate(Instrumentation.java:1271)\n```\nHow to fix this error in my Android Studio project? Please send code.",
+  "status": "SPAM",
+  "effort": "",
+  "triage_metadata": {
+    "quality": "SPAM",
+    "reasoning": "",
+    "comment": "",
+    "effort_estimate": "",
+    "effort_reasoning": ""
+  },
+  "workable_spec": {},
+  "github_metadata": {
+    "owner": "google-gemini",
+    "repo": "gemini-cli",
+    "issue_number": 6,
+    "title": "Error: NullPointerException in com.example.myandroidapp.MainActivity.onCreate(MainActivity.java:42)",
+    "target_version": "main",
+    "pr_number": 0
+  },
+  "notes": "Custom handcrafted SPAM edge case issue created by Chad. Unrelated Android Java stack trace copy-pasted for homework help. Note: Issue IDs 1-99 are custom made by Chad for benchmark testing.",
+  "golden_spec_rationale": ""
+}

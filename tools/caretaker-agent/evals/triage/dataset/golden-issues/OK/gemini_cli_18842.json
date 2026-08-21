@@ -1,0 +1,53 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 18842,
+  "title": "Tool descriptions are generic instead of dynamic on session resume",
+  "body": "Dynamic tool descriptions (e.g., \"Reading file X\") are lost and replaced by static/generic ones (e.g., \"Reads and returns content...\") when resuming a session using `gemini --resume`.\n\nThis occurs because:\n1. `ChatRecordingService` was overwriting dynamic descriptions with static ones from the `ToolRegistry`.\n2. `GeminiChat` was not passing dynamic descriptions to the recording service.\n\nThis issue has been present since the initial implementation of session recording in September 2025 (PR #6721).\n\nFixing in PR #18835.",
+  "status": "OK",
+  "effort": "SMALL",
+  "triage_metadata": {
+    "quality": "OK",
+    "reasoning": "No source files were pruned; all PR modifications directly address the reported issue.",
+    "comment": "",
+    "effort_estimate": "SMALL",
+    "effort_reasoning": ""
+  },
+  "workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#18842",
+    "summary": {
+      "problem": "Dynamic tool descriptions (e.g., \"Reading file X\") are lost and replaced by static/generic ones (e.g., \"Reads and returns content...\") when resuming a session using `gemini --resume`.",
+      "root_cause": "`ChatRecordingService.recordToolCalls` was unconditionally overwriting the recorded tool call description with generic descriptions from the `ToolRegistry`. Concurrently, `GeminiChat` (specifically within the recordCompletedToolCalls logic cluster) did not extract or pass the dynamic description from the tool invocation record.",
+      "context": "This issue arose from the session recording implementation introduced in PR #6721, where resumed sessions would reinitialize tool descriptions from `ToolRegistry` defaults instead of using the runtime dynamic descriptions."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/core/src/core/geminiChat.ts",
+        "packages/core/src/services/chatRecordingService.ts"
+      ],
+      "steps": [
+        "In `packages/core/src/core/geminiChat.ts`, update the recording mapping inside `GeminiChat` to set `description` by checking if `'invocation' in call` is true, and extracting `call.invocation?.getDescription()`, falling back to `undefined` if not present.",
+        "In `packages/core/src/services/chatRecordingService.ts`, modify `ChatRecordingService.recordToolCalls` to prioritize and preserve `toolCall.description` if provided (e.g., via `toolCall.description?.trim()`) instead of unconditionally overwriting it with `toolInstance?.description`."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "packages/core/src/services/chatRecordingService.test.ts",
+      "expected_behavior": "Dynamic tool descriptions are preserved when recording tool calls, ensuring they do not get overwritten by generic descriptions in the registry.",
+      "verification_steps": [
+        "Add a unit test checking that `ChatRecordingService.recordToolCalls` preserves a dynamic description when specified on a `ToolCallRecord`.",
+        "Verify that checking the conversation record state retrieves the correct custom description after mapping and writing to the session file."
+      ],
+      "framework": "Jest"
+    }
+  },
+  "github_metadata": {
+    "owner": "google-gemini",
+    "repo": "gemini-cli",
+    "issue_number": 18842,
+    "title": "Tool descriptions are generic instead of dynamic on session resume",
+    "target_version": "58557ba7866c057115d12f7427824aba372c4c06",
+    "pr_number": 18835
+  },
+  "notes": "Created at 2026-02-11T20:28:11Z by automated generate_golden_issue.py",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue."
+}

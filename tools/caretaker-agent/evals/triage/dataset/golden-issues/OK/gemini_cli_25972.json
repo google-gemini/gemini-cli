@@ -1,0 +1,62 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 25972,
+  "title": "cli breaks on certain prompts which contain code logs",
+  "body": "",
+  "status": "OK",
+  "effort": "LARGE",
+  "triage_metadata": {
+    "quality": "OK",
+    "reasoning": "No source files were pruned; all PR modifications directly address the reported issue.",
+    "comment": "",
+    "effort_estimate": "LARGE",
+    "effort_reasoning": ""
+  },
+  "workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#25972",
+    "summary": {
+      "problem": "The CLI crashes with filesystem errors (such as ENAMETOOLONG) when user prompts contain test logs or stack traces.",
+      "root_cause": "The CLI misinterprets large text blocks and log fragments (containing markers like `AssertionError:`, `FAIL `, or `TestingLibraryElementError:`) as file paths and attempts to resolve them via system filesystem APIs without validating path length or structure.",
+      "context": "Pasting terminal output or test failure logs into the CLI causes @-command path resolution and Config.validatePathAccess to execute filesystem operations on malformed strings."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/core/src/utils/path-validator.ts",
+        "packages/core/src/utils/atCommandUtils.ts",
+        "packages/core/src/config/config.ts",
+        "packages/core/src/index.ts",
+        "packages/cli/src/ui/hooks/atCommandProcessor.ts",
+        "packages/cli/src/acp/acpSession.ts"
+      ],
+      "steps": [
+        "Create `validatePath` in `packages/core/src/utils/path-validator.ts` to check input paths against control/newline characters (`/[\\n\\r\\0\\t]/`), log markers (`/(^|[/\\\\])(AssertionError:|FAIL |\u2713 |\u00d7 |TestingLibraryElementError:)/`), suspicious quotes/ellipses, and length limits (`MAX_PATH_LENGTH = 4096`, `MAX_COMPONENT_LENGTH = 255`).",
+        "Implement `resolveAtCommandPath` and `tryExtractPath` in `packages/core/src/utils/atCommandUtils.ts` to validate @-command paths and extract valid embedded file paths from log fragments.",
+        "Export `validatePath` and `resolveAtCommandPath` from `packages/core/src/index.ts`.",
+        "Update `Config.validatePathAccess` in `packages/core/src/config/config.ts` to call `validatePath` before performing permission checks.",
+        "Refactor `resolveFilePaths` in `packages/cli/src/ui/hooks/atCommandProcessor.ts` to use `resolveAtCommandPath` instead of directly calling `fs.stat` on raw path strings.",
+        "Refactor path resolution in `packages/cli/src/acp/acpSession.ts` to use `resolveAtCommandPath` for safe path lookup and permission dialog prompts."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "packages/core/src/utils/path-validator.test.ts",
+      "expected_behavior": "Malformed paths and log snippets are recognized as invalid or best-effort recovered without triggering filesystem crashes.",
+      "verification_steps": [
+        "Run unit tests for path validation: `npm test -w @google/gemini-cli-core -- src/utils/path-validator.test.ts`.",
+        "Verify `validatePath` rejects paths with newlines, control characters, log markers (`AssertionError:`, `FAIL`), and path lengths exceeding 4096 characters.",
+        "Verify that valid paths with apostrophes, spaces, or brackets remain valid."
+      ],
+      "framework": "Vitest"
+    }
+  },
+  "github_metadata": {
+    "owner": "google-gemini",
+    "repo": "gemini-cli",
+    "issue_number": 25972,
+    "title": "cli breaks on certain prompts which contain code logs",
+    "target_version": "e440e02866fca0997ecea97f11223a3a9507c608",
+    "pr_number": 27211
+  },
+  "notes": "Created at 2026-04-25T13:02:25Z by automated generate_golden_issue.py",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue."
+}

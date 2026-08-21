@@ -1,0 +1,59 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 24480,
+  "title": "fix(core): improve windows sandbox reliability and fix integration tests",
+  "body": "",
+  "status": "OK",
+  "effort": "LARGE",
+  "triage_metadata": {
+    "quality": "OK",
+    "reasoning": "No source files were pruned; all PR modifications directly address the reported issue.",
+    "comment": "",
+    "effort_estimate": "LARGE",
+    "effort_reasoning": ""
+  },
+  "workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#24480",
+    "summary": {
+      "problem": "Sandboxed process execution pathways suffer from resource leaks and uncleaned temporary sandbox artifacts when execution completes, fails, or is aborted early.",
+      "root_cause": "Execution paths in `SandboxedFileSystemService`, `ShellExecutionService`, `GrepTool`, `ToolRegistry`, and `shell-utils` omitted cleanup calls or relied on standard event listeners that did not fire during synchronous exceptions or generator cancellations.",
+      "context": "Identified during Windows sandboxing review (#24480), sandbox preparation produces temporary resources (such as manifests and sidecar processes) whose `prepared.cleanup()` callback must be guaranteed execution via `try...finally` blocks."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/core/src/services/sandboxedFileSystemService.ts",
+        "packages/core/src/services/shellExecutionService.ts",
+        "packages/core/src/tools/grep.ts",
+        "packages/core/src/tools/tool-registry.ts",
+        "packages/core/src/utils/shell-utils.ts"
+      ],
+      "steps": [
+        "In `SandboxedFileSystemService` (`packages/core/src/services/sandboxedFileSystemService.ts`), wrap process spawning and event handling in `readFile` and `writeTextFile` with `try...finally` blocks that execute `prepared.cleanup?.()` in `finally`.",
+        "In `ShellExecutionService` (`packages/core/src/services/shellExecutionService.ts`), capture `prepared.cleanup` as `cmdCleanup` in `childProcessFallback` and `executeWithPty`, ensuring `cmdCleanup?.()` is invoked in `catch` blocks when process execution fails.",
+        "In `GrepToolInvocation` (`packages/core/src/tools/grep.ts`), store the sandbox preparation `cleanup` callback and wrap the process `spawn` execution inside a `try...finally` block that invokes `cleanup?.()`.",
+        "In `ToolRegistry` (`packages/core/src/tools/tool-registry.ts`), capture `prepared.cleanup` as `cleanupFunc` in `DiscoveredToolInvocation.execute` and `ToolRegistry.discoverTools`, placing `spawn` execution within `try...finally` blocks to guarantee `cleanupFunc?.()` is run.",
+        "In `shell-utils` (`packages/core/src/utils/shell-utils.ts`), update `spawnAsync` and `execStreaming` to wrap `spawn` execution and line iteration in `try...finally` blocks that trigger `prepared.cleanup?.()`."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "N/A",
+      "expected_behavior": "All sandbox process execution paths across file system operations, shell executions, grep tools, and tool discovery reliably execute cleanup callbacks (`prepared.cleanup()`) upon completion, failure, or early cancellation.",
+      "verification_steps": [
+        "Run sandbox and shell execution core test suite: `npm test -w @google/gemini-cli-core -- src/utils/sandboxUtils.test.ts src/services/sandboxedFileSystemService.test.ts src/tools/grep.test.ts src/tools/tool-registry.test.ts src/services/shellExecutionService.test.ts`.",
+        "Verify that temporary sandbox artifacts and sidecar processes are cleaned up without resource leaks in both success and error scenarios."
+      ],
+      "framework": "N/A"
+    }
+  },
+  "github_metadata": {
+    "owner": "google-gemini",
+    "repo": "gemini-cli",
+    "issue_number": 24480,
+    "title": "fix(core): improve windows sandbox reliability and fix integration tests",
+    "target_version": "4c5e887732a24870b41d1028b1ed294493ad9033",
+    "pr_number": 24763
+  },
+  "notes": "Created at 2026-04-01T22:53:16Z by automated generate_golden_issue.py",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue."
+}

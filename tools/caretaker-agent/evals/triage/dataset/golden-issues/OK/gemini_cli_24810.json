@@ -1,0 +1,56 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 24810,
+  "title": "Stable installation was automatically updated to a nightly build",
+  "body": "",
+  "status": "OK",
+  "effort": "MEDIUM",
+  "triage_metadata": {
+    "quality": "OK",
+    "reasoning": "No source files were pruned; all PR modifications directly address the reported issue.",
+    "comment": "",
+    "effort_estimate": "MEDIUM",
+    "effort_reasoning": ""
+  },
+  "workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#24810",
+    "summary": {
+      "problem": "Gemini CLI installations on the stable channel were automatically updated or prompted to update to nightly builds when the npm `latest` tag pointed to a nightly version.",
+      "root_cause": "The update detection logic lacked stability channel checking and only relied on semver comparison (`semver.gt(latestUpdate, currentVersion)`), allowing unstable nightly versions to override stable installations.",
+      "context": "The CLI needed channel analysis (`getChannelFromVersion`) and a stability ranking hierarchy (`STABLE > PREVIEW > NIGHTLY`) to ensure update checks and auto-update executions never downgrade a user to a less stable release channel."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/core/src/utils/channel.ts",
+        "packages/cli/src/ui/utils/updateCheck.ts",
+        "packages/cli/src/utils/handleAutoUpdate.ts"
+      ],
+      "steps": [
+        "In `packages/core/src/utils/channel.ts`, export `RELEASE_CHANNEL_STABILITY` mapping `ReleaseChannel.NIGHTLY` to 0, `PREVIEW` to 1, and `STABLE` to 2. Export `getChannelFromVersion(version: string)` to determine the release channel based on version strings containing 'nightly' or 'preview'. Refactor `getReleaseChannel` to utilize `getChannelFromVersion`.",
+        "In `packages/cli/src/ui/utils/updateCheck.ts`, import `getChannelFromVersion` and `RELEASE_CHANNEL_STABILITY`. In `checkForUpdates`, resolve `currentChannel` and `targetChannel`. Return `null` if `RELEASE_CHANNEL_STABILITY[targetChannel] < RELEASE_CHANNEL_STABILITY[currentChannel]`.",
+        "In `packages/cli/src/utils/handleAutoUpdate.ts`, import `getChannelFromVersion` and `RELEASE_CHANNEL_STABILITY`. Add a defense-in-depth check comparing `currentChannel` and `targetChannel` stability ranks and return early without executing the install command if the target channel is less stable than the current channel."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "packages/cli/src/ui/utils/updateCheck.test.ts",
+      "expected_behavior": "Users on the stable channel will not receive update prompts or auto-updates for nightly or preview versions even if those versions are tagged as latest and have a higher semver.",
+      "verification_steps": [
+        "Run unit tests using Vitest: `npx vitest run packages/cli/src/ui/utils/updateCheck.test.ts packages/cli/src/utils/handleAutoUpdate.test.ts`.",
+        "Verify `checkForUpdates` returns `null` when current version is stable (e.g. `1.0.0`) and target is nightly (e.g. `1.1.0-nightly.1`) or preview (e.g. `1.1.0-preview.1`).",
+        "Verify `handleAutoUpdate` aborts execution when target update channel has a lower stability ranking than the current version."
+      ],
+      "framework": "Vitest"
+    }
+  },
+  "github_metadata": {
+    "owner": "google-gemini",
+    "repo": "gemini-cli",
+    "issue_number": 24810,
+    "title": "Stable installation was automatically updated to a nightly build",
+    "target_version": "7a3f7c383ee85fa86864abf0f4f1a3a575b5e8e4",
+    "pr_number": 26132
+  },
+  "notes": "Created at 2026-04-07T06:55:08Z by automated generate_golden_issue.py",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue."
+}

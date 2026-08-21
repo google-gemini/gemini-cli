@@ -1,0 +1,74 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 18369,
+  "title": "Wrong session id shown after resuming a session",
+  "body": "",
+  "status": "OK",
+  "effort": "LARGE",
+  "triage_metadata": {
+    "quality": "OK",
+    "reasoning": "No source files were pruned; all PR modifications directly address the reported issue.",
+    "comment": "",
+    "effort_estimate": "LARGE",
+    "effort_reasoning": ""
+  },
+  "workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#18369",
+    "summary": {
+      "problem": "When resuming a session via `gemini --resume <session-id>`, executing `/stats session` afterwards displays a newly generated Session ID created at startup rather than the resumed session's ID.",
+      "root_cause": "`SessionStatsProvider` and downstream telemetry/logging utilities relied on a static module-level `sessionId` constant exported from `@google/gemini-cli-core` (generated via `randomUUID()` at module load time) that was never updated when a session was resumed.",
+      "context": "Config stores the resumed session ID, but UI context providers (`SessionStatsProvider`), logger hooks (`useLogger`), bug commands (`bugCommand`), and telemetry trace spans (`runInDevTraceSpan`) did not retrieve the session ID dynamically from configuration."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/cli/src/acp/acpClient.ts",
+        "packages/cli/src/gemini.tsx",
+        "packages/cli/src/interactiveCli.tsx",
+        "packages/cli/src/ui/AppContainer.tsx",
+        "packages/cli/src/ui/commands/bugCommand.ts",
+        "packages/cli/src/ui/contexts/SessionContext.tsx",
+        "packages/cli/src/ui/hooks/useGeminiStream.ts",
+        "packages/cli/src/ui/hooks/useLogger.ts",
+        "packages/cli/src/utils/sessionUtils.ts",
+        "packages/cli/src/utils/sessions.ts",
+        "packages/core/src/agents/subagent-tool.ts",
+        "packages/core/src/core/loggingContentGenerator.ts",
+        "packages/core/src/index.ts",
+        "packages/core/src/scheduler/scheduler.ts",
+        "packages/core/src/scheduler/tool-executor.ts",
+        "packages/core/src/telemetry/trace.ts",
+        "packages/core/src/utils/session.ts"
+      ],
+      "steps": [
+        "Remove the static `sessionId` constant export from `packages/core/src/utils/session.ts` and `packages/core/src/index.ts`, keeping `createSessionId()`.",
+        "Update `runInDevTraceSpan` in `packages/core/src/telemetry/trace.ts` to require a `sessionId` string parameter in span options, and update caller sites (`loggingContentGenerator.ts`, `subagent-tool.ts`, `scheduler.ts`, `tool-executor.ts`, `useGeminiStream.ts`) to inject `config.getSessionId()`.",
+        "Refactor `SessionStatsProvider` in `packages/cli/src/ui/contexts/SessionContext.tsx` to take `sessionId` as a component prop, and update `interactiveCli.tsx` to pass `config.getSessionId()` to `SessionStatsProvider`.",
+        "Add `resolveSessionId(resumeArg)` helper in `packages/cli/src/gemini.tsx` to resolve the resumed session ID or generate a new session ID prior to startup.",
+        "Refactor `useLogger` in `packages/cli/src/ui/hooks/useLogger.ts` and `AppContainer.tsx` to take `config: Config` and instantiate `Logger` using `config.getSessionId()`.",
+        "Update `bugCommand` in `packages/cli/src/ui/commands/bugCommand.ts` to display `config?.getSessionId()` instead of importing the static `sessionId`.",
+        "Update `SessionSelector` in `packages/cli/src/utils/sessionUtils.ts`, `acpClient.ts`, and `sessions.ts` to accept `Storage` directly instead of `Config`."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "packages/cli/src/ui/contexts/SessionContext.test.tsx",
+      "expected_behavior": "`SessionStatsProvider` uses the passed active session ID prop and correctly exposes it through `useSessionStats`, ensuring `/stats session` displays the resumed session ID.",
+      "verification_steps": [
+        "Render `SessionStatsProvider` with a mock `sessionId=\"test-session-id\"` prop in test harnesses.",
+        "Verify `useSessionStats()` context returns `sessionId` matching the prop.",
+        "Run `gemini --resume <session-id>` and run `/stats session` to verify the displayed session ID matches the resumed session."
+      ],
+      "framework": "Vitest"
+    }
+  },
+  "github_metadata": {
+    "owner": "google-gemini",
+    "repo": "gemini-cli",
+    "issue_number": 18369,
+    "title": "Wrong session id shown after resuming a session",
+    "target_version": "15f7b24312fee332d737d3cbb3ee617f97d0e008",
+    "pr_number": 24972
+  },
+  "notes": "Created at 2026-02-05T11:31:40Z by automated generate_golden_issue.py",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue."
+}

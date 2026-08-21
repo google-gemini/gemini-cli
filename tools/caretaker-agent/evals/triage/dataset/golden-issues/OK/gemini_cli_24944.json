@@ -1,0 +1,64 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 24944,
+  "title": "[BUG] update_topic tool inflates confirmation queue count",
+  "body": "",
+  "status": "OK",
+  "effort": "LARGE",
+  "triage_metadata": {
+    "quality": "OK",
+    "reasoning": "No source files were pruned; all PR modifications directly address the reported issue.",
+    "comment": "",
+    "effort_estimate": "LARGE",
+    "effort_reasoning": ""
+  },
+  "workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#24944",
+    "summary": {
+      "problem": "The `update_topic` tool is an auto-executing background operation, but it is incorrectly included in the tool confirmation queue size calculation in the UI, causing misleading counts (e.g., '1 of 2') when only one actionable tool requires approval.",
+      "root_cause": "In `packages/cli/src/ui/utils/confirmingTool.ts`, `getConfirmingToolState` calculated the pending confirmation queue size using `allPendingTools.length` without filtering out background or non-actionable tools like `UPDATE_TOPIC_TOOL_NAME`. Additionally, tool visibility rules were fragmented across `ToolGroupMessage.tsx`, `useGeminiStream.ts`, and `tool-utils.ts`.",
+      "context": "Background operations such as `update_topic` do not require user confirmation or interaction. Centralizing tool visibility rules into a single `@google/gemini-cli-core` module provides a single source of truth for chat history, active tool groups, and confirmation queue eligibility."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/core/src/utils/tool-visibility.ts",
+        "packages/core/src/index.ts",
+        "packages/core/src/utils/tool-utils.ts",
+        "packages/cli/src/ui/utils/confirmingTool.ts",
+        "packages/cli/src/ui/utils/historyUtils.ts",
+        "packages/cli/src/ui/hooks/useGeminiStream.ts",
+        "packages/cli/src/ui/components/messages/ToolGroupMessage.tsx"
+      ],
+      "steps": [
+        "Create `packages/core/src/utils/tool-visibility.ts` defining `ToolVisibilityContext`, `buildToolVisibilityContext`, `isRenderedInHistory`, `belongsInConfirmationQueue`, and `isVisibleInToolGroup`. Ensure `belongsInConfirmationQueue` returns `false` when `ctx.name === UPDATE_TOPIC_TOOL_NAME` or `displayName === UPDATE_TOPIC_DISPLAY_NAME`.",
+        "Export `tool-visibility.js` module in `packages/core/src/index.ts`.",
+        "Remove the obsolete `shouldHideToolCall` function and `ShouldHideToolCallParams` interface from `packages/core/src/utils/tool-utils.ts`.",
+        "Add helper function `buildToolVisibilityContextFromDisplay(tool: IndividualToolCallDisplay)` in `packages/cli/src/ui/utils/historyUtils.ts` to map UI representation objects to `ToolVisibilityContext`.",
+        "In `packages/cli/src/ui/utils/confirmingTool.ts`, update `getConfirmingToolState` to filter `allPendingTools` using `belongsInConfirmationQueue(buildToolVisibilityContextFromDisplay(tool))` before determining the head tool index and total count.",
+        "In `packages/cli/src/ui/hooks/useGeminiStream.ts`, replace calls to `shouldHideToolCall` with `isRenderedInHistory(buildToolVisibilityContext(tc))`.",
+        "In `packages/cli/src/ui/components/messages/ToolGroupMessage.tsx`, update `visibleToolCalls` filter logic to use `isVisibleInToolGroup(buildToolVisibilityContextFromDisplay(t), isLowErrorVerbosity ? 'low' : 'full')`."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "packages/core/src/utils/tool-visibility.test.ts",
+      "expected_behavior": "Background tools like `update_topic` are filtered out from the confirmation queue count (`belongsInConfirmationQueue` returns `false`), ensuring the UI displays an accurate queue count (e.g., '1 of 1').",
+      "verification_steps": [
+        "Run `npm test -w @google/gemini-cli-core -- src/utils/tool-visibility.test.ts` to verify unit tests for `isRenderedInHistory`, `belongsInConfirmationQueue`, and `isVisibleInToolGroup`.",
+        "Assert `belongsInConfirmationQueue` returns `false` for `UPDATE_TOPIC_TOOL_NAME` and `true` for standard tools like `write_file`.",
+        "Run `npm test -w @google/gemini-cli` to verify UI component tests pass with updated tool visibility logic."
+      ],
+      "framework": "Vitest"
+    }
+  },
+  "github_metadata": {
+    "owner": "google-gemini",
+    "repo": "gemini-cli",
+    "issue_number": 24944,
+    "title": "[BUG] update_topic tool inflates confirmation queue count",
+    "target_version": "21e1c609229f485ba5e2a64a32f9ece977777a10",
+    "pr_number": 24945
+  },
+  "notes": "Created at 2026-04-08T18:12:21Z by automated generate_golden_issue.py",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue."
+}

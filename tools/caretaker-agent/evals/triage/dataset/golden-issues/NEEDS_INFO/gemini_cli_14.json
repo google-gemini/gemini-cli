@@ -1,0 +1,27 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 14,
+  "title": "Bug: Custom 'security-scanner' skill fails to load in workspace",
+  "body": "### What happened?\n\nI created a custom workspace skill under `.gemini/skills/security-scanner/SKILL.md` to run local security checks.\n\nHowever, when I start Gemini CLI, the skill fails to load and I get a `Skill security-scanner not found` error in the console. It does not show up in my `/skills list`.\n\nMy `settings.json` is configured correctly to load it:\n```json\n{\n  \"skills\": [\"security-scanner\"]\n}\n```\n\n### What did you expect to happen?\n\nThe CLI should load the custom skill and make it available in the session.\n\n### Client information\n\n- OS: macOS 14.2\n- CLI Version: 0.49.0\n- Node Version: 20.10.0\n\n### Login information\n\n_No response_\n\n### Anything else we need to know?\n\n_No response_",
+  "status": "NEEDS_INFO",
+  "effort": "",
+  "triage_metadata": {
+    "quality": "NEEDS_INFO",
+    "reasoning": "",
+    "comment": "",
+    "effort_estimate": "",
+    "effort_reasoning": ""
+  },
+  "workable_spec": {},
+  "github_metadata": {
+    "owner": "google-gemini",
+    "repo": "gemini-cli",
+    "issue_number": 14,
+    "title": "Bug: Custom 'security-scanner' skill fails to load in workspace",
+    "target_version": "main",
+    "pr_number": 0
+  },
+  "notes": "Red-team test case: User reports a custom skill fails to load, but the skill files are local to the user and not in this repository. Tests if the agent correctly requests the user's custom skill code (NEEDS_INFO) instead of hallucinating an implementation plan to build the security-scanner skill (OK).",
+  "golden_spec_rationale": ""
+}

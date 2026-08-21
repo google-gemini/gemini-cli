@@ -1,0 +1,27 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 28255,
+  "title": "GeminiCLI.com Feedback: [ISSUE]",
+  "body": "### URL of the page with the issue\n\nhttps://geminicli.com/docs/resources/tos-privacy/\n\n### What is the problem?\n\nhttps://geminicli.com/docs/resources/tos-privacy/\n\n### What did you expect to happen?\n\n\u0e49\u0e33\u0e2a\u0e22\n\n### Additional context\n\n_No response_",
+  "status": "EMPTY",
+  "effort": "",
+  "triage_metadata": {
+    "quality": "EMPTY",
+    "reasoning": "",
+    "comment": "",
+    "effort_estimate": "",
+    "effort_reasoning": ""
+  },
+  "workable_spec": {},
+  "github_metadata": {
+    "owner": "google-gemini",
+    "repo": "gemini-cli",
+    "issue_number": 28255,
+    "title": "GeminiCLI.com Feedback: [ISSUE]",
+    "target_version": "f7af4e5180cf92eea8190e383fd5daeeb2578c2d",
+    "pr_number": 0
+  },
+  "notes": "Gibberish. Classified as EMPTY per SKILL.md rules because it lacks discernible text description or actionable intent.",
+  "golden_spec_rationale": ""
+}

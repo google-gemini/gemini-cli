@@ -1,0 +1,27 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 12,
+  "title": "Bug Report",
+  "body": "### What happened?\n\n<!-- Please write a detailed description of what happened here. -->\n\n### Steps to Reproduce\n\n1. \n2. \n\n### Expected Behavior\n\n<!-- What did you expect to happen? -->\n\n### Client information\n\n_No response_\n\n### Login information\n\n_No response_\n\n### Anything else we need to know?\n\n_No response_",
+  "status": "EMPTY",
+  "effort": "",
+  "triage_metadata": {
+    "quality": "EMPTY",
+    "reasoning": "",
+    "comment": "",
+    "effort_estimate": "",
+    "effort_reasoning": ""
+  },
+  "workable_spec": {},
+  "github_metadata": {
+    "owner": "google-gemini",
+    "repo": "gemini-cli",
+    "issue_number": 12,
+    "title": "Bug Report",
+    "target_version": "main",
+    "pr_number": 0
+  },
+  "notes": "Unfilled bug template. Classified as EMPTY.",
+  "golden_spec_rationale": ""
+}

@@ -1,0 +1,27 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 15,
+  "title": "GaxiosError: No capacity available for model gemini-3.1-pro-preview",
+  "body": "Attempt 1 failed with status 429. Retrying with backoff... _GaxiosError: [{\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"No capacity available for model gemini-3.1-pro-preview on the server\",\n    \"errors\": [\n      {\n        \"message\": \"No capacity available for model gemini-3.1-pro-preview on the server\",\n        \"domain\": \"global\",\n        \"reason\": \"rateLimitExceeded\"\n      }\n    ],\n    \"status\": \"RESOURCE_EXHAUSTED\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.ErrorInfo\",\n        \"reason\": \"MODEL_CAPACITY_EXHAUSTED\",\n        \"domain\": \"cloudcode-pa.googleapis.com\",\n        \"metadata\": {\n          \"model\": \"gemini-3.1-pro-preview\"\n        }\n      }\n    ]\n  }\n}\n]\n    at Gaxios._request (file:///usr/local/lib/node_modules/@google/gemini-cli/dist/server.js:4082:19)\n    at async _OAuth2Client.requestAsync (file:///usr/local/lib/node_modules/@google/gemini-cli/dist/server.js:4483:17)\n    at async GeminiChat.generateContentStream (file:///usr/local/lib/node_modules/@google/gemini-cli/dist/server.js:33644:27)",
+  "status": "NEEDS_INFO",
+  "effort": "",
+  "triage_metadata": {
+    "quality": "NEEDS_INFO",
+    "reasoning": "",
+    "comment": "",
+    "effort_estimate": "",
+    "effort_reasoning": ""
+  },
+  "workable_spec": {},
+  "github_metadata": {
+    "owner": "google-gemini",
+    "repo": "gemini-cli",
+    "issue_number": 15,
+    "title": "GaxiosError: No capacity available for model gemini-3.1-pro-preview",
+    "target_version": "main",
+    "pr_number": 0
+  },
+  "notes": "Stack-trace-only issue showing a capacity 429 error. Classified as NEEDS_INFO because a raw capacity trace with no user context or reproduction steps requires more details to triage.",
+  "golden_spec_rationale": ""
+}

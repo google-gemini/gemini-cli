@@ -1,0 +1,59 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 21053,
+  "title": "MCP tool results with 'outputSchema' fail with error -32600",
+  "body": "",
+  "status": "OK",
+  "effort": "LARGE",
+  "triage_metadata": {
+    "quality": "OK",
+    "reasoning": "No source files were pruned; all PR modifications directly address the reported issue.",
+    "comment": "",
+    "effort_estimate": "LARGE",
+    "effort_reasoning": ""
+  },
+  "workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#21053",
+    "summary": {
+      "problem": "MCP tool calls fail with protocol error 'MCP error -32600: Tool [name] has an output schema but did not return structured content' when an MCP server returns schema-backed results inside the 'content' field rather than 'structuredContent'.",
+      "root_cause": "The CLI previously only wrapped stdio transports using XcodeMcpBridgeFixTransport for 'xcrun mcpbridge'. When other MCP servers (or HTTP/SSE transports) returned JSON payloads in 'content' without 'structuredContent', outputSchema validation failed in the MCP SDK.",
+      "context": "The fix refactors XcodeMcpBridgeFixTransport into McpComplianceTransport and applies it to all MCP connection types (Stdio, SSE, HTTP) in mcp-client.ts."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/core/src/tools/mcp-compliance-transport.ts",
+        "packages/core/src/tools/mcp-client.ts"
+      ],
+      "steps": [
+        "Rename packages/core/src/tools/xcode-mcp-fix-transport.ts to packages/core/src/tools/mcp-compliance-transport.ts and rename class XcodeMcpBridgeFixTransport to McpComplianceTransport.",
+        "In McpComplianceTransport, mark property 'readonly transport: Transport' to allow unwrapping the underlying transport.",
+        "In packages/core/src/tools/mcp-client.ts, update transport imports from XcodeMcpBridgeFixTransport to McpComplianceTransport.",
+        "In createTransportWithOAuth in mcp-client.ts, wrap the created URL transport with new McpComplianceTransport(...).",
+        "In createTransport in mcp-client.ts, wrap all created URL transports (SSE and HTTP) and StdioClientTransport instances unconditionally with new McpComplianceTransport(...).",
+        "In createTransport debug mode, unwrap transport by checking 'transport instanceof McpComplianceTransport ? transport.transport : transport' to attach debug listeners to the underlying StdioClientTransport stderr."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "packages/core/src/tools/mcp-compliance-transport.test.ts",
+      "expected_behavior": "When an MCP server returns JSON stringified output in the 'content' text array without 'structuredContent', McpComplianceTransport parses the JSON and populates 'structuredContent', allowing schema validation to pass.",
+      "verification_steps": [
+        "Run unit tests: npm test -w @google/gemini-cli-core -- src/tools/mcp-compliance-transport.test.ts",
+        "Verify non-compliant tool results with JSON in content are enriched with structuredContent.",
+        "Verify already compliant responses with structuredContent, plain text non-JSON content, empty content, and error responses are preserved without modification.",
+        "Run client tests: npm test -w @google/gemini-cli-core -- src/tools/mcp-client.test.ts"
+      ],
+      "framework": "Vitest"
+    }
+  },
+  "github_metadata": {
+    "owner": "google-gemini",
+    "repo": "gemini-cli",
+    "issue_number": 21053,
+    "title": "MCP tool results with 'outputSchema' fail with error -32600",
+    "target_version": "29481a1562c68ecbabbf11df87d5a87319c06cac",
+    "pr_number": 27045
+  },
+  "notes": "Created at 2026-03-04T03:22:55Z by automated generate_golden_issue.py",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue."
+}

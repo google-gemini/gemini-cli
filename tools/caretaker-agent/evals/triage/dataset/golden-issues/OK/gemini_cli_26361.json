@@ -1,0 +1,58 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 26361,
+  "title": "fix(core): externalize https-proxy-agent to fix proxy support",
+  "body": "",
+  "status": "OK",
+  "effort": "MEDIUM",
+  "triage_metadata": {
+    "quality": "OK",
+    "reasoning": "No source files were pruned; all PR modifications directly address the reported issue.",
+    "comment": "",
+    "effort_estimate": "MEDIUM",
+    "effort_reasoning": ""
+  },
+  "workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#26361",
+    "summary": {
+      "problem": "Calling Vertex AI / Gemini API or fallback proxy paths through an HTTP/HTTPS proxy fails with 'TypeError: HttpsProxyAgent is not a constructor' when executed from bundled ESM code.",
+      "root_cause": "esbuild ESM code-splitting ('splitting: true', 'format: 'esm'') converts CJS dependencies like 'https-proxy-agent' and 'http-proxy-agent' into default exports in split chunks, causing dynamic imports such as '(await import('https-proxy-agent')).HttpsProxyAgent' in 'gaxios' to resolve 'HttpsProxyAgent' to 'undefined'.",
+      "context": "While earlier PRs attempted explicit proxy agent injection for main auth paths, fallback proxy pathways still triggered dynamic imports. Adding esbuild aliases for 'https-proxy-agent' and 'http-proxy-agent' pointing to ESM patch re-exports preserves constructable named exports in the bundle without requiring externalization."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "esbuild.config.js",
+        "packages/cli/src/patches/http-proxy-agent.ts",
+        "packages/cli/src/patches/https-proxy-agent.ts"
+      ],
+      "steps": [
+        "Create patch file 'packages/cli/src/patches/http-proxy-agent.ts' that re-exports 'HttpProxyAgent' from '../../../../node_modules/http-proxy-agent/dist/index.js'.",
+        "Create patch file 'packages/cli/src/patches/https-proxy-agent.ts' that re-exports 'HttpsProxyAgent' from '../../../../node_modules/https-proxy-agent/dist/index.js'.",
+        "In 'esbuild.config.js', update the 'cliConfig.alias' mapping to resolve 'https-proxy-agent' to 'packages/cli/src/patches/https-proxy-agent.ts' and 'http-proxy-agent' to 'packages/cli/src/patches/http-proxy-agent.ts'."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "scripts/tests/proxy-agent-bundle.test.ts",
+      "expected_behavior": "Dynamic imports of bundled 'https-proxy-agent' and 'http-proxy-agent' modules expose constructable named constructor functions ('HttpsProxyAgent' and 'HttpProxyAgent').",
+      "verification_steps": [
+        "Create 'scripts/tests/proxy-agent-bundle.test.ts' to build a test entry using 'esbuild.build' with 'splitting: true', 'format: 'esm'', and the patch aliases from 'cliConfig'.",
+        "Import the generated bundle output via file URL using 'pathToFileURL'.",
+        "Verify that 'typeof https.HttpsProxyAgent === 'function'' and 'typeof http.HttpProxyAgent === 'function''.",
+        "Verify that calling 'new https.HttpsProxyAgent('http://127.0.0.1:9')' and 'new http.HttpProxyAgent('http://127.0.0.1:9')' does not throw an error.",
+        "Run 'npx vitest run scripts/tests/proxy-agent-bundle.test.ts' to confirm all tests pass."
+      ],
+      "framework": "Vitest"
+    }
+  },
+  "github_metadata": {
+    "owner": "google-gemini",
+    "repo": "gemini-cli",
+    "issue_number": 26361,
+    "title": "fix(core): externalize https-proxy-agent to fix proxy support",
+    "target_version": "3494fda2cfc5241aad036ce0d355eef626746cc5",
+    "pr_number": 27145
+  },
+  "notes": "Created at 2026-05-02T03:01:04Z by automated generate_golden_issue.py",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue."
+}

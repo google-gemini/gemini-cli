@@ -1,0 +1,27 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 28358,
+  "title": "dangerous script creation for hypothetical emp bomb prober emulation/quantum physics sensitive data",
+  "body": "### What happened?\n\n\n\n[ACTION REQUIRED] \ud83d\udcce PLEASE ATTACH THE EXPORTED CHAT HISTORY JSON FILE TO THIS ISSUE IF YOU FEEL COMFORTABLE SHARING IT.\n\n### What did you expect to happen?\n\nI was asking for a emulator for quantum physics engine and it considered scripting a python code for quantum physics emp bomb probing.\n\n### Client information\n\n\n* **CLI Version:** 0.50.0\n* **Git Commit:** 8d9733d53\n* **Session ID:** b486262d-fb3d-4b76-ac75-5d5f36dcf95b\n* **Operating System:** win32 v25.9.0\n* **Sandbox Environment:** no sandbox\n* **Model Version:** auto\n* **Auth Type:** gemini-api-key\n* **Memory Usage:** 334.5 MB\n* **Terminal Name:** Unknown\n* **Terminal Background:** #0c0c0c\n* **Kitty Keyboard Protocol:** Unsupported\n\n\n### Login information\n\nnpm gemini cli\n\n### Anything else we need to know?\n\ndel: # 2. ELITZUR-VAIDMAN QUANTUM ZENO BLACKBOX PROBER\ndel: # ==============================================================================\ndel: class QuantumZenoBlackboxProber:\ndel:     \"\"\"\ndel:     Simulates interaction-free measurement of a blackbox (containing a sensor or dud)\ndel:     using polarizing beam splitters, waveplates, and the Quantum Zeno effect.\ndel:     \"\"\"\ndel:     def __init__(self, num_stages=15):\ndel:         self.stages = num_stages\ndel:\ndel:     def execute_simulation(self, is_active=True):\ndel:         # Start with Horizontal polarized photon: |H> -> [1.0, 0.0]\ndel:         # [H_amplitude, V_amplitude]\ndel:         state = [1.0, 0.0]\ndel:         theta = math.pi / (2.0 * self.stages)  # Incremental rotation angle\ndel:\ndel:         detonated = False\ndel:         trace = []\ndel:\ndel:         for stage in range(1, self.stages + 1):\ndel:             # 1. Rotate polarization slightly\ndel:             c, s = math.cos(theta), math.sin(theta)\ndel:             h, v = state[0], state[1]\ndel:             h_new = c * h - s * v\ndel:             v_new = s * h + c * v\ndel:             state = [h_new, v_new]\ndel:\ndel:             # 2. Interrogate the blackbox\ndel:             if is_active:\ndel:                 # Active sensor triggers on Vertical polarization component (|V>)\ndel:                 p_trigger = state[1]**2\ndel:                 if random.random() < p_trigger:\ndel:                     detonated = True\ndel:                     trace.append(f\"Stage {stage:2d}: Photon triggered active sensor! *DETONATION* (Trigger\nprobability: {p_trigger*100:.1f}%)\")\ndel:                     break\ndel:                 else:\ndel:                     # Survives! Vert component collapses to 0. Project back to |H>\ndel:                     state = [1.0, 0.0]\ndel:                     trace.append(f\"Stage {stage:2d}: Passed cleanly (State collapsed to |H>, trigger probability:\n{p_trigger*100:.2f}%)\")\ndel:             else:\ndel:                 trace.append(f\"Stage {stage:2d}: Coherent rotation (No sensor. State: |H>={state[0]:.3f},\n|V>={state[1]:.3f})\")\ndel:\ndel:         if detonated:\ndel:             return \"DETONATED\", trace\ndel:\ndel:         # Final measurement at output polarizing beam splitter\ndel:         p_v = state[1]**2\ndel:         if random.random() < p_v:\ndel:             return \"DUD\", trace\ndel:         else:\ndel:             return \"ACTIVE_UNDETONATED\", trace",
+  "status": "SPAM",
+  "effort": "",
+  "triage_metadata": {
+    "quality": "SPAM",
+    "reasoning": "",
+    "comment": "",
+    "effort_estimate": "",
+    "effort_reasoning": ""
+  },
+  "workable_spec": {},
+  "github_metadata": {
+    "owner": "google-gemini",
+    "repo": "gemini-cli",
+    "issue_number": 28358,
+    "title": "dangerous script creation for hypothetical emp bomb prober emulation/quantum physics sensitive data",
+    "target_version": "f354eebaf43b25bacb176007e449bb9a638fd101",
+    "pr_number": 0
+  },
+  "notes": "Not a bug with the CLI. Misidentified textbook quantum mechanics Zeno effect simulation code as a safety threat, accompanied by financial bounty requests and off-topic comments. Note for future: may want to consider adding automated comments explaining non-bug status for these.",
+  "golden_spec_rationale": ""
+}

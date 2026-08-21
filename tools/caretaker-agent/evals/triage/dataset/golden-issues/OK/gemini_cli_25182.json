@@ -1,0 +1,62 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 25182,
+  "title": "Policy is bypassed if the file is opened in the IDE",
+  "body": "",
+  "status": "OK",
+  "effort": "LARGE",
+  "triage_metadata": {
+    "quality": "OK",
+    "reasoning": "No source files were pruned; all PR modifications directly address the reported issue.",
+    "comment": "",
+    "effort_estimate": "LARGE",
+    "effort_reasoning": ""
+  },
+  "workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#25182",
+    "summary": {
+      "problem": "The A2A server in Gemini CLI does not load default security policies, causing policy checks to be bypassed and inconsistent policy enforcement compared to interactive CLI mode.",
+      "root_cause": "In `packages/a2a-server/src/config/config.ts`, `loadConfig` previously set `policyEngineConfig` with an empty rules array in non-YOLO mode instead of invoking `createPolicyEngineConfig` from `@google/gemini-cli-core`. Additionally, workspace settings were loaded unconditionally without verifying folder trust via `checkPathTrust`, allowing workspace settings to potentially override `policyPaths` and `adminPolicyPaths`.",
+      "context": "To achieve parity with the CLI policy engine, default policies must be initialized through `createPolicyEngineConfig`, and path trust boundaries must be strictly enforced when loading settings in `a2a-server`."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/a2a-server/src/agent/executor.ts",
+        "packages/a2a-server/src/config/config.ts",
+        "packages/a2a-server/src/config/settings.ts",
+        "packages/a2a-server/src/http/app.ts",
+        "packages/a2a-server/src/types.ts",
+        "scripts/copy_bundle_assets.js"
+      ],
+      "steps": [
+        "In `packages/a2a-server/src/types.ts`, extend `AgentSettings` with an optional `isTrusted?: boolean` field.",
+        "In `packages/a2a-server/src/config/settings.ts`, update `loadSettings(workspaceDir: string, isTrustedOverride?: boolean)` to perform a folder trust check using `checkPathTrust` when `isTrustedOverride` is undefined, only load `workspaceSettings` if `isTrusted` evaluates to true, and override `policyPaths` and `adminPolicyPaths` on the merged result to strictly use `userSettings` values.",
+        "In `packages/a2a-server/src/config/config.ts`, update `loadConfig` to accept `trusted: boolean = false`. Construct `PolicySettings` with `mcpServers`, mapped `tools` (core, exclude, allowed), `policyPaths`, and `adminPolicyPaths`, then call `createPolicyEngineConfig(policySettings, approvalMode, undefined, true)` to generate `policyEngineConfig` instead of returning empty rules.",
+        "In `packages/a2a-server/src/agent/executor.ts`, read `isTrusted` from `agentSettings` in `CoderAgentExecutor.getTaskConfig` and pass `isTrusted` to `loadSettings` and `loadConfig`.",
+        "In `packages/a2a-server/src/http/app.ts`, perform initial trust evaluation via `checkPathTrust` in `createApp` and pass `isTrusted` into `loadSettings` and `loadConfig`.",
+        "In `scripts/copy_bundle_assets.js`, add copy execution logic to copy policy files from the root directory into `packages/a2a-server/dist/policies`."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "packages/a2a-server/src/config/config.test.ts",
+      "expected_behavior": "The A2A server populates default policy rules via `createPolicyEngineConfig` and enforces folder trust constraints when loading workspace settings and policy paths.",
+      "verification_steps": [
+        "Run unit tests with `npm test -w @google/gemini-cli-a2a-server`.",
+        "Verify `createPolicyEngineConfig` is invoked with mapped tool settings and policy paths in `config.test.ts`.",
+        "Verify `loadSettings` ignores untrusted workspace `settings.json` and prevents workspace override of `adminPolicyPaths` or `policyPaths` in `settings.test.ts`."
+      ],
+      "framework": "Vitest"
+    }
+  },
+  "github_metadata": {
+    "owner": "google-gemini",
+    "repo": "gemini-cli",
+    "issue_number": 25182,
+    "title": "Policy is bypassed if the file is opened in the IDE",
+    "target_version": "792654c88b0c01bc97a465184e1911a7c75c6685",
+    "pr_number": 27073
+  },
+  "notes": "Created at 2026-04-11T13:42:12Z by automated generate_golden_issue.py",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue."
+}

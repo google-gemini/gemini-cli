@@ -1,0 +1,65 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 20635,
+  "title": "Typo in policy inadvertently allows all tools",
+  "body": "",
+  "status": "OK",
+  "effort": "LARGE",
+  "triage_metadata": {
+    "quality": "OK",
+    "reasoning": "No source files were pruned; all PR modifications directly address the reported issue.",
+    "comment": "",
+    "effort_estimate": "LARGE",
+    "effort_reasoning": ""
+  },
+  "workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#20635",
+    "summary": {
+      "problem": "Policy rules missing the 'toolName' property (such as when misconfigured with a typo like 'toolname') implicitly act as catch-all rules matching all tools, leading to dangerous inadvertent permission grants.",
+      "root_cause": "The Zod schemas ('PolicyRuleSchema' and 'SafetyCheckerRuleSchema') in 'toml-loader.ts' and TypeScript interfaces ('PolicyRule' and 'SafetyCheckerRule') in 'types.ts' defined 'toolName' as optional ('toolName?: string'), causing missing or misspelled 'toolName' properties to evaluate as 'undefined' and match all tools unconditionally.",
+      "context": "Requiring 'toolName' on all policy entries forces catch-all policies to explicitly specify wildcard '*' for 'toolName', preventing unintended rule matching from typos or missing fields."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/core/src/policy/types.ts",
+        "packages/core/src/policy/toml-loader.ts",
+        "packages/core/src/policy/policy-engine.ts",
+        "packages/core/src/policy/policies/plan.toml",
+        "packages/core/src/policy/policies/yolo.toml",
+        "packages/a2a-server/src/config/config.ts",
+        "packages/core/src/tools/mcp-client.ts",
+        "packages/core/src/tools/mcp-tool.ts"
+      ],
+      "steps": [
+        "In 'packages/core/src/policy/types.ts', update the 'PolicyRule' and 'SafetyCheckerRule' interfaces to make 'toolName' a required field ('toolName: string') instead of optional.",
+        "In 'packages/core/src/policy/toml-loader.ts', update 'PolicyRuleSchema' and 'SafetyCheckerRuleSchema' Zod schemas so 'toolName' is required using 'z.union([z.string(), z.array(z.string())])'. Add validation checks in 'loadPoliciesFromToml' to reject policy rules and safety checker rules that pass empty string 'toolName' values.",
+        "In 'packages/core/src/policy/policy-engine.ts', add constructor validation that throws an Error if any rule or safety checker has an undefined or empty 'toolName'. Update rule matching logic ('ruleMatches') to handle explicit 'toolName' matching and wildcard '*' behavior.",
+        "In 'packages/core/src/policy/policies/plan.toml' and 'packages/core/src/policy/policies/yolo.toml', update default built-in policy rules to explicitly specify 'toolName = \"*\"' for wildcard rules.",
+        "In 'packages/a2a-server/src/config/config.ts', update the default YOLO approval mode policy configuration rule to explicitly include 'toolName: \"*\"'.",
+        "In 'packages/core/src/tools/mcp-client.ts', update the 'McpContext.getPolicyEngine()' return type definition so 'getRules()' returns rule objects with required 'toolName: string'.",
+        "In 'packages/core/src/tools/mcp-tool.ts', update 'formatMcpToolName' to treat 'toolName === undefined || toolName === \"*\"' as wildcard tool matching."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "packages/core/src/policy/toml-loader.test.ts",
+      "expected_behavior": "TOML policy definitions omitting 'toolName' (or misconfiguring it with typos like 'toolname') fail schema validation with a 'schema_validation' error. Rules explicitly specifying 'toolName = \"*\"' pass validation.",
+      "verification_steps": [
+        "Run Vitest on 'packages/core/src/policy/toml-loader.test.ts' to verify that missing 'toolName' in '[[rule]]' or '[[safety_checker]]' blocks produces a schema_validation error.",
+        "Verify that TOML parsing succeeds when 'toolName = \"*\"' is specified on catch-all rules.",
+        "Run Vitest on 'packages/core/src/policy/policy-engine.test.ts' to ensure policy evaluation correctly enforces rules with wildcard '*' tool names."
+      ],
+      "framework": "Vitest"
+    }
+  },
+  "github_metadata": {
+    "owner": "google-gemini",
+    "repo": "gemini-cli",
+    "issue_number": 20635,
+    "title": "Typo in policy inadvertently allows all tools",
+    "target_version": "919e5da58187530c2247c105f64575fda79e3d67",
+    "pr_number": 23330
+  },
+  "notes": "Created at 2026-02-27T23:31:31Z by automated generate_golden_issue.py",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue."
+}

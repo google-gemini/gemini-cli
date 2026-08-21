@@ -1,0 +1,26 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 27430,
+  "title": "npm install -g @google/gemini-cli",
+  "body": "",
+  "status": "EMPTY",
+  "effort": "",
+  "triage_metadata": {
+    "quality": "EMPTY",
+    "reasoning": "",
+    "comment": "",
+    "effort_estimate": "",
+    "effort_reasoning": ""
+  },
+  "workable_spec": {},
+  "github_metadata": {
+    "owner": "google-gemini",
+    "repo": "gemini-cli",
+    "issue_number": 27430,
+    "title": "npm install -g @google/gemini-cli",
+    "target_version": "630ecc21b94e747ef6b7e1356db42327a1f93dd9",
+    "pr_number": 0
+  },
+  "notes": "Automatically added via fetch_github_info.py"
+}

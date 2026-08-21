@@ -1,0 +1,51 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 17733,
+  "title": "Docs-writer skill is missing",
+  "body": "### What happened?\n\nGemini-CLI isn't able to see the docs-writer skill. Additionally, it doesn't automatically use the skill.\n\n### What did you expect to happen?\n\nGemini-CLI automatically loads the skill at start, and also automatically uses the skill when documentation requests are made.\n\n### Client information\n\ndocs-writer not listed when doing `/skills list`\n\n### Login information\n\n_No response_\n\n### Anything else we need to know?\n\n_No response_",
+  "status": "OK",
+  "effort": "SMALL",
+  "triage_metadata": {
+    "quality": "OK",
+    "reasoning": "Pruned GEMINI.md, `.gemini/skills/docs-writer/references/style-guide.md`, and `docs/cli/skills.md` from files_to_modify. The instruction file GEMINI.md already contains the instruction '- Use the docs-writer skill.' prior to the fix. The PR author's change to 'Always use...' was a stylistic/prose reinforcement, not a functional requirement. Therefore, modifying GEMINI.md is pruned to focus evaluation strictly on the functional parsing fix in skillLoader.ts. `.gemini/skills/docs-writer/references/style-guide.md` is a reference guide and `docs/cli/skills.md` is a user docs update, neither of which are required to resolve the functional bugs.",
+    "comment": "",
+    "effort_estimate": "SMALL",
+    "effort_reasoning": ""
+  },
+  "workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#17733",
+    "summary": {
+      "problem": "Gemini-CLI fails to discover or load the `docs-writer` skill, and additionally does not automatically invoke the skill when processing documentation-related requests.",
+      "root_cause": "The `.gemini/skills/docs-writer/SKILL.md` file contains a leading empty line before the YAML frontmatter opening delimiter (`---`), causing parsing libraries to fail to recognize the frontmatter metadata. This prevents the skill from being loaded and dynamically registered in the ActivateSkill tool schema, which in turn prevents the agent from utilizing it.",
+      "context": "Skills are directories containing a `SKILL.md` file with YAML frontmatter at the root. Standard frontmatter parsing requires `---` to be at the very first line of the file. `GEMINI.md` serves as the system instructions for the CLI within the repository."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        ".gemini/skills/docs-writer/SKILL.md (or packages/core/src/skills/skillLoader.ts)"
+      ],
+      "steps": [
+        "In `.gemini/skills/docs-writer/SKILL.md`, delete the leading empty line (newline) at the top of the file so that the frontmatter delimiter `---` sits exactly on line 1. Alternatively, update the skill loader in `packages/core/src/skills/skillLoader.ts` to trim leading whitespaces/newlines from the file content before running the frontmatter regex matching."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "N/A (or packages/core/src/skills/skillLoader.test.ts)",
+      "expected_behavior": "The `docs-writer` skill is correctly detected and loaded upon starting Gemini-CLI, appearing in `/skills list` output, and the skill is automatically invoked when requesting documentation edits or reviews.",
+      "verification_steps": [
+        "Ensure `.gemini/skills/docs-writer/SKILL.md` starts directly with the frontmatter triple-dash delimiter, OR verify that the parser handles leading whitespaces correctly with a unit test in `skillLoader.test.ts`.",
+        "Start Gemini-CLI and run `/skills list` (or equivalent command) to verify that `docs-writer` is registered successfully internally."
+      ],
+      "framework": "N/A (or Vitest)"
+    }
+  },
+  "github_metadata": {
+    "owner": "google-gemini",
+    "repo": "gemini-cli",
+    "issue_number": 17733,
+    "title": "Docs-writer skill is missing",
+    "target_version": "ef3146eed6efd1c2a38dc938569284047b530b12",
+    "pr_number": 17734
+  },
+  "notes": "Created at 2026-01-28T03:35:15Z by automated generate_golden_issue.py",
+  "golden_spec_rationale": "Pruned GEMINI.md, `.gemini/skills/docs-writer/references/style-guide.md`, and `docs/cli/skills.md` from files_to_modify. The instruction file GEMINI.md already contains the instruction '- Use the docs-writer skill.' prior to the fix. The PR author's change to 'Always use...' was a stylistic/prose reinforcement, not a functional requirement. Therefore, modifying GEMINI.md is pruned to focus evaluation strictly on the functional parsing fix in skillLoader.ts. `.gemini/skills/docs-writer/references/style-guide.md` is a reference guide and `docs/cli/skills.md` is a user docs update, neither of which are required to resolve the functional bugs."
+}

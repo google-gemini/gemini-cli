@@ -1,0 +1,61 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 24874,
+  "title": "Set terminalBuffer back to false",
+  "body": "",
+  "status": "OK",
+  "effort": "LARGE",
+  "triage_metadata": {
+    "quality": "OK",
+    "reasoning": "No source files were pruned; all PR modifications directly address the reported issue.",
+    "comment": "",
+    "effort_estimate": "LARGE",
+    "effort_reasoning": ""
+  },
+  "workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#24874",
+    "summary": {
+      "problem": "TerminalBuffer mode causes performance regressions with long chat histories and needs to be set to false by default, and rendering regressions for non-terminal buffer mode need to be fixed.",
+      "root_cause": "The default setting for terminalBuffer was set to true in settingsSchema, Config, and settings.schema.json. In addition, UI components like InputPrompt and ToolResultDisplay relied on virtualized ScrollableList components that produced rendering artifacts when running outside of alternate buffer / terminal buffer mode.",
+      "context": "When ui.terminalBuffer is false, Ink components should render items directly using line slicing wrapped in React Fragments or MaxSizedBox rather than using ScrollableList virtualization."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/cli/src/config/settingsSchema.ts",
+        "packages/cli/src/interactiveCli.tsx",
+        "packages/cli/src/ui/components/InputPrompt.tsx",
+        "packages/cli/src/ui/components/messages/ToolResultDisplay.tsx",
+        "packages/cli/src/ui/components/shared/MaxSizedBox.tsx",
+        "packages/core/src/config/config.ts",
+        "schemas/settings.schema.json"
+      ],
+      "steps": [
+        "In `packages/cli/src/config/settingsSchema.ts`, `packages/core/src/config/config.ts`, and `schemas/settings.schema.json`, change the default value of `terminalBuffer` / `ui.terminalBuffer` from `true` to `false`.",
+        "In `packages/cli/src/interactiveCli.tsx`, update `renderProcess` in `startInteractiveUI` to only activate when both `config.getUseRenderProcess()` and `config.getUseTerminalBuffer()` return true.",
+        "In `packages/cli/src/ui/components/InputPrompt.tsx`, conditionally check `isAlternateBuffer`. When `isAlternateBuffer` is true, render `ScrollableList`; when false, render a slice of `scrollableData` (from `buffer.visualScrollRow` to `buffer.visualScrollRow + buffer.viewportHeight`) using React `Fragment` elements.",
+        "In `packages/cli/src/ui/components/messages/ToolResultDisplay.tsx`, check `isAlternateBuffer` when rendering array `resultDisplay` outputs. When `isAlternateBuffer` is false, calculate hidden line counts and render visible items using `MaxSizedBox` and `AnsiLineText` instead of `ScrollableList`.",
+        "In `packages/cli/src/ui/components/shared/MaxSizedBox.tsx`, change the check `if (effectiveMaxHeight === undefined)` to `if (effectiveMaxHeight === undefined && totalHiddenLines === 0)` so that truncation indicators are retained when `totalHiddenLines > 0` even if `effectiveMaxHeight` is undefined."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "packages/cli/src/ui/components/InputPrompt.test.tsx",
+      "expected_behavior": "InputPrompt and ToolResultDisplay components render prompt contents and tool outputs cleanly when terminalBuffer is false.",
+      "verification_steps": [
+        "Run Vitest tests in `packages/cli/src/ui/components/InputPrompt.test.tsx` and `packages/cli/src/ui/components/messages/ToolResultDisplay.test.tsx`.",
+        "Verify that `ToolResultDisplay` stays scrolled to the bottom as lines are incrementally added in non-alternate buffer mode."
+      ],
+      "framework": "Vitest"
+    }
+  },
+  "github_metadata": {
+    "owner": "google-gemini",
+    "repo": "gemini-cli",
+    "issue_number": 24874,
+    "title": "Set terminalBuffer back to false",
+    "target_version": "28efab483fc921ee889eacc723a84806928d956d",
+    "pr_number": 24873
+  },
+  "notes": "Created at 2026-04-08T00:40:59Z by automated generate_golden_issue.py",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue."
+}

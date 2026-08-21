@@ -1,0 +1,55 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 19271,
+  "title": "If I switch git branches within the CLI, it's not reflected in the UI",
+  "body": "",
+  "status": "OK",
+  "effort": "MEDIUM",
+  "triage_metadata": {
+    "quality": "OK",
+    "reasoning": "No source files were pruned; all PR modifications directly address the reported issue.",
+    "comment": "",
+    "effort_estimate": "MEDIUM",
+    "effort_reasoning": ""
+  },
+  "workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#19271",
+    "summary": {
+      "problem": "When switching git branches within the CLI (e.g., using `!git checkout`), the branch name displayed in the UI footer fails to update.",
+      "root_cause": "The `useGitBranchName` hook only monitored `.git/logs/HEAD` via `fs.watch`. On certain platforms and git operations, branch switches update `.git/HEAD` directly without triggering updates on `.git/logs/HEAD`.",
+      "context": "Monitoring `.git/HEAD` (the canonical branch reference) alongside `.git/logs/HEAD` (the reflog) ensures that branch updates are reliably detected across all git operations and operating systems."
+    },
+    "implementation_plan": {
+      "files_to_modify": ["packages/cli/src/ui/hooks/useGitBranchName.ts"],
+      "steps": [
+        "Modify `fetchBranchName` in `useGitBranchName.ts` to accept an `isMounted` callback function that guards calls to `setBranchName` against state updates on unmounted hooks.",
+        "Refactor watcher initialization in `useEffect` to construct paths for both `gitHeadPath` (`path.join(cwd, '.git', 'HEAD')`) and `gitLogsHeadPath` (`path.join(cwd, '.git', 'logs', 'HEAD')`).",
+        "Implement a `watchFile` helper that attempts to access and set up an `fs.watch` listener on a specified path, storing active watcher instances in a `watchers` array.",
+        "Set up watchers for both `gitHeadPath` and `gitLogsHeadPath` within an async `setupWatchers` routine.",
+        "Update the `useEffect` cleanup function to mark `cancelled = true` and iterate over all items in `watchers` to invoke `.close()`."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "packages/cli/src/ui/hooks/useGitBranchName.test.tsx",
+      "expected_behavior": "The `useGitBranchName` hook triggers a refetch and updates the returned branch name whenever either `.git/HEAD` or `.git/logs/HEAD` changes, and properly closes all watchers on unmount.",
+      "verification_steps": [
+        "Add unit test verifying that `useGitBranchName` updates the branch name when `.git/HEAD` changes.",
+        "Verify existing unit test that `useGitBranchName` updates the branch name when `.git/logs/HEAD` changes.",
+        "Ensure setup failure handles missing `.git/HEAD` and `.git/logs/HEAD` silently without throwing errors.",
+        "Verify unit test ensuring all active file watchers are closed on hook unmount."
+      ],
+      "framework": "Vitest"
+    }
+  },
+  "github_metadata": {
+    "owner": "google-gemini",
+    "repo": "gemini-cli",
+    "issue_number": 19271,
+    "title": "If I switch git branches within the CLI, it's not reflected in the UI",
+    "target_version": "e54c450bc14e45e29079c8a88b98d0dafabbd4ee",
+    "pr_number": 19457
+  },
+  "notes": "Created at 2026-02-17T18:05:59Z by automated generate_golden_issue.py",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue."
+}

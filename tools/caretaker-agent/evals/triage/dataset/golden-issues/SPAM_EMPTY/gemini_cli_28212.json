@@ -1,0 +1,27 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 28212,
+  "title": "Smrupchusakdi859@gmail.com\u200b",
+  "body": "",
+  "status": "SPAM",
+  "effort": "",
+  "triage_metadata": {
+    "quality": "SPAM",
+    "reasoning": "",
+    "comment": "",
+    "effort_estimate": "",
+    "effort_reasoning": ""
+  },
+  "workable_spec": {},
+  "github_metadata": {
+    "owner": "google-gemini",
+    "repo": "gemini-cli",
+    "issue_number": 28212,
+    "title": "Smrupchusakdi859@gmail.com\u200b",
+    "target_version": "ae0a3aa7b928cc73bb09604bb9c2c020e6b647db",
+    "pr_number": 0
+  },
+  "notes": "Unsolicited email address dropped in title with empty body. Classified as SPAM.",
+  "golden_spec_rationale": ""
+}

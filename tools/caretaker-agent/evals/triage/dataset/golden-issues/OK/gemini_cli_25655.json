@@ -1,0 +1,55 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 25655,
+  "title": "SessionStart hook's systemMessage renders twice (BeforeAgent/BeforeTool render once)",
+  "body": "### Summary\n\nWhen a `SessionStart` hook emits a `systemMessage` response, Gemini CLI v0.38.2 renders it **twice** at session start \u2014 once with a trailing `[node \"\u2026\"]` command-annotation tag, once without. The same hook wired to `BeforeAgent` or `BeforeTool` renders only once, so the duplication appears specific to the `SessionStart` event.\n\n### Version\n\n- Gemini CLI `v0.38.2`\n- Windows 11 (PowerShell / Git Bash, same behavior)\n- Node 24.14.0\n\n### Minimal repro\n\n1. Save this script as `C:/tmp/hello-hook.js`:\n\n```js\nlet _=''; process.stdin.on('data',d=>_+=d);\nprocess.stdin.on('end',()=>{\n  console.log(JSON.stringify({ systemMessage: 'hello from the hook' }));\n});\n```\n\n2. Add to `~/.gemini/settings.json`:\n\n```json\n{\n  \"hooks\": {\n    \"SessionStart\": [\n      {\n        \"matcher\": \"*\",\n        \"hooks\": [\n          { \"type\": \"command\", \"command\": \"node C:/tmp/hello-hook.js\" }\n        ]\n      }\n    ]\n  }\n}\n```\n\n3. Run `gemini` in any directory.\n\n### Expected\n\nSingle `hello from the hook` banner.\n\n### Actual\n\nTwo identical banners:\n\n```\n\u2139 hello from the hook\n   --- [node \"C:/tmp/hello-hook.js\"]\n\n\u2139 hello from the hook\n   ---\n```\n\nSwap the event name to `BeforeAgent` or `BeforeTool` (with an appropriate trigger) \u2014 only one banner renders. So the double-rendering path is specific to `SessionStart`.\n\n### Additional notes\n\n- Also observed: `systemMessage` is not ANSI-interpreted \u2014 escape sequences like `\\x1b[1m` render as literal `\\u001b[...` text. This is likely intentional (safety) but worth documenting.\n- Setting `\"notifications\": false` on the hook entry (suggested by Gemini CLI itself as a workaround) does not change behavior \u2014 the key appears to be silently dropped.",
+  "status": "OK",
+  "effort": "MEDIUM",
+  "triage_metadata": {
+    "quality": "OK",
+    "reasoning": "No source files were pruned; all PR modifications directly address the reported issue.",
+    "comment": "",
+    "effort_estimate": "MEDIUM",
+    "effort_reasoning": ""
+  },
+  "workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#25655",
+    "summary": {
+      "problem": "When a SessionStart hook emits a systemMessage, it renders twice at session start \u2014 once with a command source annotation tag and once without.",
+      "root_cause": "AppContainer directly rendered result.systemMessage via historyManager.addItem upon completing fireSessionStartEvent while also receiving the same message via the HookSystemMessage event-bus listener. Furthermore, hookEventHandler.ts restricted HookSystemMessage emissions to outputFormat === 'json', requiring the event-bus check to be expanded so plain-text hooks are not lost when direct rendering is removed.",
+      "context": "BeforeAgent and BeforeTool hooks rendered system messages only once because they exclusively relied on the event-bus path. Plain-text hooks convert stdout into systemMessage via convertPlainTextToHookOutput, so removing direct rendering in AppContainer requires hookEventHandler.ts to emit HookSystemMessage for text-format hooks as well."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/cli/src/ui/AppContainer.tsx",
+        "packages/core/src/hooks/hookEventHandler.ts"
+      ],
+      "steps": [
+        "In packages/cli/src/ui/AppContainer.tsx, remove the direct historyManager.addItem invocation for result.systemMessage in the session start useEffect, and remove the associated react-hooks/exhaustive-deps eslint-disable comment.",
+        "In packages/core/src/hooks/hookEventHandler.ts, update the system message emission check from if (result.output?.systemMessage && result.outputFormat === 'json') to if (result.output?.systemMessage) so coreEvents.emitHookSystemMessage is emitted for both 'json' and 'text' output formats."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "packages/cli/src/ui/AppContainer.test.tsx",
+      "expected_behavior": "SessionStart hooks emit systemMessage events strictly through the event bus for both JSON and text formats, resulting in a single rendered banner in the UI.",
+      "verification_steps": [
+        "Run Vitest suite on AppContainer tests: npx vitest run packages/cli/src/ui/AppContainer.test.tsx",
+        "Run Vitest suite on hookEventHandler tests: npx vitest run packages/core/src/hooks/hookEventHandler.test.ts",
+        "Assert in AppContainer.test.tsx that session start does not trigger direct historyManager.addItem calls lacking a source tag.",
+        "Assert in hookEventHandler.test.ts that emitHookSystemMessage is called for both json and text output formats when systemMessage is present."
+      ],
+      "framework": "Vitest"
+    }
+  },
+  "github_metadata": {
+    "owner": "google-gemini",
+    "repo": "gemini-cli",
+    "issue_number": 25655,
+    "title": "SessionStart hook's systemMessage renders twice (BeforeAgent/BeforeTool render once)",
+    "target_version": "7cd228f5af66f13c64e946d17c923b876a53cf4f",
+    "pr_number": 25827
+  },
+  "notes": "Created at 2026-04-19T11:47:59Z by automated generate_golden_issue.py",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue."
+}
