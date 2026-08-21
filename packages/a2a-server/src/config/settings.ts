@@ -186,8 +186,10 @@ function resolveEnvVarsInObject<T>(obj: T): T {
   }
 
   if (Array.isArray(obj)) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-return
-    return obj.map((item) => resolveEnvVarsInObject(item)) as unknown as T;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    return (obj as unknown[]).map((item) =>
+      resolveEnvVarsInObject(item),
+    ) as unknown as T;
   }
 
   if (typeof obj === 'object') {
