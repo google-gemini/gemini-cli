@@ -1,5 +1,16 @@
 # Copyright 2026 Google LLC
-# Apache-2.0 License
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 """Unit tests for workflow/worker.py."""
 
@@ -29,15 +40,13 @@ def test_ignore_raw_ws_msg_filter():
     assert msg_filter.filter(record_normal) is True
 
 
-@patch("logging.basicConfig")
-def test_setup_logging(mock_basic_config):
-    """Tests that setup_logging configures root logger handlers correctly."""
+def test_setup_logging():
+    """Tests that setup_logging configures root logger correctly."""
     setup_logging()
-    mock_basic_config.assert_called_once()
-    kwargs = mock_basic_config.call_args[1]
-    assert kwargs["level"] == logging.INFO
-    assert len(kwargs["handlers"]) == 1
-    assert isinstance(kwargs["handlers"][0], logging.StreamHandler)
+    root_logger = logging.getLogger()
+    assert root_logger.level == logging.INFO
+    assert len(root_logger.handlers) == 1
+    assert isinstance(root_logger.handlers[0], logging.StreamHandler)
 
 
 @pytest.mark.asyncio
