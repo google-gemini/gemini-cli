@@ -1,3 +1,17 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Configuration module for the SSR Agent Orchestrator.
 
 This module parses, validates, and holds all configuration parameters and path
@@ -23,7 +37,13 @@ class Config:
         self.repo_url: str = os.environ.get(
             "REPO_URL", "https://github.com/joneba-google/gemini-cli-clone"
         )
-        self.git_token: str | None = os.environ.pop("GIT_TOKEN", None)
+        git_token = os.environ.pop("GIT_TOKEN", None)
+        github_token = os.environ.pop("GITHUB_TOKEN", None)
+        gh_token = os.environ.pop("GH_TOKEN", None)
+        resolved_token = git_token or github_token or gh_token
+        if resolved_token:
+            Config._cached_git_token = resolved_token
+        self.git_token: str | None = getattr(Config, "_cached_git_token", None)
         self.firestore_doc_raw: str | None = os.environ.get("FIRESTORE_DOC")
         self.firestore_id: str | None = (
             os.environ.get("FIRESTORE_ID") or os.environ.get("firestore_id")
@@ -64,7 +84,7 @@ class Config:
             The decoded dictionary of the Firestore document.
 
         Raises:
-            ConfigurationError: If the document is missing or not valid JSON.
+            ConfigurationError: If the document is missing, not valid JSON, or missing required fields.
         """
         if not self.firestore_doc_raw:
             raise ConfigurationError(
@@ -75,6 +95,12 @@ class Config:
             if not isinstance(doc_data, dict):
                 raise ConfigurationError(
                     "Firestore document specification must be a JSON object."
+                )
+            required_fields = ["workable_spec", "github_metadata"]
+            missing = [f for f in required_fields if f not in doc_data]
+            if missing:
+                raise ConfigurationError(
+                    f"Firestore document missing required fields: {', '.join(missing)}"
                 )
             return doc_data
         except json.JSONDecodeError as e:
