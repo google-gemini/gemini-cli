@@ -264,15 +264,22 @@ export function applyRetryNudge(
   if (!nudgeMessage) {
     return contents;
   }
+  const lastTurn = contents[contents.length - 1];
+  const hasNudge = lastTurn?.parts?.some((p) => p.text?.includes(nudgeMessage));
+  if (hasNudge) {
+    return contents;
+  }
   const cloned: Content[] = contents.map((c) => ({
     ...c,
     parts: c.parts ? [...c.parts] : [],
   }));
 
-  const lastTurn = cloned[cloned.length - 1];
-  const hasFunctionResponse = lastTurn?.parts?.some((p) => p.functionResponse);
+  const clonedLastTurn = cloned[cloned.length - 1];
+  const hasFunctionResponse = clonedLastTurn?.parts?.some(
+    (p) => p.functionResponse,
+  );
 
-  if (lastTurn?.role === 'user' && hasFunctionResponse) {
+  if (clonedLastTurn?.role === 'user' && hasFunctionResponse) {
     // Satisfy strict role alternation invariants of the Gemini API by inserting
     // a neutral, synthetic model turn between the tool response and the nudge prompt.
     cloned.push({
@@ -283,11 +290,11 @@ export function applyRetryNudge(
       role: 'user',
       parts: [{ text: nudgeMessage }],
     });
-  } else if (lastTurn?.role === 'user') {
-    if (!lastTurn.parts) {
-      lastTurn.parts = [];
+  } else if (clonedLastTurn?.role === 'user') {
+    if (!clonedLastTurn.parts) {
+      clonedLastTurn.parts = [];
     }
-    lastTurn.parts.push({ text: `\n${nudgeMessage}` });
+    clonedLastTurn.parts.push({ text: `\n${nudgeMessage}` });
   } else {
     cloned.push({
       role: 'user',

@@ -5031,5 +5031,16 @@ describe('GeminiChat', () => {
         { text: NO_RESPONSE_TEXT_NUDGE_MESSAGE },
       ]);
     });
+
+    it('should not duplicate the nudge message if it is already present in contents', () => {
+      const contents: Content[] = [
+        {
+          role: 'user',
+          parts: [{ text: 'Hello\n' + THINKING_ONLY_NUDGE_MESSAGE }],
+        },
+      ];
+      const result = applyRetryNudge(contents, THINKING_ONLY_NUDGE_MESSAGE);
+      expect(result).toEqual(contents);
+    });
   });
 });
