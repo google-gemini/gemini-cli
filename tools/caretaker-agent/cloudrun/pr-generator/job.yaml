@@ -25,6 +25,8 @@ spec:
                   value: 'gcli-db'
                 - name: 'FIRESTORE_COLLECTION'
                   value: 'issues'
+                - name: 'PR_GEN_DEBUG_LOGS_BUCKET'
+                  value: 'pr_generation_debug_logs'
                 - name: 'GIT_TOKEN'
                   valueFrom:
                     secretKeyRef:
@@ -33,8 +35,8 @@ spec:
               image: 'us-central1-docker.pkg.dev/gcli-intern-project-2026/pr-gen-repo/jetski-worker:latest'
               resources:
                 limits:
-                  cpu: '2'
-                  memory: '8Gi'
+                  cpu: '4'
+                  memory: '16Gi'
           maxRetries: 2
           serviceAccountName: 'code-gen-job-execution-sa@gcli-intern-project-2026.iam.gserviceaccount.com'
-          timeoutSeconds: '3600'
+          timeoutSeconds: '5400'
