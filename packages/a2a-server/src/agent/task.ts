@@ -1165,6 +1165,9 @@ export class Task {
     requestContext: RequestContext,
     aborted: AbortSignal,
   ): AsyncGenerator<ServerGeminiStreamEvent> {
+    // Clear any stale cancellation error from a previous aborted execution loop
+    this.cancellationError = undefined;
+
     const userMessage = requestContext.userMessage;
     const llmParts: PartUnion[] = [];
     let anyConfirmationHandled = false;
