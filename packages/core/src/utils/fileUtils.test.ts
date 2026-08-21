@@ -39,6 +39,7 @@ import {
 } from './fileUtils.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import { ToolErrorType } from '../tools/tool-error.js';
+import { canCreateSymlinks } from '../test-utils/environment-capabilities.js';
 
 vi.mock('mime/lite', () => ({
   default: { getType: vi.fn() },
@@ -189,7 +190,7 @@ describe('fileUtils', () => {
       expect(getRealPath(ghostFile)).toBe(path.resolve(ghostFile));
     });
 
-    it('should resolve symbolic links', () => {
+    it.skipIf(!canCreateSymlinks())('should resolve symbolic links', () => {
       const targetFile = path.join(tempRootDir, 'target.txt');
       const linkFile = path.join(tempRootDir, 'link.txt');
       actualNodeFs.writeFileSync(targetFile, 'content');

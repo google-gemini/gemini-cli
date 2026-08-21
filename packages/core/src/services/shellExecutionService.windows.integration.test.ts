@@ -8,6 +8,7 @@ import { describe, it, expect } from 'vitest';
 import os from 'node:os';
 import { ShellExecutionService } from './shellExecutionService.js';
 import { NoopSandboxManager } from './sandboxManager.js';
+import { hasPowerShell7 } from '../test-utils/environment-capabilities.js';
 
 const isWindows = os.platform() === 'win32';
 
@@ -21,8 +22,12 @@ const isWindows = os.platform() === 'win32';
  * These tests exercise the full pipeline end-to-end. They pass when
  * gemini-cli selects pwsh.exe from PATH; they fail when the pipeline
  * routes through Windows PowerShell 5.1.
+ *
+ * That condition is the guard below rather than only a note here: on a
+ * default Windows install pwsh.exe is absent, so these would otherwise
+ * fail for a reason unrelated to the change under test.
  */
-describe.skipIf(!isWindows)(
+describe.skipIf(!isWindows || !hasPowerShell7())(
   'ShellExecutionService Windows quoting (real shell)',
   () => {
     const baseConfig = {
