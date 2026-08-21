@@ -693,6 +693,7 @@ export interface ConfigParameters {
   maxAttempts?: number;
   enableShellOutputEfficiency?: boolean;
   shellToolInactivityTimeout?: number;
+  toolCallTimeout?: number;
   fakeResponses?: string;
   fakeResponsesNonStrict?: string;
   recordResponses?: string;
@@ -928,6 +929,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly maxAttempts: number;
   private readonly enableShellOutputEfficiency: boolean;
   private readonly shellToolInactivityTimeout: number;
+  private readonly toolCallTimeout: number;
   readonly fakeResponses?: string;
   readonly fakeResponsesNonStrict?: string;
   readonly recordResponses?: string;
@@ -1304,6 +1306,8 @@ export class Config implements McpContext, AgentLoopContext {
       params.enableShellOutputEfficiency ?? true;
     this.shellToolInactivityTimeout =
       (params.shellToolInactivityTimeout ?? 300) * 1000; // 5 minutes
+    // Stored in milliseconds. A value <= 0 disables the per-tool-call timeout.
+    this.toolCallTimeout = (params.toolCallTimeout ?? 0) * 1000;
     this.extensionManagement = params.extensionManagement ?? true;
     this.extensionRegistryURI = params.extensionRegistryURI;
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
@@ -3762,6 +3766,15 @@ export class Config implements McpContext, AgentLoopContext {
 
   getShellToolInactivityTimeout(): number {
     return this.shellToolInactivityTimeout;
+  }
+
+  /**
+   * The maximum wall-clock time, in milliseconds, that a single tool call is
+   * allowed to run before it is aborted. A value <= 0 means no timeout is
+   * applied (the default).
+   */
+  getToolCallTimeout(): number {
+    return this.toolCallTimeout;
   }
 
   getShellExecutionConfig(): ShellExecutionConfig {

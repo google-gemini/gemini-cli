@@ -1454,6 +1454,31 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
+  describe('Tool Call Timeout', () => {
+    it('should default to 0ms (disabled) when not provided', () => {
+      const config = new Config(baseParams);
+      expect(config.getToolCallTimeout()).toBe(0);
+    });
+
+    it('should convert provided seconds to milliseconds', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        toolCallTimeout: 30, // 30 seconds
+      };
+      const config = new Config(params);
+      expect(config.getToolCallTimeout()).toBe(30000);
+    });
+
+    it('should keep negative values negative so the timeout stays disabled', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        toolCallTimeout: -1,
+      };
+      const config = new Config(params);
+      expect(config.getToolCallTimeout()).toBeLessThanOrEqual(0);
+    });
+  });
+
   describe('createToolRegistry', () => {
     it('should register a tool if coreTools contains an argument-specific pattern', async () => {
       const params: ConfigParameters = {
