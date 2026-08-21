@@ -260,8 +260,18 @@ export class GeminiClient {
     }
   }
 
-  async initialize() {
-    this.chat = await this.startChat();
+  /**
+   * When the process was started to resume a session, `resumedSessionData` must
+   * be passed here even though the history is only replayed later by
+   * `resumeChat`. Without it the recording service treats this as a brand new
+   * conversation and opens a second file for a session that already has one:
+   * both files carry the same eight-character id suffix, because the resumed
+   * session id is reused for the process. Startup retention cleanup then
+   * expands that suffix back to every matching file and takes the real
+   * conversation down with the empty one.
+   */
+  async initialize(resumedSessionData?: ResumedSessionData) {
+    this.chat = await this.startChat(undefined, resumedSessionData);
     this.updateTelemetryTokenCount();
   }
 
