@@ -67,3 +67,34 @@ export function loadInstallMetadata(
     return undefined;
   }
 }
+
+/**
+ * Reads the `version` field from an extension's `package.json`, if present.
+ * Returns undefined when no package.json exists or it cannot be parsed.
+ */
+export function getPackageVersion(extensionDir: string): string | undefined {
+  try {
+    const pkgPath = path.join(extensionDir, 'package.json');
+    const content = fs.readFileSync(pkgPath, 'utf-8');
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const pkg = JSON.parse(content) as { version?: string };
+    return pkg.version;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Formats a version string for display. When the config version (e.g. "latest")
+ * differs from the actual package.json version, appends the concrete version in
+ * parentheses so users see meaningful info: `latest (0.20.2)`.
+ */
+export function formatVersion(
+  configVersion: string,
+  packageVersion?: string,
+): string {
+  if (!packageVersion || packageVersion === configVersion) {
+    return configVersion;
+  }
+  return `${configVersion} (${packageVersion})`;
+}
