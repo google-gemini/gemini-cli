@@ -92,7 +92,7 @@ main:
         next: 'mark_completed'
 
     - handle_failure:
-        return: '${"Failed: " + json.encode_to_string(error_details)}'
+        raise: '${"Workflow Execution Failed: " + json.encode_to_string(error_details)}'
 
     - mark_completed:
         assign:
