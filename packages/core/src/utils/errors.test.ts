@@ -15,6 +15,7 @@ import {
   AccountSuspendedError,
   getErrorMessage,
   getErrorType,
+  sanitizeUrlsInMessage,
   FatalAuthenticationError,
   FatalCancellationError,
   FatalInputError,
@@ -379,5 +380,42 @@ describe('getErrorType', () => {
       }
     }
     expect(getErrorType(new _AbortError2('test'))).toBe('AbortError');
+  });
+});
+
+describe('sanitizeUrlsInMessage', () => {
+  it('strips trailing period from URL at end of message (issue #28052)', () => {
+    expect(
+      sanitizeUrlsInMessage(
+        'Please migrate to the Antigravity suite of products: https://antigravity.google.',
+      ),
+    ).toBe(
+      'Please migrate to the Antigravity suite of products: https://antigravity.google',
+    );
+  });
+
+  it('strips trailing period from URL followed by whitespace', () => {
+    expect(
+      sanitizeUrlsInMessage('Visit https://example.com. Then do something.'),
+    ).toBe('Visit https://example.com Then do something.');
+  });
+
+  it('does not strip non-trailing punctuation within URL path', () => {
+    expect(
+      sanitizeUrlsInMessage(
+        'See https://example.com/path/to/page for details.',
+      ),
+    ).toBe('See https://example.com/path/to/page for details.');
+  });
+
+  it('strips trailing exclamation mark from URL', () => {
+    expect(sanitizeUrlsInMessage('Go to https://example.com!')).toBe(
+      'Go to https://example.com',
+    );
+  });
+
+  it('leaves messages without URLs unchanged', () => {
+    const msg = 'No URLs here. Just plain text.';
+    expect(sanitizeUrlsInMessage(msg)).toBe(msg);
   });
 });
