@@ -654,7 +654,8 @@ export class CoderAgentExecutor implements AgentExecutor {
             logger.warn(
               `[CoderAgentExecutor] Task ${taskId} was aborted during initialization.`,
             );
-            const isExplicitCancel = this.explicitlyCanceledTasks.has(abortController);
+            const isExplicitCancel =
+              this.explicitlyCanceledTasks.has(abortController);
             const finalState = isExplicitCancel ? 'canceled' : 'input-required';
             const message = isExplicitCancel
               ? 'Task canceled by user request.'

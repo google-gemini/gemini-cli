@@ -886,7 +886,9 @@ describe('Task', () => {
 
       // Verify cancellationError is set and would throw on wait
       expect(task['cancellationError']).toBeDefined();
-      await expect(task.waitForPendingTools()).rejects.toThrow('Execution aborted');
+      await expect(task.waitForPendingTools()).rejects.toThrow(
+        'Execution aborted',
+      );
 
       // Call acceptUserMessage to start a new user turn
       const userMessage = {
@@ -897,7 +899,10 @@ describe('Task', () => {
       const abortController = new AbortController();
 
       // Drain the generator to let acceptUserMessage execute
-      for await (const _ of task.acceptUserMessage(userMessage, abortController.signal)) {
+      for await (const _ of task.acceptUserMessage(
+        userMessage,
+        abortController.signal,
+      )) {
         // no-op
       }
 
