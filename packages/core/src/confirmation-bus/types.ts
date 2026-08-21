@@ -10,6 +10,7 @@ import type {
   ToolConfirmationOutcome,
   ToolConfirmationPayload,
   DiffStat,
+  ToolResultDisplay,
 } from '../tools/tools.js';
 import type { ToolCall } from '../scheduler/types.js';
 import type { SandboxPermissions } from '../services/sandboxManager.js';
@@ -89,6 +90,7 @@ export type SerializableConfirmationDetails =
       rootCommand: string;
       additionalPermissions: SandboxPermissions;
       systemMessage?: string;
+      cancelResult?: ToolResultDisplay;
     }
   | {
       type: 'info';
@@ -96,6 +98,7 @@ export type SerializableConfirmationDetails =
       systemMessage?: string;
       prompt: string;
       urls?: string[];
+      cancelResult?: ToolResultDisplay;
     }
   | {
       type: 'edit';
@@ -108,6 +111,7 @@ export type SerializableConfirmationDetails =
       newContent: string;
       isModifying?: boolean;
       diffStat?: DiffStat;
+      cancelResult?: ToolResultDisplay;
     }
   | {
       type: 'exec';
@@ -117,6 +121,7 @@ export type SerializableConfirmationDetails =
       rootCommand: string;
       rootCommands: string[];
       commands?: string[];
+      cancelResult?: ToolResultDisplay;
     }
   | {
       type: 'mcp';
@@ -128,18 +133,21 @@ export type SerializableConfirmationDetails =
       toolArgs?: Record<string, unknown>;
       toolDescription?: string;
       toolParameterSchema?: unknown;
+      cancelResult?: ToolResultDisplay;
     }
   | {
       type: 'ask_user';
       title: string;
       systemMessage?: string;
       questions: Question[];
+      cancelResult?: ToolResultDisplay;
     }
   | {
       type: 'exit_plan_mode';
       title: string;
       systemMessage?: string;
       planPath: string;
+      cancelResult?: ToolResultDisplay;
     };
 
 export interface UpdatePolicy {
