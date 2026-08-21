@@ -129,6 +129,26 @@ describe('Settings Validation Warning', () => {
         e.message.includes("Unrecognized key(s) in object: 'DiffModified'"),
       ),
     ).toBe(true);
+
+    expect(settings?.user.settings).toMatchObject({
+      ui: {
+        customThemes: {
+          terafox: {
+            name: 'terafox',
+            type: 'custom',
+          },
+        },
+      },
+    });
+    expect(settings?.user.settings).not.toMatchObject({
+      ui: {
+        customThemes: {
+          terafox: {
+            DiffModified: '#ffffff',
+          },
+        },
+      },
+    });
   });
 
   it('should throw a fatal error when settings file is not a valid JSON object', () => {
