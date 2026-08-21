@@ -490,12 +490,14 @@ export class ShellExecutionService {
       GIT_PAGER: shellExecutionConfig.pager ?? 'cat',
     };
 
-    // Ensure all GIT_CONFIG_* variables are preserved even if they were redacted
-    for (const key of gitConfigKeys) {
-      baseEnv[key] = sourceEnv[key];
-    }
-
-    let gitConfigCount = parseInt(baseEnv['GIT_CONFIG_COUNT'] || '0', 10);
+    // Git rejects a non-numeric GIT_CONFIG_COUNT outright, so an unusable
+    // inherited value must not be carried into the appended overrides.
+    const declaredGitConfigCount = baseEnv['GIT_CONFIG_COUNT'];
+    let gitConfigCount =
+      declaredGitConfigCount !== undefined &&
+      /^\d+$/.test(declaredGitConfigCount)
+        ? Number(declaredGitConfigCount)
+        : 0;
     const devNullPath = os.platform() === 'win32' ? 'NUL' : '/dev/null';
 
     baseEnv['GIT_CONFIG_GLOBAL'] = devNullPath;

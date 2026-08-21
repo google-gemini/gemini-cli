@@ -23,7 +23,11 @@ import {
   type ShellOutputEvent,
   type ShellExecutionConfig,
 } from './shellExecutionService.js';
-import { NoopSandboxManager } from './sandboxManager.js';
+import {
+  NoopSandboxManager,
+  type SandboxManager,
+  type SandboxRequest,
+} from './sandboxManager.js';
 import { ExecutionLifecycleService } from './executionLifecycleService.js';
 import type { AnsiOutput, AnsiToken } from '../utils/terminalSerializer.js';
 
@@ -2257,6 +2261,105 @@ describe('ShellExecutionService environment variables', () => {
     expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_8', '');
     expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_9', 'diff.external');
     expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_9', '');
+
+    // Ensure child_process exits
+    mockChildProcess.emit('exit', 0, null);
+    mockChildProcess.emit('close', 0, null);
+    await new Promise(process.nextTick);
+
+    vi.unstubAllEnvs();
+  });
+
+  it('should not restore a sensitive GIT_CONFIG pair after value-first redaction', async () => {
+    const prepareCommand = vi.fn(async (request: SandboxRequest) => ({
+      program: request.command,
+      args: request.args,
+      env: request.env,
+    }));
+    const sensitiveGitConfig: ShellExecutionConfig = {
+      ...shellExecutionConfig,
+      env: {
+        ...process.env,
+        GIT_CONFIG_COUNT: '2',
+        GIT_CONFIG_KEY_0: 'url.https://github.com/.insteadOf',
+        GIT_CONFIG_VALUE_0: 'https://alice:supersecret@github.com/',
+        GIT_CONFIG_KEY_1: 'core.pager',
+        GIT_CONFIG_VALUE_1: 'less',
+      },
+      sanitizationConfig: {
+        ...shellExecutionConfig.sanitizationConfig,
+        enableEnvironmentVariableRedaction: true,
+      },
+      sandboxManager: { prepareCommand } as unknown as SandboxManager,
+    };
+
+    mockGetPty.mockResolvedValue(null);
+    await ShellExecutionService.execute(
+      'test-cp-redacted-git-config',
+      '/',
+      vi.fn(),
+      new AbortController().signal,
+      false,
+      sensitiveGitConfig,
+    );
+
+    expect(prepareCommand).toHaveBeenCalledOnce();
+    const preparedEnv = prepareCommand.mock.calls[0][0].env;
+    expect(preparedEnv['GIT_CONFIG_VALUE_0']).not.toContain('supersecret');
+    expect(preparedEnv).not.toHaveProperty(
+      'GIT_CONFIG_KEY_0',
+      'url.https://github.com/.insteadOf',
+    );
+    expect(preparedEnv).toHaveProperty('GIT_CONFIG_COUNT', '9');
+    expect(preparedEnv).toHaveProperty('GIT_CONFIG_KEY_0', 'core.pager');
+    expect(preparedEnv).toHaveProperty('GIT_CONFIG_VALUE_0', 'less');
+
+    const declaredCount = Number(preparedEnv['GIT_CONFIG_COUNT']);
+    for (let index = 0; index < declaredCount; index++) {
+      expect(preparedEnv[`GIT_CONFIG_KEY_${index}`]).toBeDefined();
+      expect(preparedEnv[`GIT_CONFIG_VALUE_${index}`]).toBeDefined();
+    }
+
+    mockChildProcess.emit('exit', 0, null);
+    mockChildProcess.emit('close', 0, null);
+    await new Promise(process.nextTick);
+  });
+
+  it('should ignore a non-numeric inherited GIT_CONFIG_COUNT instead of emitting a count git rejects', async () => {
+    vi.resetModules();
+    vi.stubEnv('GIT_CONFIG_COUNT', 'not-a-number');
+
+    const { ShellExecutionService } = await import(
+      './shellExecutionService.js'
+    );
+
+    mockGetPty.mockResolvedValue(null); // Force child_process fallback
+    await ShellExecutionService.execute(
+      'test-cp-bogus-git-count',
+      '/',
+      vi.fn(),
+      new AbortController().signal,
+      false, // non-interactive
+      shellExecutionConfig,
+    );
+
+    expect(mockCpSpawn).toHaveBeenCalled();
+    const cpEnv = mockCpSpawn.mock.calls[0][2].env;
+
+    // A NaN index would produce GIT_CONFIG_KEY_NaN and GIT_CONFIG_COUNT=NaN,
+    // which git rejects with "bogus count in GIT_CONFIG_COUNT".
+    expect(cpEnv).not.toHaveProperty('GIT_CONFIG_KEY_NaN');
+    expect(cpEnv).not.toHaveProperty('GIT_CONFIG_VALUE_NaN');
+    expect(cpEnv['GIT_CONFIG_COUNT']).toMatch(/^\d+$/);
+
+    // The overrides restart at slot 0 and every declared slot is populated.
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_0', 'credential.helper');
+    const declaredCount = Number(cpEnv['GIT_CONFIG_COUNT']);
+    expect(declaredCount).toBeGreaterThan(0);
+    for (let i = 0; i < declaredCount; i++) {
+      expect(cpEnv[`GIT_CONFIG_KEY_${i}`]).toBeDefined();
+      expect(cpEnv[`GIT_CONFIG_VALUE_${i}`]).toBeDefined();
+    }
 
     // Ensure child_process exits
     mockChildProcess.emit('exit', 0, null);
