@@ -229,19 +229,39 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
   ): Promise<{
     threshold: number;
     groupLabel: string;
-    modelAlias: typeof FLASH_MODEL | typeof PRO_MODEL;
+    modelAlias: string;
   }> {
-    const threshold = await config.getResolvedClassifierThreshold();
-    const remoteThresholdValue = await config.getClassifierThreshold();
+    const rules = await config.getNumericalRoutingRules();
+    // Sort rules by maxScore ascending to evaluate sequentially
+    rules.sort((a, b) => a.maxScore - b.maxScore);
 
-    let groupLabel: string;
-    if (threshold === remoteThresholdValue) {
-      groupLabel = 'Remote';
-    } else {
-      groupLabel = 'Default';
+    let modelAlias = rules[rules.length - 1].model;
+    let threshold = rules[0].maxScore;
+
+    for (const rule of rules) {
+      if (score <= rule.maxScore) {
+        modelAlias = rule.model;
+        threshold = rule.maxScore;
+        break;
+      }
     }
 
-    const modelAlias = score >= threshold ? PRO_MODEL : FLASH_MODEL;
+    const remoteThresholdValue = await config.getClassifierThreshold();
+    const isDefaultRules =
+      rules.length === 2 &&
+      rules[1].model === PRO_MODEL &&
+      rules[0].model === FLASH_MODEL;
+
+    let groupLabel = 'Custom';
+    if (isDefaultRules) {
+      // In the default 2-rule setup, report the original split threshold for logs
+      threshold = rules[0].maxScore + 1;
+      if (threshold === remoteThresholdValue) {
+        groupLabel = 'Remote';
+      } else {
+        groupLabel = 'Default';
+      }
+    }
 
     return { threshold, groupLabel, modelAlias };
   }
