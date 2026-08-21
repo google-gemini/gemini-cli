@@ -190,25 +190,13 @@ if should_deploy "pr-gen"; then
     if [ "${SKIP_BUILD}" = false ]; then
         echo "  [5.1] Submitting Cloud Build for container image: ${IMAGE_NAME}"
         if [ "${DRY_RUN}" = true ]; then
-            echo "[DRY-RUN] gcloud builds submit --tag ${IMAGE_NAME} --project=${PROJECT_ID} --async ${PR_GEN_DIR}"
+            echo "[DRY-RUN] gcloud builds submit --tag ${IMAGE_NAME} --project=${PROJECT_ID} ${PR_GEN_DIR}"
             echo "[DRY-RUN] gcloud container images add-tag ${IMAGE_NAME} ${LATEST_NAME} --quiet"
         else
-            BUILD_ID=$(gcloud builds submit "${PR_GEN_DIR}" \
+            if ! gcloud builds submit "${PR_GEN_DIR}" \
               --tag "${IMAGE_NAME}" \
-              --project="${PROJECT_ID}" \
-              --async \
-              --format="value(ID)")
-
-            echo "  Cloud Build started with ID: ${BUILD_ID}. Waiting for build completion..."
-            STATUS="WORKING"
-            while [[ "${STATUS}" == "WORKING" || "${STATUS}" == "QUEUED" || "${STATUS}" == "PENDING" ]]; do
-              sleep 5
-              STATUS=$(gcloud builds describe "${BUILD_ID}" --project="${PROJECT_ID}" --format="value(status)")
-              echo "    Build status: ${STATUS}"
-            done
-
-            if [[ "${STATUS}" != "SUCCESS" ]]; then
-              echo "Error: Cloud Build ${BUILD_ID} failed with status: ${STATUS}" >&2
+              --project="${PROJECT_ID}"; then
+              echo "Error: Cloud Build failed." >&2
               exit 1
             fi
             echo "  Cloud Build completed successfully."
