@@ -299,7 +299,11 @@ export function isAuthenticationError(error: unknown): boolean {
   // Fallback: Check for MCP SDK's plain Error messages with HTTP 401
   // The SDK sometimes throws: new Error(`Error POSTing to endpoint (HTTP 401): ...`)
   const message = getErrorMessage(error);
-  if (/(?:^|\b(?:HTTP|status(?: code)?)\s*:?\s*)401\b/i.test(message)) {
+  if (
+    /(?:^|\b(?:HTTP(?:\/\d+\.\d+)?|status(?:[-_ ]?code)?|response[-_ ]?code|error[-_ ]?code|code|error)\s*:?\s*)401\b/i.test(
+      message,
+    )
+  ) {
     return true;
   }
 
