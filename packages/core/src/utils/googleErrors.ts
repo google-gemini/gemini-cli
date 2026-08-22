@@ -153,6 +153,18 @@ export function parseGoogleApiError(error: unknown): GoogleApiError | null {
     return null;
   }
 
+  // Skip parsing if the error is already a classified quota error
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'name' in error &&
+    (error.name === 'TerminalQuotaError' ||
+      error.name === 'RetryableQuotaError' ||
+      error.name === 'ValidationRequiredError')
+  ) {
+    return null;
+  }
+
   let errorObj: unknown = error;
 
   // If error is a string, try to parse it.
@@ -174,7 +186,9 @@ export function parseGoogleApiError(error: unknown): GoogleApiError | null {
   }
 
   let currentError: ErrorShape | undefined =
-    fromGaxiosError(errorObj) ?? fromApiError(errorObj);
+    fromGaxiosError(errorObj) ??
+    fromApiError(errorObj) ??
+    fromCauseError(errorObj);
 
   let depth = 0;
   const maxDepth = 10;
@@ -370,4 +384,71 @@ function fromApiError(errorObj: object): ErrorShape | undefined {
     }
   }
   return outerError;
+}
+
+function fromCauseError(errorObj: object): ErrorShape | undefined {
+  const err = errorObj as {
+    code?: unknown;
+    status?: unknown;
+    cause?: unknown;
+  };
+  if (!err.cause) return undefined;
+
+  const rawCode = err.code ?? err.status;
+  const fallbackCode =
+    typeof rawCode === 'number'
+      ? rawCode
+      : typeof rawCode === 'string' &&
+          rawCode.trim() !== '' &&
+          !isNaN(Number(rawCode))
+        ? Number(rawCode)
+        : undefined;
+
+  const resolveError = (
+    resolved: ErrorShape | undefined,
+  ): ErrorShape | undefined => {
+    if (!resolved) return undefined;
+    const message = resolved.message;
+    const details = resolved.details;
+    const code = resolved.code ?? fallbackCode;
+    return {
+      ...(message !== undefined ? { message } : {}),
+      ...(details !== undefined ? { details } : {}),
+      ...(code !== undefined ? { code } : {}),
+    };
+  };
+
+  if (typeof err.cause === 'object' && err.cause !== null) {
+    if (
+      'error' in err.cause &&
+      err.cause.error &&
+      isErrorShape(err.cause.error)
+    ) {
+      return resolveError(err.cause.error);
+    }
+    if ('message' in err.cause && err.cause.message) {
+      if (typeof err.cause.message === 'string') {
+        const parsed = fromApiError({ message: err.cause.message });
+        if (parsed) return resolveError(parsed);
+      } else if (
+        typeof err.cause.message === 'object' &&
+        err.cause.message !== null
+      ) {
+        const msgObj = err.cause.message as { error?: unknown };
+        if (msgObj.error && isErrorShape(msgObj.error)) {
+          return resolveError(msgObj.error);
+        }
+      }
+    }
+    if (isErrorShape(err.cause)) {
+      return resolveError(err.cause);
+    }
+  }
+  if (typeof err.cause === 'string' && err.cause.trim() !== '') {
+    const parsed = fromApiError({ message: err.cause }) ?? {
+      message: err.cause,
+    };
+    return resolveError(parsed);
+  }
+  return undefined;
 }
