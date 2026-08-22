@@ -102,7 +102,25 @@ describe('isAuthenticationError', () => {
   it('should detect 401 in various message formats', () => {
     expect(isAuthenticationError(new Error('401 Unauthorized'))).toBe(true);
     expect(isAuthenticationError(new Error('HTTP 401'))).toBe(true);
+    expect(isAuthenticationError(new Error('HTTP/1.1 401 Unauthorized'))).toBe(
+      true,
+    );
     expect(isAuthenticationError(new Error('Status code: 401'))).toBe(true);
+    expect(isAuthenticationError(new Error('statusCode: 401'))).toBe(true);
+    expect(isAuthenticationError(new Error('code: 401'))).toBe(true);
+    expect(isAuthenticationError(new Error('Error: 401 Unauthorized'))).toBe(
+      true,
+    );
+  });
+
+  it('should ignore 401 embedded in unrelated values', () => {
+    expect(
+      isAuthenticationError(
+        new Error('Error connecting to http://localhost:4012'),
+      ),
+    ).toBe(false);
+    expect(isAuthenticationError(new Error('exit status 4010'))).toBe(false);
+    expect(isAuthenticationError(new Error('error at line 401'))).toBe(false);
   });
 });
 
