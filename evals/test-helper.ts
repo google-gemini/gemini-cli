@@ -337,6 +337,10 @@ export async function prepareWorkspace(
     fs.writeFileSync(ackPath, JSON.stringify(acknowledgedAgents, null, 2));
   }
 
+  if (!fs.existsSync(path.join(projectRoot, '.gitignore'))) {
+    fs.writeFileSync(path.join(projectRoot, '.gitignore'), 'node_modules/\n');
+  }
+
   const execOptions = { cwd: testDir, stdio: 'ignore' as const };
   execSync('git init --initial-branch=main', execOptions);
   execSync('git config user.email "test@example.com"', execOptions);
@@ -407,7 +411,8 @@ export function symlinkNodeModules(testDir: string) {
     fs.existsSync(rootNodeModules) &&
     !fs.existsSync(testNodeModules)
   ) {
-    fs.symlinkSync(rootNodeModules, testNodeModules, 'dir');
+    const type = process.platform === 'win32' ? 'junction' : 'dir';
+    fs.symlinkSync(rootNodeModules, testNodeModules, type);
   }
 }
 
