@@ -24,6 +24,21 @@ export const BUILTIN_SEATBELT_PROFILES = [
   'strict-proxied',
 ];
 
+/**
+ * Parses the DEBUG environment variable using strict boolean semantics.
+ * Only the values 'true' and '1' are treated as enabled; every other value
+ * (including 'false', '0', empty string, and undefined) is treated as disabled.
+ *
+ * This centralises the check that was previously duplicated across sandbox.ts
+ * and sandboxUtils.ts, where some call-sites used JavaScript truthiness
+ * (!!process.env['DEBUG']) instead of strict comparison — causing values like
+ * 'false' and '0' to be incorrectly interpreted as enabled.
+ */
+export function isDebugEnvEnabled(): boolean {
+  const v = process.env['DEBUG'];
+  return v === 'true' || v === '1';
+}
+
 export function getContainerPath(hostPath: string): string {
   if (os.platform() !== 'win32') {
     return hostPath;
@@ -149,8 +164,7 @@ export function entrypoint(workdir: string, cliArgs: string[]): string[] {
   );
 
   const quotedCliArgs = cliArgs.slice(2).map((arg) => quote([arg]));
-  const isDebugMode =
-    process.env['DEBUG'] === 'true' || process.env['DEBUG'] === '1';
+  const isDebugMode = isDebugEnvEnabled();
   const cliCmd =
     process.env['NODE_ENV'] === 'development'
       ? isDebugMode
