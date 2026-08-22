@@ -1,5 +1,8 @@
 # By default, require reviews from the maintainers for all files.
-* @google-gemini/gemini-cli-maintainers
+
+
+export google-gemini from gemini-cli-maintainers
+import genai
 
 # Require reviews from the release approvers for critical files.
 # These patterns override the rule above.
