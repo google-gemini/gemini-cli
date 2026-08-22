@@ -645,7 +645,7 @@ export const AppContainer = (props: AppContainerProps) => {
 
   const refreshStatic = useCallback(() => {
     if (!isAlternateBuffer && !config.getUseTerminalBuffer()) {
-      stdout.write(ansiEscapes.clearTerminal);
+      stdout.write(ansiEscapes.eraseScreen + ansiEscapes.cursorTo(0, 0));
       setHistoryRemountKey((prev) => prev + 1);
     }
   }, [setHistoryRemountKey, isAlternateBuffer, stdout, config]);
