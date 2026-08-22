@@ -99,6 +99,15 @@ export function ports(): string[] {
     .map((p) => p.trim());
 }
 
+/**
+ * Returns whether debug mode is enabled via the DEBUG environment variable.
+ * Only the explicit values 'true' and '1' enable it; 'false', '0', empty
+ * values, and unset values all leave debug mode disabled.
+ */
+export function isDebugEnvEnabled(): boolean {
+  return process.env['DEBUG'] === 'true' || process.env['DEBUG'] === '1';
+}
+
 export function entrypoint(workdir: string, cliArgs: string[]): string[] {
   const isWindows = os.platform() === 'win32';
   const containerWorkdir = getContainerPath(workdir);
@@ -149,8 +158,7 @@ export function entrypoint(workdir: string, cliArgs: string[]): string[] {
   );
 
   const quotedCliArgs = cliArgs.slice(2).map((arg) => quote([arg]));
-  const isDebugMode =
-    process.env['DEBUG'] === 'true' || process.env['DEBUG'] === '1';
+  const isDebugMode = isDebugEnvEnabled();
   const cliCmd =
     process.env['NODE_ENV'] === 'development'
       ? isDebugMode

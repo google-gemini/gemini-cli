@@ -501,6 +501,126 @@ describe('sandbox', () => {
       );
     });
 
+    it.each(['true', '1'])(
+      'should publish the debug port when DEBUG=%s',
+      async (debugValue) => {
+        const config: SandboxConfig = createMockSandboxConfig({
+          command: 'docker',
+          image: 'gemini-cli-sandbox',
+        });
+
+        vi.stubEnv('DEBUG', debugValue);
+
+        // Mock image check to return true (image exists)
+        interface MockProcessWithStdout extends EventEmitter {
+          stdout: EventEmitter;
+        }
+        const mockImageCheckProcess =
+          new EventEmitter() as MockProcessWithStdout;
+        mockImageCheckProcess.stdout = new EventEmitter();
+        vi.mocked(spawn).mockImplementationOnce((_cmd, args) => {
+          if (args && args[0] === 'images') {
+            setTimeout(() => {
+              mockImageCheckProcess.stdout.emit(
+                'data',
+                Buffer.from('image-id'),
+              );
+              mockImageCheckProcess.emit('close', 0);
+            }, 1);
+            return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+          }
+          return new EventEmitter() as unknown as ReturnType<typeof spawn>;
+        });
+
+        const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+          typeof spawn
+        >;
+        mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+          if (event === 'close') {
+            setTimeout(() => cb(0), 10);
+          }
+          return mockSpawnProcess;
+        });
+        vi.mocked(spawn).mockImplementationOnce((cmd, args) => {
+          if (cmd === 'docker' && args && args[0] === 'run') {
+            return mockSpawnProcess;
+          }
+          return new EventEmitter() as unknown as ReturnType<typeof spawn>;
+        });
+
+        await expect(
+          start_sandbox(config, [], undefined, ['arg1']),
+        ).resolves.toBe(0);
+
+        expect(spawn).toHaveBeenNthCalledWith(
+          2,
+          'docker',
+          expect.arrayContaining(['--publish', '9229:9229']),
+          expect.objectContaining({ stdio: 'inherit' }),
+        );
+      },
+    );
+
+    it.each(['false', '0', ''])(
+      'should not publish the debug port when DEBUG=%s',
+      async (debugValue) => {
+        const config: SandboxConfig = createMockSandboxConfig({
+          command: 'docker',
+          image: 'gemini-cli-sandbox',
+        });
+
+        vi.stubEnv('DEBUG', debugValue);
+
+        // Mock image check to return true (image exists)
+        interface MockProcessWithStdout extends EventEmitter {
+          stdout: EventEmitter;
+        }
+        const mockImageCheckProcess =
+          new EventEmitter() as MockProcessWithStdout;
+        mockImageCheckProcess.stdout = new EventEmitter();
+        vi.mocked(spawn).mockImplementationOnce((_cmd, args) => {
+          if (args && args[0] === 'images') {
+            setTimeout(() => {
+              mockImageCheckProcess.stdout.emit(
+                'data',
+                Buffer.from('image-id'),
+              );
+              mockImageCheckProcess.emit('close', 0);
+            }, 1);
+            return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+          }
+          return new EventEmitter() as unknown as ReturnType<typeof spawn>;
+        });
+
+        const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+          typeof spawn
+        >;
+        mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+          if (event === 'close') {
+            setTimeout(() => cb(0), 10);
+          }
+          return mockSpawnProcess;
+        });
+        vi.mocked(spawn).mockImplementationOnce((cmd, args) => {
+          if (cmd === 'docker' && args && args[0] === 'run') {
+            return mockSpawnProcess;
+          }
+          return new EventEmitter() as unknown as ReturnType<typeof spawn>;
+        });
+
+        await expect(
+          start_sandbox(config, [], undefined, ['arg1']),
+        ).resolves.toBe(0);
+
+        expect(spawn).toHaveBeenNthCalledWith(
+          2,
+          'docker',
+          expect.not.arrayContaining(['--publish', '9229:9229']),
+          expect.objectContaining({ stdio: 'inherit' }),
+        );
+      },
+    );
+
     it('should preserve the integration-test prefix for random container names', async () => {
       const config: SandboxConfig = createMockSandboxConfig({
         command: 'docker',
