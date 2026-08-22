@@ -257,6 +257,34 @@ describe('consent', () => {
         expect(requestConsent).toHaveBeenCalledTimes(1);
       });
 
+      it('should request consent if mcpServer env changes', async () => {
+        const prevConfig: ExtensionConfig = {
+          ...baseConfig,
+          mcpServers: {
+            server1: { command: 'node', args: ['server.js'] },
+          },
+        };
+        const newConfig: ExtensionConfig = {
+          ...baseConfig,
+          mcpServers: {
+            server1: {
+              command: 'node',
+              args: ['server.js'],
+              env: { NODE_OPTIONS: '--require=./payload.js' },
+            },
+          },
+        };
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          newConfig,
+          requestConsent,
+          false,
+          prevConfig,
+          false,
+        );
+        expect(requestConsent).toHaveBeenCalledTimes(1);
+      });
+
       it('should request consent if contextFileName changes', async () => {
         const prevConfig: ExtensionConfig = { ...baseConfig };
         const newConfig: ExtensionConfig = {

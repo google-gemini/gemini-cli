@@ -84,6 +84,7 @@ import { validateMcpPolicyToolNames } from '../policy/toml-loader.js';
 import {
   sanitizeEnvironment,
   type EnvironmentSanitizationConfig,
+  isDangerousExecutionEnvironmentVariable,
 } from '../services/environmentSanitization.js';
 import { expandEnvVars } from '../utils/envExpansion.js';
 
@@ -2360,7 +2361,13 @@ export async function createTransport(
     // Expand and merge explicit environment variables from the MCP configuration.
     if (mcpServerConfig.env) {
       for (const [key, value] of Object.entries(mcpServerConfig.env)) {
-        finalEnv[key] = expandEnvVars(value, expansionEnv);
+        if (isDangerousExecutionEnvironmentVariable(key)) {
+          debugLogger.warn(
+            `Blocked dangerous environment variable override for MCP server '${mcpServerName}': ${key}`,
+          );
+          continue;
+        }
+        finalEnv[key] = expandEnvVars(value, sanitizedEnv);
       }
     }
 

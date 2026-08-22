@@ -236,3 +236,35 @@ export function getSecureSanitizationConfig(
       false,
   };
 }
+
+export const BLOCKED_EXECUTION_ENVS = new Set([
+  'NODE_OPTIONS',
+  'NODE_CLI_FLAGS',
+  '_FORCE_NODE_OPTIONS',
+  'NODE_PATH',
+  'ELECTRON_RUN_AS_NODE',
+  'PYTHONPATH',
+  'PYTHONSTARTUP',
+  'RUBYOPT',
+  'RUBYLIB',
+  'PERL5OPT',
+  'PERL5LIB',
+  'LD_PRELOAD',
+  'LD_AUDIT',
+  'LD_DEBUG',
+  'LD_PROFILE',
+  'LD_LIBRARY_PATH',
+  'DYLD_INSERT_LIBRARIES',
+  'DYLD_FORCE_FLAT_NAMESPACE',
+  'DYLD_LIBRARY_PATH',
+  'DYLD_FRAMEWORK_PATH',
+  'DYLD_FALLBACK_LIBRARY_PATH',
+  'DYLD_FALLBACK_FRAMEWORK_PATH',
+  'BASH_ENV',
+  'ENV',
+  'PERL5DB',
+]);
+
+export function isDangerousExecutionEnvironmentVariable(key: string): boolean {
+  return BLOCKED_EXECUTION_ENVS.has(key.toUpperCase());
+}
