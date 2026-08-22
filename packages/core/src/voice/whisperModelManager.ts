@@ -57,6 +57,15 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
     }
 
     const destination = path.join(this.modelsDir, modelName);
+    const tmpPath = `${destination}.downloading`;
+    if (fs.existsSync(tmpPath)) {
+      try {
+        fs.unlinkSync(tmpPath);
+      } catch {
+        // ignore
+      }
+    }
+
     const url = `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/${modelName}`;
 
     debugLogger.debug(
@@ -76,15 +85,25 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
       throw new Error('Response body is not readable');
     }
 
-    const writer = fs.createWriteStream(destination);
+    const writer = fs.createWriteStream(tmpPath);
+    let writeError: Error | null = null;
+    writer.on('error', (err) => {
+      writeError = err;
+    });
 
     try {
       while (true) {
+        if (writeError) {
+          throw writeError;
+        }
         const { done, value } = await reader.read();
         if (done) break;
 
         transferred += value.length;
-        writer.write(value);
+        const writeOk = writer.write(value);
+        if (!writeOk) {
+          await new Promise<void>((resolve) => writer.once('drain', resolve));
+        }
 
         const percentage = total > 0 ? transferred / total : 0;
         this.emit('progress', {
@@ -94,9 +113,52 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
           percentage,
         });
       }
-    } finally {
-      writer.end();
+
+      if (total > 0 && transferred < total) {
+        throw new Error(
+          `Incomplete download for ${modelName}: received ${transferred} of ${total} bytes`,
+        );
+      }
+
+      await new Promise<void>((resolve, reject) => {
+        if (writeError) {
+          reject(writeError);
+          return;
+        }
+        const onFinish = () => {
+          cleanup();
+          resolve();
+        };
+        const onError = (err: Error) => {
+          cleanup();
+          reject(err);
+        };
+        const cleanup = () => {
+          writer.off('finish', onFinish);
+          writer.off('error', onError);
+        };
+        writer.once('finish', onFinish);
+        writer.once('error', onError);
+        writer.end();
+      });
+    } catch (err) {
+      if (!writer.destroyed) {
+        await new Promise<void>((resolve) => {
+          writer.once('close', () => resolve());
+          writer.destroy();
+        });
+      }
+      if (fs.existsSync(tmpPath)) {
+        try {
+          fs.unlinkSync(tmpPath);
+        } catch {
+          // ignore
+        }
+      }
+      throw err;
     }
+
+    fs.renameSync(tmpPath, destination);
   }
 
   private validateModelName(modelName: string): void {
