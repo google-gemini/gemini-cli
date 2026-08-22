@@ -481,6 +481,10 @@ export class AppRig {
     return Array.from(this.pendingConfirmations.values());
   }
 
+  getToolCalls() {
+    return this.toolCalls;
+  }
+
   private async waitUntil(
     predicate: () => boolean | Promise<boolean>,
     options: { timeout?: number; interval?: number; message?: string } = {},
