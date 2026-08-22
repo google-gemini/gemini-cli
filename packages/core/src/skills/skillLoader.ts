@@ -118,7 +118,12 @@ export async function loadSkillsFromDir(
   const discoveredSkills: SkillDefinition[] = [];
 
   try {
-    const absoluteSearchPath = path.resolve(dir);
+    // Resolve symlinks/junctions (e.g. a Windows junction from .gemini to
+    // .agents) to the physical path so skills discovered through alias
+    // directories report identical locations and deduplicate correctly.
+    const absoluteSearchPath = await fs
+      .realpath(path.resolve(dir))
+      .catch(() => path.resolve(dir));
     const stats = await fs.stat(absoluteSearchPath).catch(() => null);
     if (!stats || !stats.isDirectory()) {
       return [];

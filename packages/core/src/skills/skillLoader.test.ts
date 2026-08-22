@@ -286,4 +286,35 @@ description: Test sanitization
       'https://antigravity.google/docs/cli-getting-started',
     );
   });
+
+  it('should resolve symlinked/junctioned skill directories to the physical path', async () => {
+    const agentsDir = path.join(testRootDir, 'agents');
+    const skillDir = path.join(agentsDir, 'skills', 'my-skill');
+    await fs.mkdir(skillDir, { recursive: true });
+    await fs.writeFile(
+      path.join(skillDir, 'SKILL.md'),
+      `---\nname: my-skill\ndescription: A test skill\n---\nbody\n`,
+    );
+
+    // Link an alias directory to the physical one, the way users link
+    // .gemini to .agents (issue #28944). On Windows a junction requires no
+    // elevated privileges; elsewhere use a directory symlink.
+    const aliasDir = path.join(testRootDir, 'alias');
+    await fs.symlink(
+      agentsDir,
+      aliasDir,
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+
+    const physicalSkills = await loadSkillsFromDir(
+      path.join(agentsDir, 'skills'),
+    );
+    const aliasSkills = await loadSkillsFromDir(path.join(aliasDir, 'skills'));
+
+    expect(physicalSkills).toHaveLength(1);
+    expect(aliasSkills).toHaveLength(1);
+    // Both entry points must report the same physical location so the
+    // manager deduplicates them instead of warning about a conflict.
+    expect(aliasSkills[0].location).toBe(physicalSkills[0].location);
+  });
 });
