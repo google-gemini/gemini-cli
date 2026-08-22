@@ -4291,6 +4291,53 @@ describe('Model Persistence Bug Fix (#19864)', () => {
     expect(config.getHasAccessToPreviewModel()).toBe(true);
   });
 
+  it('should warn when a requested preview model is silently substituted due to lack of entitlement', async () => {
+    const mockContentConfig = {
+      authType: AuthType.LOGIN_WITH_GOOGLE,
+    } as Partial<ContentGeneratorConfig> as ContentGeneratorConfig;
+
+    const mockContentGenerator = {
+      generateContent: vi.fn(),
+    } as Partial<ContentGenerator> as ContentGenerator;
+
+    vi.mocked(createContentGeneratorConfig).mockResolvedValue(
+      mockContentConfig,
+    );
+    vi.mocked(createContentGenerator).mockResolvedValue(mockContentGenerator);
+    vi.mocked(getCodeAssistServer).mockReturnValue({
+      projectId: 'test-project',
+      retrieveUserQuota: vi.fn().mockResolvedValue({
+        buckets: [
+          {
+            modelId: 'gemini-2.5-pro',
+            remainingAmount: '10',
+            remainingFraction: 0.1,
+          },
+        ],
+      }),
+    } as Partial<CodeAssistServer> as CodeAssistServer);
+    vi.mocked(getExperiments).mockResolvedValue({
+      experimentIds: [],
+      flags: {},
+    });
+
+    const config = new Config(baseParams);
+    const warnSpy = vi.spyOn(debugLogger, 'warn').mockImplementation(() => {});
+
+    expect(config.getModel()).toBe(PREVIEW_GEMINI_3_1_MODEL);
+
+    await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+
+    // The account lacks preview entitlement, so the model is substituted.
+    expect(config.getHasAccessToPreviewModel()).toBe(false);
+    expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL_AUTO);
+    // The substitution must not happen silently.
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining(PREVIEW_GEMINI_3_1_MODEL),
+    );
+    warnSpy.mockRestore();
+  });
+
   it('should persist model when user selects it with persistMode=true', () => {
     const onModelChange = vi.fn();
     const config = new Config({

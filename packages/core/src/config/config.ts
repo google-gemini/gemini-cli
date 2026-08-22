@@ -1658,7 +1658,13 @@ export class Config implements McpContext, AgentLoopContext {
       isPreviewModel(this.model, this) &&
       this.hasAccessToPreviewModel === false
     ) {
+      const requestedModel = this.model;
       this.setModel(DEFAULT_GEMINI_MODEL_AUTO);
+      debugLogger.warn(
+        `[Config] Requested model "${requestedModel}" is not available to ` +
+          `the current account and will be substituted with an automatically ` +
+          `selected model instead.`,
+      );
     }
 
     const adminControlsEnabled =
