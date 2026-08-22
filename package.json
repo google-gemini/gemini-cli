@@ -99,7 +99,6 @@
   "devDependencies": {
     "@agentclientprotocol/sdk": "0.16.1",
     "@modelcontextprotocol/sdk": "1.23.0",
-    "read-package-up": "11.0.0",
     "@octokit/rest": "22.0.0",
     "@types/express": "5.0.3",
     "@types/marked": "5.0.2",
@@ -141,6 +140,7 @@
     "prettier": "3.5.3",
     "react-devtools-core": "6.1.2",
     "react-dom": "19.2.4",
+    "read-package-up": "11.0.0",
     "semver": "7.7.2",
     "strip-ansi": "7.1.2",
     "ts-prune": "0.10.3",
@@ -156,7 +156,7 @@
     "node-fetch-native": "1.6.7",
     "proper-lockfile": "4.1.2",
     "punycode": "2.3.1",
-    "simple-git": "3.28.0"
+    "simple-git": "^3.36.0"
   },
   "optionalDependencies": {
     "@github/keytar": "7.10.6",
