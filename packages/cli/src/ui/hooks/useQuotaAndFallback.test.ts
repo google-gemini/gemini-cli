@@ -598,7 +598,7 @@ describe('useQuotaAndFallback', () => {
         });
       }
 
-      it('should handle ModelNotFoundError correctly', async () => {
+      it('should handle ModelNotFoundError for personal accounts correctly', async () => {
         const { result } = await renderHook(() =>
           useQuotaAndFallback({
             config: mockConfig,
@@ -630,9 +630,60 @@ describe('useQuotaAndFallback', () => {
 
         const message = request!.message;
         expect(message).toBe(
-          `It seems like you don't have access to gemini-3-pro-preview.
-Your admin might have disabled the access. Contact them to enable the Preview Release Channel.`,
+          `It seems like you don't have access to gemini-3-pro-preview.\n` +
+            `This model is not available for personal accounts.`,
         );
+        expect(message).not.toContain('admin');
+        expect(message).not.toContain('Preview Release Channel');
+
+        // Simulate the user choosing to switch
+        act(() => {
+          result.current.handleProQuotaChoice('retry_always');
+        });
+
+        const intent = await promise!;
+        expect(intent).toBe('retry_always');
+
+        expect(result.current.proQuotaRequest).toBeNull();
+      });
+
+      it('should handle ModelNotFoundError for enterprise/workspace accounts correctly', async () => {
+        const { result } = await renderHook(() =>
+          useQuotaAndFallback({
+            config: mockConfig,
+            historyManager: mockHistoryManager,
+            userTier: UserTierId.STANDARD,
+            setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+            onShowAuthSelection: mockOnShowAuthSelection,
+            paidTier: null,
+            settings: mockSettings,
+          }),
+        );
+
+        const handler = setFallbackHandlerSpy.mock
+          .calls[0][0] as FallbackModelHandler;
+
+        let promise: Promise<FallbackIntent | null>;
+        const error = new ModelNotFoundError('model not found', 404);
+
+        act(() => {
+          promise = handler('gemini-3-pro-preview', 'gemini-2.5-pro', error);
+        });
+
+        // The hook should now have a pending request for the UI to handle
+        const request = result.current.proQuotaRequest;
+        expect(request).not.toBeNull();
+        expect(request?.failedModel).toBe('gemini-3-pro-preview');
+        expect(request?.isTerminalQuotaError).toBe(false);
+        expect(request?.isModelNotFoundError).toBe(true);
+
+        const message = request!.message;
+        expect(message).toBe(
+          `It seems like you don't have access to gemini-3-pro-preview.\n` +
+            `Your admin might have disabled the access. Contact them to enable the Preview Release Channel.`,
+        );
+        expect(message).toContain('admin');
+        expect(message).toContain('Preview Release Channel');
 
         // Simulate the user choosing to switch
         act(() => {
