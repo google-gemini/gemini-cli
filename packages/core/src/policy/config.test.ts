@@ -227,6 +227,26 @@ describe('createPolicyEngineConfig', () => {
     expect(rule?.priority).toBeCloseTo(4.4, 5); // Command line exclude
   });
 
+  it('should deny specific shell commands in tools.exclude using toolName(args)', async () => {
+    const config = await createPolicyEngineConfig(
+      { tools: { exclude: ['run_shell_command(rm)'] } },
+      ApprovalMode.DEFAULT,
+      MOCK_DEFAULT_DIR,
+    );
+    const rule = config.rules?.find(
+      (r) =>
+        r.toolName === 'run_shell_command' &&
+        r.decision === PolicyDecision.DENY &&
+        r.argsPattern,
+    );
+    expect(rule).toBeDefined();
+    expect(rule?.argsPattern?.test('{"command":"rm -rf /"}')).toBe(true);
+    expect(rule?.argsPattern?.test('{"command":"ls"}')).toBe(false);
+    expect(
+      config.rules?.some((r) => r.toolName === 'run_shell_command(rm)'),
+    ).toBe(false);
+  });
+
   it('should allow tools from allowed MCP servers', async () => {
     const config = await createPolicyEngineConfig(
       { mcp: { allowed: ['my-server'] } },

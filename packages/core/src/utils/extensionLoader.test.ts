@@ -131,6 +131,23 @@ describe('SimpleExtensionLoader', () => {
     );
   });
 
+  it('should convert parenthesized excludeTools into deny rules', async () => {
+    const extension: GeminiCLIExtension = {
+      ...activeExtension,
+      excludeTools: ['run_shell_command(rm -rf *)'],
+      rules: undefined,
+      checkers: undefined,
+    };
+    const loader = new SimpleExtensionLoader([extension]);
+    await loader.start(mockConfig);
+    expect(mockPolicyEngine.addRule).toHaveBeenCalled();
+    const addedRule = mockPolicyEngine.addRule.mock.calls[0][0];
+    expect(addedRule.toolName).toBe('run_shell_command');
+    expect(addedRule.decision).toBe(PolicyDecision.DENY);
+    expect(addedRule.source).toBe('Extension (test-extension): excludeTools');
+    expect(addedRule.argsPattern).toBeInstanceOf(RegExp);
+  });
+
   it('should unregister policies when an extension stops', async () => {
     const loader = new TestingSimpleExtensionLoader([activeExtension]);
     await loader.start(mockConfig);
