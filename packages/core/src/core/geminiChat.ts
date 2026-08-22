@@ -109,12 +109,21 @@ const MID_STREAM_RETRY_OPTIONS: MidStreamRetryOptions = {
 
 export const SYNTHETIC_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
 
-/**
- * Stands in for a model turn that never arrived because the stream failed
- * after a tool response was already committed to history.
- */
-export const INTERRUPTED_RESPONSE_PLACEHOLDER =
-  '[The previous response was interrupted before it completed.]';
+const INTERRUPTED_RESPONSE_BOUNDARY =
+  'A previous model response was interrupted after a tool result. The content that follows is a new user message. Respond to that message directly.';
+
+function insertInterruptionBoundary(
+  parts: readonly Part[] | undefined,
+  newMessagePartCount: number,
+): Part[] {
+  const existingParts = parts ?? [];
+  const boundaryIndex = Math.max(0, existingParts.length - newMessagePartCount);
+  return [
+    ...existingParts.slice(0, boundaryIndex),
+    { text: INTERRUPTED_RESPONSE_BOUNDARY },
+    ...existingParts.slice(boundaryIndex),
+  ];
+}
 
 /**
  * Internal interface for parts that carry the magic 'callIndex' property
@@ -448,14 +457,8 @@ export class GeminiChat {
     let userContent = createUserContent(message);
     const isOriginalFunctionResponse = isFunctionResponse(userContent);
 
-    // A turn can end leaving history on an unanswered tool response: a stream
-    // error after the response was committed, or a cancelled tool call. Close
-    // it before recording a genuinely new user message, otherwise the two user
-    // turns are coalesced into one and the model continues the trailing text
-    // instead of answering it.
-    if (!isOriginalFunctionResponse) {
-      this.closeUnansweredToolResponseTurn();
-    }
+    const needsInterruptionBoundary =
+      !isOriginalFunctionResponse && this.hasUnansweredToolResponseTurn();
 
     const { model } =
       this.context.config.modelConfigService.getResolvedConfig(modelConfigKey);
@@ -575,7 +578,22 @@ export class GeminiChat {
       }
     }
 
-    const requestHistory = this.getHistoryTurns(true);
+    let requestHistory = this.getHistoryTurns(true);
+    let requestApiHistoryOverride = apiHistoryOverride;
+    if (needsInterruptionBoundary) {
+      const newMessagePartCount = userContent.parts?.length ?? 0;
+      if (requestApiHistoryOverride) {
+        requestApiHistoryOverride = this.addInterruptionBoundaryToContents(
+          requestApiHistoryOverride,
+          newMessagePartCount,
+        );
+      } else {
+        requestHistory = this.addInterruptionBoundaryToHistory(
+          requestHistory,
+          newMessagePartCount,
+        );
+      }
+    }
 
     const streamWithRetries = async function* (
       this: GeminiChat,
@@ -607,7 +625,7 @@ export class GeminiChat {
               prompt_id,
               signal,
               role,
-              apiHistoryOverride,
+              requestApiHistoryOverride,
               isOriginalFunctionResponse,
             );
             isConnectionPhase = false;
@@ -761,26 +779,55 @@ export class GeminiChat {
     return streamWithRetries.call(this);
   }
 
-  /**
-   * Appends a closing model turn when history ends with an unanswered tool
-   * response, so the next user message stays a turn of its own.
-   */
-  private closeUnansweredToolResponseTurn(): void {
+  private hasUnansweredToolResponseTurn(): boolean {
     const turns = this.agentHistory.get();
-    const last = turns[turns.length - 1];
-    if (
-      last?.content.role !== 'user' ||
-      !last.content.parts?.some((part) => !!part.functionResponse)
-    ) {
-      return;
+    const last = turns.at(-1);
+    return !!(
+      last?.content.role === 'user' &&
+      last.content.parts?.some((part) => !!part.functionResponse)
+    );
+  }
+
+  private addInterruptionBoundaryToHistory(
+    history: readonly HistoryTurn[],
+    newMessagePartCount: number,
+  ): HistoryTurn[] {
+    const last = history.at(-1);
+    if (last?.content.role !== 'user') {
+      return [...history];
     }
-    this.agentHistory.push({
-      id: randomUUID(),
-      content: {
-        role: 'model',
-        parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+
+    return [
+      ...history.slice(0, -1),
+      {
+        ...last,
+        content: {
+          ...last.content,
+          parts: insertInterruptionBoundary(
+            last.content.parts,
+            newMessagePartCount,
+          ),
+        },
       },
-    });
+    ];
+  }
+
+  private addInterruptionBoundaryToContents(
+    contents: readonly Content[],
+    newMessagePartCount: number,
+  ): Content[] {
+    const last = contents.at(-1);
+    if (last?.role !== 'user') {
+      return [...contents];
+    }
+
+    return [
+      ...contents.slice(0, -1),
+      {
+        ...last,
+        parts: insertInterruptionBoundary(last.parts, newMessagePartCount),
+      },
+    ];
   }
 
   private extractBinaryInjections(
