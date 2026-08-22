@@ -6,6 +6,12 @@
 
 import type { EventEmitter } from 'node:events';
 import type { Config, GeminiCLIExtension } from '../config/config.js';
+import { EXTENSION_POLICY_TIER } from '../policy/config.js';
+import {
+  extensionExcludeToolsPolicySource,
+  isLegacyCommandScopedToolRef,
+  mapExcludeToolsToDenyRules,
+} from '../policy/legacy-tool-syntax.js';
 
 export abstract class ExtensionLoader {
   // Assigned in `start`.
@@ -75,8 +81,8 @@ export abstract class ExtensionLoader {
       await this.maybeRefreshGeminiTools(extension);
 
       // Register policy rules and checkers
+      const policyEngine = this.config.getPolicyEngine();
       if (extension.rules || extension.checkers) {
-        const policyEngine = this.config.getPolicyEngine();
         if (extension.rules) {
           for (const rule of extension.rules) {
             policyEngine.addRule(rule);
@@ -86,6 +92,22 @@ export abstract class ExtensionLoader {
           for (const checker of extension.checkers) {
             policyEngine.addChecker(checker);
           }
+        }
+      }
+
+      // Parenthesized excludeTools entries never match a tool name. Convert
+      // them into command-level DENY rules so they actually take effect.
+      const commandScopedExcludes = (extension.excludeTools ?? []).filter(
+        isLegacyCommandScopedToolRef,
+      );
+      if (commandScopedExcludes.length > 0) {
+        const denyRules = mapExcludeToolsToDenyRules(
+          commandScopedExcludes,
+          EXTENSION_POLICY_TIER + 0.4,
+          extensionExcludeToolsPolicySource(extension.name),
+        );
+        for (const rule of denyRules) {
+          policyEngine.addRule(rule);
         }
       }
 
@@ -184,7 +206,11 @@ export abstract class ExtensionLoader {
       await this.maybeRefreshGeminiTools(extension);
 
       // Unregister policy rules and checkers
-      if (extension.rules || extension.checkers) {
+      if (
+        extension.rules ||
+        extension.checkers ||
+        extension.excludeTools?.some(isLegacyCommandScopedToolRef)
+      ) {
         const policyEngine = this.config.getPolicyEngine();
         const sources = new Set<string>();
         if (extension.rules) {
@@ -196,6 +222,9 @@ export abstract class ExtensionLoader {
           for (const checker of extension.checkers) {
             if (checker.source) sources.add(checker.source);
           }
+        }
+        if (extension.excludeTools?.some(isLegacyCommandScopedToolRef)) {
+          sources.add(extensionExcludeToolsPolicySource(extension.name));
         }
 
         for (const source of sources) {

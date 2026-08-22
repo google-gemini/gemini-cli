@@ -38,6 +38,7 @@ import { isNodeError } from '../utils/errors.js';
 import { MCP_TOOL_PREFIX } from '../tools/mcp-tool.js';
 
 import { isDirectorySecure } from '../utils/security.js';
+import { mapExcludeToolsToDenyRules } from './legacy-tool-syntax.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -425,15 +426,17 @@ export async function createPolicyEngineConfig(
 
   // Tools that are explicitly excluded in the settings.
   // Priority: EXCLUDE_TOOLS_FLAG_PRIORITY (user tier - explicit temporary blocks)
+  // Parenthesized `toolName(args)` entries are command restrictions, not tool
+  // names — convert them into DENY rules with an argsPattern.
   if (settings.tools?.exclude) {
-    for (const tool of settings.tools.exclude) {
-      rules.push({
-        toolName: tool,
-        decision: PolicyDecision.DENY,
-        priority: EXCLUDE_TOOLS_FLAG_PRIORITY,
-        source: 'Settings (Tools Excluded)',
-      });
-    }
+    rules.push(
+      ...mapExcludeToolsToDenyRules(
+        settings.tools.exclude,
+        EXCLUDE_TOOLS_FLAG_PRIORITY,
+        'Settings (Tools Excluded)',
+        emitWarningOnce,
+      ),
+    );
   }
 
   const nonPlanModes = [

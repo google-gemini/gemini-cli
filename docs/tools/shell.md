@@ -146,8 +146,9 @@ tools to detect if they are being run from within Gemini CLI.
 > `replace`, etc.
 
 You can restrict the commands that can be executed by the `run_shell_command`
-tool by using the `tools.core` and `tools.exclude` settings in your
-configuration file.
+tool with `tools.core` (an allowlist) and the
+[Policy Engine](../reference/policy-engine.md) (for blocking individual
+commands).
 
 - `tools.core`: To restrict `run_shell_command` to a specific set of commands,
   add entries to the `core` list under the `tools` category in the format
@@ -156,10 +157,18 @@ configuration file.
   commands. Including the generic `run_shell_command` acts as a wildcard,
   allowing any command not explicitly blocked.
 - `tools.exclude` [DEPRECATED]: To block specific commands, use the
-  [Policy Engine](../reference/policy-engine.md). Historically, this setting
-  allowed adding entries to the `exclude` list under the `tools` category in the
-  format `run_shell_command(<command>)`. For example,
-  `"tools": {"exclude": ["run_shell_command(rm)"]}` will block `rm` commands.
+  [Policy Engine](../reference/policy-engine.md). `tools.exclude` and extension
+  `excludeTools` match **whole tool names**. A parenthesized
+  `run_shell_command(<command>)` entry is not a tool name; the CLI converts it
+  into a command-level deny rule and warns. Prefer a policy file:
+
+```toml
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "rm"
+decision = "deny"
+priority = 100
+```
 
 The validation logic is designed to be secure and flexible:
 
@@ -168,9 +177,10 @@ The validation logic is designed to be secure and flexible:
     part of the chain is disallowed, the entire command is blocked.
 2.  **Prefix matching**: The tool uses prefix matching. For example, if you
     allow `git`, you can run `git status` or `git log`.
-3.  **Blocklist precedence**: The `tools.exclude` list is always checked first.
-    If a command matches a blocked prefix, it will be denied, even if it also
-    matches an allowed prefix in `tools.core`.
+3.  **Deny-rule precedence**: A Policy Engine `deny` (or a legacy
+    `tools.exclude` entry that has been converted into one) is evaluated by
+    priority. A matching deny blocks the command even when `tools.core` would
+    otherwise allow it.
 
 ### Command restriction examples
 
@@ -192,25 +202,25 @@ To allow only `git` and `npm` commands, and block all others:
 
 **Block specific command prefixes**
 
-To block `rm` and allow all other commands:
+To block `rm` and allow all other commands, ship a policy rule rather than
+`tools.exclude`:
 
-```json
-{
-  "tools": {
-    "core": ["run_shell_command"],
-    "exclude": ["run_shell_command(rm)"]
-  }
-}
+```toml
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "rm"
+decision = "deny"
+priority = 100
 ```
 
 - `rm -rf /`: Blocked
 - `git status`: Allowed
 - `npm install`: Allowed
 
-**Blocklist takes precedence**
+**Deny rules take precedence**
 
-If a command prefix is in both `tools.core` and `tools.exclude`, it will be
-blocked.
+If a command prefix is both allowlisted in `tools.core` and denied by a policy
+rule, it is blocked.
 
 - **`tools.shell.enableInteractiveShell`**: (boolean) Uses `node-pty` for
   real-time interaction.
@@ -224,8 +234,10 @@ You can limit which commands the agent is allowed to request using these
 settings:
 
 - **`tools.core`**: An allowlist of command prefixes (for example,
-  `["git", "npm test"]`).
-- **`tools.exclude`**: A blocklist of command prefixes.
+  `["run_shell_command(git)", "run_shell_command(npm test)"]`).
+- **Policy Engine**: A `deny` rule with `commandPrefix` or `commandRegex`. The
+  deprecated **`tools.exclude`** setting matches whole tool names; parenthesized
+  entries are converted into command-level deny rules.
 
 ## Use cases
 
