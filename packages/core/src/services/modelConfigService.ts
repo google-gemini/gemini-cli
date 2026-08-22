@@ -37,6 +37,9 @@ export interface ModelConfigKey {
   // Indicates whether this request originates from the primary interactive chat model.
   // Enables the default fallback configuration to `chat-base` when unknown.
   isChatModel?: boolean;
+
+  // The last stream error that triggered this retry attempt, if any.
+  lastStreamError?: unknown;
 }
 
 export interface ModelConfig {

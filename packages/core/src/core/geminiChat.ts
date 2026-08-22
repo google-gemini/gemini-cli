@@ -30,10 +30,15 @@ import {
   getRetryErrorType,
 } from '../utils/retry.js';
 import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
-import { resolveModel, supportsModernFeatures } from '../config/models.js';
+import {
+  resolveModel,
+  supportsModernFeatures,
+  isGemini2Model,
+} from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
 import type { CompletedToolCall } from '../scheduler/types.js';
+import { isAbortError } from '../utils/errors.js';
 import {
   logContentRetry,
   logContentRetryFailure,
@@ -105,6 +110,13 @@ const MID_STREAM_RETRY_OPTIONS: MidStreamRetryOptions = {
 export const SYNTHETIC_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
 
 /**
+ * Stands in for a model turn that never arrived because the stream failed
+ * after a tool response was already committed to history.
+ */
+export const INTERRUPTED_RESPONSE_PLACEHOLDER =
+  '[The previous response was interrupted before it completed.]';
+
+/**
  * Internal interface for parts that carry the magic 'callIndex' property
  * used during model response consolidation.
  */
@@ -144,6 +156,12 @@ export function isValidNonThoughtTextPart(part: Part): boolean {
 }
 
 function isValidContent(content: Content): boolean {
+  if (
+    content.role === 'model' &&
+    (content.parts === undefined || content.parts.length === 0)
+  ) {
+    return true;
+  }
   if (content.parts === undefined || content.parts.length === 0) {
     return false;
   }
@@ -151,7 +169,18 @@ function isValidContent(content: Content): boolean {
     if (part === undefined || Object.keys(part).length === 0) {
       return false;
     }
-    if (!part.thought && part.text !== undefined && part.text === '') {
+    // Check if the part contains any keys other than 'text', 'thought', or 'callIndex'.
+    // If it has other keys, it carries an active payload (such as tools, files, or code execution)
+    // and must be preserved even if the text itself is empty, preventing history sequence corruption.
+    const nonTextKeys = Object.keys(part).filter(
+      (key) => key !== 'text' && key !== 'thought' && key !== 'callIndex',
+    );
+    if (
+      !part.thought &&
+      part.text !== undefined &&
+      part.text === '' &&
+      nonTextKeys.length === 0
+    ) {
       return false;
     }
   }
@@ -221,7 +250,12 @@ export class InvalidStreamError extends Error {
     | 'NO_FINISH_REASON'
     | 'NO_RESPONSE_TEXT'
     | 'MALFORMED_FUNCTION_CALL'
-    | 'UNEXPECTED_TOOL_CALL';
+    | 'UNEXPECTED_TOOL_CALL'
+    | 'MAX_TOKENS_EXCEEDED'
+    | 'SAFETY_BLOCKED'
+    | 'RECITATION_BLOCKED'
+    | 'OTHER_BLOCKED'
+    | 'THINKING_ONLY_RESPONSE';
 
   constructor(
     message: string,
@@ -229,7 +263,12 @@ export class InvalidStreamError extends Error {
       | 'NO_FINISH_REASON'
       | 'NO_RESPONSE_TEXT'
       | 'MALFORMED_FUNCTION_CALL'
-      | 'UNEXPECTED_TOOL_CALL',
+      | 'UNEXPECTED_TOOL_CALL'
+      | 'MAX_TOKENS_EXCEEDED'
+      | 'SAFETY_BLOCKED'
+      | 'RECITATION_BLOCKED'
+      | 'OTHER_BLOCKED'
+      | 'THINKING_ONLY_RESPONSE',
   ) {
     super(message);
     this.name = 'InvalidStreamError';
@@ -275,6 +314,9 @@ export class GeminiChat {
   private lastPromptTokenCount: number;
   private callCounter = 0;
   agentHistory: AgentChatHistory;
+  private lastPromptId?: string;
+  private promptOriginalHistoryLength?: number;
+  private promptOriginalTokenCount?: number;
 
   constructor(
     readonly context: AgentLoopContext,
@@ -383,6 +425,20 @@ export class GeminiChat {
   ): Promise<AsyncGenerator<StreamEvent>> {
     await this.sendPromise;
 
+    const historyLengthBefore = this.agentHistory.length;
+    const baselinePromptTokenCount = this.lastPromptTokenCount;
+
+    if (this.lastPromptId && this.lastPromptId !== prompt_id) {
+      this.promptOriginalHistoryLength = undefined;
+      this.promptOriginalTokenCount = undefined;
+    }
+    this.lastPromptId = prompt_id;
+
+    if (this.promptOriginalHistoryLength === undefined) {
+      this.promptOriginalHistoryLength = historyLengthBefore;
+      this.promptOriginalTokenCount = baselinePromptTokenCount;
+    }
+
     let streamDoneResolver: () => void;
     const streamDonePromise = new Promise<void>((resolve) => {
       streamDoneResolver = resolve;
@@ -390,6 +446,17 @@ export class GeminiChat {
     this.sendPromise = streamDonePromise;
 
     let userContent = createUserContent(message);
+    const isOriginalFunctionResponse = isFunctionResponse(userContent);
+
+    // A turn can end leaving history on an unanswered tool response: a stream
+    // error after the response was committed, or a cancelled tool call. Close
+    // it before recording a genuinely new user message, otherwise the two user
+    // turns are coalesced into one and the model continues the trailing text
+    // instead of answering it.
+    if (!isOriginalFunctionResponse) {
+      this.closeUnansweredToolResponseTurn();
+    }
+
     const { model } =
       this.context.config.modelConfigService.getResolvedConfig(modelConfigKey);
 
@@ -398,7 +465,7 @@ export class GeminiChat {
 
     // Record user input - capture complete message with all parts (text, files, images, etc.)
     // but skip recording function responses (tool call results) as they should be stored in tool call records
-    if (!isFunctionResponse(userContent)) {
+    if (!isOriginalFunctionResponse) {
       const userMessageParts = userContent.parts || [];
       const userMessageContent = partListUnionToString(userMessageParts);
 
@@ -513,8 +580,12 @@ export class GeminiChat {
     const streamWithRetries = async function* (
       this: GeminiChat,
     ): AsyncGenerator<StreamEvent, void, void> {
+      let isSuccess = false;
+      let caughtError: unknown = undefined;
+
       try {
         const maxAttempts = this.context.config.getMaxAttempts();
+        let lastStreamError: unknown = undefined;
 
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
           let isConnectionPhase = true;
@@ -526,7 +597,7 @@ export class GeminiChat {
             // If this is a retry, update the key with the new context.
             const currentConfigKey =
               attempt > 0
-                ? { ...modelConfigKey, isRetry: true }
+                ? { ...modelConfigKey, isRetry: true, lastStreamError }
                 : modelConfigKey;
 
             isConnectionPhase = true;
@@ -537,19 +608,26 @@ export class GeminiChat {
               signal,
               role,
               apiHistoryOverride,
+              isOriginalFunctionResponse,
             );
             isConnectionPhase = false;
             for await (const chunk of stream) {
               yield { type: StreamEventType.CHUNK, value: chunk };
             }
 
+            isSuccess = true;
             return;
           } catch (error) {
+            if (error instanceof InvalidStreamError) {
+              lastStreamError = error;
+            }
+
             if (error instanceof AgentExecutionStoppedError) {
               yield {
                 type: StreamEventType.AGENT_EXECUTION_STOPPED,
                 reason: error.reason,
               };
+              isSuccess = true;
               return; // Stop the generator
             }
 
@@ -564,6 +642,7 @@ export class GeminiChat {
                   value: error.syntheticResponse,
                 };
               }
+              isSuccess = true;
               return; // Stop the generator
             }
 
@@ -581,8 +660,7 @@ export class GeminiChat {
             );
 
             const isContentError = error instanceof InvalidStreamError;
-            const isRetryableContentError =
-              isContentError && error.type !== 'NO_RESPONSE_TEXT';
+            const isRetryableContentError = isContentError;
             const errorType = isContentError
               ? error.type
               : getRetryErrorType(error);
@@ -644,12 +722,65 @@ export class GeminiChat {
             throw error;
           }
         }
+      } catch (error) {
+        caughtError = error;
+        throw error;
       } finally {
+        if (!isSuccess) {
+          const isAborted =
+            signal?.aborted ||
+            isAbortError(caughtError) ||
+            (caughtError instanceof Error &&
+              (caughtError.name === 'CanceledError' ||
+                caughtError.name === 'FatalCancellationError'));
+          const originalLength = this.promptOriginalHistoryLength;
+          const originalTokenCount = this.promptOriginalTokenCount;
+          if (isAborted && originalLength !== undefined) {
+            this.agentHistory.rollback(originalLength);
+            this.chatRecordingService.updateMessagesFromHistory(
+              this.agentHistory.get(),
+            );
+            if (originalTokenCount !== undefined) {
+              this.lastPromptTokenCount = originalTokenCount;
+            }
+            this.promptOriginalHistoryLength = undefined;
+            this.promptOriginalTokenCount = undefined;
+            this.lastPromptId = undefined;
+          } else if (!isOriginalFunctionResponse) {
+            this.agentHistory.rollback(historyLengthBefore);
+            this.chatRecordingService.updateMessagesFromHistory(
+              this.agentHistory.get(),
+            );
+            this.lastPromptTokenCount = baselinePromptTokenCount;
+          }
+        }
         streamDoneResolver!();
       }
     };
 
     return streamWithRetries.call(this);
+  }
+
+  /**
+   * Appends a closing model turn when history ends with an unanswered tool
+   * response, so the next user message stays a turn of its own.
+   */
+  private closeUnansweredToolResponseTurn(): void {
+    const turns = this.agentHistory.get();
+    const last = turns[turns.length - 1];
+    if (
+      last?.content.role !== 'user' ||
+      !last.content.parts?.some((part) => !!part.functionResponse)
+    ) {
+      return;
+    }
+    this.agentHistory.push({
+      id: randomUUID(),
+      content: {
+        role: 'model',
+        parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+      },
+    });
   }
 
   private extractBinaryInjections(
@@ -680,12 +811,16 @@ export class GeminiChat {
     abortSignal: AbortSignal,
     role: LlmRole,
     apiHistoryOverride?: Content[],
+    isOriginalFunctionResponse: boolean = false,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     // Last mile scrubbing to remove internal tracking properties (e.g. callIndex)
     // before sending to the Gemini API. This whitelists only standard Gemini fields.
-    const scrubbedHistory = this.context.config.isContextManagementEnabled()
+    let scrubbedHistory = this.context.config.isContextManagementEnabled()
       ? scrubHistory([...requestHistory])
       : [...requestHistory];
+
+    // Always coalesce consecutive roles to prevent 400 Bad Request errors
+    scrubbedHistory = coalesceConsecutiveRoles(scrubbedHistory);
 
     const scrubbedContents = scrubbedHistory.map((h) => h.content);
 
@@ -763,9 +898,34 @@ export class GeminiChat {
         abortSignal,
       };
 
-      let contentsToUse: Content[] = supportsModernFeatures(modelToUse)
-        ? [...contentsForPreviewModel]
-        : [...requestContents];
+      // Apply Context-Aware Retries (On-Retry Nudging) to guide the model out of silent loops
+      if (
+        modelConfigKey.isRetry &&
+        modelConfigKey.lastStreamError instanceof InvalidStreamError
+      ) {
+        const lastError = modelConfigKey.lastStreamError;
+        let nudgeMessage = '';
+        if (lastError.type === 'THINKING_ONLY_RESPONSE') {
+          nudgeMessage =
+            '\n[System: You previously generated thoughts but failed to provide a final user-facing response. Please ensure you provide your final answer or call a tool now.]';
+        } else if (lastError.type === 'NO_RESPONSE_TEXT') {
+          nudgeMessage =
+            '\n[System: You previously returned an empty response with no text or thoughts. Please ensure you provide your final answer or call a tool now.]';
+        }
+
+        if (nudgeMessage) {
+          if (typeof config.systemInstruction === 'string') {
+            config.systemInstruction += nudgeMessage;
+          } else if (config.systemInstruction === undefined) {
+            config.systemInstruction = nudgeMessage;
+          }
+        }
+      }
+
+      let contentsToUse: Content[] =
+        supportsModernFeatures(modelToUse) || isGemini2Model(modelToUse)
+          ? [...contentsForPreviewModel]
+          : [...requestContents];
 
       const hookSystem = this.context.config.getHookSystem();
       if (hookSystem) {
@@ -807,9 +967,10 @@ export class GeminiChat {
           );
           lastModelToUse = modelToUse;
           // Re-evaluate contentsToUse based on the new model's feature support
-          contentsToUse = supportsModernFeatures(modelToUse)
-            ? [...contentsForPreviewModel]
-            : [...requestContents];
+          contentsToUse =
+            supportsModernFeatures(modelToUse) || isGemini2Model(modelToUse)
+              ? [...contentsForPreviewModel]
+              : [...requestContents];
         }
         if (beforeModelResult.modifiedConfig) {
           Object.assign(config, beforeModelResult.modifiedConfig);
@@ -915,6 +1076,7 @@ export class GeminiChat {
       lastModelToUse,
       streamResponse,
       originalRequest,
+      isOriginalFunctionResponse,
     );
   }
 
@@ -953,9 +1115,16 @@ export class GeminiChat {
       ? extractCuratedHistory(this.agentHistory.get())
       : [...this.agentHistory.get()];
 
-    return this.context.config.isContextManagementEnabled()
-      ? scrubHistory(history)
-      : history;
+    if (this.context.config.isContextManagementEnabled()) {
+      return scrubHistory(history);
+    }
+
+    const model = this.context.config.getModel();
+    if (isGemini2Model(model) || supportsModernFeatures(model)) {
+      return coalesceConsecutiveRoles(stripThoughts(history));
+    }
+
+    return history;
   }
 
   /**
@@ -1028,11 +1197,19 @@ export class GeminiChat {
     requestContents: readonly Content[],
   ): readonly Content[] {
     // First, find the start of the active loop by finding the last user turn
-    // with a text message, i.e. that is not a function response.
+    // with a text message, i.e. that is not a function response. Testing for
+    // text alone is not enough: `coalesceConsecutiveRoles` can merge a function
+    // response turn with the prompt that follows it, and starting the loop at
+    // such a turn starts it later than the API starts the turn, leaving earlier
+    // function calls unsigned but still validated.
     let activeLoopStartIndex = -1;
     for (let i = requestContents.length - 1; i >= 0; i--) {
       const content = requestContents[i];
-      if (content.role === 'user' && content.parts?.some((part) => part.text)) {
+      if (
+        content.role === 'user' &&
+        content.parts?.some((part) => part.text) &&
+        !content.parts?.some((part) => part.functionResponse)
+      ) {
         activeLoopStartIndex = i;
         break;
       }
@@ -1112,12 +1289,20 @@ export class GeminiChat {
     model: string,
     streamResponse: AsyncGenerator<GenerateContentResponse>,
     originalRequest: GenerateContentParameters,
+    isOriginalFunctionResponse: boolean = false,
   ): AsyncGenerator<GenerateContentResponse> {
     const modelResponseParts: Part[] = [];
 
     let hasToolCall = false;
     let hasThoughts = false;
     let finishReason: FinishReason | undefined;
+
+    // Buffers to prevent failed stream attempts from polluting telemetry and logs
+    const bufferedThoughts: Array<{ subject: string; description: string }> =
+      [];
+    let bufferedUsageMetadata:
+      | GenerateContentResponse['usageMetadata']
+      | undefined = undefined;
 
     // The SDK provides fully assembled FunctionCall objects in chunk.functionCalls
     // We use a Map to ensure we only keep the latest version of each call (by ID)
@@ -1174,7 +1359,10 @@ export class GeminiChat {
           if (content.parts.some((part) => part.thought)) {
             // Record thoughts
             hasThoughts = true;
-            this.recordThoughtFromContent(content);
+            const thought = this.extractThoughtFromContent(content);
+            if (thought) {
+              bufferedThoughts.push(thought);
+            }
           }
           if (content.parts.some((part) => part.functionCall)) {
             hasToolCall = true;
@@ -1202,12 +1390,9 @@ export class GeminiChat {
         }
       }
 
-      // Record token usage if this chunk has usageMetadata
+      // Buffer token usage if this chunk has usageMetadata
       if (chunk.usageMetadata) {
-        this.chatRecordingService.recordMessageTokens(chunk.usageMetadata);
-        if (chunk.usageMetadata.promptTokenCount !== undefined) {
-          this.lastPromptTokenCount = chunk.usageMetadata.promptTokenCount;
-        }
+        bufferedUsageMetadata = chunk.usageMetadata;
       }
 
       const hookSystem = this.context.config.getHookSystem();
@@ -1294,11 +1479,104 @@ export class GeminiChat {
       }
     }
 
-    const responseText = consolidatedParts
+    const rawResponseText = consolidatedParts
       .filter((part) => part.text)
       .map((part) => part.text)
-      .join('')
-      .trim();
+      .join('');
+
+    // Clean zero-width/invisible characters and HTML comments to determine actual printable/visible content
+    let responseText = rawResponseText.replace(
+      /[\u200B-\u200D\uFEFF\u200E\u200F]/g,
+      '',
+    );
+    let previous: string;
+    do {
+      previous = responseText;
+      responseText = responseText.replace(/<!--[\s\S]*?-->/g, '');
+    } while (responseText !== previous);
+    responseText = responseText.trim();
+
+    // Stream validation logic: A stream is considered successful if:
+    // 1. There's a tool call OR
+    // 2. A not MALFORMED_FUNCTION_CALL finish reason and a non-mepty resp
+    //
+    // We throw an error only when there's no tool call AND:
+    // - No finish reason, OR
+    // - MALFORMED_FUNCTION_CALL finish reason OR
+    // - Empty response text (e.g., only thoughts with no actual content)
+    if (!hasToolCall) {
+      if (!finishReason) {
+        if (!isOriginalFunctionResponse) {
+          throw new InvalidStreamError(
+            'Model stream ended without a finish reason.',
+            'NO_FINISH_REASON',
+          );
+        }
+      }
+      if (finishReason === FinishReason.MALFORMED_FUNCTION_CALL) {
+        throw new InvalidStreamError(
+          'Model stream ended with malformed function call.',
+          'MALFORMED_FUNCTION_CALL',
+        );
+      }
+      if (finishReason === FinishReason.UNEXPECTED_TOOL_CALL) {
+        throw new InvalidStreamError(
+          'Model stream ended with unexpected tool call.',
+          'UNEXPECTED_TOOL_CALL',
+        );
+      }
+      if (!responseText) {
+        if (finishReason === FinishReason.MAX_TOKENS) {
+          throw new InvalidStreamError(
+            'Model stream ended due to token limit exhaustion (MAX_TOKENS) with empty response text.',
+            'MAX_TOKENS_EXCEEDED',
+          );
+        }
+        if (finishReason === FinishReason.SAFETY) {
+          throw new InvalidStreamError(
+            'Model stream ended due to safety settings (SAFETY) with empty response text.',
+            'SAFETY_BLOCKED',
+          );
+        }
+        if (finishReason === FinishReason.RECITATION) {
+          throw new InvalidStreamError(
+            'Model stream ended due to recitation settings (RECITATION) with empty response text.',
+            'RECITATION_BLOCKED',
+          );
+        }
+        if (finishReason === FinishReason.OTHER) {
+          throw new InvalidStreamError(
+            'Model stream ended due to other settings (OTHER) with empty response text.',
+            'OTHER_BLOCKED',
+          );
+        }
+        if (hasThoughts) {
+          throw new InvalidStreamError(
+            'Model stream ended with empty response text but contained reasoning thoughts.',
+            'THINKING_ONLY_RESPONSE',
+          );
+        }
+        if (!isOriginalFunctionResponse) {
+          throw new InvalidStreamError(
+            'Model stream ended with empty response text.',
+            'NO_RESPONSE_TEXT',
+          );
+        }
+      }
+    }
+
+    // Flush buffered thoughts from the successful attempt
+    for (const thought of bufferedThoughts) {
+      this.chatRecordingService.recordThought(thought);
+    }
+
+    // Flush buffered usage metadata and token counts from the successful attempt
+    if (bufferedUsageMetadata) {
+      this.chatRecordingService.recordMessageTokens(bufferedUsageMetadata);
+      if (bufferedUsageMetadata.promptTokenCount !== undefined) {
+        this.lastPromptTokenCount = bufferedUsageMetadata.promptTokenCount;
+      }
+    }
 
     let id: string;
     // Record model response text from the collected parts.
@@ -1316,41 +1594,6 @@ export class GeminiChat {
         'gemini',
         consolidatedParts,
       );
-    }
-
-    // Stream validation logic: A stream is considered successful if:
-    // 1. There's a tool call OR
-    // 2. A not MALFORMED_FUNCTION_CALL finish reason and a non-mepty resp
-    //
-    // We throw an error only when there's no tool call AND:
-    // - No finish reason, OR
-    // - MALFORMED_FUNCTION_CALL finish reason OR
-    // - Empty response text (e.g., only thoughts with no actual content)
-    if (!hasToolCall) {
-      if (!finishReason) {
-        throw new InvalidStreamError(
-          'Model stream ended without a finish reason.',
-          'NO_FINISH_REASON',
-        );
-      }
-      if (finishReason === FinishReason.MALFORMED_FUNCTION_CALL) {
-        throw new InvalidStreamError(
-          'Model stream ended with malformed function call.',
-          'MALFORMED_FUNCTION_CALL',
-        );
-      }
-      if (finishReason === FinishReason.UNEXPECTED_TOOL_CALL) {
-        throw new InvalidStreamError(
-          'Model stream ended with unexpected tool call.',
-          'UNEXPECTED_TOOL_CALL',
-        );
-      }
-      if (!responseText) {
-        throw new InvalidStreamError(
-          'Model stream ended with empty response text.',
-          'NO_RESPONSE_TEXT',
-        );
-      }
     }
 
     this.agentHistory.push({
@@ -1407,11 +1650,13 @@ export class GeminiChat {
   }
 
   /**
-   * Extracts and records thought from thought content.
+   * Extracts thought from thought content.
    */
-  private recordThoughtFromContent(content: Content): void {
+  private extractThoughtFromContent(
+    content: Content,
+  ): { subject: string; description: string } | undefined {
     if (!content.parts || content.parts.length === 0) {
-      return;
+      return undefined;
     }
 
     const thoughtPart = content.parts[0];
@@ -1424,11 +1669,12 @@ export class GeminiChat {
         : '';
       const description = rawText.replace(/\*\*(.*?)\*\*/s, '').trim();
 
-      this.chatRecordingService.recordThought({
+      return {
         subject,
         description,
-      });
+      };
     }
+    return undefined;
   }
 }
 
@@ -1471,4 +1717,74 @@ export function stripToolCallIdPrefixes(contents: Content[]): Content[] {
       return newPart;
     }),
   }));
+}
+
+export function coalesceConsecutiveRoles(
+  history: HistoryTurn[],
+): HistoryTurn[] {
+  const result: HistoryTurn[] = [];
+  for (const turn of history) {
+    const lastIdx = result.length - 1;
+    const last = result[lastIdx];
+    if (last && last.content.role && last.content.role === turn.content.role) {
+      const hasParts = last.content.parts || turn.content.parts;
+      result[lastIdx] = {
+        id: last.id,
+        content: {
+          ...last.content,
+          parts: hasParts
+            ? [...(last.content.parts || []), ...(turn.content.parts || [])]
+            : undefined,
+        },
+      };
+    } else {
+      result.push({
+        id: turn.id,
+        content: { ...turn.content },
+      });
+    }
+  }
+  return result;
+}
+
+export function stripThoughts(history: HistoryTurn[]): HistoryTurn[] {
+  return history
+    .map((turn) => {
+      if (!turn.content.parts) return turn;
+      const hasThought = turn.content.parts.some((p) => p && p.thought);
+      if (!hasThought) return turn;
+
+      const nonThoughtParts = turn.content.parts.filter((p) => p && !p.thought);
+
+      // The thoughtSignature the API requires on the first functionCall of a
+      // model turn is sometimes only carried by the thought part we just
+      // removed, not by the functionCall part itself. Without it, replaying
+      // this turn in a later request gets rejected with a 400 "missing
+      // thought_signature" error, so inject a synthetic one if needed.
+      let patchedFirstCall = false;
+      const finalParts =
+        turn.content.role === 'model'
+          ? nonThoughtParts.map((p) => {
+              if (!patchedFirstCall && p.functionCall) {
+                patchedFirstCall = true;
+                if (!p.thoughtSignature) {
+                  return {
+                    ...p,
+                    thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE,
+                  };
+                }
+              }
+              return p;
+            })
+          : nonThoughtParts;
+
+      return {
+        ...turn,
+        content: {
+          ...turn.content,
+          parts: finalParts,
+        },
+      };
+    })
+    .filter((turn) => !turn.content.parts || turn.content.parts.length > 0);
 }

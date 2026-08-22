@@ -209,6 +209,46 @@ export function isRetryableError(
 }
 
 /**
+ * Enriches quota-related errors with helpful hints if using a shared Google project
+ * without a dedicated user project set in their environment.
+ */
+function enrichQuotaError(error: Error, authType?: string): Error {
+  const isQuotaError =
+    error instanceof TerminalQuotaError ||
+    error instanceof RetryableQuotaError ||
+    error.name === 'TerminalQuotaError' ||
+    error.name === 'RetryableQuotaError';
+
+  if (
+    isQuotaError &&
+    (authType === 'oauth-personal' ||
+      authType === 'compute-default-credentials' ||
+      authType === 'LOGIN_WITH_GOOGLE' ||
+      authType === 'COMPUTE_ADC')
+  ) {
+    const hasUserProject = !!(
+      process.env['GOOGLE_CLOUD_PROJECT'] ||
+      process.env['GOOGLE_CLOUD_PROJECT_ID']
+    );
+    if (!hasUserProject) {
+      const enrichment =
+        '\n\n💡 Tip: The shared Google Cloud project is experiencing high traffic and has hit its quota limits. ' +
+        'To get dedicated, uninterrupted quota, please set your own Google Cloud project by running:\n' +
+        '  gcloud config set project [PROJECT_ID]\n' +
+        'or by setting the GOOGLE_CLOUD_PROJECT environment variable.';
+      if (!error.message.includes('💡 Tip:')) {
+        Object.defineProperty(error, 'message', {
+          value: error.message + enrichment,
+          writable: true,
+          configurable: true,
+        });
+      }
+    }
+  }
+  return error;
+}
+
+/**
  * Retries a function with exponential backoff and jitter.
  * @param fn The asynchronous function to retry.
  * @param options Optional retry configuration.
@@ -254,6 +294,8 @@ export async function retryWithBackoff<T>(
     getAvailabilityContext?.()?.policy.maxAttempts ?? maxAttempts;
 
   let attempt = 0;
+  let capacityAttempts = 0;
+  const MAX_SILENT_CAPACITY_ATTEMPTS = 3;
   let currentDelay = initialDelayMs;
   const throwIfAborted = () => {
     if (signal?.aborted) {
@@ -297,7 +339,7 @@ export async function retryWithBackoff<T>(
       }
       throwIfAborted();
 
-      const classifiedError = classifyGoogleError(error);
+      let classifiedError = classifyGoogleError(error);
 
       const errorCode = getErrorStatus(error);
 
@@ -305,23 +347,76 @@ export async function retryWithBackoff<T>(
         classifiedError instanceof TerminalQuotaError ||
         classifiedError instanceof ModelNotFoundError
       ) {
-        if (onPersistent429) {
-          try {
-            const fallbackModel = await onPersistent429(
-              authType,
-              classifiedError,
-            );
-            if (fallbackModel) {
-              attempt = 0; // Reset attempts and retry with the new model.
-              currentDelay = initialDelayMs;
-              continue;
+        // Fall back to automatic retry for capacity exhaustion in unattended/non-interactive mode,
+        // or allow up to 3 silent retries in interactive mode before prompting the fallback dialog.
+        const isCapacityExceeded =
+          classifiedError instanceof TerminalQuotaError &&
+          (classifiedError.reason === 'MODEL_CAPACITY_EXHAUSTED' ||
+            classifiedError.reason === 'MODEL_CAPACITY_EXCEEDED' ||
+            /exhausted your capacity|capacity exceeded|MODEL_CAPACITY_EXHAUSTED/i.test(
+              classifiedError.message,
+            ));
+
+        let useSilentRetry = false;
+        let silentDelayMs: number | undefined;
+
+        if (
+          classifiedError instanceof TerminalQuotaError &&
+          isCapacityExceeded
+        ) {
+          if (!onPersistent429) {
+            // Unattended mode: always retry up to standard maxAttempts
+            useSilentRetry = true;
+            silentDelayMs = classifiedError.retryDelayMs;
+          } else {
+            // Interactive mode: allow up to 3 silent retries with progressive backoff before calling fallback handler
+            capacityAttempts++;
+            if (capacityAttempts < MAX_SILENT_CAPACITY_ATTEMPTS) {
+              useSilentRetry = true;
+              silentDelayMs =
+                classifiedError.retryDelayMs !== undefined
+                  ? classifiedError.retryDelayMs
+                  : capacityAttempts === 1
+                    ? 1000
+                    : 3000; // 1s on attempt 1, 3s on attempt 2
             }
-          } catch (fallbackError) {
-            debugLogger.warn('Fallback to Flash model failed:', fallbackError);
           }
         }
-        // Terminal/not_found already recorded; nothing else to mark here.
-        throw classifiedError; // Throw if no fallback or fallback failed.
+
+        if (useSilentRetry && classifiedError instanceof TerminalQuotaError) {
+          const retryable = new RetryableQuotaError(
+            classifiedError.message,
+            classifiedError.cause,
+          );
+          if (silentDelayMs !== undefined) {
+            retryable.retryDelayMs = silentDelayMs;
+            currentDelay = silentDelayMs;
+          }
+          classifiedError = retryable;
+        } else {
+          if (onPersistent429) {
+            try {
+              const fallbackModel = await onPersistent429(
+                authType,
+                classifiedError,
+              );
+              if (fallbackModel) {
+                attempt = 0; // Reset attempts and retry with the new model.
+                currentDelay = initialDelayMs;
+                continue;
+              }
+            } catch (fallbackError) {
+              debugLogger.warn(
+                'Fallback to Flash model failed:',
+                fallbackError,
+              );
+            }
+          }
+          // Terminal/not_found already recorded; nothing else to mark here.
+          throw classifiedError instanceof Error
+            ? enrichQuotaError(classifiedError, authType)
+            : classifiedError; // Throw if no fallback or fallback failed.
+        }
       }
 
       // Handle ValidationRequiredError - user needs to verify before proceeding
@@ -370,7 +465,7 @@ export async function retryWithBackoff<T>(
             }
           }
           throw classifiedError instanceof RetryableQuotaError
-            ? classifiedError
+            ? enrichQuotaError(classifiedError, authType)
             : error;
         }
 

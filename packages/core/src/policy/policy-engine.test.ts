@@ -1531,6 +1531,121 @@ describe('PolicyEngine', () => {
       expect(result.decision).toBe(PolicyDecision.ALLOW);
     });
 
+    it('should NOT upgrade Git commands to ALLOW in untrusted workspace', async () => {
+      const isTrustedMock = vi.fn().mockReturnValue(false);
+      const engine = new PolicyEngine({
+        isTrustedFolder: isTrustedMock,
+      });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'git status' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+      expect(isTrustedMock).toHaveBeenCalled();
+    });
+
+    it('should NOT treat commands with git in arguments or URLs as Git commands', async () => {
+      const isTrustedMock = vi.fn().mockReturnValue(false);
+      const engine = new PolicyEngine({
+        isTrustedFolder: isTrustedMock,
+      });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo git' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should detect chained Git commands as Git commands and force ASK_USER in untrusted workspaces', async () => {
+      const isTrustedMock = vi.fn().mockReturnValue(false);
+      const engine = new PolicyEngine({
+        isTrustedFolder: isTrustedMock,
+      });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo "hello" && git status' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+      expect(isTrustedMock).toHaveBeenCalled();
+    });
+
+    it('should detect Git commands prefixed with environment variable assignments', async () => {
+      const isTrustedMock = vi.fn().mockReturnValue(false);
+      const engine = new PolicyEngine({
+        isTrustedFolder: isTrustedMock,
+      });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'VAR=val git status' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+      expect(isTrustedMock).toHaveBeenCalled();
+    });
+
+    it('should NOT upgrade a DENY decision to ASK_USER for Git commands in untrusted workspaces', async () => {
+      const isTrustedMock = vi.fn().mockReturnValue(false);
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"git status"/,
+          decision: PolicyDecision.DENY,
+          priority: 100,
+        },
+      ];
+      const engine = new PolicyEngine({
+        rules,
+        isTrustedFolder: isTrustedMock,
+      });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'git status' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.DENY);
+    });
+
+    it('should upgrade Git commands to ALLOW in trusted workspace when heuristics apply', async () => {
+      const isTrustedMock = vi.fn().mockReturnValue(true);
+      const engine = new PolicyEngine({
+        isTrustedFolder: isTrustedMock,
+      });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'git status' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+      expect(isTrustedMock).toHaveBeenCalled();
+    });
+
     it('should respect explicit DENY for compound commands even if parts are allowed', async () => {
       const rules: PolicyRule[] = [
         {
