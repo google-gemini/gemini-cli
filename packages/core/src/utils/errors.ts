@@ -33,25 +33,34 @@ export function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === 'AbortError';
 }
 
+export function sanitizeAntigravityUrl(message: string): string {
+  return message.replace(
+    /(https:\/\/antigravity\.google(?:[/?#][^\s]*?)?)\.(?=\s|$)/g,
+    '$1',
+  );
+}
+
 export function getErrorMessage(error: unknown): string {
   const friendlyError = toFriendlyError(error);
+  let message: string;
   if (friendlyError instanceof Error) {
-    return friendlyError.message;
-  }
-  if (
+    message = friendlyError.message;
+  } else if (
     typeof friendlyError === 'object' &&
     friendlyError !== null &&
     'message' in friendlyError &&
     typeof (friendlyError as { message: unknown }).message === 'string'
   ) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return (friendlyError as { message: string }).message;
+    message = (friendlyError as { message: string }).message;
+  } else {
+    try {
+      message = String(friendlyError);
+    } catch {
+      message = 'Failed to get error details';
+    }
   }
-  try {
-    return String(friendlyError);
-  } catch {
-    return 'Failed to get error details';
-  }
+  return sanitizeAntigravityUrl(message);
 }
 
 export function getErrorType(error: unknown): string {
@@ -136,7 +145,7 @@ export class CanceledError extends Error {
 
 export class ForbiddenError extends Error {
   constructor(message: string) {
-    super(message);
+    super(sanitizeAntigravityUrl(message));
     this.name = 'ForbiddenError';
   }
 }
@@ -153,13 +162,13 @@ export class AccountSuspendedError extends ForbiddenError {
 }
 export class UnauthorizedError extends Error {
   constructor(message: string) {
-    super(message);
+    super(sanitizeAntigravityUrl(message));
     this.name = 'UnauthorizedError';
   }
 }
 export class BadRequestError extends Error {
   constructor(message: string) {
-    super(message);
+    super(sanitizeAntigravityUrl(message));
     this.name = 'BadRequestError';
   }
 }

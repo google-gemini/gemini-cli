@@ -47,6 +47,39 @@ describe('getErrorMessage', () => {
     };
     expect(getErrorMessage(error)).toBe('Bad Request Message');
   });
+
+  it('should remove trailing period from antigravity.google URLs', () => {
+    expect(
+      getErrorMessage(new Error('Please visit https://antigravity.google.')),
+    ).toBe('Please visit https://antigravity.google');
+    expect(
+      getErrorMessage(
+        new Error(
+          'Please visit https://antigravity.google/docs/cli-getting-started.',
+        ),
+      ),
+    ).toBe('Please visit https://antigravity.google/docs/cli-getting-started');
+    expect(
+      getErrorMessage(
+        new Error('Please visit https://antigravity.google.com.'),
+      ),
+    ).toBe('Please visit https://antigravity.google.com.');
+    expect(
+      getErrorMessage(
+        new Error('Check https://antigravity.google/cli/install.sh.'),
+      ),
+    ).toBe('Check https://antigravity.google/cli/install.sh');
+    expect(
+      getErrorMessage(
+        new Error('Please visit https://antigravity.google?utm_source=cli.'),
+      ),
+    ).toBe('Please visit https://antigravity.google?utm_source=cli');
+    expect(
+      getErrorMessage(
+        new Error('Please visit https://antigravity.google#faq.'),
+      ),
+    ).toBe('Please visit https://antigravity.google#faq');
+  });
 });
 
 describe('isAbortError', () => {
@@ -379,5 +412,29 @@ describe('getErrorType', () => {
       }
     }
     expect(getErrorType(new _AbortError2('test'))).toBe('AbortError');
+  });
+});
+
+describe('custom errors URL sanitization', () => {
+  it('should remove trailing period from antigravity.google URLs in ForbiddenError', () => {
+    const error = new ForbiddenError('Go to https://antigravity.google.');
+    expect(error.message).toBe('Go to https://antigravity.google');
+  });
+
+  it('should remove trailing period from antigravity.google URLs in AccountSuspendedError', () => {
+    const error = new AccountSuspendedError(
+      'Go to https://antigravity.google.',
+    );
+    expect(error.message).toBe('Go to https://antigravity.google');
+  });
+
+  it('should remove trailing period from antigravity.google URLs in UnauthorizedError', () => {
+    const error = new UnauthorizedError('Go to https://antigravity.google.');
+    expect(error.message).toBe('Go to https://antigravity.google');
+  });
+
+  it('should remove trailing period from antigravity.google URLs in BadRequestError', () => {
+    const error = new BadRequestError('Go to https://antigravity.google.');
+    expect(error.message).toBe('Go to https://antigravity.google');
   });
 });
