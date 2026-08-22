@@ -29,7 +29,7 @@ export function loadIgnoreRules(
     }
   }
 
-  const allIgnoreDirs = ['.git', ...ignoreDirs];
+  const allIgnoreDirs = ['.git', '.gemini', ...ignoreDirs];
   ignorer.add(
     allIgnoreDirs.map((dir) => {
       if (dir.endsWith('/')) {
