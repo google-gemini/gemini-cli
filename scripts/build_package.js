@@ -48,6 +48,9 @@ if (packageName === 'core') {
   const docsSource = join(process.cwd(), '..', '..', 'docs');
   const docsTarget = join(process.cwd(), 'dist', 'docs');
   if (existsSync(docsSource)) {
+    if (existsSync(docsTarget)) {
+      execSync(`rm -rf "${docsTarget}"`);
+    }
     cpSync(docsSource, docsTarget, { recursive: true, dereference: true });
     console.log('Copied documentation to dist/docs');
   }
