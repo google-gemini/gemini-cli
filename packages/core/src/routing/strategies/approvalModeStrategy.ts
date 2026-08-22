@@ -67,6 +67,9 @@ export class ApprovalModeStrategy implements RoutingStrategy {
         config,
         useGemini3_5Flash,
       );
+      if (!config.getModelAvailabilityService().snapshot(proModel).available) {
+        return null;
+      }
       return {
         model: proModel,
         metadata: {
@@ -86,6 +89,9 @@ export class ApprovalModeStrategy implements RoutingStrategy {
         config,
         useGemini3_5Flash,
       );
+      if (!config.getModelAvailabilityService().snapshot(flashModel).available) {
+        return null;
+      }
       return {
         model: flashModel,
         metadata: {
