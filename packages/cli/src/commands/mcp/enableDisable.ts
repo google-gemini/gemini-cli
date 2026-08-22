@@ -25,7 +25,7 @@ interface Args {
   session?: boolean;
 }
 
-async function handleEnable(args: Args): Promise<void> {
+async function handleEnable(args: Args): Promise<boolean> {
   const manager = McpServerEnablementManager.getInstance();
   const name = normalizeServerId(args.name);
 
@@ -39,7 +39,7 @@ async function handleEnable(args: Args): Promise<void> {
     debugLogger.log(
       `${RED}Error:${RESET} Server '${args.name}' not found. Use 'gemini mcp' to see available servers.`,
     );
-    return;
+    return false;
   }
 
   const result = await canLoadServer(name, {
@@ -53,14 +53,21 @@ async function handleEnable(args: Args): Promise<void> {
     (result.blockType === 'allowlist' || result.blockType === 'excludelist')
   ) {
     debugLogger.log(`${RED}Error:${RESET} ${result.reason}`);
-    return;
+    return false;
   }
 
   if (args.session) {
     manager.clearSessionDisable(name);
     debugLogger.log(`${GREEN}✓${RESET} Session disable cleared for '${name}'.`);
   } else {
-    await manager.enable(name);
+    try {
+      await manager.enable(name);
+    } catch (error) {
+      debugLogger.log(
+        `${RED}Error:${RESET} ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return false;
+    }
     debugLogger.log(`${GREEN}✓${RESET} MCP server '${name}' enabled.`);
   }
 
@@ -69,9 +76,10 @@ async function handleEnable(args: Args): Promise<void> {
       `${YELLOW}Warning:${RESET} MCP servers are disabled by administrator.`,
     );
   }
+  return true;
 }
 
-async function handleDisable(args: Args): Promise<void> {
+async function handleDisable(args: Args): Promise<boolean> {
   const manager = McpServerEnablementManager.getInstance();
   const name = normalizeServerId(args.name);
 
@@ -82,7 +90,7 @@ async function handleDisable(args: Args): Promise<void> {
     debugLogger.log(
       `${RED}Error:${RESET} Server '${args.name}' not found. Use 'gemini mcp' to see available servers.`,
     );
-    return;
+    return false;
   }
 
   if (args.session) {
@@ -91,9 +99,17 @@ async function handleDisable(args: Args): Promise<void> {
       `${GREEN}✓${RESET} MCP server '${name}' disabled for this session.`,
     );
   } else {
-    await manager.disable(name);
+    try {
+      await manager.disable(name);
+    } catch (error) {
+      debugLogger.log(
+        `${RED}Error:${RESET} ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return false;
+    }
     debugLogger.log(`${GREEN}✓${RESET} MCP server '${name}' disabled.`);
   }
+  return true;
 }
 
 export const enableCommand: CommandModule<object, Args> = {
@@ -112,8 +128,8 @@ export const enableCommand: CommandModule<object, Args> = {
         default: false,
       }),
   handler: async (argv) => {
-    await handleEnable(argv as Args);
-    await exitCli();
+    const success = await handleEnable(argv as Args);
+    await exitCli(success ? 0 : 1);
   },
 };
 
@@ -133,7 +149,7 @@ export const disableCommand: CommandModule<object, Args> = {
         default: false,
       }),
   handler: async (argv) => {
-    await handleDisable(argv as Args);
-    await exitCli();
+    const success = await handleDisable(argv as Args);
+    await exitCli(success ? 0 : 1);
   },
 };

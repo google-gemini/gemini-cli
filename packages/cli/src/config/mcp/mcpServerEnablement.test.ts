@@ -110,6 +110,27 @@ describe('McpServerEnablementManager', () => {
     ).toBe(true);
   });
 
+  it('should fail closed and refuse to write when config file is corrupted', async () => {
+    await manager.disable('server-a');
+    inMemoryFs['/virtual-home/.gemini/mcp-server-enablement.json'] =
+      '{not valid json';
+
+    expect(await manager.isFileEnabled('server-a')).toBe(false);
+    expect(await manager.isFileEnabled('server-b')).toBe(false);
+    expect(await manager.isConfigReadable()).toBe(false);
+
+    await expect(manager.disable('server-b')).rejects.toThrow(
+      'mcp-server-enablement.json',
+    );
+    await expect(manager.enable('server-a')).rejects.toThrow(
+      'mcp-server-enablement.json',
+    );
+
+    expect(inMemoryFs['/virtual-home/.gemini/mcp-server-enablement.json']).toBe(
+      '{not valid json',
+    );
+  });
+
   it('should share session state across getInstance calls', () => {
     const instance1 = McpServerEnablementManager.getInstance();
     const instance2 = McpServerEnablementManager.getInstance();
@@ -157,6 +178,19 @@ describe('canLoadServer', () => {
       enablement: createMockEnablement(false, false),
     });
     expect(result.blockType).toBe('enablement');
+    expect(result.reason).toContain('is disabled');
+  });
+
+  it('gives a distinct reason when the config file is unreadable', async () => {
+    const result = await canLoadServer('s', {
+      adminMcpEnabled: true,
+      enablement: {
+        ...createMockEnablement(false, false),
+        isConfigReadable: () => Promise.resolve(false),
+      },
+    });
+    expect(result.blockType).toBe('enablement');
+    expect(result.reason).toContain('could not be read');
   });
 
   it('allows when admin MCP is enabled and no restrictions', async () => {
