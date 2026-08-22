@@ -225,6 +225,9 @@ export class McpServerEnablementManager {
    */
   async isFileEnabled(serverName: string): Promise<boolean> {
     const config = await this.readConfig();
+    if (config === null) {
+      return false;
+    }
     const state = config[normalizeServerId(serverName)];
     return state?.enabled ?? true;
   }
@@ -254,6 +257,11 @@ export class McpServerEnablementManager {
   async enable(serverName: string): Promise<void> {
     const normalizedName = normalizeServerId(serverName);
     const config = await this.readConfig();
+    if (config === null) {
+      throw new Error(
+        `Cannot modify MCP server enablement: config file at ${this.configFilePath} is corrupted. Fix or delete the file and try again.`,
+      );
+    }
 
     if (normalizedName in config) {
       delete config[normalizedName];
@@ -267,6 +275,11 @@ export class McpServerEnablementManager {
    */
   async disable(serverName: string): Promise<void> {
     const config = await this.readConfig();
+    if (config === null) {
+      throw new Error(
+        `Cannot modify MCP server enablement: config file at ${this.configFilePath} is corrupted. Fix or delete the file and try again.`,
+      );
+    }
     config[normalizeServerId(serverName)] = { enabled: false };
     await this.writeConfig(config);
   }
@@ -286,11 +299,16 @@ export class McpServerEnablementManager {
   }
 
   /**
-   * Get display state for a specific server (for UI).
+   * Helper to compute display state for a server given a loaded config.
    */
-  async getDisplayState(serverName: string): Promise<McpServerDisplayState> {
-    const isSessionDisabled = this.isSessionDisabled(serverName);
-    const isPersistentDisabled = !(await this.isFileEnabled(serverName));
+  private computeDisplayState(
+    serverId: string,
+    config: McpServerEnablementConfig | null,
+  ): McpServerDisplayState {
+    const normalizedId = normalizeServerId(serverId);
+    const isSessionDisabled = this.isSessionDisabled(normalizedId);
+    const isPersistentDisabled =
+      config === null ? true : !(config[normalizedId]?.enabled ?? true);
 
     return {
       enabled: !isSessionDisabled && !isPersistentDisabled,
@@ -300,15 +318,26 @@ export class McpServerEnablementManager {
   }
 
   /**
+   * Get display state for a specific server (for UI).
+   */
+  async getDisplayState(serverName: string): Promise<McpServerDisplayState> {
+    const config = await this.readConfig();
+    return this.computeDisplayState(serverName, config);
+  }
+
+  /**
    * Get all display states (for UI listing).
    */
   async getAllDisplayStates(
     serverIds: string[],
   ): Promise<Record<string, McpServerDisplayState>> {
+    const config = await this.readConfig();
     const result: Record<string, McpServerDisplayState> = {};
     for (const serverId of serverIds) {
-      result[normalizeServerId(serverId)] =
-        await this.getDisplayState(serverId);
+      result[normalizeServerId(serverId)] = this.computeDisplayState(
+        serverId,
+        config,
+      );
     }
     return result;
   }
@@ -328,18 +357,32 @@ export class McpServerEnablementManager {
    * Returns server names that were actually re-enabled.
    */
   async autoEnableServers(serverNames: string[]): Promise<string[]> {
+    const config = await this.readConfig();
+    if (config === null) {
+      return [];
+    }
+
     const enabledServers: string[] = [];
 
     for (const serverName of serverNames) {
       const normalizedName = normalizeServerId(serverName);
-      const state = await this.getDisplayState(normalizedName);
+      const isSessionDisabled = this.isSessionDisabled(normalizedName);
+      const isPersistentDisabled = !(config[normalizedName]?.enabled ?? true);
 
       let wasDisabled = false;
-      if (state.isPersistentDisabled) {
-        await this.enable(normalizedName);
-        wasDisabled = true;
+      if (isPersistentDisabled) {
+        try {
+          await this.enable(normalizedName);
+          wasDisabled = true;
+        } catch (error) {
+          coreEvents.emitFeedback(
+            'error',
+            `Failed to auto-enable server '${serverName}'.`,
+            error,
+          );
+        }
       }
-      if (state.isSessionDisabled) {
+      if (isSessionDisabled) {
         this.clearSessionDisable(normalizedName);
         wasDisabled = true;
       }
@@ -355,11 +398,24 @@ export class McpServerEnablementManager {
   /**
    * Read config from file asynchronously.
    */
-  private async readConfig(): Promise<McpServerEnablementConfig> {
+  private async readConfig(): Promise<McpServerEnablementConfig | null> {
     try {
       const content = await fs.readFile(this.configFilePath, 'utf-8');
+      const parsed: unknown = JSON.parse(content);
+      if (
+        parsed === null ||
+        typeof parsed !== 'object' ||
+        Array.isArray(parsed)
+      ) {
+        coreEvents.emitFeedback(
+          'error',
+          'Failed to read MCP server enablement config.',
+          new Error('Config is not a valid JSON object'),
+        );
+        return null;
+      }
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      return JSON.parse(content) as McpServerEnablementConfig;
+      return parsed as McpServerEnablementConfig;
     } catch (error) {
       if (
         error instanceof Error &&
@@ -373,7 +429,7 @@ export class McpServerEnablementManager {
         'Failed to read MCP server enablement config.',
         error,
       );
-      return {};
+      return null;
     }
   }
 

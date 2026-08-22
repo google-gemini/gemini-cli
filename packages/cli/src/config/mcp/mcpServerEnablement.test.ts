@@ -5,6 +5,7 @@
  */
 
 import fs from 'node:fs/promises';
+import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -20,6 +21,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 
+import { coreEvents } from '@google/gemini-cli-core';
 import {
   McpServerEnablementManager,
   canLoadServer,
@@ -42,7 +44,8 @@ function createMockEnablement(
 
 function setupFsMocks(): void {
   vi.spyOn(fs, 'readFile').mockImplementation(async (filePath) => {
-    const content = inMemoryFs[filePath.toString()];
+    const normPath = path.normalize(filePath.toString());
+    const content = inMemoryFs[normPath];
     if (content === undefined) {
       const error = new Error(`ENOENT: ${filePath}`);
       (error as NodeJS.ErrnoException).code = 'ENOENT';
@@ -51,7 +54,8 @@ function setupFsMocks(): void {
     return content;
   });
   vi.spyOn(fs, 'writeFile').mockImplementation(async (filePath, data) => {
-    inMemoryFs[filePath.toString()] = data.toString();
+    const normPath = path.normalize(filePath.toString());
+    inMemoryFs[normPath] = data.toString();
   });
   vi.spyOn(fs, 'mkdir').mockImplementation(async () => undefined);
 }
@@ -118,6 +122,89 @@ describe('McpServerEnablementManager', () => {
 
     expect(instance2.isSessionDisabled('test-server')).toBe(true);
     expect(instance1).toBe(instance2);
+  });
+
+  it('returns false for isFileEnabled when JSON content is corrupted', async () => {
+    const configPath = path.normalize(
+      '/virtual-home/.gemini/mcp-server-enablement.json',
+    );
+    inMemoryFs[configPath] = '{ invalid json syntax';
+
+    expect(await manager.isFileEnabled('some-server')).toBe(false);
+  });
+
+  it.each(['null', '[1, 2, 3]', '"a string"', '123'])(
+    'returns false for isFileEnabled when JSON is valid but not an object (%s)',
+    async (content) => {
+      const configPath = path.normalize(
+        '/virtual-home/.gemini/mcp-server-enablement.json',
+      );
+      inMemoryFs[configPath] = content;
+
+      expect(await manager.isFileEnabled('some-server')).toBe(false);
+    },
+  );
+
+  it('throws and preserves file when calling disable() or enable() on corrupt config', async () => {
+    const configPath = path.normalize(
+      '/virtual-home/.gemini/mcp-server-enablement.json',
+    );
+    inMemoryFs[configPath] = '{ corrupt json';
+    const writeFileSpy = vi.spyOn(fs, 'writeFile');
+
+    await expect(manager.disable('some-server')).rejects.toThrow(/corrupted/i);
+    expect(writeFileSpy).not.toHaveBeenCalled();
+
+    await expect(manager.enable('some-server')).rejects.toThrow(/corrupted/i);
+    expect(writeFileSpy).not.toHaveBeenCalled();
+
+    expect(inMemoryFs[configPath]).toBe('{ corrupt json');
+  });
+
+  it('handles autoEnableServers with corrupt config without throwing or reporting re-enabled servers', async () => {
+    const configPath = path.normalize(
+      '/virtual-home/.gemini/mcp-server-enablement.json',
+    );
+    inMemoryFs[configPath] = '{ corrupt json';
+    const writeFileSpy = vi.spyOn(fs, 'writeFile');
+
+    const result = await manager.autoEnableServers(['server1', 'server2']);
+    expect(result).toEqual([]);
+    expect(writeFileSpy).not.toHaveBeenCalled();
+  });
+
+  it('returns isPersistentDisabled: true for getDisplayState and getAllDisplayStates on corrupt config', async () => {
+    const configPath = path.normalize(
+      '/virtual-home/.gemini/mcp-server-enablement.json',
+    );
+    inMemoryFs[configPath] = '{ corrupt json';
+
+    const state = await manager.getDisplayState('server1');
+    expect(state).toEqual({
+      enabled: false,
+      isSessionDisabled: false,
+      isPersistentDisabled: true,
+    });
+
+    const allStates = await manager.getAllDisplayStates(['server1', 'server2']);
+    expect(allStates['server1']?.isPersistentDisabled).toBe(true);
+    expect(allStates['server2']?.isPersistentDisabled).toBe(true);
+  });
+
+  it('emits coreEvents error feedback exactly once on getAllDisplayStates with corrupt config', async () => {
+    const feedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+    const configPath = path.normalize(
+      '/virtual-home/.gemini/mcp-server-enablement.json',
+    );
+    inMemoryFs[configPath] = '{ corrupt json';
+
+    await manager.getAllDisplayStates(['server1', 'server2', 'server3']);
+    expect(feedbackSpy).toHaveBeenCalledTimes(1);
+    expect(feedbackSpy).toHaveBeenCalledWith(
+      'error',
+      'Failed to read MCP server enablement config.',
+      expect.any(Error),
+    );
   });
 });
 
