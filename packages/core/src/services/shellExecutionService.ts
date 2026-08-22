@@ -517,7 +517,6 @@ export class ShellExecutionService {
       ['core.pager', 'cat'],
       ['core.editor', ''],
       ['sequence.editor', ''],
-      ['diff.external', ''],
     ];
 
     for (const [overrideKey, overrideVal] of defaultGitOverrides) {
