@@ -210,13 +210,18 @@ development setup of this project.
     - **Production:** For running the CLI in a production environment, any
       version of Node.js `>=20` is acceptable.
 2.  **Git**
+    - **Windows:** Enable long paths support (`core.longpaths=true`) to avoid
+      checkout failures from snapshot files exceeding the 260-character
+      `MAX_PATH` limit. If you have already cloned the repository and are
+      experiencing issues, run:
+      `git config --global core.longpaths true && git checkout -- .`
 
 ### Build process
 
 To clone the repository:
 
 ```bash
-git clone https://github.com/google-gemini/gemini-cli.git # Or your fork's URL
+git clone -c core.longpaths=true https://github.com/google-gemini/gemini-cli.git # Or your fork's URL
 cd gemini-cli
 ```
 
