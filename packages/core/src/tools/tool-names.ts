@@ -190,6 +190,23 @@ export const TRACKER_VISUALIZE_TOOL_NAME = 'tracker_visualize';
 
 export const AGENT_TOOL_NAME = 'invoke_agent';
 
+/**
+ * Wildcard entry in an agent's `tools` list granting access to every registered
+ * agent. `invoke_agent` is accepted as an equivalent spelling.
+ */
+export const ALL_AGENTS_WILDCARD = 'agent_*';
+
+/** Kept in sync with the `nameSchema` slug rule in the agent loader. */
+const AGENT_NAME_PATTERN = /^[a-z0-9-_]+$/;
+
+/**
+ * Whether `name` could refer to a subagent in an agent's `tools` list. Purely
+ * syntactic; callers resolve it against the agent registry.
+ */
+export function isAgentReferenceName(name: string): boolean {
+  return name === ALL_AGENTS_WILDCARD || AGENT_NAME_PATTERN.test(name);
+}
+
 // Tool Display Names
 export const WRITE_FILE_DISPLAY_NAME = 'WriteFile';
 export const EDIT_DISPLAY_NAME = 'Edit';
@@ -299,10 +316,14 @@ export const PLAN_MODE_TOOLS = [
 /**
  * Validates if a tool name is syntactically valid.
  * Checks against built-in tools, discovered tools, and MCP naming conventions.
+ *
+ * @param options.allowWildcards Accept policy wildcards such as `*` and `mcp_*`.
+ * @param options.allowAgentNames Accept subagent references, for callers that
+ *   resolve them against the agent registry (e.g. an agent's `tools` list).
  */
 export function isValidToolName(
   name: string,
-  options: { allowWildcards?: boolean } = {},
+  options: { allowWildcards?: boolean; allowAgentNames?: boolean } = {},
 ): boolean {
   // Built-in tools
   if ((ALL_BUILTIN_TOOL_NAMES as readonly string[]).includes(name)) {
@@ -362,6 +383,12 @@ export function isValidToolName(
     }
 
     return false;
+  }
+
+  // Must stay after the MCP branch, so malformed MCP names (e.g. `mcp__tool`)
+  // are rejected rather than mistaken for slug-shaped agent names.
+  if (options.allowAgentNames && isAgentReferenceName(name)) {
+    return true;
   }
 
   return false;

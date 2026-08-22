@@ -58,10 +58,13 @@ import { ResourceRegistry } from '../resources/resource-registry.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { LSTool } from '../tools/ls.js';
 import {
+  AGENT_TOOL_NAME,
+  ALL_AGENTS_WILDCARD,
   COMPLETE_TASK_TOOL_NAME,
   LS_TOOL_NAME,
   READ_FILE_TOOL_NAME,
 } from '../tools/tool-names.js';
+import { AgentTool, MAX_AGENT_DEPTH } from './agent-tool.js';
 import {
   GeminiChat,
   StreamEventType,
@@ -487,6 +490,7 @@ describe('LocalAgentExecutor', () => {
     );
     vi.spyOn(mockConfig, 'getAgentRegistry').mockReturnValue({
       getAllAgentNames: () => [],
+      getDefinition: () => undefined,
     } as unknown as AgentRegistry);
 
     mockedGetDirectoryContextString.mockResolvedValue(
@@ -834,6 +838,263 @@ describe('LocalAgentExecutor', () => {
 
       // Should exclude subagent
       expect(agentRegistry.getTool(subAgentName)).toBeUndefined();
+    });
+
+    describe('agents calling agents', () => {
+      const stubAgentRegistry = (names: string[]) => {
+        vi.spyOn(mockConfig, 'getAgentRegistry').mockReturnValue({
+          getAllAgentNames: () => names,
+          getDefinition: (name: string) =>
+            names.includes(name)
+              ? ({ kind: 'local', name } as unknown as LocalAgentDefinition)
+              : undefined,
+        } as unknown as AgentRegistry);
+      };
+
+      const getAllowedAgentNames = (
+        registry: ToolRegistry,
+      ): string[] | undefined => {
+        const tool = registry.getTool(AGENT_TOOL_NAME);
+        if (!tool) return undefined;
+        const schema = tool.parameterSchema as {
+          properties: { agent_name: { enum?: string[] } };
+        };
+        return schema.properties.agent_name.enum;
+      };
+
+      it('should grant a scoped invoke_agent tool for a listed agent name', async () => {
+        stubAgentRegistry(['code-reviewer', 'doc-writer']);
+
+        const definition = createTestDefinition([
+          LS_TOOL_NAME,
+          'code-reviewer',
+        ]);
+        const executor = await LocalAgentExecutor.create(
+          definition,
+          mockConfig,
+          onActivity,
+        );
+        const registry = executor['toolRegistry'];
+
+        expect(registry.getTool(LS_TOOL_NAME)).toBeDefined();
+        const agentTool = registry.getTool(AGENT_TOOL_NAME);
+        expect(agentTool).toBeDefined();
+        expect(agentTool!.kind).toBe(Kind.Agent);
+        // Only the listed agent is offered, not every registered agent.
+        expect(getAllowedAgentNames(registry)).toEqual(['code-reviewer']);
+      });
+
+      it('should allow an agent to list itself for recursion', async () => {
+        stubAgentRegistry(['TestAgent']);
+
+        const definition = createTestDefinition([LS_TOOL_NAME, 'TestAgent']);
+        const executor = await LocalAgentExecutor.create(
+          definition,
+          mockConfig,
+          onActivity,
+        );
+
+        expect(getAllowedAgentNames(executor['toolRegistry'])).toEqual([
+          'TestAgent',
+        ]);
+      });
+
+      it.each([ALL_AGENTS_WILDCARD, AGENT_TOOL_NAME])(
+        'should grant access to all agents via %s',
+        async (entry) => {
+          stubAgentRegistry(['code-reviewer', 'doc-writer']);
+
+          const definition = createTestDefinition([LS_TOOL_NAME, entry]);
+          const executor = await LocalAgentExecutor.create(
+            definition,
+            mockConfig,
+            onActivity,
+          );
+
+          expect(getAllowedAgentNames(executor['toolRegistry'])).toEqual([
+            'code-reviewer',
+            'doc-writer',
+          ]);
+        },
+      );
+
+      it('should not register invoke_agent when no agents are listed', async () => {
+        stubAgentRegistry(['code-reviewer']);
+
+        const definition = createTestDefinition([LS_TOOL_NAME]);
+        const executor = await LocalAgentExecutor.create(
+          definition,
+          mockConfig,
+          onActivity,
+        );
+
+        expect(
+          executor['toolRegistry'].getTool(AGENT_TOOL_NAME),
+        ).toBeUndefined();
+      });
+
+      it('should not grant agent access via the "*" wildcard', async () => {
+        stubAgentRegistry(['code-reviewer']);
+        const { messageBus } = mockConfig as unknown as {
+          messageBus: MessageBus;
+        };
+        parentToolRegistry.registerTool(new AgentTool(mockConfig, messageBus));
+
+        const definition = createTestDefinition(['*']);
+        const executor = await LocalAgentExecutor.create(
+          definition,
+          mockConfig,
+          onActivity,
+        );
+
+        expect(
+          executor['toolRegistry'].getTool(AGENT_TOOL_NAME),
+        ).toBeUndefined();
+      });
+
+      it('should not grant agent access when toolConfig is undefined', async () => {
+        stubAgentRegistry(['code-reviewer']);
+        const { messageBus } = mockConfig as unknown as {
+          messageBus: MessageBus;
+        };
+        parentToolRegistry.registerTool(new AgentTool(mockConfig, messageBus));
+
+        const definition = createTestDefinition();
+        definition.toolConfig = undefined;
+        const executor = await LocalAgentExecutor.create(
+          definition,
+          mockConfig,
+          onActivity,
+        );
+        const registry = executor['toolRegistry'];
+
+        expect(registry.getTool(LS_TOOL_NAME)).toBeDefined();
+        expect(registry.getTool(AGENT_TOOL_NAME)).toBeUndefined();
+      });
+
+      it('should warn and ignore names matching neither a tool nor an agent', async () => {
+        stubAgentRegistry(['code-reviewer']);
+        const warnSpy = vi
+          .spyOn(debugLogger, 'warn')
+          .mockImplementation(() => {});
+
+        const definition = createTestDefinition([LS_TOOL_NAME, 'no-such-name']);
+        const executor = await LocalAgentExecutor.create(
+          definition,
+          mockConfig,
+          onActivity,
+        );
+
+        expect(
+          executor['toolRegistry'].getTool(AGENT_TOOL_NAME),
+        ).toBeUndefined();
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining('no-such-name'),
+        );
+      });
+
+      it('should hand the nested agent tool an incremented depth', async () => {
+        stubAgentRegistry(['code-reviewer']);
+
+        const definition = createTestDefinition([
+          LS_TOOL_NAME,
+          'code-reviewer',
+        ]);
+        const executor = await LocalAgentExecutor.create(
+          definition,
+          mockConfig,
+          onActivity,
+        );
+
+        const agentTool = executor['toolRegistry'].getTool(
+          AGENT_TOOL_NAME,
+        ) as AgentTool;
+        const nestedContext = agentTool['context'];
+        expect(nestedContext.agentDepth).toBe(1);
+        expect(nestedContext.config).toBe(mockConfig);
+      });
+
+      it('should nest the message bus and isolated registries for the child', async () => {
+        stubAgentRegistry(['code-reviewer']);
+
+        const definition = createTestDefinition([
+          LS_TOOL_NAME,
+          'code-reviewer',
+        ]);
+        const executor = await LocalAgentExecutor.create(
+          definition,
+          mockConfig,
+          onActivity,
+        );
+
+        const agentTool = executor['toolRegistry'].getTool(
+          AGENT_TOOL_NAME,
+        ) as AgentTool;
+        const nestedContext = agentTool['context'];
+
+        // Publishing through this agent's derived bus is what attributes the
+        // child's confirmations as `parent/child` rather than `child`.
+        expect(nestedContext.messageBus).toBe(
+          executor['toolRegistry'].getMessageBus(),
+        );
+        expect(nestedContext.messageBus).not.toBe(
+          parentToolRegistry.getMessageBus(),
+        );
+        expect(nestedContext.promptRegistry).toBe(executor['promptRegistry']);
+        expect(nestedContext.resourceRegistry).toBe(
+          executor['resourceRegistry'],
+        );
+      });
+
+      it('should let a delegated agent resolve tools its caller does not have', async () => {
+        // A coordinator listing only another agent has no file tools of its
+        // own, but its delegates must still resolve theirs.
+        stubAgentRegistry(['code-reviewer']);
+
+        const definition = createTestDefinition(['code-reviewer']);
+        const executor = await LocalAgentExecutor.create(
+          definition,
+          mockConfig,
+          onActivity,
+        );
+
+        expect(executor['toolRegistry'].getTool(LS_TOOL_NAME)).toBeUndefined();
+        expect(
+          executor['toolRegistry'].getTool(READ_FILE_TOOL_NAME),
+        ).toBeUndefined();
+
+        const agentTool = executor['toolRegistry'].getTool(
+          AGENT_TOOL_NAME,
+        ) as AgentTool;
+        const nestedContext = agentTool['context'];
+
+        expect(nestedContext.toolRegistry.getTool(LS_TOOL_NAME)).toBeDefined();
+        expect(
+          nestedContext.toolRegistry.getTool(READ_FILE_TOOL_NAME),
+        ).toBeDefined();
+      });
+
+      it('should stop granting agent access at the maximum nesting depth', async () => {
+        stubAgentRegistry(['code-reviewer']);
+        Object.defineProperty(mockConfig, 'agentDepth', {
+          value: MAX_AGENT_DEPTH - 1,
+          configurable: true,
+        });
+
+        const definition = createTestDefinition([
+          LS_TOOL_NAME,
+          'code-reviewer',
+        ]);
+        const executor = await LocalAgentExecutor.create(
+          definition,
+          mockConfig,
+          onActivity,
+        );
+
+        expect(
+          executor['toolRegistry'].getTool(AGENT_TOOL_NAME),
+        ).toBeUndefined();
+      });
     });
 
     it('should automatically qualify MCP tools in agent definitions', async () => {
