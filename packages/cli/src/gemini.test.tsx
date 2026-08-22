@@ -1474,6 +1474,51 @@ describe('gemini.tsx main function exit codes', () => {
 
     expect(refreshAuthSpy).toHaveBeenCalledWith(AuthType.USE_GEMINI);
   });
+
+  it('should exit with 41 instead of crashing when refreshAuth fails in non-interactive mode', async () => {
+    // Force the "hop into sandbox" branch to be skipped so execution reaches
+    // the non-interactive refreshAuth call further down in main().
+    vi.mocked(loadSandboxConfig).mockResolvedValue(undefined);
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        isInteractive: () => false,
+        getQuestion: () => 'test prompt',
+        getSandbox: () => undefined,
+        refreshAuth: vi
+          .fn()
+          .mockRejectedValue(new Error('This client is no longer supported')),
+      }),
+    );
+    vi.mocked(validateNonInteractiveAuth).mockResolvedValue(
+      AuthType.USE_GEMINI,
+    );
+
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: {
+          security: {
+            auth: { selectedType: undefined },
+            folderTrust: { enabled: false },
+          },
+          ui: {},
+        },
+      }),
+    );
+    vi.mocked(parseArguments).mockResolvedValue({
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
+    } as unknown as CliArgs);
+
+    vi.stubEnv('GEMINI_API_KEY', 'test-key');
+    try {
+      await main();
+      expect.fail('Should have thrown MockProcessExitError');
+    } catch (e) {
+      expect(e).toBeInstanceOf(MockProcessExitError);
+      expect((e as MockProcessExitError).code).toBe(41);
+    }
+  });
 });
 
 describe('validateDnsResolutionOrder', () => {
