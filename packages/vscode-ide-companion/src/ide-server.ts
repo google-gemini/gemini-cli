@@ -127,6 +127,7 @@ export class IDEServer {
   private authToken: string | undefined;
   private transports: { [sessionId: string]: StreamableHTTPServerTransport } =
     {};
+  private keepAliveIntervals: Set<NodeJS.Timeout> = new Set();
   private openFilesManager: OpenFilesManager | undefined;
   diffManager: DiffManager;
 
@@ -138,6 +139,7 @@ export class IDEServer {
   start(context: vscode.ExtensionContext): Promise<void> {
     return new Promise((resolve) => {
       this.context = context;
+      this.transports = {};
       this.authToken = randomUUID();
       const sessionsWithInitialNotification = new Set<string>();
 
@@ -242,12 +244,16 @@ export class IDEServer {
                     `Session ${sessionId} missed ${missedPings} pings. Closing connection and cleaning up interval.`,
                   );
                   clearInterval(keepAlive);
+                  this.keepAliveIntervals.delete(keepAlive);
+                  void transport.close();
                 }
               });
           }, 60000); // 60 sec
+          this.keepAliveIntervals.add(keepAlive);
 
           transport.onclose = () => {
             clearInterval(keepAlive);
+            this.keepAliveIntervals.delete(keepAlive);
             if (transport.sessionId) {
               this.log(`Session closed: ${transport.sessionId}`);
               sessionsWithInitialNotification.delete(transport.sessionId);
@@ -404,6 +410,22 @@ export class IDEServer {
   }
 
   async stop(): Promise<void> {
+    await Promise.race([
+      Promise.allSettled(
+        Object.values(this.transports).map((transport) =>
+          Promise.resolve().then(() => transport.close()),
+        ),
+      ),
+      // Bounding the wait for a hung transport so stop() doesn't hang forever
+      new Promise<void>((resolve) => setTimeout(resolve, 1000)),
+    ]);
+
+    // Clear all keep-alive intervals upfront so background timers stop regardless of transport teardown state
+    for (const interval of this.keepAliveIntervals) {
+      clearInterval(interval);
+    }
+    this.keepAliveIntervals.clear();
+
     if (this.server) {
       await new Promise<void>((resolve, reject) => {
         this.server!.close((err?: Error) => {
@@ -414,6 +436,7 @@ export class IDEServer {
           this.log(`IDE server shut down`);
           resolve();
         });
+        this.server!.closeAllConnections();
       });
       this.server = undefined;
     }
@@ -428,6 +451,16 @@ export class IDEServer {
         // Ignore errors if the file doesn't exist.
       }
     }
+  }
+
+  /** @internal */
+  getTransports(): Readonly<Record<string, StreamableHTTPServerTransport>> {
+    return this.transports;
+  }
+
+  /** @internal */
+  getKeepAliveIntervals(): ReadonlySet<NodeJS.Timeout> {
+    return this.keepAliveIntervals;
   }
 }
 
