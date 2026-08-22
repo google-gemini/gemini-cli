@@ -160,7 +160,6 @@ export class AgentRegistry {
   private async loadAgents(errors?: string[]): Promise<void> {
     this.agents.clear();
     this.allDefinitions.clear();
-    this.loadBuiltInAgents();
 
     // Clear old dynamic rules before reloading
     this.config.getPolicyEngine()?.removeRulesBySource(DYNAMIC_RULE_SOURCE);
@@ -168,6 +167,8 @@ export class AgentRegistry {
     if (!this.config.isAgentsEnabled()) {
       return;
     }
+
+    this.loadBuiltInAgents();
 
     // Load project-level agents: .gemini/agents/ (relative to Project Root)
     const folderTrustEnabled = this.config.getFolderTrust();
@@ -317,6 +318,9 @@ export class AgentRegistry {
   private async refreshAgents(
     scope: AgentDefinition['kind'] | 'all' = 'all',
   ): Promise<void> {
+    if (!this.config.isAgentsEnabled()) {
+      return;
+    }
     this.loadBuiltInAgents();
     await Promise.allSettled(
       Array.from(this.agents.values()).map(async (agent) => {

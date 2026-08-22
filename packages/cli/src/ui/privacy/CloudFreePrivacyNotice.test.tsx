@@ -72,6 +72,11 @@ describe('CloudFreePrivacyNotice', () => {
       expectedText: 'Gemini Code Assist Privacy Notice',
     },
     {
+      stateName: 'tier unavailable state',
+      mockState: { isFreeTier: undefined, isTierUnavailable: true },
+      expectedText: 'GOOGLE_CLOUD_PROJECT',
+    },
+    {
       stateName: 'free tier state',
       mockState: { isFreeTier: true },
       expectedText: 'Gemini Code Assist for Individuals Privacy Notice',
@@ -99,6 +104,11 @@ describe('CloudFreePrivacyNotice', () => {
     {
       stateName: 'non-free tier state',
       mockState: { isFreeTier: false },
+      shouldExit: true,
+    },
+    {
+      stateName: 'tier unavailable state',
+      mockState: { isFreeTier: undefined, isTierUnavailable: true },
       shouldExit: true,
     },
     {
@@ -135,6 +145,26 @@ describe('CloudFreePrivacyNotice', () => {
       unmount();
     },
   );
+
+  it('provides renderItem to RadioButtonSelect that wraps option text without truncation', async () => {
+    const { unmount } = await render(
+      <CloudFreePrivacyNotice config={mockConfig} onExit={onExit} />,
+    );
+
+    const selectProps = mockedRadioButtonSelect.mock.calls[0][0];
+    expect(selectProps.renderItem).toBeDefined();
+
+    // Verify renderItem output has wrap="wrap"
+    const rendered = selectProps.renderItem(selectProps.items[0], {
+      titleColor: 'green',
+    });
+    expect(rendered.props.children.props.wrap).toBe('wrap');
+    expect(rendered.props.children.props.children).toBe(
+      'Yes, grant permission to use my data for product improvement (Opt-in)',
+    );
+
+    unmount();
+  });
 
   describe('RadioButtonSelect interaction', () => {
     it.each([

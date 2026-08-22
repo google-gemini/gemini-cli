@@ -197,8 +197,7 @@ async function handleExecuteCommand(
 export async function createApp() {
   try {
     // Load the server configuration once on startup.
-    const workspaceRoot = setTargetDir(undefined);
-    loadEnvironment();
+    const workspaceRoot = await setTargetDir(undefined);
 
     // Use a temporary settings load to check if folder trust is enabled.
     // This is similar to how the CLI handles the initial trust check.
@@ -209,13 +208,35 @@ export async function createApp() {
       isHeadless: isHeadlessMode(),
     });
 
+    // Change the global working directory to the workspace root during startup
+    process.chdir(workspaceRoot);
+
+    // Load environment globally for the server startup
+    const globalEnv = await loadEnvironment(isTrusted ?? false, workspaceRoot);
+    // Only assign safe server-config variables to process.env to prevent credential leakage
+    const allowedServerKeys = [
+      'CODER_AGENT_PORT',
+      'CODER_AGENT_WORKSPACE_PATH',
+      'GCS_BUCKET_NAME',
+      'LOG_LEVEL',
+      'GOOGLE_APPLICATION_CREDENTIALS',
+      'GOOGLE_CLOUD_PROJECT',
+      'GEMINI_CLI_USE_COMPUTE_ADC',
+    ];
+    for (const key of allowedServerKeys) {
+      if (globalEnv[key] !== undefined) {
+        process.env[key] = globalEnv[key];
+      }
+    }
+
     const settings = loadSettings(workspaceRoot, isTrusted ?? false);
-    const extensions = loadExtensions(workspaceRoot);
+    const extensions = loadExtensions(workspaceRoot, isTrusted ?? false);
     const config = await loadConfig(
       settings,
       new SimpleExtensionLoader(extensions),
       'a2a-server',
       isTrusted ?? false,
+      workspaceRoot,
     );
 
     let git: GitService | undefined;

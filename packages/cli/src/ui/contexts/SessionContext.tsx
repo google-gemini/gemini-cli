@@ -36,6 +36,18 @@ function areModelMetricsEqual(a: ModelMetrics, b: ModelMetrics): boolean {
   ) {
     return false;
   }
+  const errorsA = a.api.errorsByType || {};
+  const errorsB = b.api.errorsByType || {};
+  const keysA = Object.keys(errorsA);
+  const keysB = Object.keys(errorsB);
+  if (keysA.length !== keysB.length) {
+    return false;
+  }
+  for (const key of keysA) {
+    if (errorsA[key] !== errorsB[key]) {
+      return false;
+    }
+  }
   if (
     a.tokens.input !== b.tokens.input ||
     a.tokens.prompt !== b.tokens.prompt ||

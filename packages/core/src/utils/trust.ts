@@ -47,6 +47,9 @@ export function checkPathTrust(options: TrustOptions): TrustResult {
   if (process.env['GEMINI_CLI_TRUST_WORKSPACE'] === 'true') {
     return { isTrusted: true, source: 'env' };
   }
+  if (process.env['GEMINI_CLI_TRUST_WORKSPACE'] === 'false') {
+    return { isTrusted: false, source: 'env' };
+  }
 
   if (!options.isFolderTrustEnabled) {
     return { isTrusted: true, source: undefined };

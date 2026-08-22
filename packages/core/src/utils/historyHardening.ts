@@ -44,8 +44,11 @@ export function hardenHistory(
 
   const sentinels = { ...DEFAULT_SENTINELS, ...options.sentinels };
 
+  // Pass 0: Strip internal thoughts and remove empty turns
+  const processed = stripThoughts(history);
+
   // Pass 1: Initial Coalesce & Empty Turn Removal
-  let coalesced = coalesce(history);
+  let coalesced = coalesce(processed);
 
   // Pass 2: Tool Pairing & Signatures (The semantic layer)
   coalesced = pairToolsAndEnforceSignatures(coalesced, sentinels);
@@ -63,6 +66,36 @@ export function hardenHistory(
 }
 
 /**
+ * Helper to check if a Part object represents an internal thought.
+ */
+function isInternalThought(part: Part): boolean {
+  return !!part && !!(part as ThoughtPart).thought;
+}
+
+/**
+ * Removes parts that represent thoughts (where part.thought === true).
+ * Empty turns resulting from thought removal are handled in subsequent coalescing passes.
+ */
+function stripThoughts(history: HistoryTurn[]): HistoryTurn[] {
+  return history.map((turn) => {
+    if (!turn.content.parts) return turn;
+    const hasThought = turn.content.parts.some(isInternalThought);
+    if (!hasThought) return turn;
+
+    const nonThoughtParts = turn.content.parts.filter(
+      (p) => p && !isInternalThought(p),
+    );
+    return {
+      id: turn.id,
+      content: {
+        ...turn.content,
+        parts: nonThoughtParts,
+      },
+    };
+  });
+}
+
+/**
  * Combines adjacent turns with the same role and removes empty turns.
  */
 function coalesce(history: HistoryTurn[]): HistoryTurn[] {
@@ -70,12 +103,16 @@ function coalesce(history: HistoryTurn[]): HistoryTurn[] {
   for (const turn of history) {
     if (!turn.content.parts || turn.content.parts.length === 0) continue;
 
-    const last = result[result.length - 1];
+    const lastIdx = result.length - 1;
+    const last = result[lastIdx];
     if (last && last.content.role === turn.content.role) {
-      last.content.parts = [
-        ...(last.content.parts || []),
-        ...(turn.content.parts || []),
-      ];
+      result[lastIdx] = {
+        id: last.id,
+        content: {
+          ...last.content,
+          parts: [...(last.content.parts || []), ...(turn.content.parts || [])],
+        },
+      };
     } else {
       // Shallow clone the turn and content so we don't mutate the original history array structure
       result.push({ id: turn.id, content: { ...turn.content } });
@@ -344,23 +381,73 @@ function enforceRoleConstraints(
  * This ensures compatibility with strict APIs (like Vertex AI) that reject unknown fields.
  */
 export function scrubHistory(history: HistoryTurn[]): HistoryTurn[] {
-  return history.map((turn) => ({
-    id: turn.id,
-    content: scrubContents([turn.content])[0],
-  }));
+  const result: HistoryTurn[] = [];
+  for (const turn of history) {
+    const nonThoughtParts = (turn.content.parts ?? []).filter(
+      (p) => p && !isInternalThought(p),
+    );
+    if (nonThoughtParts.length === 0) continue; // Skip turns that became empty
+
+    const scrubbedParts = nonThoughtParts.map((p) => scrubPart(p));
+
+    const lastIdx = result.length - 1;
+    const last = result[lastIdx];
+    if (last && last.content.role === turn.content.role) {
+      // Coalesce inline with strict immutability
+      result[lastIdx] = {
+        id: last.id,
+        content: {
+          ...last.content,
+          parts: [...(last.content.parts || []), ...scrubbedParts],
+        },
+      };
+    } else {
+      result.push({
+        id: turn.id,
+        content: {
+          role: turn.content.role,
+          parts: scrubbedParts,
+        },
+      });
+    }
+  }
+  return result;
 }
 
 /**
  * Deep-scrubs an array of Content objects to remove non-standard properties.
+ * Coalesces adjacent turns of the same role to preserve Gemini API alternation invariants.
  */
 export function scrubContents(contents: Content[]): Content[] {
-  return contents.map((content) => ({
-    role: content.role,
-    parts: (content.parts || []).map((p) => scrubPart(p)),
-  }));
+  const result: Content[] = [];
+  for (const content of contents) {
+    const nonThoughtParts = (content.parts ?? []).filter(
+      (p) => p && !isInternalThought(p),
+    );
+    if (nonThoughtParts.length === 0) continue; // Skip turns that became empty after thought stripping
+
+    const scrubbedParts = nonThoughtParts.map((p) => scrubPart(p));
+
+    const lastIdx = result.length - 1;
+    const last = result[lastIdx];
+    if (last && last.role === content.role) {
+      // Coalesce adjacent turns of the same role inline
+      result[lastIdx] = {
+        role: last.role,
+        parts: [...(last.parts || []), ...scrubbedParts],
+      };
+    } else {
+      result.push({
+        role: content.role,
+        parts: scrubbedParts,
+      });
+    }
+  }
+  return result;
 }
 
 interface ThoughtPart extends Part {
+  thought?: boolean;
   thoughtSignature?: string;
 }
 

@@ -9,6 +9,7 @@ import { promisify } from 'node:util';
 import { once } from 'node:events';
 import { debugLogger } from './debugLogger.js';
 import { coreEvents, CoreEvent, type EditorSelectedPayload } from './events.js';
+import { isHeadlessMode } from './headless.js';
 
 const GUI_EDITORS = [
   'vscode',
@@ -404,6 +405,13 @@ export async function openDiff(
   newPath: string,
   editor: EditorType,
 ): Promise<void> {
+  if (isHeadlessMode()) {
+    debugLogger.warn(
+      'External editor spawning is disabled in headless/server mode.',
+    );
+    return;
+  }
+
   const diffCommand = getDiffCommand(oldPath, newPath, editor);
   if (!diffCommand) {
     debugLogger.error('No diff tool available. Install a supported editor.');
