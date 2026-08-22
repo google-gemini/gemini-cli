@@ -32,6 +32,7 @@ export class WhisperTranscriptionProvider
 {
   private process: ChildProcessWithoutNullStreams | null = null;
   private currentTranscription = '';
+  private stdoutBuffer = '';
 
   constructor(private readonly options: WhisperProviderOptions) {
     super();
@@ -53,6 +54,7 @@ export class WhisperTranscriptionProvider
     const { modelPath, threads = 4, step = 0, length = 5000 } = this.options;
 
     this.currentTranscription = '';
+    this.stdoutBuffer = '';
 
     const available = await WhisperTranscriptionProvider.isAvailable();
     if (!available) {
@@ -74,7 +76,7 @@ export class WhisperTranscriptionProvider
         // whisper-stream -m <model_path> -t <threads> --step 0 --length <length> -vth 0.6
         // Setting step == 0 enables sliding window mode with VAD, which outputs
         // non-overlapping transcription blocks suitable for appending.
-        this.process = spawn('whisper-stream', [
+        const proc = spawn('whisper-stream', [
           '-m',
           modelPath,
           '-t',
@@ -86,13 +88,14 @@ export class WhisperTranscriptionProvider
           '-vth',
           '0.6',
         ]);
+        this.process = proc;
 
-        this.process.stdout.on('data', (data: Buffer) => {
+        proc.stdout.on('data', (data: Buffer) => {
           const output = data.toString();
           this.parseOutput(output);
         });
 
-        this.process.stderr.on('data', (data: Buffer) => {
+        proc.stderr.on('data', (data: Buffer) => {
           const msg = data.toString();
           if (msg.includes('error')) {
             debugLogger.error(`[WhisperTranscription] stderr: ${msg}`);
@@ -111,7 +114,7 @@ export class WhisperTranscriptionProvider
           }
         });
 
-        this.process.on('error', (err) => {
+        proc.on('error', (err) => {
           debugLogger.error('[WhisperTranscription] Process error:', err);
           this.emit('error', err);
           if (!isResolved) {
@@ -120,12 +123,18 @@ export class WhisperTranscriptionProvider
           }
         });
 
-        this.process.on('close', (code) => {
+        proc.on('close', (code) => {
           debugLogger.debug(
             `[WhisperTranscription] Process closed with code ${code}`,
           );
+          // Flush any remaining partial output
+          if (this.stdoutBuffer.trim()) {
+            this.parseOutput('', true);
+          }
           this.emit('close');
-          this.process = null;
+          if (this.process === proc) {
+            this.process = null;
+          }
         });
 
         // Fallback timeout in case "main: processing" is never seen
@@ -151,33 +160,47 @@ export class WhisperTranscriptionProvider
     });
   }
 
-  private parseOutput(output: string): void {
-    // whisper-stream output format: "[00:00:00.000 --> 00:00:02.000]   Hello world."
-    const lines = output.split('\n');
+  /**
+   * Parses stdout chunks from whisper-stream, buffering partial lines until a newline is received.
+   */
+  parseOutput(output: string, isFinal = false): void {
+    this.stdoutBuffer += output;
+    const lines = this.stdoutBuffer.split('\n');
+
+    if (isFinal) {
+      this.stdoutBuffer = '';
+    } else {
+      this.stdoutBuffer = lines.pop() ?? '';
+    }
 
     for (const line of lines) {
-      const match = line.match(/\[.* --> .*\]\s+(.*)/);
-      if (match && match[1]) {
-        let text = match[1].trim();
+      this.parseLine(line);
+    }
+  }
 
-        // Filter out [Silence], [music], (laughter), etc.
-        text = text
-          .replace(/\[[^\]]*\]/g, '')
-          .replace(/\([^)]*\)/g, '')
-          .trim();
+  private parseLine(line: string): void {
+    // whisper-stream output format: "[00:00:00.000 --> 00:00:02.000]   Hello world."
+    const match = line.match(/\[.* --> .*\]\s+(.*)/);
+    if (match && match[1]) {
+      let text = match[1].trim();
 
-        if (text) {
-          // In VAD mode (step=0), each line is a completed speech block.
-          // Append it to the buffer to ensure it doesn't disappear.
-          this.currentTranscription = this.currentTranscription
-            ? `${this.currentTranscription} ${text}`
-            : text;
+      // Filter out [Silence], [music], (laughter), etc.
+      text = text
+        .replace(/\[[^\]]*\]/g, '')
+        .replace(/\([^)]*\)/g, '')
+        .trim();
 
-          debugLogger.debug(
-            `[WhisperTranscription] Transcription updated (Local-VAD): "${this.currentTranscription}"`,
-          );
-          this.emit('transcription', this.currentTranscription);
-        }
+      if (text) {
+        // In VAD mode (step=0), each line is a completed speech block.
+        // Append it to the buffer to ensure it doesn't disappear.
+        this.currentTranscription = this.currentTranscription
+          ? `${this.currentTranscription} ${text}`
+          : text;
+
+        debugLogger.debug(
+          `[WhisperTranscription] Transcription updated (Local-VAD): "${this.currentTranscription}"`,
+        );
+        this.emit('transcription', this.currentTranscription);
       }
     }
   }
@@ -195,5 +218,6 @@ export class WhisperTranscriptionProvider
       this.process.kill('SIGTERM');
       this.process = null;
     }
+    this.stdoutBuffer = '';
   }
 }
