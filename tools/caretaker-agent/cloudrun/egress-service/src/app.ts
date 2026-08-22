@@ -6,25 +6,10 @@
 
 import express from 'express';
 import dotenv from 'dotenv';
-import {
-  isPubSubMessageEnvelope,
-  isEgressEvent,
-  type EgressEvent,
-} from './types.js';
+import { isPubSubMessageEnvelope, isEgressEvent } from './types.js';
+import { handleEgressEvent } from './actions/github.js';
 
 dotenv.config();
-
-/**
- * Top-down stub handler for Egress events.
- * Octokit GitHub REST API integration will be added in a follow-up PR.
- *
- * @param event - The validated EgressEvent object decoded from Pub/Sub push envelope.
- */
-export async function handleEgressEvent(event: EgressEvent): Promise<void> {
-  console.log(
-    `[EGRESS_STUB] Received ${event.action} event for ${event.payload.owner}/${event.payload.repo}#${event.payload.issueNumber}`,
-  );
-}
 
 export const app = express();
 app.use(express.json());
@@ -38,7 +23,11 @@ app.get('/', (_req, res) => {
   });
 });
 
-// Pub/Sub push subscription endpoint
+/**
+ * Pub/Sub push subscription endpoint.
+ * Note: Authentication is enforced by GCP Cloud Run IAM (`roles/run.invoker`)
+ * using GCP-managed OIDC bearer tokens on the Pub/Sub push subscription.
+ */
 app.post('/', async (req, res) => {
   if (!isPubSubMessageEnvelope(req.body)) {
     return res.status(400).send('Invalid Pub/Sub message envelope');

@@ -40,6 +40,7 @@ export interface ProQuotaDialogRequest {
   message: string;
   isTerminalQuotaError: boolean;
   isModelNotFoundError?: boolean;
+  isCapacityExceeded?: boolean;
   authType?: AuthType;
   resolve: (intent: FallbackIntent) => void;
 }

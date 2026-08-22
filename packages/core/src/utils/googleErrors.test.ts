@@ -445,4 +445,113 @@ describe('parseGoogleApiError', () => {
     expect(parsed?.code).toBe(429);
     expect(parsed?.message).toBe('Quota exceeded');
   });
+
+  it('should parse an error wrapped inside cause.message by gaxios', () => {
+    const mockError = {
+      code: 429,
+      status: 429,
+      cause: {
+        message: JSON.stringify([
+          {
+            error: {
+              code: 429,
+              message:
+                'No capacity available for model gemini-3.1-pro-preview on the server',
+              details: [
+                {
+                  '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+                  reason: 'MODEL_CAPACITY_EXHAUSTED',
+                  domain: 'cloudcode-pa.googleapis.com',
+                  metadata: { model: 'gemini-3.1-pro-preview' },
+                },
+              ],
+            },
+          },
+        ]),
+        code: 429,
+        status: 'Too Many Requests',
+      },
+    };
+
+    const parsed = parseGoogleApiError(mockError);
+    expect(parsed).not.toBeNull();
+    expect(parsed?.code).toBe(429);
+    expect(parsed?.message).toBe(
+      'No capacity available for model gemini-3.1-pro-preview on the server',
+    );
+    expect(parsed?.details).toHaveLength(1);
+    expect(parsed?.details[0]['@type']).toBe(
+      'type.googleapis.com/google.rpc.ErrorInfo',
+    );
+  });
+
+  it('should parse an error where cause is a plain ErrorShape and propagate outer code', () => {
+    const mockError = {
+      code: 429,
+      cause: {
+        message: 'Quota exceeded on the server',
+      },
+    };
+
+    const parsed = parseGoogleApiError(mockError);
+    expect(parsed).not.toBeNull();
+    expect(parsed?.code).toBe(429);
+    expect(parsed?.message).toBe('Quota exceeded on the server');
+  });
+
+  it('should parse an error where cause is a standard Error object and propagate outer status', () => {
+    const mockError = {
+      status: 503,
+      cause: new Error('Service Unavailable'),
+    };
+
+    const parsed = parseGoogleApiError(mockError);
+    expect(parsed).not.toBeNull();
+    expect(parsed?.code).toBe(503);
+    expect(parsed?.message).toBe('Service Unavailable');
+  });
+
+  it('should defensively parse numeric string status codes from outer error', () => {
+    const mockError = {
+      status: '503',
+      cause: new Error('Service Unavailable'),
+    };
+
+    const parsed = parseGoogleApiError(mockError);
+    expect(parsed).not.toBeNull();
+    expect(parsed?.code).toBe(503);
+    expect(parsed?.message).toBe('Service Unavailable');
+  });
+
+  it('should return null for non-numeric string status codes from outer error', () => {
+    const mockError = {
+      status: 'Too Many Requests',
+      cause: new Error('Quota exceeded'),
+    };
+
+    const parsed = parseGoogleApiError(mockError);
+    expect(parsed).toBeNull();
+  });
+
+  it('should return null for empty or whitespace-only string status codes from outer error', () => {
+    const mockError = {
+      status: '   ',
+      cause: new Error('Quota exceeded'),
+    };
+
+    const parsed = parseGoogleApiError(mockError);
+    expect(parsed).toBeNull();
+  });
+
+  it('should parse an error where cause is a plain string and propagate outer status', () => {
+    const mockError = {
+      status: 429,
+      cause: 'Quota exceeded on the server',
+    };
+
+    const parsed = parseGoogleApiError(mockError);
+    expect(parsed).not.toBeNull();
+    expect(parsed?.code).toBe(429);
+    expect(parsed?.message).toBe('Quota exceeded on the server');
+  });
 });
