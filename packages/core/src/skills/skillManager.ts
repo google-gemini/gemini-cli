@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Storage } from '../config/storage.js';
@@ -58,6 +59,10 @@ export class SkillManager {
   ): Promise<void> {
     this.clearSkills();
 
+    // Directories already scanned, tracked by their physical (real) path so
+    // that symlinked/junctioned aliases are not discovered twice.
+    const visitedDirs = new Set<string>();
+
     // 1. Built-in skills (lowest precedence)
     await this.discoverBuiltinSkills();
 
@@ -69,12 +74,16 @@ export class SkillManager {
     }
 
     // 3. User skills
-    const userSkills = await loadSkillsFromDir(Storage.getUserSkillsDir());
+    const userSkills = await this.loadSkillsFromUniqueDir(
+      Storage.getUserSkillsDir(),
+      visitedDirs,
+    );
     this.addSkillsWithPrecedence(userSkills);
 
     // 3.1 User agent skills alias (.agents/skills)
-    const userAgentSkills = await loadSkillsFromDir(
+    const userAgentSkills = await this.loadSkillsFromUniqueDir(
       Storage.getUserAgentSkillsDir(),
+      visitedDirs,
     );
     this.addSkillsWithPrecedence(userAgentSkills);
 
@@ -86,16 +95,45 @@ export class SkillManager {
       return;
     }
 
-    const projectSkills = await loadSkillsFromDir(
+    const projectSkills = await this.loadSkillsFromUniqueDir(
       storage.getProjectSkillsDir(),
+      visitedDirs,
     );
     this.addSkillsWithPrecedence(projectSkills);
 
     // 4.1 Workspace agent skills alias (.agents/skills)
-    const projectAgentSkills = await loadSkillsFromDir(
+    const projectAgentSkills = await this.loadSkillsFromUniqueDir(
       storage.getProjectAgentSkillsDir(),
+      visitedDirs,
     );
     this.addSkillsWithPrecedence(projectAgentSkills);
+  }
+
+  /**
+   * Loads skills from a directory unless it resolves to a physical directory
+   * that was already scanned. This prevents duplicate skill warnings when
+   * e.g. `.gemini` is a symlink or Windows junction pointing at `.agents`
+   * (or vice versa), which would otherwise cause the same skills to be
+   * discovered once per alias path.
+   */
+  private async loadSkillsFromUniqueDir(
+    dir: string,
+    visitedDirs: Set<string>,
+  ): Promise<SkillDefinition[]> {
+    let realDir = path.resolve(dir);
+    try {
+      realDir = await fs.realpath(realDir);
+    } catch {
+      // The directory may not exist; fall back to the resolved path.
+    }
+    if (visitedDirs.has(realDir)) {
+      debugLogger.debug(
+        `Skipping skill discovery for "${dir}": it resolves to "${realDir}", which has already been scanned.`,
+      );
+      return [];
+    }
+    visitedDirs.add(realDir);
+    return loadSkillsFromDir(dir);
   }
 
   /**
