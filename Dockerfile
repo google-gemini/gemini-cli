@@ -1,5 +1,5 @@
 # ---- Stage 1: Builder ----
-FROM docker.io/library/node:20-slim AS builder
+FROM docker.io/library/node:22-slim AS builder
 
 # Install git (needed by generate-git-commit-info.js script)
 RUN apt-get update && apt-get install -y --no-install-recommends git \
@@ -39,7 +39,7 @@ RUN HUSKY=0 npm run build && \
     npm pack -w packages/cli --pack-destination packages/cli/dist/
 
 # ---- Stage 2: Runtime ----
-FROM docker.io/library/node:20-slim
+FROM docker.io/library/node:22-slim
 
 ARG SANDBOX_NAME="gemini-cli-sandbox"
 ARG CLI_VERSION_ARG
