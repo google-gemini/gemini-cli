@@ -1,0 +1,13 @@
+{
+  "name": "gbr",
+  "version": "0.6.1",
+  "description": "Pair a phone running Build Remote Agent to this Gemini CLI session (spectator). Protocol gbr/1. Not affiliated with xAI or SpaceX.",
+  "mcpServers": {
+    "gbr": {
+      "command": "node",
+      "args": [
+        "/ABS/PATH/GrokBuildRemote-Agents/mcp/gbr-mcp/bin/gbr-mcp.js"
+      ]
+    }
+  }
+}
