@@ -489,6 +489,49 @@ describe('Session Cleanup (Refactored)', () => {
       );
     });
 
+    it('should not delete an unrelated recent session whose shortId collides with an expired session', async () => {
+      const now = new Date();
+      const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+      // Expired session with shortId "deadbeef".
+      await writeSessionFile({
+        id: 'deadbeef-expired-session-uuid',
+        fileName: 'session-20250110-deadbeef.json',
+        lastUpdated: twoWeeksAgo.toISOString(),
+      });
+      await writeArtifacts('deadbeef-expired-session-uuid');
+
+      // Unrelated RECENT session that happens to share the same 8-character
+      // filename suffix (32-bit collision) but is not expired.
+      await writeSessionFile({
+        id: 'deadbeef-unrelated-recent-uuid',
+        fileName: 'session-20260820-deadbeef.json',
+        lastUpdated: now.toISOString(),
+      });
+      await writeArtifacts('deadbeef-unrelated-recent-uuid');
+
+      const config = createMockConfig();
+      const settings: Settings = {
+        general: { sessionRetention: { enabled: true, maxAge: '10d' } },
+      };
+
+      const result = await cleanupExpiredSessions(config, settings);
+
+      // Only the expired file is deleted; the recent colliding file survives.
+      expect(result.deleted).toBe(1);
+      expect(
+        existsSync(path.join(chatsDir, 'session-20250110-deadbeef.json')),
+      ).toBe(false);
+      expect(
+        existsSync(path.join(chatsDir, 'session-20260820-deadbeef.json')),
+      ).toBe(true);
+      expect(
+        existsSync(
+          path.join(logsDir, 'session-deadbeef-unrelated-recent-uuid.jsonl'),
+        ),
+      ).toBe(true);
+    });
+
     it('should delete corrupted session files', async () => {
       // Write a corrupted file (invalid JSON)
       const corruptPath = path.join(chatsDir, 'session-corrupt.json');

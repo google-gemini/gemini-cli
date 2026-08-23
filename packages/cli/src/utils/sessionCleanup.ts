@@ -9,7 +9,6 @@ import * as path from 'node:path';
 import {
   debugLogger,
   sanitizeFilenamePart,
-  SESSION_FILE_PREFIX,
   Storage,
   TOOL_OUTPUTS_DIR,
   type Config,
@@ -28,12 +27,6 @@ const MULTIPLIERS = {
   w: 7 * 24 * 60 * 60 * 1000, // weeks to ms
   m: 30 * 24 * 60 * 60 * 1000, // months (30 days) to ms
 };
-
-/**
- * Matches a trailing hyphen followed by exactly 8 alphanumeric characters before the .json or .jsonl extension.
- * Example: session-20250110-abcdef12.json -> captures "abcdef12"
- */
-const SHORT_ID_REGEX = /-([a-zA-Z0-9]{8})\.jsonl?$/;
 
 function hasProperty<T extends string>(
   obj: unknown,
@@ -69,17 +62,56 @@ export interface CleanupResult {
  */
 
 /**
- * Derives an 8-character shortId from a session filename.
+ * Recovers the full session id from a session file's contents.
+ *
+ * Used for files whose metadata could not be parsed during the directory scan
+ * (subagent transcripts, corrupted or legacy records) so that their associated
+ * artifacts can still be cleaned up after the file itself is removed.
  */
-function deriveShortIdFromFileName(fileName: string): string | null {
-  if (
-    fileName.startsWith(SESSION_FILE_PREFIX) &&
-    (fileName.endsWith('.json') || fileName.endsWith('.jsonl'))
-  ) {
-    const match = fileName.match(SHORT_ID_REGEX);
-    return match ? match[1] : null;
+async function readFullSessionIdFromFile(
+  filePath: string,
+): Promise<string | undefined> {
+  try {
+    // Try reading just the first line first (jsonl records).
+    const CHUNK_SIZE = 4096;
+    const buffer = Buffer.alloc(CHUNK_SIZE);
+    let fd: fs.FileHandle | undefined;
+    try {
+      fd = await fs.open(filePath, 'r');
+      const { bytesRead } = await fd.read(buffer, 0, CHUNK_SIZE, 0);
+      if (bytesRead > 0) {
+        const contentChunk = buffer.toString('utf8', 0, bytesRead);
+        const newlineIndex = contentChunk.indexOf('\n');
+        const firstLine =
+          newlineIndex !== -1
+            ? contentChunk.substring(0, newlineIndex)
+            : contentChunk;
+
+        try {
+          const record: unknown = JSON.parse(firstLine);
+          if (isSessionIdRecord(record)) {
+            return record.sessionId;
+          }
+        } catch {
+          // Ignore first line parse error, try full parse for legacy pretty-printed JSON
+        }
+      }
+    } finally {
+      if (fd !== undefined) {
+        await fd.close();
+      }
+    }
+
+    // Fall back to parsing the whole file.
+    const fileContent = await fs.readFile(filePath, 'utf8');
+    const content: unknown = JSON.parse(fileContent);
+    if (isSessionIdRecord(content)) {
+      return content.sessionId;
+    }
+  } catch {
+    // If read/parse fails, no session id can be recovered.
   }
-  return null;
+  return undefined;
 }
 
 /**
@@ -144,119 +176,38 @@ export async function cleanupExpiredSessions(
       retentionConfig,
     );
 
-    const processedShortIds = new Set<string>();
-
-    // Delete all sessions that need to be deleted
+    // Delete all sessions that need to be deleted.
+    //
+    // Only files that were *independently selected* by the retention policy
+    // (expired, count-exceeded, corrupted, or subagent transcripts) are
+    // removed here. A filename shortId is NOT treated as proof of ownership:
+    // eight hex characters collide easily, so sweeping every file that shares
+    // an expired session's suffix could delete unrelated, non-expired
+    // sessions (see #28643).
     for (const sessionToDelete of sessionsToDelete) {
       try {
-        const shortId = deriveShortIdFromFileName(sessionToDelete.fileName);
+        const filePath = path.join(chatsDir, sessionToDelete.fileName);
 
-        if (shortId) {
-          if (processedShortIds.has(shortId)) {
-            continue;
-          }
-          processedShortIds.add(shortId);
-
-          const matchingFiles = allFiles
-            .map((f) => f.fileName)
-            .filter(
-              (f) =>
-                f.startsWith(SESSION_FILE_PREFIX) &&
-                (f.endsWith(`-${shortId}.json`) ||
-                  f.endsWith(`-${shortId}.jsonl`)),
-            );
-
-          for (const file of matchingFiles) {
-            const filePath = path.join(chatsDir, file);
-            let fullSessionId: string | undefined;
-
-            try {
-              // Try to read file to get full sessionId
-              try {
-                const CHUNK_SIZE = 4096;
-                const buffer = Buffer.alloc(CHUNK_SIZE);
-                let fd: fs.FileHandle | undefined;
-                try {
-                  fd = await fs.open(filePath, 'r');
-                  const { bytesRead } = await fd.read(buffer, 0, CHUNK_SIZE, 0);
-                  if (bytesRead > 0) {
-                    const contentChunk = buffer.toString('utf8', 0, bytesRead);
-                    const newlineIndex = contentChunk.indexOf('\n');
-                    const firstLine =
-                      newlineIndex !== -1
-                        ? contentChunk.substring(0, newlineIndex)
-                        : contentChunk;
-
-                    try {
-                      const record: unknown = JSON.parse(firstLine);
-                      if (isSessionIdRecord(record)) {
-                        fullSessionId = record.sessionId;
-                      }
-                    } catch {
-                      // Ignore first line parse error, try full parse for legacy pretty-printed JSON
-                    }
-                  }
-                } finally {
-                  if (fd !== undefined) {
-                    await fd.close();
-                  }
-                }
-
-                if (!fullSessionId) {
-                  const fileContent = await fs.readFile(filePath, 'utf8');
-                  const content: unknown = JSON.parse(fileContent);
-                  if (isSessionIdRecord(content)) {
-                    fullSessionId = content.sessionId;
-                  }
-                }
-              } catch {
-                // If read/parse fails, skip getting sessionId, just delete the file below
-              }
-
-              // Delete the session file
-              if (!fullSessionId || fullSessionId !== config.getSessionId()) {
-                await fs.unlink(filePath);
-
-                if (fullSessionId) {
-                  await cleanupSessionAndSubagentsAsync(fullSessionId, config);
-                }
-                result.deleted++;
-              } else {
-                result.skipped++;
-              }
-            } catch (error) {
-              // Ignore ENOENT (file already deleted)
-              if (
-                error instanceof Error &&
-                'code' in error &&
-                error.code === 'ENOENT'
-              ) {
-                // File already deleted, do nothing.
-              } else {
-                debugLogger.warn(
-                  `Failed to delete matching file ${file}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-                );
-                result.failed++;
-              }
-            }
-          }
-        } else {
-          // Fallback to old logic
-          const sessionPath = path.join(chatsDir, sessionToDelete.fileName);
-          await fs.unlink(sessionPath);
-
-          const sessionId = sessionToDelete.sessionInfo?.id;
-          if (sessionId) {
-            await cleanupSessionAndSubagentsAsync(sessionId, config);
-          }
-
-          if (config.getDebugMode()) {
-            debugLogger.debug(
-              `Deleted fallback session: ${sessionToDelete.fileName}`,
-            );
-          }
-          result.deleted++;
+        let fullSessionId: string | undefined = sessionToDelete.sessionInfo?.id;
+        if (!fullSessionId) {
+          fullSessionId = await readFullSessionIdFromFile(filePath);
         }
+
+        // Never delete the active session's files.
+        if (fullSessionId && fullSessionId === config.getSessionId()) {
+          continue;
+        }
+
+        await fs.unlink(filePath);
+
+        if (fullSessionId) {
+          await cleanupSessionAndSubagentsAsync(fullSessionId, config);
+        }
+
+        if (config.getDebugMode()) {
+          debugLogger.debug(`Deleted session: ${sessionToDelete.fileName}`);
+        }
+        result.deleted++;
       } catch (error) {
         // Ignore ENOENT (file already deleted)
         if (
@@ -264,14 +215,10 @@ export async function cleanupExpiredSessions(
           'code' in error &&
           error.code === 'ENOENT'
         ) {
-          // File already deleted
+          // File already deleted, do nothing.
         } else {
-          const sessionId =
-            sessionToDelete.sessionInfo === null
-              ? sessionToDelete.fileName
-              : sessionToDelete.sessionInfo.id;
           debugLogger.warn(
-            `Failed to delete session ${sessionId}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            `Failed to delete matching file ${sessionToDelete.fileName}: ${error instanceof Error ? error.message : 'Unknown error'}`,
           );
           result.failed++;
         }
