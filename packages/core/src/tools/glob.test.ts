@@ -454,6 +454,76 @@ describe('GlobTool', () => {
   });
 });
 
+describe.skipIf(process.platform === 'win32')(
+  'GlobTool with a symlinked workspace root',
+  () => {
+    let tempDir: string;
+    let realRootDir: string;
+    let symlinkedRootDir: string;
+    let globTool: GlobTool;
+    const abortSignal = new AbortController().signal;
+
+    beforeEach(async () => {
+      tempDir = await fs.realpath(
+        await fs.mkdtemp(path.join(os.tmpdir(), 'glob-tool-symlink-')),
+      );
+      realRootDir = path.join(tempDir, 'real-root');
+      symlinkedRootDir = path.join(tempDir, 'symlinked-root');
+      await fs.mkdir(path.join(realRootDir, 'sub'), { recursive: true });
+      await fs.writeFile(
+        path.join(realRootDir, 'sub', 'fileA.txt'),
+        'contentA',
+      );
+      await fs.symlink(realRootDir, symlinkedRootDir, 'dir');
+
+      // Mirrors production: the target directory is the path the user launched
+      // with, while WorkspaceContext stores its realpath-resolved form.
+      const workspaceContext = createMockWorkspaceContext(symlinkedRootDir);
+      const mockConfig = {
+        getTargetDir: () => symlinkedRootDir,
+        getWorkspaceContext: () => workspaceContext,
+        getFileService: () => new FileDiscoveryService(realRootDir),
+        getFileFilteringOptions: () => DEFAULT_FILE_FILTERING_OPTIONS,
+        getFileExclusions: () => ({ getGlobExcludes: () => [] }),
+        storage: {
+          getProjectTempDir: vi.fn().mockReturnValue(path.join(tempDir, 'tmp')),
+        },
+        isPathAllowed: () => true,
+        validatePathAccess: () => null,
+      } as unknown as Config;
+
+      globTool = new GlobTool(mockConfig, createMockMessageBus());
+    });
+
+    afterEach(async () => {
+      await fs.rm(tempDir, { recursive: true, force: true });
+      vi.resetAllMocks();
+    });
+
+    it('should return matches as canonical paths', async () => {
+      const params: GlobToolParams = { pattern: '**/*.txt' };
+      const invocation = globTool.build(params);
+      const result = await invocation.execute({ abortSignal });
+
+      expect(result.llmContent).toContain('Found 1 file(s)');
+      expect(result.llmContent).toContain(
+        path.join(realRootDir, 'sub', 'fileA.txt'),
+      );
+    }, 30000);
+
+    it('should return matches as canonical paths when dir_path is given', async () => {
+      const params: GlobToolParams = { pattern: '*.txt', dir_path: 'sub' };
+      const invocation = globTool.build(params);
+      const result = await invocation.execute({ abortSignal });
+
+      expect(result.llmContent).toContain('Found 1 file(s)');
+      expect(result.llmContent).toContain(
+        path.join(realRootDir, 'sub', 'fileA.txt'),
+      );
+    }, 30000);
+  },
+);
+
 describe('sortFileEntries', () => {
   const now = 1000000;
   const threshold = 10000;

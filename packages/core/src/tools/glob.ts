@@ -235,7 +235,7 @@ class GlobToolInvocation extends BaseToolInvocation<
         });
 
       const filteredAbsolutePaths = new Set(
-        filteredPaths.map((p) => path.resolve(this.config.getTargetDir(), p)),
+        filteredPaths.map((p) => path.resolve(realTargetDir, p)),
       );
 
       const filteredEntries = allEntries.filter((entry) =>
