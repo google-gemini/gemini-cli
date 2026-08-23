@@ -447,6 +447,53 @@ describe('oauth-flow', () => {
         vi.useRealTimers();
       }
     });
+
+    it('should clear the callback timeout after a successful flow', async () => {
+      const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
+      const server = startCallbackServer('cleanup-state');
+      const port = await server.port;
+
+      await realFetch(
+        `http://localhost:${port}${REDIRECT_PATH}?code=abc&state=cleanup-state`,
+      );
+      await server.response;
+
+      // The timer must be released once the flow has settled; otherwise the
+      // retained closure keeps server/promise state alive for five minutes.
+      // server 'close' only fires after keep-alive sockets drain, so allow
+      // extra time beyond undici's default idle window.
+      await vi.waitFor(() => expect(clearTimeoutSpy).toHaveBeenCalled(), {
+        timeout: 10000,
+        interval: 100,
+      });
+
+      clearTimeoutSpy.mockRestore();
+    }, 20000);
+
+    it('should clear the callback timeout when the flow fails with an OAuth error', async () => {
+      const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
+      const server = startCallbackServer('cleanup-error-state');
+      const port = await server.port;
+
+      const responseResult = server.response.then(
+        () => new Error('Expected rejection'),
+        (e: Error) => e,
+      );
+
+      await realFetch(
+        `http://localhost:${port}${REDIRECT_PATH}?error=access_denied&error_description=User+denied`,
+      ).catch(() => {
+        // Connection may be reset by server closing — expected
+      });
+
+      await responseResult;
+      await vi.waitFor(() => expect(clearTimeoutSpy).toHaveBeenCalled(), {
+        timeout: 10000,
+        interval: 100,
+      });
+
+      clearTimeoutSpy.mockRestore();
+    }, 20000);
   });
 
   describe('exchangeCodeForToken', () => {

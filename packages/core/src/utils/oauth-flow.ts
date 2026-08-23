@@ -279,6 +279,13 @@ export function startCallbackServer(
       abortController.signal.addEventListener('abort', onAbort, { once: true });
 
       server.on('close', () => {
+        // Idempotent terminal-path cleanup: whatever caused the flow to end
+        // (success, OAuth error, state mismatch, parser error, or timeout),
+        // make sure no stale timer callback outlives the settled flow.
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = undefined;
+        }
         abortController.signal.removeEventListener('abort', onAbort);
       });
     },
