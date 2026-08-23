@@ -230,6 +230,17 @@ export async function processImports(
       filePath: string,
       depth: number,
     ) {
+      // Honor the same max depth limit as the tree format. Use `>` so the
+      // file at depth == maxDepth is included with unresolved imports.
+      if (depth > importState.maxDepth) {
+        if (debugMode) {
+          logger.warn(
+            `Maximum import depth (${importState.maxDepth}) reached at ${filePath}. Stopping flat import processing.`,
+          );
+        }
+        return;
+      }
+
       // Normalize the file path to ensure consistent comparison
       const normalizedPath = path.normalize(filePath);
 
@@ -299,7 +310,8 @@ export async function processImports(
     const rootPath = path.normalize(
       importState.currentFile || path.resolve(basePath),
     );
-    await processFlat(content, basePath, rootPath, 0);
+    // Budget from the same origin as tree mode (not a fresh 0).
+    await processFlat(content, basePath, rootPath, importState.currentDepth);
 
     // Concatenate all unique files in order, Claude-style
     const flatContent = flatFiles

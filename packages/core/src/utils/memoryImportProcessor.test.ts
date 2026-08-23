@@ -695,6 +695,60 @@ describe('memoryImportProcessor', () => {
       expect(result.content).toContain('A @./b.md');
       expect(result.content).toContain('B content');
     });
+
+    it('flat format honors maxDepth=5 exactly like tree format', async () => {
+      const projectRoot = testPath('test', 'project');
+      const basePath = testPath(projectRoot, 'src');
+      const N = 12;
+      const files = new Map<string, string>();
+      for (let i = 0; i < N; i++) {
+        const next = i + 1 < N ? ` @f${i + 1}.md` : '';
+        files.set(
+          path.resolve(basePath, `f${i}.md`),
+          `CONTENT-F${i}${next}\n`,
+        );
+      }
+
+      mockedFs.access.mockResolvedValue(undefined);
+      mockedFs.readFile.mockImplementation(async (file: unknown) => {
+        const content = files.get(path.resolve(String(file)));
+        if (content === undefined) {
+          throw new Error(`File not found: ${String(file)}`);
+        }
+        return content;
+      });
+
+      const root = files.get(path.resolve(basePath, 'f0.md'))!;
+      const tree = await processImports(
+        root,
+        basePath,
+        false,
+        undefined,
+        projectRoot,
+        'tree',
+      );
+      const flat = await processImports(
+        root,
+        basePath,
+        false,
+        undefined,
+        projectRoot,
+        'flat',
+      );
+
+      const uniqueFiles = (content: string) =>
+        [...new Set(content.match(/CONTENT-F\d+/g) ?? [])].sort();
+      const expected = [
+        'CONTENT-F0',
+        'CONTENT-F1',
+        'CONTENT-F2',
+        'CONTENT-F3',
+        'CONTENT-F4',
+        'CONTENT-F5',
+      ];
+      expect(uniqueFiles(tree.content)).toEqual(expected);
+      expect(uniqueFiles(flat.content)).toEqual(expected);
+    });
   });
 
   describe('validateImportPath', () => {
