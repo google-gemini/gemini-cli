@@ -87,13 +87,22 @@ export function isBinary(
 
 /**
  * Detects the line ending style of a string.
+ *
+ * This is purity-based: '\r\n' is only reported when every newline in the
+ * content is part of a CRLF pair. A file that is mostly LF but happens to
+ * contain a single stray CRLF (e.g. a pasted Windows snippet, or a partial
+ * line-ending conversion) is treated as LF, not CRLF. This matters because
+ * callers use the result to decide whether to rewrite every line ending in
+ * the file - misclassifying one stray CRLF as "this is a CRLF file" would
+ * silently convert every LF line to CRLF on the next unrelated edit.
  * @param content The string content to analyze.
- * @returns '\r\n' for Windows-style, '\n' for Unix-style.
+ * @returns '\r\n' only if CRLF is the sole newline style present, '\n' otherwise
+ *   (including for mixed-ending content, which is left untouched by callers).
  */
 export function detectLineEnding(content: string): '\r\n' | '\n' {
-  // If a Carriage Return is found, assume Windows-style endings.
-  // This is a simple but effective heuristic.
-  return content.includes('\r\n') ? '\r\n' : '\n';
+  const crlfCount = (content.match(/\r\n/g) || []).length;
+  const totalNewlines = (content.match(/\n/g) || []).length;
+  return totalNewlines > 0 && crlfCount === totalNewlines ? '\r\n' : '\n';
 }
 
 /**

@@ -154,6 +154,21 @@ describe('Line Ending Preservation', () => {
       expect(detectLineEnding('line1\n')).toBe('\n');
       expect(detectLineEnding('line1')).toBe('\n'); // Default to LF if no newline
     });
+
+    it('should treat a mostly-LF file with a single stray CRLF as LF', () => {
+      // A predominantly Unix-style file that picked up one pasted
+      // Windows-style line (e.g. a partial conversion, or a snippet
+      // pasted from a Windows editor) must not be classified as CRLF,
+      // otherwise a single-line edit will rewrite every line ending in
+      // the file.
+      const mostlyLfOneStrayCrlf = 'line1\nline2\r\nline3\nline4\n';
+      expect(detectLineEnding(mostlyLfOneStrayCrlf)).toBe('\n');
+    });
+
+    it('should still detect a pure CRLF file as CRLF (no regression)', () => {
+      const pureCrlf = 'line1\r\nline2\r\nline3\r\n';
+      expect(detectLineEnding(pureCrlf)).toBe('\r\n');
+    });
   });
 
   describe('WriteFileTool', () => {
@@ -270,6 +285,50 @@ describe('Line Ending Preservation', () => {
       const writtenContent = fs.readFileSync(filePath, 'utf8');
 
       expect(writtenContent).toBe('line1\r\nmodified\r\nline3\r\n');
+    });
+
+    it('should NOT convert a mostly-LF file to CRLF because of one stray CRLF line', async () => {
+      const filePath = path.join(rootDir, 'edit_mixed.txt');
+      // Mostly LF, with a single pasted Windows-style line mixed in -
+      // e.g. a snippet copied from a Windows editor, or a partial
+      // line-ending conversion that missed one line.
+      const originalContent = 'line1\nline2\r\nline3\nline4\n';
+      fs.writeFileSync(filePath, Buffer.from(originalContent));
+
+      const oldString = 'line4';
+      const newString = 'modified';
+
+      const params = {
+        file_path: filePath,
+        old_string: oldString,
+        new_string: newString,
+        instruction: 'Change line4 to modified',
+      };
+      const invocation = tool.build(params);
+
+      // Force approval
+      const confirmDetails = await invocation.shouldConfirmExecute(abortSignal);
+      if (
+        confirmDetails &&
+        typeof confirmDetails === 'object' &&
+        'onConfirm' in confirmDetails
+      ) {
+        await confirmDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce);
+      }
+
+      await invocation.execute({ abortSignal });
+
+      const writtenContent = fs.readFileSync(filePath, 'utf8');
+
+      // The file must not be silently converted wholesale to CRLF just
+      // because it contained a single stray CRLF line. The tool already
+      // normalizes all line endings to LF internally before applying an
+      // edit (see calculateEdit in edit.ts); with the file correctly
+      // classified as LF, that normalization is never re-inflated back
+      // to CRLF, so the result stays LF throughout. Before the fix, this
+      // file was misclassified as CRLF and every line - including the
+      // untouched line1 and line3 - was rewritten to CRLF.
+      expect(writtenContent).toBe('line1\nline2\nline3\nmodified\n');
     });
   });
 });
