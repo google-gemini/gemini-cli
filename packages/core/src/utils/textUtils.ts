@@ -95,14 +95,17 @@ export function isBinary(
  * callers use the result to decide whether to rewrite every line ending in
  * the file - misclassifying one stray CRLF as "this is a CRLF file" would
  * silently convert every LF line to CRLF on the next unrelated edit.
+ *
+ * Implemented as a single existence check plus a single negative-lookbehind
+ * test (no counting, no intermediate match arrays) so it stays O(N) time and
+ * O(1) space on large files: content is CRLF-only exactly when it contains
+ * at least one '\n' and every '\n' is preceded by '\r'.
  * @param content The string content to analyze.
  * @returns '\r\n' only if CRLF is the sole newline style present, '\n' otherwise
  *   (including for mixed-ending content, which is left untouched by callers).
  */
 export function detectLineEnding(content: string): '\r\n' | '\n' {
-  const crlfCount = (content.match(/\r\n/g) || []).length;
-  const totalNewlines = (content.match(/\n/g) || []).length;
-  return totalNewlines > 0 && crlfCount === totalNewlines ? '\r\n' : '\n';
+  return content.includes('\n') && !/(?<!\r)\n/.test(content) ? '\r\n' : '\n';
 }
 
 /**

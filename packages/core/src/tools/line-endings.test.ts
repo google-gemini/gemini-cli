@@ -169,6 +169,15 @@ describe('Line Ending Preservation', () => {
       const pureCrlf = 'line1\r\nline2\r\nline3\r\n';
       expect(detectLineEnding(pureCrlf)).toBe('\r\n');
     });
+
+    it('should treat lone CR (old-Mac style, no \\n at all) as LF', () => {
+      // A file using bare '\r' as its line separator (classic Mac OS,
+      // pre-OS X) contains no '\n' characters whatsoever, so it can't be
+      // CRLF and falls back to LF - matching the old counting
+      // implementation, which also returned '\n' here (totalNewlines === 0).
+      const loneCr = 'line1\rline2\rline3\r';
+      expect(detectLineEnding(loneCr)).toBe('\n');
+    });
   });
 
   describe('WriteFileTool', () => {
