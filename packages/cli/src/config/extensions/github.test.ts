@@ -631,6 +631,84 @@ describe('github.ts', () => {
         expect.anything(),
       );
     });
+
+    it('should reject and remove the partial file when the response stream errors', async () => {
+      const mockReq = new EventEmitter();
+      const mockRes =
+        new EventEmitter() as unknown as import('node:http').IncomingMessage;
+      Object.assign(mockRes, {
+        statusCode: 200,
+        pipe: vi.fn(),
+        destroy: vi.fn(),
+      });
+
+      vi.mocked(https.get).mockImplementation((url, options, cb) => {
+        if (typeof options === 'function') {
+          cb = options;
+        }
+        if (cb) cb(mockRes);
+        return mockReq as unknown as import('node:http').ClientRequest;
+      });
+
+      const mockStream = new EventEmitter() as unknown as fs.WriteStream;
+      Object.assign(mockStream, { close: vi.fn(), destroy: vi.fn() });
+      vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
+
+      const promise = downloadFile('url', '/dest');
+      mockRes.emit('error', new Error('connection reset mid-transfer'));
+
+      await expect(promise).rejects.toThrow('connection reset mid-transfer');
+      expect(fs.unlink).toHaveBeenCalledWith('/dest', expect.any(Function));
+    });
+
+    it('should reject exactly once and remove the partial file when the write stream errors', async () => {
+      const mockReq = new EventEmitter();
+      const mockRes =
+        new EventEmitter() as unknown as import('node:http').IncomingMessage;
+      Object.assign(mockRes, { statusCode: 200, pipe: vi.fn() });
+
+      vi.mocked(https.get).mockImplementation((url, options, cb) => {
+        if (typeof options === 'function') {
+          cb = options;
+        }
+        if (cb) cb(mockRes);
+        return mockReq as unknown as import('node:http').ClientRequest;
+      });
+
+      const mockStream = new EventEmitter() as unknown as fs.WriteStream;
+      Object.assign(mockStream, { close: vi.fn(), destroy: vi.fn() });
+      vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
+
+      const promise = downloadFile('url', '/dest');
+      // Simulate a disk-full style failure on the destination file.
+      mockStream.emit('error', new Error('ENOSPC: no space left on device'));
+
+      await expect(promise).rejects.toThrow('ENOSPC');
+      expect(fs.unlink).toHaveBeenCalledWith('/dest', expect.any(Function));
+      // A second failure must not cause an unhandled rejection.
+      mockStream.emit('error', new Error('second error'));
+    });
+
+    it('should not remove pre-existing files when the failure happens before writing starts', async () => {
+      const mockReq = new EventEmitter();
+      const mockRes =
+        new EventEmitter() as unknown as import('node:http').IncomingMessage;
+      Object.assign(mockRes, { statusCode: 404 });
+
+      vi.mocked(https.get).mockImplementation((url, options, cb) => {
+        if (typeof options === 'function') {
+          cb = options;
+        }
+        if (cb) cb(mockRes);
+        return mockReq as unknown as import('node:http').ClientRequest;
+      });
+
+      await expect(downloadFile('url', '/dest')).rejects.toThrow(
+        'Request failed with status code 404',
+      );
+      expect(fs.createWriteStream).not.toHaveBeenCalledWith('/dest');
+      expect(fs.unlink).not.toHaveBeenCalledWith('/dest', expect.anything());
+    });
   });
 
   describe('extractFile', () => {

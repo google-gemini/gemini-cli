@@ -532,33 +532,66 @@ export async function downloadFile(
   }
 
   return new Promise((resolve, reject) => {
+    let settled = false;
+    // Only true once the destination write stream has been created, so that
+    // cleanup never removes an unrelated pre-existing file.
+    let startedWriting = false;
+
+    const succeed = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+
+    const fail = (err: Error) => {
+      if (settled) return;
+      settled = true;
+      if (startedWriting) {
+        // Best-effort removal of the partial download.
+        fs.unlink(dest, () => {});
+      }
+      reject(err);
+    };
+
     https
       .get(url, { headers }, (res) => {
         if (res.statusCode === 302 || res.statusCode === 301) {
           if (redirectCount >= 10) {
-            return reject(new Error('Too many redirects'));
+            return fail(new Error('Too many redirects'));
           }
 
           if (!res.headers.location) {
-            return reject(
-              new Error('Redirect response missing Location header'),
-            );
+            return fail(new Error('Redirect response missing Location header'));
           }
           downloadFile(res.headers.location, dest, options, redirectCount + 1)
-            .then(resolve)
-            .catch(reject);
+            .then(succeed)
+            .catch(fail);
           return;
         }
         if (res.statusCode !== 200) {
-          return reject(
+          return fail(
             new Error(`Request failed with status code ${res.statusCode}`),
           );
         }
         const file = fs.createWriteStream(dest);
+        startedWriting = true;
+
+        const abortDownload = (err: Error) => {
+          res.destroy?.();
+          file.destroy?.();
+          fail(err);
+        };
+
+        // Handle failures on either stream: the request-level handler below
+        // only covers errors emitted by https.get() itself, not errors that
+        // occur mid-transfer (e.g. ENOSPC/EACCES on the destination file).
+        res.on('error', abortDownload);
+        file.on('error', abortDownload);
+
         res.pipe(file);
-        file.on('finish', () => file.close(resolve as () => void));
+        file.on('finish', () => file.close(succeed));
       })
-      .on('error', reject);
+      .on('error', fail);
   });
 }
 
