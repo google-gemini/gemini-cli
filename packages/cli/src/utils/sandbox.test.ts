@@ -1181,5 +1181,102 @@ describe('sandbox', () => {
         expect.objectContaining({ stdio: 'inherit' }),
       );
     });
+
+    it.each([
+      { debugValue: 'false', shouldPublish: false },
+      { debugValue: '0', shouldPublish: false },
+      { debugValue: 'true', shouldPublish: true },
+      { debugValue: '1', shouldPublish: true },
+    ])(
+      'should publish debug port: $shouldPublish when DEBUG=$debugValue',
+      async ({ debugValue, shouldPublish }) => {
+        process.env['DEBUG'] = debugValue;
+        const config: SandboxConfig = createMockSandboxConfig({
+          command: 'docker',
+          image: 'gemini-cli-sandbox',
+        });
+
+        interface MockProcessWithStdout extends EventEmitter {
+          stdout: EventEmitter;
+        }
+        const mockImageCheckProcess =
+          new EventEmitter() as MockProcessWithStdout;
+        mockImageCheckProcess.stdout = new EventEmitter();
+        vi.mocked(spawn).mockImplementationOnce(() => {
+          setTimeout(() => {
+            mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+            mockImageCheckProcess.emit('close', 0);
+          }, 1);
+          return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+        });
+
+        const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+          typeof spawn
+        >;
+        mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+          if (event === 'close') {
+            setTimeout(() => cb(0), 10);
+          }
+          return mockSpawnProcess;
+        });
+        vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+        await start_sandbox(config, [], undefined, ['arg1']);
+
+        const dockerArgs = vi.mocked(spawn).mock.calls[1]?.[1];
+        if (shouldPublish) {
+          expect(dockerArgs).toContain('--publish');
+          expect(dockerArgs).toContain('9229:9229');
+        } else {
+          expect(dockerArgs).not.toContain('--publish');
+          expect(dockerArgs).not.toContain('9229:9229');
+        }
+      },
+    );
+
+    it.each([
+      { debugValue: 'false', shouldInspectBrk: false },
+      { debugValue: '0', shouldInspectBrk: false },
+      { debugValue: 'true', shouldInspectBrk: true },
+      { debugValue: '1', shouldInspectBrk: true },
+    ])(
+      'should add --inspect-brk: $shouldInspectBrk to seatbelt NODE_OPTIONS when DEBUG=$debugValue',
+      async ({ debugValue, shouldInspectBrk }) => {
+        vi.mocked(os.platform).mockReturnValue('darwin');
+        vi.mocked(fs.existsSync).mockReturnValue(true);
+        process.env['DEBUG'] = debugValue;
+
+        const config: SandboxConfig = createMockSandboxConfig({
+          command: 'sandbox-exec',
+          image: 'some-image',
+        });
+
+        interface MockProcess extends EventEmitter {
+          stdout: EventEmitter;
+          stderr: EventEmitter;
+        }
+        const mockSpawnProcess = new EventEmitter() as MockProcess;
+        mockSpawnProcess.stdout = new EventEmitter();
+        mockSpawnProcess.stderr = new EventEmitter();
+        vi.mocked(spawn).mockReturnValue(
+          mockSpawnProcess as unknown as ReturnType<typeof spawn>,
+        );
+
+        const promise = start_sandbox(config, [], undefined, ['arg1']);
+        setTimeout(() => {
+          mockSpawnProcess.emit('close', 0);
+        }, 10);
+
+        await expect(promise).resolves.toBe(0);
+
+        const spawnArgs = vi.mocked(spawn).mock.calls[0]?.[1];
+        const shellCmd = spawnArgs?.[spawnArgs.length - 1];
+        if (shouldInspectBrk) {
+          expect(shellCmd).toContain('--inspect-brk');
+        } else {
+          expect(shellCmd).not.toContain('--inspect-brk');
+        }
+      },
+    );
   });
 });

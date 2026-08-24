@@ -8,7 +8,21 @@ import os from 'node:os';
 import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { quote } from 'shell-quote';
-import { debugLogger, GEMINI_DIR } from '@google/gemini-cli-core';
+import { debugLogger, GEMINI_DIR, type Config } from '@google/gemini-cli-core';
+
+export function isDebugModeEnabled(cliConfig?: Config): boolean {
+  if (cliConfig?.getDebugMode()) {
+    return true;
+  }
+  const debugEnv = process.env['DEBUG'];
+  const debugModeEnv = process.env['DEBUG_MODE'];
+  return (
+    debugEnv === 'true' ||
+    debugEnv === '1' ||
+    debugModeEnv === 'true' ||
+    debugModeEnv === '1'
+  );
+}
 
 export const LOCAL_DEV_SANDBOX_IMAGE_NAME = 'gemini-cli-sandbox';
 export const SANDBOX_NETWORK_NAME = 'gemini-cli-sandbox';
@@ -149,8 +163,7 @@ export function entrypoint(workdir: string, cliArgs: string[]): string[] {
   );
 
   const quotedCliArgs = cliArgs.slice(2).map((arg) => quote([arg]));
-  const isDebugMode =
-    process.env['DEBUG'] === 'true' || process.env['DEBUG'] === '1';
+  const isDebugMode = isDebugModeEnabled();
   const cliCmd =
     process.env['NODE_ENV'] === 'development'
       ? isDebugMode

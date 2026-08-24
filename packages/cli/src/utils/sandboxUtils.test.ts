@@ -14,6 +14,7 @@ import {
   ports,
   entrypoint,
   shouldUseCurrentUserInSandbox,
+  isDebugModeEnabled,
 } from './sandboxUtils.js';
 
 vi.mock('node:os');
@@ -236,6 +237,42 @@ describe('sandboxUtils', () => {
       delete process.env['SANDBOX_SET_UID_GID'];
       vi.mocked(os.platform).mockReturnValue('darwin');
       expect(await shouldUseCurrentUserInSandbox()).toBe(false);
+    });
+  });
+
+  describe('isDebugModeEnabled', () => {
+    it('should return true if cliConfig.getDebugMode() returns true', () => {
+      const mockConfig = {
+        getDebugMode: () => true,
+      } as unknown as Parameters<typeof isDebugModeEnabled>[0];
+      expect(isDebugModeEnabled(mockConfig)).toBe(true);
+    });
+
+    it.each(['true', '1'])('should return true when DEBUG is %s', (val) => {
+      process.env['DEBUG'] = val;
+      expect(isDebugModeEnabled()).toBe(true);
+    });
+
+    it.each(['true', '1'])(
+      'should return true when DEBUG_MODE is %s',
+      (val) => {
+        process.env['DEBUG_MODE'] = val;
+        expect(isDebugModeEnabled()).toBe(true);
+      },
+    );
+
+    it.each(['false', '0', '', 'random'])(
+      'should return false when DEBUG is %s',
+      (val) => {
+        process.env['DEBUG'] = val;
+        expect(isDebugModeEnabled()).toBe(false);
+      },
+    );
+
+    it('should return false when DEBUG and DEBUG_MODE are unset', () => {
+      delete process.env['DEBUG'];
+      delete process.env['DEBUG_MODE'];
+      expect(isDebugModeEnabled()).toBe(false);
     });
   });
 });
