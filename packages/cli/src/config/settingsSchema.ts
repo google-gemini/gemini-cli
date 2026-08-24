@@ -491,6 +491,16 @@ const SETTINGS_SCHEMA = {
     description: 'User interface settings.',
     showInDialog: false,
     properties: {
+      keepAskUserQuestionsInHistory: {
+        type: 'boolean',
+        label: 'Keep Ask User Questions in History',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Keep the questions from the ask_user tool visible in the chat history instead of hiding them after answering.',
+        showInDialog: true,
+      },
       debugRainbow: {
         type: 'boolean',
         label: 'Debug Rainbow',

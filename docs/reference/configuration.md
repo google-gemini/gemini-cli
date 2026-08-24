@@ -466,6 +466,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `"low"`
   - **Values:** `"low"`, `"full"`
 
+- **`ui.keepAskUserQuestionsInHistory`** (boolean):
+
+  - **Description:** Keep the questions from the ask_user tool visible in the
+    chat history instead of hiding them after answering.
+  - **Default:** `false`
+
 - **`ui.customWittyPhrases`** (array):
 
   - **Description:** Custom witty phrases to display during loading. When

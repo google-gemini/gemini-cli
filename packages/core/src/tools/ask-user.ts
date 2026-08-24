@@ -20,6 +20,7 @@ import { QuestionType, type Question } from '../confirmation-bus/types.js';
 import { ASK_USER_TOOL_NAME, ASK_USER_DISPLAY_NAME } from './tool-names.js';
 import { ASK_USER_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
+import type { Config } from '../config/config.js';
 
 export interface AskUserParams {
   questions: Question[];
@@ -30,8 +31,9 @@ export class AskUserTool extends BaseDeclarativeTool<
   ToolResult
 > {
   static readonly Name = ASK_USER_TOOL_NAME;
+  private readonly config: Config;
 
-  constructor(messageBus: MessageBus) {
+  constructor(config: Config, messageBus: MessageBus) {
     super(
       AskUserTool.Name,
       ASK_USER_DISPLAY_NAME,
@@ -40,6 +42,7 @@ export class AskUserTool extends BaseDeclarativeTool<
       ASK_USER_DEFINITION.base.parametersJsonSchema,
       messageBus,
     );
+    this.config = config;
   }
 
   protected override validateToolParamValues(
@@ -120,6 +123,7 @@ export class AskUserTool extends BaseDeclarativeTool<
     };
 
     return new AskUserInvocation(
+      this.config,
       normalizedParams,
       messageBus,
       toolName,
@@ -155,6 +159,16 @@ export class AskUserInvocation extends BaseToolInvocation<
 > {
   private confirmationOutcome: ToolConfirmationOutcome | null = null;
   private userAnswers: { [questionIndex: string]: string } = {};
+
+  constructor(
+    private readonly config: Config,
+    params: AskUserParams,
+    messageBus: MessageBus,
+    toolName: string,
+    toolDisplayName: string,
+  ) {
+    super(params, messageBus, toolName, toolDisplayName);
+  }
 
   override async shouldConfirmExecute(
     _abortSignal: AbortSignal,
@@ -212,19 +226,33 @@ export class AskUserInvocation extends BaseToolInvocation<
       },
     };
 
-    const returnDisplay = hasAnswers
-      ? `**User answered:**\n${answerEntries
-          .map(([index, answer]) => {
-            const question = this.params.questions[parseInt(index, 10)];
-            const category = question?.header ?? `Q${index}`;
-            const prefix = `  ${category} → `;
-            const indent = ' '.repeat(prefix.length);
+    let returnDisplay: string;
+    if (this.config.getKeepAskUserQuestionsInHistory()) {
+      returnDisplay = this.params.questions
+        .map((q, index) => {
+          const answer = this.userAnswers[String(index)];
+          const answerText =
+            answer !== undefined && answer.trim() !== ''
+              ? answer
+              : '(No answer)';
+          return `**Question:** ${q.question}\n**Answer:** ${answerText}`;
+        })
+        .join('\n\n');
+    } else {
+      returnDisplay = hasAnswers
+        ? `**User answered:**\n${answerEntries
+            .map(([index, answer]) => {
+              const question = this.params.questions[parseInt(index, 10)];
+              const category = question?.header ?? `Q${index}`;
+              const prefix = `  ${category} → `;
+              const indent = ' '.repeat(prefix.length);
 
-            const lines = answer.split('\n');
-            return prefix + lines.join('\n' + indent);
-          })
-          .join('\n')}`
-      : 'User submitted without answering questions.';
+              const lines = answer.split('\n');
+              return prefix + lines.join('\n' + indent);
+            })
+            .join('\n')}`
+        : 'User submitted without answering questions.';
+    }
 
     return {
       llmContent: JSON.stringify({ answers: this.userAnswers }),

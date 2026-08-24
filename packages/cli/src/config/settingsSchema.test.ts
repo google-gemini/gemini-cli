@@ -104,6 +104,16 @@ describe('SettingsSchema', () => {
       expect(definition?.options?.map((o) => o.value)).toEqual(['low', 'full']);
     });
 
+    it('should have keepAskUserQuestionsInHistory property configured', () => {
+      const definition =
+        getSettingsSchema().ui?.properties?.keepAskUserQuestionsInHistory;
+      expect(definition).toBeDefined();
+      expect(definition?.type).toBe('boolean');
+      expect(definition?.default).toBe(false);
+      expect(definition?.requiresRestart).toBe(false);
+      expect(definition?.showInDialog).toBe(true);
+    });
+
     it('should have checkpointing nested properties', () => {
       expect(
         getSettingsSchema().general?.properties?.checkpointing.properties

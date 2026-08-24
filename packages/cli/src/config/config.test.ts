@@ -3884,3 +3884,51 @@ describe('loadCliConfig acpMode and clientName', () => {
     expect(config.getClientName()).toBe('tui');
   });
 });
+
+describe('loadCliConfig keepAskUserQuestionsInHistory', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('should default keepAskUserQuestionsInHistory to false when not specified in settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const config = await loadCliConfig(
+      createTestMergedSettings(),
+      'test-session',
+      argv,
+    );
+    expect(config.getKeepAskUserQuestionsInHistory()).toBe(false);
+  });
+
+  it('should set keepAskUserQuestionsInHistory to true when specified as true in settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings = createTestMergedSettings({
+      ui: {
+        keepAskUserQuestionsInHistory: true,
+      },
+    });
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getKeepAskUserQuestionsInHistory()).toBe(true);
+  });
+
+  it('should set keepAskUserQuestionsInHistory to false when specified as false in settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings = createTestMergedSettings({
+      ui: {
+        keepAskUserQuestionsInHistory: false,
+      },
+    });
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getKeepAskUserQuestionsInHistory()).toBe(false);
+  });
+});

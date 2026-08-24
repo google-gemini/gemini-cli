@@ -84,6 +84,7 @@ they appear in the UI.
 | Show Spinner                         | `ui.showSpinner`                       | Show the spinner during operations.                                                                                                                               | `true`  |
 | Loading Phrases                      | `ui.loadingPhrases`                    | What to show while the model is working: tips, witty comments, all, or off.                                                                                       | `"off"` |
 | Error Verbosity                      | `ui.errorVerbosity`                    | Controls whether recoverable errors are hidden (low) or fully shown (full).                                                                                       | `"low"` |
+| Keep Ask User Questions In History   | `ui.keepAskUserQuestionsInHistory`     | Keep the questions from the ask_user tool visible in the chat history instead of hiding them after answering.                                                     | `false` |
 | Screen Reader Mode                   | `ui.accessibility.screenReader`        | Render output in plain-text to be more screen reader accessible                                                                                                   | `false` |
 
 ### IDE
