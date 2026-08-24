@@ -23,11 +23,7 @@ import {
   type ShellOutputEvent,
   type ShellExecutionConfig,
 } from './shellExecutionService.js';
-import {
-  NoopSandboxManager,
-  type SandboxManager,
-  type SandboxRequest,
-} from './sandboxManager.js';
+import { NoopSandboxManager, type SandboxRequest } from './sandboxManager.js';
 import { ExecutionLifecycleService } from './executionLifecycleService.js';
 import type { AnsiOutput, AnsiToken } from '../utils/terminalSerializer.js';
 
@@ -2271,11 +2267,14 @@ describe('ShellExecutionService environment variables', () => {
   });
 
   it('should not restore a sensitive GIT_CONFIG pair after value-first redaction', async () => {
-    const prepareCommand = vi.fn(async (request: SandboxRequest) => ({
-      program: request.command,
-      args: request.args,
-      env: request.env,
-    }));
+    const sandboxManager = new NoopSandboxManager();
+    const prepareCommand = vi
+      .spyOn(sandboxManager, 'prepareCommand')
+      .mockImplementation(async (request: SandboxRequest) => ({
+        program: request.command,
+        args: request.args,
+        env: request.env,
+      }));
     const sensitiveGitConfig: ShellExecutionConfig = {
       ...shellExecutionConfig,
       env: {
@@ -2290,7 +2289,7 @@ describe('ShellExecutionService environment variables', () => {
         ...shellExecutionConfig.sanitizationConfig,
         enableEnvironmentVariableRedaction: true,
       },
-      sandboxManager: { prepareCommand } as unknown as SandboxManager,
+      sandboxManager,
     };
 
     mockGetPty.mockResolvedValue(null);
