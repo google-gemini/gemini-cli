@@ -96,7 +96,12 @@ interface CliOptions {
 
 function optionValue(args: string[], index: number, option: string): string {
   const value = args[index + 1];
-  if (value === undefined || value.startsWith('--')) {
+  if (
+    value === undefined ||
+    value.length === 0 ||
+    value === '-h' ||
+    value.startsWith('--')
+  ) {
     throw new Error(`${option} requires a value.`);
   }
   return value;
