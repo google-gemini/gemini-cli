@@ -2271,8 +2271,8 @@ describe('ShellExecutionService environment variables', () => {
     // Ensure we exercise the default (non-strict) sanitization path, since
     // strict sanitization (e.g. in CI, via GITHUB_SHA) would already strip
     // these vars for unrelated reasons and mask a regression here.
-    vi.stubEnv('GITHUB_SHA', undefined);
-    vi.stubEnv('SURFACE', undefined);
+    vi.stubEnv('GITHUB_SHA', '');
+    vi.stubEnv('SURFACE', '');
     vi.stubEnv('GIT_EXEC_PATH', '/tmp/evil');
     vi.stubEnv('GIT_SSH_COMMAND', 'calc.exe');
     vi.stubEnv('GIT_PROXY_COMMAND', 'cmd /c calc.exe');
@@ -2281,6 +2281,10 @@ describe('ShellExecutionService environment variables', () => {
     vi.stubEnv('GIT_TEMPLATE_DIR', '/tmp/evil-template');
     vi.stubEnv('GIT_REPLACE_REF_BASE', 'refs/evil');
     vi.stubEnv('GIT_CEILING_DIRECTORIES', '/tmp/evil-ceiling');
+    // GIT_CONFIG_PARAMETERS is otherwise preserved by the GIT_CONFIG_* allow
+    // list below, so it must also be explicitly stripped as an
+    // execution-affecting variable.
+    vi.stubEnv('GIT_CONFIG_PARAMETERS', "'core.sshCommand=calc.exe'");
     vi.stubEnv('PATH', '/test/path'); // An unrelated var that should be kept
 
     const { ShellExecutionService } = await import(
@@ -2307,6 +2311,7 @@ describe('ShellExecutionService environment variables', () => {
     expect(cpEnv).not.toHaveProperty('GIT_TEMPLATE_DIR');
     expect(cpEnv).not.toHaveProperty('GIT_REPLACE_REF_BASE');
     expect(cpEnv).not.toHaveProperty('GIT_CEILING_DIRECTORIES');
+    expect(cpEnv).not.toHaveProperty('GIT_CONFIG_PARAMETERS');
     expect(cpEnv).toHaveProperty('PATH', '/test/path');
 
     // Ensure child_process exits

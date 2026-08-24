@@ -21,6 +21,7 @@ export const EXECUTION_AFFECTING_GIT_ENV_VARS = new Set([
   'GIT_TEMPLATE_DIR',
   'GIT_REPLACE_REF_BASE',
   'GIT_CEILING_DIRECTORIES',
+  'GIT_CONFIG_PARAMETERS',
 ]);
 
 export function getSafeGitEnv(
