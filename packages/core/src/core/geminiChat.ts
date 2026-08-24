@@ -242,6 +242,69 @@ function extractCuratedHistory(
 }
 
 /**
+ * Nudge message used during retry after an empty response with thoughts.
+ */
+export const THINKING_ONLY_NUDGE_MESSAGE =
+  '[System: You previously generated thoughts but failed to provide a final user-facing response. Please ensure you provide your final answer or call a tool now.]';
+
+/**
+ * Nudge message used during retry after an empty response with no text or thoughts.
+ */
+export const NO_RESPONSE_TEXT_NUDGE_MESSAGE =
+  '[System: You previously returned an empty response with no text or thoughts. Please ensure you provide your final answer or call a tool now.]';
+
+/**
+ * Appends an on-retry nudge message to the final user turn in contents (or adds a user turn)
+ * so that the model observes it at the end of the context window without altering systemInstruction.
+ */
+export function applyRetryNudge(
+  contents: Content[],
+  nudgeMessage: string,
+): Content[] {
+  if (!nudgeMessage) {
+    return contents;
+  }
+  const lastTurn = contents[contents.length - 1];
+  const hasNudge = lastTurn?.parts?.some((p) => p.text?.includes(nudgeMessage));
+  if (hasNudge) {
+    return contents;
+  }
+  const cloned: Content[] = contents.map((c) => ({
+    ...c,
+    parts: c.parts ? [...c.parts] : [],
+  }));
+
+  const clonedLastTurn = cloned[cloned.length - 1];
+  const hasFunctionResponse = clonedLastTurn?.parts?.some(
+    (p) => p.functionResponse,
+  );
+
+  if (clonedLastTurn?.role === 'user' && hasFunctionResponse) {
+    // Satisfy strict role alternation invariants of the Gemini API by inserting
+    // a neutral, synthetic model turn between the tool response and the nudge prompt.
+    cloned.push({
+      role: 'model',
+      parts: [{ text: '[Tool execution completed.]' }],
+    });
+    cloned.push({
+      role: 'user',
+      parts: [{ text: nudgeMessage }],
+    });
+  } else if (clonedLastTurn?.role === 'user') {
+    if (!clonedLastTurn.parts) {
+      clonedLastTurn.parts = [];
+    }
+    clonedLastTurn.parts.push({ text: `\n${nudgeMessage}` });
+  } else {
+    cloned.push({
+      role: 'user',
+      parts: [{ text: nudgeMessage }],
+    });
+  }
+  return cloned;
+}
+
+/**
  * Custom error to signal that a stream completed with invalid content,
  * which should trigger a retry.
  */
@@ -898,27 +961,20 @@ export class GeminiChat {
         abortSignal,
       };
 
-      // Apply Context-Aware Retries (On-Retry Nudging) to guide the model out of silent loops
+      // Apply Context-Aware Retries (On-Retry Nudging) to guide the model out of silent loops.
+      // The nudge message is appended to the contents array (end of conversation) rather than modifying
+      // systemInstruction. This preserves the prefix cache and ensures the nudge is directly observed
+      // by the model at the end of the context window.
+      let nudgeMessage = '';
       if (
         modelConfigKey.isRetry &&
         modelConfigKey.lastStreamError instanceof InvalidStreamError
       ) {
         const lastError = modelConfigKey.lastStreamError;
-        let nudgeMessage = '';
         if (lastError.type === 'THINKING_ONLY_RESPONSE') {
-          nudgeMessage =
-            '\n[System: You previously generated thoughts but failed to provide a final user-facing response. Please ensure you provide your final answer or call a tool now.]';
+          nudgeMessage = THINKING_ONLY_NUDGE_MESSAGE;
         } else if (lastError.type === 'NO_RESPONSE_TEXT') {
-          nudgeMessage =
-            '\n[System: You previously returned an empty response with no text or thoughts. Please ensure you provide your final answer or call a tool now.]';
-        }
-
-        if (nudgeMessage) {
-          if (typeof config.systemInstruction === 'string') {
-            config.systemInstruction += nudgeMessage;
-          } else if (config.systemInstruction === undefined) {
-            config.systemInstruction = nudgeMessage;
-          }
+          nudgeMessage = NO_RESPONSE_TEXT_NUDGE_MESSAGE;
         }
       }
 
@@ -926,6 +982,10 @@ export class GeminiChat {
         supportsModernFeatures(modelToUse) || isGemini2Model(modelToUse)
           ? [...contentsForPreviewModel]
           : [...requestContents];
+
+      if (nudgeMessage) {
+        contentsToUse = applyRetryNudge(contentsToUse, nudgeMessage);
+      }
 
       const hookSystem = this.context.config.getHookSystem();
       if (hookSystem) {
@@ -971,6 +1031,9 @@ export class GeminiChat {
             supportsModernFeatures(modelToUse) || isGemini2Model(modelToUse)
               ? [...contentsForPreviewModel]
               : [...requestContents];
+          if (nudgeMessage) {
+            contentsToUse = applyRetryNudge(contentsToUse, nudgeMessage);
+          }
         }
         if (beforeModelResult.modifiedConfig) {
           Object.assign(config, beforeModelResult.modifiedConfig);
@@ -981,6 +1044,9 @@ export class GeminiChat {
         ) {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           contentsToUse = beforeModelResult.modifiedContents as Content[];
+          if (nudgeMessage) {
+            contentsToUse = applyRetryNudge(contentsToUse, nudgeMessage);
+          }
         }
 
         const toolSelectionResult =
@@ -1578,10 +1644,10 @@ export class GeminiChat {
       }
     }
 
-    let id: string;
     // Record model response text from the collected parts.
     // Also flush when there are thoughts or a tool call (even with no text)
     // so that BeforeTool hooks always see the latest transcript state.
+    let id: string;
     if (responseText || hasThoughts || hasToolCall) {
       id = this.chatRecordingService.recordMessage({
         model,
@@ -1688,35 +1754,60 @@ export function isInvalidArgumentError(errorMessage: string): boolean {
 }
 
 export function stripToolCallIdPrefixes(contents: Content[]): Content[] {
-  return contents.map((content) => ({
-    ...content,
-    parts: (content.parts || []).map((part) => {
-      const newPart = { ...part };
-      if (newPart.functionCall) {
-        const fc = newPart.functionCall;
-        const name = fc.name?.trim() || 'generic_tool';
-        if (fc.id && fc.id.startsWith(`${name}__`)) {
-          newPart.functionCall = {
-            name: fc.name,
-            args: fc.args,
-            id: fc.id.substring(name.length + 2),
-          };
+  return contents.map((content) => {
+    const parts = (content.parts || [])
+      .map((part) => {
+        const newPart = { ...part };
+        if (newPart.functionCall) {
+          const fc = newPart.functionCall;
+          const name = fc.name?.trim() || 'generic_tool';
+          if (fc.id && fc.id.startsWith(`${name}__`)) {
+            newPart.functionCall = {
+              name: fc.name,
+              args: fc.args,
+              id: fc.id.substring(name.length + 2),
+            };
+          }
         }
-      }
-      if (newPart.functionResponse) {
-        const fr = newPart.functionResponse;
-        const name = fr.name?.trim() || 'generic_tool';
-        if (fr.id && fr.id.startsWith(`${name}__`)) {
-          newPart.functionResponse = {
-            name: fr.name,
-            response: fr.response,
-            id: fr.id.substring(name.length + 2),
-          };
+        if (newPart.functionResponse) {
+          const fr = newPart.functionResponse;
+          const name = fr.name?.trim() || 'generic_tool';
+          if (fr.id && fr.id.startsWith(`${name}__`)) {
+            newPart.functionResponse = {
+              name: fr.name,
+              response: fr.response,
+              id: fr.id.substring(name.length + 2),
+            };
+          }
         }
-      }
-      return newPart;
-    }),
-  }));
+
+        // If there's an empty text key alongside other active properties, remove the empty text key
+        // so it doesn't trigger "contains empty parts" validation errors on the Gemini API.
+        const hasOtherKeys = Object.keys(newPart).some(
+          (key) => key !== 'text' && key !== 'thought' && key !== 'callIndex',
+        );
+        if (newPart.text !== undefined && newPart.text === '' && hasOtherKeys) {
+          delete newPart.text;
+        }
+
+        return newPart;
+      })
+      .filter((part) => {
+        // Filter out truly empty parts that have only text: '' and no payload
+        const hasOtherKeys = Object.keys(part).some(
+          (key) => key !== 'text' && key !== 'thought' && key !== 'callIndex',
+        );
+        if (part.text !== undefined && part.text === '' && !hasOtherKeys) {
+          return false;
+        }
+        return true;
+      });
+
+    return {
+      ...content,
+      parts,
+    };
+  });
 }
 
 export function coalesceConsecutiveRoles(
