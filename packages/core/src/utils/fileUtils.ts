@@ -707,6 +707,9 @@ export function formatTruncatedToolOutput(
   maxChars: number,
 ): string {
   if (contentStr.length <= maxChars) return contentStr;
+  if (maxChars <= 0) {
+    return `Output too large. Showing first 0 and last 0 characters. For full output see: ${outputFile}\n\n\n... [${contentStr.length.toLocaleString()} characters omitted] ...\n\n`;
+  }
 
   const headChars = Math.floor(maxChars * 0.2);
   const tailChars = maxChars - headChars;

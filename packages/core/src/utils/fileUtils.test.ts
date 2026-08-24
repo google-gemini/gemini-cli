@@ -1348,5 +1348,30 @@ describe('fileUtils', () => {
       expect(formatted).toContain('For full output see: /tmp/out.txt');
       expect(formatted).toContain('[46,000 characters omitted]'); // 50000 - 800 - 3200
     });
+
+    it('should fully truncate content when maxChars is 0', () => {
+      const content = 'a'.repeat(50000);
+      const outputFile = '/tmp/out.txt';
+      const formatted = formatTruncatedToolOutput(content, outputFile, 0);
+      expect(formatted).toBe(
+        `Output too large. Showing first 0 and last 0 characters. For full output see: /tmp/out.txt\n\n\n... [50,000 characters omitted] ...\n\n`,
+      );
+    });
+
+    it('should fully truncate content when maxChars is negative', () => {
+      const content = 'a'.repeat(50000);
+      const outputFile = '/tmp/out.txt';
+      const formatted = formatTruncatedToolOutput(content, outputFile, -1000);
+      expect(formatted).toBe(
+        `Output too large. Showing first 0 and last 0 characters. For full output see: /tmp/out.txt\n\n\n... [50,000 characters omitted] ...\n\n`,
+      );
+    });
+
+    it('should return content unchanged when content length is within maxChars', () => {
+      const content = 'short content';
+      const outputFile = '/tmp/out.txt';
+      const formatted = formatTruncatedToolOutput(content, outputFile, 100);
+      expect(formatted).toBe(content);
+    });
   });
 });
