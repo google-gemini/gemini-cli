@@ -1795,7 +1795,7 @@ export function stripToolCallIdPrefixes(contents: Content[]): Content[] {
       .filter((part) => {
         // Filter out truly empty parts that have only text: '' and no payload
         const hasOtherKeys = Object.keys(part).some(
-          (key) => key !== 'text' && key !== 'thought' && key !== 'callIndex',
+          (key) => key !== 'text' && key !== 'thought' && key !== 'callIndex' && (part as any)[key] !== undefined,
         );
         if (part.text !== undefined && part.text === '' && !hasOtherKeys) {
           return false;
