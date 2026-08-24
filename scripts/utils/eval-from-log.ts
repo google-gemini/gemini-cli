@@ -136,9 +136,18 @@ function assertSupportedSessionFile(filePath: string): void {
   }
 }
 
-function countMalformedJsonlLines(content: string, isJsonl: boolean): number {
+function countMalformedSessionLines(content: string, isJsonl: boolean): number {
   if (!isJsonl) {
-    return 0;
+    try {
+      // Legacy .json sessions are complete JSON documents and may be
+      // pretty-printed across several lines. The core loader also accepts
+      // JSONL-shaped data with this legacy extension, so only fall through to
+      // per-line validation when whole-document parsing fails.
+      JSON.parse(content);
+      return 0;
+    } catch {
+      // Validate the JSONL-compatible form below.
+    }
   }
 
   let malformed = 0;
@@ -175,10 +184,10 @@ async function loadSession(filePath: string): Promise<ConversationRecord> {
   }
 
   const isJsonl = resolved.endsWith('.jsonl');
-  const malformedLineCount = countMalformedJsonlLines(content, isJsonl);
+  const malformedLineCount = countMalformedSessionLines(content, isJsonl);
   if (malformedLineCount > 0) {
     throw new Error(
-      `Session JSONL contains ${malformedLineCount} malformed non-empty line(s). Generation is refused because the logical session may be incomplete.`,
+      `Session file contains ${malformedLineCount} malformed non-empty line(s). Generation is refused because the logical session may be incomplete.`,
     );
   }
 
@@ -312,6 +321,33 @@ function assertFixtureNameIsSafe(relativePath: string): void {
   }
 }
 
+function readBoundedFixture(fd: number, portablePath: string): Buffer {
+  const buffer = Buffer.allocUnsafe(MAX_FIXTURE_BYTES + 1);
+  let totalBytes = 0;
+
+  while (totalBytes < buffer.byteLength) {
+    const bytesRead = fs.readSync(
+      fd,
+      buffer,
+      totalBytes,
+      buffer.byteLength - totalBytes,
+      null,
+    );
+    if (bytesRead === 0) {
+      break;
+    }
+    totalBytes += bytesRead;
+  }
+
+  if (totalBytes > MAX_FIXTURE_BYTES) {
+    throw new Error(
+      `Fixture ${portablePath} exceeds the ${MAX_FIXTURE_BYTES}-byte limit.`,
+    );
+  }
+
+  return buffer.subarray(0, totalBytes);
+}
+
 function loadFixtures(
   fixturePaths: string[],
   workspaceRoot: string,
@@ -368,7 +404,13 @@ function loadFixtures(
         `Fixture escapes the selected workspace: ${portablePath}`,
       );
     }
-    if (fs.lstatSync(candidate).isSymbolicLink()) {
+    let candidateStat: fs.Stats;
+    try {
+      candidateStat = fs.lstatSync(candidate);
+    } catch {
+      throw new Error(`Fixture could not be inspected safely: ${portablePath}`);
+    }
+    if (candidateStat.isSymbolicLink()) {
       throw new Error(
         `Fixture is a symbolic link and cannot be reproduced faithfully: ${portablePath}`,
       );
@@ -378,16 +420,34 @@ function loadFixtures(
     }
     realFiles.add(realCandidate);
 
-    const stat = fs.statSync(realCandidate);
-    if (!stat.isFile()) {
-      throw new Error(`Fixture is not a regular file: ${portablePath}`);
+    // Best-effort race hardening: refuse final-component symlink swaps where
+    // the platform supports O_NOFOLLOW, then inspect and read the same opened
+    // file descriptor. Node does not expose a portable openat API, so a hostile
+    // process can still race a swap of an intermediate directory component.
+    const openFlags = fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0);
+    let fd: number;
+    try {
+      fd = fs.openSync(candidate, openFlags);
+    } catch {
+      throw new Error(`Fixture could not be opened safely: ${portablePath}`);
     }
-    if (stat.size > MAX_FIXTURE_BYTES) {
-      throw new Error(
-        `Fixture ${portablePath} exceeds the ${MAX_FIXTURE_BYTES}-byte limit.`,
-      );
+
+    let buffer: Buffer;
+    try {
+      const stat = fs.fstatSync(fd);
+      if (!stat.isFile()) {
+        throw new Error(`Fixture is not a regular file: ${portablePath}`);
+      }
+      if (stat.size > MAX_FIXTURE_BYTES) {
+        throw new Error(
+          `Fixture ${portablePath} exceeds the ${MAX_FIXTURE_BYTES}-byte limit.`,
+        );
+      }
+      buffer = readBoundedFixture(fd, portablePath);
+    } finally {
+      fs.closeSync(fd);
     }
-    const buffer = fs.readFileSync(realCandidate);
+
     if (buffer.byteLength > MAX_FIXTURE_BYTES) {
       throw new Error(
         `Fixture ${portablePath} exceeds the ${MAX_FIXTURE_BYTES}-byte limit.`,
@@ -480,6 +540,39 @@ function toFilenameStem(name: string): string {
   return stem || 'generated-eval';
 }
 
+function assertOutputDirectorySafe(
+  realRepoRoot: string,
+  outputPath: string,
+): void {
+  const evalsDir = path.join(realRepoRoot, 'evals');
+  let evalsStat: fs.Stats;
+  let realEvalsDir: string;
+  let realOutputDirectory: string;
+
+  try {
+    evalsStat = fs.lstatSync(evalsDir);
+    realEvalsDir = fs.realpathSync(evalsDir);
+    realOutputDirectory = fs.realpathSync(path.dirname(outputPath));
+  } catch {
+    throw new Error('The repository evals directory is unavailable or unsafe.');
+  }
+
+  if (
+    !evalsStat.isDirectory() ||
+    evalsStat.isSymbolicLink() ||
+    !isInside(realRepoRoot, realEvalsDir)
+  ) {
+    throw new Error(
+      'The repository evals directory must be a real directory, not a symbolic link.',
+    );
+  }
+  if (realOutputDirectory !== realEvalsDir) {
+    throw new Error(
+      '--output resolves outside the repository evals directory.',
+    );
+  }
+}
+
 function resolveOutputPath(
   repoRoot: string,
   name: string,
@@ -488,7 +581,13 @@ function resolveOutputPath(
 ): string {
   const realRepoRoot = fs.realpathSync(repoRoot);
   const evalsDir = path.join(realRepoRoot, 'evals');
-  if (!fs.existsSync(evalsDir) || !fs.statSync(evalsDir).isDirectory()) {
+  let hasEvalsDirectory = false;
+  try {
+    hasEvalsDirectory = fs.statSync(evalsDir).isDirectory();
+  } catch {
+    // Use the sanitized error below if the directory disappeared mid-check.
+  }
+  if (!hasEvalsDirectory) {
     throw new Error(
       `Repository evals directory not found under ${displayPath(realRepoRoot)}.`,
     );
@@ -531,20 +630,7 @@ function resolveOutputPath(
   }
 
   const outputPath = path.resolve(realRepoRoot, normalized);
-  const realEvalsDir = fs.realpathSync(evalsDir);
-  if (
-    fs.lstatSync(evalsDir).isSymbolicLink() ||
-    !isInside(realRepoRoot, realEvalsDir)
-  ) {
-    throw new Error(
-      'The repository evals directory must not be a symbolic link.',
-    );
-  }
-  if (fs.realpathSync(path.dirname(outputPath)) !== realEvalsDir) {
-    throw new Error(
-      '--output resolves outside the repository evals directory.',
-    );
-  }
+  assertOutputDirectorySafe(realRepoRoot, outputPath);
   if (write && fs.existsSync(outputPath)) {
     throw new Error(`Refusing to overwrite existing file: ${normalized}`);
   }
@@ -552,7 +638,11 @@ function resolveOutputPath(
   return outputPath;
 }
 
-function previewCandidatePath(rawPath: string, workspaceRoot: string): string {
+function previewCandidatePath(
+  rawPath: string,
+  requestedWorkspaceRoot: string,
+  realWorkspaceRoot: string,
+): string {
   if (
     hasControlCharacters(rawPath) ||
     findSensitiveContent(rawPath).length > 0
@@ -563,10 +653,18 @@ function previewCandidatePath(rawPath: string, workspaceRoot: string): string {
   const normalizedInput = rawPath.replace(/[\\/]/g, path.sep);
   if (path.isAbsolute(normalizedInput)) {
     const resolved = path.resolve(normalizedInput);
-    if (!isInside(workspaceRoot, resolved)) {
-      return '<outside-workspace>';
+    const roots = Array.from(
+      new Set([
+        path.resolve(requestedWorkspaceRoot),
+        path.resolve(realWorkspaceRoot),
+      ]),
+    );
+    for (const root of roots) {
+      if (isInside(root, resolved)) {
+        return path.relative(root, resolved).split(path.sep).join('/');
+      }
     }
-    return path.relative(workspaceRoot, resolved).split(path.sep).join('/');
+    return '<outside-workspace>';
   }
 
   const normalized = path.normalize(normalizedInput);
@@ -746,6 +844,10 @@ export async function fromLog(
   validateSkeleton(skeleton, outputPath, repoRoot);
 
   if (options.write) {
+    // Formatting above is asynchronous. Re-check immediately before writing to
+    // narrow the window in which the evals directory could be replaced. This
+    // is best-effort hardening because the check and write are not atomic.
+    assertOutputDirectorySafe(repoRoot, outputPath);
     fs.writeFileSync(outputPath, skeleton, {
       encoding: 'utf8',
       flag: 'wx',
@@ -763,7 +865,7 @@ export async function fromLog(
       prompt: sanitizedPrompt,
       observedTools: turn.observedTools,
       candidatePaths: turn.candidatePaths.map((candidate) =>
-        previewCandidatePath(candidate, workspaceRoot),
+        previewCandidatePath(candidate, requestedWorkspaceRoot, workspaceRoot),
       ),
     },
     expectedTools,
@@ -790,7 +892,7 @@ export function formatTurnForDisplay(
     ...turn,
     prompt,
     candidatePaths: turn.candidatePaths.map((candidate) =>
-      previewCandidatePath(candidate, realWorkspace),
+      previewCandidatePath(candidate, requestedWorkspace, realWorkspace),
     ),
   };
 }

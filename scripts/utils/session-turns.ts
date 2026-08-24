@@ -15,8 +15,8 @@ import {
   isResumableMessageRecord,
   type ConversationRecord,
   type MessageRecord,
-  type ToolCallRecord,
 } from '@google/gemini-cli-core';
+import { buildToolRegistry, resolveToolName } from './tool-registry.js';
 
 export interface ObservedToolCall {
   name: string;
@@ -39,6 +39,12 @@ export interface UnsupportedSessionTurn {
 export interface SessionTurnAnalysis {
   turns: SessionTurnCandidate[];
   unsupportedTurns: UnsupportedSessionTurn[];
+}
+
+interface AnalyzableToolCall {
+  name: string;
+  status: string;
+  args: Record<string, unknown>;
 }
 
 type UserMessageClassification =
@@ -91,8 +97,11 @@ function isFunctionResponseContinuation(content: unknown): boolean {
 
 function isSyntheticHistorySummary(prompt: string): boolean {
   const normalized = prompt.trimStart();
+  // Compression output may persist scratchpad reasoning before its snapshot,
+  // so the snapshot tag is not guaranteed to be the first content.
   return (
-    normalized.startsWith('<state_snapshot>') ||
+    prompt.includes('<state_snapshot>') ||
+    normalized.startsWith('<scratchpad>') ||
     normalized.startsWith('### [System Note: Conversation History Truncated]')
   );
 }
@@ -160,7 +169,7 @@ function extractStringArgs(
  * Extracts only known path-shaped arguments for preview suggestions. These
  * values are never used as fixture contents or automatically copied.
  */
-function extractCandidatePaths(call: ToolCallRecord): string[] {
+function extractCandidatePaths(call: AnalyzableToolCall): string[] {
   switch (call.name) {
     case 'read_file':
     case 'write_file':
@@ -175,6 +184,57 @@ function extractCandidatePaths(call: ToolCallRecord): string[] {
     default:
       return [];
   }
+}
+
+function malformedToolCallRecordError(): Error {
+  return new Error(
+    'Session contains a malformed tool call record. The session may have been written by an incompatible Gemini CLI version.',
+  );
+}
+
+function validatedToolCalls(message: MessageRecord): AnalyzableToolCall[] {
+  // Session records originate on disk and the core loader intentionally uses a
+  // permissive record guard, so validate every field consumed below.
+  const rawToolCalls: unknown =
+    message.type === 'gemini' ? message.toolCalls : undefined;
+  if (rawToolCalls === undefined) {
+    return [];
+  }
+  if (!Array.isArray(rawToolCalls)) {
+    throw malformedToolCallRecordError();
+  }
+
+  return rawToolCalls.map((rawCall) => {
+    if (
+      typeof rawCall !== 'object' ||
+      rawCall === null ||
+      Array.isArray(rawCall)
+    ) {
+      throw malformedToolCallRecordError();
+    }
+
+    const call = rawCall as Record<string, unknown>;
+    const name = call['name'];
+    const status = call['status'];
+    const args = call['args'];
+    if (
+      typeof name !== 'string' ||
+      name.trim().length === 0 ||
+      typeof status !== 'string' ||
+      status.trim().length === 0 ||
+      typeof args !== 'object' ||
+      args === null ||
+      Array.isArray(args)
+    ) {
+      throw malformedToolCallRecordError();
+    }
+
+    return {
+      name,
+      status,
+      args: args as Record<string, unknown>,
+    };
+  });
 }
 
 function pushUnique(target: string[], values: string[]): void {
@@ -193,6 +253,7 @@ function pushUnique(target: string[], values: string[]): void {
 export function analyzeSessionTurns(
   conversation: ConversationRecord,
 ): SessionTurnAnalysis {
+  const toolRegistry = buildToolRegistry();
   const turns: SessionTurnCandidate[] = [];
   const unsupportedTurns: UnsupportedSessionTurn[] = [];
   let activeTurn: SessionTurnCandidate | undefined;
@@ -238,12 +299,16 @@ export function analyzeSessionTurns(
       activeTurn.observedModel = message.model;
     }
 
-    for (const call of message.toolCalls ?? []) {
+    for (const call of validatedToolCalls(message)) {
+      const name = resolveToolName(toolRegistry, call.name) ?? call.name;
       activeTurn.observedTools.push({
-        name: call.name,
+        name,
         status: call.status,
       });
-      pushUnique(activeTurn.candidatePaths, extractCandidatePaths(call));
+      pushUnique(
+        activeTurn.candidatePaths,
+        extractCandidatePaths({ ...call, name }),
+      );
     }
   }
 

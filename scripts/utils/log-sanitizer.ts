@@ -50,17 +50,19 @@ const SENSITIVE_PATTERNS: Array<{
   {
     category: 'API key assignment',
     pattern:
-      /(?:^|[^\w])["']?(?:GEMINI_API_KEY|GOOGLE_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|API_KEY)["']?\s*[:=]\s*["']?[^\s"']{16,}/i,
+      /(?:^|[^\w])["']?(?:GEMINI_API_KEY|GOOGLE_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|API_KEY)["']?\s*[:=]\s*(?:"[^"\r\n]{8,}"|'[^'\r\n]{8,}'|[^\s"']{8,})/i,
   },
   {
     category: 'credential assignment',
     pattern:
-      /(?:^|[^\w])["']?(?:password|passwd|secret|token|credential|client_secret|aws_secret_access_key)["']?\s*[:=]\s*["']?[^\s"']{16,}/i,
+      /(?:^|[^\w])["']?(?:password|passwd|secret|token|credential|client_secret|aws_secret_access_key)["']?\s*[:=]\s*(?:"[^"\r\n]{8,}"|'[^'\r\n]{8,}'|[^\s"']{8,})/i,
   },
   {
     category: 'known token format',
+    // Keep overlapping high-confidence formats aligned with
+    // NEVER_ALLOWED_VALUE_PATTERNS in core. Detection remains best effort.
     pattern:
-      /\b(?:AIza[0-9A-Za-z_-]{30,}|gh[pousr]_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|GOCSPX-[A-Za-z0-9_-]{20,}|npm_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{20,})\b/,
+      /\b(?:AIza[0-9A-Za-z_-]{30,}|gh[pousr]_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|GOCSPX-[A-Za-z0-9_-]{20,}|npm_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{20,}|(?:sk|rk)_(?:live|test)_[0-9A-Za-z]{24,})\b/,
   },
   {
     category: 'JSON web token',
@@ -83,7 +85,7 @@ function replacePathLiteral(
 
   const flags = /^(?:[A-Za-z]:[\\/]|\\\\|\/\/)/.test(value) ? 'gi' : 'g';
   const pattern = new RegExp(
-    `(^|[Ff][Ii][Ll][Ee]:\\/\\/\\/?|[^A-Za-z0-9._~\\\\/-])${escapeRegExp(value)}(?=$|[\\\\/])`,
+    `(^|[Ff][Ii][Ll][Ee]:\\/\\/\\/?|[^A-Za-z0-9._~\\\\/-])${escapeRegExp(value)}(?![A-Za-z0-9._~-])`,
     flags,
   );
   return content.replace(

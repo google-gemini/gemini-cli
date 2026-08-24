@@ -49,13 +49,17 @@ Safety and output:
   --root <dir>              Gemini CLI repository root (default: current directory)
   --help                    Show this help
 
+Values beginning with "--", or the value "-h", must use --option=value,
+for example --name="--yolo flag still asks for confirmation".
+
 Session files are normally stored under:
   ~/.gemini/tmp/<project-identifier>/chats/session-*.jsonl
 
 Use "gemini --list-sessions" or /resume (also /chat) to locate a session.
 
 Examples:
-  npm run eval:from-log -- --log /path/session.jsonl --list-turns
+  npm run eval:from-log -- --log /path/session.jsonl \\
+    --workspace /path/to/original/workspace --list-turns
 
   npm run eval:from-log -- --log /path/session.jsonl --message-id user-42 \\
     --workspace /path/to/original/workspace \\
@@ -64,6 +68,7 @@ Examples:
     --fixture src/a.ts --fixture src/b.ts
 
   npm run eval:from-log -- --log /path/session.jsonl --message-id user-42 \\
+    --workspace /path/to/original/workspace \\
     --name "asks before a destructive command" --expect-tool ask_user \\
     --no-fixtures-needed --output evals/asks-before-delete.eval.ts --write
 
@@ -121,66 +126,88 @@ export function parseArgs(argv: string[]): CliOptions {
   const args = argv.slice(2);
 
   for (let index = 0; index < args.length; index += 1) {
-    const arg = args[index];
+    const rawArg = args[index];
+    let arg = rawArg;
+    let inlineValue: string | undefined;
+    const equalsIndex = rawArg.indexOf('=');
+    if (rawArg.startsWith('--') && equalsIndex > 2) {
+      arg = rawArg.slice(0, equalsIndex);
+      inlineValue = rawArg.slice(equalsIndex + 1);
+    }
+
+    const readValue = (): string => {
+      if (inlineValue !== undefined) {
+        if (inlineValue.length === 0) {
+          throw new Error(`${arg} requires a value.`);
+        }
+        return inlineValue;
+      }
+
+      const value = optionValue(args, index, arg);
+      index += 1;
+      return value;
+    };
+
+    const assertFlag = (): void => {
+      if (inlineValue !== undefined) {
+        throw new Error(`${arg} does not take a value.`);
+      }
+    };
+
     switch (arg) {
       case '--help':
       case '-h':
+        assertFlag();
         options.help = true;
         break;
       case '--list-turns':
+        assertFlag();
         options.listTurns = true;
         break;
       case '--no-fixtures-needed':
+        assertFlag();
         options.noFixturesNeeded = true;
         break;
       case '--write':
+        assertFlag();
         options.write = true;
         break;
       case '--json':
+        assertFlag();
         options.json = true;
         break;
       case '--log':
-        options.log = optionValue(args, index, arg);
-        index += 1;
+        options.log = readValue();
         break;
       case '--message-id':
-        options.messageId = optionValue(args, index, arg);
-        index += 1;
+        options.messageId = readValue();
         break;
       case '--name':
-        options.name = optionValue(args, index, arg);
-        index += 1;
+        options.name = readValue();
         break;
       case '--suite':
-        options.suite = optionValue(args, index, arg);
-        index += 1;
+        options.suite = readValue();
         break;
       case '--expect-tool':
-        options.expectedTools.push(optionValue(args, index, arg));
-        index += 1;
+        options.expectedTools.push(readValue());
         break;
       case '--forbid-tool':
-        options.forbiddenTools.push(optionValue(args, index, arg));
-        index += 1;
+        options.forbiddenTools.push(readValue());
         break;
       case '--fixture':
-        options.fixtures.push(optionValue(args, index, arg));
-        index += 1;
+        options.fixtures.push(readValue());
         break;
       case '--workspace':
-        options.workspace = optionValue(args, index, arg);
-        index += 1;
+        options.workspace = readValue();
         break;
       case '--output':
-        options.output = optionValue(args, index, arg);
-        index += 1;
+        options.output = readValue();
         break;
       case '--root':
-        options.root = optionValue(args, index, arg);
-        index += 1;
+        options.root = readValue();
         break;
       default:
-        throw new Error(`Unknown argument: ${arg}`);
+        throw new Error(`Unknown argument: ${rawArg}`);
     }
   }
 

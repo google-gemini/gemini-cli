@@ -85,7 +85,8 @@ fail-closed draft; it does not turn a log into a finished regression eval.
 
 ```bash
 # Inspect eligible turns first.
-npm run eval:from-log -- --log /path/to/session.jsonl --list-turns
+npm run eval:from-log -- --log /path/to/session.jsonl \
+  --workspace /path/to/original/workspace --list-turns
 
 # Preview a draft. Nothing is written by default.
 npm run eval:from-log -- --log /path/to/session.jsonl \
@@ -93,6 +94,10 @@ npm run eval:from-log -- --log /path/to/session.jsonl \
   --message-id <user-message-id> --name "expected behavior" \
   --expect-tool read_many_files --fixture src/example.ts
 ```
+
+Pass the workspace in which the session was recorded. It is used to redact
+machine-specific paths, interpret displayed fixture candidates, and verify the
+provenance of any fixture files selected for the draft.
 
 The contributor must choose the expected and/or forbidden tools. Observed tool
 calls are evidence only, and fixture contents are copied only from explicitly

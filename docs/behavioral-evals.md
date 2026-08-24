@@ -156,8 +156,10 @@ Inside an interactive session, `/resume` opens the session browser. `/chat` is
 an alias. Do not attach a raw session log to a public issue or pull request; it
 may contain prompts, paths, tool arguments, tool output, or credentials.
 
-Run `eval:from-log` from the Gemini CLI repository. When the session came from a
-different workspace, pass that original directory with `--workspace`.
+Run `eval:from-log` from the Gemini CLI repository and pass the workspace in
+which the session was recorded with `--workspace`. The workspace is used to
+redact machine-specific paths, interpret displayed fixture candidates, and
+verify the provenance of fixture files selected for the draft.
 
 ### 2. Inspect and Select One Turn
 
