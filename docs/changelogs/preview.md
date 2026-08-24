@@ -1,6 +1,6 @@
-# Preview release: v0.57.0-preview.0
+# Preview release: v0.57.0-preview.1
 
-Released: August 19, 2026
+Released: August 24, 2026
 
 Our preview release includes the latest, new, and experimental features. This
 release may not be as stable as our [latest weekly release](latest.md).
@@ -29,6 +29,10 @@ npm install -g @google/gemini-cli@preview
 
 ## What's Changed
 
+- fix(patch): cherry-pick 812f7a2 to release/v0.57.0-preview.0-pr-28934 to patch
+  version v0.57.0-preview.0 and create version 0.57.0-preview.1 by
+  @gemini-cli-robot in
+  [#29024](https://github.com/google-gemini/gemini-cli/pull/29024)
 - fix(core): dynamically resolve Cloud Workstations proxy redirect URI for OAuth
   flows by @amelidev in
   [#28688](https://github.com/google-gemini/gemini-cli/pull/28688)
@@ -94,4 +98,4 @@ npm install -g @google/gemini-cli@preview
   [#28892](https://github.com/google-gemini/gemini-cli/pull/28892)
 
 **Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.56.0-preview.1...v0.57.0-preview.0
+https://github.com/google-gemini/gemini-cli/compare/v0.56.0-preview.1...v0.57.0-preview.1
