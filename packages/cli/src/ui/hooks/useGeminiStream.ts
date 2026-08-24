@@ -2137,6 +2137,7 @@ export const useGeminiStream = (
               geminiClient.getHistory().slice(0, targetLength),
             );
           }
+          historyLengthAfterUserPromptRef.current = undefined;
         }
 
         const callIdsToMarkAsSubmitted = geminiTools.map(
