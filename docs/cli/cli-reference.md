@@ -60,14 +60,20 @@ These commands are available within the interactive REPL.
 | `--experimental-zed-integration` | -     | boolean | -         | Run in Zed editor integration mode. **Experimental feature.**                                                                                                          |
 | `--allowed-mcp-server-names`     | -     | array   | -         | Allowed MCP server names (comma-separated or multiple flags)                                                                                                           |
 | `--allowed-tools`                | -     | array   | -         | **Deprecated.** Use the [Policy Engine](../reference/policy-engine.md) instead. Tools that are allowed to run without confirmation (comma-separated or multiple flags) |
+| `--policy`                       | -     | array   | -         | Additional policy files or directories to load (comma-separated or multiple flags)                                                                                     |
+| `--admin-policy`                 | -     | array   | -         | Additional admin policy files or directories to load (comma-separated or multiple flags)                                                                               |
 | `--extensions`                   | `-e`  | array   | -         | List of extensions to use. If not provided, all extensions are enabled (comma-separated or multiple flags)                                                             |
 | `--list-extensions`              | `-l`  | boolean | -         | List all available extensions and exit                                                                                                                                 |
 | `--resume`                       | `-r`  | string  | -         | Resume a previous session. Use `"latest"` for most recent or index number (for example `--resume 5`)                                                                   |
 | `--list-sessions`                | -     | boolean | -         | List available sessions for the current project and exit                                                                                                               |
 | `--delete-session`               | -     | string  | -         | Delete a session by index number (use `--list-sessions` to see available sessions)                                                                                     |
+| `--session-id`                   | -     | string  | -         | Start a new session with a manually provided UUID.                                                                                                                     |
+| `--session-file`                 | -     | string  | -         | Load a session from a JSON file                                                                                                                                        |
 | `--include-directories`          | -     | array   | -         | Additional directories to include in the workspace (comma-separated or multiple flags)                                                                                 |
 | `--screen-reader`                | -     | boolean | -         | Enable screen reader mode for accessibility                                                                                                                            |
 | `--output-format`                | `-o`  | string  | `text`    | The format of the CLI output. Choices: `text`, `json`, `stream-json`                                                                                                   |
+| `--raw-output`                   | -     | boolean | -         | Disable sanitization of model output (for example, allow ANSI escape sequences). **Warning:** this can be a security risk if the model output is untrusted.            |
+| `--accept-raw-output-risk`       | -     | boolean | -         | Suppress the security warning shown when using `--raw-output`.                                                                                                         |
 
 ## Model selection
 
