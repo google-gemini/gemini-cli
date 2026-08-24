@@ -855,4 +855,62 @@ describe('Task', () => {
       }
     });
   });
+
+  describe('Stale Cancellation Error Cleanup', () => {
+    it('should clear any previous execution cancellation error on acceptUserMessage', async () => {
+      const mockConfig = createMockConfig();
+      mockConfig.getGeminiClient = vi.fn().mockReturnValue({
+        sendMessageStream: vi.fn().mockReturnValue((async function* () {})()),
+      });
+      mockConfig.getSessionId = () => 'test-session-id';
+
+      const mockEventBus: ExecutionEventBus = {
+        publish: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+        once: vi.fn(),
+        removeAllListeners: vi.fn(),
+        finished: vi.fn(),
+      };
+
+      // @ts-expect-error - Calling private constructor
+      const task = new Task(
+        'task-id',
+        'context-id',
+        mockConfig as Config,
+        mockEventBus,
+      );
+
+      // Simulate cancellation from a previous aborted execution turn
+      task.cancelPendingTools('Execution aborted');
+
+      // Verify cancellationError is set and would throw on wait
+      expect(task['cancellationError']).toBeDefined();
+      await expect(task.waitForPendingTools()).rejects.toThrow(
+        'Execution aborted',
+      );
+
+      // Call acceptUserMessage to start a new user turn
+      const userMessage = {
+        userMessage: {
+          parts: [{ kind: 'text', text: 'new prompt' }],
+        },
+      } as RequestContext;
+      const abortController = new AbortController();
+
+      // Drain the generator to let acceptUserMessage execute
+      for await (const _ of task.acceptUserMessage(
+        userMessage,
+        abortController.signal,
+      )) {
+        // no-op
+      }
+
+      // Verify cancellationError is cleared
+      expect(task['cancellationError']).toBeUndefined();
+
+      // Verify waiting for pending tools now succeeds/does not throw
+      await expect(task.waitForPendingTools()).resolves.toBeUndefined();
+    });
+  });
 });
