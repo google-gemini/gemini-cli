@@ -170,6 +170,28 @@ Do something.
     );
   });
 
+  it('should strip quotes from name and description in simple frontmatter fallback', async () => {
+    const skillDir = path.join(testRootDir, 'fallback-quoted-skill');
+    await fs.mkdir(skillDir, { recursive: true });
+    const skillFile = path.join(skillDir, 'SKILL.md');
+    // Deliberately broken YAML syntax with colons causing YAML parse failure, falling back to simple parser
+    await fs.writeFile(
+      skillFile,
+      `---
+name: "fallback-quoted-skill"
+description: "unclosed string: with colons: and invalid syntax:
+---
+# Instructions
+Do something.
+`,
+    );
+
+    const skills = await loadSkillsFromDir(testRootDir);
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe('fallback-quoted-skill');
+  });
+
   it('should parse skill with multi-line YAML description', async () => {
     const skillDir = path.join(testRootDir, 'multiline-skill');
     await fs.mkdir(skillDir, { recursive: true });
