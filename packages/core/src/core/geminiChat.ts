@@ -1784,7 +1784,7 @@ export function stripToolCallIdPrefixes(contents: Content[]): Content[] {
         // If there's an empty text key alongside other active properties, remove the empty text key
         // so it doesn't trigger "contains empty parts" validation errors on the Gemini API.
         const hasOtherKeys = Object.keys(newPart).some(
-          (key) => key !== 'text' && key !== 'thought' && key !== 'callIndex',
+          (key) => key !== 'text' && key !== 'thought' && key !== 'callIndex' && (newPart as any)[key] !== undefined,
         );
         if (newPart.text !== undefined && newPart.text === '' && hasOtherKeys) {
           delete newPart.text;
