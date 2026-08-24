@@ -7,267 +7,419 @@
  */
 
 /**
- * @fileoverview CLI entry point for the eval:from-log command.
- *
- * Reads a session JSONL file produced by Gemini CLI and generates a sanitized,
- * validated TypeScript eval skeleton that can be reviewed and submitted as a
- * regression test.
- *
- * Usage:
- *   npm run eval:from-log -- <session.jsonl> [options]
- *
- * Options:
- *   --name <name>      Eval case name (default: derived from first prompt)
- *   --suite <name>     Suite name (default: 'regression')
- *   --output <dir>     Output directory (default: evals/)
- *   --stdout           Print skeleton to stdout, do not write file
- *   --no-validate      Skip running eval:validate on the output
- *   --json             Print result summary as JSON
- *   --root <dir>       Repository root (default: current directory)
- *   --help             Show this help message
- *
- * Finding your session file:
- *   Gemini CLI saves session JSONL files to:
- *     ~/.gemini/<project-hash>/chats/session-<timestamp>-<id>.jsonl
- *
- *   You can list recent sessions by running:
- *     ls ~/.gemini/<project-hash>/chats/session-*.jsonl
- *
- *   Or from within Gemini CLI, use /history to view past sessions.
+ * @fileoverview CLI entry point for creating a fail-closed, reviewable eval
+ * draft from one Gemini CLI session turn.
  */
 
+import fs from 'node:fs';
 import path from 'node:path';
-import { fromLog } from './utils/eval-from-log.js';
+import { pathToFileURL } from 'node:url';
+import {
+  formatTurnForDisplay,
+  fromLog,
+  inspectLog,
+} from './utils/eval-from-log.js';
 
 const HELP_TEXT = `
-eval:from-log — Generate an eval skeleton from a Gemini CLI session log
+eval:from-log - Create a reviewable behavioral eval draft from one session turn
 
 Usage:
-  npm run eval:from-log -- <session.jsonl> [options]
+  npm run eval:from-log -- --log <session.jsonl> --list-turns [options]
+  npm run eval:from-log -- --log <session.jsonl> --message-id <id> \\
+    --name <name> --expect-tool <tool> --fixture <path> [options]
 
-Arguments:
-  <session.jsonl>     Path to a Gemini CLI session JSONL file (required)
+Required for generation:
+  --log <path>              Gemini CLI session .jsonl or legacy .json file
+  --name <name>             Human-written eval case name
+  --expect-tool <tool>      Tool that should be called (repeatable), or use
+  --forbid-tool <tool>      Tool that must not be called (repeatable)
+  --fixture <path>          Workspace-relative starting file (repeatable), or use
+  --no-fixtures-needed      Confirm that the eval needs no workspace fixtures
 
-Options:
-  --name <name>       Eval case name (default: derived from first user prompt)
-  --suite <name>      suiteName field in the generated eval (default: 'regression')
-  --output <dir>      Directory to write the generated .eval.ts file
-                      (default: evals/)
-  --stdout            Print the skeleton to stdout instead of writing a file
-  --no-validate       Skip running eval:validate on the output file
-  --json              Print a JSON summary of the result instead of human output
-  --root <dir>        Repository root for resolving defaults (default: cwd)
-  --help              Show this help message
+Turn selection:
+  --list-turns              Inspect eligible turns without generating a draft
+  --message-id <id>         Select one user turn; required when several exist
 
-Finding your session file:
-  Gemini CLI stores session logs at:
-    ~/.gemini/<project-hash>/chats/session-<timestamp>-<id>.jsonl
+Safety and output:
+  --workspace <dir>         Original session workspace (default: current directory)
+  --output <path>           Direct child of evals/, for example evals/bug.eval.ts
+  --write                   Write the draft; preview is the default
+  --suite <name>            suiteName metadata (default: regression)
+  --json                    Emit machine-readable output
+  --root <dir>              Gemini CLI repository root (default: current directory)
+  --help                    Show this help
 
-  To list recent sessions:
-    ls ~/.gemini/*/chats/session-*.jsonl   (macOS / Linux)
-    dir %USERPROFILE%\\.gemini\\*\\chats\\     (Windows)
+Session files are normally stored under:
+  ~/.gemini/tmp/<project-identifier>/chats/session-*.jsonl
 
-  Or from within Gemini CLI, use the /history command.
+Use "gemini --list-sessions" or /resume (also /chat) to locate a session.
 
 Examples:
-  # Generate an eval from a session log (writes to evals/)
-  npm run eval:from-log -- ~/.gemini/abc123/chats/session-2026-08-23T10-00-a1b2c3d4.jsonl
+  npm run eval:from-log -- --log /path/session.jsonl --list-turns
 
-  # Provide a custom name and preview without writing
-  npm run eval:from-log -- session.jsonl --name "should not delete files when asked to clean up" --stdout
+  npm run eval:from-log -- --log /path/session.jsonl --message-id user-42 \\
+    --workspace /path/to/original/workspace \\
+    --name "uses read_many_files for related files" \\
+    --expect-tool read_many_files --forbid-tool read_file \\
+    --fixture src/a.ts --fixture src/b.ts
 
-  # Write to a custom directory and output result as JSON
-  npm run eval:from-log -- session.jsonl --output ./evals --json
+  npm run eval:from-log -- --log /path/session.jsonl --message-id user-42 \\
+    --name "asks before a destructive command" --expect-tool ask_user \\
+    --no-fixtures-needed --output evals/asks-before-delete.eval.ts --write
+
+The command never treats observed calls as expected behavior, never reconstructs
+files from tool output, and never runs the generated behavioral eval. Every
+draft contains a runtime guard that must be removed only after human review and
+a fail-before-fix check.
 `.trim();
 
-function parseArgs(argv: string[]): {
-  sessionPath: string | undefined;
-  name: string | undefined;
-  suite: string | undefined;
-  outputDir: string | undefined;
-  stdout: boolean;
-  noValidate: boolean;
-  json: boolean;
-  root: string | undefined;
-  help: boolean;
-} {
-  const args = argv.slice(2);
-  let sessionPath: string | undefined;
-  let name: string | undefined;
-  let suite: string | undefined;
-  let outputDir: string | undefined;
-  let stdout = false;
-  let noValidate = false;
-  let json = false;
-  let root: string | undefined;
-  let help = false;
+const INSPECTION_WARNING =
+  'Secret detection and path redaction are best effort. Do not publish a session log, and review displayed content before sharing it.';
 
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
+interface CliOptions {
+  log?: string;
+  listTurns: boolean;
+  messageId?: string;
+  name?: string;
+  suite?: string;
+  expectedTools: string[];
+  forbiddenTools: string[];
+  fixtures: string[];
+  noFixturesNeeded: boolean;
+  workspace?: string;
+  output?: string;
+  write: boolean;
+  json: boolean;
+  root?: string;
+  help: boolean;
+}
+
+function optionValue(args: string[], index: number, option: string): string {
+  const value = args[index + 1];
+  if (value === undefined || value.startsWith('--')) {
+    throw new Error(`${option} requires a value.`);
+  }
+  return value;
+}
+
+export function parseArgs(argv: string[]): CliOptions {
+  const options: CliOptions = {
+    listTurns: false,
+    expectedTools: [],
+    forbiddenTools: [],
+    fixtures: [],
+    noFixturesNeeded: false,
+    write: false,
+    json: false,
+    help: false,
+  };
+  const args = argv.slice(2);
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
     switch (arg) {
       case '--help':
       case '-h':
-        help = true;
+        options.help = true;
         break;
-      case '--stdout':
-        stdout = true;
+      case '--list-turns':
+        options.listTurns = true;
         break;
-      case '--no-validate':
-        noValidate = true;
+      case '--no-fixtures-needed':
+        options.noFixturesNeeded = true;
+        break;
+      case '--write':
+        options.write = true;
         break;
       case '--json':
-        json = true;
+        options.json = true;
+        break;
+      case '--log':
+        options.log = optionValue(args, index, arg);
+        index += 1;
+        break;
+      case '--message-id':
+        options.messageId = optionValue(args, index, arg);
+        index += 1;
         break;
       case '--name':
-        name = args[++i];
+        options.name = optionValue(args, index, arg);
+        index += 1;
         break;
       case '--suite':
-        suite = args[++i];
+        options.suite = optionValue(args, index, arg);
+        index += 1;
+        break;
+      case '--expect-tool':
+        options.expectedTools.push(optionValue(args, index, arg));
+        index += 1;
+        break;
+      case '--forbid-tool':
+        options.forbiddenTools.push(optionValue(args, index, arg));
+        index += 1;
+        break;
+      case '--fixture':
+        options.fixtures.push(optionValue(args, index, arg));
+        index += 1;
+        break;
+      case '--workspace':
+        options.workspace = optionValue(args, index, arg);
+        index += 1;
         break;
       case '--output':
-        outputDir = args[++i];
+        options.output = optionValue(args, index, arg);
+        index += 1;
         break;
       case '--root':
-        root = args[++i];
+        options.root = optionValue(args, index, arg);
+        index += 1;
         break;
       default:
-        if (!arg.startsWith('--') && sessionPath === undefined) {
-          sessionPath = arg;
-        } else {
-          console.error(`Unknown argument: ${arg}`);
-          process.exit(1);
-        }
+        throw new Error(`Unknown argument: ${arg}`);
     }
   }
 
-  return {
-    sessionPath,
-    name,
-    suite,
-    outputDir,
-    stdout,
-    noValidate,
-    json,
-    root,
-    help,
-  };
+  return options;
 }
 
-async function main() {
-  const {
-    sessionPath,
-    name,
-    suite,
-    outputDir,
-    stdout: stdoutMode,
-    noValidate,
-    json: jsonMode,
-    root,
-    help,
-  } = parseArgs(process.argv);
+function isUnsafeUnicodeDisplayCodePoint(codePoint: number): boolean {
+  return (
+    (codePoint >= 0x7f && codePoint <= 0x9f) ||
+    codePoint === 0x061c ||
+    codePoint === 0x200e ||
+    codePoint === 0x200f ||
+    (codePoint >= 0x2028 && codePoint <= 0x202e) ||
+    (codePoint >= 0x2066 && codePoint <= 0x2069)
+  );
+}
 
-  if (help) {
+function isUnsafeTerminalCodePoint(codePoint: number): boolean {
+  return codePoint <= 0x1f || isUnsafeUnicodeDisplayCodePoint(codePoint);
+}
+
+export function escapeForTerminal(value: string): string {
+  let escaped = '';
+  for (const character of value) {
+    const codePoint = character.codePointAt(0);
+    escaped +=
+      codePoint !== undefined && isUnsafeTerminalCodePoint(codePoint)
+        ? `\\u${codePoint.toString(16).padStart(4, '0')}`
+        : character;
+  }
+  return escaped;
+}
+
+export function stringifyJsonForOutput(value: unknown): string {
+  let escaped = '';
+  for (const character of JSON.stringify(value, null, 2)) {
+    const codePoint = character.codePointAt(0);
+    escaped +=
+      codePoint !== undefined && isUnsafeUnicodeDisplayCodePoint(codePoint)
+        ? `\\u${codePoint.toString(16).padStart(4, '0')}`
+        : character;
+  }
+  return escaped;
+}
+
+function summarizePrompt(prompt: string): string {
+  const oneLine = prompt.replace(/\s+/g, ' ').trim();
+  const summary =
+    oneLine.length > 120 ? `${oneLine.slice(0, 119)}...` : oneLine;
+  return escapeForTerminal(summary);
+}
+
+async function listTurns(
+  sessionPath: string,
+  options: CliOptions,
+  workspaceRoot: string,
+) {
+  const inspected = await inspectLog(sessionPath);
+  const turns = inspected.analysis.turns.map((turn) =>
+    formatTurnForDisplay(turn, workspaceRoot),
+  );
+
+  if (options.json) {
+    console.log(
+      stringifyJsonForOutput({
+        turns,
+        unsupportedTurns: inspected.analysis.unsupportedTurns,
+        warnings: [INSPECTION_WARNING],
+      }),
+    );
+    return;
+  }
+
+  if (turns.length === 0) {
+    console.log('No eligible plain-text user turns found.');
+  } else {
+    console.log('Eligible session turns:');
+    for (const turn of turns) {
+      console.log(`\n${escapeForTerminal(turn.messageId)}`);
+      console.log(`  Prompt: ${summarizePrompt(turn.prompt)}`);
+      console.log(
+        `  Observed tools: ${
+          turn.observedTools
+            .map(
+              (tool) =>
+                `${escapeForTerminal(tool.name)} (${escapeForTerminal(tool.status)})`,
+            )
+            .join(', ') || '(none)'
+        }`,
+      );
+      console.log(
+        `  Candidate fixture paths: ${turn.candidatePaths.map(escapeForTerminal).join(', ') || '(none)'}`,
+      );
+    }
+  }
+
+  if (inspected.analysis.unsupportedTurns.length > 0) {
+    console.log('\nUnsupported turns:');
+    for (const turn of inspected.analysis.unsupportedTurns) {
+      console.log(
+        `  ${escapeForTerminal(turn.messageId)}: ${escapeForTerminal(turn.reason)}`,
+      );
+    }
+  }
+  console.log(`\nWarning: ${INSPECTION_WARNING}`);
+}
+
+function printHumanResult(
+  result: Awaited<ReturnType<typeof fromLog>>,
+  repoRoot: string,
+) {
+  const relativeOutput = path.relative(repoRoot, result.outputPath);
+  console.log(
+    result.wroteFile
+      ? `Draft written to ${escapeForTerminal(relativeOutput)}`
+      : `Preview for ${escapeForTerminal(relativeOutput)} (nothing was written)`,
+  );
+  console.log(
+    `Selected turn: ${escapeForTerminal(result.selectedTurn.messageId)}`,
+  );
+  console.log(`Prompt: ${summarizePrompt(result.selectedTurn.prompt)}`);
+  console.log(
+    `Observed tools (evidence only): ${
+      result.selectedTurn.observedTools
+        .map(
+          (tool) =>
+            `${escapeForTerminal(tool.name)} (${escapeForTerminal(tool.status)})`,
+        )
+        .join(', ') || '(none)'
+    }`,
+  );
+  console.log(
+    `Expected tools: ${result.expectedTools.map(escapeForTerminal).join(', ') || '(none)'}`,
+  );
+  console.log(
+    `Forbidden tools: ${result.forbiddenTools.map(escapeForTerminal).join(', ') || '(none)'}`,
+  );
+  console.log(
+    `Fixtures: ${result.fixturePaths.map(escapeForTerminal).join(', ') || '(explicitly none)'}`,
+  );
+  console.log('Structural validation: passed');
+
+  console.log('\nWarnings:');
+  for (const warning of result.warnings) {
+    console.log(`  ${escapeForTerminal(warning)}`);
+  }
+
+  if (!result.wroteFile) {
+    console.log('\nGenerated draft:\n');
+    process.stdout.write(result.skeleton);
+    if (!result.skeleton.endsWith('\n')) {
+      process.stdout.write('\n');
+    }
+  }
+
+  console.log('\nNext steps:');
+  console.log('  Review the prompt, fixtures, and intended assertions.');
+  console.log('  Prove the eval fails before the behavior fix.');
+  console.log('  Remove the runtime guard only after those checks.');
+  if (!result.wroteFile) {
+    console.log(
+      '  Re-run with --output evals/<name>.eval.ts --write to save it.',
+    );
+  }
+}
+
+export async function main(argv = process.argv): Promise<number> {
+  let options: CliOptions;
+  try {
+    options = parseArgs(argv);
+  } catch (error) {
+    console.error(`Error: ${escapeForTerminal((error as Error).message)}`);
+    return 1;
+  }
+
+  if (options.help) {
     console.log(HELP_TEXT);
-    process.exit(0);
+    return 0;
   }
-
-  if (!sessionPath) {
-    console.error('Error: <session.jsonl> path is required.\n');
-    console.error('Usage: npm run eval:from-log -- <session.jsonl> [options]');
-    console.error('       npm run eval:from-log -- --help');
-    process.exit(1);
+  if (!options.log) {
+    console.error('Error: --log <session.jsonl> is required.');
+    return 1;
   }
+  const sessionPath = options.log;
 
-  const repoRoot = root ? path.resolve(root) : process.cwd();
+  const repoRoot = path.resolve(options.root ?? process.cwd());
+  const workspaceRoot = path.resolve(options.workspace ?? process.cwd());
 
   try {
+    if (options.listTurns) {
+      if (
+        options.messageId ||
+        options.name ||
+        options.suite ||
+        options.expectedTools.length > 0 ||
+        options.forbiddenTools.length > 0 ||
+        options.fixtures.length > 0 ||
+        options.noFixturesNeeded ||
+        options.output ||
+        options.write
+      ) {
+        throw new Error(
+          '--list-turns cannot be combined with generation or write options.',
+        );
+      }
+      await listTurns(sessionPath, options, workspaceRoot);
+      return 0;
+    }
+
     const result = await fromLog(sessionPath, {
-      name,
-      suiteName: suite,
-      outputDir: outputDir ? path.resolve(outputDir) : undefined,
-      stdoutMode,
-      validate: !noValidate,
+      messageId: options.messageId,
+      name: options.name ?? '',
+      suiteName: options.suite ?? 'regression',
+      expectedTools: options.expectedTools,
+      forbiddenTools: options.forbiddenTools,
+      fixturePaths: options.fixtures,
+      noFixturesNeeded: options.noFixturesNeeded,
+      workspaceRoot,
+      outputPath: options.output,
+      write: options.write,
       repoRoot,
     });
+    const realRepoRoot = fs.realpathSync(repoRoot);
 
-    if (stdoutMode) {
-      // In stdout mode: print the skeleton, warnings to stderr
-      process.stdout.write(result.skeleton);
-      for (const w of result.warnings) {
-        console.error(`⚠ ${w}`);
-      }
-      process.exit(result.validationPassed ? 0 : 1);
-    }
-
-    if (jsonMode) {
+    if (options.json) {
       console.log(
-        JSON.stringify(
-          {
-            outputPath: result.outputPath,
-            prompt: result.prompt,
-            fileCount: result.fileCount,
-            observedTools: result.observedTools,
-            validationPassed: result.validationPassed,
-            warnings: result.warnings,
-          },
-          null,
-          2,
-        ),
+        stringifyJsonForOutput({
+          ...result,
+          outputPath: path.relative(realRepoRoot, result.outputPath),
+        }),
       );
-      process.exit(result.validationPassed ? 0 : 1);
-    }
-
-    // Human-readable output
-    console.log('');
-    console.log('✓ Eval skeleton generated');
-    console.log(`  Output:  ${result.outputPath}`);
-    console.log(
-      `  Prompt:  ${result.prompt.slice(0, 80)}${result.prompt.length > 80 ? '…' : ''}`,
-    );
-    console.log(`  Files:   ${result.fileCount} workspace file(s) included`);
-    console.log(
-      `  Tools:   ${result.observedTools.join(', ') || '(none observed)'}`,
-    );
-
-    if (result.warnings.length > 0) {
-      console.log('');
-      console.log('Warnings:');
-      for (const w of result.warnings) {
-        console.log(`  ⚠ ${w}`);
-      }
-    }
-
-    if (result.validationPassed) {
-      console.log('');
-      console.log('✓ eval:validate passed');
     } else {
-      console.log('');
-      console.log('✗ eval:validate found issues — see warnings above.');
-      console.log('  Fix them before submitting the eval as a PR.');
+      printHumanResult(result, realRepoRoot);
     }
-
-    console.log('');
-    console.log('Next steps:');
-    console.log(`  1. Review the generated file: ${result.outputPath}`);
-    console.log(
-      '  2. Refine the assertions to precisely capture the expected behavior.',
-    );
-    console.log('  3. Run: npm run build && npm run bundle');
-    console.log(
-      `  4. Test: npx vitest run --config evals/vitest.config.ts ${result.outputPath}`,
-    );
-    console.log('  5. Submit a PR with the new eval file.');
-    console.log('');
-
-    process.exit(result.validationPassed ? 0 : 1);
+    return 0;
   } catch (error) {
-    if (error instanceof Error) {
-      console.error(`Error: ${error.message}`);
-    } else {
-      console.error('Fatal error:', error);
-    }
-    process.exit(1);
+    console.error(`Error: ${escapeForTerminal((error as Error).message)}`);
+    return 1;
   }
 }
 
-main();
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  process.exitCode = await main();
+}

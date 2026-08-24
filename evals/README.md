@@ -77,83 +77,34 @@ real-world usage while remaining small and maintainable.
   paths vs. more tests that are more unit-test like. These are evals, so the
   value is in testing how the agent works in a semi-realistic scenario.
 
-## Generating Evals from Bug Reports
+## Drafting Evals from Session Logs
 
-If you observed the agent behaving incorrectly during a real session, you can
-turn that session into a regression eval automatically — no manual boilerplate
-required.
-
-### 1. Find your session file
-
-Gemini CLI saves session JSONL files to:
-
-```
-~/.gemini/<project-hash>/chats/session-<timestamp>-<id>.jsonl
-```
-
-To list recent sessions:
+`eval:from-log` can use one plain-text turn from a local Gemini CLI session as
+the starting point for a behavioral eval. It creates a deliberately incomplete,
+fail-closed draft; it does not turn a log into a finished regression eval.
 
 ```bash
-# macOS / Linux
-ls ~/.gemini/*/chats/session-*.jsonl
+# Inspect eligible turns first.
+npm run eval:from-log -- --log /path/to/session.jsonl --list-turns
 
-# Windows
-dir %USERPROFILE%\.gemini\*\chats\
+# Preview a draft. Nothing is written by default.
+npm run eval:from-log -- --log /path/to/session.jsonl \
+  --workspace /path/to/original/workspace \
+  --message-id <user-message-id> --name "expected behavior" \
+  --expect-tool read_many_files --fixture src/example.ts
 ```
 
-Or use `/history` inside Gemini CLI to locate a past session by prompt.
+The contributor must choose the expected and/or forbidden tools. Observed tool
+calls are evidence only, and fixture contents are copied only from explicitly
+selected files in the original workspace. The helper never reconstructs files
+from tool results, calls an LLM, runs an eval, or uploads a session log.
 
-### 2. Generate the eval skeleton
-
-```bash
-npm run eval:from-log -- /path/to/session.jsonl
-```
-
-This command will:
-
-1. **Parse** the session JSONL
-2. **Reconstruct** the workspace files the agent read before making changes
-3. **Sanitize** the output (replaces absolute paths and known secret patterns)
-4. **Generate** a `USUALLY_PASSES` eval skeleton in `evals/`
-5. **Validate** the output against `eval:validate` rules
-
-Run `npm run eval:from-log -- --help` for all available options:
-
-| Flag             | Default             | Description                           |
-| ---------------- | ------------------- | ------------------------------------- |
-| `--name <name>`  | derived from prompt | Eval case name                        |
-| `--suite <name>` | `regression`        | `suiteName` field                     |
-| `--output <dir>` | `evals/`            | Output directory                      |
-| `--stdout`       | off                 | Print to stdout, do not write file    |
-| `--no-validate`  | off                 | Skip `eval:validate` after generation |
-| `--json`         | off                 | Print result summary as JSON          |
-
-### 3. Review and refine
-
-The generated skeleton contains `TODO` comments indicating where you should
-improve the assertions. The generated assertions are based on which tools the
-agent actually called during the session — review them to ensure they precisely
-capture the **expected** behavior (what the agent _should_ do), not just what it
-happened to do.
-
-```bash
-# Preview the generated file
-cat evals/<your-new-eval>.eval.ts
-
-# Run it to confirm it passes (or fails on the unpatched behaviour)
-npm run build && npm run bundle
-npx vitest run --config evals/vitest.config.ts evals/<your-new-eval>.eval.ts
-```
-
-### 4. Submit as a PR
-
-File a PR with the new eval file. If you have a matching bug, link to the
-[Bug → Eval Report](.github/ISSUE_TEMPLATE/bug_eval_report.yml) issue or
-reference the existing bug issue.
-
-> [!TIP] The best regression evals demonstrate a failure **before** a fix is
-> applied. If you can show the eval failing on `main` and passing on your fix
-> branch, you have a high-quality regression test.
+The generated draft includes a runtime guard. Review and refine the complete
+output, confirm that the pre-fix behavior fails at the intended assertion rather
+than the guard, then remove the guard and verify the eval before and after the
+fix. See
+[Drafting an Eval from a Session Log](../docs/behavioral-evals.md#drafting-an-eval-from-a-session-log)
+for the complete workflow, safety limits, and command reference.
 
 ## Creating an Evaluation
 

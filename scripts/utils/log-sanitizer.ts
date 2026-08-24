@@ -5,192 +5,145 @@
  */
 
 /**
- * @fileoverview Sanitization utilities for session log data.
- *
- * Strips PII, secrets, and machine-specific absolute paths from content
- * extracted from session JSONL files before it is embedded in generated evals.
- * The strategy is to preserve file content fully (for realistic evals) while
- * replacing only patterns that would make the eval non-portable or unsafe to
- * check in.
+ * @fileoverview Best-effort path redaction and high-confidence secret
+ * detection for the small set of user-approved values allowed into generated
+ * eval drafts. This is not a guarantee that arbitrary content is safe to
+ * publish, so every draft still requires human review.
  */
 
 import os from 'node:os';
-import path from 'node:path';
 
 export interface SanitizationOptions {
-  /**
-   * The workspace root directory. Absolute paths under this directory are
-   * replaced with paths relative to `<workspace>/`.
-   */
   workspaceRoot?: string;
-
-  /**
-   * Whether to strip secret patterns (API keys, tokens, private keys).
-   * Defaults to true.
-   */
-  stripSecrets?: boolean;
-
-  /**
-   * Whether to replace the home directory prefix in paths.
-   * Defaults to true.
-   */
   stripHomePaths?: boolean;
 }
 
-/** Placeholder used in place of the user's workspace root in paths. */
-export const WORKSPACE_PLACEHOLDER = '<workspace>';
+export interface SensitiveFinding {
+  category: string;
+  line: number;
+}
 
-/** Placeholder used in place of the user's home directory in paths. */
+export const WORKSPACE_PLACEHOLDER = '<workspace>';
 export const HOME_PLACEHOLDER = '<home>';
 
-/** Placeholder used in place of redacted secret values. */
-export const REDACTED_PLACEHOLDER = '<REDACTED>';
-
-/**
- * Secret patterns to scrub. Order matters — more specific patterns first.
- * Each entry: [regex, replacement].
- */
-const SECRET_PATTERNS: Array<[RegExp, string]> = [
-  // PEM private keys
-  [
-    /-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----/g,
-    `-----BEGIN PRIVATE KEY-----\n${REDACTED_PLACEHOLDER}\n-----END PRIVATE KEY-----`,
-  ],
-  // Bearer tokens in Authorization headers
-  [/Bearer\s+[A-Za-z0-9\-._~+/]+=*/g, `Bearer ${REDACTED_PLACEHOLDER}`],
-  // API key environment variable assignments (shell/dotenv style)
-  [
-    /(?:GEMINI_API_KEY|GOOGLE_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|API_KEY)\s*=\s*["']?[A-Za-z0-9\-._~+/]{20,}["']?/g,
-    (match: string) => match.split('=')[0] + `=${REDACTED_PLACEHOLDER}`,
-  ],
-  // Generic "password = ..." assignments
-  [
-    /(?:password|passwd|secret|token|credential)\s*[:=]\s*["']?[^\s"']{8,}["']?/gi,
-    (match: string) => {
-      const sep = match.includes(':') ? ':' : '=';
-      return match.split(sep)[0] + sep + ` ${REDACTED_PLACEHOLDER}`;
-    },
-  ],
+const SENSITIVE_PATTERNS: Array<{
+  category: string;
+  pattern: RegExp;
+}> = [
+  {
+    category: 'private key',
+    pattern:
+      /-----BEGIN (?:(?:RSA |EC |DSA |OPENSSH |ENCRYPTED )?PRIVATE KEY|PGP PRIVATE KEY BLOCK)-----/,
+  },
+  {
+    category: 'authorization bearer token',
+    pattern: /\bBearer\s+[A-Za-z0-9._~+/=-]{16,}/i,
+  },
+  {
+    category: 'authorization basic credential',
+    pattern: /\bBasic\s+[A-Za-z0-9+/=]{16,}/i,
+  },
+  {
+    category: 'credential-bearing URL',
+    pattern: /\b[a-z][a-z0-9+.-]*:\/\/[^/\s:@]+:[^/\s@]{8,}@/i,
+  },
+  {
+    category: 'API key assignment',
+    pattern:
+      /(?:^|[^\w])["']?(?:GEMINI_API_KEY|GOOGLE_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|API_KEY)["']?\s*[:=]\s*["']?[^\s"']{16,}/i,
+  },
+  {
+    category: 'credential assignment',
+    pattern:
+      /(?:^|[^\w])["']?(?:password|passwd|secret|token|credential|client_secret|aws_secret_access_key)["']?\s*[:=]\s*["']?[^\s"']{16,}/i,
+  },
+  {
+    category: 'known token format',
+    pattern:
+      /\b(?:AIza[0-9A-Za-z_-]{30,}|gh[pousr]_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|GOCSPX-[A-Za-z0-9_-]{20,}|npm_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{20,})\b/,
+  },
+  {
+    category: 'JSON web token',
+    pattern: /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/,
+  },
 ];
 
-/**
- * Replaces occurrences of a directory path in content with a placeholder.
- * Handles both forward slash and backslash variants.
- */
-function replacePathInContent(
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function replacePathLiteral(
   content: string,
-  dirPath: string,
-  placeholder: string,
+  value: string,
+  replacement: string,
 ): string {
-  if (!dirPath) return content;
+  if (!value) {
+    return content;
+  }
 
-  // Escape special regex chars in the directory path
-  const escaped = dirPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-  // Match both forward-slash and backslash normalizations
-  const forwardSlash = dirPath.replace(/\\/g, '/');
-  const escapedForward = forwardSlash.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-  // Replace backslash variant (Windows)
-  content = content.replace(new RegExp(escaped, 'g'), placeholder);
-  // Replace forward-slash variant
-  content = content.replace(new RegExp(escapedForward, 'g'), placeholder);
-
-  return content;
+  const flags = /^(?:[A-Za-z]:[\\/]|\\\\|\/\/)/.test(value) ? 'gi' : 'g';
+  const pattern = new RegExp(
+    `(^|[Ff][Ii][Ll][Ee]:\\/\\/\\/?|[^A-Za-z0-9._~\\\\/-])${escapeRegExp(value)}(?=$|[\\\\/])`,
+    flags,
+  );
+  return content.replace(
+    pattern,
+    (_match, prefix: string) => `${prefix}${replacement}`,
+  );
 }
 
 /**
- * Sanitizes a single string value (file content, prompt text, tool arg, etc.)
- * by replacing absolute paths and secrets with safe placeholders.
+ * Reports only a category and line number. It never returns the matched value.
+ */
+export function findSensitiveContent(content: string): SensitiveFinding[] {
+  const findings: SensitiveFinding[] = [];
+  const seen = new Set<string>();
+
+  for (const [index, line] of content.split(/\r?\n/).entries()) {
+    for (const { category, pattern } of SENSITIVE_PATTERNS) {
+      if (!pattern.test(line)) {
+        continue;
+      }
+      const key = `${category}:${index + 1}`;
+      if (!seen.has(key)) {
+        findings.push({ category, line: index + 1 });
+        seen.add(key);
+      }
+    }
+  }
+
+  return findings;
+}
+
+/**
+ * Redacts machine-specific workspace and home paths. Secret-bearing content is
+ * rejected by the caller instead of being silently mutated here.
  */
 export function sanitizeContent(
   content: string,
   options: SanitizationOptions = {},
 ): string {
-  const { workspaceRoot, stripSecrets = true, stripHomePaths = true } = options;
-
+  const { workspaceRoot, stripHomePaths = true } = options;
   let result = content;
 
-  // Replace workspace root first (most specific, so do it before home)
   if (workspaceRoot) {
-    result = replacePathInContent(result, workspaceRoot, WORKSPACE_PLACEHOLDER);
+    result = replacePathLiteral(result, workspaceRoot, WORKSPACE_PLACEHOLDER);
+    result = replacePathLiteral(
+      result,
+      workspaceRoot.replace(/\\/g, '/'),
+      WORKSPACE_PLACEHOLDER,
+    );
   }
 
-  // Replace home directory
   if (stripHomePaths) {
     const home = os.homedir();
-    if (home) {
-      result = replacePathInContent(result, home, HOME_PLACEHOLDER);
-    }
-  }
-
-  // Strip secrets
-  if (stripSecrets) {
-    for (const [pattern, replacement] of SECRET_PATTERNS) {
-      if (typeof replacement === 'string') {
-        result = result.replace(pattern, replacement);
-      } else {
-        result = result.replace(
-          pattern,
-          replacement as (match: string) => string,
-        );
-      }
-    }
+    result = replacePathLiteral(result, home, HOME_PLACEHOLDER);
+    result = replacePathLiteral(
+      result,
+      home.replace(/\\/g, '/'),
+      HOME_PLACEHOLDER,
+    );
   }
 
   return result;
-}
-
-/**
- * Sanitizes all keys and values in a file map (path → content).
- * Keys (file paths) are made workspace-relative.
- * Values (file contents) go through full sanitization.
- */
-export function sanitizeFileMap(
-  files: Record<string, string>,
-  options: SanitizationOptions = {},
-): Record<string, string> {
-  const { workspaceRoot } = options;
-  const result: Record<string, string> = {};
-
-  for (const [filePath, content] of Object.entries(files)) {
-    // Normalize the key to be workspace-relative
-    let normalizedKey = filePath;
-    if (workspaceRoot && path.isAbsolute(filePath)) {
-      // Resolve the path to collapse any '..' segments before comparing
-      const resolved = path.resolve(filePath);
-      const rel = path.relative(workspaceRoot, resolved);
-      // Only use the relative path if it stays within the workspace root.
-      if (!rel.startsWith('..') && !path.isAbsolute(rel)) {
-        normalizedKey = rel.replace(/\\/g, '/');
-      } else {
-        // Path is outside workspace (e.g. traversal attack or system file) — skip it
-        continue;
-      }
-    }
-
-    result[normalizedKey] = sanitizeContent(content, options);
-  }
-
-  return result;
-}
-
-/**
- * Sanitizes a file path string, making it workspace-relative if possible.
- */
-export function sanitizePath(
-  filePath: string,
-  options: SanitizationOptions = {},
-): string {
-  const { workspaceRoot } = options;
-
-  if (workspaceRoot && path.isAbsolute(filePath)) {
-    const rel = path.relative(workspaceRoot, filePath);
-    if (!rel.startsWith('..') && !path.isAbsolute(rel)) {
-      return rel.replace(/\\/g, '/');
-    }
-  }
-
-  // Fall back to generic content sanitization for absolute path placeholders
-  return sanitizeContent(filePath, options);
 }

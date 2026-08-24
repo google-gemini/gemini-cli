@@ -5,245 +5,792 @@
  */
 
 /**
- * @fileoverview Core pipeline for the eval:from-log command.
- *
- * Orchestrates: parse → reconstruct workspace → sanitize → generate skeleton →
- * validate → write output.
+ * @fileoverview Safe orchestration for generating a reviewable eval draft from
+ * one selected Gemini CLI session turn.
  */
 
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
-import { loadConversationRecord } from '@google/gemini-cli-core';
 import {
-  extractWorkspaceFiles,
-  extractUserPrompt,
-} from './workspace-reconstructor.js';
-import { sanitizeContent, sanitizeFileMap } from './log-sanitizer.js';
+  getProjectHash,
+  loadConversationRecord,
+  type ConversationRecord,
+} from '@google/gemini-cli-core';
 import {
-  generateEvalSkeleton,
-  deriveEvalName,
-} from './eval-skeleton-generator.js';
-import { collectInventory } from './eval-inventory.js';
-import { buildToolRegistry } from './tool-registry.js';
-import { validateInventory } from './eval-validate.js';
+  analyzeSessionTurns,
+  selectSessionTurn,
+  type ObservedToolCall,
+  type SessionTurnAnalysis,
+  type SessionTurnCandidate,
+} from './session-turns.js';
+import { findSensitiveContent, sanitizeContent } from './log-sanitizer.js';
+import { generateEvalSkeleton } from './eval-skeleton-generator.js';
+import { analyzeEvalSource, type EvalFileAnalysis } from './eval-analysis.js';
+import { buildToolRegistry, resolveToolName } from './tool-registry.js';
+import { validateInventory, type ValidationResult } from './eval-validate.js';
+import type { InventoryResult } from './eval-inventory.js';
+
+const MAX_FIXTURES = 10;
+const MAX_FIXTURE_BYTES = 100 * 1024;
+const MAX_TOTAL_FIXTURE_BYTES = 500 * 1024;
+const MAX_PROMPT_CHARS = 20_000;
+const MAX_NAME_CHARS = 200;
+const MAX_SUITE_NAME_CHARS = 100;
+const MAX_TOOL_ASSERTIONS = 20;
+const MAX_SESSION_BYTES = 100 * 1024 * 1024;
+
+const BLOCKED_FIXTURE_BASENAMES = new Set([
+  '.npmrc',
+  '.netrc',
+  '.pypirc',
+  'credentials',
+  'credentials.json',
+  'id_dsa',
+  'id_ed25519',
+  'id_rsa',
+  'service-account.json',
+]);
+
+const BLOCKED_FIXTURE_EXTENSIONS = new Set([
+  '.crt',
+  '.key',
+  '.p12',
+  '.pem',
+  '.pfx',
+]);
+
+const BLOCKED_FIXTURE_PATH_SEGMENTS = new Set([
+  '.aws',
+  '.gemini',
+  '.git',
+  '.gnupg',
+  '.ssh',
+]);
+
+const WINDOWS_RESERVED_PATH_COMPONENTS = new Set([
+  'AUX',
+  'CON',
+  'NUL',
+  'PRN',
+  ...Array.from({ length: 9 }, (_, index) => `COM${index + 1}`),
+  ...Array.from({ length: 9 }, (_, index) => `LPT${index + 1}`),
+]);
+
+export interface InspectLogResult {
+  projectHash: string;
+  analysis: SessionTurnAnalysis;
+}
 
 export interface FromLogOptions {
-  /**
-   * The display name for the generated eval case.
-   * If not provided, derived from the first user prompt.
-   */
-  name?: string;
-
-  /**
-   * The `suiteName` field in the generated eval.
-   * Defaults to `'regression'`.
-   */
+  messageId?: string;
+  name: string;
   suiteName?: string;
-
-  /**
-   * Directory to write the generated file into.
-   * Defaults to `<repoRoot>/evals/`.
-   */
-  outputDir?: string;
-
-  /**
-   * If true, return the generated source in `skeleton` but do NOT write a
-   * file to disk.
-   */
-  stdoutMode?: boolean;
-
-  /**
-   * If true, run `eval:validate` on the generated file after writing.
-   * Defaults to true.
-   */
-  validate?: boolean;
-
-  /**
-   * Repository root for resolving defaults and running validation.
-   * Defaults to `process.cwd()`.
-   */
+  expectedTools?: string[];
+  forbiddenTools?: string[];
+  fixturePaths?: string[];
+  noFixturesNeeded?: boolean;
+  workspaceRoot?: string;
+  outputPath?: string;
+  write?: boolean;
   repoRoot?: string;
 }
 
 export interface FromLogResult {
-  /** Absolute path where the eval file was written. Undefined in stdoutMode. */
-  outputPath?: string;
-
-  /** The generated TypeScript source code. */
+  outputPath: string;
+  wroteFile: boolean;
   skeleton: string;
-
-  /** True if validation ran and passed (or was skipped). */
-  validationPassed: boolean;
-
-  /** Non-fatal warnings encountered during generation. */
+  structuralValidationPassed: true;
   warnings: string[];
-
-  /** The sanitized prompt that was used. */
-  prompt: string;
-
-  /** The number of workspace files included. */
-  fileCount: number;
-
-  /** The tools that were observed and included in assertions. */
-  observedTools: string[];
-}
-
-/**
- * Converts a human-readable name into a safe filename stem.
- * e.g. "should handle: fix the bug in app.ts" → "fix_the_bug_in_app_ts"
- */
-function toFilenameStem(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/^should\s+(handle:\s*)?/i, '')
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 60);
-}
-
-/**
- * Picks a unique output file path in the given directory, avoiding collisions
- * with existing files by appending a numeric suffix.
- */
-function pickOutputPath(outputDir: string, stem: string): string {
-  const base = path.join(outputDir, `${stem}.eval.ts`);
-  if (!fs.existsSync(base)) return base;
-
-  for (let i = 2; i <= 99; i++) {
-    const candidate = path.join(outputDir, `${stem}_${i}.eval.ts`);
-    if (!fs.existsSync(candidate)) return candidate;
-  }
-
-  // Fall back to a timestamp suffix if all numeric slots are taken
-  const ts = Date.now();
-  return path.join(outputDir, `${stem}_${ts}.eval.ts`);
-}
-
-/**
- * Main pipeline: reads a session JSONL, extracts data, sanitizes, generates
- * an eval skeleton, optionally validates and writes to disk.
- *
- * @param sessionPath - Absolute or relative path to a session `.jsonl` file.
- * @param options - Pipeline configuration.
- * @returns The generation result.
- */
-export async function fromLog(
-  sessionPath: string,
-  options: FromLogOptions = {},
-): Promise<FromLogResult> {
-  const {
-    suiteName = 'regression',
-    stdoutMode = false,
-    validate = true,
-    repoRoot = process.cwd(),
-  } = options;
-
-  const warnings: string[] = [];
-
-  // ─── Step 1: Parse the session JSONL ──────────────────────────────────────
-  const resolvedSessionPath = path.resolve(sessionPath);
-  if (!fs.existsSync(resolvedSessionPath)) {
-    throw new Error(`Session file not found: ${resolvedSessionPath}`);
-  }
-
-  const conversation = await loadConversationRecord(resolvedSessionPath);
-  if (!conversation) {
-    throw new Error(
-      `Failed to parse session file: ${resolvedSessionPath}\n` +
-        'The file may be empty, corrupt, or not a valid session JSONL.',
-    );
-  }
-
-  // ─── Step 2: Extract workspace files and user prompt ──────────────────────
-  const workspace = extractWorkspaceFiles(conversation);
-  const rawPrompt = extractUserPrompt(conversation);
-
-  if (!rawPrompt) {
-    warnings.push(
-      'No user prompt found in session. The generated eval will have an empty prompt — please fill it in manually.',
-    );
-  }
-
-  if (Object.keys(workspace.files).length === 0) {
-    warnings.push(
-      'No pre-session workspace files were reconstructed. ' +
-        'This happens when the session had no read_file calls before any writes. ' +
-        'Consider adding workspace files manually to the generated eval.',
-    );
-  }
-
-  // ─── Step 3: Sanitize ─────────────────────────────────────────────────────
-  const sanitizationOptions = {
-    workspaceRoot: workspace.workspaceRoot,
+  selectedTurn: {
+    messageId: string;
+    prompt: string;
+    observedTools: ObservedToolCall[];
+    candidatePaths: string[];
   };
+  expectedTools: string[];
+  forbiddenTools: string[];
+  fixturePaths: string[];
+}
 
-  const sanitizedPrompt = rawPrompt
-    ? sanitizeContent(rawPrompt, sanitizationOptions)
-    : 'TODO: describe the user request that triggered the bug';
+function displayPath(filePath: string): string {
+  return sanitizeContent(filePath, { stripHomePaths: true });
+}
 
-  const sanitizedFiles = sanitizeFileMap(workspace.files, sanitizationOptions);
+function assertSupportedSessionFile(filePath: string): void {
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`Session file not found: ${displayPath(filePath)}`);
+  }
+  if (!fs.statSync(filePath).isFile()) {
+    throw new Error(
+      `Session path is not a regular file: ${displayPath(filePath)}`,
+    );
+  }
+  if (!filePath.endsWith('.jsonl') && !filePath.endsWith('.json')) {
+    throw new Error('Session file must end in .jsonl or .json.');
+  }
+  if (fs.statSync(filePath).size > MAX_SESSION_BYTES) {
+    throw new Error(
+      `Session file exceeds the ${MAX_SESSION_BYTES}-byte safety limit.`,
+    );
+  }
+}
 
-  // ─── Step 4: Determine eval name ──────────────────────────────────────────
-  const evalName = options.name ?? deriveEvalName(sanitizedPrompt);
-  const stem = toFilenameStem(evalName);
-
-  // ─── Step 5: Generate skeleton ────────────────────────────────────────────
-  const outputDir = options.outputDir ?? path.join(repoRoot, 'evals');
-  const outputPath = stdoutMode
-    ? path.join(outputDir, `${stem}.eval.ts`)
-    : pickOutputPath(outputDir, stem);
-
-  const skeleton = await generateEvalSkeleton(
-    {
-      name: evalName,
-      suiteName,
-      prompt: sanitizedPrompt,
-      files: sanitizedFiles,
-      observedTools: workspace.observedTools,
-    },
-    outputPath,
-  );
-
-  // ─── Step 6: Write to disk (unless stdout mode) ───────────────────────────
-  if (!stdoutMode) {
-    fs.mkdirSync(outputDir, { recursive: true });
-    fs.writeFileSync(outputPath, skeleton, 'utf8');
+function countMalformedJsonlLines(content: string, isJsonl: boolean): number {
+  if (!isJsonl) {
+    return 0;
   }
 
-  // ─── Step 7: Validate ─────────────────────────────────────────────────────
-  let validationPassed = true;
-
-  if (validate && !stdoutMode) {
+  let malformed = 0;
+  for (const line of content.split(/\r?\n/)) {
+    if (!line.trim()) {
+      continue;
+    }
     try {
-      const inventory = await collectInventory(repoRoot);
-      const registry = buildToolRegistry();
-      // Validate only the newly generated file by passing its path as a filter
-      const result = validateInventory(inventory, registry, {
-        filePaths: [outputPath],
-      });
-
-      if (result.totalViolations > 0) {
-        validationPassed = false;
-        for (const v of result.violations) {
-          warnings.push(
-            `[eval:validate] [${v.ruleId}] ${v.location.line}:${v.location.column} — ${v.message}`,
-          );
-        }
-      }
-    } catch (err) {
-      warnings.push(
-        `eval:validate could not run: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      JSON.parse(line);
+    } catch {
+      malformed += 1;
     }
   }
 
+  return malformed;
+}
+
+async function loadSession(filePath: string): Promise<ConversationRecord> {
+  const resolved = path.resolve(filePath);
+  assertSupportedSessionFile(resolved);
+
+  const buffer = fs.readFileSync(resolved);
+  if (buffer.byteLength > MAX_SESSION_BYTES) {
+    throw new Error(
+      `Session file exceeds the ${MAX_SESSION_BYTES}-byte safety limit.`,
+    );
+  }
+
+  let content: string;
+  try {
+    content = new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+  } catch {
+    throw new Error('Session file is not valid UTF-8 text.');
+  }
+
+  const isJsonl = resolved.endsWith('.jsonl');
+  const malformedLineCount = countMalformedJsonlLines(content, isJsonl);
+  if (malformedLineCount > 0) {
+    throw new Error(
+      `Session JSONL contains ${malformedLineCount} malformed non-empty line(s). Generation is refused because the logical session may be incomplete.`,
+    );
+  }
+
+  // Parse the exact bytes validated above. The original session may still be
+  // active and append between operations, while the core loader intentionally
+  // tolerates malformed lines for resume recovery.
+  const snapshotDirectory = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'gemini-eval-from-log-'),
+  );
+  const snapshotPath = path.join(
+    snapshotDirectory,
+    isJsonl ? 'session.jsonl' : 'session.json',
+  );
+  try {
+    fs.writeFileSync(snapshotPath, buffer, { mode: 0o600, flag: 'wx' });
+    const conversation = await loadConversationRecord(snapshotPath);
+    if (!conversation) {
+      throw new Error(
+        `Could not load a valid Gemini CLI conversation from ${displayPath(resolved)}.`,
+      );
+    }
+    return conversation;
+  } finally {
+    fs.rmSync(snapshotDirectory, { recursive: true, force: true });
+  }
+}
+
+export async function inspectLog(
+  sessionPath: string,
+): Promise<InspectLogResult> {
+  const conversation = await loadSession(sessionPath);
   return {
-    outputPath: stdoutMode ? undefined : outputPath,
+    projectHash: conversation.projectHash,
+    analysis: analyzeSessionTurns(conversation),
+  };
+}
+
+function isInside(root: string, candidate: string): boolean {
+  const relative = path.relative(root, candidate);
+  return (
+    relative === '' ||
+    (!relative.startsWith(`..${path.sep}`) &&
+      relative !== '..' &&
+      !path.isAbsolute(relative))
+  );
+}
+
+function hasControlCharacters(value: string): boolean {
+  for (const character of value) {
+    const codePoint = character.codePointAt(0);
+    if (
+      codePoint !== undefined &&
+      (codePoint <= 0x1f ||
+        (codePoint >= 0x7f && codePoint <= 0x9f) ||
+        codePoint === 0x061c ||
+        codePoint === 0x200e ||
+        codePoint === 0x200f ||
+        (codePoint >= 0x2028 && codePoint <= 0x202e) ||
+        (codePoint >= 0x2066 && codePoint <= 0x2069))
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function isPortablePathComponent(component: string): boolean {
+  const stem = component.split('.')[0]?.toUpperCase();
+  return (
+    component.length > 0 &&
+    !component.endsWith('.') &&
+    !component.endsWith(' ') &&
+    !/[<>:"|?*]/.test(component) &&
+    !WINDOWS_RESERVED_PATH_COMPONENTS.has(stem)
+  );
+}
+
+function assertPortableEvalPath(portablePath: string, label: string): void {
+  // prepareWorkspace currently rejects the substring anywhere, including an
+  // otherwise ordinary filename such as version..txt. Mirror that runtime
+  // contract so a generated draft cannot pass structural checks then fail in
+  // setup before reaching its guard.
+  if (
+    portablePath.includes('..') ||
+    !portablePath.split('/').every(isPortablePathComponent)
+  ) {
+    throw new Error(
+      `${label} is not portable across supported eval platforms or is rejected by eval workspace setup.`,
+    );
+  }
+}
+
+function normalizeRelativePath(filePath: string): string {
+  if (hasControlCharacters(filePath)) {
+    throw new Error('Fixture paths must not contain control characters.');
+  }
+  if (path.isAbsolute(filePath)) {
+    throw new Error('Fixture paths must be relative.');
+  }
+
+  const normalized = path.normalize(filePath.replace(/[\\/]/g, path.sep));
+  if (
+    !normalized ||
+    normalized === '.' ||
+    normalized === '..' ||
+    normalized.startsWith(`..${path.sep}`)
+  ) {
+    throw new Error('Unsafe fixture path.');
+  }
+
+  return normalized;
+}
+
+function assertFixtureNameIsSafe(relativePath: string): void {
+  const segments = relativePath
+    .split(path.sep)
+    .map((segment) => segment.toLowerCase());
+  const basename = path.basename(relativePath).toLowerCase();
+  const extension = path.extname(basename);
+  if (
+    segments.some((segment) => BLOCKED_FIXTURE_PATH_SEGMENTS.has(segment)) ||
+    (segments.includes('.config') && segments.includes('gcloud')) ||
+    basename === '.env' ||
+    basename.startsWith('.env.') ||
+    BLOCKED_FIXTURE_BASENAMES.has(basename) ||
+    BLOCKED_FIXTURE_EXTENSIONS.has(extension)
+  ) {
+    throw new Error(
+      `Fixture ${relativePath} is blocked because its path commonly contains credentials or key material.`,
+    );
+  }
+}
+
+function loadFixtures(
+  fixturePaths: string[],
+  workspaceRoot: string,
+  sessionProjectHash: string,
+  warnings: string[],
+): Record<string, string> {
+  if (fixturePaths.length > MAX_FIXTURES) {
+    throw new Error(`At most ${MAX_FIXTURES} fixture files may be included.`);
+  }
+
+  const requestedWorkspaceRoot = path.resolve(workspaceRoot);
+  const realWorkspaceRoot = fs.realpathSync(requestedWorkspaceRoot);
+  if (!fs.statSync(realWorkspaceRoot).isDirectory()) {
+    throw new Error('The workspace path must be a directory.');
+  }
+  const matchingProjectHashes = new Set([
+    getProjectHash(requestedWorkspaceRoot),
+    getProjectHash(realWorkspaceRoot),
+  ]);
+  if (!matchingProjectHashes.has(sessionProjectHash)) {
+    throw new Error(
+      'The selected workspace does not match the session project hash. Use the original workspace or omit fixtures explicitly.',
+    );
+  }
+
+  const files = Object.create(null) as Record<string, string>;
+  const realFiles = new Set<string>();
+  const portableFiles = new Set<string>();
+  let totalBytes = 0;
+
+  for (const requestedPath of fixturePaths) {
+    const normalized = normalizeRelativePath(requestedPath);
+    const portablePath = normalized.split(path.sep).join('/');
+    if (findSensitiveContent(portablePath).length > 0) {
+      throw new Error('A fixture path appears to contain sensitive content.');
+    }
+    assertPortableEvalPath(portablePath, 'Fixture path');
+    const portableKey = portablePath.toLowerCase();
+    if (portableFiles.has(portableKey)) {
+      throw new Error(`Duplicate fixture path: ${portablePath}`);
+    }
+    portableFiles.add(portableKey);
+    assertFixtureNameIsSafe(normalized);
+
+    const candidate = path.resolve(realWorkspaceRoot, normalized);
+    let realCandidate: string;
+    try {
+      realCandidate = fs.realpathSync(candidate);
+    } catch {
+      throw new Error(`Fixture file not found: ${portablePath}`);
+    }
+    if (!isInside(realWorkspaceRoot, realCandidate)) {
+      throw new Error(
+        `Fixture escapes the selected workspace: ${portablePath}`,
+      );
+    }
+    if (fs.lstatSync(candidate).isSymbolicLink()) {
+      throw new Error(
+        `Fixture is a symbolic link and cannot be reproduced faithfully: ${portablePath}`,
+      );
+    }
+    if (realFiles.has(realCandidate)) {
+      throw new Error(`Fixture resolves to a duplicate file: ${portablePath}`);
+    }
+    realFiles.add(realCandidate);
+
+    const stat = fs.statSync(realCandidate);
+    if (!stat.isFile()) {
+      throw new Error(`Fixture is not a regular file: ${portablePath}`);
+    }
+    if (stat.size > MAX_FIXTURE_BYTES) {
+      throw new Error(
+        `Fixture ${portablePath} exceeds the ${MAX_FIXTURE_BYTES}-byte limit.`,
+      );
+    }
+    const buffer = fs.readFileSync(realCandidate);
+    if (buffer.byteLength > MAX_FIXTURE_BYTES) {
+      throw new Error(
+        `Fixture ${portablePath} exceeds the ${MAX_FIXTURE_BYTES}-byte limit.`,
+      );
+    }
+    totalBytes += buffer.byteLength;
+    if (totalBytes > MAX_TOTAL_FIXTURE_BYTES) {
+      throw new Error(
+        `Fixture set exceeds the ${MAX_TOTAL_FIXTURE_BYTES}-byte total limit.`,
+      );
+    }
+    if (buffer.includes(0)) {
+      throw new Error(`Fixture appears to be binary: ${portablePath}`);
+    }
+
+    let content: string;
+    try {
+      content = new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+    } catch {
+      throw new Error(`Fixture is not valid UTF-8 text: ${portablePath}`);
+    }
+
+    const findings = findSensitiveContent(content);
+    if (findings.length > 0) {
+      const first = findings[0];
+      throw new Error(
+        `Fixture ${portablePath} contains a potential ${first.category} on line ${first.line}. Remove sensitive data before generating a draft.`,
+      );
+    }
+
+    const sanitized = sanitizeContent(
+      sanitizeContent(content, { workspaceRoot: requestedWorkspaceRoot }),
+      { workspaceRoot: realWorkspaceRoot },
+    );
+    if (sanitized !== content) {
+      warnings.push(
+        `Machine-specific paths were redacted in fixture ${portablePath}. Review the resulting content for fidelity.`,
+      );
+    }
+    files[portablePath] = sanitized;
+  }
+
+  return files;
+}
+
+function canonicalizeTools(toolNames: string[], optionName: string): string[] {
+  const registry = buildToolRegistry();
+  const result: string[] = [];
+
+  for (const rawName of toolNames) {
+    const name = rawName.trim();
+    if (!name) {
+      throw new Error(`${optionName} requires a non-empty tool name.`);
+    }
+    const canonical = resolveToolName(registry, name);
+    if (!canonical) {
+      throw new Error(`Unknown tool name for ${optionName}: ${name}`);
+    }
+    if (!result.includes(canonical)) {
+      result.push(canonical);
+    }
+  }
+
+  return result;
+}
+
+function assertSafeShortText(
+  value: string,
+  optionName: string,
+  maxLength: number,
+): void {
+  if (hasControlCharacters(value)) {
+    throw new Error(`${optionName} must not contain control characters.`);
+  }
+  if (value.length > maxLength) {
+    throw new Error(`${optionName} must be at most ${maxLength} characters.`);
+  }
+  const findings = findSensitiveContent(value);
+  if (findings.length > 0) {
+    throw new Error(`${optionName} appears to contain sensitive content.`);
+  }
+}
+
+function toFilenameStem(name: string): string {
+  const stem = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
+  return stem || 'generated-eval';
+}
+
+function resolveOutputPath(
+  repoRoot: string,
+  name: string,
+  requestedPath: string | undefined,
+  write: boolean,
+): string {
+  const realRepoRoot = fs.realpathSync(repoRoot);
+  const evalsDir = path.join(realRepoRoot, 'evals');
+  if (!fs.existsSync(evalsDir) || !fs.statSync(evalsDir).isDirectory()) {
+    throw new Error(
+      `Repository evals directory not found under ${displayPath(realRepoRoot)}.`,
+    );
+  }
+
+  if (write && !requestedPath) {
+    throw new Error('--output is required when --write is used.');
+  }
+
+  const relativePath =
+    requestedPath ?? path.join('evals', `${toFilenameStem(name)}.eval.ts`);
+  if (path.isAbsolute(relativePath)) {
+    throw new Error(
+      '--output must be a repository-relative path under evals/.',
+    );
+  }
+  if (hasControlCharacters(relativePath)) {
+    throw new Error('--output must not contain control characters.');
+  }
+
+  const normalized = path.normalize(relativePath.replace(/[\\/]/g, path.sep));
+  if (
+    normalized === '..' ||
+    normalized.startsWith(`..${path.sep}`) ||
+    path.dirname(normalized) !== 'evals' ||
+    !normalized.endsWith('.eval.ts')
+  ) {
+    throw new Error(
+      '--output must be a direct child of evals/, end in .eval.ts, and contain no traversal.',
+    );
+  }
+  assertPortableEvalPath(
+    path.basename(normalized).split(path.sep).join('/'),
+    'Output filename',
+  );
+  if (path.basename(normalized).startsWith('.')) {
+    throw new Error(
+      '--output filename must not start with a dot because hidden eval files are not discovered.',
+    );
+  }
+
+  const outputPath = path.resolve(realRepoRoot, normalized);
+  const realEvalsDir = fs.realpathSync(evalsDir);
+  if (
+    fs.lstatSync(evalsDir).isSymbolicLink() ||
+    !isInside(realRepoRoot, realEvalsDir)
+  ) {
+    throw new Error(
+      'The repository evals directory must not be a symbolic link.',
+    );
+  }
+  if (fs.realpathSync(path.dirname(outputPath)) !== realEvalsDir) {
+    throw new Error(
+      '--output resolves outside the repository evals directory.',
+    );
+  }
+  if (write && fs.existsSync(outputPath)) {
+    throw new Error(`Refusing to overwrite existing file: ${normalized}`);
+  }
+
+  return outputPath;
+}
+
+function previewCandidatePath(rawPath: string, workspaceRoot: string): string {
+  if (
+    hasControlCharacters(rawPath) ||
+    findSensitiveContent(rawPath).length > 0
+  ) {
+    return '<omitted: unsafe path>';
+  }
+
+  const normalizedInput = rawPath.replace(/[\\/]/g, path.sep);
+  if (path.isAbsolute(normalizedInput)) {
+    const resolved = path.resolve(normalizedInput);
+    if (!isInside(workspaceRoot, resolved)) {
+      return '<outside-workspace>';
+    }
+    return path.relative(workspaceRoot, resolved).split(path.sep).join('/');
+  }
+
+  const normalized = path.normalize(normalizedInput);
+  if (normalized === '..' || normalized.startsWith(`..${path.sep}`)) {
+    return '<outside-workspace>';
+  }
+  return normalized.split(path.sep).join('/');
+}
+
+function validateSkeleton(
+  skeleton: string,
+  outputPath: string,
+  repoRoot: string,
+): { analysis: EvalFileAnalysis; validation: ValidationResult } {
+  const analysis = analyzeEvalSource(skeleton, {
+    filePath: outputPath,
+    repoRoot,
+  });
+  const inventory: InventoryResult = {
+    totalFiles: 1,
+    totalCases: analysis.cases.length,
+    repoRoot,
+    files: [analysis],
+    cases: analysis.cases,
+    diagnostics: analysis.diagnostics,
+  };
+  const validation = validateInventory(inventory, buildToolRegistry());
+
+  if (
+    analysis.cases.length !== 1 ||
+    analysis.diagnostics.length > 0 ||
+    validation.totalViolations > 0
+  ) {
+    const details = [
+      ...analysis.diagnostics.map((diagnostic) => diagnostic.message),
+      ...validation.violations.map(
+        (violation) => `[${violation.ruleId}] ${violation.message}`,
+      ),
+    ];
+    throw new Error(
+      `Generated draft failed structural validation${details.length > 0 ? `: ${details.join('; ')}` : '.'}`,
+    );
+  }
+
+  return { analysis, validation };
+}
+
+export async function fromLog(
+  sessionPath: string,
+  options: FromLogOptions,
+): Promise<FromLogResult> {
+  const name = options.name.trim();
+  if (!name) {
+    throw new Error('--name is required for generation.');
+  }
+  assertSafeShortText(name, '--name', MAX_NAME_CHARS);
+
+  const suiteName = (options.suiteName ?? 'regression').trim();
+  if (!suiteName) {
+    throw new Error('--suite requires a non-empty value.');
+  }
+  assertSafeShortText(suiteName, '--suite', MAX_SUITE_NAME_CHARS);
+
+  const expectedTools = canonicalizeTools(
+    options.expectedTools ?? [],
+    '--expect-tool',
+  );
+  const forbiddenTools = canonicalizeTools(
+    options.forbiddenTools ?? [],
+    '--forbid-tool',
+  );
+  if (expectedTools.length + forbiddenTools.length > MAX_TOOL_ASSERTIONS) {
+    throw new Error(
+      `At most ${MAX_TOOL_ASSERTIONS} expected and forbidden tool assertions may be included.`,
+    );
+  }
+  if (expectedTools.length === 0 && forbiddenTools.length === 0) {
+    throw new Error(
+      'Generation requires at least one explicit --expect-tool or --forbid-tool. Observed tools are never treated as expectations.',
+    );
+  }
+  const overlap = expectedTools.find((tool) => forbiddenTools.includes(tool));
+  if (overlap) {
+    throw new Error(`Tool cannot be both expected and forbidden: ${overlap}`);
+  }
+
+  const fixturePaths = options.fixturePaths ?? [];
+  if (fixturePaths.length > 0 && options.noFixturesNeeded) {
+    throw new Error(
+      '--fixture and --no-fixtures-needed are mutually exclusive.',
+    );
+  }
+  if (fixturePaths.length === 0 && !options.noFixturesNeeded) {
+    throw new Error(
+      'Choose at least one --fixture or explicitly pass --no-fixtures-needed.',
+    );
+  }
+  const conversation = await loadSession(sessionPath);
+  const turn = selectSessionTurn(
+    analyzeSessionTurns(conversation),
+    options.messageId,
+  );
+
+  if (turn.prompt.length > MAX_PROMPT_CHARS) {
+    throw new Error(
+      `Selected prompt exceeds the ${MAX_PROMPT_CHARS}-character limit. Create a smaller synthetic reproduction instead.`,
+    );
+  }
+
+  const promptFindings = findSensitiveContent(turn.prompt);
+  if (promptFindings.length > 0) {
+    const first = promptFindings[0];
+    throw new Error(
+      `Selected prompt contains a potential ${first.category} on line ${first.line}. Generation is refused to avoid publishing sensitive data.`,
+    );
+  }
+
+  const repoRoot = fs.realpathSync(options.repoRoot ?? process.cwd());
+  const requestedWorkspaceRoot = path.resolve(
+    options.workspaceRoot ?? process.cwd(),
+  );
+  const workspaceRoot = fs.realpathSync(requestedWorkspaceRoot);
+  const warnings = [
+    'Observed tool calls are evidence only; generated assertions come exclusively from explicit expectation options.',
+    'Fixture files are copied from the current workspace, not reconstructed from the log. Confirm they represent the required starting state.',
+    'Secret detection and path redaction are best effort. Review the complete draft before committing it.',
+    'The generated runtime guard must remain until the draft is reviewed and proven to fail before the behavior fix.',
+  ];
+
+  const sanitizedPrompt = sanitizeContent(
+    sanitizeContent(turn.prompt, { workspaceRoot: requestedWorkspaceRoot }),
+    { workspaceRoot },
+  );
+  if (sanitizedPrompt !== turn.prompt) {
+    warnings.push(
+      'Machine-specific paths were redacted in the selected prompt.',
+    );
+  }
+
+  const files =
+    fixturePaths.length > 0
+      ? loadFixtures(
+          fixturePaths,
+          requestedWorkspaceRoot,
+          conversation.projectHash,
+          warnings,
+        )
+      : {};
+  if (fixturePaths.length === 0) {
+    warnings.push(
+      'No fixtures were included because --no-fixtures-needed was supplied.',
+    );
+  }
+  if (expectedTools.length === 0) {
+    warnings.push(
+      'This is a negative-only draft. Add a positive outcome assertion during review before removing the runtime guard.',
+    );
+  }
+
+  const outputPath = resolveOutputPath(
+    repoRoot,
+    name,
+    options.outputPath,
+    options.write ?? false,
+  );
+  const skeleton = await generateEvalSkeleton(
+    {
+      name,
+      suiteName,
+      prompt: sanitizedPrompt,
+      files,
+      expectedTools,
+      forbiddenTools,
+    },
+    outputPath,
+  );
+  validateSkeleton(skeleton, outputPath, repoRoot);
+
+  if (options.write) {
+    fs.writeFileSync(outputPath, skeleton, {
+      encoding: 'utf8',
+      flag: 'wx',
+    });
+  }
+
+  return {
+    outputPath,
+    wroteFile: options.write ?? false,
     skeleton,
-    validationPassed,
+    structuralValidationPassed: true,
     warnings,
-    prompt: sanitizedPrompt,
-    fileCount: Object.keys(sanitizedFiles).length,
-    observedTools: workspace.observedTools,
+    selectedTurn: {
+      messageId: turn.messageId,
+      prompt: sanitizedPrompt,
+      observedTools: turn.observedTools,
+      candidatePaths: turn.candidatePaths.map((candidate) =>
+        previewCandidatePath(candidate, workspaceRoot),
+      ),
+    },
+    expectedTools,
+    forbiddenTools,
+    fixturePaths: Object.keys(files),
+  };
+}
+
+export function formatTurnForDisplay(
+  turn: SessionTurnCandidate,
+  workspaceRoot: string,
+): SessionTurnCandidate {
+  const requestedWorkspace = path.resolve(workspaceRoot);
+  const realWorkspace = fs.realpathSync(requestedWorkspace);
+  const prompt =
+    findSensitiveContent(turn.prompt).length > 0
+      ? '<prompt omitted: potential sensitive content>'
+      : sanitizeContent(
+          sanitizeContent(turn.prompt, { workspaceRoot: requestedWorkspace }),
+          { workspaceRoot: realWorkspace },
+        );
+
+  return {
+    ...turn,
+    prompt,
+    candidatePaths: turn.candidatePaths.map((candidate) =>
+      previewCandidatePath(candidate, realWorkspace),
+    ),
   };
 }
