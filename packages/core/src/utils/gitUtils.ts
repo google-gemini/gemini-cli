@@ -8,15 +8,35 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { spawnAsync } from './shell-utils.js';
 
+// GIT_* variables that control which binaries/helpers git executes. These
+// must never be inherited from a project's .env file (or elsewhere), or a
+// trusted-but-malicious repository could use them to run arbitrary commands
+// via otherwise ordinary, non-model git invocations.
+const EXECUTION_AFFECTING_GIT_ENV_VARS = new Set([
+  'GIT_EXEC_PATH',
+  'GIT_PROXY_COMMAND',
+  'GIT_SSH_COMMAND',
+  'GIT_SSH_VARIANT',
+  'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+  'GIT_TEMPLATE_DIR',
+  'GIT_REPLACE_REF_BASE',
+  'GIT_CEILING_DIRECTORIES',
+]);
+
 export function getSafeGitEnv(
   baseEnv: Record<string, string | undefined> = process.env,
 ): Record<string, string | undefined> {
   const devNullPath = process.platform === 'win32' ? 'NUL' : '/dev/null';
 
-  // Strip pre-existing GIT_CONFIG_* and GIT_CONFIG_PARAMETERS variables to prevent environment pollution
+  // Strip pre-existing GIT_CONFIG_*, GIT_CONFIG_PARAMETERS, and
+  // execution-affecting GIT_* variables to prevent environment pollution.
   const cleanedEnv: Record<string, string | undefined> = {};
   for (const [key, value] of Object.entries(baseEnv)) {
-    if (!key.startsWith('GIT_CONFIG_') && key !== 'GIT_CONFIG_PARAMETERS') {
+    if (
+      !key.startsWith('GIT_CONFIG_') &&
+      key !== 'GIT_CONFIG_PARAMETERS' &&
+      !EXECUTION_AFFECTING_GIT_ENV_VARS.has(key)
+    ) {
       cleanedEnv[key] = value;
     }
   }
