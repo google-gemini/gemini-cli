@@ -2266,6 +2266,57 @@ describe('ShellExecutionService environment variables', () => {
     vi.unstubAllEnvs();
   });
 
+  it('should strip execution-affecting GIT_* variables from the spawned environment', async () => {
+    vi.resetModules();
+    // Ensure we exercise the default (non-strict) sanitization path, since
+    // strict sanitization (e.g. in CI, via GITHUB_SHA) would already strip
+    // these vars for unrelated reasons and mask a regression here.
+    vi.stubEnv('GITHUB_SHA', undefined);
+    vi.stubEnv('SURFACE', undefined);
+    vi.stubEnv('GIT_EXEC_PATH', '/tmp/evil');
+    vi.stubEnv('GIT_SSH_COMMAND', 'calc.exe');
+    vi.stubEnv('GIT_PROXY_COMMAND', 'cmd /c calc.exe');
+    vi.stubEnv('GIT_SSH_VARIANT', 'ssh');
+    vi.stubEnv('GIT_ALTERNATE_OBJECT_DIRECTORIES', '/tmp/evil-objects');
+    vi.stubEnv('GIT_TEMPLATE_DIR', '/tmp/evil-template');
+    vi.stubEnv('GIT_REPLACE_REF_BASE', 'refs/evil');
+    vi.stubEnv('GIT_CEILING_DIRECTORIES', '/tmp/evil-ceiling');
+    vi.stubEnv('PATH', '/test/path'); // An unrelated var that should be kept
+
+    const { ShellExecutionService } = await import(
+      './shellExecutionService.js'
+    );
+
+    mockGetPty.mockResolvedValue(null); // Force child_process fallback
+    await ShellExecutionService.execute(
+      'test-cp-execution-affecting-git-vars',
+      '/',
+      vi.fn(),
+      new AbortController().signal,
+      false, // non-interactive
+      shellExecutionConfig,
+    );
+
+    expect(mockCpSpawn).toHaveBeenCalled();
+    const cpEnv = mockCpSpawn.mock.calls[0][2].env;
+    expect(cpEnv).not.toHaveProperty('GIT_EXEC_PATH');
+    expect(cpEnv).not.toHaveProperty('GIT_SSH_COMMAND');
+    expect(cpEnv).not.toHaveProperty('GIT_PROXY_COMMAND');
+    expect(cpEnv).not.toHaveProperty('GIT_SSH_VARIANT');
+    expect(cpEnv).not.toHaveProperty('GIT_ALTERNATE_OBJECT_DIRECTORIES');
+    expect(cpEnv).not.toHaveProperty('GIT_TEMPLATE_DIR');
+    expect(cpEnv).not.toHaveProperty('GIT_REPLACE_REF_BASE');
+    expect(cpEnv).not.toHaveProperty('GIT_CEILING_DIRECTORIES');
+    expect(cpEnv).toHaveProperty('PATH', '/test/path');
+
+    // Ensure child_process exits
+    mockChildProcess.emit('exit', 0, null);
+    mockChildProcess.emit('close', 0, null);
+    await new Promise(process.nextTick);
+
+    vi.unstubAllEnvs();
+  });
+
   it('should include headless git and gh environment variables in interactive fallback mode', async () => {
     vi.resetModules();
     vi.stubEnv('GIT_TERMINAL_PROMPT', undefined);

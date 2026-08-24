@@ -30,6 +30,7 @@ import {
   sanitizeEnvironment,
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
+import { EXECUTION_AFFECTING_GIT_ENV_VARS } from '../utils/gitUtils.js';
 import {
   NoopSandboxManager,
   type SandboxManager,
@@ -540,6 +541,15 @@ export class ShellExecutionService {
       DISPLAY: '',
       DBUS_SESSION_BUS_ADDRESS: '',
     });
+
+    // GIT_* variables that control which binaries/helpers git executes must
+    // never be inherited (e.g. from a project's .env file), or a
+    // trusted-but-malicious repository could use them to run arbitrary
+    // commands via otherwise ordinary shell commands that happen to invoke
+    // git.
+    for (const key of EXECUTION_AFFECTING_GIT_ENV_VARS) {
+      delete baseEnv[key];
+    }
 
     // 3. Prepare Sandboxed Command
     const sandboxedCommand = await sandboxManager.prepareCommand({

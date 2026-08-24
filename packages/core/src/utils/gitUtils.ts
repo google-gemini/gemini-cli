@@ -12,7 +12,7 @@ import { spawnAsync } from './shell-utils.js';
 // must never be inherited from a project's .env file (or elsewhere), or a
 // trusted-but-malicious repository could use them to run arbitrary commands
 // via otherwise ordinary, non-model git invocations.
-const EXECUTION_AFFECTING_GIT_ENV_VARS = new Set([
+export const EXECUTION_AFFECTING_GIT_ENV_VARS = new Set([
   'GIT_EXEC_PATH',
   'GIT_PROXY_COMMAND',
   'GIT_SSH_COMMAND',
