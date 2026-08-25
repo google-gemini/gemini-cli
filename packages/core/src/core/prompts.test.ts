@@ -561,6 +561,25 @@ describe('Core System Prompt (prompts.ts)', () => {
       expect(prompt).toMatchSnapshot();
     });
 
+    it('should not tell the agent to wait for user feedback in non-interactive PLAN mode', () => {
+      setupPlanMode();
+      vi.mocked(mockConfig.isInteractive).mockReturnValue(false);
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).not.toContain('STOP and wait');
+      expect(prompt).not.toContain('MUST wait for user feedback');
+      expect(prompt).toContain(
+        'proceed directly to Step 3 (Draft) without waiting for feedback',
+      );
+    });
+
+    it('should tell the agent to wait for user feedback in interactive PLAN mode', () => {
+      setupPlanMode();
+      vi.mocked(mockConfig.isInteractive).mockReturnValue(true);
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).toContain('STOP and wait');
+      expect(prompt).toContain('MUST wait for user feedback');
+    });
+
     it('should NOT include approval mode instructions for DEFAULT mode', () => {
       vi.mocked(mockConfig.getApprovalMode).mockReturnValue(
         ApprovalMode.DEFAULT,
