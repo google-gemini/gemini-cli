@@ -8,6 +8,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { stat } from 'node:fs/promises';
 import chalk from 'chalk';
+import { lock } from 'proper-lockfile';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
 import { type MergedSettings, SettingScope } from './settings.js';
 import { createHash, randomUUID } from 'node:crypto';
@@ -243,6 +244,7 @@ export class ExtensionManager extends ExtensionLoader {
       }
 
       let tempDir: string | undefined;
+      let releaseExtensionLocks: ReleaseExtensionLock | undefined;
 
       if (
         installMetadata.type === 'git' ||
@@ -354,6 +356,10 @@ Would you like to attempt to install via "git clone" instead?`,
         const destinationPath = new ExtensionStorage(
           newExtensionName,
         ).getExtensionDir();
+        releaseExtensionLocks = await acquireExtensionLocks(
+          isUpdate ? [previousName, newExtensionName] : [newExtensionName],
+          newExtensionName,
+        );
 
         if (
           (!isUpdate || newExtensionName !== previousName) &&
@@ -496,6 +502,7 @@ Would you like to attempt to install via "git clone" instead?`,
           );
         }
       } finally {
+        await releaseExtensionLocks?.();
         if (tempDir) {
           await fs.promises.rm(tempDir, { recursive: true, force: true });
         }
@@ -1235,6 +1242,65 @@ Would you like to attempt to install via "git clone" instead?`,
     }
     await this.maybeStartExtension(extension);
   }
+}
+
+type ReleaseExtensionLock = () => Promise<void>;
+
+async function releaseExtensionLocks(
+  releases: ReleaseExtensionLock[],
+): Promise<void> {
+  for (const release of releases.reverse()) {
+    try {
+      await release();
+    } catch (error) {
+      debugLogger.error(
+        'Failed to release extension installation lock:',
+        error,
+      );
+    }
+  }
+}
+
+async function acquireExtensionLocks(
+  extensionNames: string[],
+  requestedExtensionName: string,
+): Promise<ReleaseExtensionLock> {
+  const releases: ReleaseExtensionLock[] = [];
+  // A stable order prevents rename operations from deadlocking each other.
+  const uniqueNames = [...new Set(extensionNames)].sort();
+  const locksDir = ExtensionStorage.getUserExtensionsLockDir();
+
+  try {
+    await fs.promises.mkdir(locksDir, { recursive: true });
+    for (const extensionName of uniqueNames) {
+      const extensionPath = new ExtensionStorage(
+        extensionName,
+      ).getExtensionDir();
+      releases.push(
+        await lock(extensionPath, {
+          realpath: false,
+          // Keep lock directories outside the extensions directory because the
+          // loader treats every entry there as a potential extension.
+          lockfilePath: path.join(locksDir, `${extensionName}.lock`),
+        }),
+      );
+    }
+  } catch (error) {
+    await releaseExtensionLocks(releases);
+    if (
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      error.code === 'ELOCKED'
+    ) {
+      throw new Error(
+        `Extension "${requestedExtensionName}" is currently being installed or updated by another process. Please try again.`,
+      );
+    }
+    throw error;
+  }
+
+  return async () => releaseExtensionLocks(releases);
 }
 
 function filterMcpConfig(original: MCPServerConfig): MCPServerConfig {

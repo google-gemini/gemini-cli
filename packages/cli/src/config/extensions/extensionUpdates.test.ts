@@ -42,6 +42,10 @@ vi.mock('node:fs', async (importOriginal) => {
   };
 });
 
+vi.mock('proper-lockfile', () => ({
+  lock: vi.fn().mockResolvedValue(vi.fn().mockResolvedValue(undefined)),
+}));
+
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
@@ -119,6 +123,9 @@ vi.mock('./storage.js', () => ({
     }
     static getUserExtensionsDir() {
       return '/mock/extensions';
+    }
+    static getUserExtensionsLockDir() {
+      return '/mock/extension-locks';
     }
     static createTmpDir() {
       return Promise.resolve('/mock/tmp');
