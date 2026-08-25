@@ -24,6 +24,9 @@ import {
   type HistoryTurn,
   coalesceConsecutiveRoles,
   stripThoughts,
+  THINKING_ONLY_NUDGE_MESSAGE,
+  NO_RESPONSE_TEXT_NUDGE_MESSAGE,
+  applyRetryNudge,
 } from './geminiChat.js';
 import {
   type CompletedToolCall,
@@ -849,7 +852,7 @@ describe('GeminiChat', () => {
         })(),
       ).resolves.not.toThrow();
 
-      // Verify history now ends with a successful model turn (with empty parts)
+      // Verify history now ends with a successful model turn containing the empty parts array
       const lastTurn = chat.agentHistory.get()[chat.agentHistory.length - 1];
       expect(lastTurn.content.role).toBe('model');
       expect(lastTurn.content.parts).toEqual([]);
@@ -2717,7 +2720,7 @@ describe('GeminiChat', () => {
       );
     });
 
-    it('should append nudge message to systemInstruction on retry when InvalidStreamError occurs', async () => {
+    it('should append nudge message on retry when InvalidStreamError occurs without altering systemInstruction', async () => {
       vi.mocked(mockContentGenerator.generateContentStream)
         .mockImplementationOnce(async () =>
           (async function* () {
@@ -2779,18 +2782,112 @@ describe('GeminiChat', () => {
         LlmRole.MAIN,
       );
 
-      // Second call (retry) should have nudge message appended to systemInstruction
+      // Second call (retry) should preserve systemInstruction and append nudge to contents
       expect(
         mockContentGenerator.generateContentStream,
       ).toHaveBeenNthCalledWith(
         2,
         expect.objectContaining({
           config: expect.objectContaining({
-            systemInstruction:
-              'Initial instruction\n[System: You previously generated thoughts but failed to provide a final user-facing response. Please ensure you provide your final answer or call a tool now.]',
+            systemInstruction: 'Initial instruction',
           }),
+          contents: [
+            expect.objectContaining({
+              role: 'user',
+              parts: [
+                { text: 'test' },
+                { text: '\n' + THINKING_ONLY_NUDGE_MESSAGE },
+              ],
+            }),
+          ],
         }),
         'prompt-id-retry-nudge',
+        LlmRole.MAIN,
+      );
+    });
+
+    it('should re-apply nudge message on retry if a BeforeModel hook returns modifiedContents', async () => {
+      vi.mocked(mockConfig.getEnableHooks).mockReturnValue(true);
+
+      const modifiedHookContents: Content[] = [
+        {
+          role: 'user',
+          parts: [{ text: 'hook-modified-prompt' }],
+        },
+      ];
+
+      const mockHookSystem = {
+        fireBeforeModelEvent: vi.fn().mockResolvedValue({
+          blocked: false,
+          modifiedContents: modifiedHookContents,
+        }),
+        fireAfterModelEvent: vi.fn().mockResolvedValue({ response: {} }),
+        fireBeforeToolSelectionEvent: vi.fn().mockResolvedValue({}),
+      } as unknown as HookSystem;
+      mockConfig.getHookSystem = vi.fn().mockReturnValue(mockHookSystem);
+
+      vi.mocked(mockContentGenerator.generateContentStream)
+        .mockImplementationOnce(async () =>
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: {
+                    role: 'model',
+                    parts: [{ thought: true, text: 'thinking...' }],
+                  },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+        )
+        .mockImplementationOnce(async () =>
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: { parts: [{ text: 'valid response' }] },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+        );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-2.5-pro' },
+        'original-test-prompt',
+        'prompt-id-retry-hook-modified',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      for await (const _ of stream) {
+        // consume
+      }
+
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
+        2,
+      );
+
+      // The second call (retry) should have hook-modified contents WITH the nudge message appended!
+      expect(
+        mockContentGenerator.generateContentStream,
+      ).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          contents: [
+            expect.objectContaining({
+              role: 'user',
+              parts: [
+                { text: 'hook-modified-prompt' },
+                { text: '\n' + THINKING_ONLY_NUDGE_MESSAGE },
+              ],
+            }),
+          ],
+        }),
+        'prompt-id-retry-hook-modified',
         LlmRole.MAIN,
       );
     });
@@ -4852,6 +4949,98 @@ describe('GeminiChat', () => {
       const history = chat.getHistory(true);
       expect(history).toHaveLength(2);
       expect(history[1].role).toBe('model');
+    });
+  });
+
+  describe('applyRetryNudge', () => {
+    it('should return original contents if nudge message is empty', () => {
+      const contents: Content[] = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+      ];
+      const result = applyRetryNudge(contents, '');
+      expect(result).toEqual(contents);
+    });
+
+    it('should append THINKING_ONLY_NUDGE_MESSAGE to the final user turn', () => {
+      const contents: Content[] = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+      ];
+      const result = applyRetryNudge(contents, THINKING_ONLY_NUDGE_MESSAGE);
+      expect(result).toHaveLength(1);
+      expect(result[0].parts).toHaveLength(2);
+      expect(result[0].parts![0].text).toBe('Hello');
+      expect(result[0].parts![1].text).toBe('\n' + THINKING_ONLY_NUDGE_MESSAGE);
+    });
+
+    it('should append NO_RESPONSE_TEXT_NUDGE_MESSAGE to the final user turn', () => {
+      const contents: Content[] = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+      ];
+      const result = applyRetryNudge(contents, NO_RESPONSE_TEXT_NUDGE_MESSAGE);
+      expect(result).toHaveLength(1);
+      expect(result[0].parts).toHaveLength(2);
+      expect(result[0].parts![0].text).toBe('Hello');
+      expect(result[0].parts![1].text).toBe(
+        '\n' + NO_RESPONSE_TEXT_NUDGE_MESSAGE,
+      );
+    });
+
+    it('should create a new user turn if history is empty', () => {
+      const result = applyRetryNudge([], THINKING_ONLY_NUDGE_MESSAGE);
+      expect(result).toHaveLength(1);
+      expect(result[0].role).toBe('user');
+      expect(result[0].parts).toEqual([{ text: THINKING_ONLY_NUDGE_MESSAGE }]);
+    });
+
+    it('should create a new user turn if the last turn is from model', () => {
+      const contents: Content[] = [
+        { role: 'model', parts: [{ text: 'AI response' }] },
+      ];
+      const result = applyRetryNudge(contents, NO_RESPONSE_TEXT_NUDGE_MESSAGE);
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual(contents[0]);
+      expect(result[1].role).toBe('user');
+      expect(result[1].parts).toEqual([
+        { text: NO_RESPONSE_TEXT_NUDGE_MESSAGE },
+      ]);
+    });
+
+    it('should insert synthetic model turn and dedicated user turn if the last turn is user with functionResponse', () => {
+      const contents: Content[] = [
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'Edit',
+                response: { result: 'success' },
+              },
+            },
+          ],
+        },
+      ];
+      const result = applyRetryNudge(contents, NO_RESPONSE_TEXT_NUDGE_MESSAGE);
+      expect(result).toHaveLength(3);
+      expect(result[0]).toEqual(contents[0]);
+      expect(result[1].role).toBe('model');
+      expect(result[1].parts).toEqual([
+        { text: '[Tool execution completed.]' },
+      ]);
+      expect(result[2].role).toBe('user');
+      expect(result[2].parts).toEqual([
+        { text: NO_RESPONSE_TEXT_NUDGE_MESSAGE },
+      ]);
+    });
+
+    it('should not duplicate the nudge message if it is already present in contents', () => {
+      const contents: Content[] = [
+        {
+          role: 'user',
+          parts: [{ text: 'Hello\n' + THINKING_ONLY_NUDGE_MESSAGE }],
+        },
+      ];
+      const result = applyRetryNudge(contents, THINKING_ONLY_NUDGE_MESSAGE);
+      expect(result).toEqual(contents);
     });
   });
 });
