@@ -58,17 +58,6 @@ const coderAgentCard: AgentCard = {
     pushNotifications: false,
     stateTransitionHistory: true,
   },
-  securitySchemes: {
-    bearerAuth: {
-      type: 'http',
-      scheme: 'bearer',
-    },
-    basicAuth: {
-      type: 'http',
-      scheme: 'basic',
-    },
-  },
-  security: [{ bearerAuth: [] }, { basicAuth: [] }],
   defaultInputModes: ['text'],
   defaultOutputModes: ['text'],
   skills: [
@@ -100,23 +89,6 @@ const customUserBuilder: UserBuilder = async (req: Request) => {
     logger.info(
       `[customUserBuilder] Received Authorization header with scheme: ${scheme}`,
     );
-  }
-  if (!auth) return new UnauthenticatedUser();
-
-  // 1. Bearer Auth
-  if (auth.startsWith('Bearer ')) {
-    const token = auth.substring(7);
-    if (token === 'valid-token') {
-      return { userName: 'bearer-user', isAuthenticated: true };
-    }
-  }
-
-  // 2. Basic Auth
-  if (auth.startsWith('Basic ')) {
-    const credentials = Buffer.from(auth.substring(6), 'base64').toString();
-    if (credentials === 'admin:password') {
-      return { userName: 'basic-user', isAuthenticated: true };
-    }
   }
 
   return new UnauthenticatedUser();
