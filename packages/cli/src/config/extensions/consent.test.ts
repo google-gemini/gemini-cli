@@ -240,6 +240,42 @@ describe('consent', () => {
         await expectConsentSnapshot(consentString);
       });
 
+      it('should sort environment variables alphabetically and handle undefined envValue', async () => {
+        const config: ExtensionConfig = {
+          ...baseConfig,
+          mcpServers: {
+            server1: {
+              command: 'node',
+              args: ['server.js'],
+              env: {
+                VAR_B: 'b',
+                VAR_A: 'a',
+                VAR_C: undefined as unknown as string,
+              },
+            },
+          },
+        };
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          config,
+          requestConsent,
+          false,
+          undefined,
+        );
+
+        expect(requestConsent).toHaveBeenCalledTimes(1);
+        const consentString = requestConsent.mock.calls[0][0] as string;
+        expect(consentString).toContain('      - VAR_A: a');
+        expect(consentString).toContain('      - VAR_B: b');
+        expect(consentString).toContain('      - VAR_C: ');
+
+        const posA = consentString.indexOf('      - VAR_A: a');
+        const posB = consentString.indexOf('      - VAR_B: b');
+        const posC = consentString.indexOf('      - VAR_C: ');
+        expect(posA).toBeLessThan(posB);
+        expect(posB).toBeLessThan(posC);
+      });
+
       it('should request consent if mcpServers change', async () => {
         const prevConfig: ExtensionConfig = { ...baseConfig };
         const newConfig: ExtensionConfig = {

@@ -2361,6 +2361,9 @@ export async function createTransport(
     // Expand and merge explicit environment variables from the MCP configuration.
     if (mcpServerConfig.env) {
       for (const [key, value] of Object.entries(mcpServerConfig.env)) {
+        if (value === undefined) {
+          continue;
+        }
         if (isDangerousExecutionEnvironmentVariable(key)) {
           debugLogger.warn(
             `Blocked dangerous environment variable override for MCP server '${mcpServerName}': ${key}`,

@@ -263,6 +263,12 @@ export const BLOCKED_EXECUTION_ENVS = new Set([
   'BASH_ENV',
   'ENV',
   'PERL5DB',
+  'JAVA_TOOL_OPTIONS',
+  '_JAVA_OPTIONS',
+  'CLASSPATH',
+  'DOTNET_STARTUP_HOOKS',
+  'CORECLR_PROFILER_PATH',
+  'CORECLR_ENABLE_PROFILING',
 ]);
 
 export function isDangerousExecutionEnvironmentVariable(key: string): boolean {

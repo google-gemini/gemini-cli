@@ -462,6 +462,9 @@ describe('isDangerousExecutionEnvironmentVariable', () => {
     expect(isDangerousExecutionEnvironmentVariable('DYLD_LIBRARY_PATH')).toBe(true);
     expect(isDangerousExecutionEnvironmentVariable('BASH_ENV')).toBe(true);
     expect(isDangerousExecutionEnvironmentVariable('PERL5DB')).toBe(true);
+    expect(isDangerousExecutionEnvironmentVariable('JAVA_TOOL_OPTIONS')).toBe(true);
+    expect(isDangerousExecutionEnvironmentVariable('java_tool_options')).toBe(true);
+    expect(isDangerousExecutionEnvironmentVariable('DOTNET_STARTUP_HOOKS')).toBe(true);
   });
 
   it('should identify safe environment variables as not dangerous', () => {
@@ -497,6 +500,12 @@ describe('isDangerousExecutionEnvironmentVariable', () => {
       'BASH_ENV',
       'ENV',
       'PERL5DB',
+      'JAVA_TOOL_OPTIONS',
+      '_JAVA_OPTIONS',
+      'CLASSPATH',
+      'DOTNET_STARTUP_HOOKS',
+      'CORECLR_PROFILER_PATH',
+      'CORECLR_ENABLE_PROFILING',
     ];
 
     for (const key of expectedBlocked) {

@@ -187,8 +187,9 @@ async function extensionConsentString(
       output.push(`  * ${key} (${isLocal ? 'local' : 'remote'}): ${source}`);
       if (mcpServer.env && Object.keys(mcpServer.env).length > 0) {
         output.push('    Environment variables:');
-        for (const [envKey, envValue] of Object.entries(mcpServer.env)) {
-          output.push(`      - ${envKey}: ${envValue}`);
+        const sortedEnv = Object.entries(mcpServer.env).sort(([a], [b]) => a.localeCompare(b));
+        for (const [envKey, envValue] of sortedEnv) {
+          output.push(`      - ${envKey}: ${envValue ?? ''}`);
         }
       }
     }
