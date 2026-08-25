@@ -357,6 +357,7 @@ export class BaseLlmClient {
         shouldRetryOnContent,
         maxAttempts:
           availabilityMaxAttempts ?? maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
+        signal: abortSignal,
         getAvailabilityContext,
         onPersistent429: this.config.isInteractive()
           ? (authType, error) =>
