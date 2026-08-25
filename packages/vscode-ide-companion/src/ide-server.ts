@@ -127,6 +127,12 @@ export class IDEServer {
   private authToken: string | undefined;
   private transports: { [sessionId: string]: StreamableHTTPServerTransport } =
     {};
+  // Every live keep-alive interval, including those for transports that have
+  // not finished initializing and so are not in `transports` yet. `onclose`
+  // removes an entry; `stop()` clears whatever is left. Without this, a
+  // transport that never completes its handshake keeps a 60s timer running
+  // against a server that is already gone.
+  private keepAliveIntervals: Set<NodeJS.Timeout> = new Set();
   private openFilesManager: OpenFilesManager | undefined;
   diffManager: DiffManager;
 
@@ -242,12 +248,19 @@ export class IDEServer {
                     `Session ${sessionId} missed ${missedPings} pings. Closing connection and cleaning up interval.`,
                   );
                   clearInterval(keepAlive);
+                  this.keepAliveIntervals.delete(keepAlive);
+                  // The log above has always claimed this closes the
+                  // connection. Until now it only stopped the pings, leaving
+                  // the transport in `transports` and its socket open.
+                  void transport.close();
                 }
               });
           }, 60000); // 60 sec
+          this.keepAliveIntervals.add(keepAlive);
 
           transport.onclose = () => {
             clearInterval(keepAlive);
+            this.keepAliveIntervals.delete(keepAlive);
             if (transport.sessionId) {
               this.log(`Session closed: ${transport.sessionId}`);
               sessionsWithInitialNotification.delete(transport.sessionId);
@@ -404,8 +417,25 @@ export class IDEServer {
   }
 
   async stop(): Promise<void> {
+    // Order matters. `server.close()` stops new connections but its callback
+    // waits for established ones to drain, and an MCP transport holds a
+    // long-lived streaming response on `GET /mcp`. Closing the transports
+    // first lets that drain happen; `closeAllConnections()` below releases
+    // anything still holding a socket. Without both, the callback never fires
+    // and extension deactivate blocks behind this promise.
+    for (const interval of this.keepAliveIntervals) {
+      clearInterval(interval);
+    }
+    this.keepAliveIntervals.clear();
+
+    await Promise.allSettled(
+      Object.values(this.transports).map((transport) => transport.close()),
+    );
+    this.transports = {};
+
     if (this.server) {
       await new Promise<void>((resolve, reject) => {
+        this.server!.closeAllConnections();
         this.server!.close((err?: Error) => {
           if (err) {
             this.log(`Error shutting down IDE server: ${err.message}`);
