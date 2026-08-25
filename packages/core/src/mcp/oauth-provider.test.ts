@@ -2269,4 +2269,54 @@ describe('MCPOAuthProvider', () => {
       expect(result.metadata).toBe(oktaMetadata);
     });
   });
+
+  describe('remote MCP server loopback restriction enforcement', () => {
+    it('rejects dynamic client registration to loopback when mcpServerUrl is remote', async () => {
+      const authProvider = new MCPOAuthProvider();
+      const providerWithAccess = authProvider as unknown as {
+        registerClient: (
+          registrationUrl: string,
+          config: MCPOAuthConfig,
+          redirectPort: number,
+          mcpServerUrl?: string,
+        ) => Promise<unknown>;
+      };
+
+      await expect(
+        providerWithAccess.registerClient(
+          'http://127.0.0.1:18080/register',
+          mockConfig,
+          7777,
+          'https://remote-mcp.example.com',
+        ),
+      ).rejects.toThrow();
+    });
+
+    it('passes allowLoopback=false during metadata discovery when mcpServerUrl is remote', async () => {
+      const authProvider = new MCPOAuthProvider();
+      const providerWithAccess = authProvider as unknown as {
+        discoverAuthServerMetadataForRegistration: (
+          issuer: string,
+          mcpServerUrl?: string,
+        ) => Promise<unknown>;
+      };
+
+      const spy = vi
+        .spyOn(OAuthUtils, 'discoverAuthorizationServerMetadata')
+        .mockResolvedValueOnce({
+          issuer: 'https://remote-auth.example.com',
+          authorization_endpoint: 'https://remote-auth.example.com/authorize',
+          token_endpoint: 'https://remote-auth.example.com/token',
+        });
+
+      await providerWithAccess.discoverAuthServerMetadataForRegistration(
+        'https://remote-auth.example.com',
+        'https://remote-mcp.example.com',
+      );
+
+      expect(spy).toHaveBeenCalledWith('https://remote-auth.example.com', {
+        allowLoopback: false,
+      });
+    });
+  });
 });

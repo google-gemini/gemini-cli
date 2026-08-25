@@ -106,9 +106,9 @@ export class MCPOAuthProvider {
     redirectPort: number,
     mcpServerUrl?: string,
   ): Promise<OAuthClientRegistrationResponse> {
-    const allowLoopback =
-      (mcpServerUrl ? isLoopbackUrl(mcpServerUrl) : false) ||
-      isLoopbackUrl(registrationUrl);
+    const allowLoopback = mcpServerUrl
+      ? isLoopbackUrl(mcpServerUrl)
+      : isLoopbackUrl(registrationUrl);
     const validatedRegistrationUrl = await validateOAuthEndpointUrl(
       registrationUrl,
       {
@@ -168,9 +168,9 @@ export class MCPOAuthProvider {
       Awaited<ReturnType<typeof OAuthUtils.discoverAuthorizationServerMetadata>>
     >;
   }> {
-    const allowLoopback =
-      (mcpServerUrl ? isLoopbackUrl(mcpServerUrl) : false) ||
-      isLoopbackUrl(issuer);
+    const allowLoopback = mcpServerUrl
+      ? isLoopbackUrl(mcpServerUrl)
+      : isLoopbackUrl(issuer);
     const authUrl = new URL(issuer);
 
     // Preserve path components for issuers with path-based discovery (e.g., Keycloak)
@@ -454,12 +454,12 @@ export class MCPOAuthProvider {
       );
     }
 
-    const allowLoopback =
-      (mcpServerUrl ? isLoopbackUrl(mcpServerUrl) : false) ||
-      (config.authorizationUrl
-        ? isLoopbackUrl(config.authorizationUrl)
-        : false) ||
-      (config.tokenUrl ? isLoopbackUrl(config.tokenUrl) : false);
+    const allowLoopback = mcpServerUrl
+      ? isLoopbackUrl(mcpServerUrl)
+      : (config.authorizationUrl
+          ? isLoopbackUrl(config.authorizationUrl)
+          : false) ||
+        (config.tokenUrl ? isLoopbackUrl(config.tokenUrl) : false);
     await validateOAuthEndpointUrl(config.authorizationUrl, {
       allowLoopback,
     });
