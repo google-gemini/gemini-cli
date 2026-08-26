@@ -73,10 +73,10 @@ export class PromptProvider {
     const desiredModel = resolveModel(
       context.config.getActiveModel(),
       context.config.getGemini31LaunchedSync?.() ?? false,
-      context.config.getGemini31FlashLiteLaunchedSync?.() ?? false,
       false,
       context.config.getHasAccessToPreviewModel?.() ?? true,
       context.config,
+      context.config.hasGemini35FlashGAAccess?.() ?? false,
     );
     const isModernModel = supportsModernFeatures(desiredModel);
     const activeSnippets = isModernModel ? snippets : legacySnippets;
@@ -297,10 +297,10 @@ export class PromptProvider {
     const desiredModel = resolveModel(
       context.config.getActiveModel(),
       context.config.getGemini31LaunchedSync?.() ?? false,
-      context.config.getGemini31FlashLiteLaunchedSync?.() ?? false,
       false,
       context.config.getHasAccessToPreviewModel?.() ?? true,
       context.config,
+      context.config.hasGemini35FlashGAAccess?.() ?? false,
     );
     const isModernModel = supportsModernFeatures(desiredModel);
     const activeSnippets = isModernModel ? snippets : legacySnippets;

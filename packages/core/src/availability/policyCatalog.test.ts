@@ -28,7 +28,6 @@ describe('policyCatalog', () => {
     const chain = getModelPolicyChain({
       previewEnabled: true,
       useGemini31: true,
-      useGemini31FlashLite: false,
     });
     expect(chain[0]?.model).toBe(PREVIEW_GEMINI_3_1_MODEL);
     expect(chain).toHaveLength(2);
@@ -39,7 +38,6 @@ describe('policyCatalog', () => {
     const chain = getModelPolicyChain({
       previewEnabled: true,
       useGemini31: true,
-      useGemini31FlashLite: false,
       useCustomToolModel: true,
     });
     expect(chain[0]?.model).toBe(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL);

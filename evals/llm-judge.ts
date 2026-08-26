@@ -76,10 +76,30 @@ export class LLMJudge {
 
     for (const res of rawResults) {
       // Remove any punctuation the model might have appended
-      const cleanRes = res.replace(/[^A-Z]/g, '');
-      if (cleanRes.startsWith('YES')) yes++;
-      else if (cleanRes.startsWith('NO')) no++;
-      else other++;
+      const cleanRes = res.replace(/[^A-Z ]/g, '');
+      if (
+        cleanRes.includes('THE ANSWER IS YES') ||
+        cleanRes.includes('ANSWER IS YES') ||
+        cleanRes.endsWith('YES')
+      ) {
+        yes++;
+      } else if (
+        cleanRes.includes('THE ANSWER IS NO') ||
+        cleanRes.includes('ANSWER IS NO') ||
+        cleanRes.endsWith('NO')
+      ) {
+        no++;
+      } else if (cleanRes.trim() === 'YES') {
+        yes++;
+      } else if (cleanRes.trim() === 'NO') {
+        no++;
+      } else {
+        // Fallback: look for YES or NO as standalone words or at the end
+        const words = cleanRes.split(/\s+/);
+        if (words.includes('YES')) yes++;
+        else if (words.includes('NO')) no++;
+        else other++;
+      }
     }
 
     // Pass if YES > NO and YES > OTHER (plurality)

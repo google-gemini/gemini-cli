@@ -52,9 +52,10 @@ export function validateVariables(
 export function hydrateString(str: string, context: VariableContext): string {
   validateVariables(context, VARIABLE_SCHEMA);
   const regex = /\${(.*?)}/g;
-  return str.replace(regex, (match, key) =>
-    context[key] == null ? match : context[key],
-  );
+  return str.replace(regex, (match, key) => {
+    const val = context[key];
+    return val == null ? match : String(val);
+  });
 }
 
 export function recursivelyHydrateStrings<T>(

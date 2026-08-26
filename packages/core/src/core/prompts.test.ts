@@ -22,7 +22,6 @@ import {
   PREVIEW_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_MODEL,
-  DEFAULT_GEMINI_FLASH_LITE_MODEL,
 } from '../config/models.js';
 import { ApprovalMode } from '../policy/types.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
@@ -253,9 +252,7 @@ describe('Core System Prompt (prompts.ts)', () => {
   });
 
   it('should use legacy system prompt for non-preview model', () => {
-    vi.mocked(mockConfig.getActiveModel).mockReturnValue(
-      DEFAULT_GEMINI_FLASH_LITE_MODEL,
-    );
+    vi.mocked(mockConfig.getActiveModel).mockReturnValue(DEFAULT_GEMINI_MODEL);
     const prompt = getCoreSystemPrompt(mockConfig);
     expect(prompt).toContain(
       'You are an interactive CLI agent specializing in software engineering tasks.',
@@ -270,9 +267,7 @@ describe('Core System Prompt (prompts.ts)', () => {
   });
 
   it('should include the TASK MANAGEMENT PROTOCOL in legacy prompt when task tracker is enabled', () => {
-    vi.mocked(mockConfig.getActiveModel).mockReturnValue(
-      DEFAULT_GEMINI_FLASH_LITE_MODEL,
-    );
+    vi.mocked(mockConfig.getActiveModel).mockReturnValue(DEFAULT_GEMINI_MODEL);
     vi.mocked(mockConfig.isTrackerEnabled).mockReturnValue(true);
     const prompt = getCoreSystemPrompt(mockConfig);
     expect(prompt).toContain('# TASK MANAGEMENT PROTOCOL');
@@ -667,7 +662,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     it('should include Windows-specific shell efficiency commands on win32', () => {
       mockPlatform('win32');
       vi.mocked(mockConfig.getActiveModel).mockReturnValue(
-        DEFAULT_GEMINI_FLASH_LITE_MODEL,
+        DEFAULT_GEMINI_MODEL,
       );
       const prompt = getCoreSystemPrompt(mockConfig);
       expect(prompt).toContain(
@@ -681,7 +676,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     it('should include generic shell efficiency commands on non-Windows', () => {
       mockPlatform('linux');
       vi.mocked(mockConfig.getActiveModel).mockReturnValue(
-        DEFAULT_GEMINI_FLASH_LITE_MODEL,
+        DEFAULT_GEMINI_MODEL,
       );
       const prompt = getCoreSystemPrompt(mockConfig);
       expect(prompt).toContain("using commands like 'grep', 'tail', 'head'");

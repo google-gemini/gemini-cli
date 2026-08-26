@@ -136,8 +136,7 @@ export class LoopDetectionService {
   private userPrompt = '';
 
   // Tool call tracking
-  private lastToolCallKey: string | null = null;
-  private toolCallRepetitionCount: number = 0;
+  private toolCallHistory: string[] = [];
 
   // Content streaming tracking
   private streamContentHistory = '';
@@ -313,15 +312,39 @@ export class LoopDetectionService {
 
   private checkToolCallLoop(toolCall: { name: string; args: object }): boolean {
     const key = this.getToolCallKey(toolCall);
-    if (this.lastToolCallKey === key) {
-      this.toolCallRepetitionCount++;
-    } else {
-      this.lastToolCallKey = key;
-      this.toolCallRepetitionCount = 1;
+    this.toolCallHistory.push(key);
+
+    const maxRequiredLength = 5 * TOOL_CALL_LOOP_THRESHOLD;
+    if (this.toolCallHistory.length > maxRequiredLength) {
+      this.toolCallHistory = this.toolCallHistory.slice(-maxRequiredLength);
     }
-    if (this.toolCallRepetitionCount >= TOOL_CALL_LOOP_THRESHOLD) {
-      return true;
+
+    const n = this.toolCallHistory.length;
+    const R = TOOL_CALL_LOOP_THRESHOLD; // 5
+
+    // Check for repeating patterns of cycle length k from 1 to 5
+    for (let k = 1; k <= 5; k++) {
+      const requiredLength = k * R;
+      if (n >= requiredLength) {
+        const cycle = this.toolCallHistory.slice(-k);
+        let isPatternMatch = true;
+
+        for (let i = 0; i < requiredLength; i++) {
+          const indexFromEnd = requiredLength - i;
+          const actualKey = this.toolCallHistory[n - indexFromEnd];
+          const expectedKey = cycle[i % k];
+          if (actualKey !== expectedKey) {
+            isPatternMatch = false;
+            break;
+          }
+        }
+
+        if (isPatternMatch) {
+          return true;
+        }
+      }
     }
+
     return false;
   }
 
@@ -739,8 +762,7 @@ export class LoopDetectionService {
   }
 
   private resetToolCallCount(): void {
-    this.lastToolCallKey = null;
-    this.toolCallRepetitionCount = 0;
+    this.toolCallHistory = [];
   }
 
   private resetContentTracking(resetHistory = true): void {

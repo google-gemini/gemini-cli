@@ -119,7 +119,7 @@ export async function canLoadServer(
   }
 
   // 2. Allowlist check
-  if (config.allowedList && config.allowedList.length > 0) {
+  if (config.allowedList !== undefined) {
     const { found, deprecationWarning } = isInSettingsList(
       normalizedId,
       config.allowedList,

@@ -16,10 +16,12 @@ sends them to the model with every prompt. The CLI loads files in the following
 order:
 
 1.  **Global context file:**
+
     - **Location:** `~/.gemini/GEMINI.md` (in your user home directory).
     - **Scope:** Provides default instructions for all your projects.
 
 2.  **Environment and workspace context files:**
+
     - **Location:** The CLI searches for `GEMINI.md` files in your configured
       workspace directories and their parent directories.
     - **Scope:** Provides context relevant to the projects you are currently

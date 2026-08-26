@@ -58,6 +58,7 @@ const mockGit = {
   checkout: vi.fn(),
   listRemote: vi.fn(),
   revparse: vi.fn(),
+  env: vi.fn(() => mockGit),
   // Not a part of the actual API, but we need to use this to do the correct
   // file system interactions.
   path: vi.fn(),

@@ -215,3 +215,26 @@ exports[`<ModelStatsDisplay /> > should render "no API calls" message when there
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "
 `;
+
+exports[`<ModelStatsDisplay /> > should resolve gemini-3-flash to gemini-3.5-flash via getDisplayString 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│  Model Stats For Nerds                                                                           │
+│                                                                                                  │
+│                                                                                                  │
+│  Metric                      gemini-3.5-flash                                                    │
+│  ──────────────────────────────────────────────────────────────────────────────────────────────  │
+│  API                                                                                             │
+│  Requests                    1                                                                   │
+│  Errors                      0 (0.0%)                                                            │
+│  Avg Latency                 100ms                                                               │
+│  Tokens                                                                                          │
+│  Total                       30                                                                  │
+│    ↳ Input                   5                                                                   │
+│    ↳ Cache Reads             5 (50.0%)                                                           │
+│    ↳ Thoughts                2                                                                   │
+│    ↳ Tool                    1                                                                   │
+│    ↳ Output                  20                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
