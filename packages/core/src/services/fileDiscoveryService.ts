@@ -42,6 +42,7 @@ export class FileDiscoveryService {
     customIgnoreFilePaths: [],
   };
   private projectRoot: string;
+  private ignoreCache = new Map<string, boolean>();
 
   constructor(projectRoot: string, options?: FilterFilesOptions) {
     this.projectRoot = path.resolve(projectRoot);
@@ -141,6 +142,7 @@ export class FileDiscoveryService {
 
   private applyFilterFilesOptions(options?: FilterFilesOptions): void {
     if (!options) return;
+    this.ignoreCache.clear();
 
     if (options.respectGitIgnore !== undefined) {
       this.defaultFilterFileOptions.respectGitIgnore = options.respectGitIgnore;
@@ -210,41 +212,43 @@ export class FileDiscoveryService {
   }
 
   /**
-   * Internal unified check for paths.
+   * Internal unified check for paths with caching optimization.
    */
   private _shouldIgnore(
     filePath: string,
     isDirectory: boolean,
     options: FilterFilesOptions = {},
   ): boolean {
+    const cacheKey = `${filePath}:${isDirectory}:${JSON.stringify(options)}`;
+    if (this.ignoreCache.has(cacheKey)) {
+      return this.ignoreCache.get(cacheKey)!;
+    }
+
     const {
       respectGitIgnore = this.defaultFilterFileOptions.respectGitIgnore,
       respectGeminiIgnore = this.defaultFilterFileOptions.respectGeminiIgnore,
     } = options;
 
+    let result = false;
+
     if (respectGitIgnore && respectGeminiIgnore && this.combinedIgnoreFilter) {
-      return this.combinedIgnoreFilter.isIgnored(filePath, isDirectory);
-    }
-
-    if (this.customIgnoreFilter?.isIgnored(filePath, isDirectory)) {
-      return true;
-    }
-
-    if (
+      result = this.combinedIgnoreFilter.isIgnored(filePath, isDirectory);
+    } else if (this.customIgnoreFilter?.isIgnored(filePath, isDirectory)) {
+      result = true;
+    } else if (
       respectGitIgnore &&
       this.gitIgnoreFilter?.isIgnored(filePath, isDirectory)
     ) {
-      return true;
-    }
-
-    if (
+      result = true;
+    } else if (
       respectGeminiIgnore &&
       this.geminiIgnoreFilter?.isIgnored(filePath, isDirectory)
     ) {
-      return true;
+      result = true;
     }
 
-    return false;
+    this.ignoreCache.set(cacheKey, result);
+    return result;
   }
 
   /**
