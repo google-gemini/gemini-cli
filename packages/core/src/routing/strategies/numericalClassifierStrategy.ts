@@ -247,10 +247,7 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
     }
 
     const remoteThresholdValue = await config.getClassifierThreshold();
-    const isDefaultRules =
-      rules.length === 2 &&
-      rules[1].model === PRO_MODEL &&
-      rules[0].model === FLASH_MODEL;
+    const isDefaultRules = !config.hasCustomNumericalRoutingRules();
 
     let groupLabel = 'Custom';
     if (isDefaultRules) {
