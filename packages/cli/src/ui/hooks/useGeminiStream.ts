@@ -258,6 +258,7 @@ export const useGeminiStream = (
   const abortControllerRef = useRef<AbortController | null>(null);
   const turnCancelledRef = useRef(false);
   const activeQueryIdRef = useRef<string | null>(null);
+  const historyLengthAfterUserPromptRef = useRef<number | undefined>(undefined);
   const previousApprovalModeRef = useRef<ApprovalMode>(
     config.getApprovalMode(),
   );
@@ -717,6 +718,16 @@ export const useGeminiStream = (
   const lastQueryRef = useRef<PartListUnion | null>(null);
   const lastPromptIdRef = useRef<string | null>(null);
   const loopDetectedRef = useRef(false);
+  const autoNudgeAttemptCountRef = useRef<number>(0);
+  const MAX_AUTO_NUDGE_ATTEMPTS = 2;
+  const submitQueryRef = useRef<
+    | ((
+        query: PartListUnion,
+        options?: { isContinuation: boolean },
+        prompt_id?: string,
+      ) => Promise<void>)
+    | null
+  >(null);
   const [
     loopDetectionConfirmationRequest,
     setLoopDetectionConfirmationRequest,
@@ -1524,6 +1535,8 @@ export const useGeminiStream = (
       stream: AsyncIterable<GeminiEvent>,
       userMessageTimestamp: number,
       signal: AbortSignal,
+      isContinuation?: boolean,
+      prompt_id?: string,
     ): Promise<StreamProcessingStatus> => {
       let geminiMessageBuffer = '';
       const toolCallRequests: ToolCallRequestInfo[] = [];
@@ -1622,6 +1635,25 @@ export const useGeminiStream = (
           setPendingHistoryItem(null);
         }
         await scheduleToolCalls(toolCallRequests, signal);
+      } else {
+        const hasVisibleText = geminiMessageBuffer.trim().length > 0;
+        if (
+          isContinuation &&
+          !hasVisibleText &&
+          autoNudgeAttemptCountRef.current < MAX_AUTO_NUDGE_ATTEMPTS
+        ) {
+          autoNudgeAttemptCountRef.current += 1;
+          const nudgeMessage =
+            '[System: You successfully executed a tool but returned an empty response. Please analyze the tool output and explain your progress or final answer.]';
+
+          // Automatically continue the query with the nudge
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
+          submitQueryRef.current?.(
+            [{ text: nudgeMessage }],
+            { isContinuation: true },
+            prompt_id,
+          );
+        }
       }
       return StreamProcessingStatus.Completed;
     },
@@ -1677,6 +1709,7 @@ export const useGeminiStream = (
 
           // Reset quota error flag when starting a new query (not a continuation)
           if (!options?.isContinuation) {
+            autoNudgeAttemptCountRef.current = 0;
             setModelSwitchedFromQuotaError(false);
             config.setQuotaErrorOccurred(false);
             config.resetBillingTurnState(
@@ -1704,6 +1737,11 @@ export const useGeminiStream = (
 
             if (!shouldProceed || queryToSend === null) {
               return;
+            }
+
+            if (geminiClient) {
+              historyLengthAfterUserPromptRef.current =
+                geminiClient.getHistory().length;
             }
 
             if (!options?.isContinuation) {
@@ -1743,6 +1781,8 @@ export const useGeminiStream = (
                 stream,
                 userMessageTimestamp,
                 abortSignal,
+                options?.isContinuation,
+                prompt_id,
               );
 
               if (processingStatus === StreamProcessingStatus.UserCancelled) {
@@ -1845,6 +1885,7 @@ export const useGeminiStream = (
       setIsResponding,
     ],
   );
+  submitQueryRef.current = submitQuery;
 
   const handleApprovalModeChange = useCallback(
     async (newApprovalMode: ApprovalMode) => {
@@ -2086,17 +2127,16 @@ export const useGeminiStream = (
         }
         setIsResponding(false);
 
-        if (geminiClient) {
-          // We need to manually add the function responses to the history
-          // so the model knows the tools were cancelled.
-          const combinedParts = geminiTools.flatMap(
-            (toolCall) => toolCall.response.responseParts,
-          );
-          // eslint-disable-next-line @typescript-eslint/no-floating-promises
-          geminiClient.addHistory({
-            role: 'user',
-            parts: combinedParts,
-          });
+        if (
+          geminiClient &&
+          historyLengthAfterUserPromptRef.current !== undefined
+        ) {
+          const targetLength = historyLengthAfterUserPromptRef.current;
+          if (geminiClient.getHistory().length > targetLength) {
+            geminiClient.setHistory(
+              geminiClient.getHistory().slice(0, targetLength),
+            );
+          }
         }
 
         const callIdsToMarkAsSubmitted = geminiTools.map(
