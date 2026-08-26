@@ -42,6 +42,9 @@ export class FileDiscoveryService {
     customIgnoreFilePaths: [],
   };
   private projectRoot: string;
+
+  // Cache for ignore results to avoid repeated pattern matching.
+  // Key format: `${filePath}|${isDirectory ? 'dir' : 'file'}|${respectGitIgnore}|${respectGeminiIgnore}`
   private ignoreCache = new Map<string, boolean>();
 
   constructor(projectRoot: string, options?: FilterFilesOptions) {
@@ -84,6 +87,9 @@ export class FileDiscoveryService {
         true,
       );
     }
+
+    // Clear any stale cache (empty at this point, but safe for future use)
+    this.ignoreCache.clear();
   }
 
   /**
@@ -142,7 +148,6 @@ export class FileDiscoveryService {
 
   private applyFilterFilesOptions(options?: FilterFilesOptions): void {
     if (!options) return;
-    this.ignoreCache.clear();
 
     if (options.respectGitIgnore !== undefined) {
       this.defaultFilterFileOptions.respectGitIgnore = options.respectGitIgnore;
@@ -212,39 +217,41 @@ export class FileDiscoveryService {
   }
 
   /**
-   * Internal unified check for paths with caching optimization.
+   * Internal unified check for paths with caching.
    */
   private _shouldIgnore(
     filePath: string,
     isDirectory: boolean,
     options: FilterFilesOptions = {},
   ): boolean {
-    const cacheKey = `${filePath}:${isDirectory}:${JSON.stringify(options)}`;
-    if (this.ignoreCache.has(cacheKey)) {
-      return this.ignoreCache.get(cacheKey)!;
-    }
-
     const {
       respectGitIgnore = this.defaultFilterFileOptions.respectGitIgnore,
       respectGeminiIgnore = this.defaultFilterFileOptions.respectGeminiIgnore,
     } = options;
 
-    let result = false;
+    // Build cache key from the parameters that affect the outcome.
+    const cacheKey = `${filePath}|${isDirectory ? 'dir' : 'file'}|${respectGitIgnore}|${respectGeminiIgnore}`;
+    if (this.ignoreCache.has(cacheKey)) {
+      return this.ignoreCache.get(cacheKey)!;
+    }
 
+    let result = false;
     if (respectGitIgnore && respectGeminiIgnore && this.combinedIgnoreFilter) {
       result = this.combinedIgnoreFilter.isIgnored(filePath, isDirectory);
-    } else if (this.customIgnoreFilter?.isIgnored(filePath, isDirectory)) {
-      result = true;
-    } else if (
-      respectGitIgnore &&
-      this.gitIgnoreFilter?.isIgnored(filePath, isDirectory)
-    ) {
-      result = true;
-    } else if (
-      respectGeminiIgnore &&
-      this.geminiIgnoreFilter?.isIgnored(filePath, isDirectory)
-    ) {
-      result = true;
+    } else {
+      if (this.customIgnoreFilter?.isIgnored(filePath, isDirectory)) {
+        result = true;
+      } else if (
+        respectGitIgnore &&
+        this.gitIgnoreFilter?.isIgnored(filePath, isDirectory)
+      ) {
+        result = true;
+      } else if (
+        respectGeminiIgnore &&
+        this.geminiIgnoreFilter?.isIgnored(filePath, isDirectory)
+      ) {
+        result = true;
+      }
     }
 
     this.ignoreCache.set(cacheKey, result);
