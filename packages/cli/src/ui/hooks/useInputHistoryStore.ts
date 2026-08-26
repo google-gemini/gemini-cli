@@ -5,7 +5,7 @@
  */
 
 import { debugLogger } from '@google/gemini-cli-core';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 
 interface Logger {
   getPreviousUserMessages(): Promise<string[]>;
@@ -18,55 +18,52 @@ export interface UseInputHistoryStoreReturn {
 }
 
 /**
+ * Combine the current session (newest first) with the past session (newest
+ * first) into a single deduplicated history, returned oldest first.
+ */
+export function computeInputHistory(
+  currentSession: string[],
+  pastSession: string[],
+): string[] {
+  // Combine current session (newest first) + past session (newest first)
+  const combinedMessages = [...currentSession, ...pastSession];
+
+  // Deduplicate consecutive identical messages (same algorithm as before)
+  const deduplicatedMessages: string[] = [];
+  if (combinedMessages.length > 0) {
+    deduplicatedMessages.push(combinedMessages[0]); // Add the newest one unconditionally
+    for (let i = 1; i < combinedMessages.length; i++) {
+      if (combinedMessages[i] !== combinedMessages[i - 1]) {
+        deduplicatedMessages.push(combinedMessages[i]);
+      }
+    }
+  }
+
+  // Reverse to oldest first for useInputHistory
+  return deduplicatedMessages.reverse();
+}
+
+/**
  * Hook for independently managing input history.
  * Completely separated from chat history and unaffected by /clear commands.
  */
 export function useInputHistoryStore(): UseInputHistoryStoreReturn {
-  const [inputHistory, setInputHistory] = useState<string[]>([]);
   const [pastSessionMessages, setPastSessionMessages] = useState<string[]>([]);
   const [currentSessionMessages, setCurrentSessionMessages] = useState<
     string[]
   >([]);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  /**
-   * Recalculate the complete input history from past and current sessions.
-   * Applies the same deduplication logic as the previous implementation.
-   */
-  const recalculateHistory = useCallback(
-    (currentSession: string[], pastSession: string[]) => {
-      // Combine current session (newest first) + past session (newest first)
-      const combinedMessages = [...currentSession, ...pastSession];
-
-      // Deduplicate consecutive identical messages (same algorithm as before)
-      const deduplicatedMessages: string[] = [];
-      if (combinedMessages.length > 0) {
-        deduplicatedMessages.push(combinedMessages[0]); // Add the newest one unconditionally
-        for (let i = 1; i < combinedMessages.length; i++) {
-          if (combinedMessages[i] !== combinedMessages[i - 1]) {
-            deduplicatedMessages.push(combinedMessages[i]);
-          }
-        }
-      }
-
-      // Reverse to oldest first for useInputHistory
-      setInputHistory(deduplicatedMessages.reverse());
-    },
-    [],
+  // Derived during render, so there is no extra render pass and no window
+  // where consumers see a stale history next to fresh session state.
+  const inputHistory = useMemo(
+    () =>
+      computeInputHistory(
+        currentSessionMessages.slice().reverse(), // Convert to newest first
+        pastSessionMessages,
+      ),
+    [currentSessionMessages, pastSessionMessages],
   );
-
-  /**
-   * Recalculate the derived input history whenever the underlying session
-   * state commits. Keeping this in an effect (instead of inside state
-   * updaters) ensures updaters stay pure and the recalculation runs exactly
-   * once per committed change.
-   */
-  useEffect(() => {
-    recalculateHistory(
-      currentSessionMessages.slice().reverse(), // Convert to newest first
-      pastSessionMessages,
-    );
-  }, [currentSessionMessages, pastSessionMessages, recalculateHistory]);
 
   /**
    * Initialize input history from logger with past session data.
