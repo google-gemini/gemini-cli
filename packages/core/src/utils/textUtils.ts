@@ -166,6 +166,33 @@ export function safeTemplateReplace(
 }
 
 /**
+ * Safely replaces a single `{placeholder}` token in a prompt template with
+ * a literal value, immune to ECMAScript `$`-pattern interpolation.
+ *
+ * `String.prototype.replace()` treats `$&`, `$'`, `` $` ``, and `$$` in the
+ * replacement string as special sequences (see ECMA-262 §22.1.3.18,
+ * GetSubstitution).  When the replacement value comes from untrusted or
+ * user-controlled text (tool output, file content, chat history), these
+ * sequences silently corrupt the resulting prompt.
+ *
+ * Using a replacer *function* instead of a replacement *string* bypasses
+ * GetSubstitution entirely — the function's return value is inserted
+ * literally.
+ *
+ * @param template  The template string containing `{key}` placeholders.
+ * @param placeholder  The placeholder token to replace, e.g. `'{textToSummarize}'`.
+ * @param value  The literal value to insert.
+ * @returns The template with the first occurrence of `placeholder` replaced.
+ */
+export function safePromptReplace(
+  template: string,
+  placeholder: string,
+  value: string,
+): string {
+  return template.replace(placeholder, () => value);
+}
+
+/**
  * Sanitizes output for injection into the model conversation.
  * Wraps output in a secure <output> tag and handles potential injection vectors
  * (like closing tags or template patterns) within the data.

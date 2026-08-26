@@ -939,4 +939,64 @@ describe('SessionSummaryService', () => {
       expect(summary).toContain('\u200D'); // ZWJ should be preserved
     });
   });
+
+  describe('Dollar-sign prompt safety', () => {
+    it('should preserve $& in conversation text without template corruption', async () => {
+      const messages: MessageRecord[] = [
+        {
+          id: '1',
+          timestamp: '2025-12-03T00:00:00Z',
+          type: 'user',
+          content: [{ text: 'Fix the regex: value.replace(/x/, "$&_suffix")' }],
+        },
+      ];
+
+      await service.generateSummary({ messages });
+
+      const calledArgs = mockGenerateContent.mock.calls[0][0];
+      const promptText = calledArgs.contents[0].parts[0].text as string;
+      expect(promptText).toContain('$&_suffix');
+    });
+
+    it("should preserve $' in conversation text without injecting template tail", async () => {
+      const messages: MessageRecord[] = [
+        {
+          id: '1',
+          timestamp: '2025-12-03T00:00:00Z',
+          type: 'user',
+          content: [{ text: "Run: echo $'hello\\nworld'" }],
+        },
+      ];
+
+      await service.generateSummary({ messages });
+
+      const calledArgs = mockGenerateContent.mock.calls[0][0];
+      const promptText = calledArgs.contents[0].parts[0].text as string;
+      expect(promptText).toContain("$'hello\\nworld'");
+
+      // The footer "Summary (max 80 chars):" should appear exactly once
+      const footer = 'Summary (max 80 chars):';
+      const firstIdx = promptText.indexOf(footer);
+      const secondIdx = promptText.indexOf(footer, firstIdx + 1);
+      expect(firstIdx).toBeGreaterThan(-1);
+      expect(secondIdx).toBe(-1);
+    });
+
+    it('should preserve $$ in conversation text without collapsing to single $', async () => {
+      const messages: MessageRecord[] = [
+        {
+          id: '1',
+          timestamp: '2025-12-03T00:00:00Z',
+          type: 'user',
+          content: [{ text: "jQuery: $$('.items').each()" }],
+        },
+      ];
+
+      await service.generateSummary({ messages });
+
+      const calledArgs = mockGenerateContent.mock.calls[0][0];
+      const promptText = calledArgs.contents[0].parts[0].text as string;
+      expect(promptText).toContain("$$('.items')");
+    });
+  });
 });

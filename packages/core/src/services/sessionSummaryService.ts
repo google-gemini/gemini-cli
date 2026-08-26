@@ -8,6 +8,7 @@ import type { MessageRecord } from './chatRecordingService.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import { partListUnionToString } from '../core/geminiRequest.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { safePromptReplace } from '../utils/textUtils.js';
 import type { Content } from '@google/genai';
 import { getResponseText } from '../utils/partUtils.js';
 import { LlmRole } from '../telemetry/types.js';
@@ -104,7 +105,11 @@ export class SessionSummaryService {
         })
         .join('\n\n');
 
-      const prompt = SUMMARY_PROMPT.replace('{conversation}', conversationText);
+      const prompt = safePromptReplace(
+        SUMMARY_PROMPT,
+        '{conversation}',
+        conversationText,
+      );
 
       // Create abort controller with timeout
       const abortController = new AbortController();

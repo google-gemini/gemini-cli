@@ -9,6 +9,7 @@ import {
   safeLiteralReplace,
   truncateString,
   safeTemplateReplace,
+  safePromptReplace,
   isBinary,
   stripAnsiFromBuffer,
   wrapUntrusted,
@@ -199,6 +200,97 @@ describe('safeTemplateReplace', () => {
     const tmpl = 'Value: {{val}}';
     const replacements = { val: '$&' };
     expect(safeTemplateReplace(tmpl, replacements)).toBe('Value: $&');
+  });
+});
+
+describe('safePromptReplace', () => {
+  it('replaces a placeholder with a plain value', () => {
+    expect(safePromptReplace('Hello {name}!', '{name}', 'World')).toBe(
+      'Hello World!',
+    );
+  });
+
+  it('returns the template unchanged when placeholder is not found', () => {
+    expect(safePromptReplace('Hello {name}!', '{missing}', 'World')).toBe(
+      'Hello {name}!',
+    );
+  });
+
+  it('replaces only the first occurrence of the placeholder', () => {
+    expect(safePromptReplace('{x} and {x}', '{x}', 'val')).toBe('val and {x}');
+  });
+
+  it('treats $& in replacement value literally (matched substring)', () => {
+    const template = 'Text: {content}';
+    const value = 'price is $& more';
+    expect(safePromptReplace(template, '{content}', value)).toBe(
+      'Text: price is $& more',
+    );
+  });
+
+  it("treats $' in replacement value literally (portion after match)", () => {
+    const template = 'Body: {textToSummarize}';
+    const value = "echo $'\\n'";
+    expect(safePromptReplace(template, '{textToSummarize}', value)).toBe(
+      "Body: echo $'\\n'",
+    );
+  });
+
+  it('treats $` in replacement value literally (portion before match)', () => {
+    const template = 'Code: {code}';
+    const value = 'const x = `${y}`';
+    expect(safePromptReplace(template, '{code}', value)).toBe(
+      'Code: const x = `${y}`',
+    );
+  });
+
+  it('treats $$ in replacement value literally (dollar literal)', () => {
+    const template = 'Price: {amount}';
+    const value = '$$100.00';
+    expect(safePromptReplace(template, '{amount}', value)).toBe(
+      'Price: $$100.00',
+    );
+  });
+
+  it('treats $1, $2 etc. in replacement value literally (capture groups)', () => {
+    const template = 'Output: {output}';
+    const value = 'match $1 and $2 groups';
+    expect(safePromptReplace(template, '{output}', value)).toBe(
+      'Output: match $1 and $2 groups',
+    );
+  });
+
+  it('handles value containing the placeholder token itself', () => {
+    const template = 'Body: {text}';
+    const value = 'contains {text} literally';
+    expect(safePromptReplace(template, '{text}', value)).toBe(
+      'Body: contains {text} literally',
+    );
+  });
+
+  it('handles empty replacement value', () => {
+    expect(safePromptReplace('a{x}b', '{x}', '')).toBe('ab');
+  });
+
+  it('handles multi-line template with $ patterns in value', () => {
+    const template = 'Line1\nContent: {data}\nLine3';
+    const value = "if ($x === $') { return $$; }";
+    expect(safePromptReplace(template, '{data}', value)).toBe(
+      "Line1\nContent: if ($x === $') { return $$; }\nLine3",
+    );
+  });
+
+  it('correctly handles the exact corruption scenario from the bug report', () => {
+    // The original bug: String.replace interprets $' as "insert portion
+    // of string after the match". With plain .replace(), the template text
+    // after {textToSummarize} would be injected into the replacement.
+    const template = 'Summarize:\n"{textToSummarize}"\n\nReturn the summary.';
+    const value = "echo $'newline'";
+    const result = safePromptReplace(template, '{textToSummarize}', value);
+    expect(result).toBe(
+      'Summarize:\n"echo $\'newline\'"\n\nReturn the summary.',
+    );
+    expect(result).not.toContain('Return the summaryReturn the summary');
   });
 });
 
