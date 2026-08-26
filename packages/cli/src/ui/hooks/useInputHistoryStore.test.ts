@@ -171,6 +171,18 @@ describe('useInputHistoryStore', () => {
     expect(result.current.inputHistory).toEqual(['test message']);
   });
 
+  it('should compose batched rapid inputs in submission order', async () => {
+    const { result } = await renderHook(() => useInputHistoryStore());
+
+    act(() => {
+      result.current.addInput('first');
+      result.current.addInput('second');
+      result.current.addInput('third');
+    });
+
+    expect(result.current.inputHistory).toEqual(['first', 'second', 'third']);
+  });
+
   describe('deduplication logic from previous implementation', () => {
     it('should deduplicate consecutive messages from past sessions during initialization', async () => {
       const mockLogger = {

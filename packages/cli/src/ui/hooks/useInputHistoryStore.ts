@@ -5,7 +5,7 @@
  */
 
 import { debugLogger } from '@google/gemini-cli-core';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 interface Logger {
   getPreviousUserMessages(): Promise<string[]>;
@@ -23,8 +23,8 @@ export interface UseInputHistoryStoreReturn {
  */
 export function useInputHistoryStore(): UseInputHistoryStoreReturn {
   const [inputHistory, setInputHistory] = useState<string[]>([]);
-  const [_pastSessionMessages, setPastSessionMessages] = useState<string[]>([]);
-  const [_currentSessionMessages, setCurrentSessionMessages] = useState<
+  const [pastSessionMessages, setPastSessionMessages] = useState<string[]>([]);
+  const [currentSessionMessages, setCurrentSessionMessages] = useState<
     string[]
   >([]);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -56,6 +56,19 @@ export function useInputHistoryStore(): UseInputHistoryStoreReturn {
   );
 
   /**
+   * Recalculate the derived input history whenever the underlying session
+   * state commits. Keeping this in an effect (instead of inside state
+   * updaters) ensures updaters stay pure and the recalculation runs exactly
+   * once per committed change.
+   */
+  useEffect(() => {
+    recalculateHistory(
+      currentSessionMessages.slice().reverse(), // Convert to newest first
+      pastSessionMessages,
+    );
+  }, [currentSessionMessages, pastSessionMessages, recalculateHistory]);
+
+  /**
    * Initialize input history from logger with past session data.
    * Executed only once at app startup.
    */
@@ -66,7 +79,6 @@ export function useInputHistoryStore(): UseInputHistoryStoreReturn {
       try {
         const pastMessages = (await logger.getPreviousUserMessages()) || [];
         setPastSessionMessages(pastMessages); // Store as newest first
-        recalculateHistory([], pastMessages);
         setIsInitialized(true);
       } catch (error) {
         // Start with empty history even if logger initialization fails
@@ -75,38 +87,22 @@ export function useInputHistoryStore(): UseInputHistoryStoreReturn {
           error,
         );
         setPastSessionMessages([]);
-        recalculateHistory([], []);
         setIsInitialized(true);
       }
     },
-    [isInitialized, recalculateHistory],
+    [isInitialized],
   );
 
   /**
    * Add new input to history.
    * Recalculates the entire history with deduplication.
    */
-  const addInput = useCallback(
-    (input: string) => {
-      const trimmedInput = input.trim();
-      if (!trimmedInput) return; // Filter empty/whitespace-only inputs
+  const addInput = useCallback((input: string) => {
+    const trimmedInput = input.trim();
+    if (!trimmedInput) return; // Filter empty/whitespace-only inputs
 
-      setCurrentSessionMessages((prevCurrent) => {
-        const newCurrentSession = [...prevCurrent, trimmedInput];
-
-        setPastSessionMessages((prevPast) => {
-          recalculateHistory(
-            newCurrentSession.slice().reverse(), // Convert to newest first
-            prevPast,
-          );
-          return prevPast; // No change to past messages
-        });
-
-        return newCurrentSession;
-      });
-    },
-    [recalculateHistory],
-  );
+    setCurrentSessionMessages((prevCurrent) => [...prevCurrent, trimmedInput]);
+  }, []);
 
   return {
     inputHistory,
