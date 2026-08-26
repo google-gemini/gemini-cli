@@ -219,7 +219,7 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
     groupLabel: string;
     modelAlias: string;
   }> {
-    const rules = await config.getNumericalRoutingRules();
+    const rules = [...await config.getNumericalRoutingRules()];
     // Sort rules by maxScore ascending to evaluate sequentially
     rules.sort((a, b) => a.maxScore - b.maxScore);
 
