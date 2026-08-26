@@ -179,6 +179,13 @@ export function safeTemplateReplace(
  * GetSubstitution entirely — the function's return value is inserted
  * literally.
  *
+ * **Note:** This replaces only the *first* occurrence of `placeholder`.
+ * This is intentional — the replacement value itself may legitimately
+ * contain text that looks like a placeholder token (e.g. source code
+ * containing `{instruction}`).  Using `replaceAll` would corrupt those
+ * occurrences.  All current prompt templates use each placeholder exactly
+ * once.
+ *
  * @param template  The template string containing `{key}` placeholders.
  * @param placeholder  The placeholder token to replace, e.g. `'{textToSummarize}'`.
  * @param value  The literal value to insert.
@@ -190,6 +197,29 @@ export function safePromptReplace(
   value: string,
 ): string {
   return template.replace(placeholder, () => value);
+}
+
+/**
+ * Batch variant of {@link safePromptReplace}.  Applies multiple placeholder
+ * replacements in a single pass (sequentially, first-match-only per key).
+ *
+ * Preferred over chained `safePromptReplace` calls when a template has
+ * many placeholders — keeps all substitutions visible in one place and
+ * makes it harder to accidentally miss one.
+ *
+ * @param template  The template string containing `{key}` placeholders.
+ * @param replacements  Array of `[placeholder, value]` pairs to apply in order.
+ * @returns The template with all listed placeholders replaced.
+ */
+export function safePromptReplaceAll(
+  template: string,
+  replacements: ReadonlyArray<[string, string]>,
+): string {
+  let result = template;
+  for (const [placeholder, value] of replacements) {
+    result = result.replace(placeholder, () => value);
+  }
+  return result;
 }
 
 /**

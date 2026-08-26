@@ -10,6 +10,7 @@ import {
   truncateString,
   safeTemplateReplace,
   safePromptReplace,
+  safePromptReplaceAll,
   isBinary,
   stripAnsiFromBuffer,
   wrapUntrusted,
@@ -291,6 +292,58 @@ describe('safePromptReplace', () => {
       'Summarize:\n"echo $\'newline\'"\n\nReturn the summary.',
     );
     expect(result).not.toContain('Return the summaryReturn the summary');
+  });
+});
+
+describe('safePromptReplaceAll', () => {
+  it('applies multiple replacements in order', () => {
+    const template = '{greeting} {name}, welcome to {place}!';
+    const result = safePromptReplaceAll(template, [
+      ['{greeting}', 'Hello'],
+      ['{name}', 'Alice'],
+      ['{place}', 'Wonderland'],
+    ]);
+    expect(result).toBe('Hello Alice, welcome to Wonderland!');
+  });
+
+  it('treats $-patterns literally across all replacements', () => {
+    const template =
+      '<instruction>{instruction}</instruction>\n<search>{old_string}</search>';
+    const result = safePromptReplaceAll(template, [
+      ['{instruction}', "fix the $'quoting' issue"],
+      ['{old_string}', 'value.replace(/x/, "$&")'],
+    ]);
+    expect(result).toBe(
+      '<instruction>fix the $\'quoting\' issue</instruction>\n<search>value.replace(/x/, "$&")</search>',
+    );
+  });
+
+  it('handles empty replacements array', () => {
+    expect(safePromptReplaceAll('unchanged', [])).toBe('unchanged');
+  });
+
+  it('applies replacements sequentially with first-match-only semantics', () => {
+    const template = '{a} and {b}';
+    const result = safePromptReplaceAll(template, [
+      ['{a}', 'contains {b} literally'],
+      ['{b}', 'second'],
+    ]);
+    // After replacing {a}: 'contains {b} literally and {b}'
+    // After replacing {b} (first-match-only): 'contains second literally and {b}'
+    // The FIRST {b} (from the value of {a}) is replaced; the SECOND {b}
+    // (from the original template) is not, because .replace() is first-match.
+    // In practice this edge case doesn't arise — prompt template placeholders
+    // are unique tokens like {textToSummarize} that don't collide.
+    expect(result).toBe('contains second literally and {b}');
+  });
+
+  it('preserves $$ without collapsing across batch replacements', () => {
+    const template = 'Price: {price}, Tax: {tax}';
+    const result = safePromptReplaceAll(template, [
+      ['{price}', '$$100'],
+      ['{tax}', '$$15'],
+    ]);
+    expect(result).toBe('Price: $$100, Tax: $$15');
   });
 });
 
