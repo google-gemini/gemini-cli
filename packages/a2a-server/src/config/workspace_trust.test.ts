@@ -39,8 +39,7 @@ describe('Workspace Trust Evaluation', () => {
   });
 
   it('resolves untrusted environment signals in checkPathTrust', () => {
-    vi.stubEnv('GEMINI_FOLDER_TRUST', 'false');
-    vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', '');
+    vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', 'false');
 
     const result = checkPathTrust({
       path: tempWorkspaceDir,
@@ -49,7 +48,6 @@ describe('Workspace Trust Evaluation', () => {
 
     expect(result).toEqual({ isTrusted: false, source: 'env' });
 
-    vi.stubEnv('GEMINI_FOLDER_TRUST', '');
     vi.stubEnv('GEMINI_RESTRICTED_MODE', 'true');
 
     const restrictedResult = checkPathTrust({
@@ -61,7 +59,7 @@ describe('Workspace Trust Evaluation', () => {
   });
 
   it('evaluates to false in Config.isTrustedFolder when untrusted signals are present or undefined', () => {
-    vi.stubEnv('GEMINI_FOLDER_TRUST', 'false');
+    vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', 'false');
 
     const untrustedConfig = new Config({
       sessionId: 'test-session',
@@ -78,6 +76,7 @@ describe('Workspace Trust Evaluation', () => {
     expect(untrustedConfig.isTrustedFolder()).toBe(false);
 
     vi.unstubAllEnvs();
+    vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', '');
 
     const fallbackConfig = new Config({
       sessionId: 'test-session',
@@ -94,7 +93,7 @@ describe('Workspace Trust Evaluation', () => {
     expect(fallbackConfig.isTrustedFolder()).toBe(false);
   });
 
-  it('assigns undefined to mcpServers, policyPaths, and adminPolicyPaths in configParams and policySettings when trusted is false', async () => {
+  it('assigns undefined to mcpServers, policyPaths, adminPolicyPaths, tools, and telemetry in configParams and policySettings when trusted is false', async () => {
     const policySpy = vi.spyOn(core, 'createPolicyEngineConfig');
     const settings: Settings = {
       mcpServers: {
@@ -105,6 +104,12 @@ describe('Workspace Trust Evaluation', () => {
       },
       policyPaths: ['/test/policy/path'],
       adminPolicyPaths: ['/test/admin/policy/path'],
+      tools: {
+        allowed: ['shell'],
+      },
+      telemetry: {
+        otlpEndpoint: 'http://untrusted-endpoint:4317',
+      },
     };
 
     const config = await loadConfig(
@@ -119,12 +124,18 @@ describe('Workspace Trust Evaluation', () => {
     expect(policySpy.mock.calls[0][0].mcpServers).toBeUndefined();
     expect(policySpy.mock.calls[0][0].policyPaths).toBeUndefined();
     expect(policySpy.mock.calls[0][0].adminPolicyPaths).toBeUndefined();
+    expect(policySpy.mock.calls[0][0].tools?.allowed).toBeUndefined();
+    expect(config.getTelemetryOtlpEndpoint()).not.toBe(
+      'http://untrusted-endpoint:4317',
+    );
     expect(settings.mcpServers).toBeDefined();
     expect(settings.policyPaths).toBeDefined();
     expect(settings.adminPolicyPaths).toBeDefined();
+    expect(settings.tools).toBeDefined();
+    expect(settings.telemetry).toBeDefined();
   });
 
-  it('retains mcpServers, policyPaths, and adminPolicyPaths in configParams and policySettings when trusted is true', async () => {
+  it('retains mcpServers, policyPaths, adminPolicyPaths, tools, and telemetry in configParams and policySettings when trusted is true', async () => {
     const policySpy = vi.spyOn(core, 'createPolicyEngineConfig');
     const settings: Settings = {
       mcpServers: {
@@ -135,6 +146,12 @@ describe('Workspace Trust Evaluation', () => {
       },
       policyPaths: ['/test/policy/path'],
       adminPolicyPaths: ['/test/admin/policy/path'],
+      tools: {
+        allowed: ['shell'],
+      },
+      telemetry: {
+        otlpEndpoint: 'http://trusted-endpoint:4317',
+      },
     };
 
     const config = await loadConfig(
@@ -152,6 +169,10 @@ describe('Workspace Trust Evaluation', () => {
     );
     expect(policySpy.mock.calls[0][0].adminPolicyPaths).toEqual(
       settings.adminPolicyPaths,
+    );
+    expect(policySpy.mock.calls[0][0].tools?.allowed).toEqual(['shell']);
+    expect(config.getTelemetryOtlpEndpoint()).toBe(
+      'http://trusted-endpoint:4317',
     );
   });
 });

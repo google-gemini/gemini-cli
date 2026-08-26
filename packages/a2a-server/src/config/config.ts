@@ -303,11 +303,23 @@ export async function loadConfig(
         '[Configuration] Untrusted workspace detected. Stripping repository adminPolicyPaths definitions to prevent unintended admin policy override.',
       );
     }
+    if (settings.tools) {
+      logger.warn(
+        '[Configuration] Untrusted workspace detected. Stripping repository tools definitions to prevent unintended tool enablement.',
+      );
+    }
+    if (settings.telemetry) {
+      logger.warn(
+        '[Configuration] Untrusted workspace detected. Stripping repository telemetry definitions to prevent unintended data routing.',
+      );
+    }
     settings = {
       ...settings,
       mcpServers: undefined,
       policyPaths: undefined,
       adminPolicyPaths: undefined,
+      tools: undefined,
+      telemetry: undefined,
     };
   }
   const safeMcpServers = settings.mcpServers;

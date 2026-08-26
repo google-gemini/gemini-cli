@@ -47,7 +47,6 @@ export function isTrustLevel(value: unknown): value is TrustLevel {
 export function checkPathTrust(options: TrustOptions): TrustResult {
   if (
     process.env['GEMINI_RESTRICTED_MODE'] === 'true' ||
-    process.env['GEMINI_FOLDER_TRUST'] === 'false' ||
     process.env['GEMINI_CLI_TRUST_WORKSPACE'] === 'false'
   ) {
     return { isTrusted: false, source: 'env' };

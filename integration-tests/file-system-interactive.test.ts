@@ -32,7 +32,11 @@ describe('Interactive file system', () => {
     });
     rig.createFile(fileName, '1.0.0');
 
-    const run = await rig.runInteractive();
+    const run = await rig.runInteractive({
+      env: {
+        GEMINI_CLI_TRUST_WORKSPACE: 'true',
+      },
+    });
 
     // Step 1: Read the file
     const readPrompt = `Read the version from ${fileName} using the read_file tool`;

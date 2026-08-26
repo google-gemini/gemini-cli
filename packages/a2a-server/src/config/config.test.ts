@@ -332,7 +332,7 @@ describe('loadConfig', () => {
           allowed: ['shell', 'fetch'],
         },
       };
-      await loadConfig(settings, mockExtensionLoader, taskId);
+      await loadConfig(settings, mockExtensionLoader, taskId, true);
       expect(Config).toHaveBeenCalledWith(
         expect.objectContaining({
           allowedTools: ['shell', 'fetch'],

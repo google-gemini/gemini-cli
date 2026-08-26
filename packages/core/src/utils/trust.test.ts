@@ -151,15 +151,6 @@ describe('Trust Utility (Core)', () => {
       expect(result).toEqual({ isTrusted: true, source: undefined });
     });
 
-    it('should return untrusted from environment when GEMINI_FOLDER_TRUST is false', () => {
-      vi.stubEnv('GEMINI_FOLDER_TRUST', 'false');
-      const result = checkPathTrust({
-        path: '/any',
-        isFolderTrustEnabled: false,
-      });
-      expect(result).toEqual({ isTrusted: false, source: 'env' });
-    });
-
     it('should return untrusted from environment when GEMINI_RESTRICTED_MODE is true', () => {
       vi.stubEnv('GEMINI_RESTRICTED_MODE', 'true');
       const result = checkPathTrust({

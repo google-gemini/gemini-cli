@@ -3165,6 +3165,10 @@ export class Config implements McpContext, AgentLoopContext {
       isFolderTrustEnabled: this.folderTrust,
     });
 
+    if (isTrusted === false) {
+      return false;
+    }
+
     if (source === 'env') {
       return isTrusted;
     }
