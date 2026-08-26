@@ -3160,6 +3160,14 @@ export class Config implements McpContext, AgentLoopContext {
    * 'false' for untrusted.
    */
   isTrustedFolder(): boolean {
+    if (
+      process.env['GEMINI_RESTRICTED_MODE'] === 'true' ||
+      process.env['GEMINI_FOLDER_TRUST'] === 'false' ||
+      process.env['GEMINI_CLI_TRUST_WORKSPACE'] === 'false'
+    ) {
+      return false;
+    }
+
     if (this.trustedFolder !== undefined) {
       return this.trustedFolder;
     }

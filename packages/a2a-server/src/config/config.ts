@@ -287,8 +287,16 @@ export async function loadConfig(
       ? ApprovalMode.YOLO
       : ApprovalMode.DEFAULT;
 
+  let safeMcpServers = settings.mcpServers;
+  if (!trusted && safeMcpServers) {
+    logger.warn(
+      '[Configuration] Untrusted workspace detected. Stripping repository mcpServers definitions to prevent unintended command execution.',
+    );
+    safeMcpServers = undefined;
+  }
+
   const policySettings: PolicySettings = {
-    mcpServers: settings.mcpServers,
+    mcpServers: safeMcpServers,
     tools: {
       core: settings.tools?.core,
       exclude: settings.tools?.exclude,
@@ -322,7 +330,7 @@ export async function loadConfig(
     showMemoryUsage: settings.showMemoryUsage || false,
     approvalMode,
     policyEngineConfig,
-    mcpServers: settings.mcpServers,
+    mcpServers: safeMcpServers,
     cwd: workspaceDir,
     telemetry: {
       enabled: settings.telemetry?.enabled,
