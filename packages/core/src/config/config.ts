@@ -3484,12 +3484,16 @@ export class Config implements McpContext, AgentLoopContext {
     return defaultValue;
   }
 
-  async getNumericalRoutingRules(): Promise<NumericalRoutingRule[]> {
-    if (
+  hasCustomNumericalRoutingRules(): boolean {
+    return !!(
       this.routing?.numericalRules &&
       this.routing.numericalRules.length > 0
-    ) {
-      return this.routing.numericalRules;
+    );
+  }
+
+  async getNumericalRoutingRules(): Promise<NumericalRoutingRule[]> {
+    if (this.hasCustomNumericalRoutingRules()) {
+      return this.routing!.numericalRules!;
     }
     const threshold = await this.getResolvedClassifierThreshold();
     return [
