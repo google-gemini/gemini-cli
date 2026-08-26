@@ -758,4 +758,31 @@ describe('ShellProcessor', () => {
       );
     });
   });
+
+  describe('Dollar-sign pattern safety', () => {
+    it("should preserve $& and $' in raw args substitution without prompt corruption", async () => {
+      const processor = new ShellProcessor('test-command');
+      context.invocation!.args = "value with $& and $' patterns";
+      const prompt: PromptPipelineContent = createPromptPipelineContent(
+        'User said: {{args}}',
+      );
+
+      const result = await processor.process(prompt, context);
+
+      expect(result).toEqual([
+        { text: "User said: value with $& and $' patterns" },
+      ]);
+    });
+
+    it('should preserve $$ in raw args without collapsing to single $', async () => {
+      const processor = new ShellProcessor('test-command');
+      context.invocation!.args = 'jQuery $$(".item")';
+      const prompt: PromptPipelineContent =
+        createPromptPipelineContent('Run: {{args}}');
+
+      const result = await processor.process(prompt, context);
+
+      expect(result).toEqual([{ text: 'Run: jQuery $$(".item")' }]);
+    });
+  });
 });
