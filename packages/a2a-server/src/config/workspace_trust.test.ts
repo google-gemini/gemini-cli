@@ -94,7 +94,7 @@ describe('Workspace Trust Evaluation', () => {
     expect(fallbackConfig.isTrustedFolder()).toBe(false);
   });
 
-  it('assigns undefined to mcpServers in configParams and policySettings when trusted is false', async () => {
+  it('assigns undefined to mcpServers, policyPaths, and adminPolicyPaths in configParams and policySettings when trusted is false', async () => {
     const policySpy = vi.spyOn(core, 'createPolicyEngineConfig');
     const settings: Settings = {
       mcpServers: {
@@ -103,6 +103,8 @@ describe('Workspace Trust Evaluation', () => {
           args: ['-e', 'process.exit(0)'],
         },
       },
+      policyPaths: ['/test/policy/path'],
+      adminPolicyPaths: ['/test/admin/policy/path'],
     };
 
     const config = await loadConfig(
@@ -115,9 +117,14 @@ describe('Workspace Trust Evaluation', () => {
 
     expect(config.getMcpServers()).toBeUndefined();
     expect(policySpy.mock.calls[0][0].mcpServers).toBeUndefined();
+    expect(policySpy.mock.calls[0][0].policyPaths).toBeUndefined();
+    expect(policySpy.mock.calls[0][0].adminPolicyPaths).toBeUndefined();
+    expect(settings.mcpServers).toBeDefined();
+    expect(settings.policyPaths).toBeDefined();
+    expect(settings.adminPolicyPaths).toBeDefined();
   });
 
-  it('retains mcpServers in configParams and policySettings when trusted is true', async () => {
+  it('retains mcpServers, policyPaths, and adminPolicyPaths in configParams and policySettings when trusted is true', async () => {
     const policySpy = vi.spyOn(core, 'createPolicyEngineConfig');
     const settings: Settings = {
       mcpServers: {
@@ -126,6 +133,8 @@ describe('Workspace Trust Evaluation', () => {
           args: ['-e', 'process.exit(0)'],
         },
       },
+      policyPaths: ['/test/policy/path'],
+      adminPolicyPaths: ['/test/admin/policy/path'],
     };
 
     const config = await loadConfig(
@@ -138,5 +147,11 @@ describe('Workspace Trust Evaluation', () => {
 
     expect(config.getMcpServers()).toEqual(settings.mcpServers);
     expect(policySpy.mock.calls[0][0].mcpServers).toEqual(settings.mcpServers);
+    expect(policySpy.mock.calls[0][0].policyPaths).toEqual(
+      settings.policyPaths,
+    );
+    expect(policySpy.mock.calls[0][0].adminPolicyPaths).toEqual(
+      settings.adminPolicyPaths,
+    );
   });
 });

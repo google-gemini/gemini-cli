@@ -169,6 +169,15 @@ describe('Trust Utility (Core)', () => {
       expect(result).toEqual({ isTrusted: false, source: 'env' });
     });
 
+    it('should return trusted from environment when GEMINI_CLI_TRUST_WORKSPACE is true', () => {
+      vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', 'true');
+      const result = checkPathTrust({
+        path: '/any',
+        isFolderTrustEnabled: false,
+      });
+      expect(result).toEqual({ isTrusted: true, source: 'env' });
+    });
+
     it('should return IDE trust if available', () => {
       ideContextStore.set({
         workspaceState: { isTrusted: true },
