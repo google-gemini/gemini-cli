@@ -45,9 +45,11 @@ export class FileDiscoveryService {
   };
   private projectRoot: string;
 
-  // Cache for ignore results to avoid repeated pattern matching.
+  // Bounded cache to avoid unbounded memory growth.
+  // Simple FIFO eviction when size exceeds MAX_CACHE_SIZE.
   // Key format: `${filePath}|${isDirectory ? 'dir' : 'file'}|${respectGitIgnore}|${respectGeminiIgnore}`
   private ignoreCache = new Map<string, boolean>();
+  private static readonly MAX_CACHE_SIZE = 5000;
 
   constructor(projectRoot: string, options?: FilterFilesOptions) {
     this.projectRoot = path.resolve(projectRoot);
@@ -90,7 +92,6 @@ export class FileDiscoveryService {
       );
     }
 
-    // Clear any stale cache (empty at this point, but safe for future use)
     this.ignoreCache.clear();
   }
 
@@ -100,9 +101,6 @@ export class FileDiscoveryService {
   async getIgnoredPaths(options: FilterFilesOptions = {}): Promise<string[]> {
     const ignoredPaths: string[] = [];
 
-    /**
-     * Recursively walks the directory tree to find ignored paths.
-     */
     const walk = async (currentDir: string) => {
       let dirEntries: fs.Dirent[];
       try {
@@ -114,7 +112,6 @@ export class FileDiscoveryService {
           isNodeError(error) &&
           (error.code === 'EACCES' || error.code === 'ENOENT')
         ) {
-          // Stop if the directory is inaccessible or doesn't exist
           debugLogger.debug(
             `Skipping directory ${currentDir} due to ${error.code}`,
           );
@@ -123,7 +120,6 @@ export class FileDiscoveryService {
         throw error;
       }
 
-      // Traverse sibling directories concurrently to improve performance.
       await Promise.all(
         dirEntries.map(async (entry) => {
           const fullPath = path.join(currentDir, entry.name);
@@ -133,8 +129,12 @@ export class FileDiscoveryService {
           };
 
           if (entry.isDirectory()) {
+<<<<<<< HEAD
             // Optimization: If a directory is ignored, its contents are not traversed.
             if (this.shouldIgnoreDirectory(fullPath, entryOptions)) {
+=======
+            if (this.shouldIgnoreDirectory(fullPath, options)) {
+>>>>>>> 8882d408d (perf(fileDiscovery): add bounded caching and subtree pruning)
               ignoredPaths.push(fullPath);
             } else {
               await walk(fullPath);
@@ -168,24 +168,13 @@ export class FileDiscoveryService {
     }
   }
 
-  /**
-   * Filters a list of file paths based on ignore rules.
-   *
-   * NOTE: Directory paths must include a trailing slash to be correctly identified and
-   * matched against directory-specific ignore patterns (e.g., 'dist/').
-   */
   filterFiles(filePaths: string[], options: FilterFilesOptions = {}): string[] {
     return filePaths.filter((filePath) => {
-      // Infer directory status from the string format
       const isDir = filePath.endsWith('/') || filePath.endsWith('\\');
       return !this._shouldIgnore(filePath, isDir, options);
     });
   }
 
-  /**
-   * Filters a list of file paths based on git ignore rules and returns a report
-   * with counts of ignored files.
-   */
   filterFilesWithReport(
     filePaths: string[],
     opts: FilterFilesOptions = {
@@ -195,16 +184,9 @@ export class FileDiscoveryService {
   ): FilterReport {
     const filteredPaths = this.filterFiles(filePaths, opts);
     const ignoredCount = filePaths.length - filteredPaths.length;
-
-    return {
-      filteredPaths,
-      ignoredCount,
-    };
+    return { filteredPaths, ignoredCount };
   }
 
-  /**
-   * Checks if a specific file should be ignored based on project ignore rules.
-   */
   shouldIgnoreFile(
     filePath: string,
     options: FilterFilesOptions = {},
@@ -212,9 +194,6 @@ export class FileDiscoveryService {
     return this._shouldIgnore(filePath, false, options);
   }
 
-  /**
-   * Checks if a specific directory should be ignored based on project ignore rules.
-   */
   shouldIgnoreDirectory(
     dirPath: string,
     options: FilterFilesOptions = {},
@@ -222,7 +201,15 @@ export class FileDiscoveryService {
     return this._shouldIgnore(dirPath, true, options);
   }
 
+<<<<<<< HEAD
   private _checkIgnoreFilters(
+=======
+  clearIgnoreCache(): void {
+    this.ignoreCache.clear();
+  }
+
+  private _shouldIgnore(
+>>>>>>> 8882d408d (perf(fileDiscovery): add bounded caching and subtree pruning)
     filePath: string,
     isDirectory: boolean,
     options: FilterFilesOptions = {},
@@ -232,10 +219,11 @@ export class FileDiscoveryService {
       respectGeminiIgnore = this.defaultFilterFileOptions.respectGeminiIgnore,
     } = options;
 
-    // Build cache key from the parameters that affect the outcome.
     const cacheKey = `${filePath}|${isDirectory ? 'dir' : 'file'}|${respectGitIgnore}|${respectGeminiIgnore}`;
-    if (this.ignoreCache.has(cacheKey)) {
-      return this.ignoreCache.get(cacheKey)!;
+
+    const cached = this.ignoreCache.get(cacheKey);
+    if (cached !== undefined) {
+      return cached;
     }
 
     let result = false;
@@ -257,10 +245,18 @@ export class FileDiscoveryService {
       }
     }
 
+    // Bound cache size: evict oldest entry when full
+    if (this.ignoreCache.size >= FileDiscoveryService.MAX_CACHE_SIZE) {
+      const firstKey = this.ignoreCache.keys().next().value;
+      if (firstKey !== undefined) {
+        this.ignoreCache.delete(firstKey);
+      }
+    }
     this.ignoreCache.set(cacheKey, result);
     return result;
   }
 
+<<<<<<< HEAD
   /**
    * Internal unified check for paths.
    */
@@ -307,6 +303,8 @@ export class FileDiscoveryService {
   /**
    * Returns the list of ignore files being used (e.g. .geminiignore) excluding .gitignore.
    */
+=======
+>>>>>>> 8882d408d (perf(fileDiscovery): add bounded caching and subtree pruning)
   getIgnoreFilePaths(): string[] {
     const paths: string[] = [];
     if (
@@ -321,9 +319,6 @@ export class FileDiscoveryService {
     return paths;
   }
 
-  /**
-   * Returns all ignore files including .gitignore if applicable.
-   */
   getAllIgnoreFilePaths(): string[] {
     const paths: string[] = [];
     if (
