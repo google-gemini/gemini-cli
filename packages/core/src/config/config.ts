@@ -755,14 +755,6 @@ export interface ConfigParameters {
   logRagSnippets?: boolean;
 }
 
-export interface NumericalRoutingRule {
-  maxScore: number;
-  model: string;
-}
-export interface RoutingSettings {
-  numericalRules?: NumericalRoutingRule[];
-}
-
 export class Config implements McpContext, AgentLoopContext {
   private _toolRegistry!: ToolRegistry;
   private mcpClientManager?: McpClientManager;
