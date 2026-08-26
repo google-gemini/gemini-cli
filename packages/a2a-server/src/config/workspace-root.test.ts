@@ -46,8 +46,8 @@ describe('setTargetDir workspace confinement', () => {
     process.argv = ['node', 'a2a-server'];
     vi.stubEnv('VITEST', '');
     vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('CODER_AGENT_WORKSPACE_PATH', undefined);
-    vi.stubEnv('CODER_AGENT_ALLOWED_ROOT', undefined);
+    vi.stubEnv('CODER_AGENT_WORKSPACE_PATH', '');
+    vi.stubEnv('CODER_AGENT_ALLOWED_ROOT', '');
   });
 
   afterEach(() => {
