@@ -3493,7 +3493,7 @@ export class Config implements McpContext, AgentLoopContext {
 
   async getNumericalRoutingRules(): Promise<NumericalRoutingRule[]> {
     if (this.hasCustomNumericalRoutingRules()) {
-      return this.routing!.numericalRules!;
+      return this.routing?.numericalRules ?? [];
     }
     const threshold = await this.getResolvedClassifierThreshold();
     return [
