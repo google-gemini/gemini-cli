@@ -63,6 +63,7 @@ describe('NumericalClassifierStrategy', () => {
       getNumericalRoutingEnabled: vi.fn().mockResolvedValue(true),
       getResolvedClassifierThreshold: vi.fn().mockResolvedValue(90),
       getClassifierThreshold: vi.fn().mockResolvedValue(undefined),
+      hasCustomNumericalRoutingRules: vi.fn().mockReturnValue(false),
       getNumericalRoutingRules: vi.fn().mockImplementation(async () => {
         const t = await mockConfig.getResolvedClassifierThreshold();
         return [
