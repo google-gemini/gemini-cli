@@ -60,6 +60,17 @@ export function parseFrontmatter(
   return parseSimpleFrontmatter(content);
 }
 
+function stripQuotes(str: string): string {
+  const trimmed = str.trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
+}
+
 /**
  * Simple frontmatter parser that extracts name and description fields.
  * Handles cases where values contain colons that would break YAML parsing.
@@ -77,14 +88,15 @@ function parseSimpleFrontmatter(
     // Match "name:" at the start of the line (optional whitespace)
     const nameMatch = line.match(/^\s*name:\s*(.*)$/);
     if (nameMatch) {
-      name = nameMatch[1].trim();
+      name = stripQuotes(nameMatch[1]);
       continue;
     }
 
     // Match "description:" at the start of the line (optional whitespace)
     const descMatch = line.match(/^\s*description:\s*(.*)$/);
     if (descMatch) {
-      const descLines = [descMatch[1].trim()];
+      const firstLine = descMatch[1].trim();
+      const descLines = firstLine === '|' || firstLine === '>' ? [] : [firstLine];
 
       // Check for multi-line description (indented continuation lines)
       while (i + 1 < lines.length) {
@@ -98,7 +110,7 @@ function parseSimpleFrontmatter(
         }
       }
 
-      description = descLines.filter(Boolean).join(' ');
+      description = stripQuotes(descLines.filter(Boolean).join(' '));
       continue;
     }
   }
