@@ -225,6 +225,7 @@ describe('NumericalClassifierStrategy', () => {
 
 describe('Custom Numerical Routing Rules', () => {
   it('should route according to custom numerical routing rules', async () => {
+    vi.mocked(mockConfig.hasCustomNumericalRoutingRules).mockReturnValue(true);
     vi.mocked(mockConfig.getNumericalRoutingRules).mockResolvedValue([
       { maxScore: 30, model: 'flash' },
       { maxScore: 70, model: 'pro' },
