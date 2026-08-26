@@ -140,6 +140,19 @@ describe('github.ts', () => {
     });
 
     it.each([
+      ['https://github.com/owner/blog.github.io', 'owner', 'blog.github.io'],
+      ['https://github.com/owner/my.git.repo.git', 'owner', 'my.git.repo'],
+      ['https://github.com/owner/repo.GIT', 'owner', 'repo'],
+      ['owner/blog.github.io', 'owner', 'blog.github.io'],
+      ['owner/my.git.repo.git', 'owner', 'my.git.repo'],
+    ])(
+      'should only strip a trailing .git suffix from %s',
+      (url, owner, repo) => {
+        expect(tryParseGithubUrl(url)).toEqual({ owner, repo });
+      },
+    );
+
+    it.each([
       'https://gitlab.com/owner/repo',
       'https://my-git-host.com/owner/group/repo',
       'git@gitlab.com:some-group/some-project/some-repo.git',
