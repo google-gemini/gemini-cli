@@ -841,9 +841,18 @@ describe('runNonInteractive', () => {
       },
     ];
 
+    // Third call handles the auto-nudge recovery (when no response is received after tools)
+    const thirdCallEvents: ServerGeminiStreamEvent[] = [
+      {
+        type: GeminiEventType.Finished,
+        value: { reason: undefined, usageMetadata: { totalTokenCount: 1 } },
+      },
+    ];
+
     mockGeminiClient.sendMessageStream
       .mockReturnValueOnce(createStreamFromEvents(firstCallEvents))
-      .mockReturnValueOnce(createStreamFromEvents(secondCallEvents));
+      .mockReturnValueOnce(createStreamFromEvents(secondCallEvents))
+      .mockReturnValueOnce(createStreamFromEvents(thirdCallEvents));
 
     vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
     vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
@@ -857,7 +866,7 @@ describe('runNonInteractive', () => {
       prompt_id: 'prompt-id-tool-only',
     });
 
-    expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(2);
+    expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(3);
     expect(mockSchedulerSchedule).toHaveBeenCalledWith(
       [expect.objectContaining({ name: 'testTool' })],
       expect.any(AbortSignal),

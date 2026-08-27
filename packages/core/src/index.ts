@@ -260,8 +260,14 @@ export type { MCPOAuthConfig } from './mcp/oauth-provider.js';
 export type {
   OAuthAuthorizationServerMetadata,
   OAuthProtectedResourceMetadata,
+  OAuthUrlValidationOptions,
 } from './mcp/oauth-utils.js';
-export { OAuthUtils } from './mcp/oauth-utils.js';
+export {
+  OAuthUtils,
+  OAuthSecurityError,
+  isLoopbackUrl,
+  validateOAuthEndpointUrl,
+} from './mcp/oauth-utils.js';
 
 // Export telemetry functions
 export * from './telemetry/index.js';
