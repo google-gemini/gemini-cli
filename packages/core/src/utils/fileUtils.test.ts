@@ -37,7 +37,10 @@ import {
   getRealPath,
   isEmpty,
 } from './fileUtils.js';
-import { StandardFileSystemService } from '../services/fileSystemService.js';
+import {
+  StandardFileSystemService,
+  type FileSystemService,
+} from '../services/fileSystemService.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 
 vi.mock('mime/lite', () => ({
@@ -817,6 +820,49 @@ describe('fileUtils', () => {
       );
       expect(result.error).toContain('File not found');
       expect(result.returnDisplay).toContain('File not found');
+    });
+
+    it('should route text file reads through a non-standard FileSystemService', async () => {
+      // On-disk content differs from what the injected service returns, so
+      // asserting on the service's content (not the disk content) proves the
+      // read was routed through it rather than reading local disk directly.
+      // This is the behavior an ACP client's fs/read_text_file capability
+      // (or a sandboxed FileSystemService) relies on.
+      actualNodeFs.writeFileSync(testTextFilePath, 'stale on-disk content');
+      const clientContent = 'fresh content from the client';
+      const readTextFile = vi.fn().mockResolvedValue(clientContent);
+      const clientBackedService: FileSystemService = {
+        readTextFile,
+        writeTextFile: vi.fn(),
+      };
+
+      const result = await processSingleFileContent(
+        testTextFilePath,
+        tempRootDir,
+        clientBackedService,
+      );
+
+      expect(readTextFile).toHaveBeenCalledWith(testTextFilePath);
+      expect(result.llmContent).toBe(clientContent);
+      expect(result.error).toBeUndefined();
+    });
+
+    it('should still use the BOM-aware reader for the standard FileSystemService', async () => {
+      const utf8Bom = Buffer.from([0xef, 0xbb, 0xbf]);
+      const content = 'Line 1\nLine 2';
+      actualNodeFs.writeFileSync(
+        testTextFilePath,
+        Buffer.concat([utf8Bom, Buffer.from(content, 'utf8')]),
+      );
+
+      const result = await processSingleFileContent(
+        testTextFilePath,
+        tempRootDir,
+        new StandardFileSystemService(),
+      );
+
+      // The BOM should be stripped, matching readFileWithEncoding's behavior.
+      expect(result.llmContent).toBe(content);
     });
 
     it('should handle read errors for text files', async () => {

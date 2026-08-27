@@ -10,7 +10,10 @@ import path from 'node:path';
 import type { PartUnion } from '@google/genai';
 import { isBinaryFile as isBinaryFileCheck } from 'isbinaryfile';
 import mime from 'mime/lite';
-import type { FileSystemService } from '../services/fileSystemService.js';
+import {
+  StandardFileSystemService,
+  type FileSystemService,
+} from '../services/fileSystemService.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { BINARY_EXTENSIONS } from './ignorePatterns.js';
 import { createRequire as createModuleRequire } from 'node:module';
@@ -481,10 +484,33 @@ export interface ProcessedFileReadResult {
 }
 
 /**
+ * Reads the textual content of a file, routing through the provided
+ * FileSystemService so callers (e.g. an ACP client advertising the
+ * fs/read_text_file capability, or a sandboxed service) get a chance to
+ * serve the read instead of it always hitting local disk.
+ *
+ * The default StandardFileSystemService reads straight off local disk, so
+ * for that case we use the BOM-aware reader to preserve existing behavior
+ * (correct handling of UTF-8/16/32 byte-order marks). Any other
+ * implementation is trusted to return already-decoded text.
+ */
+async function readTextFileContent(
+  filePath: string,
+  fileSystemService: FileSystemService,
+): Promise<string> {
+  if (fileSystemService instanceof StandardFileSystemService) {
+    return readFileWithEncoding(filePath);
+  }
+  return fileSystemService.readTextFile(filePath);
+}
+
+/**
  * Reads and processes a single file, handling text, images, and PDFs.
  * @param filePath Absolute path to the file.
  * @param rootDirectory Absolute path to the project root for relative path display.
- * @param _fileSystemService Currently unused in this function; kept for signature stability.
+ * @param fileSystemService Used to read the file's text content, so that a
+ * client-backed or sandboxed FileSystemService is honored instead of always
+ * reading local disk directly.
  * @param startLine Optional 1-based line number to start reading from.
  * @param endLine Optional 1-based line number to end reading at (inclusive).
  * @returns ProcessedFileReadResult object.
@@ -492,7 +518,7 @@ export interface ProcessedFileReadResult {
 export async function processSingleFileContent(
   filePath: string,
   rootDirectory: string,
-  _fileSystemService: FileSystemService,
+  fileSystemService: FileSystemService,
   startLine?: number,
   endLine?: number,
 ): Promise<ProcessedFileReadResult> {
@@ -548,15 +574,17 @@ export async function processSingleFileContent(
             returnDisplay: `Skipped large SVG file (>1MB): ${relativePathForDisplay}`,
           };
         }
-        const content = await readFileWithEncoding(filePath);
+        const content = await readTextFileContent(filePath, fileSystemService);
         return {
           llmContent: content,
           returnDisplay: `Read SVG as text: ${relativePathForDisplay}`,
         };
       }
       case 'text': {
-        // Use BOM-aware reader to avoid leaving a BOM character in content and to support UTF-16/32 transparently
-        const content = await readFileWithEncoding(filePath);
+        // Routed through the FileSystemService (BOM-aware for local disk
+        // reads; see readTextFileContent) so encodings like UTF-16/32 are
+        // still handled correctly and a client-backed service is honored.
+        const content = await readTextFileContent(filePath, fileSystemService);
         const lines = content.split(/\r?\n/);
         const originalLineCount = lines.length;
 
