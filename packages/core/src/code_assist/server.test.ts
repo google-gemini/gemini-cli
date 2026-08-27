@@ -503,6 +503,41 @@ describe('CodeAssistServer', () => {
     expect(results).toHaveLength(0);
   });
 
+  it('should yield the final buffered event when the stream ends without a trailing blank line (EOF flush)', async () => {
+    const { server, mockRequest } = createTestServer();
+
+    const { Readable } = await import('node:stream');
+    const mockStream = new Readable({
+      read() {},
+    });
+
+    mockRequest.mockResolvedValue({ data: mockStream });
+
+    const stream = await server.requestStreamingPost('testStream', {});
+
+    const firstEvent = {
+      candidates: [{ content: { parts: [{ text: 'first' }] } }],
+    };
+    const finalEvent = {
+      candidates: [{ content: { parts: [{ text: 'final' }] } }],
+    };
+
+    setTimeout(() => {
+      mockStream.push('data: ' + JSON.stringify(firstEvent) + '\n\n');
+      mockStream.push('data: ' + JSON.stringify(finalEvent) + '\n');
+      mockStream.push(null);
+    }, 0);
+
+    const results = [];
+    for await (const res of stream) {
+      results.push(res);
+    }
+
+    expect(results).toHaveLength(2);
+    expect(results[0]).toEqual(firstEvent);
+    expect(results[1]).toEqual(finalEvent);
+  });
+
   it('should call the onboardUser endpoint', async () => {
     const { server } = createTestServer();
 
