@@ -20,6 +20,7 @@ import {
   startCallbackServer,
   exchangeCodeForToken,
   refreshAccessToken,
+  areIssuersEqual,
   REDIRECT_PATH,
 } from './oauth-flow.js';
 
@@ -83,6 +84,62 @@ describe('oauth-flow', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
+  });
+
+  describe('areIssuersEqual', () => {
+    it('should return true for identical issuer strings', () => {
+      expect(
+        areIssuersEqual(
+          'https://github.com/login/oauth',
+          'https://github.com/login/oauth',
+        ),
+      ).toBe(true);
+    });
+
+    it('should return true when one issuer has a trailing slash', () => {
+      expect(
+        areIssuersEqual(
+          'https://github.com/login/oauth/',
+          'https://github.com/login/oauth',
+        ),
+      ).toBe(true);
+      expect(
+        areIssuersEqual(
+          'https://github.com/login/oauth',
+          'https://github.com/login/oauth/',
+        ),
+      ).toBe(true);
+      expect(
+        areIssuersEqual(
+          'https://auth.example.com/',
+          'https://auth.example.com',
+        ),
+      ).toBe(true);
+    });
+
+    it('should return false for different domains', () => {
+      expect(
+        areIssuersEqual(
+          'https://attacker.example.com',
+          'https://github.com/login/oauth',
+        ),
+      ).toBe(false);
+    });
+
+    it('should return false for different paths', () => {
+      expect(
+        areIssuersEqual(
+          'https://auth.example.com/realm-a',
+          'https://auth.example.com/realm-b',
+        ),
+      ).toBe(false);
+    });
+
+    it('should handle non-URL strings gracefully', () => {
+      expect(areIssuersEqual('custom-issuer', 'custom-issuer')).toBe(true);
+      expect(areIssuersEqual('custom-issuer/', 'custom-issuer')).toBe(true);
+      expect(areIssuersEqual('custom-issuer-a', 'custom-issuer-b')).toBe(false);
+    });
   });
 
   describe('generatePKCEParams', () => {
@@ -377,6 +434,62 @@ describe('oauth-flow', () => {
       expect(response.state).toBe('my-state');
     });
 
+    it('should resolve response with code, state, and matching iss on valid callback', async () => {
+      const server = startCallbackServer(
+        'my-state',
+        undefined,
+        'https://github.com/login/oauth',
+      );
+      const port = await server.port;
+
+      const res = await realFetch(
+        `http://localhost:${port}${REDIRECT_PATH}?code=auth-code-123&state=my-state&iss=https://github.com/login/oauth`,
+      );
+      expect(res.status).toBe(200);
+
+      const response = await server.response;
+      expect(response.code).toBe('auth-code-123');
+      expect(response.state).toBe('my-state');
+      expect(response.iss).toBe('https://github.com/login/oauth');
+    });
+
+    it('should accept callback when issuer matches with trailing slash normalization', async () => {
+      const server = startCallbackServer(
+        'my-state',
+        undefined,
+        'https://github.com/login/oauth/',
+      );
+      const port = await server.port;
+
+      const res = await realFetch(
+        `http://localhost:${port}${REDIRECT_PATH}?code=auth-code-123&state=my-state&iss=https://github.com/login/oauth`,
+      );
+      expect(res.status).toBe(200);
+
+      const response = await server.response;
+      expect(response.code).toBe('auth-code-123');
+      expect(response.state).toBe('my-state');
+    });
+
+    it('should allow callback when iss parameter is omitted for legacy authorization servers', async () => {
+      const server = startCallbackServer(
+        'my-state',
+        undefined,
+        'https://legacy-idp.example.com',
+      );
+      const port = await server.port;
+
+      const res = await realFetch(
+        `http://localhost:${port}${REDIRECT_PATH}?code=legacy-code&state=my-state`,
+      );
+      expect(res.status).toBe(200);
+
+      const response = await server.response;
+      expect(response.code).toBe('legacy-code');
+      expect(response.state).toBe('my-state');
+      expect(response.iss).toBeUndefined();
+    });
+
     it('should reject on state mismatch', async () => {
       const server = startCallbackServer('expected-state');
       const port = await server.port;
@@ -396,6 +509,31 @@ describe('oauth-flow', () => {
 
       const error = await responseResult;
       expect(error.message).toContain('State mismatch - possible CSRF attack');
+    });
+
+    it('should reject callback when issuer (iss) does not match expected authorization server', async () => {
+      const server = startCallbackServer(
+        'expected-state',
+        undefined,
+        'https://github.com/login/oauth',
+      );
+      const port = await server.port;
+
+      const responseResult = server.response.then(
+        () => new Error('Expected rejection'),
+        (e: Error) => e,
+      );
+
+      const res = await realFetch(
+        `http://localhost:${port}${REDIRECT_PATH}?code=abc&state=expected-state&iss=https://attacker-idp.example.com`,
+      ).catch(() => {});
+
+      if (res) {
+        expect(res.status).toBe(400);
+      }
+
+      const error = await responseResult;
+      expect(error.message).toContain('Issuer mismatch');
     });
 
     it('should reject on OAuth error in callback', async () => {

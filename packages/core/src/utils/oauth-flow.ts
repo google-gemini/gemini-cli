@@ -55,6 +55,7 @@ export interface PKCEParams {
 export interface OAuthAuthorizationResponse {
   code: string;
   state: string;
+  iss?: string;
 }
 
 /**
@@ -136,16 +137,36 @@ export function generatePKCEParams(): PKCEParams {
 }
 
 /**
+ * Compares two OAuth issuer URLs per RFC 8414 / RFC 9207.
+ * Normalizes trailing slashes and origins to ensure consistent matching.
+ */
+export function areIssuersEqual(issuerA: string, issuerB: string): boolean {
+  if (issuerA === issuerB) return true;
+  const normalize = (iss: string): string => {
+    try {
+      const u = new URL(iss);
+      const normalizedPath = u.pathname.replace(/\/+$/, '');
+      return `${u.protocol}//${u.host}${normalizedPath}`;
+    } catch {
+      return iss.replace(/\/+$/, '');
+    }
+  };
+  return normalize(issuerA) === normalize(issuerB);
+}
+
+/**
  * Start a local HTTP server to handle OAuth callback.
  * The server will listen on the specified port (or port 0 for OS assignment).
  *
  * @param expectedState The state parameter to validate
  * @param port Optional preferred port to listen on
+ * @param expectedIssuer Optional expected authorization server issuer for RFC 9207 validation
  * @returns Object containing the port (available immediately) and a promise for the auth response
  */
 export function startCallbackServer(
   expectedState: string,
   port?: number,
+  expectedIssuer?: string,
 ): {
   port: Promise<number>;
   response: Promise<OAuthAuthorizationResponse>;
@@ -177,8 +198,10 @@ export function startCallbackServer(
             const code = url.searchParams.get('code');
             const state = url.searchParams.get('state');
             const error = url.searchParams.get('error');
+            const iss = url.searchParams.get('iss') || undefined;
 
             if (error) {
+              debugLogger.warn(`OAuth callback received error: ${error}`);
               res.writeHead(HTTP_OK, { 'Content-Type': 'text/html' });
               res.end(`
               <html>
@@ -196,17 +219,60 @@ export function startCallbackServer(
             }
 
             if (!code || !state) {
+              debugLogger.warn(
+                'OAuth callback rejected: Missing code or state parameter.',
+              );
               res.writeHead(400);
               res.end('Missing code or state parameter');
               return;
             }
 
             if (state !== expectedState) {
+              debugLogger.error(
+                `OAuth callback state mismatch: received state "${state}", expected "${expectedState}". Possible CSRF attack.`,
+              );
               res.writeHead(400);
               res.end('Invalid state parameter');
               server.close();
               reject(new Error('State mismatch - possible CSRF attack'));
               return;
+            }
+
+            // RFC 9207 Authorization Server Issuer Identification check
+            if (expectedIssuer && iss) {
+              if (!areIssuersEqual(iss, expectedIssuer)) {
+                debugLogger.error(
+                  `OAuth callback issuer mismatch: received "${iss}", expected "${expectedIssuer}". Possible IdP mix-up attack (RFC 9207).`,
+                );
+                res.writeHead(400, { 'Content-Type': 'text/html' });
+                res.end(`
+                <html>
+                  <body>
+                    <h1>Authentication Failed</h1>
+                    <p>Error: Issuer mismatch - possible OAuth mix-up attack.</p>
+                    <p>You can close this window.</p>
+                  </body>
+                </html>
+              `);
+                server.close();
+                reject(
+                  new Error(
+                    `Issuer mismatch: received "${iss}", expected "${expectedIssuer}" - possible OAuth mix-up attack`,
+                  ),
+                );
+                return;
+              }
+              debugLogger.debug(
+                `✓ OAuth callback issuer validated successfully: "${iss}"`,
+              );
+            } else if (expectedIssuer && !iss) {
+              debugLogger.debug(
+                `OAuth callback omitted "iss" parameter; expected "${expectedIssuer}". Proceeding for backwards compatibility with legacy authorization servers.`,
+              );
+            } else if (iss) {
+              debugLogger.debug(
+                `OAuth callback received issuer: "${iss}" (no expected issuer was specified).`,
+              );
             }
 
             // Send success response to browser
@@ -222,7 +288,7 @@ export function startCallbackServer(
           `);
 
             server.close();
-            resolve({ code, state });
+            resolve({ code, state, iss });
           } catch (error) {
             server.close();
             reject(error);
