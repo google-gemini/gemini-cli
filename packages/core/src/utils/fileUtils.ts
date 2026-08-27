@@ -15,6 +15,7 @@ import { ToolErrorType } from '../tools/tool-error.js';
 import { BINARY_EXTENSIONS } from './ignorePatterns.js';
 import { createRequire as createModuleRequire } from 'node:module';
 import { debugLogger } from './debugLogger.js';
+import { resolveToRealPath } from './paths.js';
 
 import {
   DEFAULT_MAX_LINES_TEXT_FILE,
@@ -269,6 +270,21 @@ function getSupportedAudioMimeTypeForFile(
   return extensionMimeType;
 }
 
+export function canonicalizeMacosPath(p: string): string {
+  if (process.platform === 'darwin') {
+    if (p === '/var' || p.startsWith('/var/')) {
+      return '/private' + p;
+    }
+    if (p === '/tmp' || p.startsWith('/tmp/')) {
+      return '/private' + p;
+    }
+    if (p === '/etc' || p.startsWith('/etc/')) {
+      return '/private' + p;
+    }
+  }
+  return p;
+}
+
 /**
  * Checks if a path is within a given root directory.
  * @param pathToCheck The absolute path to check.
@@ -279,8 +295,12 @@ export function isWithinRoot(
   pathToCheck: string,
   rootDirectory: string,
 ): boolean {
-  const normalizedPathToCheck = path.resolve(pathToCheck);
-  const normalizedRootDirectory = path.resolve(rootDirectory);
+  const normalizedPathToCheck = canonicalizeMacosPath(
+    path.resolve(pathToCheck),
+  );
+  const normalizedRootDirectory = canonicalizeMacosPath(
+    path.resolve(rootDirectory),
+  );
 
   // Ensure the rootDirectory path ends with a separator for correct startsWith comparison,
   // unless it's the root path itself (e.g., '/' or 'C:\').
@@ -290,10 +310,33 @@ export function isWithinRoot(
       ? normalizedRootDirectory
       : normalizedRootDirectory + path.sep;
 
-  return (
+  if (
     normalizedPathToCheck === normalizedRootDirectory ||
     normalizedPathToCheck.startsWith(rootWithSeparator)
-  );
+  ) {
+    return true;
+  }
+
+  // Cross-platform check for macOS /private symlink aliases
+  if (process.platform === 'darwin') {
+    try {
+      const realPathToCheck = resolveToRealPath(normalizedPathToCheck);
+      const realRootDirectory = resolveToRealPath(normalizedRootDirectory);
+      const realRootWithSeparator =
+        realRootDirectory === path.sep || realRootDirectory.endsWith(path.sep)
+          ? realRootDirectory
+          : realRootDirectory + path.sep;
+
+      return (
+        realPathToCheck === realRootDirectory ||
+        realPathToCheck.startsWith(realRootWithSeparator)
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
 }
 
 /**
