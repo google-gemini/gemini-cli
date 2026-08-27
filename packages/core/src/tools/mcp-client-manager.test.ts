@@ -35,16 +35,16 @@ describe('McpClientManager', () => {
   let toolRegistry: ToolRegistry;
 
   beforeEach(() => {
-    mockedMcpClient = vi.mockObject({
+    mockedMcpClient = {
       connect: vi.fn(),
       discoverInto: vi.fn(),
       disconnect: vi.fn(),
       getStatus: vi.fn().mockReturnValue(MCPServerStatus.DISCONNECTED),
       getServerConfig: vi.fn(),
       getServerName: vi.fn().mockReturnValue('test-server'),
-    } as unknown as McpClient);
+    } as unknown as MockedObject<McpClient>;
     vi.mocked(McpClient).mockReturnValue(mockedMcpClient);
-    mockConfig = vi.mockObject({
+    mockConfig = {
       isTrustedFolder: vi.fn().mockReturnValue(true),
       getMcpServers: vi.fn().mockReturnValue({}),
       getPromptRegistry: vi.fn().mockReturnValue({ registerPrompt: vi.fn() }),
@@ -62,15 +62,15 @@ describe('McpClientManager', () => {
         isInitialized: vi.fn(),
       }),
       refreshMcpContext: vi.fn(),
-    } as unknown as Config);
-    toolRegistry = vi.mockObject({
+    } as unknown as MockedObject<Config>;
+    toolRegistry = {
       registerTool: vi.fn(),
       unregisterTool: vi.fn(),
       sortTools: vi.fn(),
       getMessageBus: vi.fn().mockReturnValue({}),
       removeMcpToolsByServer: vi.fn(),
       getToolsByServer: vi.fn().mockReturnValue([]),
-    } as unknown as ToolRegistry);
+    } as unknown as ToolRegistry;
   });
 
   afterEach(() => {

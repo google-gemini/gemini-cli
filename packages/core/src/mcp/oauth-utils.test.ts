@@ -5,11 +5,21 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import * as dnsPromises from 'node:dns/promises';
+import type { LookupAddress, LookupAllOptions } from 'node:dns';
+import ipaddr from 'ipaddr.js';
 import {
   OAuthUtils,
+  OAuthSecurityError,
+  validateOAuthEndpointUrl,
+  isLoopbackUrl,
   type OAuthAuthorizationServerMetadata,
   type OAuthProtectedResourceMetadata,
 } from './oauth-utils.js';
+
+vi.mock('node:dns/promises', () => ({
+  lookup: vi.fn(),
+}));
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -21,6 +31,18 @@ describe('OAuthUtils', () => {
     vi.spyOn(console, 'debug').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    vi.mocked(
+      dnsPromises.lookup as (
+        hostname: string,
+        options: LookupAllOptions,
+      ) => Promise<LookupAddress[]>,
+    ).mockImplementation(async (hostname: string) => {
+      if (ipaddr.isValid(hostname)) {
+        return [{ address: hostname, family: hostname.includes(':') ? 6 : 4 }];
+      }
+      return [{ address: '93.184.216.34', family: 4 }];
+    });
   });
 
   afterEach(() => {
@@ -505,6 +527,189 @@ describe('OAuthUtils', () => {
       const token = `header.${Buffer.from('{ not valid json').toString('base64')}.signature`;
       const result = OAuthUtils.parseTokenExpiry(token);
       expect(result).toBeUndefined();
+    });
+  });
+
+  describe('validateOAuthEndpointUrl & SSRF Protections', () => {
+    it('should allow valid public HTTPS URLs', async () => {
+      const validated = await validateOAuthEndpointUrl(
+        'https://auth.example.com/authorize',
+      );
+      expect(validated).toBe('https://auth.example.com/authorize');
+    });
+
+    it('should allow localhost URLs when allowLoopback is true', async () => {
+      const validated = await validateOAuthEndpointUrl(
+        'http://localhost:3000/oauth',
+        { allowLoopback: true },
+      );
+      expect(validated).toBe('http://localhost:3000/oauth');
+    });
+
+    it('should reject HTTP URLs for remote hosts', async () => {
+      await expect(
+        validateOAuthEndpointUrl('http://auth.example.com/authorize'),
+      ).rejects.toThrow(OAuthSecurityError);
+    });
+
+    it('should reject loopback URLs when allowLoopback is false', async () => {
+      await expect(
+        validateOAuthEndpointUrl('http://127.0.0.1:18080/authorize', {
+          allowLoopback: false,
+        }),
+      ).rejects.toThrow(OAuthSecurityError);
+
+      await expect(
+        validateOAuthEndpointUrl('https://localhost:8080/authorize', {
+          allowLoopback: false,
+        }),
+      ).rejects.toThrow(OAuthSecurityError);
+    });
+
+    it('should reject private IPv4 addresses (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16)', async () => {
+      await expect(
+        validateOAuthEndpointUrl('https://10.0.0.1/oauth'),
+      ).rejects.toThrow(OAuthSecurityError);
+
+      await expect(
+        validateOAuthEndpointUrl('https://172.16.0.1/oauth'),
+      ).rejects.toThrow(OAuthSecurityError);
+
+      await expect(
+        validateOAuthEndpointUrl('https://192.168.1.1/oauth'),
+      ).rejects.toThrow(OAuthSecurityError);
+    });
+
+    it('should reject cloud instance metadata endpoints (169.254.169.254)', async () => {
+      await expect(
+        validateOAuthEndpointUrl('http://169.254.169.254/latest/meta-data'),
+      ).rejects.toThrow(OAuthSecurityError);
+
+      await expect(
+        validateOAuthEndpointUrl('https://169.254.169.254/computeMetadata/v1'),
+      ).rejects.toThrow(OAuthSecurityError);
+    });
+
+    it('should reject domains resolving to private IPs (DNS rebinding / SSRF)', async () => {
+      vi.mocked(
+        dnsPromises.lookup as (
+          hostname: string,
+          options: LookupAllOptions,
+        ) => Promise<LookupAddress[]>,
+      ).mockImplementationOnce(async () => [
+        { address: '127.0.0.1', family: 4 },
+      ]);
+
+      await expect(
+        validateOAuthEndpointUrl('https://attacker-domain.com/metadata'),
+      ).rejects.toThrow(/resolves to private network address/);
+    });
+
+    it('should reject domains resolving to AWS/GCP metadata IP', async () => {
+      vi.mocked(
+        dnsPromises.lookup as (
+          hostname: string,
+          options: LookupAllOptions,
+        ) => Promise<LookupAddress[]>,
+      ).mockImplementationOnce(async () => [
+        { address: '169.254.169.254', family: 4 },
+      ]);
+
+      await expect(
+        validateOAuthEndpointUrl('https://rebinding-cloud.com/metadata'),
+      ).rejects.toThrow(/resolves to private network address/);
+    });
+
+    it('should enforce origin matching when expectedOrigin is specified', async () => {
+      await expect(
+        validateOAuthEndpointUrl('https://attacker.com/metadata', {
+          expectedOrigin: 'https://legit-mcp.com',
+        }),
+      ).rejects.toThrow(/does not match expected origin/);
+
+      const validated = await validateOAuthEndpointUrl(
+        'https://legit-mcp.com/metadata',
+        {
+          expectedOrigin: 'https://legit-mcp.com',
+        },
+      );
+      expect(validated).toBe('https://legit-mcp.com/metadata');
+    });
+
+    it('should resolve and validate relative URLs with baseUri', async () => {
+      const validated = await validateOAuthEndpointUrl(
+        '/.well-known/metadata',
+        {
+          allowRelative: true,
+          baseUri: 'https://legit-mcp.com/mcp',
+          expectedOrigin: 'https://legit-mcp.com',
+        },
+      );
+      expect(validated).toBe('https://legit-mcp.com/.well-known/metadata');
+    });
+
+    it('should identify loopback URLs correctly', () => {
+      expect(isLoopbackUrl('http://localhost:3000')).toBe(true);
+      expect(isLoopbackUrl('http://127.0.0.1:8080/mcp')).toBe(true);
+      expect(isLoopbackUrl('http://[::1]:9000')).toBe(true);
+      expect(isLoopbackUrl('https://example.com')).toBe(false);
+      expect(isLoopbackUrl('http://10.0.0.1')).toBe(false);
+    });
+  });
+
+  describe('SSRF Chained Attack Scenarios', () => {
+    it('should block chained SSRF when attacker server points authorization_servers to 127.0.0.1', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            resource: 'https://mcp.attacker.com/mcp',
+            authorization_servers: ['http://127.0.0.1:18080'],
+          }),
+      });
+
+      await expect(
+        OAuthUtils.discoverOAuthFromWWWAuthenticate(
+          'Bearer resource_metadata="https://mcp.attacker.com/metadata"',
+          'https://mcp.attacker.com/mcp',
+        ),
+      ).rejects.toThrow(OAuthSecurityError);
+    });
+
+    it('should block chained SSRF when attacker server points resource_metadata to internal IP', async () => {
+      await expect(
+        OAuthUtils.discoverOAuthFromWWWAuthenticate(
+          'Bearer resource_metadata="http://127.0.0.1:18080/metadata"',
+          'https://mcp.attacker.com/mcp',
+        ),
+      ).rejects.toThrow(OAuthSecurityError);
+    });
+
+    it('should block chained SSRF when attacker server points resource_metadata to cloud metadata IP', async () => {
+      await expect(
+        OAuthUtils.discoverOAuthFromWWWAuthenticate(
+          'Bearer resource_metadata="http://169.254.169.254/computeMetadata/v1"',
+          'https://mcp.attacker.com/mcp',
+        ),
+      ).rejects.toThrow(OAuthSecurityError);
+    });
+
+    it('should block chained SSRF when attacker returns authorization_servers pointing to 169.254.169.254', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            resource: 'https://mcp.attacker.com/mcp',
+            authorization_servers: ['http://169.254.169.254'],
+          }),
+      });
+
+      await expect(
+        OAuthUtils.discoverOAuthFromWWWAuthenticate(
+          'Bearer resource_metadata="https://mcp.attacker.com/metadata"',
+          'https://mcp.attacker.com/mcp',
+        ),
+      ).rejects.toThrow(OAuthSecurityError);
     });
   });
 });

@@ -285,7 +285,7 @@ environment to a blocklist.
 <!-- prettier-ignore -->
 > [!WARNING]
 > Blocklisting with `excludeTools` is less secure than
-> allowlisting with `coreTools`, as it relies on blocking known-bad commands,
+> allowlisting with `tools.core`, as it relies on blocking known-bad commands,
 > and clever users may find ways to bypass simple string-based blocks.
 > **Allowlisting is the recommended approach.**
 

@@ -55,9 +55,13 @@ vi.mock('node:child_process', () => ({
 }));
 
 const mockQuote = vi.hoisted(() => vi.fn());
-vi.mock('shell-quote', () => ({
-  quote: mockQuote,
-}));
+vi.mock('shell-quote', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('shell-quote')>();
+  return {
+    ...actual,
+    quote: mockQuote,
+  };
+});
 
 const mockDebugLogger = vi.hoisted(() => ({
   error: vi.fn(),
@@ -387,6 +391,12 @@ describe('stripShellWrapper', () => {
 
   it('should not strip anything if no wrapper is present', () => {
     expect(stripShellWrapper('ls -l')).toEqual('ls -l');
+  });
+
+  it('should handle multi-line escaped double quotes correctly', () => {
+    const multiLine = 'bash -c "hg commit -m \\"title\n\nbody\\""';
+    const expected = 'hg commit -m "title\n\nbody"';
+    expect(stripShellWrapper(multiLine)).toEqual(expected);
   });
 });
 

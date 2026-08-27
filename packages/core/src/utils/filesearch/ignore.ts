@@ -5,7 +5,10 @@
  */
 
 import fs from 'node:fs';
-import ignore from 'ignore';
+import ignorePkg, { type Ignore as IgnoreType } from 'ignore';
+// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+const ignore = ((ignorePkg as unknown as { default?: () => IgnoreType })
+  .default ?? ignorePkg) as () => IgnoreType;
 import picomatch from 'picomatch';
 import type { FileDiscoveryService } from '../../services/fileDiscoveryService.js';
 

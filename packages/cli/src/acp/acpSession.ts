@@ -510,7 +510,12 @@ export class Session {
             (error.type === 'NO_RESPONSE_TEXT' ||
               error.type === 'NO_FINISH_REASON' ||
               error.type === 'MALFORMED_FUNCTION_CALL' ||
-              error.type === 'UNEXPECTED_TOOL_CALL'))
+              error.type === 'UNEXPECTED_TOOL_CALL' ||
+              error.type === 'MAX_TOKENS_EXCEEDED' ||
+              error.type === 'SAFETY_BLOCKED' ||
+              error.type === 'RECITATION_BLOCKED' ||
+              error.type === 'OTHER_BLOCKED' ||
+              error.type === 'THINKING_ONLY_RESPONSE'))
         ) {
           // The stream ended with an empty response or malformed tool call.
           // Treat this as a graceful end to the model's turn rather than a crash.

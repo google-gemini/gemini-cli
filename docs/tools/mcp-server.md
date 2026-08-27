@@ -768,6 +768,7 @@ defaults:
 
 - **Tool lists:** Tool lists are merged securely to ensure the most restrictive
   policy wins:
+
   - **Exclusions (`excludeTools`):** Arrays are combined (unioned). If either
     source blocks a tool, it remains disabled.
   - **Inclusions (`includeTools`):** Arrays are intersected. If both sources

@@ -173,6 +173,7 @@ describe('UiTelemetryService', () => {
           totalRequests: 1,
           totalErrors: 0,
           totalLatencyMs: 500,
+          errorsByType: {},
         },
         tokens: {
           input: 5,
@@ -229,6 +230,7 @@ describe('UiTelemetryService', () => {
           totalRequests: 2,
           totalErrors: 0,
           totalLatencyMs: 1100,
+          errorsByType: {},
         },
         tokens: {
           input: 10,
@@ -305,6 +307,9 @@ describe('UiTelemetryService', () => {
           totalRequests: 1,
           totalErrors: 1,
           totalLatencyMs: 300,
+          errorsByType: {
+            UNKNOWN: 1,
+          },
         },
         tokens: {
           input: 0,
@@ -316,6 +321,42 @@ describe('UiTelemetryService', () => {
           tool: 0,
         },
         roles: {},
+      });
+    });
+
+    it('should track errors by error_type distinctly', () => {
+      const event1 = {
+        'event.name': EVENT_API_ERROR,
+        model: 'gemini-2.5-pro',
+        duration_ms: 200,
+        error: 'Empty response',
+        error_type: 'NO_RESPONSE_TEXT',
+      } as unknown as ApiErrorEvent & { 'event.name': typeof EVENT_API_ERROR };
+
+      const event2 = {
+        'event.name': EVENT_API_ERROR,
+        model: 'gemini-2.5-pro',
+        duration_ms: 250,
+        error: 'Malformed JSON',
+        error_type: 'MALFORMED_FUNCTION_CALL',
+      } as unknown as ApiErrorEvent & { 'event.name': typeof EVENT_API_ERROR };
+
+      const event3 = {
+        'event.name': EVENT_API_ERROR,
+        model: 'gemini-2.5-pro',
+        duration_ms: 100,
+        error: 'Another empty response',
+        error_type: 'NO_RESPONSE_TEXT',
+      } as unknown as ApiErrorEvent & { 'event.name': typeof EVENT_API_ERROR };
+
+      service.addEvent(event1);
+      service.addEvent(event2);
+      service.addEvent(event3);
+
+      const metrics = service.getMetrics();
+      expect(metrics.models['gemini-2.5-pro'].api.errorsByType).toEqual({
+        NO_RESPONSE_TEXT: 2,
+        MALFORMED_FUNCTION_CALL: 1,
       });
     });
 
@@ -351,6 +392,9 @@ describe('UiTelemetryService', () => {
           totalRequests: 2,
           totalErrors: 1,
           totalLatencyMs: 800,
+          errorsByType: {
+            UNKNOWN: 1,
+          },
         },
         tokens: {
           input: 5,

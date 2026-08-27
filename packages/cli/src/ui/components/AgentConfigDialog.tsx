@@ -128,7 +128,7 @@ function setNestedValue(obj: unknown, path: string[], value: unknown): unknown {
     if (current[key] === undefined || current[key] === null) {
       current[key] = {};
     } else if (isRecord(current[key])) {
-      current[key] = { ...current[key] };
+      current[key] = { ...(current[key] as object) };
     }
 
     const next = current[key];

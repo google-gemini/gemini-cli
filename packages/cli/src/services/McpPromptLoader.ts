@@ -158,16 +158,15 @@ export class McpPromptLoader implements ICommandLoader {
               return [];
             }
             const indexOfFirstSpace = invocation.raw.indexOf(' ') + 1;
-            let promptInputs =
+            const parsedInputs =
               indexOfFirstSpace === 0
                 ? {}
                 : this.parseArgs(
                     invocation.raw.substring(indexOfFirstSpace),
                     prompt.arguments,
                   );
-            if (promptInputs instanceof Error) {
-              promptInputs = {};
-            }
+            const promptInputs =
+              parsedInputs instanceof Error ? {} : parsedInputs;
 
             const providedArgNames = Object.keys(promptInputs);
             const unusedArguments =

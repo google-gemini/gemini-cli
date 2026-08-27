@@ -1,6 +1,6 @@
-# Preview release: v0.45.0-preview.0
+# Preview release: v0.58.0-preview.0
 
-Released: May 27, 2026
+Released: August 25, 2026
 
 Our preview release includes the latest, new, and experimental features. This
 release may not be as stable as our [latest weekly release](latest.md).
@@ -13,52 +13,37 @@ npm install -g @google/gemini-cli@preview
 
 ## Highlights
 
-- **Context Simplification:** Completed major architectural work to simplify and
-  optimize how the agent manages and processes session context.
-- **A2A Usage Metadata:** The Agent-to-Agent (A2A) interface now exposes
-  detailed usage metadata, providing better visibility into resource
-  consumption.
-- **Improved Routing:** Updated default auto-routing logic and added bypasses
-  for certain routing classifiers to prevent orphaned function response errors.
-- **Terminal Stability:** Fixed several issues affecting terminal environments,
-  including Termux relaunch loops and PTY resize errors.
-- **Security & Fixes:** Strengthened MCP list security and addressed issues with
-  session resumption and PTY environment signals.
+- **Sandbox Security Enhancements**: Isolated Docker and container runtime
+  sockets and binaries in macOS Seatbelt to improve sandbox safety.
+- **Core Path Resolution Fixes**: Ensured consistent symlink evaluation in
+  ignore path handling within core services.
+- **History & Retry Optimizations**: Enhanced history rollback and optimized
+  retry nudges for smoother session management.
+- **A2A Server Resilience**: Cleared stale cancellation errors on new message
+  turns to prevent incorrect error states.
+- **Write Policy & Safety Improvements**: Declared top-level safety checkers in
+  the write policy configuration to strengthen execution guardrails.
 
 ## What's Changed
 
-- chore(release): bump version to 0.45.0-nightly.20260521.g854f811be by
-  @gemini-cli-robot in
-  [#27362](https://github.com/google-gemini/gemini-cli/pull/27362)
-- fix(cli): prevent Termux relaunch and resize remount loops by @saymanq in
-  [#27110](https://github.com/google-gemini/gemini-cli/pull/27110)
-- Feat/a2a expose usage metadata by @jvargassanchez-dot in
-  [#27288](https://github.com/google-gemini/gemini-cli/pull/27288)
-- feat(context): Complete simplification work. by @joshualitt in
-  [#27345](https://github.com/google-gemini/gemini-cli/pull/27345)
-- fix(core): force update_topic tool to execute sequentially by
-  @jvargassanchez-dot in
-  [#27357](https://github.com/google-gemini/gemini-cli/pull/27357)
-- Changelog for v0.44.0-preview.0 by @gemini-cli-robot in
-  [#27360](https://github.com/google-gemini/gemini-cli/pull/27360)
-- Changelog for v0.43.0 by @gemini-cli-robot in
-  [#27361](https://github.com/google-gemini/gemini-cli/pull/27361)
-- Revert "fix(core): prevent SIGHUP kills in PTY environments" by @bbiggs in
-  [#27401](https://github.com/google-gemini/gemini-cli/pull/27401)
-- fix(cli): filter internal session context from history during resumption by
-  @rmedranollamas in
-  [#27391](https://github.com/google-gemini/gemini-cli/pull/27391)
-- Update default auto routing by @DavidAPierce in
-  [#27071](https://github.com/google-gemini/gemini-cli/pull/27071)
-- fix(core): bypass routing classifiers to prevent orphaned function response
-  errors by @danielweis in
-  [#27389](https://github.com/google-gemini/gemini-cli/pull/27389)
-- fix(core): suppress PTY resize EBADF errors by @scidomino in
-  [#27461](https://github.com/google-gemini/gemini-cli/pull/27461)
-- fix(core): prevent blacklist bypass in mcp list by @ompatel-aiml in
-  [#27377](https://github.com/google-gemini/gemini-cli/pull/27377)
-- fix(cli): ignore unmapped vim normal keys by @MukundaKatta in
-  [#27102](https://github.com/google-gemini/gemini-cli/pull/27102)
+- Changelog for v0.57.0-preview.0 by @gemini-cli-robot in
+  [#28918](https://github.com/google-gemini/gemini-cli/pull/28918)
+- fix(core): ensure consistent symlink evaluation in ignore path handling by
+  @luisfelipe-alt in
+  [#28915](https://github.com/google-gemini/gemini-cli/pull/28915)
+- refactor(core): remove eslint-disable and type-asserts from
+  shellExecutionService by @DavidAPierce in
+  [#28862](https://github.com/google-gemini/gemini-cli/pull/28862)
+- fix(sandbox): isolate Docker and container runtime sockets and binaries in
+  macOS Seatbelt by @josebalius in
+  [#28935](https://github.com/google-gemini/gemini-cli/pull/28935)
+- fix(a2a-server): clear stale cancellation error on new message turns by
+  @amelidev in [#28940](https://github.com/google-gemini/gemini-cli/pull/28940)
+- fix(core): declare top-level safety checkers in write policy configuration by
+  @luisfelipe-alt in
+  [#28961](https://github.com/google-gemini/gemini-cli/pull/28961)
+- (FIX) history rollback and retry nudge optimizations by @DavidAPierce in
+  [#28934](https://github.com/google-gemini/gemini-cli/pull/28934)
 
 **Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.44.0-preview.0...v0.45.0-preview.0
+https://github.com/google-gemini/gemini-cli/compare/v0.57.0-preview.1...v0.58.0-preview.0

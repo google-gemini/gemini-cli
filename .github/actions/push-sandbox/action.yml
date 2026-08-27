@@ -28,11 +28,6 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: '📝 Print Inputs'
-      shell: 'bash'
-      env:
-        JSON_INPUTS: '${{ toJSON(inputs) }}'
-      run: 'echo "$JSON_INPUTS"'
     - name: 'Checkout'
       uses: 'actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5' # ratchet:actions/checkout@v4
       with:

@@ -37,6 +37,9 @@ export interface ModelConfigKey {
   // Indicates whether this request originates from the primary interactive chat model.
   // Enables the default fallback configuration to `chat-base` when unknown.
   isChatModel?: boolean;
+
+  // The last stream error that triggered this retry attempt, if any.
+  lastStreamError?: unknown;
 }
 
 export interface ModelConfig {
@@ -97,6 +100,7 @@ export interface ModelResolution {
 export interface ResolutionContext {
   useGemini3_1?: boolean;
   useGemini3_1FlashLite?: boolean;
+  useGemini3_5Flash?: boolean;
   useCustomTools?: boolean;
   hasAccessToPreview?: boolean;
   hasAccessToProModel?: boolean;
@@ -107,6 +111,7 @@ export interface ResolutionContext {
 export interface ResolutionCondition {
   useGemini3_1?: boolean;
   useGemini3_1FlashLite?: boolean;
+  useGemini3_5Flash?: boolean;
   useCustomTools?: boolean;
   hasAccessToPreview?: boolean;
   /** Matches if the current model is in this list. */
@@ -155,6 +160,7 @@ export class ModelConfigService {
     const definitions = this.config.modelDefinitions ?? {};
     const shouldShowPreviewModels = context.hasAccessToPreview ?? false;
     const useGemini31 = context.useGemini3_1 ?? false;
+    const useGemini3_5Flash = context.useGemini3_5Flash ?? false;
 
     const mainOptions = Object.entries(definitions)
       .filter(([_, m]) => {
@@ -169,6 +175,7 @@ export class ModelConfigService {
           description = getAutoModelDescription(
             shouldShowPreviewModels,
             useGemini31,
+            useGemini3_5Flash,
           );
         } else if (id === 'auto-gemini-3' && useGemini31) {
           description = description.replace('gemini-3-pro', 'gemini-3.1-pro');
@@ -250,6 +257,8 @@ export class ModelConfigService {
           return value === context.useGemini3_1;
         case 'useGemini3_1FlashLite':
           return value === context.useGemini3_1FlashLite;
+        case 'useGemini3_5Flash':
+          return value === context.useGemini3_5Flash;
         case 'useCustomTools':
           return value === context.useCustomTools;
         case 'hasAccessToPreview':

@@ -82,6 +82,24 @@ describe('GoogleCredentialsAuthProvider', () => {
           ),
       ).not.toThrow();
     });
+
+    it('throws if the protocol is not HTTPS', () => {
+      expect(
+        () =>
+          new GoogleCredentialsAuthProvider(
+            mockConfig,
+            'http://language.googleapis.com/v1/models',
+          ),
+      ).toThrow(/requires HTTPS/);
+
+      expect(
+        () =>
+          new GoogleCredentialsAuthProvider(
+            mockConfig,
+            'http://my-cloud-run-service.run.app',
+          ),
+      ).toThrow(/requires HTTPS/);
+    });
   });
 
   describe('Token Fetching', () => {

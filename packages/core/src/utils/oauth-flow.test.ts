@@ -5,6 +5,9 @@
  */
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import * as dnsPromises from 'node:dns/promises';
+import type { LookupAddress, LookupAllOptions } from 'node:dns';
+import ipaddr from 'ipaddr.js';
 import type {
   OAuthFlowConfig,
   OAuthRefreshConfig,
@@ -19,6 +22,10 @@ import {
   refreshAccessToken,
   REDIRECT_PATH,
 } from './oauth-flow.js';
+
+vi.mock('node:dns/promises', () => ({
+  lookup: vi.fn(),
+}));
 
 // Save real fetch for startCallbackServer tests (which hit a real local server)
 const realFetch = global.fetch;
@@ -59,6 +66,18 @@ describe('oauth-flow', () => {
   beforeEach(() => {
     vi.stubEnv('OAUTH_CALLBACK_PORT', '');
     mockFetch.mockReset();
+
+    vi.mocked(
+      dnsPromises.lookup as (
+        hostname: string,
+        options: LookupAllOptions,
+      ) => Promise<LookupAddress[]>,
+    ).mockImplementation(async (hostname: string) => {
+      if (ipaddr.isValid(hostname)) {
+        return [{ address: hostname, family: hostname.includes(':') ? 6 : 4 }];
+      }
+      return [{ address: '93.184.216.34', family: 4 }];
+    });
   });
 
   afterEach(() => {
@@ -208,6 +227,126 @@ describe('oauth-flow', () => {
       const url = buildAuthorizationUrl(baseConfig, basePkceParams, 3000);
       const parsed = new URL(url);
       expect(parsed.searchParams.has('resource')).toBe(false);
+    });
+
+    it('should use the Cloud Workstations proxy callback URL when running inside Cloud Workstations', () => {
+      vi.stubEnv('GOOGLE_CLOUD_WORKSTATIONS', 'true');
+      vi.stubEnv(
+        'WEB_HOST',
+        'my-workstation.cluster.workstations.cloud.google.com',
+      );
+
+      const url = buildAuthorizationUrl(baseConfig, basePkceParams, 3000);
+      const parsed = new URL(url);
+      expect(parsed.searchParams.get('redirect_uri')).toBe(
+        `https://3000-my-workstation.cluster.workstations.cloud.google.com${REDIRECT_PATH}`,
+      );
+    });
+
+    it('should convert explicitly configured localhost URL to Workstations proxy URL', () => {
+      vi.stubEnv('GOOGLE_CLOUD_WORKSTATIONS', 'true');
+      vi.stubEnv(
+        'WEB_HOST',
+        'my-workstation.cluster.workstations.cloud.google.com',
+      );
+
+      const config: OAuthFlowConfig = {
+        ...baseConfig,
+        redirectUri: 'http://localhost:8080/custom/callback',
+      };
+      const url = buildAuthorizationUrl(config, basePkceParams, 3000);
+      const parsed = new URL(url);
+      expect(parsed.searchParams.get('redirect_uri')).toBe(
+        'https://3000-my-workstation.cluster.workstations.cloud.google.com/custom/callback',
+      );
+    });
+
+    it('should convert explicitly configured 127.0.0.1 URL to Workstations proxy URL', () => {
+      vi.stubEnv('GOOGLE_CLOUD_WORKSTATIONS', 'true');
+      vi.stubEnv(
+        'WEB_HOST',
+        'my-workstation.cluster.workstations.cloud.google.com',
+      );
+
+      const config: OAuthFlowConfig = {
+        ...baseConfig,
+        redirectUri: 'http://127.0.0.1:4000/oauth2callback',
+      };
+      const url = buildAuthorizationUrl(config, basePkceParams, 3000);
+      const parsed = new URL(url);
+      expect(parsed.searchParams.get('redirect_uri')).toBe(
+        'https://3000-my-workstation.cluster.workstations.cloud.google.com/oauth2callback',
+      );
+    });
+
+    it('should convert explicitly configured [::1] IPv6 loopback URL to Workstations proxy URL', () => {
+      vi.stubEnv('GOOGLE_CLOUD_WORKSTATIONS', 'true');
+      vi.stubEnv(
+        'WEB_HOST',
+        'my-workstation.cluster.workstations.cloud.google.com',
+      );
+
+      const config: OAuthFlowConfig = {
+        ...baseConfig,
+        redirectUri: 'http://[::1]:9090/oauth2callback',
+      };
+      const url = buildAuthorizationUrl(config, basePkceParams, 3000);
+      const parsed = new URL(url);
+      expect(parsed.searchParams.get('redirect_uri')).toBe(
+        'https://3000-my-workstation.cluster.workstations.cloud.google.com/oauth2callback',
+      );
+    });
+
+    it('should preserve query parameters and hashes from the configured redirectUri', () => {
+      vi.stubEnv('GOOGLE_CLOUD_WORKSTATIONS', 'true');
+      vi.stubEnv(
+        'WEB_HOST',
+        'my-workstation.cluster.workstations.cloud.google.com',
+      );
+
+      const config: OAuthFlowConfig = {
+        ...baseConfig,
+        redirectUri: 'http://localhost:5050/callback?tenant=123#token=abc',
+      };
+      const url = buildAuthorizationUrl(config, basePkceParams, 3000);
+      const parsed = new URL(url);
+      expect(parsed.searchParams.get('redirect_uri')).toBe(
+        'https://3000-my-workstation.cluster.workstations.cloud.google.com/callback?tenant=123#token=abc',
+      );
+    });
+
+    it('should leave external explicitly configured redirect URIs untouched under Cloud Workstations', () => {
+      vi.stubEnv('GOOGLE_CLOUD_WORKSTATIONS', 'true');
+      vi.stubEnv(
+        'WEB_HOST',
+        'my-workstation.cluster.workstations.cloud.google.com',
+      );
+
+      const config: OAuthFlowConfig = {
+        ...baseConfig,
+        redirectUri: 'https://external-domain.com/callback',
+      };
+      const url = buildAuthorizationUrl(config, basePkceParams, 3000);
+      const parsed = new URL(url);
+      expect(parsed.searchParams.get('redirect_uri')).toBe(
+        'https://external-domain.com/callback',
+      );
+    });
+
+    it('should handle invalid redirect URIs gracefully by returning them as-is', () => {
+      vi.stubEnv('GOOGLE_CLOUD_WORKSTATIONS', 'true');
+      vi.stubEnv(
+        'WEB_HOST',
+        'my-workstation.cluster.workstations.cloud.google.com',
+      );
+
+      const config: OAuthFlowConfig = {
+        ...baseConfig,
+        redirectUri: 'not-a-valid-url',
+      };
+      const url = buildAuthorizationUrl(config, basePkceParams, 3000);
+      const parsed = new URL(url);
+      expect(parsed.searchParams.get('redirect_uri')).toBe('not-a-valid-url');
     });
   });
 
@@ -493,6 +632,29 @@ describe('oauth-flow', () => {
       expect(body.get('redirect_uri')).toBe('https://custom.example.com/cb');
     });
 
+    it('should use the Cloud Workstations proxy callback URL when running inside Cloud Workstations', async () => {
+      vi.stubEnv('GOOGLE_CLOUD_WORKSTATIONS', 'true');
+      vi.stubEnv(
+        'WEB_HOST',
+        'my-workstation.cluster.workstations.cloud.google.com',
+      );
+
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse(
+          JSON.stringify({ access_token: 'tok', token_type: 'Bearer' }),
+        ),
+      );
+
+      await exchangeCodeForToken(baseConfig, 'code', 'verifier', 3000);
+
+      const body = new URLSearchParams(
+        (mockFetch.mock.calls[0] as [string, RequestInit])[1].body as string,
+      );
+      expect(body.get('redirect_uri')).toBe(
+        `https://3000-my-workstation.cluster.workstations.cloud.google.com${REDIRECT_PATH}`,
+      );
+    });
+
     it('should default token_type to Bearer when missing from JSON response', async () => {
       mockFetch.mockResolvedValueOnce(
         createMockResponse(JSON.stringify({ access_token: 'tok' })),
@@ -652,6 +814,52 @@ describe('oauth-flow', () => {
 
       expect(result.access_token).toBe('refreshed-token');
       expect(result.expires_in).toBe(1800);
+    });
+
+    it('should reject token refresh when tokenUrl points to private IP or loopback from remote', async () => {
+      await expect(
+        refreshAccessToken(
+          refreshConfig,
+          'refresh-token',
+          'http://127.0.0.1:18080/token',
+          'https://mcp.remote.com',
+        ),
+      ).rejects.toThrow();
+
+      await expect(
+        refreshAccessToken(
+          refreshConfig,
+          'refresh-token',
+          'http://169.254.169.254/token',
+        ),
+      ).rejects.toThrow();
+    });
+
+    it('should reject token exchange when tokenUrl points to private IP or loopback from remote', async () => {
+      await expect(
+        exchangeCodeForToken(
+          {
+            ...baseConfig,
+            tokenUrl: 'http://127.0.0.1:18080/token',
+          },
+          'code',
+          'verifier',
+          3000,
+          'https://mcp.remote.com',
+        ),
+      ).rejects.toThrow();
+
+      await expect(
+        exchangeCodeForToken(
+          {
+            ...baseConfig,
+            tokenUrl: 'http://169.254.169.254/token',
+          },
+          'code',
+          'verifier',
+          3000,
+        ),
+      ).rejects.toThrow();
     });
   });
 });

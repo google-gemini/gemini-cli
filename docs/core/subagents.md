@@ -105,7 +105,7 @@ Gemini CLI comes with the following built-in subagents:
     slow. You can invoke it explicitly using `@generalist`.
 - **Configuration:** Enabled by default.
 
-### Browser Agent (experimental)
+### Browser Agent
 
 - **Name:** `browser_agent`
 - **Purpose:** Automate web browser tasks — navigating websites, filling forms,
@@ -114,10 +114,6 @@ Gemini CLI comes with the following built-in subagents:
 - **When to use:** "Go to example.com and fill out the contact form," "Extract
   the pricing table from this page," "Click the login button and enter my
   credentials."
-
-<!-- prettier-ignore -->
-> [!NOTE]
-> This is a preview feature currently under active development.
 
 #### Prerequisites
 

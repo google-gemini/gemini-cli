@@ -105,6 +105,19 @@ export type ServerGeminiContextWindowWillOverflowEvent = {
 
 export type ServerGeminiInvalidStreamEvent = {
   type: GeminiEventType.InvalidStream;
+  value: {
+    type:
+      | 'NO_FINISH_REASON'
+      | 'NO_RESPONSE_TEXT'
+      | 'MALFORMED_FUNCTION_CALL'
+      | 'UNEXPECTED_TOOL_CALL'
+      | 'MAX_TOKENS_EXCEEDED'
+      | 'SAFETY_BLOCKED'
+      | 'RECITATION_BLOCKED'
+      | 'OTHER_BLOCKED'
+      | 'THINKING_ONLY_RESPONSE';
+    message: string;
+  };
 };
 
 export type ServerGeminiModelInfoEvent = {
@@ -408,7 +421,13 @@ export class Turn {
       }
 
       if (e instanceof InvalidStreamError) {
-        yield { type: GeminiEventType.InvalidStream };
+        yield {
+          type: GeminiEventType.InvalidStream,
+          value: {
+            type: e.type,
+            message: e.message,
+          },
+        };
         return;
       }
 

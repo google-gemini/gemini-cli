@@ -216,6 +216,7 @@ ${formattedHistory}
           config.getUseCustomToolModel(),
           config.getHasAccessToPreviewModel(),
         ]);
+      const useGemini3_5Flash = config.hasGemini35FlashGAAccess?.() ?? false;
 
       const selectedModel = resolveClassifierModel(
         context.requestedModel ?? config.getModel(),
@@ -224,6 +225,7 @@ ${formattedHistory}
         useCustomToolModel,
         hasAccessToPreview,
         config,
+        useGemini3_5Flash,
       );
 
       return {

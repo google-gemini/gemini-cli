@@ -242,4 +242,22 @@ describe('ApprovalModeStrategy', () => {
     // Should resolve to Preview Flash (3.0) because resolveClassifierModel uses preview variants for Gemini 3
     expect(decision?.model).toBe(PREVIEW_GEMINI_FLASH_MODEL);
   });
+
+  it('should route to DEFAULT_GEMINI_FLASH_MODEL when hasGemini35FlashGAAccess is true and plan is approved', async () => {
+    vi.mocked(mockConfig.getModel).mockReturnValue(GEMINI_MODEL_ALIAS_AUTO);
+    mockConfig.hasGemini35FlashGAAccess = vi.fn().mockReturnValue(true);
+
+    vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.DEFAULT);
+    vi.mocked(mockConfig.getApprovedPlanPath).mockReturnValue(
+      '/path/to/plan.md',
+    );
+
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+    );
+
+    expect(decision?.model).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+  });
 });

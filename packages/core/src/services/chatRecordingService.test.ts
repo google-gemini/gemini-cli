@@ -40,6 +40,8 @@ vi.mock('node:fs', async (importOriginal) => {
 
 import {
   ChatRecordingService,
+  hasResumableConversationContent,
+  isResumableMessageRecord,
   loadConversationRecord,
   type ConversationRecord,
   type ToolCallRecord,
@@ -123,6 +125,76 @@ describe('ChatRecordingService', () => {
     if (testTempDir) {
       await fs.promises.rm(testTempDir, { recursive: true, force: true });
     }
+  });
+
+  describe('isResumableMessageRecord', () => {
+    it('should treat malformed messages without content as non-resumable', () => {
+      const message = {
+        id: 'malformed-message',
+        timestamp: '2024-01-01T00:00:00.000Z',
+        type: 'user',
+      } as MessageRecord;
+
+      expect(() => isResumableMessageRecord(message)).not.toThrow();
+      expect(isResumableMessageRecord(message)).toBe(false);
+    });
+
+    it('should return false for command-only messages', () => {
+      const messages = [
+        {
+          type: 'user',
+          content: '/resume',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+        {
+          type: 'user',
+          content: '?help',
+          id: 'msg2',
+          timestamp: '2024-01-01T10:01:00.000Z',
+        },
+      ] as MessageRecord[];
+
+      expect(hasResumableConversationContent(messages)).toBe(false);
+    });
+
+    it('should return false for internal context-only messages', () => {
+      const messages = [
+        {
+          type: 'user',
+          content: '<session_context>previous state</session_context>',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+        {
+          type: 'user',
+          content: '<hook_context>hook data</hook_context>',
+          id: 'msg2',
+          timestamp: '2024-01-01T10:01:00.000Z',
+        },
+      ] as MessageRecord[];
+
+      expect(hasResumableConversationContent(messages)).toBe(false);
+    });
+
+    it('should return true for real user or assistant content', () => {
+      const messages = [
+        {
+          type: 'user',
+          content: '/resume',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+        {
+          type: 'gemini',
+          content: 'I can help with that.',
+          id: 'msg2',
+          timestamp: '2024-01-01T10:01:00.000Z',
+        },
+      ] as MessageRecord[];
+
+      expect(hasResumableConversationContent(messages)).toBe(true);
+    });
   });
 
   describe('initialize', () => {
@@ -235,6 +307,125 @@ describe('ChatRecordingService', () => {
         sessionFile,
       )) as ConversationRecord;
       expect(conversation.sessionId).toBe('old-session-id');
+    });
+
+    it('should fall back to the in-memory conversation when the file cannot be reloaded', async () => {
+      // Regression test for the `/compress` "Failed to load resumed session
+      // data from file" bug: when resuming with a filePath that cannot be
+      // loaded from disk, initialize must NOT throw. It should adopt the
+      // in-memory conversation it was handed and rewrite a clean file.
+      const chatsDir = path.join(testTempDir, 'chats');
+      fs.mkdirSync(chatsDir, { recursive: true });
+      const missingFile = path.join(chatsDir, 'missing-session.jsonl');
+      expect(fs.existsSync(missingFile)).toBe(false);
+
+      const inMemoryConversation = {
+        sessionId: 'resumed-session-id',
+        projectHash: 'resumed-project-hash',
+        startTime: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
+        messages: [
+          {
+            id: 'msg-1',
+            type: 'user',
+            timestamp: new Date().toISOString(),
+            content: 'hello from memory',
+          },
+        ],
+      } as unknown as ConversationRecord;
+
+      await expect(
+        chatRecordingService.initialize({
+          filePath: missingFile,
+          conversation: inMemoryConversation,
+        }),
+      ).resolves.not.toThrow();
+
+      // The in-memory conversation is adopted.
+      expect(chatRecordingService.getConversation()?.sessionId).toBe(
+        'resumed-session-id',
+      );
+
+      // A clean, loadable file is rewritten from the in-memory copy so future
+      // loads and appends succeed.
+      const reloaded = (await loadConversationRecord(
+        missingFile,
+      )) as ConversationRecord;
+      expect(reloaded).not.toBeNull();
+      expect(reloaded.sessionId).toBe('resumed-session-id');
+      expect(reloaded.projectHash).toBe('resumed-project-hash');
+      expect(reloaded.messages).toHaveLength(1);
+    });
+
+    it('should preserve an unreadable session file instead of destroying it', async () => {
+      // The reload may have failed only transiently, so the original bytes
+      // must survive the recovery rewrite.
+      const chatsDir = path.join(testTempDir, 'chats');
+      fs.mkdirSync(chatsDir, { recursive: true });
+      const sessionFile = path.join(chatsDir, 'unreadable.jsonl');
+
+      // No usable metadata line => loadConversationRecord() returns null.
+      const originalBytes = '{"not":"a valid metadata line"}\n';
+      fs.writeFileSync(sessionFile, originalBytes);
+
+      await chatRecordingService.initialize({
+        filePath: sessionFile,
+        conversation: {
+          sessionId: 'recovered-session-id',
+          projectHash: 'recovered-project-hash',
+          startTime: new Date().toISOString(),
+          lastUpdated: new Date().toISOString(),
+          messages: [],
+        } as unknown as ConversationRecord,
+      });
+
+      // The rewritten file is loadable again...
+      const reloaded = (await loadConversationRecord(
+        sessionFile,
+      )) as ConversationRecord;
+      expect(reloaded.sessionId).toBe('recovered-session-id');
+
+      // ...and the original bytes were kept alongside it.
+      const preserved = fs
+        .readdirSync(chatsDir)
+        .filter((f) => f.startsWith('unreadable.jsonl.unreadable-'));
+      expect(preserved).toHaveLength(1);
+      expect(fs.readFileSync(path.join(chatsDir, preserved[0]), 'utf-8')).toBe(
+        originalBytes,
+      );
+    });
+
+    it('should not leave a temp file behind when the rewrite fails', async () => {
+      const chatsDir = path.join(testTempDir, 'chats');
+      fs.mkdirSync(chatsDir, { recursive: true });
+      const sessionFile = path.join(chatsDir, 'rewrite-fails.jsonl');
+
+      // Fail the rename that publishes the temp file, leaving it orphaned.
+      const realRename = fs.renameSync;
+      vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+        if (String(from).includes('.tmp-')) {
+          throw new Error('simulated rename failure');
+        }
+        return realRename(from, to);
+      });
+
+      await expect(
+        chatRecordingService.initialize({
+          filePath: sessionFile,
+          conversation: {
+            sessionId: 'temp-cleanup-session',
+            projectHash: 'temp-cleanup-hash',
+            startTime: new Date().toISOString(),
+            lastUpdated: new Date().toISOString(),
+            messages: [],
+          } as unknown as ConversationRecord,
+        }),
+      ).rejects.toThrow('simulated rename failure');
+
+      const leftovers = fs
+        .readdirSync(chatsDir)
+        .filter((f) => f.includes('.tmp-'));
+      expect(leftovers).toEqual([]);
     });
   });
 
@@ -835,6 +1026,49 @@ describe('ChatRecordingService', () => {
       await expect(
         chatRecordingService.deleteCurrentSessionAsync(),
       ).resolves.not.toThrow();
+    });
+  });
+
+  describe('deleteCurrentSessionIfNotResumableAsync', () => {
+    it('should delete a startup-only session', async () => {
+      await chatRecordingService.initialize();
+      const conversationFile = chatRecordingService.getConversationFilePath();
+      expect(conversationFile).not.toBeNull();
+      expect(fs.existsSync(conversationFile!)).toBe(true);
+
+      await chatRecordingService.deleteCurrentSessionIfNotResumableAsync();
+
+      expect(fs.existsSync(conversationFile!)).toBe(false);
+    });
+
+    it('should delete a command-only session', async () => {
+      await chatRecordingService.initialize();
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: '/resume',
+        model: 'gemini-pro',
+      });
+      const conversationFile = chatRecordingService.getConversationFilePath();
+      expect(conversationFile).not.toBeNull();
+
+      await chatRecordingService.deleteCurrentSessionIfNotResumableAsync();
+
+      expect(fs.existsSync(conversationFile!)).toBe(false);
+    });
+
+    it('should keep a session with a real user message', async () => {
+      await chatRecordingService.initialize();
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'Help me debug this test',
+        model: 'gemini-pro',
+      });
+      const conversationFile = chatRecordingService.getConversationFilePath();
+      expect(conversationFile).not.toBeNull();
+
+      await chatRecordingService.deleteCurrentSessionIfNotResumableAsync();
+
+      expect(fs.existsSync(conversationFile!)).toBe(true);
     });
   });
 

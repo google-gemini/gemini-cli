@@ -131,10 +131,20 @@ export class Task {
     this.autoExecute = autoExecute;
     this.config.setFallbackModelHandler(
       // For a2a-server, we want to automatically switch to the fallback model
-      // for future requests without retrying the current one. The 'stop'
-      // intent achieves this.
-      async () => 'stop',
+      // for future requests without retrying the current one.
+      async (failedModel, fallbackModel) => {
+        this.config.activateFallbackMode(fallbackModel, failedModel);
+        return 'stop';
+      },
     );
+  }
+
+  get hasPendingTools(): boolean {
+    return this.pendingToolCalls.size > 0;
+  }
+
+  get pendingToolsCount(): number {
+    return this.pendingToolCalls.size;
   }
 
   static async create(
@@ -658,13 +668,18 @@ export class Task {
     }
 
     try {
-      const currentContent = await fs.readFile(resolvedPath, 'utf8');
-      return this._applyReplacement(
+      const rawContent = await fs.readFile(resolvedPath, 'utf8');
+      const hasCrlf = rawContent.includes('\r\n');
+      const currentContent = rawContent.replace(/\r\n/g, '\n');
+      const normalizedOldString = old_string.replace(/\r\n/g, '\n');
+      const normalizedNewString = new_string.replace(/\r\n/g, '\n');
+      const proposedContent = this._applyReplacement(
         currentContent,
-        old_string,
-        new_string,
-        old_string === '' && currentContent === '',
+        normalizedOldString,
+        normalizedNewString,
+        normalizedOldString === '' && currentContent === '',
       );
+      return hasCrlf ? proposedContent.replace(/\n/g, '\r\n') : proposedContent;
     } catch (err) {
       if (!isNodeError(err) || err.code !== 'ENOENT') throw err;
       return '';
@@ -1084,19 +1099,21 @@ export class Task {
     logger.info(
       `[Task] Adding ${completedTools.length} tool responses to history without generating a new response.`,
     );
-    const responsesToAdd = completedTools.flatMap(
-      (toolCall) => toolCall.response.responseParts,
-    );
-
-    for (const response of responsesToAdd) {
-      let parts: genAiPart[];
-      if (Array.isArray(response)) {
-        parts = response;
-      } else if (typeof response === 'string') {
-        parts = [{ text: response }];
-      } else {
-        parts = [response];
+    const parts: genAiPart[] = [];
+    for (const toolCall of completedTools) {
+      const response = toolCall.response?.responseParts;
+      if (!response) {
+        continue;
       }
+      if (Array.isArray(response)) {
+        parts.push(...response);
+      } else if (typeof response === 'string') {
+        parts.push({ text: response });
+      } else {
+        parts.push(response);
+      }
+    }
+    if (parts.length > 0) {
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
       this.geminiClient.addHistory({
         role: 'user',
@@ -1148,6 +1165,9 @@ export class Task {
     requestContext: RequestContext,
     aborted: AbortSignal,
   ): AsyncGenerator<ServerGeminiStreamEvent> {
+    // Clear any stale cancellation error from a previous aborted execution loop
+    this.cancellationError = undefined;
+
     const userMessage = requestContext.userMessage;
     const llmParts: PartUnion[] = [];
     let anyConfirmationHandled = false;

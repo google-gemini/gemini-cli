@@ -16,6 +16,7 @@ import { isGitRepository } from '../utils/gitUtils.js';
 import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
 import { isNodeError } from '../utils/errors.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { resolveToRealPath } from '../utils/paths.js';
 import fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -23,6 +24,7 @@ export interface FilterFilesOptions {
   respectGitIgnore?: boolean;
   respectGeminiIgnore?: boolean;
   customIgnoreFilePaths?: string[];
+  isSymbolicLink?: boolean;
 }
 
 export interface FilterReport {
@@ -118,16 +120,20 @@ export class FileDiscoveryService {
       await Promise.all(
         dirEntries.map(async (entry) => {
           const fullPath = path.join(currentDir, entry.name);
+          const entryOptions: FilterFilesOptions = {
+            ...options,
+            isSymbolicLink: entry.isSymbolicLink(),
+          };
 
           if (entry.isDirectory()) {
             // Optimization: If a directory is ignored, its contents are not traversed.
-            if (this.shouldIgnoreDirectory(fullPath, options)) {
+            if (this.shouldIgnoreDirectory(fullPath, entryOptions)) {
               ignoredPaths.push(fullPath);
             } else {
               await walk(fullPath);
             }
           } else {
-            if (this.shouldIgnoreFile(fullPath, options)) {
+            if (this.shouldIgnoreFile(fullPath, entryOptions)) {
               ignoredPaths.push(fullPath);
             }
           }
@@ -209,10 +215,7 @@ export class FileDiscoveryService {
     return this._shouldIgnore(dirPath, true, options);
   }
 
-  /**
-   * Internal unified check for paths.
-   */
-  private _shouldIgnore(
+  private _checkIgnoreFilters(
     filePath: string,
     isDirectory: boolean,
     options: FilterFilesOptions = {},
@@ -242,6 +245,49 @@ export class FileDiscoveryService {
       this.geminiIgnoreFilter?.isIgnored(filePath, isDirectory)
     ) {
       return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Internal unified check for paths.
+   */
+  private _shouldIgnore(
+    filePath: string,
+    isDirectory: boolean,
+    options: FilterFilesOptions = {},
+  ): boolean {
+    if (this._checkIgnoreFilters(filePath, isDirectory, options)) {
+      return true;
+    }
+
+    try {
+      const absolutePath = path.isAbsolute(filePath)
+        ? filePath
+        : path.resolve(this.projectRoot, filePath);
+
+      const isSymlink =
+        options.isSymbolicLink ??
+        fs
+          .lstatSync(absolutePath, { throwIfNoEntry: false })
+          ?.isSymbolicLink() ??
+        false;
+
+      if (isSymlink) {
+        const realPath = resolveToRealPath(absolutePath);
+        let targetIsDir = isDirectory;
+        try {
+          targetIsDir = fs.statSync(realPath).isDirectory();
+        } catch {
+          // Fallback to original isDirectory status if target is inaccessible
+        }
+        if (this._checkIgnoreFilters(realPath, targetIsDir, options)) {
+          return true;
+        }
+      }
+    } catch {
+      // Gracefully handle resolution errors or inaccessible paths
     }
 
     return false;
