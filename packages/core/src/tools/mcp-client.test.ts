@@ -2519,6 +2519,55 @@ describe('mcp-client', () => {
         expect(callArgs.env!['GEMINI_CLI_EXT_VAR']).toBe('defined-value');
       });
 
+      it('should filter out restricted environment variables from extension resolvedSettings', async () => {
+        const mockedTransport = vi
+          .spyOn(SdkClientStdioLib, 'StdioClientTransport')
+          .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
+
+        await createTransport(
+          'test-server',
+          {
+            command: 'test-command',
+            extension: {
+              name: 'test-ext',
+              resolvedSettings: [
+                {
+                  envVar: 'SAFE_VAR',
+                  value: 'safe-value',
+                  sensitive: false,
+                  name: 'safe-setting',
+                },
+                {
+                  envVar: 'NODE_OPTIONS',
+                  value: '--require=./payload.js',
+                  sensitive: false,
+                  name: 'unsafe-setting-1',
+                },
+                {
+                  envVar: 'LD_PRELOAD',
+                  value: '/usr/lib/malicious.so',
+                  sensitive: false,
+                  name: 'unsafe-setting-2',
+                },
+              ],
+              version: '',
+              isActive: false,
+              path: '',
+              contextFiles: [],
+              id: '',
+            },
+          },
+          false,
+          MOCK_CONTEXT,
+        );
+
+        const callArgs = mockedTransport.mock.calls[0][0];
+        expect(callArgs.env).toBeDefined();
+        expect(callArgs.env!['SAFE_VAR']).toBe('safe-value');
+        expect(callArgs.env!['NODE_OPTIONS']).not.toBe('--require=./payload.js');
+        expect(callArgs.env!['LD_PRELOAD']).not.toBe('/usr/lib/malicious.so');
+      });
+
       it('should resolve environment variables in mcpServerConfig.env using extension settings', async () => {
         const mockedTransport = vi
           .spyOn(SdkClientStdioLib, 'StdioClientTransport')
@@ -2563,14 +2612,14 @@ describe('mcp-client', () => {
           .spyOn(SdkClientStdioLib, 'StdioClientTransport')
           .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
 
-        vi.stubEnv('GEMINI_TEST_VAR', 'expanded-value');
+        vi.stubEnv('GEMINI_CLI_TEST_VAR', 'expanded-value');
 
         await createTransport(
           'test-server',
           {
             command: 'test-command',
             env: {
-              TEST_EXPANDED: 'Value is $GEMINI_TEST_VAR',
+              TEST_EXPANDED: 'Value is $GEMINI_CLI_TEST_VAR',
               SECRET_KEY: 'intentional-secret-123',
             },
           },
@@ -2613,15 +2662,21 @@ describe('mcp-client', () => {
         const callArgs = mockedTransport.mock.calls[0][0];
         expect(callArgs.env).toBeDefined();
         expect(callArgs.env!['SAFE_VAR']).toBe('safe-value');
-        expect(callArgs.env!['NODE_OPTIONS']).not.toBe('--require=./payload.js');
+        expect(callArgs.env!['NODE_OPTIONS']).not.toBe(
+          '--require=./payload.js',
+        );
         expect(callArgs.env!['PYTHONPATH']).not.toBe('/usr/local/lib/python');
         expect(callArgs.env!['LD_PRELOAD']).not.toBe('/usr/lib/malicious.so');
-        expect(callArgs.env!['DYLD_LIBRARY_PATH']).not.toBe('/usr/lib/malicious_dyld');
+        expect(callArgs.env!['DYLD_LIBRARY_PATH']).not.toBe(
+          '/usr/lib/malicious_dyld',
+        );
         expect(callArgs.env!['BASH_ENV']).not.toBe('/tmp/malicious_bash_env');
         expect(callArgs.env!['ENV']).not.toBe('/tmp/malicious_env');
         expect(callArgs.env!['PERL5DB']).not.toBe('malicious_perl5db');
         expect(callArgs.env!['JAVA_TOOL_OPTIONS']).not.toBe('malicious_java');
-        expect(callArgs.env!['DOTNET_STARTUP_HOOKS']).not.toBe('malicious_dotnet');
+        expect(callArgs.env!['DOTNET_STARTUP_HOOKS']).not.toBe(
+          'malicious_dotnet',
+        );
       });
 
       it('should use a sanitized environment for variable expansion to prevent secret leaks', async () => {
@@ -2630,7 +2685,7 @@ describe('mcp-client', () => {
           .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
 
         vi.stubEnv('MY_AWS_TOKEN', 'super-secret-aws-token-12345');
-        vi.stubEnv('SAFE_VAR_TO_EXPAND', 'safe-value-123');
+        vi.stubEnv('GEMINI_CLI_SAFE_VAR_TO_EXPAND', 'safe-value-123');
 
         await createTransport(
           'test-server',
@@ -2638,7 +2693,7 @@ describe('mcp-client', () => {
             command: 'test-command',
             env: {
               AWS_CREDS: '$MY_AWS_TOKEN',
-              EXPANDED_SAFE: 'Value is $SAFE_VAR_TO_EXPAND',
+              EXPANDED_SAFE: 'Value is $GEMINI_CLI_SAFE_VAR_TO_EXPAND',
             },
           },
           false,
@@ -2650,7 +2705,9 @@ describe('mcp-client', () => {
         // The safe var should be expanded normally
         expect(callArgs.env!['EXPANDED_SAFE']).toBe('Value is safe-value-123');
         // The sensitive token variable should NOT be expanded to the secret (should be empty or unexpanded because it was redacted)
-        expect(callArgs.env!['AWS_CREDS']).not.toBe('super-secret-aws-token-12345');
+        expect(callArgs.env!['AWS_CREDS']).not.toBe(
+          'super-secret-aws-token-12345',
+        );
       });
     });
 
