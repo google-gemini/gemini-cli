@@ -508,9 +508,9 @@ async function readTextFileContent(
  * Reads and processes a single file, handling text, images, and PDFs.
  * @param filePath Absolute path to the file.
  * @param rootDirectory Absolute path to the project root for relative path display.
- * @param fileSystemService Used to read the file's text content, so that a
- * client-backed or sandboxed FileSystemService is honored instead of always
- * reading local disk directly.
+ * @param fileSystemService Used to read the file's content (text or binary),
+ * so that a client-backed or sandboxed FileSystemService is honored instead
+ * of always reading local disk directly.
  * @param startLine Optional 1-based line number to start reading from.
  * @param endLine Optional 1-based line number to end reading at (inclusive).
  * @returns ProcessedFileReadResult object.
@@ -655,7 +655,7 @@ export async function processSingleFileContent(
             errorType: ToolErrorType.READ_CONTENT_FAILURE,
           };
         }
-        const contentBuffer = await fs.promises.readFile(filePath);
+        const contentBuffer = await fileSystemService.readBinaryFile(filePath);
         const base64Data = contentBuffer.toString('base64');
         return {
           llmContent: {
@@ -672,7 +672,7 @@ export async function processSingleFileContent(
       case 'video': {
         const mimeType =
           getSpecificMimeType(filePath) ?? 'application/octet-stream';
-        const contentBuffer = await fs.promises.readFile(filePath);
+        const contentBuffer = await fileSystemService.readBinaryFile(filePath);
         const base64Data = contentBuffer.toString('base64');
         return {
           llmContent: {

@@ -85,4 +85,14 @@ export class AcpFileSystemService implements FileSystemService {
       this.normalizeFileSystemError(err);
     }
   }
+
+  async readBinaryFile(filePath: string): Promise<Buffer> {
+    // The ACP `fs` capability only defines readTextFile/writeTextFile — there
+    // is no client-routed way to read binary content over the protocol.
+    // Delegate to the fallback service unconditionally so binary reads still
+    // go through whatever local backing that fallback provides (e.g. a
+    // SandboxedFileSystemService's path validation and sandboxing) rather
+    // than silently reading straight off the host disk.
+    return this.fallback.readBinaryFile(filePath);
+  }
 }

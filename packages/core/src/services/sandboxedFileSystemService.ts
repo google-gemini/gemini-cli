@@ -47,7 +47,13 @@ export class SandboxedFileSystemService implements FileSystemService {
     );
   }
 
-  async readTextFile(filePath: string): Promise<string> {
+  /**
+   * Spawns the sandboxed `__read` command for filePath and resolves with the
+   * raw bytes written to stdout. Chunks are accumulated as Buffers (not
+   * concatenated via `.toString()`) so binary content isn't corrupted and
+   * multi-byte text sequences aren't split across chunk boundaries.
+   */
+  private async runSandboxedRead(filePath: string): Promise<Buffer> {
     const safePath = this.sanitizeAndValidatePath(filePath);
     const prepared = await this.sandboxManager.prepareCommand({
       command: '__read',
@@ -60,7 +66,7 @@ export class SandboxedFileSystemService implements FileSystemService {
     });
 
     try {
-      return await new Promise((resolve, reject) => {
+      return await new Promise<Buffer>((resolve, reject) => {
         // Direct spawn is necessary here for streaming large file contents.
 
         const child = spawn(prepared.program, prepared.args, {
@@ -68,11 +74,11 @@ export class SandboxedFileSystemService implements FileSystemService {
           env: prepared.env,
         });
 
-        let output = '';
+        const outputChunks: Buffer[] = [];
         let error = '';
 
-        child.stdout?.on('data', (data) => {
-          output += data.toString();
+        child.stdout?.on('data', (data: Buffer) => {
+          outputChunks.push(data);
         });
 
         child.stderr?.on('data', (data) => {
@@ -81,7 +87,7 @@ export class SandboxedFileSystemService implements FileSystemService {
 
         child.on('close', (code) => {
           if (code === 0) {
-            resolve(output);
+            resolve(Buffer.concat(outputChunks));
           } else {
             const isEnoent =
               error.toLowerCase().includes('no such file or directory') ||
@@ -109,6 +115,15 @@ export class SandboxedFileSystemService implements FileSystemService {
     } finally {
       prepared.cleanup?.();
     }
+  }
+
+  async readTextFile(filePath: string): Promise<string> {
+    const buffer = await this.runSandboxedRead(filePath);
+    return buffer.toString('utf-8');
+  }
+
+  async readBinaryFile(filePath: string): Promise<Buffer> {
+    return this.runSandboxedRead(filePath);
   }
 
   async writeTextFile(filePath: string, content: string): Promise<void> {

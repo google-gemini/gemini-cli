@@ -113,6 +113,49 @@ describe('SandboxedFileSystemService', () => {
     );
   });
 
+  it('should read raw binary bytes through the sandbox without corruption', async () => {
+    const mockChild = new EventEmitter() as unknown as ChildProcess;
+    Object.assign(mockChild, {
+      stdout: new EventEmitter(),
+      stderr: new EventEmitter(),
+    });
+
+    vi.mocked(spawn).mockReturnValue(mockChild);
+
+    // Bytes that are not valid on their own as UTF-8 (e.g. a lone
+    // continuation byte) to prove the content isn't round-tripped through a
+    // lossy string conversion anywhere in the sandboxed read path, and that
+    // it's emitted across multiple chunks to prove chunk boundaries don't
+    // corrupt multi-byte sequences either.
+    const binaryChunks = [
+      Buffer.from([0x89, 0x50, 0x4e, 0x47]), // PNG magic bytes, split...
+      Buffer.from([0x0d, 0x0a, 0x1a, 0x0a, 0xff, 0xd8]), // ...across chunks
+    ];
+
+    const testFile = path.resolve('/test/cwd/image.png');
+    const readPromise = service.readBinaryFile(testFile);
+
+    setImmediate(() => {
+      for (const chunk of binaryChunks) {
+        mockChild.stdout!.emit('data', chunk);
+      }
+      mockChild.emit('close', 0);
+    });
+
+    const content = await readPromise;
+    expect(Buffer.isBuffer(content)).toBe(true);
+    expect(content).toEqual(Buffer.concat(binaryChunks));
+    expect(vi.mocked(sandboxManager.prepareCommand)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: '__read',
+        args: [testFile],
+        policy: {
+          allowedPaths: [testFile],
+        },
+      }),
+    );
+  });
+
   it('should write a file through the sandbox', async () => {
     const mockChild = new EventEmitter() as unknown as ChildProcess;
     const mockStdin = new EventEmitter();
