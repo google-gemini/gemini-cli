@@ -10,16 +10,19 @@ import * as dnsPromises from 'node:dns/promises';
 import type { LookupAddress, LookupAllOptions } from 'node:dns';
 import ipaddr from 'ipaddr.js';
 
-const { setGlobalDispatcher, Agent, EnvHttpProxyAgent } = vi.hoisted(() => ({
-  setGlobalDispatcher: vi.fn(),
-  Agent: vi.fn(),
-  EnvHttpProxyAgent: vi.fn(),
-}));
+const { setGlobalDispatcher, Agent, EnvHttpProxyAgent, buildConnector } =
+  vi.hoisted(() => ({
+    setGlobalDispatcher: vi.fn(),
+    Agent: vi.fn(),
+    EnvHttpProxyAgent: vi.fn(),
+    buildConnector: vi.fn(() => vi.fn()),
+  }));
 
 vi.mock('undici', () => ({
   setGlobalDispatcher,
   Agent,
   EnvHttpProxyAgent,
+  buildConnector,
 }));
 
 vi.mock('node:dns/promises', () => ({
@@ -125,16 +128,16 @@ describe('fetch utils', () => {
   });
 
   describe('isPrivateIp', () => {
-    it('should identify private IPs in URLs', () => {
-      expect(isPrivateIp('http://10.0.0.1/')).toBe(true);
-      expect(isPrivateIp('https://127.0.0.1:8080/')).toBe(true);
-      expect(isPrivateIp('http://localhost/')).toBe(true);
-      expect(isPrivateIp('http://[::1]/')).toBe(true);
+    it('should identify private IPs in URLs', async () => {
+      expect(await isPrivateIp('http://10.0.0.1/')).toBe(true);
+      expect(await isPrivateIp('https://127.0.0.1:8080/')).toBe(true);
+      expect(await isPrivateIp('http://localhost/')).toBe(true);
+      expect(await isPrivateIp('http://[::1]/')).toBe(true);
     });
 
-    it('should identify public IPs in URLs as non-private', () => {
-      expect(isPrivateIp('http://8.8.8.8/')).toBe(false);
-      expect(isPrivateIp('https://google.com/')).toBe(false);
+    it('should identify public IPs in URLs as non-private', async () => {
+      expect(await isPrivateIp('http://8.8.8.8/')).toBe(false);
+      expect(await isPrivateIp('https://google.com/')).toBe(false);
     });
   });
 
