@@ -265,10 +265,34 @@ export function startCallbackServer(
             }
 
             // RFC 9207 Authorization Server Issuer Identification check
-            if (expectedIssuer && iss) {
+            if (expectedIssuer) {
+              // Fail-closed: if an issuer was expected, the response MUST include it
+              if (!iss) {
+                debugLogger.error(
+                  'OAuth callback rejected: Missing required "iss" parameter when an expected issuer is configured. Possible IdP mix-up attack (RFC 9207).',
+                );
+                res.writeHead(400, { 'Content-Type': 'text/html' });
+                res.end(`
+                <html>
+                  <body>
+                    <h1>Authentication Failed</h1>
+                    <p>Error: Missing issuer parameter in response.</p>
+                    <p>You can close this window.</p>
+                  </body>
+                </html>
+              `);
+                server.close();
+                reject(
+                  new Error(
+                    'Missing "iss" parameter in authorization response per RFC 9207',
+                  ),
+                );
+                return;
+              }
+
               if (!areIssuersEqual(iss, expectedIssuer)) {
                 debugLogger.error(
-                  `OAuth callback issuer mismatch: received "${iss}", expected "${expectedIssuer}". Possible IdP mix-up attack (RFC 9207).`,
+                  'OAuth callback rejected: Issuer mismatch between authorization response and expected authorization server. Possible IdP mix-up attack (RFC 9207).',
                 );
                 res.writeHead(400, { 'Content-Type': 'text/html' });
                 res.end(`
@@ -283,21 +307,17 @@ export function startCallbackServer(
                 server.close();
                 reject(
                   new Error(
-                    `Issuer mismatch: received "${iss}", expected "${expectedIssuer}" - possible OAuth mix-up attack`,
+                    'Issuer mismatch in authorization response - possible OAuth mix-up attack',
                   ),
                 );
                 return;
               }
               debugLogger.debug(
-                `✓ OAuth callback issuer validated successfully: "${iss}"`,
-              );
-            } else if (expectedIssuer && !iss) {
-              debugLogger.debug(
-                `OAuth callback omitted "iss" parameter; expected "${expectedIssuer}". Proceeding for backwards compatibility with legacy authorization servers.`,
+                '✓ OAuth callback issuer validated successfully.',
               );
             } else if (iss) {
               debugLogger.debug(
-                `OAuth callback received issuer: "${iss}" (no expected issuer was specified).`,
+                'OAuth callback received "iss" parameter (no expected issuer was configured).',
               );
             }
 

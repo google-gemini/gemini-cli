@@ -555,12 +555,37 @@ describe('oauth-flow', () => {
       expect(response.state).toBe('my-state');
     });
 
-    it('should allow callback when iss parameter is omitted for legacy authorization servers', async () => {
+    it('should reject callback when expectedIssuer is configured but iss parameter is omitted (downgrade prevention)', async () => {
       const server = startCallbackServer(
         'my-state',
         undefined,
-        'https://legacy-idp.example.com',
+        'https://secure-idp.example.com',
       );
+      const port = await server.port;
+
+      const responseResult = server.response.then(
+        () => new Error('Expected rejection'),
+        (e: Error) => e,
+      );
+
+      const res = await realFetch(
+        `http://localhost:${port}${REDIRECT_PATH}?code=auth-code-123&state=my-state`,
+      ).catch(() => {});
+
+      if (res) {
+        expect(res.status).toBe(400);
+      }
+
+      const error = await responseResult;
+      expect(error.message).toContain(
+        'Missing "iss" parameter in authorization response per RFC 9207',
+      );
+      // Ensure sensitive internal issuer details are not exposed in the error message
+      expect(error.message).not.toContain('https://secure-idp.example.com');
+    });
+
+    it('should allow callback when no expectedIssuer is configured and iss parameter is omitted', async () => {
+      const server = startCallbackServer('my-state', undefined, undefined);
       const port = await server.port;
 
       const res = await realFetch(
@@ -572,6 +597,21 @@ describe('oauth-flow', () => {
       expect(response.code).toBe('legacy-code');
       expect(response.state).toBe('my-state');
       expect(response.iss).toBeUndefined();
+    });
+
+    it('should allow callback when no expectedIssuer is configured and iss parameter is present', async () => {
+      const server = startCallbackServer('my-state', undefined, undefined);
+      const port = await server.port;
+
+      const res = await realFetch(
+        `http://localhost:${port}${REDIRECT_PATH}?code=code-456&state=my-state&iss=https://idp.example.com`,
+      );
+      expect(res.status).toBe(200);
+
+      const response = await server.response;
+      expect(response.code).toBe('code-456');
+      expect(response.state).toBe('my-state');
+      expect(response.iss).toBe('https://idp.example.com');
     });
 
     it('should reject on state mismatch', async () => {
@@ -618,6 +658,8 @@ describe('oauth-flow', () => {
 
       const error = await responseResult;
       expect(error.message).toContain('Issuer mismatch');
+      expect(error.message).not.toContain('https://attacker-idp.example.com');
+      expect(error.message).not.toContain('https://github.com/login/oauth');
     });
 
     it('should reject callback when issuer contains userinfo spoofing attempt', async () => {
@@ -643,6 +685,8 @@ describe('oauth-flow', () => {
 
       const error = await responseResult;
       expect(error.message).toContain('Issuer mismatch');
+      expect(error.message).not.toContain('https://attacker.com');
+      expect(error.message).not.toContain('https://github.com/login/oauth');
     });
 
     it('should reject on OAuth error in callback', async () => {
