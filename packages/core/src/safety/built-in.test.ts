@@ -242,6 +242,24 @@ describe('AllowedPathChecker', () => {
   });
 
   describe('Security Regression: Case-Insensitive Blocklist & .vscode HITL', () => {
+    it('should deny sensitive paths specified via NTFS 8.3 short names (SFNs) like git~1, env~1, node_m~1', async () => {
+      const sfnPaths = [
+        path.join(mockCwd, 'git~1', 'config'),
+        path.join(mockCwd, 'GIT~1', 'config'),
+        path.join(mockCwd, 'env~1'),
+        path.join(mockCwd, 'ENV~1'),
+        path.join(mockCwd, 'node_m~1', 'package', 'index.js'),
+        path.join(mockCwd, 'NODE_M~1', 'package', 'index.js'),
+      ];
+
+      for (const p of sfnPaths) {
+        const input = createInput({ path: p });
+        const result = await checker.check(input);
+        expect(result.decision).toBe(SafetyCheckDecision.DENY);
+        expect(result.reason).toContain('Access to sensitive path');
+      }
+    });
+
     it('should deny sensitive paths like .git, .env, and node_modules case-insensitively, including Windows trailing character and NTFS ADS bypasses', async () => {
       const sensitivePaths = [
         path.join(mockCwd, '.git', 'config'),

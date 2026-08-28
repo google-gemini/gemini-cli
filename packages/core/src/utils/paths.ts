@@ -434,7 +434,11 @@ function robustRealpath(p: string, visited = new Set<string>()): string {
   }
   visited.add(key);
   try {
-    return fs.realpathSync(p);
+    const realpathFn =
+      process.platform === 'win32' && fs.realpathSync.native
+        ? fs.realpathSync.native
+        : fs.realpathSync;
+    return realpathFn(p);
   } catch (e: unknown) {
     if (
       e &&

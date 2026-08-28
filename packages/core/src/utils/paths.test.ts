@@ -25,9 +25,11 @@ import {
 
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof fs>();
+  const mockRealpath = (p: string) => p;
+  mockRealpath.native = (p: string) => p;
   return {
     ...(actual as object),
-    realpathSync: (p: string) => p,
+    realpathSync: mockRealpath,
   };
 });
 
