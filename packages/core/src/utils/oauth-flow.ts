@@ -138,20 +138,46 @@ export function generatePKCEParams(): PKCEParams {
 
 /**
  * Compares two OAuth issuer URLs per RFC 8414 / RFC 9207.
- * Normalizes trailing slashes and origins to ensure consistent matching.
+ * Normalizes trailing slashes and origins to ensure consistent matching,
+ * while rejecting userinfo (preventing OAuth mix-up attacks) and preserving
+ * query parameters and fragments.
  */
 export function areIssuersEqual(issuerA: string, issuerB: string): boolean {
-  if (issuerA === issuerB) return true;
-  const normalize = (iss: string): string => {
+  if (issuerA === issuerB && !issuerA.includes('@')) return true;
+
+  const normalize = (iss: string): string | null => {
     try {
       const u = new URL(iss);
+
+      // RFC 8414 & RFC 9207: Valid OAuth issuers MUST NOT contain userinfo.
+      // Discarding or accepting userinfo can enable URL confusion / mix-up attacks
+      // (e.g., https://attacker.com@github.com/login/oauth).
+      if (u.username || u.password) {
+        return null;
+      }
+
+      // Normalize trailing slashes on pathname (e.g., "/oauth/" -> "/oauth")
       const normalizedPath = u.pathname.replace(/\/+$/, '');
-      return `${u.protocol}//${u.host}${normalizedPath}`;
+
+      // Reconstruct canonical URL:
+      // - u.protocol and u.host handle lowercasing and default port removal (:443)
+      // - normalizedPath handles trailing slash equivalence
+      // - u.search and u.hash are preserved so different tenants/queries never collide
+      return `${u.protocol}//${u.host}${normalizedPath}${u.search}${u.hash}`;
     } catch {
+      // Fallback for non-standard / relative strings
       return iss.replace(/\/+$/, '');
     }
   };
-  return normalize(issuerA) === normalize(issuerB);
+
+  const normA = normalize(issuerA);
+  const normB = normalize(issuerB);
+
+  if (normA === null || normB === null) {
+    return false;
+  }
+
+  return normA === normB;
 }
 
 /**

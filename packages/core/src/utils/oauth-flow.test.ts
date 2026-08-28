@@ -135,6 +135,90 @@ describe('oauth-flow', () => {
       ).toBe(false);
     });
 
+    it('should reject issuers containing userinfo to prevent mix-up attacks (RFC 9207 bypass)', () => {
+      expect(
+        areIssuersEqual(
+          'https://github.com/login/oauth',
+          'https://attacker.com@github.com/login/oauth',
+        ),
+      ).toBe(false);
+      expect(
+        areIssuersEqual(
+          'https://attacker.com@github.com/login/oauth',
+          'https://github.com/login/oauth',
+        ),
+      ).toBe(false);
+      expect(
+        areIssuersEqual(
+          'https://github.com@attacker.com/login/oauth',
+          'https://github.com/login/oauth',
+        ),
+      ).toBe(false);
+      expect(
+        areIssuersEqual(
+          'https://user:password@github.com/login/oauth',
+          'https://github.com/login/oauth',
+        ),
+      ).toBe(false);
+      expect(
+        areIssuersEqual(
+          'https://attacker.com@github.com/login/oauth',
+          'https://attacker.com@github.com/login/oauth',
+        ),
+      ).toBe(false);
+    });
+
+    it('should distinguish issuers with different query parameters to prevent multi-tenant mix-up', () => {
+      expect(
+        areIssuersEqual(
+          'https://auth.example.com?tenant=tenant1',
+          'https://auth.example.com?tenant=tenant2',
+        ),
+      ).toBe(false);
+      expect(
+        areIssuersEqual(
+          'https://auth.example.com?tenant=tenant1',
+          'https://auth.example.com',
+        ),
+      ).toBe(false);
+      expect(
+        areIssuersEqual(
+          'https://auth.example.com/oauth/?tenant=tenant1',
+          'https://auth.example.com/oauth?tenant=tenant1',
+        ),
+      ).toBe(true);
+    });
+
+    it('should distinguish issuers with different hash fragments', () => {
+      expect(
+        areIssuersEqual(
+          'https://auth.example.com#env1',
+          'https://auth.example.com#env2',
+        ),
+      ).toBe(false);
+    });
+
+    it('should normalize host casing and default ports', () => {
+      expect(
+        areIssuersEqual(
+          'HTTPS://GITHUB.COM/login/oauth',
+          'https://github.com/login/oauth',
+        ),
+      ).toBe(true);
+      expect(
+        areIssuersEqual(
+          'https://github.com:443/login/oauth',
+          'https://github.com/login/oauth',
+        ),
+      ).toBe(true);
+      expect(
+        areIssuersEqual(
+          'https://github.com:8443/login/oauth',
+          'https://github.com/login/oauth',
+        ),
+      ).toBe(false);
+    });
+
     it('should handle non-URL strings gracefully', () => {
       expect(areIssuersEqual('custom-issuer', 'custom-issuer')).toBe(true);
       expect(areIssuersEqual('custom-issuer/', 'custom-issuer')).toBe(true);
@@ -526,6 +610,31 @@ describe('oauth-flow', () => {
 
       const res = await realFetch(
         `http://localhost:${port}${REDIRECT_PATH}?code=abc&state=expected-state&iss=https://attacker-idp.example.com`,
+      ).catch(() => {});
+
+      if (res) {
+        expect(res.status).toBe(400);
+      }
+
+      const error = await responseResult;
+      expect(error.message).toContain('Issuer mismatch');
+    });
+
+    it('should reject callback when issuer contains userinfo spoofing attempt', async () => {
+      const server = startCallbackServer(
+        'expected-state',
+        undefined,
+        'https://github.com/login/oauth',
+      );
+      const port = await server.port;
+
+      const responseResult = server.response.then(
+        () => new Error('Expected rejection'),
+        (e: Error) => e,
+      );
+
+      const res = await realFetch(
+        `http://localhost:${port}${REDIRECT_PATH}?code=abc&state=expected-state&iss=https://attacker.com@github.com/login/oauth`,
       ).catch(() => {});
 
       if (res) {
