@@ -816,41 +816,35 @@ export class ShellExecutionService {
 
       child.stdout.on('data', (data) => handleOutput(data, 'stdout'));
       child.stderr.on('data', (data) => handleOutput(data, 'stderr'));
-      let hasHandledExit = false;
+       let hasHandledExit = false;
 
-const safeHandleExit = (code: number | null, signal: NodeJS.Signals | null) => {
-  if (hasHandledExit) {
-    return;
-  }
-  hasHandledExit = true;
-  handleExit(code, signal);
-};
+      const safeHandleExit = (code: number | null, signal: string | null) => {
+        if (hasHandledExit) {
+          return;
+        }
+        hasHandledExit = true;
+        handleExit(code, signal);
+      };
 
-child.on('error', (err) => {
-  error = err;
-  safeHandleExit(1, null);
-});
+      child.on('error', (err) => {
+        error = err;
+        safeHandleExit(1, null);
+      });
 
-const abortHandler = async () => {
-  if (child.pid && !exited) {
-    await killProcessGroup({
-      pid: child.pid,
-      escalate: true,
-      isExited: () => exited,
-    });
-  }
-};
-
-abortSignal.addEventListener('abort', abortHandler, { once: true });
-
-child.on('close', (code, signal) => {
-  safeHandleExit(code, signal);
-});
+      const abortHandler = async () => {
+        if (child.pid && !exited) {
+          await killProcessGroup({
+            pid: child.pid,
+            escalate: true,
+            isExited: () => exited,
+          });
+        }
+      };
 
       abortSignal.addEventListener('abort', abortHandler, { once: true });
 
       child.on('close', (code, signal) => {
-        handleExit(code, signal);
+        safeHandleExit(code, signal);
       });
 
       function cleanup() {
