@@ -78,15 +78,15 @@ export class AllowedPathChecker implements InProcessChecker {
             clean === '.git' ||
             clean === '.env' ||
             clean === 'node_modules' ||
-            /^git~\d+$/.test(clean) ||
-            /^env~\d+$/.test(clean) ||
-            /^node_m~\d+$/.test(clean)
+            /^(git|gi[0-9a-f]{4})~\d+$/.test(clean) ||
+            /^(env|en[0-9a-f]{4})~\d+$/.test(clean) ||
+            /^(node_m|no[0-9a-f]{4})~\d+$/.test(clean)
           ) {
             hasBlockedSegment = true;
           }
           if (
             clean === '.vscode' ||
-            /^vscode~\d+$/.test(clean)
+            /^(vscode|vs[0-9a-f]{4})~\d+$/.test(clean)
           ) {
             isVscodePath = true;
           }
