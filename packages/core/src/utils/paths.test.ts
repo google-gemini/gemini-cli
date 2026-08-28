@@ -606,6 +606,26 @@ describe('resolveToRealPath', () => {
       /Infinite recursion detected/,
     );
   });
+
+  describe('on Windows realpathSync.native prefixes', () => {
+    beforeEach(() => {
+      mockPlatform('win32');
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('should strip long path prefix \\\\?\\', () => {
+      vi.spyOn(fs.realpathSync, 'native').mockReturnValueOnce('\\\\?\\C:\\foo\\bar');
+      expect(resolveToRealPath('C:\\foo\\bar')).toBe('C:\\foo\\bar');
+    });
+
+    it('should strip UNC long path prefix \\\\?\\UNC\\ and keep UNC slash structure', () => {
+      vi.spyOn(fs.realpathSync, 'native').mockReturnValueOnce('\\\\?\\UNC\\server\\share\\foo');
+      expect(resolveToRealPath('\\\\server\\share\\foo')).toBe('\\\\server\\share\\foo');
+    });
+  });
 });
 
 describe('makeRelative', () => {
