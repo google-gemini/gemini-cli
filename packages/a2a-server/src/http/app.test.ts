@@ -1264,7 +1264,6 @@ describe('E2E Tests', () => {
     });
 
     it('should parse json body for A2A SDK routes', async () => {
-      const app = await createApp();
       const res = await request(app)
         .post('/')
         .set('Content-Type', 'application/json')
