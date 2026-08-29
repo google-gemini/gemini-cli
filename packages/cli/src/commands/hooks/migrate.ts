@@ -24,7 +24,7 @@ const EVENT_MAPPING: Record<string, string> = {
   PostToolUse: 'AfterTool',
   UserPromptSubmit: 'BeforeAgent',
   Stop: 'AfterAgent',
-  SubAgentStop: 'AfterAgent', // Gemini doesn't have sub-agents, map to AfterAgent
+  SubagentStop: 'AfterAgent', // Gemini doesn't have sub-agents, map to AfterAgent
   SessionStart: 'SessionStart',
   SessionEnd: 'SessionEnd',
   PreCompact: 'PreCompress',

@@ -178,7 +178,7 @@ describe('migrate command', () => {
         PostToolUse: [{ hooks: [{ type: 'command', command: 'echo 2' }] }],
         UserPromptSubmit: [{ hooks: [{ type: 'command', command: 'echo 3' }] }],
         Stop: [{ hooks: [{ type: 'command', command: 'echo 4' }] }],
-        SubAgentStop: [{ hooks: [{ type: 'command', command: 'echo 5' }] }],
+        SubagentStop: [{ hooks: [{ type: 'command', command: 'echo 5' }] }],
         SessionStart: [{ hooks: [{ type: 'command', command: 'echo 6' }] }],
         SessionEnd: [{ hooks: [{ type: 'command', command: 'echo 7' }] }],
         PreCompact: [{ hooks: [{ type: 'command', command: 'echo 8' }] }],
