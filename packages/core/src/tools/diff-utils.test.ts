@@ -74,4 +74,13 @@ describe('getDiffContextSnippet', () => {
       '...\n9\nchanged\n11\n...',
     );
   });
+
+  it('should keep line indexes consistent for standalone CR line endings', () => {
+    const original = ['1', '2', '3', '4'].join('\r');
+    const modified = ['1', 'changed', '3', '4'].join('\r');
+
+    expect(getDiffContextSnippet(original, modified, 1)).toBe(
+      '1\nchanged\n3\n...',
+    );
+  });
 });
