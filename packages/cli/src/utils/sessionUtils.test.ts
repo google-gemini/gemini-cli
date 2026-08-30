@@ -421,6 +421,56 @@ describe('SessionSelector', () => {
     );
   });
 
+  it('should mark only the session whose filename ends with the current id', async () => {
+    const currentSessionId = randomUUID();
+    const otherSessionId = randomUUID();
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const createSession = (sessionId: string) => ({
+      sessionId,
+      projectHash: 'test-hash',
+      startTime: '2024-01-01T10:00:00.000Z',
+      lastUpdated: '2024-01-01T10:30:00.000Z',
+      messages: [
+        {
+          type: 'user',
+          content: 'Test message',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+      ],
+    });
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${currentSessionId.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(createSession(currentSessionId)),
+    );
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-01-${currentSessionId.slice(0, 8)}-archive.json`,
+      ),
+      JSON.stringify(createSession(otherSessionId)),
+    );
+
+    const sessionSelector = new SessionSelector(storage);
+    const sessions = await sessionSelector.listSessions(currentSessionId);
+
+    expect(sessions).toHaveLength(2);
+    expect(
+      sessions.find((session) => session.id === currentSessionId)
+        ?.isCurrentSession,
+    ).toBe(true);
+    expect(
+      sessions.find((session) => session.id === otherSessionId)
+        ?.isCurrentSession,
+    ).toBe(false);
+  });
+
   it('should throw SessionError with NO_SESSIONS_FOUND when resolving latest with no sessions', async () => {
     // Empty chats directory — no session files
     const chatsDir = path.join(tmpDir, 'chats');
