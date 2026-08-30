@@ -10,19 +10,23 @@ import * as dnsPromises from 'node:dns/promises';
 import type { LookupAddress, LookupAllOptions } from 'node:dns';
 import ipaddr from 'ipaddr.js';
 
-const { setGlobalDispatcher, Agent, EnvHttpProxyAgent, buildConnector } =
+const { setGlobalDispatcher, Agent, EnvHttpProxyAgent, mockHolder } =
   vi.hoisted(() => ({
     setGlobalDispatcher: vi.fn(),
     Agent: vi.fn(),
     EnvHttpProxyAgent: vi.fn(),
-    buildConnector: vi.fn(() => vi.fn()),
+    mockHolder: {
+      buildConnector: vi.fn(() => vi.fn()) as unknown,
+    },
   }));
 
 vi.mock('undici', () => ({
   setGlobalDispatcher,
   Agent,
   EnvHttpProxyAgent,
-  buildConnector,
+  get buildConnector() {
+    return mockHolder.buildConnector;
+  },
 }));
 
 vi.mock('node:dns/promises', () => ({
@@ -37,6 +41,7 @@ const {
   fetchWithTimeout,
   setGlobalProxy,
   createSafeProxyAgent,
+  createSafeAgent,
 } = await import('./fetch.js');
 interface ErrorWithCode extends Error {
   code?: string;
@@ -319,6 +324,29 @@ describe('fetch utils', () => {
         headersTimeout: 60000,
         bodyTimeout: 300000,
       });
+    });
+  });
+
+  describe('createSafeAgent', () => {
+    it('should instantiate undici.Agent with connect handler bound', () => {
+      createSafeAgent();
+      expect(Agent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          connect: expect.any(Function),
+        }),
+      );
+    });
+
+    it('should throw fail-closed error if buildConnector is unavailable', () => {
+      const original = mockHolder.buildConnector;
+      mockHolder.buildConnector = undefined;
+      try {
+        expect(() => createSafeAgent()).toThrow(
+          'Security initialization failed: undici.buildConnector is not available.',
+        );
+      } finally {
+        mockHolder.buildConnector = original;
+      }
     });
   });
 });

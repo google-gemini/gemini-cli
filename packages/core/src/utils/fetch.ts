@@ -141,11 +141,17 @@ export function createSafeAgent(options?: {
   bodyTimeout?: number;
 }): undici.Agent {
   const buildConnectorFn = getBuildConnector();
+  if (!buildConnectorFn) {
+    throw new Error(
+      'Security initialization failed: undici.buildConnector is not available.',
+    );
+  }
+
   const connect = createSafeConnector();
   return new undici.Agent({
     headersTimeout: options?.headersTimeout ?? defaultHeadersTimeout,
     bodyTimeout: options?.bodyTimeout ?? defaultBodyTimeout,
-    ...(buildConnectorFn ? { connect } : {}),
+    connect,
   });
 }
 
