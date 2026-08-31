@@ -10,6 +10,7 @@ import * as net from 'node:net';
 import * as undici from 'undici';
 import ipaddr from 'ipaddr.js';
 import { lookup } from 'node:dns/promises';
+import type { LookupAddress } from 'node:dns';
 
 export class FetchError extends Error {
   constructor(
@@ -33,10 +34,15 @@ let defaultHeadersTimeout = 60000; // 60 seconds
 const defaultBodyTimeout = 300000; // 5 minutes
 let currentProxy: string | undefined = undefined;
 
-function getBuildConnector(): typeof undici.buildConnector | undefined {
+function getBuildConnector():
+  | ((options?: object) => undici.buildConnector.connector)
+  | undefined {
   try {
-    const fn = (undici as { buildConnector?: typeof undici.buildConnector })
-      .buildConnector;
+    const fn = (
+      undici as {
+        buildConnector?: (options?: object) => undici.buildConnector.connector;
+      }
+    ).buildConnector;
     return typeof fn === 'function' ? fn : undefined;
   } catch {
     return undefined;
@@ -44,17 +50,108 @@ function getBuildConnector(): typeof undici.buildConnector | undefined {
 }
 
 /**
- * Creates an undici connector that validates destination IP addresses and pins
- * the connection to prevent DNS rebinding (TOCTOU) attacks while preserving SNI.
+ * Custom DNS lookup function for undici.buildConnector that resolves all IP addresses,
+ * validates every address against private/reserved ranges, and passes back validated addresses
+ * to preserve dual-stack fallback (Happy Eyeballs, RFC 8305) without risking DNS rebinding.
+ */
+export function safeLookup(
+  hostname: string,
+  options: { all?: boolean; family?: number },
+  callback: (
+    err: Error | null,
+    address: string | LookupAddress[] | net.IPVersion,
+    family?: number,
+  ) => void,
+): void {
+  const sanitized = sanitizeHostname(hostname);
+
+  // Block internal TLDs / loopback domain names
+  if (
+    sanitized === 'localhost' ||
+    sanitized.endsWith('.localhost') ||
+    sanitized.endsWith('.local') ||
+    sanitized.endsWith('.internal')
+  ) {
+    callback(
+      new PrivateIpError(`Access to internal host ${sanitized} is blocked`),
+      '',
+    );
+    return;
+  }
+
+  // Direct IP literal check
+  if (net.isIP(sanitized)) {
+    if (isAddressPrivate(sanitized)) {
+      callback(
+        new PrivateIpError(`Access to private IP ${sanitized} is blocked`),
+        '',
+      );
+      return;
+    }
+    if (options?.all) {
+      callback(null, [{ address: sanitized, family: net.isIP(sanitized) }]);
+    } else {
+      callback(null, sanitized, net.isIP(sanitized));
+    }
+    return;
+  }
+
+  // Resolve all IP addresses via dns.lookup
+  lookup(sanitized, { all: true })
+    .then((addresses) => {
+      if (!addresses || addresses.length === 0) {
+        callback(new Error(`getaddrinfo ENOTFOUND ${sanitized}`), '');
+        return;
+      }
+
+      // Evaluate ALL resolved addresses against private ranges
+      for (const addr of addresses) {
+        if (isAddressPrivate(addr.address)) {
+          callback(
+            new PrivateIpError(
+              `Access to private IP ${addr.address} (resolved from ${sanitized}) is blocked`,
+            ),
+            '',
+          );
+          return;
+        }
+      }
+
+      // Pass back safe addresses to undici connector
+      if (options?.all) {
+        callback(null, addresses);
+      } else {
+        const family = options?.family;
+        const match = family
+          ? addresses.find((a) => a.family === family) || addresses[0]
+          : addresses[0];
+        callback(null, match.address, match.family);
+      }
+    })
+    .catch((err: unknown) => {
+      callback(err instanceof Error ? err : new Error(String(err)), '');
+    });
+}
+
+/**
+ * Creates an undici connector that validates destination IP addresses and configures
+ * a safe DNS lookup function to prevent DNS rebinding (TOCTOU) attacks while preserving
+ * dual-stack resilience (Happy Eyeballs).
  */
 export function createSafeConnector(
   connectorOpts?: undici.buildConnector.BuildOptions,
   customDefaultConnector?: undici.buildConnector.connector,
 ): undici.buildConnector.connector {
   const buildConnectorFn = getBuildConnector();
+
+  const safeConnectorOpts = {
+    ...connectorOpts,
+    lookup: safeLookup,
+  };
+
   const defaultConnector =
     customDefaultConnector ??
-    (buildConnectorFn ? buildConnectorFn(connectorOpts ?? {}) : undefined);
+    (buildConnectorFn ? buildConnectorFn(safeConnectorOpts) : undefined);
 
   return function safeConnect(
     opts: undici.buildConnector.Options,
@@ -68,7 +165,7 @@ export function createSafeConnector(
     const rawHostname = opts.hostname;
     const sanitized = sanitizeHostname(rawHostname);
 
-    // 1. Disallow loopback and internal TLDs outright
+    // Direct IP address literal check or internal TLD check
     if (
       sanitized === 'localhost' ||
       sanitized.endsWith('.localhost') ||
@@ -82,57 +179,15 @@ export function createSafeConnector(
       return;
     }
 
-    // 2. Direct IP address literal
-    if (net.isIP(sanitized)) {
-      if (isAddressPrivate(sanitized)) {
-        callback(
-          new PrivateIpError(`Access to private IP ${sanitized} is blocked`),
-          null,
-        );
-        return;
-      }
-      defaultConnector(opts, callback);
+    if (net.isIP(sanitized) && isAddressPrivate(sanitized)) {
+      callback(
+        new PrivateIpError(`Access to private IP ${sanitized} is blocked`),
+        null,
+      );
       return;
     }
 
-    // 3. Domain name: resolve all IPs and pin connection
-    lookup(sanitized, { all: true })
-      .then((addresses) => {
-        if (!addresses || addresses.length === 0) {
-          callback(new Error(`getaddrinfo ENOTFOUND ${sanitized}`), null);
-          return;
-        }
-
-        for (const addr of addresses) {
-          if (isAddressPrivate(addr.address)) {
-            callback(
-              new PrivateIpError(
-                `Access to private IP ${addr.address} (resolved from ${sanitized}) is blocked`,
-              ),
-              null,
-            );
-            return;
-          }
-        }
-
-        // Pin the connection to the first resolved IP
-        // Ensure SNI is preserved for TLS verification on legitimate domains
-        const pinnedIp = addresses[0].address;
-        const servername = opts.servername || sanitized;
-
-        defaultConnector(
-          {
-            ...opts,
-            hostname: pinnedIp,
-            servername,
-          },
-          callback,
-        );
-      })
-      .catch((err: Error) => {
-        // Fail closed on DNS resolution failure or timeout
-        callback(err, null);
-      });
+    defaultConnector(opts, callback);
   };
 }
 

@@ -9,6 +9,7 @@ import * as http from 'node:http';
 import * as net from 'node:net';
 import type { buildConnector } from 'undici';
 import ipaddr from 'ipaddr.js';
+import type { LookupAddress } from 'node:dns';
 
 const { mockLookup } = vi.hoisted(() => ({
   mockLookup: vi.fn(async (hostname: string) => {
@@ -50,6 +51,7 @@ const {
   validateUrlDestination,
   PrivateIpError,
   createSafeConnector,
+  safeLookup,
 } = await import('./fetch.js');
 
 describe('Destination IP Validation & Connection Pinning (fetch.spec.ts)', () => {
@@ -253,7 +255,7 @@ describe('Destination IP Validation & Connection Pinning (fetch.spec.ts)', () =>
   });
 
   describe('Connection Pinning & Fail-Closed Safety', () => {
-    it('should preserve original hostname as servername during TLS connection pinning', async () => {
+    it('should forward connection options and preserve hostname/servername', async () => {
       let passedOpts: buildConnector.Options | undefined;
       const mockDefaultConnector: buildConnector.connector = (
         opts: buildConnector.Options,
@@ -270,6 +272,7 @@ describe('Destination IP Validation & Connection Pinning (fetch.spec.ts)', () =>
             hostname: 'pinning-test.example.com',
             protocol: 'https:',
             port: '443',
+            servername: 'pinning-test.example.com',
           },
           (...args) => {
             const [err] = args;
@@ -279,8 +282,100 @@ describe('Destination IP Validation & Connection Pinning (fetch.spec.ts)', () =>
         );
       });
 
-      expect(passedOpts?.hostname).toBe('93.184.216.34');
+      expect(passedOpts?.hostname).toBe('pinning-test.example.com');
       expect(passedOpts?.servername).toBe('pinning-test.example.com');
+    });
+
+    it('should block direct private IP literals and internal TLDs at connector level', async () => {
+      const mockDefaultConnector: buildConnector.connector = (
+        opts,
+        callback,
+      ) => {
+        callback(null, new net.Socket());
+      };
+      const connector = createSafeConnector(undefined, mockDefaultConnector);
+
+      await expect(
+        new Promise<void>((resolve, reject) => {
+          connector(
+            { hostname: '127.0.0.1', protocol: 'http:', port: '80' },
+            (...args) => {
+              const [err] = args;
+              if (err) reject(err);
+              else resolve();
+            },
+          );
+        }),
+      ).rejects.toThrow(PrivateIpError);
+
+      await expect(
+        new Promise<void>((resolve, reject) => {
+          connector(
+            {
+              hostname: 'metadata.google.internal',
+              protocol: 'http:',
+              port: '80',
+            },
+            (...args) => {
+              const [err] = args;
+              if (err) reject(err);
+              else resolve();
+            },
+          );
+        }),
+      ).rejects.toThrow(PrivateIpError);
+    });
+
+    it('should configure safeLookup for dual-stack Happy Eyeballs resolution and validate IPs', async () => {
+      const addresses = await new Promise<LookupAddress[]>(
+        (resolve, reject) => {
+          safeLookup('pinning-test.example.com', { all: true }, (err, res) => {
+            if (err) {
+              reject(err);
+            } else if (Array.isArray(res)) {
+              resolve(res);
+            } else {
+              reject(new Error('Expected array of addresses'));
+            }
+          });
+        },
+      );
+      expect(addresses).toEqual([{ address: '93.184.216.34', family: 4 }]);
+    });
+
+    it('should block safeLookup when resolving to private IP or internal host', async () => {
+      await expect(
+        new Promise((resolve, reject) => {
+          safeLookup('test.localhost', { all: true }, (err, res) => {
+            if (err) reject(err);
+            else resolve(res);
+          });
+        }),
+      ).rejects.toThrow(PrivateIpError);
+
+      await expect(
+        new Promise((resolve, reject) => {
+          safeLookup('169.254.169.254', { all: true }, (err, res) => {
+            if (err) reject(err);
+            else resolve(res);
+          });
+        }),
+      ).rejects.toThrow(PrivateIpError);
+    });
+
+    it('should block safeLookup for dual-stack when any resolved IP is private', async () => {
+      await expect(
+        new Promise((resolve, reject) => {
+          safeLookup(
+            'dual-stack-test.example.com',
+            { all: true },
+            (err, res) => {
+              if (err) reject(err);
+              else resolve(res);
+            },
+          );
+        }),
+      ).rejects.toThrow(PrivateIpError);
     });
 
     it('should fail closed when DNS resolution fails or times out', async () => {
