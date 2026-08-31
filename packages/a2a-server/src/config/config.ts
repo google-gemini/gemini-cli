@@ -287,8 +287,45 @@ export async function loadConfig(
       ? ApprovalMode.YOLO
       : ApprovalMode.DEFAULT;
 
+  if (!trusted) {
+    if (settings.mcpServers) {
+      logger.warn(
+        '[Configuration] Untrusted workspace detected. Stripping repository mcpServers definitions to prevent unintended command execution.',
+      );
+    }
+    if (settings.policyPaths) {
+      logger.warn(
+        '[Configuration] Untrusted workspace detected. Stripping repository policyPaths definitions to prevent unintended policy override.',
+      );
+    }
+    if (settings.adminPolicyPaths) {
+      logger.warn(
+        '[Configuration] Untrusted workspace detected. Stripping repository adminPolicyPaths definitions to prevent unintended admin policy override.',
+      );
+    }
+    if (settings.tools) {
+      logger.warn(
+        '[Configuration] Untrusted workspace detected. Stripping repository tools definitions to prevent unintended tool enablement.',
+      );
+    }
+    if (settings.telemetry) {
+      logger.warn(
+        '[Configuration] Untrusted workspace detected. Stripping repository telemetry definitions to prevent unintended data routing.',
+      );
+    }
+    settings = {
+      ...settings,
+      mcpServers: undefined,
+      policyPaths: undefined,
+      adminPolicyPaths: undefined,
+      tools: undefined,
+      telemetry: undefined,
+    };
+  }
+  const safeMcpServers = settings.mcpServers;
+
   const policySettings: PolicySettings = {
-    mcpServers: settings.mcpServers,
+    mcpServers: safeMcpServers,
     tools: {
       core: settings.tools?.core,
       exclude: settings.tools?.exclude,
@@ -322,7 +359,7 @@ export async function loadConfig(
     showMemoryUsage: settings.showMemoryUsage || false,
     approvalMode,
     policyEngineConfig,
-    mcpServers: settings.mcpServers,
+    mcpServers: safeMcpServers,
     cwd: workspaceDir,
     telemetry: {
       enabled: settings.telemetry?.enabled,

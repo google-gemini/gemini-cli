@@ -10,7 +10,13 @@ import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
 import type { OAuthToken } from './token-storage/types.js';
 import { MCPOAuthTokenStorage } from './oauth-token-storage.js';
 import { getErrorMessage, FatalCancellationError } from '../utils/errors.js';
-import { OAuthUtils, ResourceMismatchError } from './oauth-utils.js';
+import {
+  OAuthUtils,
+  ResourceMismatchError,
+  OAuthSecurityError,
+  isLoopbackUrl,
+  validateOAuthEndpointUrl,
+} from './oauth-utils.js';
 import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getConsentForOauth } from '../utils/authConsent.js';
@@ -98,7 +104,18 @@ export class MCPOAuthProvider {
     registrationUrl: string,
     config: MCPOAuthConfig,
     redirectPort: number,
+    mcpServerUrl?: string,
   ): Promise<OAuthClientRegistrationResponse> {
+    const allowLoopback = mcpServerUrl
+      ? isLoopbackUrl(mcpServerUrl)
+      : isLoopbackUrl(registrationUrl);
+    const validatedRegistrationUrl = await validateOAuthEndpointUrl(
+      registrationUrl,
+      {
+        allowLoopback,
+      },
+    );
+
     const redirectUri = getRedirectUri(config, redirectPort);
 
     const registrationRequest: OAuthClientRegistrationRequest = {
@@ -110,7 +127,7 @@ export class MCPOAuthProvider {
       scope: config.scopes?.join(' ') || '',
     };
 
-    const response = await fetch(registrationUrl, {
+    const response = await fetch(validatedRegistrationUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -144,12 +161,16 @@ export class MCPOAuthProvider {
 
   private async discoverAuthServerMetadataForRegistration(
     issuer: string,
+    mcpServerUrl?: string,
   ): Promise<{
     issuerUrl: string;
     metadata: NonNullable<
       Awaited<ReturnType<typeof OAuthUtils.discoverAuthorizationServerMetadata>>
     >;
   }> {
+    const allowLoopback = mcpServerUrl
+      ? isLoopbackUrl(mcpServerUrl)
+      : isLoopbackUrl(issuer);
     const authUrl = new URL(issuer);
 
     // Preserve path components for issuers with path-based discovery (e.g., Keycloak)
@@ -197,12 +218,14 @@ export class MCPOAuthProvider {
       Awaited<ReturnType<typeof OAuthUtils.discoverAuthorizationServerMetadata>>
     > | null = null;
 
-    for (const issuer of attemptedIssuers) {
-      debugLogger.debug(`   Trying issuer URL: ${issuer}`);
-      const metadata =
-        await OAuthUtils.discoverAuthorizationServerMetadata(issuer);
+    for (const issuerCandidate of attemptedIssuers) {
+      debugLogger.debug(`   Trying issuer URL: ${issuerCandidate}`);
+      const metadata = await OAuthUtils.discoverAuthorizationServerMetadata(
+        issuerCandidate,
+        { allowLoopback },
+      );
       if (metadata) {
-        selectedIssuer = issuer;
+        selectedIssuer = issuerCandidate;
         discoveredMetadata = metadata;
         break;
       }
@@ -330,7 +353,10 @@ export class MCPOAuthProvider {
         }
       } catch (error) {
         // Re-throw security validation errors
-        if (error instanceof ResourceMismatchError) {
+        if (
+          error instanceof ResourceMismatchError ||
+          error instanceof OAuthSecurityError
+        ) {
           throw error;
         }
 
@@ -392,7 +418,10 @@ export class MCPOAuthProvider {
 
         debugLogger.debug('→ Attempting dynamic client registration...');
         const { metadata: authServerMetadata } =
-          await this.discoverAuthServerMetadataForRegistration(config.issuer);
+          await this.discoverAuthServerMetadataForRegistration(
+            config.issuer,
+            mcpServerUrl,
+          );
         registrationUrl = authServerMetadata.registration_endpoint;
       }
 
@@ -402,6 +431,7 @@ export class MCPOAuthProvider {
           registrationUrl,
           config,
           redirectPort,
+          mcpServerUrl,
         );
 
         config.clientId = clientRegistration.client_id;
@@ -423,6 +453,19 @@ export class MCPOAuthProvider {
         'Missing required OAuth configuration after discovery and registration',
       );
     }
+
+    const allowLoopback = mcpServerUrl
+      ? isLoopbackUrl(mcpServerUrl)
+      : (config.authorizationUrl
+          ? isLoopbackUrl(config.authorizationUrl)
+          : false) ||
+        (config.tokenUrl ? isLoopbackUrl(config.tokenUrl) : false);
+    await validateOAuthEndpointUrl(config.authorizationUrl, {
+      allowLoopback,
+    });
+    await validateOAuthEndpointUrl(config.tokenUrl, {
+      allowLoopback,
+    });
 
     // Build flow config for shared utilities
     const flowConfig: OAuthFlowConfig = {

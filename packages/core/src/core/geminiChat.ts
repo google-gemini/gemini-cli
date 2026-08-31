@@ -156,6 +156,12 @@ export function isValidNonThoughtTextPart(part: Part): boolean {
 }
 
 function isValidContent(content: Content): boolean {
+  if (
+    content.role === 'model' &&
+    (content.parts === undefined || content.parts.length === 0)
+  ) {
+    return true;
+  }
   if (content.parts === undefined || content.parts.length === 0) {
     return false;
   }
@@ -163,7 +169,18 @@ function isValidContent(content: Content): boolean {
     if (part === undefined || Object.keys(part).length === 0) {
       return false;
     }
-    if (!part.thought && part.text !== undefined && part.text === '') {
+    // Check if the part contains any keys other than 'text', 'thought', or 'callIndex'.
+    // If it has other keys, it carries an active payload (such as tools, files, or code execution)
+    // and must be preserved even if the text itself is empty, preventing history sequence corruption.
+    const nonTextKeys = Object.keys(part).filter(
+      (key) => key !== 'text' && key !== 'thought' && key !== 'callIndex',
+    );
+    if (
+      !part.thought &&
+      part.text !== undefined &&
+      part.text === '' &&
+      nonTextKeys.length === 0
+    ) {
       return false;
     }
   }
@@ -222,6 +239,69 @@ function extractCuratedHistory(
     }
   }
   return curatedHistory;
+}
+
+/**
+ * Nudge message used during retry after an empty response with thoughts.
+ */
+export const THINKING_ONLY_NUDGE_MESSAGE =
+  '[System: You previously generated thoughts but failed to provide a final user-facing response. Please ensure you provide your final answer or call a tool now.]';
+
+/**
+ * Nudge message used during retry after an empty response with no text or thoughts.
+ */
+export const NO_RESPONSE_TEXT_NUDGE_MESSAGE =
+  '[System: You previously returned an empty response with no text or thoughts. Please ensure you provide your final answer or call a tool now.]';
+
+/**
+ * Appends an on-retry nudge message to the final user turn in contents (or adds a user turn)
+ * so that the model observes it at the end of the context window without altering systemInstruction.
+ */
+export function applyRetryNudge(
+  contents: Content[],
+  nudgeMessage: string,
+): Content[] {
+  if (!nudgeMessage) {
+    return contents;
+  }
+  const lastTurn = contents[contents.length - 1];
+  const hasNudge = lastTurn?.parts?.some((p) => p.text?.includes(nudgeMessage));
+  if (hasNudge) {
+    return contents;
+  }
+  const cloned: Content[] = contents.map((c) => ({
+    ...c,
+    parts: c.parts ? [...c.parts] : [],
+  }));
+
+  const clonedLastTurn = cloned[cloned.length - 1];
+  const hasFunctionResponse = clonedLastTurn?.parts?.some(
+    (p) => p.functionResponse,
+  );
+
+  if (clonedLastTurn?.role === 'user' && hasFunctionResponse) {
+    // Satisfy strict role alternation invariants of the Gemini API by inserting
+    // a neutral, synthetic model turn between the tool response and the nudge prompt.
+    cloned.push({
+      role: 'model',
+      parts: [{ text: '[Tool execution completed.]' }],
+    });
+    cloned.push({
+      role: 'user',
+      parts: [{ text: nudgeMessage }],
+    });
+  } else if (clonedLastTurn?.role === 'user') {
+    if (!clonedLastTurn.parts) {
+      clonedLastTurn.parts = [];
+    }
+    clonedLastTurn.parts.push({ text: `\n${nudgeMessage}` });
+  } else {
+    cloned.push({
+      role: 'user',
+      parts: [{ text: nudgeMessage }],
+    });
+  }
+  return cloned;
 }
 
 /**
@@ -563,6 +643,9 @@ export class GeminiChat {
     const streamWithRetries = async function* (
       this: GeminiChat,
     ): AsyncGenerator<StreamEvent, void, void> {
+      let isSuccess = false;
+      let caughtError: unknown = undefined;
+
       try {
         const maxAttempts = this.context.config.getMaxAttempts();
         let lastStreamError: unknown = undefined;
@@ -588,12 +671,14 @@ export class GeminiChat {
               signal,
               role,
               apiHistoryOverride,
+              isOriginalFunctionResponse,
             );
             isConnectionPhase = false;
             for await (const chunk of stream) {
               yield { type: StreamEventType.CHUNK, value: chunk };
             }
 
+            isSuccess = true;
             return;
           } catch (error) {
             if (error instanceof InvalidStreamError) {
@@ -605,6 +690,7 @@ export class GeminiChat {
                 type: StreamEventType.AGENT_EXECUTION_STOPPED,
                 reason: error.reason,
               };
+              isSuccess = true;
               return; // Stop the generator
             }
 
@@ -619,6 +705,7 @@ export class GeminiChat {
                   value: error.syntheticResponse,
                 };
               }
+              isSuccess = true;
               return; // Stop the generator
             }
 
@@ -699,34 +786,37 @@ export class GeminiChat {
           }
         }
       } catch (error) {
-        const isAborted =
-          signal?.aborted ||
-          isAbortError(error) ||
-          (error instanceof Error &&
-            (error.name === 'CanceledError' ||
-              error.name === 'FatalCancellationError'));
-        const originalLength = this.promptOriginalHistoryLength;
-        const originalTokenCount = this.promptOriginalTokenCount;
-        if (isAborted && originalLength !== undefined) {
-          this.agentHistory.rollback(originalLength);
-          this.chatRecordingService.updateMessagesFromHistory(
-            this.agentHistory.get(),
-          );
-          if (originalTokenCount !== undefined) {
-            this.lastPromptTokenCount = originalTokenCount;
-          }
-          this.promptOriginalHistoryLength = undefined;
-          this.promptOriginalTokenCount = undefined;
-          this.lastPromptId = undefined;
-        } else if (!isOriginalFunctionResponse) {
-          this.agentHistory.rollback(historyLengthBefore);
-          this.chatRecordingService.updateMessagesFromHistory(
-            this.agentHistory.get(),
-          );
-          this.lastPromptTokenCount = baselinePromptTokenCount;
-        }
+        caughtError = error;
         throw error;
       } finally {
+        if (!isSuccess) {
+          const isAborted =
+            signal?.aborted ||
+            isAbortError(caughtError) ||
+            (caughtError instanceof Error &&
+              (caughtError.name === 'CanceledError' ||
+                caughtError.name === 'FatalCancellationError'));
+          const originalLength = this.promptOriginalHistoryLength;
+          const originalTokenCount = this.promptOriginalTokenCount;
+          if (isAborted && originalLength !== undefined) {
+            this.agentHistory.rollback(originalLength);
+            this.chatRecordingService.updateMessagesFromHistory(
+              this.agentHistory.get(),
+            );
+            if (originalTokenCount !== undefined) {
+              this.lastPromptTokenCount = originalTokenCount;
+            }
+            this.promptOriginalHistoryLength = undefined;
+            this.promptOriginalTokenCount = undefined;
+            this.lastPromptId = undefined;
+          } else if (!isOriginalFunctionResponse) {
+            this.agentHistory.rollback(historyLengthBefore);
+            this.chatRecordingService.updateMessagesFromHistory(
+              this.agentHistory.get(),
+            );
+            this.lastPromptTokenCount = baselinePromptTokenCount;
+          }
+        }
         streamDoneResolver!();
       }
     };
@@ -784,6 +874,7 @@ export class GeminiChat {
     abortSignal: AbortSignal,
     role: LlmRole,
     apiHistoryOverride?: Content[],
+    isOriginalFunctionResponse: boolean = false,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     // Last mile scrubbing to remove internal tracking properties (e.g. callIndex)
     // before sending to the Gemini API. This whitelists only standard Gemini fields.
@@ -870,27 +961,20 @@ export class GeminiChat {
         abortSignal,
       };
 
-      // Apply Context-Aware Retries (On-Retry Nudging) to guide the model out of silent loops
+      // Apply Context-Aware Retries (On-Retry Nudging) to guide the model out of silent loops.
+      // The nudge message is appended to the contents array (end of conversation) rather than modifying
+      // systemInstruction. This preserves the prefix cache and ensures the nudge is directly observed
+      // by the model at the end of the context window.
+      let nudgeMessage = '';
       if (
         modelConfigKey.isRetry &&
         modelConfigKey.lastStreamError instanceof InvalidStreamError
       ) {
         const lastError = modelConfigKey.lastStreamError;
-        let nudgeMessage = '';
         if (lastError.type === 'THINKING_ONLY_RESPONSE') {
-          nudgeMessage =
-            '\n[System: You previously generated thoughts but failed to provide a final user-facing response. Please ensure you provide your final answer or call a tool now.]';
+          nudgeMessage = THINKING_ONLY_NUDGE_MESSAGE;
         } else if (lastError.type === 'NO_RESPONSE_TEXT') {
-          nudgeMessage =
-            '\n[System: You previously returned an empty response with no text or thoughts. Please ensure you provide your final answer or call a tool now.]';
-        }
-
-        if (nudgeMessage) {
-          if (typeof config.systemInstruction === 'string') {
-            config.systemInstruction += nudgeMessage;
-          } else if (config.systemInstruction === undefined) {
-            config.systemInstruction = nudgeMessage;
-          }
+          nudgeMessage = NO_RESPONSE_TEXT_NUDGE_MESSAGE;
         }
       }
 
@@ -898,6 +982,10 @@ export class GeminiChat {
         supportsModernFeatures(modelToUse) || isGemini2Model(modelToUse)
           ? [...contentsForPreviewModel]
           : [...requestContents];
+
+      if (nudgeMessage) {
+        contentsToUse = applyRetryNudge(contentsToUse, nudgeMessage);
+      }
 
       const hookSystem = this.context.config.getHookSystem();
       if (hookSystem) {
@@ -943,6 +1031,9 @@ export class GeminiChat {
             supportsModernFeatures(modelToUse) || isGemini2Model(modelToUse)
               ? [...contentsForPreviewModel]
               : [...requestContents];
+          if (nudgeMessage) {
+            contentsToUse = applyRetryNudge(contentsToUse, nudgeMessage);
+          }
         }
         if (beforeModelResult.modifiedConfig) {
           Object.assign(config, beforeModelResult.modifiedConfig);
@@ -953,6 +1044,9 @@ export class GeminiChat {
         ) {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           contentsToUse = beforeModelResult.modifiedContents as Content[];
+          if (nudgeMessage) {
+            contentsToUse = applyRetryNudge(contentsToUse, nudgeMessage);
+          }
         }
 
         const toolSelectionResult =
@@ -1048,6 +1142,7 @@ export class GeminiChat {
       lastModelToUse,
       streamResponse,
       originalRequest,
+      isOriginalFunctionResponse,
     );
   }
 
@@ -1260,6 +1355,7 @@ export class GeminiChat {
     model: string,
     streamResponse: AsyncGenerator<GenerateContentResponse>,
     originalRequest: GenerateContentParameters,
+    isOriginalFunctionResponse: boolean = false,
   ): AsyncGenerator<GenerateContentResponse> {
     const modelResponseParts: Part[] = [];
 
@@ -1476,10 +1572,12 @@ export class GeminiChat {
     // - Empty response text (e.g., only thoughts with no actual content)
     if (!hasToolCall) {
       if (!finishReason) {
-        throw new InvalidStreamError(
-          'Model stream ended without a finish reason.',
-          'NO_FINISH_REASON',
-        );
+        if (!isOriginalFunctionResponse) {
+          throw new InvalidStreamError(
+            'Model stream ended without a finish reason.',
+            'NO_FINISH_REASON',
+          );
+        }
       }
       if (finishReason === FinishReason.MALFORMED_FUNCTION_CALL) {
         throw new InvalidStreamError(
@@ -1524,10 +1622,12 @@ export class GeminiChat {
             'THINKING_ONLY_RESPONSE',
           );
         }
-        throw new InvalidStreamError(
-          'Model stream ended with empty response text.',
-          'NO_RESPONSE_TEXT',
-        );
+        if (!isOriginalFunctionResponse) {
+          throw new InvalidStreamError(
+            'Model stream ended with empty response text.',
+            'NO_RESPONSE_TEXT',
+          );
+        }
       }
     }
 
@@ -1544,10 +1644,10 @@ export class GeminiChat {
       }
     }
 
-    let id: string;
     // Record model response text from the collected parts.
     // Also flush when there are thoughts or a tool call (even with no text)
     // so that BeforeTool hooks always see the latest transcript state.
+    let id: string;
     if (responseText || hasThoughts || hasToolCall) {
       id = this.chatRecordingService.recordMessage({
         model,
@@ -1654,35 +1754,60 @@ export function isInvalidArgumentError(errorMessage: string): boolean {
 }
 
 export function stripToolCallIdPrefixes(contents: Content[]): Content[] {
-  return contents.map((content) => ({
-    ...content,
-    parts: (content.parts || []).map((part) => {
-      const newPart = { ...part };
-      if (newPart.functionCall) {
-        const fc = newPart.functionCall;
-        const name = fc.name?.trim() || 'generic_tool';
-        if (fc.id && fc.id.startsWith(`${name}__`)) {
-          newPart.functionCall = {
-            name: fc.name,
-            args: fc.args,
-            id: fc.id.substring(name.length + 2),
-          };
+  return contents.map((content) => {
+    const parts = (content.parts || [])
+      .map((part) => {
+        const newPart = { ...part };
+        if (newPart.functionCall) {
+          const fc = newPart.functionCall;
+          const name = fc.name?.trim() || 'generic_tool';
+          if (fc.id && fc.id.startsWith(`${name}__`)) {
+            newPart.functionCall = {
+              name: fc.name,
+              args: fc.args,
+              id: fc.id.substring(name.length + 2),
+            };
+          }
         }
-      }
-      if (newPart.functionResponse) {
-        const fr = newPart.functionResponse;
-        const name = fr.name?.trim() || 'generic_tool';
-        if (fr.id && fr.id.startsWith(`${name}__`)) {
-          newPart.functionResponse = {
-            name: fr.name,
-            response: fr.response,
-            id: fr.id.substring(name.length + 2),
-          };
+        if (newPart.functionResponse) {
+          const fr = newPart.functionResponse;
+          const name = fr.name?.trim() || 'generic_tool';
+          if (fr.id && fr.id.startsWith(`${name}__`)) {
+            newPart.functionResponse = {
+              name: fr.name,
+              response: fr.response,
+              id: fr.id.substring(name.length + 2),
+            };
+          }
         }
-      }
-      return newPart;
-    }),
-  }));
+
+        // If there's an empty text key alongside other active properties, remove the empty text key
+        // so it doesn't trigger "contains empty parts" validation errors on the Gemini API.
+        const hasOtherKeys = Object.keys(newPart).some(
+          (key) => key !== 'text' && key !== 'thought' && key !== 'callIndex',
+        );
+        if (newPart.text !== undefined && newPart.text === '' && hasOtherKeys) {
+          delete newPart.text;
+        }
+
+        return newPart;
+      })
+      .filter((part) => {
+        // Filter out truly empty parts that have only text: '' and no payload
+        const hasOtherKeys = Object.keys(part).some(
+          (key) => key !== 'text' && key !== 'thought' && key !== 'callIndex',
+        );
+        if (part.text !== undefined && part.text === '' && !hasOtherKeys) {
+          return false;
+        }
+        return true;
+      });
+
+    return {
+      ...content,
+      parts,
+    };
+  });
 }
 
 export function coalesceConsecutiveRoles(

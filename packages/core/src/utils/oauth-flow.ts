@@ -16,6 +16,7 @@ import * as crypto from 'node:crypto';
 import type * as net from 'node:net';
 import { URL } from 'node:url';
 import { debugLogger } from './debugLogger.js';
+import { validateOAuthEndpointUrl, isLoopbackUrl } from '../mcp/oauth-utils.js';
 
 /**
  * Configuration for an OAuth 2.0 Authorization Code flow.
@@ -507,7 +508,14 @@ export async function exchangeCodeForToken(
     params.append('resource', resource);
   }
 
-  const response = await fetch(config.tokenUrl, {
+  const allowLoopback = resource
+    ? isLoopbackUrl(resource)
+    : isLoopbackUrl(config.tokenUrl);
+  const validatedTokenUrl = await validateOAuthEndpointUrl(config.tokenUrl, {
+    allowLoopback,
+  });
+
+  const response = await fetch(validatedTokenUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -560,7 +568,14 @@ export async function refreshAccessToken(
     params.append('resource', resource);
   }
 
-  const response = await fetch(tokenUrl, {
+  const allowLoopback = resource
+    ? isLoopbackUrl(resource)
+    : isLoopbackUrl(tokenUrl);
+  const validatedTokenUrl = await validateOAuthEndpointUrl(tokenUrl, {
+    allowLoopback,
+  });
+
+  const response = await fetch(validatedTokenUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
