@@ -268,8 +268,9 @@ export async function checkForExtensionUpdate(
       // Determine the ref to check on the remote.
       const refToCheck = installMetadata.ref || 'HEAD';
 
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(
           () =>
             reject(
               new Error(
@@ -277,13 +278,17 @@ export async function checkForExtensionUpdate(
               ),
             ),
           GIT_BACKGROUND_TIMEOUT_MS,
-        ),
-      );
+        );
+      });
 
       const lsRemoteOutput = await Promise.race([
         git.listRemote([remoteUrl, refToCheck]),
         timeoutPromise,
-      ]);
+      ]).finally(() => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+      });
 
       if (typeof lsRemoteOutput !== 'string' || lsRemoteOutput.trim() === '') {
         debugLogger.error(`Git ref ${refToCheck} not found.`);

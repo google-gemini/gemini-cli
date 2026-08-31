@@ -368,6 +368,43 @@ describe('github.ts', () => {
 
       expect(state).toBe(ExtensionUpdateState.ERROR);
     });
+
+    it('should clear the timeout timer when git.listRemote resolves', async () => {
+      const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
+      mockGit.getRemotes.mockResolvedValue([
+        { name: 'origin', refs: { fetch: 'url' } },
+      ]);
+      mockGit.listRemote.mockResolvedValue('hash\tHEAD');
+      mockGit.revparse.mockResolvedValue('hash');
+
+      const ext = {
+        path: '/path',
+        installMetadata: { type: 'git', source: 'url' },
+      } as unknown as GeminiCLIExtension;
+
+      await checkForExtensionUpdate(ext, mockExtensionManager);
+
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+      clearTimeoutSpy.mockRestore();
+    });
+
+    it('should clear the timeout timer when git.listRemote rejects', async () => {
+      const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
+      mockGit.getRemotes.mockResolvedValue([
+        { name: 'origin', refs: { fetch: 'url' } },
+      ]);
+      mockGit.listRemote.mockRejectedValue(new Error('git error'));
+
+      const ext = {
+        path: '/path',
+        installMetadata: { type: 'git', source: 'url' },
+      } as unknown as GeminiCLIExtension;
+
+      await checkForExtensionUpdate(ext, mockExtensionManager);
+
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+      clearTimeoutSpy.mockRestore();
+    });
   });
 
   describe('downloadFromGitHubRelease', () => {
