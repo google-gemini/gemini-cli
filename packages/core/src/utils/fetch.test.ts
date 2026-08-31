@@ -245,6 +245,20 @@ describe('fetch utils', () => {
       // Must NOT be classified as a timeout
       await expect(rejection).rejects.not.toThrow('timed out');
     });
+
+    it('should route dispatcher to createSafeProxyAgent when proxy is configured', async () => {
+      setGlobalProxy('http://proxy.example.com');
+      vi.mocked(global.fetch).mockResolvedValueOnce(new Response('OK'));
+
+      await fetchWithTimeout('http://example.com', 10_000);
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        'http://example.com',
+        expect.objectContaining({
+          dispatcher: expect.any(Object),
+        }),
+      );
+    });
   });
 
   describe('setGlobalProxy', () => {

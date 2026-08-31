@@ -465,13 +465,15 @@ export async function fetchWithTimeout(
   }
 
   try {
-    const fetchOptions: RequestInit & { dispatcher?: undici.Agent } = {
+    const fetchOptions: RequestInit & { dispatcher?: undici.Dispatcher } = {
       ...options,
       signal: controller.signal,
     };
 
-    if (!currentProxy && !fetchOptions.dispatcher) {
-      fetchOptions.dispatcher = defaultSafeAgent;
+    if (!fetchOptions.dispatcher) {
+      fetchOptions.dispatcher = currentProxy
+        ? createSafeProxyAgent(currentProxy)
+        : defaultSafeAgent;
     }
 
     const response = await fetch(url, fetchOptions);
