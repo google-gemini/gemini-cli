@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { simpleGit } from 'simple-git';
+import { simpleGit, type SimpleGit } from 'simple-git';
 import {
   debugLogger,
   getErrorMessage,
@@ -24,6 +24,33 @@ import type { ExtensionConfig } from '../extension.js';
 import type { ExtensionManager } from '../extension-manager.js';
 import { EXTENSIONS_CONFIG_FILENAME } from './variables.js';
 
+const GIT_BACKGROUND_TIMEOUT_MS = 15_000;
+
+/**
+ * Instantiates a SimpleGit client configured for non-interactive execution.
+ *
+ * Prevents git and ssh subprocesses from opening /dev/tty or blocking on stdin
+ * during background extension operations.
+ */
+export function createNonInteractiveGit(baseDir: string): SimpleGit {
+  const safeEnv = getSafeGitEnv();
+
+  // Preserve existing GIT_SSH_COMMAND if configured by user, but enforce BatchMode=yes
+  const existingSsh =
+    safeEnv['GIT_SSH_COMMAND'] || process.env['GIT_SSH_COMMAND'];
+  const sshCommand = existingSsh
+    ? `${existingSsh} -o BatchMode=yes`
+    : 'ssh -o BatchMode=yes';
+
+  return simpleGit(baseDir).env({
+    ...safeEnv,
+    // Native Git flag (>=2.3) disabling terminal prompts
+    GIT_TERMINAL_PROMPT: '0',
+    // Prevents SSH from prompting for passphrases or host key confirmation
+    GIT_SSH_COMMAND: sshCommand,
+  });
+}
+
 /**
  * Clones a Git repository to a specified local path.
  * @param installMetadata The metadata for the extension to install.
@@ -34,7 +61,7 @@ export async function cloneFromGit(
   destination: string,
 ): Promise<void> {
   try {
-    const git = simpleGit(destination).env(getSafeGitEnv());
+    const git = createNonInteractiveGit(destination);
     let sourceUrl = installMetadata.source;
     const token = getGitHubToken();
     if (token) {
@@ -224,7 +251,7 @@ export async function checkForExtensionUpdate(
 
   try {
     if (installMetadata.type === 'git') {
-      const git = simpleGit(extension.path).env(getSafeGitEnv());
+      const git = createNonInteractiveGit(extension.path);
       const remotes = await git.getRemotes(true);
       if (remotes.length === 0) {
         debugLogger.error('No git remotes found.');
@@ -241,7 +268,22 @@ export async function checkForExtensionUpdate(
       // Determine the ref to check on the remote.
       const refToCheck = installMetadata.ref || 'HEAD';
 
-      const lsRemoteOutput = await git.listRemote([remoteUrl, refToCheck]);
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(
+          () =>
+            reject(
+              new Error(
+                `git ls-remote timed out after ${GIT_BACKGROUND_TIMEOUT_MS}ms`,
+              ),
+            ),
+          GIT_BACKGROUND_TIMEOUT_MS,
+        ),
+      );
+
+      const lsRemoteOutput = await Promise.race([
+        git.listRemote([remoteUrl, refToCheck]),
+        timeoutPromise,
+      ]);
 
       if (typeof lsRemoteOutput !== 'string' || lsRemoteOutput.trim() === '') {
         debugLogger.error(`Git ref ${refToCheck} not found.`);
