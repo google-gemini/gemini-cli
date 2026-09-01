@@ -305,7 +305,7 @@ describe('loadConfig', () => {
         adminPolicyPaths: ['/path/to/admin/policy'],
       };
 
-      await loadConfig(settings, mockExtensionLoader, taskId);
+      await loadConfig(settings, mockExtensionLoader, taskId, true);
 
       expect(createPolicyEngineConfig).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -332,7 +332,7 @@ describe('loadConfig', () => {
           allowed: ['shell', 'fetch'],
         },
       };
-      await loadConfig(settings, mockExtensionLoader, taskId);
+      await loadConfig(settings, mockExtensionLoader, taskId, true);
       expect(Config).toHaveBeenCalledWith(
         expect.objectContaining({
           allowedTools: ['shell', 'fetch'],
