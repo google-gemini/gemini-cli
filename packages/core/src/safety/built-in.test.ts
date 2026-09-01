@@ -242,7 +242,7 @@ describe('AllowedPathChecker', () => {
   });
 
   describe('Security Regression: Case-Insensitive Blocklist & .vscode HITL', () => {
-    it('should deny sensitive paths specified via NTFS 8.3 short names (SFNs), including standard and collision-based SFN formats', async () => {
+    it('should deny sensitive paths specified via NTFS 8.3 short names (SFNs), including standard and collision-based SFN formats.', async () => {
       const sfnPaths = [
         // Standard SFNs
         path.join(mockCwd, 'git~1', 'config'),
