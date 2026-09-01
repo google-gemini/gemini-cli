@@ -161,22 +161,11 @@ function decodeUTF32(buf: Buffer, littleEndian: boolean): string {
 }
 
 /**
- * Read a file as text, honoring BOM encodings (UTF‑8/16/32) and stripping the BOM.
- * Falls back to utf8 when no BOM is present.
+ * Decode a buffer whose BOM has already been detected, stripping the BOM and
+ * decoding according to its encoding.
  */
-export async function readFileWithEncoding(filePath: string): Promise<string> {
-  // Read the file once; detect BOM and decode from the single buffer.
-  const full = await fs.promises.readFile(filePath);
-  if (full.length === 0) return '';
-
-  const bom = detectBOM(full);
-  if (!bom) {
-    // No BOM → treat as UTF‑8
-    return full.toString('utf8');
-  }
-
-  // Strip BOM and decode per encoding
-  const content = full.subarray(bom.bomLength);
+function decodeBOMContent(buffer: Buffer, bom: BOMInfo): string {
+  const content = buffer.subarray(bom.bomLength);
   switch (bom.encoding) {
     case 'utf8':
       return content.toString('utf8');
@@ -192,6 +181,24 @@ export async function readFileWithEncoding(filePath: string): Promise<string> {
       // Defensive fallback; should be unreachable
       return content.toString('utf8');
   }
+}
+
+/**
+ * Read a file as text, honoring BOM encodings (UTF‑8/16/32) and stripping the BOM.
+ * Falls back to utf8 when no BOM is present.
+ */
+export async function readFileWithEncoding(filePath: string): Promise<string> {
+  // Read the file once; detect BOM and decode from the single buffer.
+  const full = await fs.promises.readFile(filePath);
+  if (full.length === 0) return '';
+
+  const bom = detectBOM(full);
+  if (!bom) {
+    // No BOM → treat as UTF‑8
+    return full.toString('utf8');
+  }
+
+  return decodeBOMContent(full, bom);
 }
 
 /**
@@ -375,7 +382,7 @@ export async function isEmpty(filePath: string): Promise<boolean> {
 
       const bom = detectBOM(buffer);
       const content = bom
-        ? buffer.subarray(bom.bomLength).toString('utf8')
+        ? decodeBOMContent(buffer, bom)
         : buffer.toString('utf8');
 
       return content.trim().length === 0;
