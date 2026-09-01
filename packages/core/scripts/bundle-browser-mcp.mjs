@@ -95,6 +95,36 @@ async function bundle() {
     } else {
       console.warn(`Warning: third_party assets not found at ${srcThirdParty}`);
     }
+
+    // Sanitize any hardcoded sensitive API keys in the bundled and copied output files.
+    // Replace the plaintext Google CrUX API key with dynamic process.env lookup at runtime.
+    const leakedKey = 'AIzaSyCCSOx25vrb5z0tbedCB3_JRzzbVW6Uwgw';
+    const bundleMcpFile = path.resolve(
+      __dirname,
+      '../dist/bundled/chrome-devtools-mcp.mjs',
+    );
+    const destThirdPartyIndex = path.resolve(
+      __dirname,
+      '../dist/bundled/third_party/index.js',
+    );
+
+    const sanitizeFile = (filePath) => {
+      if (fs.existsSync(filePath)) {
+        let content = fs.readFileSync(filePath, 'utf8');
+        if (content.includes(leakedKey)) {
+          console.log(`Sanitizing hardcoded API key in: ${filePath}`);
+          // Replace single-quoted and double-quoted occurrences of the leaked key with process.env lookup
+          const singleQuotedPattern = new RegExp(`'${leakedKey}'`, 'g');
+          const doubleQuotedPattern = new RegExp(`"${leakedKey}"`, 'g');
+          content = content.replace(singleQuotedPattern, 'process.env.CRUX_API_KEY || ""');
+          content = content.replace(doubleQuotedPattern, 'process.env.CRUX_API_KEY || ""');
+          fs.writeFileSync(filePath, content, 'utf8');
+        }
+      }
+    };
+
+    sanitizeFile(bundleMcpFile);
+    sanitizeFile(destThirdPartyIndex);
   } catch (error) {
     console.error('Error bundling chrome-devtools-mcp:', error);
     process.exit(1);
