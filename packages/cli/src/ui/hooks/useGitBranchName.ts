@@ -67,7 +67,7 @@ export function useGitBranchName(cwd: string): string | undefined {
           },
         );
 
-        if (typeof w.on === 'function') {
+        if (w && typeof w.on === 'function') {
           w.on('error', (err) => {
             debugLogger.debug('FSWatcher error in useGitBranchName:', err);
           });
