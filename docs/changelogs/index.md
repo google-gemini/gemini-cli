@@ -18,6 +18,26 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.57.0 - 2026-08-25
+
+- **Evaluation Validation & Formatting:** Added evaluation validation features,
+  a tool call formatter, and integrated failure summaries to improve behavioral
+  evaluation diagnostics
+  ([#28344](https://github.com/google-gemini/gemini-cli/pull/28344),
+  [#28305](https://github.com/google-gemini/gemini-cli/pull/28305) by @ved015).
+- **Resilience & Capacity Error Mitigation:** Implemented context-aware silent
+  retries and availability TTL for capacity errors, and enabled full multi-turn
+  request rollback upon cancellation or abort
+  ([#28790](https://github.com/google-gemini/gemini-cli/pull/28790) by
+  @DavidAPierce,
+  [#28801](https://github.com/google-gemini/gemini-cli/pull/28801) by
+  @amelidev).
+- **Terminal UI & Subagent Operations:** Added execution timeouts to prevent
+  indefinite TUI hangs and resolved a subagent handoff token regression on
+  startup ([#28812](https://github.com/google-gemini/gemini-cli/pull/28812),
+  [#28882](https://github.com/google-gemini/gemini-cli/pull/28882) by
+  @joneba-google).
+
 ## Announcements: v0.54.0 - 2026-08-06
 
 - **PR Automation & Antigravity Agent:** Integrated the Antigravity agent runner
