@@ -98,7 +98,6 @@ async function bundle() {
 
     // Sanitize any hardcoded sensitive API keys in the bundled and copied output files.
     // Replace the plaintext Google CrUX API key with dynamic process.env lookup at runtime.
-    const leakedKey = 'AIzaSyCCSOx25vrb5z0tbedCB3_JRzzbVW6Uwgw';
     const bundleMcpFile = path.resolve(
       __dirname,
       '../dist/bundled/chrome-devtools-mcp.mjs',
@@ -111,11 +110,12 @@ async function bundle() {
     const sanitizeFile = (filePath) => {
       if (fs.existsSync(filePath)) {
         let content = fs.readFileSync(filePath, 'utf8');
-        if (content.includes(leakedKey)) {
+        const keyPattern = /AIzaSy[A-Za-z0-9_-]{30,40}/g;
+        if (keyPattern.test(content)) {
           console.log(`Sanitizing hardcoded API key in: ${filePath}`);
-          // Replace single-quoted and double-quoted occurrences of the leaked key with process.env lookup
-          const singleQuotedPattern = new RegExp(`'${leakedKey}'`, 'g');
-          const doubleQuotedPattern = new RegExp(`"${leakedKey}"`, 'g');
+          // Replace single-quoted and double-quoted occurrences of any matching Google API key with process.env lookup
+          const singleQuotedPattern = /'AIzaSy[A-Za-z0-9_-]{30,40}'/g;
+          const doubleQuotedPattern = /"AIzaSy[A-Za-z0-9_-]{30,40}"/g;
           content = content.replace(singleQuotedPattern, 'process.env.CRUX_API_KEY || ""');
           content = content.replace(doubleQuotedPattern, 'process.env.CRUX_API_KEY || ""');
           fs.writeFileSync(filePath, content, 'utf8');

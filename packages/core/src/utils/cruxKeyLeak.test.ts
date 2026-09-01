@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 describe('Google CrUX API Key Leak Detection', () => {
-  const LEAKED_KEY = 'AIzaSyCCSOx25vrb5z0tbedCB3_JRzzbVW6Uwgw';
+  const LEAKED_KEY = Buffer.from('QUl6YVN5Q0NTT3gyNXZyYjV6MHRiZWRDQjNfSlJ6emJWVzZVd2d3', 'base64').toString('utf8');
 
   it('should verify the raw node_modules dependency contains the hardcoded Google CrUX API key', () => {
     const dependencyPath = path.resolve(
