@@ -7,7 +7,7 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import stripJsonComments from 'strip-json-comments';
-import { GEMINI_DIR } from '../utils/paths.js';
+import { GEMINI_DIR, isSubpath } from '../utils/paths.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { isNodeError } from '../utils/errors.js';
 
@@ -20,6 +20,13 @@ export interface FolderDiscoveryResults {
   settings: string[];
   securityWarnings: string[];
   discoveryErrors: string[];
+}
+
+const EXTENSION_CONFIG_FILENAME = 'gemini-extension.json';
+
+interface ExtensionDiscoveryConfig {
+  hooksDir?: string;
+  skillsDir?: string;
 }
 
 /**
@@ -45,16 +52,34 @@ export class FolderTrustDiscoveryService {
     };
 
     const geminiDir = path.join(workspaceDir, GEMINI_DIR);
-    if (!(await this.exists(geminiDir))) {
+    const hasGeminiDir = await this.exists(geminiDir);
+    const extensionConfig = await this.loadExtensionDiscoveryConfig(
+      workspaceDir,
+      results,
+    );
+
+    if (!hasGeminiDir && !extensionConfig) {
       return results;
     }
 
-    await Promise.all([
-      this.discoverCommands(geminiDir, results),
-      this.discoverSkills(geminiDir, results),
-      this.discoverAgents(geminiDir, results),
-      this.discoverSettings(geminiDir, results),
-    ]);
+    const discoveryTasks: Array<Promise<void>> = [];
+    if (hasGeminiDir) {
+      discoveryTasks.push(
+        this.discoverCommands(geminiDir, results),
+        this.discoverSkills(geminiDir, results),
+        this.discoverAgents(geminiDir, results),
+        this.discoverSettings(geminiDir, results),
+      );
+    }
+
+    if (extensionConfig) {
+      discoveryTasks.push(
+        this.discoverExtensionSkills(workspaceDir, extensionConfig, results),
+        this.discoverExtensionHooks(workspaceDir, extensionConfig, results),
+      );
+    }
+
+    await Promise.all(discoveryTasks);
 
     return results;
   }
@@ -83,6 +108,13 @@ export class FolderTrustDiscoveryService {
     results: FolderDiscoveryResults,
   ) {
     const skillsDir = path.join(geminiDir, 'skills');
+    await this.discoverSkillsInDirectory(skillsDir, results);
+  }
+
+  private static async discoverSkillsInDirectory(
+    skillsDir: string,
+    results: FolderDiscoveryResults,
+  ) {
     if (await this.exists(skillsDir)) {
       try {
         const entries = await fs.readdir(skillsDir, { withFileTypes: true });
@@ -169,11 +201,84 @@ export class FolderTrustDiscoveryService {
             }
           }
         }
-        results.hooks = Array.from(hooks);
+        this.addUniqueItems(results.hooks, Array.from(hooks));
       }
     } catch (e) {
       results.discoveryErrors.push(
         `Failed to discover settings: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+  }
+
+  private static async discoverExtensionSkills(
+    extensionDir: string,
+    config: ExtensionDiscoveryConfig,
+    results: FolderDiscoveryResults,
+  ) {
+    const skillsDir = this.resolveExtensionDir(
+      extensionDir,
+      config.skillsDir,
+      'skills',
+      'skills',
+      results,
+    );
+    if (!skillsDir) return;
+    await this.discoverSkillsInDirectory(skillsDir, results);
+  }
+
+  private static async discoverExtensionHooks(
+    extensionDir: string,
+    config: ExtensionDiscoveryConfig,
+    results: FolderDiscoveryResults,
+  ) {
+    const hooksDir = this.resolveExtensionDir(
+      extensionDir,
+      config.hooksDir,
+      'hooks',
+      'hooks',
+      results,
+    );
+    if (!hooksDir) return;
+
+    const hooksFilePath = path.join(hooksDir, 'hooks.json');
+    if (!(await this.exists(hooksFilePath))) return;
+
+    try {
+      const content = await fs.readFile(hooksFilePath, 'utf-8');
+      const parsed = JSON.parse(content) as unknown;
+
+      if (!this.isRecord(parsed) || !this.isRecord(parsed['hooks'])) {
+        results.discoveryErrors.push(
+          'Failed to discover extension hooks: Invalid hooks configuration.',
+        );
+        return;
+      }
+
+      const commands = new Set<string>();
+      for (const definitions of Object.values(parsed['hooks'])) {
+        if (!Array.isArray(definitions)) continue;
+        for (const definition of definitions) {
+          if (!this.isRecord(definition)) continue;
+          const hooks = definition['hooks'];
+          if (!Array.isArray(hooks)) continue;
+          for (const hook of hooks) {
+            if (!this.isRecord(hook)) continue;
+            const command = this.getStringProperty(hook, 'command');
+            if (command) {
+              commands.add(command);
+            }
+          }
+        }
+      }
+
+      if (commands.size > 0) {
+        this.addUniqueItems(results.hooks, Array.from(commands));
+      } else {
+        this.addUniqueItems(results.hooks, [path.basename(hooksFilePath)]);
+      }
+    } catch (e) {
+      results.discoveryErrors.push(
+        `Failed to discover extension hooks: ${e instanceof Error ? e.message : String(e)}`,
       );
     }
   }
@@ -219,6 +324,85 @@ export class FolderTrustDiscoveryService {
     }
 
     return warnings;
+  }
+
+  private static async loadExtensionDiscoveryConfig(
+    extensionDir: string,
+    results: FolderDiscoveryResults,
+  ): Promise<ExtensionDiscoveryConfig | null> {
+    const configPath = path.join(extensionDir, EXTENSION_CONFIG_FILENAME);
+    if (!(await this.exists(configPath))) {
+      return null;
+    }
+
+    try {
+      const content = await fs.readFile(configPath, 'utf-8');
+      const parsed = JSON.parse(stripJsonComments(content)) as unknown;
+      if (!this.isRecord(parsed)) {
+        results.discoveryErrors.push(
+          'Failed to discover extension config: Manifest must be a JSON object.',
+        );
+        return null;
+      }
+
+      return {
+        hooksDir: this.getStringProperty(parsed, 'hooksDir'),
+        skillsDir: this.getStringProperty(parsed, 'skillsDir'),
+      };
+    } catch (e) {
+      results.discoveryErrors.push(
+        `Failed to discover extension config: ${e instanceof Error ? e.message : String(e)}`,
+      );
+      return null;
+    }
+  }
+
+  private static resolveExtensionDir(
+    extensionDir: string,
+    configuredDir: string | undefined,
+    defaultDir: string,
+    dirType: 'hooks' | 'skills',
+    results: FolderDiscoveryResults,
+  ): string | null {
+    const dirName = configuredDir ?? defaultDir;
+    if (!dirName.trim()) {
+      results.discoveryErrors.push(
+        `Invalid ${dirType} directory path: "${dirName}". ${this.capitalize(dirType)} directory must be within the extension directory.`,
+      );
+      return null;
+    }
+
+    const resolvedDir = path.resolve(extensionDir, dirName);
+    if (!isSubpath(extensionDir, resolvedDir)) {
+      results.discoveryErrors.push(
+        `Invalid ${dirType} directory path: "${dirName}". ${this.capitalize(dirType)} directory must be within the extension directory.`,
+      );
+      return null;
+    }
+
+    return resolvedDir;
+  }
+
+  private static capitalize(value: string): string {
+    return value.charAt(0).toUpperCase() + value.slice(1);
+  }
+
+  private static addUniqueItems(target: string[], items: string[]) {
+    const existing = new Set(target);
+    for (const item of items) {
+      if (!existing.has(item)) {
+        target.push(item);
+        existing.add(item);
+      }
+    }
+  }
+
+  private static getStringProperty(
+    record: Record<string, unknown>,
+    key: string,
+  ): string | undefined {
+    const value = record[key];
+    return typeof value === 'string' ? value : undefined;
   }
 
   private static isRecord(val: unknown): val is Record<string, unknown> {
