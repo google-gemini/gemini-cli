@@ -165,6 +165,69 @@ description: project-desc
     expect(service.getSkills()[0].description).toBe('user-desc');
   });
 
+  it('should respect precedence case-insensitively', async () => {
+    const userDir = path.join(testRootDir, 'user');
+    const projectDir = path.join(testRootDir, 'workspace');
+    await fs.mkdir(path.join(userDir, 'skill'), { recursive: true });
+    await fs.mkdir(path.join(projectDir, 'skill'), { recursive: true });
+
+    await fs.writeFile(
+      path.join(userDir, 'skill', 'SKILL.md'),
+      `---
+name: my-skill
+description: user-desc
+---
+`,
+    );
+    await fs.writeFile(
+      path.join(projectDir, 'skill', 'SKILL.md'),
+      `---
+name: My-Skill
+description: project-desc
+---
+`,
+    );
+
+    const mockExtension: GeminiCLIExtension = {
+      name: 'test-ext',
+      version: '1.0.0',
+      isActive: true,
+      path: '/ext',
+      contextFiles: [],
+      id: 'ext-id',
+      skills: [
+        {
+          name: 'MY-SKILL',
+          description: 'ext-desc',
+          location: '/ext/skills/SKILL.md',
+          body: 'body',
+        },
+      ],
+    };
+
+    vi.spyOn(Storage, 'getUserSkillsDir').mockReturnValue(userDir);
+    vi.spyOn(Storage, 'getUserAgentSkillsDir').mockReturnValue(
+      '/non-existent-user-agent',
+    );
+    const storage = new Storage('/dummy');
+    vi.spyOn(storage, 'getProjectSkillsDir').mockReturnValue(projectDir);
+    vi.spyOn(storage, 'getProjectAgentSkillsDir').mockReturnValue(
+      '/non-existent-project-agent',
+    );
+
+    const service = new SkillManager();
+    // @ts-expect-error accessing private method for testing
+    vi.spyOn(service, 'discoverBuiltinSkills').mockResolvedValue(undefined);
+    await service.discoverSkills(storage, [mockExtension], true);
+
+    const skills = service.getSkills();
+    expect(skills).toHaveLength(1);
+    expect(skills[0].description).toBe('project-desc');
+
+    const skillFetched = service.getSkill('my-skill');
+    expect(skillFetched?.description).toBe('project-desc');
+  });
+
   it('should discover built-in skills', async () => {
     const service = new SkillManager();
     const mockBuiltinSkill: SkillDefinition = {
@@ -332,6 +395,16 @@ description: project-desc
     expect(service.isSkillActive('skill-2')).toBe(false);
   });
 
+  it('should activate and check active skills case-insensitively', () => {
+    const service = new SkillManager();
+    service.activateSkill('Skill-One');
+
+    expect(service.isSkillActive('skill-one')).toBe(true);
+    expect(service.isSkillActive('Skill-One')).toBe(true);
+    expect(service.isSkillActive('SKILL-ONE')).toBe(true);
+    expect(service.isSkillActive('skill-two')).toBe(false);
+  });
+
   describe('Conflict Detection', () => {
     it('should emit UI warning when a non-built-in skill is overridden', async () => {
       const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
@@ -448,6 +521,64 @@ description: project-desc
       expect(debugWarnSpy).toHaveBeenCalledWith(
         expect.stringContaining(
           `Skill "${skillName}" from "${userSkillPath}" is overriding the built-in skill.`,
+        ),
+      );
+    });
+
+    it('should detect skill conflicts case-insensitively', async () => {
+      const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+      const userDir = path.join(testRootDir, 'user');
+      const projectDir = path.join(testRootDir, 'workspace');
+      await fs.mkdir(userDir, { recursive: true });
+      await fs.mkdir(projectDir, { recursive: true });
+
+      const userSkillPath = path.join(userDir, 'SKILL.md');
+      const projectSkillPath = path.join(projectDir, 'SKILL.md');
+
+      vi.mocked(loadSkillsFromDir).mockImplementation(async (dir) => {
+        if (dir === userDir) {
+          return [
+            {
+              name: 'Conflicting-Skill',
+              description: 'user-desc',
+              location: userSkillPath,
+              body: '',
+            },
+          ];
+        }
+        if (dir === projectDir) {
+          return [
+            {
+              name: 'conflicting-skill',
+              description: 'project-desc',
+              location: projectSkillPath,
+              body: '',
+            },
+          ];
+        }
+        return [];
+      });
+
+      vi.spyOn(Storage, 'getUserSkillsDir').mockReturnValue(userDir);
+      vi.spyOn(Storage, 'getUserAgentSkillsDir').mockReturnValue(
+        '/non-existent-user-agent',
+      );
+      const storage = new Storage('/dummy');
+      vi.spyOn(storage, 'getProjectSkillsDir').mockReturnValue(projectDir);
+      vi.spyOn(storage, 'getProjectAgentSkillsDir').mockReturnValue(
+        '/non-existent-project-agent',
+      );
+
+      const service = new SkillManager();
+      // @ts-expect-error accessing private method for testing
+      vi.spyOn(service, 'discoverBuiltinSkills').mockResolvedValue(undefined);
+
+      await service.discoverSkills(storage, [], true);
+
+      expect(emitFeedbackSpy).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining(
+          `Skill conflict detected: "conflicting-skill" from "${projectSkillPath}" is overriding the same skill from "${userSkillPath}".`,
         ),
       );
     });

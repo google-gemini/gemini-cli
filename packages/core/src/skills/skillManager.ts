@@ -123,11 +123,12 @@ export class SkillManager {
 
   private addSkillsWithPrecedence(newSkills: SkillDefinition[]): void {
     const skillMap = new Map<string, SkillDefinition>(
-      this.skills.map((s) => [s.name, s]),
+      this.skills.map((s) => [s.name.toLowerCase(), s]),
     );
 
     for (const newSkill of newSkills) {
-      const existingSkill = skillMap.get(newSkill.name);
+      const key = newSkill.name.toLowerCase();
+      const existingSkill = skillMap.get(key);
       if (existingSkill && existingSkill.location !== newSkill.location) {
         if (existingSkill.isBuiltin) {
           debugLogger.warn(
@@ -140,7 +141,7 @@ export class SkillManager {
           );
         }
       }
-      skillMap.set(newSkill.name, newSkill);
+      skillMap.set(key, newSkill);
     }
 
     this.skills = Array.from(skillMap.values());
@@ -201,13 +202,13 @@ export class SkillManager {
    * Activates a skill by name.
    */
   activateSkill(name: string): void {
-    this.activeSkillNames.add(name);
+    this.activeSkillNames.add(name.toLowerCase());
   }
 
   /**
    * Checks if a skill is active.
    */
   isSkillActive(name: string): boolean {
-    return this.activeSkillNames.has(name);
+    return this.activeSkillNames.has(name.toLowerCase());
   }
 }
