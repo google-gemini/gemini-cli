@@ -18,6 +18,30 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.56.0 - 2026-08-19
+
+- **Evaluation Suite & Golden Issues:** Introduced local reporting commands,
+  developer docs, and a triage evaluation framework with an automated judge
+  runner ([#28369](https://github.com/google-gemini/gemini-cli/pull/28369) by
+  @ved015, [#28530](https://github.com/google-gemini/gemini-cli/pull/28530) by
+  @chadd28).
+- **Caretaker & Ingestion Pipelines:** Implemented issue comment handling,
+  re-triage workflows, spec event publishing, and automated Firestore schema
+  updates ([#28690](https://github.com/google-gemini/gemini-cli/pull/28690),
+  [#28588](https://github.com/google-gemini/gemini-cli/pull/28588) by @chadd28).
+- **PR Generator & Workflows:** Configured deployment files, environment
+  parsers, and state machine container entries for the PR generator
+  ([#28431](https://github.com/google-gemini/gemini-cli/pull/28431),
+  [#28433](https://github.com/google-gemini/gemini-cli/pull/28433) by
+  @joneba-google).
+- **API Resilience & Troubleshooting:** Enforced terminal classification for
+  capacity exhaustion, resolved core quota lookup mapping, and propagated
+  InvalidStreamError guidance to the UI
+  ([#28599](https://github.com/google-gemini/gemini-cli/pull/28599) by
+  @luisfelipe-alt,
+  [#28566](https://github.com/google-gemini/gemini-cli/pull/28566) by
+  @DavidAPierce).
+
 ## Announcements: v0.54.0 - 2026-08-06
 
 - **PR Automation & Antigravity Agent:** Integrated the Antigravity agent runner
