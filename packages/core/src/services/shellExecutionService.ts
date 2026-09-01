@@ -496,18 +496,18 @@ export class ShellExecutionService {
     }
 
     let gitConfigCount = parseInt(baseEnv['GIT_CONFIG_COUNT'] || '0', 10);
-    const devNullPath = os.platform() === 'win32' ? 'NUL' : '/dev/null';
 
-    baseEnv['GIT_CONFIG_GLOBAL'] = devNullPath;
-    baseEnv['GIT_CONFIG_SYSTEM'] = devNullPath;
-    baseEnv['GIT_CONFIG_NOSYSTEM'] = '1';
+    // Do not point GIT_CONFIG_GLOBAL / GIT_CONFIG_SYSTEM at /dev/null here.
+    // Doing so hides the user's real global/system git config (e.g.
+    // user.name, user.email, init.defaultBranch, pull.rebase) from every
+    // shell command, which breaks `git commit` with "Author identity
+    // unknown". The overrides appended below via GIT_CONFIG_KEY_n pairs are
+    // evaluated by git with higher precedence than any config file, so
+    // dangerous interactive settings (pagers, editors, hooks, fsmonitor,
+    // credential helpers) are still neutralized while harmless user
+    // preferences are preserved.
 
-    sanitizationConfig.allowedEnvironmentVariables.push(
-      'GIT_CONFIG_COUNT',
-      'GIT_CONFIG_GLOBAL',
-      'GIT_CONFIG_SYSTEM',
-      'GIT_CONFIG_NOSYSTEM',
-    );
+    sanitizationConfig.allowedEnvironmentVariables.push('GIT_CONFIG_COUNT');
 
     const defaultGitOverrides: Array<[string, string]> = [
       ['credential.helper', ''],
