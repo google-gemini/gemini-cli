@@ -109,16 +109,19 @@ async function bundle() {
 
     const sanitizeFile = (filePath) => {
       if (fs.existsSync(filePath)) {
-        let content = fs.readFileSync(filePath, 'utf8');
-        const keyPattern = /AIzaSy[A-Za-z0-9_-]{30,40}/g;
+        const content = fs.readFileSync(filePath, 'utf8');
+        const keyPattern = /AIzaSy[A-Za-z0-9_-]{30,40}/;
         if (keyPattern.test(content)) {
           console.log(`Sanitizing hardcoded API key in: ${filePath}`);
-          // Replace single-quoted and double-quoted occurrences of any matching Google API key with process.env lookup
-          const singleQuotedPattern = /'AIzaSy[A-Za-z0-9_-]{30,40}'/g;
-          const doubleQuotedPattern = /"AIzaSy[A-Za-z0-9_-]{30,40}"/g;
-          content = content.replace(singleQuotedPattern, 'process.env.CRUX_API_KEY || ""');
-          content = content.replace(doubleQuotedPattern, 'process.env.CRUX_API_KEY || ""');
-          fs.writeFileSync(filePath, content, 'utf8');
+          // Replace single-quoted, double-quoted, and backtick occurrences of any matching Google API key with process.env lookup
+          const quotedPattern = /([\x27\x22\x60])AIzaSy[A-Za-z0-9_-]{30,40}\1/g;
+          const sanitizedContent = content.replace(quotedPattern, 'process.env.CRUX_API_KEY || ""');
+          
+          if (keyPattern.test(sanitizedContent)) {
+            throw new Error(`Failed to fully sanitize API key in ${filePath}. The key pattern was detected but could not be safely replaced.`);
+          }
+          
+          fs.writeFileSync(filePath, sanitizedContent, 'utf8');
         }
       }
     };
