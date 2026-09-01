@@ -67,3 +67,41 @@ export function loadInstallMetadata(
     return undefined;
   }
 }
+
+/**
+ * Reads the `version` field from an extension's `package.json`, if one is
+ * present alongside `gemini-extension.json` and has a string `version`. Returns
+ * `undefined` for any failure (missing file, parse error, non-string version)
+ * so callers can treat it as best-effort metadata.
+ *
+ * Intended to be called exactly once per extension during the load pipeline;
+ * the result is then carried on `GeminiCLIExtension.packageVersion`.
+ */
+export async function getPackageVersion(
+  extensionDir: string,
+): Promise<string | undefined> {
+  const pkgPath = path.join(extensionDir, 'package.json');
+  try {
+    const content = await fs.promises.readFile(pkgPath, 'utf-8');
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const pkg = JSON.parse(content) as { version?: unknown };
+    return typeof pkg.version === 'string' ? pkg.version : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Formats an extension version for display. When the config version (e.g.
+ * `latest`) differs from the concrete `package.json` version, the latter is
+ * appended in parentheses so users see meaningful info: `latest (0.20.2)`.
+ */
+export function formatVersion(
+  configVersion: string,
+  packageVersion?: string,
+): string {
+  if (!packageVersion || packageVersion === configVersion) {
+    return configVersion;
+  }
+  return `${configVersion} (${packageVersion})`;
+}
