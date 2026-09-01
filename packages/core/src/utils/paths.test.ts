@@ -26,11 +26,12 @@ import {
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof fs>();
   const mockRealpath = (p: string) => p;
-  mockRealpath.native = (p: string) => p;
-  return {
+  mockRealpath.native = (p: string) => mockedFs.realpathSync(p);
+  const mockedFs = {
     ...(actual as object),
     realpathSync: mockRealpath,
   };
+  return mockedFs;
 });
 
 const mockPlatform = (platform: string) => {
@@ -617,13 +618,19 @@ describe('resolveToRealPath', () => {
     });
 
     it('should strip long path prefix \\\\?\\', () => {
-      vi.spyOn(fs.realpathSync, 'native').mockReturnValueOnce('\\\\?\\C:\\foo\\bar');
+      vi.spyOn(fs.realpathSync, 'native').mockReturnValueOnce(
+        '\\\\?\\C:\\foo\\bar',
+      );
       expect(resolveToRealPath('C:\\foo\\bar')).toBe('C:\\foo\\bar');
     });
 
     it('should strip UNC long path prefix \\\\?\\UNC\\ and keep UNC slash structure', () => {
-      vi.spyOn(fs.realpathSync, 'native').mockReturnValueOnce('\\\\?\\UNC\\server\\share\\foo');
-      expect(resolveToRealPath('\\\\server\\share\\foo')).toBe('\\\\server\\share\\foo');
+      vi.spyOn(fs.realpathSync, 'native').mockReturnValueOnce(
+        '\\\\?\\UNC\\server\\share\\foo',
+      );
+      expect(resolveToRealPath('\\\\server\\share\\foo')).toBe(
+        '\\\\server\\share\\foo',
+      );
     });
   });
 });
