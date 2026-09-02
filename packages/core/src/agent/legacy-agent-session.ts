@@ -179,6 +179,7 @@ export class LegacyAgentProtocol implements AgentProtocol {
     let currentDisplayContent = initialDisplayContent;
     let turnCount = 0;
     const maxTurns = this._config.getMaxSessionTurns();
+    let isAfterToolResponse = false;
 
     while (true) {
       turnCount++;
@@ -193,6 +194,8 @@ export class LegacyAgentProtocol implements AgentProtocol {
 
       const toolCallRequests: ToolCallRequestInfo[] = [];
       let finishedReason: FinishReason | undefined = undefined;
+      let hasVisibleText = false;
+
       const responseStream = this._client.sendMessageStream(
         currentParts,
         this._abortController.signal,
@@ -210,6 +213,12 @@ export class LegacyAgentProtocol implements AgentProtocol {
 
         if (event.type === GeminiEventType.ToolCallRequest) {
           toolCallRequests.push(event.value);
+        }
+
+        if (event.type === GeminiEventType.Content) {
+          if (typeof event.value === 'string' && event.value.trim() !== '') {
+            hasVisibleText = true;
+          }
         }
 
         this._emit(translateEvent(event, this._translationState));
@@ -239,6 +248,15 @@ export class LegacyAgentProtocol implements AgentProtocol {
       }
 
       if (toolCallRequests.length === 0) {
+        if (isAfterToolResponse && !hasVisibleText) {
+          const nudgeMessage =
+            '[System: You successfully executed a tool but returned an empty response. Please analyze the tool output and explain your progress or final answer.]';
+
+          currentParts = [{ text: nudgeMessage }];
+          isAfterToolResponse = false;
+          continue;
+        }
+
         if (finishedReason !== undefined) {
           this._finishStream(mapFinishReason(finishedReason));
         } else {
@@ -321,6 +339,7 @@ export class LegacyAgentProtocol implements AgentProtocol {
       }
 
       currentParts = toolResponseParts;
+      isAfterToolResponse = completedToolCalls.length > 0;
     }
   }
 

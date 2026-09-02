@@ -5,6 +5,9 @@
  */
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import * as dnsPromises from 'node:dns/promises';
+import type { LookupAddress, LookupAllOptions } from 'node:dns';
+import ipaddr from 'ipaddr.js';
 import type {
   OAuthFlowConfig,
   OAuthRefreshConfig,
@@ -19,6 +22,10 @@ import {
   refreshAccessToken,
   REDIRECT_PATH,
 } from './oauth-flow.js';
+
+vi.mock('node:dns/promises', () => ({
+  lookup: vi.fn(),
+}));
 
 // Save real fetch for startCallbackServer tests (which hit a real local server)
 const realFetch = global.fetch;
@@ -59,6 +66,18 @@ describe('oauth-flow', () => {
   beforeEach(() => {
     vi.stubEnv('OAUTH_CALLBACK_PORT', '');
     mockFetch.mockReset();
+
+    vi.mocked(
+      dnsPromises.lookup as (
+        hostname: string,
+        options: LookupAllOptions,
+      ) => Promise<LookupAddress[]>,
+    ).mockImplementation(async (hostname: string) => {
+      if (ipaddr.isValid(hostname)) {
+        return [{ address: hostname, family: hostname.includes(':') ? 6 : 4 }];
+      }
+      return [{ address: '93.184.216.34', family: 4 }];
+    });
   });
 
   afterEach(() => {
@@ -795,6 +814,52 @@ describe('oauth-flow', () => {
 
       expect(result.access_token).toBe('refreshed-token');
       expect(result.expires_in).toBe(1800);
+    });
+
+    it('should reject token refresh when tokenUrl points to private IP or loopback from remote', async () => {
+      await expect(
+        refreshAccessToken(
+          refreshConfig,
+          'refresh-token',
+          'http://127.0.0.1:18080/token',
+          'https://mcp.remote.com',
+        ),
+      ).rejects.toThrow();
+
+      await expect(
+        refreshAccessToken(
+          refreshConfig,
+          'refresh-token',
+          'http://169.254.169.254/token',
+        ),
+      ).rejects.toThrow();
+    });
+
+    it('should reject token exchange when tokenUrl points to private IP or loopback from remote', async () => {
+      await expect(
+        exchangeCodeForToken(
+          {
+            ...baseConfig,
+            tokenUrl: 'http://127.0.0.1:18080/token',
+          },
+          'code',
+          'verifier',
+          3000,
+          'https://mcp.remote.com',
+        ),
+      ).rejects.toThrow();
+
+      await expect(
+        exchangeCodeForToken(
+          {
+            ...baseConfig,
+            tokenUrl: 'http://169.254.169.254/token',
+          },
+          'code',
+          'verifier',
+          3000,
+        ),
+      ).rejects.toThrow();
     });
   });
 });
