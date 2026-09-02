@@ -21,6 +21,7 @@ import {
   toPathKey,
   isTrustedSystemPath,
   resolveDefensiveToolPath,
+  hasBlockedPathSegment,
 } from './paths.js';
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -974,6 +975,28 @@ describe('normalizePath', () => {
       const filePathWithNull = '@/components/Button.tsx\0';
       const result = resolveDefensiveToolPath(filePathWithNull, targetDir);
       expect(result).toBe('components/Button.tsx');
+    });
+  });
+
+  describe('hasBlockedPathSegment', () => {
+    it('should identify standard blocked segments', () => {
+      expect(hasBlockedPathSegment('src/.git/config')).toBe(true);
+      expect(hasBlockedPathSegment('.env')).toBe(true);
+      expect(hasBlockedPathSegment('node_modules/lodash')).toBe(true);
+      expect(hasBlockedPathSegment('safe/path/here')).toBe(false);
+    });
+
+    it('should identify NTFS 8.3 short name (SFN) blocked segments', () => {
+      expect(hasBlockedPathSegment('git~1/config')).toBe(true);
+      expect(hasBlockedPathSegment('gi1a2b~1/config')).toBe(true);
+      expect(hasBlockedPathSegment('env~1')).toBe(true);
+      expect(hasBlockedPathSegment('node_m~1/lodash')).toBe(true);
+    });
+
+    it('should block standard and SFN patterns for gha-creds-*.json', () => {
+      expect(hasBlockedPathSegment('gha-creds-1234.json')).toBe(true);
+      expect(hasBlockedPathSegment('gha-cr~1.json')).toBe(true);
+      expect(hasBlockedPathSegment('gh1a2b~1.json')).toBe(true);
     });
   });
 });

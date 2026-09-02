@@ -11,7 +11,11 @@ import {
   type SafetyCheckResult,
 } from './protocol.js';
 import type { AllowedPathConfig } from '../policy/types.js';
-import { resolveToRealPath, hasBlockedPathSegment, trimTrailingSpacesAndDots } from '../utils/paths.js';
+import {
+  resolveToRealPath,
+  hasBlockedPathSegment,
+  trimTrailingSpacesAndDots,
+} from '../utils/paths.js';
 
 /**
  * Interface for all in-process safety checkers.
@@ -72,7 +76,7 @@ export class AllowedPathChecker implements InProcessChecker {
         if (hasBlockedPathSegment(relative)) {
           hasBlockedSegment = true;
         }
-        const segments = relative.split(path.sep);
+        const segments = relative.split(/[/\\]/);
         for (const segment of segments) {
           const clean = trimTrailingSpacesAndDots(
             segment.split(':')[0],
