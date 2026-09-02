@@ -100,7 +100,16 @@ export async function updateExtension(
   const originalVersion = extension.version;
 
   const tempDir = await ExtensionStorage.createTmpDir();
+  // Tracks whether tempDir actually holds a copy of the current installation.
+  // The rollback below must not restore from tempDir unless it does, or a
+  // failed backup would overwrite an intact extension with a partial copy.
+  let backedUp = false;
   try {
+    // Back up the current installation before anything mutates it. Without
+    // this, tempDir stays empty and the rollback in the catch block restores
+    // nothing.
+    await copyExtension(extension.path, tempDir);
+    backedUp = true;
     const previousExtensionConfig = await extensionManager.loadExtensionConfig(
       extension.path,
     );
@@ -142,7 +151,9 @@ export async function updateExtension(
       type: 'SET_STATE',
       payload: { name: extension.name, state: ExtensionUpdateState.ERROR },
     });
-    await copyExtension(tempDir, extension.path);
+    if (backedUp) {
+      await copyExtension(tempDir, extension.path);
+    }
     throw e;
   } finally {
     await fs.promises.rm(tempDir, { recursive: true, force: true });
