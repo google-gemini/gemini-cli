@@ -2424,7 +2424,7 @@ function getExtensionEnvironment(
   const env: Record<string, string> = {};
   if (extension?.resolvedSettings) {
     for (const setting of extension.resolvedSettings) {
-      if (setting.value !== undefined) {
+      if (setting.value !== undefined && typeof setting.envVar === 'string') {
         if (isDangerousExecutionEnvironmentVariable(setting.envVar)) {
           debugLogger.warn(
             `Blocked restricted environment variable override in extension settings: ${setting.envVar}`,
