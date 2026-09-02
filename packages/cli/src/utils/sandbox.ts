@@ -173,10 +173,9 @@ export async function start_sandbox(
         ].join(' ');
 
         const hostTmpDir = fs.realpathSync(os.tmpdir());
-        const createdTmpDir = fs.mkdtempSync(
+        const resolvedTmpDir = fs.mkdtempSync(
           path.join(hostTmpDir, 'gemini-sandbox-'),
         );
-        const resolvedTmpDir = fs.realpathSync(createdTmpDir);
         sandboxTmpDir = resolvedTmpDir;
 
         const args = [
