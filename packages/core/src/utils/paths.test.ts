@@ -34,6 +34,7 @@ vi.mock('node:fs', async (importOriginal) => {
   Object.defineProperty(mockRealpath, 'native', {
     value: (p: string) => mockedFs.realpathSync(p),
     writable: true,
+    configurable: true,
   });
   return mockedFs;
 });
