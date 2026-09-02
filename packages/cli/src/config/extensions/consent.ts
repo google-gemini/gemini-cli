@@ -226,7 +226,9 @@ async function extensionConsentString(
           a.localeCompare(b),
         );
         for (const [envKey, envValue] of sortedEnv) {
-          output.push(`      - ${envKey}: ${envValue ?? ''}`);
+          const isSensitive = /token|secret|password|passwd|key|auth|credential|creds|private|cert/i.test(envKey);
+          const displayValue = isSensitive && envValue ? '********' : (envValue ?? '');
+          output.push(`      - ${envKey}: ${displayValue}`);
         }
       }
       if (mcpServer.headers && Object.keys(mcpServer.headers).length > 0) {
@@ -235,7 +237,9 @@ async function extensionConsentString(
           a.localeCompare(b),
         );
         for (const [headerKey, headerValue] of sortedHeaders) {
-          output.push(`      - ${headerKey}: ${headerValue ?? ''}`);
+          const isSensitive = /authorization|key|cookie|token|secret/i.test(headerKey);
+          const displayValue = isSensitive && headerValue ? '********' : (headerValue ?? '');
+          output.push(`      - ${headerKey}: ${displayValue}`);
         }
       }
       if (mcpServer.url) {
@@ -277,10 +281,12 @@ async function extensionConsentString(
           a.localeCompare(b),
         );
         for (const [oKey, oValue] of sortedOauth) {
+          const isSensitive = /secret|token|password/i.test(oKey);
           const valStr = Array.isArray(oValue)
             ? oValue.join(', ')
             : String(oValue ?? '');
-          output.push(`      - ${oKey}: ${valStr}`);
+          const displayValue = isSensitive && valStr ? '********' : valStr;
+          output.push(`      - ${oKey}: ${displayValue}`);
         }
       }
       output.push(`    Config signature: ${getMcpServerConfigHash(mcpServer)}`);
