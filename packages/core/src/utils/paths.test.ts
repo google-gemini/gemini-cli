@@ -632,6 +632,15 @@ describe('resolveToRealPath', () => {
         '\\\\server\\share\\foo',
       );
     });
+
+    it('should strip lowercase UNC long path prefix \\\\?\\unc\\ case-insensitively', () => {
+      vi.spyOn(fs.realpathSync, 'native').mockReturnValueOnce(
+        '\\\\?\\unc\\server\\share\\foo',
+      );
+      expect(resolveToRealPath('\\\\server\\share\\foo')).toBe(
+        '\\\\server\\share\\foo',
+      );
+    });
   });
 });
 
