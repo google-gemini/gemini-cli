@@ -1091,6 +1091,63 @@ describe('isFileAndDirectorySecureSync', () => {
       'Security check output missing or incomplete',
     );
   });
+
+  it('handles Windows drive letter casing differences case-insensitively and does not perform redundant checks', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('win32');
+    vi.mocked(fsSync.existsSync).mockReturnValue(true);
+    // Real path has lowercase 'c:' drive letter
+    vi.mocked(fsSync.realpathSync).mockImplementation((p) => {
+      const pStr = p.toString();
+      if (pStr.startsWith('C:\\')) {
+        return 'c:\\' + pStr.slice(3);
+      }
+      return pStr;
+    });
+    vi.mocked(fsSync.lstatSync).mockReturnValue({
+      isSymbolicLink: () => false,
+    } as unknown as Stats);
+    vi.mocked(fsSync.statSync).mockImplementation((p) => {
+      if (String(p).toLowerCase().endsWith('settings.json')) {
+        return {
+          isDirectory: () => false,
+          isFile: () => true,
+        } as unknown as Stats;
+      }
+      return {
+        isDirectory: () => true,
+        isFile: () => false,
+      } as unknown as Stats;
+    });
+
+    const testFilePath = 'C:\\ProgramData\\gemini-cli\\settings.json';
+    const lowercaseFile = 'c:\\ProgramData\\gemini-cli\\settings.json';
+    const normalizedFile = path.win32.resolve(testFilePath);
+    const parentDir = path.win32.dirname(normalizedFile);
+
+    // Mock spawnSync to return success for all paths
+    vi.mocked(spawnSync).mockReturnValue({
+      stdout: `PATH:${parentDir}\nPATH:${normalizedFile}\nPATH:${lowercaseFile}\n`,
+      stderr: '',
+      status: 0,
+      pid: 1234,
+      output: [],
+      signal: null,
+    });
+
+    const cache = createPathSecurityCache();
+    const result = isFileAndDirectorySecureSync(testFilePath, cache);
+
+    expect(result.secure).toBe(true);
+    // Verified that spawnSync was invoked exactly once because the canonical path and normalized path were compared case-insensitively
+    expect(spawnSync).toHaveBeenCalledTimes(1);
+    // The PowerShell script should only check unique, non-redundant paths
+    const spawnCall = vi.mocked(spawnSync).mock.calls[0];
+    const scriptArg = (spawnCall[1] as string[])?.[5] ?? '';
+    expect(scriptArg).toContain(`'${normalizedFile}'`);
+    expect(scriptArg).toContain(`'${parentDir}'`);
+    // Should NOT contain duplicate real path with lowercase drive letter as pathsEqual should prevent batching it
+    expect(scriptArg).not.toContain(`'${lowercaseFile}'`);
+  });
 });
 
 describe('SecurityValidator', () => {

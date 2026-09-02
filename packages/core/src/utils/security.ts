@@ -262,13 +262,13 @@ function formatWindowsSecurityResult(
   const itemType = isDirectory ? 'Directory' : 'File';
   const reasons: string[] = [];
 
-  if (parsed.ownerViolation) {
+  if (parsed.ownerViolation !== undefined) {
     reasons.push(
       `${itemType} '${targetPath}' is not owned by a trusted administrator or SYSTEM account. Current owner: ${parsed.ownerViolation}.`,
     );
   }
 
-  if (parsed.permsViolation) {
+  if (parsed.permsViolation !== undefined) {
     reasons.push(
       `${itemType} '${targetPath}' is insecure. The following user groups have write permissions: ${parsed.permsViolation}. To fix this, remove Write and Modify permissions for these groups from the directory's ACLs.`,
     );
@@ -584,10 +584,15 @@ export function isFileAndDirectorySecureSync(
 
   const canonicalParentDir = pathModule.dirname(canonicalFilePath);
 
+  const isWin = os.platform() === 'win32';
+  const pathsEqual = isWin
+    ? canonicalFilePath.toLowerCase() === normalizedFilePath.toLowerCase()
+    : canonicalFilePath === normalizedFilePath;
+
   // On Windows, batch all uncached paths into a single PowerShell check
-  if (os.platform() === 'win32') {
+  if (isWin) {
     const pathsToCheck = [normalizedFilePath, parentDir];
-    if (canonicalFilePath !== normalizedFilePath) {
+    if (!pathsEqual) {
       pathsToCheck.push(canonicalParentDir, canonicalFilePath);
     }
     const uniquePaths = Array.from(new Set(pathsToCheck));
@@ -620,7 +625,7 @@ export function isFileAndDirectorySecureSync(
   }
 
   // 3. If the canonical path differs (symlink in leaf or parent), verify canonical target file and its parent directory
-  if (canonicalFilePath !== normalizedFilePath) {
+  if (!pathsEqual) {
     const realFileCheck = isPathSecureSync(
       canonicalFilePath,
       'file',
