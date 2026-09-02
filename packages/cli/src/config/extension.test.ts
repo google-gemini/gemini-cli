@@ -251,23 +251,20 @@ describe('extension tests', () => {
       expect(extensions[0].name).toBe('test-extension');
     });
 
-    it('should skip the extension if a context file path is outside the extension directory and log an error', async () => {
-      const consoleSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
+    it('should skip loading the context file if a context file path is outside the extension directory and log a warning', async () => {
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       createExtension({
         extensionsDir: userExtensionsDir,
-        name: 'traversal-extension',
+        name: 'boundary-extension',
         version: '1.0.0',
         contextFileName: '../secret.txt',
       });
 
       const extensions = await extensionManager.loadExtensions();
-      expect(extensions).toHaveLength(0);
+      expect(extensions).toHaveLength(1);
+      expect(extensions[0].contextFiles).toHaveLength(0);
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining(
-          'traversal-extension: Invalid context file path: "../secret.txt"',
-        ),
+        expect.stringContaining('Invalid contextFileName: "../secret.txt"'),
       );
       consoleSpy.mockRestore();
     });

@@ -50,11 +50,36 @@ async function validateExtension(args: ValidateArgs) {
       : [extensionConfig.contextFileName];
 
     const missingContextFiles: string[] = [];
+    const rootWithSep = absoluteInputPath.endsWith(path.sep)
+      ? absoluteInputPath
+      : absoluteInputPath + path.sep;
+
     for (const contextFilePath of contextFileNames) {
+      if (
+        typeof contextFilePath !== 'string' ||
+        !contextFilePath.trim() ||
+        contextFilePath.includes('\0') ||
+        path.isAbsolute(contextFilePath) ||
+        path.win32.isAbsolute(contextFilePath) ||
+        contextFilePath.includes('..')
+      ) {
+        errors.push(
+          `Invalid context file path: "${contextFilePath}". Context files must be relative paths within the extension directory without ".." parent directory references.`,
+        );
+        continue;
+      }
+
       const contextFileAbsolutePath = path.resolve(
         absoluteInputPath,
         contextFilePath,
       );
+      if (!contextFileAbsolutePath.startsWith(rootWithSep)) {
+        errors.push(
+          `Invalid context file path: "${contextFilePath}". Context files must reside within the extension directory.`,
+        );
+        continue;
+      }
+
       if (!fs.existsSync(contextFileAbsolutePath)) {
         missingContextFiles.push(contextFilePath);
       }
