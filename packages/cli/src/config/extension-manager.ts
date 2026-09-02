@@ -1286,85 +1286,119 @@ function getContextFileNames(config: ExtensionConfig): string[] {
 }
 
 /**
- * Resolves and validates context file paths defined in an extension configuration.
- * Hardens path resolution and enforces directory boundaries by:
- * - Using path.resolve() to determine the absolute root and target file paths.
- * - Rejecting absolute paths upfront (both POSIX and Windows formats).
- * - Disallowing relative parent directory references (e.g. '..').
- * - Verifying that the resolved file path starts with the extension root directory.
- * - Logging a warning when an invalid path is detected and skipping loading that context file.
+ * Context file candidate path validation result.
  */
-export function resolveContextFilePaths(
-  config: ExtensionConfig,
+export interface ContextPathValidationResult {
+  isValid: boolean;
+  resolvedPath?: string;
+  errorMessage?: string;
+}
+
+/**
+ * Validates a single context file candidate path against the extension root.
+ * Enforces directory boundary and path formatting by:
+ * - Requiring a non-empty string without null bytes.
+ * - Rejecting absolute paths (both POSIX and Windows formats).
+ * - Disallowing relative parent directory references (e.g. '..'), including URL-encoded variations.
+ * - Verifying that the resolved path stays strictly within the extension root directory.
+ */
+export function validateContextFilePath(
+  contextFileName: unknown,
   effectiveExtensionPath: string,
-): string[] {
+): ContextPathValidationResult {
+  if (typeof contextFileName !== 'string' || !contextFileName.trim()) {
+    return {
+      isValid: false,
+      errorMessage: 'expected a non-empty string.',
+    };
+  }
+
+  if (contextFileName.includes('\0')) {
+    return {
+      isValid: false,
+      errorMessage: 'null bytes are not allowed.',
+    };
+  }
+
+  // Reject absolute paths upfront (both POSIX and Windows formats)
+  if (
+    path.isAbsolute(contextFileName) ||
+    path.win32.isAbsolute(contextFileName)
+  ) {
+    return {
+      isValid: false,
+      errorMessage: 'Absolute paths are not allowed.',
+    };
+  }
+
+  // Disallow relative parent directory references (e.g. ..)
+  let decodedFileName = contextFileName;
+  try {
+    decodedFileName = decodeURIComponent(contextFileName);
+  } catch {
+    debugLogger.debug(
+      `[ExtensionManager] Could not decode URI component in contextFileName: "${contextFileName}". Proceeding with undecoded name.`,
+    );
+  }
+
+  if (contextFileName.includes('..') || decodedFileName.includes('..')) {
+    return {
+      isValid: false,
+      errorMessage:
+        'Relative parent directory references ("..") are not allowed.',
+    };
+  }
+
   const resolvedExtensionRoot = path.resolve(effectiveExtensionPath);
   const rootWithSep = resolvedExtensionRoot.endsWith(path.sep)
     ? resolvedExtensionRoot
     : resolvedExtensionRoot + path.sep;
 
+  const contextFilePath = path.resolve(resolvedExtensionRoot, contextFileName);
+
+  // Verify that resolvedFilePath starts with resolvedExtensionRoot + path.sep
+  if (
+    !contextFilePath.startsWith(rootWithSep) ||
+    !isSubpath(resolvedExtensionRoot, contextFilePath)
+  ) {
+    return {
+      isValid: false,
+      errorMessage: `escapes the extension directory boundary ("${resolvedExtensionRoot}").`,
+    };
+  }
+
+  return {
+    isValid: true,
+    resolvedPath: contextFilePath,
+  };
+}
+
+/**
+ * Resolves and validates context file paths defined in an extension configuration.
+ * Hardens path resolution and enforces directory boundaries by:
+ * - Validating each candidate context file path using validateContextFilePath.
+ * - Logging a warning when an invalid path is detected and skipping loading that context file.
+ * - Returning only paths that exist on disk.
+ */
+export function resolveContextFilePaths(
+  config: ExtensionConfig,
+  effectiveExtensionPath: string,
+): string[] {
   return getContextFileNames(config)
     .map((contextFileName) => {
-      if (typeof contextFileName !== 'string' || !contextFileName.trim()) {
-        debugLogger.warn(
-          `[ExtensionManager] Invalid contextFileName in extension "${config.name}": expected a non-empty string.`,
-        );
-        return null;
-      }
-
-      if (contextFileName.includes('\0')) {
-        debugLogger.warn(
-          `[ExtensionManager] Invalid contextFileName in extension "${config.name}": null bytes are not allowed.`,
-        );
-        return null;
-      }
-
-      // Reject absolute paths upfront (both POSIX and Windows formats)
-      if (
-        path.isAbsolute(contextFileName) ||
-        path.win32.isAbsolute(contextFileName)
-      ) {
-        debugLogger.warn(
-          `[ExtensionManager] Invalid contextFileName: "${contextFileName}" in extension "${config.name}". Absolute paths are not allowed.`,
-        );
-        return null;
-      }
-
-      // Disallow relative parent directory references (e.g. ..)
-      let decodedFileName = contextFileName;
-      try {
-        decodedFileName = decodeURIComponent(contextFileName);
-      } catch {
-        debugLogger.warn(
-          `[ExtensionManager] Malformed URI in contextFileName for extension "${config.name}": "${contextFileName}".`,
-        );
-        return null;
-      }
-
-      if (contextFileName.includes('..') || decodedFileName.includes('..')) {
-        debugLogger.warn(
-          `[ExtensionManager] Invalid contextFileName: "${contextFileName}" in extension "${config.name}". Relative parent directory references ("..") are not allowed.`,
-        );
-        return null;
-      }
-
-      const contextFilePath = path.resolve(
-        resolvedExtensionRoot,
+      const validation = validateContextFilePath(
         contextFileName,
+        effectiveExtensionPath,
       );
 
-      // Verify that resolvedFilePath starts with resolvedExtensionRoot + path.sep
-      if (
-        !contextFilePath.startsWith(rootWithSep) ||
-        !isSubpath(resolvedExtensionRoot, contextFilePath)
-      ) {
+      if (!validation.isValid) {
         debugLogger.warn(
-          `[ExtensionManager] Context file path "${contextFileName}" in extension "${config.name}" escapes the extension directory boundary ("${resolvedExtensionRoot}").`,
+          `[ExtensionManager] Invalid contextFileName: "${contextFileName}" in extension "${config.name}". ${validation.errorMessage}`,
         );
         return null;
       }
 
-      return contextFilePath;
+      return validation.resolvedPath!;
     })
     .filter(
       (contextFilePath): contextFilePath is string =>

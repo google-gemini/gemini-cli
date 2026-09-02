@@ -11,6 +11,7 @@ import * as path from 'node:path';
 import {
   ExtensionManager,
   resolveContextFilePaths,
+  validateContextFilePath,
 } from './extension-manager.js';
 import { createTestMergedSettings, type MergedSettings } from './settings.js';
 import { createExtension } from '../test-utils/createExtension.js';
@@ -873,6 +874,125 @@ describe('ExtensionManager', () => {
         expect(result).toEqual([]);
         expect(warnSpy).toHaveBeenCalled();
         warnSpy.mockRestore();
+      });
+
+      it('loads context file with percent characters without skipping it', () => {
+        const testFile = path.join(tempWorkspaceDir, '100%_complete.md');
+        fs.writeFileSync(testFile, '100% completed content');
+        const config = {
+          name: 'test',
+          version: '1.0.0',
+          contextFileName: '100%_complete.md',
+        };
+        const result = resolveContextFilePaths(config, tempWorkspaceDir);
+        expect(result).toEqual([testFile]);
+      });
+    });
+
+    describe('validateContextFilePath unit tests', () => {
+      it('validates standard relative context file path', () => {
+        const result = validateContextFilePath('GEMINI.md', tempWorkspaceDir);
+        expect(result.isValid).toBe(true);
+        expect(result.resolvedPath).toBe(
+          path.resolve(tempWorkspaceDir, 'GEMINI.md'),
+        );
+      });
+
+      it('validates context file path in nested subdirectory', () => {
+        const result = validateContextFilePath(
+          'docs/context.md',
+          tempWorkspaceDir,
+        );
+        expect(result.isValid).toBe(true);
+        expect(result.resolvedPath).toBe(
+          path.resolve(tempWorkspaceDir, 'docs/context.md'),
+        );
+      });
+
+      it('validates context file path containing percent characters', () => {
+        const result = validateContextFilePath(
+          'progress_100%_report.md',
+          tempWorkspaceDir,
+        );
+        expect(result.isValid).toBe(true);
+        expect(result.resolvedPath).toBe(
+          path.resolve(tempWorkspaceDir, 'progress_100%_report.md'),
+        );
+      });
+
+      it('rejects relative parent directory navigation', () => {
+        const result = validateContextFilePath(
+          '../secret.txt',
+          tempWorkspaceDir,
+        );
+        expect(result.isValid).toBe(false);
+        expect(result.errorMessage).toContain(
+          'Relative parent directory references ("..") are not allowed.',
+        );
+      });
+
+      it('rejects URL-encoded relative parent directory navigation', () => {
+        const resultLower = validateContextFilePath(
+          '%2e%2e/secret.txt',
+          tempWorkspaceDir,
+        );
+        expect(resultLower.isValid).toBe(false);
+        expect(resultLower.errorMessage).toContain(
+          'Relative parent directory references ("..") are not allowed.',
+        );
+
+        const resultUpper = validateContextFilePath(
+          '%2E%2E/secret.txt',
+          tempWorkspaceDir,
+        );
+        expect(resultUpper.isValid).toBe(false);
+        expect(resultUpper.errorMessage).toContain(
+          'Relative parent directory references ("..") are not allowed.',
+        );
+      });
+
+      it('rejects POSIX and Windows absolute paths', () => {
+        const resultPosix = validateContextFilePath(
+          '/etc/hosts',
+          tempWorkspaceDir,
+        );
+        expect(resultPosix.isValid).toBe(false);
+        expect(resultPosix.errorMessage).toContain(
+          'Absolute paths are not allowed.',
+        );
+
+        const resultWin = validateContextFilePath(
+          'C:\\Windows\\System32',
+          tempWorkspaceDir,
+        );
+        expect(resultWin.isValid).toBe(false);
+        expect(resultWin.errorMessage).toContain(
+          'Absolute paths are not allowed.',
+        );
+      });
+
+      it('rejects null bytes', () => {
+        const result = validateContextFilePath(
+          'context.md\0outside.txt',
+          tempWorkspaceDir,
+        );
+        expect(result.isValid).toBe(false);
+        expect(result.errorMessage).toContain('null bytes are not allowed.');
+      });
+
+      it('rejects empty or non-string inputs', () => {
+        expect(validateContextFilePath('', tempWorkspaceDir).isValid).toBe(
+          false,
+        );
+        expect(validateContextFilePath('   ', tempWorkspaceDir).isValid).toBe(
+          false,
+        );
+        expect(validateContextFilePath(null, tempWorkspaceDir).isValid).toBe(
+          false,
+        );
+        expect(validateContextFilePath(123, tempWorkspaceDir).isValid).toBe(
+          false,
+        );
       });
     });
   });

@@ -10,7 +10,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import semver from 'semver';
 import type { ExtensionConfig } from '../../config/extension.js';
-import { ExtensionManager } from '../../config/extension-manager.js';
+import {
+  ExtensionManager,
+  validateContextFilePath,
+} from '../../config/extension-manager.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 import { loadSettings } from '../../config/settings.js';
@@ -50,37 +53,21 @@ async function validateExtension(args: ValidateArgs) {
       : [extensionConfig.contextFileName];
 
     const missingContextFiles: string[] = [];
-    const rootWithSep = absoluteInputPath.endsWith(path.sep)
-      ? absoluteInputPath
-      : absoluteInputPath + path.sep;
 
     for (const contextFilePath of contextFileNames) {
-      if (
-        typeof contextFilePath !== 'string' ||
-        !contextFilePath.trim() ||
-        contextFilePath.includes('\0') ||
-        path.isAbsolute(contextFilePath) ||
-        path.win32.isAbsolute(contextFilePath) ||
-        contextFilePath.includes('..')
-      ) {
-        errors.push(
-          `Invalid context file path: "${contextFilePath}". Context files must be relative paths within the extension directory without ".." parent directory references.`,
-        );
-        continue;
-      }
-
-      const contextFileAbsolutePath = path.resolve(
-        absoluteInputPath,
+      const validation = validateContextFilePath(
         contextFilePath,
+        absoluteInputPath,
       );
-      if (!contextFileAbsolutePath.startsWith(rootWithSep)) {
+
+      if (!validation.isValid) {
         errors.push(
-          `Invalid context file path: "${contextFilePath}". Context files must reside within the extension directory.`,
+          `Invalid context file path: "${contextFilePath}". ${validation.errorMessage}`,
         );
         continue;
       }
 
-      if (!fs.existsSync(contextFileAbsolutePath)) {
+      if (!fs.existsSync(validation.resolvedPath!)) {
         missingContextFiles.push(contextFilePath);
       }
     }
