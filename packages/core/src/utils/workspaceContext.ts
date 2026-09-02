@@ -124,8 +124,8 @@ export class WorkspaceContext {
       if (!fs.existsSync(pathToAdd)) {
         return;
       }
-      // Resolve symlinks
-      const resolved = fs.realpathSync(path.resolve(this.targetDir, pathToAdd));
+      // Resolve symlinks and SFNs canonically
+      const resolved = resolveToRealPath(path.resolve(this.targetDir, pathToAdd));
       this.readOnlyPaths.add(resolved);
     } catch (e) {
       debugLogger.warn(`Failed to add read-only path ${pathToAdd}:`, e);
@@ -143,7 +143,8 @@ export class WorkspaceContext {
       throw new Error(`Path is not a directory: ${absolutePath}`);
     }
 
-    return fs.realpathSync(absolutePath);
+    // Resolve workspace directory canonically (supporting Windows SFNs)
+    return resolveToRealPath(absolutePath);
   }
 
   /**
