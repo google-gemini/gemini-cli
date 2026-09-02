@@ -635,3 +635,43 @@ export function resolveDefensiveToolPath(
   // Fallback: return the original path
   return cleanPath;
 }
+
+/**
+ * Trims trailing spaces and dots from a string without using regular expressions
+ * to completely eliminate any potential ReDoS (Regular Expression Denial of Service) risk.
+ */
+export function trimTrailingSpacesAndDots(str: string): string {
+  let end = str.length - 1;
+  while (end >= 0 && (str[end] === ' ' || str[end] === '.')) {
+    end--;
+  }
+  return str.slice(0, end + 1);
+}
+
+/**
+ * Checks if a path string contains any blocked segments (.git, .env, node_modules, gha-creds-*.json)
+ * including case-insensitive matches and NTFS 8.3 short names.
+ */
+export function hasBlockedPathSegment(p: string): boolean {
+  // Split by both forward and backward slashes to be platform-agnostic
+  const segments = p.split(/[/\\]/);
+  for (const segment of segments) {
+    const clean = trimTrailingSpacesAndDots(
+      segment.split(':')[0],
+    ).toLowerCase();
+    if (
+      clean === '.git' ||
+      clean === '.env' ||
+      clean === 'node_modules' ||
+      /^(git|gi[0-9a-f]{4})~\d+$/.test(clean) ||
+      /^(env|en[0-9a-f]{4})~\d+$/.test(clean) ||
+      /^(node_m|no[0-9a-f]{4})~\d+$/.test(clean)
+    ) {
+      return true;
+    }
+    if (clean.startsWith('gha-creds-') && clean.endsWith('.json')) {
+      return true;
+    }
+  }
+  return false;
+}
