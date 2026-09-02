@@ -1350,17 +1350,10 @@ export function validateContextFilePath(
   }
 
   const resolvedExtensionRoot = path.resolve(effectiveExtensionPath);
-  const rootWithSep = resolvedExtensionRoot.endsWith(path.sep)
-    ? resolvedExtensionRoot
-    : resolvedExtensionRoot + path.sep;
-
   const contextFilePath = path.resolve(resolvedExtensionRoot, contextFileName);
 
-  // Verify that resolvedFilePath starts with resolvedExtensionRoot + path.sep
-  if (
-    !contextFilePath.startsWith(rootWithSep) ||
-    !isSubpath(resolvedExtensionRoot, contextFilePath)
-  ) {
+  // Verify that contextFilePath is strictly within resolvedExtensionRoot
+  if (!isSubpath(resolvedExtensionRoot, contextFilePath)) {
     return {
       isValid: false,
       errorMessage: `escapes the extension directory boundary ("${resolvedExtensionRoot}").`,

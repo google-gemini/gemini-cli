@@ -994,6 +994,14 @@ describe('ExtensionManager', () => {
           false,
         );
       });
+
+      it('validates context files when root path casing varies on case-insensitive platforms', () => {
+        const lowerRoot = tempWorkspaceDir.toLowerCase();
+        const result = validateContextFilePath('GEMINI.md', lowerRoot);
+        if (process.platform === 'darwin' || process.platform === 'win32') {
+          expect(result.isValid).toBe(true);
+        }
+      });
     });
   });
 });
