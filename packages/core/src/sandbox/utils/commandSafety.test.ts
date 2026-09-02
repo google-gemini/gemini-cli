@@ -280,6 +280,16 @@ describe('commandSafety', () => {
         ),
       ).toBe(false);
     });
+
+    it('should reject file-reading commands with options containing relative paths escaping workspace', () => {
+      expect(
+        isKnownSafeCommand(
+          ['cat', '--output=subdir/../../outside/file'],
+          workspaceDir,
+          workspaceDir,
+        ),
+      ).toBe(false);
+    });
   });
 
   describe('ln command safety in isDangerousCommand', () => {

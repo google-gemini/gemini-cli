@@ -341,17 +341,9 @@ function isSafeToCallWithExec(
             if (arg.includes('=')) {
               const val = arg.slice(arg.indexOf('=') + 1);
               if (
-                val.startsWith('/') ||
-                val.startsWith('~') ||
-                val.startsWith('.') ||
-                val.includes('$') ||
-                val.includes('`')
+                isPathEscapingWorkspace(val, effectiveWorkspace, effectiveCwd)
               ) {
-                if (
-                  isPathEscapingWorkspace(val, effectiveWorkspace, effectiveCwd)
-                ) {
-                  return false;
-                }
+                return false;
               }
             }
             continue;
