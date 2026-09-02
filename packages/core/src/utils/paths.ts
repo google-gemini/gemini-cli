@@ -671,7 +671,7 @@ export function hasBlockedPathSegment(p: string): boolean {
     }
     if (
       (clean.startsWith('gha-creds-') && clean.endsWith('.json')) ||
-      /^(gha-cr|gh[0-9a-f]{4})~\d+\.json$/.test(clean)
+      /^(gha-cr|gh[0-9a-f]{4})~\d+\.jso(n)?$/.test(clean)
     ) {
       return true;
     }

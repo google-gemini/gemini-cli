@@ -997,6 +997,8 @@ describe('normalizePath', () => {
       expect(hasBlockedPathSegment('gha-creds-1234.json')).toBe(true);
       expect(hasBlockedPathSegment('gha-cr~1.json')).toBe(true);
       expect(hasBlockedPathSegment('gh1a2b~1.json')).toBe(true);
+      expect(hasBlockedPathSegment('gha-cr~1.jso')).toBe(true);
+      expect(hasBlockedPathSegment('gh1a2b~1.jso')).toBe(true);
     });
   });
 });
