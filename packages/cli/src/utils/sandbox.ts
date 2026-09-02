@@ -176,13 +176,14 @@ export async function start_sandbox(
         const createdTmpDir = fs.mkdtempSync(
           path.join(hostTmpDir, 'gemini-sandbox-'),
         );
-        sandboxTmpDir = fs.realpathSync(createdTmpDir);
+        const resolvedTmpDir = fs.realpathSync(createdTmpDir);
+        sandboxTmpDir = resolvedTmpDir;
 
         const args = [
           '-D',
           `TARGET_DIR=${fs.realpathSync(process.cwd())}`,
           '-D',
-          `TMP_DIR=${sandboxTmpDir}`,
+          `TMP_DIR=${resolvedTmpDir}`,
           '-D',
           `HOME_DIR=${fs.realpathSync(homedir())}`,
           '-D',
@@ -243,9 +244,9 @@ export async function start_sandbox(
           '-c',
           [
             `SANDBOX=sandbox-exec`,
-            'TMPDIR=' + quote([sandboxTmpDir]),
-            'TMP=' + quote([sandboxTmpDir]),
-            'TEMP=' + quote([sandboxTmpDir]),
+            'TMPDIR=' + quote([resolvedTmpDir]),
+            'TMP=' + quote([resolvedTmpDir]),
+            'TEMP=' + quote([resolvedTmpDir]),
             'NODE_OPTIONS=' + quote([nodeOptions]),
             ...finalArgv.map((arg) => quote([arg])),
           ].join(' '),
@@ -255,9 +256,9 @@ export async function start_sandbox(
         let proxyProcess: ChildProcess | undefined = undefined;
         let sandboxProcess: ChildProcess | undefined = undefined;
         const sandboxEnv = { ...process.env };
-        sandboxEnv['TMPDIR'] = sandboxTmpDir;
-        sandboxEnv['TMP'] = sandboxTmpDir;
-        sandboxEnv['TEMP'] = sandboxTmpDir;
+        sandboxEnv['TMPDIR'] = resolvedTmpDir;
+        sandboxEnv['TMP'] = resolvedTmpDir;
+        sandboxEnv['TEMP'] = resolvedTmpDir;
         if (proxyCommand) {
           const proxy =
             process.env['HTTPS_PROXY'] ||
