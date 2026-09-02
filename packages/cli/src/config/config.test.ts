@@ -64,7 +64,8 @@ vi.mock('fs', async (importOriginal) => {
 
   const mockedRealpath = vi.fn((p) => p);
   Object.defineProperty(mockedRealpath, 'native', {
-    value: (p: Parameters<typeof actualFs.realpathSync>[0]) => mockedRealpath(p),
+    value: (p: Parameters<typeof actualFs.realpathSync>[0]) =>
+      mockedRealpath(p),
     writable: true,
   });
 

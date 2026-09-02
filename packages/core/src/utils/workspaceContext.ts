@@ -125,7 +125,9 @@ export class WorkspaceContext {
         return;
       }
       // Resolve symlinks and SFNs canonically
-      const resolved = resolveToRealPath(path.resolve(this.targetDir, pathToAdd));
+      const resolved = resolveToRealPath(
+        path.resolve(this.targetDir, pathToAdd),
+      );
       this.readOnlyPaths.add(resolved);
     } catch (e) {
       debugLogger.warn(`Failed to add read-only path ${pathToAdd}:`, e);

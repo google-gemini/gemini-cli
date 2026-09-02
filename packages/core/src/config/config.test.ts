@@ -242,6 +242,7 @@ vi.mock('../utils/events.js', async (importOriginal) => {
 
 vi.mock('../utils/fetch.js', () => ({
   setGlobalProxy: mockSetGlobalProxy,
+  updateGlobalFetchTimeouts: vi.fn(),
 }));
 
 vi.mock('../context/memoryContextManager.js', () => ({
