@@ -6,6 +6,17 @@
 
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { FinishReason } from '@google/genai';
+
+vi.mock('./top-level-principle-validator.js', () => ({
+  detectTopLevelPrincipleViolation: vi.fn().mockResolvedValue(false),
+  TopLevelPrincipleViolationError: class TopLevelPrincipleViolationError extends Error {
+    constructor(msg: string) {
+      super(msg);
+      this.name = 'TopLevelPrincipleViolationError';
+    }
+  },
+}));
+import { detectTopLevelPrincipleViolation } from './top-level-principle-validator.js';
 import { LegacyAgentSession } from './legacy-agent-session.js';
 import type { LegacyAgentSessionDeps } from './legacy-agent-session.js';
 import { GeminiEventType } from '../core/turn.js';
@@ -1505,6 +1516,90 @@ describe('LegacyAgentSession', () => {
         (e): e is AgentEvent<'error'> => e.type === 'error',
       );
       expect(err?._meta?.['status']).toBe('RESOURCE_EXHAUSTED');
+    });
+
+    describe('Top-level Principle Output Interceptor', () => {
+      beforeEach(() => {
+        vi.mocked(detectTopLevelPrincipleViolation).mockReset();
+      });
+
+      it('automatically retries in interactive mode if a violation is detected', async () => {
+        const sendMock = deps.client.sendMessageStream as ReturnType<
+          typeof vi.fn
+        >;
+        sendMock.mockImplementation(() => makeStream([
+            { type: GeminiEventType.Content, value: 'This does not exist.' },
+            {
+              type: GeminiEventType.Finished,
+              value: {
+                reason: 'STOP' as FinishReason,
+                usageMetadata: undefined,
+              },
+            },
+          ]));
+
+        vi.mocked(detectTopLevelPrincipleViolation)
+          .mockResolvedValueOnce(true)
+          .mockResolvedValueOnce(false);
+
+        const interactiveConfig = {
+          // eslint-disable-next-line @typescript-eslint/no-misused-spread
+          ...deps.config,
+          isInteractive: vi.fn().mockReturnValue(true),
+        };
+         
+        const sessionDeps = {
+          ...deps,
+          config: interactiveConfig as unknown as Config,
+        };
+
+        const session = new LegacyAgentSession(sessionDeps);
+        await session.send(makeMessageSend('Check for gemini-3.5-flash'));
+        await collectEvents(session);
+
+        expect(sendMock).toHaveBeenCalledTimes(2);
+      });
+
+      it('aborts and exits immediately with process.exit(1) in non-interactive mode', async () => {
+        const sendMock = deps.client.sendMessageStream as ReturnType<
+          typeof vi.fn
+        >;
+        sendMock.mockImplementation(() => makeStream([
+            { type: GeminiEventType.Content, value: 'This does not exist.' },
+            {
+              type: GeminiEventType.Finished,
+              value: {
+                reason: 'STOP' as FinishReason,
+                usageMetadata: undefined,
+              },
+            },
+          ]));
+
+        vi.mocked(detectTopLevelPrincipleViolation).mockResolvedValue(true);
+
+        const nonInteractiveConfig = {
+          // eslint-disable-next-line @typescript-eslint/no-misused-spread
+          ...deps.config,
+          isInteractive: vi.fn().mockReturnValue(false),
+        };
+         
+        const sessionDeps = {
+          ...deps,
+          config: nonInteractiveConfig as unknown as Config,
+        };
+
+        const exitMock = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+
+        const session = new LegacyAgentSession(sessionDeps);
+        await session.send(makeMessageSend('Check for gemini-3.5-flash'));
+
+        const events = await collectEvents(session);
+
+        expect(exitMock).toHaveBeenCalledWith(1);
+        const endEvent = events.find((e) => e.type === 'agent_end');
+        expect(endEvent?.reason).toBe('failed');
+        exitMock.mockRestore();
+      });
     });
   });
 });
