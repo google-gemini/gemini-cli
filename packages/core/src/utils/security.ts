@@ -5,8 +5,12 @@
  */
 
 import * as fs from 'node:fs/promises';
-import { constants } from 'node:fs';
+import * as fsSync from 'node:fs';
+import { constants, type Stats } from 'node:fs';
 import * as os from 'node:os';
+import * as path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { LRUCache } from 'mnemonist';
 import { spawnAsync } from './shell-utils.js';
 
 export interface SecurityCheckResult {
@@ -14,8 +18,370 @@ export interface SecurityCheckResult {
   reason?: string;
 }
 
+export type PathSecurityCache = LRUCache<string, SecurityCheckResult>;
+
 /**
- * Verifies if a directory is secure (owned by root and not writable by others).
+ * Creates an isolated LRU cache for path security check results.
+ */
+export function createPathSecurityCache(maxSize = 1000): PathSecurityCache {
+  return new LRUCache<string, SecurityCheckResult>(maxSize);
+}
+
+/**
+ * Backwards-compatibility helper for test isolation.
+ */
+export function clearSecurityCacheForTesting(): void {
+  // No-op: caches are instance- or session-scoped rather than module-level globals.
+}
+
+/**
+ * SecurityValidator provides instance-scoped security validation with an isolated cache.
+ */
+export class SecurityValidator {
+  private readonly cache: PathSecurityCache;
+
+  constructor(cache?: PathSecurityCache) {
+    this.cache = cache ?? createPathSecurityCache();
+  }
+
+  clearCache(): void {
+    this.cache.clear();
+  }
+
+  getCache(): PathSecurityCache {
+    return this.cache;
+  }
+
+  isPathSecureSync(
+    targetPath: string,
+    expectedType?: 'file' | 'directory',
+  ): SecurityCheckResult {
+    return isPathSecureSync(targetPath, expectedType, this.cache);
+  }
+
+  isFileAndDirectorySecureSync(filePath: string): SecurityCheckResult {
+    return isFileAndDirectorySecureSync(filePath, this.cache);
+  }
+}
+
+function getWindowsPowerShellPath(): string {
+  const systemRoot =
+    process.env['SystemRoot'] ||
+    process.env['systemroot'] ||
+    process.env['windir'] ||
+    process.env['WINDIR'] ||
+    'C:\\Windows';
+  const pathModule = os.platform() === 'win32' ? path.win32 : path;
+  return pathModule.join(
+    systemRoot,
+    'System32',
+    'WindowsPowerShell',
+    'v1.0',
+    'powershell.exe',
+  );
+}
+
+function buildWindowsAclScript(paths: string[]): string {
+  const pathsArray = paths.map((p) => `'${p}'`).join(', ');
+  return `
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8;
+    $paths = @(${pathsArray});
+    foreach ($path in $paths) {
+      Write-Output "PATH:$path";
+      $acl = $null;
+      try {
+        $acl = Get-Acl -LiteralPath $path;
+      } catch {
+        Write-Output "ERROR:$($_.Exception.Message)";
+        continue;
+      }
+
+      $owner = $acl.Owner;
+      $ownerSid = '';
+      try {
+        $ownerSid = $acl.GetOwner([System.Security.Principal.SecurityIdentifier]).Value;
+      } catch {}
+
+      $isTrustedOwner = (
+        ($owner -like '*\\Administrators' -or $owner -eq 'Administrators') -or
+        ($owner -like '*\\SYSTEM' -or $owner -eq 'SYSTEM') -or
+        ($owner -like '*\\TrustedInstaller' -or $owner -eq 'TrustedInstaller') -or
+        $ownerSid -eq 'S-1-5-32-544' -or
+        $ownerSid -eq 'S-1-5-18' -or
+        $ownerSid -like 'S-1-5-80-*'
+      );
+
+      if (-not $isTrustedOwner) {
+        Write-Output "OWNER:$owner";
+      }
+
+      $rules = $acl.Access | Where-Object { 
+          $_.AccessControlType -eq 'Allow' -and 
+          ($_.FileSystemRights -match 'Write|Modify|FullControl|CreateFiles|AppendData|CreateDirectories|Delete|TakeOwnership|ChangePermissions')
+      };
+      $insecureIdentity = $rules | Where-Object {
+          $isTrustedWriter = $false;
+          try {
+              $sid = $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value;
+              $isTrustedWriter = (
+                  $sid -eq 'S-1-5-32-544' -or
+                  $sid -eq 'S-1-5-18' -or
+                  $sid -like 'S-1-5-80-*'
+              );
+          } catch {
+              $id = $_.IdentityReference.Value;
+              $isTrustedWriter = (
+                  ($id -like '*\\Administrators' -or $id -eq 'Administrators') -or
+                  ($id -like '*\\SYSTEM' -or $id -eq 'SYSTEM') -or
+                  ($id -like '*\\TrustedInstaller' -or $id -eq 'TrustedInstaller')
+              );
+          }
+          -not $isTrustedWriter;
+      } | Select-Object -ExpandProperty IdentityReference;
+
+      if ($insecureIdentity) {
+        Write-Output "PERMS:$($insecureIdentity -join ', ')";
+      }
+    }
+  `;
+}
+
+interface ParsedPathViolation {
+  ownerViolation?: string;
+  permsViolation?: string;
+  error?: string;
+}
+
+function parseWindowsSecurityOutput(
+  stdout: string,
+  targetPath: string,
+  isDirectory: boolean,
+): SecurityCheckResult {
+  const map = parseWindowsBatchSecurityOutput(stdout, [targetPath]);
+  const parsed = map.get(targetPath) ?? {};
+  return formatWindowsSecurityResult(parsed, targetPath, isDirectory);
+}
+
+function parseWindowsBatchSecurityOutput(
+  stdout: string,
+  targetPaths: string[],
+): Map<string, ParsedPathViolation> {
+  const results = new Map<string, ParsedPathViolation>();
+
+  // Initialize all paths to a failed/error state by default (fail secure)
+  for (const p of targetPaths) {
+    results.set(p, { error: 'Security check output missing or incomplete' });
+  }
+
+  const trimmed = stdout.trim();
+  if (!trimmed) {
+    return results;
+  }
+
+  const lines = trimmed
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  let currentPath: string | undefined;
+  let currentOwner: string | undefined;
+  let currentPerms: string | undefined;
+  let currentError: string | undefined;
+  let hasPathMarker = false;
+
+  const flush = () => {
+    if (currentPath) {
+      const matchedPath =
+        targetPaths.find(
+          (tp) => tp.toLowerCase() === currentPath!.toLowerCase(),
+        ) ?? currentPath;
+      results.set(matchedPath, {
+        ownerViolation: currentOwner,
+        permsViolation: currentPerms,
+        error: currentError,
+      });
+    }
+    currentOwner = undefined;
+    currentPerms = undefined;
+    currentError = undefined;
+  };
+
+  for (const line of lines) {
+    if (line.startsWith('PATH:')) {
+      hasPathMarker = true;
+      flush();
+      currentPath = line.substring(5).trim();
+    } else if (line.startsWith('OWNER:')) {
+      currentOwner = line.substring(6).trim();
+    } else if (line.startsWith('PERMS:')) {
+      currentPerms = line.substring(6).trim();
+    } else if (line.startsWith('ERROR:')) {
+      currentError = line.substring(6).trim();
+    }
+  }
+  flush();
+
+  // For backwards compatibility with legacy test mocks that don't output PATH:
+  if (!hasPathMarker && targetPaths.length === 1) {
+    let ownerViolation: string | undefined;
+    let permsViolation: string | undefined;
+    let error: string | undefined;
+    let foundViolationOrError = false;
+    for (const line of lines) {
+      if (line.startsWith('OWNER:')) {
+        ownerViolation = line.substring(6).trim();
+        foundViolationOrError = true;
+      } else if (line.startsWith('PERMS:')) {
+        permsViolation = line.substring(6).trim();
+        foundViolationOrError = true;
+      } else if (line.startsWith('ERROR:')) {
+        error = line.substring(6).trim();
+        foundViolationOrError = true;
+      }
+    }
+    if (foundViolationOrError) {
+      results.set(targetPaths[0], { ownerViolation, permsViolation, error });
+    }
+  }
+
+  return results;
+}
+
+function formatWindowsSecurityResult(
+  parsed: ParsedPathViolation,
+  targetPath: string,
+  isDirectory: boolean,
+): SecurityCheckResult {
+  if (parsed.error) {
+    return {
+      secure: false,
+      reason: `A security check for '${targetPath}' failed and could not be completed. Please file a bug report. Original error: ${parsed.error}`,
+    };
+  }
+
+  const itemType = isDirectory ? 'Directory' : 'File';
+  const reasons: string[] = [];
+
+  if (parsed.ownerViolation) {
+    reasons.push(
+      `${itemType} '${targetPath}' is not owned by a trusted administrator or SYSTEM account. Current owner: ${parsed.ownerViolation}.`,
+    );
+  }
+
+  if (parsed.permsViolation) {
+    reasons.push(
+      `${itemType} '${targetPath}' is insecure. The following user groups have write permissions: ${parsed.permsViolation}. To fix this, remove Write and Modify permissions for these groups from the directory's ACLs.`,
+    );
+  }
+
+  if (reasons.length === 0) {
+    return { secure: true };
+  }
+
+  return {
+    secure: false,
+    reason: reasons.join(' '),
+  };
+}
+
+function batchCheckWindowsPathsSync(
+  paths: string[],
+  cache: PathSecurityCache,
+): void {
+  const uncached = paths.filter((p) => !cache.has(p));
+  if (uncached.length === 0) return;
+
+  try {
+    const escapedPaths = uncached.map((p) => p.replace(/'/g, "''"));
+    const script = buildWindowsAclScript(escapedPaths);
+    const powershellPath = getWindowsPowerShellPath();
+
+    const res = spawnSync(
+      powershellPath,
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        script,
+      ],
+      { encoding: 'utf-8', timeout: 5000 },
+    );
+
+    if (res.error) {
+      if ((res.error as NodeJS.ErrnoException).code === 'ETIMEDOUT') {
+        throw new Error(`Security validation timed out after 5000ms`);
+      }
+      throw res.error;
+    }
+
+    if (res.status !== 0) {
+      throw new Error(
+        `PowerShell execution failed with status ${res.status}: ${res.stderr || res.stdout}`,
+      );
+    }
+
+    const batchResults = parseWindowsBatchSecurityOutput(
+      res.stdout ?? '',
+      uncached,
+    );
+
+    for (const p of uncached) {
+      const parsed = batchResults.get(p) ?? {};
+      let isDir = false;
+      try {
+        isDir = fsSync.statSync(p).isDirectory();
+      } catch {
+        // Leave isDir false if stat fails
+      }
+      const result = formatWindowsSecurityResult(parsed, p, isDir);
+      cache.set(p, result);
+    }
+  } catch (error) {
+    for (const p of uncached) {
+      cache.set(p, {
+        secure: false,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        reason: `A security check for '${p}' failed and could not be completed. Please file a bug report. Original error: ${(error as Error).message}`,
+      });
+    }
+  }
+}
+
+function checkPosixStatsSecurity(
+  stats: Stats,
+  targetPath: string,
+  isDirectory: boolean,
+): SecurityCheckResult {
+  const itemType = isDirectory ? 'Directory' : 'File';
+
+  // Check ownership: must be root (uid 0)
+  if (stats.uid !== 0) {
+    return {
+      secure: false,
+      reason: `${itemType} '${targetPath}' is not owned by root (uid 0). Current uid: ${stats.uid}. To fix this, run: sudo chown root:root "${targetPath}"`,
+    };
+  }
+
+  // Check permissions: not writable by group (S_IWGRP) or others (S_IWOTH)
+  const S_IWGRP = constants?.S_IWGRP ?? 0o020;
+  const S_IWOTH = constants?.S_IWOTH ?? 0o002;
+  const mode = stats.mode;
+  if ((mode & (S_IWGRP | S_IWOTH)) !== 0) {
+    return {
+      secure: false,
+      reason: `${itemType} '${targetPath}' is writable by group or others (mode: ${mode.toString(
+        8,
+      )}). To fix this, run: sudo chmod g-w,o-w "${targetPath}"`,
+    };
+  }
+
+  return { secure: true };
+}
+
+/**
+ * Verifies if a directory is secure (owned by root/admins and not writable by unprivileged users).
  *
  * @param dirPath The path to the directory to check.
  * @returns A promise that resolves to a SecurityCheckResult.
@@ -32,37 +398,24 @@ export async function isDirectorySecure(
 
     if (os.platform() === 'win32') {
       try {
-        // Check ACLs using PowerShell to ensure standard users don't have write access
         const escapedPath = dirPath.replace(/'/g, "''");
-        const script = `
-          $path = '${escapedPath}';
-          $acl = Get-Acl -LiteralPath $path;
-          $rules = $acl.Access | Where-Object { 
-              $_.AccessControlType -eq 'Allow' -and 
-              (($_.FileSystemRights -match 'Write') -or ($_.FileSystemRights -match 'Modify') -or ($_.FileSystemRights -match 'FullControl')) 
-          };
-          $insecureIdentity = $rules | Where-Object { 
-              $_.IdentityReference.Value -match 'Users' -or $_.IdentityReference.Value -eq 'Everyone' 
-          } | Select-Object -ExpandProperty IdentityReference;
-          Write-Output ($insecureIdentity -join ', ');
-        `;
+        const script = buildWindowsAclScript([escapedPath]);
+        const powershellPath = getWindowsPowerShellPath();
 
-        const { stdout } = await spawnAsync('powershell', [
-          '-NoProfile',
-          '-NonInteractive',
-          '-Command',
-          script,
-        ]);
+        const { stdout } = await spawnAsync(
+          powershellPath,
+          [
+            '-NoProfile',
+            '-NonInteractive',
+            '-ExecutionPolicy',
+            'Bypass',
+            '-Command',
+            script,
+          ],
+          { timeout: 5000 },
+        );
 
-        const insecureGroups = stdout.trim();
-        if (insecureGroups) {
-          return {
-            secure: false,
-            reason: `Directory '${dirPath}' is insecure. The following user groups have write permissions: ${insecureGroups}. To fix this, remove Write and Modify permissions for these groups from the directory's ACLs.`,
-          };
-        }
-
-        return { secure: true };
+        return parseWindowsSecurityOutput(stdout, dirPath, true);
       } catch (error) {
         return {
           secure: false,
@@ -72,27 +425,20 @@ export async function isDirectorySecure(
       }
     }
 
-    // POSIX checks
-    // Check ownership: must be root (uid 0)
-    if (stats.uid !== 0) {
-      return {
-        secure: false,
-        reason: `Directory '${dirPath}' is not owned by root (uid 0). Current uid: ${stats.uid}. To fix this, run: sudo chown root:root "${dirPath}"`,
-      };
+    // POSIX checks:
+    try {
+      const lstats = await fs.lstat(dirPath);
+      if (lstats.isSymbolicLink() && lstats.uid !== 0) {
+        return {
+          secure: false,
+          reason: `Symlink '${dirPath}' is not owned by root (uid 0). Current uid: ${lstats.uid}. To fix this, run: sudo chown -h root:root "${dirPath}"`,
+        };
+      }
+    } catch {
+      // Ignore lstat failure if stat succeeded
     }
 
-    // Check permissions: not writable by group (S_IWGRP) or others (S_IWOTH)
-    const mode = stats.mode;
-    if ((mode & (constants.S_IWGRP | constants.S_IWOTH)) !== 0) {
-      return {
-        secure: false,
-        reason: `Directory '${dirPath}' is writable by group or others (mode: ${mode.toString(
-          8,
-        )}). To fix this, run: sudo chmod g-w,o-w "${dirPath}"`,
-      };
-    }
-
-    return { secure: true };
+    return checkPosixStatsSecurity(stats, dirPath, true);
   } catch (error) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
@@ -104,4 +450,201 @@ export async function isDirectorySecure(
       reason: `Failed to access directory: ${(error as Error).message}`,
     };
   }
+}
+
+/**
+ * Synchronously verifies if a file or directory is secure.
+ *
+ * @param targetPath The path to check.
+ * @param expectedType Optional constraint ('file' or 'directory').
+ * @returns A SecurityCheckResult.
+ */
+export function isPathSecureSync(
+  targetPath: string,
+  expectedType?: 'file' | 'directory',
+  cache?: PathSecurityCache,
+): SecurityCheckResult {
+  const pathModule = os.platform() === 'win32' ? path.win32 : path;
+  const normalizedPath = pathModule.resolve(targetPath);
+
+  try {
+    let stats: Stats;
+    try {
+      stats = fsSync.statSync(normalizedPath);
+    } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return { secure: true };
+      }
+      const result = {
+        secure: false,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        reason: `Failed to access path: ${(error as Error).message}`,
+      };
+      cache?.set(normalizedPath, result);
+      return result;
+    }
+
+    const isDir = stats.isDirectory();
+    if (expectedType === 'directory' && !isDir) {
+      return { secure: false, reason: 'Not a directory' };
+    }
+    if (expectedType === 'file' && !stats.isFile()) {
+      return { secure: false, reason: 'Not a file' };
+    }
+
+    if (cache?.has(normalizedPath)) {
+      return cache.get(normalizedPath)!;
+    }
+
+    if (os.platform() === 'win32') {
+      const effectiveCache = cache ?? createPathSecurityCache(1);
+      batchCheckWindowsPathsSync([normalizedPath], effectiveCache);
+      const winResult = effectiveCache.get(normalizedPath);
+      if (winResult) {
+        cache?.set(normalizedPath, winResult);
+        return winResult;
+      }
+      return {
+        secure: false,
+        reason:
+          'Security validation failed on Windows for path ' + normalizedPath,
+      };
+    }
+
+    // POSIX checks:
+    // If it's a symlink, verify that the symlink itself is owned by root (uid === 0).
+    // Note: On POSIX systems, symlinks always have mode 0777 in lstat, and permission bits
+    // are ignored during path resolution, so we only check uid for the symlink itself.
+    try {
+      const lstats = fsSync.lstatSync(normalizedPath);
+      if (lstats.isSymbolicLink()) {
+        if (lstats.uid !== 0) {
+          const lstatCheck: SecurityCheckResult = {
+            secure: false,
+            reason: `Symlink '${normalizedPath}' is not owned by root (uid 0). Current uid: ${lstats.uid}. To fix this, run: sudo chown -h root:root "${normalizedPath}"`,
+          };
+          cache?.set(normalizedPath, lstatCheck);
+          return lstatCheck;
+        }
+      }
+    } catch {
+      // Ignore lstat failure if stat succeeded
+    }
+
+    const posixCheck = checkPosixStatsSecurity(stats, normalizedPath, isDir);
+    cache?.set(normalizedPath, posixCheck);
+    return posixCheck;
+  } catch (error) {
+    return {
+      secure: false,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      reason: `Failed to access path: ${(error as Error).message}`,
+    };
+  }
+}
+
+/**
+ * Synchronously checks that a configuration file AND its parent directory are secure.
+ * If the file does not exist, it is considered safe since nothing is loaded.
+ *
+ * @param filePath The file path to validate.
+ * @param cache Optional cache for session or instance isolation.
+ * @returns A SecurityCheckResult.
+ */
+export function isFileAndDirectorySecureSync(
+  filePath: string,
+  cache?: PathSecurityCache,
+): SecurityCheckResult {
+  const pathModule = os.platform() === 'win32' ? path.win32 : path;
+  const normalizedFilePath = pathModule.resolve(filePath);
+
+  // If the file does not exist, nothing will be loaded, so it is safe
+  try {
+    if (!fsSync.existsSync(normalizedFilePath)) {
+      return { secure: true };
+    }
+  } catch {
+    return { secure: true };
+  }
+
+  const effectiveCache = cache ?? createPathSecurityCache(50);
+  const parentDir = pathModule.dirname(normalizedFilePath);
+
+  // Resolve symbolic links to canonical real path first to prevent parent/grandparent symlink bypasses
+  let canonicalFilePath = normalizedFilePath;
+  try {
+    const real = fsSync.realpathSync(normalizedFilePath);
+    if (typeof real === 'string' && real.length > 0) {
+      canonicalFilePath = real;
+    }
+  } catch {
+    // If realpathSync fails, keep normalizedFilePath
+  }
+
+  const canonicalParentDir = pathModule.dirname(canonicalFilePath);
+
+  // On Windows, batch all uncached paths into a single PowerShell check
+  if (os.platform() === 'win32') {
+    const pathsToCheck = [normalizedFilePath, parentDir];
+    if (canonicalFilePath !== normalizedFilePath) {
+      pathsToCheck.push(canonicalParentDir, canonicalFilePath);
+    }
+    const uniquePaths = Array.from(new Set(pathsToCheck));
+    const uncached = uniquePaths.filter((p) => !effectiveCache.has(p));
+    if (uncached.length > 0) {
+      batchCheckWindowsPathsSync(uncached, effectiveCache);
+    }
+  }
+
+  // 1. Check the immediate parent directory
+  const parentCheck = isPathSecureSync(parentDir, 'directory', effectiveCache);
+  if (!parentCheck.secure) {
+    return {
+      secure: false,
+      reason: `Parent directory '${parentDir}' is insecure: ${parentCheck.reason}`,
+    };
+  }
+
+  // 2. Check the file itself
+  const fileCheck = isPathSecureSync(
+    normalizedFilePath,
+    'file',
+    effectiveCache,
+  );
+  if (!fileCheck.secure) {
+    return {
+      secure: false,
+      reason: `File is insecure: ${fileCheck.reason}`,
+    };
+  }
+
+  // 3. If the canonical path differs (symlink in leaf or parent), verify canonical target file and its parent directory
+  if (canonicalFilePath !== normalizedFilePath) {
+    const realFileCheck = isPathSecureSync(
+      canonicalFilePath,
+      'file',
+      effectiveCache,
+    );
+    if (!realFileCheck.secure) {
+      return {
+        secure: false,
+        reason: `Resolved target file is insecure: ${realFileCheck.reason}`,
+      };
+    }
+
+    const realParentCheck = isPathSecureSync(
+      canonicalParentDir,
+      'directory',
+      effectiveCache,
+    );
+    if (!realParentCheck.secure) {
+      return {
+        secure: false,
+        reason: `Resolved target parent directory '${canonicalParentDir}' is insecure: ${realParentCheck.reason}`,
+      };
+    }
+  }
+
+  return { secure: true };
 }

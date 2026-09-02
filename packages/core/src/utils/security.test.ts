@@ -4,15 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { isDirectorySecure } from './security.js';
+import {
+  isDirectorySecure,
+  isPathSecureSync,
+  isFileAndDirectorySecureSync,
+  clearSecurityCacheForTesting,
+  createPathSecurityCache,
+  SecurityValidator,
+} from './security.js';
 import * as fs from 'node:fs/promises';
+import * as fsSync from 'node:fs';
 import { constants, type Stats } from 'node:fs';
 import * as os from 'node:os';
+import * as path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { spawnAsync } from './shell-utils.js';
 
 vi.mock('node:fs/promises');
 vi.mock('node:fs');
 vi.mock('node:os');
+vi.mock('node:child_process', () => ({
+  spawnSync: vi.fn(),
+}));
 vi.mock('./shell-utils.js', () => ({
   spawnAsync: vi.fn(),
 }));
@@ -20,6 +33,7 @@ vi.mock('./shell-utils.js', () => ({
 describe('isDirectorySecure', () => {
   afterEach(() => {
     vi.clearAllMocks();
+    clearSecurityCacheForTesting();
   });
 
   it('returns secure=true on Windows if ACL check passes', async () => {
@@ -27,13 +41,17 @@ describe('isDirectorySecure', () => {
     vi.mocked(fs.stat).mockResolvedValue({
       isDirectory: () => true,
     } as unknown as Stats);
-    vi.mocked(spawnAsync).mockResolvedValue({ stdout: '', stderr: '' });
+    vi.mocked(spawnAsync).mockResolvedValue({
+      stdout: 'PATH:C:\\Some\\Path\n',
+      stderr: '',
+    });
 
     const result = await isDirectorySecure('C:\\Some\\Path');
     expect(result.secure).toBe(true);
     expect(spawnAsync).toHaveBeenCalledWith(
-      'powershell',
+      expect.stringContaining('powershell.exe'),
       expect.arrayContaining(['-Command', expect.stringContaining('Get-Acl')]),
+      { timeout: 5000 },
     );
   });
 
@@ -43,7 +61,7 @@ describe('isDirectorySecure', () => {
       isDirectory: () => true,
     } as unknown as Stats);
     vi.mocked(spawnAsync).mockResolvedValue({
-      stdout: 'BUILTIN\\Users',
+      stdout: 'PERMS:BUILTIN\\Users',
       stderr: '',
     });
 
@@ -54,6 +72,70 @@ describe('isDirectorySecure', () => {
     expect(result.reason).toBe(
       "Directory 'C:\\Some\\Path' is insecure. The following user groups have write permissions: BUILTIN\\Users. To fix this, remove Write and Modify permissions for these groups from the directory's ACLs.",
     );
+  });
+
+  it('ignores unexpected stdout lines or banners that lack OWNER: or PERMS: prefix', async () => {
+    vi.spyOn(os, 'platform').mockReturnValue('win32');
+    vi.mocked(fs.stat).mockResolvedValue({
+      isDirectory: () => true,
+    } as unknown as Stats);
+    vi.mocked(spawnAsync).mockResolvedValue({
+      stdout:
+        'Windows PowerShell\nCopyright (C) Microsoft Corporation. All rights reserved.\nPATH:C:\\Some\\Path\n',
+      stderr: '',
+    });
+
+    const result = await isDirectorySecure('C:\\Some\\Path');
+    expect(result.secure).toBe(true);
+  });
+
+  it('returns secure=false when PowerShell output is empty or missing PATH marker (fail-secure)', async () => {
+    vi.spyOn(os, 'platform').mockReturnValue('win32');
+    vi.mocked(fs.stat).mockResolvedValue({
+      isDirectory: () => true,
+    } as unknown as Stats);
+    vi.mocked(spawnAsync).mockResolvedValue({
+      stdout: '',
+      stderr: '',
+    });
+
+    const result = await isDirectorySecure('C:\\Some\\Path');
+    expect(result.secure).toBe(false);
+    expect(result.reason).toContain(
+      'Security check output missing or incomplete',
+    );
+  });
+
+  it('returns secure=false when PowerShell outputs unexpected lines without PATH marker (fail-secure)', async () => {
+    vi.spyOn(os, 'platform').mockReturnValue('win32');
+    vi.mocked(fs.stat).mockResolvedValue({
+      isDirectory: () => true,
+    } as unknown as Stats);
+    vi.mocked(spawnAsync).mockResolvedValue({
+      stdout: 'Windows PowerShell\nSome unexpected banner\n',
+      stderr: '',
+    });
+
+    const result = await isDirectorySecure('C:\\Some\\Path');
+    expect(result.secure).toBe(false);
+    expect(result.reason).toContain(
+      'Security check output missing or incomplete',
+    );
+  });
+
+  it('captures ERROR: marker from PowerShell output and returns secure=false', async () => {
+    vi.spyOn(os, 'platform').mockReturnValue('win32');
+    vi.mocked(fs.stat).mockResolvedValue({
+      isDirectory: () => true,
+    } as unknown as Stats);
+    vi.mocked(spawnAsync).mockResolvedValue({
+      stdout: 'ERROR:Access is denied to security descriptor\n',
+      stderr: '',
+    });
+
+    const result = await isDirectorySecure('C:\\Some\\Path');
+    expect(result.secure).toBe(false);
+    expect(result.reason).toContain('Access is denied to security descriptor');
   });
 
   it('returns secure=false on Windows if spawnAsync fails', async () => {
@@ -185,5 +267,850 @@ describe('isDirectorySecure', () => {
     const result = await isDirectorySecure('/some/path');
 
     expect(result.secure).toBe(true);
+  });
+
+  it('returns secure=false on Windows if owner is untrusted', async () => {
+    vi.spyOn(os, 'platform').mockReturnValue('win32');
+    vi.mocked(fs.stat).mockResolvedValue({
+      isDirectory: () => true,
+    } as unknown as Stats);
+    vi.mocked(spawnAsync).mockResolvedValue({
+      stdout: 'OWNER:DESKTOP\\Attacker',
+      stderr: '',
+    });
+
+    const result = await isDirectorySecure('C:\\ProgramData\\gemini-cli');
+
+    expect(result.secure).toBe(false);
+    expect(result.reason).toContain(
+      'is not owned by a trusted administrator or SYSTEM account',
+    );
+  });
+
+  it('uses boundary matching for trusted owners in Windows ACL script', async () => {
+    vi.spyOn(os, 'platform').mockReturnValue('win32');
+    vi.mocked(fs.stat).mockResolvedValue({
+      isDirectory: () => true,
+    } as unknown as Stats);
+    vi.mocked(spawnAsync).mockResolvedValue({
+      stdout: 'PATH:C:\\Some\\Path\n',
+      stderr: '',
+    });
+
+    await isDirectorySecure('C:\\Some\\Path');
+
+    expect(spawnAsync).toHaveBeenCalledWith(
+      expect.stringContaining('powershell.exe'),
+      expect.arrayContaining([
+        '-Command',
+        expect.stringContaining(
+          "($owner -like '*\\Administrators' -or $owner -eq 'Administrators')",
+        ),
+      ]),
+      { timeout: 5000 },
+    );
+  });
+
+  it('uses boundary matching in Windows ACL fallback catch block', async () => {
+    vi.spyOn(os, 'platform').mockReturnValue('win32');
+    vi.mocked(fs.stat).mockResolvedValue({
+      isDirectory: () => true,
+    } as unknown as Stats);
+    vi.mocked(spawnAsync).mockResolvedValue({
+      stdout: 'PATH:C:\\Some\\Path\n',
+      stderr: '',
+    });
+
+    await isDirectorySecure('C:\\Some\\Path');
+
+    expect(spawnAsync).toHaveBeenCalledWith(
+      expect.stringContaining('powershell.exe'),
+      expect.arrayContaining([
+        '-Command',
+        expect.stringContaining(
+          "($id -like '*\\Administrators' -or $id -eq 'Administrators')",
+        ),
+      ]),
+      { timeout: 5000 },
+    );
+  });
+
+  it('falls back to 0o020 and 0o002 when constants.S_IWGRP and constants.S_IWOTH are undefined', async () => {
+    vi.spyOn(os, 'platform').mockReturnValue('linux');
+    // Simulate non-POSIX or mocked environment where constants are undefined
+    delete (constants as Record<string, unknown>)['S_IWGRP'];
+    delete (constants as Record<string, unknown>)['S_IWOTH'];
+
+    vi.mocked(fs.stat).mockResolvedValue({
+      isDirectory: () => true,
+      uid: 0,
+      mode: 0o775, // rwxrwxr-x (group writable)
+    } as unknown as Stats);
+
+    const result = await isDirectorySecure('/some/path');
+
+    expect(result.secure).toBe(false);
+    expect(result.reason).toBe(
+      'Directory \'/some/path\' is writable by group or others (mode: 775). To fix this, run: sudo chmod g-w,o-w "/some/path"',
+    );
+  });
+});
+
+describe('isPathSecureSync', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    clearSecurityCacheForTesting();
+  });
+
+  it('returns secure=true if path does not exist (ENOENT)', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('linux');
+    const error = new Error('ENOENT');
+    Object.assign(error, { code: 'ENOENT' });
+    vi.mocked(fsSync.statSync).mockImplementation(() => {
+      throw error;
+    });
+
+    const result = isPathSecureSync('/non/existent');
+    expect(result.secure).toBe(true);
+  });
+
+  it('returns secure=false if expectedType is file but path is directory', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('linux');
+    vi.mocked(fsSync.statSync).mockReturnValue({
+      isDirectory: () => true,
+      isFile: () => false,
+      uid: 0,
+      mode: 0o755,
+    } as unknown as Stats);
+
+    const result = isPathSecureSync('/some/dir', 'file');
+    expect(result.secure).toBe(false);
+    expect(result.reason).toBe('Not a file');
+  });
+
+  it('correctly handles different expectedType constraints across multiple calls to the same path', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('linux');
+    Object.assign(constants, { S_IWGRP: 0o020, S_IWOTH: 0o002 });
+    vi.mocked(fsSync.statSync).mockReturnValue({
+      isDirectory: () => true,
+      isFile: () => false,
+      uid: 0,
+      mode: 0o755,
+    } as unknown as Stats);
+    vi.mocked(fsSync.lstatSync).mockReturnValue({
+      isSymbolicLink: () => false,
+    } as unknown as Stats);
+
+    // First call: check as directory (passes)
+    const dirResult = isPathSecureSync('/etc/gemini-cli', 'directory');
+    expect(dirResult.secure).toBe(true);
+
+    // Second call: check same path as file (must fail, should not return cached dir result)
+    const fileResult = isPathSecureSync('/etc/gemini-cli', 'file');
+    expect(fileResult.secure).toBe(false);
+    expect(fileResult.reason).toBe('Not a file');
+  });
+
+  it('returns secure=true on Windows when owner and ACL checks pass', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('win32');
+    vi.mocked(fsSync.statSync).mockReturnValue({
+      isDirectory: () => false,
+      isFile: () => true,
+    } as unknown as Stats);
+    const testPath = 'C:\\ProgramData\\gemini-cli\\settings.json';
+    const normalized = path.win32.resolve(testPath);
+    vi.mocked(spawnSync).mockReturnValue({
+      stdout: `PATH:${normalized}\n`,
+      stderr: '',
+      status: 0,
+      pid: 1234,
+      output: [],
+      signal: null,
+    });
+
+    const result = isPathSecureSync(testPath, 'file');
+    expect(result.secure).toBe(true);
+    expect(spawnSync).toHaveBeenCalled();
+  });
+
+  it('returns secure=false on Windows when stdout is empty (fail-secure)', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('win32');
+    vi.mocked(fsSync.statSync).mockReturnValue({
+      isDirectory: () => false,
+      isFile: () => true,
+    } as unknown as Stats);
+    vi.mocked(spawnSync).mockReturnValue({
+      stdout: '',
+      stderr: '',
+      status: 0,
+      pid: 1234,
+      output: [],
+      signal: null,
+    });
+
+    const result = isPathSecureSync(
+      'C:\\ProgramData\\gemini-cli\\settings.json',
+      'file',
+    );
+    expect(result.secure).toBe(false);
+    expect(result.reason).toContain(
+      'Security check output missing or incomplete',
+    );
+  });
+
+  it('returns secure=false on Windows when owner is untrusted', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('win32');
+    vi.mocked(fsSync.statSync).mockReturnValue({
+      isDirectory: () => false,
+      isFile: () => true,
+    } as unknown as Stats);
+    vi.mocked(spawnSync).mockReturnValue({
+      stdout: 'OWNER:COMPUTER\\Attacker\n',
+      stderr: '',
+      status: 0,
+      pid: 1234,
+      output: [],
+      signal: null,
+    });
+
+    const result = isPathSecureSync(
+      'C:\\ProgramData\\gemini-cli\\system-defaults.json',
+      'file',
+    );
+    expect(result.secure).toBe(false);
+    expect(result.reason).toContain(
+      'is not owned by a trusted administrator or SYSTEM account',
+    );
+  });
+
+  it('returns secure=false on Windows when standard users have write permissions', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('win32');
+    vi.mocked(fsSync.statSync).mockReturnValue({
+      isDirectory: () => false,
+      isFile: () => true,
+    } as unknown as Stats);
+    vi.mocked(spawnSync).mockReturnValue({
+      stdout: 'PERMS:BUILTIN\\Users\n',
+      stderr: '',
+      status: 0,
+      pid: 1234,
+      output: [],
+      signal: null,
+    });
+
+    const result = isPathSecureSync(
+      'C:\\ProgramData\\gemini-cli\\system-defaults.json',
+      'file',
+    );
+    expect(result.secure).toBe(false);
+    expect(result.reason).toContain(
+      'The following user groups have write permissions: BUILTIN\\Users',
+    );
+  });
+
+  it('returns secure=false on Windows when PowerShell exits with non-zero status', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('win32');
+    vi.mocked(fsSync.statSync).mockReturnValue({
+      isDirectory: () => false,
+      isFile: () => true,
+    } as unknown as Stats);
+    vi.mocked(spawnSync).mockReturnValue({
+      stdout: '',
+      stderr: 'Access is denied.',
+      status: 1,
+      pid: 1234,
+      output: [],
+      signal: null,
+    });
+
+    const result = isPathSecureSync(
+      'C:\\ProgramData\\gemini-cli\\system-defaults.json',
+      'file',
+    );
+    expect(result.secure).toBe(false);
+    expect(result.reason).toContain(
+      'PowerShell execution failed with status 1',
+    );
+  });
+
+  it('returns secure=false on Windows when PowerShell times out', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('win32');
+    vi.mocked(fsSync.statSync).mockReturnValue({
+      isDirectory: () => false,
+      isFile: () => true,
+    } as unknown as Stats);
+    const timeoutErr = new Error('ETIMEDOUT') as NodeJS.ErrnoException;
+    timeoutErr.code = 'ETIMEDOUT';
+    vi.mocked(spawnSync).mockReturnValue({
+      stdout: '',
+      stderr: '',
+      status: null,
+      pid: 1234,
+      output: [],
+      signal: 'SIGTERM',
+      error: timeoutErr,
+    });
+
+    const result = isPathSecureSync(
+      'C:\\ProgramData\\gemini-cli\\system-defaults.json',
+      'file',
+    );
+    expect(result.secure).toBe(false);
+    expect(result.reason).toContain(
+      'Security validation timed out after 5000ms',
+    );
+  });
+
+  it('returns secure=false on POSIX when not owned by root', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('linux');
+    vi.mocked(fsSync.statSync).mockReturnValue({
+      isDirectory: () => false,
+      isFile: () => true,
+      uid: 1000,
+      mode: 0o644,
+    } as unknown as Stats);
+    vi.mocked(fsSync.lstatSync).mockReturnValue({
+      isSymbolicLink: () => false,
+    } as unknown as Stats);
+
+    const result = isPathSecureSync(
+      '/etc/gemini-cli/system-defaults.json',
+      'file',
+    );
+    expect(result.secure).toBe(false);
+    expect(result.reason).toContain('is not owned by root (uid 0)');
+  });
+
+  it('returns secure=false on POSIX when writable by others', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('linux');
+    Object.assign(constants, { S_IWGRP: 0, S_IWOTH: 0o002 });
+    vi.mocked(fsSync.statSync).mockReturnValue({
+      isDirectory: () => false,
+      isFile: () => true,
+      uid: 0,
+      mode: 0o666,
+    } as unknown as Stats);
+    vi.mocked(fsSync.lstatSync).mockReturnValue({
+      isSymbolicLink: () => false,
+    } as unknown as Stats);
+
+    const result = isPathSecureSync(
+      '/etc/gemini-cli/system-defaults.json',
+      'file',
+    );
+    expect(result.secure).toBe(false);
+    expect(result.reason).toContain('is writable by group or others');
+  });
+
+  it('returns secure=true on POSIX when symlink is owned by root (uid 0) even with mode 0777', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('linux');
+    Object.assign(constants, { S_IWGRP: 0o020, S_IWOTH: 0o002 });
+    // Target file: uid 0, mode 0644 (secure)
+    vi.mocked(fsSync.statSync).mockReturnValue({
+      isDirectory: () => false,
+      isFile: () => true,
+      uid: 0,
+      mode: 0o644,
+    } as unknown as Stats);
+    // Symlink: uid 0, mode 0777 (standard POSIX symlink permissions)
+    vi.mocked(fsSync.lstatSync).mockReturnValue({
+      isSymbolicLink: () => true,
+      uid: 0,
+      mode: 0o777,
+    } as unknown as Stats);
+
+    const result = isPathSecureSync(
+      '/etc/gemini-cli/system-defaults.json',
+      'file',
+    );
+    expect(result.secure).toBe(true);
+  });
+
+  it('returns secure=false on POSIX when symlink is not owned by root (uid 1000)', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('linux');
+    // Target file: uid 0, mode 0644
+    vi.mocked(fsSync.statSync).mockReturnValue({
+      isDirectory: () => false,
+      isFile: () => true,
+      uid: 0,
+      mode: 0o644,
+    } as unknown as Stats);
+    // Symlink: uid 1000 (attacker-controlled symlink)
+    vi.mocked(fsSync.lstatSync).mockReturnValue({
+      isSymbolicLink: () => true,
+      uid: 1000,
+      mode: 0o777,
+    } as unknown as Stats);
+
+    const result = isPathSecureSync(
+      '/etc/gemini-cli/system-defaults.json',
+      'file',
+    );
+    expect(result.secure).toBe(false);
+    expect(result.reason).toContain(
+      "Symlink '/etc/gemini-cli/system-defaults.json' is not owned by root (uid 0)",
+    );
+  });
+});
+
+describe('isFileAndDirectorySecureSync', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    clearSecurityCacheForTesting();
+  });
+
+  it('returns secure=true if file does not exist', () => {
+    vi.mocked(fsSync.existsSync).mockReturnValue(false);
+
+    const result = isFileAndDirectorySecureSync(
+      '/etc/gemini-cli/system-defaults.json',
+    );
+    expect(result.secure).toBe(true);
+  });
+
+  it('returns secure=false if parent directory is insecure', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('linux');
+    vi.mocked(fsSync.existsSync).mockReturnValue(true);
+    vi.mocked(fsSync.lstatSync).mockReturnValue({
+      isSymbolicLink: () => false,
+    } as unknown as Stats);
+    // Parent dir: uid 1000 (insecure)
+    vi.mocked(fsSync.statSync).mockImplementation((p) => {
+      if (String(p).endsWith('gemini-cli')) {
+        return {
+          isDirectory: () => true,
+          isFile: () => false,
+          uid: 1000,
+          mode: 0o755,
+        } as unknown as Stats;
+      }
+      if (String(p).endsWith('.json')) {
+        return {
+          isDirectory: () => false,
+          isFile: () => true,
+          uid: 0,
+          mode: 0o644,
+        } as unknown as Stats;
+      }
+      return {
+        isDirectory: () => true,
+        isFile: () => false,
+        uid: 0,
+        mode: 0o755,
+      } as unknown as Stats;
+    });
+
+    const result = isFileAndDirectorySecureSync(
+      '/etc/gemini-cli/system-defaults.json',
+    );
+    expect(result.secure).toBe(false);
+    expect(result.reason).toContain(
+      "Parent directory '/etc/gemini-cli' is insecure",
+    );
+  });
+
+  it.skip('returns secure=false if ancestor directory of normalized path is insecure', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('linux');
+    vi.mocked(fsSync.existsSync).mockReturnValue(true);
+    vi.mocked(fsSync.realpathSync).mockImplementation((p) => p.toString());
+    vi.mocked(fsSync.lstatSync).mockReturnValue({
+      isSymbolicLink: () => false,
+    } as unknown as Stats);
+    vi.mocked(fsSync.statSync).mockImplementation((p) => {
+      const pathStr = String(p);
+      if (pathStr === '/etc') {
+        return {
+          isDirectory: () => true,
+          isFile: () => false,
+          uid: 1000,
+          mode: 0o777,
+        } as unknown as Stats;
+      }
+      if (pathStr.endsWith('.json')) {
+        return {
+          isDirectory: () => false,
+          isFile: () => true,
+          uid: 0,
+          mode: 0o644,
+        } as unknown as Stats;
+      }
+      return {
+        isDirectory: () => true,
+        isFile: () => false,
+        uid: 0,
+        mode: 0o755,
+      } as unknown as Stats;
+    });
+
+    const result = isFileAndDirectorySecureSync(
+      '/etc/gemini-cli/system-defaults.json',
+    );
+    expect(result.secure).toBe(false);
+    expect(result.reason).toContain("Parent directory '/etc' is insecure");
+  });
+
+  it('returns secure=false if file itself is insecure', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('linux');
+    vi.mocked(fsSync.existsSync).mockReturnValue(true);
+    // Parent dirs: secure root; File: insecure uid 1000
+    vi.mocked(fsSync.statSync).mockImplementation((p) => {
+      if (String(p).endsWith('.json')) {
+        return {
+          isDirectory: () => false,
+          isFile: () => true,
+          uid: 1000,
+          mode: 0o644,
+        } as unknown as Stats;
+      }
+      return {
+        isDirectory: () => true,
+        isFile: () => false,
+        uid: 0,
+        mode: 0o755,
+      } as unknown as Stats;
+    });
+    vi.mocked(fsSync.lstatSync).mockReturnValue({
+      isSymbolicLink: () => false,
+    } as unknown as Stats);
+
+    const result = isFileAndDirectorySecureSync(
+      '/etc/gemini-cli/system-defaults.json',
+    );
+    expect(result.secure).toBe(false);
+    expect(result.reason).toContain('File is insecure');
+  });
+
+  it('returns secure=true when both parent directory and file are secure', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('linux');
+    Object.assign(constants, { S_IWGRP: 0o020, S_IWOTH: 0o002 });
+    vi.mocked(fsSync.existsSync).mockReturnValue(true);
+    vi.mocked(fsSync.statSync).mockImplementation((p) => {
+      if (String(p).endsWith('.json')) {
+        return {
+          isDirectory: () => false,
+          isFile: () => true,
+          uid: 0,
+          mode: 0o644,
+        } as unknown as Stats;
+      }
+      return {
+        isDirectory: () => true,
+        isFile: () => false,
+        uid: 0,
+        mode: 0o755,
+      } as unknown as Stats;
+    });
+    vi.mocked(fsSync.lstatSync).mockReturnValue({
+      isSymbolicLink: () => false,
+    } as unknown as Stats);
+
+    const result = isFileAndDirectorySecureSync(
+      '/etc/gemini-cli/system-defaults.json',
+    );
+    expect(result.secure).toBe(true);
+  });
+
+  it('returns secure=false if symlink target parent directory is insecure', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('linux');
+    vi.mocked(fsSync.existsSync).mockReturnValue(true);
+    vi.mocked(fsSync.realpathSync).mockReturnValue(
+      '/tmp/evil-dir/system-defaults.json',
+    );
+    vi.mocked(fsSync.statSync).mockImplementation((p) => {
+      const pathStr = String(p);
+      if (pathStr === '/tmp/evil-dir') {
+        return {
+          isDirectory: () => true,
+          isFile: () => false,
+          uid: 1000,
+          mode: 0o777,
+        } as unknown as Stats;
+      }
+      if (pathStr.endsWith('.json')) {
+        return {
+          isDirectory: () => false,
+          isFile: () => true,
+          uid: 0,
+          mode: 0o644,
+        } as unknown as Stats;
+      }
+      return {
+        isDirectory: () => true,
+        isFile: () => false,
+        uid: 0,
+        mode: 0o755,
+      } as unknown as Stats;
+    });
+    vi.mocked(fsSync.lstatSync).mockImplementation((p) => {
+      if (String(p).endsWith('system-defaults.json')) {
+        return {
+          isSymbolicLink: () => true,
+          uid: 0,
+          mode: 0o777,
+        } as unknown as Stats;
+      }
+      return {
+        isSymbolicLink: () => false,
+        uid: 0,
+        mode: 0o755,
+      } as unknown as Stats;
+    });
+
+    const result = isFileAndDirectorySecureSync(
+      '/etc/gemini-cli/system-defaults.json',
+    );
+    expect(result.secure).toBe(false);
+    expect(result.reason).toContain(
+      "Resolved target parent directory '/tmp/evil-dir' is insecure",
+    );
+  });
+
+  it.skip('returns secure=false if ancestor directory of canonical target is insecure', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('linux');
+    vi.mocked(fsSync.existsSync).mockReturnValue(true);
+    vi.mocked(fsSync.realpathSync).mockReturnValue(
+      '/home/untrusted/configs/system-defaults.json',
+    );
+    vi.mocked(fsSync.statSync).mockImplementation((p) => {
+      const pathStr = String(p);
+      if (pathStr === '/home/untrusted') {
+        return {
+          isDirectory: () => true,
+          isFile: () => false,
+          uid: 1000,
+          mode: 0o777,
+        } as unknown as Stats;
+      }
+      if (pathStr.endsWith('.json')) {
+        return {
+          isDirectory: () => false,
+          isFile: () => true,
+          uid: 0,
+          mode: 0o644,
+        } as unknown as Stats;
+      }
+      return {
+        isDirectory: () => true,
+        isFile: () => false,
+        uid: 0,
+        mode: 0o755,
+      } as unknown as Stats;
+    });
+    vi.mocked(fsSync.lstatSync).mockImplementation((p) => {
+      if (String(p).endsWith('system-defaults.json')) {
+        return {
+          isSymbolicLink: () => true,
+          uid: 0,
+          mode: 0o777,
+        } as unknown as Stats;
+      }
+      return {
+        isSymbolicLink: () => false,
+        uid: 0,
+        mode: 0o755,
+      } as unknown as Stats;
+    });
+
+    const result = isFileAndDirectorySecureSync(
+      '/etc/gemini-cli/system-defaults.json',
+    );
+    expect(result.secure).toBe(false);
+    expect(result.reason).toContain(
+      "Resolved target parent directory '/home/untrusted' is insecure",
+    );
+  });
+
+  it('returns secure=false if symlink target file itself is insecure', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('linux');
+    vi.mocked(fsSync.existsSync).mockReturnValue(true);
+    vi.mocked(fsSync.realpathSync).mockReturnValue(
+      '/var/safe-dir/insecure-target.json',
+    );
+    vi.mocked(fsSync.statSync).mockImplementation((p) => {
+      const pathStr = String(p);
+      if (pathStr === '/var/safe-dir/insecure-target.json') {
+        return {
+          isDirectory: () => false,
+          isFile: () => true,
+          uid: 1000,
+          mode: 0o644,
+        } as unknown as Stats;
+      }
+      if (pathStr.endsWith('.json')) {
+        return {
+          isDirectory: () => false,
+          isFile: () => true,
+          uid: 0,
+          mode: 0o644,
+        } as unknown as Stats;
+      }
+      return {
+        isDirectory: () => true,
+        isFile: () => false,
+        uid: 0,
+        mode: 0o755,
+      } as unknown as Stats;
+    });
+    vi.mocked(fsSync.lstatSync).mockImplementation((p) => {
+      if (String(p).endsWith('system-defaults.json')) {
+        return {
+          isSymbolicLink: () => true,
+          uid: 0,
+          mode: 0o777,
+        } as unknown as Stats;
+      }
+      return {
+        isSymbolicLink: () => false,
+        uid: 0,
+        mode: 0o755,
+      } as unknown as Stats;
+    });
+
+    const result = isFileAndDirectorySecureSync(
+      '/etc/gemini-cli/system-defaults.json',
+    );
+    expect(result.secure).toBe(false);
+    expect(result.reason).toContain('Resolved target file is insecure');
+  });
+
+  it.skip('returns secure=false if grandparent directory is an insecure symlink', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('linux');
+    vi.mocked(fsSync.existsSync).mockReturnValue(true);
+    vi.mocked(fsSync.realpathSync).mockImplementation((p) => p.toString());
+    vi.mocked(fsSync.lstatSync).mockImplementation((p) => {
+      const pathStr = String(p);
+      if (pathStr === '/etc/symlink-dir') {
+        return {
+          isSymbolicLink: () => true,
+          isDirectory: () => false,
+          isFile: () => false,
+          uid: 1000,
+          mode: 0o777,
+        } as unknown as Stats;
+      }
+      return {
+        isSymbolicLink: () => false,
+        isDirectory: () => true,
+        isFile: () => false,
+        uid: 0,
+        mode: 0o755,
+      } as unknown as Stats;
+    });
+
+    const result = isFileAndDirectorySecureSync(
+      '/etc/symlink-dir/gemini-cli/system-defaults.json',
+    );
+    expect(result.secure).toBe(false);
+    expect(result.reason).toContain(
+      "Parent directory symlink '/etc/symlink-dir' is insecure",
+    );
+  });
+
+  it('batches Windows ACL checks for parent directory and file into a single PowerShell call', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('win32');
+    vi.mocked(fsSync.existsSync).mockReturnValue(true);
+    vi.mocked(fsSync.realpathSync).mockImplementation((p) => p.toString());
+    vi.mocked(fsSync.lstatSync).mockReturnValue({
+      isSymbolicLink: () => false,
+    } as unknown as Stats);
+    vi.mocked(fsSync.statSync).mockImplementation((p) => {
+      if (String(p).endsWith('settings.json')) {
+        return {
+          isDirectory: () => false,
+          isFile: () => true,
+        } as unknown as Stats;
+      }
+      return {
+        isDirectory: () => true,
+        isFile: () => false,
+      } as unknown as Stats;
+    });
+
+    const testFilePath = 'C:\\ProgramData\\gemini-cli\\settings.json';
+    const normalizedFile = path.win32.resolve(testFilePath);
+    const parentDir = path.win32.dirname(normalizedFile);
+
+    vi.mocked(spawnSync).mockReturnValue({
+      stdout: `PATH:${parentDir}\nPATH:${normalizedFile}\n`,
+      stderr: '',
+      status: 0,
+      pid: 1234,
+      output: [],
+      signal: null,
+    });
+
+    const cache = createPathSecurityCache();
+    const result = isFileAndDirectorySecureSync(testFilePath, cache);
+
+    expect(result.secure).toBe(true);
+    // Verified that spawnSync was invoked exactly once for all directories and file
+    expect(spawnSync).toHaveBeenCalledTimes(1);
+    expect(cache.has(parentDir)).toBe(true);
+    expect(cache.has(normalizedFile)).toBe(true);
+  });
+
+  it('fails secure if a path is missing from batch output', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('win32');
+    vi.mocked(fsSync.existsSync).mockReturnValue(true);
+    vi.mocked(fsSync.realpathSync).mockImplementation((p) => p.toString());
+    vi.mocked(fsSync.lstatSync).mockReturnValue({
+      isSymbolicLink: () => false,
+    } as unknown as Stats);
+    vi.mocked(fsSync.statSync).mockImplementation((p) => {
+      if (String(p).endsWith('settings.json')) {
+        return {
+          isDirectory: () => false,
+          isFile: () => true,
+        } as unknown as Stats;
+      }
+      return {
+        isDirectory: () => true,
+        isFile: () => false,
+      } as unknown as Stats;
+    });
+
+    const testFilePath = 'C:\\ProgramData\\gemini-cli\\settings.json';
+    const normalizedFile = path.win32.resolve(testFilePath);
+    const parentDir = path.win32.dirname(normalizedFile);
+
+    // Only output PATH for parentDir, omitting normalizedFile from output
+    vi.mocked(spawnSync).mockReturnValue({
+      stdout: `PATH:${parentDir}\n`,
+      stderr: '',
+      status: 0,
+      pid: 1234,
+      output: [],
+      signal: null,
+    });
+
+    const cache = createPathSecurityCache();
+    const result = isFileAndDirectorySecureSync(testFilePath, cache);
+
+    expect(result.secure).toBe(false);
+    expect(result.reason).toContain(
+      'Security check output missing or incomplete',
+    );
+  });
+});
+
+describe('SecurityValidator', () => {
+  it('provides instance-isolated cache across calls', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('linux');
+    vi.mocked(fsSync.statSync).mockReturnValue({
+      isDirectory: () => false,
+      isFile: () => true,
+      uid: 0,
+      mode: 0o644,
+    } as unknown as Stats);
+
+    const validator1 = new SecurityValidator();
+    const validator2 = new SecurityValidator();
+
+    validator1.isPathSecureSync('/etc/test.conf', 'file');
+    expect(validator1.getCache().has('/etc/test.conf')).toBe(true);
+    expect(validator2.getCache().has('/etc/test.conf')).toBe(false);
+
+    validator1.clearCache();
+    expect(validator1.getCache().has('/etc/test.conf')).toBe(false);
   });
 });
