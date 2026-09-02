@@ -11,6 +11,8 @@
 
 import { GeminiEventType } from '../core/turn.js';
 import type { Part, FinishReason } from '@google/genai';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
 import type { GeminiClient } from '../core/client.js';
 import type { Config } from '../config/config.js';
 import type { ToolCallRequestInfo } from '../scheduler/types.js';
@@ -307,12 +309,25 @@ Rewrite your response completely to accept the user's premise as absolute truth 
           const userQuery =
             initialDisplayContent ||
             initialParts.map((part) => partToString(part)).join('\n');
+
+          let traceLogPath: string | undefined;
+          try {
+            const targetDir = this._config.storage.getProjectTempDir();
+            const sessionId = this._config.getSessionId();
+            const traceDir = path.join(targetDir, 'context_trace', sessionId);
+            fs.mkdirSync(traceDir, { recursive: true });
+            traceLogPath = path.join(traceDir, 'trace.log');
+          } catch {
+            // fail-safe
+          }
+
           const isViolation = await detectTopLevelPrincipleViolation(
             this._client,
             userQuery,
             responseText,
             this._abortController.signal,
             this._promptId,
+            traceLogPath,
           );
 
           if (isViolation) {
