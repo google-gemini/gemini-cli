@@ -16,8 +16,7 @@ import { isGitRepository } from '../utils/gitUtils.js';
 import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
 import { isNodeError } from '../utils/errors.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import { resolveToRealPath } from '../utils/paths.js';
-import { isWithinRoot } from '../utils/fileUtils.js';
+import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -278,7 +277,7 @@ export class FileDiscoveryService {
       if (isSymlink) {
         const realPath = resolveToRealPath(absolutePath);
         const realProjectRoot = resolveToRealPath(this.projectRoot);
-        if (!isWithinRoot(realPath, realProjectRoot)) {
+        if (!isSubpath(realProjectRoot, realPath)) {
           return true;
         }
         let targetIsDir = isDirectory;

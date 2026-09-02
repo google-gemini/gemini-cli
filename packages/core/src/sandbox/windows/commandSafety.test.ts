@@ -42,11 +42,31 @@ describe('Windows commandSafety', () => {
       ).toBe(false);
       expect(
         isKnownSafeCommand(
+          ['findstr', '/F:subdir\\..\\..\\outside\\win.ini', 'foo'],
+          'C:\\workspace',
+          'C:\\workspace',
+        ),
+      ).toBe(false);
+      expect(
+        isKnownSafeCommand(
           ['dir', '/Windows/win.ini'],
           'C:\\workspace',
           'C:\\workspace',
         ),
       ).toBe(false);
+    });
+
+    it('should reject cd with switches escaping workspace and bare cd escaping', () => {
+      expect(
+        isKnownSafeCommand(
+          ['cd', '-Path', '..\\outside'],
+          'C:\\workspace',
+          'C:\\workspace',
+        ),
+      ).toBe(false);
+      expect(isKnownSafeCommand(['cd'], 'C:\\workspace', 'C:\\workspace')).toBe(
+        false,
+      );
     });
 
     it('should allow file-reading commands with valid switches', () => {

@@ -13,8 +13,11 @@ import {
   splitCommands,
   stripShellWrapper,
 } from '../../utils/shell-utils.js';
-import { isWithinRoot } from '../../utils/fileUtils.js';
-import { isTrustedSystemPath, resolveToRealPath } from '../../utils/paths.js';
+import {
+  isSubpath,
+  isTrustedSystemPath,
+  resolveToRealPath,
+} from '../../utils/paths.js';
 
 function isRipgrepCommand(cmd: string): boolean {
   const cmdBasename = path.basename(cmd);
@@ -105,19 +108,19 @@ function isPathEscapingWorkspace(
   if (arg === '~' || arg.startsWith('~/') || arg.startsWith('~\\')) {
     const homeDir = os.homedir();
     target = path.resolve(homeDir, arg.slice(2));
-    if (!isWithinRoot(target, workspaceRoot)) {
+    if (!isSubpath(workspaceRoot, target)) {
       return true;
     }
   } else if (arg.startsWith('~')) {
     return true;
   } else if (path.isAbsolute(arg)) {
     target = path.resolve(arg);
-    if (!isWithinRoot(target, workspaceRoot)) {
+    if (!isSubpath(workspaceRoot, target)) {
       return true;
     }
   } else {
     target = path.resolve(cwd, arg);
-    if (!isWithinRoot(target, workspaceRoot)) {
+    if (!isSubpath(workspaceRoot, target)) {
       return true;
     }
   }
@@ -129,7 +132,7 @@ function isPathEscapingWorkspace(
       const stat = fs.lstatSync(curr, { throwIfNoEntry: false });
       if (stat?.isSymbolicLink()) {
         const real = fs.realpathSync(curr);
-        if (!isWithinRoot(real, workspaceRoot)) {
+        if (!isSubpath(workspaceRoot, real)) {
           return true;
         }
       }
@@ -248,7 +251,7 @@ function isSafeToCallWithExec(
 
   if (
     effectiveCwd !== effectiveWorkspace &&
-    !isWithinRoot(effectiveCwd, effectiveWorkspace)
+    !isSubpath(effectiveWorkspace, effectiveCwd)
   ) {
     return false;
   }
@@ -286,10 +289,19 @@ function isSafeToCallWithExec(
 
   if (safeCommands.has(cmd)) {
     if (cmd === 'cd') {
-      if (args[1]) {
-        if (
-          isPathEscapingWorkspace(args[1], effectiveWorkspace, effectiveCwd)
-        ) {
+      let hasPath = false;
+      for (let i = 1; i < args.length; i++) {
+        const arg = args[i];
+        if (arg.startsWith('-')) {
+          continue;
+        }
+        hasPath = true;
+        if (isPathEscapingWorkspace(arg, effectiveWorkspace, effectiveCwd)) {
+          return false;
+        }
+      }
+      if (!hasPath) {
+        if (isPathEscapingWorkspace('~', effectiveWorkspace, effectiveCwd)) {
           return false;
         }
       }
@@ -444,7 +456,7 @@ function isSafeToCallWithExec(
     }
     for (let i = 1; i < args.length; i++) {
       const arg = args[i];
-      if (arg.startsWith('-')) break;
+      if (arg.startsWith('-')) continue;
       if (isPathEscapingWorkspace(arg, effectiveWorkspace, effectiveCwd)) {
         return false;
       }

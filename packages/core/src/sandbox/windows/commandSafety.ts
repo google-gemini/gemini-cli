@@ -13,8 +13,7 @@ import {
   splitCommands,
   stripShellWrapper,
 } from '../../utils/shell-utils.js';
-import { isWithinRoot } from '../../utils/fileUtils.js';
-import { resolveToRealPath } from '../../utils/paths.js';
+import { isSubpath, resolveToRealPath } from '../../utils/paths.js';
 
 /**
  * Determines if a command is strictly approved for execution on Windows.
@@ -87,19 +86,19 @@ function isPathEscapingWorkspace(
   if (arg === '~' || arg.startsWith('~/') || arg.startsWith('~\\')) {
     const homeDir = os.homedir();
     target = path.win32.resolve(homeDir, arg.slice(2));
-    if (!isWithinRoot(target, workspaceRoot)) {
+    if (!isSubpath(workspaceRoot, target)) {
       return true;
     }
   } else if (arg.startsWith('~')) {
     return true;
   } else if (path.win32.isAbsolute(arg) || path.isAbsolute(arg)) {
     target = path.win32.resolve(arg);
-    if (!isWithinRoot(target, workspaceRoot)) {
+    if (!isSubpath(workspaceRoot, target)) {
       return true;
     }
   } else {
     target = path.win32.resolve(cwd, arg);
-    if (!isWithinRoot(target, workspaceRoot)) {
+    if (!isSubpath(workspaceRoot, target)) {
       return true;
     }
   }
@@ -110,7 +109,7 @@ function isPathEscapingWorkspace(
       const stat = fs.lstatSync(curr, { throwIfNoEntry: false });
       if (stat?.isSymbolicLink()) {
         const real = fs.realpathSync(curr);
-        if (!isWithinRoot(real, workspaceRoot)) {
+        if (!isSubpath(workspaceRoot, real)) {
           return true;
         }
       }
@@ -165,7 +164,7 @@ export function isKnownSafeCommand(
 
   if (
     effectiveCwd !== effectiveWorkspace &&
-    !isWithinRoot(effectiveCwd, effectiveWorkspace)
+    !isSubpath(effectiveWorkspace, effectiveCwd)
   ) {
     return false;
   }
@@ -201,10 +200,22 @@ export function isKnownSafeCommand(
 
   if (safeCommands.has(cmd)) {
     if (cmd === 'cd') {
-      if (args[1]) {
-        if (
-          isPathEscapingWorkspace(args[1], effectiveWorkspace, effectiveCwd)
-        ) {
+      let hasPath = false;
+      for (let i = 1; i < args.length; i++) {
+        const arg = args[i];
+        const isSwitch =
+          arg.startsWith('-') ||
+          (arg.startsWith('/') && /^\/[a-zA-Z0-9?]+(?::.*)?$/.test(arg));
+        if (isSwitch) {
+          continue;
+        }
+        hasPath = true;
+        if (isPathEscapingWorkspace(arg, effectiveWorkspace, effectiveCwd)) {
+          return false;
+        }
+      }
+      if (!hasPath) {
+        if (isPathEscapingWorkspace('~', effectiveWorkspace, effectiveCwd)) {
           return false;
         }
       }
@@ -241,19 +252,9 @@ export function isKnownSafeCommand(
             if (sepIdx !== -1) {
               const val = arg.slice(sepIdx + 1);
               if (
-                val.startsWith('/') ||
-                val.startsWith('\\') ||
-                val.startsWith('~') ||
-                val.startsWith('.') ||
-                val.includes('$') ||
-                val.includes('%') ||
-                /^[a-zA-Z]:/.test(val)
+                isPathEscapingWorkspace(val, effectiveWorkspace, effectiveCwd)
               ) {
-                if (
-                  isPathEscapingWorkspace(val, effectiveWorkspace, effectiveCwd)
-                ) {
-                  return false;
-                }
+                return false;
               }
             }
             continue;

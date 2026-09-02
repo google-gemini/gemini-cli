@@ -243,6 +243,43 @@ describe('commandSafety', () => {
         ),
       ).toBe(false);
     });
+
+    it('should reject cd with switches escaping workspace and bare cd escaping', () => {
+      expect(
+        isKnownSafeCommand(
+          ['cd', '-P', '../outside'],
+          workspaceDir,
+          workspaceDir,
+        ),
+      ).toBe(false);
+      expect(
+        isKnownSafeCommand(
+          ['cd', '-L', '../outside'],
+          workspaceDir,
+          workspaceDir,
+        ),
+      ).toBe(false);
+      expect(isKnownSafeCommand(['cd'], workspaceDir, workspaceDir)).toBe(
+        false,
+      );
+    });
+
+    it('should reject find commands with paths escaping workspace even with options', () => {
+      expect(
+        isKnownSafeCommand(
+          ['find', '-L', outsideDir],
+          workspaceDir,
+          workspaceDir,
+        ),
+      ).toBe(false);
+      expect(
+        isKnownSafeCommand(
+          ['find', '.', '-type', 'f', outsideDir],
+          workspaceDir,
+          workspaceDir,
+        ),
+      ).toBe(false);
+    });
   });
 
   describe('ln command safety in isDangerousCommand', () => {
