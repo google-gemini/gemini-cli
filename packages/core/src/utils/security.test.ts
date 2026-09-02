@@ -1045,8 +1045,8 @@ describe('isFileAndDirectorySecureSync', () => {
     expect(result.secure).toBe(true);
     // Verified that spawnSync was invoked exactly once for all directories and file
     expect(spawnSync).toHaveBeenCalledTimes(1);
-    expect(cache.has(parentDir)).toBe(true);
-    expect(cache.has(normalizedFile)).toBe(true);
+    expect(cache.has(parentDir.toLowerCase())).toBe(true);
+    expect(cache.has(normalizedFile.toLowerCase())).toBe(true);
   });
 
   it('fails secure if a path is missing from batch output', () => {
@@ -1143,10 +1143,58 @@ describe('isFileAndDirectorySecureSync', () => {
     // The PowerShell script should only check unique, non-redundant paths
     const spawnCall = vi.mocked(spawnSync).mock.calls[0];
     const scriptArg = (spawnCall[1] as string[])?.[5] ?? '';
-    expect(scriptArg).toContain(`'${normalizedFile}'`);
-    expect(scriptArg).toContain(`'${parentDir}'`);
+    expect(scriptArg).toContain(`'${normalizedFile.toLowerCase()}'`);
+    expect(scriptArg).toContain(`'${parentDir.toLowerCase()}'`);
     // Should NOT contain duplicate real path with lowercase drive letter as pathsEqual should prevent batching it
     expect(scriptArg).not.toContain(`'${lowercaseFile}'`);
+  });
+
+  it('trusts CREATOR OWNER and CREATOR GROUP on Windows', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('win32');
+    vi.mocked(fsSync.existsSync).mockReturnValue(true);
+    vi.mocked(fsSync.realpathSync).mockImplementation((p) => p.toString());
+    vi.mocked(fsSync.lstatSync).mockReturnValue({
+      isSymbolicLink: () => false,
+    } as unknown as Stats);
+    vi.mocked(fsSync.statSync).mockImplementation((p) => {
+      if (String(p).endsWith('settings.json')) {
+        return {
+          isDirectory: () => false,
+          isFile: () => true,
+        } as unknown as Stats;
+      }
+      return {
+        isDirectory: () => true,
+        isFile: () => false,
+      } as unknown as Stats;
+    });
+
+    const testFilePath = 'C:\\ProgramData\\gemini-cli\\settings.json';
+    const normalizedFile = path.win32.resolve(testFilePath);
+    const parentDir = path.win32.dirname(normalizedFile);
+
+    // Mock spawnSync to return no violations for paths owned/writable by CREATOR OWNER/GROUP
+    vi.mocked(spawnSync).mockReturnValue({
+      stdout: `PATH:${parentDir}\nPATH:${normalizedFile}\n`,
+      stderr: '',
+      status: 0,
+      pid: 1234,
+      output: [],
+      signal: null,
+    });
+
+    const cache = createPathSecurityCache();
+    const result = isFileAndDirectorySecureSync(testFilePath, cache);
+
+    expect(result.secure).toBe(true);
+
+    // Verify the PowerShell command was invoked and contains CREATOR OWNER and CREATOR GROUP checks
+    const spawnCall = vi.mocked(spawnSync).mock.calls[0];
+    const scriptArg = (spawnCall[1] as string[])?.[5] ?? '';
+    expect(scriptArg).toContain('CREATOR OWNER');
+    expect(scriptArg).toContain('CREATOR GROUP');
+    expect(scriptArg).toContain('S-1-3-0');
+    expect(scriptArg).toContain('S-1-3-1');
   });
 });
 

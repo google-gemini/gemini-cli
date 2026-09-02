@@ -106,9 +106,13 @@ function buildWindowsAclScript(paths: string[]): string {
         ($owner -like '*\\Administrators' -or $owner -eq 'Administrators') -or
         ($owner -like '*\\SYSTEM' -or $owner -eq 'SYSTEM') -or
         ($owner -like '*\\TrustedInstaller' -or $owner -eq 'TrustedInstaller') -or
+        ($owner -like '*\\CREATOR OWNER' -or $owner -eq 'CREATOR OWNER') -or
+        ($owner -like '*\\CREATOR GROUP' -or $owner -eq 'CREATOR GROUP') -or
         $ownerSid -eq 'S-1-5-32-544' -or
         $ownerSid -eq 'S-1-5-18' -or
-        $ownerSid -like 'S-1-5-80-*'
+        $ownerSid -like 'S-1-5-80-*' -or
+        $ownerSid -eq 'S-1-3-0' -or
+        $ownerSid -eq 'S-1-3-1'
       );
 
       if (-not $isTrustedOwner) {
@@ -126,14 +130,18 @@ function buildWindowsAclScript(paths: string[]): string {
               $isTrustedWriter = (
                   $sid -eq 'S-1-5-32-544' -or
                   $sid -eq 'S-1-5-18' -or
-                  $sid -like 'S-1-5-80-*'
+                  $sid -like 'S-1-5-80-*' -or
+                  $sid -eq 'S-1-3-0' -or
+                  $sid -eq 'S-1-3-1'
               );
           } catch {
               $id = $_.IdentityReference.Value;
               $isTrustedWriter = (
                   ($id -like '*\\Administrators' -or $id -eq 'Administrators') -or
                   ($id -like '*\\SYSTEM' -or $id -eq 'SYSTEM') -or
-                  ($id -like '*\\TrustedInstaller' -or $id -eq 'TrustedInstaller')
+                  ($id -like '*\\TrustedInstaller' -or $id -eq 'TrustedInstaller') -or
+                  ($id -like '*\\CREATOR OWNER' -or $id -eq 'CREATOR OWNER') -or
+                  ($id -like '*\\CREATOR GROUP' -or $id -eq 'CREATOR GROUP')
               );
           }
           -not $isTrustedWriter;
@@ -464,8 +472,12 @@ export function isPathSecureSync(
   expectedType?: 'file' | 'directory',
   cache?: PathSecurityCache,
 ): SecurityCheckResult {
-  const pathModule = os.platform() === 'win32' ? path.win32 : path;
-  const normalizedPath = pathModule.resolve(targetPath);
+  const isWin = os.platform() === 'win32';
+  const pathModule = isWin ? path.win32 : path;
+  let normalizedPath = pathModule.resolve(targetPath);
+  if (isWin) {
+    normalizedPath = normalizedPath.toLowerCase();
+  }
 
   try {
     let stats: Stats;
@@ -556,8 +568,12 @@ export function isFileAndDirectorySecureSync(
   filePath: string,
   cache?: PathSecurityCache,
 ): SecurityCheckResult {
-  const pathModule = os.platform() === 'win32' ? path.win32 : path;
-  const normalizedFilePath = pathModule.resolve(filePath);
+  const isWin = os.platform() === 'win32';
+  const pathModule = isWin ? path.win32 : path;
+  let normalizedFilePath = pathModule.resolve(filePath);
+  if (isWin) {
+    normalizedFilePath = normalizedFilePath.toLowerCase();
+  }
 
   // If the file does not exist, nothing will be loaded, so it is safe
   try {
@@ -576,7 +592,7 @@ export function isFileAndDirectorySecureSync(
   try {
     const real = fsSync.realpathSync(normalizedFilePath);
     if (typeof real === 'string' && real.length > 0) {
-      canonicalFilePath = real;
+      canonicalFilePath = isWin ? real.toLowerCase() : real;
     }
   } catch {
     // If realpathSync fails, keep normalizedFilePath
@@ -584,7 +600,6 @@ export function isFileAndDirectorySecureSync(
 
   const canonicalParentDir = pathModule.dirname(canonicalFilePath);
 
-  const isWin = os.platform() === 'win32';
   const pathsEqual = isWin
     ? canonicalFilePath.toLowerCase() === normalizedFilePath.toLowerCase()
     : canonicalFilePath === normalizedFilePath;
