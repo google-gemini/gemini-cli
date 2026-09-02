@@ -5,6 +5,9 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
 import {
   isStrictlyApproved,
   isKnownSafeCommand,
@@ -124,6 +127,135 @@ describe('commandSafety', () => {
       expect(await isStrictlyApproved('/tmp/malicious/rg', ['pattern'])).toBe(
         false,
       );
+    });
+  });
+
+  describe('workspace path boundary validation in isKnownSafeCommand', () => {
+    const tempDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-test-safety-'),
+    );
+    const workspaceDir = path.join(tempDir, 'workspace');
+    const outsideDir = path.join(tempDir, 'outside');
+
+    beforeEach(() => {
+      fs.mkdirSync(workspaceDir, { recursive: true });
+      fs.mkdirSync(outsideDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(workspaceDir, 'in_workspace.txt'),
+        'in workspace',
+      );
+      fs.writeFileSync(path.join(outsideDir, 'outside.txt'), 'outside content');
+    });
+
+    it('should consider ls or cat safe with in-workspace arguments', () => {
+      expect(
+        isKnownSafeCommand(
+          ['ls', 'in_workspace.txt'],
+          workspaceDir,
+          workspaceDir,
+        ),
+      ).toBe(true);
+      expect(
+        isKnownSafeCommand(
+          ['cat', 'in_workspace.txt'],
+          workspaceDir,
+          workspaceDir,
+        ),
+      ).toBe(true);
+    });
+
+    it('should reject ls or cat when argument traverses outside workspace', () => {
+      expect(
+        isKnownSafeCommand(
+          ['ls', '../outside/outside.txt'],
+          workspaceDir,
+          workspaceDir,
+        ),
+      ).toBe(false);
+      expect(
+        isKnownSafeCommand(
+          ['cat', path.join(outsideDir, 'outside.txt')],
+          workspaceDir,
+          workspaceDir,
+        ),
+      ).toBe(false);
+    });
+
+    it('should reject safe commands accessing a symlink pointing outside workspace', () => {
+      const symlinkPath = path.join(workspaceDir, 'my_link');
+      if (!fs.existsSync(symlinkPath)) {
+        fs.symlinkSync(outsideDir, symlinkPath);
+      }
+
+      expect(
+        isKnownSafeCommand(['ls', 'my_link'], workspaceDir, workspaceDir),
+      ).toBe(false);
+      expect(
+        isKnownSafeCommand(
+          ['cat', 'my_link/outside.txt'],
+          workspaceDir,
+          workspaceDir,
+        ),
+      ).toBe(false);
+    });
+
+    it('should reject commands with unresolved shell variable expansions in paths', () => {
+      expect(
+        isKnownSafeCommand(['ls', '${d}'], workspaceDir, workspaceDir),
+      ).toBe(false);
+      expect(
+        isKnownSafeCommand(['cat', '$SECRET_PATH'], workspaceDir, workspaceDir),
+      ).toBe(false);
+    });
+
+    it('should reject commands with user-specific tilde expansions', () => {
+      expect(
+        isKnownSafeCommand(['ls', '~root/secret'], workspaceDir, workspaceDir),
+      ).toBe(false);
+    });
+
+    it('should reject commands when effectiveCwd is outside workspace', () => {
+      expect(isKnownSafeCommand(['ls'], outsideDir, workspaceDir)).toBe(false);
+      expect(isKnownSafeCommand(['pwd'], outsideDir, workspaceDir)).toBe(false);
+    });
+
+    it('should reject grep or rg with file options pointing outside workspace', () => {
+      const outsideFile = path.join(outsideDir, 'outside.txt');
+      expect(
+        isKnownSafeCommand(
+          ['grep', '--file', outsideFile, 'pattern'],
+          workspaceDir,
+          workspaceDir,
+        ),
+      ).toBe(false);
+      expect(
+        isKnownSafeCommand(
+          ['grep', `-f${outsideFile}`, 'pattern'],
+          workspaceDir,
+          workspaceDir,
+        ),
+      ).toBe(false);
+      expect(
+        isKnownSafeCommand(
+          ['/usr/bin/rg', '--file', outsideFile, 'pattern'],
+          workspaceDir,
+          workspaceDir,
+        ),
+      ).toBe(false);
+    });
+  });
+
+  describe('ln command safety in isDangerousCommand', () => {
+    it('should flag ln with symbolic flags as dangerous', () => {
+      expect(isDangerousCommand(['ln', '-s', 'target', 'link'])).toBe(true);
+      expect(isDangerousCommand(['ln', '-sf', 'target', 'link'])).toBe(true);
+      expect(isDangerousCommand(['ln', '--symbolic', 'target', 'link'])).toBe(
+        true,
+      );
+    });
+
+    it('should not flag hard link ln without symbolic flag as dangerous', () => {
+      expect(isDangerousCommand(['ln', 'target', 'link'])).toBe(false);
     });
   });
 });

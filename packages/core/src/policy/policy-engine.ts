@@ -351,6 +351,7 @@ export class PolicyEngine {
   private async applyShellHeuristics(
     command: string,
     decision: PolicyDecision,
+    dir_path?: string,
   ): Promise<PolicyDecision> {
     if (decision === PolicyDecision.DENY) {
       return PolicyDecision.DENY;
@@ -360,6 +361,14 @@ export class PolicyEngine {
       const parsedObjArgs = shellParse(command);
       const parsedArgs = parsedObjArgs.map(extractStringFromParseEntry);
 
+      const workspace =
+        typeof this.sandboxManager.getWorkspace === 'function'
+          ? this.sandboxManager.getWorkspace()
+          : process.cwd();
+      const effectiveCwd = dir_path
+        ? path.resolve(workspace, dir_path)
+        : workspace;
+
       if (containsGitCommand(parsedArgs) && !this.isTrustedFolder()) {
         debugLogger.debug(
           `[PolicyEngine.check] Git command evaluated in untrusted workspace. Forcing ASK_USER: ${command}`,
@@ -367,7 +376,7 @@ export class PolicyEngine {
         return PolicyDecision.ASK_USER;
       }
 
-      if (this.sandboxManager.isDangerousCommand(parsedArgs)) {
+      if (this.sandboxManager.isDangerousCommand(parsedArgs, effectiveCwd)) {
         if (this.approvalMode === ApprovalMode.YOLO) {
           debugLogger.debug(
             `[PolicyEngine.check] Command evaluated as dangerous, but YOLO mode is active. Preserving decision: ${command}`,
@@ -382,9 +391,16 @@ export class PolicyEngine {
       }
 
       if (
-        this.sandboxManager.isKnownSafeCommand(parsedArgs) &&
+        this.sandboxManager.isKnownSafeCommand(parsedArgs, effectiveCwd) &&
         decision === PolicyDecision.ASK_USER
       ) {
+        if (effectiveCwd !== workspace && !isSubpath(workspace, effectiveCwd)) {
+          debugLogger.debug(
+            `[PolicyEngine.check] dir_path evaluated outside workspace. Preserving ASK_USER: ${command}`,
+          );
+          return PolicyDecision.ASK_USER;
+        }
+
         if (containsGitCommand(parsedArgs) && !this.isTrustedFolder()) {
           debugLogger.debug(
             `[PolicyEngine.check] Known safe Git command evaluated in untrusted workspace. Preserving ASK_USER: ${command}`,
@@ -667,7 +683,11 @@ export class PolicyEngine {
           !('commandPrefix' in rule) &&
           !rule.argsPattern
         ) {
-          ruleDecision = await this.applyShellHeuristics(command, ruleDecision);
+          ruleDecision = await this.applyShellHeuristics(
+            command,
+            ruleDecision,
+            shellDirPath,
+          );
         }
 
         if (isShellCommand && toolName) {
@@ -713,6 +733,7 @@ export class PolicyEngine {
           heuristicDecision = await this.applyShellHeuristics(
             command,
             heuristicDecision,
+            shellDirPath,
           );
         }
 
