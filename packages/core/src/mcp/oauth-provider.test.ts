@@ -239,7 +239,7 @@ describe('MCPOAuthProvider', () => {
         // Simulate OAuth callback
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -421,7 +421,7 @@ describe('MCPOAuthProvider', () => {
         callback?.();
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -505,7 +505,7 @@ describe('MCPOAuthProvider', () => {
         callback?.();
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -603,7 +603,7 @@ describe('MCPOAuthProvider', () => {
         callback?.();
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -713,7 +713,7 @@ describe('MCPOAuthProvider', () => {
         callback?.();
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -845,7 +845,7 @@ describe('MCPOAuthProvider', () => {
         callback?.();
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -965,7 +965,7 @@ describe('MCPOAuthProvider', () => {
         callback?.();
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -1004,7 +1004,7 @@ describe('MCPOAuthProvider', () => {
         callback?.();
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -1081,7 +1081,7 @@ describe('MCPOAuthProvider', () => {
         callback?.();
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -1184,7 +1184,7 @@ describe('MCPOAuthProvider', () => {
         callback?.();
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -1236,7 +1236,7 @@ describe('MCPOAuthProvider', () => {
         callback?.();
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -1284,7 +1284,7 @@ describe('MCPOAuthProvider', () => {
         callback?.();
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -1328,7 +1328,7 @@ describe('MCPOAuthProvider', () => {
         // Simulate OAuth callback
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -1370,7 +1370,7 @@ describe('MCPOAuthProvider', () => {
       vi.mocked(http.createServer).mockImplementation((handler) => {
         setTimeout(() => {
           const req = {
-            url: '/oauth/callback?code=code&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=code&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           } as http.IncomingMessage;
           const res = {
             writeHead: vi.fn(),
@@ -1798,7 +1798,7 @@ describe('MCPOAuthProvider', () => {
         callback?.();
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -1848,7 +1848,7 @@ describe('MCPOAuthProvider', () => {
         callback?.();
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -1905,7 +1905,7 @@ describe('MCPOAuthProvider', () => {
         callback?.();
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -1959,7 +1959,7 @@ describe('MCPOAuthProvider', () => {
         callback?.();
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
