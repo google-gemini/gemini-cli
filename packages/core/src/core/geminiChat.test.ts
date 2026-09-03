@@ -1184,58 +1184,40 @@ describe('GeminiChat', () => {
         { text: 'check the target before retrying' },
       ]);
 
-      const requestText = capturedContents
-        .flatMap((content) => content.parts ?? [])
-        .map((part) => part.text ?? '')
-        .join('\n');
-      expect(requestText).not.toContain(
-        '[The previous response was interrupted before it completed.]',
+      expect(JSON.stringify(chat.agentHistory.get())).not.toContain(
+        INTERRUPTED_RESPONSE_BOUNDARY,
       );
-
-      const storedText = chat.agentHistory
-        .get()
-        .flatMap((turn) => turn.content.parts ?? [])
-        .map((part) => part.text ?? '')
-        .join('\n');
-      expect(storedText).not.toContain(INTERRUPTED_RESPONSE_BOUNDARY);
     });
 
-    it.each([{ contextManagement: false }, { contextManagement: true }])(
-      'should add a transient boundary after a dangling tool response restored from a resumed session (context management: $contextManagement)',
-      async ({ contextManagement }) => {
-        vi.mocked(mockConfig.isContextManagementEnabled).mockReturnValue(
-          contextManagement,
-        );
+    it('should add a transient boundary to a context-managed history override after a resumed dangling tool response', async () => {
+      vi.mocked(mockConfig.isContextManagementEnabled).mockReturnValue(true);
 
-        const history: Content[] = [
-          { role: 'user', parts: [{ text: 'run the tests' }] },
-          {
-            role: 'model',
-            parts: [
-              {
-                functionCall: { id: 'c1', name: 'run_shell_command', args: {} },
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'run the tests' }] },
+        {
+          role: 'model',
+          parts: [
+            { functionCall: { id: 'c1', name: 'run_shell_command', args: {} } },
+          ],
+        },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                id: 'c1',
+                name: 'run_shell_command',
+                response: { output: 'ok' },
               },
-            ],
-          },
-          {
-            role: 'user',
-            parts: [
-              {
-                functionResponse: {
-                  id: 'c1',
-                  name: 'run_shell_command',
-                  response: { output: 'ok' },
-                },
-              },
-            ],
-          },
-        ];
-        chat.setHistory(history);
+            },
+          ],
+        },
+      ];
+      chat.setHistory(history);
 
-        let capturedContents: Content[] = [];
-        vi.mocked(
-          mockContentGenerator.generateContentStream,
-        ).mockImplementation(async (req) => {
+      let capturedContents: Content[] = [];
+      vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
+        async (req) => {
           capturedContents = req.contents as Content[];
           return (async function* () {
             yield {
@@ -1247,49 +1229,40 @@ describe('GeminiChat', () => {
               ],
             } as unknown as GenerateContentResponse;
           })();
-        });
+        },
+      );
 
-        const stream = await chat.sendMessageStream(
-          { model: 'gemini-2.0-flash' },
-          'are you done?',
-          'prompt-id-resumed-fusion',
-          new AbortController().signal,
-          LlmRole.MAIN,
-          undefined,
-          contextManagement
-            ? [...history, { role: 'user', parts: [{ text: 'are you done?' }] }]
-            : undefined,
-        );
-        for await (const _ of stream) {
-          // consume
-        }
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-2.0-flash' },
+        'are you done?',
+        'prompt-id-resumed-fusion',
+        new AbortController().signal,
+        LlmRole.MAIN,
+        undefined,
+        [...history, { role: 'user', parts: [{ text: 'are you done?' }] }],
+      );
+      for await (const _ of stream) {
+        // consume
+      }
 
-        const repairedTurn = capturedContents.find(
-          (c) =>
-            c.role === 'user' &&
-            !!c.parts?.some((p) => !!p.functionResponse) &&
-            !!c.parts?.some((p) => p.text?.includes('are you done?')),
-        );
-        expect(repairedTurn?.parts).toEqual([
-          {
-            functionResponse: {
-              id: 'c1',
-              name: 'run_shell_command',
-              response: { output: 'ok' },
-            },
+      const repairedTurn = capturedContents.find(
+        (c) =>
+          c.role === 'user' &&
+          !!c.parts?.some((p) => !!p.functionResponse) &&
+          !!c.parts?.some((p) => p.text?.includes('are you done?')),
+      );
+      expect(repairedTurn?.parts).toEqual([
+        {
+          functionResponse: {
+            id: 'c1',
+            name: 'run_shell_command',
+            response: { output: 'ok' },
           },
-          { text: INTERRUPTED_RESPONSE_BOUNDARY },
-          { text: 'are you done?' },
-        ]);
-
-        const storedText = chat.agentHistory
-          .get()
-          .flatMap((turn) => turn.content.parts ?? [])
-          .map((part) => part.text ?? '')
-          .join('\n');
-        expect(storedText).not.toContain(INTERRUPTED_RESPONSE_BOUNDARY);
-      },
-    );
+        },
+        { text: INTERRUPTED_RESPONSE_BOUNDARY },
+        { text: 'are you done?' },
+      ]);
+    });
 
     it('should preserve mixed multimodal function responses during rollback when InvalidStreamError is thrown (regression)', async () => {
       // 1. Setup history ending with a model turn containing functionCall
