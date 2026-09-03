@@ -12,6 +12,7 @@ import * as path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { LRUCache } from 'mnemonist';
 import { spawnAsync } from './shell-utils.js';
+import { stripExtendedLengthPrefix } from './paths.js';
 
 export interface SecurityCheckResult {
   secure: boolean;
@@ -461,6 +462,25 @@ export async function isDirectorySecure(
 }
 
 /**
+ * Resolves and normalizes a path for security checks across Windows and POSIX.
+ * On Windows, strips extended-length prefixes (\\?\ and \\?\UNC\) and converts to lowercase
+ * to prevent security bypasses and ensure PowerShell Get-Acl compatibility.
+ *
+ * @param targetPath The path to normalize.
+ * @returns The normalized path.
+ */
+export function normalizeSecurityPath(targetPath: string): string {
+  const isWin = os.platform() === 'win32';
+  const pathModule = isWin ? path.win32 : path.posix;
+  const stripped = isWin ? stripExtendedLengthPrefix(targetPath) : targetPath;
+  let resolved = pathModule.resolve(stripped);
+  if (isWin) {
+    resolved = stripExtendedLengthPrefix(resolved).toLowerCase();
+  }
+  return resolved;
+}
+
+/**
  * Synchronously verifies if a file or directory is secure.
  *
  * @param targetPath The path to check.
@@ -472,12 +492,7 @@ export function isPathSecureSync(
   expectedType?: 'file' | 'directory',
   cache?: PathSecurityCache,
 ): SecurityCheckResult {
-  const isWin = os.platform() === 'win32';
-  const pathModule = isWin ? path.win32 : path.posix;
-  let normalizedPath = pathModule.resolve(targetPath);
-  if (isWin) {
-    normalizedPath = normalizedPath.replace(/^\\\\\?\\/, '').toLowerCase();
-  }
+  const normalizedPath = normalizeSecurityPath(targetPath);
 
   try {
     let stats: Stats;
@@ -569,13 +584,8 @@ export function isFileAndDirectorySecureSync(
   cache?: PathSecurityCache,
 ): SecurityCheckResult {
   const isWin = os.platform() === 'win32';
-  const pathModule = isWin ? path.win32 : path;
-  let normalizedFilePath = pathModule.resolve(filePath);
-  if (isWin) {
-    normalizedFilePath = normalizedFilePath
-      .replace(/^\\\\\?\\/, '')
-      .toLowerCase();
-  }
+  const pathModule = isWin ? path.win32 : path.posix;
+  const normalizedFilePath = normalizeSecurityPath(filePath);
 
   // If the file does not exist, nothing will be loaded, so it is safe.
   // If existsSync throws an error, fail closed (secure = false) to prevent security bypasses.
@@ -586,6 +596,7 @@ export function isFileAndDirectorySecureSync(
   } catch (error) {
     return {
       secure: false,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       reason: `Failed to verify existence of path: ${(error as Error).message}`,
     };
   }
@@ -596,14 +607,9 @@ export function isFileAndDirectorySecureSync(
   // Resolve symbolic links to canonical real path first to prevent parent/grandparent symlink bypasses
   let canonicalFilePath = normalizedFilePath;
   try {
-    let real = fsSync.realpathSync(normalizedFilePath);
+    const real = fsSync.realpathSync(normalizedFilePath);
     if (typeof real === 'string' && real.length > 0) {
-      if (isWin) {
-        real = real.replace(/^\\\\\?\\/, '');
-        canonicalFilePath = real.toLowerCase();
-      } else {
-        canonicalFilePath = real;
-      }
+      canonicalFilePath = normalizeSecurityPath(real);
     }
   } catch {
     // If realpathSync fails, keep normalizedFilePath
@@ -611,9 +617,7 @@ export function isFileAndDirectorySecureSync(
 
   const canonicalParentDir = pathModule.dirname(canonicalFilePath);
 
-  const pathsEqual = isWin
-    ? canonicalFilePath.toLowerCase() === normalizedFilePath.toLowerCase()
-    : canonicalFilePath === normalizedFilePath;
+  const pathsEqual = canonicalFilePath === normalizedFilePath;
 
   // On Windows, batch all uncached paths into a single PowerShell check
   if (isWin) {

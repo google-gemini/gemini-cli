@@ -11,6 +11,7 @@ import {
   clearSecurityCacheForTesting,
   createPathSecurityCache,
   SecurityValidator,
+  normalizeSecurityPath,
 } from './security.js';
 import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
@@ -1263,6 +1264,86 @@ describe('isFileAndDirectorySecureSync', () => {
     const scriptArg = (spawnCall[1] as string[])?.[5] ?? '';
     expect(scriptArg).toContain(`'${normalizedFile}'`);
     expect(scriptArg).not.toContain('\\\\?\\');
+  });
+
+  it('strips Windows extended UNC path prefix \\\\?\\UNC\\ and converts to standard UNC path', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('win32');
+    vi.mocked(fsSync.existsSync).mockReturnValue(true);
+    // Realpath returns \\?\UNC\server\share\gemini-cli\settings.json
+    vi.mocked(fsSync.realpathSync).mockReturnValue(
+      '\\\\?\\UNC\\server\\share\\gemini-cli\\settings.json',
+    );
+    vi.mocked(fsSync.lstatSync).mockReturnValue({
+      isSymbolicLink: () => false,
+    } as unknown as Stats);
+    vi.mocked(fsSync.statSync).mockImplementation((p) => {
+      if (String(p).toLowerCase().endsWith('settings.json')) {
+        return {
+          isDirectory: () => false,
+          isFile: () => true,
+        } as unknown as Stats;
+      }
+      return {
+        isDirectory: () => true,
+        isFile: () => false,
+      } as unknown as Stats;
+    });
+
+    const testFilePath = '\\\\server\\share\\gemini-cli\\settings.json';
+    const normalizedFile =
+      '\\\\server\\share\\gemini-cli\\settings.json'.toLowerCase();
+    const parentDir = '\\\\server\\share\\gemini-cli'.toLowerCase();
+
+    // Mock spawnSync to return success for stripped paths
+    vi.mocked(spawnSync).mockReturnValue({
+      stdout: `PATH:${parentDir}\nPATH:${normalizedFile}\n`,
+      stderr: '',
+      status: 0,
+      pid: 1234,
+      output: [],
+      signal: null,
+    });
+
+    const cache = createPathSecurityCache();
+    const result = isFileAndDirectorySecureSync(testFilePath, cache);
+
+    expect(result.secure).toBe(true);
+
+    // Verify cache has the stripped and normalised lowercased paths (without \\?\UNC\ or UNC\)
+    expect(cache.has(normalizedFile)).toBe(true);
+    expect(cache.has(parentDir)).toBe(true);
+    expect(cache.has('unc\\server\\share\\gemini-cli\\settings.json')).toBe(
+      false,
+    );
+
+    // Verify spawnSync was called and received the standard UNC paths
+    const spawnCall = vi.mocked(spawnSync).mock.calls[0];
+    const scriptArg = (spawnCall[1] as string[])?.[5] ?? '';
+    expect(scriptArg).toContain(`'${normalizedFile}'`);
+    expect(scriptArg).not.toContain('\\\\?\\');
+    expect(scriptArg).not.toContain("'unc\\");
+  });
+});
+
+describe('normalizeSecurityPath', () => {
+  it('strips \\\\?\\ prefix on Windows and converts to lowercase', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('win32');
+    const result = normalizeSecurityPath('\\\\?\\C:\\ProgramData\\gemini-cli');
+    expect(result).toBe('c:\\programdata\\gemini-cli');
+  });
+
+  it('strips \\\\?\\UNC\\ prefix on Windows and converts to standard UNC path', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('win32');
+    const result = normalizeSecurityPath(
+      '\\\\?\\UNC\\server\\share\\config.json',
+    );
+    expect(result).toBe('\\\\server\\share\\config.json');
+  });
+
+  it('preserves POSIX paths on Linux', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('linux');
+    const result = normalizeSecurityPath('/etc/gemini-cli/settings.json');
+    expect(result).toBe('/etc/gemini-cli/settings.json');
   });
 });
 
