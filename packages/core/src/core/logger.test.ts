@@ -567,6 +567,25 @@ describe('Logger', () => {
       );
     });
 
+    it.each([
+      ['null', null],
+      ['number', 123],
+    ])(
+      'should return an empty history if history is %s instead of an array (#29194)',
+      async (_label: string, badHistory: unknown) => {
+        const taggedFilePath = path.join(
+          TEST_GEMINI_DIR,
+          'checkpoint-wrong-shape.json',
+        );
+        await fs.writeFile(
+          taggedFilePath,
+          JSON.stringify({ history: badHistory }),
+        );
+        const loadedCheckpoint = await logger.loadCheckpoint('wrong-shape');
+        expect(loadedCheckpoint).toEqual({ history: [] });
+      },
+    );
+
     it('should return an empty history if logger is not initialized', async () => {
       const uninitializedLogger = new Logger(
         testSessionId,
