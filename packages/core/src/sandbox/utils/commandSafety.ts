@@ -349,8 +349,19 @@ function isSafeToCallWithExec(
               ) {
                 return false;
               }
+              continue;
             }
-            continue;
+
+            try {
+              const stat = fs.lstatSync(path.resolve(effectiveCwd, arg), {
+                throwIfNoEntry: false,
+              });
+              if (!stat) {
+                continue;
+              }
+            } catch {
+              continue;
+            }
           }
         }
         if (isPathEscapingWorkspace(arg, effectiveWorkspace, effectiveCwd)) {
@@ -397,8 +408,19 @@ function isSafeToCallWithExec(
               ) {
                 return false;
               }
+              continue;
             }
-            continue;
+
+            try {
+              const stat = fs.lstatSync(path.resolve(effectiveCwd, arg), {
+                throwIfNoEntry: false,
+              });
+              if (!stat) {
+                continue;
+              }
+            } catch {
+              continue;
+            }
           }
         }
         if (isPathEscapingWorkspace(arg, effectiveWorkspace, effectiveCwd)) {
@@ -507,8 +529,19 @@ function isSafeToCallWithExec(
             ) {
               return false;
             }
+            continue;
           }
-          continue;
+
+          try {
+            const stat = fs.lstatSync(path.resolve(effectiveCwd, arg), {
+              throwIfNoEntry: false,
+            });
+            if (!stat) {
+              continue;
+            }
+          } catch {
+            continue;
+          }
         }
       }
       if (isPathEscapingWorkspace(arg, effectiveWorkspace, effectiveCwd)) {

@@ -94,6 +94,16 @@ describe('Windows commandSafety', () => {
       expect(
         isKnownSafeCommand(['dir', '/B'], 'C:\\workspace', 'C:\\workspace'),
       ).toBe(true);
+      expect(
+        isKnownSafeCommand(['findstr', '/s'], 'C:\\workspace', 'C:\\workspace'),
+      ).toBe(true);
+      expect(
+        isKnownSafeCommand(
+          ['sort', '-nonExistentFlag'],
+          'C:\\workspace',
+          'C:\\workspace',
+        ),
+      ).toBe(true);
     });
   });
 

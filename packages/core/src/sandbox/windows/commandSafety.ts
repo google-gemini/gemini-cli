@@ -261,8 +261,26 @@ export function isKnownSafeCommand(
               ) {
                 return false;
               }
+              continue;
             }
-            continue;
+
+            if (arg.startsWith('-')) {
+              try {
+                const stat = fs.lstatSync(
+                  path.win32.resolve(effectiveCwd, arg),
+                  {
+                    throwIfNoEntry: false,
+                  },
+                );
+                if (!stat) {
+                  continue;
+                }
+              } catch {
+                continue;
+              }
+            } else {
+              continue;
+            }
           }
         }
         if (isPathEscapingWorkspace(arg, effectiveWorkspace, effectiveCwd)) {

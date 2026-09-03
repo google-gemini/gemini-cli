@@ -290,6 +290,43 @@ describe('commandSafety', () => {
         ),
       ).toBe(false);
     });
+
+    it('should reject file-reading commands and grep/rg when an argument starting with hyphen is an existing file escaping workspace', () => {
+      const hyphenSymlinkName = '-escapedFile';
+      const hyphenSymlinkPath = path.join(workspaceDir, hyphenSymlinkName);
+      const outsideFile = path.join(outsideDir, 'outside.txt');
+      fs.symlinkSync(outsideFile, hyphenSymlinkPath);
+
+      try {
+        expect(
+          isKnownSafeCommand(
+            ['cat', hyphenSymlinkName],
+            workspaceDir,
+            workspaceDir,
+          ),
+        ).toBe(false);
+
+        expect(
+          isKnownSafeCommand(
+            ['grep', 'foo', hyphenSymlinkName],
+            workspaceDir,
+            workspaceDir,
+          ),
+        ).toBe(false);
+
+        expect(
+          isKnownSafeCommand(
+            ['/usr/bin/rg', 'foo', hyphenSymlinkName],
+            workspaceDir,
+            workspaceDir,
+          ),
+        ).toBe(false);
+      } finally {
+        if (fs.existsSync(hyphenSymlinkPath)) {
+          fs.unlinkSync(hyphenSymlinkPath);
+        }
+      }
+    });
   });
 
   describe('ln command safety in isDangerousCommand', () => {
