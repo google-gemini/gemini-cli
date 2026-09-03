@@ -226,28 +226,19 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
       const exitMessage = getPlanModeExitMessage(newMode);
 
       return {
-        llmContent: `${exitMessage}
-
-The approved implementation plan is stored at: ${resolvedPlanPath}
-Read and follow the plan strictly during implementation.`,
+        llmContent: `${exitMessage}\n\nThe approved implementation plan is stored at: ${resolvedPlanPath}\nRead and follow the plan strictly during implementation.`,
         returnDisplay: `Plan approved: ${resolvedPlanPath}`,
       };
     } else {
       const feedback = payload?.feedback?.trim();
       if (feedback) {
         return {
-          llmContent: `Plan rejected. User feedback: ${feedback}
-
-The plan is stored at: ${resolvedPlanPath}
-Revise the plan based on the feedback.`,
+          llmContent: `Plan rejected. User feedback: ${feedback}\n\nThe plan is stored at: ${resolvedPlanPath}\nRevise the plan based on the feedback.`,
           returnDisplay: `Feedback: ${feedback}`,
         };
       } else {
         return {
-          llmContent: `Plan rejected. No feedback provided.
-
-The plan is stored at: ${resolvedPlanPath}
-Ask the user for specific feedback on how to improve the plan.`,
+          llmContent: `Plan rejected. No feedback provided.\n\nThe plan is stored at: ${resolvedPlanPath}\nAsk the user for specific feedback on how to improve the plan.`,
           returnDisplay: 'Rejected (no feedback)',
         };
       }

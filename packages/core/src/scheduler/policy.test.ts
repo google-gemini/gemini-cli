@@ -813,6 +813,33 @@ describe('policy.ts', () => {
         }),
       );
     });
+
+    it('should map ProceedAlways to ProceedOnce in Plan Mode', async () => {
+      const mockConfig = {
+        getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.PLAN),
+        setApprovalMode: vi.fn(),
+        getSessionId: vi.fn().mockReturnValue('test-session-id'),
+      } as unknown as Mocked<Config>;
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
+      const mockMessageBus = {
+        publish: vi.fn(),
+      } as unknown as Mocked<MessageBus>;
+      (mockConfig as unknown as { messageBus: MessageBus }).messageBus =
+        mockMessageBus;
+      const tool = { name: 'replace' } as AnyDeclarativeTool;
+
+      await updatePolicy(
+        tool,
+        ToolConfirmationOutcome.ProceedAlways,
+        undefined,
+        mockConfig,
+        mockMessageBus,
+      );
+
+      expect(mockConfig.setApprovalMode).not.toHaveBeenCalled();
+      expect(mockMessageBus.publish).not.toHaveBeenCalled();
+    });
   });
 
   describe('getPolicyDenialError', () => {

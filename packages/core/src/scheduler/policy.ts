@@ -121,6 +121,14 @@ export async function updatePolicy(
 ): Promise<void> {
   const currentMode = context.config.getApprovalMode();
 
+  // If in Plan Mode, map 'Proceed Always' (Allow for this session) to 'Proceed Once' (Allow once)
+  // to prevent transitioning to AUTO_EDIT mode and updating policy.
+  if (
+    currentMode === ApprovalMode.PLAN &&
+    outcome === ToolConfirmationOutcome.ProceedAlways
+  ) {
+    outcome = ToolConfirmationOutcome.ProceedOnce;
+  }
   // Mode Transitions (AUTO_EDIT)
   if (isAutoEditTransition(tool, outcome)) {
     context.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
