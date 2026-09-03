@@ -71,7 +71,7 @@ function getWindowsPowerShellPath(): string {
     process.env['windir'] ||
     process.env['WINDIR'] ||
     'C:\\Windows';
-  const pathModule = os.platform() === 'win32' ? path.win32 : path;
+  const pathModule = os.platform() === 'win32' ? path.win32 : path.posix;
   return pathModule.join(
     systemRoot,
     'System32',
@@ -473,7 +473,7 @@ export function isPathSecureSync(
   cache?: PathSecurityCache,
 ): SecurityCheckResult {
   const isWin = os.platform() === 'win32';
-  const pathModule = isWin ? path.win32 : path;
+  const pathModule = isWin ? path.win32 : path.posix;
   let normalizedPath = pathModule.resolve(targetPath);
   if (isWin) {
     normalizedPath = normalizedPath.toLowerCase();
