@@ -290,7 +290,7 @@ describe('consent', () => {
               },
               headers: {
                 'X-API-Key': 'some-api-key',
-                'Authorization': 'Bearer 12345',
+                Authorization: 'Bearer 12345',
                 'Content-Type': 'application/json',
               },
               oauth: {
@@ -317,7 +317,9 @@ describe('consent', () => {
         expect(consentString).toContain('      - DB_PASSWORD: ********');
 
         // Assert sensitive headers are masked
-        expect(consentString).toContain('      - Content-Type: application/json');
+        expect(consentString).toContain(
+          '      - Content-Type: application/json',
+        );
         expect(consentString).toContain('      - Authorization: ********');
         expect(consentString).toContain('      - X-API-Key: ********');
 

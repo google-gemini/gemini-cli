@@ -7,7 +7,11 @@
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { debugLogger, type SkillDefinition, type MCPServerConfig } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  type SkillDefinition,
+  type MCPServerConfig,
+} from '@google/gemini-cli-core';
 import chalk from 'chalk';
 
 import type { ConfirmationRequest } from '../../ui/types.js';
@@ -154,7 +158,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * Excludes circular or complex fields like extension.
  */
 function getMcpServerConfigHash(mcpServer: MCPServerConfig): string {
-  const plainMcpServer: Record<string, unknown> = isRecord(mcpServer) ? mcpServer : {};
+  const plainMcpServer: Record<string, unknown> = isRecord(mcpServer)
+    ? mcpServer
+    : {};
   const copy = { ...plainMcpServer };
   delete copy['extension'];
 
@@ -226,19 +232,26 @@ async function extensionConsentString(
           a.localeCompare(b),
         );
         for (const [envKey, envValue] of sortedEnv) {
-          const isSensitive = /token|secret|password|passwd|key|auth|credential|creds|private|cert/i.test(envKey);
-          const displayValue = isSensitive && envValue ? '********' : (envValue ?? '');
+          const isSensitive =
+            /token|secret|password|passwd|key|auth|credential|creds|private|cert/i.test(
+              envKey,
+            );
+          const displayValue =
+            isSensitive && envValue ? '********' : (envValue ?? '');
           output.push(`      - ${envKey}: ${displayValue}`);
         }
       }
       if (mcpServer.headers && Object.keys(mcpServer.headers).length > 0) {
         output.push('    Headers:');
-        const sortedHeaders = Object.entries(mcpServer.headers).sort(([a], [b]) =>
-          a.localeCompare(b),
+        const sortedHeaders = Object.entries(mcpServer.headers).sort(
+          ([a], [b]) => a.localeCompare(b),
         );
         for (const [headerKey, headerValue] of sortedHeaders) {
-          const isSensitive = /authorization|key|cookie|token|secret/i.test(headerKey);
-          const displayValue = isSensitive && headerValue ? '********' : (headerValue ?? '');
+          const isSensitive = /authorization|key|cookie|token|secret/i.test(
+            headerKey,
+          );
+          const displayValue =
+            isSensitive && headerValue ? '********' : (headerValue ?? '');
           output.push(`      - ${headerKey}: ${displayValue}`);
         }
       }
@@ -273,7 +286,9 @@ async function extensionConsentString(
         output.push(`    Target Audience: ${mcpServer.targetAudience}`);
       }
       if (mcpServer.targetServiceAccount) {
-        output.push(`    Target Service Account: ${mcpServer.targetServiceAccount}`);
+        output.push(
+          `    Target Service Account: ${mcpServer.targetServiceAccount}`,
+        );
       }
       if (mcpServer.oauth) {
         output.push('    OAuth Configuration:');

@@ -2565,7 +2565,9 @@ describe('mcp-client', () => {
         const callArgs = mockedTransport.mock.calls[0][0];
         expect(callArgs.env).toBeDefined();
         expect(callArgs.env!['SAFE_VAR']).toBe('safe-value');
-        expect(callArgs.env!['NODE_OPTIONS']).not.toBe('--require=./payload.js');
+        expect(callArgs.env!['NODE_OPTIONS']).not.toBe(
+          '--require=./payload.js',
+        );
         expect(callArgs.env!['LD_PRELOAD']).not.toBe('/usr/lib/malicious.so');
       });
 

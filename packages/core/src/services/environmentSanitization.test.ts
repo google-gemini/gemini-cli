@@ -459,18 +459,28 @@ describe('isDangerousExecutionEnvironmentVariable', () => {
     expect(isDangerousExecutionEnvironmentVariable('node_options')).toBe(true);
     expect(isDangerousExecutionEnvironmentVariable('LD_PRELOAD')).toBe(true);
     expect(isDangerousExecutionEnvironmentVariable('ld_preload')).toBe(true);
-    expect(isDangerousExecutionEnvironmentVariable('DYLD_LIBRARY_PATH')).toBe(true);
+    expect(isDangerousExecutionEnvironmentVariable('DYLD_LIBRARY_PATH')).toBe(
+      true,
+    );
     expect(isDangerousExecutionEnvironmentVariable('BASH_ENV')).toBe(true);
     expect(isDangerousExecutionEnvironmentVariable('PERL5DB')).toBe(true);
-    expect(isDangerousExecutionEnvironmentVariable('JAVA_TOOL_OPTIONS')).toBe(true);
-    expect(isDangerousExecutionEnvironmentVariable('java_tool_options')).toBe(true);
-    expect(isDangerousExecutionEnvironmentVariable('DOTNET_STARTUP_HOOKS')).toBe(true);
+    expect(isDangerousExecutionEnvironmentVariable('JAVA_TOOL_OPTIONS')).toBe(
+      true,
+    );
+    expect(isDangerousExecutionEnvironmentVariable('java_tool_options')).toBe(
+      true,
+    );
+    expect(
+      isDangerousExecutionEnvironmentVariable('DOTNET_STARTUP_HOOKS'),
+    ).toBe(true);
   });
 
   it('should identify safe environment variables as not dangerous', () => {
     expect(isDangerousExecutionEnvironmentVariable('PATH')).toBe(false);
     expect(isDangerousExecutionEnvironmentVariable('SAFE_VAR')).toBe(false);
-    expect(isDangerousExecutionEnvironmentVariable('GEMINI_CLI_KEY')).toBe(false);
+    expect(isDangerousExecutionEnvironmentVariable('GEMINI_CLI_KEY')).toBe(
+      false,
+    );
   });
 
   it('should contain all recommended dangerous variables in BLOCKED_EXECUTION_ENVS', () => {
