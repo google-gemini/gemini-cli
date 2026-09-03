@@ -710,6 +710,20 @@ describe('Logger', () => {
         await fs.rm(outsidePath, { force: true });
       }
     });
+
+    it('should not reach sibling files that shed the checkpoint prefix (#29191)', async () => {
+      // `../bar/../../logs` normalizes back inside the dir but drops the
+      // `checkpoint-` filename prefix: still refuse it.
+      const siblingPath = path.join(TEST_GEMINI_DIR, 'logs.json');
+      await fs.writeFile(siblingPath, '{}');
+      try {
+        const result = await logger.deleteCheckpoint('../bar/../../logs');
+        expect(result).toBe(false);
+        expect(existsSync(siblingPath)).toBe(true);
+      } finally {
+        await fs.rm(siblingPath, { force: true });
+      }
+    });
   });
 
   describe('checkpointExists', () => {

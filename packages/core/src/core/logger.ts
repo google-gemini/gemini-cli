@@ -297,13 +297,18 @@ export class Logger {
   private _resolveLegacyCheckpointPath(tag: string): string | null {
     // Contain the backward-compatibility fallback: a tag carrying directory
     // components (e.g. `../`) must never resolve outside the checkpoints
-    // directory (#29191).
+    // directory, nor shed its `checkpoint-` filename prefix to reach a
+    // sibling file inside it (#29191).
     if (!this.geminiDir) {
       return null;
     }
     const oldPath = path.join(this.geminiDir, `checkpoint-${tag}.json`);
     const resolvedDir = path.resolve(this.geminiDir) + path.sep;
-    if (!path.resolve(oldPath).startsWith(resolvedDir)) {
+    const resolved = path.resolve(oldPath);
+    if (!resolved.startsWith(resolvedDir)) {
+      return null;
+    }
+    if (!path.basename(resolved).startsWith('checkpoint-')) {
       return null;
     }
     return oldPath;
