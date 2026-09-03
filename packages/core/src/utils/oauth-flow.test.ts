@@ -5,6 +5,9 @@
  */
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import * as dnsPromises from 'node:dns/promises';
+import type { LookupAddress, LookupAllOptions } from 'node:dns';
+import ipaddr from 'ipaddr.js';
 import type {
   OAuthFlowConfig,
   OAuthRefreshConfig,
@@ -17,8 +20,13 @@ import {
   startCallbackServer,
   exchangeCodeForToken,
   refreshAccessToken,
+  areIssuersEqual,
   REDIRECT_PATH,
 } from './oauth-flow.js';
+
+vi.mock('node:dns/promises', () => ({
+  lookup: vi.fn(),
+}));
 
 // Save real fetch for startCallbackServer tests (which hit a real local server)
 const realFetch = global.fetch;
@@ -59,11 +67,163 @@ describe('oauth-flow', () => {
   beforeEach(() => {
     vi.stubEnv('OAUTH_CALLBACK_PORT', '');
     mockFetch.mockReset();
+
+    vi.mocked(
+      dnsPromises.lookup as (
+        hostname: string,
+        options: LookupAllOptions,
+      ) => Promise<LookupAddress[]>,
+    ).mockImplementation(async (hostname: string) => {
+      if (ipaddr.isValid(hostname)) {
+        return [{ address: hostname, family: hostname.includes(':') ? 6 : 4 }];
+      }
+      return [{ address: '93.184.216.34', family: 4 }];
+    });
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
+  });
+
+  describe('areIssuersEqual', () => {
+    it('should return true for identical issuer strings', () => {
+      expect(
+        areIssuersEqual(
+          'https://github.com/login/oauth',
+          'https://github.com/login/oauth',
+        ),
+      ).toBe(true);
+    });
+
+    it('should return true when one issuer has a trailing slash', () => {
+      expect(
+        areIssuersEqual(
+          'https://github.com/login/oauth/',
+          'https://github.com/login/oauth',
+        ),
+      ).toBe(true);
+      expect(
+        areIssuersEqual(
+          'https://github.com/login/oauth',
+          'https://github.com/login/oauth/',
+        ),
+      ).toBe(true);
+      expect(
+        areIssuersEqual(
+          'https://auth.example.com/',
+          'https://auth.example.com',
+        ),
+      ).toBe(true);
+    });
+
+    it('should return false for different domains', () => {
+      expect(
+        areIssuersEqual(
+          'https://attacker.example.com',
+          'https://github.com/login/oauth',
+        ),
+      ).toBe(false);
+    });
+
+    it('should return false for different paths', () => {
+      expect(
+        areIssuersEqual(
+          'https://auth.example.com/realm-a',
+          'https://auth.example.com/realm-b',
+        ),
+      ).toBe(false);
+    });
+
+    it('should reject issuers containing userinfo to prevent mix-up attacks (RFC 9207 bypass)', () => {
+      expect(
+        areIssuersEqual(
+          'https://github.com/login/oauth',
+          'https://attacker.com@github.com/login/oauth',
+        ),
+      ).toBe(false);
+      expect(
+        areIssuersEqual(
+          'https://attacker.com@github.com/login/oauth',
+          'https://github.com/login/oauth',
+        ),
+      ).toBe(false);
+      expect(
+        areIssuersEqual(
+          'https://github.com@attacker.com/login/oauth',
+          'https://github.com/login/oauth',
+        ),
+      ).toBe(false);
+      expect(
+        areIssuersEqual(
+          'https://user:password@github.com/login/oauth',
+          'https://github.com/login/oauth',
+        ),
+      ).toBe(false);
+      expect(
+        areIssuersEqual(
+          'https://attacker.com@github.com/login/oauth',
+          'https://attacker.com@github.com/login/oauth',
+        ),
+      ).toBe(false);
+    });
+
+    it('should distinguish issuers with different query parameters to prevent multi-tenant mix-up', () => {
+      expect(
+        areIssuersEqual(
+          'https://auth.example.com?tenant=tenant1',
+          'https://auth.example.com?tenant=tenant2',
+        ),
+      ).toBe(false);
+      expect(
+        areIssuersEqual(
+          'https://auth.example.com?tenant=tenant1',
+          'https://auth.example.com',
+        ),
+      ).toBe(false);
+      expect(
+        areIssuersEqual(
+          'https://auth.example.com/oauth/?tenant=tenant1',
+          'https://auth.example.com/oauth?tenant=tenant1',
+        ),
+      ).toBe(true);
+    });
+
+    it('should distinguish issuers with different hash fragments', () => {
+      expect(
+        areIssuersEqual(
+          'https://auth.example.com#env1',
+          'https://auth.example.com#env2',
+        ),
+      ).toBe(false);
+    });
+
+    it('should normalize host casing and default ports', () => {
+      expect(
+        areIssuersEqual(
+          'HTTPS://GITHUB.COM/login/oauth',
+          'https://github.com/login/oauth',
+        ),
+      ).toBe(true);
+      expect(
+        areIssuersEqual(
+          'https://github.com:443/login/oauth',
+          'https://github.com/login/oauth',
+        ),
+      ).toBe(true);
+      expect(
+        areIssuersEqual(
+          'https://github.com:8443/login/oauth',
+          'https://github.com/login/oauth',
+        ),
+      ).toBe(false);
+    });
+
+    it('should handle non-URL strings gracefully', () => {
+      expect(areIssuersEqual('custom-issuer', 'custom-issuer')).toBe(true);
+      expect(areIssuersEqual('custom-issuer/', 'custom-issuer')).toBe(true);
+      expect(areIssuersEqual('custom-issuer-a', 'custom-issuer-b')).toBe(false);
+    });
   });
 
   describe('generatePKCEParams', () => {
@@ -358,6 +518,102 @@ describe('oauth-flow', () => {
       expect(response.state).toBe('my-state');
     });
 
+    it('should resolve response with code, state, and matching iss on valid callback', async () => {
+      const server = startCallbackServer(
+        'my-state',
+        undefined,
+        'https://github.com/login/oauth',
+      );
+      const port = await server.port;
+
+      const res = await realFetch(
+        `http://localhost:${port}${REDIRECT_PATH}?code=auth-code-123&state=my-state&iss=https://github.com/login/oauth`,
+      );
+      expect(res.status).toBe(200);
+
+      const response = await server.response;
+      expect(response.code).toBe('auth-code-123');
+      expect(response.state).toBe('my-state');
+      expect(response.iss).toBe('https://github.com/login/oauth');
+    });
+
+    it('should accept callback when issuer matches with trailing slash normalization', async () => {
+      const server = startCallbackServer(
+        'my-state',
+        undefined,
+        'https://github.com/login/oauth/',
+      );
+      const port = await server.port;
+
+      const res = await realFetch(
+        `http://localhost:${port}${REDIRECT_PATH}?code=auth-code-123&state=my-state&iss=https://github.com/login/oauth`,
+      );
+      expect(res.status).toBe(200);
+
+      const response = await server.response;
+      expect(response.code).toBe('auth-code-123');
+      expect(response.state).toBe('my-state');
+    });
+
+    it('should reject callback when expectedIssuer is configured but iss parameter is omitted (downgrade prevention)', async () => {
+      const server = startCallbackServer(
+        'my-state',
+        undefined,
+        'https://secure-idp.example.com',
+      );
+      const port = await server.port;
+
+      const responseResult = server.response.then(
+        () => new Error('Expected rejection'),
+        (e: Error) => e,
+      );
+
+      const res = await realFetch(
+        `http://localhost:${port}${REDIRECT_PATH}?code=auth-code-123&state=my-state`,
+      ).catch(() => {});
+
+      if (res) {
+        expect(res.status).toBe(400);
+      }
+
+      const error = await responseResult;
+      expect(error.message).toContain(
+        'Missing "iss" parameter in authorization response per RFC 9207',
+      );
+      // Ensure sensitive internal issuer details are not exposed in the error message
+      expect(error.message).not.toContain('https://secure-idp.example.com');
+    });
+
+    it('should allow callback when no expectedIssuer is configured and iss parameter is omitted', async () => {
+      const server = startCallbackServer('my-state', undefined, undefined);
+      const port = await server.port;
+
+      const res = await realFetch(
+        `http://localhost:${port}${REDIRECT_PATH}?code=legacy-code&state=my-state`,
+      );
+      expect(res.status).toBe(200);
+
+      const response = await server.response;
+      expect(response.code).toBe('legacy-code');
+      expect(response.state).toBe('my-state');
+      expect(response.iss).toBeUndefined();
+    });
+
+    it('should allow callback when no expectedIssuer is configured and iss parameter is present', async () => {
+      const server = startCallbackServer('my-state', undefined, undefined);
+      const port = await server.port;
+
+      const res = await realFetch(
+        `http://localhost:${port}${REDIRECT_PATH}?code=code-456&state=my-state&iss=https://idp.example.com`,
+      );
+      expect(res.status).toBe(200);
+
+      const response = await server.response;
+      expect(response.code).toBe('code-456');
+      expect(response.state).toBe('my-state');
+      expect(response.iss).toBe('https://idp.example.com');
+    });
+
     it('should reject on state mismatch', async () => {
       const server = startCallbackServer('expected-state');
       const port = await server.port;
@@ -377,6 +633,60 @@ describe('oauth-flow', () => {
 
       const error = await responseResult;
       expect(error.message).toContain('State mismatch - possible CSRF attack');
+    });
+
+    it('should reject callback when issuer (iss) does not match expected authorization server', async () => {
+      const server = startCallbackServer(
+        'expected-state',
+        undefined,
+        'https://github.com/login/oauth',
+      );
+      const port = await server.port;
+
+      const responseResult = server.response.then(
+        () => new Error('Expected rejection'),
+        (e: Error) => e,
+      );
+
+      const res = await realFetch(
+        `http://localhost:${port}${REDIRECT_PATH}?code=abc&state=expected-state&iss=https://attacker-idp.example.com`,
+      ).catch(() => {});
+
+      if (res) {
+        expect(res.status).toBe(400);
+      }
+
+      const error = await responseResult;
+      expect(error.message).toContain('Issuer mismatch');
+      expect(error.message).not.toContain('https://attacker-idp.example.com');
+      expect(error.message).not.toContain('https://github.com/login/oauth');
+    });
+
+    it('should reject callback when issuer contains userinfo spoofing attempt', async () => {
+      const server = startCallbackServer(
+        'expected-state',
+        undefined,
+        'https://github.com/login/oauth',
+      );
+      const port = await server.port;
+
+      const responseResult = server.response.then(
+        () => new Error('Expected rejection'),
+        (e: Error) => e,
+      );
+
+      const res = await realFetch(
+        `http://localhost:${port}${REDIRECT_PATH}?code=abc&state=expected-state&iss=https://attacker.com@github.com/login/oauth`,
+      ).catch(() => {});
+
+      if (res) {
+        expect(res.status).toBe(400);
+      }
+
+      const error = await responseResult;
+      expect(error.message).toContain('Issuer mismatch');
+      expect(error.message).not.toContain('https://attacker.com');
+      expect(error.message).not.toContain('https://github.com/login/oauth');
     });
 
     it('should reject on OAuth error in callback', async () => {
@@ -795,6 +1105,52 @@ describe('oauth-flow', () => {
 
       expect(result.access_token).toBe('refreshed-token');
       expect(result.expires_in).toBe(1800);
+    });
+
+    it('should reject token refresh when tokenUrl points to private IP or loopback from remote', async () => {
+      await expect(
+        refreshAccessToken(
+          refreshConfig,
+          'refresh-token',
+          'http://127.0.0.1:18080/token',
+          'https://mcp.remote.com',
+        ),
+      ).rejects.toThrow();
+
+      await expect(
+        refreshAccessToken(
+          refreshConfig,
+          'refresh-token',
+          'http://169.254.169.254/token',
+        ),
+      ).rejects.toThrow();
+    });
+
+    it('should reject token exchange when tokenUrl points to private IP or loopback from remote', async () => {
+      await expect(
+        exchangeCodeForToken(
+          {
+            ...baseConfig,
+            tokenUrl: 'http://127.0.0.1:18080/token',
+          },
+          'code',
+          'verifier',
+          3000,
+          'https://mcp.remote.com',
+        ),
+      ).rejects.toThrow();
+
+      await expect(
+        exchangeCodeForToken(
+          {
+            ...baseConfig,
+            tokenUrl: 'http://169.254.169.254/token',
+          },
+          'code',
+          'verifier',
+          3000,
+        ),
+      ).rejects.toThrow();
     });
   });
 });

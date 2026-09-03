@@ -53,11 +53,7 @@ import {
   logEditCorrectionEvent,
 } from '../telemetry/loggers.js';
 
-import {
-  EDIT_TOOL_NAME,
-  READ_FILE_TOOL_NAME,
-  EDIT_DISPLAY_NAME,
-} from './tool-names.js';
+import { EDIT_TOOL_NAME, EDIT_DISPLAY_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import levenshtein from 'fast-levenshtein';
 import { EDIT_DEFINITION } from './definitions/coreTools.js';
@@ -366,8 +362,8 @@ export function getErrorReplaceResult(
     undefined;
   if (occurrences === 0) {
     error = {
-      display: `Failed to edit, could not find the string to replace.`,
-      raw: `Failed to edit, 0 occurrences found for old_string in ${params.file_path}. Ensure you're not escaping content incorrectly and check whitespace, indentation, and context. Use ${READ_FILE_TOOL_NAME} tool to verify.`,
+      display: `Could not find an exact match for old_string in '${params.file_path}'.`,
+      raw: `Could not find an exact match for 'old_string' in '${params.file_path}'. If previous edits modified the file or you are modifying lines outside your recent read window, please use ReadFile to inspect the target lines before retrying with an exact 'old_string'.`,
       type: ToolErrorType.EDIT_NO_OCCURRENCE_FOUND,
     };
   } else if (!params.allow_multiple && occurrences !== 1) {
@@ -552,6 +548,22 @@ class EditToolInvocation
     abortSignal: AbortSignal,
     originalLineEnding: '\r\n' | '\n',
   ): Promise<CalculatedEdit> {
+    // Fail fast without invoking FixLLMEditWithInstruction when old_string is empty
+    if (!params.old_string || params.old_string.trim() === '') {
+      return {
+        currentContent,
+        newContent: currentContent,
+        occurrences: 0,
+        isNewFile: false,
+        error: {
+          display: "Edit failed: 'old_string' cannot be empty.",
+          raw: "The 'old_string' parameter is required. The Edit tool performs localized search-and-replace. If you are modifying a section of the file you have not viewed recently, call ReadFile on the target line range to inspect the current code, then provide the exact matching lines in 'old_string'.",
+          type: ToolErrorType.INVALID_TOOL_PARAMS,
+        },
+        originalLineEnding,
+      };
+    }
+
     // In order to keep from clobbering edits made outside our system,
     // check if the file has been modified since we first read it.
     let errorForLlmEditFixer = initialError.raw;
@@ -1023,7 +1035,7 @@ ${snippet}`);
       }
       if (this.params.modified_by_user) {
         llmSuccessMessageParts.push(
-          `User modified the \`new_string\` content to be: ${this.params.new_string}.`,
+          `The confirmation step modified the \`new_string\` content to be: ${this.params.new_string}.`,
         );
       }
 
