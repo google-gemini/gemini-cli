@@ -298,16 +298,24 @@ ${finalExclusionPatternsForDescription
             fileType === 'pdf' ||
             fileType === 'audio'
           ) {
-            const fileExtension = path.extname(filePath).toLowerCase();
-            const fileNameWithoutExtension = path.basename(
-              filePath,
-              fileExtension,
-            );
-            const requestedExplicitly = include.some(
-              (pattern: string) =>
-                pattern.toLowerCase().includes(fileExtension) ||
-                pattern.includes(fileNameWithoutExtension),
-            );
+            const rawExtension = path.extname(filePath);
+            const fileExtension = rawExtension.toLowerCase();
+            const fileNameWithoutExtension = path
+              .basename(filePath, rawExtension)
+              .toLowerCase();
+            const requestedExplicitly = include.some((pattern: string) => {
+              const normalizedPattern = pattern.replace(/\\/g, '/');
+              const patternExtension = path
+                .extname(normalizedPattern)
+                .toLowerCase();
+              const patternNameWithoutExtension = path
+                .basename(normalizedPattern, patternExtension)
+                .toLowerCase();
+              return (
+                patternExtension === fileExtension ||
+                patternNameWithoutExtension === fileNameWithoutExtension
+              );
+            });
 
             if (!requestedExplicitly) {
               return {

@@ -533,6 +533,56 @@ describe('ReadManyFilesTool', () => {
       ]);
     });
 
+    it('should not treat an image as explicitly requested merely because a pattern directory name contains its stem as a substring', async () => {
+      createBinaryFile(
+        'assets/logo.png',
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      );
+      // 'assets/**' discovers the file; 'assets/logos-report/**' is an
+      // unrelated pattern whose directory name ("logos-report") happens to
+      // contain the file's stem ("logo") as a substring. It must not cause
+      // the file to be treated as explicitly requested.
+      const params = {
+        include: ['assets/**', 'assets/logos-report/**'],
+      };
+      const invocation = tool.build(params);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
+        '**Skipped 1 item(s):**',
+      );
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
+        '- `assets/logo.png` (Reason: asset file (image/pdf/audio) was not explicitly requested by name or extension)',
+      );
+    });
+
+    it('should match an explicit name request case-insensitively', async () => {
+      createBinaryFile(
+        'assets/logo.png',
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      );
+      // 'assets/**' discovers the file. 'assets/Logo' has no extension, so
+      // only the (case-insensitive) name match can identify it as
+      // explicitly requested, despite the differing case.
+      const params = { include: ['assets/**', 'assets/Logo'] };
+      const invocation = tool.build(params);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.llmContent).toEqual([
+        {
+          inlineData: {
+            data: Buffer.from([
+              0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+            ]).toString('base64'),
+            mimeType: 'image/png',
+          },
+        },
+        '\n--- End of content ---',
+      ]);
+    });
+
     it('should return error if path is ignored by a .geminiignore pattern', async () => {
       createFile('foo.bar', '');
       createFile('bar.ts', '');
