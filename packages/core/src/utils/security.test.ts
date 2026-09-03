@@ -668,6 +668,20 @@ describe('isFileAndDirectorySecureSync', () => {
     expect(result.secure).toBe(true);
   });
 
+  it('returns secure=false if existsSync throws an error', () => {
+    vi.mocked(fsSync.existsSync).mockImplementation(() => {
+      throw new Error('Permission denied or storage error');
+    });
+
+    const result = isFileAndDirectorySecureSync(
+      '/etc/gemini-cli/system-defaults.json',
+    );
+    expect(result.secure).toBe(false);
+    expect(result.reason).toContain(
+      'Failed to verify existence of path: Permission denied or storage error',
+    );
+  });
+
   it('returns secure=false if parent directory is insecure', () => {
     vi.spyOn(os, 'platform').mockReturnValue('linux');
     vi.mocked(fsSync.existsSync).mockReturnValue(true);

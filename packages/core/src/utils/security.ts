@@ -577,13 +577,17 @@ export function isFileAndDirectorySecureSync(
       .toLowerCase();
   }
 
-  // If the file does not exist, nothing will be loaded, so it is safe
+  // If the file does not exist, nothing will be loaded, so it is safe.
+  // If existsSync throws an error, fail closed (secure = false) to prevent security bypasses.
   try {
     if (!fsSync.existsSync(normalizedFilePath)) {
       return { secure: true };
     }
-  } catch {
-    return { secure: true };
+  } catch (error) {
+    return {
+      secure: false,
+      reason: `Failed to verify existence of path: ${(error as Error).message}`,
+    };
   }
 
   const effectiveCache = cache ?? createPathSecurityCache(50);
