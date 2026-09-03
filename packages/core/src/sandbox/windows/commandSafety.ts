@@ -104,7 +104,11 @@ function isPathEscapingWorkspace(
   }
 
   let curr = target;
-  while (curr && curr !== workspaceRoot && curr !== path.win32.dirname(curr)) {
+  while (
+    curr &&
+    isSubpath(workspaceRoot, curr) &&
+    curr !== path.win32.dirname(curr)
+  ) {
     try {
       const stat = fs.lstatSync(curr, { throwIfNoEntry: false });
       if (stat?.isSymbolicLink()) {
@@ -232,6 +236,7 @@ export function isKnownSafeCommand(
       'get-content',
       'select-string',
       '__read',
+      'sort',
     ]);
 
     if (fileReadingCommands.has(cmd)) {
@@ -245,7 +250,7 @@ export function isKnownSafeCommand(
           }
           const isSwitch =
             arg.startsWith('-') ||
-            (arg.startsWith('/') && /^\/[a-zA-Z0-9?]+(?::.*)?$/.test(arg));
+            (arg.startsWith('/') && /^\/[a-zA-Z0-9?]{1,4}(?::.*)?$/.test(arg));
           if (isSwitch) {
             const sepIdx =
               arg.indexOf('=') !== -1 ? arg.indexOf('=') : arg.indexOf(':');

@@ -127,7 +127,11 @@ function isPathEscapingWorkspace(
 
   // Check if target or any parent directory resolves through a symlink to outside the workspace
   let curr = target;
-  while (curr && curr !== workspaceRoot && curr !== path.dirname(curr)) {
+  while (
+    curr &&
+    isSubpath(workspaceRoot, curr) &&
+    curr !== path.dirname(curr)
+  ) {
     try {
       const stat = fs.lstatSync(curr, { throwIfNoEntry: false });
       if (stat?.isSymbolicLink()) {

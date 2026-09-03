@@ -44,6 +44,18 @@ export class FileDiscoveryService {
     customIgnoreFilePaths: [],
   };
   private projectRoot: string;
+  private _realProjectRoot?: string;
+
+  private get realProjectRoot(): string {
+    if (!this._realProjectRoot) {
+      try {
+        this._realProjectRoot = resolveToRealPath(this.projectRoot);
+      } catch {
+        this._realProjectRoot = this.projectRoot;
+      }
+    }
+    return this._realProjectRoot;
+  }
 
   constructor(projectRoot: string, options?: FilterFilesOptions) {
     this.projectRoot = path.resolve(projectRoot);
@@ -276,8 +288,7 @@ export class FileDiscoveryService {
 
       if (isSymlink) {
         const realPath = resolveToRealPath(absolutePath);
-        const realProjectRoot = resolveToRealPath(this.projectRoot);
-        if (!isSubpath(realProjectRoot, realPath)) {
+        if (!isSubpath(this.realProjectRoot, realPath)) {
           return true;
         }
         let targetIsDir = isDirectory;

@@ -54,6 +54,20 @@ describe('Windows commandSafety', () => {
           'C:\\workspace',
         ),
       ).toBe(false);
+      expect(
+        isKnownSafeCommand(
+          ['dir', '/windows'],
+          'C:\\workspace',
+          'C:\\workspace',
+        ),
+      ).toBe(false);
+      expect(
+        isKnownSafeCommand(
+          ['sort', 'C:\\Windows\\win.ini'],
+          'C:\\workspace',
+          'C:\\workspace',
+        ),
+      ).toBe(false);
     });
 
     it('should reject cd with switches escaping workspace and bare cd escaping', () => {
