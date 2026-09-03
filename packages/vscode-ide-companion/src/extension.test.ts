@@ -22,55 +22,74 @@ vi.mock('@google/gemini-cli-core/src/ide/detect-ide.js', async () => {
   };
 });
 
-vi.mock('vscode', () => ({
-  window: {
-    createOutputChannel: vi.fn(() => ({
-      appendLine: vi.fn(),
-    })),
-    showInformationMessage: vi.fn(),
-    createTerminal: vi.fn(() => ({
-      show: vi.fn(),
-      sendText: vi.fn(),
-    })),
-    onDidChangeActiveTextEditor: vi.fn(),
-    activeTextEditor: undefined,
-    tabGroups: {
-      all: [],
-      close: vi.fn(),
-    },
-    showTextDocument: vi.fn(),
-    showWorkspaceFolderPick: vi.fn(),
-  },
-  workspace: {
-    workspaceFolders: [],
-    onDidCloseTextDocument: vi.fn(),
-    registerTextDocumentContentProvider: vi.fn(),
-    onDidChangeWorkspaceFolders: vi.fn(),
-    onDidGrantWorkspaceTrust: vi.fn(),
-    getConfiguration: vi.fn(() => ({
-      get: vi.fn(),
-    })),
-  },
-  commands: {
-    registerCommand: vi.fn(),
-    executeCommand: vi.fn(),
-  },
-  Uri: {
-    joinPath: vi.fn(),
-  },
-  ExtensionMode: {
-    Development: 1,
-    Production: 2,
-  },
-  EventEmitter: vi.fn(() => ({
-    event: vi.fn(),
-    fire: vi.fn(),
+vi.mock('vscode', () => {
+  const createDisposable = (id: string) => ({
     dispose: vi.fn(),
-  })),
-  extensions: {
-    getExtension: vi.fn(),
-  },
-}));
+    id,
+  });
+
+  return {
+    window: {
+      createOutputChannel: vi.fn(() => ({
+        appendLine: vi.fn(),
+      })),
+      showInformationMessage: vi.fn(),
+      createTerminal: vi.fn(() => ({
+        show: vi.fn(),
+        sendText: vi.fn(),
+      })),
+      onDidChangeActiveTextEditor: vi.fn(() =>
+        createDisposable('onDidChangeActiveTextEditor'),
+      ),
+      activeTextEditor: undefined,
+      tabGroups: {
+        all: [],
+        close: vi.fn(),
+      },
+      showTextDocument: vi.fn(),
+      showWorkspaceFolderPick: vi.fn(),
+    },
+    workspace: {
+      workspaceFolders: [],
+      onDidCloseTextDocument: vi.fn(() =>
+        createDisposable('onDidCloseTextDocument'),
+      ),
+      registerTextDocumentContentProvider: vi.fn(() =>
+        createDisposable('registerTextDocumentContentProvider'),
+      ),
+      onDidChangeWorkspaceFolders: vi.fn(() =>
+        createDisposable('onDidChangeWorkspaceFolders'),
+      ),
+      onDidGrantWorkspaceTrust: vi.fn(() =>
+        createDisposable('onDidGrantWorkspaceTrust'),
+      ),
+      getConfiguration: vi.fn(() => ({
+        get: vi.fn(),
+      })),
+    },
+    commands: {
+      registerCommand: vi.fn((command: string) =>
+        createDisposable(`registerCommand:${command}`),
+      ),
+      executeCommand: vi.fn(),
+    },
+    Uri: {
+      joinPath: vi.fn(),
+    },
+    ExtensionMode: {
+      Development: 1,
+      Production: 2,
+    },
+    EventEmitter: vi.fn(() => ({
+      event: vi.fn(),
+      fire: vi.fn(),
+      dispose: vi.fn(),
+    })),
+    extensions: {
+      getExtension: vi.fn(),
+    },
+  };
+});
 
 describe('activate', () => {
   let context: vscode.ExtensionContext;
@@ -129,6 +148,23 @@ describe('activate', () => {
   it('should register a handler for onDidGrantWorkspaceTrust', async () => {
     await activate(context);
     expect(vscode.workspace.onDidGrantWorkspaceTrust).toHaveBeenCalled();
+  });
+
+  it('should track gemini.diff.accept and onDidChangeWorkspaceFolders in context.subscriptions', async () => {
+    await activate(context);
+
+    const subscriptionIds = context.subscriptions.map(
+      (disposable) => (disposable as { id?: string }).id,
+    );
+
+    expect(subscriptionIds).toEqual(
+      expect.arrayContaining([
+        'registerCommand:gemini.diff.accept',
+        'registerCommand:gemini.diff.cancel',
+        'onDidChangeWorkspaceFolders',
+        'onDidGrantWorkspaceTrust',
+      ]),
+    );
   });
 
   it('should launch the Gemini CLI when the user clicks the button', async () => {
