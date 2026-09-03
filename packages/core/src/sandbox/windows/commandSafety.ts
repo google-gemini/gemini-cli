@@ -209,7 +209,7 @@ export function isKnownSafeCommand(
         const arg = args[i];
         const isSwitch =
           arg.startsWith('-') ||
-          (arg.startsWith('/') && /^\/[a-zA-Z0-9?]+(?::.*)?$/.test(arg));
+          (arg.startsWith('/') && /^\/[a-zA-Z0-9?]{1,4}(?::.*)?$/.test(arg));
         if (isSwitch) {
           continue;
         }

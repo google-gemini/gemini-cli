@@ -78,6 +78,13 @@ describe('Windows commandSafety', () => {
           'C:\\workspace',
         ),
       ).toBe(false);
+      expect(
+        isKnownSafeCommand(
+          ['cd', '/windows'],
+          'C:\\workspace',
+          'C:\\workspace',
+        ),
+      ).toBe(false);
       expect(isKnownSafeCommand(['cd'], 'C:\\workspace', 'C:\\workspace')).toBe(
         false,
       );

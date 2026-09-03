@@ -369,6 +369,17 @@ export class PolicyEngine {
         ? path.resolve(workspace, dir_path)
         : workspace;
 
+      if (
+        effectiveCwd !== workspace &&
+        !isSubpath(workspace, effectiveCwd) &&
+        this.approvalMode !== ApprovalMode.YOLO
+      ) {
+        debugLogger.debug(
+          `[PolicyEngine.check] Command working directory is outside workspace, forcing ASK_USER: ${command}`,
+        );
+        return PolicyDecision.ASK_USER;
+      }
+
       if (containsGitCommand(parsedArgs) && !this.isTrustedFolder()) {
         debugLogger.debug(
           `[PolicyEngine.check] Git command evaluated in untrusted workspace. Forcing ASK_USER: ${command}`,
