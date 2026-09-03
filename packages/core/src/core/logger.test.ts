@@ -582,6 +582,24 @@ describe('Logger', () => {
         'Logger not initialized or checkpoint file path not set. Cannot load checkpoint.',
       );
     });
+
+    it('should not read files outside the checkpoints directory (#29191)', async () => {
+      // Same containment as delete: a `../` tag must miss instead of
+      // pulling an outside file into the conversation.
+      const outsidePath = path.join(TEST_GEMINI_DIR, '..', 'outside-read.json');
+      await fs.writeFile(
+        outsidePath,
+        JSON.stringify({
+          history: [{ role: 'user', parts: [{ text: 'pwned' }] }],
+        }),
+      );
+      try {
+        const loaded = await logger.loadCheckpoint('x/../../outside-read');
+        expect(loaded).toEqual({ history: [] });
+      } finally {
+        await fs.rm(outsidePath, { force: true });
+      }
+    });
   });
 
   describe('deleteCheckpoint', () => {
@@ -673,6 +691,24 @@ describe('Logger', () => {
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         'Logger not initialized or checkpoint file path not set. Cannot delete checkpoint.',
       );
+    });
+
+    it('should not delete files outside the checkpoints directory (#29191)', async () => {
+      // A tag carrying `../` must never reach past the checkpoints dir,
+      // even though the legacy fallback resolves the raw tag.
+      const outsidePath = path.join(
+        TEST_GEMINI_DIR,
+        '..',
+        'should-survive.json',
+      );
+      await fs.writeFile(outsidePath, '{}');
+      try {
+        const result = await logger.deleteCheckpoint('x/../../should-survive');
+        expect(result).toBe(false);
+        expect(existsSync(outsidePath)).toBe(true);
+      } finally {
+        await fs.rm(outsidePath, { force: true });
+      }
     });
   });
 

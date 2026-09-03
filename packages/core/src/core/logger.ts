@@ -294,6 +294,21 @@ export class Logger {
     return path.join(this.geminiDir, `checkpoint-${encodedTag}.json`);
   }
 
+  private _resolveLegacyCheckpointPath(tag: string): string | null {
+    // Contain the backward-compatibility fallback: a tag carrying directory
+    // components (e.g. `../`) must never resolve outside the checkpoints
+    // directory (#29191).
+    if (!this.geminiDir) {
+      return null;
+    }
+    const oldPath = path.join(this.geminiDir, `checkpoint-${tag}.json`);
+    const resolvedDir = path.resolve(this.geminiDir) + path.sep;
+    if (!path.resolve(oldPath).startsWith(resolvedDir)) {
+      return null;
+    }
+    return oldPath;
+  }
+
   private async _getCheckpointPath(tag: string): Promise<string> {
     // 1. Check for the new encoded path first.
     const newPath = this._checkpointPath(tag);
@@ -309,8 +324,12 @@ export class Logger {
       // It was not found, so we'll check the old path next.
     }
 
-    // 2. Fallback for backward compatibility: check for the old raw path.
-    const oldPath = path.join(this.geminiDir!, `checkpoint-${tag}.json`);
+    // 2. Fallback for backward compatibility: check for the old raw path,
+    // contained to the checkpoints directory.
+    const oldPath = this._resolveLegacyCheckpointPath(tag);
+    if (oldPath === null) {
+      return newPath;
+    }
     try {
       await fs.access(oldPath);
       return oldPath; // Found it, use the old path.
@@ -418,9 +437,10 @@ export class Logger {
       // It's okay if it doesn't exist.
     }
 
-    // 2. Attempt to delete the old raw path for backward compatibility.
-    const oldPath = path.join(this.geminiDir, `checkpoint-${tag}.json`);
-    if (newPath !== oldPath) {
+    // 2. Attempt to delete the old raw path for backward compatibility,
+    // contained to the checkpoints directory.
+    const oldPath = this._resolveLegacyCheckpointPath(tag);
+    if (oldPath !== null && newPath !== oldPath) {
       try {
         await fs.unlink(oldPath);
         deletedSomething = true;
