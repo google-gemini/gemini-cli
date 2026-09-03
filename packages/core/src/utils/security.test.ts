@@ -1196,6 +1196,60 @@ describe('isFileAndDirectorySecureSync', () => {
     expect(scriptArg).toContain('S-1-3-0');
     expect(scriptArg).toContain('S-1-3-1');
   });
+
+  it('strips Windows extended path prefix \\\\?\\ when resolving paths and canonicalising', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('win32');
+    vi.mocked(fsSync.existsSync).mockReturnValue(true);
+    // Realpath returns \\?\C:\ProgramData\gemini-cli\settings.json
+    vi.mocked(fsSync.realpathSync).mockReturnValue(
+      '\\\\?\\C:\\ProgramData\\gemini-cli\\settings.json',
+    );
+    vi.mocked(fsSync.lstatSync).mockReturnValue({
+      isSymbolicLink: () => false,
+    } as unknown as Stats);
+    vi.mocked(fsSync.statSync).mockImplementation((p) => {
+      if (String(p).toLowerCase().endsWith('settings.json')) {
+        return {
+          isDirectory: () => false,
+          isFile: () => true,
+        } as unknown as Stats;
+      }
+      return {
+        isDirectory: () => true,
+        isFile: () => false,
+      } as unknown as Stats;
+    });
+
+    const testFilePath = 'C:\\ProgramData\\gemini-cli\\settings.json';
+    const normalizedFile = path.win32.resolve(testFilePath).toLowerCase();
+    const parentDir = path.win32.dirname(normalizedFile);
+
+    // Mock spawnSync to return success for stripped paths
+    vi.mocked(spawnSync).mockReturnValue({
+      stdout: `PATH:${parentDir}\nPATH:${normalizedFile}\n`,
+      stderr: '',
+      status: 0,
+      pid: 1234,
+      output: [],
+      signal: null,
+    });
+
+    const cache = createPathSecurityCache();
+    const result = isFileAndDirectorySecureSync(testFilePath, cache);
+
+    expect(result.secure).toBe(true);
+
+    // Verify cache has the stripped and normalised lowercased paths (without \\?\)
+    expect(cache.has(normalizedFile)).toBe(true);
+    expect(cache.has(parentDir)).toBe(true);
+    expect(cache.has('\\\\?\\' + normalizedFile)).toBe(false);
+
+    // Verify spawnSync was called and received the stripped paths
+    const spawnCall = vi.mocked(spawnSync).mock.calls[0];
+    const scriptArg = (spawnCall[1] as string[])?.[5] ?? '';
+    expect(scriptArg).toContain(`'${normalizedFile}'`);
+    expect(scriptArg).not.toContain('\\\\?\\');
+  });
 });
 
 describe('SecurityValidator', () => {

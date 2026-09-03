@@ -476,7 +476,7 @@ export function isPathSecureSync(
   const pathModule = isWin ? path.win32 : path.posix;
   let normalizedPath = pathModule.resolve(targetPath);
   if (isWin) {
-    normalizedPath = normalizedPath.toLowerCase();
+    normalizedPath = normalizedPath.replace(/^\\\\\?\\/, '').toLowerCase();
   }
 
   try {
@@ -572,7 +572,9 @@ export function isFileAndDirectorySecureSync(
   const pathModule = isWin ? path.win32 : path;
   let normalizedFilePath = pathModule.resolve(filePath);
   if (isWin) {
-    normalizedFilePath = normalizedFilePath.toLowerCase();
+    normalizedFilePath = normalizedFilePath
+      .replace(/^\\\\\?\\/, '')
+      .toLowerCase();
   }
 
   // If the file does not exist, nothing will be loaded, so it is safe
@@ -590,9 +592,14 @@ export function isFileAndDirectorySecureSync(
   // Resolve symbolic links to canonical real path first to prevent parent/grandparent symlink bypasses
   let canonicalFilePath = normalizedFilePath;
   try {
-    const real = fsSync.realpathSync(normalizedFilePath);
+    let real = fsSync.realpathSync(normalizedFilePath);
     if (typeof real === 'string' && real.length > 0) {
-      canonicalFilePath = isWin ? real.toLowerCase() : real;
+      if (isWin) {
+        real = real.replace(/^\\\\\?\\/, '');
+        canonicalFilePath = real.toLowerCase();
+      } else {
+        canonicalFilePath = real;
+      }
     }
   } catch {
     // If realpathSync fails, keep normalizedFilePath
