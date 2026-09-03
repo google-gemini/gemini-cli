@@ -83,6 +83,7 @@ vi.mock('undici', () => ({
   fetch: vi.fn(),
   setGlobalDispatcher: vi.fn(),
   Agent: vi.fn(),
+  buildConnector: vi.fn(() => vi.fn()),
 }));
 vi.mock('../mcp/oauth-provider.js');
 vi.mock('../mcp/oauth-token-storage.js');
