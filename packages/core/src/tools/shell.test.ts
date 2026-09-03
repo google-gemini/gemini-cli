@@ -1454,6 +1454,40 @@ EOF`;
       // Should be regular exec confirmation, not expansion
       expect(details.type).toBe('exec');
     });
+
+    it('should NOT run sandbox denial detection when exitCode is null without a signal', async () => {
+      const sandboxManager = {
+        parseDenials: vi.fn().mockReturnValue({
+          network: true,
+          filePaths: [],
+        }),
+        prepareCommand: vi.fn(),
+        isKnownSafeCommand: vi.fn(),
+        isDangerousCommand: vi.fn(),
+      } as unknown as SandboxManager;
+      mockSandboxManager = sandboxManager;
+
+      const invocation = shellTool.build({ command: 'echo hi' });
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
+
+      resolveExecutionPromise({
+        exitCode: null,
+        output: '',
+        executionMethod: 'child_process',
+        signal: null,
+        error: null,
+        aborted: false,
+        pid: 12345,
+        rawOutput: Buffer.from(''),
+      });
+
+      const result = await promise;
+
+      expect(sandboxManager.parseDenials).not.toHaveBeenCalled();
+      expect(result.error?.type).not.toBe(
+        ToolErrorType.SANDBOX_EXPANSION_REQUIRED,
+      );
+    });
   });
 
   describe('getSchema', () => {
