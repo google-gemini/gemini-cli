@@ -192,6 +192,32 @@ describe('FixLLMEditWithInstruction', () => {
     );
   });
 
+  it('should not double-interpolate when a value contains a placeholder token', async () => {
+    mockGenerateJson.mockResolvedValue(mockApiResponse);
+    const instructionWithPlaceholder =
+      'Replace {current_content} with the new heading';
+
+    await FixLLMEditWithInstruction(
+      instructionWithPlaceholder,
+      old_string,
+      new_string,
+      error,
+      current_content,
+      mockBaseLlmClient,
+      abortSignal,
+    );
+
+    const generateJsonCall = mockGenerateJson.mock.calls[0][0];
+    const userPromptContent = generateJsonCall.contents[0].parts[0].text;
+
+    expect(userPromptContent).toContain(
+      `<instruction>\n${instructionWithPlaceholder}\n</instruction>`,
+    );
+    expect(userPromptContent).toContain(
+      `<file_content>\n${current_content}\n</file_content>`,
+    );
+  });
+
   it('should return a cached result on subsequent identical calls', async () => {
     mockGenerateJson.mockResolvedValue(mockApiResponse);
     const testPromptId = 'test-prompt-id-caching';

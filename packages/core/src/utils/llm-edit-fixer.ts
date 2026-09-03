@@ -10,7 +10,6 @@ import { type BaseLlmClient } from '../core/baseLlmClient.js';
 import { LRUCache } from 'mnemonist';
 import { getPromptIdWithFallback } from './promptIdContext.js';
 import { debugLogger } from './debugLogger.js';
-import { safeLiteralReplace } from './textUtils.js';
 import { LlmRole } from '../telemetry/types.js';
 
 const MAX_CACHE_SIZE = 50;
@@ -166,18 +165,16 @@ export async function FixLLMEditWithInstruction(
   if (cachedResult) {
     return cachedResult;
   }
-  let userPrompt = safeLiteralReplace(
-    EDIT_USER_PROMPT,
-    '{instruction}',
-    instruction,
-  );
-  userPrompt = safeLiteralReplace(userPrompt, '{old_string}', old_string);
-  userPrompt = safeLiteralReplace(userPrompt, '{new_string}', new_string);
-  userPrompt = safeLiteralReplace(userPrompt, '{error}', error);
-  userPrompt = safeLiteralReplace(
-    userPrompt,
-    '{current_content}',
-    current_content,
+  const replacements: Record<string, string> = {
+    '{instruction}': instruction,
+    '{old_string}': old_string,
+    '{new_string}': new_string,
+    '{error}': error,
+    '{current_content}': current_content,
+  };
+  const userPrompt = EDIT_USER_PROMPT.replace(
+    /\{instruction\}|\{old_string\}|\{new_string\}|\{error\}|\{current_content\}/g,
+    (matched) => replacements[matched],
   );
 
   const contents: Content[] = [
