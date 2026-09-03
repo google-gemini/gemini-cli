@@ -156,6 +156,42 @@ describe('FixLLMEditWithInstruction', () => {
     );
   });
 
+  it('should insert $-pattern values literally without corrupting the prompt', async () => {
+    mockGenerateJson.mockResolvedValue(mockApiResponse);
+    const dollarInstruction = "Replace $& with $$ and $`quote$'";
+    const dollarOldString = "echo $'\\n'";
+    const dollarNewString = 'jQuery $$()';
+    const dollarError = 'not found: $&';
+    const dollarContent = 'body $`before`';
+
+    await FixLLMEditWithInstruction(
+      dollarInstruction,
+      dollarOldString,
+      dollarNewString,
+      dollarError,
+      dollarContent,
+      mockBaseLlmClient,
+      abortSignal,
+    );
+
+    const generateJsonCall = mockGenerateJson.mock.calls[0][0];
+    const userPromptContent = generateJsonCall.contents[0].parts[0].text;
+
+    expect(userPromptContent).toContain(
+      `<instruction>\n${dollarInstruction}\n</instruction>`,
+    );
+    expect(userPromptContent).toContain(
+      `<search>\n${dollarOldString}\n</search>`,
+    );
+    expect(userPromptContent).toContain(
+      `<replace>\n${dollarNewString}\n</replace>`,
+    );
+    expect(userPromptContent).toContain(`<error>\n${dollarError}\n</error>`);
+    expect(userPromptContent).toContain(
+      `<file_content>\n${dollarContent}\n</file_content>`,
+    );
+  });
+
   it('should return a cached result on subsequent identical calls', async () => {
     mockGenerateJson.mockResolvedValue(mockApiResponse);
     const testPromptId = 'test-prompt-id-caching';
