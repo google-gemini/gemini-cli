@@ -226,35 +226,7 @@ function isSafeToCallWithExec(args: string[]): boolean {
   }
 
   if (cmd === 'git') {
-    if (gitHasConfigOverrideGlobalOption(args)) {
-      return false;
-    }
-
-    const { idx, subcommand } = findGitSubcommand(args, [
-      'status',
-      'log',
-      'diff',
-      'show',
-      'branch',
-    ]);
-    if (!subcommand) {
-      return false;
-    }
-
-    const subcommandArgs = args.slice(idx + 1);
-
-    if (['status', 'log', 'diff', 'show'].includes(subcommand)) {
-      return gitSubcommandArgsAreReadOnly(subcommandArgs);
-    }
-
-    if (subcommand === 'branch') {
-      return (
-        gitSubcommandArgsAreReadOnly(subcommandArgs) &&
-        gitBranchIsReadOnly(subcommandArgs)
-      );
-    }
-
-    return false;
+    return isGitCommandReadOnly(args);
   }
 
   if (cmd === 'sed') {
@@ -409,6 +381,69 @@ function gitBranchIsReadOnly(args: string[]): boolean {
   return sawReadOnlyFlag;
 }
 
+/** The git subcommands treated as candidates for read-only execution. */
+const GIT_READONLY_SUBCOMMANDS = ['status', 'log', 'diff', 'show', 'branch'];
+
+/**
+ * Determines whether a full `git ...` invocation is strictly read-only.
+ *
+ * @param args - The full command and its arguments (including `git`).
+ */
+export function isGitCommandReadOnly(args: string[]): boolean {
+  if (gitHasConfigOverrideGlobalOption(args)) {
+    return false;
+  }
+
+  const { idx, subcommand } = findGitSubcommand(args, GIT_READONLY_SUBCOMMANDS);
+  if (!subcommand) {
+    return false;
+  }
+
+  const subcommandArgs = args.slice(idx + 1);
+
+  if (subcommand === 'branch') {
+    return (
+      gitSubcommandArgsAreReadOnly(subcommandArgs) &&
+      gitBranchIsReadOnly(subcommandArgs)
+    );
+  }
+
+  return gitSubcommandArgsAreReadOnly(subcommandArgs);
+}
+
+/**
+ * Determines whether a `git ...` invocation is dangerous enough to force a
+ * user confirmation even when a policy rule would otherwise allow it.
+ *
+ * Inverse of {@link isGitCommandReadOnly}, but only for recognized
+ * subcommands: an unrecognized git subcommand is "not known safe" rather than
+ * "dangerous", so it returns false and falls through to the normal policy.
+ *
+ * @param args - The full command and its arguments (including `git`).
+ */
+export function isGitCommandDangerous(args: string[]): boolean {
+  if (gitHasConfigOverrideGlobalOption(args)) {
+    return true;
+  }
+
+  const { idx, subcommand } = findGitSubcommand(args, GIT_READONLY_SUBCOMMANDS);
+  if (!subcommand) {
+    // A git command we don't recognize as explicitly safe; leave it to policy.
+    return false;
+  }
+
+  const subcommandArgs = args.slice(idx + 1);
+
+  if (subcommand === 'branch') {
+    return !(
+      gitSubcommandArgsAreReadOnly(subcommandArgs) &&
+      gitBranchIsReadOnly(subcommandArgs)
+    );
+  }
+
+  return !gitSubcommandArgsAreReadOnly(subcommandArgs);
+}
+
 /**
  * Ensures that a `sed` command argument is a valid line-printing instruction
  * (e.g., `10p` or `5,10p`), preventing unsafe script execution in `sed`.
@@ -488,36 +523,7 @@ export function isDangerousCommand(args: string[]): boolean {
   }
 
   if (cmd === 'git') {
-    if (gitHasConfigOverrideGlobalOption(args)) {
-      return true;
-    }
-
-    const { idx, subcommand } = findGitSubcommand(args, [
-      'status',
-      'log',
-      'diff',
-      'show',
-      'branch',
-    ]);
-    if (!subcommand) {
-      // It's a git command we don't recognize as explicitly safe.
-      return false;
-    }
-
-    const subcommandArgs = args.slice(idx + 1);
-
-    if (['status', 'log', 'diff', 'show'].includes(subcommand)) {
-      return !gitSubcommandArgsAreReadOnly(subcommandArgs);
-    }
-
-    if (subcommand === 'branch') {
-      return !(
-        gitSubcommandArgsAreReadOnly(subcommandArgs) &&
-        gitBranchIsReadOnly(subcommandArgs)
-      );
-    }
-
-    return false;
+    return isGitCommandDangerous(args);
   }
 
   if (cmd === 'base64') {
