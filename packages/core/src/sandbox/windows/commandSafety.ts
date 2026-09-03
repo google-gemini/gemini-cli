@@ -10,6 +10,10 @@ import {
   splitCommands,
   stripShellWrapper,
 } from '../../utils/shell-utils.js';
+import {
+  isGitCommandDangerous,
+  isGitCommandReadOnly,
+} from '../utils/commandSafety.js';
 
 /**
  * Determines if a command is strictly approved for execution on Windows.
@@ -103,12 +107,10 @@ export function isKnownSafeCommand(args: string[]): boolean {
     return true;
   }
 
-  // We allow git on Windows if it's read-only, using the same logic as POSIX
+  // Allow git only if it's strictly read-only, using the same sub-command and
+  // argument validation as POSIX.
   if (cmd === 'git') {
-    // For simplicity in this branch, we'll allow standard git read operations
-    // In a full implementation, we'd port the sub-command validation too.
-    const sub = args[1]?.toLowerCase();
-    return ['status', 'log', 'diff', 'show', 'branch'].includes(sub);
+    return isGitCommandReadOnly(args);
   }
 
   return false;
@@ -146,5 +148,13 @@ export function isDangerousCommand(args: string[]): boolean {
     'new-item',
   ]);
 
-  return dangerous.has(cmd);
+  if (dangerous.has(cmd)) {
+    return true;
+  }
+
+  if (cmd === 'git') {
+    return isGitCommandDangerous(args);
+  }
+
+  return false;
 }

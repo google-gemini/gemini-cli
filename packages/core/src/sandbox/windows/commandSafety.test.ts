@@ -25,6 +25,29 @@ describe('Windows commandSafety', () => {
       expect(isKnownSafeCommand(['unknown'])).toBe(false);
       expect(isKnownSafeCommand(['npm', 'install'])).toBe(false);
     });
+
+    it('should treat read-only git commands as safe', () => {
+      expect(isKnownSafeCommand(['git', 'status'])).toBe(true);
+      expect(isKnownSafeCommand(['git', 'diff'])).toBe(true);
+      expect(isKnownSafeCommand(['git', 'log', '--oneline'])).toBe(true);
+      expect(isKnownSafeCommand(['git', 'show', 'HEAD'])).toBe(true);
+      expect(isKnownSafeCommand(['git', 'branch', '--list'])).toBe(true);
+    });
+
+    it('should NOT treat write-capable git commands as safe', () => {
+      expect(
+        isKnownSafeCommand(['git', 'diff', '--output=C:\\Users\\me\\x.txt']),
+      ).toBe(false);
+      expect(isKnownSafeCommand(['git', 'diff', '--output', 'x.txt'])).toBe(
+        false,
+      );
+      expect(isKnownSafeCommand(['git', 'diff', '--ext-diff'])).toBe(false);
+      expect(isKnownSafeCommand(['git', 'show', '--textconv'])).toBe(false);
+      expect(isKnownSafeCommand(['git', '-c', 'core.pager=calc', 'diff'])).toBe(
+        false,
+      );
+      expect(isKnownSafeCommand(['git', 'branch', '-D', 'main'])).toBe(false);
+    });
   });
 
   describe('isDangerousCommand', () => {
@@ -45,6 +68,25 @@ describe('Windows commandSafety', () => {
     it('should not flag safe commands as dangerous', () => {
       expect(isDangerousCommand(['dir'])).toBe(false);
       expect(isDangerousCommand(['echo', 'hello'])).toBe(false);
+    });
+
+    it('should flag write-capable git commands as dangerous', () => {
+      expect(
+        isDangerousCommand(['git', 'diff', '--output=C:\\Users\\me\\x.txt']),
+      ).toBe(true);
+      expect(isDangerousCommand(['git', 'diff', '--output', 'x.txt'])).toBe(
+        true,
+      );
+      expect(isDangerousCommand(['git', '-c', 'core.pager=calc', 'diff'])).toBe(
+        true,
+      );
+      expect(isDangerousCommand(['git', 'branch', '-D', 'main'])).toBe(true);
+    });
+
+    it('should not flag read-only git commands as dangerous', () => {
+      expect(isDangerousCommand(['git', 'diff'])).toBe(false);
+      expect(isDangerousCommand(['git', 'status'])).toBe(false);
+      expect(isDangerousCommand(['git', 'log', '--oneline'])).toBe(false);
     });
   });
 });
