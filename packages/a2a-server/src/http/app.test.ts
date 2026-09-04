@@ -1262,5 +1262,19 @@ describe('E2E Tests', () => {
       listenSpy.mockRestore();
       exitSpy.mockRestore();
     });
+
+    it('should parse json body for A2A SDK routes', async () => {
+      const res = await request(app)
+        .post('/')
+        .set('Content-Type', 'application/json')
+        .send({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'message/send',
+          params: { message: { role: 'user', parts: [{ text: 'test' }] } },
+        });
+
+      expect(res.status).not.toBe(400);
+    });
   });
 });
