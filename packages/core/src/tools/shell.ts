@@ -757,6 +757,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
                 continue;
               }
               debugLogger.error(`background pid output: ${line}`);
+              continue;
             }
             const pid = Number(line);
             if (pid !== result.pid) {

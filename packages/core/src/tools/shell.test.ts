@@ -366,6 +366,39 @@ describe('ShellTool', () => {
       expect(fs.existsSync(extractedTmpFile)).toBe(false);
     });
 
+    it('should skip non-numeric background PID lines', async () => {
+      const debugErrorSpy = vi
+        .spyOn(debugLogger, 'error')
+        .mockImplementation(() => undefined);
+      try {
+        const invocation = shellTool.build({ command: 'my-command &' });
+        const promise = invocation.execute({ abortSignal: mockAbortSignal });
+
+        fs.writeFileSync(
+          extractedTmpFile,
+          [
+            '54321',
+            '54322',
+            'stray shell warning',
+            'sysmond service not found',
+          ].join(os.EOL),
+        );
+
+        resolveShellExecution({ pid: 54321 });
+
+        const result = await promise;
+
+        expect(debugErrorSpy).toHaveBeenCalledWith(
+          'background pid output: stray shell warning',
+        );
+        expect(result.llmContent).toContain('Background PIDs: 54322');
+        expect(result.llmContent).not.toContain('NaN');
+        expect(fs.existsSync(extractedTmpFile)).toBe(false);
+      } finally {
+        debugErrorSpy.mockRestore();
+      }
+    });
+
     it('should disable PTY execution when interactive shell is unavailable', async () => {
       (mockConfig.getEnableInteractiveShell as Mock).mockReturnValue(true);
       (mockConfig.isInteractiveShellEnabled as Mock).mockReturnValue(false);
