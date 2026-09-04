@@ -160,12 +160,14 @@ export class LinuxSandboxManager implements SandboxManager {
     this.governanceFilesInitialized = true;
   }
 
-  isKnownSafeCommand(args: string[]): boolean {
-    return isKnownSafeCommand(args);
+  isKnownSafeCommand(args: string[], cwd?: string): boolean {
+    const effectiveCwd = cwd ?? this.options.workspace;
+    return isKnownSafeCommand(args, effectiveCwd, this.options.workspace);
   }
 
-  isDangerousCommand(args: string[]): boolean {
-    return isDangerousCommand(args);
+  isDangerousCommand(args: string[], cwd?: string): boolean {
+    const effectiveCwd = cwd ?? this.options.workspace;
+    return isDangerousCommand(args, effectiveCwd, this.options.workspace);
   }
 
   parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined {
