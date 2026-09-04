@@ -1542,7 +1542,11 @@ name = "yolo-checker"
         `Installing extension "my-local-extension".
 This extension will run the following MCP servers:
   * test-server (local): node dobadthing \\u001b[12D\\u001b[K server.js
+    Description: a local mcp server
+    Config signature: 2e78d87d1e8ad2180a3b7c7cadf540ccd376375312fa9d94371b1b4ea486d992
   * test-server-2 (remote): https://google.com
+    Description: a remote mcp server
+    Config signature: 08fe6539fb2663eceb2f28aeca2ee49ced91a937780986616f989b496f7c8e83
 
 ${INSTALL_WARNING_MESSAGE}`,
       );
