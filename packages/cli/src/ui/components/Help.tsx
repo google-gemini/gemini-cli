@@ -80,6 +80,9 @@ export const Help: React.FC<Help> = ({ commands }) => (
             {command.kind === CommandKind.MCP_PROMPT && (
               <Text color={theme.text.secondary}> [MCP]</Text>
             )}
+            {command.kind === CommandKind.SKILL && (
+              <Text color={theme.text.secondary}> [Skill]</Text>
+            )}
             {command.description &&
               ' - ' + sanitizeForDisplay(command.description, 100)}
           </Text>
@@ -108,6 +111,9 @@ export const Help: React.FC<Help> = ({ commands }) => (
     <Text color={theme.text.primary}>
       <Text color={theme.text.secondary}>[MCP]</Text> - Model Context Protocol
       command (from external servers)
+    </Text>
+    <Text color={theme.text.primary}>
+      <Text color={theme.text.secondary}>[Skill]</Text> - Agent Skill
     </Text>
 
     <Box height={1} />
