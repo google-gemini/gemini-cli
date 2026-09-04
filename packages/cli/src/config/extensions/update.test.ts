@@ -295,7 +295,16 @@ describe('Extension Update Logic', () => {
         ),
       ).rejects.toThrow('Updated extension not found after installation');
 
-      expect(copyExtension).toHaveBeenCalledWith(
+      // Order matters. A backup taken after the install has already mutated
+      // the extension directory is exactly as empty as no backup at all, so
+      // an unordered pair of assertions would not catch a regression.
+      expect(copyExtension).toHaveBeenNthCalledWith(
+        1,
+        mockExtension.path,
+        '/tmp/mock-dir',
+      );
+      expect(copyExtension).toHaveBeenNthCalledWith(
+        2,
         '/tmp/mock-dir',
         mockExtension.path,
       );
@@ -306,6 +315,27 @@ describe('Extension Update Logic', () => {
           state: ExtensionUpdateState.ERROR,
         },
       });
+      expect(fs.promises.rm).toHaveBeenCalled();
+    });
+
+    it('should not restore from the temp dir if the backup itself failed', async () => {
+      vi.mocked(copyExtension).mockRejectedValueOnce(
+        new Error('Backup failed'),
+      );
+
+      await expect(
+        updateExtension(
+          mockExtension,
+          mockExtensionManager,
+          ExtensionUpdateState.UPDATE_AVAILABLE,
+          mockDispatch,
+        ),
+      ).rejects.toThrow('Backup failed');
+
+      // The extension directory is still intact at this point. Copying a
+      // partial temp dir over it would be the corruption the rollback exists
+      // to prevent, so the only call must be the failed backup attempt.
+      expect(copyExtension).toHaveBeenCalledTimes(1);
       expect(fs.promises.rm).toHaveBeenCalled();
     });
 
