@@ -83,10 +83,7 @@ export class AllowedPathChecker implements InProcessChecker {
           const clean = trimTrailingSpacesAndDots(
             segment.split(':')[0],
           ).toLowerCase();
-          if (
-            clean === '.vscode' ||
-            VSCODE_SFN_REGEX.test(clean)
-          ) {
+          if (clean === '.vscode' || VSCODE_SFN_REGEX.test(clean)) {
             isVscodePath = true;
           }
         }

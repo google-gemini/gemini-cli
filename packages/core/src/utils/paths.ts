@@ -368,6 +368,15 @@ export function isSubpath(parentPath: string, childPath: string): boolean {
   let p = pathModule.resolve(parentPath);
   let c = pathModule.resolve(childPath);
 
+  if (isWindows) {
+    try {
+      p = resolveToRealPath(p);
+      c = resolveToRealPath(c);
+    } catch {
+      // Ignore resolution errors if any
+    }
+  }
+
   // On Windows, path.relative is case-insensitive.
   // On POSIX (including Darwin), path.relative is case-sensitive.
   // We want it to be case-insensitive on Darwin to match user expectation and sandbox policy.
