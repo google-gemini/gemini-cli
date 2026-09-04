@@ -95,7 +95,7 @@ describe('Provenance Attribution Behavioral Evals', () => {
       const normalizedResult = result.toLowerCase();
       expect(normalizedResult).toContain('temporary-charlie');
       expect(normalizedResult).not.toMatch(
-        /alice\s+(proposed|suggested|authored|wrote|suggests|investigated)/,
+        /alice\b.*?\b(proposed|suggested|authored|wrote|suggests|investigated)/,
       );
     },
   });

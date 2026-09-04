@@ -137,6 +137,10 @@ describe('sandbox', () => {
     vi.mocked(os.tmpdir).mockReturnValue('/tmp');
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.realpathSync).mockImplementation((p) => p as string);
+    vi.mocked(fs.mkdtempSync).mockImplementation(
+      (prefix) => `${prefix}test-tmp`,
+    );
+    vi.mocked(fs.rmSync).mockImplementation(() => {});
     vi.mocked(execSync).mockReturnValue(Buffer.from(''));
   });
 
@@ -180,6 +184,121 @@ describe('sandbox', () => {
         ]),
         expect.objectContaining({ stdio: 'inherit' }),
       );
+    });
+
+    it('should isolate temporary directory for macOS seatbelt (sandbox-exec)', async () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      vi.mocked(os.tmpdir).mockReturnValue('/var/folders/test/T');
+      vi.mocked(fs.realpathSync).mockImplementation((p) => p as string);
+      vi.mocked(fs.mkdtempSync).mockReturnValue(
+        '/var/folders/test/T/gemini-sandbox-tmp-123456',
+      );
+
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'sandbox-exec',
+        image: 'some-image',
+      });
+
+      interface MockProcess extends EventEmitter {
+        stdout: EventEmitter;
+        stderr: EventEmitter;
+      }
+      const mockSpawnProcess = new EventEmitter() as MockProcess;
+      mockSpawnProcess.stdout = new EventEmitter();
+      mockSpawnProcess.stderr = new EventEmitter();
+      vi.mocked(spawn).mockReturnValue(
+        mockSpawnProcess as unknown as ReturnType<typeof spawn>,
+      );
+
+      const onSpy = vi.spyOn(process, 'on');
+      const offSpy = vi.spyOn(process, 'off');
+
+      const promise = start_sandbox(config, [], undefined, ['arg1']);
+
+      setTimeout(() => {
+        mockSpawnProcess.emit('close', 0);
+      }, 10);
+
+      await expect(promise).resolves.toBe(0);
+
+      // Verify that an isolated temporary directory was created
+      expect(fs.mkdtempSync).toHaveBeenCalledWith(
+        expect.stringContaining(
+          path.join('/var/folders/test/T', 'gemini-sandbox-'),
+        ),
+      );
+
+      const spawnCalls = vi.mocked(spawn).mock.calls;
+      const spawnArgs = spawnCalls[0]?.[1] as string[];
+
+      // Verify that TMP_DIR argument passed to seatbelt is the isolated temp directory, NOT host tmpdir
+      expect(spawnArgs).toContain(
+        'TMP_DIR=/var/folders/test/T/gemini-sandbox-tmp-123456',
+      );
+      expect(spawnArgs).not.toContain('TMP_DIR=/var/folders/test/T');
+
+      // Verify that TMPDIR environment variable is set in the sandboxed shell execution
+      const shCommand = spawnArgs[spawnArgs.indexOf('sh') + 2];
+      expect(shCommand).toContain('TMPDIR=');
+      expect(shCommand).toContain(
+        '/var/folders/test/T/gemini-sandbox-tmp-123456',
+      );
+
+      // Verify cleanup of the isolated temporary directory
+      expect(fs.rmSync).toHaveBeenCalledWith(
+        '/var/folders/test/T/gemini-sandbox-tmp-123456',
+        expect.objectContaining({ recursive: true, force: true }),
+      );
+
+      // Verify that exit and signal cleanup hooks are registered and unregistered
+      expect(onSpy).toHaveBeenCalledWith('exit', expect.any(Function));
+      expect(onSpy).toHaveBeenCalledWith('SIGINT', expect.any(Function));
+      expect(onSpy).toHaveBeenCalledWith('SIGTERM', expect.any(Function));
+
+      expect(offSpy).toHaveBeenCalledWith('exit', expect.any(Function));
+      expect(offSpy).toHaveBeenCalledWith('SIGINT', expect.any(Function));
+      expect(offSpy).toHaveBeenCalledWith('SIGTERM', expect.any(Function));
+
+      onSpy.mockRestore();
+      offSpy.mockRestore();
+    });
+
+    it('should safely swallow errors if fs.rmSync fails during cleanup', async () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      vi.mocked(os.tmpdir).mockReturnValue('/var/folders/test/T');
+      vi.mocked(fs.realpathSync).mockImplementation((p) => p as string);
+      vi.mocked(fs.mkdtempSync).mockReturnValue(
+        '/var/folders/test/T/gemini-sandbox-tmp-error',
+      );
+      vi.mocked(fs.rmSync).mockImplementation(() => {
+        throw new Error('EPERM: operation not permitted');
+      });
+
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'sandbox-exec',
+        image: 'some-image',
+      });
+
+      interface MockProcess extends EventEmitter {
+        stdout: EventEmitter;
+        stderr: EventEmitter;
+      }
+      const mockSpawnProcess = new EventEmitter() as MockProcess;
+      mockSpawnProcess.stdout = new EventEmitter();
+      mockSpawnProcess.stderr = new EventEmitter();
+      vi.mocked(spawn).mockReturnValue(
+        mockSpawnProcess as unknown as ReturnType<typeof spawn>,
+      );
+
+      const promise = start_sandbox(config, [], undefined, ['arg1']);
+
+      setTimeout(() => {
+        mockSpawnProcess.emit('close', 0);
+      }, 10);
+
+      // Even if fs.rmSync throws, start_sandbox should resolve successfully and not crash
+      await expect(promise).resolves.toBe(0);
+      expect(fs.rmSync).toHaveBeenCalled();
     });
 
     it('should resolve custom seatbelt profile from user home directory', async () => {
