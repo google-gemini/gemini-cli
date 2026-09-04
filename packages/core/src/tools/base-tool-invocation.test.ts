@@ -132,4 +132,26 @@ describe('BaseToolInvocation', () => {
       // ignore abort error
     }
   });
+
+  describe('getDisplayTitle', () => {
+    it('should return _toolDisplayName if provided', () => {
+      const tool = new TestBaseToolInvocation(
+        {},
+        messageBus,
+        'test-tool',
+        'Test Tool Display Name',
+      );
+      expect(tool.getDisplayTitle()).toBe('Test Tool Display Name');
+    });
+
+    it('should return _toolName if _toolDisplayName is not provided but _toolName is', () => {
+      const tool = new TestBaseToolInvocation({}, messageBus, 'test-tool');
+      expect(tool.getDisplayTitle()).toBe('test-tool');
+    });
+
+    it('should fall back to getDescription() if neither display name nor name is provided', () => {
+      const tool = new TestBaseToolInvocation({}, messageBus);
+      expect(tool.getDisplayTitle()).toBe('test description');
+    });
+  });
 });

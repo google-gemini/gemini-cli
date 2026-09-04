@@ -173,7 +173,11 @@ export abstract class BaseToolInvocation<
   abstract getDescription(): string;
 
   getDisplayTitle(): string {
-    return this.getDescription();
+    return (
+      this._toolDisplayName?.trim() ||
+      this._toolName?.trim() ||
+      this.getDescription()
+    );
   }
 
   getExplanation(): string {
