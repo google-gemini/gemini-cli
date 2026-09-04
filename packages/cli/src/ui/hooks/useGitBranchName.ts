@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { spawnAsync, getAbsoluteGitDir } from '@google/gemini-cli-core';
+import { spawnAsync, getAbsoluteGitDir, debugLogger } from '@google/gemini-cli-core';
 import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 
@@ -66,6 +66,12 @@ export function useGitBranchName(cwd: string): string | undefined {
             }
           },
         );
+
+        if (w && typeof w.on === 'function') {
+          w.on('error', (err) => {
+            debugLogger.debug('FSWatcher error in useGitBranchName:', err);
+          });
+        }
 
         if (cancelled) {
           w.close();
