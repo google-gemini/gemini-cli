@@ -32,9 +32,16 @@ vi.mock('./shell-utils.js', () => ({
 }));
 
 describe('isDirectorySecure', () => {
+  const originalS_IWGRP = constants.S_IWGRP;
+  const originalS_IWOTH = constants.S_IWOTH;
+
   afterEach(() => {
     vi.clearAllMocks();
     clearSecurityCacheForTesting();
+    Object.assign(constants, {
+      S_IWGRP: originalS_IWGRP,
+      S_IWOTH: originalS_IWOTH,
+    });
   });
 
   it('returns secure=true on Windows if ACL check passes', async () => {
@@ -352,12 +359,91 @@ describe('isDirectorySecure', () => {
       'Directory \'/some/path\' is writable by group or others (mode: 775). To fix this, run: sudo chmod g-w,o-w "/some/path"',
     );
   });
+
+  it('falls back to C:\\Windows if SystemRoot is invalid or a UNC path', async () => {
+    vi.spyOn(os, 'platform').mockReturnValue('win32');
+    const envBackup = {
+      SystemRoot: process.env['SystemRoot'],
+      systemroot: process.env['systemroot'],
+      windir: process.env['windir'],
+      WINDIR: process.env['WINDIR'],
+    };
+    try {
+      delete process.env['systemroot'];
+      delete process.env['windir'];
+      delete process.env['WINDIR'];
+      process.env['SystemRoot'] = '\\\\attacker\\share';
+      vi.mocked(fs.stat).mockResolvedValue({
+        isDirectory: () => true,
+      } as unknown as Stats);
+      vi.mocked(spawnAsync).mockResolvedValue({
+        stdout: 'PATH:C:\\Some\\Path\n',
+        stderr: '',
+      });
+
+      await isDirectorySecure('C:\\Some\\Path');
+      expect(vi.mocked(spawnAsync).mock.calls[0]?.[0]).toBe(
+        'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+      );
+    } finally {
+      for (const [key, val] of Object.entries(envBackup)) {
+        if (val !== undefined) {
+          process.env[key] = val;
+        } else {
+          delete process.env[key];
+        }
+      }
+    }
+  });
+
+  it('uses valid drive letter systemRoot if provided', async () => {
+    vi.spyOn(os, 'platform').mockReturnValue('win32');
+    const envBackup = {
+      SystemRoot: process.env['SystemRoot'],
+      systemroot: process.env['systemroot'],
+      windir: process.env['windir'],
+      WINDIR: process.env['WINDIR'],
+    };
+    try {
+      delete process.env['systemroot'];
+      delete process.env['windir'];
+      delete process.env['WINDIR'];
+      process.env['SystemRoot'] = 'D:\\CustomWindows';
+      vi.mocked(fs.stat).mockResolvedValue({
+        isDirectory: () => true,
+      } as unknown as Stats);
+      vi.mocked(spawnAsync).mockResolvedValue({
+        stdout: 'PATH:C:\\Some\\Path\n',
+        stderr: '',
+      });
+
+      await isDirectorySecure('C:\\Some\\Path');
+      expect(vi.mocked(spawnAsync).mock.calls[0]?.[0]).toBe(
+        'D:\\CustomWindows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+      );
+    } finally {
+      for (const [key, val] of Object.entries(envBackup)) {
+        if (val !== undefined) {
+          process.env[key] = val;
+        } else {
+          delete process.env[key];
+        }
+      }
+    }
+  });
 });
 
 describe('isPathSecureSync', () => {
+  const originalS_IWGRP = constants.S_IWGRP;
+  const originalS_IWOTH = constants.S_IWOTH;
+
   afterEach(() => {
     vi.clearAllMocks();
     clearSecurityCacheForTesting();
+    Object.assign(constants, {
+      S_IWGRP: originalS_IWGRP,
+      S_IWOTH: originalS_IWOTH,
+    });
   });
 
   it('returns secure=true if path does not exist (ENOENT)', () => {
