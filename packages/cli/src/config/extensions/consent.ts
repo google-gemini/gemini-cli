@@ -6,12 +6,33 @@
 
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { debugLogger, type SkillDefinition } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  isSensitiveEnvVarName,
+  type SkillDefinition,
+} from '@google/gemini-cli-core';
 import chalk from 'chalk';
 
 import type { ConfirmationRequest } from '../../ui/types.js';
 import { escapeAnsiCtrlCodes } from '../../ui/utils/textUtils.js';
 import type { ExtensionConfig } from '../extension.js';
+
+/** Placeholder shown instead of a sensitive value in a consent prompt. */
+const REDACTED_CONSENT_VALUE = '<redacted>';
+
+/**
+ * Neutralizes control characters — including newlines, carriage returns, and
+ * the ESC byte that begins ANSI sequences — in a string rendered into a consent
+ * prompt. This prevents attacker-controlled MCP server keys or values from
+ * injecting or hiding lines in the prompt (`escapeAnsiCtrlCodes` escapes string
+ * values but not object keys, and does not strip raw newlines).
+ */
+function sanitizeConsentField(value: string): string {
+  // eslint-disable-next-line no-control-regex
+  return value.replace(/[\u0000-\u001f\u007f]/g, (ch) =>
+    JSON.stringify(ch).slice(1, -1),
+  );
+}
 
 export const INSTALL_WARNING_MESSAGE = chalk.yellow(
   'The extension you are about to install may have been created by a third-party developer and sourced from a public repository. Google does not vet, endorse, or guarantee the functionality or security of extensions. Please carefully inspect any extension and its source code before installing to understand the permissions it requires and the actions it may perform.',
@@ -185,6 +206,30 @@ async function extensionConsentString(
         mcpServer.httpUrl ??
         `${mcpServer.command || ''}${mcpServer.args ? ' ' + mcpServer.args.join(' ') : ''}`;
       output.push(`  * ${key} (${isLocal ? 'local' : 'remote'}): ${source}`);
+      // Render the remaining execution-affecting fields so they are surfaced to
+      // the user and reflected in the consent string. Keys are sorted so that
+      // reordering alone does not change the string.
+      if (mcpServer.env) {
+        for (const envKey of Object.keys(mcpServer.env).sort()) {
+          const value = isSensitiveEnvVarName(envKey)
+            ? REDACTED_CONSENT_VALUE
+            : sanitizeConsentField(mcpServer.env[envKey]);
+          output.push(`      env: ${sanitizeConsentField(envKey)}=${value}`);
+        }
+      }
+      if (mcpServer.cwd) {
+        output.push(`      cwd: ${sanitizeConsentField(mcpServer.cwd)}`);
+      }
+      if (mcpServer.headers) {
+        for (const headerKey of Object.keys(mcpServer.headers).sort()) {
+          const value = isSensitiveEnvVarName(headerKey)
+            ? REDACTED_CONSENT_VALUE
+            : sanitizeConsentField(mcpServer.headers[headerKey]);
+          output.push(
+            `      header: ${sanitizeConsentField(headerKey)}: ${value}`,
+          );
+        }
+      }
     }
   }
   if (sanitizedConfig.contextFileName) {

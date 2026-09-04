@@ -140,6 +140,68 @@ export const NEVER_ALLOWED_VALUE_PATTERNS = [
   /xox[abpr]-[a-zA-Z0-9-]+/i,
 ] as const;
 
+/**
+ * Environment variable names that instruct a runtime or dynamic loader to load
+ * and run additional code before the target program starts (e.g. Node's
+ * `--require` hook or the ELF dynamic linker preloading a shared object). To
+ * keep spawned child processes predictable, these are not forwarded from
+ * external configuration into a child's environment.
+ */
+export const EXECUTION_OVERRIDE_ENV_VAR_NAMES: ReadonlySet<string> = new Set([
+  // Node.js
+  'NODE_OPTIONS',
+  // ELF dynamic linker (Linux)
+  'LD_PRELOAD',
+  'LD_LIBRARY_PATH',
+  'LD_AUDIT',
+  // Shell non-interactive startup hook
+  'BASH_ENV',
+  // Python
+  'PYTHONSTARTUP',
+  // Perl / Ruby
+  'PERL5OPT',
+  'RUBYOPT',
+  // JVM (agent / option injection)
+  'JAVA_TOOL_OPTIONS',
+  '_JAVA_OPTIONS',
+]);
+
+/**
+ * Case-insensitive prefixes for environment variables in the same class as
+ * {@link EXECUTION_OVERRIDE_ENV_VAR_NAMES}. `DYLD_` covers the macOS dynamic
+ * loader variables such as `DYLD_INSERT_LIBRARIES` and `DYLD_LIBRARY_PATH`.
+ */
+export const EXECUTION_OVERRIDE_ENV_VAR_PREFIXES: readonly string[] = ['DYLD_'];
+
+/**
+ * Returns true if `key` names an environment variable that can override how a
+ * spawned process loads or executes code. The comparison is case-insensitive.
+ */
+export function isExecutionOverrideEnvVar(key: string): boolean {
+  const upperKey = key.toUpperCase();
+  if (EXECUTION_OVERRIDE_ENV_VAR_NAMES.has(upperKey)) {
+    return true;
+  }
+  return EXECUTION_OVERRIDE_ENV_VAR_PREFIXES.some((prefix) =>
+    upperKey.startsWith(prefix),
+  );
+}
+
+/**
+ * Returns true if `key` names a variable whose value is likely to be a secret
+ * (token, password, key, credential, etc.), reusing the same name policy used
+ * to redact the process environment. Intended for masking values that must be
+ * shown to the user (e.g. an extension consent prompt) without disclosing the
+ * secret itself. The comparison is case-insensitive.
+ */
+export function isSensitiveEnvVarName(key: string): boolean {
+  const upperKey = key.toUpperCase();
+  if (NEVER_ALLOWED_ENVIRONMENT_VARIABLES.has(upperKey)) {
+    return true;
+  }
+  return NEVER_ALLOWED_NAME_PATTERNS.some((pattern) => pattern.test(upperKey));
+}
+
 function shouldRedactEnvironmentVariable(
   key: string,
   value: string | undefined,

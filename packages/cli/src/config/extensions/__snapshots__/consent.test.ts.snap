@@ -24,6 +24,23 @@ of extensions. Please carefully inspect any extension and its source code before
 understand the permissions it requires and the actions it may perform."
 `;
 
+exports[`consent > maybeRequestConsentOrFail > consent string generation > should render mcp server env, cwd, and headers in the consent string 1`] = `
+"Installing extension "test-ext".
+This extension will run the following MCP servers:
+  * local (local): node server.js
+      env: API_BASE=https://example.com
+      env: NODE_OPTIONS=--inspect
+      cwd: /srv/app
+  * remote (remote): https://remote.com
+      header: Authorization: <redacted>
+      header: X-Trace: 1
+
+The extension you are about to install may have been created by a third-party developer and sourced
+from a public repository. Google does not vet, endorse, or guarantee the functionality or security
+of extensions. Please carefully inspect any extension and its source code before installing to
+understand the permissions it requires and the actions it may perform."
+`;
+
 exports[`consent > maybeRequestConsentOrFail > consent string generation > should request consent if extension is migrated 1`] = `
 "Migrating extension "old-ext" to a new repository, renaming to "test-ext", and installing updates.
 

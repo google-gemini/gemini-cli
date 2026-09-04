@@ -82,6 +82,7 @@ import {
 } from '../resources/resource-registry.js';
 import { validateMcpPolicyToolNames } from '../policy/toml-loader.js';
 import {
+  isExecutionOverrideEnvVar,
   sanitizeEnvironment,
   type EnvironmentSanitizationConfig,
 } from '../services/environmentSanitization.js';
@@ -2360,7 +2361,33 @@ export async function createTransport(
     // Expand and merge explicit environment variables from the MCP configuration.
     if (mcpServerConfig.env) {
       for (const [key, value] of Object.entries(mcpServerConfig.env)) {
+        // Do not let server configuration set variables that control how the
+        // child process loads or executes code (e.g. loader/runtime hooks).
+        if (isExecutionOverrideEnvVar(key)) {
+          debugLogger.debug(
+            `Ignoring environment variable '${key}' from MCP server '${mcpServerName}' configuration.`,
+          );
+          continue;
+        }
         finalEnv[key] = expandEnvVars(value, expansionEnv);
+      }
+    }
+
+    // Defense in depth: variables that instruct a runtime or dynamic loader to
+    // execute additional code must only ever be honored from the trusted host
+    // environment — never from extension-provided settings or server config.
+    // This backstops the per-key filtering above and closes indirect paths
+    // (e.g. extension settings that reach `finalEnv` via the sanitized base
+    // environment).
+    for (const key of Object.keys(finalEnv)) {
+      if (!isExecutionOverrideEnvVar(key)) {
+        continue;
+      }
+      const hostValue = process.env[key];
+      if (hostValue === undefined || hostValue === '') {
+        delete finalEnv[key];
+      } else if (finalEnv[key] !== hostValue) {
+        finalEnv[key] = hostValue;
       }
     }
 

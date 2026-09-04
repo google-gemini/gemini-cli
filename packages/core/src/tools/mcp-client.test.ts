@@ -2541,11 +2541,7 @@ describe('mcp-client', () => {
         .spyOn(SdkClientStdioLib, 'StdioClientTransport')
         .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
 
-      const originalEnv = process.env;
-      process.env = {
-        ...originalEnv,
-        GEMINI_TEST_VAR: 'expanded-value',
-      };
+      vi.stubEnv('GEMINI_TEST_VAR', 'expanded-value');
 
       try {
         await createTransport(
@@ -2566,7 +2562,99 @@ describe('mcp-client', () => {
         expect(callArgs.env!['TEST_EXPANDED']).toBe('Value is expanded-value');
         expect(callArgs.env!['SECRET_KEY']).toBe('intentional-secret-123');
       } finally {
-        process.env = originalEnv;
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it('should not forward execution-override variables from mcpServerConfig.env to the spawned process', async () => {
+      const mockedTransport = vi
+        .spyOn(SdkClientStdioLib, 'StdioClientTransport')
+        .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
+
+      // Ensure the base environment does not already contain these variables so
+      // the assertions isolate the mcpServerConfig.env merge behavior.
+      vi.stubEnv('NODE_OPTIONS', '');
+      vi.stubEnv('LD_PRELOAD', '');
+      vi.stubEnv('LD_LIBRARY_PATH', '');
+      vi.stubEnv('DYLD_INSERT_LIBRARIES', '');
+
+      try {
+        await createTransport(
+          'test-server',
+          {
+            command: 'test-command',
+            env: {
+              NODE_OPTIONS: '--require=./startup.js',
+              // Lower-case must be filtered too (matching is case-insensitive).
+              ld_preload: '/tmp/evil.so',
+              LD_LIBRARY_PATH: '/tmp/lib',
+              DYLD_INSERT_LIBRARIES: '/tmp/extra.dylib',
+              MY_VAR: 'keep-me',
+            },
+          },
+          false,
+          MOCK_CONTEXT,
+        );
+
+        const callArgs = mockedTransport.mock.calls[0][0];
+        expect(callArgs.env).toBeDefined();
+        expect(callArgs.env!['NODE_OPTIONS']).toBeUndefined();
+        expect(callArgs.env!['ld_preload']).toBeUndefined();
+        expect(callArgs.env!['LD_LIBRARY_PATH']).toBeUndefined();
+        expect(callArgs.env!['DYLD_INSERT_LIBRARIES']).toBeUndefined();
+        expect(callArgs.env!['MY_VAR']).toBe('keep-me');
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it('should not forward execution-override variables from extension settings to the spawned process', async () => {
+      const mockedTransport = vi
+        .spyOn(SdkClientStdioLib, 'StdioClientTransport')
+        .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
+
+      // Host env must not already define it, so the assertion isolates the
+      // extension-settings path.
+      vi.stubEnv('NODE_OPTIONS', '');
+
+      try {
+        await createTransport(
+          'test-server',
+          {
+            command: 'test-command',
+            extension: {
+              name: 'test-ext',
+              resolvedSettings: [
+                {
+                  envVar: 'NODE_OPTIONS',
+                  value: '--require=./evil.js',
+                  sensitive: false,
+                  name: 'exec-override-setting',
+                },
+                {
+                  envVar: 'SAFE_VAR',
+                  value: 'ok',
+                  sensitive: false,
+                  name: 'safe-setting',
+                },
+              ],
+              version: '',
+              isActive: false,
+              path: '',
+              contextFiles: [],
+              id: '',
+            },
+          },
+          false,
+          MOCK_CONTEXT,
+        );
+
+        const callArgs = mockedTransport.mock.calls[0][0];
+        expect(callArgs.env).toBeDefined();
+        expect(callArgs.env!['NODE_OPTIONS']).toBeUndefined();
+        expect(callArgs.env!['SAFE_VAR']).toBe('ok');
+      } finally {
+        vi.unstubAllEnvs();
       }
     });
 

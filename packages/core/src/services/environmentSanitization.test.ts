@@ -7,9 +7,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   ALWAYS_ALLOWED_ENVIRONMENT_VARIABLES,
+  EXECUTION_OVERRIDE_ENV_VAR_NAMES,
   NEVER_ALLOWED_ENVIRONMENT_VARIABLES,
   NEVER_ALLOWED_NAME_PATTERNS,
   NEVER_ALLOWED_VALUE_PATTERNS,
+  isExecutionOverrideEnvVar,
+  isSensitiveEnvVarName,
   sanitizeEnvironment,
   getSecureSanitizationConfig,
 } from './environmentSanitization.js';
@@ -448,5 +451,85 @@ describe('getSecureSanitizationConfig', () => {
     const config = getSecureSanitizationConfig(requestedConfig);
 
     expect(config.enableEnvironmentVariableRedaction).toBe(false);
+  });
+});
+
+describe('isExecutionOverrideEnvVar', () => {
+  it('should return true for each blocklisted name', () => {
+    for (const name of EXECUTION_OVERRIDE_ENV_VAR_NAMES) {
+      expect(isExecutionOverrideEnvVar(name)).toBe(true);
+    }
+  });
+
+  it('should be case-insensitive for blocklisted names', () => {
+    expect(isExecutionOverrideEnvVar('node_options')).toBe(true);
+    expect(isExecutionOverrideEnvVar('Node_Options')).toBe(true);
+    expect(isExecutionOverrideEnvVar('ld_preload')).toBe(true);
+    expect(isExecutionOverrideEnvVar('Ld_Library_Path')).toBe(true);
+  });
+
+  it('should return true for variables with the DYLD_ prefix', () => {
+    expect(isExecutionOverrideEnvVar('DYLD_INSERT_LIBRARIES')).toBe(true);
+    expect(isExecutionOverrideEnvVar('DYLD_LIBRARY_PATH')).toBe(true);
+    expect(isExecutionOverrideEnvVar('Dyld_Insert_Libraries')).toBe(true);
+  });
+
+  it('should cover loader/interpreter hooks beyond Node.js', () => {
+    // MCP servers can be any interpreter, so the list is not Node-specific.
+    for (const name of [
+      'LD_AUDIT',
+      'BASH_ENV',
+      'PYTHONSTARTUP',
+      'PERL5OPT',
+      'RUBYOPT',
+      'JAVA_TOOL_OPTIONS',
+      '_JAVA_OPTIONS',
+    ]) {
+      expect(isExecutionOverrideEnvVar(name)).toBe(true);
+      expect(isExecutionOverrideEnvVar(name.toLowerCase())).toBe(true);
+    }
+  });
+
+  it('should return false for benign variables', () => {
+    expect(isExecutionOverrideEnvVar('PATH')).toBe(false);
+    expect(isExecutionOverrideEnvVar('FOO')).toBe(false);
+    expect(isExecutionOverrideEnvVar('HOME')).toBe(false);
+    expect(isExecutionOverrideEnvVar('MY_NODE_OPTION')).toBe(false);
+    expect(isExecutionOverrideEnvVar('DYLD')).toBe(false);
+  });
+
+  it('should ensure all execution-override names are capitalized', () => {
+    for (const name of EXECUTION_OVERRIDE_ENV_VAR_NAMES) {
+      expect(name).toBe(name.toUpperCase());
+    }
+  });
+});
+
+describe('isSensitiveEnvVarName', () => {
+  it('should return true for names that match sensitive patterns', () => {
+    for (const name of [
+      'AUTHORIZATION',
+      'Authorization',
+      'API_KEY',
+      'GITHUB_TOKEN',
+      'MY_SECRET',
+      'DB_PASSWORD',
+      'AWS_CREDENTIALS',
+      'PrivateThing',
+    ]) {
+      expect(isSensitiveEnvVarName(name)).toBe(true);
+    }
+  });
+
+  it('should return true for explicitly never-allowed variable names', () => {
+    for (const name of NEVER_ALLOWED_ENVIRONMENT_VARIABLES) {
+      expect(isSensitiveEnvVarName(name)).toBe(true);
+    }
+  });
+
+  it('should return false for benign names', () => {
+    for (const name of ['PATH', 'HOME', 'API_BASE', 'X-Trace', 'FOO']) {
+      expect(isSensitiveEnvVarName(name)).toBe(false);
+    }
   });
 });
