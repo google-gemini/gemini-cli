@@ -222,7 +222,26 @@ describe('McpPromptLoader', () => {
       });
       expect(result).toEqual({
         type: 'submit_prompt',
-        content: JSON.stringify('Hello, world!'),
+        content: 'Hello, world!',
+      });
+    });
+
+    it('should preserve quotes and newlines in prompt response text', async () => {
+      const promptText = 'He said "hello".\nNext line';
+      mockPrompt.invoke.mockResolvedValueOnce({
+        messages: [{ content: { type: 'text', text: promptText } }],
+      });
+
+      const loader = new McpPromptLoader(mockConfigWithPrompts);
+      const commands = await loader.loadCommands(new AbortController().signal);
+      const result = await commands[0].action!(
+        {} as CommandContext,
+        'test-name 123 tiger',
+      );
+
+      expect(result).toEqual({
+        type: 'submit_prompt',
+        content: promptText,
       });
     });
 
