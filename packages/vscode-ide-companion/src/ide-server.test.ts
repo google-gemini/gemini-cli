@@ -535,4 +535,82 @@ describe('IDEServer HTTP endpoints', () => {
     // but it's not a host error, which is what we are testing.
     expect(response.statusCode).toBe(400);
   });
+  it('should resolve stop() while an MCP stream is open', async () => {
+    // The bug: stop() awaited server.close(), whose callback fires only once
+    // every established connection has drained. The MCP transport holds a
+    // long-lived streaming response on GET /mcp, so nothing drained and
+    // extension deactivate blocked behind stop() forever.
+    //
+    // An idle socket does not reproduce it: close() destroys those. The
+    // connection has to be one the server is actively holding open, which
+    // means a real session and a real stream.
+    const initialize = await request(
+      port,
+      {
+        path: '/mcp',
+        method: 'POST',
+        headers: {
+          Host: `localhost:${port}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json, text/event-stream',
+          Authorization: 'Bearer test-auth-token',
+        },
+      },
+      JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: {
+          protocolVersion: '2024-11-05',
+          capabilities: {},
+          clientInfo: { name: 'stop-test', version: '1.0.0' },
+        },
+      }),
+    );
+    const sessionId = initialize.headers['mcp-session-id'] as string;
+    expect(sessionId).toBeTruthy();
+
+    // Held open by the server for the lifetime of the session.
+    const stream = http.request({
+      hostname: '127.0.0.1',
+      port,
+      path: '/mcp',
+      method: 'GET',
+      headers: {
+        Host: `localhost:${port}`,
+        Accept: 'text/event-stream',
+        Authorization: 'Bearer test-auth-token',
+        'mcp-session-id': sessionId,
+      },
+    });
+    const streamOpen = new Promise<void>((resolve, reject) => {
+      stream.once('response', (res) => {
+        expect(res.statusCode).toBe(200);
+        res.resume();
+        resolve();
+      });
+      stream.once('error', reject);
+    });
+    stream.end();
+    await streamOpen;
+
+    try {
+      await expect(
+        Promise.race([
+          ideServer.stop().then(() => 'stopped' as const),
+          new Promise<'timed out'>((resolve) =>
+            setTimeout(() => resolve('timed out'), 3000),
+          ),
+        ]),
+      ).resolves.toBe('stopped');
+
+      // stop() must close the transport, not just stop listening. The
+      // transport's onclose handler is what clears the keep-alive interval
+      // and drops the session, so this log line is the observable proof that
+      // the interval is not still pinging a server that is gone.
+      expect(mockLog).toHaveBeenCalledWith(`Session closed: ${sessionId}`);
+    } finally {
+      stream.destroy();
+    }
+  });
 });
