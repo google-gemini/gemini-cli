@@ -708,11 +708,12 @@ export function formatTruncatedToolOutput(
 ): string {
   if (contentStr.length <= maxChars) return contentStr;
 
-  const headChars = Math.floor(maxChars * 0.2);
-  const tailChars = maxChars - headChars;
+  const effectiveMax = Math.max(0, maxChars);
+  const headChars = Math.floor(effectiveMax * 0.2);
+  const tailChars = effectiveMax - headChars;
 
   const head = contentStr.slice(0, headChars);
-  const tail = contentStr.slice(-tailChars);
+  const tail = tailChars > 0 ? contentStr.slice(-tailChars) : '';
   const omittedChars = contentStr.length - headChars - tailChars;
 
   return `Output too large. Showing first ${headChars.toLocaleString()} and last ${tailChars.toLocaleString()} characters. For full output see: ${outputFile}
