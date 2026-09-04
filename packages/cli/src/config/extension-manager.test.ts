@@ -15,7 +15,11 @@ import {
 } from './extension-manager.js';
 import { createTestMergedSettings, type MergedSettings } from './settings.js';
 import { createExtension } from '../test-utils/createExtension.js';
-import { EXTENSIONS_DIRECTORY_NAME } from './extensions/variables.js';
+import {
+  EXTENSIONS_DIRECTORY_NAME,
+  INSTALL_METADATA_FILENAME,
+} from './extensions/variables.js';
+import { ExtensionStorage } from './extensions/storage.js';
 import { themeManager } from '../ui/themes/theme-manager.js';
 import {
   TrustLevel,
@@ -227,6 +231,339 @@ describe('ExtensionManager', () => {
       expect(names).toEqual(['ext1', 'ext2']);
 
       fs.rmSync(externalDir, { recursive: true, force: true });
+    });
+  });
+
+  describe('concurrent installation locking', () => {
+    function createLocalSource(
+      prefix: string,
+      name: string,
+      version: string,
+      marker: string,
+    ): string {
+      const sourceDir = fs.mkdtempSync(path.join(tempHomeDir, prefix));
+      fs.writeFileSync(
+        path.join(sourceDir, 'gemini-extension.json'),
+        JSON.stringify({ name, version }),
+      );
+      fs.writeFileSync(path.join(sourceDir, marker), marker);
+      return sourceDir;
+    }
+
+    function createManager(
+      integrityManager: typeof mockIntegrityManager = mockIntegrityManager,
+    ): ExtensionManager {
+      return new ExtensionManager({
+        settings: createTestMergedSettings(),
+        workspaceDir: tempWorkspaceDir,
+        requestConsent: vi.fn().mockResolvedValue(true),
+        requestSetting: null,
+        integrityManager,
+      });
+    }
+
+    function createStoreBarrier() {
+      let notifyStoreStarted!: () => void;
+      const storeStarted = new Promise<void>((resolve) => {
+        notifyStoreStarted = resolve;
+      });
+      let releaseStore!: () => void;
+      const storeCanFinish = new Promise<void>((resolve) => {
+        releaseStore = resolve;
+      });
+      const integrityManager = {
+        verify: vi.fn().mockResolvedValue(IntegrityDataStatus.VERIFIED),
+        store: vi.fn().mockImplementation(async () => {
+          notifyStoreStarted();
+          await storeCanFinish;
+        }),
+      };
+
+      return { integrityManager, storeStarted, releaseStore };
+    }
+
+    it('allows only one concurrent install to write the destination', async () => {
+      const winnerSource = createLocalSource(
+        'winner-source-',
+        'shared-name',
+        '1.0.0',
+        'winner-only.txt',
+      );
+      const loserSource = createLocalSource(
+        'loser-source-',
+        'shared-name',
+        '2.0.0',
+        'loser-only.txt',
+      );
+      const { integrityManager, storeStarted, releaseStore } =
+        createStoreBarrier();
+      const winnerManager = createManager(integrityManager);
+      const loserManager = createManager({
+        verify: vi.fn().mockResolvedValue(IntegrityDataStatus.VERIFIED),
+        store: vi.fn().mockResolvedValue(undefined),
+      });
+      await Promise.all([
+        winnerManager.loadExtensions(),
+        loserManager.loadExtensions(),
+      ]);
+
+      const winnerInstall = winnerManager.installOrUpdateExtension({
+        type: 'local',
+        source: winnerSource,
+      });
+      await storeStarted;
+
+      await expect(
+        loserManager.installOrUpdateExtension({
+          type: 'local',
+          source: loserSource,
+        }),
+      ).rejects.toThrow(
+        'Extension "shared-name" is currently being installed or updated by another process.',
+      );
+
+      releaseStore();
+      const installed = await winnerInstall;
+      const destinationPath = path.join(userExtensionsDir, 'shared-name');
+      const metadata = JSON.parse(
+        fs.readFileSync(
+          path.join(destinationPath, INSTALL_METADATA_FILENAME),
+          'utf8',
+        ),
+      ) as { source: string };
+
+      expect(installed.version).toBe('1.0.0');
+      expect(metadata.source).toBe(winnerSource);
+      expect(fs.existsSync(path.join(destinationPath, 'winner-only.txt'))).toBe(
+        true,
+      );
+      expect(fs.existsSync(path.join(destinationPath, 'loser-only.txt'))).toBe(
+        false,
+      );
+      expect(
+        fs.existsSync(
+          path.join(
+            ExtensionStorage.getUserExtensionsLockDir(),
+            'shared-name.lock',
+          ),
+        ),
+      ).toBe(false);
+    });
+
+    it('does not expose installation locks to extension discovery', async () => {
+      const source = createLocalSource(
+        'discovery-source-',
+        'discoverable',
+        '1.0.0',
+        'content.txt',
+      );
+      const { integrityManager, storeStarted, releaseStore } =
+        createStoreBarrier();
+      const installingManager = createManager(integrityManager);
+      await installingManager.loadExtensions();
+
+      const install = installingManager.installOrUpdateExtension({
+        type: 'local',
+        source,
+      });
+      await storeStarted;
+
+      const settings = {
+        security: {
+          folderTrust: { enabled: false },
+          allowedExtensions: [source.replace(/\\/g, '\\\\')],
+        },
+        experimental: { extensionConfig: false },
+        admin: { extensions: { enabled: true }, mcp: { enabled: true } },
+        hooksConfig: { enabled: true },
+      } as unknown as MergedSettings;
+      const loadingManager = new ExtensionManager({
+        settings,
+        workspaceDir: tempWorkspaceDir,
+        requestConsent: vi.fn().mockResolvedValue(true),
+        requestSetting: null,
+      });
+
+      expect(
+        fs.existsSync(
+          path.join(
+            ExtensionStorage.getUserExtensionsLockDir(),
+            'discoverable.lock',
+          ),
+        ),
+      ).toBe(true);
+      await expect(loadingManager.loadExtensions()).resolves.toHaveLength(1);
+
+      releaseStore();
+      await install;
+    });
+
+    it('prevents concurrent updates from replacing each other', async () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'update-target',
+        version: '1.0.0',
+      });
+      const winnerSource = createLocalSource(
+        'winner-update-',
+        'update-target',
+        '2.0.0',
+        'winner-update.txt',
+      );
+      const loserSource = createLocalSource(
+        'loser-update-',
+        'update-target',
+        '3.0.0',
+        'loser-update.txt',
+      );
+      const { integrityManager, storeStarted, releaseStore } =
+        createStoreBarrier();
+      const winnerManager = createManager(integrityManager);
+      const loserManager = createManager();
+      await Promise.all([
+        winnerManager.loadExtensions(),
+        loserManager.loadExtensions(),
+      ]);
+      const previousConfig = { name: 'update-target', version: '1.0.0' };
+
+      const winnerUpdate = winnerManager.installOrUpdateExtension(
+        { type: 'local', source: winnerSource },
+        previousConfig,
+      );
+      await storeStarted;
+
+      await expect(
+        loserManager.installOrUpdateExtension(
+          { type: 'local', source: loserSource },
+          previousConfig,
+        ),
+      ).rejects.toThrow(/currently being installed or updated/);
+
+      releaseStore();
+      await winnerUpdate;
+      const destinationPath = path.join(userExtensionsDir, 'update-target');
+      expect(
+        fs.existsSync(path.join(destinationPath, 'winner-update.txt')),
+      ).toBe(true);
+      expect(
+        fs.existsSync(path.join(destinationPath, 'loser-update.txt')),
+      ).toBe(false);
+      expect(
+        fs.existsSync(
+          path.join(
+            ExtensionStorage.getUserExtensionsLockDir(),
+            'update-target.lock',
+          ),
+        ),
+      ).toBe(false);
+    });
+
+    it('locks both names while renaming an extension', async () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'old-name',
+        version: '1.0.0',
+      });
+      const renamedSource = createLocalSource(
+        'renamed-source-',
+        'new-name',
+        '2.0.0',
+        'renamed.txt',
+      );
+      const competingSource = createLocalSource(
+        'competing-source-',
+        'new-name',
+        '1.0.0',
+        'competing.txt',
+      );
+      const { integrityManager, storeStarted, releaseStore } =
+        createStoreBarrier();
+      const updateManager = createManager(integrityManager);
+      const installManager = createManager();
+      await Promise.all([
+        updateManager.loadExtensions(),
+        installManager.loadExtensions(),
+      ]);
+
+      const renameUpdate = updateManager.installOrUpdateExtension(
+        { type: 'local', source: renamedSource },
+        { name: 'old-name', version: '1.0.0' },
+      );
+      await storeStarted;
+
+      await expect(
+        installManager.installOrUpdateExtension({
+          type: 'local',
+          source: competingSource,
+        }),
+      ).rejects.toThrow(/currently being installed or updated/);
+
+      releaseStore();
+      await renameUpdate;
+      expect(fs.existsSync(path.join(userExtensionsDir, 'old-name'))).toBe(
+        false,
+      );
+      expect(
+        fs.existsSync(path.join(userExtensionsDir, 'new-name', 'renamed.txt')),
+      ).toBe(true);
+      expect(
+        fs.existsSync(
+          path.join(userExtensionsDir, 'new-name', 'competing.txt'),
+        ),
+      ).toBe(false);
+      expect(
+        fs.existsSync(
+          path.join(
+            ExtensionStorage.getUserExtensionsLockDir(),
+            'old-name.lock',
+          ),
+        ),
+      ).toBe(false);
+      expect(
+        fs.existsSync(
+          path.join(
+            ExtensionStorage.getUserExtensionsLockDir(),
+            'new-name.lock',
+          ),
+        ),
+      ).toBe(false);
+    });
+
+    it('releases the lock when installation fails', async () => {
+      const source = createLocalSource(
+        'failing-source-',
+        'failing-install',
+        '1.0.0',
+        'content.txt',
+      );
+      const integrityManager = {
+        verify: vi.fn().mockResolvedValue(IntegrityDataStatus.VERIFIED),
+        store: vi
+          .fn()
+          .mockRejectedValueOnce(new Error('integrity storage failed'))
+          .mockResolvedValue(undefined),
+      };
+      const manager = createManager(integrityManager);
+      await manager.loadExtensions();
+
+      await expect(
+        manager.installOrUpdateExtension({ type: 'local', source }),
+      ).rejects.toThrow('integrity storage failed');
+
+      const destinationPath = path.join(userExtensionsDir, 'failing-install');
+      expect(
+        fs.existsSync(
+          path.join(
+            ExtensionStorage.getUserExtensionsLockDir(),
+            'failing-install.lock',
+          ),
+        ),
+      ).toBe(false);
+
+      fs.rmSync(destinationPath, { recursive: true, force: true });
+      await expect(
+        manager.installOrUpdateExtension({ type: 'local', source }),
+      ).resolves.toMatchObject({ name: 'failing-install' });
     });
   });
 

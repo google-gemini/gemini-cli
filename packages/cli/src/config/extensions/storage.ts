@@ -39,6 +39,10 @@ export class ExtensionStorage {
     return new Storage(homedir()).getExtensionsDir();
   }
 
+  static getUserExtensionsLockDir(): string {
+    return path.join(new Storage(homedir()).getGeminiDir(), 'extension-locks');
+  }
+
   static async createTmpDir(): Promise<string> {
     return fs.promises.mkdtemp(path.join(os.tmpdir(), 'gemini-extension'));
   }
