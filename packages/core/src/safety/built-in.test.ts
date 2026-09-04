@@ -242,6 +242,32 @@ describe('AllowedPathChecker', () => {
   });
 
   describe('Security Regression: Case-Insensitive Blocklist & .vscode HITL', () => {
+    it('should deny sensitive paths specified via NTFS 8.3 short names (SFNs), including standard and collision-based SFN formats.', async () => {
+      const sfnPaths = [
+        // Standard SFNs
+        path.join(mockCwd, 'git~1', 'config'),
+        path.join(mockCwd, 'GIT~1', 'config'),
+        path.join(mockCwd, 'env~1'),
+        path.join(mockCwd, 'ENV~1'),
+        path.join(mockCwd, 'node_m~1', 'package', 'index.js'),
+        path.join(mockCwd, 'NODE_M~1', 'package', 'index.js'),
+        // NTFS Collision-Based SFNs (e.g. first two characters followed by 4-digit hex hash and ~number)
+        path.join(mockCwd, 'gi1a2b~1', 'config'),
+        path.join(mockCwd, 'GI3F4E~2', 'config'),
+        path.join(mockCwd, 'en9c8d~1'),
+        path.join(mockCwd, 'EN2A1B~3'),
+        path.join(mockCwd, 'no5c6d~1', 'package', 'index.js'),
+        path.join(mockCwd, 'NO7A8B~2', 'package', 'index.js'),
+      ];
+
+      for (const p of sfnPaths) {
+        const input = createInput({ path: p });
+        const result = await checker.check(input);
+        expect(result.decision).toBe(SafetyCheckDecision.DENY);
+        expect(result.reason).toContain('Access to sensitive path');
+      }
+    });
+
     it('should deny sensitive paths like .git, .env, and node_modules case-insensitively, including Windows trailing character and NTFS ADS bypasses', async () => {
       const sensitivePaths = [
         path.join(mockCwd, '.git', 'config'),
@@ -272,7 +298,7 @@ describe('AllowedPathChecker', () => {
       }
     });
 
-    it('should require ASK_USER for .vscode configuration files inside workspace, but deny them if outside, including NTFS ADS bypasses', async () => {
+    it('should require ASK_USER for .vscode configuration files inside workspace, but deny them if outside, including NTFS ADS bypasses and SFNs', async () => {
       const vscodePaths = [
         path.join(mockCwd, '.vscode', 'settings.json'),
         path.join(mockCwd, '.vscode', 'settings.JSON'),
@@ -283,6 +309,11 @@ describe('AllowedPathChecker', () => {
         path.join(mockCwd, '.vscode.', 'settings.json'),
         // NTFS Alternate Data Stream bypasses
         path.join(mockCwd, '.vscode::$DATA', 'settings.json'),
+        // SFN formats (standard and collision-based)
+        path.join(mockCwd, 'vscode~1', 'settings.json'),
+        path.join(mockCwd, 'VSCODE~1', 'settings.json'),
+        path.join(mockCwd, 'vs12ab~1', 'settings.json'),
+        path.join(mockCwd, 'VS3F4E~2', 'settings.json'),
       ];
 
       for (const p of vscodePaths) {

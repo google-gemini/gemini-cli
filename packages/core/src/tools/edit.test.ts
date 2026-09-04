@@ -63,7 +63,7 @@ import {
   getMockMessageBusInstance,
 } from '../test-utils/mock-message-bus.js';
 import path from 'node:path';
-import { isSubpath } from '../utils/paths.js';
+import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import { ApprovalMode } from '../policy/types.js';
@@ -87,7 +87,7 @@ describe('EditTool', () => {
     const rawTempDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'edit-tool-test-'),
     );
-    tempDir = fs.realpathSync(rawTempDir);
+    tempDir = resolveToRealPath(rawTempDir);
     rootDir = path.join(tempDir, 'root');
     fs.mkdirSync(rootDir);
 
