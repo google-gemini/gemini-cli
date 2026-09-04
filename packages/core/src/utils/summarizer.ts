@@ -85,9 +85,12 @@ export async function summarizeToolOutput(
     return textToSummarize;
   }
   const prompt = SUMMARIZE_TOOL_OUTPUT_PROMPT.replace(
-    '{maxOutputTokens}',
-    String(maxOutputTokens),
-  ).replace('{textToSummarize}', textToSummarize);
+    /\{maxOutputTokens\}|\{textToSummarize\}/g,
+    (matched) =>
+      matched === '{maxOutputTokens}'
+        ? String(maxOutputTokens)
+        : textToSummarize,
+  );
 
   const contents: Content[] = [{ role: 'user', parts: [{ text: prompt }] }];
   try {

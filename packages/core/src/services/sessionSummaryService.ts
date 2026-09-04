@@ -104,7 +104,10 @@ export class SessionSummaryService {
         })
         .join('\n\n');
 
-      const prompt = SUMMARY_PROMPT.replace('{conversation}', conversationText);
+      const prompt = SUMMARY_PROMPT.replaceAll(
+        '{conversation}',
+        () => conversationText,
+      );
 
       // Create abort controller with timeout
       const abortController = new AbortController();

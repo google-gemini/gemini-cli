@@ -165,11 +165,17 @@ export async function FixLLMEditWithInstruction(
   if (cachedResult) {
     return cachedResult;
   }
-  const userPrompt = EDIT_USER_PROMPT.replace('{instruction}', instruction)
-    .replace('{old_string}', old_string)
-    .replace('{new_string}', new_string)
-    .replace('{error}', error)
-    .replace('{current_content}', current_content);
+  const replacements: Record<string, string> = {
+    '{instruction}': instruction,
+    '{old_string}': old_string,
+    '{new_string}': new_string,
+    '{error}': error,
+    '{current_content}': current_content,
+  };
+  const userPrompt = EDIT_USER_PROMPT.replace(
+    /\{instruction\}|\{old_string\}|\{new_string\}|\{error\}|\{current_content\}/g,
+    (matched) => replacements[matched],
+  );
 
   const contents: Content[] = [
     {
