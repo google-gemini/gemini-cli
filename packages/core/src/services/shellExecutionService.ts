@@ -816,9 +816,19 @@ export class ShellExecutionService {
 
       child.stdout.on('data', (data) => handleOutput(data, 'stdout'));
       child.stderr.on('data', (data) => handleOutput(data, 'stderr'));
+       let hasHandledExit = false;
+
+      const safeHandleExit = (code: number | null, signal: string | null) => {
+        if (hasHandledExit) {
+          return;
+        }
+        hasHandledExit = true;
+        handleExit(code, signal);
+      };
+
       child.on('error', (err) => {
         error = err;
-        handleExit(1, null);
+        safeHandleExit(1, null);
       });
 
       const abortHandler = async () => {
@@ -834,7 +844,7 @@ export class ShellExecutionService {
       abortSignal.addEventListener('abort', abortHandler, { once: true });
 
       child.on('close', (code, signal) => {
-        handleExit(code, signal);
+        safeHandleExit(code, signal);
       });
 
       function cleanup() {
