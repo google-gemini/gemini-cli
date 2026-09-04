@@ -305,6 +305,7 @@ function batchCheckWindowsPathsSync(
     const script = buildWindowsAclScript(escapedPaths);
     const powershellPath = getWindowsPowerShellPath();
 
+    const encodedScript = Buffer.from(script, 'utf16le').toString('base64');
     const res = spawnSync(
       powershellPath,
       [
@@ -312,8 +313,8 @@ function batchCheckWindowsPathsSync(
         '-NonInteractive',
         '-ExecutionPolicy',
         'Bypass',
-        '-Command',
-        script,
+        '-EncodedCommand',
+        encodedScript,
       ],
       { encoding: 'utf-8', timeout: 5000 },
     );
@@ -411,6 +412,7 @@ export async function isDirectorySecure(
         const script = buildWindowsAclScript([escapedPath]);
         const powershellPath = getWindowsPowerShellPath();
 
+        const encodedScript = Buffer.from(script, 'utf16le').toString('base64');
         const { stdout } = await spawnAsync(
           powershellPath,
           [
@@ -418,8 +420,8 @@ export async function isDirectorySecure(
             '-NonInteractive',
             '-ExecutionPolicy',
             'Bypass',
-            '-Command',
-            script,
+            '-EncodedCommand',
+            encodedScript,
           ],
           { timeout: 5000 },
         );

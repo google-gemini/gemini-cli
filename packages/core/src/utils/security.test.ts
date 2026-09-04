@@ -49,11 +49,12 @@ describe('isDirectorySecure', () => {
 
     const result = await isDirectorySecure('C:\\Some\\Path');
     expect(result.secure).toBe(true);
-    expect(spawnAsync).toHaveBeenCalledWith(
-      expect.stringContaining('powershell.exe'),
-      expect.arrayContaining(['-Command', expect.stringContaining('Get-Acl')]),
-      { timeout: 5000 },
+    const spawnCall = vi.mocked(spawnAsync).mock.calls[0];
+    const scriptArg = Buffer.from(spawnCall[1]?.[5] ?? '', 'base64').toString(
+      'utf16le',
     );
+    expect(spawnCall[1]).toContain('-EncodedCommand');
+    expect(scriptArg).toContain('Get-Acl');
   });
 
   it('returns secure=false on Windows if ACL check fails', async () => {
@@ -300,15 +301,13 @@ describe('isDirectorySecure', () => {
 
     await isDirectorySecure('C:\\Some\\Path');
 
-    expect(spawnAsync).toHaveBeenCalledWith(
-      expect.stringContaining('powershell.exe'),
-      expect.arrayContaining([
-        '-Command',
-        expect.stringContaining(
-          "($owner -like '*\\Administrators' -or $owner -eq 'Administrators')",
-        ),
-      ]),
-      { timeout: 5000 },
+    const spawnCall = vi.mocked(spawnAsync).mock.calls[0];
+    const scriptArg = Buffer.from(spawnCall[1]?.[5] ?? '', 'base64').toString(
+      'utf16le',
+    );
+    expect(spawnCall[1]).toContain('-EncodedCommand');
+    expect(scriptArg).toContain(
+      "($owner -like '*\\Administrators' -or $owner -eq 'Administrators')",
     );
   });
 
@@ -324,15 +323,13 @@ describe('isDirectorySecure', () => {
 
     await isDirectorySecure('C:\\Some\\Path');
 
-    expect(spawnAsync).toHaveBeenCalledWith(
-      expect.stringContaining('powershell.exe'),
-      expect.arrayContaining([
-        '-Command',
-        expect.stringContaining(
-          "($id -like '*\\Administrators' -or $id -eq 'Administrators')",
-        ),
-      ]),
-      { timeout: 5000 },
+    const spawnCall = vi.mocked(spawnAsync).mock.calls[0];
+    const scriptArg = Buffer.from(spawnCall[1]?.[5] ?? '', 'base64').toString(
+      'utf16le',
+    );
+    expect(spawnCall[1]).toContain('-EncodedCommand');
+    expect(scriptArg).toContain(
+      "($id -like '*\\Administrators' -or $id -eq 'Administrators')",
     );
   });
 
@@ -1157,7 +1154,10 @@ describe('isFileAndDirectorySecureSync', () => {
     expect(spawnSync).toHaveBeenCalledTimes(1);
     // The PowerShell script should only check unique, non-redundant paths
     const spawnCall = vi.mocked(spawnSync).mock.calls[0];
-    const scriptArg = (spawnCall[1] as string[])?.[5] ?? '';
+    const scriptArg = Buffer.from(
+      (spawnCall[1] as string[])?.[5] ?? '',
+      'base64',
+    ).toString('utf16le');
     expect(scriptArg).toContain(`'${normalizedFile.toLowerCase()}'`);
     expect(scriptArg).toContain(`'${parentDir.toLowerCase()}'`);
     // Should NOT contain duplicate real path with lowercase drive letter as pathsEqual should prevent batching it
@@ -1205,7 +1205,10 @@ describe('isFileAndDirectorySecureSync', () => {
 
     // Verify the PowerShell command was invoked and contains CREATOR OWNER and CREATOR GROUP checks
     const spawnCall = vi.mocked(spawnSync).mock.calls[0];
-    const scriptArg = (spawnCall[1] as string[])?.[5] ?? '';
+    const scriptArg = Buffer.from(
+      (spawnCall[1] as string[])?.[5] ?? '',
+      'base64',
+    ).toString('utf16le');
     expect(scriptArg).toContain('CREATOR OWNER');
     expect(scriptArg).toContain('CREATOR GROUP');
     expect(scriptArg).toContain('S-1-3-0');
@@ -1261,7 +1264,10 @@ describe('isFileAndDirectorySecureSync', () => {
 
     // Verify spawnSync was called and received the stripped paths
     const spawnCall = vi.mocked(spawnSync).mock.calls[0];
-    const scriptArg = (spawnCall[1] as string[])?.[5] ?? '';
+    const scriptArg = Buffer.from(
+      (spawnCall[1] as string[])?.[5] ?? '',
+      'base64',
+    ).toString('utf16le');
     expect(scriptArg).toContain(`'${normalizedFile}'`);
     expect(scriptArg).not.toContain('\\\\?\\');
   });
@@ -1318,7 +1324,10 @@ describe('isFileAndDirectorySecureSync', () => {
 
     // Verify spawnSync was called and received the standard UNC paths
     const spawnCall = vi.mocked(spawnSync).mock.calls[0];
-    const scriptArg = (spawnCall[1] as string[])?.[5] ?? '';
+    const scriptArg = Buffer.from(
+      (spawnCall[1] as string[])?.[5] ?? '',
+      'base64',
+    ).toString('utf16le');
     expect(scriptArg).toContain(`'${normalizedFile}'`);
     expect(scriptArg).not.toContain('\\\\?\\');
     expect(scriptArg).not.toContain("'unc\\");
