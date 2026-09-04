@@ -14,7 +14,6 @@ import {
   type Mock,
 } from 'vitest';
 
-import os from 'node:os';
 import EventEmitter from 'node:events';
 import type { Readable } from 'node:stream';
 import { type ChildProcess } from 'node:child_process';
@@ -2227,11 +2226,11 @@ describe('ShellExecutionService environment variables', () => {
     expect(cpEnv).toHaveProperty('DISPLAY', '');
     expect(cpEnv).toHaveProperty('DBUS_SESSION_BUS_ADDRESS', '');
 
-    // Global / system config neutralization paths
-    const devNullPath = os.platform() === 'win32' ? 'NUL' : '/dev/null';
-    expect(cpEnv).toHaveProperty('GIT_CONFIG_GLOBAL', devNullPath);
-    expect(cpEnv).toHaveProperty('GIT_CONFIG_SYSTEM', devNullPath);
-    expect(cpEnv).toHaveProperty('GIT_CONFIG_NOSYSTEM', '1');
+    // User's global / system git config must NOT be neutralized so that
+    // settings like user.name / user.email keep working for `git commit`.
+    expect(cpEnv).not.toHaveProperty('GIT_CONFIG_GLOBAL');
+    expect(cpEnv).not.toHaveProperty('GIT_CONFIG_SYSTEM');
+    expect(cpEnv).not.toHaveProperty('GIT_CONFIG_NOSYSTEM');
 
     // Existing values should be preserved
     expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_0', 'core.editor');
@@ -2257,6 +2256,56 @@ describe('ShellExecutionService environment variables', () => {
     expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_8', '');
     expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_9', 'diff.external');
     expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_9', '');
+
+    // Ensure child_process exits
+    mockChildProcess.emit('exit', 0, null);
+    mockChildProcess.emit('close', 0, null);
+    await new Promise(process.nextTick);
+
+    vi.unstubAllEnvs();
+  });
+
+  it('should preserve user global git config so git commit can resolve author identity', async () => {
+    vi.resetModules();
+    vi.stubEnv('GIT_CONFIG_COUNT', undefined);
+    // Simulate a user whose identity lives in the global git config
+    // (typically ~/.gitconfig, or GIT_CONFIG_GLOBAL when overridden).
+    vi.stubEnv('GIT_CONFIG_GLOBAL', '/home/tester/.gitconfig');
+    vi.stubEnv('GIT_CONFIG_SYSTEM', '/etc/gitconfig');
+
+    const { ShellExecutionService } = await import(
+      './shellExecutionService.js'
+    );
+
+    mockGetPty.mockResolvedValue(null); // Force child_process fallback
+    await ShellExecutionService.execute(
+      'git commit -m "test"',
+      '/test/repo',
+      vi.fn(),
+      new AbortController().signal,
+      false, // non-interactive
+      shellExecutionConfig,
+    );
+
+    expect(mockCpSpawn).toHaveBeenCalled();
+    const cpEnv = mockCpSpawn.mock.calls[0][2].env;
+    // The user's global / system config paths must be inherited untouched so
+    // `git commit` can read user.name / user.email instead of failing with
+    // "Author identity unknown" (see issue #29152).
+    expect(cpEnv).toHaveProperty(
+      'GIT_CONFIG_GLOBAL',
+      '/home/tester/.gitconfig',
+    );
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_SYSTEM', '/etc/gitconfig');
+    expect(cpEnv).not.toHaveProperty('GIT_CONFIG_NOSYSTEM');
+
+    // Dangerous interactive overrides must still be applied with higher
+    // precedence than any config file.
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_COUNT', '8');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_0', 'credential.helper');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_0', '');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_4', 'core.pager');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_4', 'cat');
 
     // Ensure child_process exits
     mockChildProcess.emit('exit', 0, null);
