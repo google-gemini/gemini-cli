@@ -125,7 +125,7 @@ export function tryParseGithubUrl(source: string): GithubRepoInfo | null {
     );
   }
   const owner = parts[0];
-  const repo = parts[1].replace('.git', '');
+  const repo = parts[1].replace(/\.git$/i, '');
 
   return {
     owner,
