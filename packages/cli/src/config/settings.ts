@@ -21,6 +21,7 @@ import {
   AuthType,
   type AdminControlsSettings,
   createCache,
+  isPathSecureSync,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/builtin/light/default-light.js';
@@ -118,8 +119,13 @@ export function getSystemDefaultsPath(): string {
   if (process.env['GEMINI_CLI_SYSTEM_DEFAULTS_PATH']) {
     return process.env['GEMINI_CLI_SYSTEM_DEFAULTS_PATH'];
   }
-  return path.join(
-    path.dirname(getSystemSettingsPath()),
+  const systemSettingsPath = getSystemSettingsPath();
+  const pathHelper =
+    platform() === 'win32' || systemSettingsPath.includes('\\')
+      ? path.win32
+      : path;
+  return pathHelper.join(
+    pathHelper.dirname(systemSettingsPath),
     'system-defaults.json',
   );
 }
@@ -844,8 +850,34 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
     return { settings: {}, rawSettings: {} };
   };
 
-  const systemResult = load(systemSettingsPath);
-  const systemDefaultsResult = load(systemDefaultsPath);
+  const validateSystemPath = (filePath: string, scopeName: string): boolean => {
+    if (!fs.existsSync(filePath)) {
+      return true;
+    }
+    const check = isPathSecureSync(filePath);
+    if (!check.secure) {
+      const reason = check.reason || 'insecure path permissions';
+      const message = `Skipping ${scopeName} configuration file ${filePath} due to insecure permissions: ${reason}`;
+      settingsErrors.push({
+        message,
+        path: filePath,
+        severity: 'warning',
+      });
+      coreEvents.emitFeedback('warning', message);
+      return false;
+    }
+    return true;
+  };
+
+  const systemResult = validateSystemPath(systemSettingsPath, 'system')
+    ? load(systemSettingsPath)
+    : { settings: {}, rawSettings: {} };
+  const systemDefaultsResult = validateSystemPath(
+    systemDefaultsPath,
+    'system default',
+  )
+    ? load(systemDefaultsPath)
+    : { settings: {}, rawSettings: {} };
   const userResult = load(USER_SETTINGS_PATH);
 
   let workspaceResult: {
