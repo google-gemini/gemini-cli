@@ -575,6 +575,28 @@ describe('BaseLlmClient', () => {
       );
     });
 
+    it('should forward the caller-provided abortSignal to retryWithBackoff so the overall retry loop honors it', async () => {
+      const mockResponse = createMockResponse('This is the content.');
+      mockGenerateContent.mockResolvedValue(mockResponse);
+
+      const options = {
+        modelConfigKey: { model: 'test-model' },
+        contents: [{ role: 'user', parts: [{ text: 'Give me content.' }] }],
+        abortSignal: abortController.signal,
+        promptId: 'content-prompt-id',
+        role: LlmRole.UTILITY_TOOL,
+      };
+
+      await client.generateContent(options);
+
+      expect(retryWithBackoff).toHaveBeenCalledWith(
+        expect.any(Function),
+        expect.objectContaining({
+          signal: options.abortSignal,
+        }),
+      );
+    });
+
     it('should validate content using shouldRetryOnContent function', async () => {
       const mockResponse = createMockResponse('Some valid content.');
       mockGenerateContent.mockResolvedValue(mockResponse);
