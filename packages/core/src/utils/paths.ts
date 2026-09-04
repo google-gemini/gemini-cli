@@ -368,7 +368,7 @@ export function isSubpath(parentPath: string, childPath: string): boolean {
   let p = pathModule.resolve(parentPath);
   let c = pathModule.resolve(childPath);
 
-  if (isWindows) {
+  if (isWindows && (p.includes('~') || c.includes('~'))) {
     try {
       p = resolveToRealPath(p);
       c = resolveToRealPath(c);
