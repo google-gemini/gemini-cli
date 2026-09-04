@@ -572,7 +572,7 @@ export function isPathSecureSync(
 }
 
 /**
- * Synchronously checks that a configuration file AND its parent directory are secure.
+ * Synchronously checks that a configuration file AND all its parent/ancestor directories are secure.
  * If the file does not exist, it is considered safe since nothing is loaded.
  *
  * @param filePath The file path to validate.
@@ -616,14 +616,34 @@ export function isFileAndDirectorySecureSync(
   }
 
   const canonicalParentDir = pathModule.dirname(canonicalFilePath);
-
   const pathsEqual = canonicalFilePath === normalizedFilePath;
+
+  const getAncestors = (dir: string): string[] => {
+    const ancestors: string[] = [];
+    let current = dir;
+    while (true) {
+      ancestors.push(current);
+      const next = pathModule.dirname(current);
+      if (next === current || !next || next === '.') {
+        break;
+      }
+      current = next;
+    }
+    return ancestors;
+  };
+
+  const normalizedAncestors = isWin ? [parentDir] : getAncestors(parentDir);
+  const canonicalAncestors = !pathsEqual
+    ? isWin
+      ? [canonicalParentDir]
+      : getAncestors(canonicalParentDir)
+    : [];
 
   // On Windows, batch all uncached paths into a single PowerShell check
   if (isWin) {
-    const pathsToCheck = [normalizedFilePath, parentDir];
+    const pathsToCheck = [normalizedFilePath, ...normalizedAncestors];
     if (!pathsEqual) {
-      pathsToCheck.push(canonicalParentDir, canonicalFilePath);
+      pathsToCheck.push(...canonicalAncestors, canonicalFilePath);
     }
     const uniquePaths = Array.from(new Set(pathsToCheck));
     const uncached = uniquePaths.filter((p) => !effectiveCache.has(p));
@@ -632,16 +652,36 @@ export function isFileAndDirectorySecureSync(
     }
   }
 
-  // 1. Check the immediate parent directory
-  const parentCheck = isPathSecureSync(parentDir, 'directory', effectiveCache);
-  if (!parentCheck.secure) {
-    return {
-      secure: false,
-      reason: `Parent directory '${parentDir}' is insecure: ${parentCheck.reason}`,
-    };
+  // 1. Verify that any parent/grandparent directories of normalizedFilePath that are symlinks are owned by root
+  for (const dir of normalizedAncestors) {
+    try {
+      const lstat = fsSync.lstatSync(dir);
+      if (lstat.isSymbolicLink()) {
+        const symlinkCheck = isPathSecureSync(dir, 'directory', effectiveCache);
+        if (!symlinkCheck.secure) {
+          return {
+            secure: false,
+            reason: `Parent directory symlink '${dir}' is insecure: ${symlinkCheck.reason}`,
+          };
+        }
+      }
+    } catch {
+      // If lstat fails, subsequent checks will handle it
+    }
   }
 
-  // 2. Check the file itself
+  // 2. Check the immediate parent directory and all its ancestors up to the root
+  for (const ancestor of normalizedAncestors) {
+    const parentCheck = isPathSecureSync(ancestor, 'directory', effectiveCache);
+    if (!parentCheck.secure) {
+      return {
+        secure: false,
+        reason: `Parent directory '${ancestor}' is insecure: ${parentCheck.reason}`,
+      };
+    }
+  }
+
+  // 3. Check the file itself
   const fileCheck = isPathSecureSync(
     normalizedFilePath,
     'file',
@@ -654,7 +694,7 @@ export function isFileAndDirectorySecureSync(
     };
   }
 
-  // 3. If the canonical path differs (symlink in leaf or parent), verify canonical target file and its parent directory
+  // 4. If the canonical path differs (symlink in leaf or parent), verify canonical target file and all ancestors up to root
   if (!pathsEqual) {
     const realFileCheck = isPathSecureSync(
       canonicalFilePath,
@@ -668,16 +708,18 @@ export function isFileAndDirectorySecureSync(
       };
     }
 
-    const realParentCheck = isPathSecureSync(
-      canonicalParentDir,
-      'directory',
-      effectiveCache,
-    );
-    if (!realParentCheck.secure) {
-      return {
-        secure: false,
-        reason: `Resolved target parent directory '${canonicalParentDir}' is insecure: ${realParentCheck.reason}`,
-      };
+    for (const canonicalAncestor of canonicalAncestors) {
+      const realParentCheck = isPathSecureSync(
+        canonicalAncestor,
+        'directory',
+        effectiveCache,
+      );
+      if (!realParentCheck.secure) {
+        return {
+          secure: false,
+          reason: `Resolved target parent directory '${canonicalAncestor}' is insecure: ${realParentCheck.reason}`,
+        };
+      }
     }
   }
 
