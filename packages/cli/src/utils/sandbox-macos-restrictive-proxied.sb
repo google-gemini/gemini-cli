@@ -67,7 +67,6 @@
     (subpath (param "TARGET_DIR"))
     (subpath (param "TMP_DIR"))
     (subpath (param "CACHE_DIR"))
-    (subpath (string-append (param "HOME_DIR") "/.gemini"))
     (subpath (string-append (param "HOME_DIR") "/.npm"))
     (subpath (string-append (param "HOME_DIR") "/.cache"))
     ;; Allow writes to included directories from --include-directories
@@ -144,4 +143,23 @@
     (ipc-posix-name-prefix "docker")
     (ipc-posix-name-prefix "com.docker.")
 )
+
+;; Deny writing to user's Gemini CLI configuration directory
+(deny file-write*
+    (subpath (string-append (param "HOME_DIR") "/.gemini"))
+)
+
+;; Block reading sensitive credentials and environment files
+(deny file-read*
+    (literal (string-append (param "HOME_DIR") "/.gemini/oauth_creds.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/gemini-credentials.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/mcp-oauth-tokens.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/a2a-oauth-tokens.json"))
+    (regex #"/oauth_creds\.json$")
+    (regex #"/gemini-credentials\.json$")
+    (regex #"/mcp-oauth-tokens\.json$")
+    (regex #"/a2a-oauth-tokens\.json$")
+    (regex #"/\.env($|\..*)")
+)
+
 

@@ -830,7 +830,9 @@ describe('sandbox', () => {
           '--volume',
           '/host/path:/container/path:ro',
           '--volume',
-          expect.stringMatching(/[\\/]home[\\/]user[\\/]\.gemini/),
+          expect.stringMatching(
+            /[\\/]home[\\/]user[\\/]\.gemini[\\/]settings\.json:ro$/,
+          ),
         ]),
         expect.any(Object),
       );
@@ -876,6 +878,82 @@ describe('sandbox', () => {
         expect.arrayContaining(['--volume', '/extra/path:/extra/path:ro']),
         expect.any(Object),
       );
+    });
+
+    it('should reject sensitive host mounts in SANDBOX_MOUNTS with FatalSandboxError', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      vi.stubEnv('SANDBOX_MOUNTS', '/home/user/.gemini:/mnt:rw');
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      await expect(start_sandbox(config)).rejects.toThrow(FatalSandboxError);
+    });
+
+    it('should ignore sensitive paths in allowedPaths', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+        allowedPaths: ['/home/user/.gemini', '/safe/extra/path'],
+      });
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+      await start_sandbox(config);
+
+      const runCalls = vi
+        .mocked(spawn)
+        .mock.calls.filter(
+          (call) =>
+            call[0] === 'docker' &&
+            Array.isArray(call[1]) &&
+            call[1].includes('run'),
+        );
+      expect(runCalls.length).toBe(1);
+      const runArgs = runCalls[0][1] as string[];
+      expect(runArgs).toContain('/safe/extra/path:/safe/extra/path:ro');
+      expect(
+        runArgs.some(
+          (arg) =>
+            typeof arg === 'string' && arg.includes('/home/user/.gemini:'),
+        ),
+      ).toBe(false);
     });
 
     it('should handle networkAccess: false in Docker', async () => {

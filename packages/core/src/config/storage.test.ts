@@ -455,4 +455,25 @@ describe('Storage - System Paths', () => {
       expect(result).toBe('/etc/gemini-cli/policies');
     }
   });
+
+  describe('Storage - Sandbox Isolation', () => {
+    afterEach(() => {
+      delete process.env['SANDBOX'];
+    });
+
+    it('identifies sandbox mode when SANDBOX environment variable is set', () => {
+      delete process.env['SANDBOX'];
+      expect(Storage.isSandbox()).toBe(false);
+      expect(Storage.getGlobalRuntimeDir()).toBe(Storage.getGlobalGeminiDir());
+
+      process.env['SANDBOX'] = 'docker';
+      expect(Storage.isSandbox()).toBe(true);
+      expect(Storage.getGlobalRuntimeDir()).toBe(
+        path.join(os.tmpdir(), GEMINI_DIR),
+      );
+      expect(Storage.getGlobalTempDir()).toBe(
+        path.join(os.tmpdir(), GEMINI_DIR, 'tmp'),
+      );
+    });
+  });
 });

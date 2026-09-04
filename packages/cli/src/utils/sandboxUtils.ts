@@ -5,10 +5,13 @@
  */
 
 import os from 'node:os';
+import path from 'node:path';
 import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { quote } from 'shell-quote';
-import { debugLogger, GEMINI_DIR } from '@google/gemini-cli-core';
+import { debugLogger, GEMINI_DIR, homedir } from '@google/gemini-cli-core';
+
+import { isRecord } from './settingsUtils.js';
 
 export const LOCAL_DEV_SANDBOX_IMAGE_NAME = 'gemini-cli-sandbox';
 export const SANDBOX_NETWORK_NAME = 'gemini-cli-sandbox';
@@ -23,6 +26,98 @@ export const BUILTIN_SEATBELT_PROFILES = [
   'strict-open',
   'strict-proxied',
 ];
+
+/**
+ * Checks if a host path is sensitive and should be prohibited from mounting
+ * into the sandbox container. This protects ~/.gemini, user home directories,
+ * and sensitive credential files from being accessed or poisoned.
+ */
+export function isSensitiveHostPath(hostPath: string): boolean {
+  try {
+    const home = path.resolve(homedir());
+    const osHome = path.resolve(os.homedir());
+    let expandedPath = hostPath;
+    if (hostPath === '~' || hostPath === '~/' || hostPath === '~\\') {
+      expandedPath = home;
+    } else if (hostPath.startsWith('~/') || hostPath.startsWith('~\\')) {
+      expandedPath = path.join(home, hostPath.slice(2));
+    }
+    const normalized = path.resolve(expandedPath);
+    const geminiDir = path.resolve(home, GEMINI_DIR);
+    const osGeminiDir = path.resolve(osHome, GEMINI_DIR);
+
+    const isWindows = os.platform() === 'win32';
+    const arePathsEqual = (p1: string, p2: string) =>
+      isWindows ? p1.toLowerCase() === p2.toLowerCase() : p1 === p2;
+    const isSubpathOf = (child: string, parent: string) =>
+      isWindows
+        ? child.toLowerCase().startsWith((parent + path.sep).toLowerCase())
+        : child.startsWith(parent + path.sep);
+
+    // Block mounting user home directory root directly
+    if (arePathsEqual(normalized, home) || arePathsEqual(normalized, osHome)) {
+      return true;
+    }
+
+    // Block mounting ~/.gemini or anything inside ~/.gemini
+    if (
+      arePathsEqual(normalized, geminiDir) ||
+      isSubpathOf(normalized, geminiDir) ||
+      arePathsEqual(normalized, osGeminiDir) ||
+      isSubpathOf(normalized, osGeminiDir)
+    ) {
+      return true;
+    }
+
+    // Block sensitive secrets, credential stores, and environment files anywhere
+    const baseName = path.basename(normalized).toLowerCase();
+    if (
+      baseName === '.env' ||
+      baseName.startsWith('.env.') ||
+      baseName === 'oauth_creds.json' ||
+      baseName === 'gemini-credentials.json' ||
+      baseName === 'mcp-oauth-tokens.json' ||
+      baseName === 'a2a-oauth-tokens.json' ||
+      baseName === 'google_accounts.json' ||
+      baseName === 'trusted_hooks.json'
+    ) {
+      return true;
+    }
+  } catch {
+    return true; // Fail closed if path resolution fails
+  }
+
+  return false;
+}
+
+/**
+ * Sanitizes user settings for the sandbox by stripping unvalidated hooks,
+ * command hooks, API keys, and sensitive tokens.
+ */
+export function sanitizeSettingsForSandbox(
+  settings: Record<string, unknown>,
+): Record<string, unknown> {
+  const sanitized = structuredClone(settings);
+
+  // Remove hooks to prevent configuration poisoning and unvalidated hook execution
+  delete sanitized['hooks'];
+
+  // Remove command execution hooks in tools if present
+  const tools = sanitized['tools'];
+  if (isRecord(tools)) {
+    const safeTools = { ...tools };
+    delete safeTools['discoveryCommand'];
+    delete safeTools['callCommand'];
+    sanitized['tools'] = safeTools;
+  }
+
+  // Remove sensitive keys and credentials
+  delete sanitized['apiKey'];
+  delete sanitized['geminiApiKey'];
+  delete sanitized['googleApiKey'];
+
+  return sanitized;
+}
 
 export function getContainerPath(hostPath: string): string {
   if (os.platform() !== 'win32') {

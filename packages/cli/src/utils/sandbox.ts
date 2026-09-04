@@ -28,6 +28,7 @@ import {
 } from '@google/gemini-cli-core';
 import { ConsolePatcher } from '../ui/utils/ConsolePatcher.js';
 import { randomBytes } from 'node:crypto';
+import stripJsonComments from 'strip-json-comments';
 import {
   getContainerPath,
   shouldUseCurrentUserInSandbox,
@@ -38,7 +39,10 @@ import {
   SANDBOX_NETWORK_NAME,
   SANDBOX_PROXY_NAME,
   BUILTIN_SEATBELT_PROFILES,
+  isSensitiveHostPath,
+  sanitizeSettingsForSandbox,
 } from './sandboxUtils.js';
+import { isRecord } from './settingsUtils.js';
 import { BUILTIN_SEATBELT_PROFILE_CONTENTS } from './sandboxBuiltinProfiles.js';
 
 const execAsync = promisify(exec);
@@ -439,39 +443,61 @@ export async function start_sandbox(
     // mount current directory as working directory in sandbox (set via --workdir)
     args.push('--volume', `${workdir}:${containerWorkdir}`);
 
-    // mount user settings directory inside container, after creating if missing
-    // note user/home changes inside sandbox and we mount at BOTH paths for consistency
+    // Create ephemeral sandbox temp directory on host for sanitized configuration files
+    if (!sandboxTmpDir) {
+      const hostTmpDir = fs.realpathSync(os.tmpdir());
+      sandboxTmpDir = fs.mkdtempSync(path.join(hostTmpDir, 'gemini-sandbox-'));
+    }
+
+    // Sanitize user settings before mounting into the sandbox container.
+    // We STRICTLY do NOT mount ~/.gemini root directory or sensitive credential files
+    // (oauth_creds.json, .env, etc.). We only mount the sanitized settings file as read-only (:ro).
     const userHomeDirOnHost = homedir();
+    const userSettingsDirOnHost = path.join(userHomeDirOnHost, GEMINI_DIR);
+    const userSettingsFileOnHost = path.join(
+      userSettingsDirOnHost,
+      'settings.json',
+    );
+
+    let rawSettings: Record<string, unknown> = {};
+    if (fs.existsSync(userSettingsFileOnHost)) {
+      try {
+        const rawContent = fs.readFileSync(userSettingsFileOnHost, 'utf8');
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const parsedJson = JSON.parse(stripJsonComments(rawContent));
+        const parsed: unknown = parsedJson;
+        if (isRecord(parsed) && !Array.isArray(parsed)) {
+          rawSettings = parsed;
+        }
+      } catch (err) {
+        debugLogger.warn(
+          `Failed to parse host user settings for sandbox: ${err}`,
+        );
+      }
+    }
+
+    const sanitizedSettings = sanitizeSettingsForSandbox(rawSettings);
+    const sanitizedSettingsFile = path.join(sandboxTmpDir, 'settings.json');
+    fs.writeFileSync(
+      sanitizedSettingsFile,
+      JSON.stringify(sanitizedSettings, null, 2),
+      { mode: 0o444 },
+    );
+
+    // Mount sanitized settings as read-only (:ro) inside container
     const userSettingsDirInSandbox = getContainerPath(
       `/home/node/${GEMINI_DIR}`,
     );
-    if (!fs.existsSync(userHomeDirOnHost)) {
-      fs.mkdirSync(userHomeDirOnHost, { recursive: true });
-    }
-    const userSettingsDirOnHost = path.join(userHomeDirOnHost, GEMINI_DIR);
-    if (!fs.existsSync(userSettingsDirOnHost)) {
-      fs.mkdirSync(userSettingsDirOnHost, { recursive: true });
-    }
+    const hostContainerSettingsDir = getContainerPath(userSettingsDirOnHost);
 
     args.push(
       '--volume',
-      `${userSettingsDirOnHost}:${userSettingsDirInSandbox}`,
+      `${sanitizedSettingsFile}:${userSettingsDirInSandbox}/settings.json:ro`,
     );
-    if (userSettingsDirInSandbox !== getContainerPath(userSettingsDirOnHost)) {
+    if (userSettingsDirInSandbox !== hostContainerSettingsDir) {
       args.push(
         '--volume',
-        `${userSettingsDirOnHost}:${getContainerPath(userSettingsDirOnHost)}`,
-      );
-    }
-
-    // mount os.tmpdir() as os.tmpdir() inside container
-    args.push('--volume', `${os.tmpdir()}:${getContainerPath(os.tmpdir())}`);
-
-    // mount homedir() as homedir() inside container
-    if (userHomeDirOnHost !== os.homedir()) {
-      args.push(
-        '--volume',
-        `${userHomeDirOnHost}:${getContainerPath(userHomeDirOnHost)}`,
+        `${sanitizedSettingsFile}:${hostContainerSettingsDir}/settings.json:ro`,
       );
     }
 
@@ -511,6 +537,11 @@ export async function start_sandbox(
               `Path '${from}' listed in SANDBOX_MOUNTS must be absolute`,
             );
           }
+          if (isSensitiveHostPath(from)) {
+            throw new FatalSandboxError(
+              `Mounting sensitive host path '${from}' listed in SANDBOX_MOUNTS is strictly prohibited`,
+            );
+          }
           // check that from path exists on host
           if (!fs.existsSync(from)) {
             throw new FatalSandboxError(
@@ -527,6 +558,12 @@ export async function start_sandbox(
     if (config.allowedPaths) {
       for (const hostPath of config.allowedPaths) {
         if (hostPath && path.isAbsolute(hostPath) && fs.existsSync(hostPath)) {
+          if (isSensitiveHostPath(hostPath)) {
+            debugLogger.warn(
+              `Skipping sensitive path '${hostPath}' in config.allowedPaths`,
+            );
+            continue;
+          }
           const containerPath = getContainerPath(hostPath);
           debugLogger.log(
             `Config allowedPath: ${hostPath} -> ${containerPath} (ro)`,
@@ -1039,6 +1076,12 @@ async function start_lxc_sandbox(
     if (config.allowedPaths) {
       for (const hostPath of config.allowedPaths) {
         if (hostPath && path.isAbsolute(hostPath) && fs.existsSync(hostPath)) {
+          if (isSensitiveHostPath(hostPath)) {
+            debugLogger.warn(
+              `Skipping sensitive path '${hostPath}' in config.allowedPaths for LXC`,
+            );
+            continue;
+          }
           const allowedDeviceName = `gemini-allowed-${randomBytes(4).toString(
             'hex',
           )}`;
