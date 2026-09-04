@@ -33,7 +33,13 @@ export function clearSecurityCheckCacheForTesting(): void {
 
 function buildPowerShellAclScript(): string {
   return `
+    $ErrorActionPreference = 'Stop';
     $path = $env:GEMINI_TARGET_PATH;
+    if (-not $path) {
+        Write-Error "GEMINI_TARGET_PATH environment variable is not set";
+        exit 1;
+    }
+
     $acl = Get-Acl -LiteralPath $path;
 
     $trustedSids = @('S-1-5-32-544', 'S-1-5-18', 'S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464');
@@ -47,7 +53,8 @@ function buildPowerShellAclScript(): string {
                       ($ownerName -and ($trustedNames -contains $ownerName.ToLower()));
 
     if (-not $ownerIsTrusted -and ($ownerName -or $ownerSid)) {
-        Write-Output "InsecureOwner: $($ownerName)";
+        $ownerDisplay = if ($ownerName) { $ownerName } else { $ownerSid };
+        Write-Output "InsecureOwner: $ownerDisplay";
         exit 0;
     }
 
@@ -55,23 +62,17 @@ function buildPowerShellAclScript(): string {
         $_.AccessControlType -eq 'Allow' -and 
         (($_.FileSystemRights -match 'Write') -or ($_.FileSystemRights -match 'Modify') -or ($_.FileSystemRights -match 'FullControl')) 
     };
-    $insecureIdentity = $rules | Where-Object { 
-        $_.IdentityReference.Value -match 'Users' -or $_.IdentityReference.Value -eq 'Everyone' 
-    } | Select-Object -ExpandProperty IdentityReference;
-
-    if (-not $insecureIdentity) {
-        $insecureIdentity = $rules | Where-Object {
-            $rSid = '';
-            try { $rSid = $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value } catch {};
-            $rName = $_.IdentityReference.Value;
-            -not (
-                ($rSid -and ($trustedSids -contains $rSid)) -or
-                ($rName -and ($trustedNames -contains $rName.ToLower())) -or
-                ($rSid -eq 'S-1-3-0') -or
-                ($rName -eq 'CREATOR OWNER')
-            )
-        } | Select-Object -ExpandProperty IdentityReference;
-    }
+    $insecureIdentity = $rules | Where-Object {
+        $rSid = '';
+        try { $rSid = $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value } catch {};
+        $rName = $_.IdentityReference.Value;
+        -not (
+            ($rSid -and ($trustedSids -contains $rSid)) -or
+            ($rName -and ($trustedNames -contains $rName.ToLower())) -or
+            ($rSid -eq 'S-1-3-0') -or
+            ($rName -eq 'CREATOR OWNER')
+        )
+    } | Select-Object -ExpandProperty IdentityReference -Unique;
 
     Write-Output ($insecureIdentity -join ', ');
   `;
@@ -80,6 +81,7 @@ function buildPowerShellAclScript(): string {
 function evaluateWindowsSecurityOutput(
   stdout: string,
   targetPath: string,
+  pathType: 'Directory' | 'File' = 'Directory',
 ): SecurityCheckResult {
   const output = stdout.trim();
   if (!output) {
@@ -89,12 +91,12 @@ function evaluateWindowsSecurityOutput(
     const owner = output.replace('InsecureOwner:', '').trim();
     return {
       secure: false,
-      reason: `Path '${targetPath}' is insecure. Owner is untrusted: ${owner}. Only SYSTEM and Administrators may own system configuration paths.`,
+      reason: `${pathType} '${targetPath}' is insecure. Owner is untrusted: ${owner}. Only SYSTEM and Administrators may own system configuration paths.`,
     };
   }
   return {
     secure: false,
-    reason: `Directory '${targetPath}' is insecure. The following user groups have write permissions: ${output}. To fix this, remove Write and Modify permissions for these groups from the directory's ACLs.`,
+    reason: `${pathType} '${targetPath}' is insecure. The following user groups have write permissions: ${output}. To fix this, remove Write and Modify permissions for these groups from the ${pathType.toLowerCase()}'s ACLs.`,
   };
 }
 
@@ -128,27 +130,35 @@ function checkPosixStats(
 function validateSinglePathSync(targetPath: string): SecurityCheckResult {
   try {
     const stats = fsSync.statSync(targetPath);
+    const pathType = stats.isDirectory() ? 'Directory' : 'File';
 
     if (os.platform() === 'win32') {
       try {
         const script = buildPowerShellAclScript();
-        const { stdout, error, status } = spawnSync(
+        const { stdout, error, status, stderr } = spawnSync(
           'powershell',
           ['-NoProfile', '-NonInteractive', '-Command', script],
           {
             encoding: 'utf-8',
             env: { ...process.env, GEMINI_TARGET_PATH: targetPath },
+            timeout: 5000,
           },
         );
 
         if (error || (status !== null && status !== 0)) {
+          const detail =
+            error?.message || (stderr ? stderr.trim() : `exit code ${status}`);
           return {
             secure: false,
-            reason: `A security check for the system policy directory '${targetPath}' failed and could not be completed. Please file a bug report. Original error: ${error?.message || `exit code ${status}`}`,
+            reason: `A security check for the system policy directory '${targetPath}' failed and could not be completed. Please file a bug report. Original error: ${detail}`,
           };
         }
 
-        return evaluateWindowsSecurityOutput(stdout || '', targetPath);
+        return evaluateWindowsSecurityOutput(
+          stdout || '',
+          targetPath,
+          pathType,
+        );
       } catch (error) {
         return {
           secure: false,
@@ -164,7 +174,7 @@ function validateSinglePathSync(targetPath: string): SecurityCheckResult {
     }
     return {
       secure: false,
-      reason: `Failed to access directory: ${getErrorMessage(error)}`,
+      reason: `Failed to access path: ${getErrorMessage(error)}`,
     };
   }
 }
@@ -174,6 +184,7 @@ async function validateSinglePathAsync(
 ): Promise<SecurityCheckResult> {
   try {
     const stats = await fs.stat(targetPath);
+    const pathType = stats.isDirectory() ? 'Directory' : 'File';
 
     if (os.platform() === 'win32') {
       try {
@@ -183,9 +194,10 @@ async function validateSinglePathAsync(
           ['-NoProfile', '-NonInteractive', '-Command', script],
           {
             env: { ...process.env, GEMINI_TARGET_PATH: targetPath },
+            timeout: 5000,
           },
         );
-        return evaluateWindowsSecurityOutput(stdout, targetPath);
+        return evaluateWindowsSecurityOutput(stdout, targetPath, pathType);
       } catch (error) {
         return {
           secure: false,
@@ -201,7 +213,7 @@ async function validateSinglePathAsync(
     }
     return {
       secure: false,
-      reason: `Failed to access directory: ${getErrorMessage(error)}`,
+      reason: `Failed to access path: ${getErrorMessage(error)}`,
     };
   }
 }
@@ -228,7 +240,7 @@ export function isPathSecureSync(targetPath: string): SecurityCheckResult {
     const pathHelper = os.platform() === 'win32' ? path.win32 : path;
     const parentDir = pathHelper.dirname(targetPath);
     if (parentDir && parentDir !== targetPath) {
-      const parentCheck = validateSinglePathSync(parentDir);
+      const parentCheck = isPathSecureSync(parentDir);
       if (!parentCheck.secure) {
         return parentCheck;
       }
@@ -265,7 +277,7 @@ export async function isPathSecure(
   const pathHelper = os.platform() === 'win32' ? path.win32 : path;
   const parentDir = pathHelper.dirname(targetPath);
   if (parentDir && parentDir !== targetPath) {
-    const parentCheck = await validateSinglePathAsync(parentDir);
+    const parentCheck = await isPathSecure(parentDir);
     if (!parentCheck.secure) {
       securityCheckCache.set(targetPath, parentCheck);
       return parentCheck;

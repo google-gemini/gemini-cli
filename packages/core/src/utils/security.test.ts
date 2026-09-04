@@ -52,6 +52,7 @@ describe('isDirectorySecure', () => {
       expect.arrayContaining(['-Command', expect.stringContaining('Get-Acl')]),
       expect.objectContaining({
         env: expect.objectContaining({ GEMINI_TARGET_PATH: 'C:\\Some\\Path' }),
+        timeout: 5000,
       }),
     );
   });
@@ -284,7 +285,9 @@ describe('isPathSecureSync', () => {
       'C:\\ProgramData\\gemini-cli\\system-defaults.json',
     );
     expect(result.secure).toBe(false);
-    expect(result.reason).toContain('Owner is untrusted: COMPUTER\\Attacker');
+    expect(result.reason).toBe(
+      "File 'C:\\ProgramData\\gemini-cli\\system-defaults.json' is insecure. Owner is untrusted: COMPUTER\\Attacker. Only SYSTEM and Administrators may own system configuration paths.",
+    );
     expect(spawnSync).toHaveBeenCalledWith(
       'powershell',
       expect.anything(),
@@ -293,6 +296,7 @@ describe('isPathSecureSync', () => {
           GEMINI_TARGET_PATH:
             'C:\\ProgramData\\gemini-cli\\system-defaults.json',
         }),
+        timeout: 5000,
       }),
     );
   });
@@ -330,7 +334,62 @@ describe('isPathSecureSync', () => {
       'C:\\ProgramData\\gemini-cli\\system-defaults.json',
     );
     expect(result.secure).toBe(false);
-    expect(result.reason).toContain('BUILTIN\\Users');
+    expect(result.reason).toBe(
+      "File 'C:\\ProgramData\\gemini-cli\\system-defaults.json' is insecure. The following user groups have write permissions: BUILTIN\\Users. To fix this, remove Write and Modify permissions for these groups from the file's ACLs.",
+    );
+  });
+
+  it('recursively validates parent directories on Windows and leverages cache', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('win32');
+    vi.mocked(fsSync.statSync).mockReturnValue({
+      isDirectory: () => false,
+    } as unknown as Stats);
+    vi.mocked(spawnSync).mockReturnValue({
+      stdout: '',
+      stderr: '',
+      status: 0,
+      pid: 1,
+      output: [],
+      signal: null,
+    });
+
+    const result1 = isPathSecureSync(
+      'C:\\ProgramData\\gemini-cli\\system-defaults.json',
+    );
+    expect(result1.secure).toBe(true);
+
+    const initialSpawnCount = vi.mocked(spawnSync).mock.calls.length;
+
+    // Second file in the same directory: parent directory C:\ProgramData\gemini-cli and ancestors should be cached
+    const result2 = isPathSecureSync(
+      'C:\\ProgramData\\gemini-cli\\settings.json',
+    );
+    expect(result2.secure).toBe(true);
+
+    // Only 1 additional spawn for settings.json itself, none for the already cached parent hierarchy
+    expect(vi.mocked(spawnSync).mock.calls.length).toBe(initialSpawnCount + 1);
+  });
+
+  it('returns secure=false on Windows if spawnSync times out or fails', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('win32');
+    vi.mocked(fsSync.statSync).mockReturnValue({
+      isDirectory: () => false,
+    } as unknown as Stats);
+    vi.mocked(spawnSync).mockReturnValue({
+      stdout: '',
+      stderr: 'The process timed out',
+      status: 1,
+      pid: 1,
+      output: [],
+      signal: null,
+      error: new Error('spawnSync powershell ETIMEDOUT'),
+    });
+
+    const result = isPathSecureSync(
+      'C:\\ProgramData\\gemini-cli\\system-defaults.json',
+    );
+    expect(result.secure).toBe(false);
+    expect(result.reason).toContain('ETIMEDOUT');
   });
 
   it('validates parent directory for files on POSIX and fails if parent is insecure', () => {
@@ -416,7 +475,64 @@ describe('isPathSecure', () => {
       'C:\\ProgramData\\gemini-cli\\system-defaults.json',
     );
     expect(result.secure).toBe(false);
-    expect(result.reason).toContain('Owner is untrusted: COMPUTER\\Attacker');
+    expect(result.reason).toBe(
+      "File 'C:\\ProgramData\\gemini-cli\\system-defaults.json' is insecure. Owner is untrusted: COMPUTER\\Attacker. Only SYSTEM and Administrators may own system configuration paths.",
+    );
+    expect(spawnAsync).toHaveBeenCalledWith(
+      'powershell',
+      expect.anything(),
+      expect.objectContaining({
+        env: expect.objectContaining({
+          GEMINI_TARGET_PATH:
+            'C:\\ProgramData\\gemini-cli\\system-defaults.json',
+        }),
+        timeout: 5000,
+      }),
+    );
+  });
+
+  it('returns secure=false on Windows if localized non-English group has write permissions', async () => {
+    vi.spyOn(os, 'platform').mockReturnValue('win32');
+    vi.mocked(fs.stat).mockResolvedValue({
+      isDirectory: () => false,
+    } as unknown as Stats);
+    vi.mocked(spawnAsync).mockResolvedValue({
+      stdout: 'VORDEFINIERT\\Benutzer\n',
+      stderr: '',
+    });
+
+    const result = await isPathSecure(
+      'C:\\ProgramData\\gemini-cli\\system-defaults.json',
+    );
+    expect(result.secure).toBe(false);
+    expect(result.reason).toContain('VORDEFINIERT\\Benutzer');
+  });
+
+  it('recursively validates parent directories on Windows and leverages cache in isPathSecure', async () => {
+    vi.spyOn(os, 'platform').mockReturnValue('win32');
+    vi.mocked(fs.stat).mockResolvedValue({
+      isDirectory: () => false,
+    } as unknown as Stats);
+    vi.mocked(spawnAsync).mockResolvedValue({
+      stdout: '',
+      stderr: '',
+    });
+
+    const result1 = await isPathSecure(
+      'C:\\ProgramData\\gemini-cli\\system-defaults.json',
+    );
+    expect(result1.secure).toBe(true);
+
+    const initialSpawnCount = vi.mocked(spawnAsync).mock.calls.length;
+
+    // Second file in the same directory: parent directory C:\ProgramData\gemini-cli and ancestors should be cached
+    const result2 = await isPathSecure(
+      'C:\\ProgramData\\gemini-cli\\settings.json',
+    );
+    expect(result2.secure).toBe(true);
+
+    // Only 1 additional spawn for settings.json itself, none for the already cached parent hierarchy
+    expect(vi.mocked(spawnAsync).mock.calls.length).toBe(initialSpawnCount + 1);
   });
 
   it('returns secure=false on POSIX in isPathSecure if parent directory is insecure', async () => {
