@@ -3261,6 +3261,12 @@ describe('AppContainer State Management', () => {
 
       // Should be reset
       expect(capturedUIState.constrainHeight).toBe(true);
+      expect(mocks.mockStdout.write).toHaveBeenCalledWith(
+        ansiEscapes.eraseScreen + ansiEscapes.cursorTo(0, 0),
+      );
+      expect(mocks.mockStdout.write).not.toHaveBeenCalledWith(
+        ansiEscapes.clearTerminal,
+      );
       unmount();
     });
 
@@ -3295,7 +3301,10 @@ describe('AppContainer State Management', () => {
 
       // Should be reset
       expect(capturedUIState.constrainHeight).toBe(true);
-      // Should NOT refresh static's clearTerminal in alternate buffer
+      // Should NOT refresh static in alternate buffer
+      expect(mocks.mockStdout.write).not.toHaveBeenCalledWith(
+        ansiEscapes.eraseScreen + ansiEscapes.cursorTo(0, 0),
+      );
       expect(mocks.mockStdout.write).not.toHaveBeenCalledWith(
         ansiEscapes.clearTerminal,
       );
