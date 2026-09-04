@@ -22,7 +22,7 @@ export function createExtension({
   name = 'my-extension',
   version = '1.0.0',
   addContextFile = false,
-  contextFileName = undefined as string | undefined,
+  contextFileName = undefined as string | string[] | undefined,
   mcpServers = {} as Record<string, MCPServerConfig>,
   installMetadata = undefined as ExtensionInstallMetadata | undefined,
   settings = undefined as ExtensionSetting[] | undefined,
@@ -47,7 +47,20 @@ export function createExtension({
   }
 
   if (contextFileName) {
-    fs.writeFileSync(path.join(extDir, contextFileName), 'context');
+    const files = Array.isArray(contextFileName)
+      ? contextFileName
+      : [contextFileName];
+    for (const f of files) {
+      if (typeof f === 'string') {
+        try {
+          const filePath = path.join(extDir, f);
+          fs.mkdirSync(path.dirname(filePath), { recursive: true });
+          fs.writeFileSync(filePath, 'context');
+        } catch {
+          // Ignore errors for invalid paths in tests
+        }
+      }
+    }
   }
 
   if (installMetadata) {
