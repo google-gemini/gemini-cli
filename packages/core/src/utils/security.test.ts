@@ -1304,6 +1304,8 @@ describe('isFileAndDirectorySecureSync', () => {
     expect(scriptArg).toContain('CREATOR GROUP');
     expect(scriptArg).toContain('S-1-3-0');
     expect(scriptArg).toContain('S-1-3-1');
+    expect(scriptArg).toContain('$rule = $_;');
+    expect(scriptArg).toContain('$rule.IdentityReference.Value');
   });
 
   it('strips Windows extended path prefix \\\\?\\ when resolving paths and canonicalising', () => {

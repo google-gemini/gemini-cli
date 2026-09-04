@@ -131,9 +131,10 @@ function buildWindowsAclScript(paths: string[]): string {
           ($_.FileSystemRights -match 'Write|Modify|FullControl|CreateFiles|AppendData|CreateDirectories|Delete|TakeOwnership|ChangePermissions')
       };
       $insecureIdentity = $rules | Where-Object {
+          $rule = $_;
           $isTrustedWriter = $false;
           try {
-              $sid = $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value;
+              $sid = $rule.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value;
               $isTrustedWriter = (
                   $sid -eq 'S-1-5-32-544' -or
                   $sid -eq 'S-1-5-18' -or
@@ -142,7 +143,7 @@ function buildWindowsAclScript(paths: string[]): string {
                   $sid -eq 'S-1-3-1'
               );
           } catch {
-              $id = $_.IdentityReference.Value;
+              $id = $rule.IdentityReference.Value;
               $isTrustedWriter = (
                   ($id -like '*\\Administrators' -or $id -eq 'Administrators') -or
                   ($id -like '*\\SYSTEM' -or $id -eq 'SYSTEM') -or
