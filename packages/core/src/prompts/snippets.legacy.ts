@@ -96,6 +96,7 @@ export interface FinalReminderOptions {
 }
 
 export interface PlanningWorkflowOptions {
+  interactive: boolean;
   planModeToolsList: string;
   plansDir: string;
   approvedPlanPath?: string;
@@ -454,12 +455,20 @@ ${options.planModeToolsList}
 
 ## Workflow Phases
 
-**IMPORTANT: Complete ONE phase at a time. Do NOT skip ahead or combine phases. Wait for user input before proceeding to the next phase.**
+${
+  options.interactive
+    ? '**IMPORTANT: Complete ONE phase at a time. Do NOT skip ahead or combine phases. Wait for user input before proceeding to the next phase.**'
+    : '**IMPORTANT: Complete ONE phase at a time. Do NOT skip ahead or combine phases. No user is available to consult in this non-interactive session, so proceed directly to the next phase using your best judgement instead of waiting for input.**'
+}
 
 ### Phase 1: Requirements Understanding
 - Analyze the user's request to identify core requirements and constraints
-- If critical information is missing or ambiguous, ask clarifying questions using the \`${ASK_USER_TOOL_NAME}\` tool
-- When using \`${ASK_USER_TOOL_NAME}\`, prefer providing multiple-choice options for the user to select from when possible
+${
+  options.interactive
+    ? `- If critical information is missing or ambiguous, ask clarifying questions using the \`${ASK_USER_TOOL_NAME}\` tool
+- When using \`${ASK_USER_TOOL_NAME}\`, prefer providing multiple-choice options for the user to select from when possible`
+    : '- If critical information is missing or ambiguous, make reasonable assumptions based on the codebase and conventions instead of asking, since no user is available to consult'
+}
 - Do NOT explore the project or create a plan yet
 
 ### Phase 2: Project Exploration

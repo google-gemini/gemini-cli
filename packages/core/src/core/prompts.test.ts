@@ -546,6 +546,16 @@ describe('Core System Prompt (prompts.ts)', () => {
       );
     };
 
+    const setupPlanModeLegacy = () => {
+      vi.mocked(mockConfig.getActiveModel).mockReturnValue(
+        DEFAULT_GEMINI_MODEL,
+      );
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
+      vi.mocked(mockConfig.toolRegistry.getAllTools).mockReturnValue(
+        planModeTools,
+      );
+    };
+
     it('should include PLAN mode instructions', () => {
       setupPlanMode();
       const prompt = getCoreSystemPrompt(mockConfig);
@@ -559,6 +569,46 @@ describe('Core System Prompt (prompts.ts)', () => {
         '`mcp_nonreadonly-server_write_data` (nonreadonly-server)',
       );
       expect(prompt).toMatchSnapshot();
+    });
+
+    it('should not tell the agent to wait for user feedback in non-interactive PLAN mode', () => {
+      setupPlanMode();
+      vi.mocked(mockConfig.isInteractive).mockReturnValue(false);
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).not.toContain('STOP and wait');
+      expect(prompt).not.toContain('MUST wait for user feedback');
+      expect(prompt).toContain(
+        'proceed directly to Step 3 (Draft) without waiting for feedback',
+      );
+    });
+
+    it('should tell the agent to wait for user feedback in interactive PLAN mode', () => {
+      setupPlanMode();
+      vi.mocked(mockConfig.isInteractive).mockReturnValue(true);
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).toContain('STOP and wait');
+      expect(prompt).toContain('MUST wait for user feedback');
+    });
+
+    it('should not tell the agent to wait for user input in non-interactive PLAN mode (legacy prompt)', () => {
+      setupPlanModeLegacy();
+      vi.mocked(mockConfig.isInteractive).mockReturnValue(false);
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).not.toContain(
+        'Wait for user input before proceeding to the next phase',
+      );
+      expect(prompt).toContain(
+        'proceed directly to the next phase using your best judgement',
+      );
+    });
+
+    it('should tell the agent to wait for user input in interactive PLAN mode (legacy prompt)', () => {
+      setupPlanModeLegacy();
+      vi.mocked(mockConfig.isInteractive).mockReturnValue(true);
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).toContain(
+        'Wait for user input before proceeding to the next phase',
+      );
     });
 
     it('should NOT include approval mode instructions for DEFAULT mode', () => {
