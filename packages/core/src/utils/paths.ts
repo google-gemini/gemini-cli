@@ -36,15 +36,33 @@ export function tmpdir(): string {
 
 /**
  * Replaces the home directory with a tilde.
- * @param path - The path to tildeify.
+ * @param filePath - The path to tildeify.
  * @returns The tildeified path.
  */
-export function tildeifyPath(path: string): string {
+export function tildeifyPath(filePath: string): string {
   const homeDir = homedir();
-  if (path.startsWith(homeDir)) {
-    return path.replace(homeDir, '~');
+  const pathModule = process.platform === 'win32' ? path.win32 : path.posix;
+  const relativePath = pathModule.relative(homeDir, filePath);
+  const isWithinHome =
+    relativePath === '' ||
+    (relativePath !== '..' &&
+      !relativePath.startsWith(`..${pathModule.sep}`) &&
+      !pathModule.isAbsolute(relativePath));
+
+  if (!isWithinHome) {
+    return filePath;
   }
-  return path;
+
+  if (relativePath === '') {
+    return '~';
+  }
+
+  const originalSuffix = filePath.slice(homeDir.length);
+  if (originalSuffix.startsWith('/') || originalSuffix.startsWith('\\')) {
+    return `~${originalSuffix}`;
+  }
+
+  return `~${pathModule.sep}${relativePath}`;
 }
 
 /**

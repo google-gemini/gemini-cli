@@ -21,6 +21,7 @@ import {
   toPathKey,
   isTrustedSystemPath,
   resolveDefensiveToolPath,
+  tildeifyPath,
 } from './paths.js';
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -41,6 +42,57 @@ const mockPlatform = (platform: string) => {
     }),
   );
 };
+
+describe('tildeifyPath', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  describe('on POSIX', () => {
+    beforeEach(() => {
+      mockPlatform('linux');
+      vi.stubEnv('GEMINI_CLI_HOME', '/Users/al');
+    });
+
+    it('should replace the exact home directory with a tilde', () => {
+      expect(tildeifyPath('/Users/al')).toBe('~');
+    });
+
+    it('should replace the home directory prefix for a descendant', () => {
+      expect(tildeifyPath('/Users/al/Documents/app')).toBe('~/Documents/app');
+    });
+
+    it('should not replace a sibling directory with the same prefix', () => {
+      expect(tildeifyPath('/Users/albert/Documents/app')).toBe(
+        '/Users/albert/Documents/app',
+      );
+    });
+  });
+
+  describe('on Windows', () => {
+    beforeEach(() => {
+      mockPlatform('win32');
+      vi.stubEnv('GEMINI_CLI_HOME', 'C:\\Users\\Al');
+    });
+
+    it('should replace the home directory prefix with native separators', () => {
+      expect(tildeifyPath('C:\\Users\\Al\\Documents\\app')).toBe(
+        '~\\Documents\\app',
+      );
+    });
+
+    it('should replace the home directory prefix with forward slashes', () => {
+      expect(tildeifyPath('C:/Users/Al/Documents/app')).toBe('~/Documents/app');
+    });
+
+    it('should not replace a sibling directory with the same prefix', () => {
+      expect(tildeifyPath('C:\\Users\\Albert\\Documents\\app')).toBe(
+        'C:\\Users\\Albert\\Documents\\app',
+      );
+    });
+  });
+});
 
 describe('escapePath', () => {
   afterEach(() => vi.unstubAllGlobals());
