@@ -455,4 +455,49 @@ describe('Storage - System Paths', () => {
       expect(result).toBe('/etc/gemini-cli/policies');
     }
   });
+
+  describe('Storage - Sandbox Isolation', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('identifies sandbox mode when SANDBOX environment variable is set', () => {
+      vi.stubEnv('SANDBOX', '');
+      expect(Storage.isSandbox()).toBe(false);
+      expect(Storage.getGlobalRuntimeDir()).toBe(Storage.getGlobalGeminiDir());
+      expect(Storage.getGoogleAccountsPath()).toBe(
+        path.join(Storage.getGlobalGeminiDir(), 'google_accounts.json'),
+      );
+      expect(Storage.getMcpOAuthTokensPath()).toBe(
+        path.join(Storage.getGlobalGeminiDir(), 'mcp-oauth-tokens.json'),
+      );
+      expect(Storage.getA2AOAuthTokensPath()).toBe(
+        path.join(Storage.getGlobalGeminiDir(), 'a2a-oauth-tokens.json'),
+      );
+      expect(Storage.getTrustedFoldersPath()).toBe(
+        path.join(Storage.getGlobalGeminiDir(), 'trustedFolders.json'),
+      );
+
+      vi.stubEnv('SANDBOX', 'docker');
+      expect(Storage.isSandbox()).toBe(true);
+      expect(Storage.getGlobalRuntimeDir()).toBe(
+        path.join(os.tmpdir(), '.gemini'),
+      );
+      expect(Storage.getGlobalTempDir()).toBe(
+        path.join(os.tmpdir(), '.gemini', 'tmp'),
+      );
+      expect(Storage.getGoogleAccountsPath()).toBe(
+        path.join(os.tmpdir(), '.gemini', 'google_accounts.json'),
+      );
+      expect(Storage.getMcpOAuthTokensPath()).toBe(
+        path.join(os.tmpdir(), '.gemini', 'mcp-oauth-tokens.json'),
+      );
+      expect(Storage.getA2AOAuthTokensPath()).toBe(
+        path.join(os.tmpdir(), '.gemini', 'a2a-oauth-tokens.json'),
+      );
+      expect(Storage.getTrustedFoldersPath()).toBe(
+        path.join(os.tmpdir(), '.gemini', 'trustedFolders.json'),
+      );
+    });
+  });
 });

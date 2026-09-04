@@ -61,7 +61,6 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
     (subpath (param "TARGET_DIR"))
     (subpath (param "TMP_DIR"))
     (subpath (param "CACHE_DIR"))
-    (subpath (string-append (param "HOME_DIR") "/.gemini"))
     (subpath (string-append (param "HOME_DIR") "/.npm"))
     (subpath (string-append (param "HOME_DIR") "/.cache"))
     (subpath (param "INCLUDE_DIR_0"))
@@ -140,6 +139,24 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
 (deny ipc-posix-shm*
     (ipc-posix-name-prefix "docker")
     (ipc-posix-name-prefix "com.docker.")
+)
+(deny file-write*
+    (subpath (string-append (param "HOME_DIR") "/.gemini"))
+)
+(deny file-read*
+    (literal (string-append (param "HOME_DIR") "/.gemini/oauth_creds.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/gemini-credentials.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/mcp-oauth-tokens.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/a2a-oauth-tokens.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/google_accounts.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/trusted_hooks.json"))
+    (regex #"/oauth_creds\\.json$")
+    (regex #"/gemini-credentials\\.json$")
+    (regex #"/mcp-oauth-tokens\\.json$")
+    (regex #"/a2a-oauth-tokens\\.json$")
+    (regex #"/google_accounts\\.json$")
+    (regex #"/trusted_hooks\\.json$")
+    (regex #"/\\.env($|\\..*)")
 )`,
 
   'permissive-proxied': `(version 1)
@@ -198,7 +215,6 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
     (subpath (param "TARGET_DIR"))
     (subpath (param "TMP_DIR"))
     (subpath (param "CACHE_DIR"))
-    (subpath (string-append (param "HOME_DIR") "/.gemini"))
     (subpath (string-append (param "HOME_DIR") "/.npm"))
     (subpath (string-append (param "HOME_DIR") "/.cache"))
     (subpath (param "INCLUDE_DIR_0"))
@@ -277,6 +293,24 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
 (deny ipc-posix-shm*
     (ipc-posix-name-prefix "docker")
     (ipc-posix-name-prefix "com.docker.")
+)
+(deny file-write*
+    (subpath (string-append (param "HOME_DIR") "/.gemini"))
+)
+(deny file-read*
+    (literal (string-append (param "HOME_DIR") "/.gemini/oauth_creds.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/gemini-credentials.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/mcp-oauth-tokens.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/a2a-oauth-tokens.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/google_accounts.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/trusted_hooks.json"))
+    (regex #"/oauth_creds\\.json$")
+    (regex #"/gemini-credentials\\.json$")
+    (regex #"/mcp-oauth-tokens\\.json$")
+    (regex #"/a2a-oauth-tokens\\.json$")
+    (regex #"/google_accounts\\.json$")
+    (regex #"/trusted_hooks\\.json$")
+    (regex #"/\\.env($|\\..*)")
 )`,
 
   'restrictive-open': `(version 1)
@@ -335,7 +369,6 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
     (subpath (param "TARGET_DIR"))
     (subpath (param "TMP_DIR"))
     (subpath (param "CACHE_DIR"))
-    (subpath (string-append (param "HOME_DIR") "/.gemini"))
     (subpath (string-append (param "HOME_DIR") "/.npm"))
     (subpath (string-append (param "HOME_DIR") "/.cache"))
     (subpath (param "INCLUDE_DIR_0"))
@@ -391,6 +424,24 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
 (deny ipc-posix-shm*
     (ipc-posix-name-prefix "docker")
     (ipc-posix-name-prefix "com.docker.")
+)
+(deny file-write*
+    (subpath (string-append (param "HOME_DIR") "/.gemini"))
+)
+(deny file-read*
+    (literal (string-append (param "HOME_DIR") "/.gemini/oauth_creds.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/gemini-credentials.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/mcp-oauth-tokens.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/a2a-oauth-tokens.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/google_accounts.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/trusted_hooks.json"))
+    (regex #"/oauth_creds\\.json$")
+    (regex #"/gemini-credentials\\.json$")
+    (regex #"/mcp-oauth-tokens\\.json$")
+    (regex #"/a2a-oauth-tokens\\.json$")
+    (regex #"/google_accounts\\.json$")
+    (regex #"/trusted_hooks\\.json$")
+    (regex #"/\\.env($|\\..*)")
 )`,
 
   'restrictive-proxied': `(version 1)
@@ -449,7 +500,6 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
     (subpath (param "TARGET_DIR"))
     (subpath (param "TMP_DIR"))
     (subpath (param "CACHE_DIR"))
-    (subpath (string-append (param "HOME_DIR") "/.gemini"))
     (subpath (string-append (param "HOME_DIR") "/.npm"))
     (subpath (string-append (param "HOME_DIR") "/.cache"))
     (subpath (param "INCLUDE_DIR_0"))
@@ -505,6 +555,24 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
 (deny ipc-posix-shm*
     (ipc-posix-name-prefix "docker")
     (ipc-posix-name-prefix "com.docker.")
+)
+(deny file-write*
+    (subpath (string-append (param "HOME_DIR") "/.gemini"))
+)
+(deny file-read*
+    (literal (string-append (param "HOME_DIR") "/.gemini/oauth_creds.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/gemini-credentials.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/mcp-oauth-tokens.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/a2a-oauth-tokens.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/google_accounts.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/trusted_hooks.json"))
+    (regex #"/oauth_creds\\.json$")
+    (regex #"/gemini-credentials\\.json$")
+    (regex #"/mcp-oauth-tokens\\.json$")
+    (regex #"/a2a-oauth-tokens\\.json$")
+    (regex #"/google_accounts\\.json$")
+    (regex #"/trusted_hooks\\.json$")
+    (regex #"/\\.env($|\\..*)")
 )`,
 
   'strict-open': `(version 1)
@@ -592,7 +660,6 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
     (subpath (param "TARGET_DIR"))
     (subpath (param "TMP_DIR"))
     (subpath (param "CACHE_DIR"))
-    (subpath (string-append (param "HOME_DIR") "/.gemini"))
     (subpath (string-append (param "HOME_DIR") "/.npm"))
     (subpath (string-append (param "HOME_DIR") "/.cache"))
     (subpath (param "INCLUDE_DIR_0"))
@@ -648,6 +715,24 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
 (deny ipc-posix-shm*
     (ipc-posix-name-prefix "docker")
     (ipc-posix-name-prefix "com.docker.")
+)
+(deny file-write*
+    (subpath (string-append (param "HOME_DIR") "/.gemini"))
+)
+(deny file-read*
+    (literal (string-append (param "HOME_DIR") "/.gemini/oauth_creds.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/gemini-credentials.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/mcp-oauth-tokens.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/a2a-oauth-tokens.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/google_accounts.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/trusted_hooks.json"))
+    (regex #"/oauth_creds\\.json$")
+    (regex #"/gemini-credentials\\.json$")
+    (regex #"/mcp-oauth-tokens\\.json$")
+    (regex #"/a2a-oauth-tokens\\.json$")
+    (regex #"/google_accounts\\.json$")
+    (regex #"/trusted_hooks\\.json$")
+    (regex #"/\\.env($|\\..*)")
 )`,
 
   'strict-proxied': `(version 1)
@@ -735,7 +820,6 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
     (subpath (param "TARGET_DIR"))
     (subpath (param "TMP_DIR"))
     (subpath (param "CACHE_DIR"))
-    (subpath (string-append (param "HOME_DIR") "/.gemini"))
     (subpath (string-append (param "HOME_DIR") "/.npm"))
     (subpath (string-append (param "HOME_DIR") "/.cache"))
     (subpath (param "INCLUDE_DIR_0"))
@@ -791,6 +875,24 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
 (deny ipc-posix-shm*
     (ipc-posix-name-prefix "docker")
     (ipc-posix-name-prefix "com.docker.")
+)
+(deny file-write*
+    (subpath (string-append (param "HOME_DIR") "/.gemini"))
+)
+(deny file-read*
+    (literal (string-append (param "HOME_DIR") "/.gemini/oauth_creds.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/gemini-credentials.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/mcp-oauth-tokens.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/a2a-oauth-tokens.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/google_accounts.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/trusted_hooks.json"))
+    (regex #"/oauth_creds\\.json$")
+    (regex #"/gemini-credentials\\.json$")
+    (regex #"/mcp-oauth-tokens\\.json$")
+    (regex #"/a2a-oauth-tokens\\.json$")
+    (regex #"/google_accounts\\.json$")
+    (regex #"/trusted_hooks\\.json$")
+    (regex #"/\\.env($|\\..*)")
 )`,
 };
 

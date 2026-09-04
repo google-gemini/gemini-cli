@@ -68,30 +68,49 @@ export class Storage {
   }
 
   static getMcpOAuthTokensPath(): string {
-    return path.join(Storage.getGlobalGeminiDir(), 'mcp-oauth-tokens.json');
+    return path.join(Storage.getGlobalRuntimeDir(), 'mcp-oauth-tokens.json');
   }
 
   static getA2AOAuthTokensPath(): string {
-    return path.join(Storage.getGlobalGeminiDir(), 'a2a-oauth-tokens.json');
+    return path.join(Storage.getGlobalRuntimeDir(), 'a2a-oauth-tokens.json');
   }
 
   static getGlobalSettingsPath(): string {
     return path.join(Storage.getGlobalGeminiDir(), 'settings.json');
   }
 
+  /**
+   * Returns whether the CLI is currently running in sandbox mode.
+   */
+  static isSandbox(): boolean {
+    return !!process.env['SANDBOX'];
+  }
+
+  /**
+   * Returns the directory for global runtime state (temp files, chat history, etc.).
+   * In sandbox mode, runtime operations are redirected to an ephemeral, isolated directory
+   * under os.tmpdir() to prevent accessing or mutating host user configuration.
+   */
+  static getGlobalRuntimeDir(): string {
+    if (Storage.isSandbox()) {
+      return path.join(os.tmpdir(), GEMINI_DIR);
+    }
+    return Storage.getGlobalGeminiDir();
+  }
+
   static getInstallationIdPath(): string {
-    return path.join(Storage.getGlobalGeminiDir(), 'installation_id');
+    return path.join(Storage.getGlobalRuntimeDir(), 'installation_id');
   }
 
   static getGoogleAccountsPath(): string {
-    return path.join(Storage.getGlobalGeminiDir(), GOOGLE_ACCOUNTS_FILENAME);
+    return path.join(Storage.getGlobalRuntimeDir(), GOOGLE_ACCOUNTS_FILENAME);
   }
 
   static getTrustedFoldersPath(): string {
     if (process.env['GEMINI_CLI_TRUSTED_FOLDERS_PATH']) {
       return process.env['GEMINI_CLI_TRUSTED_FOLDERS_PATH'];
     }
-    return path.join(Storage.getGlobalGeminiDir(), TRUSTED_FOLDERS_FILENAME);
+    return path.join(Storage.getGlobalRuntimeDir(), TRUSTED_FOLDERS_FILENAME);
   }
 
   static getUserCommandsDir(): string {
@@ -152,7 +171,7 @@ export class Storage {
   }
 
   static getGlobalTempDir(): string {
-    return path.join(Storage.getGlobalGeminiDir(), TMP_DIR_NAME);
+    return path.join(Storage.getGlobalRuntimeDir(), TMP_DIR_NAME);
   }
 
   static getGlobalBinDir(): string {
@@ -236,12 +255,12 @@ export class Storage {
       }
 
       const registryPath = path.join(
-        Storage.getGlobalGeminiDir(),
+        Storage.getGlobalRuntimeDir(),
         'projects.json',
       );
       const registry = new ProjectRegistry(registryPath, [
         Storage.getGlobalTempDir(),
-        path.join(Storage.getGlobalGeminiDir(), 'history'),
+        path.join(Storage.getGlobalRuntimeDir(), 'history'),
       ]);
       await registry.initialize();
 
@@ -266,7 +285,7 @@ export class Storage {
     await StorageMigration.migrateDirectory(oldTempDir, newTempDir);
 
     // Migrate History Dir
-    const historyDir = path.join(Storage.getGlobalGeminiDir(), 'history');
+    const historyDir = path.join(Storage.getGlobalRuntimeDir(), 'history');
     const newHistoryDir = path.join(historyDir, shortId);
     const oldHistoryDir = path.join(historyDir, oldHash);
     await StorageMigration.migrateDirectory(oldHistoryDir, newHistoryDir);
@@ -274,7 +293,7 @@ export class Storage {
 
   getHistoryDir(): string {
     const identifier = this.getProjectIdentifier();
-    const historyDir = path.join(Storage.getGlobalGeminiDir(), 'history');
+    const historyDir = path.join(Storage.getGlobalRuntimeDir(), 'history');
     return path.join(historyDir, identifier);
   }
 

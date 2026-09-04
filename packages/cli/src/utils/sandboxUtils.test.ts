@@ -6,14 +6,18 @@
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import os from 'node:os';
+import path from 'node:path';
 import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { resolveToRealPath } from '@google/gemini-cli-core';
 import {
   getContainerPath,
   parseImageName,
   ports,
   entrypoint,
   shouldUseCurrentUserInSandbox,
+  isSensitiveHostPath,
+  sanitizeSettingsForSandbox,
 } from './sandboxUtils.js';
 
 vi.mock('node:os');
@@ -25,6 +29,8 @@ vi.mock('@google/gemini-cli-core', () => ({
     warn: vi.fn(),
   },
   GEMINI_DIR: '.gemini',
+  homedir: vi.fn(() => os.homedir()),
+  resolveToRealPath: vi.fn((p: string) => path.resolve(p)),
 }));
 
 describe('sandboxUtils', () => {
@@ -236,6 +242,120 @@ describe('sandboxUtils', () => {
       delete process.env['SANDBOX_SET_UID_GID'];
       vi.mocked(os.platform).mockReturnValue('darwin');
       expect(await shouldUseCurrentUserInSandbox()).toBe(false);
+    });
+  });
+
+  describe('isSensitiveHostPath', () => {
+    it('should detect ~/.gemini directory path', () => {
+      vi.mocked(os.homedir).mockReturnValue('/home/testuser');
+      expect(isSensitiveHostPath('/home/testuser/.gemini')).toBe(true);
+      expect(isSensitiveHostPath('/home/testuser/.gemini/settings.json')).toBe(
+        true,
+      );
+      expect(isSensitiveHostPath('~/.gemini')).toBe(true);
+    });
+
+    it('should detect user home directory', () => {
+      vi.mocked(os.homedir).mockReturnValue('/home/testuser');
+      expect(isSensitiveHostPath('/home/testuser')).toBe(true);
+      expect(isSensitiveHostPath('~')).toBe(true);
+    });
+
+    it('should detect sensitive credential files', () => {
+      expect(isSensitiveHostPath('/any/path/oauth_creds.json')).toBe(true);
+      expect(isSensitiveHostPath('/any/path/gemini-credentials.json')).toBe(
+        true,
+      );
+      expect(isSensitiveHostPath('/any/path/mcp-oauth-tokens.json')).toBe(true);
+      expect(isSensitiveHostPath('/any/path/a2a-oauth-tokens.json')).toBe(true);
+    });
+
+    it('should detect environment files (.env)', () => {
+      expect(isSensitiveHostPath('/project/.env')).toBe(true);
+      expect(isSensitiveHostPath('/project/.env.local')).toBe(true);
+      expect(isSensitiveHostPath('/project/.env.production')).toBe(true);
+    });
+
+    it('should allow non-sensitive workspace and project paths', () => {
+      vi.mocked(os.homedir).mockReturnValue('/home/testuser');
+      expect(isSensitiveHostPath('/home/testuser/project')).toBe(false);
+      expect(isSensitiveHostPath('/workspace/app')).toBe(false);
+      expect(isSensitiveHostPath('/tmp/test-dir')).toBe(false);
+    });
+
+    it('should resolve symlinks to detect sensitive targets', () => {
+      vi.mocked(os.homedir).mockReturnValue('/home/testuser');
+      vi.mocked(resolveToRealPath).mockImplementation((p: string) => {
+        if (p === '/var/symlink_to_gemini') {
+          return '/home/testuser/.gemini';
+        }
+        if (p === '/var/symlink_to_home') {
+          return '/home/testuser';
+        }
+        return path.resolve(p);
+      });
+
+      expect(isSensitiveHostPath('/var/symlink_to_gemini')).toBe(true);
+      expect(isSensitiveHostPath('/var/symlink_to_home')).toBe(true);
+    });
+
+    it('should safely fall back when resolveToRealPath throws', () => {
+      vi.mocked(os.homedir).mockReturnValue('/home/testuser');
+      vi.mocked(resolveToRealPath).mockImplementation(() => {
+        throw new Error('Path does not exist');
+      });
+
+      expect(isSensitiveHostPath('/home/testuser/.gemini')).toBe(true);
+      expect(isSensitiveHostPath('/workspace/safe-path')).toBe(false);
+    });
+  });
+
+  describe('sanitizeSettingsForSandbox', () => {
+    it('should strip hooks and malicious execution commands', () => {
+      const rawSettings = {
+        theme: 'dark',
+        hooks: {
+          beforeCommand: 'evil-script.sh',
+        },
+        tools: {
+          allowed: ['read_file'],
+          callCommand: '/bin/bash',
+          discoveryCommand: '/bin/sh',
+        },
+        apiKey: 'secret-api-key',
+        geminiApiKey: 'secret-gemini-key',
+        googleApiKey: 'secret-google-key',
+        customConfig: {
+          nestedKey: 'safe-value',
+        },
+      };
+
+      const sanitized = sanitizeSettingsForSandbox(rawSettings);
+
+      expect(sanitized['hooks']).toBeUndefined();
+      expect(sanitized['apiKey']).toBeUndefined();
+      expect(sanitized['geminiApiKey']).toBeUndefined();
+      expect(sanitized['googleApiKey']).toBeUndefined();
+
+      const tools = sanitized['tools'] as Record<string, unknown>;
+      expect(tools['allowed']).toEqual(['read_file']);
+      expect(tools['callCommand']).toBeUndefined();
+      expect(tools['discoveryCommand']).toBeUndefined();
+
+      expect(sanitized['theme']).toBe('dark');
+      expect(
+        (sanitized['customConfig'] as Record<string, unknown>)['nestedKey'],
+      ).toBe('safe-value');
+    });
+
+    it('should not mutate the original settings object', () => {
+      const original = {
+        hooks: { test: true },
+        tools: { callCommand: 'run' },
+      };
+      const copy = JSON.parse(JSON.stringify(original));
+      sanitizeSettingsForSandbox(original);
+      expect(original).toEqual(copy);
     });
   });
 });
