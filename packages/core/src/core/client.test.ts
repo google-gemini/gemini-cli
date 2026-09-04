@@ -351,6 +351,34 @@ describe('Gemini Client (client.ts)', () => {
     });
   });
 
+  describe('initialize', () => {
+    it('passes resumed session data to startChat so recording reopens the existing file', async () => {
+      const resumedSessionData = {
+        conversation: {
+          sessionId: 'resumed-session-id',
+          projectHash: 'test-project-hash',
+          startTime: '2024-01-01T10:00:00.000Z',
+          lastUpdated: '2024-01-01T10:05:00.000Z',
+          messages: [],
+        },
+        filePath: '/test/temp/chats/session-2024-01-01T10-00-resumed-.jsonl',
+      } as unknown as Parameters<typeof client.initialize>[0];
+
+      const startChatSpy = vi.spyOn(client, 'startChat').mockResolvedValue({
+        getHistory: vi.fn().mockReturnValue([]),
+        getLastPromptTokenCount: vi.fn().mockReturnValue(0),
+      } as unknown as GeminiChat);
+
+      await client.initialize(resumedSessionData);
+
+      // Without the resumed data the recording service treats this as a
+      // brand new conversation and opens a second file under the same
+      // eight-character id suffix, which startup retention cleanup later
+      // expands back over the real conversation.
+      expect(startChatSpy).toHaveBeenCalledWith(undefined, resumedSessionData);
+    });
+  });
+
   describe('resumeChat', () => {
     it('should update telemetry token count when a chat is resumed', async () => {
       const history: Content[] = [

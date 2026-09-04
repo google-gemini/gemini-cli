@@ -11,6 +11,7 @@ import { inspect } from 'node:util';
 import process from 'node:process';
 import { z } from 'zod';
 import type { ConversationRecord } from '../services/chatRecordingService.js';
+import type { ResumedSessionData } from '../services/chatRecordingTypes.js';
 import type {
   AgentHistoryProviderConfig,
   ContextManagementConfig,
@@ -1438,17 +1439,19 @@ export class Config implements McpContext, AgentLoopContext {
    * Dedups initialization requests using a shared promise that is only resolved
    * once.
    */
-  async initialize(): Promise<void> {
+  async initialize(resumedSessionData?: ResumedSessionData): Promise<void> {
     if (this.initPromise) {
       return this.initPromise;
     }
 
-    this.initPromise = this._initialize();
+    this.initPromise = this._initialize(resumedSessionData);
 
     return this.initPromise;
   }
 
-  private async _initialize(): Promise<void> {
+  private async _initialize(
+    resumedSessionData?: ResumedSessionData,
+  ): Promise<void> {
     await this.storage.initialize();
     ragLogger.initialize(this.storage.getProjectTempLogsDir());
 
@@ -1560,7 +1563,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.memoryContextManager = new MemoryContextManager(this);
     await this.memoryContextManager.refresh();
 
-    await this._geminiClient.initialize();
+    await this._geminiClient.initialize(resumedSessionData);
     this.initialized = true;
   }
 
