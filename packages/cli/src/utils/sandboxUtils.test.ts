@@ -324,6 +324,19 @@ describe('sandboxUtils', () => {
       );
     });
 
+    it('should not false-positive on user scripts containing credential in filename', () => {
+      expect(
+        isCredentialOrSensitivePath(
+          '/home/user/.gemini/commands/setup-credentials.sh',
+        ),
+      ).toBe(false);
+      expect(
+        isCredentialOrSensitivePath(
+          '/home/user/.gemini/skills/credential-helper.js',
+        ),
+      ).toBe(false);
+    });
+
     it('should not filter out the root directory itself', () => {
       const rootDir = '/home/user/.gemini';
       expect(isCredentialOrSensitivePath(rootDir, rootDir)).toBe(false);

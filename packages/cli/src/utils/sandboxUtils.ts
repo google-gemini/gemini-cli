@@ -56,9 +56,10 @@ export function isCredentialOrSensitivePath(
   }
   if (
     base.endsWith('.credentials') ||
-    base.includes('tokens.json') ||
-    base.includes('creds.json') ||
-    base.includes('credential')
+    base.endsWith('credentials') ||
+    base.endsWith('credentials.json') ||
+    base.endsWith('tokens.json') ||
+    base.endsWith('creds.json')
   ) {
     return true;
   }
