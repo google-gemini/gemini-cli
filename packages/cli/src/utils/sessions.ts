@@ -22,7 +22,7 @@ export async function listSessions(config: Config): Promise<void> {
   await generateSummary(config);
 
   const sessionSelector = new SessionSelector(config.storage);
-  const sessions = await sessionSelector.listSessions();
+  const sessions = await sessionSelector.listSessions(config.getSessionId());
 
   if (sessions.length === 0) {
     writeToStdout('No previous sessions found for this project.');
@@ -56,7 +56,7 @@ export async function deleteSession(
   sessionIndex: string,
 ): Promise<void> {
   const sessionSelector = new SessionSelector(config.storage);
-  const sessions = await sessionSelector.listSessions();
+  const sessions = await sessionSelector.listSessions(config.getSessionId());
 
   if (sessions.length === 0) {
     writeToStderr('No sessions found for this project.');
