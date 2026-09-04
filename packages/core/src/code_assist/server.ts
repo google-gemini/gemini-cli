@@ -495,28 +495,41 @@ export class CodeAssistServer implements ContentGenerator {
       });
 
       let bufferedLines: string[] = [];
+      const flushBufferedLines = (): T | undefined => {
+        if (bufferedLines.length === 0) {
+          return undefined;
+        }
+        const chunk = bufferedLines.join('\n');
+        bufferedLines = [];
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          return JSON.parse(chunk) as T;
+        } catch {
+          if (server.config) {
+            logInvalidChunk(
+              server.config,
+              // Don't include the chunk content in the log for security/privacy reasons.
+              new InvalidChunkEvent('Malformed JSON chunk'),
+            );
+          }
+        }
+        return undefined;
+      };
+
       for await (const line of rl) {
         if (line.startsWith('data: ')) {
           bufferedLines.push(line.slice(6).trim());
         } else if (line === '') {
-          if (bufferedLines.length === 0) {
-            continue; // no data to yield
+          const chunk = flushBufferedLines();
+          if (chunk !== undefined) {
+            yield chunk;
           }
-          const chunk = bufferedLines.join('\n');
-          try {
-            yield JSON.parse(chunk);
-          } catch {
-            if (server.config) {
-              logInvalidChunk(
-                server.config,
-                // Don't include the chunk content in the log for security/privacy reasons.
-                new InvalidChunkEvent('Malformed JSON chunk'),
-              );
-            }
-          }
-          bufferedLines = []; // Reset the buffer after yielding
         }
         // Ignore other lines like comments or id fields
+      }
+      const finalChunk = flushBufferedLines();
+      if (finalChunk !== undefined) {
+        yield finalChunk;
       }
     })(this);
   }
