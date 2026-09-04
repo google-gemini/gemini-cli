@@ -290,6 +290,18 @@ describe('sandboxUtils', () => {
       expect(
         isCredentialOrSensitivePath('/home/user/.gemini/user_creds.json'),
       ).toBe(true);
+      expect(isCredentialOrSensitivePath('/home/user/.gemini/.env')).toBe(true);
+      expect(
+        isCredentialOrSensitivePath('/home/user/.gemini/private.key'),
+      ).toBe(true);
+      expect(isCredentialOrSensitivePath('/home/user/.gemini/cert.pem')).toBe(
+        true,
+      );
+      expect(
+        isCredentialOrSensitivePath(
+          '/home/user/.gemini/service-account-key.json',
+        ),
+      ).toBe(true);
       expect(isCredentialOrSensitivePath('/home/user/.gemini/history')).toBe(
         true,
       );

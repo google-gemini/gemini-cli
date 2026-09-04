@@ -62,7 +62,13 @@ export function isCredentialOrSensitivePath(
     base.endsWith('credentials') ||
     base.endsWith('credentials.json') ||
     base.endsWith('tokens.json') ||
-    base.endsWith('creds.json')
+    base.endsWith('creds.json') ||
+    base === '.env' ||
+    base.endsWith('.env') ||
+    base.endsWith('.key') ||
+    base.endsWith('.pem') ||
+    base.endsWith('.p12') ||
+    base.endsWith('key.json')
   ) {
     return true;
   }
