@@ -5,6 +5,9 @@ on:
     types:
       - 'opened'
 
+permissions:
+  issues: 'write'
+
 jobs:
   label-issue:
     runs-on: 'ubuntu-latest'
@@ -21,6 +24,7 @@ jobs:
         with:
           app-id: '${{ secrets.APP_ID }}'
           private-key: '${{ secrets.PRIVATE_KEY }}'
+          permission-issues: 'write'
 
       - name: 'Add need-triage label'
         uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'

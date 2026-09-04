@@ -5,6 +5,8 @@ on:
       - 'main'
     paths:
       - 'docs/**'
+permissions: {}
+
 jobs:
   trigger-rebuild:
     if: "github.repository == 'google-gemini/gemini-cli'"

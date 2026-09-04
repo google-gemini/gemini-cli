@@ -23,6 +23,9 @@ concurrency:
   cancel-in-progress: |-
     ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/') }}
 
+permissions:
+  contents: 'read'
+
 jobs:
   deflake_e2e_linux:
     name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
