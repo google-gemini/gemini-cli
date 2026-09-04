@@ -439,7 +439,7 @@ function robustRealpath(p: string, visited = new Set<string>()): string {
         ? fs.realpathSync.native
         : fs.realpathSync;
     let resolved = realpathFn(p);
-    if (process.platform === 'win32') {
+    if (process.platform === 'win32' && typeof resolved === 'string') {
       if (resolved.slice(0, 8).toUpperCase() === '\\\\?\\UNC\\') {
         resolved = '\\\\' + resolved.slice(8);
       } else if (resolved.startsWith('\\\\?\\')) {
