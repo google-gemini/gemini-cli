@@ -64,11 +64,10 @@ export class KeychainTokenStorage
 
   async deleteCredentials(serverName: string): Promise<void> {
     const sanitizedName = this.sanitizeServerName(serverName);
-    const deleted = await this.keychainService.deletePassword(sanitizedName);
-
-    if (!deleted) {
-      throw new Error(`No credentials found for ${serverName}`);
-    }
+    // Treat a missing credential as a successful no-op — deleting something
+    // that doesn't exist is idempotent and should not cause errors during
+    // re-auth flows that clear credentials before re-authenticating.
+    await this.keychainService.deletePassword(sanitizedName);
   }
 
   async listServers(): Promise<string[]> {
