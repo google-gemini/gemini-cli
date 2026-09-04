@@ -2,7 +2,8 @@
 name: docs-changelog
 description: >-
   Generates and formats changelog files for a new release based on provided
-  version and raw changelog data.
+  version and raw changelog data. For maintenance and troubleshooting help, see
+  references/changelog-automation.md.
 ---
 
 # Procedure: Updating Changelog for New Releases
