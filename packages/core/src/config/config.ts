@@ -184,6 +184,7 @@ import { validatePath } from '../utils/path-validator.js';
 import { InjectionService } from './injectionService.js';
 import { ExecutionLifecycleService } from '../services/executionLifecycleService.js';
 import { WORKSPACE_POLICY_TIER } from '../policy/config.js';
+import { isLegacyCommandScopedToolRef } from '../policy/legacy-tool-syntax.js';
 import { loadPoliciesFromToml } from '../policy/toml-loader.js';
 
 import { CheckerRunner } from '../safety/checker-runner.js';
@@ -2428,12 +2429,21 @@ export class Config implements McpContext, AgentLoopContext {
     allToolNames?: Set<string>,
   ): Set<string> | undefined {
     // Right now this is present for backward compatibility with settings.json exclude
-    const excludeToolsSet = new Set([...(this.excludeTools ?? [])]);
+    const excludeToolsSet = new Set<string>();
+    for (const tool of this.excludeTools ?? []) {
+      if (isLegacyCommandScopedToolRef(tool)) {
+        continue;
+      }
+      excludeToolsSet.add(tool);
+    }
     for (const extension of this.getExtensionLoader().getExtensions()) {
       if (!extension.isActive) {
         continue;
       }
       for (const tool of extension.excludeTools || []) {
+        if (isLegacyCommandScopedToolRef(tool)) {
+          continue;
+        }
         excludeToolsSet.add(tool);
       }
     }

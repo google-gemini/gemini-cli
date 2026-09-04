@@ -269,17 +269,20 @@ on the approved list.
 > **Deprecated:** Use the [Policy Engine](../reference/policy-engine.md) for
 > more robust control.
 
-Alternatively, you can add specific tools that are considered dangerous in your
-environment to a blocklist.
+Alternatively, you can deny dangerous commands with the
+[Policy Engine](../reference/policy-engine.md). Do not put `ShellTool(rm -rf)`
+or `run_shell_command(rm -rf)` in `tools.exclude` as if it were a command filter
+— that list matches whole tool names. Legacy parenthesized entries are converted
+into deny rules, but a policy file is the supported way to block a command.
 
-**Example:** Prevent the use of the shell tool for removing files.
+**Example:** Deny `rm -rf` via a policy rule:
 
-```json
-{
-  "tools": {
-    "exclude": ["ShellTool(rm -rf)"]
-  }
-}
+```toml
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "rm -rf"
+decision = "deny"
+priority = 100
 ```
 
 <!-- prettier-ignore -->

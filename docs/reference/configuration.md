@@ -1801,7 +1801,11 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`tools.exclude`** (array):
 
-  - **Description:** Tool names to exclude from discovery.
+  - **Description:** Tool names to exclude from discovery. Entries must be whole
+    tool names (for example `run_shell_command`). Parenthesized `toolName(args)`
+    values are not tool names; they are converted into command-level deny rules.
+    Prefer the [Policy Engine](policy-engine.md) for command restrictions.
+    Deprecated.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
