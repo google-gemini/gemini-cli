@@ -11,6 +11,7 @@ import * as path from 'node:path';
 import { SkillManager } from './skillManager.js';
 import { Storage } from '../config/storage.js';
 import { loadSkillsFromDir } from './skillLoader.js';
+import { coreEvents } from '../utils/events.js';
 
 vi.mock('./skillLoader.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./skillLoader.js')>();
@@ -174,5 +175,120 @@ describe('SkillManager Alias', () => {
     const skills = service.getSkills();
     expect(skills).toHaveLength(1);
     expect(skills[0].description).toBe('agent-desc');
+  });
+
+  describe('symlinked/junctioned alias directories', () => {
+    /**
+     * Creates `linkDir` as a link pointing at `targetDir`. Returns true if the
+     * platform allowed creating the link (junctions on Windows do not require
+     * elevated privileges, symlinks elsewhere may).
+     */
+    async function tryCreateDirLink(
+      targetDir: string,
+      linkDir: string,
+    ): Promise<boolean> {
+      try {
+        if (process.platform === 'win32') {
+          await fs.symlink(targetDir, linkDir, 'junction');
+        } else {
+          await fs.symlink(targetDir, linkDir, 'dir');
+        }
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    it('should not report duplicate skills when .gemini is linked to .agents', async () => {
+      // Real layout from the issue: workspace/.agents/skills/<skill>/SKILL.md
+      // with workspace/.gemini created as a junction/symlink to .agents.
+      const agentsDir = path.join(testRootDir, 'workspace', '.agents');
+      const skillsDir = path.join(agentsDir, 'skills', 'my-skill');
+      await fs.mkdir(skillsDir, { recursive: true });
+      await fs.writeFile(
+        path.join(skillsDir, 'SKILL.md'),
+        '---\nname: my-skill\ndescription: A test skill\n---\nBody',
+      );
+
+      const geminiLink = path.join(testRootDir, 'workspace', '.gemini');
+      if (!(await tryCreateDirLink(agentsDir, geminiLink))) {
+        return; // Platform does not permit directory links; nothing to assert.
+      }
+
+      // Isolate discovery from any real user-level skills directories.
+      vi.spyOn(Storage, 'getUserSkillsDir').mockReturnValue(
+        path.join(testRootDir, 'user', '.gemini', 'skills'),
+      );
+      vi.spyOn(Storage, 'getUserAgentSkillsDir').mockReturnValue(
+        path.join(testRootDir, 'user', '.agents', 'skills'),
+      );
+
+      const storage = new Storage(path.join(testRootDir, 'workspace'));
+      const service = new SkillManager();
+      // @ts-expect-error accessing private method for testing
+      vi.spyOn(service, 'discoverBuiltinSkills').mockResolvedValue(undefined);
+
+      const feedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+
+      await service.discoverSkills(storage, [], true);
+
+      const skills = service.getSkills();
+      expect(
+        skills.filter((s) => s.name === 'my-skill' && !s.isBuiltin),
+      ).toHaveLength(1);
+
+      const conflictWarnings = feedbackSpy.mock.calls.filter(
+        ([type, message]) =>
+          type === 'warning' &&
+          typeof message === 'string' &&
+          message.includes('my-skill'),
+      );
+      expect(conflictWarnings).toHaveLength(0);
+    });
+
+    it('should scan aliased directories only once when they resolve to the same physical path', async () => {
+      // User-tier layout: ~/.agents/skills/<skill>/SKILL.md with ~/.gemini
+      // created as a junction/symlink to .agents.
+      const agentsDir = path.join(testRootDir, 'user', '.agents');
+      const skillsDir = path.join(agentsDir, 'skills', 'shared-skill');
+      await fs.mkdir(skillsDir, { recursive: true });
+      await fs.writeFile(
+        path.join(skillsDir, 'SKILL.md'),
+        '---\nname: shared-skill\ndescription: desc\n---\nBody',
+      );
+
+      const geminiLink = path.join(testRootDir, 'user', '.gemini');
+      if (!(await tryCreateDirLink(agentsDir, geminiLink))) {
+        return; // Platform does not permit directory links; nothing to assert.
+      }
+
+      vi.spyOn(Storage, 'getUserSkillsDir').mockReturnValue(
+        path.join(geminiLink, 'skills'),
+      );
+      vi.spyOn(Storage, 'getUserAgentSkillsDir').mockReturnValue(
+        path.join(agentsDir, 'skills'),
+      );
+
+      const storage = new Storage(path.join(testRootDir, 'workspace'));
+      const service = new SkillManager();
+      // @ts-expect-error accessing private method for testing
+      vi.spyOn(service, 'discoverBuiltinSkills').mockResolvedValue(undefined);
+
+      const feedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+
+      await service.discoverSkills(storage, [], true);
+
+      expect(
+        service.getSkills().filter((s) => s.name === 'shared-skill'),
+      ).toHaveLength(1);
+
+      const conflictWarnings = feedbackSpy.mock.calls.filter(
+        ([type, message]) =>
+          type === 'warning' &&
+          typeof message === 'string' &&
+          message.includes('shared-skill'),
+      );
+      expect(conflictWarnings).toHaveLength(0);
+    });
   });
 });
