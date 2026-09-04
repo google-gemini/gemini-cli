@@ -5,7 +5,7 @@
  */
 
 import { debugLogger } from '@google/gemini-cli-core';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 
 interface Logger {
   getPreviousUserMessages(): Promise<string[]>;
@@ -18,41 +18,51 @@ export interface UseInputHistoryStoreReturn {
 }
 
 /**
+ * Combine the current session (newest first) with the past session (newest
+ * first) into a single deduplicated history, returned oldest first.
+ */
+export function computeInputHistory(
+  currentSession: string[],
+  pastSession: string[],
+): string[] {
+  // Combine current session (newest first) + past session (newest first)
+  const combinedMessages = [...currentSession, ...pastSession];
+
+  // Deduplicate consecutive identical messages (same algorithm as before)
+  const deduplicatedMessages: string[] = [];
+  if (combinedMessages.length > 0) {
+    deduplicatedMessages.push(combinedMessages[0]); // Add the newest one unconditionally
+    for (let i = 1; i < combinedMessages.length; i++) {
+      if (combinedMessages[i] !== combinedMessages[i - 1]) {
+        deduplicatedMessages.push(combinedMessages[i]);
+      }
+    }
+  }
+
+  // Reverse to oldest first for useInputHistory
+  return deduplicatedMessages.reverse();
+}
+
+/**
  * Hook for independently managing input history.
  * Completely separated from chat history and unaffected by /clear commands.
  */
 export function useInputHistoryStore(): UseInputHistoryStoreReturn {
-  const [inputHistory, setInputHistory] = useState<string[]>([]);
-  const [_pastSessionMessages, setPastSessionMessages] = useState<string[]>([]);
-  const [_currentSessionMessages, setCurrentSessionMessages] = useState<
+  const [pastSessionMessages, setPastSessionMessages] = useState<string[]>([]);
+  const [currentSessionMessages, setCurrentSessionMessages] = useState<
     string[]
   >([]);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  /**
-   * Recalculate the complete input history from past and current sessions.
-   * Applies the same deduplication logic as the previous implementation.
-   */
-  const recalculateHistory = useCallback(
-    (currentSession: string[], pastSession: string[]) => {
-      // Combine current session (newest first) + past session (newest first)
-      const combinedMessages = [...currentSession, ...pastSession];
-
-      // Deduplicate consecutive identical messages (same algorithm as before)
-      const deduplicatedMessages: string[] = [];
-      if (combinedMessages.length > 0) {
-        deduplicatedMessages.push(combinedMessages[0]); // Add the newest one unconditionally
-        for (let i = 1; i < combinedMessages.length; i++) {
-          if (combinedMessages[i] !== combinedMessages[i - 1]) {
-            deduplicatedMessages.push(combinedMessages[i]);
-          }
-        }
-      }
-
-      // Reverse to oldest first for useInputHistory
-      setInputHistory(deduplicatedMessages.reverse());
-    },
-    [],
+  // Derived during render, so there is no extra render pass and no window
+  // where consumers see a stale history next to fresh session state.
+  const inputHistory = useMemo(
+    () =>
+      computeInputHistory(
+        currentSessionMessages.slice().reverse(), // Convert to newest first
+        pastSessionMessages,
+      ),
+    [currentSessionMessages, pastSessionMessages],
   );
 
   /**
@@ -66,7 +76,6 @@ export function useInputHistoryStore(): UseInputHistoryStoreReturn {
       try {
         const pastMessages = (await logger.getPreviousUserMessages()) || [];
         setPastSessionMessages(pastMessages); // Store as newest first
-        recalculateHistory([], pastMessages);
         setIsInitialized(true);
       } catch (error) {
         // Start with empty history even if logger initialization fails
@@ -75,38 +84,22 @@ export function useInputHistoryStore(): UseInputHistoryStoreReturn {
           error,
         );
         setPastSessionMessages([]);
-        recalculateHistory([], []);
         setIsInitialized(true);
       }
     },
-    [isInitialized, recalculateHistory],
+    [isInitialized],
   );
 
   /**
    * Add new input to history.
    * Recalculates the entire history with deduplication.
    */
-  const addInput = useCallback(
-    (input: string) => {
-      const trimmedInput = input.trim();
-      if (!trimmedInput) return; // Filter empty/whitespace-only inputs
+  const addInput = useCallback((input: string) => {
+    const trimmedInput = input.trim();
+    if (!trimmedInput) return; // Filter empty/whitespace-only inputs
 
-      setCurrentSessionMessages((prevCurrent) => {
-        const newCurrentSession = [...prevCurrent, trimmedInput];
-
-        setPastSessionMessages((prevPast) => {
-          recalculateHistory(
-            newCurrentSession.slice().reverse(), // Convert to newest first
-            prevPast,
-          );
-          return prevPast; // No change to past messages
-        });
-
-        return newCurrentSession;
-      });
-    },
-    [recalculateHistory],
-  );
+    setCurrentSessionMessages((prevCurrent) => [...prevCurrent, trimmedInput]);
+  }, []);
 
   return {
     inputHistory,

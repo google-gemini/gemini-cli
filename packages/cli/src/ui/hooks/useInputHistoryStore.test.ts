@@ -7,7 +7,10 @@
 import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { useInputHistoryStore } from './useInputHistoryStore.js';
+import {
+  computeInputHistory,
+  useInputHistoryStore,
+} from './useInputHistoryStore.js';
 import { debugLogger } from '@google/gemini-cli-core';
 
 describe('useInputHistoryStore', () => {
@@ -169,6 +172,38 @@ describe('useInputHistoryStore', () => {
     });
 
     expect(result.current.inputHistory).toEqual(['test message']);
+  });
+
+  it('should compose batched rapid inputs in submission order', async () => {
+    const { result } = await renderHook(() => useInputHistoryStore());
+
+    act(() => {
+      result.current.addInput('first');
+      result.current.addInput('second');
+      result.current.addInput('third');
+    });
+
+    expect(result.current.inputHistory).toEqual(['first', 'second', 'third']);
+  });
+
+  describe('computeInputHistory', () => {
+    it('should return empty history for empty sessions', () => {
+      expect(computeInputHistory([], [])).toEqual([]);
+    });
+
+    it('should combine current and past sessions newest first, output oldest first', () => {
+      expect(computeInputHistory(['cur2', 'cur1'], ['past2', 'past1'])).toEqual(
+        ['past1', 'past2', 'cur1', 'cur2'],
+      );
+    });
+
+    it('should deduplicate consecutive messages across the session boundary', () => {
+      expect(computeInputHistory(['new1'], ['old2', 'old1', 'old1'])).toEqual([
+        'old1',
+        'old2',
+        'new1',
+      ]);
+    });
   });
 
   describe('deduplication logic from previous implementation', () => {
