@@ -24,9 +24,6 @@ export interface UseInputHistoryStoreReturn {
 export function useInputHistoryStore(): UseInputHistoryStoreReturn {
   const [inputHistory, setInputHistory] = useState<string[]>([]);
   const [_pastSessionMessages, setPastSessionMessages] = useState<string[]>([]);
-  const [_currentSessionMessages, setCurrentSessionMessages] = useState<
-    string[]
-  >([]);
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Mirrors of the two message lists, read by addInput so it can derive the
@@ -100,13 +97,12 @@ export function useInputHistoryStore(): UseInputHistoryStoreReturn {
       const trimmedInput = input.trim();
       if (!trimmedInput) return; // Filter empty/whitespace-only inputs
 
-      // Derive everything up front, then issue plain state updates. Keeping the
+      // Derive everything up front, then issue a plain state update. Keeping the
       // derivation out of the updaters means a replayed or double-invoked
       // updater cannot run recalculateHistory (itself a setState) again.
       const newCurrentSession = [...currentRef.current, trimmedInput];
       currentRef.current = newCurrentSession;
 
-      setCurrentSessionMessages(newCurrentSession);
       recalculateHistory(
         newCurrentSession.slice().reverse(), // Convert to newest first
         pastRef.current,

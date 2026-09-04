@@ -305,9 +305,9 @@ describe('useInputHistoryStore', () => {
 
   describe('state updates stay outside updater functions', () => {
     // React may call an updater more than once for a single update (StrictMode
-    // double-invoke, replays under batching). addInput used to nest
-    // setPastSessionMessages inside the setCurrentSessionMessages updater and
-    // run recalculateHistory - itself a setState - from there. The resulting
+    // double-invoke, replays under batching). addInput used to nest a
+    // setPastSessionMessages call inside the current-session updater and run
+    // recalculateHistory - itself a setState - from there. The resulting
     // history happened to be idempotent, so the tests below pin both the
     // history and the render count, which is what the nesting actually cost.
 
@@ -332,6 +332,35 @@ describe('useInputHistoryStore', () => {
       // The nested-updater version queued a redundant past-messages update on
       // top of the history update, costing an extra render pass per submit.
       expect(rendersForOneSubmit).toBeLessThanOrEqual(2);
+    });
+
+    it('does not grow the render cost as submits accumulate', async () => {
+      // addInput only writes the history state now. Should a redundant
+      // per-submit state write reappear, the extra dispatch shows up here.
+      const renders: string[][] = [];
+      const { result } = await renderHook(
+        () => {
+          const store = useInputHistoryStore();
+          renders.push(store.inputHistory);
+          return store;
+        },
+        { wrapper: StrictMode as never },
+      );
+
+      const first = renders.length;
+      act(() => {
+        result.current.addInput('one');
+      });
+      const costOfFirst = renders.length - first;
+
+      const second = renders.length;
+      act(() => {
+        result.current.addInput('two');
+      });
+      const costOfSecond = renders.length - second;
+
+      expect(result.current.inputHistory).toEqual(['one', 'two']);
+      expect(costOfSecond).toBeLessThanOrEqual(costOfFirst);
     });
 
     it('keeps every submit when several are batched into one update', async () => {
