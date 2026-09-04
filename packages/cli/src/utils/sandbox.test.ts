@@ -827,11 +827,13 @@ describe('sandbox', () => {
         'docker',
         expect.arrayContaining([
           'run',
+          '--env',
+          'HOME=/home/node',
           '--volume',
           '/host/path:/container/path:ro',
           '--volume',
           expect.stringMatching(
-            /[\\/]home[\\/]user[\\/]\.gemini[\\/]settings\.json:ro$/,
+            /[\\/]home[\\/]node[\\/]\.gemini[\\/]settings\.json:ro$/,
           ),
         ]),
         expect.any(Object),
@@ -1122,7 +1124,7 @@ describe('sandbox', () => {
 
       expect(spawn).toHaveBeenCalledWith(
         'docker',
-        expect.arrayContaining(['--user', 'root', '--env', 'HOME=/home/user']),
+        expect.arrayContaining(['--user', 'root', '--env', 'HOME=/home/node']),
         expect.any(Object),
       );
       // Check that the entrypoint command includes the defensive useradd check

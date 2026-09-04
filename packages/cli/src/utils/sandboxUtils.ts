@@ -11,8 +11,6 @@ import { readFile } from 'node:fs/promises';
 import { quote } from 'shell-quote';
 import { debugLogger, GEMINI_DIR, homedir } from '@google/gemini-cli-core';
 
-import { isRecord } from './settingsUtils.js';
-
 export const LOCAL_DEV_SANDBOX_IMAGE_NAME = 'gemini-cli-sandbox';
 export const SANDBOX_NETWORK_NAME = 'gemini-cli-sandbox';
 export const SANDBOX_PROXY_NAME = 'gemini-cli-sandbox-proxy';
@@ -26,6 +24,10 @@ export const BUILTIN_SEATBELT_PROFILES = [
   'strict-open',
   'strict-proxied',
 ];
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
 
 /**
  * Checks if a host path is sensitive and should be prohibited from mounting

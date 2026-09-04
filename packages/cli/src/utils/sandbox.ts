@@ -42,8 +42,11 @@ import {
   isSensitiveHostPath,
   sanitizeSettingsForSandbox,
 } from './sandboxUtils.js';
-import { isRecord } from './settingsUtils.js';
 import { BUILTIN_SEATBELT_PROFILE_CONTENTS } from './sandboxBuiltinProfiles.js';
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -488,18 +491,14 @@ export async function start_sandbox(
     const userSettingsDirInSandbox = getContainerPath(
       `/home/node/${GEMINI_DIR}`,
     );
-    const hostContainerSettingsDir = getContainerPath(userSettingsDirOnHost);
+
+    // Force HOME to /home/node inside the container so that the isolated settings are correctly resolved
+    args.push('--env', 'HOME=/home/node');
 
     args.push(
       '--volume',
       `${sanitizedSettingsFile}:${userSettingsDirInSandbox}/settings.json:ro`,
     );
-    if (userSettingsDirInSandbox !== hostContainerSettingsDir) {
-      args.push(
-        '--volume',
-        `${sanitizedSettingsFile}:${hostContainerSettingsDir}/settings.json:ro`,
-      );
-    }
 
     // mount gcloud config directory if it exists
     const gcloudConfigDir = path.join(homedir(), '.config', 'gcloud');
@@ -844,8 +843,8 @@ export async function start_sandbox(
 
       // We still need userFlag for the simpler proxy container, which does not have this issue.
       userFlag = `--user ${uid}:${gid}`;
-      // When forcing a UID in the sandbox, $HOME can be reset to '/', so we copy $HOME as well.
-      args.push('--env', `HOME=${homedir()}`);
+      // When forcing a UID in the sandbox, $HOME can be reset to '/', so ensure $HOME is set to /home/node.
+      args.push('--env', 'HOME=/home/node');
     }
 
     // push container image name
