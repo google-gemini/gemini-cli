@@ -325,6 +325,29 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
+  describe('keepAskUserQuestionsInHistory', () => {
+    it('should default to false when keepAskUserQuestionsInHistory is not specified', () => {
+      const config = new Config(baseParams);
+      expect(config.getKeepAskUserQuestionsInHistory()).toBe(false);
+    });
+
+    it('should use provided keepAskUserQuestionsInHistory if set to true', () => {
+      const config = new Config({
+        ...baseParams,
+        keepAskUserQuestionsInHistory: true,
+      });
+      expect(config.getKeepAskUserQuestionsInHistory()).toBe(true);
+    });
+
+    it('should use provided keepAskUserQuestionsInHistory if set to false', () => {
+      const config = new Config({
+        ...baseParams,
+        keepAskUserQuestionsInHistory: false,
+      });
+      expect(config.getKeepAskUserQuestionsInHistory()).toBe(false);
+    });
+  });
+
   describe('setShellExecutionConfig', () => {
     it('should preserve existing shell execution fields that are not being updated', () => {
       const config = new Config({

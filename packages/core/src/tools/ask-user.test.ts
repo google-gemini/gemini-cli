@@ -16,6 +16,7 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolConfirmationOutcome } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import { ASK_USER_DISPLAY_NAME } from './tool-names.js';
+import type { Config } from '../config/config.js';
 
 describe('AskUserTool Helpers', () => {
   describe('isCompletedAskUserTool', () => {
@@ -52,15 +53,19 @@ describe('AskUserTool Helpers', () => {
 
 describe('AskUserTool', () => {
   let mockMessageBus: MessageBus;
+  let mockConfig: Config;
   let tool: AskUserTool;
 
   beforeEach(() => {
+    mockConfig = {
+      getKeepAskUserQuestionsInHistory: vi.fn().mockReturnValue(false),
+    } as unknown as Config;
     mockMessageBus = {
       publish: vi.fn().mockResolvedValue(undefined),
       subscribe: vi.fn(),
       unsubscribe: vi.fn(),
     } as unknown as MessageBus;
-    tool = new AskUserTool(mockMessageBus);
+    tool = new AskUserTool(mockConfig, mockMessageBus);
   });
 
   it('should have correct metadata', () => {
@@ -595,6 +600,125 @@ describe('AskUserTool', () => {
           dismissed: true,
         },
       });
+    });
+
+    it('should format questions and answers together when getKeepAskUserQuestionsInHistory is true', async () => {
+      vi.mocked(mockConfig.getKeepAskUserQuestionsInHistory).mockReturnValue(
+        true,
+      );
+
+      const questions: Question[] = [
+        {
+          question: 'How should we proceed with this task?',
+          header: 'Approach',
+          type: QuestionType.CHOICE,
+          options: [
+            {
+              label: 'Quick fix (Recommended)',
+              description: 'Apply the most direct solution.',
+            },
+            {
+              label: 'Comprehensive refactor',
+              description: 'Restructure the affected code.',
+            },
+          ],
+        },
+      ];
+
+      const invocation = tool.build({ questions });
+      const details = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+
+      if (details && 'onConfirm' in details) {
+        const answers = { '0': 'Quick fix (Recommended)' };
+        await details.onConfirm(ToolConfirmationOutcome.ProceedOnce, {
+          answers,
+        });
+      }
+
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).toBe(
+        '**Question:** How should we proceed with this task?\n**Answer:** Quick fix (Recommended)',
+      );
+    });
+
+    it('should format multiple questions and answers together when getKeepAskUserQuestionsInHistory is true', async () => {
+      vi.mocked(mockConfig.getKeepAskUserQuestionsInHistory).mockReturnValue(
+        true,
+      );
+
+      const questions: Question[] = [
+        {
+          question: 'First question?',
+          header: 'Q1',
+          type: QuestionType.TEXT,
+        },
+        {
+          question: 'Second question?',
+          header: 'Q2',
+          type: QuestionType.TEXT,
+        },
+      ];
+
+      const invocation = tool.build({ questions });
+      const details = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+
+      if (details && 'onConfirm' in details) {
+        const answers = { '0': 'First answer', '1': 'Second answer' };
+        await details.onConfirm(ToolConfirmationOutcome.ProceedOnce, {
+          answers,
+        });
+      }
+
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).toBe(
+        '**Question:** First question?\n**Answer:** First answer\n\n**Question:** Second question?\n**Answer:** Second answer',
+      );
+    });
+
+    it('should handle empty or missing answers gracefully when getKeepAskUserQuestionsInHistory is true', async () => {
+      vi.mocked(mockConfig.getKeepAskUserQuestionsInHistory).mockReturnValue(
+        true,
+      );
+
+      const questions: Question[] = [
+        {
+          question: 'First question?',
+          header: 'Q1',
+          type: QuestionType.TEXT,
+        },
+        {
+          question: 'Second question?',
+          header: 'Q2',
+          type: QuestionType.TEXT,
+        },
+      ];
+
+      const invocation = tool.build({ questions });
+      const details = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+
+      if (details && 'onConfirm' in details) {
+        const answers = { '0': 'First answer' }; // '1' is missing
+        await details.onConfirm(ToolConfirmationOutcome.ProceedOnce, {
+          answers,
+        });
+      }
+
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).toBe(
+        '**Question:** First question?\n**Answer:** First answer\n\n**Question:** Second question?\n**Answer:** (No answer)',
+      );
     });
   });
 });

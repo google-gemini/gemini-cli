@@ -975,6 +975,8 @@ export async function loadCliConfig(
     debugMode,
     question,
     worktreeSettings,
+    keepAskUserQuestionsInHistory:
+      settings.ui?.keepAskUserQuestionsInHistory ?? false,
 
     coreTools: settings.tools?.core || undefined,
     experimentalContextManagementConfig: profileSelector,

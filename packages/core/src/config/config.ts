@@ -748,6 +748,7 @@ export interface ConfigParameters {
   };
   vertexAiRouting?: VertexAiRoutingConfig;
   logRagSnippets?: boolean;
+  keepAskUserQuestionsInHistory?: boolean;
 }
 
 export class Config implements McpContext, AgentLoopContext {
@@ -987,12 +988,15 @@ export class Config implements McpContext, AgentLoopContext {
   private lastModeSwitchTime: number = performance.now();
   readonly injectionService: InjectionService;
   private approvedPlanPath: string | undefined;
+  private readonly keepAskUserQuestionsInHistory: boolean;
 
   constructor(params: ConfigParameters) {
     this._sessionId = params.sessionId;
     this.clientName = params.clientName;
     this._clientVersion = params.clientVersion ?? 'unknown';
     this.approvedPlanPath = undefined;
+    this.keepAskUserQuestionsInHistory =
+      params.keepAskUserQuestionsInHistory ?? false;
 
     this.embeddingModel =
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
@@ -1821,6 +1825,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getSessionId(): string {
     return this.promptId;
+  }
+
+  getKeepAskUserQuestionsInHistory(): boolean {
+    return this.keepAskUserQuestionsInHistory;
   }
 
   getWorktreeSettings(): WorktreeSettings | undefined {
@@ -4039,7 +4047,7 @@ export class Config implements McpContext, AgentLoopContext {
       registry.registerTool(new WebSearchTool(this, this.messageBus)),
     );
     maybeRegister(AskUserTool, () =>
-      registry.registerTool(new AskUserTool(this.messageBus)),
+      registry.registerTool(new AskUserTool(this, this.messageBus)),
     );
     if (this.getUseWriteTodos()) {
       maybeRegister(WriteTodosTool, () =>
