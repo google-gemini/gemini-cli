@@ -17,6 +17,12 @@ export interface AcknowledgedAgentsMap {
   };
 }
 
+function isAcknowledgedAgentsMap(
+  value: unknown,
+): value is AcknowledgedAgentsMap {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
 export class AcknowledgedAgentsService {
   private acknowledgedAgents: AcknowledgedAgentsMap = {};
   private loaded = false;
@@ -27,8 +33,18 @@ export class AcknowledgedAgentsService {
     const filePath = Storage.getAcknowledgedAgentsPath();
     try {
       const content = await fs.readFile(filePath, 'utf-8');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      this.acknowledgedAgents = JSON.parse(content);
+      const parsed: unknown = JSON.parse(content);
+      // A previous interrupted save (full disk, sync conflict, hand edit)
+      // can leave valid JSON with the wrong shape (null, array, scalar).
+      // Fall back to empty rather than crashing callers (#29207).
+      if (isAcknowledgedAgentsMap(parsed)) {
+        this.acknowledgedAgents = parsed;
+      } else {
+        debugLogger.error(
+          'Failed to load acknowledged agents: unexpected file shape, falling back to empty.',
+        );
+        this.acknowledgedAgents = {};
+      }
     } catch (error: unknown) {
       if (!isNodeError(error) || error.code !== 'ENOENT') {
         debugLogger.error(
