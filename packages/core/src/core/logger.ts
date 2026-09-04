@@ -367,8 +367,13 @@ export class Logger {
         parsedContent !== null &&
         'history' in parsedContent
       ) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        return parsedContent as Checkpoint;
+        const history: unknown = parsedContent.history;
+        // A valid-JSON file with a non-array history (crash mid-save, full
+        // disk, hand edit) must degrade like any other corrupt file (#29194).
+        if (Array.isArray(history)) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          return parsedContent as Checkpoint;
+        }
       }
 
       debugLogger.warn(
