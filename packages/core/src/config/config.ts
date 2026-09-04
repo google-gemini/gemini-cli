@@ -642,6 +642,7 @@ export interface ConfigParameters {
   bugCommand?: BugCommandSettings;
   model: string;
   disableLoopDetection?: boolean;
+  allowCommandSubstitution?: boolean;
   maxSessionTurns?: number;
   acpMode?: boolean;
   listSessions?: boolean;
@@ -928,6 +929,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly maxAttempts: number;
   private readonly enableShellOutputEfficiency: boolean;
   private readonly shellToolInactivityTimeout: number;
+  private readonly allowCommandSubstitution: boolean;
   readonly fakeResponses?: string;
   readonly fakeResponsesNonStrict?: string;
   readonly recordResponses?: string;
@@ -1304,6 +1306,7 @@ export class Config implements McpContext, AgentLoopContext {
       params.enableShellOutputEfficiency ?? true;
     this.shellToolInactivityTimeout =
       (params.shellToolInactivityTimeout ?? 300) * 1000; // 5 minutes
+    this.allowCommandSubstitution = params.allowCommandSubstitution ?? false;
     this.extensionManagement = params.extensionManagement ?? true;
     this.extensionRegistryURI = params.extensionRegistryURI;
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
@@ -3766,6 +3769,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getEnableShellOutputEfficiency(): boolean {
     return this.enableShellOutputEfficiency;
+  }
+
+  getAllowCommandSubstitution(): boolean {
+    return this.allowCommandSubstitution;
   }
 
   getShellToolInactivityTimeout(): number {

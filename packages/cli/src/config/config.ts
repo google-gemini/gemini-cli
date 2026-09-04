@@ -1016,6 +1016,7 @@ export async function loadCliConfig(
     disableAlwaysAllow:
       settings.security?.disableAlwaysAllow ||
       settings.admin?.secureModeEnabled,
+    allowCommandSubstitution: settings.allowCommandSubstitution,
     showMemoryUsage: settings.ui?.showMemoryUsage || false,
     accessibility: {
       ...settings.ui?.accessibility,
