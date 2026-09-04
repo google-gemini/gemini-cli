@@ -638,8 +638,9 @@ Upon successful connection:
    requirements:
    - Characters other than letters, numbers, underscore (`_`), hyphen (`-`), dot
      (`.`), and colon (`:`) are replaced with underscores
-   - Names longer than 63 characters are truncated with middle replacement
-     (`...`)
+   - Names longer than 63 characters keep a leading and trailing portion of the
+     name, with a short hash of the full qualified name inserted between them so
+     that distinct tools keep distinct identifiers
 
 ### 3. Tool naming and namespaces
 

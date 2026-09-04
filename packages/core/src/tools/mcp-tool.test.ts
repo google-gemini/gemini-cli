@@ -64,7 +64,7 @@ describe('generateValidName', () => {
 
   it('should truncate long names', () => {
     expect(generateValidName('x'.repeat(80))).toBe(
-      'mcp_xxxxxxxxxxxxxxxxxxxxxxxxxx...xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      'mcp_xxxxxxxxxxxxxxxxxxxxxxx_634ab198_xxxxxxxxxxxxxxxxxxxxxxxxxx',
     );
   });
 
@@ -1109,7 +1109,38 @@ describe('MCP Tool Naming Regression Fixes', () => {
       const longName = 'a'.repeat(40) + '__' + 'b'.repeat(40);
       const result = generateValidName(longName);
       expect(result.length).toBeLessThanOrEqual(63);
-      expect(result).toMatch(/^mcp_a{26}\.\.\.b{30}$/);
+      // head + '_' + 8-char digest + '_' + tail
+      expect(result).toMatch(/^mcp_a+_[0-9a-f]{8}_b+$/);
+    });
+
+    it('should keep truncated names unique when only the middle differs', () => {
+      // Both qualified names share their first and last characters and differ
+      // only in the middle, which is exactly the region a head+tail truncation
+      // discards.
+      const prefix = 'atlassian-remote-mcp-server__getConfluence';
+      const suffix = 'DetailedInformationByIdentifier';
+      const a = `${prefix}SpaceSpaceSpaceSpace${suffix}`;
+      const b = `${prefix}PagePagePagePagePage${suffix}`;
+
+      const nameA = generateValidName(a);
+      const nameB = generateValidName(b);
+
+      expect(a).not.toBe(b);
+      expect(nameA.length).toBeLessThanOrEqual(63);
+      expect(nameB.length).toBeLessThanOrEqual(63);
+      expect(nameA).not.toBe(nameB);
+    });
+
+    it('should be deterministic for the same input', () => {
+      const longName = `server__${'x'.repeat(80)}`;
+      expect(generateValidName(longName)).toBe(generateValidName(longName));
+    });
+
+    it('should produce API-valid names when truncating', () => {
+      const longName = `atlassian-mcp-server__${'tool'.repeat(20)}`;
+      const result = generateValidName(longName);
+      expect(result.length).toBeLessThanOrEqual(63);
+      expect(result).toMatch(/^[a-zA-Z_][a-zA-Z0-9_\-.:]{0,63}$/);
     });
 
     it('should handle very long names starting with a digit', () => {
@@ -1149,7 +1180,8 @@ describe('MCP Tool Naming Regression Fixes', () => {
 
       const qn = tool.getFullyQualifiedName();
       expect(qn.length).toBeLessThanOrEqual(63);
-      expect(qn).toContain('...');
+      // Truncated names embed a short digest of the full qualified name.
+      expect(qn).toMatch(/_[0-9a-f]{8}_/);
     });
 
     it('should handle server names starting with digits', () => {

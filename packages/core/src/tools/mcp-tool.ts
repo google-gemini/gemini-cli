@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { createHash } from 'node:crypto';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
@@ -589,6 +590,14 @@ function getStringifiedResultForDisplay(rawResponse: Part[]): string {
  */
 const MAX_FUNCTION_NAME_LENGTH = 64;
 
+/**
+ * Number of hex characters of the name digest embedded into truncated tool
+ * names. Eight hex characters (32 bits) keeps collisions negligible for the
+ * handful of tools a single MCP server exposes while leaving most of the
+ * budget for the readable head and tail.
+ */
+const NAME_DIGEST_LENGTH = 8;
+
 /** Visible for testing */
 export function generateValidName(name: string) {
   // Enforce the mcp_ prefix for all generated MCP tool names
@@ -603,15 +612,30 @@ export function generateValidName(name: string) {
     validToolname = `_${validToolname}`;
   }
 
-  // If longer than the API limit, replace middle with '...'
+  // If longer than the API limit, keep a head and a tail and put a short
+  // digest of the full name in between.
+  //
+  // The digest is what keeps this transform injective. Retaining only a head
+  // and a tail maps every name that shares those two windows onto the same
+  // result, so two tools on one server whose names differ only in the discarded
+  // middle collapse together. `ToolRegistry.registerTool` then overwrites one
+  // with the other and the displaced tool becomes unreachable by the model.
+  //
   // Note: We use 63 instead of 64 to be safe, as some environments have off-by-one behaviors.
   const safeLimit = MAX_FUNCTION_NAME_LENGTH - 1;
   if (validToolname.length > safeLimit) {
     debugLogger.warn(
       `Truncating MCP tool name "${validToolname}" to fit within the 64 character limit. This tool may require user approval.`,
     );
-    validToolname =
-      validToolname.slice(0, 30) + '...' + validToolname.slice(-30);
+    const digest = createHash('sha256')
+      .update(validToolname)
+      .digest('hex')
+      .slice(0, NAME_DIGEST_LENGTH);
+    // head + '_' + digest + '_' + tail === safeLimit characters.
+    const remaining = safeLimit - NAME_DIGEST_LENGTH - 2;
+    const headLength = Math.ceil(remaining / 2);
+    const tailLength = remaining - headLength;
+    validToolname = `${validToolname.slice(0, headLength)}_${digest}_${validToolname.slice(-tailLength)}`;
   }
 
   return validToolname;
