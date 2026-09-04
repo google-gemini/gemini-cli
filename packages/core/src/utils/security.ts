@@ -630,9 +630,12 @@ export function isFileAndDirectorySecureSync(
     const ancestors: string[] = [];
     let current = dir;
     while (true) {
-      ancestors.push(current);
       const next = pathModule.dirname(current);
-      if (next === current || !next || next === '.') {
+      const isRoot = next === current;
+      if (!(isWin && isRoot)) {
+        ancestors.push(current);
+      }
+      if (isRoot || !next || next === '.') {
         break;
       }
       current = next;
@@ -640,11 +643,9 @@ export function isFileAndDirectorySecureSync(
     return ancestors;
   };
 
-  const normalizedAncestors = isWin ? [parentDir] : getAncestors(parentDir);
+  const normalizedAncestors = getAncestors(parentDir);
   const canonicalAncestors = !pathsEqual
-    ? isWin
-      ? [canonicalParentDir]
-      : getAncestors(canonicalParentDir)
+    ? getAncestors(canonicalParentDir)
     : [];
 
   // On Windows, batch all uncached paths into a single PowerShell check

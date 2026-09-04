@@ -1127,9 +1127,10 @@ describe('isFileAndDirectorySecureSync', () => {
     const testFilePath = 'C:\\ProgramData\\gemini-cli\\settings.json';
     const normalizedFile = path.win32.resolve(testFilePath);
     const parentDir = path.win32.dirname(normalizedFile);
+    const grandparentDir = path.win32.dirname(parentDir);
 
     vi.mocked(spawnSync).mockReturnValue({
-      stdout: `PATH:${parentDir}\nPATH:${normalizedFile}\n`,
+      stdout: `PATH:${parentDir}\nPATH:${grandparentDir}\nPATH:${normalizedFile}\n`,
       stderr: '',
       status: 0,
       pid: 1234,
@@ -1144,6 +1145,7 @@ describe('isFileAndDirectorySecureSync', () => {
     // Verified that spawnSync was invoked exactly once for all directories and file
     expect(spawnSync).toHaveBeenCalledTimes(1);
     expect(cache.has(parentDir.toLowerCase())).toBe(true);
+    expect(cache.has(grandparentDir.toLowerCase())).toBe(true);
     expect(cache.has(normalizedFile.toLowerCase())).toBe(true);
   });
 
@@ -1221,10 +1223,11 @@ describe('isFileAndDirectorySecureSync', () => {
     const lowercaseFile = 'c:\\ProgramData\\gemini-cli\\settings.json';
     const normalizedFile = path.win32.resolve(testFilePath);
     const parentDir = path.win32.dirname(normalizedFile);
+    const grandparentDir = path.win32.dirname(parentDir);
 
     // Mock spawnSync to return success for all paths
     vi.mocked(spawnSync).mockReturnValue({
-      stdout: `PATH:${parentDir}\nPATH:${normalizedFile}\nPATH:${lowercaseFile}\n`,
+      stdout: `PATH:${parentDir}\nPATH:${grandparentDir}\nPATH:${normalizedFile}\nPATH:${lowercaseFile}\n`,
       stderr: '',
       status: 0,
       pid: 1234,
@@ -1246,6 +1249,7 @@ describe('isFileAndDirectorySecureSync', () => {
     ).toString('utf16le');
     expect(scriptArg).toContain(`'${normalizedFile.toLowerCase()}'`);
     expect(scriptArg).toContain(`'${parentDir.toLowerCase()}'`);
+    expect(scriptArg).toContain(`'${grandparentDir.toLowerCase()}'`);
     // Should NOT contain duplicate real path with lowercase drive letter as pathsEqual should prevent batching it
     expect(scriptArg).not.toContain(`'${lowercaseFile}'`);
   });
@@ -1273,10 +1277,11 @@ describe('isFileAndDirectorySecureSync', () => {
     const testFilePath = 'C:\\ProgramData\\gemini-cli\\settings.json';
     const normalizedFile = path.win32.resolve(testFilePath);
     const parentDir = path.win32.dirname(normalizedFile);
+    const grandparentDir = path.win32.dirname(parentDir);
 
     // Mock spawnSync to return no violations for paths owned/writable by CREATOR OWNER/GROUP
     vi.mocked(spawnSync).mockReturnValue({
-      stdout: `PATH:${parentDir}\nPATH:${normalizedFile}\n`,
+      stdout: `PATH:${parentDir}\nPATH:${grandparentDir}\nPATH:${normalizedFile}\n`,
       stderr: '',
       status: 0,
       pid: 1234,
@@ -1327,10 +1332,11 @@ describe('isFileAndDirectorySecureSync', () => {
     const testFilePath = 'C:\\ProgramData\\gemini-cli\\settings.json';
     const normalizedFile = path.win32.resolve(testFilePath).toLowerCase();
     const parentDir = path.win32.dirname(normalizedFile);
+    const grandparentDir = path.win32.dirname(parentDir);
 
     // Mock spawnSync to return success for stripped paths
     vi.mocked(spawnSync).mockReturnValue({
-      stdout: `PATH:${parentDir}\nPATH:${normalizedFile}\n`,
+      stdout: `PATH:${parentDir}\nPATH:${grandparentDir}\nPATH:${normalizedFile}\n`,
       stderr: '',
       status: 0,
       pid: 1234,
@@ -1346,6 +1352,7 @@ describe('isFileAndDirectorySecureSync', () => {
     // Verify cache has the stripped and normalised lowercased paths (without \\?\)
     expect(cache.has(normalizedFile)).toBe(true);
     expect(cache.has(parentDir)).toBe(true);
+    expect(cache.has(grandparentDir)).toBe(true);
     expect(cache.has('\\\\?\\' + normalizedFile)).toBe(false);
 
     // Verify spawnSync was called and received the stripped paths
@@ -1356,6 +1363,57 @@ describe('isFileAndDirectorySecureSync', () => {
     ).toString('utf16le');
     expect(scriptArg).toContain(`'${normalizedFile}'`);
     expect(scriptArg).not.toContain('\\\\?\\');
+  });
+
+  it('validates Windows ancestor directories up to drive root while excluding drive root', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('win32');
+    vi.mocked(fsSync.existsSync).mockReturnValue(true);
+    vi.mocked(fsSync.realpathSync).mockImplementation((p) => p.toString());
+    vi.mocked(fsSync.lstatSync).mockReturnValue({
+      isSymbolicLink: () => false,
+    } as unknown as Stats);
+    vi.mocked(fsSync.statSync).mockImplementation((p) => {
+      if (String(p).endsWith('settings.json')) {
+        return {
+          isDirectory: () => false,
+          isFile: () => true,
+        } as unknown as Stats;
+      }
+      return {
+        isDirectory: () => true,
+        isFile: () => false,
+      } as unknown as Stats;
+    });
+
+    const testFilePath = 'C:\\ProgramData\\gemini-cli\\settings.json';
+    const normalizedFile = path.win32.resolve(testFilePath);
+    const parentDir = path.win32.dirname(normalizedFile);
+    const grandparentDir = path.win32.dirname(parentDir);
+
+    vi.mocked(spawnSync).mockReturnValue({
+      stdout: `PATH:${parentDir}\nPATH:${grandparentDir}\nPATH:${normalizedFile}\n`,
+      stderr: '',
+      status: 0,
+      pid: 1234,
+      output: [],
+      signal: null,
+    });
+
+    const cache = createPathSecurityCache();
+    const result = isFileAndDirectorySecureSync(testFilePath, cache);
+
+    expect(result.secure).toBe(true);
+    const spawnCall = vi.mocked(spawnSync).mock.calls[0];
+    const scriptArg = Buffer.from(
+      (spawnCall[1] as string[])?.[5] ?? '',
+      'base64',
+    ).toString('utf16le');
+    // Ancestors C:\ProgramData\gemini-cli and C:\ProgramData must be included
+    expect(scriptArg).toContain(`'${parentDir.toLowerCase()}'`);
+    expect(scriptArg).toContain(`'${grandparentDir.toLowerCase()}'`);
+    // Drive root C:\ must be excluded
+    expect(scriptArg).not.toContain("'c:\\'");
+    expect(cache.has('c:\\')).toBe(false);
   });
 
   it('strips Windows extended UNC path prefix \\\\?\\UNC\\ and converts to standard UNC path', () => {
