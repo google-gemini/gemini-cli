@@ -118,7 +118,7 @@ describe('migrate command', () => {
               expect.objectContaining({
                 command: 'echo "Before Edit"',
                 type: 'command',
-                timeout: 30,
+                timeout: 30000,
               }),
             ]),
           }),
@@ -274,7 +274,7 @@ describe('migrate command', () => {
     expect(migratedHooks.BeforeTool[0].sequential).toBe(true);
   });
 
-  it('should preserve timeout values', async () => {
+  it('should convert timeout values from seconds to milliseconds', async () => {
     const claudeSettings = {
       hooks: {
         PreToolUse: [
@@ -297,7 +297,7 @@ describe('migrate command', () => {
     await handleMigrateFromClaude();
 
     const migratedHooks = mockSetValue.mock.calls[0][2];
-    expect(migratedHooks.BeforeTool[0].hooks[0].timeout).toBe(60);
+    expect(migratedHooks.BeforeTool[0].hooks[0].timeout).toBe(60000);
   });
 
   it('should merge with existing Gemini hooks', async () => {

@@ -93,10 +93,10 @@ function migrateClaudeHook(claudeHook: unknown): unknown {
     migrated['type'] = 'command';
   }
 
-  // Map timeout field (Claude uses seconds, Gemini uses seconds)
+  // Map timeout field (Claude uses seconds, Gemini uses milliseconds)
   // eslint-disable-next-line no-restricted-syntax
   if ('timeout' in hook && typeof hook['timeout'] === 'number') {
-    migrated['timeout'] = hook['timeout'];
+    migrated['timeout'] = hook['timeout'] * 1000;
   }
 
   return migrated;
