@@ -18,6 +18,7 @@ import {
   type SubagentActivityItem,
   type SubagentActivityMessage,
   AGENT_TOOL_NAME,
+  Kind,
 } from '@google/gemini-cli-core';
 import { useCallback, useState, useMemo, useEffect, useRef } from 'react';
 
@@ -153,6 +154,9 @@ export function useToolScheduler(
           : event.toolCalls.filter(
               (tc) =>
                 tc.status === CoreToolCallStatus.AwaitingApproval ||
+                (tc.status === CoreToolCallStatus.Executing &&
+                  (tc.tool?.kind === Kind.Agent ||
+                    tc.request.name === AGENT_TOOL_NAME)) ||
                 prevCallIds.has(tc.request.callId),
             );
 
