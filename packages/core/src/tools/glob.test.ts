@@ -19,6 +19,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import type { Config } from '../config/config.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
+import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { ToolErrorType } from './tool-error.js';
 import * as glob from 'glob';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
@@ -452,6 +453,149 @@ describe('GlobTool', () => {
       expect(result.llmContent).toContain('gemini-ignored_test.txt');
     }, 30000);
   });
+});
+
+describe.skipIf(process.platform === 'win32')(
+  'GlobTool with a symlinked workspace root',
+  () => {
+    let tempDir: string;
+    let realRootDir: string;
+    let symlinkedRootDir: string;
+    let globTool: GlobTool;
+    const abortSignal = new AbortController().signal;
+
+    beforeEach(async () => {
+      tempDir = await fs.realpath(
+        await fs.mkdtemp(path.join(os.tmpdir(), 'glob-tool-symlink-')),
+      );
+      realRootDir = path.join(tempDir, 'real-root');
+      symlinkedRootDir = path.join(tempDir, 'symlinked-root');
+      await fs.mkdir(path.join(realRootDir, 'sub'), { recursive: true });
+      await fs.writeFile(
+        path.join(realRootDir, 'sub', 'fileA.txt'),
+        'contentA',
+      );
+      await fs.symlink(realRootDir, symlinkedRootDir, 'dir');
+
+      // Mirrors production: the target directory is the path the user launched
+      // with, while WorkspaceContext stores its realpath-resolved form.
+      const workspaceContext = createMockWorkspaceContext(symlinkedRootDir);
+      const mockConfig = {
+        getTargetDir: () => symlinkedRootDir,
+        getWorkspaceContext: () => workspaceContext,
+        getFileService: () => new FileDiscoveryService(realRootDir),
+        getFileFilteringOptions: () => DEFAULT_FILE_FILTERING_OPTIONS,
+        getFileExclusions: () => ({ getGlobExcludes: () => [] }),
+        storage: {
+          getProjectTempDir: vi.fn().mockReturnValue(path.join(tempDir, 'tmp')),
+        },
+        isPathAllowed: () => true,
+        validatePathAccess: () => null,
+      } as unknown as Config;
+
+      globTool = new GlobTool(mockConfig, createMockMessageBus());
+    });
+
+    afterEach(async () => {
+      await fs.rm(tempDir, { recursive: true, force: true });
+      vi.resetAllMocks();
+    });
+
+    it('should return matches as canonical paths', async () => {
+      const params: GlobToolParams = { pattern: '**/*.txt' };
+      const invocation = globTool.build(params);
+      const result = await invocation.execute({ abortSignal });
+
+      expect(result.llmContent).toContain('Found 1 file(s)');
+      expect(result.llmContent).toContain(
+        path.join(realRootDir, 'sub', 'fileA.txt'),
+      );
+    }, 30000);
+
+    it('should return matches as canonical paths when dir_path is given', async () => {
+      const params: GlobToolParams = { pattern: '*.txt', dir_path: 'sub' };
+      const invocation = globTool.build(params);
+      const result = await invocation.execute({ abortSignal });
+
+      expect(result.llmContent).toContain('Found 1 file(s)');
+      expect(result.llmContent).toContain(
+        path.join(realRootDir, 'sub', 'fileA.txt'),
+      );
+    }, 30000);
+  },
+);
+
+describe('GlobTool workspace boundaries', () => {
+  let tempDir: string;
+  let workspaceDir: string;
+  let secondRootDir: string;
+  let outsideDir: string;
+  const abortSignal = new AbortController().signal;
+
+  const buildTool = (roots: string[]) => {
+    const workspaceContext = new WorkspaceContext(roots[0], roots.slice(1));
+    const mockConfig = {
+      getTargetDir: () => roots[0],
+      getWorkspaceContext: () => workspaceContext,
+      getFileService: () => new FileDiscoveryService(roots[0]),
+      getFileFilteringOptions: () => DEFAULT_FILE_FILTERING_OPTIONS,
+      getFileExclusions: () => ({ getGlobExcludes: () => [] }),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue(path.join(tempDir, 'tmp')),
+      },
+      isPathAllowed(this: Config, absolutePath: string): boolean {
+        return this.getWorkspaceContext().isPathWithinWorkspace(absolutePath);
+      },
+      validatePathAccess(this: Config, absolutePath: string): string | null {
+        return this.isPathAllowed(absolutePath)
+          ? null
+          : `Path not in workspace: ${absolutePath}`;
+      },
+    } as unknown as Config;
+
+    return new GlobTool(mockConfig, createMockMessageBus());
+  };
+
+  beforeEach(async () => {
+    tempDir = await fs.realpath(
+      await fs.mkdtemp(path.join(os.tmpdir(), 'glob-tool-boundary-')),
+    );
+    workspaceDir = path.join(tempDir, 'workspace');
+    secondRootDir = path.join(tempDir, 'second-root');
+    outsideDir = path.join(tempDir, 'outside');
+    await fs.mkdir(workspaceDir, { recursive: true });
+    await fs.mkdir(secondRootDir, { recursive: true });
+    await fs.mkdir(outsideDir, { recursive: true });
+    await fs.writeFile(path.join(workspaceDir, 'inside.txt'), 'inside');
+    await fs.writeFile(path.join(secondRootDir, 'second.txt'), 'second');
+    await fs.writeFile(path.join(outsideDir, 'secret.txt'), 'secret');
+  });
+
+  afterEach(async () => {
+    await fs.rm(tempDir, { recursive: true, force: true });
+    vi.resetAllMocks();
+  });
+
+  it('should not report files a traversing pattern matches outside the workspace', async () => {
+    const globTool = buildTool([workspaceDir]);
+    const params: GlobToolParams = { pattern: '../outside/*.txt' };
+    const invocation = globTool.build(params);
+    const result = await invocation.execute({ abortSignal });
+
+    expect(result.llmContent).toContain('No files found');
+    expect(result.llmContent).not.toContain('secret.txt');
+  }, 30000);
+
+  it('should still report files in additional workspace directories', async () => {
+    const globTool = buildTool([workspaceDir, secondRootDir]);
+    const params: GlobToolParams = { pattern: '**/*.txt' };
+    const invocation = globTool.build(params);
+    const result = await invocation.execute({ abortSignal });
+
+    expect(result.llmContent).toContain('Found 2 file(s)');
+    expect(result.llmContent).toContain(path.join(workspaceDir, 'inside.txt'));
+    expect(result.llmContent).toContain(path.join(secondRootDir, 'second.txt'));
+  }, 30000);
 });
 
 describe('sortFileEntries', () => {
