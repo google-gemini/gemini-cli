@@ -412,6 +412,11 @@ describe('stripShellWrapper', () => {
     );
   });
 
+  it('should not backtrack on long flag runs without -Command (#29203)', () => {
+    const input = `powershell ${'-A '.repeat(30)}tail`;
+    expect(stripShellWrapper(input)).toEqual(input.trim());
+  });
+
   it('should not strip anything if no wrapper is present', () => {
     expect(stripShellWrapper('ls -l')).toEqual('ls -l');
   });
