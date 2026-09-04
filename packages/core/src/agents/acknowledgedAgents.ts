@@ -20,7 +20,15 @@ export interface AcknowledgedAgentsMap {
 function isAcknowledgedAgentsMap(
   value: unknown,
 ): value is AcknowledgedAgentsMap {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+  // Each project entry must itself be a map object: a truthy primitive
+  // (e.g. {"/project": "str"}) would otherwise pass this guard and then
+  // crash acknowledge() with "Cannot create property on string".
+  return Object.values(value).every(
+    (entry) => !!entry && typeof entry === 'object' && !Array.isArray(entry),
+  );
 }
 
 export class AcknowledgedAgentsService {

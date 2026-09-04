@@ -95,7 +95,16 @@ describe('AcknowledgedAgentsService', () => {
     );
   });
 
-  it.each(['null', '42', '"str"', '[]'])(
+  it.each([
+    'null',
+    '42',
+    '"str"',
+    '[]',
+    '{"/project": "str"}',
+    '{"/project": 42}',
+    '{"/project": null}',
+    '{"/project": []}',
+  ])(
     'should fall back to empty for valid JSON with the wrong shape (%s, #29207)',
     async (content) => {
       const ackPath = Storage.getAcknowledgedAgentsPath();
