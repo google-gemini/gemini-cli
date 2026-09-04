@@ -337,6 +337,16 @@ describe('sandboxUtils', () => {
       ).toBe(false);
     });
 
+    it('should not false-positive on nested bin or tmp directories inside commands or skills', () => {
+      const rootDir = '/home/user/.gemini';
+      expect(
+        isCredentialOrSensitivePath('/home/user/.gemini/commands/bin', rootDir),
+      ).toBe(false);
+      expect(
+        isCredentialOrSensitivePath('/home/user/.gemini/skills/tmp', rootDir),
+      ).toBe(false);
+    });
+
     it('should not filter out the root directory itself', () => {
       const rootDir = '/home/user/.gemini';
       expect(isCredentialOrSensitivePath(rootDir, rootDir)).toBe(false);

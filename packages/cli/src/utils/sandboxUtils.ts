@@ -51,7 +51,10 @@ export function isCredentialOrSensitivePath(
   if (SENSITIVE_SETTINGS_FILENAMES.has(base)) {
     return true;
   }
-  if (base === 'history' || base === 'tmp' || base === 'bin') {
+  const isRootChild = rootDir
+    ? path.dirname(path.resolve(targetPath)) === path.resolve(rootDir)
+    : true;
+  if (isRootChild && (base === 'history' || base === 'tmp' || base === 'bin')) {
     return true;
   }
   if (
