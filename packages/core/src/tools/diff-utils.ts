@@ -18,8 +18,12 @@ export function getDiffContextSnippet(
     return newContent;
   }
 
-  const changes = Diff.diffLines(originalContent, newContent);
-  const newLines = newContent.split(/\r?\n/);
+  // Compare logical lines so that changing only the line-ending style does not
+  // turn every line into a diff (for example, when an edit restores CRLF).
+  const normalizedOriginal = originalContent.replace(/\r\n?/g, '\n');
+  const normalizedNew = newContent.replace(/\r\n?/g, '\n');
+  const changes = Diff.diffLines(normalizedOriginal, normalizedNew);
+  const newLines = normalizedNew.split('\n');
   const ranges: Array<{ start: number; end: number }> = [];
   let newLineIdx = 0;
 
