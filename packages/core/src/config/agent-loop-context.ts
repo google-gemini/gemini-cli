@@ -43,4 +43,11 @@ export interface AgentLoopContext {
 
   /** The service used to prepare commands for sandboxed execution. */
   readonly sandboxManager: SandboxManager;
+
+  /**
+   * How many agents deep this context is. Absent (or 0) at the top level; each
+   * nested agent invocation increments it. Used to bound agent-calls-agent
+   * recursion.
+   */
+  readonly agentDepth?: number;
 }
