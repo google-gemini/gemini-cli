@@ -12,18 +12,17 @@ import * as path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { spawnAsync } from './shell-utils.js';
 import { isNodeError, getErrorMessage } from './errors.js';
+import { createCache } from './cache.js';
 
 export interface SecurityCheckResult {
   secure: boolean;
   reason?: string;
 }
 
-const securityCheckCache = new Map<
-  string,
-  { result: SecurityCheckResult; expiresAt: number }
->();
-
-const CACHE_TTL_MS = 10_000;
+const securityCheckCache = createCache<string, SecurityCheckResult>({
+  storage: 'map',
+  defaultTtl: 10_000,
+});
 
 /**
  * Clears the path security cache. Used exclusively for test isolation.
@@ -32,10 +31,9 @@ export function clearSecurityCheckCacheForTesting(): void {
   securityCheckCache.clear();
 }
 
-function buildPowerShellAclScript(targetPath: string): string {
-  const escapedPath = targetPath.replace(/'/g, "''");
+function buildPowerShellAclScript(): string {
   return `
-    $path = '${escapedPath}';
+    $path = $env:GEMINI_TARGET_PATH;
     $acl = Get-Acl -LiteralPath $path;
 
     $trustedSids = @('S-1-5-32-544', 'S-1-5-18', 'S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464');
@@ -104,11 +102,12 @@ function checkPosixStats(
   targetPath: string,
   stats: Stats,
 ): SecurityCheckResult {
+  const pathType = stats.isDirectory() ? 'Directory' : 'File';
   // Check ownership: must be root (uid 0)
   if (stats.uid !== 0) {
     return {
       secure: false,
-      reason: `Directory '${targetPath}' is not owned by root (uid 0). Current uid: ${stats.uid}. To fix this, run: sudo chown root:root "${targetPath}"`,
+      reason: `${pathType} '${targetPath}' is not owned by root (uid 0). Current uid: ${stats.uid}. To fix this, run: sudo chown root:root "${targetPath}"`,
     };
   }
 
@@ -117,7 +116,7 @@ function checkPosixStats(
   if ((mode & (constants.S_IWGRP | constants.S_IWOTH)) !== 0) {
     return {
       secure: false,
-      reason: `Directory '${targetPath}' is writable by group or others (mode: ${mode.toString(
+      reason: `${pathType} '${targetPath}' is writable by group or others (mode: ${mode.toString(
         8,
       )}). To fix this, run: sudo chmod g-w,o-w "${targetPath}"`,
     };
@@ -132,11 +131,14 @@ function validateSinglePathSync(targetPath: string): SecurityCheckResult {
 
     if (os.platform() === 'win32') {
       try {
-        const script = buildPowerShellAclScript(targetPath);
+        const script = buildPowerShellAclScript();
         const { stdout, error, status } = spawnSync(
           'powershell',
           ['-NoProfile', '-NonInteractive', '-Command', script],
-          { encoding: 'utf-8' },
+          {
+            encoding: 'utf-8',
+            env: { ...process.env, GEMINI_TARGET_PATH: targetPath },
+          },
         );
 
         if (error || (status !== null && status !== 0)) {
@@ -175,13 +177,14 @@ async function validateSinglePathAsync(
 
     if (os.platform() === 'win32') {
       try {
-        const script = buildPowerShellAclScript(targetPath);
-        const { stdout } = await spawnAsync('powershell', [
-          '-NoProfile',
-          '-NonInteractive',
-          '-Command',
-          script,
-        ]);
+        const script = buildPowerShellAclScript();
+        const { stdout } = await spawnAsync(
+          'powershell',
+          ['-NoProfile', '-NonInteractive', '-Command', script],
+          {
+            env: { ...process.env, GEMINI_TARGET_PATH: targetPath },
+          },
+        );
         return evaluateWindowsSecurityOutput(stdout, targetPath);
       } catch (error) {
         return {
@@ -212,8 +215,8 @@ async function validateSinglePathAsync(
  */
 export function isPathSecureSync(targetPath: string): SecurityCheckResult {
   const cached = securityCheckCache.get(targetPath);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.result;
+  if (cached) {
+    return cached;
   }
 
   const result = (() => {
@@ -224,7 +227,7 @@ export function isPathSecureSync(targetPath: string): SecurityCheckResult {
 
     const pathHelper = os.platform() === 'win32' ? path.win32 : path;
     const parentDir = pathHelper.dirname(targetPath);
-    if (parentDir && parentDir !== targetPath && fsSync.existsSync(parentDir)) {
+    if (parentDir && parentDir !== targetPath) {
       const parentCheck = validateSinglePathSync(parentDir);
       if (!parentCheck.secure) {
         return parentCheck;
@@ -234,10 +237,7 @@ export function isPathSecureSync(targetPath: string): SecurityCheckResult {
     return { secure: true };
   })();
 
-  securityCheckCache.set(targetPath, {
-    result,
-    expiresAt: Date.now() + CACHE_TTL_MS,
-  });
+  securityCheckCache.set(targetPath, result);
   return result;
 }
 
@@ -252,37 +252,28 @@ export async function isPathSecure(
   targetPath: string,
 ): Promise<SecurityCheckResult> {
   const cached = securityCheckCache.get(targetPath);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.result;
+  if (cached) {
+    return cached;
   }
 
   const targetCheck = await validateSinglePathAsync(targetPath);
   if (!targetCheck.secure) {
-    securityCheckCache.set(targetPath, {
-      result: targetCheck,
-      expiresAt: Date.now() + CACHE_TTL_MS,
-    });
+    securityCheckCache.set(targetPath, targetCheck);
     return targetCheck;
   }
 
   const pathHelper = os.platform() === 'win32' ? path.win32 : path;
   const parentDir = pathHelper.dirname(targetPath);
-  if (parentDir && parentDir !== targetPath && fsSync.existsSync(parentDir)) {
+  if (parentDir && parentDir !== targetPath) {
     const parentCheck = await validateSinglePathAsync(parentDir);
     if (!parentCheck.secure) {
-      securityCheckCache.set(targetPath, {
-        result: parentCheck,
-        expiresAt: Date.now() + CACHE_TTL_MS,
-      });
+      securityCheckCache.set(targetPath, parentCheck);
       return parentCheck;
     }
   }
 
   const secureResult: SecurityCheckResult = { secure: true };
-  securityCheckCache.set(targetPath, {
-    result: secureResult,
-    expiresAt: Date.now() + CACHE_TTL_MS,
-  });
+  securityCheckCache.set(targetPath, secureResult);
   return secureResult;
 }
 

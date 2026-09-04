@@ -50,6 +50,9 @@ describe('isDirectorySecure', () => {
     expect(spawnAsync).toHaveBeenCalledWith(
       'powershell',
       expect.arrayContaining(['-Command', expect.stringContaining('Get-Acl')]),
+      expect.objectContaining({
+        env: expect.objectContaining({ GEMINI_TARGET_PATH: 'C:\\Some\\Path' }),
+      }),
     );
   });
 
@@ -282,6 +285,31 @@ describe('isPathSecureSync', () => {
     );
     expect(result.secure).toBe(false);
     expect(result.reason).toContain('Owner is untrusted: COMPUTER\\Attacker');
+    expect(spawnSync).toHaveBeenCalledWith(
+      'powershell',
+      expect.anything(),
+      expect.objectContaining({
+        env: expect.objectContaining({
+          GEMINI_TARGET_PATH:
+            'C:\\ProgramData\\gemini-cli\\system-defaults.json',
+        }),
+      }),
+    );
+  });
+
+  it('returns secure=false with File prefix on POSIX when file is not owned by root', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('linux');
+    vi.mocked(fsSync.statSync).mockReturnValue({
+      isDirectory: () => false,
+      uid: 1000,
+      mode: 0o644,
+    } as unknown as Stats);
+
+    const result = isPathSecureSync('/etc/gemini-cli/system-defaults.json');
+    expect(result.secure).toBe(false);
+    expect(result.reason).toBe(
+      'File \'/etc/gemini-cli/system-defaults.json\' is not owned by root (uid 0). Current uid: 1000. To fix this, run: sudo chown root:root "/etc/gemini-cli/system-defaults.json"',
+    );
   });
 
   it('returns secure=false on Windows if user groups have write permissions', () => {
@@ -309,7 +337,6 @@ describe('isPathSecureSync', () => {
     vi.spyOn(os, 'platform').mockReturnValue('linux');
     Object.assign(constants, { S_IWGRP: 0, S_IWOTH: 0 });
 
-    vi.mocked(fsSync.existsSync).mockReturnValue(true);
     vi.mocked(fsSync.statSync).mockImplementation((target) => {
       if (target === '/etc/gemini-cli/system-defaults.json') {
         return {
@@ -335,7 +362,6 @@ describe('isPathSecureSync', () => {
     vi.spyOn(os, 'platform').mockReturnValue('linux');
     Object.assign(constants, { S_IWGRP: 0, S_IWOTH: 0 });
 
-    vi.mocked(fsSync.existsSync).mockReturnValue(true);
     vi.mocked(fsSync.statSync).mockImplementation((target) => {
       if (target === '/etc/gemini-cli/system-defaults.json') {
         return {
@@ -393,11 +419,36 @@ describe('isPathSecure', () => {
     expect(result.reason).toContain('Owner is untrusted: COMPUTER\\Attacker');
   });
 
+  it('returns secure=false on POSIX in isPathSecure if parent directory is insecure', async () => {
+    vi.spyOn(os, 'platform').mockReturnValue('linux');
+    Object.assign(constants, { S_IWGRP: 0, S_IWOTH: 0 });
+
+    vi.mocked(fs.stat).mockImplementation(async (target) => {
+      if (target === '/etc/gemini-cli/system-defaults.json') {
+        return {
+          isDirectory: () => false,
+          uid: 0,
+          mode: 0o644,
+        } as unknown as Stats;
+      }
+      return {
+        isDirectory: () => true,
+        uid: 1000,
+        mode: 0o755,
+      } as unknown as Stats;
+    });
+
+    const result = await isPathSecure('/etc/gemini-cli/system-defaults.json');
+    expect(result.secure).toBe(false);
+    expect(result.reason).toContain(
+      "Directory '/etc/gemini-cli' is not owned by root (uid 0)",
+    );
+  });
+
   it('returns secure=true on POSIX if both file and parent directory are secure', async () => {
     vi.spyOn(os, 'platform').mockReturnValue('linux');
     Object.assign(constants, { S_IWGRP: 0, S_IWOTH: 0 });
 
-    vi.mocked(fsSync.existsSync).mockReturnValue(true);
     vi.mocked(fs.stat).mockImplementation(async (target) => {
       if (target === '/etc/gemini-cli/system-defaults.json') {
         return {
