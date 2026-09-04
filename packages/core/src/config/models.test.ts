@@ -19,6 +19,7 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_3_8_FLASH_MODEL,
   DEFAULT_GEMINI_3_5_FLASH_MODEL,
+  SECONDARY_GEMINI_3_5_FLASH_MODEL,
   GEMINI_3_5_FLASH_LITE_MODEL,
   GEMINI_3_6_FLASH_MODEL,
   GEMINI_3_7_FLASH_MODEL,
@@ -881,6 +882,16 @@ describe('resolveModel Gemini 3.5 Flash GA', () => {
     ).toBe(DEFAULT_GEMINI_3_5_FLASH_MODEL);
     expect(
       resolveModel(
+        SECONDARY_GEMINI_3_5_FLASH_MODEL,
+        false,
+        false,
+        true,
+        undefined,
+        true,
+      ),
+    ).toBe(SECONDARY_GEMINI_3_5_FLASH_MODEL);
+    expect(
+      resolveModel(
         GEMINI_3_5_FLASH_LITE_MODEL,
         false,
         false,
@@ -890,24 +901,10 @@ describe('resolveModel Gemini 3.5 Flash GA', () => {
       ),
     ).toBe(GEMINI_3_5_FLASH_LITE_MODEL);
     expect(
-      resolveModel(
-        GEMINI_3_6_FLASH_MODEL,
-        false,
-        false,
-        true,
-        undefined,
-        true,
-      ),
+      resolveModel(GEMINI_3_6_FLASH_MODEL, false, false, true, undefined, true),
     ).toBe(GEMINI_3_6_FLASH_MODEL);
     expect(
-      resolveModel(
-        GEMINI_3_7_FLASH_MODEL,
-        false,
-        false,
-        true,
-        undefined,
-        true,
-      ),
+      resolveModel(GEMINI_3_7_FLASH_MODEL, false, false, true, undefined, true),
     ).toBe(GEMINI_3_7_FLASH_MODEL);
     expect(
       resolveModel(

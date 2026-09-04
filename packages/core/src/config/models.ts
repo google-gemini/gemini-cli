@@ -239,6 +239,7 @@ export function resolveModel(
     isFlashModel(resolved) &&
     normalizedModel !== PREVIEW_GEMINI_FLASH_MODEL &&
     normalizedModel !== DEFAULT_GEMINI_3_5_FLASH_MODEL &&
+    normalizedModel !== SECONDARY_GEMINI_3_5_FLASH_MODEL &&
     normalizedModel !== GEMINI_3_5_FLASH_LITE_MODEL &&
     normalizedModel !== GEMINI_3_6_FLASH_MODEL &&
     normalizedModel !== GEMINI_3_7_FLASH_MODEL &&
