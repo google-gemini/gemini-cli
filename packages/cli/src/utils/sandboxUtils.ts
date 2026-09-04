@@ -6,6 +6,7 @@
 
 import os from 'node:os';
 import fs from 'node:fs';
+import path from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { quote } from 'shell-quote';
 import { debugLogger, GEMINI_DIR } from '@google/gemini-cli-core';
@@ -23,6 +24,75 @@ export const BUILTIN_SEATBELT_PROFILES = [
   'strict-open',
   'strict-proxied',
 ];
+
+/**
+ * Known sensitive or credential file names that must not be mounted into the sandbox container.
+ */
+export const SENSITIVE_SETTINGS_FILENAMES = new Set([
+  'oauth_creds.json',
+  'google_accounts.json',
+  'gemini-credentials.json',
+  'mcp-oauth-tokens.json',
+  'a2a-oauth-tokens.json',
+]);
+
+/**
+ * Returns true if the given file or directory path corresponds to credentials or sensitive data
+ * that must not be mounted into the untrusted sandbox container.
+ */
+export function isCredentialOrSensitivePath(
+  targetPath: string,
+  rootDir?: string,
+): boolean {
+  if (rootDir && path.resolve(targetPath) === path.resolve(rootDir)) {
+    return false;
+  }
+  const base = path.basename(targetPath).toLowerCase();
+  if (SENSITIVE_SETTINGS_FILENAMES.has(base)) {
+    return true;
+  }
+  if (base === 'history' || base === 'tmp' || base === 'bin') {
+    return true;
+  }
+  if (
+    base.endsWith('.credentials') ||
+    base.includes('tokens.json') ||
+    base.includes('creds.json') ||
+    base.includes('credential')
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Creates an isolated settings directory in a temporary location, populated with non-sensitive
+ * configuration files from the user settings directory while excluding credential and auth files.
+ */
+export function prepareIsolatedSettingsDir(
+  userSettingsDirOnHost: string,
+): string {
+  const baseTmpDir = os.tmpdir() || '/tmp';
+  const isolatedDir = fs.mkdtempSync(
+    path.join(baseTmpDir, 'gemini-sandbox-settings-'),
+  );
+
+  if (fs.existsSync(userSettingsDirOnHost)) {
+    try {
+      fs.cpSync(userSettingsDirOnHost, isolatedDir, {
+        recursive: true,
+        filter: (source) =>
+          !isCredentialOrSensitivePath(source, userSettingsDirOnHost),
+      });
+    } catch (err) {
+      debugLogger.warn(
+        `Failed to copy user settings to sandbox directory: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  return isolatedDir;
+}
 
 export function getContainerPath(hostPath: string): string {
   if (os.platform() !== 'win32') {
