@@ -5,12 +5,14 @@
  */
 
 import * as path from 'node:path';
+import * as fs from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { Storage } from '../config/storage.js';
 import { type SkillDefinition, loadSkillsFromDir } from './skillLoader.js';
 import type { GeminiCLIExtension } from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
+import { normalizePath } from '../utils/paths.js';
 
 export { type SkillDefinition };
 
@@ -58,6 +60,11 @@ export class SkillManager {
   ): Promise<void> {
     this.clearSkills();
 
+    // Track real (canonicalized) paths already scanned to prevent duplicate
+    // loading when .gemini and .agents are symlinked/junctioned to the same
+    // physical directory (see GitHub issue #28944).
+    const visitedRealPaths = new Set<string>();
+
     // 1. Built-in skills (lowest precedence)
     await this.discoverBuiltinSkills();
 
@@ -69,12 +76,16 @@ export class SkillManager {
     }
 
     // 3. User skills
-    const userSkills = await loadSkillsFromDir(Storage.getUserSkillsDir());
+    const userSkills = await this.loadSkillsFromUniqueDir(
+      Storage.getUserSkillsDir(),
+      visitedRealPaths,
+    );
     this.addSkillsWithPrecedence(userSkills);
 
     // 3.1 User agent skills alias (.agents/skills)
-    const userAgentSkills = await loadSkillsFromDir(
+    const userAgentSkills = await this.loadSkillsFromUniqueDir(
       Storage.getUserAgentSkillsDir(),
+      visitedRealPaths,
     );
     this.addSkillsWithPrecedence(userAgentSkills);
 
@@ -86,16 +97,57 @@ export class SkillManager {
       return;
     }
 
-    const projectSkills = await loadSkillsFromDir(
+    const projectSkills = await this.loadSkillsFromUniqueDir(
       storage.getProjectSkillsDir(),
+      visitedRealPaths,
     );
     this.addSkillsWithPrecedence(projectSkills);
 
     // 4.1 Workspace agent skills alias (.agents/skills)
-    const projectAgentSkills = await loadSkillsFromDir(
+    const projectAgentSkills = await this.loadSkillsFromUniqueDir(
       storage.getProjectAgentSkillsDir(),
+      visitedRealPaths,
     );
     this.addSkillsWithPrecedence(projectAgentSkills);
+  }
+
+  /**
+   * Loads skills from `dir` unless its real (canonical) path has already been
+   * scanned in this discovery pass.  This prevents duplicate skill loading and
+   * spurious conflict warnings when two logical paths (e.g. `.gemini/skills`
+   * and `.agents/skills`) are symlinked or junctioned to the same physical
+   * directory.
+   *
+   * Resolution failures (ENOENT, broken symlinks, permission errors) are
+   * handled gracefully: the raw `dir` path is used as the fallback key so
+   * that the subsequent `loadSkillsFromDir` call can produce its own
+   * informative error or empty result.
+   */
+  private async loadSkillsFromUniqueDir(
+    dir: string,
+    visitedRealPaths: Set<string>,
+  ): Promise<SkillDefinition[]> {
+    let realKey: string;
+    try {
+      const realPath = await fs.realpath(dir);
+      realKey = normalizePath(realPath);
+    } catch {
+      // Path doesn't exist, is a broken symlink, or we lack permission to
+      // resolve it.  Fall back to a normalized lexical key so that the
+      // directory isn't silently skipped — loadSkillsFromDir will return []
+      // for non-existent paths without any additional warning.
+      realKey = normalizePath(path.resolve(dir));
+    }
+
+    if (visitedRealPaths.has(realKey)) {
+      debugLogger.debug(
+        `Skipping duplicate skill directory (same physical path): ${dir}`,
+      );
+      return [];
+    }
+
+    visitedRealPaths.add(realKey);
+    return loadSkillsFromDir(dir);
   }
 
   /**

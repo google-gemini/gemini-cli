@@ -1348,5 +1348,42 @@ describe('fileUtils', () => {
       expect(formatted).toContain('For full output see: /tmp/out.txt');
       expect(formatted).toContain('[46,000 characters omitted]'); // 50000 - 800 - 3200
     });
+
+    it('should return original content unchanged when content length <= maxChars', () => {
+      const content = 'Hello world!';
+      const outputFile = '/tmp/out.txt';
+
+      // maxChars larger than content length
+      expect(formatTruncatedToolOutput(content, outputFile, 100)).toBe(content);
+      // maxChars equal to content length
+      expect(
+        formatTruncatedToolOutput(content, outputFile, content.length),
+      ).toBe(content);
+    });
+
+    it('should handle maxChars === 0 without duplicating or returning full content', () => {
+      const content = 'B'.repeat(1000);
+      const outputFile = '/tmp/out.txt';
+
+      const formatted = formatTruncatedToolOutput(content, outputFile, 0);
+
+      expect(formatted).toContain('Showing first 0 and last 0 characters');
+      expect(formatted).toContain('[1,000 characters omitted]');
+      // Ensure the original content body is not included
+      expect(formatted).not.toContain(content);
+      expect(formatted.length).toBeLessThan(content.length);
+    });
+
+    it('should handle negative maxChars safely without output inflation or duplication', () => {
+      const content = 'A'.repeat(1000);
+      const outputFile = '/tmp/out.txt';
+
+      const formatted = formatTruncatedToolOutput(content, outputFile, -100);
+
+      expect(formatted).toContain('Showing first 0 and last 0 characters');
+      expect(formatted).toContain('[1,000 characters omitted]');
+      // Fixes #28620: formatted output length must NOT be inflated (~2,000 chars)
+      expect(formatted.length).toBeLessThan(content.length);
+    });
   });
 });
