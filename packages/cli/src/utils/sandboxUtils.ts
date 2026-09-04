@@ -9,7 +9,12 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { quote } from 'shell-quote';
-import { debugLogger, GEMINI_DIR, homedir } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  GEMINI_DIR,
+  homedir,
+  resolveToRealPath,
+} from '@google/gemini-cli-core';
 
 export const LOCAL_DEV_SANDBOX_IMAGE_NAME = 'gemini-cli-sandbox';
 export const SANDBOX_NETWORK_NAME = 'gemini-cli-sandbox';
@@ -36,17 +41,45 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  */
 export function isSensitiveHostPath(hostPath: string): boolean {
   try {
-    const home = path.resolve(homedir());
-    const osHome = path.resolve(os.homedir());
+    let home = path.resolve(homedir());
+    let osHome = path.resolve(os.homedir());
+    try {
+      home = resolveToRealPath(home);
+    } catch {
+      // Keep resolved path if resolveToRealPath fails
+    }
+    try {
+      osHome = resolveToRealPath(osHome);
+    } catch {
+      // Keep resolved path if resolveToRealPath fails
+    }
+
     let expandedPath = hostPath;
     if (hostPath === '~' || hostPath === '~/' || hostPath === '~\\') {
       expandedPath = home;
     } else if (hostPath.startsWith('~/') || hostPath.startsWith('~\\')) {
       expandedPath = path.join(home, hostPath.slice(2));
     }
-    const normalized = path.resolve(expandedPath);
-    const geminiDir = path.resolve(home, GEMINI_DIR);
-    const osGeminiDir = path.resolve(osHome, GEMINI_DIR);
+
+    let resolvedPath = expandedPath;
+    try {
+      resolvedPath = resolveToRealPath(expandedPath);
+    } catch {
+      resolvedPath = path.resolve(expandedPath);
+    }
+    const normalized = resolvedPath;
+    let geminiDir = path.resolve(home, GEMINI_DIR);
+    let osGeminiDir = path.resolve(osHome, GEMINI_DIR);
+    try {
+      geminiDir = resolveToRealPath(geminiDir);
+    } catch {
+      // Keep resolved path if resolveToRealPath fails
+    }
+    try {
+      osGeminiDir = resolveToRealPath(osGeminiDir);
+    } catch {
+      // Keep resolved path if resolveToRealPath fails
+    }
 
     const isWindows = os.platform() === 'win32';
     const arePathsEqual = (p1: string, p2: string) =>

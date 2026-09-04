@@ -150,6 +150,14 @@ describe('macOS Seatbelt Gemini configuration isolation', () => {
       expect(rules).toContain(
         '(literal (string-append (param "HOME_DIR") "/.gemini/a2a-oauth-tokens.json"))',
       );
+      expect(rules).toContain(
+        '(literal (string-append (param "HOME_DIR") "/.gemini/google_accounts.json"))',
+      );
+      expect(rules).toContain(
+        '(literal (string-append (param "HOME_DIR") "/.gemini/trusted_hooks.json"))',
+      );
+      expect(rules).toContain('(regex #"/google_accounts\\.json$")');
+      expect(rules).toContain('(regex #"/trusted_hooks\\.json$")');
     });
   });
 });
@@ -185,6 +193,12 @@ describe('BUILTIN_SEATBELT_PROFILE_CONTENTS consistency', () => {
         );
         expect(embeddedContent).toContain(
           '(literal (string-append (param "HOME_DIR") "/.gemini/oauth_creds.json"))',
+        );
+        expect(embeddedContent).toContain(
+          '(literal (string-append (param "HOME_DIR") "/.gemini/google_accounts.json"))',
+        );
+        expect(embeddedContent).toContain(
+          '(literal (string-append (param "HOME_DIR") "/.gemini/trusted_hooks.json"))',
         );
       });
     },

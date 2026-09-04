@@ -68,11 +68,11 @@ export class Storage {
   }
 
   static getMcpOAuthTokensPath(): string {
-    return path.join(Storage.getGlobalGeminiDir(), 'mcp-oauth-tokens.json');
+    return path.join(Storage.getGlobalRuntimeDir(), 'mcp-oauth-tokens.json');
   }
 
   static getA2AOAuthTokensPath(): string {
-    return path.join(Storage.getGlobalGeminiDir(), 'a2a-oauth-tokens.json');
+    return path.join(Storage.getGlobalRuntimeDir(), 'a2a-oauth-tokens.json');
   }
 
   static getGlobalSettingsPath(): string {
@@ -103,14 +103,14 @@ export class Storage {
   }
 
   static getGoogleAccountsPath(): string {
-    return path.join(Storage.getGlobalGeminiDir(), GOOGLE_ACCOUNTS_FILENAME);
+    return path.join(Storage.getGlobalRuntimeDir(), GOOGLE_ACCOUNTS_FILENAME);
   }
 
   static getTrustedFoldersPath(): string {
     if (process.env['GEMINI_CLI_TRUSTED_FOLDERS_PATH']) {
       return process.env['GEMINI_CLI_TRUSTED_FOLDERS_PATH'];
     }
-    return path.join(Storage.getGlobalGeminiDir(), TRUSTED_FOLDERS_FILENAME);
+    return path.join(Storage.getGlobalRuntimeDir(), TRUSTED_FOLDERS_FILENAME);
   }
 
   static getUserCommandsDir(): string {

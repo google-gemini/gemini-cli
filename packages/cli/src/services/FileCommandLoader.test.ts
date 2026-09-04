@@ -1327,6 +1327,37 @@ describe('FileCommandLoader', () => {
 
       expect(commands).toHaveLength(0);
     });
+
+    it('allows global user commands in listAvailableFiles when folder is not trusted', async () => {
+      const userCommandsDir = Storage.getUserCommandsDir();
+      const projectCommandsDir = path.join(
+        '/path/to/project',
+        '.gemini',
+        'commands',
+      );
+      mock({
+        [userCommandsDir]: {
+          'user_cmd.toml': 'prompt = "User prompt"',
+        },
+        [projectCommandsDir]: {
+          'project_cmd.toml': 'prompt = "Project prompt"',
+        },
+      });
+
+      const mockConfig = {
+        getProjectRoot: vi.fn(() => '/path/to/project'),
+        getExtensions: vi.fn(() => []),
+        getFolderTrust: vi.fn(() => true),
+        isTrustedFolder: vi.fn(() => false),
+      } as unknown as Config;
+
+      const loader = new FileCommandLoader(mockConfig);
+      const groups = await loader.listAvailableFiles();
+
+      expect(groups).toHaveLength(1);
+      expect(groups[0]?.displayName).toBe('User');
+      expect(groups[0]?.files).toEqual(['user_cmd.toml']);
+    });
   });
 
   describe('Aborted signal', () => {

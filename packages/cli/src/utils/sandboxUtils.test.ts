@@ -6,8 +6,10 @@
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import os from 'node:os';
+import path from 'node:path';
 import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { resolveToRealPath } from '@google/gemini-cli-core';
 import {
   getContainerPath,
   parseImageName,
@@ -28,6 +30,7 @@ vi.mock('@google/gemini-cli-core', () => ({
   },
   GEMINI_DIR: '.gemini',
   homedir: vi.fn(() => os.homedir()),
+  resolveToRealPath: vi.fn((p: string) => path.resolve(p)),
 }));
 
 describe('sandboxUtils', () => {
@@ -278,6 +281,32 @@ describe('sandboxUtils', () => {
       expect(isSensitiveHostPath('/home/testuser/project')).toBe(false);
       expect(isSensitiveHostPath('/workspace/app')).toBe(false);
       expect(isSensitiveHostPath('/tmp/test-dir')).toBe(false);
+    });
+
+    it('should resolve symlinks to detect sensitive targets', () => {
+      vi.mocked(os.homedir).mockReturnValue('/home/testuser');
+      vi.mocked(resolveToRealPath).mockImplementation((p: string) => {
+        if (p === '/var/symlink_to_gemini') {
+          return '/home/testuser/.gemini';
+        }
+        if (p === '/var/symlink_to_home') {
+          return '/home/testuser';
+        }
+        return path.resolve(p);
+      });
+
+      expect(isSensitiveHostPath('/var/symlink_to_gemini')).toBe(true);
+      expect(isSensitiveHostPath('/var/symlink_to_home')).toBe(true);
+    });
+
+    it('should safely fall back when resolveToRealPath throws', () => {
+      vi.mocked(os.homedir).mockReturnValue('/home/testuser');
+      vi.mocked(resolveToRealPath).mockImplementation(() => {
+        throw new Error('Path does not exist');
+      });
+
+      expect(isSensitiveHostPath('/home/testuser/.gemini')).toBe(true);
+      expect(isSensitiveHostPath('/workspace/safe-path')).toBe(false);
     });
   });
 

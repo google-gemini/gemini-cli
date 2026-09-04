@@ -152,10 +152,6 @@ export class FileCommandLoader implements ICommandLoader {
    * Lists available .toml command files from user, project, and extension directories.
    */
   async listAvailableFiles(): Promise<CommandFileGroup[]> {
-    if (this.folderTrustEnabled && !this.isTrustedFolder) {
-      return [];
-    }
-
     const directories = this.getCommandDirectories();
     const groups: CommandFileGroup[] = [];
 

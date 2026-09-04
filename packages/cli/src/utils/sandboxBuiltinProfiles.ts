@@ -148,10 +148,14 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
     (literal (string-append (param "HOME_DIR") "/.gemini/gemini-credentials.json"))
     (literal (string-append (param "HOME_DIR") "/.gemini/mcp-oauth-tokens.json"))
     (literal (string-append (param "HOME_DIR") "/.gemini/a2a-oauth-tokens.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/google_accounts.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/trusted_hooks.json"))
     (regex #"/oauth_creds\\.json$")
     (regex #"/gemini-credentials\\.json$")
     (regex #"/mcp-oauth-tokens\\.json$")
     (regex #"/a2a-oauth-tokens\\.json$")
+    (regex #"/google_accounts\\.json$")
+    (regex #"/trusted_hooks\\.json$")
     (regex #"/\\.env($|\\..*)")
 )`,
 
@@ -298,10 +302,14 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
     (literal (string-append (param "HOME_DIR") "/.gemini/gemini-credentials.json"))
     (literal (string-append (param "HOME_DIR") "/.gemini/mcp-oauth-tokens.json"))
     (literal (string-append (param "HOME_DIR") "/.gemini/a2a-oauth-tokens.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/google_accounts.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/trusted_hooks.json"))
     (regex #"/oauth_creds\\.json$")
     (regex #"/gemini-credentials\\.json$")
     (regex #"/mcp-oauth-tokens\\.json$")
     (regex #"/a2a-oauth-tokens\\.json$")
+    (regex #"/google_accounts\\.json$")
+    (regex #"/trusted_hooks\\.json$")
     (regex #"/\\.env($|\\..*)")
 )`,
 
@@ -425,10 +433,14 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
     (literal (string-append (param "HOME_DIR") "/.gemini/gemini-credentials.json"))
     (literal (string-append (param "HOME_DIR") "/.gemini/mcp-oauth-tokens.json"))
     (literal (string-append (param "HOME_DIR") "/.gemini/a2a-oauth-tokens.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/google_accounts.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/trusted_hooks.json"))
     (regex #"/oauth_creds\\.json$")
     (regex #"/gemini-credentials\\.json$")
     (regex #"/mcp-oauth-tokens\\.json$")
     (regex #"/a2a-oauth-tokens\\.json$")
+    (regex #"/google_accounts\\.json$")
+    (regex #"/trusted_hooks\\.json$")
     (regex #"/\\.env($|\\..*)")
 )`,
 
@@ -552,10 +564,14 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
     (literal (string-append (param "HOME_DIR") "/.gemini/gemini-credentials.json"))
     (literal (string-append (param "HOME_DIR") "/.gemini/mcp-oauth-tokens.json"))
     (literal (string-append (param "HOME_DIR") "/.gemini/a2a-oauth-tokens.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/google_accounts.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/trusted_hooks.json"))
     (regex #"/oauth_creds\\.json$")
     (regex #"/gemini-credentials\\.json$")
     (regex #"/mcp-oauth-tokens\\.json$")
     (regex #"/a2a-oauth-tokens\\.json$")
+    (regex #"/google_accounts\\.json$")
+    (regex #"/trusted_hooks\\.json$")
     (regex #"/\\.env($|\\..*)")
 )`,
 
@@ -708,10 +724,14 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
     (literal (string-append (param "HOME_DIR") "/.gemini/gemini-credentials.json"))
     (literal (string-append (param "HOME_DIR") "/.gemini/mcp-oauth-tokens.json"))
     (literal (string-append (param "HOME_DIR") "/.gemini/a2a-oauth-tokens.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/google_accounts.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/trusted_hooks.json"))
     (regex #"/oauth_creds\\.json$")
     (regex #"/gemini-credentials\\.json$")
     (regex #"/mcp-oauth-tokens\\.json$")
     (regex #"/a2a-oauth-tokens\\.json$")
+    (regex #"/google_accounts\\.json$")
+    (regex #"/trusted_hooks\\.json$")
     (regex #"/\\.env($|\\..*)")
 )`,
 
@@ -864,10 +884,14 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
     (literal (string-append (param "HOME_DIR") "/.gemini/gemini-credentials.json"))
     (literal (string-append (param "HOME_DIR") "/.gemini/mcp-oauth-tokens.json"))
     (literal (string-append (param "HOME_DIR") "/.gemini/a2a-oauth-tokens.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/google_accounts.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/trusted_hooks.json"))
     (regex #"/oauth_creds\\.json$")
     (regex #"/gemini-credentials\\.json$")
     (regex #"/mcp-oauth-tokens\\.json$")
     (regex #"/a2a-oauth-tokens\\.json$")
+    (regex #"/google_accounts\\.json$")
+    (regex #"/trusted_hooks\\.json$")
     (regex #"/\\.env($|\\..*)")
 )`,
 };
