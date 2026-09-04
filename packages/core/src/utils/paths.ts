@@ -440,9 +440,10 @@ function robustRealpath(p: string, visited = new Set<string>()): string {
         : fs.realpathSync;
     let resolved = realpathFn(p);
     if (process.platform === 'win32' && typeof resolved === 'string') {
-      if (resolved.slice(0, 8).toUpperCase() === '\\\\?\\UNC\\') {
+      const upper = resolved.toUpperCase();
+      if (upper.startsWith('\\\\?\\UNC\\')) {
         resolved = '\\\\' + resolved.slice(8);
-      } else if (resolved.startsWith('\\\\?\\')) {
+      } else if (upper.startsWith('\\\\?\\')) {
         resolved = resolved.slice(4);
       }
     }
@@ -648,6 +649,11 @@ export function trimTrailingSpacesAndDots(str: string): string {
   return str.slice(0, end + 1);
 }
 
+const GIT_SFN_REGEX = /^(git|gi[0-9a-f]{4})~\d+$/;
+const ENV_SFN_REGEX = /^(env|en[0-9a-f]{4})~\d+$/;
+const NODE_MODULES_SFN_REGEX = /^(node_m|no[0-9a-f]{4})~\d+$/;
+const GHA_CREDS_SFN_REGEX = /^(gha-cr|gh[0-9a-f]{4})~\d+\.jso(n)?$/;
+
 /**
  * Checks if a path string contains any blocked segments (.git, .env, node_modules, gha-creds-*.json)
  * including case-insensitive matches and NTFS 8.3 short names.
@@ -663,15 +669,15 @@ export function hasBlockedPathSegment(p: string): boolean {
       clean === '.git' ||
       clean === '.env' ||
       clean === 'node_modules' ||
-      /^(git|gi[0-9a-f]{4})~\d+$/.test(clean) ||
-      /^(env|en[0-9a-f]{4})~\d+$/.test(clean) ||
-      /^(node_m|no[0-9a-f]{4})~\d+$/.test(clean)
+      GIT_SFN_REGEX.test(clean) ||
+      ENV_SFN_REGEX.test(clean) ||
+      NODE_MODULES_SFN_REGEX.test(clean)
     ) {
       return true;
     }
     if (
       (clean.startsWith('gha-creds-') && clean.endsWith('.json')) ||
-      /^(gha-cr|gh[0-9a-f]{4})~\d+\.jso(n)?$/.test(clean)
+      GHA_CREDS_SFN_REGEX.test(clean)
     ) {
       return true;
     }

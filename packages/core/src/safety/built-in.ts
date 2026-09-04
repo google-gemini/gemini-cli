@@ -17,6 +17,8 @@ import {
   trimTrailingSpacesAndDots,
 } from '../utils/paths.js';
 
+const VSCODE_SFN_REGEX = /^(vscode|vs[0-9a-f]{4})~\d+$/;
+
 /**
  * Interface for all in-process safety checkers.
  */
@@ -83,7 +85,7 @@ export class AllowedPathChecker implements InProcessChecker {
           ).toLowerCase();
           if (
             clean === '.vscode' ||
-            /^(vscode|vs[0-9a-f]{4})~\d+$/.test(clean)
+            VSCODE_SFN_REGEX.test(clean)
           ) {
             isVscodePath = true;
           }
