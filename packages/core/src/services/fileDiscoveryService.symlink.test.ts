@@ -164,4 +164,22 @@ describe('FileDiscoveryService - Symlink Ignore Handling', () => {
     // it should dynamically detect that the target is a directory and match 'ignored_dir/'
     expect(service.shouldIgnoreFile('link_to_dir')).toBe(true);
   });
+
+  it('should ignore symlinks pointing outside the project root (Scenario G)', async () => {
+    // Create an external directory outside projectRoot
+    const outsideDir = path.join(testRootDir, 'outside');
+    await fs.mkdir(outsideDir, { recursive: true });
+    await fs.writeFile(
+      path.join(outsideDir, 'external.txt'),
+      'outside content',
+    );
+
+    const linkPath = path.join(projectRoot, 'my_link');
+    await fs.symlink(outsideDir, linkPath);
+
+    const service = new FileDiscoveryService(projectRoot);
+    expect(service.shouldIgnoreFile('my_link')).toBe(true);
+    expect(service.shouldIgnoreDirectory('my_link')).toBe(true);
+    expect(service.filterFiles(['my_link'])).toEqual([]);
+  });
 });

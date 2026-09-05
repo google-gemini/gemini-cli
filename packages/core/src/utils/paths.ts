@@ -402,10 +402,29 @@ export function assertValidPathString(p: unknown): asserts p is string {
 }
 
 /**
+ * Strips Windows extended-length path prefixes (\\?\ and \\?\UNC\) from a path.
+ * Converts \\?\UNC\server\share to \\server\share, and \\?\C:\path to C:\path.
+ */
+export function stripExtendedLengthPrefix(p: string): string {
+  if (typeof p !== 'string') return p;
+  if (
+    /^\\\\[?][\\/](?:UNC|unc)[\\/]/.test(p) ||
+    /^\/\/[?][\\/](?:UNC|unc)[\\/]/.test(p)
+  ) {
+    return '\\\\' + p.slice(8);
+  }
+  if (/^\\\\[?][\\/]/.test(p) || /^\/\/[?][\\/]/.test(p)) {
+    return p.slice(4);
+  }
+  return p;
+}
+
+/**
  * Resolves a path to its real path, sanitizing it first.
  * - Removes 'file://' protocol if present.
  * - Decodes URI components (e.g. %20 -> space).
  * - Resolves symbolic links using fs.realpathSync.
+ * - Strips Windows extended-length path prefixes (\\?\ and \\?\UNC\).
  *
  * @param pathStr The path string to resolve.
  * @returns The resolved real path.
@@ -424,7 +443,8 @@ export function resolveToRealPath(pathStr: string): string {
     // Ignore error (e.g. malformed URI), keep path from previous step
   }
 
-  return robustRealpath(path.resolve(resolvedPath));
+  const result = robustRealpath(path.resolve(resolvedPath));
+  return stripExtendedLengthPrefix(result);
 }
 
 function robustRealpath(p: string, visited = new Set<string>()): string {
