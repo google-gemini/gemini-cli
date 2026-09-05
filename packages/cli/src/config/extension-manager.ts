@@ -859,20 +859,10 @@ Would you like to attempt to install via "git clone" instead?`,
         }
       }
 
-      const contextFiles = getContextFileNames(config)
-        .map((contextFileName) => {
-          const contextFilePath = path.join(
-            effectiveExtensionPath,
-            contextFileName,
-          );
-          if (!isSubpath(effectiveExtensionPath, contextFilePath)) {
-            throw new Error(
-              `Invalid context file path: "${contextFileName}". Context files must be within the extension directory.`,
-            );
-          }
-          return contextFilePath;
-        })
-        .filter((contextFilePath) => fs.existsSync(contextFilePath));
+      const contextFiles = resolveContextFilePaths(
+        config,
+        effectiveExtensionPath,
+      );
 
       const hydrationContext: VariableContext = {
         extensionPath: effectiveExtensionPath,
@@ -959,6 +949,21 @@ Would you like to attempt to install via "git clone" instead?`,
         );
       }
 
+      let plan = config.plan;
+      if (plan?.directory) {
+        if (
+          typeof plan.directory !== 'string' ||
+          path.isAbsolute(plan.directory) ||
+          path.win32.isAbsolute(plan.directory) ||
+          plan.directory.includes('..')
+        ) {
+          debugLogger.warn(
+            `[ExtensionManager] Invalid plan.directory in extension "${config.name}": "${plan.directory}". Relative parent navigation and absolute paths are not allowed.`,
+          );
+          plan = undefined;
+        }
+      }
+
       return {
         name: config.name,
         version: config.version,
@@ -981,7 +986,7 @@ Would you like to attempt to install via "git clone" instead?`,
         themes: config.themes,
         rules,
         checkers,
-        plan: config.plan,
+        plan,
       };
     } catch (e) {
       debugLogger.error(
@@ -1278,6 +1283,120 @@ function getContextFileNames(config: ExtensionConfig): string[] {
     return [config.contextFileName];
   }
   return config.contextFileName;
+}
+
+/**
+ * Context file candidate path validation result.
+ */
+export interface ContextPathValidationResult {
+  isValid: boolean;
+  resolvedPath?: string;
+  errorMessage?: string;
+}
+
+/**
+ * Validates a single context file candidate path against the extension root.
+ * Enforces directory boundary and path formatting by:
+ * - Requiring a non-empty string without null bytes.
+ * - Rejecting absolute paths (both POSIX and Windows formats).
+ * - Disallowing relative parent directory references (e.g. '..'), including URL-encoded variations.
+ * - Verifying that the resolved path stays strictly within the extension root directory.
+ */
+export function validateContextFilePath(
+  contextFileName: unknown,
+  effectiveExtensionPath: string,
+): ContextPathValidationResult {
+  if (typeof contextFileName !== 'string' || !contextFileName.trim()) {
+    return {
+      isValid: false,
+      errorMessage: 'expected a non-empty string.',
+    };
+  }
+
+  if (contextFileName.includes('\0')) {
+    return {
+      isValid: false,
+      errorMessage: 'null bytes are not allowed.',
+    };
+  }
+
+  // Reject absolute paths upfront (both POSIX and Windows formats)
+  if (
+    path.isAbsolute(contextFileName) ||
+    path.win32.isAbsolute(contextFileName)
+  ) {
+    return {
+      isValid: false,
+      errorMessage: 'Absolute paths are not allowed.',
+    };
+  }
+
+  // Disallow relative parent directory references (e.g. ..)
+  let decodedFileName = contextFileName;
+  try {
+    decodedFileName = decodeURIComponent(contextFileName);
+  } catch {
+    debugLogger.debug(
+      `[ExtensionManager] Could not decode URI component in contextFileName: "${contextFileName}". Proceeding with undecoded name.`,
+    );
+  }
+
+  if (contextFileName.includes('..') || decodedFileName.includes('..')) {
+    return {
+      isValid: false,
+      errorMessage:
+        'Relative parent directory references ("..") are not allowed.',
+    };
+  }
+
+  const resolvedExtensionRoot = path.resolve(effectiveExtensionPath);
+  const contextFilePath = path.resolve(resolvedExtensionRoot, contextFileName);
+
+  // Verify that contextFilePath is strictly within resolvedExtensionRoot
+  if (!isSubpath(resolvedExtensionRoot, contextFilePath)) {
+    return {
+      isValid: false,
+      errorMessage: `escapes the extension directory boundary ("${resolvedExtensionRoot}").`,
+    };
+  }
+
+  return {
+    isValid: true,
+    resolvedPath: contextFilePath,
+  };
+}
+
+/**
+ * Resolves and validates context file paths defined in an extension configuration.
+ * Hardens path resolution and enforces directory boundaries by:
+ * - Validating each candidate context file path using validateContextFilePath.
+ * - Logging a warning when an invalid path is detected and skipping loading that context file.
+ * - Returning only paths that exist on disk.
+ */
+export function resolveContextFilePaths(
+  config: ExtensionConfig,
+  effectiveExtensionPath: string,
+): string[] {
+  return getContextFileNames(config)
+    .map((contextFileName) => {
+      const validation = validateContextFilePath(
+        contextFileName,
+        effectiveExtensionPath,
+      );
+
+      if (!validation.isValid) {
+        debugLogger.warn(
+          `[ExtensionManager] Invalid contextFileName: "${contextFileName}" in extension "${config.name}". ${validation.errorMessage}`,
+        );
+        return null;
+      }
+
+      return validation.resolvedPath!;
+    })
+    .filter(
+      (contextFilePath): contextFilePath is string =>
+        contextFilePath !== null && fs.existsSync(contextFilePath),
+    );
 }
 
 function validateName(name: string) {

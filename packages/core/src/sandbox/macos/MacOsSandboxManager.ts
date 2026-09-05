@@ -48,17 +48,14 @@ export class MacOsSandboxManager implements SandboxManager {
 
   constructor(private readonly options: GlobalSandboxOptions) {}
 
-  isKnownSafeCommand(args: string[]): boolean {
-    const toolName = args[0];
-    const approvedTools = this.options.modeConfig?.approvedTools ?? [];
-    if (toolName && approvedTools.includes(toolName)) {
-      return true;
-    }
-    return isKnownSafeCommand(args);
+  isKnownSafeCommand(args: string[], cwd?: string): boolean {
+    const effectiveCwd = cwd ?? this.options.workspace;
+    return isKnownSafeCommand(args, effectiveCwd, this.options.workspace);
   }
 
-  isDangerousCommand(args: string[]): boolean {
-    return isDangerousCommand(args);
+  isDangerousCommand(args: string[], cwd?: string): boolean {
+    const effectiveCwd = cwd ?? this.options.workspace;
+    return isDangerousCommand(args, effectiveCwd, this.options.workspace);
   }
 
   parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined {
