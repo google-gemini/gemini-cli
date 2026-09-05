@@ -85,6 +85,7 @@ import {
   AuthType,
   type MCPServerConfig,
 } from '@google/gemini-cli-core';
+import * as core from '@google/gemini-cli-core';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
 import {
   getSettingsSchema,
@@ -3528,6 +3529,106 @@ MALICIOUS_VAR=allowed-because-trusted
         expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe(
           'attacker-projectinject',
         );
+      });
+    });
+
+    describe('system configuration security', () => {
+      beforeEach(() => {
+        vi.mocked(isWorkspaceTrusted).mockReturnValue({
+          isTrusted: true,
+          source: 'file',
+        });
+      });
+
+      it('should skip system-defaults.json when insecure and record a warning', () => {
+        resetSettingsCacheForTesting();
+        vi.mocked(fs.existsSync).mockImplementation(
+          (p) => String(p) === getSystemDefaultsPath(),
+        );
+        vi.mocked(fs.readFileSync).mockImplementation((p) => {
+          if (String(p) === getSystemDefaultsPath()) {
+            return JSON.stringify({
+              hooks: {
+                onSessionStart: { command: 'malicious-command.exe' },
+              },
+            });
+          }
+          return '';
+        });
+        vi.spyOn(core, 'isFileAndDirectorySecureSync').mockReturnValue({
+          secure: false,
+          reason:
+            'Directory is insecure. User group Users has write permissions.',
+        });
+
+        const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+        expect(settings.systemDefaults.settings).toEqual({});
+        expect(settings.errors).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              message: expect.stringContaining('Skipping system defaults file'),
+              severity: 'warning',
+            }),
+          ]),
+        );
+      });
+
+      it('should skip system settings.json when insecure and record a warning', () => {
+        resetSettingsCacheForTesting();
+        vi.mocked(fs.existsSync).mockImplementation(
+          (p) => String(p) === getSystemSettingsPath(),
+        );
+        vi.mocked(fs.readFileSync).mockImplementation((p) => {
+          if (String(p) === getSystemSettingsPath()) {
+            return JSON.stringify({
+              hooks: {
+                onSessionStart: { command: 'malicious-command.exe' },
+              },
+            });
+          }
+          return '';
+        });
+        vi.spyOn(core, 'isFileAndDirectorySecureSync').mockReturnValue({
+          secure: false,
+          reason: 'File is not owned by root (uid 0).',
+        });
+
+        const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+        expect(settings.system.settings).toEqual({});
+        expect(settings.errors).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              message: expect.stringContaining('Skipping system settings file'),
+              severity: 'warning',
+            }),
+          ]),
+        );
+      });
+
+      it('should load system-defaults.json when secure', () => {
+        resetSettingsCacheForTesting();
+        vi.mocked(fs.existsSync).mockImplementation(
+          (p) => String(p) === getSystemDefaultsPath(),
+        );
+        vi.mocked(fs.readFileSync).mockImplementation((p) => {
+          if (String(p) === getSystemDefaultsPath()) {
+            return JSON.stringify({
+              ui: { theme: 'corporate-theme' },
+            });
+          }
+          return '';
+        });
+        vi.spyOn(core, 'isFileAndDirectorySecureSync').mockReturnValue({
+          secure: true,
+        });
+
+        const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+        expect(settings.systemDefaults.settings).toEqual({
+          ui: { theme: 'corporate-theme' },
+        });
       });
     });
   });

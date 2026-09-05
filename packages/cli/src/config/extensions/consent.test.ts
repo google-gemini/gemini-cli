@@ -240,11 +240,127 @@ describe('consent', () => {
         await expectConsentSnapshot(consentString);
       });
 
+      it('should sort environment variables alphabetically and handle undefined envValue', async () => {
+        const config: ExtensionConfig = {
+          ...baseConfig,
+          mcpServers: {
+            server1: {
+              command: 'node',
+              args: ['server.js'],
+              env: {
+                VAR_B: 'b',
+                VAR_A: 'a',
+                VAR_C: undefined as unknown as string,
+              },
+            },
+          },
+        };
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          config,
+          requestConsent,
+          false,
+          undefined,
+        );
+
+        expect(requestConsent).toHaveBeenCalledTimes(1);
+        const consentString = requestConsent.mock.calls[0][0] as string;
+        expect(consentString).toContain('      - VAR_A: a');
+        expect(consentString).toContain('      - VAR_B: b');
+        expect(consentString).toContain('      - VAR_C: ');
+
+        const posA = consentString.indexOf('      - VAR_A: a');
+        const posB = consentString.indexOf('      - VAR_B: b');
+        const posC = consentString.indexOf('      - VAR_C: ');
+        expect(posA).toBeLessThan(posB);
+        expect(posB).toBeLessThan(posC);
+      });
+
+      it('should mask sensitive environment variables, headers, and OAuth parameters', async () => {
+        const config: ExtensionConfig = {
+          ...baseConfig,
+          mcpServers: {
+            server1: {
+              command: 'node',
+              args: ['server.js'],
+              env: {
+                SAFE_VAR: 'safe-value',
+                SUPER_TOKEN: 'secret-token-123',
+                DB_PASSWORD: 'my-password',
+              },
+              headers: {
+                'X-API-Key': 'some-api-key',
+                Authorization: 'Bearer 12345',
+                'Content-Type': 'application/json',
+              },
+              oauth: {
+                clientId: 'my-client-id',
+                clientSecret: 'secret-oauth-value',
+              },
+            },
+          },
+        };
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          config,
+          requestConsent,
+          false,
+          undefined,
+        );
+
+        expect(requestConsent).toHaveBeenCalledTimes(1);
+        const consentString = requestConsent.mock.calls[0][0] as string;
+
+        // Assert sensitive env values are masked
+        expect(consentString).toContain('      - SAFE_VAR: safe-value');
+        expect(consentString).toContain('      - SUPER_TOKEN: ********');
+        expect(consentString).toContain('      - DB_PASSWORD: ********');
+
+        // Assert sensitive headers are masked
+        expect(consentString).toContain(
+          '      - Content-Type: application/json',
+        );
+        expect(consentString).toContain('      - Authorization: ********');
+        expect(consentString).toContain('      - X-API-Key: ********');
+
+        // Assert sensitive OAuth parameters are masked
+        expect(consentString).toContain('      - clientId: my-client-id');
+        expect(consentString).toContain('      - clientSecret: ********');
+      });
+
       it('should request consent if mcpServers change', async () => {
         const prevConfig: ExtensionConfig = { ...baseConfig };
         const newConfig: ExtensionConfig = {
           ...baseConfig,
           mcpServers: { server1: { command: 'npm', args: ['start'] } },
+        };
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          newConfig,
+          requestConsent,
+          false,
+          prevConfig,
+          false,
+        );
+        expect(requestConsent).toHaveBeenCalledTimes(1);
+      });
+
+      it('should request consent if mcpServer env changes', async () => {
+        const prevConfig: ExtensionConfig = {
+          ...baseConfig,
+          mcpServers: {
+            server1: { command: 'node', args: ['server.js'] },
+          },
+        };
+        const newConfig: ExtensionConfig = {
+          ...baseConfig,
+          mcpServers: {
+            server1: {
+              command: 'node',
+              args: ['server.js'],
+              env: { NODE_OPTIONS: '--require=./payload.js' },
+            },
+          },
         };
         const requestConsent = vi.fn().mockResolvedValue(true);
         await maybeRequestConsentOrFail(

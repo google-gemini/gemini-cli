@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+vi.unmock('@google/gemini-cli-core');
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';

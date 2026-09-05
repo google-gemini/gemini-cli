@@ -21,6 +21,7 @@ import {
   toPathKey,
   isTrustedSystemPath,
   resolveDefensiveToolPath,
+  stripExtendedLengthPrefix,
 } from './paths.js';
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -602,6 +603,28 @@ describe('resolveToRealPath', () => {
 
     expect(() => resolveToRealPath(maliciousPath)).toThrow(
       /Infinite recursion detected/,
+    );
+  });
+});
+
+describe('stripExtendedLengthPrefix', () => {
+  it('strips \\\\?\\ prefix', () => {
+    expect(stripExtendedLengthPrefix('\\\\?\\C:\\foo\\bar')).toBe(
+      'C:\\foo\\bar',
+    );
+  });
+
+  it('strips \\\\?\\UNC\\ prefix and replaces with \\\\', () => {
+    expect(
+      stripExtendedLengthPrefix('\\\\?\\UNC\\server\\share\\foo\\bar'),
+    ).toBe('\\\\server\\share\\foo\\bar');
+  });
+
+  it('preserves normal paths without extended prefixes', () => {
+    expect(stripExtendedLengthPrefix('C:\\foo\\bar')).toBe('C:\\foo\\bar');
+    expect(stripExtendedLengthPrefix('/foo/bar')).toBe('/foo/bar');
+    expect(stripExtendedLengthPrefix('\\\\server\\share\\file')).toBe(
+      '\\\\server\\share\\file',
     );
   });
 });
