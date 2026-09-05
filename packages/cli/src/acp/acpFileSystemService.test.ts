@@ -39,6 +39,7 @@ describe('AcpFileSystemService', () => {
     mockFallback = {
       readTextFile: vi.fn(),
       writeTextFile: vi.fn(),
+      readBinaryFile: vi.fn(),
     };
     vi.mocked(os.homedir).mockReturnValue('/home/user');
   });
@@ -231,6 +232,31 @@ describe('AcpFileSystemService', () => {
         code: 'ENOENT',
         message: 'Resource not found for directory',
       });
+    });
+  });
+
+  describe('readBinaryFile', () => {
+    it('should always delegate to the fallback, since ACP has no binary read capability', async () => {
+      // Even with both fs capabilities advertised and the path inside root,
+      // there is no ACP wire method for binary content, so this must never
+      // reach the connection and must always use the fallback (which may
+      // itself be a SandboxedFileSystemService enforcing path validation).
+      service = new AcpFileSystemService(
+        mockConnection,
+        'session-1',
+        { readTextFile: true, writeTextFile: true },
+        mockFallback,
+        '/path/to',
+      );
+      const binaryContent = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+      vi.mocked(mockFallback.readBinaryFile).mockResolvedValue(binaryContent);
+
+      const result = await service.readBinaryFile('/path/to/image.png');
+
+      expect(result).toBe(binaryContent);
+      expect(mockFallback.readBinaryFile).toHaveBeenCalledWith(
+        '/path/to/image.png',
+      );
     });
   });
 });

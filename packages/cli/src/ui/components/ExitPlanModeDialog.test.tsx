@@ -166,6 +166,7 @@ Implement a comprehensive authentication system with multiple providers.
           getFileSystemService: (): FileSystemService => ({
             readTextFile: vi.fn(),
             writeTextFile: vi.fn(),
+            readBinaryFile: vi.fn(),
           }),
           getUseAlternateBuffer: () => useAlternateBuffer,
           getUseTerminalBuffer: () => false,
@@ -474,6 +475,7 @@ Implement a comprehensive authentication system with multiple providers.
                 getFileSystemService: (): FileSystemService => ({
                   readTextFile: vi.fn(),
                   writeTextFile: vi.fn(),
+                  readBinaryFile: vi.fn(),
                 }),
                 getUseAlternateBuffer: () => useAlternateBuffer ?? true,
                 getUseTerminalBuffer: () => false,

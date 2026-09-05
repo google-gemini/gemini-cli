@@ -25,6 +25,17 @@ export interface FileSystemService {
    * @param content - The content to write
    */
   writeTextFile(filePath: string, content: string): Promise<void>;
+
+  /**
+   * Read the raw bytes of a file (images, PDFs, audio, video, or any other
+   * binary content). Implementations MUST return the exact on-disk bytes —
+   * do not round-trip through a string encoding, since that is lossy for
+   * binary data.
+   *
+   * @param filePath - The path to the file to read
+   * @returns The file content as a Buffer
+   */
+  readBinaryFile(filePath: string): Promise<Buffer>;
 }
 
 /**
@@ -37,5 +48,9 @@ export class StandardFileSystemService implements FileSystemService {
 
   async writeTextFile(filePath: string, content: string): Promise<void> {
     await fs.writeFile(filePath, content, 'utf-8');
+  }
+
+  async readBinaryFile(filePath: string): Promise<Buffer> {
+    return fs.readFile(filePath);
   }
 }

@@ -37,7 +37,10 @@ import {
   getRealPath,
   isEmpty,
 } from './fileUtils.js';
-import { StandardFileSystemService } from '../services/fileSystemService.js';
+import {
+  StandardFileSystemService,
+  type FileSystemService,
+} from '../services/fileSystemService.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 
 vi.mock('mime/lite', () => ({
@@ -819,6 +822,50 @@ describe('fileUtils', () => {
       expect(result.returnDisplay).toContain('File not found');
     });
 
+    it('should route text file reads through a non-standard FileSystemService', async () => {
+      // On-disk content differs from what the injected service returns, so
+      // asserting on the service's content (not the disk content) proves the
+      // read was routed through it rather than reading local disk directly.
+      // This is the behavior an ACP client's fs/read_text_file capability
+      // (or a sandboxed FileSystemService) relies on.
+      actualNodeFs.writeFileSync(testTextFilePath, 'stale on-disk content');
+      const clientContent = 'fresh content from the client';
+      const readTextFile = vi.fn().mockResolvedValue(clientContent);
+      const clientBackedService: FileSystemService = {
+        readTextFile,
+        writeTextFile: vi.fn(),
+        readBinaryFile: vi.fn(),
+      };
+
+      const result = await processSingleFileContent(
+        testTextFilePath,
+        tempRootDir,
+        clientBackedService,
+      );
+
+      expect(readTextFile).toHaveBeenCalledWith(testTextFilePath);
+      expect(result.llmContent).toBe(clientContent);
+      expect(result.error).toBeUndefined();
+    });
+
+    it('should still use the BOM-aware reader for the standard FileSystemService', async () => {
+      const utf8Bom = Buffer.from([0xef, 0xbb, 0xbf]);
+      const content = 'Line 1\nLine 2';
+      actualNodeFs.writeFileSync(
+        testTextFilePath,
+        Buffer.concat([utf8Bom, Buffer.from(content, 'utf8')]),
+      );
+
+      const result = await processSingleFileContent(
+        testTextFilePath,
+        tempRootDir,
+        new StandardFileSystemService(),
+      );
+
+      // The BOM should be stripped, matching readFileWithEncoding's behavior.
+      expect(result.llmContent).toBe(content);
+    });
+
     it('should handle read errors for text files', async () => {
       actualNodeFs.writeFileSync(testTextFilePath, 'content'); // File must exist for initial statSync
       const readError = new Error('Simulated read error');
@@ -915,6 +962,66 @@ describe('fileUtils', () => {
         (result.llmContent as { inlineData: { data: string } }).inlineData.data,
       ).toBe(fakeMp3Data.toString('base64'));
       expect(result.returnDisplay).toContain('Read audio file: audio.mp3');
+    });
+
+    it('should route image file reads through a non-standard FileSystemService', async () => {
+      // On-disk content differs from what the injected service returns, so
+      // asserting on the service's content (not the disk content) proves the
+      // binary read was routed through it rather than reading local disk
+      // directly. This is the security property a SandboxedFileSystemService
+      // relies on to enforce its path validation for binary files.
+      actualNodeFs.writeFileSync(testImageFilePath, 'stale on-disk bytes');
+      mockMimeGetType.mockReturnValue('image/png');
+      const clientBinaryData = Buffer.from('fresh bytes from the client');
+      const readBinaryFile = vi.fn().mockResolvedValue(clientBinaryData);
+      const clientBackedService: FileSystemService = {
+        readTextFile: vi.fn(),
+        writeTextFile: vi.fn(),
+        readBinaryFile,
+      };
+
+      const result = await processSingleFileContent(
+        testImageFilePath,
+        tempRootDir,
+        clientBackedService,
+      );
+
+      expect(readBinaryFile).toHaveBeenCalledWith(testImageFilePath);
+      expect(
+        (result.llmContent as { inlineData: { data: string } }).inlineData.data,
+      ).toBe(clientBinaryData.toString('base64'));
+    });
+
+    it('should route audio file reads through a non-standard FileSystemService', async () => {
+      // detectFileType() does its own on-disk binary-content sniff (to avoid
+      // MIME misidentification) before dispatching to the audio branch, so
+      // the on-disk bytes must still look like binary audio; the actual
+      // returned content, however, should come from the injected service,
+      // not from what's on disk.
+      const staleOnDiskBytes = Buffer.from([
+        0x49, 0x44, 0x33, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00,
+      ]);
+      actualNodeFs.writeFileSync(testAudioFilePath, staleOnDiskBytes);
+      mockMimeGetType.mockReturnValue('audio/mpeg');
+      const clientBinaryData = Buffer.from('fresh audio bytes from the client');
+      const readBinaryFile = vi.fn().mockResolvedValue(clientBinaryData);
+      const clientBackedService: FileSystemService = {
+        readTextFile: vi.fn(),
+        writeTextFile: vi.fn(),
+        readBinaryFile,
+      };
+
+      const result = await processSingleFileContent(
+        testAudioFilePath,
+        tempRootDir,
+        clientBackedService,
+      );
+
+      expect(readBinaryFile).toHaveBeenCalledWith(testAudioFilePath);
+      expect(
+        (result.llmContent as { inlineData: { data: string } }).inlineData.data,
+      ).toBe(clientBinaryData.toString('base64'));
     });
 
     it('should normalize supported audio mime types before returning inline data', async () => {
