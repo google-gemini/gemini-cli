@@ -754,7 +754,7 @@ export class Config implements McpContext, AgentLoopContext {
   private _toolRegistry!: ToolRegistry;
   private mcpClientManager?: McpClientManager;
   private readonly a2aClientManager?: A2AClientManager;
-  private allowedMcpServers: string[];
+  private allowedMcpServers: string[] | undefined;
   private blockedMcpServers: string[];
   private allowedEnvironmentVariables: string[];
   private blockedEnvironmentVariables: string[];
@@ -1071,7 +1071,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.mcpEnablementCallbacks = params.mcpEnablementCallbacks;
     this.mcpEnabled = params.mcpEnabled ?? true;
     this.extensionsEnabled = params.extensionsEnabled ?? true;
-    this.allowedMcpServers = params.allowedMcpServers ?? [];
+    this.allowedMcpServers = this.mcpEnabled ? params.allowedMcpServers : [];
     this.blockedMcpServers = params.blockedMcpServers ?? [];
     this.allowedEnvironmentVariables = params.allowedEnvironmentVariables ?? [];
     this.blockedEnvironmentVariables = params.blockedEnvironmentVariables ?? [];
