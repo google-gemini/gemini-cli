@@ -603,10 +603,12 @@ export async function createPolicyEngineConfig(
   // In non-interactive mode, automatically allow all configured MCP servers if opted-in.
   // This ensures that tools provided by these servers are available without
   // requiring explicit entries in settings.mcp.allowed.
+  const hasExplicitEmptyMcpAllowlist = settings.mcp?.allowed?.length === 0;
   if (
     !interactive &&
     settings.mcp?.autoAllowInHeadless &&
-    settings.mcpServers
+    settings.mcpServers &&
+    !hasExplicitEmptyMcpAllowlist
   ) {
     for (const serverName of Object.keys(settings.mcpServers)) {
       // Avoid duplicates if already explicitly allowed, allowed via wildcard, or trusted.
