@@ -272,6 +272,24 @@ description: Test sanitization
     expect(skills[0].name).toBe('gke-prs-troubleshooter');
   });
 
+  it('should parse skill with single-line description and trailing spaces in frontmatter delimiters', async () => {
+    const skillDir = path.join(testRootDir, 'trailing-space-skill');
+    await fs.mkdir(skillDir, { recursive: true });
+    const skillFile = path.join(skillDir, 'SKILL.md');
+    await fs.writeFile(
+      skillFile,
+      `--- \nname: test-skill \ndescription: A single line description that is relatively long and contains some punctuation.\n--- \n# Test Skill\nContent here.`,
+    );
+
+    const skills = await loadSkillsFromDir(testRootDir);
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe('test-skill');
+    expect(skills[0].description).toBe(
+      'A single line description that is relatively long and contains some punctuation.',
+    );
+  });
+
   it('should load real built-in antigravity-support skill successfully', async () => {
     const { fileURLToPath } = await import('node:url');
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
