@@ -70,8 +70,7 @@ export class WorkspaceContext {
   /**
    * Adds a directory to the workspace.
    * @param directory The directory path to add (can be relative or absolute)
-   * @param basePath Optional base path for resolving relative paths (defaults to cwd)
-   * @throws Error if the directory cannot be added
+   *    * @throws Error if the directory cannot be added
    */
   addDirectory(directory: string): void {
     const result = this.addDirectories([directory]);
