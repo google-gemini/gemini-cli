@@ -18,7 +18,7 @@ export interface ResolvedProvider {
 
 export class ProviderRegistry {
   private providers = new Map<string, ModelProvider>();
-  private defaultModel = 'placeholder';
+  private defaultModel = 'gemini-3.8-flash-high';
 
   constructor() {
     this.register(new PlaceholderProvider());

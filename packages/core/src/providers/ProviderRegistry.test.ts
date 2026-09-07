@@ -24,6 +24,20 @@ describe('ProviderRegistry', () => {
     expect(providers).not.toContain('openai');
   });
 
+  it('resolves to Antigravity (gemini-3.8-flash-high) by default when no model is specified', () => {
+    const registry = new ProviderRegistry();
+    const resolved = registry.resolve();
+    expect(resolved.provider.name).toBe('agy');
+    expect(resolved.model).toBe('gemini-3.8-flash-high');
+  });
+
+  it('still resolves placeholder when explicitly requested', () => {
+    const registry = new ProviderRegistry();
+    const resolved = registry.resolve('placeholder');
+    expect(resolved.provider.name).toBe('placeholder');
+    expect(resolved.model).toBe('placeholder');
+  });
+
   it('resolves bare provider names to their default models', () => {
     const registry = new ProviderRegistry();
 

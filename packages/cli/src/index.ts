@@ -28,7 +28,7 @@ Usage:
 Options:
   -v, --version         Show Zoe version
   -h, --help            Show this help message
-  -m, --model <name>    Run with a specific model (e.g. llama3.2, mistral)
+  -m, --model <name>    Run with a specific model (e.g. agy, codex, claude, llama3.2)
 
 Interactive Slash Commands:
   /help                 Show all available slash commands
