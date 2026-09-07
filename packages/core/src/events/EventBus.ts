@@ -10,6 +10,7 @@ export interface ZoeEvents {
   'session:start': { sessionId: string };
   'session:end': { sessionId: string; reason?: string };
   'user:input': { text: string };
+  'runtime:stream': { chunk: string; fullText: string };
   'runtime:message': { content: string; role: 'assistant' | 'system' };
   'runtime:state': { state: 'idle' | 'processing' | 'error' };
   'command:result': { command: string; success: boolean; message?: string };

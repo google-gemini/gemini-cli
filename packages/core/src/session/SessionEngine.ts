@@ -6,7 +6,8 @@
 
 import { randomUUID } from 'node:crypto';
 import { EventBus } from '../events/EventBus.js';
-import { PlaceholderRuntime, type ZoeRuntime } from '../runtime/PlaceholderRuntime.js';
+import type { ModelProvider, ChatMessage } from '../providers/ModelProvider.js';
+import { PlaceholderProvider } from '../providers/placeholder/PlaceholderProvider.js';
 
 export interface SessionMessage {
   id: string;
@@ -17,17 +18,40 @@ export interface SessionMessage {
 
 export type SessionState = 'idle' | 'processing' | 'error';
 
+export interface SessionEngineOptions {
+  provider?: ModelProvider;
+  model?: string;
+  eventBus?: EventBus;
+}
+
 export class SessionEngine {
   public readonly id: string;
   public readonly events: EventBus;
-  private runtime: ZoeRuntime;
+  private provider: ModelProvider;
+  private model: string;
   private messages: SessionMessage[] = [];
   private state: SessionState = 'idle';
 
-  constructor(runtime?: ZoeRuntime, eventBus?: EventBus) {
+  constructor(options: SessionEngineOptions = {}) {
     this.id = randomUUID();
-    this.events = eventBus ?? new EventBus();
-    this.runtime = runtime ?? new PlaceholderRuntime();
+    this.events = options.eventBus ?? new EventBus();
+    this.provider = options.provider ?? new PlaceholderProvider();
+    this.model = options.model ?? 'placeholder';
+  }
+
+  public getProvider(): ModelProvider {
+    return this.provider;
+  }
+
+  public getModel(): string {
+    return this.model;
+  }
+
+  public setProvider(provider: ModelProvider, model?: string): void {
+    this.provider = provider;
+    if (model) {
+      this.model = model;
+    }
   }
 
   public start(): void {
@@ -80,17 +104,39 @@ export class SessionEngine {
     this.events.emit('runtime:state', { state: 'processing' });
 
     try {
-      const response = await this.runtime.process(trimmed);
+      const chatMessages: ChatMessage[] = this.messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+
+      let accumulated = '';
+      for await (const event of this.provider.chat({
+        messages: chatMessages,
+        model: this.model,
+      })) {
+        if (event.type === 'chunk') {
+          accumulated += event.text;
+          this.events.emit('runtime:stream', {
+            chunk: event.text,
+            fullText: accumulated,
+          });
+        } else if (event.type === 'complete') {
+          accumulated = event.fullText || accumulated;
+        } else if (event.type === 'error') {
+          throw event.error;
+        }
+      }
+
       const assistantMsg: SessionMessage = {
         id: randomUUID(),
-        role: response.role,
-        content: response.content,
+        role: 'assistant',
+        content: accumulated,
         timestamp: Date.now(),
       };
       this.messages.push(assistantMsg);
       this.events.emit('runtime:message', {
-        content: response.content,
-        role: response.role,
+        content: accumulated,
+        role: 'assistant',
       });
 
       this.state = 'idle';

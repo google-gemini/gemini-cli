@@ -20,6 +20,7 @@ export interface MainScreenProps {
 export function MainScreen({ session, commands }: MainScreenProps): React.JSX.Element {
   const { exit } = useApp();
   const [messages, setMessages] = useState<SessionMessage[]>(session.getMessages());
+  const [streamingText, setStreamingText] = useState<string>('');
   const [state, setState] = useState(session.getState());
 
   useEffect(() => {
@@ -27,19 +28,33 @@ export function MainScreen({ session, commands }: MainScreenProps): React.JSX.El
       setMessages(session.getMessages());
     };
 
+    const handleStream = (data: { chunk: string; fullText: string }) => {
+      setStreamingText(data.fullText);
+    };
+
+    const handleMessage = () => {
+      setStreamingText('');
+      updateMessages();
+    };
+
     const updateState = (data: { state: 'idle' | 'processing' | 'error' }) => {
       setState(data.state);
+      if (data.state === 'idle') {
+        setStreamingText('');
+      }
       updateMessages();
     };
 
     session.events.on('user:input', updateMessages);
-    session.events.on('runtime:message', updateMessages);
+    session.events.on('runtime:stream', handleStream);
+    session.events.on('runtime:message', handleMessage);
     session.events.on('history:cleared', updateMessages);
     session.events.on('runtime:state', updateState);
 
     return () => {
       session.events.off('user:input', updateMessages);
-      session.events.off('runtime:message', updateMessages);
+      session.events.off('runtime:stream', handleStream);
+      session.events.off('runtime:message', handleMessage);
       session.events.off('history:cleared', updateMessages);
       session.events.off('runtime:state', updateState);
     };
@@ -69,7 +84,7 @@ export function MainScreen({ session, commands }: MainScreenProps): React.JSX.El
   return (
     <Box flexDirection="column" paddingX={1} paddingY={0}>
       <Header />
-      <MessageList messages={messages} />
+      <MessageList messages={messages} streamingText={streamingText} />
       <InputPrompt
         onSubmit={handleSubmit}
         onExit={handleExit}

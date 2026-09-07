@@ -10,15 +10,17 @@ import type { SessionMessage } from '@zoe/core';
 
 export interface MessageListProps {
   messages: SessionMessage[];
+  streamingText?: string;
 }
 
-export function MessageList({ messages }: MessageListProps): React.JSX.Element {
+export function MessageList({ messages, streamingText }: MessageListProps): React.JSX.Element {
   return (
     <Box flexDirection="column">
-      {messages.map((msg) => {
+      {messages.map((msg, index) => {
+        const key = `${msg.id}-${index}`;
         if (msg.role === 'user') {
           return (
-            <Box key={msg.id} marginY={0}>
+            <Box key={key} marginY={0}>
               <Text color="gray">zoe &gt; </Text>
               <Text color="white">{msg.content}</Text>
             </Box>
@@ -26,17 +28,23 @@ export function MessageList({ messages }: MessageListProps): React.JSX.Element {
         }
         if (msg.role === 'system') {
           return (
-            <Box key={msg.id} marginY={0}>
+            <Box key={key} marginY={0}>
               <Text color="yellow">{msg.content}</Text>
             </Box>
           );
         }
         return (
-          <Box key={msg.id} marginY={0}>
+          <Box key={key} marginY={0}>
             <Text color="white">{msg.content}</Text>
           </Box>
         );
       })}
+
+      {streamingText ? (
+        <Box marginY={0}>
+          <Text color="white">{streamingText}</Text>
+        </Box>
+      ) : null}
     </Box>
   );
 }

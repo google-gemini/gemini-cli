@@ -8,16 +8,37 @@
 
 import React from 'react';
 import { render } from 'ink';
-import { SessionEngine, ZoeConfig } from '@zoe/core';
+import { SessionEngine, ZoeConfig, ProviderRegistry } from '@zoe/core';
 import { CommandRegistry } from './commands/CommandRegistry.js';
 import { MainScreen } from './ui/screens/MainScreen.js';
+
+function parseModelArg(args: string[]): string | undefined {
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--model' || args[i] === '-m') {
+      return args[i + 1];
+    }
+    if (args[i].startsWith('--model=')) {
+      return args[i].slice('--model='.length);
+    }
+  }
+  return undefined;
+}
 
 export async function run(): Promise<void> {
   process.title = 'zoe';
 
   const config = new ZoeConfig();
-  const session = new SessionEngine();
-  const commands = new CommandRegistry();
+  const providerRegistry = new ProviderRegistry();
+
+  const cliModel = parseModelArg(process.argv.slice(2));
+  const targetModel = cliModel || config.getSettings().model || 'placeholder';
+  const resolved = providerRegistry.resolve(targetModel);
+
+  const session = new SessionEngine({
+    provider: resolved.provider,
+    model: resolved.model,
+  });
+  const commands = new CommandRegistry(providerRegistry);
 
   session.start();
 
@@ -25,7 +46,6 @@ export async function run(): Promise<void> {
     React.createElement(MainScreen, { session, commands })
   );
 
-  // Handle termination signals
   const cleanup = () => {
     session.end('signal_interrupt');
     process.exit(0);

@@ -13,6 +13,7 @@ describe('CommandRegistry', () => {
     const registry = new CommandRegistry();
     expect(registry.isCommand('/help')).toBe(true);
     expect(registry.isCommand('/exit')).toBe(true);
+    expect(registry.isCommand('/model')).toBe(true);
     expect(registry.isCommand('hello')).toBe(false);
   });
 
@@ -31,9 +32,32 @@ describe('CommandRegistry', () => {
     expect(typeof result).toBe('string');
     expect(result).toContain('Available commands:');
     expect(result).toContain('/help');
+    expect(result).toContain('/model');
     expect(result).toContain('/exit');
     expect(result).toContain('/clear');
     expect(exited).toBe(false);
+  });
+
+  it('inspects and switches model with /model', async () => {
+    const registry = new CommandRegistry();
+    const session = new SessionEngine({ model: 'placeholder' });
+
+    // Inspect
+    const inspectResult = await registry.execute('/model', {
+      session,
+      exit: () => {},
+    });
+    expect(inspectResult).toContain('Active provider: placeholder');
+    expect(inspectResult).toContain('Active model: placeholder');
+
+    // Switch to ollama model
+    const switchResult = await registry.execute('/model llama3.2', {
+      session,
+      exit: () => {},
+    });
+    expect(switchResult).toContain('Switched model to llama3.2 (ollama)');
+    expect(session.getModel()).toBe('llama3.2');
+    expect(session.getProvider().name).toBe('ollama');
   });
 
   it('executes /version', async () => {
