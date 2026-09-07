@@ -14,6 +14,7 @@ export interface ZoeEvents {
   'runtime:stream': { chunk: string; fullText: string };
   'runtime:message': { content: string; role: 'assistant' | 'system' };
   'runtime:state': { state: 'idle' | 'processing' | 'error' };
+  'runtime:status': { message: string; step?: 'thinking' | 'tool' | 'streaming' | 'idle' | 'error' };
   'command:result': { command: string; success: boolean; message?: string };
   'history:cleared': Record<string, never>;
   'provider:changed': { provider: ModelProvider; model: string };

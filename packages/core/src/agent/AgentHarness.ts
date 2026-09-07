@@ -103,6 +103,10 @@ export class AgentHarness {
       }
 
       // Notify UI that a tool execution started
+      this.events?.emit('runtime:status', {
+        message: `Inspecting codebase with ${toolName}...`,
+        step: 'tool',
+      });
       const toolStatusMessage = `\n[Inspecting: ${toolName}...]\n`;
       yield { type: 'chunk', text: toolStatusMessage };
 
@@ -115,6 +119,11 @@ export class AgentHarness {
       } catch (err: unknown) {
         toolResult = `Error executing tool "${toolName}": ${err instanceof Error ? err.message : String(err)}`;
       }
+
+      this.events?.emit('runtime:status', {
+        message: `Analyzing results with ${this.provider.name}...`,
+        step: 'thinking',
+      });
 
       // Add assistant output and tool result to working conversation
       workingMessages.push({ role: 'assistant', content: assistantText });

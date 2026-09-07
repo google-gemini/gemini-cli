@@ -152,6 +152,10 @@ export class SessionEngine {
     // Transition state
     this.state = 'processing';
     this.events.emit('runtime:state', { state: 'processing' });
+    this.events.emit('runtime:status', {
+      message: `Thinking with ${this.provider.name} (${this.model})...`,
+      step: 'thinking',
+    });
 
     try {
       // Evaluate active mentoring policy
@@ -166,6 +170,12 @@ export class SessionEngine {
       let accumulated = '';
       for await (const event of this.harness.run(chatMessages, activePolicy, knowledgeProfile)) {
         if (event.type === 'chunk') {
+          if (!accumulated) {
+            this.events.emit('runtime:status', {
+              message: `Generating response with ${this.provider.name}...`,
+              step: 'streaming',
+            });
+          }
           accumulated += event.text;
           this.events.emit('runtime:stream', {
             chunk: event.text,
@@ -191,9 +201,11 @@ export class SessionEngine {
       });
 
       this.state = 'idle';
+      this.events.emit('runtime:status', { message: '', step: 'idle' });
       this.events.emit('runtime:state', { state: 'idle' });
     } catch (error) {
       this.state = 'error';
+      this.events.emit('runtime:status', { message: '', step: 'error' });
       this.events.emit('runtime:state', { state: 'error' });
       const errorMsg: SessionMessage = {
         id: randomUUID(),
@@ -207,6 +219,7 @@ export class SessionEngine {
         role: 'system',
       });
       this.state = 'idle';
+      this.events.emit('runtime:status', { message: '', step: 'idle' });
       this.events.emit('runtime:state', { state: 'idle' });
     }
   }

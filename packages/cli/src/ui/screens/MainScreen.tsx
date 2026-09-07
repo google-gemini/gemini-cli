@@ -21,6 +21,8 @@ export function MainScreen({ session, commands }: MainScreenProps): React.JSX.El
   const { exit } = useApp();
   const [messages, setMessages] = useState<SessionMessage[]>(session.getMessages());
   const [streamingText, setStreamingText] = useState<string>('');
+  const [statusMessage, setStatusMessage] = useState<string>('');
+  const [startTime, setStartTime] = useState<number | undefined>(undefined);
   const [state, setState] = useState(session.getState());
   const [providerName, setProviderName] = useState(session.getProvider().name);
   const [modelName, setModelName] = useState(session.getModel());
@@ -34,15 +36,24 @@ export function MainScreen({ session, commands }: MainScreenProps): React.JSX.El
       setStreamingText(data.fullText);
     };
 
+    const handleStatus = (data: { message: string; step?: string }) => {
+      setStatusMessage(data.message);
+    };
+
     const handleMessage = () => {
       setStreamingText('');
+      setStatusMessage('');
       updateMessages();
     };
 
     const updateState = (data: { state: 'idle' | 'processing' | 'error' }) => {
       setState(data.state);
-      if (data.state === 'idle') {
+      if (data.state === 'processing') {
+        setStartTime(Date.now());
+      } else {
         setStreamingText('');
+        setStatusMessage('');
+        setStartTime(undefined);
       }
       updateMessages();
     };
@@ -54,6 +65,7 @@ export function MainScreen({ session, commands }: MainScreenProps): React.JSX.El
 
     session.events.on('user:input', updateMessages);
     session.events.on('runtime:stream', handleStream);
+    session.events.on('runtime:status', handleStatus);
     session.events.on('runtime:message', handleMessage);
     session.events.on('history:cleared', updateMessages);
     session.events.on('runtime:state', updateState);
@@ -62,6 +74,7 @@ export function MainScreen({ session, commands }: MainScreenProps): React.JSX.El
     return () => {
       session.events.off('user:input', updateMessages);
       session.events.off('runtime:stream', handleStream);
+      session.events.off('runtime:status', handleStatus);
       session.events.off('runtime:message', handleMessage);
       session.events.off('history:cleared', updateMessages);
       session.events.off('runtime:state', updateState);
@@ -101,6 +114,8 @@ export function MainScreen({ session, commands }: MainScreenProps): React.JSX.El
         messages={messages}
         streamingText={streamingText}
         isProcessing={state === 'processing'}
+        statusText={statusMessage}
+        startTime={startTime}
       />
       <InputPrompt
         onSubmit={handleSubmit}

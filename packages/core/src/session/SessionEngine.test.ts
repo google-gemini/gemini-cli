@@ -28,8 +28,15 @@ describe('SessionEngine', () => {
   it('handles user input, streams tokens, and returns Zoe core is running.', async () => {
     const events = new EventBus();
     const chunks: string[] = [];
+    const statuses: string[] = [];
+
     events.on('runtime:stream', (data) => {
       chunks.push(data.chunk);
+    });
+    events.on('runtime:status', (data) => {
+      if (data.message) {
+        statuses.push(data.message);
+      }
     });
 
     const session = new SessionEngine({ eventBus: events });
@@ -44,6 +51,8 @@ describe('SessionEngine', () => {
     expect(messages[1].role).toBe('assistant');
     expect(messages[1].content).toBe('Zoe core is running.');
     expect(chunks.join('')).toBe('Zoe core is running.');
+    expect(statuses.length).toBeGreaterThan(0);
+    expect(statuses[0]).toContain('Thinking with placeholder');
   });
 
   it('clears message history', async () => {

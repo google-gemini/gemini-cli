@@ -7,14 +7,23 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import type { SessionMessage } from '@zoe/core';
+import { LiveStatus, StreamingCursor } from './LiveStatus.js';
 
 export interface MessageListProps {
   messages: SessionMessage[];
   streamingText?: string;
   isProcessing?: boolean;
+  statusText?: string;
+  startTime?: number;
 }
 
-export function MessageList({ messages, streamingText, isProcessing }: MessageListProps): React.JSX.Element {
+export function MessageList({
+  messages,
+  streamingText,
+  isProcessing,
+  statusText,
+  startTime,
+}: MessageListProps): React.JSX.Element {
   return (
     <Box flexDirection="column">
       {messages.map((msg, index) => {
@@ -22,8 +31,10 @@ export function MessageList({ messages, streamingText, isProcessing }: MessageLi
         if (msg.role === 'user') {
           return (
             <Box key={key} marginY={0}>
-              <Text color="gray">zoe &gt; </Text>
-              <Text color="white">{msg.content}</Text>
+              <Text>
+                <Text color="gray">zoe &gt; </Text>
+                <Text color="white">{msg.content}</Text>
+              </Text>
             </Box>
           );
         }
@@ -42,14 +53,18 @@ export function MessageList({ messages, streamingText, isProcessing }: MessageLi
       })}
 
       {isProcessing && !streamingText ? (
-        <Box marginY={0}>
-          <Text color="cyan" dimColor>Thinking...</Text>
-        </Box>
+        <LiveStatus statusText={statusText} startTime={startTime} />
       ) : null}
 
       {streamingText ? (
-        <Box marginY={0}>
-          <Text color="white">{streamingText}</Text>
+        <Box flexDirection="column" marginY={0}>
+          <Text>
+            <Text color="white">{streamingText}</Text>
+            {isProcessing ? <StreamingCursor /> : null}
+          </Text>
+          {isProcessing ? (
+            <LiveStatus statusText={statusText || 'Streaming response...'} startTime={startTime} />
+          ) : null}
         </Box>
       ) : null}
     </Box>
