@@ -34,6 +34,7 @@ import {
   resolveToRealPath,
 } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
+import { withPathLock } from '../utils/pathMutex.js';
 import { correctPath } from '../utils/pathCorrector.js';
 import type { Config } from '../config/config.js';
 import { CoreToolCallStatus } from '../scheduler/types.js';
@@ -911,6 +912,21 @@ class EditToolInvocation
       };
     }
 
+    // Serialize the whole read-modify-write against other writers of this
+    // path. Two edits scheduled in parallel (common with sub-agents) would
+    // otherwise both read the original content, and whichever wrote second
+    // would silently discard the other's edit while still reporting success.
+    return withPathLock(this.resolvedPath, () => this.applyEdit(signal));
+  }
+
+  /**
+   * Computes and applies the edit.
+   *
+   * Must be called while holding the path lock for `this.resolvedPath`, so
+   * that the read in `calculateEdit` and the subsequent write cannot be
+   * interleaved with another writer of the same file.
+   */
+  private async applyEdit(signal: AbortSignal): Promise<ToolResult> {
     let editData: CalculatedEdit;
     try {
       editData = await this.calculateEdit(this.params, signal);

@@ -490,5 +490,37 @@ describe('GitService', () => {
       expect(hoistedMockRaw).toHaveBeenCalledWith('rev-parse', 'HEAD');
       expect(commitHash).toBe('current-head-hash');
     });
+
+    it('does not interleave staging and committing across concurrent snapshots', async () => {
+      const events: string[] = [];
+      hoistedMockAdd.mockImplementation(async () => {
+        events.push('add:start');
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        events.push('add:end');
+      });
+      hoistedMockStatus.mockResolvedValue({ isClean: () => false });
+      hoistedMockCommit.mockImplementation(async (message: string) => {
+        events.push(`commit:${message}`);
+        return { commit: `hash-${message}` };
+      });
+
+      const service = new GitService(projectRoot, storage);
+      await Promise.all([
+        service.createFileSnapshot('A'),
+        service.createFileSnapshot('B'),
+      ]);
+
+      // `add('.')` stages the whole working tree, so a second snapshot that
+      // stages while the first has not committed yet folds the first
+      // snapshot's files into its own commit.
+      expect(events).toEqual([
+        'add:start',
+        'add:end',
+        'commit:A',
+        'add:start',
+        'add:end',
+        'commit:B',
+      ]);
+    });
   });
 });
