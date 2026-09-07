@@ -9,6 +9,7 @@ import { PlaceholderProvider } from './placeholder/PlaceholderProvider.js';
 import { OllamaProvider } from './ollama/OllamaProvider.js';
 import { GroqProvider } from './groq/GroqProvider.js';
 import { OpenRouterProvider } from './openrouter/OpenRouterProvider.js';
+import { OpenAiProvider } from './openai/OpenAiProvider.js';
 
 export interface ResolvedProvider {
   provider: ModelProvider;
@@ -24,6 +25,7 @@ export class ProviderRegistry {
     this.register(new OllamaProvider());
     this.register(new GroqProvider());
     this.register(new OpenRouterProvider());
+    this.register(new OpenAiProvider());
   }
 
   public register(provider: ModelProvider): void {
@@ -59,12 +61,17 @@ export class ProviderRegistry {
       return { provider: openrouter, model: 'meta-llama/llama-3.3-70b-instruct' };
     }
 
+    if (lower === 'openai') {
+      const openai = this.get('openai') ?? new OpenAiProvider();
+      return { provider: openai, model: 'gpt-4o-mini' };
+    }
+
     if (lower === 'ollama') {
       const ollama = this.get('ollama') ?? new OllamaProvider();
       return { provider: ollama, model: 'llama3.2' };
     }
 
-    // Explicit format: provider:model (e.g. groq:qwen/qwen3.8-27b, openrouter:anthropic/claude-3.5-sonnet)
+    // Explicit format: provider:model (e.g. groq:qwen/qwen3.8-27b, openrouter:anthropic/claude-3.5-sonnet, openai:gpt-4o)
     if (target.includes(':') && !target.startsWith('http')) {
       const [providerName, ...rest] = target.split(':');
       const innerModel = rest.join(':');
@@ -72,6 +79,12 @@ export class ProviderRegistry {
       if (provider) {
         return { provider, model: innerModel };
       }
+    }
+
+    // Direct OpenAI model name aliases (gpt-4o, gpt-4o-mini, o1, o3-mini)
+    if (lower.startsWith('gpt-') || lower.startsWith('o1') || lower.startsWith('o3')) {
+      const openai = this.get('openai') ?? new OpenAiProvider();
+      return { provider: openai, model: target };
     }
 
     // Active models hosted on Groq

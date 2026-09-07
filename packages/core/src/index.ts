@@ -13,6 +13,7 @@ export * from './providers/ProviderRegistry.js';
 export * from './providers/placeholder/PlaceholderProvider.js';
 export * from './providers/ollama/OllamaProvider.js';
 export * from './providers/openai/OpenAiCompatibleProvider.js';
+export * from './providers/openai/OpenAiProvider.js';
 export * from './providers/groq/GroqProvider.js';
 export * from './providers/openrouter/OpenRouterProvider.js';
 export * from './permissions/Capability.js';

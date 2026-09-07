@@ -55,6 +55,9 @@ export class OpenAiCompatibleProvider implements ModelProvider {
       if (this.apiKeyEnvVar === 'OPENROUTER_API_KEY' && settings.openrouterApiKey) {
         return settings.openrouterApiKey.trim();
       }
+      if (this.apiKeyEnvVar === 'OPENAI_API_KEY' && settings.openaiApiKey) {
+        return settings.openaiApiKey.trim();
+      }
     } catch {
       // Ignore config read error
     }

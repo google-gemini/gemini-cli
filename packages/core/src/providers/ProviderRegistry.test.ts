@@ -16,6 +16,7 @@ describe('ProviderRegistry', () => {
     expect(providers).toContain('ollama');
     expect(providers).toContain('groq');
     expect(providers).toContain('openrouter');
+    expect(providers).toContain('openai');
   });
 
   it('resolves bare provider names to their default models', () => {
@@ -28,6 +29,10 @@ describe('ProviderRegistry', () => {
     const openrouter = registry.resolve('openrouter');
     expect(openrouter.provider.name).toBe('openrouter');
     expect(openrouter.model).toBe('meta-llama/llama-3.3-70b-instruct');
+
+    const openai = registry.resolve('openai');
+    expect(openai.provider.name).toBe('openai');
+    expect(openai.model).toBe('gpt-4o-mini');
 
     const ollama = registry.resolve('ollama');
     expect(ollama.provider.name).toBe('ollama');
@@ -44,6 +49,22 @@ describe('ProviderRegistry', () => {
     const openrouterModel = registry.resolve('openrouter:anthropic/claude-3.5-sonnet');
     expect(openrouterModel.provider.name).toBe('openrouter');
     expect(openrouterModel.model).toBe('anthropic/claude-3.5-sonnet');
+
+    const openaiModel = registry.resolve('openai:gpt-4o');
+    expect(openaiModel.provider.name).toBe('openai');
+    expect(openaiModel.model).toBe('gpt-4o');
+  });
+
+  it('resolves direct gpt- and o1- model names to openai', () => {
+    const registry = new ProviderRegistry();
+
+    const gpt = registry.resolve('gpt-4o');
+    expect(gpt.provider.name).toBe('openai');
+    expect(gpt.model).toBe('gpt-4o');
+
+    const o1 = registry.resolve('o1-mini');
+    expect(o1.provider.name).toBe('openai');
+    expect(o1.model).toBe('o1-mini');
   });
 
   it('resolves slash prefixed provider names', () => {

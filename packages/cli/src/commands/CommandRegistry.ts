@@ -52,12 +52,12 @@ export class CommandRegistry {
           `Active provider: ${ctx.session.getProvider().name}`,
           `Active model: ${ctx.session.getModel()}`,
           '',
-          'Available providers: ollama, groq, openrouter',
+          'Available providers: ollama, groq, openrouter, openai',
           'Examples:',
           '  /model llama3.2                              (Local Ollama)',
-          '  /model groq:llama-3.3-70b-versatile          (Groq ultra-fast inference)',
+          '  /model groq:qwen/qwen3.8-27b                 (Groq ultra-fast inference)',
           '  /model openrouter:anthropic/claude-3.5-sonnet (OpenRouter)',
-          '  /model deepseek/deepseek-r1                  (OpenRouter shortcut)',
+          '  /model gpt-4o                                (OpenAI GPT-4o)',
         ].join('\n');
       }
 
@@ -75,9 +75,9 @@ export class CommandRegistry {
       if (!provider || !key) {
         return [
           'Usage: /key <provider> <api_key>',
-          'Providers: groq, openrouter',
-          'Example: /key groq gsk_your_key_here',
-          'Note: You can also set GROQ_API_KEY or OPENROUTER_API_KEY environment variables.',
+          'Providers: groq, openrouter, openai',
+          'Example: /key openai sk-proj-...',
+          'Note: You can also set GROQ_API_KEY, OPENROUTER_API_KEY, or OPENAI_API_KEY environment variables.',
         ].join('\n');
       }
 
@@ -90,8 +90,12 @@ export class CommandRegistry {
         config.save({ openrouterApiKey: key, model: 'meta-llama/llama-3.3-70b-instruct' });
         process.env['OPENROUTER_API_KEY'] = key;
         return 'OpenRouter API key saved successfully.';
+      } else if (provider === 'openai') {
+        config.save({ openaiApiKey: key, model: 'gpt-4o-mini' });
+        process.env['OPENAI_API_KEY'] = key;
+        return 'OpenAI API key saved successfully. Default model set to gpt-4o-mini.';
       } else {
-        return `Unknown provider "${provider}". Supported providers for /key: groq, openrouter`;
+        return `Unknown provider "${provider}". Supported providers for /key: groq, openrouter, openai`;
       }
     });
 

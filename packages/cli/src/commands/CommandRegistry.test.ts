@@ -92,6 +92,15 @@ describe('CommandRegistry', () => {
     expect(orResult).toContain('Switched model to anthropic/claude-3.5-sonnet (openrouter)');
     expect(session.getModel()).toBe('anthropic/claude-3.5-sonnet');
     expect(session.getProvider().name).toBe('openrouter');
+
+    // Switch to openai model
+    const openaiResult = await registry.execute('/model gpt-4o', {
+      session,
+      exit: () => {},
+    });
+    expect(openaiResult).toContain('Switched model to gpt-4o (openai)');
+    expect(session.getModel()).toBe('gpt-4o');
+    expect(session.getProvider().name).toBe('openai');
   });
 
   it('configures API keys with /key', async () => {
@@ -121,6 +130,14 @@ describe('CommandRegistry', () => {
     });
     expect(orKeyResult).toContain('OpenRouter API key saved successfully');
     expect(process.env['OPENROUTER_API_KEY']).toBe('sk-or-987654');
+
+    // Set OpenAI key
+    const openaiKeyResult = await registry.execute('/key openai sk-proj-112233', {
+      session,
+      exit: () => {},
+    });
+    expect(openaiKeyResult).toContain('OpenAI API key saved successfully');
+    expect(process.env['OPENAI_API_KEY']).toBe('sk-proj-112233');
 
     fs.rmSync(tempDir, { recursive: true, force: true });
   });

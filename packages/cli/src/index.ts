@@ -107,6 +107,9 @@ export async function run(args: string[] = process.argv.slice(2)): Promise<void>
   if (settings.openrouterApiKey && !process.env['OPENROUTER_API_KEY']) {
     process.env['OPENROUTER_API_KEY'] = settings.openrouterApiKey;
   }
+  if (settings.openaiApiKey && !process.env['OPENAI_API_KEY']) {
+    process.env['OPENAI_API_KEY'] = settings.openaiApiKey;
+  }
 
   const providerRegistry = new ProviderRegistry();
 
