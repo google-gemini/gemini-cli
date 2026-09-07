@@ -62,7 +62,10 @@ export function isCredentialOrSensitivePath(
     base.endsWith('credentials') ||
     base.endsWith('credentials.json') ||
     base.endsWith('tokens.json') ||
+    base.endsWith('token.json') ||
+    base.endsWith('token') ||
     base.endsWith('creds.json') ||
+    base.endsWith('cred.json') ||
     base === '.env' ||
     base.endsWith('.env') ||
     base.endsWith('.key') ||
@@ -86,6 +89,7 @@ export function prepareIsolatedSettingsDir(
   const isolatedDir = fs.mkdtempSync(
     path.join(baseTmpDir, 'gemini-sandbox-settings-'),
   );
+  fs.chmodSync(isolatedDir, 0o700);
 
   if (fs.existsSync(userSettingsDirOnHost)) {
     try {

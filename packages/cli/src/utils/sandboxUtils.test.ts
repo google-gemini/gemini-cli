@@ -284,11 +284,20 @@ describe('sandboxUtils', () => {
       expect(
         isCredentialOrSensitivePath('/home/user/.gemini/custom-tokens.json'),
       ).toBe(true);
+      expect(isCredentialOrSensitivePath('/home/user/.gemini/token.json')).toBe(
+        true,
+      );
+      expect(
+        isCredentialOrSensitivePath('/home/user/.gemini/github-token'),
+      ).toBe(true);
       expect(
         isCredentialOrSensitivePath('/home/user/.gemini/api.credentials'),
       ).toBe(true);
       expect(
         isCredentialOrSensitivePath('/home/user/.gemini/user_creds.json'),
+      ).toBe(true);
+      expect(
+        isCredentialOrSensitivePath('/home/user/.gemini/user_cred.json'),
       ).toBe(true);
       expect(isCredentialOrSensitivePath('/home/user/.gemini/.env')).toBe(true);
       expect(
@@ -378,6 +387,7 @@ describe('sandboxUtils', () => {
       expect(fs.mkdtempSync).toHaveBeenCalledWith(
         expect.stringContaining('gemini-sandbox-settings-'),
       );
+      expect(fs.chmodSync).toHaveBeenCalledWith(fakeIsolatedDir, 0o700);
       expect(fs.cpSync).toHaveBeenCalledWith(
         fakeHostSettingsDir,
         fakeIsolatedDir,
@@ -398,6 +408,7 @@ describe('sandboxUtils', () => {
 
       const result = prepareIsolatedSettingsDir(fakeHostSettingsDir);
 
+      expect(fs.chmodSync).toHaveBeenCalledWith(fakeIsolatedDir, 0o700);
       expect(result).toBe(fakeIsolatedDir);
       expect(fs.cpSync).not.toHaveBeenCalled();
     });
