@@ -33,7 +33,7 @@ export class CommandRegistry {
     this.register('help', 'Show available commands', () => {
       const lines = ['Available commands:'];
       for (const [name, meta] of this.commands.entries()) {
-        lines.push(`  /${name.padEnd(9)} - ${meta.description}`);
+        lines.push(`  /${name.padEnd(11)} - ${meta.description}`);
       }
       return lines.join('\n');
     });

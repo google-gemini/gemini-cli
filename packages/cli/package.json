@@ -8,8 +8,24 @@
   "bin": {
     "zoe": "dist/index.js"
   },
+  "author": "Zoe Authors",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Abinjshaju/cli-zoe.git",
+    "directory": "packages/cli"
+  },
+  "keywords": [
+    "zoe",
+    "cli",
+    "terminal",
+    "socratic",
+    "ai-mentor",
+    "engineering"
+  ],
   "scripts": {
     "build": "tsc --build",
+    "clean": "rm -rf dist",
+    "prepack": "npm run build",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit"
   },

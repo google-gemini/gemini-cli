@@ -2,6 +2,21 @@
   "name": "zoe-monorepo",
   "version": "0.1.0",
   "description": "Zoe — Engineering, not autocomplete.",
+  "license": "Apache-2.0",
+  "author": "Zoe Authors",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Abinjshaju/cli-zoe.git"
+  },
+  "keywords": [
+    "zoe",
+    "socratic",
+    "ai-mentor",
+    "engineering",
+    "cli",
+    "terminal",
+    "ollama"
+  ],
   "engines": {
     "node": ">=20.0.0"
   },
@@ -16,10 +31,11 @@
   },
   "scripts": {
     "build": "npm run build --workspace=@zoe/core && npm run build --workspace=zoe",
+    "clean": "rm -rf packages/*/dist",
+    "pack": "npm pack --workspaces",
     "start": "node packages/cli/dist/index.js",
     "test": "vitest run",
-    "typecheck": "npm run typecheck --workspaces",
-    "clean": "rm -rf packages/*/dist"
+    "typecheck": "npm run typecheck --workspaces"
   },
   "overrides": {
     "ink": "npm:@jrichman/ink@6.6.9"

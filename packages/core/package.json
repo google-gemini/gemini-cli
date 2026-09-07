@@ -6,9 +6,25 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "author": "Zoe Authors",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Abinjshaju/cli-zoe.git",
+    "directory": "packages/core"
+  },
+  "keywords": [
+    "zoe",
+    "socratic",
+    "ai-mentor",
+    "engineering",
+    "knowledge-graph",
+    "symbol-indexer",
+    "ollama"
+  ],
   "scripts": {
     "build": "tsc --build",
     "clean": "rm -rf dist",
+    "prepack": "npm run build",
     "typecheck": "tsc --noEmit"
   },
   "files": [
