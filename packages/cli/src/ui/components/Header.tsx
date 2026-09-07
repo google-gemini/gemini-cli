@@ -16,24 +16,24 @@ export interface HeaderProps {
 
 export function Header({ project, provider, model }: HeaderProps): React.JSX.Element {
   const modelPill = provider && model ? `[${provider}:${model}]` : (model ? `[${model}]` : '');
+  const badges = project?.badges ? project.badges.filter((b) => b !== 'Git').slice(0, 3) : [];
+  const badgeText = badges.length > 0 ? badges.join(' • ') : '';
 
   return (
     <Box flexDirection="column" marginBottom={1}>
-      <Box flexDirection="row">
+      <Text>
         <Text bold color="cyan">◈ ZOE</Text>
-        {modelPill ? (
-          <Text color="yellow"> {modelPill}</Text>
-        ) : null}
-        {project?.displayPath ? (
-          <Text color="gray">  {project.displayPath}</Text>
-        ) : null}
-        {project?.badges && project.badges.length > 0 ? (
-          <Text color="blue">  ({project.badges.join(' • ')})</Text>
-        ) : null}
-      </Box>
-      <Box>
-        <Text color="gray">{'─'.repeat(72)}</Text>
-      </Box>
+        {modelPill ? <Text color="yellow">  {modelPill}</Text> : null}
+      </Text>
+
+      {project?.displayPath ? (
+        <Text>
+          <Text color="gray">{project.displayPath}</Text>
+          {badgeText ? <Text color="blue">  ({badgeText})</Text> : null}
+        </Text>
+      ) : null}
+
+      <Text color="gray">{'─'.repeat(60)}</Text>
     </Box>
   );
 }
