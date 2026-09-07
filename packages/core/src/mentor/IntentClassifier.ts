@@ -18,6 +18,21 @@ export class IntentClassifier {
     if (trimmed.startsWith('/explain')) return 'explain';
     if (trimmed.startsWith('/hint')) return 'hint';
     if (trimmed.startsWith('/ponytail') || trimmed.startsWith('/simplify')) return 'ponytail';
+    if (trimmed.startsWith('/archify') || trimmed.startsWith('/diagram')) return 'archify';
+
+    // Heuristics for Archify visual reasoning & diagrams
+    if (
+      trimmed.includes('draw a diagram') ||
+      trimmed.includes('visualize the architecture') ||
+      trimmed.includes('visualize the flow') ||
+      trimmed.includes('system topology') ||
+      trimmed.includes('ascii diagram') ||
+      trimmed.includes('architecture diagram') ||
+      trimmed.includes('show the data flow') ||
+      trimmed.startsWith('diagram ')
+    ) {
+      return 'archify';
+    }
 
     // Heuristics for Ponytail minimalism & code simplification
     if (

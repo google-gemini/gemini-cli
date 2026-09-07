@@ -188,4 +188,35 @@ describe('CommandRegistry', () => {
     });
     expect(policyResult).toContain('Switched active policy to: Ponytail Minimalist Philosopher (ponytail)');
   });
+
+  it('executes /archify and /diagram commands', async () => {
+    const registry = new CommandRegistry();
+    const session = new SessionEngine();
+
+    // Without arguments: adds topology system message
+    await registry.execute('/archify', {
+      session,
+      exit: () => {},
+    });
+    const messages = session.getMessages();
+    expect(messages.length).toBeGreaterThanOrEqual(1);
+    expect(messages[0].content).toContain('SYSTEM ARCHITECTURE TOPOLOGY');
+    expect(session.mentor.getActivePolicy().intent).toBe('archify');
+
+    // With target: sends prompt with Archify policy
+    await registry.execute('/diagram database', {
+      session,
+      exit: () => {},
+    });
+    const updatedMessages = session.getMessages();
+    const lastUserMsg = updatedMessages.find((m) => m.content.includes('Visually diagram'));
+    expect(lastUserMsg).toBeDefined();
+
+    // /policy archify switches to Archify
+    const policyResult = await registry.execute('/policy archify', {
+      session,
+      exit: () => {},
+    });
+    expect(policyResult).toContain('Switched active policy to: Archify Visual Reasoner (archify)');
+  });
 });

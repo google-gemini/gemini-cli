@@ -12,6 +12,7 @@ export type IntentType =
   | 'explain'
   | 'hint'
   | 'ponytail'
+  | 'archify'
   | 'default';
 
 export interface MentorPolicy {

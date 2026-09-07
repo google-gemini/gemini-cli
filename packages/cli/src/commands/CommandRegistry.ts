@@ -6,7 +6,13 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { type SessionEngine, ProviderRegistry, DependencyAuditor, ComplexityAnalyzer } from '@zoe/core';
+import {
+  type SessionEngine,
+  ProviderRegistry,
+  DependencyAuditor,
+  ComplexityAnalyzer,
+  ArchitectureVisualizer,
+} from '@zoe/core';
 
 export interface CommandContext {
   session: SessionEngine;
@@ -160,6 +166,31 @@ export class CommandRegistry {
     );
     this.register('simplify', 'Alias for /ponytail', handlePonytail);
 
+    const handleArchify: CommandHandler = async (args, ctx) => {
+      const target = args.join(' ').trim();
+      const policy = ctx.session.mentor.getPolicy('archify');
+
+      if (!target) {
+        const topology = ArchitectureVisualizer.renderWorkspaceTopology(ctx.session.getProject());
+        ctx.session.addSystemMessage(topology);
+        ctx.session.mentor.setActivePolicy(policy);
+        return;
+      }
+
+      await ctx.session.send(
+        `Visually diagram and explain the system architecture, component flow, and topologies for: ${target}`,
+        policy
+      );
+      return;
+    };
+
+    this.register(
+      'archify',
+      'Terminal-native visual reasoning: render ASCII topology or component diagrams (e.g. /archify or /archify auth)',
+      handleArchify
+    );
+    this.register('diagram', 'Alias for /archify', handleArchify);
+
     this.register('policy', 'Inspect or set active mentoring policy (e.g. /policy learn)', (args, ctx) => {
       const mode = args[0]?.toLowerCase().trim();
       if (!mode) {
@@ -171,7 +202,7 @@ export class CommandRegistry {
         ctx.session.mentor.setActivePolicy(policy);
         return `Switched active policy to: ${policy.name} (${policy.intent})`;
       } catch (_err: any) {
-        return `Unknown policy: ${mode}. Available policies: learn, solve, debug, review, explain, hint, ponytail`;
+        return `Unknown policy: ${mode}. Available policies: learn, solve, debug, review, explain, hint, ponytail, archify`;
       }
     });
 

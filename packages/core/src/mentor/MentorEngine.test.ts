@@ -19,6 +19,8 @@ describe('IntentClassifier', () => {
     expect(IntentClassifier.classify('/hint')).toBe('hint');
     expect(IntentClassifier.classify('/ponytail src/app.ts')).toBe('ponytail');
     expect(IntentClassifier.classify('/simplify')).toBe('ponytail');
+    expect(IntentClassifier.classify('/archify')).toBe('archify');
+    expect(IntentClassifier.classify('/diagram auth')).toBe('archify');
   });
 
   it('classifies natural language heuristics', () => {
@@ -30,6 +32,8 @@ describe('IntentClassifier', () => {
     expect(IntentClassifier.classify('where does authentication happen?')).toBe('explain');
     expect(IntentClassifier.classify('how can I simplify this architecture?')).toBe('ponytail');
     expect(IntentClassifier.classify('what can I delete here?')).toBe('ponytail');
+    expect(IntentClassifier.classify('draw a diagram of the auth flow')).toBe('archify');
+    expect(IntentClassifier.classify('visualize the architecture')).toBe('archify');
   });
 });
 
@@ -69,5 +73,13 @@ describe('MentorEngine', () => {
     expect(policy.intent).toBe('ponytail');
     expect(policy.name).toBe('Ponytail Minimalist Philosopher');
     expect(policy.getDirectives()).toContain('CODE DELETION OVER ADDITION');
+  });
+
+  it('registers and evaluates ArchifyPolicy', () => {
+    const mentor = new MentorEngine();
+    const policy = mentor.evaluatePrompt('/archify');
+    expect(policy.intent).toBe('archify');
+    expect(policy.name).toBe('Archify Visual Reasoner');
+    expect(policy.getDirectives()).toContain('THINK SPATIALLY & ARCHITECTURALLY');
   });
 });

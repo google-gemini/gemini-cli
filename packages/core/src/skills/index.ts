@@ -5,3 +5,4 @@
  */
 
 export * from './ponytail/index.js';
+export * from './archify/index.js';

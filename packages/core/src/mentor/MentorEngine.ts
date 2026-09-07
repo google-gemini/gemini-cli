@@ -12,6 +12,7 @@ import { ReviewPolicy } from './policies/ReviewPolicy.js';
 import { ExplainPolicy } from './policies/ExplainPolicy.js';
 import { HintPolicy } from './policies/HintPolicy.js';
 import { PonytailPolicy } from '../skills/ponytail/PonytailPolicy.js';
+import { ArchifyPolicy } from '../skills/archify/ArchifyPolicy.js';
 import { IntentClassifier } from './IntentClassifier.js';
 
 export class MentorEngine {
@@ -27,6 +28,7 @@ export class MentorEngine {
     this.register(new ExplainPolicy());
     this.register(new HintPolicy(1));
     this.register(new PonytailPolicy());
+    this.register(new ArchifyPolicy());
 
     this.activePolicy = this.policies.get('explain')!;
   }
