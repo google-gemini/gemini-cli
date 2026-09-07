@@ -15,6 +15,8 @@ import { AgentHarness } from '../agent/AgentHarness.js';
 import { MentorEngine } from '../mentor/MentorEngine.js';
 import type { MentorPolicy } from '../mentor/MentorPolicy.js';
 import { KnowledgeStore } from '../memory/KnowledgeStore.js';
+import { WorkspaceSymbolIndex } from '../indexer/WorkspaceSymbolIndex.js';
+import { InspectSymbolTool } from '../tools/symbols/InspectSymbolTool.js';
 
 export interface SessionMessage {
   id: string;
@@ -44,6 +46,7 @@ export class SessionEngine {
   public readonly project: ProjectInfo;
   public readonly mentor: MentorEngine;
   public readonly knowledge: KnowledgeStore;
+  public readonly symbolIndex: WorkspaceSymbolIndex;
 
   private provider: ModelProvider;
   private model: string;
@@ -61,6 +64,10 @@ export class SessionEngine {
     this.mentor = options.mentor ?? new MentorEngine();
     this.project = ProjectDetector.detect(options.workspaceRoot || process.cwd());
     this.knowledge = options.knowledge ?? new KnowledgeStore(this.project.workspacePath);
+    this.symbolIndex = new WorkspaceSymbolIndex(this.project.workspacePath);
+
+    // Register symbol inspection tool
+    this.toolRegistry.register(new InspectSymbolTool(this.symbolIndex));
 
     this.harness = new AgentHarness({
       provider: this.provider,
@@ -82,6 +89,10 @@ export class SessionEngine {
 
   public getProject(): ProjectInfo {
     return this.project;
+  }
+
+  public getSymbolIndex(): WorkspaceSymbolIndex {
+    return this.symbolIndex;
   }
 
   public setProvider(provider: ModelProvider, model?: string): void {

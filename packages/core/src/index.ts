@@ -34,3 +34,5 @@ export * from './mentor/policies/HintPolicy.js';
 export * from './skills/index.js';
 export * from './memory/index.js';
 export * from './challenges/index.js';
+export * from './indexer/index.js';
+export * from './tools/symbols/index.js';

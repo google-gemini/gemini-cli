@@ -242,6 +242,37 @@ export class CommandRegistry {
     );
     this.register('quiz', 'Alias for /challenge', handleChallenge);
 
+    this.register('symbols', 'List or search codebase symbols (classes, functions, interfaces) (e.g. /symbols or /symbols engine)', (args, ctx) => {
+      const query = args.join(' ').trim();
+      const index = ctx.session.getSymbolIndex();
+      if (index.getStats().totalSymbols === 0) {
+        index.indexWorkspace();
+      }
+      const symbols = index.find(query);
+      return index.formatTable(symbols);
+    });
+
+    this.register('find', 'Find symbol declaration location and signature (e.g. /find SessionEngine)', (args, ctx) => {
+      const name = args.join(' ').trim();
+      if (!name) {
+        return 'Usage: /find <symbol name>';
+      }
+      const index = ctx.session.getSymbolIndex();
+      if (index.getStats().totalSymbols === 0) {
+        index.indexWorkspace();
+      }
+      const matches = index.find(name);
+      if (matches.length === 0) {
+        return `Symbol '${name}' not found in workspace index.`;
+      }
+      const lines: string[] = [`Found ${matches.length} declaration${matches.length === 1 ? '' : 's'} for '${name}':`];
+      for (const m of matches) {
+        lines.push(`- **[${m.kind.toUpperCase()}]** \`${m.name}\` at \`${m.file}:${m.line}\``);
+        lines.push(`  Signature: \`${m.signature}\``);
+      }
+      return lines.join('\n');
+    });
+
     this.register('policy', 'Inspect or set active mentoring policy (e.g. /policy learn)', (args, ctx) => {
       const mode = args[0]?.toLowerCase().trim();
       if (!mode) {

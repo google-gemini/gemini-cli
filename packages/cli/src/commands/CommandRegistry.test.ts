@@ -291,4 +291,37 @@ describe('CommandRegistry', () => {
     });
     expect(policyResult).toContain('Switched active policy to: Socratic Challenge Evaluator (challenge)');
   });
+
+  it('executes /symbols and /find commands', async () => {
+    const registry = new CommandRegistry();
+    const session = new SessionEngine({
+      knowledge: new KnowledgeStore(undefined, { autoSave: false }),
+    });
+
+    // Populate mock symbol in session's symbolIndex
+    session.getSymbolIndex().indexFile('packages/core/src/session/SessionEngine.ts', 'export class SessionEngine {}');
+
+    // /symbols lists matching symbols
+    const symbolsResult = await registry.execute('/symbols engine', {
+      session,
+      exit: () => {},
+    });
+    expect(symbolsResult).toContain('SessionEngine');
+    expect(symbolsResult).toContain('CLASS');
+
+    // /find locates symbol with exact file location
+    const findResult = await registry.execute('/find SessionEngine', {
+      session,
+      exit: () => {},
+    });
+    expect(findResult).toContain('Found 1 declaration for \'SessionEngine\'');
+    expect(findResult).toContain('packages/core/src/session/SessionEngine.ts:1');
+
+    // /find for non-existent symbol
+    const notFoundResult = await registry.execute('/find UnknownSymbol', {
+      session,
+      exit: () => {},
+    });
+    expect(notFoundResult).toContain("Symbol 'UnknownSymbol' not found");
+  });
 });
