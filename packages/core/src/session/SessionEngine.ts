@@ -101,6 +101,7 @@ export class SessionEngine {
       this.model = model;
     }
     this.harness.setModel(this.model, this.provider);
+    this.events.emit('provider:changed', { provider: this.provider, model: this.model });
   }
 
   public start(): void {

@@ -4,14 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Box, Text, useInput, useStdin } from 'ink';
 import readline from 'node:readline';
+import type { CommandItem } from '../../commands/CommandRegistry.js';
+import { CommandPalette } from '../components/CommandPalette.js';
 
 export interface InputPromptProps {
   onSubmit: (value: string) => void;
   onExit: () => void;
   isDisabled?: boolean;
+  commands?: CommandItem[];
 }
 
 interface RawInputHandlerProps {
@@ -28,6 +31,12 @@ interface RawInputHandlerProps {
   setHistoryIndex: React.Dispatch<React.SetStateAction<number>>;
   draftText: string;
   setDraftText: React.Dispatch<React.SetStateAction<string>>;
+  isCommandMode: boolean;
+  matches: CommandItem[];
+  selectedIndex: number;
+  setSelectedIndex: React.Dispatch<React.SetStateAction<number>>;
+  isDismissed: boolean;
+  setIsDismissed: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 function RawInputHandler({
@@ -44,6 +53,12 @@ function RawInputHandler({
   setHistoryIndex,
   draftText,
   setDraftText,
+  isCommandMode,
+  matches,
+  selectedIndex,
+  setSelectedIndex,
+  isDismissed,
+  setIsDismissed,
 }: RawInputHandlerProps): null {
   useInput(
     (input, key) => {
@@ -53,6 +68,7 @@ function RawInputHandler({
           setText('');
           setCursorPos(0);
           setHistoryIndex(-1);
+          setIsDismissed(false);
         } else {
           onExit();
         }
@@ -61,8 +77,39 @@ function RawInputHandler({
 
       if (isDisabled) return;
 
+      // Handle Escape (dismiss suggestion palette)
+      if (key.escape) {
+        if (isCommandMode && !isDismissed) {
+          setIsDismissed(true);
+        }
+        return;
+      }
+
+      // Handle Tab (autocomplete selected suggestion)
+      if (key.tab) {
+        if (isCommandMode && !isDismissed && matches.length > 0) {
+          const selected = matches[selectedIndex] ?? matches[0];
+          if (selected) {
+            const completed = `/${selected.name} `;
+            setText(completed);
+            setCursorPos(completed.length);
+          }
+        }
+        return;
+      }
+
       // Handle Enter
       if (key.return) {
+        if (text.trim() === '/' && isCommandMode && !isDismissed && matches.length > 0) {
+          const selected = matches[selectedIndex] ?? matches[0];
+          if (selected) {
+            const completed = `/${selected.name} `;
+            setText(completed);
+            setCursorPos(completed.length);
+            return;
+          }
+        }
+
         const trimmed = text.trim();
         if (trimmed) {
           setHistory((prev) => [...prev, trimmed]);
@@ -72,6 +119,7 @@ function RawInputHandler({
         setCursorPos(0);
         setHistoryIndex(-1);
         setDraftText('');
+        setIsDismissed(false);
         return;
       }
 
@@ -87,8 +135,13 @@ function RawInputHandler({
         return;
       }
 
-      // Handle Up Arrow (History Backwards)
+      // Handle Up Arrow (Palette navigation or History backwards)
       if (key.upArrow) {
+        if (isCommandMode && !isDismissed && matches.length > 0) {
+          setSelectedIndex((prev) => (prev > 0 ? prev - 1 : matches.length - 1));
+          return;
+        }
+
         if (history.length === 0) return;
         if (historyIndex === -1) {
           setDraftText(text);
@@ -105,8 +158,13 @@ function RawInputHandler({
         return;
       }
 
-      // Handle Down Arrow (History Forwards)
+      // Handle Down Arrow (Palette navigation or History forwards)
       if (key.downArrow) {
+        if (isCommandMode && !isDismissed && matches.length > 0) {
+          setSelectedIndex((prev) => (prev < matches.length - 1 ? prev + 1 : 0));
+          return;
+        }
+
         if (historyIndex === -1) return;
         if (historyIndex < history.length - 1) {
           const newIdx = historyIndex + 1;
@@ -123,6 +181,7 @@ function RawInputHandler({
 
       // Handle Backspace
       if (key.backspace || key.delete) {
+        setIsDismissed(false);
         if (cursorPos > 0) {
           const newText = text.slice(0, cursorPos - 1) + text.slice(cursorPos);
           setText(newText);
@@ -132,12 +191,13 @@ function RawInputHandler({
       }
 
       // Ignore other control keys or escape sequences
-      if (key.escape || key.tab || key.pageDown || key.pageUp || key.meta || key.ctrl) {
+      if (key.pageDown || key.pageUp || key.meta || key.ctrl) {
         return;
       }
 
       // Append printable character
       if (input) {
+        setIsDismissed(false);
         const newText = text.slice(0, cursorPos) + input + text.slice(cursorPos);
         setText(newText);
         setCursorPos((prev) => prev + input.length);
@@ -185,6 +245,7 @@ export function InputPrompt({
   onSubmit,
   onExit,
   isDisabled = false,
+  commands,
 }: InputPromptProps): React.JSX.Element {
   const { isRawModeSupported } = useStdin();
   const [text, setText] = useState('');
@@ -192,6 +253,30 @@ export function InputPrompt({
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [draftText, setDraftText] = useState('');
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [isDismissed, setIsDismissed] = useState(false);
+
+  const isCommandMode = text.startsWith('/') && !text.includes(' ');
+  const query = isCommandMode ? text.slice(1).toLowerCase() : '';
+
+  const matches = useMemo(() => {
+    if (!isCommandMode || !commands || commands.length === 0) {
+      return [];
+    }
+    return commands
+      .filter((cmd) => cmd.name.toLowerCase().includes(query))
+      .sort((a, b) => {
+        const aStarts = a.name.toLowerCase().startsWith(query);
+        const bStarts = b.name.toLowerCase().startsWith(query);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+        return a.name.localeCompare(b.name);
+      });
+  }, [isCommandMode, query, commands]);
+
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [query]);
 
   const beforeCursor = text.slice(0, cursorPos);
   const cursorChar = text[cursorPos] || ' ';
@@ -214,9 +299,22 @@ export function InputPrompt({
           setHistoryIndex={setHistoryIndex}
           draftText={draftText}
           setDraftText={setDraftText}
+          isCommandMode={isCommandMode}
+          matches={matches}
+          selectedIndex={selectedIndex}
+          setSelectedIndex={setSelectedIndex}
+          isDismissed={isDismissed}
+          setIsDismissed={setIsDismissed}
         />
       ) : (
         <PipedInputHandler onSubmit={onSubmit} onExit={onExit} />
+      )}
+      {isCommandMode && !isDismissed && (
+        <CommandPalette
+          matches={matches}
+          selectedIndex={selectedIndex}
+          query={query}
+        />
       )}
       <Box flexDirection="row">
         <Text color="cyan">zoe &gt; </Text>

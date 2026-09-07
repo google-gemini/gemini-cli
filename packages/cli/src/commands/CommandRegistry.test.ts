@@ -394,4 +394,30 @@ describe('CommandRegistry', () => {
     });
     expect(notFoundResult).toContain("Symbol 'UnknownSymbol' not found");
   });
+
+  it('returns all registered commands alphabetically via getCommands()', () => {
+    const registry = new CommandRegistry();
+    const commands = registry.getCommands();
+    expect(commands.length).toBeGreaterThan(15);
+
+    const names = commands.map((c) => c.name);
+    expect(names).toContain('model');
+    expect(names).toContain('learn');
+    expect(names).toContain('solve');
+    expect(names).toContain('debug');
+    expect(names).toContain('archify');
+    expect(names).toContain('ponytail');
+    expect(names).toContain('symbols');
+    expect(names).toContain('help');
+    expect(names).toContain('key');
+
+    // Sorted alphabetically
+    const sorted = [...names].sort((a, b) => a.localeCompare(b));
+    expect(names).toEqual(sorted);
+
+    // Each command has a valid description
+    for (const cmd of commands) {
+      expect(cmd.description.length).toBeGreaterThan(0);
+    }
+  });
 });

@@ -5,6 +5,7 @@
  */
 
 import { EventEmitter } from 'node:events';
+import type { ModelProvider } from '../providers/ModelProvider.js';
 
 export interface ZoeEvents {
   'session:start': { sessionId: string };
@@ -15,6 +16,7 @@ export interface ZoeEvents {
   'runtime:state': { state: 'idle' | 'processing' | 'error' };
   'command:result': { command: string; success: boolean; message?: string };
   'history:cleared': Record<string, never>;
+  'provider:changed': { provider: ModelProvider; model: string };
 }
 
 export class EventBus {

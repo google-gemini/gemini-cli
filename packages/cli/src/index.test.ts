@@ -35,7 +35,7 @@ describe('CLI Argument Parser & Help', () => {
 
   it('returns comprehensive help text with commands', () => {
     const helpText = getHelpText();
-    expect(helpText).toContain('Engineering, not autocomplete.');
+    expect(helpText).toContain('Socratic terminal coding mentor.');
     expect(helpText).toContain('-v, --version');
     expect(helpText).toContain('-h, --help');
     expect(helpText).toContain('-m, --model');

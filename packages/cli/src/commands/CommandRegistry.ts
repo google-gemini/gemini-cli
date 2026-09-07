@@ -24,10 +24,23 @@ export interface CommandContext {
 
 export type CommandHandler = (args: string[], ctx: CommandContext) => Promise<string | void> | string | void;
 
+export interface CommandItem {
+  name: string;
+  description: string;
+}
+
 export class CommandRegistry {
   private commands = new Map<string, { description: string; handler: CommandHandler }>();
   private providerRegistry: ProviderRegistry;
   private customConfigDir?: string;
+
+  public getCommands(): CommandItem[] {
+    const list: CommandItem[] = [];
+    for (const [name, meta] of this.commands.entries()) {
+      list.push({ name, description: meta.description });
+    }
+    return list.sort((a, b) => a.name.localeCompare(b.name));
+  }
 
   constructor(providerRegistry?: ProviderRegistry, customConfigDir?: string) {
     this.providerRegistry = providerRegistry ?? new ProviderRegistry();

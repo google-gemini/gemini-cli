@@ -20,7 +20,7 @@ export function getVersionText(): string {
 
 export function getHelpText(): string {
   return `
-Zoe — Engineering, not autocomplete.
+Zoe — Socratic terminal coding mentor.
 
 Usage:
   zoe [options]

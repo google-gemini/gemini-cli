@@ -22,6 +22,8 @@ export function MainScreen({ session, commands }: MainScreenProps): React.JSX.El
   const [messages, setMessages] = useState<SessionMessage[]>(session.getMessages());
   const [streamingText, setStreamingText] = useState<string>('');
   const [state, setState] = useState(session.getState());
+  const [providerName, setProviderName] = useState(session.getProvider().name);
+  const [modelName, setModelName] = useState(session.getModel());
 
   useEffect(() => {
     const updateMessages = () => {
@@ -45,11 +47,17 @@ export function MainScreen({ session, commands }: MainScreenProps): React.JSX.El
       updateMessages();
     };
 
+    const handleProviderChange = (data: { provider: { name: string }; model: string }) => {
+      setProviderName(data.provider.name);
+      setModelName(data.model);
+    };
+
     session.events.on('user:input', updateMessages);
     session.events.on('runtime:stream', handleStream);
     session.events.on('runtime:message', handleMessage);
     session.events.on('history:cleared', updateMessages);
     session.events.on('runtime:state', updateState);
+    session.events.on('provider:changed', handleProviderChange);
 
     return () => {
       session.events.off('user:input', updateMessages);
@@ -57,6 +65,7 @@ export function MainScreen({ session, commands }: MainScreenProps): React.JSX.El
       session.events.off('runtime:message', handleMessage);
       session.events.off('history:cleared', updateMessages);
       session.events.off('runtime:state', updateState);
+      session.events.off('provider:changed', handleProviderChange);
     };
   }, [session]);
 
@@ -83,7 +92,11 @@ export function MainScreen({ session, commands }: MainScreenProps): React.JSX.El
 
   return (
     <Box flexDirection="column" paddingX={1} paddingY={0}>
-      <Header project={session.getProject()} />
+      <Header
+        project={session.getProject()}
+        provider={providerName}
+        model={modelName}
+      />
       <MessageList
         messages={messages}
         streamingText={streamingText}
@@ -93,6 +106,7 @@ export function MainScreen({ session, commands }: MainScreenProps): React.JSX.El
         onSubmit={handleSubmit}
         onExit={handleExit}
         isDisabled={state === 'processing'}
+        commands={commands.getCommands()}
       />
     </Box>
   );
