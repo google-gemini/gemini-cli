@@ -14,6 +14,12 @@ describe('CommandRegistry', () => {
     expect(registry.isCommand('/help')).toBe(true);
     expect(registry.isCommand('/exit')).toBe(true);
     expect(registry.isCommand('/model')).toBe(true);
+    expect(registry.isCommand('/learn')).toBe(true);
+    expect(registry.isCommand('/solve')).toBe(true);
+    expect(registry.isCommand('/debug')).toBe(true);
+    expect(registry.isCommand('/review')).toBe(true);
+    expect(registry.isCommand('/explain')).toBe(true);
+    expect(registry.isCommand('/hint')).toBe(true);
     expect(registry.isCommand('hello')).toBe(false);
   });
 
@@ -32,6 +38,12 @@ describe('CommandRegistry', () => {
     expect(typeof result).toBe('string');
     expect(result).toContain('Available commands:');
     expect(result).toContain('/help');
+    expect(result).toContain('/learn');
+    expect(result).toContain('/solve');
+    expect(result).toContain('/debug');
+    expect(result).toContain('/review');
+    expect(result).toContain('/explain');
+    expect(result).toContain('/hint');
     expect(result).toContain('/model');
     expect(result).toContain('/exit');
     expect(result).toContain('/clear');
@@ -58,6 +70,31 @@ describe('CommandRegistry', () => {
     expect(switchResult).toContain('Switched model to llama3.2 (ollama)');
     expect(session.getModel()).toBe('llama3.2');
     expect(session.getProvider().name).toBe('ollama');
+  });
+
+  it('executes mentoring commands and sends prompt through session', async () => {
+    const registry = new CommandRegistry();
+    const session = new SessionEngine();
+
+    await registry.execute('/learn closures', {
+      session,
+      exit: () => {},
+    });
+    const messages = session.getMessages();
+    expect(messages.length).toBeGreaterThanOrEqual(2);
+    expect(messages[0].content).toContain('Teach me about: closures');
+  });
+
+  it('executes /hint and triggers progressive hints', async () => {
+    const registry = new CommandRegistry();
+    const session = new SessionEngine();
+
+    await registry.execute('/hint', {
+      session,
+      exit: () => {},
+    });
+    const messages = session.getMessages();
+    expect(messages[0].content).toContain('Level 1');
   });
 
   it('executes /version', async () => {
@@ -97,5 +134,29 @@ describe('CommandRegistry', () => {
     });
 
     expect(result).toContain('Unknown command: /unknown');
+  });
+
+  it('inspects and switches active mentoring policy via /policy', async () => {
+    const registry = new CommandRegistry();
+    const session = new SessionEngine();
+
+    const inspectResult = await registry.execute('/policy', {
+      session,
+      exit: () => {},
+    });
+    expect(inspectResult).toContain('Active policy: Deep Code Comprehension');
+
+    const switchResult = await registry.execute('/policy solve', {
+      session,
+      exit: () => {},
+    });
+    expect(switchResult).toContain('Switched active policy to: Guided Problem Solving (solve)');
+    expect(session.mentor.getActivePolicy().intent).toBe('solve');
+
+    const errorResult = await registry.execute('/policy invalid_mode', {
+      session,
+      exit: () => {},
+    });
+    expect(errorResult).toContain('Unknown policy: invalid_mode');
   });
 });

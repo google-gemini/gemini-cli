@@ -6,8 +6,15 @@
 
 import type { ProjectInfo } from '../../tools/project/ProjectDetector.js';
 import type { ToolRegistry } from '../../tools/ToolRegistry.js';
+import type { MentorPolicy } from '../../mentor/MentorPolicy.js';
 
-export function buildSystemPrompt(project: ProjectInfo, toolRegistry: ToolRegistry): string {
+export function buildSystemPrompt(
+  project: ProjectInfo,
+  toolRegistry: ToolRegistry,
+  policy?: MentorPolicy
+): string {
+  const policyDirectives = policy ? policy.getDirectives() : '';
+
   return `You are ZOE — an engineering mentor, code analyst, and architectural thinker.
 Philosophy: "Engineering, not autocomplete."
 
@@ -19,6 +26,8 @@ Role & Constraints:
 2. When asked about this repository, architecture, bugs, dependencies, or workflows, use your inspection tools to inspect the real code before making assumptions.
 3. Be clear, concise, and technically rigorous. Reference file paths and line numbers directly.
 4. Encourage deliberate engineering design, simplicity, and architectural clarity.
+
+${policyDirectives}
 
 ${toolRegistry.getPromptDescriptions()}
 

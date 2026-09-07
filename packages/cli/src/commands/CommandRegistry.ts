@@ -24,7 +24,7 @@ export class CommandRegistry {
     this.register('help', 'Show available commands', () => {
       const lines = ['Available commands:'];
       for (const [name, meta] of this.commands.entries()) {
-        lines.push(`  /${name.padEnd(8)} - ${meta.description}`);
+        lines.push(`  /${name.padEnd(9)} - ${meta.description}`);
       }
       return lines.join('\n');
     });
@@ -44,6 +44,78 @@ export class CommandRegistry {
       ctx.session.setProvider(resolved.provider, resolved.model);
 
       return `Switched model to ${resolved.model} (${resolved.provider.name}).`;
+    });
+
+    // Mentoring Commands
+    this.register('learn', 'Socratic conceptual learning on a topic (e.g. /learn event loops)', async (args, ctx) => {
+      const topic = args.join(' ').trim();
+      if (!topic) {
+        return 'Usage: /learn <topic or concept>';
+      }
+      const policy = ctx.session.mentor.getPolicy('learn');
+      await ctx.session.send(`Teach me about: ${topic}`, policy);
+      return;
+    });
+
+    this.register('solve', 'Architect and solve an engineering problem (e.g. /solve rate limiter)', async (args, ctx) => {
+      const problem = args.join(' ').trim();
+      if (!problem) {
+        return 'Usage: /solve <problem or feature>';
+      }
+      const policy = ctx.session.mentor.getPolicy('solve');
+      await ctx.session.send(`Guide me through solving: ${problem}`, policy);
+      return;
+    });
+
+    this.register('debug', 'Methodical root-cause debugging (e.g. /debug connection timeout)', async (args, ctx) => {
+      const issue = args.join(' ').trim();
+      if (!issue) {
+        return 'Usage: /debug <error, exception, or failure description>';
+      }
+      const policy = ctx.session.mentor.getPolicy('debug');
+      await ctx.session.send(`Help me debug this issue: ${issue}`, policy);
+      return;
+    });
+
+    this.register('review', 'Review code quality, simplicity, and security (e.g. /review src/index.ts)', async (args, ctx) => {
+      const target = args.join(' ').trim();
+      if (!target) {
+        return 'Usage: /review <file, component, or diff>';
+      }
+      const policy = ctx.session.mentor.getPolicy('review');
+      await ctx.session.send(`Review: ${target}`, policy);
+      return;
+    });
+
+    this.register('explain', 'Deep comprehension of architecture or files (e.g. /explain package.json)', async (args, ctx) => {
+      const target = args.join(' ').trim();
+      if (!target) {
+        return 'Usage: /explain <file, function, or concept>';
+      }
+      const policy = ctx.session.mentor.getPolicy('explain');
+      await ctx.session.send(`Explain: ${target}`, policy);
+      return;
+    });
+
+    this.register('hint', 'Provide a progressive hint for the active engineering problem', async (_args, ctx) => {
+      const policy = ctx.session.mentor.advanceHint();
+      await ctx.session.send(`Give me a progressive hint (Level ${policy.getLevel()}).`, policy);
+      return;
+    });
+
+    this.register('policy', 'Inspect or set active mentoring policy (e.g. /policy learn)', (args, ctx) => {
+      const mode = args[0]?.toLowerCase().trim();
+      if (!mode) {
+        const current = ctx.session.mentor.getActivePolicy();
+        return `Active policy: ${current.name} (${current.intent})\n${current.description}`;
+      }
+      try {
+        const policy = ctx.session.mentor.getPolicy(mode as any);
+        ctx.session.mentor.setActivePolicy(policy);
+        return `Switched active policy to: ${policy.name} (${policy.intent})`;
+      } catch (_err: any) {
+        return `Unknown policy: ${mode}. Available policies: learn, solve, debug, review, explain, hint`;
+      }
     });
 
     this.register('exit', 'Exit Zoe', (_args, ctx) => {

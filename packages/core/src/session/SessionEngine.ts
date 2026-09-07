@@ -12,6 +12,8 @@ import { PermissionManager } from '../permissions/PermissionManager.js';
 import { ToolRegistry } from '../tools/ToolRegistry.js';
 import { ProjectDetector, type ProjectInfo } from '../tools/project/ProjectDetector.js';
 import { AgentHarness } from '../agent/AgentHarness.js';
+import { MentorEngine } from '../mentor/MentorEngine.js';
+import type { MentorPolicy } from '../mentor/MentorPolicy.js';
 
 export interface SessionMessage {
   id: string;
@@ -29,6 +31,7 @@ export interface SessionEngineOptions {
   eventBus?: EventBus;
   permissions?: PermissionManager;
   toolRegistry?: ToolRegistry;
+  mentor?: MentorEngine;
 }
 
 export class SessionEngine {
@@ -37,6 +40,7 @@ export class SessionEngine {
   public readonly permissions: PermissionManager;
   public readonly toolRegistry: ToolRegistry;
   public readonly project: ProjectInfo;
+  public readonly mentor: MentorEngine;
 
   private provider: ModelProvider;
   private model: string;
@@ -51,6 +55,7 @@ export class SessionEngine {
     this.model = options.model ?? 'placeholder';
     this.permissions = options.permissions ?? new PermissionManager();
     this.toolRegistry = options.toolRegistry ?? new ToolRegistry();
+    this.mentor = options.mentor ?? new MentorEngine();
     this.project = ProjectDetector.detect(options.workspaceRoot || process.cwd());
 
     this.harness = new AgentHarness({
@@ -114,7 +119,7 @@ export class SessionEngine {
     });
   }
 
-  public async send(text: string): Promise<void> {
+  public async send(text: string, overridePolicy?: MentorPolicy): Promise<void> {
     const trimmed = text.trim();
     if (!trimmed) return;
 
@@ -133,13 +138,16 @@ export class SessionEngine {
     this.events.emit('runtime:state', { state: 'processing' });
 
     try {
+      // Evaluate active mentoring policy
+      const activePolicy = overridePolicy ?? this.mentor.evaluatePrompt(trimmed);
+
       const chatMessages: ChatMessage[] = this.messages.map((m) => ({
         role: m.role,
         content: m.content,
       }));
 
       let accumulated = '';
-      for await (const event of this.harness.run(chatMessages)) {
+      for await (const event of this.harness.run(chatMessages, activePolicy)) {
         if (event.type === 'chunk') {
           accumulated += event.text;
           this.events.emit('runtime:stream', {

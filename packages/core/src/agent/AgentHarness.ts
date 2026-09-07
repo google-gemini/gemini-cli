@@ -10,6 +10,7 @@ import type { PermissionManager } from '../permissions/PermissionManager.js';
 import type { ProjectInfo } from '../tools/project/ProjectDetector.js';
 import { buildSystemPrompt } from './prompts/systemPrompt.js';
 import type { EventBus } from '../events/EventBus.js';
+import type { MentorPolicy } from '../mentor/MentorPolicy.js';
 
 export interface AgentHarnessOptions {
   provider: ModelProvider;
@@ -47,8 +48,8 @@ export class AgentHarness {
     }
   }
 
-  public async *run(conversation: ChatMessage[]): AsyncIterable<ModelEvent> {
-    const systemPrompt = buildSystemPrompt(this.project, this.toolRegistry);
+  public async *run(conversation: ChatMessage[], policy?: MentorPolicy): AsyncIterable<ModelEvent> {
+    const systemPrompt = buildSystemPrompt(this.project, this.toolRegistry, policy);
 
     const workingMessages: ChatMessage[] = [
       { role: 'system', content: systemPrompt },
