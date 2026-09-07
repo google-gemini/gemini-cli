@@ -64,6 +64,7 @@ import {
 import { discoverJitContext, appendJitContext } from './jit-context.js';
 import { isBuildFile } from '../utils/buildFileUtils.js';
 import { recordModifiedBuildFile } from '../utils/untrustedContextTracker.js';
+import { withPathLock } from '../utils/pathMutex.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -382,6 +383,18 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       };
     }
 
+    // Serialize against other writers of this path, so that the existence
+    // check and content read that produce the diff cannot be interleaved with
+    // another write to the same file.
+    return withPathLock(this.resolvedPath, () => this.applyWrite(abortSignal));
+  }
+
+  /**
+   * Writes the file.
+   *
+   * Must be called while holding the path lock for `this.resolvedPath`.
+   */
+  private async applyWrite(abortSignal: AbortSignal): Promise<ToolResult> {
     const { content, ai_proposed_content, modified_by_user } = this.params;
     const correctedContentResult = await getCorrectedFileContent(
       this.config,
