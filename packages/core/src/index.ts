@@ -16,6 +16,8 @@ export * from './providers/openai/OpenAiCompatibleProvider.js';
 export * from './providers/openai/OpenAiProvider.js';
 export * from './providers/groq/GroqProvider.js';
 export * from './providers/openrouter/OpenRouterProvider.js';
+export * from './providers/agy/AgyProvider.js';
+export * from './providers/codex/CodexProvider.js';
 export * from './permissions/Capability.js';
 export * from './permissions/PermissionManager.js';
 export * from './tools/Tool.js';

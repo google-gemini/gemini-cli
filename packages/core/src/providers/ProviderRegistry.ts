@@ -10,6 +10,8 @@ import { OllamaProvider } from './ollama/OllamaProvider.js';
 import { GroqProvider } from './groq/GroqProvider.js';
 import { OpenRouterProvider } from './openrouter/OpenRouterProvider.js';
 import { OpenAiProvider } from './openai/OpenAiProvider.js';
+import { AgyProvider } from './agy/AgyProvider.js';
+import { CodexProvider } from './codex/CodexProvider.js';
 
 export interface ResolvedProvider {
   provider: ModelProvider;
@@ -26,6 +28,8 @@ export class ProviderRegistry {
     this.register(new GroqProvider());
     this.register(new OpenRouterProvider());
     this.register(new OpenAiProvider());
+    this.register(new AgyProvider());
+    this.register(new CodexProvider());
   }
 
   public register(provider: ModelProvider): void {
@@ -33,7 +37,11 @@ export class ProviderRegistry {
   }
 
   public get(name: string): ModelProvider | undefined {
-    return this.providers.get(name.toLowerCase());
+    const lower = name.toLowerCase();
+    if (lower === 'antigravity') {
+      return this.providers.get('agy');
+    }
+    return this.providers.get(lower);
   }
 
   public getRegisteredProviderNames(): string[] {
@@ -51,6 +59,16 @@ export class ProviderRegistry {
     const lower = target.toLowerCase();
 
     // Bare provider names -> use default model for that provider
+    if (lower === 'agy' || lower === 'antigravity') {
+      const agy = this.get('agy') ?? new AgyProvider();
+      return { provider: agy, model: 'gemini-3.8-flash-high' };
+    }
+
+    if (lower === 'codex') {
+      const codex = this.get('codex') ?? new CodexProvider();
+      return { provider: codex, model: 'gpt-6-astra' };
+    }
+
     if (lower === 'groq') {
       const groq = this.get('groq') ?? new GroqProvider();
       return { provider: groq, model: 'qwen/qwen3.8-27b' };
@@ -71,7 +89,7 @@ export class ProviderRegistry {
       return { provider: ollama, model: 'llama3.2' };
     }
 
-    // Explicit format: provider:model (e.g. groq:qwen/qwen3.8-27b, openrouter:anthropic/claude-3.5-sonnet, openai:gpt-4o)
+    // Explicit format: provider:model (e.g. agy:gemini-3.8-flash-high, codex:gpt-6-astra, groq:qwen/qwen3.8-27b)
     if (target.includes(':') && !target.startsWith('http')) {
       const [providerName, ...rest] = target.split(':');
       const innerModel = rest.join(':');
@@ -79,6 +97,22 @@ export class ProviderRegistry {
       if (provider) {
         return { provider, model: innerModel };
       }
+    }
+
+    // Direct Codex models (e.g. gpt-6-astra)
+    if (lower.startsWith('gpt-6')) {
+      const codex = this.get('codex') ?? new CodexProvider();
+      return { provider: codex, model: target };
+    }
+
+    // Direct Antigravity models (e.g. gemini-3.8-flash-high, claude-sonnet-4-6)
+    if (
+      lower.startsWith('gemini-3.') ||
+      lower.startsWith('claude-sonnet-') ||
+      lower.startsWith('claude-opus-')
+    ) {
+      const agy = this.get('agy') ?? new AgyProvider();
+      return { provider: agy, model: target };
     }
 
     // Direct OpenAI model name aliases (gpt-4o, gpt-4o-mini, o1, o3-mini)

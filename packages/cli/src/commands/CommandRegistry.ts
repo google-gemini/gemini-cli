@@ -65,11 +65,13 @@ export class CommandRegistry {
           `Active provider: ${ctx.session.getProvider().name}`,
           `Active model: ${ctx.session.getModel()}`,
           '',
-          'Available providers: ollama, groq, openrouter, openai',
+          'Available providers: agy, codex, groq, openrouter, openai, ollama',
           'Examples:',
-          '  /model llama3.2                              (Local Ollama)',
+          '  /model agy                                   (Antigravity Gemini 3.8 Flash)',
+          '  /model agy:claude-sonnet-4-6                 (Antigravity Claude Sonnet 4.6)',
+          '  /model codex                                 (OpenAI Codex GPT-6 Astra)',
           '  /model groq:qwen/qwen3.8-27b                 (Groq ultra-fast inference)',
-          '  /model openrouter:anthropic/claude-3.5-sonnet (OpenRouter)',
+          '  /model llama3.2                              (Local Ollama)',
           '  /model gpt-4o                                (OpenAI GPT-4o)',
         ].join('\n');
       }

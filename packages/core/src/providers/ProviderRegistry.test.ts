@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { ProviderRegistry } from './ProviderRegistry.js';
 
 describe('ProviderRegistry', () => {
-  it('registers placeholder, ollama, groq, and openrouter by default', () => {
+  it('registers placeholder, ollama, groq, openrouter, openai, agy, and codex by default', () => {
     const registry = new ProviderRegistry();
     const providers = registry.getRegisteredProviderNames();
 
@@ -17,6 +17,44 @@ describe('ProviderRegistry', () => {
     expect(providers).toContain('groq');
     expect(providers).toContain('openrouter');
     expect(providers).toContain('openai');
+    expect(providers).toContain('agy');
+    expect(providers).toContain('codex');
+  });
+
+  it('resolves agy and codex provider names and aliases', () => {
+    const registry = new ProviderRegistry();
+
+    const agy = registry.resolve('agy');
+    expect(agy.provider.name).toBe('agy');
+    expect(agy.model).toBe('gemini-3.8-flash-high');
+
+    const antigravity = registry.resolve('antigravity');
+    expect(antigravity.provider.name).toBe('agy');
+    expect(antigravity.model).toBe('gemini-3.8-flash-high');
+
+    const codex = registry.resolve('codex');
+    expect(codex.provider.name).toBe('codex');
+    expect(codex.model).toBe('gpt-6-astra');
+
+    const agyModel = registry.resolve('agy:claude-sonnet-4-6');
+    expect(agyModel.provider.name).toBe('agy');
+    expect(agyModel.model).toBe('claude-sonnet-4-6');
+
+    const codexModel = registry.resolve('codex:o3');
+    expect(codexModel.provider.name).toBe('codex');
+    expect(codexModel.model).toBe('o3');
+
+    const directGemini = registry.resolve('gemini-3.8-flash-high');
+    expect(directGemini.provider.name).toBe('agy');
+    expect(directGemini.model).toBe('gemini-3.8-flash-high');
+
+    const directClaude = registry.resolve('claude-sonnet-4-6');
+    expect(directClaude.provider.name).toBe('agy');
+    expect(directClaude.model).toBe('claude-sonnet-4-6');
+
+    const directGpt6 = registry.resolve('gpt-6-astra');
+    expect(directGpt6.provider.name).toBe('codex');
+    expect(directGpt6.model).toBe('gpt-6-astra');
   });
 
   it('resolves bare provider names to their default models', () => {

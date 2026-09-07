@@ -64,7 +64,7 @@ describe('CommandRegistry', () => {
     });
     expect(inspectResult).toContain('Active provider: placeholder');
     expect(inspectResult).toContain('Active model: placeholder');
-    expect(inspectResult).toContain('Available providers: ollama, groq, openrouter');
+    expect(inspectResult).toContain('Available providers: agy, codex, groq, openrouter, openai, ollama');
 
     // Switch to ollama model
     const switchResult = await registry.execute('/model llama3.2', {
@@ -74,6 +74,24 @@ describe('CommandRegistry', () => {
     expect(switchResult).toContain('Switched model to llama3.2 (ollama)');
     expect(session.getModel()).toBe('llama3.2');
     expect(session.getProvider().name).toBe('ollama');
+
+    // Switch to agy model
+    const agyResult = await registry.execute('/model agy', {
+      session,
+      exit: () => {},
+    });
+    expect(agyResult).toContain('Switched model to gemini-3.8-flash-high (agy)');
+    expect(session.getModel()).toBe('gemini-3.8-flash-high');
+    expect(session.getProvider().name).toBe('agy');
+
+    // Switch to codex model
+    const codexResult = await registry.execute('/model codex', {
+      session,
+      exit: () => {},
+    });
+    expect(codexResult).toContain('Switched model to gpt-6-astra (codex)');
+    expect(session.getModel()).toBe('gpt-6-astra');
+    expect(session.getProvider().name).toBe('codex');
 
     // Switch to groq model
     const groqResult = await registry.execute('/model groq', {
