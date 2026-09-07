@@ -14,6 +14,7 @@ import { ProjectDetector, type ProjectInfo } from '../tools/project/ProjectDetec
 import { AgentHarness } from '../agent/AgentHarness.js';
 import { MentorEngine } from '../mentor/MentorEngine.js';
 import type { MentorPolicy } from '../mentor/MentorPolicy.js';
+import { KnowledgeStore } from '../memory/KnowledgeStore.js';
 
 export interface SessionMessage {
   id: string;
@@ -22,16 +23,17 @@ export interface SessionMessage {
   timestamp: number;
 }
 
-export type SessionState = 'idle' | 'processing' | 'error';
+export type SessionState = 'idle' | 'processing' | 'waiting' | 'error';
 
 export interface SessionEngineOptions {
-  provider?: ModelProvider;
   model?: string;
+  provider?: ModelProvider;
   workspaceRoot?: string;
   eventBus?: EventBus;
   permissions?: PermissionManager;
   toolRegistry?: ToolRegistry;
   mentor?: MentorEngine;
+  knowledge?: KnowledgeStore;
 }
 
 export class SessionEngine {
@@ -41,6 +43,7 @@ export class SessionEngine {
   public readonly toolRegistry: ToolRegistry;
   public readonly project: ProjectInfo;
   public readonly mentor: MentorEngine;
+  public readonly knowledge: KnowledgeStore;
 
   private provider: ModelProvider;
   private model: string;
@@ -57,6 +60,7 @@ export class SessionEngine {
     this.toolRegistry = options.toolRegistry ?? new ToolRegistry();
     this.mentor = options.mentor ?? new MentorEngine();
     this.project = ProjectDetector.detect(options.workspaceRoot || process.cwd());
+    this.knowledge = options.knowledge ?? new KnowledgeStore(this.project.workspacePath);
 
     this.harness = new AgentHarness({
       provider: this.provider,
@@ -140,6 +144,7 @@ export class SessionEngine {
     try {
       // Evaluate active mentoring policy
       const activePolicy = overridePolicy ?? this.mentor.evaluatePrompt(trimmed);
+      const knowledgeProfile = this.knowledge.getGraph().formatPromptProfile();
 
       const chatMessages: ChatMessage[] = this.messages.map((m) => ({
         role: m.role,
@@ -147,7 +152,7 @@ export class SessionEngine {
       }));
 
       let accumulated = '';
-      for await (const event of this.harness.run(chatMessages, activePolicy)) {
+      for await (const event of this.harness.run(chatMessages, activePolicy, knowledgeProfile)) {
         if (event.type === 'chunk') {
           accumulated += event.text;
           this.events.emit('runtime:stream', {

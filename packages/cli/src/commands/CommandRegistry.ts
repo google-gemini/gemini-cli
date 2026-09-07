@@ -60,6 +60,7 @@ export class CommandRegistry {
       if (!topic) {
         return 'Usage: /learn <topic or concept>';
       }
+      ctx.session.knowledge.addOrTouch(topic, 'general', 'introduced');
       const policy = ctx.session.mentor.getPolicy('learn');
       await ctx.session.send(`Teach me about: ${topic}`, policy);
       return;
@@ -70,6 +71,7 @@ export class CommandRegistry {
       if (!problem) {
         return 'Usage: /solve <problem or feature>';
       }
+      ctx.session.knowledge.addOrTouch(problem, 'architecture', 'practicing');
       const policy = ctx.session.mentor.getPolicy('solve');
       await ctx.session.send(`Guide me through solving: ${problem}`, policy);
       return;
@@ -190,6 +192,30 @@ export class CommandRegistry {
       handleArchify
     );
     this.register('diagram', 'Alias for /archify', handleArchify);
+
+    const handleKnowledge: CommandHandler = (_args, ctx) => {
+      return ctx.session.knowledge.getGraph().formatSummary();
+    };
+    this.register('knowledge', 'Display developer concept mastery and learning progress', handleKnowledge);
+    this.register('progress', 'Alias for /knowledge', handleKnowledge);
+
+    this.register('mastered', 'Mark a concept as mastered (e.g. /mastered closures)', (args, ctx) => {
+      const concept = args.join(' ').trim();
+      if (!concept) {
+        return 'Usage: /mastered <concept name>';
+      }
+      ctx.session.knowledge.advanceMastery(concept, 'mastered');
+      return `Marked '${concept}' as Mastered ★. Zoe will avoid redundant hand-holding on this topic.`;
+    });
+
+    this.register('practice', 'Mark a concept as in-progress (e.g. /practice rate limiting)', (args, ctx) => {
+      const concept = args.join(' ').trim();
+      if (!concept) {
+        return 'Usage: /practice <concept name>';
+      }
+      ctx.session.knowledge.advanceMastery(concept, 'practicing');
+      return `Marked '${concept}' as In-Progress / Practicing ⚡. Guidance will focus on real-world edge cases.`;
+    });
 
     this.register('policy', 'Inspect or set active mentoring policy (e.g. /policy learn)', (args, ctx) => {
       const mode = args[0]?.toLowerCase().trim();

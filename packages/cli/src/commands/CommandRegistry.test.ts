@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { CommandRegistry } from './CommandRegistry.js';
-import { SessionEngine } from '@zoe/core';
+import { SessionEngine, KnowledgeStore } from '@zoe/core';
 
 describe('CommandRegistry', () => {
   it('detects slash commands', () => {
@@ -218,5 +218,44 @@ describe('CommandRegistry', () => {
       exit: () => {},
     });
     expect(policyResult).toContain('Switched active policy to: Archify Visual Reasoner (archify)');
+  });
+
+  it('executes /knowledge, /progress, /mastered, and /practice commands', async () => {
+    const registry = new CommandRegistry();
+    const session = new SessionEngine({
+      knowledge: new KnowledgeStore(undefined, { autoSave: false }),
+    });
+
+    // Initially empty knowledge summary
+    const emptyResult = await registry.execute('/knowledge', {
+      session,
+      exit: () => {},
+    });
+    expect(emptyResult).toContain('No concepts recorded yet');
+
+    // /practice registers in-progress concept
+    const practiceResult = await registry.execute('/practice rate limiting', {
+      session,
+      exit: () => {},
+    });
+    expect(practiceResult).toContain("Marked 'rate limiting' as In-Progress / Practicing ⚡");
+
+    // /mastered marks concept as mastered
+    const masteredResult = await registry.execute('/mastered closures', {
+      session,
+      exit: () => {},
+    });
+    expect(masteredResult).toContain("Marked 'closures' as Mastered ★");
+
+    // /progress outputs dashboard with both concepts
+    const progressResult = await registry.execute('/progress', {
+      session,
+      exit: () => {},
+    });
+    expect(progressResult).toContain('DEVELOPER KNOWLEDGE & CONCEPT MASTERY');
+    expect(progressResult).toContain('★ Mastered:');
+    expect(progressResult).toContain('closures');
+    expect(progressResult).toContain('⚡ In-Progress / Practicing:');
+    expect(progressResult).toContain('rate limiting');
   });
 });

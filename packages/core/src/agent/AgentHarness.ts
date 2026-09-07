@@ -48,8 +48,12 @@ export class AgentHarness {
     }
   }
 
-  public async *run(conversation: ChatMessage[], policy?: MentorPolicy): AsyncIterable<ModelEvent> {
-    const systemPrompt = buildSystemPrompt(this.project, this.toolRegistry, policy);
+  public async *run(
+    conversation: ChatMessage[],
+    policy?: MentorPolicy,
+    knowledgeProfile?: string
+  ): AsyncIterable<ModelEvent> {
+    const systemPrompt = buildSystemPrompt(this.project, this.toolRegistry, policy, knowledgeProfile);
 
     const workingMessages: ChatMessage[] = [
       { role: 'system', content: systemPrompt },

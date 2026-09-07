@@ -11,9 +11,11 @@ import type { MentorPolicy } from '../../mentor/MentorPolicy.js';
 export function buildSystemPrompt(
   project: ProjectInfo,
   toolRegistry: ToolRegistry,
-  policy?: MentorPolicy
+  policy?: MentorPolicy,
+  knowledgeProfile?: string
 ): string {
   const policyDirectives = policy ? policy.getDirectives() : '';
+  const knowledgeDirectives = knowledgeProfile ? `\n${knowledgeProfile}\n` : '';
 
   return `You are ZOE — an engineering mentor, code analyst, and architectural thinker.
 Philosophy: "Engineering, not autocomplete."
@@ -27,7 +29,7 @@ Role & Constraints:
 3. Be clear, concise, and technically rigorous. Reference file paths and line numbers directly.
 4. Encourage deliberate engineering design, simplicity, and architectural clarity.
 
-${policyDirectives}
+${knowledgeDirectives}${policyDirectives}
 
 ${toolRegistry.getPromptDescriptions()}
 
