@@ -11,9 +11,10 @@ import type { SessionMessage } from '@zoe/core';
 export interface MessageListProps {
   messages: SessionMessage[];
   streamingText?: string;
+  isProcessing?: boolean;
 }
 
-export function MessageList({ messages, streamingText }: MessageListProps): React.JSX.Element {
+export function MessageList({ messages, streamingText, isProcessing }: MessageListProps): React.JSX.Element {
   return (
     <Box flexDirection="column">
       {messages.map((msg, index) => {
@@ -39,6 +40,12 @@ export function MessageList({ messages, streamingText }: MessageListProps): Reac
           </Box>
         );
       })}
+
+      {isProcessing && !streamingText ? (
+        <Box marginY={0}>
+          <Text color="cyan" dimColor>Thinking...</Text>
+        </Box>
+      ) : null}
 
       {streamingText ? (
         <Box marginY={0}>

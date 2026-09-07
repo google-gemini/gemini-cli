@@ -84,7 +84,11 @@ export function MainScreen({ session, commands }: MainScreenProps): React.JSX.El
   return (
     <Box flexDirection="column" paddingX={1} paddingY={0}>
       <Header project={session.getProject()} />
-      <MessageList messages={messages} streamingText={streamingText} />
+      <MessageList
+        messages={messages}
+        streamingText={streamingText}
+        isProcessing={state === 'processing'}
+      />
       <InputPrompt
         onSubmit={handleSubmit}
         onExit={handleExit}
