@@ -4,7 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type SessionEngine, ProviderRegistry } from '@zoe/core';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { type SessionEngine, ProviderRegistry, DependencyAuditor, ComplexityAnalyzer } from '@zoe/core';
 
 export interface CommandContext {
   session: SessionEngine;
@@ -103,6 +105,61 @@ export class CommandRegistry {
       return;
     });
 
+    const handlePonytail: CommandHandler = async (args, ctx) => {
+      const target = args.join(' ').trim();
+      const policy = ctx.session.mentor.getPolicy('ponytail');
+      if (!target) {
+        ctx.session.mentor.setActivePolicy(policy);
+        return `Activated Ponytail Minimalist Philosopher mode.\n${policy.description}\nAsk what to delete, simplify, or audit with /ponytail <file>.`;
+      }
+
+      let auditContext = '';
+      try {
+        const fullPath = path.isAbsolute(target)
+          ? target
+          : path.resolve(ctx.session.getProject().workspacePath, target);
+
+        if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
+          const content = fs.readFileSync(fullPath, 'utf8');
+          const depAuditor = new DependencyAuditor();
+          const compAnalyzer = new ComplexityAnalyzer();
+
+          const depFindings = fullPath.endsWith('package.json')
+            ? depAuditor.auditPackageJson(content, target)
+            : depAuditor.auditCode(content, target);
+
+          const compFindings = compAnalyzer.analyze(content, target);
+
+          const reports: string[] = [];
+          if (depFindings.length > 0) {
+            reports.push(depAuditor.formatReport(depFindings));
+          }
+          if (compFindings.length > 0) {
+            reports.push(compAnalyzer.formatReport(compFindings));
+          }
+
+          if (reports.length > 0) {
+            auditContext = `\n\nAutomated Pre-Audit Findings:\n${reports.join('\n\n')}`;
+          }
+        }
+      } catch (_e) {
+        // Continue without pre-audit if reading fails
+      }
+
+      await ctx.session.send(
+        `Apply Ponytail minimalist philosophy: audit, simplify, and find code/dependencies to delete in: ${target}${auditContext}`,
+        policy
+      );
+      return;
+    };
+
+    this.register(
+      'ponytail',
+      'Minimalist audit: delete code, prune bloat & dependencies (e.g. /ponytail src/app.ts)',
+      handlePonytail
+    );
+    this.register('simplify', 'Alias for /ponytail', handlePonytail);
+
     this.register('policy', 'Inspect or set active mentoring policy (e.g. /policy learn)', (args, ctx) => {
       const mode = args[0]?.toLowerCase().trim();
       if (!mode) {
@@ -114,7 +171,7 @@ export class CommandRegistry {
         ctx.session.mentor.setActivePolicy(policy);
         return `Switched active policy to: ${policy.name} (${policy.intent})`;
       } catch (_err: any) {
-        return `Unknown policy: ${mode}. Available policies: learn, solve, debug, review, explain, hint`;
+        return `Unknown policy: ${mode}. Available policies: learn, solve, debug, review, explain, hint, ponytail`;
       }
     });
 

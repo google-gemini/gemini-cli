@@ -31,3 +31,4 @@ export * from './mentor/policies/DebugPolicy.js';
 export * from './mentor/policies/ReviewPolicy.js';
 export * from './mentor/policies/ExplainPolicy.js';
 export * from './mentor/policies/HintPolicy.js';
+export * from './skills/index.js';

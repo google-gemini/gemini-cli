@@ -159,4 +159,33 @@ describe('CommandRegistry', () => {
     });
     expect(errorResult).toContain('Unknown policy: invalid_mode');
   });
+
+  it('executes /ponytail and /simplify commands', async () => {
+    const registry = new CommandRegistry();
+    const session = new SessionEngine();
+
+    // Without arguments: switches active policy and returns description
+    const activateResult = await registry.execute('/ponytail', {
+      session,
+      exit: () => {},
+    });
+    expect(activateResult).toContain('Activated Ponytail Minimalist Philosopher mode');
+    expect(session.mentor.getActivePolicy().intent).toBe('ponytail');
+
+    // With target: sends prompt with Ponytail policy
+    await registry.execute('/simplify package.json', {
+      session,
+      exit: () => {},
+    });
+    const messages = session.getMessages();
+    expect(messages.length).toBeGreaterThanOrEqual(2);
+    expect(messages[0].content).toContain('Ponytail minimalist philosophy');
+
+    // /policy ponytail switches to Ponytail
+    const policyResult = await registry.execute('/policy ponytail', {
+      session,
+      exit: () => {},
+    });
+    expect(policyResult).toContain('Switched active policy to: Ponytail Minimalist Philosopher (ponytail)');
+  });
 });

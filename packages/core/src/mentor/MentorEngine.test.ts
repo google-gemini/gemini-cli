@@ -17,6 +17,8 @@ describe('IntentClassifier', () => {
     expect(IntentClassifier.classify('/review index.ts')).toBe('review');
     expect(IntentClassifier.classify('/explain flow')).toBe('explain');
     expect(IntentClassifier.classify('/hint')).toBe('hint');
+    expect(IntentClassifier.classify('/ponytail src/app.ts')).toBe('ponytail');
+    expect(IntentClassifier.classify('/simplify')).toBe('ponytail');
   });
 
   it('classifies natural language heuristics', () => {
@@ -26,6 +28,8 @@ describe('IntentClassifier', () => {
     expect(IntentClassifier.classify('review my database connection logic')).toBe('review');
     expect(IntentClassifier.classify('what does this project do?')).toBe('explain');
     expect(IntentClassifier.classify('where does authentication happen?')).toBe('explain');
+    expect(IntentClassifier.classify('how can I simplify this architecture?')).toBe('ponytail');
+    expect(IntentClassifier.classify('what can I delete here?')).toBe('ponytail');
   });
 });
 
@@ -57,5 +61,13 @@ describe('MentorEngine', () => {
     // Cycles back to 1
     const hint4 = mentor.evaluatePrompt('/hint');
     expect((hint4 as HintPolicy).getLevel()).toBe(1);
+  });
+
+  it('registers and evaluates PonytailPolicy', () => {
+    const mentor = new MentorEngine();
+    const policy = mentor.evaluatePrompt('/ponytail src/app.ts');
+    expect(policy.intent).toBe('ponytail');
+    expect(policy.name).toBe('Ponytail Minimalist Philosopher');
+    expect(policy.getDirectives()).toContain('CODE DELETION OVER ADDITION');
   });
 });

@@ -17,6 +17,24 @@ export class IntentClassifier {
     if (trimmed.startsWith('/review')) return 'review';
     if (trimmed.startsWith('/explain')) return 'explain';
     if (trimmed.startsWith('/hint')) return 'hint';
+    if (trimmed.startsWith('/ponytail') || trimmed.startsWith('/simplify')) return 'ponytail';
+
+    // Heuristics for Ponytail minimalism & code simplification
+    if (
+      trimmed.includes('simplify') ||
+      trimmed.includes('minimalist') ||
+      trimmed.includes('delete code') ||
+      trimmed.includes('remove unused') ||
+      trimmed.includes('prune') ||
+      trimmed.includes('remove dependency') ||
+      trimmed.includes('replace with standard library') ||
+      trimmed.includes('stdlib alternative') ||
+      trimmed.includes('reduce complexity') ||
+      trimmed.startsWith('what can i delete') ||
+      trimmed.startsWith('can we delete')
+    ) {
+      return 'ponytail';
+    }
 
     // Heuristics for debugging
     if (
