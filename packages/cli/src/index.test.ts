@@ -27,6 +27,12 @@ describe('CLI Argument Parser & Help', () => {
     expect(parseCliFlags([]).model).toBeUndefined();
   });
 
+  it('rejects missing model values and unknown arguments', () => {
+    expect(() => parseCliFlags(['--model'])).toThrow('--model requires a model name.');
+    expect(() => parseCliFlags(['--model='])).toThrow('--model requires a model name.');
+    expect(() => parseCliFlags(['--unknown'])).toThrow('Unknown argument: --unknown');
+  });
+
   it('returns formatted version string', () => {
     const versionText = getVersionText();
     expect(versionText).toBe(`zoe v${VERSION}`);

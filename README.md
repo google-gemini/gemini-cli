@@ -67,11 +67,10 @@ Zoe enforces a strict, capability-based security model:
 - `code.generate`: **DENY** (Enforced by default)
 - `git.commit`: **DENY** (Enforced by default)
 
-### 8. 🌐 Multi-Provider Architecture (Ollama, Groq, OpenRouter)
-Zoe works across local and cloud providers with native Server-Sent Events (SSE) streaming and zero external dependencies:
-- **Ollama** (Local-first): Run private offline models (`llama3.2`, `deepseek-r1`, `qwen2.5`, `mistral`).
-- **Groq** (Ultra-fast LPU inference): High-speed inference using `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `mixtral-8x7b-32768`.
-- **OpenRouter** (Unified multi-model gateway): Access hundreds of models including Claude 3.5 Sonnet, GPT-4o, DeepSeek R1, Llama 3.3, and Gemini.
+### 8. Model Providers
+Zoe connects to installed local CLI tools (`agy`, `codex`, `claude`) and the Ollama daemon. Use `/model <provider>` or `/model <provider>:<model>` to select one. The current default is Antigravity (`agy`); install and authenticate your chosen CLI before chatting. For Ollama, start the daemon and pull the model you select, for example `llama3.2`.
+
+Groq, OpenRouter, and `/key` are not implemented in this version. `--model placeholder` is an offline smoke-test mode that returns a fixed response, without model inference.
 
 ---
 
@@ -80,8 +79,7 @@ Zoe works across local and cloud providers with native Server-Sent Events (SSE) 
 | Command | Arguments | Description |
 | :--- | :--- | :--- |
 | `/help` | — | Display all available slash commands and descriptions |
-| `/model` | `[name]` | Inspect current model or switch active model (e.g. `/model groq:llama-3.3-70b-versatile`) |
-| `/key` | `<provider> <key>` | Configure and persist API key for `groq` or `openrouter` (saved to `~/.zoe/config.json`) |
+| `/model` | `[name]` | Inspect current model or switch active model (e.g. `/model ollama:llama3.2`) |
 | `/policy` | `[name]` | Inspect or switch active Socratic policy (`socratic`, `learning`, `debugging`, etc.) |
 | `/learn` | `<topic>` | Start a Socratic conceptual deep-dive into a computer science or engineering topic |
 | `/solve` | `<problem>` | Begin guided, step-by-step problem breakdown |
@@ -96,7 +94,7 @@ Zoe works across local and cloud providers with native Server-Sent Events (SSE) 
 | `/knowledge` | `[query]` | Inspect your recorded concept knowledge graph and mastery ratings |
 | `/progress` | — | View concept mastery statistics and learning trajectory |
 | `/mastered` | `<concept>` | Mark an engineering concept as mastered in your knowledge store |
-| `/practice` | `<concept>` | Generate targeted Socratic practice questions for a concept |
+| `/practice` | `<concept>` | Mark a concept as practicing for future guidance |
 | `/challenge` | `[topic]` | Start a Socratic engineering dilemma challenge |
 | `/quiz` | `[topic]` | Quick conceptual check-in on a specific topic |
 | `/symbols` | `[query]` | Scan and list symbols (classes, functions, types) in the workspace |
@@ -130,6 +128,13 @@ npm run build
 # Run Zoe
 ./bin/zoe
 ```
+
+#### Piped input
+```bash
+printf 'Explain this project\n' | ./bin/zoe --model ollama:llama3.2
+printf 'hello\n' | ./bin/zoe --model placeholder
+```
+Piped requests run sequentially and finish before Zoe exits at end of input. Slash commands are supported; `/exit` stops processing subsequent lines.
 
 #### CLI Flags
 ```bash

@@ -7,6 +7,10 @@
  */
 
 import React from 'react';
+import { createInterface } from 'node:readline';
+import type { Readable } from 'node:stream';
+import { realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { render } from 'ink';
 import { SessionEngine, ZoeConfig, ProviderRegistry } from '@zoe/core';
 import { CommandRegistry } from './commands/CommandRegistry.js';
@@ -74,14 +78,47 @@ export function parseCliFlags(args: string[]): CliFlags {
     } else if (arg === '--help' || arg === '-h') {
       help = true;
     } else if (arg === '--model' || arg === '-m') {
-      model = args[i + 1];
+      model = args[i + 1]?.trim();
+      if (!model || model.startsWith('-')) throw new Error(`${arg} requires a model name.`);
       i++;
     } else if (arg?.startsWith('--model=')) {
-      model = arg.slice('--model='.length);
+      model = arg.slice('--model='.length).trim();
+      if (!model) throw new Error('--model requires a model name.');
+    } else {
+      throw new Error(`Unknown argument: ${arg}. Use --help for usage.`);
     }
   }
 
   return { version, help, model };
+}
+
+export async function runPipedSession(
+  session: SessionEngine,
+  commands: CommandRegistry,
+  input: Readable,
+  write: (text: string) => void,
+): Promise<void> {
+  const lines = createInterface({ input, terminal: false });
+  let exited = false;
+  const onMessage = (message: { content: string }) => write(`${message.content}\n`);
+  session.events.on('runtime:message', onMessage);
+  try {
+    for await (const line of lines) {
+      const value = line.trim();
+      if (!value) continue;
+      if (commands.isCommand(value)) {
+        const result = await commands.execute(value, { session, exit: () => { exited = true; } });
+        if (result) session.addSystemMessage(result);
+      } else {
+        await session.send(value);
+      }
+      if (exited) break;
+    }
+  } finally {
+    lines.close();
+    session.events.off('runtime:message', onMessage);
+    session.end(exited ? 'user_exit' : 'input_end');
+  }
 }
 
 export async function run(args: string[] = process.argv.slice(2)): Promise<void> {
@@ -111,7 +148,13 @@ export async function run(args: string[] = process.argv.slice(2)): Promise<void>
   });
   const commands = new CommandRegistry(providerRegistry);
 
+  session.setShowThoughts(config.getSettings().showThoughts ?? true);
   session.start();
+
+  if (!process.stdin.isTTY) {
+    await runPipedSession(session, commands, process.stdin, (text) => process.stdout.write(text));
+    return;
+  }
 
   const { waitUntilExit } = render(
     React.createElement(MainScreen, { session, commands })
@@ -125,13 +168,19 @@ export async function run(args: string[] = process.argv.slice(2)): Promise<void>
   process.on('SIGINT', cleanup);
   process.on('SIGTERM', cleanup);
 
-  await waitUntilExit();
+  try {
+    await waitUntilExit();
+  } finally {
+    process.off('SIGINT', cleanup);
+    process.off('SIGTERM', cleanup);
+  }
 }
 
 // Only auto-run if directly executed
-if (process.argv[1]?.endsWith('dist/index.js') || process.argv[1]?.endsWith('bin/zoe')) {
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   run().catch((err) => {
-    console.error('Fatal error starting Zoe:', err);
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`Error: ${message}`);
     process.exit(1);
   });
 }

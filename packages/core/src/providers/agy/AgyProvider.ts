@@ -52,13 +52,17 @@ export class AgyProvider implements ModelProvider {
 
     const child = spawn(
       this.binaryPath,
-      ['--model', model, '--output-format', 'stream-json', '--print', '-'],
+      ['--model', model, '--mode', 'plan', '--output-format', 'stream-json', '--print', prompt],
       { stdio: ['pipe', 'pipe', 'pipe'] }
     );
 
     child.stdin.on('error', () => {});
-    child.stdin.write(prompt);
     child.stdin.end();
+
+    const completion = new Promise<number | null>((resolve) => {
+      child.on('error', (error) => { errorOutput = error.message; resolve(-1); });
+      child.on('close', resolve);
+    });
 
     const rl = readline.createInterface({
       input: child.stdout,
@@ -90,8 +94,8 @@ export class AgyProvider implements ModelProvider {
           if (res?.status === 'SUCCESS' && res.response && !hasYielded) {
             fullText = res.response;
             yield { type: 'chunk', text: res.response };
-          } else if (res?.status === 'ERROR') {
-            const err = new Error(res.error_message || 'Antigravity execution error');
+          } else if (res?.status && res.status !== 'SUCCESS') {
+            const err = new Error(res.error_message || `Antigravity request ${res.status.toLowerCase()}. Native tool permissions may be unavailable in headless mode.`);
             yield { type: 'error', error: err };
             return;
           }
@@ -101,12 +105,10 @@ export class AgyProvider implements ModelProvider {
       }
     }
 
-    const exitCode = await new Promise<number | null>((resolve) => {
-      child.on('close', resolve);
-    });
+    const exitCode = await completion;
 
-    if (exitCode !== 0 && !hasYielded) {
-      const err = new Error(errorOutput.trim() || `Antigravity process exited with code ${exitCode}`);
+    if (exitCode !== 0 || !fullText.trim()) {
+      const err = new Error(errorOutput.trim() || (exitCode === 0 ? 'Antigravity returned no response.' : `Antigravity process exited with code ${exitCode}`));
       yield { type: 'error', error: err };
       return;
     }
@@ -118,7 +120,9 @@ export class AgyProvider implements ModelProvider {
     const systemMessages = messages.filter((m) => m.role === 'system');
     const nonSystemMessages = messages.filter((m) => m.role !== 'system');
 
-    const parts: string[] = [];
+    const parts: string[] = [
+      'You are a text-only model backend for Zoe. Do not invoke any native CLI tools, browse, ask permission, or access files yourself. Zoe owns tool execution. When inspection is needed, output exactly one fenced tool call in the tool:name format described below and stop. Zoe will supply the result in the next request. Otherwise answer the developer directly.',
+    ];
     if (systemMessages.length > 0) {
       parts.push(`[System Instructions]\n${systemMessages.map((m) => m.content).join('\n\n')}`);
     }

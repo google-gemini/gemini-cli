@@ -43,13 +43,25 @@ export class ReadFileTool implements Tool {
       : path.normalize(path.join(context.workspaceRoot, rawPath));
 
     // Security check: Must stay within workspaceRoot
-    const normalizedRoot = path.normalize(context.workspaceRoot);
-    if (!resolved.startsWith(normalizedRoot)) {
+    const normalizedRoot = path.resolve(context.workspaceRoot);
+    const isWithinRoot = (root: string, file: string): boolean => {
+      const relative = path.relative(root, file);
+      return relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
+    };
+    if (!isWithinRoot(normalizedRoot, resolved)) {
       return `Access denied: path "${rawPath}" is outside the workspace root "${normalizedRoot}".`;
     }
 
     if (!fs.existsSync(resolved)) {
       return `Error: File not found: "${rawPath}".`;
+    }
+
+    try {
+      if (!isWithinRoot(fs.realpathSync(normalizedRoot), fs.realpathSync(resolved))) {
+        return `Access denied: path "${rawPath}" resolves outside the workspace root.`;
+      }
+    } catch (err) {
+      return `Error resolving file: ${err instanceof Error ? err.message : String(err)}`;
     }
 
     const stats = fs.statSync(resolved);
