@@ -9,7 +9,6 @@ import * as path from 'node:path';
 import {
   type SessionEngine,
   ProviderRegistry,
-  ZoeConfig,
   DependencyAuditor,
   ComplexityAnalyzer,
   ArchitectureVisualizer,
@@ -32,7 +31,6 @@ export interface CommandItem {
 export class CommandRegistry {
   private commands = new Map<string, { description: string; handler: CommandHandler }>();
   private providerRegistry: ProviderRegistry;
-  private customConfigDir?: string;
 
   public getCommands(): CommandItem[] {
     const list: CommandItem[] = [];
@@ -42,9 +40,8 @@ export class CommandRegistry {
     return list.sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  constructor(providerRegistry?: ProviderRegistry, customConfigDir?: string) {
+  constructor(providerRegistry?: ProviderRegistry) {
     this.providerRegistry = providerRegistry ?? new ProviderRegistry();
-    this.customConfigDir = customConfigDir;
 
     this.register('help', 'Show available commands', () => {
       const lines = ['Available commands:'];
@@ -58,21 +55,21 @@ export class CommandRegistry {
       ctx.session.clearHistory();
     });
 
-    this.register('model', 'Inspect or switch active model (e.g. /model groq:llama-3.3-70b-versatile)', (args, ctx) => {
+    this.register('model', 'Inspect or switch active model (e.g. /model agy:gemini-3.8-flash-high)', (args, ctx) => {
       const modelArg = args[0]?.trim();
       if (!modelArg) {
         return [
           `Active provider: ${ctx.session.getProvider().name}`,
           `Active model: ${ctx.session.getModel()}`,
           '',
-          'Available providers: agy, codex, groq, openrouter, openai, ollama',
+          'Available local providers: agy, codex, claude, ollama',
           'Examples:',
           '  /model agy                                   (Antigravity Gemini 3.8 Flash)',
           '  /model agy:claude-sonnet-4-6                 (Antigravity Claude Sonnet 4.6)',
           '  /model codex                                 (OpenAI Codex GPT-6 Astra)',
-          '  /model groq:qwen/qwen3.8-27b                 (Groq ultra-fast inference)',
+          '  /model codex:o3                              (OpenAI Codex o3)',
+          '  /model claude                                (Claude Code CLI)',
           '  /model llama3.2                              (Local Ollama)',
-          '  /model gpt-4o                                (OpenAI GPT-4o)',
         ].join('\n');
       }
 
@@ -81,37 +78,6 @@ export class CommandRegistry {
       ctx.session.setProvider(resolved.provider, resolved.model);
 
       return `Switched model to ${resolved.model} (${resolved.provider.name}).`;
-    });
-
-    this.register('key', 'Configure API key for a provider (e.g. /key groq gsk_...)', (args) => {
-      const provider = args[0]?.toLowerCase().trim();
-      const key = args[1]?.trim();
-
-      if (!provider || !key) {
-        return [
-          'Usage: /key <provider> <api_key>',
-          'Providers: groq, openrouter, openai',
-          'Example: /key openai sk-proj-...',
-          'Note: You can also set GROQ_API_KEY, OPENROUTER_API_KEY, or OPENAI_API_KEY environment variables.',
-        ].join('\n');
-      }
-
-      const config = new ZoeConfig(this.customConfigDir);
-      if (provider === 'groq') {
-        config.save({ groqApiKey: key, model: 'qwen/qwen3.8-27b' });
-        process.env['GROQ_API_KEY'] = key;
-        return 'Groq API key saved successfully. Default model set to qwen/qwen3.8-27b.';
-      } else if (provider === 'openrouter') {
-        config.save({ openrouterApiKey: key, model: 'meta-llama/llama-3.3-70b-instruct' });
-        process.env['OPENROUTER_API_KEY'] = key;
-        return 'OpenRouter API key saved successfully.';
-      } else if (provider === 'openai') {
-        config.save({ openaiApiKey: key, model: 'gpt-4o-mini' });
-        process.env['OPENAI_API_KEY'] = key;
-        return 'OpenAI API key saved successfully. Default model set to gpt-4o-mini.';
-      } else {
-        return `Unknown provider "${provider}". Supported providers for /key: groq, openrouter, openai`;
-      }
     });
 
     // Mentoring Commands

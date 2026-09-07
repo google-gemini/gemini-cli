@@ -7,11 +7,9 @@
 import type { ModelProvider } from './ModelProvider.js';
 import { PlaceholderProvider } from './placeholder/PlaceholderProvider.js';
 import { OllamaProvider } from './ollama/OllamaProvider.js';
-import { GroqProvider } from './groq/GroqProvider.js';
-import { OpenRouterProvider } from './openrouter/OpenRouterProvider.js';
-import { OpenAiProvider } from './openai/OpenAiProvider.js';
 import { AgyProvider } from './agy/AgyProvider.js';
 import { CodexProvider } from './codex/CodexProvider.js';
+import { ClaudeCodeProvider } from './claude/ClaudeCodeProvider.js';
 
 export interface ResolvedProvider {
   provider: ModelProvider;
@@ -25,11 +23,9 @@ export class ProviderRegistry {
   constructor() {
     this.register(new PlaceholderProvider());
     this.register(new OllamaProvider());
-    this.register(new GroqProvider());
-    this.register(new OpenRouterProvider());
-    this.register(new OpenAiProvider());
     this.register(new AgyProvider());
     this.register(new CodexProvider());
+    this.register(new ClaudeCodeProvider());
   }
 
   public register(provider: ModelProvider): void {
@@ -40,6 +36,9 @@ export class ProviderRegistry {
     const lower = name.toLowerCase();
     if (lower === 'antigravity') {
       return this.providers.get('agy');
+    }
+    if (lower === 'claudecode' || lower === 'claude-code') {
+      return this.providers.get('claude');
     }
     return this.providers.get(lower);
   }
@@ -58,7 +57,7 @@ export class ProviderRegistry {
 
     const lower = target.toLowerCase();
 
-    // Bare provider names -> use default model for that provider
+    // Bare provider names -> default model for each local tool
     if (lower === 'agy' || lower === 'antigravity') {
       const agy = this.get('agy') ?? new AgyProvider();
       return { provider: agy, model: 'gemini-3.8-flash-high' };
@@ -69,19 +68,9 @@ export class ProviderRegistry {
       return { provider: codex, model: 'gpt-6-astra' };
     }
 
-    if (lower === 'groq') {
-      const groq = this.get('groq') ?? new GroqProvider();
-      return { provider: groq, model: 'qwen/qwen3.8-27b' };
-    }
-
-    if (lower === 'openrouter') {
-      const openrouter = this.get('openrouter') ?? new OpenRouterProvider();
-      return { provider: openrouter, model: 'meta-llama/llama-3.3-70b-instruct' };
-    }
-
-    if (lower === 'openai') {
-      const openai = this.get('openai') ?? new OpenAiProvider();
-      return { provider: openai, model: 'gpt-4o-mini' };
+    if (lower === 'claude' || lower === 'claudecode' || lower === 'claude-code') {
+      const claude = this.get('claude') ?? new ClaudeCodeProvider();
+      return { provider: claude, model: 'claude-3-7-sonnet' };
     }
 
     if (lower === 'ollama') {
@@ -89,7 +78,7 @@ export class ProviderRegistry {
       return { provider: ollama, model: 'llama3.2' };
     }
 
-    // Explicit format: provider:model (e.g. agy:gemini-3.8-flash-high, codex:gpt-6-astra, groq:qwen/qwen3.8-27b)
+    // Explicit format: provider:model (e.g. agy:claude-sonnet-4-6, codex:o3, claude:claude-3-5-sonnet)
     if (target.includes(':') && !target.startsWith('http')) {
       const [providerName, ...rest] = target.split(':');
       const innerModel = rest.join(':');
@@ -99,64 +88,35 @@ export class ProviderRegistry {
       }
     }
 
-    // Direct Codex models (e.g. gpt-6-astra)
-    if (lower.startsWith('gpt-6')) {
+    // Direct Codex models (e.g. gpt-6-astra, o3, o1, gpt-4o)
+    if (
+      lower.startsWith('gpt-6') ||
+      lower.startsWith('o3') ||
+      lower.startsWith('o1') ||
+      lower.startsWith('gpt-4')
+    ) {
       const codex = this.get('codex') ?? new CodexProvider();
       return { provider: codex, model: target };
     }
 
-    // Direct Antigravity models (e.g. gemini-3.8-flash-high, claude-sonnet-4-6)
+    // Direct Antigravity models (e.g. gemini-3.8-flash-high, claude-sonnet-4-6, gpt-oss-120b-medium)
     if (
-      lower.startsWith('gemini-3.') ||
+      lower.startsWith('gemini-') ||
       lower.startsWith('claude-sonnet-') ||
-      lower.startsWith('claude-opus-')
+      lower.startsWith('claude-opus-') ||
+      lower.startsWith('gpt-oss-')
     ) {
       const agy = this.get('agy') ?? new AgyProvider();
       return { provider: agy, model: target };
     }
 
-    // Direct OpenAI model name aliases (gpt-4o, gpt-4o-mini, o1, o3-mini)
-    if (lower.startsWith('gpt-') || lower.startsWith('o1') || lower.startsWith('o3')) {
-      const openai = this.get('openai') ?? new OpenAiProvider();
-      return { provider: openai, model: target };
+    // Direct Claude Code models (e.g. claude-3-7-sonnet, claude-3-5-sonnet)
+    if (lower.startsWith('claude-3-')) {
+      const claude = this.get('claude') ?? new ClaudeCodeProvider();
+      return { provider: claude, model: target };
     }
 
-    // Active models hosted on Groq
-    const activeGroqModels = [
-      'qwen/qwen3.8-27b',
-      'qwen/qwen3.6-27b',
-      'openai/gpt-oss-120b',
-      'openai/gpt-oss-20b',
-      'groq/compound',
-      'groq/compound-mini',
-      'allam-2-7b',
-      'meta-llama/llama-prompt-guard-2-86m',
-      'meta-llama/llama-prompt-guard-2-22m',
-    ];
-    if (activeGroqModels.includes(lower)) {
-      const groq = this.get('groq') ?? new GroqProvider();
-      return { provider: groq, model: target };
-    }
-
-    // Slash prefix formats (e.g. groq/qwen/qwen3.8-27b, openrouter/deepseek/deepseek-r1)
-    if (lower.startsWith('groq/')) {
-      const groq = this.get('groq') ?? new GroqProvider();
-      return { provider: groq, model: target.slice('groq/'.length) };
-    }
-
-    if (lower.startsWith('openrouter/')) {
-      const openrouter = this.get('openrouter') ?? new OpenRouterProvider();
-      return { provider: openrouter, model: target.slice('openrouter/'.length) };
-    }
-
-    // Known multi-part OpenRouter org models (e.g. anthropic/..., meta-llama/..., deepseek/..., openai/...)
-    const openrouterOrgs = ['anthropic/', 'meta-llama/', 'deepseek/', 'openai/', 'google/', 'mistralai/', 'qwen/'];
-    if (openrouterOrgs.some((org) => lower.startsWith(org))) {
-      const openrouter = this.get('openrouter') ?? new OpenRouterProvider();
-      return { provider: openrouter, model: target };
-    }
-
-    // Default provider for other model names is Ollama
+    // Default local provider for other models is Ollama
     const ollama = this.get('ollama') ?? new OllamaProvider();
     return {
       provider: ollama,

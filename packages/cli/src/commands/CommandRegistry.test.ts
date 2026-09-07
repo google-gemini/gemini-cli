@@ -64,7 +64,7 @@ describe('CommandRegistry', () => {
     });
     expect(inspectResult).toContain('Active provider: placeholder');
     expect(inspectResult).toContain('Active model: placeholder');
-    expect(inspectResult).toContain('Available providers: agy, codex, groq, openrouter, openai, ollama');
+    expect(inspectResult).toContain('Available local providers: agy, codex, claude, ollama');
 
     // Switch to ollama model
     const switchResult = await registry.execute('/model llama3.2', {
@@ -93,71 +93,14 @@ describe('CommandRegistry', () => {
     expect(session.getModel()).toBe('gpt-6-astra');
     expect(session.getProvider().name).toBe('codex');
 
-    // Switch to groq model
-    const groqResult = await registry.execute('/model groq', {
+    // Switch to claude model
+    const claudeResult = await registry.execute('/model claude', {
       session,
       exit: () => {},
     });
-    expect(groqResult).toContain('Switched model to qwen/qwen3.8-27b (groq)');
-    expect(session.getModel()).toBe('qwen/qwen3.8-27b');
-    expect(session.getProvider().name).toBe('groq');
-
-    // Switch to openrouter model
-    const orResult = await registry.execute('/model openrouter:anthropic/claude-3.5-sonnet', {
-      session,
-      exit: () => {},
-    });
-    expect(orResult).toContain('Switched model to anthropic/claude-3.5-sonnet (openrouter)');
-    expect(session.getModel()).toBe('anthropic/claude-3.5-sonnet');
-    expect(session.getProvider().name).toBe('openrouter');
-
-    // Switch to openai model
-    const openaiResult = await registry.execute('/model gpt-4o', {
-      session,
-      exit: () => {},
-    });
-    expect(openaiResult).toContain('Switched model to gpt-4o (openai)');
-    expect(session.getModel()).toBe('gpt-4o');
-    expect(session.getProvider().name).toBe('openai');
-  });
-
-  it('configures API keys with /key', async () => {
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-test-key-'));
-    const registry = new CommandRegistry(undefined, tempDir);
-    const session = new SessionEngine();
-
-    // Usage help
-    const helpResult = await registry.execute('/key', {
-      session,
-      exit: () => {},
-    });
-    expect(helpResult).toContain('Usage: /key <provider> <api_key>');
-
-    // Set Groq key
-    const groqKeyResult = await registry.execute('/key groq gsk_123456', {
-      session,
-      exit: () => {},
-    });
-    expect(groqKeyResult).toContain('Groq API key saved successfully');
-    expect(process.env['GROQ_API_KEY']).toBe('gsk_123456');
-
-    // Set OpenRouter key
-    const orKeyResult = await registry.execute('/key openrouter sk-or-987654', {
-      session,
-      exit: () => {},
-    });
-    expect(orKeyResult).toContain('OpenRouter API key saved successfully');
-    expect(process.env['OPENROUTER_API_KEY']).toBe('sk-or-987654');
-
-    // Set OpenAI key
-    const openaiKeyResult = await registry.execute('/key openai sk-proj-112233', {
-      session,
-      exit: () => {},
-    });
-    expect(openaiKeyResult).toContain('OpenAI API key saved successfully');
-    expect(process.env['OPENAI_API_KEY']).toBe('sk-proj-112233');
-
-    fs.rmSync(tempDir, { recursive: true, force: true });
+    expect(claudeResult).toContain('Switched model to claude-3-7-sonnet (claude)');
+    expect(session.getModel()).toBe('claude-3-7-sonnet');
+    expect(session.getProvider().name).toBe('claude');
   });
 
   it('executes mentoring commands and sends prompt through session', async () => {
@@ -427,7 +370,7 @@ describe('CommandRegistry', () => {
     expect(names).toContain('ponytail');
     expect(names).toContain('symbols');
     expect(names).toContain('help');
-    expect(names).toContain('key');
+    expect(names).toContain('clear');
 
     // Sorted alphabetically
     const sorted = [...names].sort((a, b) => a.localeCompare(b));

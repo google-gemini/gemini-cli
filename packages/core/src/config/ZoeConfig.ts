@@ -12,15 +12,12 @@ export interface ZoeSettings {
   version: string;
   theme: string;
   model: string;
-  openrouterApiKey?: string;
-  groqApiKey?: string;
-  openaiApiKey?: string;
 }
 
 export const DEFAULT_SETTINGS: ZoeSettings = {
   version: '0.1.0',
   theme: 'default',
-  model: 'placeholder',
+  model: 'gemini-3.8-flash-high',
 };
 
 export class ZoeConfig {

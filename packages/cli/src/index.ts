@@ -50,7 +50,6 @@ Interactive Slash Commands:
   /quiz [topic]         Quick engineering concept check
   /symbols [query]      List codebase symbols
   /find <query>         Inspect symbol definitions and signatures
-  /key <provider> <key> Configure API key for groq or openrouter
   /clear                Clear terminal screen history
   /exit                 Exit Zoe
 `.trim();
@@ -100,20 +99,9 @@ export async function run(args: string[] = process.argv.slice(2)): Promise<void>
   process.title = 'zoe';
 
   const config = new ZoeConfig();
-  const settings = config.getSettings();
-  if (settings.groqApiKey && !process.env['GROQ_API_KEY']) {
-    process.env['GROQ_API_KEY'] = settings.groqApiKey;
-  }
-  if (settings.openrouterApiKey && !process.env['OPENROUTER_API_KEY']) {
-    process.env['OPENROUTER_API_KEY'] = settings.openrouterApiKey;
-  }
-  if (settings.openaiApiKey && !process.env['OPENAI_API_KEY']) {
-    process.env['OPENAI_API_KEY'] = settings.openaiApiKey;
-  }
-
   const providerRegistry = new ProviderRegistry();
 
-  const targetModel = flags.model || config.getSettings().model || 'placeholder';
+  const targetModel = flags.model || config.getSettings().model || 'gemini-3.8-flash-high';
   const resolved = providerRegistry.resolve(targetModel);
 
   const session = new SessionEngine({

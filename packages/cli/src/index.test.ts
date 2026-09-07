@@ -46,7 +46,6 @@ describe('CLI Argument Parser & Help', () => {
     expect(helpText).toContain('/challenge');
     expect(helpText).toContain('/symbols');
     expect(helpText).toContain('/find');
-    expect(helpText).toContain('/key');
     expect(helpText).toContain('/clear');
     expect(helpText).toContain('/exit');
   });

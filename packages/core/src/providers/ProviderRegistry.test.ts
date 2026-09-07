@@ -8,20 +8,23 @@ import { describe, it, expect } from 'vitest';
 import { ProviderRegistry } from './ProviderRegistry.js';
 
 describe('ProviderRegistry', () => {
-  it('registers placeholder, ollama, groq, openrouter, openai, agy, and codex by default', () => {
+  it('registers local CLI providers and daemons by default', () => {
     const registry = new ProviderRegistry();
     const providers = registry.getRegisteredProviderNames();
 
     expect(providers).toContain('placeholder');
     expect(providers).toContain('ollama');
-    expect(providers).toContain('groq');
-    expect(providers).toContain('openrouter');
-    expect(providers).toContain('openai');
     expect(providers).toContain('agy');
     expect(providers).toContain('codex');
+    expect(providers).toContain('claude');
+
+    // External API providers are removed
+    expect(providers).not.toContain('groq');
+    expect(providers).not.toContain('openrouter');
+    expect(providers).not.toContain('openai');
   });
 
-  it('resolves agy and codex provider names and aliases', () => {
+  it('resolves bare provider names to their default models', () => {
     const registry = new ProviderRegistry();
 
     const agy = registry.resolve('agy');
@@ -36,41 +39,13 @@ describe('ProviderRegistry', () => {
     expect(codex.provider.name).toBe('codex');
     expect(codex.model).toBe('gpt-6-astra');
 
-    const agyModel = registry.resolve('agy:claude-sonnet-4-6');
-    expect(agyModel.provider.name).toBe('agy');
-    expect(agyModel.model).toBe('claude-sonnet-4-6');
+    const claude = registry.resolve('claude');
+    expect(claude.provider.name).toBe('claude');
+    expect(claude.model).toBe('claude-3-7-sonnet');
 
-    const codexModel = registry.resolve('codex:o3');
-    expect(codexModel.provider.name).toBe('codex');
-    expect(codexModel.model).toBe('o3');
-
-    const directGemini = registry.resolve('gemini-3.8-flash-high');
-    expect(directGemini.provider.name).toBe('agy');
-    expect(directGemini.model).toBe('gemini-3.8-flash-high');
-
-    const directClaude = registry.resolve('claude-sonnet-4-6');
-    expect(directClaude.provider.name).toBe('agy');
-    expect(directClaude.model).toBe('claude-sonnet-4-6');
-
-    const directGpt6 = registry.resolve('gpt-6-astra');
-    expect(directGpt6.provider.name).toBe('codex');
-    expect(directGpt6.model).toBe('gpt-6-astra');
-  });
-
-  it('resolves bare provider names to their default models', () => {
-    const registry = new ProviderRegistry();
-
-    const groq = registry.resolve('groq');
-    expect(groq.provider.name).toBe('groq');
-    expect(groq.model).toBe('qwen/qwen3.8-27b');
-
-    const openrouter = registry.resolve('openrouter');
-    expect(openrouter.provider.name).toBe('openrouter');
-    expect(openrouter.model).toBe('meta-llama/llama-3.3-70b-instruct');
-
-    const openai = registry.resolve('openai');
-    expect(openai.provider.name).toBe('openai');
-    expect(openai.model).toBe('gpt-4o-mini');
+    const claudecode = registry.resolve('claudecode');
+    expect(claudecode.provider.name).toBe('claude');
+    expect(claudecode.model).toBe('claude-3-7-sonnet');
 
     const ollama = registry.resolve('ollama');
     expect(ollama.provider.name).toBe('ollama');
@@ -80,60 +55,56 @@ describe('ProviderRegistry', () => {
   it('resolves explicit provider:model format', () => {
     const registry = new ProviderRegistry();
 
-    const groqModel = registry.resolve('groq:llama-3.1-8b-instant');
-    expect(groqModel.provider.name).toBe('groq');
-    expect(groqModel.model).toBe('llama-3.1-8b-instant');
+    const agyModel = registry.resolve('agy:claude-sonnet-4-6');
+    expect(agyModel.provider.name).toBe('agy');
+    expect(agyModel.model).toBe('claude-sonnet-4-6');
 
-    const openrouterModel = registry.resolve('openrouter:anthropic/claude-3.5-sonnet');
-    expect(openrouterModel.provider.name).toBe('openrouter');
-    expect(openrouterModel.model).toBe('anthropic/claude-3.5-sonnet');
+    const codexModel = registry.resolve('codex:o3');
+    expect(codexModel.provider.name).toBe('codex');
+    expect(codexModel.model).toBe('o3');
 
-    const openaiModel = registry.resolve('openai:gpt-4o');
-    expect(openaiModel.provider.name).toBe('openai');
-    expect(openaiModel.model).toBe('gpt-4o');
+    const claudeModel = registry.resolve('claude:claude-3-5-sonnet');
+    expect(claudeModel.provider.name).toBe('claude');
+    expect(claudeModel.model).toBe('claude-3-5-sonnet');
+
+    const ollamaModel = registry.resolve('ollama:qwen2.5-coder');
+    expect(ollamaModel.provider.name).toBe('ollama');
+    expect(ollamaModel.model).toBe('qwen2.5-coder');
   });
 
-  it('resolves direct gpt- and o1- model names to openai', () => {
+  it('resolves direct model name aliases to corresponding CLI tools', () => {
     const registry = new ProviderRegistry();
 
-    const gpt = registry.resolve('gpt-4o');
-    expect(gpt.provider.name).toBe('openai');
-    expect(gpt.model).toBe('gpt-4o');
+    // Antigravity models
+    const gemini = registry.resolve('gemini-3.8-flash-high');
+    expect(gemini.provider.name).toBe('agy');
+    expect(gemini.model).toBe('gemini-3.8-flash-high');
 
-    const o1 = registry.resolve('o1-mini');
-    expect(o1.provider.name).toBe('openai');
-    expect(o1.model).toBe('o1-mini');
-  });
+    const claudeAgy = registry.resolve('claude-sonnet-4-6');
+    expect(claudeAgy.provider.name).toBe('agy');
+    expect(claudeAgy.model).toBe('claude-sonnet-4-6');
 
-  it('resolves slash prefixed provider names', () => {
-    const registry = new ProviderRegistry();
+    // Codex models
+    const gpt6 = registry.resolve('gpt-6-astra');
+    expect(gpt6.provider.name).toBe('codex');
+    expect(gpt6.model).toBe('gpt-6-astra');
 
-    const groqSlash = registry.resolve('groq/mixtral-8x7b-32768');
-    expect(groqSlash.provider.name).toBe('groq');
-    expect(groqSlash.model).toBe('mixtral-8x7b-32768');
+    const o3 = registry.resolve('o3');
+    expect(o3.provider.name).toBe('codex');
+    expect(o3.model).toBe('o3');
 
-    const openrouterSlash = registry.resolve('openrouter/deepseek/deepseek-r1');
-    expect(openrouterSlash.provider.name).toBe('openrouter');
-    expect(openrouterSlash.model).toBe('deepseek/deepseek-r1');
-  });
+    const gpt4 = registry.resolve('gpt-4o');
+    expect(gpt4.provider.name).toBe('codex');
+    expect(gpt4.model).toBe('gpt-4o');
 
-  it('auto-resolves known OpenRouter org prefixes', () => {
-    const registry = new ProviderRegistry();
+    // Claude Code models
+    const claudeCode = registry.resolve('claude-3-7-sonnet');
+    expect(claudeCode.provider.name).toBe('claude');
+    expect(claudeCode.model).toBe('claude-3-7-sonnet');
 
-    const claude = registry.resolve('anthropic/claude-3.5-sonnet');
-    expect(claude.provider.name).toBe('openrouter');
-    expect(claude.model).toBe('anthropic/claude-3.5-sonnet');
-
-    const deepseek = registry.resolve('deepseek/deepseek-r1');
-    expect(deepseek.provider.name).toBe('openrouter');
-    expect(deepseek.model).toBe('deepseek/deepseek-r1');
-  });
-
-  it('defaults simple model names to Ollama', () => {
-    const registry = new ProviderRegistry();
-
-    const res = registry.resolve('mistral');
-    expect(res.provider.name).toBe('ollama');
-    expect(res.model).toBe('mistral');
+    // Fallback models default to Ollama
+    const mistral = registry.resolve('mistral');
+    expect(mistral.provider.name).toBe('ollama');
+    expect(mistral.model).toBe('mistral');
   });
 });
