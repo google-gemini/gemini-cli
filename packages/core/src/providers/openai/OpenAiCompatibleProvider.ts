@@ -5,6 +5,7 @@
  */
 
 import type { ModelProvider, ChatRequest, ModelEvent } from '../ModelProvider.js';
+import { ZoeConfig } from '../../config/ZoeConfig.js';
 
 export interface OpenAiCompatibleOptions {
   name: string;
@@ -38,7 +39,26 @@ export class OpenAiCompatibleProvider implements ModelProvider {
   }
 
   public getApiKey(): string | undefined {
-    return this.explicitApiKey || process.env[this.apiKeyEnvVar]?.trim();
+    if (this.explicitApiKey) {
+      return this.explicitApiKey;
+    }
+    const envKey = process.env[this.apiKeyEnvVar]?.trim();
+    if (envKey) {
+      return envKey;
+    }
+    try {
+      const config = new ZoeConfig();
+      const settings = config.getSettings();
+      if (this.apiKeyEnvVar === 'GROQ_API_KEY' && settings.groqApiKey) {
+        return settings.groqApiKey.trim();
+      }
+      if (this.apiKeyEnvVar === 'OPENROUTER_API_KEY' && settings.openrouterApiKey) {
+        return settings.openrouterApiKey.trim();
+      }
+    } catch {
+      // Ignore config read error
+    }
+    return undefined;
   }
 
   public setApiKey(key: string): void {

@@ -27,9 +27,11 @@ export type CommandHandler = (args: string[], ctx: CommandContext) => Promise<st
 export class CommandRegistry {
   private commands = new Map<string, { description: string; handler: CommandHandler }>();
   private providerRegistry: ProviderRegistry;
+  private customConfigDir?: string;
 
-  constructor(providerRegistry?: ProviderRegistry) {
+  constructor(providerRegistry?: ProviderRegistry, customConfigDir?: string) {
     this.providerRegistry = providerRegistry ?? new ProviderRegistry();
+    this.customConfigDir = customConfigDir;
 
     this.register('help', 'Show available commands', () => {
       const lines = ['Available commands:'];
@@ -79,13 +81,13 @@ export class CommandRegistry {
         ].join('\n');
       }
 
-      const config = new ZoeConfig();
+      const config = new ZoeConfig(this.customConfigDir);
       if (provider === 'groq') {
-        config.save({ groqApiKey: key });
+        config.save({ groqApiKey: key, model: 'qwen/qwen3.8-27b' });
         process.env['GROQ_API_KEY'] = key;
-        return 'Groq API key saved successfully.';
+        return 'Groq API key saved successfully. Default model set to qwen/qwen3.8-27b.';
       } else if (provider === 'openrouter') {
-        config.save({ openrouterApiKey: key });
+        config.save({ openrouterApiKey: key, model: 'meta-llama/llama-3.3-70b-instruct' });
         process.env['OPENROUTER_API_KEY'] = key;
         return 'OpenRouter API key saved successfully.';
       } else {

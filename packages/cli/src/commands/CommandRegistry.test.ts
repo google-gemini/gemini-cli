@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { CommandRegistry } from './CommandRegistry.js';
 import { SessionEngine, KnowledgeStore } from '@zoe/core';
@@ -92,7 +95,8 @@ describe('CommandRegistry', () => {
   });
 
   it('configures API keys with /key', async () => {
-    const registry = new CommandRegistry();
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-test-key-'));
+    const registry = new CommandRegistry(undefined, tempDir);
     const session = new SessionEngine();
 
     // Usage help
@@ -117,6 +121,8 @@ describe('CommandRegistry', () => {
     });
     expect(orKeyResult).toContain('OpenRouter API key saved successfully');
     expect(process.env['OPENROUTER_API_KEY']).toBe('sk-or-987654');
+
+    fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
   it('executes mentoring commands and sends prompt through session', async () => {

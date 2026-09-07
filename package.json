@@ -31,7 +31,7 @@
   },
   "scripts": {
     "build": "npm run build --workspace=@zoe/core && npm run build --workspace=zoe",
-    "clean": "rm -rf packages/*/dist",
+    "clean": "rm -rf packages/*/dist packages/*/tsconfig.tsbuildinfo",
     "pack": "npm pack --workspaces",
     "start": "node packages/cli/dist/index.js",
     "test": "vitest run",
