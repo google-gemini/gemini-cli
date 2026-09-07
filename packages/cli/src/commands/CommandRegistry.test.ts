@@ -258,4 +258,37 @@ describe('CommandRegistry', () => {
     expect(progressResult).toContain('⚡ In-Progress / Practicing:');
     expect(progressResult).toContain('rate limiting');
   });
+
+  it('executes /challenge and /quiz commands', async () => {
+    const registry = new CommandRegistry();
+    const session = new SessionEngine({
+      knowledge: new KnowledgeStore(undefined, { autoSave: false }),
+    });
+
+    // Execute /challenge without arguments (selects from graph or default)
+    await registry.execute('/challenge', {
+      session,
+      exit: () => {},
+    });
+    const messages = session.getMessages();
+    expect(messages.length).toBeGreaterThanOrEqual(1);
+    expect(messages[0].content).toContain('SOCRATIC ENGINEERING CHALLENGE');
+    expect(session.mentor.getActivePolicy().intent).toBe('challenge');
+
+    // Execute /quiz with explicit concept
+    await registry.execute('/quiz rate limiting', {
+      session,
+      exit: () => {},
+    });
+    const updatedMessages = session.getMessages();
+    const challengeMsg = updatedMessages.find((m) => m.content.includes('Concept: rate limiting'));
+    expect(challengeMsg).toBeDefined();
+
+    // /policy challenge switches to ChallengePolicy
+    const policyResult = await registry.execute('/policy challenge', {
+      session,
+      exit: () => {},
+    });
+    expect(policyResult).toContain('Switched active policy to: Socratic Challenge Evaluator (challenge)');
+  });
 });

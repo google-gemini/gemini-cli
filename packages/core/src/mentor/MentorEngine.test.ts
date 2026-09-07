@@ -21,6 +21,8 @@ describe('IntentClassifier', () => {
     expect(IntentClassifier.classify('/simplify')).toBe('ponytail');
     expect(IntentClassifier.classify('/archify')).toBe('archify');
     expect(IntentClassifier.classify('/diagram auth')).toBe('archify');
+    expect(IntentClassifier.classify('/challenge')).toBe('challenge');
+    expect(IntentClassifier.classify('/quiz closures')).toBe('challenge');
   });
 
   it('classifies natural language heuristics', () => {
@@ -34,6 +36,8 @@ describe('IntentClassifier', () => {
     expect(IntentClassifier.classify('what can I delete here?')).toBe('ponytail');
     expect(IntentClassifier.classify('draw a diagram of the auth flow')).toBe('archify');
     expect(IntentClassifier.classify('visualize the architecture')).toBe('archify');
+    expect(IntentClassifier.classify('quiz me on rate limiting')).toBe('challenge');
+    expect(IntentClassifier.classify('give me a challenge on event loops')).toBe('challenge');
   });
 });
 
@@ -81,5 +85,13 @@ describe('MentorEngine', () => {
     expect(policy.intent).toBe('archify');
     expect(policy.name).toBe('Archify Visual Reasoner');
     expect(policy.getDirectives()).toContain('THINK SPATIALLY & ARCHITECTURALLY');
+  });
+
+  it('registers and evaluates ChallengePolicy', () => {
+    const mentor = new MentorEngine();
+    const policy = mentor.evaluatePrompt('/challenge closures');
+    expect(policy.intent).toBe('challenge');
+    expect(policy.name).toBe('Socratic Challenge Evaluator');
+    expect(policy.getDirectives()).toContain('RIGOROUS FIRST-PRINCIPLES SCRUTINY');
   });
 });

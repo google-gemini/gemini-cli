@@ -19,6 +19,18 @@ export class IntentClassifier {
     if (trimmed.startsWith('/hint')) return 'hint';
     if (trimmed.startsWith('/ponytail') || trimmed.startsWith('/simplify')) return 'ponytail';
     if (trimmed.startsWith('/archify') || trimmed.startsWith('/diagram')) return 'archify';
+    if (trimmed.startsWith('/challenge') || trimmed.startsWith('/quiz')) return 'challenge';
+
+    // Heuristics for Socratic Challenges & Practice
+    if (
+      trimmed.includes('quiz me') ||
+      trimmed.includes('give me a challenge') ||
+      trimmed.includes('test my knowledge') ||
+      trimmed.includes('practice challenge') ||
+      trimmed.startsWith('challenge me')
+    ) {
+      return 'challenge';
+    }
 
     // Heuristics for Archify visual reasoning & diagrams
     if (

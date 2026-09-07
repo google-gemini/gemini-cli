@@ -12,6 +12,7 @@ import {
   DependencyAuditor,
   ComplexityAnalyzer,
   ArchitectureVisualizer,
+  ChallengeGenerator,
 } from '@zoe/core';
 
 export interface CommandContext {
@@ -217,6 +218,30 @@ export class CommandRegistry {
       return `Marked '${concept}' as In-Progress / Practicing ⚡. Guidance will focus on real-world edge cases.`;
     });
 
+    const handleChallenge: CommandHandler = async (args, ctx) => {
+      const topic = args.join(' ').trim();
+      const policy = ctx.session.mentor.getPolicy('challenge');
+
+      const challenge = topic
+        ? ChallengeGenerator.generateForConcept(topic)
+        : ChallengeGenerator.selectForGraph(ctx.session.knowledge.getGraph());
+
+      // Touch in knowledge graph
+      ctx.session.knowledge.addOrTouch(challenge.concept, 'general', 'practicing');
+
+      const card = ChallengeGenerator.formatCard(challenge);
+      ctx.session.addSystemMessage(card);
+      ctx.session.mentor.setActivePolicy(policy);
+      return;
+    };
+
+    this.register(
+      'challenge',
+      'Test engineering mastery: solve Socratic design and debugging challenges (e.g. /challenge or /challenge rate limiting)',
+      handleChallenge
+    );
+    this.register('quiz', 'Alias for /challenge', handleChallenge);
+
     this.register('policy', 'Inspect or set active mentoring policy (e.g. /policy learn)', (args, ctx) => {
       const mode = args[0]?.toLowerCase().trim();
       if (!mode) {
@@ -228,7 +253,7 @@ export class CommandRegistry {
         ctx.session.mentor.setActivePolicy(policy);
         return `Switched active policy to: ${policy.name} (${policy.intent})`;
       } catch (_err: any) {
-        return `Unknown policy: ${mode}. Available policies: learn, solve, debug, review, explain, hint, ponytail, archify`;
+        return `Unknown policy: ${mode}. Available policies: learn, solve, debug, review, explain, hint, ponytail, archify, challenge`;
       }
     });
 
