@@ -12,12 +12,14 @@ export interface ZoeEvents {
   'session:end': { sessionId: string; reason?: string };
   'user:input': { text: string };
   'runtime:stream': { chunk: string; fullText: string };
+  'runtime:thought': { chunk: string; fullThought: string; isThinking: boolean };
   'runtime:message': { content: string; role: 'assistant' | 'system' };
   'runtime:state': { state: 'idle' | 'processing' | 'error' };
   'runtime:status': { message: string; step?: 'thinking' | 'tool' | 'streaming' | 'idle' | 'error' };
   'command:result': { command: string; success: boolean; message?: string };
   'history:cleared': Record<string, never>;
   'provider:changed': { provider: ModelProvider; model: string };
+  'thoughts:toggled': { enabled: boolean };
 }
 
 export class EventBus {

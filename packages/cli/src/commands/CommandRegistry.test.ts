@@ -103,6 +103,32 @@ describe('CommandRegistry', () => {
     expect(session.getProvider().name).toBe('claude');
   });
 
+  it('inspects and toggles thought process visibility with /thoughts', async () => {
+    const registry = new CommandRegistry();
+    const session = new SessionEngine();
+
+    const inspectResult = await registry.execute('/thoughts', {
+      session,
+      exit: () => {},
+    });
+    expect(inspectResult).toContain('Thought process display is currently ENABLED');
+    expect(session.getShowThoughts()).toBe(true);
+
+    const offResult = await registry.execute('/thoughts off', {
+      session,
+      exit: () => {},
+    });
+    expect(offResult).toContain('Thought process display DISABLED');
+    expect(session.getShowThoughts()).toBe(false);
+
+    const onResult = await registry.execute('/thoughts on', {
+      session,
+      exit: () => {},
+    });
+    expect(onResult).toContain('Thought process display ENABLED');
+    expect(session.getShowThoughts()).toBe(true);
+  });
+
   it('executes mentoring commands and sends prompt through session', async () => {
     const registry = new CommandRegistry();
     const session = new SessionEngine();

@@ -6,6 +6,7 @@
 
 export * from './events/EventBus.js';
 export * from './session/SessionEngine.js';
+export * from './session/ThoughtParser.js';
 export * from './config/ZoeConfig.js';
 export * from './runtime/PlaceholderRuntime.js';
 export * from './providers/ModelProvider.js';

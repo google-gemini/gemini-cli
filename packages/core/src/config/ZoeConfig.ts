@@ -12,12 +12,14 @@ export interface ZoeSettings {
   version: string;
   theme: string;
   model: string;
+  showThoughts?: boolean;
 }
 
 export const DEFAULT_SETTINGS: ZoeSettings = {
   version: '0.1.0',
   theme: 'default',
   model: 'gemini-3.8-flash-high',
+  showThoughts: true,
 };
 
 export class ZoeConfig {

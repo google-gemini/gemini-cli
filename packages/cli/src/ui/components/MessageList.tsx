@@ -8,21 +8,26 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import type { SessionMessage } from '@zoe/core';
 import { LiveStatus, StreamingCursor } from './LiveStatus.js';
+import { ThoughtBox } from './ThoughtBox.js';
 
 export interface MessageListProps {
   messages: SessionMessage[];
   streamingText?: string;
+  streamingThought?: string;
   isProcessing?: boolean;
   statusText?: string;
   startTime?: number;
+  showThoughts?: boolean;
 }
 
 export function MessageList({
   messages,
   streamingText,
+  streamingThought,
   isProcessing,
   statusText,
   startTime,
+  showThoughts = true,
 }: MessageListProps): React.JSX.Element {
   return (
     <Box flexDirection="column">
@@ -46,11 +51,18 @@ export function MessageList({
           );
         }
         return (
-          <Box key={key} marginY={0}>
+          <Box key={key} flexDirection="column" marginY={0}>
+            {msg.thought && showThoughts ? (
+              <ThoughtBox thought={msg.thought} />
+            ) : null}
             <Text color="white">{msg.content}</Text>
           </Box>
         );
       })}
+
+      {isProcessing && streamingThought && showThoughts ? (
+        <ThoughtBox thought={streamingThought} isStreaming={!streamingText} />
+      ) : null}
 
       {isProcessing && !streamingText ? (
         <LiveStatus statusText={statusText} startTime={startTime} />

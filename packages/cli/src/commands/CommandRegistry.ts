@@ -80,6 +80,23 @@ export class CommandRegistry {
       return `Switched model to ${resolved.model} (${resolved.provider.name}).`;
     });
 
+    this.register('thoughts', 'Inspect or toggle thought process visibility (/thoughts [on|off])', (args, ctx) => {
+      const mode = args[0]?.trim().toLowerCase();
+      if (!mode) {
+        const current = ctx.session.getShowThoughts() ? 'ENABLED' : 'DISABLED';
+        return `Thought process display is currently ${current}.\nUse "/thoughts on" to show or "/thoughts off" to hide.`;
+      }
+      if (mode === 'on' || mode === 'true' || mode === 'enable' || mode === 'show') {
+        ctx.session.setShowThoughts(true);
+        return 'Thought process display ENABLED.';
+      }
+      if (mode === 'off' || mode === 'false' || mode === 'disable' || mode === 'hide') {
+        ctx.session.setShowThoughts(false);
+        return 'Thought process display DISABLED.';
+      }
+      return 'Usage: /thoughts [on|off]';
+    });
+
     // Mentoring Commands
     this.register('learn', 'Socratic conceptual learning on a topic (e.g. /learn event loops)', async (args, ctx) => {
       const topic = args.join(' ').trim();

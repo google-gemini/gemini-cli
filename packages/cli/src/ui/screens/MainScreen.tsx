@@ -21,6 +21,8 @@ export function MainScreen({ session, commands }: MainScreenProps): React.JSX.El
   const { exit } = useApp();
   const [messages, setMessages] = useState<SessionMessage[]>(session.getMessages());
   const [streamingText, setStreamingText] = useState<string>('');
+  const [streamingThought, setStreamingThought] = useState<string>('');
+  const [showThoughts, setShowThoughts] = useState<boolean>(session.getShowThoughts());
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [startTime, setStartTime] = useState<number | undefined>(undefined);
   const [state, setState] = useState(session.getState());
@@ -36,12 +38,21 @@ export function MainScreen({ session, commands }: MainScreenProps): React.JSX.El
       setStreamingText(data.fullText);
     };
 
+    const handleThought = (data: { chunk: string; fullThought: string; isThinking: boolean }) => {
+      setStreamingThought(data.fullThought);
+    };
+
+    const handleThoughtsToggled = (data: { enabled: boolean }) => {
+      setShowThoughts(data.enabled);
+    };
+
     const handleStatus = (data: { message: string; step?: string }) => {
       setStatusMessage(data.message);
     };
 
     const handleMessage = () => {
       setStreamingText('');
+      setStreamingThought('');
       setStatusMessage('');
       updateMessages();
     };
@@ -52,6 +63,7 @@ export function MainScreen({ session, commands }: MainScreenProps): React.JSX.El
         setStartTime(Date.now());
       } else {
         setStreamingText('');
+        setStreamingThought('');
         setStatusMessage('');
         setStartTime(undefined);
       }
@@ -65,20 +77,24 @@ export function MainScreen({ session, commands }: MainScreenProps): React.JSX.El
 
     session.events.on('user:input', updateMessages);
     session.events.on('runtime:stream', handleStream);
+    session.events.on('runtime:thought', handleThought);
     session.events.on('runtime:status', handleStatus);
     session.events.on('runtime:message', handleMessage);
     session.events.on('history:cleared', updateMessages);
     session.events.on('runtime:state', updateState);
     session.events.on('provider:changed', handleProviderChange);
+    session.events.on('thoughts:toggled', handleThoughtsToggled);
 
     return () => {
       session.events.off('user:input', updateMessages);
       session.events.off('runtime:stream', handleStream);
+      session.events.off('runtime:thought', handleThought);
       session.events.off('runtime:status', handleStatus);
       session.events.off('runtime:message', handleMessage);
       session.events.off('history:cleared', updateMessages);
       session.events.off('runtime:state', updateState);
       session.events.off('provider:changed', handleProviderChange);
+      session.events.off('thoughts:toggled', handleThoughtsToggled);
     };
   }, [session]);
 
@@ -113,9 +129,11 @@ export function MainScreen({ session, commands }: MainScreenProps): React.JSX.El
       <MessageList
         messages={messages}
         streamingText={streamingText}
+        streamingThought={streamingThought}
         isProcessing={state === 'processing'}
         statusText={statusMessage}
         startTime={startTime}
+        showThoughts={showThoughts}
       />
       <InputPrompt
         onSubmit={handleSubmit}

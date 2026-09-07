@@ -17,11 +17,13 @@ import type { MentorPolicy } from '../mentor/MentorPolicy.js';
 import { KnowledgeStore } from '../memory/KnowledgeStore.js';
 import { WorkspaceSymbolIndex } from '../indexer/WorkspaceSymbolIndex.js';
 import { InspectSymbolTool } from '../tools/symbols/InspectSymbolTool.js';
+import { extractThoughts, parseStreamingThoughts } from './ThoughtParser.js';
 
 export interface SessionMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
+  thought?: string;
   timestamp: number;
 }
 
@@ -53,6 +55,7 @@ export class SessionEngine {
   private harness: AgentHarness;
   private messages: SessionMessage[] = [];
   private state: SessionState = 'idle';
+  private showThoughts = true;
 
   constructor(options: SessionEngineOptions = {}) {
     this.id = randomUUID();
@@ -93,6 +96,15 @@ export class SessionEngine {
 
   public getSymbolIndex(): WorkspaceSymbolIndex {
     return this.symbolIndex;
+  }
+
+  public getShowThoughts(): boolean {
+    return this.showThoughts;
+  }
+
+  public setShowThoughts(show: boolean): void {
+    this.showThoughts = show;
+    this.events.emit('thoughts:toggled', { enabled: show });
   }
 
   public setProvider(provider: ModelProvider, model?: string): void {
@@ -177,10 +189,27 @@ export class SessionEngine {
             });
           }
           accumulated += event.text;
-          this.events.emit('runtime:stream', {
-            chunk: event.text,
-            fullText: accumulated,
-          });
+
+          const parsedStream = parseStreamingThoughts(accumulated);
+          if (parsedStream.thought) {
+            this.events.emit('runtime:thought', {
+              chunk: event.text,
+              fullThought: parsedStream.thought,
+              isThinking: parsedStream.isThinking,
+            });
+          }
+
+          if (parsedStream.content) {
+            this.events.emit('runtime:stream', {
+              chunk: event.text,
+              fullText: parsedStream.content,
+            });
+          } else if (!parsedStream.isThinking) {
+            this.events.emit('runtime:stream', {
+              chunk: event.text,
+              fullText: accumulated,
+            });
+          }
         } else if (event.type === 'complete') {
           accumulated = event.fullText || accumulated;
         } else if (event.type === 'error') {
@@ -188,15 +217,19 @@ export class SessionEngine {
         }
       }
 
+      const { thought, content } = extractThoughts(accumulated);
+      const finalContent = content || accumulated;
+
       const assistantMsg: SessionMessage = {
         id: randomUUID(),
         role: 'assistant',
-        content: accumulated,
+        content: finalContent,
+        thought,
         timestamp: Date.now(),
       };
       this.messages.push(assistantMsg);
       this.events.emit('runtime:message', {
-        content: accumulated,
+        content: finalContent,
         role: 'assistant',
       });
 

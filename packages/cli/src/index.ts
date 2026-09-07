@@ -33,6 +33,7 @@ Options:
 Interactive Slash Commands:
   /help                 Show all available slash commands
   /model [name]         Inspect or switch active model
+  /thoughts [on|off]    Inspect or toggle model thought process visibility
   /policy [name]        Inspect or set mentor policy
   /learn <topic>        Socratic conceptual deep-dive
   /solve <problem>      Guided problem solving
