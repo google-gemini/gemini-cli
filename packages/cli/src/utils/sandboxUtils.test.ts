@@ -358,6 +358,18 @@ describe('sandboxUtils', () => {
       ).toBe(false);
     });
 
+    it('should not false-positive on words sharing sensitive substrings without separators', () => {
+      expect(
+        isCredentialOrSensitivePath('/home/user/.gemini/monkey.json'),
+      ).toBe(false);
+      expect(
+        isCredentialOrSensitivePath('/home/user/.gemini/sacred.json'),
+      ).toBe(false);
+      expect(
+        isCredentialOrSensitivePath('/home/user/.gemini/commands/tokenized.js'),
+      ).toBe(false);
+    });
+
     it('should not false-positive on nested bin or tmp directories inside commands or skills', () => {
       const rootDir = '/home/user/.gemini';
       expect(

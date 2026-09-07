@@ -57,21 +57,29 @@ export function isCredentialOrSensitivePath(
   if (isRootChild && (base === 'history' || base === 'tmp' || base === 'bin')) {
     return true;
   }
+  const hasSensitiveSuffix = (s: string) => {
+    if (base === s) return true;
+    if (base.endsWith(s)) {
+      const charBefore = base.charAt(base.length - s.length - 1);
+      return charBefore === '-' || charBefore === '_' || charBefore === '.';
+    }
+    return false;
+  };
+
   if (
     base.endsWith('.credentials') ||
-    base.endsWith('credentials') ||
-    base.endsWith('credentials.json') ||
-    base.endsWith('tokens.json') ||
-    base.endsWith('token.json') ||
-    base.endsWith('token') ||
-    base.endsWith('creds.json') ||
-    base.endsWith('cred.json') ||
-    base === '.env' ||
+    hasSensitiveSuffix('credentials') ||
+    hasSensitiveSuffix('credentials.json') ||
+    hasSensitiveSuffix('tokens.json') ||
+    hasSensitiveSuffix('token.json') ||
+    hasSensitiveSuffix('token') ||
+    hasSensitiveSuffix('creds.json') ||
+    hasSensitiveSuffix('cred.json') ||
     base.endsWith('.env') ||
     base.endsWith('.key') ||
     base.endsWith('.pem') ||
     base.endsWith('.p12') ||
-    base.endsWith('key.json')
+    hasSensitiveSuffix('key.json')
   ) {
     return true;
   }
