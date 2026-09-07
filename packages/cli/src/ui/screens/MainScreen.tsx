@@ -83,7 +83,7 @@ export function MainScreen({ session, commands }: MainScreenProps): React.JSX.El
 
   return (
     <Box flexDirection="column" paddingX={1} paddingY={0}>
-      <Header />
+      <Header project={session.getProject()} />
       <MessageList messages={messages} streamingText={streamingText} />
       <InputPrompt
         onSubmit={handleSubmit}

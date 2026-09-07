@@ -8,6 +8,10 @@ import { randomUUID } from 'node:crypto';
 import { EventBus } from '../events/EventBus.js';
 import type { ModelProvider, ChatMessage } from '../providers/ModelProvider.js';
 import { PlaceholderProvider } from '../providers/placeholder/PlaceholderProvider.js';
+import { PermissionManager } from '../permissions/PermissionManager.js';
+import { ToolRegistry } from '../tools/ToolRegistry.js';
+import { ProjectDetector, type ProjectInfo } from '../tools/project/ProjectDetector.js';
+import { AgentHarness } from '../agent/AgentHarness.js';
 
 export interface SessionMessage {
   id: string;
@@ -21,14 +25,22 @@ export type SessionState = 'idle' | 'processing' | 'error';
 export interface SessionEngineOptions {
   provider?: ModelProvider;
   model?: string;
+  workspaceRoot?: string;
   eventBus?: EventBus;
+  permissions?: PermissionManager;
+  toolRegistry?: ToolRegistry;
 }
 
 export class SessionEngine {
   public readonly id: string;
   public readonly events: EventBus;
+  public readonly permissions: PermissionManager;
+  public readonly toolRegistry: ToolRegistry;
+  public readonly project: ProjectInfo;
+
   private provider: ModelProvider;
   private model: string;
+  private harness: AgentHarness;
   private messages: SessionMessage[] = [];
   private state: SessionState = 'idle';
 
@@ -37,6 +49,18 @@ export class SessionEngine {
     this.events = options.eventBus ?? new EventBus();
     this.provider = options.provider ?? new PlaceholderProvider();
     this.model = options.model ?? 'placeholder';
+    this.permissions = options.permissions ?? new PermissionManager();
+    this.toolRegistry = options.toolRegistry ?? new ToolRegistry();
+    this.project = ProjectDetector.detect(options.workspaceRoot || process.cwd());
+
+    this.harness = new AgentHarness({
+      provider: this.provider,
+      toolRegistry: this.toolRegistry,
+      permissions: this.permissions,
+      project: this.project,
+      events: this.events,
+      model: this.model,
+    });
   }
 
   public getProvider(): ModelProvider {
@@ -47,11 +71,16 @@ export class SessionEngine {
     return this.model;
   }
 
+  public getProject(): ProjectInfo {
+    return this.project;
+  }
+
   public setProvider(provider: ModelProvider, model?: string): void {
     this.provider = provider;
     if (model) {
       this.model = model;
     }
+    this.harness.setModel(this.model, this.provider);
   }
 
   public start(): void {
@@ -110,10 +139,7 @@ export class SessionEngine {
       }));
 
       let accumulated = '';
-      for await (const event of this.provider.chat({
-        messages: chatMessages,
-        model: this.model,
-      })) {
+      for await (const event of this.harness.run(chatMessages)) {
         if (event.type === 'chunk') {
           accumulated += event.text;
           this.events.emit('runtime:stream', {

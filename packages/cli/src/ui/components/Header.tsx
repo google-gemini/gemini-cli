@@ -6,8 +6,13 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
+import type { ProjectInfo } from '@zoe/core';
 
-export function Header(): React.JSX.Element {
+export interface HeaderProps {
+  project?: ProjectInfo;
+}
+
+export function Header({ project }: HeaderProps): React.JSX.Element {
   return (
     <Box flexDirection="column" marginBottom={1}>
       <Box
@@ -24,6 +29,17 @@ export function Header(): React.JSX.Element {
           Engineering, not autocomplete.
         </Text>
       </Box>
+
+      {project && (
+        <Box flexDirection="column" marginTop={0}>
+          <Text bold color="white">
+            {project.displayPath}
+          </Text>
+          <Text color="cyan">
+            {project.summary}
+          </Text>
+        </Box>
+      )}
     </Box>
   );
 }
