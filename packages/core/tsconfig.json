@@ -2,14 +2,11 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "dist",
-    "lib": ["DOM", "DOM.Iterable", "ES2023"],
+    "rootDir": ".",
+    "lib": ["ES2023"],
     "composite": true,
-    "types": ["node", "vitest/globals"],
-    "baseUrl": ".",
-    "paths": {
-      "@google/gemini-cli-core": ["./index.ts"]
-    }
+    "types": ["node"]
   },
-  "include": ["index.ts", "src/**/*.ts", "src/**/*.json"],
+  "include": ["index.ts", "src/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

@@ -2,18 +2,15 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "dist",
-    "jsx": "react-jsx",
+    "rootDir": "src",
     "lib": ["DOM", "DOM.Iterable", "ES2023"],
-    "types": ["node", "vitest/globals"],
-    "composite": true
+    "composite": true,
+    "types": ["node"],
+    "jsx": "react-jsx"
   },
-  "include": [
-    "index.ts",
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    "src/**/*.json",
-    "./package.json"
-  ],
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["node_modules", "dist"],
-  "references": [{ "path": "../core" }]
+  "references": [
+    { "path": "../core" }
+  ]
 }

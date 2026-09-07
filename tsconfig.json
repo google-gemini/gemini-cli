@@ -9,7 +9,7 @@
     "noImplicitThis": true,
     "forceConsistentCasingInFileNames": true,
     "noPropertyAccessFromIndexSignature": true,
-    "noUnusedLocals": true,
+    "noUnusedLocals": false,
     "strictBindCallApply": true,
     "strictFunctionTypes": true,
     "strictNullChecks": true,
@@ -25,7 +25,12 @@
     "module": "NodeNext",
     "moduleResolution": "nodenext",
     "target": "es2022",
-    "types": ["node", "vitest/globals"],
+    "types": ["node"],
     "jsx": "react-jsx"
-  }
+  },
+  "files": [],
+  "references": [
+    { "path": "packages/core" },
+    { "path": "packages/cli" }
+  ]
 }

@@ -1,59 +1,29 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Zoe Authors
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type React from 'react';
-import { Box } from 'ink';
-import { ThemedGradient } from './ThemedGradient.js';
-import { shortAsciiLogo, longAsciiLogo, tinyAsciiLogo } from './AsciiArt.js';
-import { getAsciiArtWidth } from '../utils/textUtils.js';
-import { useTerminalSize } from '../hooks/useTerminalSize.js';
-import { useSnowfall } from '../hooks/useSnowfall.js';
+import React from 'react';
+import { Box, Text } from 'ink';
 
-interface HeaderProps {
-  customAsciiArt?: string; // For user-defined ASCII art
-  version: string;
-  nightly: boolean;
-}
-
-export const Header: React.FC<HeaderProps> = ({
-  customAsciiArt,
-  version,
-  nightly,
-}) => {
-  const { columns: terminalWidth } = useTerminalSize();
-  let displayTitle;
-  const widthOfLongLogo = getAsciiArtWidth(longAsciiLogo);
-  const widthOfShortLogo = getAsciiArtWidth(shortAsciiLogo);
-
-  if (customAsciiArt) {
-    displayTitle = customAsciiArt;
-  } else if (terminalWidth >= widthOfLongLogo) {
-    displayTitle = longAsciiLogo;
-  } else if (terminalWidth >= widthOfShortLogo) {
-    displayTitle = shortAsciiLogo;
-  } else {
-    displayTitle = tinyAsciiLogo;
-  }
-
-  const artWidth = getAsciiArtWidth(displayTitle);
-  const title = useSnowfall(displayTitle);
-
+export function Header(): React.JSX.Element {
   return (
-    <Box
-      alignItems="flex-start"
-      width={artWidth}
-      flexShrink={0}
-      flexDirection="column"
-    >
-      <ThemedGradient>{title}</ThemedGradient>
-      {nightly && (
-        <Box width="100%" flexDirection="row" justifyContent="flex-end">
-          <ThemedGradient>v{version}</ThemedGradient>
-        </Box>
-      )}
+    <Box flexDirection="column" marginBottom={1}>
+      <Box
+        borderStyle="round"
+        borderColor="cyan"
+        paddingX={1}
+        flexDirection="column"
+        width={38}
+      >
+        <Text bold color="cyan">
+          ZOE
+        </Text>
+        <Text color="gray">
+          Engineering, not autocomplete.
+        </Text>
+      </Box>
     </Box>
   );
-};
+}
