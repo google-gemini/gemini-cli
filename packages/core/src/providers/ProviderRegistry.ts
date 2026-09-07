@@ -51,7 +51,7 @@ export class ProviderRegistry {
     // Bare provider names -> use default model for that provider
     if (lower === 'groq') {
       const groq = this.get('groq') ?? new GroqProvider();
-      return { provider: groq, model: 'llama-3.3-70b-versatile' };
+      return { provider: groq, model: 'qwen/qwen3.8-27b' };
     }
 
     if (lower === 'openrouter') {
@@ -64,7 +64,7 @@ export class ProviderRegistry {
       return { provider: ollama, model: 'llama3.2' };
     }
 
-    // Explicit format: provider:model (e.g. groq:llama-3.3-70b-versatile, openrouter:anthropic/claude-3.5-sonnet)
+    // Explicit format: provider:model (e.g. groq:qwen/qwen3.8-27b, openrouter:anthropic/claude-3.5-sonnet)
     if (target.includes(':') && !target.startsWith('http')) {
       const [providerName, ...rest] = target.split(':');
       const innerModel = rest.join(':');
@@ -74,7 +74,24 @@ export class ProviderRegistry {
       }
     }
 
-    // Slash prefix formats (e.g. groq/llama-3.1-8b, openrouter/deepseek/deepseek-r1)
+    // Active models hosted on Groq
+    const activeGroqModels = [
+      'qwen/qwen3.8-27b',
+      'qwen/qwen3.6-27b',
+      'openai/gpt-oss-120b',
+      'openai/gpt-oss-20b',
+      'groq/compound',
+      'groq/compound-mini',
+      'allam-2-7b',
+      'meta-llama/llama-prompt-guard-2-86m',
+      'meta-llama/llama-prompt-guard-2-22m',
+    ];
+    if (activeGroqModels.includes(lower)) {
+      const groq = this.get('groq') ?? new GroqProvider();
+      return { provider: groq, model: target };
+    }
+
+    // Slash prefix formats (e.g. groq/qwen/qwen3.8-27b, openrouter/deepseek/deepseek-r1)
     if (lower.startsWith('groq/')) {
       const groq = this.get('groq') ?? new GroqProvider();
       return { provider: groq, model: target.slice('groq/'.length) };

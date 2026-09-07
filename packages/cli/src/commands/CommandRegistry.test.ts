@@ -73,12 +73,12 @@ describe('CommandRegistry', () => {
     expect(session.getProvider().name).toBe('ollama');
 
     // Switch to groq model
-    const groqResult = await registry.execute('/model groq:llama-3.3-70b-versatile', {
+    const groqResult = await registry.execute('/model groq', {
       session,
       exit: () => {},
     });
-    expect(groqResult).toContain('Switched model to llama-3.3-70b-versatile (groq)');
-    expect(session.getModel()).toBe('llama-3.3-70b-versatile');
+    expect(groqResult).toContain('Switched model to qwen/qwen3.8-27b (groq)');
+    expect(session.getModel()).toBe('qwen/qwen3.8-27b');
     expect(session.getProvider().name).toBe('groq');
 
     // Switch to openrouter model

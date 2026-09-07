@@ -23,7 +23,7 @@ describe('ProviderRegistry', () => {
 
     const groq = registry.resolve('groq');
     expect(groq.provider.name).toBe('groq');
-    expect(groq.model).toBe('llama-3.3-70b-versatile');
+    expect(groq.model).toBe('qwen/qwen3.8-27b');
 
     const openrouter = registry.resolve('openrouter');
     expect(openrouter.provider.name).toBe('openrouter');
