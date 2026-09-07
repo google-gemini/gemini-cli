@@ -42,14 +42,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export function isSensitiveHostPath(hostPath: string): boolean {
   try {
     let home = path.resolve(homedir());
-    let osHome = path.resolve(os.homedir());
     try {
       home = resolveToRealPath(home);
-    } catch {
-      // Keep resolved path if resolveToRealPath fails
-    }
-    try {
-      osHome = resolveToRealPath(osHome);
     } catch {
       // Keep resolved path if resolveToRealPath fails
     }
@@ -68,15 +62,10 @@ export function isSensitiveHostPath(hostPath: string): boolean {
       resolvedPath = path.resolve(expandedPath);
     }
     const normalized = resolvedPath;
+
     let geminiDir = path.resolve(home, GEMINI_DIR);
-    let osGeminiDir = path.resolve(osHome, GEMINI_DIR);
     try {
       geminiDir = resolveToRealPath(geminiDir);
-    } catch {
-      // Keep resolved path if resolveToRealPath fails
-    }
-    try {
-      osGeminiDir = resolveToRealPath(osGeminiDir);
     } catch {
       // Keep resolved path if resolveToRealPath fails
     }
@@ -90,16 +79,14 @@ export function isSensitiveHostPath(hostPath: string): boolean {
         : child.startsWith(parent + path.sep);
 
     // Block mounting user home directory root directly
-    if (arePathsEqual(normalized, home) || arePathsEqual(normalized, osHome)) {
+    if (arePathsEqual(normalized, home)) {
       return true;
     }
 
     // Block mounting ~/.gemini or anything inside ~/.gemini
     if (
       arePathsEqual(normalized, geminiDir) ||
-      isSubpathOf(normalized, geminiDir) ||
-      arePathsEqual(normalized, osGeminiDir) ||
-      isSubpathOf(normalized, osGeminiDir)
+      isSubpathOf(normalized, geminiDir)
     ) {
       return true;
     }
