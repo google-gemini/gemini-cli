@@ -9,6 +9,7 @@ import * as path from 'node:path';
 import {
   type SessionEngine,
   ProviderRegistry,
+  ZoeConfig,
   DependencyAuditor,
   ComplexityAnalyzer,
   ArchitectureVisualizer,
@@ -42,10 +43,20 @@ export class CommandRegistry {
       ctx.session.clearHistory();
     });
 
-    this.register('model', 'Inspect or switch active model (e.g. /model llama3.2)', (args, ctx) => {
+    this.register('model', 'Inspect or switch active model (e.g. /model groq:llama-3.3-70b-versatile)', (args, ctx) => {
       const modelArg = args[0]?.trim();
       if (!modelArg) {
-        return `Active provider: ${ctx.session.getProvider().name}\nActive model: ${ctx.session.getModel()}`;
+        return [
+          `Active provider: ${ctx.session.getProvider().name}`,
+          `Active model: ${ctx.session.getModel()}`,
+          '',
+          'Available providers: ollama, groq, openrouter',
+          'Examples:',
+          '  /model llama3.2                              (Local Ollama)',
+          '  /model groq:llama-3.3-70b-versatile          (Groq ultra-fast inference)',
+          '  /model openrouter:anthropic/claude-3.5-sonnet (OpenRouter)',
+          '  /model deepseek/deepseek-r1                  (OpenRouter shortcut)',
+        ].join('\n');
       }
 
       const registry = ctx.registry ?? this.providerRegistry;
@@ -53,6 +64,33 @@ export class CommandRegistry {
       ctx.session.setProvider(resolved.provider, resolved.model);
 
       return `Switched model to ${resolved.model} (${resolved.provider.name}).`;
+    });
+
+    this.register('key', 'Configure API key for a provider (e.g. /key groq gsk_...)', (args) => {
+      const provider = args[0]?.toLowerCase().trim();
+      const key = args[1]?.trim();
+
+      if (!provider || !key) {
+        return [
+          'Usage: /key <provider> <api_key>',
+          'Providers: groq, openrouter',
+          'Example: /key groq gsk_your_key_here',
+          'Note: You can also set GROQ_API_KEY or OPENROUTER_API_KEY environment variables.',
+        ].join('\n');
+      }
+
+      const config = new ZoeConfig();
+      if (provider === 'groq') {
+        config.save({ groqApiKey: key });
+        process.env['GROQ_API_KEY'] = key;
+        return 'Groq API key saved successfully.';
+      } else if (provider === 'openrouter') {
+        config.save({ openrouterApiKey: key });
+        process.env['OPENROUTER_API_KEY'] = key;
+        return 'OpenRouter API key saved successfully.';
+      } else {
+        return `Unknown provider "${provider}". Supported providers for /key: groq, openrouter`;
+      }
     });
 
     // Mentoring Commands

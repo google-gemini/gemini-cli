@@ -67,11 +67,11 @@ Zoe enforces a strict, capability-based security model:
 - `code.generate`: **DENY** (Enforced by default)
 - `git.commit`: **DENY** (Enforced by default)
 
-### 8. 🦙 Local-First & Multi-Model Architecture
-Native integration with **Ollama** for zero-cost, private, offline local LLMs:
-- Full streaming response support.
-- Switch models on-the-fly (`/model llama3.2`, `/model deepseek-r1`, `/model qwen2.5`, etc.).
-- Pluggable `ModelProvider` interface supporting custom API bridges or cloud providers.
+### 8. 🌐 Multi-Provider Architecture (Ollama, Groq, OpenRouter)
+Zoe works across local and cloud providers with native Server-Sent Events (SSE) streaming and zero external dependencies:
+- **Ollama** (Local-first): Run private offline models (`llama3.2`, `deepseek-r1`, `qwen2.5`, `mistral`).
+- **Groq** (Ultra-fast LPU inference): High-speed inference using `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `mixtral-8x7b-32768`.
+- **OpenRouter** (Unified multi-model gateway): Access hundreds of models including Claude 3.5 Sonnet, GPT-4o, DeepSeek R1, Llama 3.3, and Gemini.
 
 ---
 
@@ -80,7 +80,8 @@ Native integration with **Ollama** for zero-cost, private, offline local LLMs:
 | Command | Arguments | Description |
 | :--- | :--- | :--- |
 | `/help` | — | Display all available slash commands and descriptions |
-| `/model` | `[name]` | Inspect current model or switch active model (e.g. `/model llama3.2`) |
+| `/model` | `[name]` | Inspect current model or switch active model (e.g. `/model groq:llama-3.3-70b-versatile`) |
+| `/key` | `<provider> <key>` | Configure and persist API key for `groq` or `openrouter` (saved to `~/.zoe/config.json`) |
 | `/policy` | `[name]` | Inspect or switch active Socratic policy (`socratic`, `learning`, `debugging`, etc.) |
 | `/learn` | `<topic>` | Start a Socratic conceptual deep-dive into a computer science or engineering topic |
 | `/solve` | `<problem>` | Begin guided, step-by-step problem breakdown |

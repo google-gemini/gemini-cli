@@ -61,6 +61,7 @@ describe('CommandRegistry', () => {
     });
     expect(inspectResult).toContain('Active provider: placeholder');
     expect(inspectResult).toContain('Active model: placeholder');
+    expect(inspectResult).toContain('Available providers: ollama, groq, openrouter');
 
     // Switch to ollama model
     const switchResult = await registry.execute('/model llama3.2', {
@@ -70,6 +71,52 @@ describe('CommandRegistry', () => {
     expect(switchResult).toContain('Switched model to llama3.2 (ollama)');
     expect(session.getModel()).toBe('llama3.2');
     expect(session.getProvider().name).toBe('ollama');
+
+    // Switch to groq model
+    const groqResult = await registry.execute('/model groq:llama-3.3-70b-versatile', {
+      session,
+      exit: () => {},
+    });
+    expect(groqResult).toContain('Switched model to llama-3.3-70b-versatile (groq)');
+    expect(session.getModel()).toBe('llama-3.3-70b-versatile');
+    expect(session.getProvider().name).toBe('groq');
+
+    // Switch to openrouter model
+    const orResult = await registry.execute('/model openrouter:anthropic/claude-3.5-sonnet', {
+      session,
+      exit: () => {},
+    });
+    expect(orResult).toContain('Switched model to anthropic/claude-3.5-sonnet (openrouter)');
+    expect(session.getModel()).toBe('anthropic/claude-3.5-sonnet');
+    expect(session.getProvider().name).toBe('openrouter');
+  });
+
+  it('configures API keys with /key', async () => {
+    const registry = new CommandRegistry();
+    const session = new SessionEngine();
+
+    // Usage help
+    const helpResult = await registry.execute('/key', {
+      session,
+      exit: () => {},
+    });
+    expect(helpResult).toContain('Usage: /key <provider> <api_key>');
+
+    // Set Groq key
+    const groqKeyResult = await registry.execute('/key groq gsk_123456', {
+      session,
+      exit: () => {},
+    });
+    expect(groqKeyResult).toContain('Groq API key saved successfully');
+    expect(process.env['GROQ_API_KEY']).toBe('gsk_123456');
+
+    // Set OpenRouter key
+    const orKeyResult = await registry.execute('/key openrouter sk-or-987654', {
+      session,
+      exit: () => {},
+    });
+    expect(orKeyResult).toContain('OpenRouter API key saved successfully');
+    expect(process.env['OPENROUTER_API_KEY']).toBe('sk-or-987654');
   });
 
   it('executes mentoring commands and sends prompt through session', async () => {

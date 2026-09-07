@@ -12,6 +12,8 @@ export interface ZoeSettings {
   version: string;
   theme: string;
   model: string;
+  openrouterApiKey?: string;
+  groqApiKey?: string;
 }
 
 export const DEFAULT_SETTINGS: ZoeSettings = {
