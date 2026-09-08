@@ -298,8 +298,10 @@ export function isAuthenticationError(error: unknown): boolean {
 
   // Fallback: Check for MCP SDK's plain Error messages with HTTP 401
   // The SDK sometimes throws: new Error(`Error POSTing to endpoint (HTTP 401): ...`)
+  // Match 401 as a standalone status code, not as a substring of a larger
+  // number (e.g. a port like 4012 or an id), which produced false positives.
   const message = getErrorMessage(error);
-  if (message.includes('401')) {
+  if (/\b401\b/.test(message)) {
     return true;
   }
 
