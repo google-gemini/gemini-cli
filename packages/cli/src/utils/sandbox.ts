@@ -38,6 +38,7 @@ import {
   SANDBOX_NETWORK_NAME,
   SANDBOX_PROXY_NAME,
   BUILTIN_SEATBELT_PROFILES,
+  prepareIsolatedSettingsDir,
 } from './sandboxUtils.js';
 import { BUILTIN_SEATBELT_PROFILE_CONTENTS } from './sandboxBuiltinProfiles.js';
 
@@ -59,8 +60,20 @@ export async function start_sandbox(
   let stopProxy: (() => void) | undefined = undefined;
   let tempProfileFile: string | null = null;
   let sandboxTmpDir: string | null = null;
+  let isolatedSettingsDir: string | null = null;
 
   const cleanup = () => {
+    if (isolatedSettingsDir) {
+      const dirToDelete = isolatedSettingsDir;
+      isolatedSettingsDir = null;
+      try {
+        if (fs.existsSync(dirToDelete)) {
+          fs.rmSync(dirToDelete, { recursive: true, force: true });
+        }
+      } catch {
+        // ignore
+      }
+    }
     if (sandboxTmpDir) {
       const dirToDelete = sandboxTmpDir;
       sandboxTmpDir = null;
@@ -72,6 +85,7 @@ export async function start_sandbox(
         // ignore
       }
     }
+
     if (tempProfileFile) {
       const fileToDelete = tempProfileFile;
       tempProfileFile = null;
@@ -453,14 +467,13 @@ export async function start_sandbox(
       fs.mkdirSync(userSettingsDirOnHost, { recursive: true });
     }
 
-    args.push(
-      '--volume',
-      `${userSettingsDirOnHost}:${userSettingsDirInSandbox}`,
-    );
+    isolatedSettingsDir = prepareIsolatedSettingsDir(userSettingsDirOnHost);
+
+    args.push('--volume', `${isolatedSettingsDir}:${userSettingsDirInSandbox}`);
     if (userSettingsDirInSandbox !== getContainerPath(userSettingsDirOnHost)) {
       args.push(
         '--volume',
-        `${userSettingsDirOnHost}:${getContainerPath(userSettingsDirOnHost)}`,
+        `${isolatedSettingsDir}:${getContainerPath(userSettingsDirOnHost)}`,
       );
     }
 
