@@ -7,6 +7,7 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { isNodeError } from '../utils/errors.js';
+import { withPathLock } from '../utils/pathMutex.js';
 import { spawnAsync } from '../utils/shell-utils.js';
 import {
   simpleGit,
@@ -194,23 +195,28 @@ export class GitService {
   }
 
   async createFileSnapshot(message: string): Promise<string> {
-    try {
-      const repo = this.shadowGitRepository;
-      await repo.add('.');
-      const status = await repo.status();
-      if (status.isClean()) {
-        // If no changes are staged, return the current HEAD commit hash
-        return await this.getCurrentCommitHash();
+    // `add('.')` stages the entire working tree, so two snapshots running at
+    // once fold each other's files into whichever commit lands first. Serialize
+    // stage -> status -> commit per shadow repository.
+    return withPathLock(`git-snapshot:${this.projectRoot}`, async () => {
+      try {
+        const repo = this.shadowGitRepository;
+        await repo.add('.');
+        const status = await repo.status();
+        if (status.isClean()) {
+          // If no changes are staged, return the current HEAD commit hash
+          return await this.getCurrentCommitHash();
+        }
+        const commitResult = await repo.commit(message, {
+          '--no-verify': null,
+        });
+        return commitResult.commit;
+      } catch (error) {
+        throw new Error(
+          `Failed to create checkpoint snapshot: ${error instanceof Error ? error.message : 'Unknown error'}. Checkpointing may not be working properly.`,
+        );
       }
-      const commitResult = await repo.commit(message, {
-        '--no-verify': null,
-      });
-      return commitResult.commit;
-    } catch (error) {
-      throw new Error(
-        `Failed to create checkpoint snapshot: ${error instanceof Error ? error.message : 'Unknown error'}. Checkpointing may not be working properly.`,
-      );
-    }
+    });
   }
 
   async restoreProjectFromSnapshot(commitHash: string): Promise<void> {

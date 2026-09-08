@@ -944,6 +944,36 @@ describe('WriteFileTool', () => {
     });
   });
 
+  describe('concurrent writes to the same file', () => {
+    it('does not report two creations of the same new file', async () => {
+      const abortSignal = new AbortController().signal;
+      const filePath = path.join(rootDir, 'concurrent_new_file.txt');
+      mockEnsureCorrectFileContent.mockImplementation(
+        async (content: string) => content,
+      );
+
+      const first = tool.build({ file_path: filePath, content: 'first' });
+      const second = tool.build({ file_path: filePath, content: 'second' });
+
+      const results = await Promise.all([
+        first.execute({ abortSignal }),
+        second.execute({ abortSignal }),
+      ]);
+
+      // Whichever call lands second must observe the file the other created,
+      // otherwise both report a creation and the second one's diff claims the
+      // file was empty beforehand.
+      const created = results.filter((r) =>
+        /Successfully created and wrote to new file/.test(String(r.llmContent)),
+      );
+      const overwrote = results.filter((r) =>
+        /Successfully overwrote file/.test(String(r.llmContent)),
+      );
+      expect(created).toHaveLength(1);
+      expect(overwrote).toHaveLength(1);
+    });
+  });
+
   describe('workspace boundary validation', () => {
     it('should validate paths are within workspace root', () => {
       const params = {
