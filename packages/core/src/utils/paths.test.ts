@@ -69,6 +69,13 @@ describe('tildeifyPath', () => {
       expect(tildeifyPath('/Users/al/Documents/app/')).toBe('~/Documents/app/');
     });
 
+    it('should normalize duplicate slashes and relative segments', () => {
+      expect(tildeifyPath('/Users//al/Documents/app')).toBe('~/Documents/app');
+      expect(tildeifyPath('/Users/al/../al/Documents/./app')).toBe(
+        '~/Documents/app',
+      );
+    });
+
     it('should not replace a sibling directory with the same prefix', () => {
       expect(tildeifyPath('/Users/albert/Documents/app')).toBe(
         '/Users/albert/Documents/app',
@@ -100,6 +107,15 @@ describe('tildeifyPath', () => {
       vi.stubEnv('GEMINI_CLI_HOME', 'C:\\Users\\Al\\');
       expect(tildeifyPath('C:/Users/Al/Documents/app/')).toBe(
         '~/Documents/app/',
+      );
+    });
+
+    it('should normalize duplicate separators and relative segments', () => {
+      expect(tildeifyPath('C:\\Users\\\\Al\\Documents\\.\\app')).toBe(
+        '~\\Documents\\app',
+      );
+      expect(tildeifyPath('C:/Users/Al/Documents/../Documents/app')).toBe(
+        '~/Documents/app',
       );
     });
 

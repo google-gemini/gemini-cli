@@ -69,12 +69,16 @@ export function tildeifyPath(filePath: string): string {
     return '~';
   }
 
-  const originalSuffix = filePath.slice(homeDir.length);
-  if (originalSuffix.startsWith('/') || originalSuffix.startsWith('\\')) {
-    return `~${originalSuffix}`;
-  }
+  const separator =
+    process.platform === 'win32' && !filePath.includes('/') ? '\\' : '/';
+  const formattedRelativePath =
+    process.platform === 'win32'
+      ? relativePath.replaceAll(pathModule.sep, separator)
+      : relativePath;
+  const trailingSeparator =
+    filePath.endsWith('/') || filePath.endsWith('\\') ? separator : '';
 
-  return `~${pathModule.sep}${relativePath}`;
+  return `~${separator}${formattedRelativePath}${trailingSeparator}`;
 }
 
 /**
