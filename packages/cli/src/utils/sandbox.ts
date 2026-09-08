@@ -467,7 +467,9 @@ export async function start_sandbox(
     // We STRICTLY do NOT mount ~/.gemini root directory or sensitive credential files
     // (oauth_creds.json, .env, etc.). We only mount the sanitized settings file as read-only (:ro).
     const userHomeDirOnHost = homedir();
-    const userSettingsDirOnHost = path.join(userHomeDirOnHost, GEMINI_DIR);
+    const userSettingsDirOnHost = userHomeDirOnHost
+      ? path.join(userHomeDirOnHost, GEMINI_DIR)
+      : path.join(os.tmpdir(), GEMINI_DIR);
     const userSettingsFileOnHost = path.join(
       userSettingsDirOnHost,
       'settings.json',

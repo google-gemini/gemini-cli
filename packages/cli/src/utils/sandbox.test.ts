@@ -13,6 +13,7 @@ import { randomBytes } from 'node:crypto';
 import { start_sandbox } from './sandbox.js';
 import {
   FatalSandboxError,
+  GEMINI_DIR,
   homedir,
   type SandboxConfig,
 } from '@google/gemini-cli-core';
@@ -143,6 +144,7 @@ describe('sandbox', () => {
     vi.mocked(fs.chmodSync).mockImplementation(() => {});
     vi.mocked(fs.rmSync).mockImplementation(() => {});
     vi.mocked(execSync).mockReturnValue(Buffer.from(''));
+    mockedHomedir.mockReturnValue('/home/user');
   });
 
   afterEach(() => {
@@ -618,6 +620,48 @@ describe('sandbox', () => {
           `SANDBOX=${containerName}`,
         ]),
         expect.objectContaining({ stdio: 'inherit' }),
+      );
+    });
+
+    it('should fall back to os.tmpdir() for settings directory when homedir is empty', async () => {
+      mockedHomedir.mockReturnValue('');
+      vi.mocked(os.tmpdir).mockReturnValue('/mock/tmp');
+
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+      await expect(
+        start_sandbox(config, [], undefined, ['arg1']),
+      ).resolves.toBe(0);
+
+      expect(fs.existsSync).toHaveBeenCalledWith(
+        path.join('/mock/tmp', GEMINI_DIR, 'settings.json'),
       );
     });
 
