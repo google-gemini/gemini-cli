@@ -419,6 +419,14 @@ describe('sandboxUtils', () => {
       sanitizeSettingsForSandbox(original);
       expect(original).toEqual(copy);
     });
+
+    it('should handle tools property when it is an array without runtime errors', () => {
+      const rawSettings = {
+        tools: ['read_file', 'edit_file'],
+      };
+      const sanitized = sanitizeSettingsForSandbox(rawSettings);
+      expect(sanitized['tools']).toEqual(['read_file', 'edit_file']);
+    });
   });
 
   describe('isCredentialOrSensitivePath', () => {

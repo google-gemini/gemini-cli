@@ -45,7 +45,7 @@ import {
 import { BUILTIN_SEATBELT_PROFILE_CONTENTS } from './sandboxBuiltinProfiles.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 const execAsync = promisify(exec);
@@ -479,10 +479,8 @@ export async function start_sandbox(
     if (fs.existsSync(userSettingsFileOnHost)) {
       try {
         const rawContent = fs.readFileSync(userSettingsFileOnHost, 'utf8');
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        const parsedJson = JSON.parse(stripJsonComments(rawContent));
-        const parsed: unknown = parsedJson;
-        if (isRecord(parsed) && !Array.isArray(parsed)) {
+        const parsed = JSON.parse(stripJsonComments(rawContent)) as unknown;
+        if (isRecord(parsed)) {
           rawSettings = parsed;
         }
       } catch (err) {
