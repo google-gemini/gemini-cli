@@ -960,7 +960,7 @@ class EditToolInvocation
         .writeTextFile(this.resolvedPath, finalContent);
 
       if (isBuildFile(this.resolvedPath)) {
-        recordModifiedBuildFile(this.resolvedPath);
+        recordModifiedBuildFile(this.resolvedPath, this.config);
       }
 
       let displayResult: ToolResultDisplay;

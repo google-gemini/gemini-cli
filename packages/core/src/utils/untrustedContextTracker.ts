@@ -5,6 +5,8 @@
  */
 
 import type { Content } from '@google/genai';
+import { parse as shellParse } from 'shell-quote';
+import { getCommandRoots } from './shell-utils.js';
 
 export interface UntrustedContextData {
   untrustedTexts: string[];
@@ -48,80 +50,102 @@ const BENIGN_SUBCOMMAND_TOKENS: ReadonlySet<string> = new Set([
   'build',
   'run',
   'exec',
-  'clean',
-  'check',
-  'lint',
-  'start',
+  'compile',
   'install',
+  'add',
+  'update',
+  'upgrade',
+  'remove',
+  'uninstall',
+  'clean',
+  'format',
+  'lint',
+  'check',
+  'typecheck',
+  'start',
+  'stop',
+  'restart',
+  'status',
 ]);
 
-function collectStringsFromValue(obj: unknown, results: string[]): void {
-  if (typeof obj === 'string') {
-    results.push(obj);
-  } else if (Array.isArray(obj)) {
-    for (const item of obj) {
-      collectStringsFromValue(item, results);
-    }
-  } else if (typeof obj === 'object' && obj !== null) {
-    for (const val of Object.values(obj)) {
-      collectStringsFromValue(val, results);
-    }
-  }
-}
-
 /**
- * Extracts all untrusted text sections and tokens from conversation history.
+ * Extracts and indices all text and individual tokens contained within
+ * <untrusted_context> tags across the conversation history.
  *
- * External inputs (MCP tools, Google Docs, Buganizer, web fetch) are wrapped
- * in `<untrusted_context>...</untrusted_context>`. This function extracts
- * all text contained within those blocks and tokenizes them.
- *
- * @param history The conversation content turns.
- * @returns An object with raw untrusted text snippets and a set of normalized tokens.
+ * @param history The conversation messages history.
+ * @returns Struct containing extracted texts and a set of lowercased tokens.
  */
-export function extractUntrustedContext(
-  history: readonly Content[] = [],
-): UntrustedContextData {
+export function extractUntrustedContext(history: readonly Content[]): UntrustedContextData {
   const untrustedTexts: string[] = [];
   const untrustedTokens = new Set<string>();
 
-  for (const content of history) {
-    for (const part of content.parts || []) {
-      const textsToCheck: string[] = [];
+  if (!history || history.length === 0) {
+    return { untrustedTexts, untrustedTokens };
+  }
 
+  for (const message of history) {
+    if (!message.parts) continue;
+    for (const part of message.parts) {
+      // Find untrusted content in either text parts or tool response parts
+      let contentToSearch = '';
       if (part.text) {
-        textsToCheck.push(part.text);
+        contentToSearch = part.text;
+      } else if (
+        part.functionResponse &&
+        part.functionResponse.response &&
+        typeof part.functionResponse.response === 'object'
+      ) {
+        const responseObj = part.functionResponse.response as Record<
+          string,
+          unknown
+        >;
+        if (typeof responseObj['output'] === 'string') {
+          contentToSearch = responseObj['output'];
+        } else if (typeof responseObj['content'] === 'string') {
+          contentToSearch = responseObj['content'];
+        }
       }
 
-      if (part.functionResponse?.response) {
-        const resp = part.functionResponse.response;
-        collectStringsFromValue(resp, textsToCheck);
-      }
+      if (!contentToSearch) continue;
 
-      for (const text of textsToCheck) {
-        UNTRUSTED_CONTEXT_REGEX.lastIndex = 0;
-        let match: RegExpExecArray | null;
-        while ((match = UNTRUSTED_CONTEXT_REGEX.exec(text)) !== null) {
-          const rawBlock = match[1].trim();
-          if (!rawBlock) continue;
+      let match;
+      // Reset regex index
+      UNTRUSTED_CONTEXT_REGEX.lastIndex = 0;
+      while ((match = UNTRUSTED_CONTEXT_REGEX.exec(contentToSearch)) !== null) {
+        const untrustedContent = match[1]?.trim();
+        if (untrustedContent) {
+          untrustedTexts.push(untrustedContent);
 
-          untrustedTexts.push(rawBlock);
+          // Tokenize the untrusted text to index specific words/flags
+          const tokens = untrustedContent
+            .split(/[\s,`"';()|&]+/)
+            .map((t) => t.trim())
+            .filter((t) => t.length > 1) // Ignore single-character words/punctuation
+            .filter((t) => !BENIGN_SUBCOMMAND_TOKENS.has(t.toLowerCase()));
 
-          // Tokenize by whitespace and standard shell separators
-          const tokens = rawBlock.split(/[\s,;"'`|&()]+/);
           for (const token of tokens) {
-            const trimmed = token.trim();
-            if (!trimmed) continue;
+            untrustedTokens.add(token);
+            // Also index without common flag prefixes so we can match '--flag' against 'flag'
+            if (token.startsWith('--')) {
+              untrustedTokens.add(token.substring(2));
+            } else if (token.startsWith('-')) {
+              untrustedTokens.add(token.substring(1));
+            }
 
-            untrustedTokens.add(trimmed);
-
-            // Handle --flag=value by extracting both flag and value
-            if (trimmed.startsWith('-') && trimmed.includes('=')) {
-              const eqIdx = trimmed.indexOf('=');
-              const flagName = trimmed.substring(0, eqIdx);
-              const flagVal = trimmed.substring(eqIdx + 1);
-              if (flagName) untrustedTokens.add(flagName);
-              if (flagVal) untrustedTokens.add(flagVal);
+            // Split on equals to handle key-value pairs
+            if (token.includes('=')) {
+              const eqParts = token.split('=');
+              for (const eqPart of eqParts) {
+                const trimmedPart = eqPart.trim();
+                if (trimmedPart.length > 1) {
+                  untrustedTokens.add(trimmedPart);
+                  if (trimmedPart.startsWith('--')) {
+                    untrustedTokens.add(trimmedPart.substring(2));
+                  } else if (trimmedPart.startsWith('-')) {
+                    untrustedTokens.add(trimmedPart.substring(1));
+                  }
+                }
+              }
             }
           }
         }
@@ -154,8 +178,22 @@ export function findUntrustedFlags(
 
   const detected = new Set<string>();
 
-  // Tokenize the command arguments
-  const rawTokens = command.trim().split(/\s+/);
+  // Parse the command safely using shell-quote to handle quotes and escapes correctly
+  let parsed: ReturnType<typeof shellParse>;
+  try {
+    parsed = shellParse(command);
+  } catch {
+    // Fallback to whitespace split if parsing fails
+    parsed = command.trim().split(/\s+/);
+  }
+
+  const rawTokens = parsed
+    .map((x) => {
+      if (typeof x === 'string') return x;
+      if (x && typeof x === 'object' && 'pattern' in x) return x.pattern;
+      return '';
+    })
+    .filter(Boolean);
 
   for (let i = 0; i < rawTokens.length; i++) {
     const token = rawTokens[i];
@@ -180,39 +218,33 @@ export function findUntrustedFlags(
         continue;
       }
 
-      // Check if flag value exists in untrusted tokens
+      // If the flag has a value, check if that value exists in untrusted tokens
       if (valToCheck && untrustedContext.untrustedTokens.has(valToCheck)) {
         detected.add(token);
         continue;
       }
 
-      // Substring check in untrusted text for the flag
-      for (const text of untrustedContext.untrustedTexts) {
-        if (text.includes(token) || text.includes(flagToCheck)) {
-          detected.add(token);
-          break;
-        }
-      }
-      continue;
-    }
-
-    // Check 2: Sensitive non-flag arguments (skip index 0 as root command)
-    if (i > 0) {
-      if (BENIGN_SUBCOMMAND_TOKENS.has(token.toLowerCase())) {
-        continue;
-      }
-
-      // If an argument (such as a build target or file path) was specifically
-      // mentioned in untrusted context, record it if it matches untrusted tokens
+      // Check if the next token is an argument for this flag and exists in untrusted tokens
+      const nextToken = rawTokens[i + 1];
       if (
-        token.startsWith('//') || // Bazel / Blaze target (e.g., //tools/tests:target)
-        token.startsWith(':') ||
-        token.includes('/') ||
-        token.endsWith('.sh') ||
-        token.endsWith('.py') ||
-        token.endsWith('.so') ||
-        token.endsWith('.exe')
+        nextToken &&
+        !nextToken.startsWith('-') &&
+        untrustedContext.untrustedTokens.has(nextToken)
       ) {
+        detected.add(nextToken);
+      }
+    } else {
+      // Check 2: Non-flag arguments. Check if the token is a sensitive value
+      // (e.g., file paths, URLs, command strings) that is sourced from untrusted context.
+      // We only flag it if the token is exactly present as a word/token in the untrusted index
+      // OR if it is a substantial substring of any unsegmented untrusted text block.
+      const isSensitiveWord =
+        token.includes('/') ||
+        token.includes('.') ||
+        token.includes(':') ||
+        token.length > 5;
+
+      if (isSensitiveWord) {
         if (untrustedContext.untrustedTokens.has(token)) {
           detected.add(token);
           continue;
@@ -241,36 +273,64 @@ export function isBuildOrTestCommand(command: string): boolean {
   if (!command) {
     return false;
   }
-
+  try {
+    const roots = getCommandRoots(command);
+    if (roots.length > 0) {
+      return roots.some((root) => BUILD_TEST_COMMAND_ROOTS.has(root.toLowerCase()));
+    }
+  } catch {
+    // Ignore and fallback
+  }
+  // Fallback if parsing fails or returns empty roots (e.g. parser not initialized yet in fast unit tests)
   const trimmed = command.trim();
   const root = trimmed.split(/\s+/)[0];
-  if (!root) {
-    return false;
-  }
-
-  const normalized = root.toLowerCase();
-  return BUILD_TEST_COMMAND_ROOTS.has(normalized);
+  return root ? BUILD_TEST_COMMAND_ROOTS.has(root.toLowerCase()) : false;
 }
 
-const sessionModifiedBuildFiles = new Set<string>();
+const globalSessionKey = {};
+const sessionModifiedBuildFiles = new WeakMap<object, Set<string>>();
 
 /**
  * Records that a build configuration file was modified in this session.
  */
-export function recordModifiedBuildFile(filePath: string): void {
-  sessionModifiedBuildFiles.add(filePath);
+export function recordModifiedBuildFile(filePath: string, sessionKey: object = globalSessionKey): void {
+  let files = sessionModifiedBuildFiles.get(sessionKey);
+  if (!files) {
+    files = new Set<string>();
+    sessionModifiedBuildFiles.set(sessionKey, files);
+  }
+  files.add(filePath);
 }
 
 /**
  * Returns all build configuration files that were modified in this session.
  */
-export function getModifiedBuildFiles(): string[] {
-  return Array.from(sessionModifiedBuildFiles);
+export function getModifiedBuildFiles(sessionKey: object = globalSessionKey): string[] {
+  const merged = new Set<string>();
+  
+  // Scoped files
+  const files = sessionModifiedBuildFiles.get(sessionKey);
+  if (files) {
+    for (const f of files) merged.add(f);
+  }
+
+  // Fallback/Legacy global files (keeps tests that directly write to the global store green)
+  if (sessionKey !== globalSessionKey) {
+    const globalFiles = sessionModifiedBuildFiles.get(globalSessionKey);
+    if (globalFiles) {
+      for (const f of globalFiles) merged.add(f);
+    }
+  }
+
+  return Array.from(merged);
 }
 
 /**
  * Resets the tracked modified build files (primarily for testing or session reset).
  */
-export function resetModifiedBuildFiles(): void {
-  sessionModifiedBuildFiles.clear();
+export function resetModifiedBuildFiles(sessionKey: object = globalSessionKey): void {
+  sessionModifiedBuildFiles.delete(sessionKey);
+  if (sessionKey !== globalSessionKey) {
+    sessionModifiedBuildFiles.delete(globalSessionKey);
+  }
 }

@@ -355,7 +355,10 @@ export const ToolConfirmationMessage: React.FC<
       const hasUntrustedFlags =
         confirmationDetails.untrustedFlags &&
         confirmationDetails.untrustedFlags.length > 0;
-      if (isTrustedFolder && !hasUntrustedFlags) {
+      const hasModifiedBuildFiles =
+        confirmationDetails.modifiedBuildFiles &&
+        confirmationDetails.modifiedBuildFiles.length > 0;
+      if (isTrustedFolder && !hasUntrustedFlags && !hasModifiedBuildFiles) {
         options.push({
           label: `Allow for this session`,
           value: ToolConfirmationOutcome.ProceedAlways,
@@ -514,6 +517,7 @@ export const ToolConfirmationMessage: React.FC<
     measuredSecurityWarningsHeight,
     confirmationDetails,
     config,
+    deceptiveUrlWarningText,
   ]);
 
   const { question, bodyContent, options, securityWarnings, initialIndex } =

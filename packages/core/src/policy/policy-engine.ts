@@ -805,7 +805,8 @@ export class PolicyEngine {
         (name) =>
           EDIT_TOOL_NAMES.has(name) ||
           name === 'replace' ||
-          name === 'write_file',
+          name === 'write_file' ||
+          /write|edit|replace|patch|update|create|append|save/i.test(name),
       );
       if (isFileEditTool) {
         const targetPath = extractFilePathFromArgs(toolCall.args);

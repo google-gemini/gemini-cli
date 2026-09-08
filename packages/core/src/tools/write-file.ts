@@ -440,7 +440,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         .writeTextFile(this.resolvedPath, finalContent);
 
       if (isBuildFile(this.resolvedPath)) {
-        recordModifiedBuildFile(this.resolvedPath);
+        recordModifiedBuildFile(this.resolvedPath, this.config);
       }
 
       // Generate diff for display result
