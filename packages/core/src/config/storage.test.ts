@@ -505,5 +505,33 @@ describe('Storage - System Paths', () => {
         path.join(Storage.getGlobalGeminiDir(), 'trustedFolders.json'),
       );
     });
+
+    it('routes getGlobalRuntimeDir to TMPDIR/.gemini under macOS Seatbelt (sandbox-exec)', () => {
+      vi.stubEnv('SANDBOX', 'sandbox-exec');
+      vi.stubEnv('TMPDIR', '/tmp/test-seatbelt');
+
+      expect(Storage.getGlobalRuntimeDir()).toBe(
+        path.join('/tmp/test-seatbelt', GEMINI_DIR),
+      );
+      expect(Storage.getGoogleAccountsPath()).toBe(
+        path.join('/tmp/test-seatbelt', GEMINI_DIR, 'google_accounts.json'),
+      );
+      expect(Storage.getMcpOAuthTokensPath()).toBe(
+        path.join('/tmp/test-seatbelt', GEMINI_DIR, 'mcp-oauth-tokens.json'),
+      );
+      expect(Storage.getA2AOAuthTokensPath()).toBe(
+        path.join('/tmp/test-seatbelt', GEMINI_DIR, 'a2a-oauth-tokens.json'),
+      );
+      expect(Storage.getTrustedFoldersPath()).toBe(
+        path.join('/tmp/test-seatbelt', GEMINI_DIR, 'trustedFolders.json'),
+      );
+    });
+
+    it('falls back to getGlobalGeminiDir under sandbox-exec if TMPDIR is not set', () => {
+      vi.stubEnv('SANDBOX', 'sandbox-exec');
+      vi.stubEnv('TMPDIR', '');
+
+      expect(Storage.getGlobalRuntimeDir()).toBe(Storage.getGlobalGeminiDir());
+    });
   });
 });
