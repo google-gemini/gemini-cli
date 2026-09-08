@@ -10,16 +10,23 @@ import * as dnsPromises from 'node:dns/promises';
 import type { LookupAddress, LookupAllOptions } from 'node:dns';
 import ipaddr from 'ipaddr.js';
 
-const { setGlobalDispatcher, Agent, EnvHttpProxyAgent } = vi.hoisted(() => ({
-  setGlobalDispatcher: vi.fn(),
-  Agent: vi.fn(),
-  EnvHttpProxyAgent: vi.fn(),
-}));
+const { setGlobalDispatcher, Agent, EnvHttpProxyAgent, mockHolder } =
+  vi.hoisted(() => ({
+    setGlobalDispatcher: vi.fn(),
+    Agent: vi.fn(),
+    EnvHttpProxyAgent: vi.fn(),
+    mockHolder: {
+      buildConnector: vi.fn(() => vi.fn()) as unknown,
+    },
+  }));
 
 vi.mock('undici', () => ({
   setGlobalDispatcher,
   Agent,
   EnvHttpProxyAgent,
+  get buildConnector() {
+    return mockHolder.buildConnector;
+  },
 }));
 
 vi.mock('node:dns/promises', () => ({
@@ -34,6 +41,7 @@ const {
   fetchWithTimeout,
   setGlobalProxy,
   createSafeProxyAgent,
+  createSafeAgent,
 } = await import('./fetch.js');
 interface ErrorWithCode extends Error {
   code?: string;
@@ -125,16 +133,16 @@ describe('fetch utils', () => {
   });
 
   describe('isPrivateIp', () => {
-    it('should identify private IPs in URLs', () => {
-      expect(isPrivateIp('http://10.0.0.1/')).toBe(true);
-      expect(isPrivateIp('https://127.0.0.1:8080/')).toBe(true);
-      expect(isPrivateIp('http://localhost/')).toBe(true);
-      expect(isPrivateIp('http://[::1]/')).toBe(true);
+    it('should identify private IPs in URLs', async () => {
+      expect(await isPrivateIp('http://10.0.0.1/')).toBe(true);
+      expect(await isPrivateIp('https://127.0.0.1:8080/')).toBe(true);
+      expect(await isPrivateIp('http://localhost/')).toBe(true);
+      expect(await isPrivateIp('http://[::1]/')).toBe(true);
     });
 
-    it('should identify public IPs in URLs as non-private', () => {
-      expect(isPrivateIp('http://8.8.8.8/')).toBe(false);
-      expect(isPrivateIp('https://google.com/')).toBe(false);
+    it('should identify public IPs in URLs as non-private', async () => {
+      expect(await isPrivateIp('http://8.8.8.8/')).toBe(false);
+      expect(await isPrivateIp('https://google.com/')).toBe(false);
     });
   });
 
@@ -237,6 +245,20 @@ describe('fetch utils', () => {
       // Must NOT be classified as a timeout
       await expect(rejection).rejects.not.toThrow('timed out');
     });
+
+    it('should route dispatcher to createSafeProxyAgent when proxy is configured', async () => {
+      setGlobalProxy('http://proxy.example.com');
+      vi.mocked(global.fetch).mockResolvedValueOnce(new Response('OK'));
+
+      await fetchWithTimeout('http://example.com', 10_000);
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        'http://example.com',
+        expect.objectContaining({
+          dispatcher: expect.any(Object),
+        }),
+      );
+    });
   });
 
   describe('setGlobalProxy', () => {
@@ -316,6 +338,29 @@ describe('fetch utils', () => {
         headersTimeout: 60000,
         bodyTimeout: 300000,
       });
+    });
+  });
+
+  describe('createSafeAgent', () => {
+    it('should instantiate undici.Agent with connect handler bound', () => {
+      createSafeAgent();
+      expect(Agent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          connect: expect.any(Function),
+        }),
+      );
+    });
+
+    it('should throw fail-closed error if buildConnector is unavailable', () => {
+      const original = mockHolder.buildConnector;
+      mockHolder.buildConnector = undefined;
+      try {
+        expect(() => createSafeAgent()).toThrow(
+          'Security initialization failed: undici.buildConnector is not available.',
+        );
+      } finally {
+        mockHolder.buildConnector = original;
+      }
     });
   });
 });

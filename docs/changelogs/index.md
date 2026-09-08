@@ -18,6 +18,26 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.58.0 - 2026-09-01
+
+- **Core Security & Path Handling:** Enforced consistent symlink evaluation in
+  ignore path handling and declared top-level safety checkers in write policy
+  configuration
+  ([#28915](https://github.com/google-gemini/gemini-cli/pull/28915),
+  [#28961](https://github.com/google-gemini/gemini-cli/pull/28961) by
+  @luisfelipe-alt).
+- **macOS Seatbelt Sandbox:** Isolated Docker and container runtime sockets and
+  binaries to restrict container runtime access in the macOS sandbox
+  ([#28935](https://github.com/google-gemini/gemini-cli/pull/28935) by
+  @josebalius).
+- **Session & Recovery Optimizations:** Optimized history rollback mechanics,
+  retry nudge prompts, and resolved stale cancellation errors in the
+  Agent-to-Agent server
+  ([#28934](https://github.com/google-gemini/gemini-cli/pull/28934) by
+  @DavidAPierce,
+  [#28940](https://github.com/google-gemini/gemini-cli/pull/28940) by
+  @amelidev).
+
 ## Announcements: v0.54.0 - 2026-08-06
 
 - **PR Automation & Antigravity Agent:** Integrated the Antigravity agent runner

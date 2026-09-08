@@ -84,6 +84,16 @@ exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlterna
 "
 `;
 
+exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlternateBuffer = false > should render a gap indicator for skipped lines 2`] = `
+" 1   context line 1
+ 2 - deleted line
+ 2 + added line
+════════════════════════════════════════════════════════════════════════════════
+10   context line 10
+11   context line 11
+"
+`;
+
 exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlternateBuffer = false > should render diff content for existing file (not calling colorizeCode directly for the whole block) 1`] = `
 "1 - old line
 1 + new line

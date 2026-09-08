@@ -1479,7 +1479,10 @@ describe('PolicyEngine', () => {
         },
       ];
 
-      engine = new PolicyEngine({ rules });
+      engine = new PolicyEngine({
+        rules,
+        sandboxManager: new NoopSandboxManager({ workspace: '/safe/path' }),
+      });
 
       // Compound command. The decomposition will call check() for "echo hello"
       // which should match our specific high-priority rule IF dir_path is preserved.
@@ -1487,6 +1490,55 @@ describe('PolicyEngine', () => {
         {
           name: 'run_shell_command',
           args: { command: 'echo hello && pwd', dir_path: '/safe/path' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should force ASK_USER when dir_path escapes workspace boundary even if rule allows it', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ALLOW,
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        sandboxManager: new NoopSandboxManager({ workspace: '/safe/path' }),
+      });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'pwd', dir_path: '/outside/path' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should preserve ALLOW in YOLO mode even when dir_path escapes workspace boundary', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ALLOW,
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.YOLO,
+        sandboxManager: new NoopSandboxManager({ workspace: '/safe/path' }),
+      });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'pwd', dir_path: '/outside/path' },
         },
         undefined,
       );

@@ -322,6 +322,57 @@ This feature will not work in:
 - Remote SSH sessions without X11 forwarding
 - Containerized environments without browser support
 
+#### Authorization server requirements (RFC 9207)
+
+<!-- prettier-ignore -->
+> [!IMPORTANT]
+> To protect against OAuth Identity Provider (IdP) mix-up attacks, Gemini CLI
+> validates the `iss` (issuer) parameter per
+> [RFC 9207](https://www.rfc-editor.org/rfc/rfc9207). When an expected issuer is
+> discovered or configured, authorization servers **must** return the `iss`
+> parameter in the callback redirect matching the issuer URL. Responses missing
+> `iss` or with mismatched issuers are rejected with HTTP 400.
+
+##### Expected authorization callback example
+
+When the authorization server redirects the user back to Gemini CLI, the
+redirect URI must include the `iss` parameter:
+
+```http
+HTTP/1.1 302 Found
+Location: http://localhost:<port>/oauth/callback?code=AUTH_CODE&state=STATE&iss=https%3A%2F%2Fauth.example.com
+```
+
+- **Valid response (accepted):** `iss` matches the configured or discovered
+  issuer (`https://auth.example.com`).
+- **Missing `iss` (rejected):**
+  `http://localhost:<port>/oauth/callback?code=AUTH_CODE&state=STATE` (fails
+  with HTTP 400: `Missing issuer parameter in response`).
+- **Mismatched `iss` (rejected):** `iss` points to a different domain or
+  includes userinfo (fails with HTTP 400: `Issuer mismatch`).
+
+##### Configuration example with explicit issuer
+
+If your remote MCP server uses an authorization server with a known issuer URL:
+
+```json
+{
+  "mcpServers": {
+    "secureRemoteServer": {
+      "url": "https://mcp.example.com/sse",
+      "oauth": {
+        "enabled": true,
+        "issuer": "https://auth.example.com",
+        "authorizationUrl": "https://auth.example.com/oauth/authorize",
+        "tokenUrl": "https://auth.example.com/oauth/token",
+        "clientId": "gemini-cli-client",
+        "scopes": ["mcp:read", "mcp:write"]
+      }
+    }
+  }
+}
+```
+
 #### Managing OAuth authentication
 
 Use the `/mcp auth` command to manage OAuth authentication:
@@ -345,6 +396,8 @@ Use the `/mcp auth` command to manage OAuth authentication:
 - **`clientSecret`** (string): OAuth client secret (optional for public clients)
 - **`authorizationUrl`** (string): OAuth authorization endpoint (auto-discovered
   if omitted)
+- **`issuer`** (string): Authorization server issuer URL (auto-discovered if
+  omitted; validated per RFC 9207)
 - **`tokenUrl`** (string): OAuth token endpoint (auto-discovered if omitted)
 - **`scopes`** (string[]): Required OAuth scopes
 - **`redirectUri`** (string): Custom redirect URI (defaults to an OS-assigned
