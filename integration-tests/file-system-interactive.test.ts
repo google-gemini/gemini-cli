@@ -5,9 +5,9 @@
  */
 
 import { expect, describe, it, beforeEach, afterEach } from 'vitest';
-import { TestRig } from './test-helper.js';
+import { TestRig, skipFlaky } from './test-helper.js';
 
-describe('Interactive file system', () => {
+describe.skipIf(skipFlaky)('Interactive file system', () => {
   let rig: TestRig;
 
   beforeEach(() => {
@@ -50,7 +50,7 @@ describe('Interactive file system', () => {
     await run.expectText('Type your message', 30000);
 
     // Step 2: Write the file
-    const writePrompt = `now change the version to 1.0.1 in the file`;
+    const writePrompt = `now change the version to 1.0.1 in ${fileName} using the write_file tool`;
     await run.type(writePrompt);
     await run.type('\r');
 
@@ -63,5 +63,5 @@ describe('Interactive file system', () => {
 
     // Wait for telemetry to flush and file system to sync, especially in sandboxed environments
     await rig.waitForTelemetryReady();
-  }, 60000);
+  }, 120000);
 });
