@@ -155,7 +155,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
           }
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           filename={(contentData as FileDiffResult).fileName}
-          availableTerminalHeight={availableHeight}
+          disableTruncation={true}
           terminalWidth={childWidth}
         />
       );
