@@ -22,6 +22,7 @@ import { glob } from 'glob';
 import { ToolErrorType } from './tool-error.js';
 import { GET_INTERNAL_DOCS_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
+import { isSubpath } from '../utils/paths.js';
 
 /**
  * Parameters for the GetInternalDocs tool.
@@ -120,9 +121,12 @@ class GetInternalDocsInvocation extends BaseToolInvocation<
       }
 
       // Read a specific file
-      // Security: Prevent path traversal by resolving and verifying it stays within docsRoot
+      // Security: Prevent path traversal by resolving and verifying it stays
+      // within docsRoot. A plain startsWith() check is not enough: it also
+      // accepts any sibling directory that shares the prefix, so a docsRoot of
+      // `<repo>/docs` would let `../docs-private/secret.md` through.
       const resolvedPath = path.resolve(docsRoot, this.params.path);
-      if (!resolvedPath.startsWith(docsRoot)) {
+      if (!isSubpath(docsRoot, resolvedPath)) {
         throw new Error(
           'Access denied: Requested path is outside the documentation directory.',
         );

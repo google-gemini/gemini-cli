@@ -62,6 +62,31 @@ describe('GetInternalDocsTool (Integration)', () => {
     expect(result.error?.message).toContain('Access denied');
   });
 
+  it('should prevent access to a sibling directory that shares the docs prefix', async () => {
+    // getDocsRoot() resolves to the repository's real docs/ directory, so the
+    // probe has to be a real sibling of it.
+    const docsRoot = path.resolve(__dirname, '../../../../docs');
+    const siblingDir = `${docsRoot}-traversal-probe`;
+    const secret = 'SENSITIVE-PROBE-CONTENT';
+
+    await fs.mkdir(siblingDir, { recursive: true });
+    await fs.writeFile(path.join(siblingDir, 'secret.md'), secret, 'utf8');
+
+    try {
+      const invocation = tool.build({
+        path: `../${path.basename(siblingDir)}/secret.md`,
+      });
+      const result = await invocation.execute({ abortSignal });
+
+      expect(result.error).toBeDefined();
+      expect(result.error?.type).toBe(ToolErrorType.EXECUTION_FAILED);
+      expect(result.error?.message).toContain('Access denied');
+      expect(String(result.llmContent)).not.toContain(secret);
+    } finally {
+      await fs.rm(siblingDir, { recursive: true, force: true });
+    }
+  });
+
   it('should handle non-existent files', async () => {
     const invocation = tool.build({ path: 'this-file-does-not-exist.md' });
     const result = await invocation.execute({ abortSignal });
