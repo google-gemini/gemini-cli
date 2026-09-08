@@ -38,6 +38,7 @@ import {
   SANDBOX_NETWORK_NAME,
   SANDBOX_PROXY_NAME,
   BUILTIN_SEATBELT_PROFILES,
+  prepareIsolatedSettingsDir,
 } from './sandboxUtils.js';
 import { BUILTIN_SEATBELT_PROFILE_CONTENTS } from './sandboxBuiltinProfiles.js';
 
@@ -58,15 +59,43 @@ export async function start_sandbox(
 
   let stopProxy: (() => void) | undefined = undefined;
   let tempProfileFile: string | null = null;
+  let sandboxTmpDir: string | null = null;
+  let isolatedSettingsDir: string | null = null;
 
   const cleanup = () => {
-    if (tempProfileFile && fs.existsSync(tempProfileFile)) {
+    if (isolatedSettingsDir) {
+      const dirToDelete = isolatedSettingsDir;
+      isolatedSettingsDir = null;
       try {
-        fs.unlinkSync(tempProfileFile);
+        if (fs.existsSync(dirToDelete)) {
+          fs.rmSync(dirToDelete, { recursive: true, force: true });
+        }
       } catch {
         // ignore
       }
+    }
+    if (sandboxTmpDir) {
+      const dirToDelete = sandboxTmpDir;
+      sandboxTmpDir = null;
+      try {
+        if (fs.existsSync(dirToDelete)) {
+          fs.rmSync(dirToDelete, { recursive: true, force: true });
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    if (tempProfileFile) {
+      const fileToDelete = tempProfileFile;
       tempProfileFile = null;
+      try {
+        if (fs.existsSync(fileToDelete)) {
+          fs.unlinkSync(fileToDelete);
+        }
+      } catch {
+        // ignore
+      }
     }
     if (stopProxy) {
       try {
@@ -157,11 +186,17 @@ export async function start_sandbox(
           ...nodeArgs,
         ].join(' ');
 
+        const hostTmpDir = fs.realpathSync(os.tmpdir());
+        const resolvedTmpDir = fs.mkdtempSync(
+          path.join(hostTmpDir, 'gemini-sandbox-'),
+        );
+        sandboxTmpDir = resolvedTmpDir;
+
         const args = [
           '-D',
           `TARGET_DIR=${fs.realpathSync(process.cwd())}`,
           '-D',
-          `TMP_DIR=${fs.realpathSync(os.tmpdir())}`,
+          `TMP_DIR=${resolvedTmpDir}`,
           '-D',
           `HOME_DIR=${fs.realpathSync(homedir())}`,
           '-D',
@@ -222,6 +257,9 @@ export async function start_sandbox(
           '-c',
           [
             `SANDBOX=sandbox-exec`,
+            'TMPDIR=' + quote([resolvedTmpDir]),
+            'TMP=' + quote([resolvedTmpDir]),
+            'TEMP=' + quote([resolvedTmpDir]),
             'NODE_OPTIONS=' + quote([nodeOptions]),
             ...finalArgv.map((arg) => quote([arg])),
           ].join(' '),
@@ -231,6 +269,9 @@ export async function start_sandbox(
         let proxyProcess: ChildProcess | undefined = undefined;
         let sandboxProcess: ChildProcess | undefined = undefined;
         const sandboxEnv = { ...process.env };
+        sandboxEnv['TMPDIR'] = resolvedTmpDir;
+        sandboxEnv['TMP'] = resolvedTmpDir;
+        sandboxEnv['TEMP'] = resolvedTmpDir;
         if (proxyCommand) {
           const proxy =
             process.env['HTTPS_PROXY'] ||
@@ -288,6 +329,7 @@ export async function start_sandbox(
         process.stdin.pause();
         sandboxProcess = spawn(config.command, args, {
           stdio: 'inherit',
+          env: sandboxEnv,
         });
         return await new Promise((resolve, reject) => {
           sandboxProcess?.on('error', (err) => {
@@ -425,14 +467,13 @@ export async function start_sandbox(
       fs.mkdirSync(userSettingsDirOnHost, { recursive: true });
     }
 
-    args.push(
-      '--volume',
-      `${userSettingsDirOnHost}:${userSettingsDirInSandbox}`,
-    );
+    isolatedSettingsDir = prepareIsolatedSettingsDir(userSettingsDirOnHost);
+
+    args.push('--volume', `${isolatedSettingsDir}:${userSettingsDirInSandbox}`);
     if (userSettingsDirInSandbox !== getContainerPath(userSettingsDirOnHost)) {
       args.push(
         '--volume',
-        `${userSettingsDirOnHost}:${getContainerPath(userSettingsDirOnHost)}`,
+        `${isolatedSettingsDir}:${getContainerPath(userSettingsDirOnHost)}`,
       );
     }
 

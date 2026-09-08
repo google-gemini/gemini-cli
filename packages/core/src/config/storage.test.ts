@@ -16,10 +16,15 @@ import * as fs from 'node:fs';
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
+  const mockedRealpath = vi.fn(actual.realpathSync);
+  Object.defineProperty(mockedRealpath, 'native', {
+    value: (p: fs.PathLike) => mockedRealpath(p),
+    writable: true,
+  });
   return {
     ...actual,
     mkdirSync: vi.fn(),
-    realpathSync: vi.fn(actual.realpathSync),
+    realpathSync: mockedRealpath,
   };
 });
 

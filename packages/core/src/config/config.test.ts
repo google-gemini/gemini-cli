@@ -80,13 +80,18 @@ import {
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
+  const mockedRealpath = vi.fn((path) => path);
+  Object.defineProperty(mockedRealpath, 'native', {
+    value: (p: fs.PathLike) => mockedRealpath(p),
+    writable: true,
+  });
   return {
     ...actual,
     existsSync: vi.fn().mockReturnValue(true),
     statSync: vi.fn().mockReturnValue({
       isDirectory: vi.fn().mockReturnValue(true),
     }),
-    realpathSync: vi.fn((path) => path),
+    realpathSync: mockedRealpath,
   };
 });
 
@@ -237,6 +242,7 @@ vi.mock('../utils/events.js', async (importOriginal) => {
 
 vi.mock('../utils/fetch.js', () => ({
   setGlobalProxy: mockSetGlobalProxy,
+  updateGlobalFetchTimeouts: vi.fn(),
 }));
 
 vi.mock('../context/memoryContextManager.js', () => ({
