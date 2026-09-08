@@ -102,7 +102,46 @@ export function isCredentialOrSensitivePath(
  */
 export function isSensitiveHostPath(hostPath: string): boolean {
   try {
-    let home = path.resolve(homedir());
+    const rawHome = homedir();
+    if (!rawHome || rawHome.trim() === '') {
+      // If home directory cannot be determined, do not resolve it to process.cwd().
+      // Only block user-tilde notations and sensitive files.
+      if (
+        hostPath === '~' ||
+        hostPath === '~/' ||
+        hostPath === '~\\' ||
+        hostPath === '~/.gemini' ||
+        hostPath.startsWith('~/.gemini/') ||
+        hostPath === '~\\.gemini' ||
+        hostPath.startsWith('~\\.gemini\\')
+      ) {
+        return true;
+      }
+
+      let resolvedPath = hostPath;
+      try {
+        resolvedPath = resolveToRealPath(hostPath);
+      } catch {
+        resolvedPath = path.resolve(hostPath);
+      }
+
+      const baseName = path.basename(resolvedPath).toLowerCase();
+      if (
+        baseName === '.env' ||
+        baseName.startsWith('.env.') ||
+        baseName === 'oauth_creds.json' ||
+        baseName === 'gemini-credentials.json' ||
+        baseName === 'mcp-oauth-tokens.json' ||
+        baseName === 'a2a-oauth-tokens.json' ||
+        baseName === 'google_accounts.json' ||
+        baseName === 'trusted_hooks.json'
+      ) {
+        return true;
+      }
+      return false;
+    }
+
+    let home = path.resolve(rawHome);
     try {
       home = resolveToRealPath(home);
     } catch {

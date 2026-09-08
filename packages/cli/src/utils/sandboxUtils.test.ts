@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { resolveToRealPath } from '@google/gemini-cli-core';
+import { resolveToRealPath, homedir } from '@google/gemini-cli-core';
 import {
   getContainerPath,
   parseImageName,
@@ -311,6 +311,27 @@ describe('sandboxUtils', () => {
 
       expect(isSensitiveHostPath('/home/testuser/.gemini')).toBe(true);
       expect(isSensitiveHostPath('/workspace/safe-path')).toBe(false);
+    });
+
+    it('should handle empty or undetermined homedir without blocking working directory', () => {
+      vi.mocked(homedir).mockReturnValue('');
+      vi.mocked(os.homedir).mockReturnValue('');
+
+      expect(isSensitiveHostPath(process.cwd())).toBe(false);
+      expect(isSensitiveHostPath(path.join(process.cwd(), '.gemini'))).toBe(
+        false,
+      );
+      expect(isSensitiveHostPath('/workspace/safe-project')).toBe(false);
+
+      // Still blocks ~ notations and sensitive credential files
+      expect(isSensitiveHostPath('~')).toBe(true);
+      expect(isSensitiveHostPath('~/.gemini')).toBe(true);
+      expect(isSensitiveHostPath('/workspace/.env')).toBe(true);
+      expect(isSensitiveHostPath('/workspace/oauth_creds.json')).toBe(true);
+      expect(isSensitiveHostPath('/workspace/google_accounts.json')).toBe(true);
+
+      // Reset mock
+      vi.mocked(homedir).mockImplementation(() => os.homedir());
     });
   });
 

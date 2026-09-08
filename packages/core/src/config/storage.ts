@@ -79,6 +79,15 @@ export class Storage {
     return path.join(Storage.getGlobalGeminiDir(), 'settings.json');
   }
 
+  private static sandboxRuntimeDir: string | null = null;
+
+  /**
+   * Resets the cached sandbox runtime directory. Exposed for testing.
+   */
+  static resetSandboxRuntimeDirForTesting(): void {
+    Storage.sandboxRuntimeDir = null;
+  }
+
   /**
    * Returns whether the CLI is currently running in sandbox mode.
    */
@@ -89,12 +98,23 @@ export class Storage {
   /**
    * Returns the directory for global runtime state (temp files, chat history, etc.).
    * In sandbox mode, runtime operations are redirected to an ephemeral, isolated directory
-   * under os.tmpdir() to prevent accessing or mutating host user configuration.
+   * generated securely with unique temporary naming under os.tmpdir() to prevent symlink attacks
+   * and avoid accessing or mutating host user configuration.
    */
   static getGlobalRuntimeDir(): string {
     if (Storage.isSandbox()) {
-      return path.join(os.tmpdir(), GEMINI_DIR);
+      if (!Storage.sandboxRuntimeDir) {
+        try {
+          Storage.sandboxRuntimeDir = fs.mkdtempSync(
+            path.join(os.tmpdir(), 'gemini-'),
+          );
+        } catch {
+          return path.join(os.tmpdir(), GEMINI_DIR);
+        }
+      }
+      return Storage.sandboxRuntimeDir;
     }
+    Storage.sandboxRuntimeDir = null;
     return Storage.getGlobalGeminiDir();
   }
 

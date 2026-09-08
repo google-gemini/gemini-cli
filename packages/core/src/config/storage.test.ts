@@ -463,6 +463,17 @@ describe('Storage - System Paths', () => {
 
   describe('Storage - Sandbox Isolation', () => {
     afterEach(() => {
+      if (Storage.isSandbox()) {
+        try {
+          const dir = Storage.getGlobalRuntimeDir();
+          if (dir.includes('gemini-') && fs.existsSync(dir)) {
+            fs.rmSync(dir, { recursive: true, force: true });
+          }
+        } catch {
+          // ignore
+        }
+      }
+      Storage.resetSandboxRuntimeDirForTesting();
       vi.unstubAllEnvs();
     });
 
@@ -485,24 +496,36 @@ describe('Storage - System Paths', () => {
 
       vi.stubEnv('SANDBOX', 'docker');
       expect(Storage.isSandbox()).toBe(true);
-      expect(Storage.getGlobalRuntimeDir()).toBe(
-        path.join(os.tmpdir(), '.gemini'),
-      );
-      expect(Storage.getGlobalTempDir()).toBe(
-        path.join(os.tmpdir(), '.gemini', 'tmp'),
-      );
+      const runtimeDir = Storage.getGlobalRuntimeDir();
+      expect(runtimeDir).toContain('gemini-');
+      // Consecutive calls return the exact same cached directory
+      expect(Storage.getGlobalRuntimeDir()).toBe(runtimeDir);
+      expect(Storage.getGlobalTempDir()).toBe(path.join(runtimeDir, 'tmp'));
       expect(Storage.getGoogleAccountsPath()).toBe(
-        path.join(os.tmpdir(), '.gemini', 'google_accounts.json'),
+        path.join(runtimeDir, 'google_accounts.json'),
       );
       expect(Storage.getMcpOAuthTokensPath()).toBe(
-        path.join(os.tmpdir(), '.gemini', 'mcp-oauth-tokens.json'),
+        path.join(runtimeDir, 'mcp-oauth-tokens.json'),
       );
       expect(Storage.getA2AOAuthTokensPath()).toBe(
-        path.join(os.tmpdir(), '.gemini', 'a2a-oauth-tokens.json'),
+        path.join(runtimeDir, 'a2a-oauth-tokens.json'),
       );
       expect(Storage.getTrustedFoldersPath()).toBe(
-        path.join(os.tmpdir(), '.gemini', 'trustedFolders.json'),
+        path.join(runtimeDir, 'trustedFolders.json'),
       );
+    });
+
+    it('falls back gracefully to tmpdir/GEMINI_DIR if mkdtempSync throws', () => {
+      vi.stubEnv('SANDBOX', 'docker');
+      const mkdtempSpy = vi
+        .spyOn(fs, 'mkdtempSync')
+        .mockImplementationOnce(() => {
+          throw new Error('Permission denied');
+        });
+      expect(Storage.getGlobalRuntimeDir()).toBe(
+        path.join(os.tmpdir(), GEMINI_DIR),
+      );
+      mkdtempSpy.mockRestore();
     });
   });
 });
