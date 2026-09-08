@@ -303,14 +303,28 @@ describe('sandboxUtils', () => {
       expect(isSensitiveHostPath('/var/symlink_to_home')).toBe(true);
     });
 
-    it('should safely fall back when resolveToRealPath throws', () => {
+    it('should fail closed when resolveToRealPath encounters an error', () => {
       vi.mocked(os.homedir).mockReturnValue('/home/testuser');
       vi.mocked(resolveToRealPath).mockImplementation(() => {
-        throw new Error('Path does not exist');
+        throw new Error('Unrecoverable resolution error');
       });
 
       expect(isSensitiveHostPath('/home/testuser/.gemini')).toBe(true);
-      expect(isSensitiveHostPath('/workspace/safe-path')).toBe(false);
+      expect(isSensitiveHostPath('/workspace/safe-path')).toBe(true);
+    });
+
+    it('should resolve non-existent paths cleanly via resolveToRealPath', () => {
+      vi.mocked(os.homedir).mockReturnValue('/home/testuser');
+      vi.mocked(resolveToRealPath).mockImplementation((p: string) =>
+        path.resolve(p),
+      );
+
+      expect(
+        isSensitiveHostPath('/home/testuser/.gemini/non-existent-sub'),
+      ).toBe(true);
+      expect(isSensitiveHostPath('/workspace/safe-path/non-existent-sub')).toBe(
+        false,
+      );
     });
 
     it('should handle empty or undetermined homedir without blocking working directory', () => {

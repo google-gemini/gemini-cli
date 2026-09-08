@@ -140,6 +140,7 @@ describe('sandbox', () => {
     vi.mocked(fs.mkdtempSync).mockImplementation(
       (prefix) => `${prefix}test-tmp`,
     );
+    vi.mocked(fs.chmodSync).mockImplementation(() => {});
     vi.mocked(fs.rmSync).mockImplementation(() => {});
     vi.mocked(execSync).mockReturnValue(Buffer.from(''));
   });
@@ -890,6 +891,12 @@ describe('sandbox', () => {
           ),
         ]),
         expect.any(Object),
+      );
+
+      // Verify that ephemeral sandbox directory permissions are restricted to owner (0o700)
+      expect(fs.chmodSync).toHaveBeenCalledWith(
+        expect.stringContaining('gemini-sandbox-'),
+        0o700,
       );
     });
 

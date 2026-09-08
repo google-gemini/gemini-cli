@@ -118,12 +118,7 @@ export function isSensitiveHostPath(hostPath: string): boolean {
         return true;
       }
 
-      let resolvedPath = hostPath;
-      try {
-        resolvedPath = resolveToRealPath(hostPath);
-      } catch {
-        resolvedPath = path.resolve(hostPath);
-      }
+      const resolvedPath = resolveToRealPath(hostPath);
 
       const baseName = path.basename(resolvedPath).toLowerCase();
       if (
@@ -141,12 +136,7 @@ export function isSensitiveHostPath(hostPath: string): boolean {
       return false;
     }
 
-    let home = path.resolve(rawHome);
-    try {
-      home = resolveToRealPath(home);
-    } catch {
-      // Keep resolved path if resolveToRealPath fails
-    }
+    const home = resolveToRealPath(rawHome);
 
     let expandedPath = hostPath;
     if (hostPath === '~' || hostPath === '~/' || hostPath === '~\\') {
@@ -155,20 +145,8 @@ export function isSensitiveHostPath(hostPath: string): boolean {
       expandedPath = path.join(home, hostPath.slice(2));
     }
 
-    let resolvedPath = expandedPath;
-    try {
-      resolvedPath = resolveToRealPath(expandedPath);
-    } catch {
-      resolvedPath = path.resolve(expandedPath);
-    }
-    const normalized = resolvedPath;
-
-    let geminiDir = path.resolve(home, GEMINI_DIR);
-    try {
-      geminiDir = resolveToRealPath(geminiDir);
-    } catch {
-      // Keep resolved path if resolveToRealPath fails
-    }
+    const normalized = resolveToRealPath(expandedPath);
+    const geminiDir = resolveToRealPath(path.join(home, GEMINI_DIR));
 
     const isWindows = os.platform() === 'win32';
     const arePathsEqual = (p1: string, p2: string) =>

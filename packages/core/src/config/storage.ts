@@ -127,6 +127,11 @@ export class Storage {
       if (!Storage.sandboxRuntimeDir) {
         try {
           const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-'));
+          try {
+            fs.chmodSync(dir, 0o700);
+          } catch {
+            // ignore chmod errors on platforms without POSIX permissions
+          }
           Storage.sandboxRuntimeDir = dir;
           Storage.removeExitListener();
           const cleanup = () => {

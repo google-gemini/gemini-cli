@@ -184,6 +184,7 @@ export async function start_sandbox(
         const resolvedTmpDir = fs.mkdtempSync(
           path.join(hostTmpDir, 'gemini-sandbox-'),
         );
+        fs.chmodSync(resolvedTmpDir, 0o700);
         sandboxTmpDir = resolvedTmpDir;
 
         const args = [
@@ -451,6 +452,7 @@ export async function start_sandbox(
     if (!sandboxTmpDir) {
       const hostTmpDir = fs.realpathSync(os.tmpdir());
       sandboxTmpDir = fs.mkdtempSync(path.join(hostTmpDir, 'gemini-sandbox-'));
+      fs.chmodSync(sandboxTmpDir, 0o700);
     }
 
     // Sanitize user settings before mounting into the sandbox container.
