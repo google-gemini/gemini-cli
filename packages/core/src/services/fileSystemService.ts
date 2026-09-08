@@ -54,15 +54,30 @@ export class StandardFileSystemService implements FileSystemService {
     // concurrent writers do not clobber each other's temp file.
     const tmpPath = `${filePath}.${randomUUID()}.tmp`;
 
-    try {
-      await fs.writeFile(tmpPath, content, 'utf-8');
+    // A fresh temp file does not inherit the destination's permissions, so
+    // without this, replacing a 0600 file would silently widen it to the
+    // default mode.
+    const existingMode = await this.getFileMode(filePath);
 
-      // A fresh temp file does not inherit the destination's permissions, so
-      // copy them over before the rename. Without this, replacing a 0600 file
-      // would silently widen it to the default mode.
-      const existingMode = await this.getFileMode(filePath);
+    try {
+      // Create the temp file already carrying the destination's mode, so the
+      // content is never briefly readable through a wider default mode. The
+      // mode is masked by umask, so this can only be more restrictive.
+      await fs.writeFile(tmpPath, content, {
+        encoding: 'utf-8',
+        ...(existingMode !== undefined ? { mode: existingMode } : {}),
+      });
+
       if (existingMode !== undefined) {
-        await fs.chmod(tmpPath, existingMode);
+        try {
+          // Correct any narrowing that umask applied above. Best effort: some
+          // filesystems (FAT32, exFAT, a few NFS/CIFS mounts) and restricted
+          // sandboxes reject chmod with EPERM/ENOTSUP, and permissions must
+          // not be the reason a write fails.
+          await fs.chmod(tmpPath, existingMode);
+        } catch {
+          // Keep whatever mode the temp file was created with.
+        }
       }
 
       await this.renameWithRetry(tmpPath, filePath);
