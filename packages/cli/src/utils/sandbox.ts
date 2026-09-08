@@ -185,7 +185,7 @@ export async function start_sandbox(
           path.join(hostTmpDir, 'gemini-sandbox-'),
         );
         try {
-          await fs.promises.chmod(resolvedTmpDir, 0o700);
+          fs.chmodSync(resolvedTmpDir, 0o700);
         } catch {
           // Silently ignore permission errors on non-POSIX filesystems
         }
@@ -457,7 +457,7 @@ export async function start_sandbox(
       const hostTmpDir = fs.realpathSync(os.tmpdir());
       sandboxTmpDir = fs.mkdtempSync(path.join(hostTmpDir, 'gemini-sandbox-'));
       try {
-        await fs.promises.chmod(sandboxTmpDir, 0o700);
+        fs.chmodSync(sandboxTmpDir, 0o700);
       } catch {
         // Silently ignore permission errors on non-POSIX filesystems
       }
