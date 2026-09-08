@@ -43,6 +43,10 @@ describe('sandboxUtils', () => {
     vi.clearAllMocks();
     process.env = { ...originalEnv };
     vi.mocked(os.tmpdir).mockReturnValue('/tmp');
+    vi.mocked(homedir).mockImplementation(() => os.homedir());
+    vi.mocked(resolveToRealPath).mockImplementation((p: string) =>
+      path.resolve(p),
+    );
     // Clean up these env vars that might affect tests
     delete process.env['NODE_ENV'];
     delete process.env['DEBUG'];
@@ -331,9 +335,15 @@ describe('sandboxUtils', () => {
       );
     });
 
-    it('should fall back to path.resolve when path does not exist on disk', () => {
+    it('should fall back to path.resolve when resolveToRealPath encounters ENOENT', () => {
       vi.mocked(os.homedir).mockReturnValue('/home/testuser');
-      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(resolveToRealPath).mockImplementation((p: string) => {
+        const err = new Error(
+          `ENOENT: no such file or directory, realpath '${p}'`,
+        );
+        (err as NodeJS.ErrnoException).code = 'ENOENT';
+        throw err;
+      });
 
       expect(
         isSensitiveHostPath('/home/testuser/.gemini/non-existent-sub'),
@@ -359,9 +369,6 @@ describe('sandboxUtils', () => {
       expect(isSensitiveHostPath('/workspace/.env')).toBe(true);
       expect(isSensitiveHostPath('/workspace/oauth_creds.json')).toBe(true);
       expect(isSensitiveHostPath('/workspace/google_accounts.json')).toBe(true);
-
-      // Reset mock
-      vi.mocked(homedir).mockImplementation(() => os.homedir());
     });
   });
 

@@ -96,6 +96,29 @@ export function isCredentialOrSensitivePath(
 }
 
 /**
+ * Resolves a path to its real path, falling back to path.resolve if it does not exist (ENOENT).
+ * Rethrows unrecoverable errors so callers can fail closed.
+ */
+function safeResolveToRealPath(targetPath: string): string {
+  try {
+    return path.resolve(resolveToRealPath(targetPath));
+  } catch (err: unknown) {
+    if (isRecord(err)) {
+      const code = err['code'];
+      const message = err['message'];
+      if (
+        code === 'ENOENT' ||
+        (typeof message === 'string' &&
+          (message.includes('ENOENT') || message.includes('not found')))
+      ) {
+        return path.resolve(targetPath);
+      }
+    }
+    throw err;
+  }
+}
+
+/**
  * Checks if a host path is sensitive and should be prohibited from mounting
  * into the sandbox container. This protects ~/.gemini, user home directories,
  * and sensitive credential files from being accessed or poisoned.
@@ -118,9 +141,7 @@ export function isSensitiveHostPath(hostPath: string): boolean {
         return true;
       }
 
-      const resolvedPath = fs.existsSync(hostPath)
-        ? resolveToRealPath(hostPath)
-        : path.resolve(hostPath);
+      const resolvedPath = safeResolveToRealPath(hostPath);
 
       const baseName = path.basename(resolvedPath).toLowerCase();
       if (
@@ -138,9 +159,7 @@ export function isSensitiveHostPath(hostPath: string): boolean {
       return false;
     }
 
-    const home = fs.existsSync(rawHome)
-      ? resolveToRealPath(rawHome)
-      : path.resolve(rawHome);
+    const home = safeResolveToRealPath(rawHome);
 
     let expandedPath = hostPath;
     if (hostPath === '~' || hostPath === '~/' || hostPath === '~\\') {
@@ -149,22 +168,26 @@ export function isSensitiveHostPath(hostPath: string): boolean {
       expandedPath = path.join(home, hostPath.slice(2));
     }
 
-    const normalized = fs.existsSync(expandedPath)
-      ? resolveToRealPath(expandedPath)
-      : path.resolve(expandedPath);
+    const normalized = safeResolveToRealPath(expandedPath);
 
     const geminiDirCandidate = path.join(home, GEMINI_DIR);
-    const geminiDirOnHost = fs.existsSync(geminiDirCandidate)
-      ? resolveToRealPath(geminiDirCandidate)
-      : path.resolve(geminiDirCandidate);
+    const geminiDirOnHost = safeResolveToRealPath(geminiDirCandidate);
 
     const isWindows = os.platform() === 'win32';
     const arePathsEqual = (p1: string, p2: string) =>
-      isWindows ? p1.toLowerCase() === p2.toLowerCase() : p1 === p2;
-    const isSubpathOf = (child: string, parent: string) =>
       isWindows
-        ? child.toLowerCase().startsWith((parent + path.sep).toLowerCase())
-        : child.startsWith(parent + path.sep);
+        ? path.resolve(p1).toLowerCase() === path.resolve(p2).toLowerCase()
+        : path.resolve(p1) === path.resolve(p2);
+    const isSubpathOf = (child: string, parent: string) => {
+      const resolvedChild = path.resolve(child);
+      const resolvedParent = path.resolve(parent);
+      const parentWithSep = resolvedParent.endsWith(path.sep)
+        ? resolvedParent
+        : resolvedParent + path.sep;
+      return isWindows
+        ? resolvedChild.toLowerCase().startsWith(parentWithSep.toLowerCase())
+        : resolvedChild.startsWith(parentWithSep);
+    };
 
     // Block mounting user home directory root directly
     if (arePathsEqual(normalized, home)) {
