@@ -265,8 +265,7 @@ function isFlashModel(model: string): boolean {
     model === PREVIEW_GEMINI_FLASH_MODEL ||
     model === DEFAULT_GEMINI_3_5_FLASH_MODEL ||
     model === SECONDARY_GEMINI_3_5_FLASH_MODEL ||
-    model === 'flash' ||
-    model.endsWith('flash')
+    model === 'flash'
   );
 }
 

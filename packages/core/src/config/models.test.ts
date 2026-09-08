@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import {
   resolveModel,
   resolveClassifierModel,
@@ -19,6 +19,7 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_3_5_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  setFlashModels,
   supportsMultimodalFunctionResponse,
   GEMINI_MODEL_ALIAS_PRO,
   GEMINI_MODEL_ALIAS_FLASH,
@@ -787,7 +788,20 @@ describe('resolveModel Gemini 3.5 Flash GA', () => {
     ).toBe(PREVIEW_GEMINI_FLASH_MODEL);
   });
 
-  it('should resolve all but preview flash models to gemini-3.5-flash when useGemini3_5Flash is true (dynamic)', () => {
+  describe('explicit gemini-2.5-flash', () => {
+    afterEach(() => {
+      setFlashModels('gemini-3-flash-preview', 'gemini-2.5-flash');
+    });
+
+    it('should not rewrite explicitly requested gemini-2.5-flash to gemini-3.5-flash', () => {
+      setFlashModels('gemini-3.5-flash', 'gemini-3.5-flash');
+      expect(
+        resolveModel('gemini-2.5-flash', false, false, true, undefined, true),
+      ).toBe('gemini-2.5-flash');
+    });
+  });
+
+  it('should resolve flash alias to gemini-3.5-flash but leave concrete models untouched (dynamic)', () => {
     const mockDynamicConfig = {
       getExperimentalDynamicModelConfiguration: () => true,
       modelConfigService,
@@ -805,14 +819,14 @@ describe('resolveModel Gemini 3.5 Flash GA', () => {
     ).toBe('gemini-3.5-flash');
     expect(
       resolveModel(
-        DEFAULT_GEMINI_FLASH_MODEL,
+        'gemini-2.5-flash',
         false,
         false,
         true,
         mockDynamicConfig,
         true,
       ),
-    ).toBe('gemini-3.5-flash');
+    ).toBe('gemini-2.5-flash');
     expect(
       resolveModel(
         PREVIEW_GEMINI_FLASH_MODEL,
