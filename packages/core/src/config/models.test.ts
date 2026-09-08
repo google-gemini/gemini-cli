@@ -534,10 +534,15 @@ describe('isAutoModel', () => {
     expect(isAutoModel(DEFAULT_GEMINI_MODEL_AUTO)).toBe(true);
   });
 
+  it('should return true for any "auto-gemini-" prefixed model', () => {
+    expect(isAutoModel('auto-gemini-custom')).toBe(true);
+  });
+
   it('should return false for concrete models', () => {
     expect(isAutoModel(DEFAULT_GEMINI_MODEL)).toBe(false);
     expect(isAutoModel(PREVIEW_GEMINI_MODEL)).toBe(false);
     expect(isAutoModel('some-random-model')).toBe(false);
+    expect(isAutoModel('auto-gpt')).toBe(false);
   });
 });
 

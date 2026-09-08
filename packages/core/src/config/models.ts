@@ -506,13 +506,19 @@ export function isAutoModel(
   model: string,
   config?: ModelCapabilityContext,
 ): boolean {
+  const normalized =
+    typeof model === 'string' ? model.trim().toLowerCase() : '';
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
-    return config.modelConfigService.getModelDefinition(model)?.tier === 'auto';
+    const definition = config.modelConfigService.getModelDefinition(normalized);
+    if (definition) {
+      return definition.tier === 'auto';
+    }
   }
   return (
-    model === GEMINI_MODEL_ALIAS_AUTO ||
-    model === PREVIEW_GEMINI_MODEL_AUTO ||
-    model === DEFAULT_GEMINI_MODEL_AUTO
+    normalized === GEMINI_MODEL_ALIAS_AUTO ||
+    normalized === PREVIEW_GEMINI_MODEL_AUTO ||
+    normalized === DEFAULT_GEMINI_MODEL_AUTO ||
+    normalized.startsWith('auto-gemini-')
   );
 }
 
