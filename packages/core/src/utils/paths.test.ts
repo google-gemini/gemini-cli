@@ -69,6 +69,10 @@ describe('tildeifyPath', () => {
         '/Users/albert/Documents/app',
       );
     });
+
+    it('should not replace a relative path', () => {
+      expect(tildeifyPath('Documents/app')).toBe('Documents/app');
+    });
   });
 
   describe('on Windows', () => {
@@ -91,6 +95,10 @@ describe('tildeifyPath', () => {
       expect(tildeifyPath('C:\\Users\\Albert\\Documents\\app')).toBe(
         'C:\\Users\\Albert\\Documents\\app',
       );
+    });
+
+    it('should not replace a relative path', () => {
+      expect(tildeifyPath('Documents\\app')).toBe('Documents\\app');
     });
   });
 });

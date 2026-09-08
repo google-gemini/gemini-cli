@@ -40,8 +40,12 @@ export function tmpdir(): string {
  * @returns The tildeified path.
  */
 export function tildeifyPath(filePath: string): string {
-  const homeDir = homedir();
   const pathModule = process.platform === 'win32' ? path.win32 : path.posix;
+  if (!pathModule.isAbsolute(filePath)) {
+    return filePath;
+  }
+
+  const homeDir = homedir();
   const relativePath = pathModule.relative(homeDir, filePath);
   const isWithinHome =
     relativePath === '' ||
