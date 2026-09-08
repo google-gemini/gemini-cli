@@ -175,6 +175,40 @@ describe('fileUtils', () => {
         expect(isWithinRoot(testPath, root || defaultRoot)).toBe(expected);
       },
     );
+
+    describe.skipIf(process.platform !== 'win32')('on Windows', () => {
+      const mockPlatform = (platform: string) => {
+        vi.stubGlobal(
+          'process',
+          Object.create(process, {
+            platform: {
+              get: () => platform,
+            },
+          }),
+        );
+      };
+
+      beforeEach(() => mockPlatform('win32'));
+      afterEach(() => vi.unstubAllGlobals());
+
+      it('treats drive-letter casing as equivalent', () => {
+        expect(
+          isWithinRoot('C:\\Users\\Test\\file.txt', 'c:\\Users\\Test'),
+        ).toBe(true);
+      });
+
+      it('treats path-component casing as equivalent', () => {
+        expect(
+          isWithinRoot('c:\\users\\test\\file.txt', 'C:\\Users\\Test'),
+        ).toBe(true);
+      });
+
+      it('still rejects a different drive', () => {
+        expect(
+          isWithinRoot('D:\\Users\\Test\\file.txt', 'C:\\Users\\Test'),
+        ).toBe(false);
+      });
+    });
   });
 
   describe('getRealPath', () => {
