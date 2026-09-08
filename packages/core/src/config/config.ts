@@ -3572,7 +3572,10 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   /**
-   * Returns whether Gemini 3.5 Flash GA has been launched.
+   * Returns whether Gemini Flash GA (Gemini 3.8 Flash) has been launched for the user.
+   *
+   * Drives the default flash model target (`gemini-3.8-flash`) based on backend/auth type
+   * and the flash GA rollout experiment flag.
    *
    * Note: This method should only be called after startup, once experiments have been loaded.
    */
@@ -3593,9 +3596,9 @@ export class Config implements McpContext, AgentLoopContext {
       // Gemini API key users should have the ability to manually select the
       // old preview flash model.
       if (authType === AuthType.USE_GEMINI) {
-        setFlashModels('gemini-3-flash-preview', 'gemini-3.5-flash');
+        setFlashModels('gemini-3-flash-preview', 'gemini-3.8-flash');
       } else {
-        setFlashModels('gemini-3.5-flash', 'gemini-3.5-flash');
+        setFlashModels('gemini-3.8-flash', 'gemini-3.8-flash');
       }
     } else {
       setFlashModels('gemini-3-flash-preview', 'gemini-2.5-flash');

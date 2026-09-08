@@ -59,9 +59,7 @@ export const PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL =
 // cleaned up.
 export let PREVIEW_GEMINI_FLASH_MODEL = 'gemini-3-flash-preview';
 export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro';
-// TODO: Set to const and update to 'gemini-3.5-flash' once the experiment for
-// 3_5 flash rollut can be cleaned up.
-// This is set to either the same as the DEFAULT_GEMINI_3_5_FLASH_MODEL const
+// This is set to either the same as the DEFAULT_GEMINI_3_8_FLASH_MODEL const
 // OR the SECONDARY_GEMINI_3_5_FLASH_MODEL depending on which is needed for
 // the user's backend as determined by hasGemini35FlashGAAccess in
 // packages/core/src/config/config.ts
@@ -71,6 +69,11 @@ export const DEFAULT_GEMINI_3_5_FLASH_MODEL = 'gemini-3.5-flash';
 // however those backends do not expect to see the string gemini-3.5-flash
 // so we need to provide this model as an alternative name in certain instances.
 export const SECONDARY_GEMINI_3_5_FLASH_MODEL = 'gemini-3-flash';
+export const GEMINI_3_5_FLASH_LITE_MODEL = 'gemini-3.5-flash-lite';
+export const GEMINI_3_6_FLASH_MODEL = 'gemini-3.6-flash';
+export const GEMINI_3_7_FLASH_MODEL = 'gemini-3.7-flash';
+export const GEMINI_3_8_FLASH_MODEL = 'gemini-3.8-flash';
+export const DEFAULT_GEMINI_3_8_FLASH_MODEL = GEMINI_3_8_FLASH_MODEL;
 
 // Used to set default flash models based on access
 // TODO: Cleanup once the experiment for 3_5 flash rollut can be cleaned up.
@@ -96,6 +99,10 @@ export const VALID_GEMINI_MODELS = new Set([
   DEFAULT_GEMINI_3_5_FLASH_MODEL,
   SECONDARY_GEMINI_3_5_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  GEMINI_3_5_FLASH_LITE_MODEL,
+  GEMINI_3_6_FLASH_MODEL,
+  GEMINI_3_7_FLASH_MODEL,
+  GEMINI_3_8_FLASH_MODEL,
 
   GEMMA_4_31B_IT_MODEL,
   GEMMA_4_26B_A4B_IT_MODEL,
@@ -129,7 +136,7 @@ export function getAutoModelDescription(
     : DEFAULT_GEMINI_MODEL;
   const flashModel = hasAccessToPreview
     ? useGemini3_5Flash
-      ? DEFAULT_GEMINI_3_5_FLASH_MODEL
+      ? GEMINI_3_8_FLASH_MODEL
       : PREVIEW_GEMINI_FLASH_MODEL
     : DEFAULT_GEMINI_FLASH_MODEL;
   return `Let Gemini CLI decide the best model for the task: ${getDisplayString(proModel)}, ${getDisplayString(flashModel)}`;
@@ -230,7 +237,13 @@ export function resolveModel(
   if (
     useGemini3_5Flash &&
     isFlashModel(resolved) &&
-    normalizedModel !== PREVIEW_GEMINI_FLASH_MODEL
+    normalizedModel !== PREVIEW_GEMINI_FLASH_MODEL &&
+    normalizedModel !== DEFAULT_GEMINI_3_5_FLASH_MODEL &&
+    normalizedModel !== SECONDARY_GEMINI_3_5_FLASH_MODEL &&
+    normalizedModel !== GEMINI_3_5_FLASH_LITE_MODEL &&
+    normalizedModel !== GEMINI_3_6_FLASH_MODEL &&
+    normalizedModel !== GEMINI_3_7_FLASH_MODEL &&
+    normalizedModel !== GEMINI_3_8_FLASH_MODEL
   ) {
     return DEFAULT_GEMINI_FLASH_MODEL;
   }
@@ -263,6 +276,7 @@ function isFlashModel(model: string): boolean {
   return (
     model === DEFAULT_GEMINI_FLASH_MODEL ||
     model === PREVIEW_GEMINI_FLASH_MODEL ||
+    model === GEMINI_3_8_FLASH_MODEL ||
     model === DEFAULT_GEMINI_3_5_FLASH_MODEL ||
     model === SECONDARY_GEMINI_3_5_FLASH_MODEL ||
     model === 'flash' ||
