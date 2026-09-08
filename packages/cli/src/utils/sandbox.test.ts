@@ -832,9 +832,7 @@ describe('sandbox', () => {
           '--volume',
           '/host/path:/container/path:ro',
           '--volume',
-          expect.stringMatching(
-            /[\\/]home[\\/]node[\\/]\.gemini[\\/]settings\.json:ro$/,
-          ),
+          expect.stringMatching(/[\\/]home[\\/]node[\\/]\.gemini:rw$/),
         ]),
         expect.any(Object),
       );
@@ -881,14 +879,14 @@ describe('sandbox', () => {
         expect.any(Object),
       );
 
-      // Verify that docker run mounts the sanitized settings file as read-only
+      // Verify that docker run mounts the isolated sanitized settings directory
       expect(spawn).toHaveBeenNthCalledWith(
         2,
         'docker',
         expect.arrayContaining([
           '--volume',
           expect.stringMatching(
-            /[\\/]home[\\/]node[\\/]\.gemini[\\/]settings\.json:ro$/,
+            /gemini-sandbox.*:[\\/]home[\\/]node[\\/]\.gemini:rw$/,
           ),
         ]),
         expect.any(Object),

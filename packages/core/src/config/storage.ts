@@ -85,7 +85,19 @@ export class Storage {
    * Resets the cached sandbox runtime directory. Exposed for testing.
    */
   static resetSandboxRuntimeDirForTesting(): void {
-    Storage.sandboxRuntimeDir = null;
+    if (Storage.sandboxRuntimeDir) {
+      try {
+        if (fs.existsSync(Storage.sandboxRuntimeDir)) {
+          fs.rmSync(Storage.sandboxRuntimeDir, {
+            recursive: true,
+            force: true,
+          });
+        }
+      } catch {
+        // ignore
+      }
+      Storage.sandboxRuntimeDir = null;
+    }
   }
 
   /**
@@ -105,9 +117,17 @@ export class Storage {
     if (Storage.isSandbox()) {
       if (!Storage.sandboxRuntimeDir) {
         try {
-          Storage.sandboxRuntimeDir = fs.mkdtempSync(
-            path.join(os.tmpdir(), 'gemini-'),
-          );
+          const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-'));
+          Storage.sandboxRuntimeDir = dir;
+          process.on('exit', () => {
+            try {
+              if (fs.existsSync(dir)) {
+                fs.rmSync(dir, { recursive: true, force: true });
+              }
+            } catch {
+              // ignore
+            }
+          });
         } catch {
           return path.join(os.tmpdir(), GEMINI_DIR);
         }

@@ -488,7 +488,7 @@ export async function start_sandbox(
       { mode: 0o444 },
     );
 
-    // Mount sanitized settings as read-only (:ro) inside container
+    // Mount isolated sanitized settings directory inside container
     const userSettingsDirInSandbox = getContainerPath(
       `/home/node/${GEMINI_DIR}`,
     );
@@ -496,10 +496,7 @@ export async function start_sandbox(
     // Force HOME to /home/node inside the container so that the isolated settings are correctly resolved
     args.push('--env', 'HOME=/home/node');
 
-    args.push(
-      '--volume',
-      `${sanitizedSettingsFile}:${userSettingsDirInSandbox}/settings.json:ro`,
-    );
+    args.push('--volume', `${sandboxTmpDir}:${userSettingsDirInSandbox}:rw`);
 
     // mount gcloud config directory if it exists
     const gcloudConfigDir = path.join(homedir(), '.config', 'gcloud');
