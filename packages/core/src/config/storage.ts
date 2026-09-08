@@ -80,11 +80,20 @@ export class Storage {
   }
 
   private static sandboxRuntimeDir: string | null = null;
+  private static exitListener: (() => void) | null = null;
+
+  private static removeExitListener(): void {
+    if (Storage.exitListener) {
+      process.off('exit', Storage.exitListener);
+      Storage.exitListener = null;
+    }
+  }
 
   /**
    * Resets the cached sandbox runtime directory. Exposed for testing.
    */
   static resetSandboxRuntimeDirForTesting(): void {
+    Storage.removeExitListener();
     if (Storage.sandboxRuntimeDir) {
       try {
         if (fs.existsSync(Storage.sandboxRuntimeDir)) {
@@ -119,7 +128,8 @@ export class Storage {
         try {
           const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-'));
           Storage.sandboxRuntimeDir = dir;
-          process.on('exit', () => {
+          Storage.removeExitListener();
+          const cleanup = () => {
             try {
               if (fs.existsSync(dir)) {
                 fs.rmSync(dir, { recursive: true, force: true });
@@ -127,14 +137,16 @@ export class Storage {
             } catch {
               // ignore
             }
-          });
+          };
+          Storage.exitListener = cleanup;
+          process.on('exit', cleanup);
         } catch {
           return path.join(os.tmpdir(), GEMINI_DIR);
         }
       }
       return Storage.sandboxRuntimeDir;
     }
-    Storage.sandboxRuntimeDir = null;
+    Storage.resetSandboxRuntimeDirForTesting();
     return Storage.getGlobalGeminiDir();
   }
 

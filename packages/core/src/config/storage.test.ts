@@ -527,5 +527,17 @@ describe('Storage - System Paths', () => {
       );
       mkdtempSpy.mockRestore();
     });
+
+    it('removes process exit listener on resetSandboxRuntimeDirForTesting to prevent listener leaks', () => {
+      vi.stubEnv('SANDBOX', 'docker');
+      const initialListeners = process.listenerCount('exit');
+
+      for (let i = 0; i < 5; i++) {
+        Storage.getGlobalRuntimeDir();
+        Storage.resetSandboxRuntimeDirForTesting();
+      }
+
+      expect(process.listenerCount('exit')).toBe(initialListeners);
+    });
   });
 });
