@@ -492,12 +492,6 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         },
       ],
     },
-    'gemini-2.5-flash': {
-      default: 'gemini-2.5-flash',
-      contexts: [
-        { condition: { useGemini3_5Flash: true }, target: 'gemini-3.5-flash' },
-      ],
-    },
     'gemini-3-pro-preview': {
       default: 'gemini-3-pro-preview',
       contexts: [

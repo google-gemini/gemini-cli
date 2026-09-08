@@ -260,13 +260,14 @@ export function resolveModel(
 }
 
 function isFlashModel(model: string): boolean {
+  // No `endsWith('flash')` catch-all: that would also match explicitly
+  // pinned model IDs like 'gemini-2.5-flash' and silently upgrade them.
   return (
     model === DEFAULT_GEMINI_FLASH_MODEL ||
     model === PREVIEW_GEMINI_FLASH_MODEL ||
     model === DEFAULT_GEMINI_3_5_FLASH_MODEL ||
     model === SECONDARY_GEMINI_3_5_FLASH_MODEL ||
-    model === 'flash' ||
-    model.endsWith('flash')
+    model === 'flash'
   );
 }
 

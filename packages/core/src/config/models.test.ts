@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import {
   resolveModel,
   resolveClassifierModel,
@@ -19,6 +19,7 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_3_5_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  setFlashModels,
   supportsMultimodalFunctionResponse,
   GEMINI_MODEL_ALIAS_PRO,
   GEMINI_MODEL_ALIAS_FLASH,
@@ -787,7 +788,25 @@ describe('resolveModel Gemini 3.5 Flash GA', () => {
     ).toBe(PREVIEW_GEMINI_FLASH_MODEL);
   });
 
-  it('should resolve all but preview flash models to gemini-3.5-flash when useGemini3_5Flash is true (dynamic)', () => {
+  describe('explicit --model gemini-2.5-flash (issue #29213)', () => {
+    afterEach(() => {
+      // Restore the module-level defaults mutated by setFlashModels().
+      setFlashModels('gemini-3-flash-preview', 'gemini-2.5-flash');
+    });
+
+    it('should not rewrite an explicitly requested gemini-2.5-flash to gemini-3.5-flash once GA rollout has flipped the default flash pointer (legacy)', () => {
+      // Simulates hasGemini35FlashGAAccess() mutating the default/preview
+      // flash pointers once GA is available for the user's backend (e.g.
+      // Vertex AI), as happens before routing an explicit --model flag.
+      setFlashModels('gemini-3.5-flash', 'gemini-3.5-flash');
+
+      expect(
+        resolveModel('gemini-2.5-flash', false, false, true, undefined, true),
+      ).toBe('gemini-2.5-flash');
+    });
+  });
+
+  it('should resolve the flash alias to gemini-3.5-flash when useGemini3_5Flash is true, but leave explicitly requested concrete flash models untouched (dynamic)', () => {
     const mockDynamicConfig = {
       getExperimentalDynamicModelConfiguration: () => true,
       modelConfigService,
@@ -803,16 +822,19 @@ describe('resolveModel Gemini 3.5 Flash GA', () => {
         true,
       ),
     ).toBe('gemini-3.5-flash');
+    // An explicitly requested, pinned model ID must not be silently
+    // rewritten to a different model, even when the 3.5 flash GA alias
+    // upgrade is active. See https://github.com/google-gemini/gemini-cli/issues/29213
     expect(
       resolveModel(
-        DEFAULT_GEMINI_FLASH_MODEL,
+        'gemini-2.5-flash',
         false,
         false,
         true,
         mockDynamicConfig,
         true,
       ),
-    ).toBe('gemini-3.5-flash');
+    ).toBe('gemini-2.5-flash');
     expect(
       resolveModel(
         PREVIEW_GEMINI_FLASH_MODEL,
