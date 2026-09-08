@@ -45,7 +45,15 @@ export function tildeifyPath(filePath: string): string {
     return filePath;
   }
 
-  const homeDir = homedir();
+  let homeDir = homedir();
+  const homeRoot = pathModule.parse(homeDir).root;
+  while (
+    homeDir.length > homeRoot.length &&
+    (homeDir.endsWith('/') || homeDir.endsWith('\\'))
+  ) {
+    homeDir = homeDir.slice(0, -1);
+  }
+
   const relativePath = pathModule.relative(homeDir, filePath);
   const isWithinHome =
     relativePath === '' ||

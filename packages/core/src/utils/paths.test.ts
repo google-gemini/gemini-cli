@@ -64,6 +64,11 @@ describe('tildeifyPath', () => {
       expect(tildeifyPath('/Users/al/Documents/app')).toBe('~/Documents/app');
     });
 
+    it('should preserve a descendant trailing slash when home has one', () => {
+      vi.stubEnv('GEMINI_CLI_HOME', '/Users/al/');
+      expect(tildeifyPath('/Users/al/Documents/app/')).toBe('~/Documents/app/');
+    });
+
     it('should not replace a sibling directory with the same prefix', () => {
       expect(tildeifyPath('/Users/albert/Documents/app')).toBe(
         '/Users/albert/Documents/app',
@@ -89,6 +94,13 @@ describe('tildeifyPath', () => {
 
     it('should replace the home directory prefix with forward slashes', () => {
       expect(tildeifyPath('C:/Users/Al/Documents/app')).toBe('~/Documents/app');
+    });
+
+    it('should preserve forward slashes when home has a trailing slash', () => {
+      vi.stubEnv('GEMINI_CLI_HOME', 'C:\\Users\\Al\\');
+      expect(tildeifyPath('C:/Users/Al/Documents/app/')).toBe(
+        '~/Documents/app/',
+      );
     });
 
     it('should not replace a sibling directory with the same prefix', () => {
