@@ -79,36 +79,6 @@ export class Storage {
     return path.join(Storage.getGlobalGeminiDir(), 'settings.json');
   }
 
-  private static sandboxRuntimeDir: string | null = null;
-  private static exitListener: (() => void) | null = null;
-
-  private static removeExitListener(): void {
-    if (Storage.exitListener) {
-      process.off('exit', Storage.exitListener);
-      Storage.exitListener = null;
-    }
-  }
-
-  /**
-   * Resets the cached sandbox runtime directory. Exposed for testing.
-   */
-  static resetSandboxRuntimeDirForTesting(): void {
-    Storage.removeExitListener();
-    if (Storage.sandboxRuntimeDir) {
-      try {
-        if (fs.existsSync(Storage.sandboxRuntimeDir)) {
-          fs.rmSync(Storage.sandboxRuntimeDir, {
-            recursive: true,
-            force: true,
-          });
-        }
-      } catch {
-        // ignore
-      }
-      Storage.sandboxRuntimeDir = null;
-    }
-  }
-
   /**
    * Returns whether the CLI is currently running in sandbox mode.
    */
@@ -118,40 +88,11 @@ export class Storage {
 
   /**
    * Returns the directory for global runtime state (temp files, chat history, etc.).
-   * In sandbox mode, runtime operations are redirected to an ephemeral, isolated directory
-   * generated securely with unique temporary naming under os.tmpdir() to prevent symlink attacks
-   * and avoid accessing or mutating host user configuration.
    */
   static getGlobalRuntimeDir(): string {
-    if (Storage.isSandbox()) {
-      if (!Storage.sandboxRuntimeDir) {
-        try {
-          const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-'));
-          try {
-            fs.chmodSync(dir, 0o700);
-          } catch {
-            // ignore chmod errors on platforms without POSIX permissions
-          }
-          Storage.sandboxRuntimeDir = dir;
-          Storage.removeExitListener();
-          const cleanup = () => {
-            try {
-              if (fs.existsSync(dir)) {
-                fs.rmSync(dir, { recursive: true, force: true });
-              }
-            } catch {
-              // ignore
-            }
-          };
-          Storage.exitListener = cleanup;
-          process.on('exit', cleanup);
-        } catch {
-          return path.join(os.tmpdir(), GEMINI_DIR);
-        }
-      }
-      return Storage.sandboxRuntimeDir;
-    }
-    Storage.resetSandboxRuntimeDirForTesting();
+    // When running in a sandbox, the container launcher mounts an ephemeral
+    // directory at the global gemini directory location (/home/node/.gemini).
+    // For non-sandbox mode, runtime state and global config share the same path.
     return Storage.getGlobalGeminiDir();
   }
 

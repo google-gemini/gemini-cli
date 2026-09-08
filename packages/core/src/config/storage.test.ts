@@ -461,25 +461,21 @@ describe('Storage - System Paths', () => {
     }
   });
 
-  describe('Storage - Sandbox Isolation', () => {
+  describe('Storage - Runtime Directory Resolution', () => {
     afterEach(() => {
-      if (Storage.isSandbox()) {
-        try {
-          const dir = Storage.getGlobalRuntimeDir();
-          if (dir.includes('gemini-') && fs.existsSync(dir)) {
-            fs.rmSync(dir, { recursive: true, force: true });
-          }
-        } catch {
-          // ignore
-        }
-      }
-      Storage.resetSandboxRuntimeDirForTesting();
       vi.unstubAllEnvs();
     });
 
     it('identifies sandbox mode when SANDBOX environment variable is set', () => {
       vi.stubEnv('SANDBOX', '');
       expect(Storage.isSandbox()).toBe(false);
+
+      vi.stubEnv('SANDBOX', 'docker');
+      expect(Storage.isSandbox()).toBe(true);
+    });
+
+    it('consistently resolves getGlobalRuntimeDir to getGlobalGeminiDir in both normal and sandbox mode', () => {
+      vi.stubEnv('SANDBOX', '');
       expect(Storage.getGlobalRuntimeDir()).toBe(Storage.getGlobalGeminiDir());
       expect(Storage.getGoogleAccountsPath()).toBe(
         path.join(Storage.getGlobalGeminiDir(), 'google_accounts.json'),
@@ -495,49 +491,19 @@ describe('Storage - System Paths', () => {
       );
 
       vi.stubEnv('SANDBOX', 'docker');
-      expect(Storage.isSandbox()).toBe(true);
-      const runtimeDir = Storage.getGlobalRuntimeDir();
-      expect(runtimeDir).toContain('gemini-');
-      // Consecutive calls return the exact same cached directory
-      expect(Storage.getGlobalRuntimeDir()).toBe(runtimeDir);
-      expect(Storage.getGlobalTempDir()).toBe(path.join(runtimeDir, 'tmp'));
+      expect(Storage.getGlobalRuntimeDir()).toBe(Storage.getGlobalGeminiDir());
       expect(Storage.getGoogleAccountsPath()).toBe(
-        path.join(runtimeDir, 'google_accounts.json'),
+        path.join(Storage.getGlobalGeminiDir(), 'google_accounts.json'),
       );
       expect(Storage.getMcpOAuthTokensPath()).toBe(
-        path.join(runtimeDir, 'mcp-oauth-tokens.json'),
+        path.join(Storage.getGlobalGeminiDir(), 'mcp-oauth-tokens.json'),
       );
       expect(Storage.getA2AOAuthTokensPath()).toBe(
-        path.join(runtimeDir, 'a2a-oauth-tokens.json'),
+        path.join(Storage.getGlobalGeminiDir(), 'a2a-oauth-tokens.json'),
       );
       expect(Storage.getTrustedFoldersPath()).toBe(
-        path.join(runtimeDir, 'trustedFolders.json'),
+        path.join(Storage.getGlobalGeminiDir(), 'trustedFolders.json'),
       );
-    });
-
-    it('falls back gracefully to tmpdir/GEMINI_DIR if mkdtempSync throws', () => {
-      vi.stubEnv('SANDBOX', 'docker');
-      const mkdtempSpy = vi
-        .spyOn(fs, 'mkdtempSync')
-        .mockImplementationOnce(() => {
-          throw new Error('Permission denied');
-        });
-      expect(Storage.getGlobalRuntimeDir()).toBe(
-        path.join(os.tmpdir(), GEMINI_DIR),
-      );
-      mkdtempSpy.mockRestore();
-    });
-
-    it('removes process exit listener on resetSandboxRuntimeDirForTesting to prevent listener leaks', () => {
-      vi.stubEnv('SANDBOX', 'docker');
-      const initialListeners = process.listenerCount('exit');
-
-      for (let i = 0; i < 5; i++) {
-        Storage.getGlobalRuntimeDir();
-        Storage.resetSandboxRuntimeDirForTesting();
-      }
-
-      expect(process.listenerCount('exit')).toBe(initialListeners);
     });
   });
 });
