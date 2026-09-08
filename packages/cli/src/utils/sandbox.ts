@@ -79,6 +79,7 @@ export async function start_sandbox(
         // ignore
       }
     }
+
     if (tempProfileFile) {
       const fileToDelete = tempProfileFile;
       tempProfileFile = null;

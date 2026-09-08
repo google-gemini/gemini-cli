@@ -11,7 +11,13 @@ import {
   type SafetyCheckResult,
 } from './protocol.js';
 import type { AllowedPathConfig } from '../policy/types.js';
-import { resolveToRealPath } from '../utils/paths.js';
+import {
+  resolveToRealPath,
+  hasBlockedPathSegment,
+  trimTrailingSpacesAndDots,
+} from '../utils/paths.js';
+
+const VSCODE_SFN_REGEX = /^(vscode|vs[0-9a-f]{4})~\d+$/;
 
 /**
  * Interface for all in-process safety checkers.
@@ -69,19 +75,15 @@ export class AllowedPathChecker implements InProcessChecker {
       for (const resolvedDir of resolvedAllowedDirs) {
         if (!this.isPathAllowed(resolvedPath, resolvedDir)) continue;
         const relative = path.relative(resolvedDir, resolvedPath);
-        const segments = relative.split(path.sep);
+        if (hasBlockedPathSegment(relative)) {
+          hasBlockedSegment = true;
+        }
+        const segments = relative.split(/[/\\]/);
         for (const segment of segments) {
           const clean = trimTrailingSpacesAndDots(
             segment.split(':')[0],
           ).toLowerCase();
-          if (
-            clean === '.git' ||
-            clean === '.env' ||
-            clean === 'node_modules'
-          ) {
-            hasBlockedSegment = true;
-          }
-          if (clean === '.vscode') {
+          if (clean === '.vscode' || VSCODE_SFN_REGEX.test(clean)) {
             isVscodePath = true;
           }
         }
@@ -198,16 +200,4 @@ export class AllowedPathChecker implements InProcessChecker {
 
     return paths;
   }
-}
-
-/**
- * Trims trailing spaces and dots from a string without using regular expressions
- * to completely eliminate any potential ReDoS (Regular Expression Denial of Service) risk.
- */
-function trimTrailingSpacesAndDots(str: string): string {
-  let end = str.length - 1;
-  while (end >= 0 && (str[end] === ' ' || str[end] === '.')) {
-    end--;
-  }
-  return str.slice(0, end + 1);
 }
