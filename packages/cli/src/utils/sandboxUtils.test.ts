@@ -250,6 +250,10 @@ describe('sandboxUtils', () => {
   });
 
   describe('isSensitiveHostPath', () => {
+    beforeEach(() => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+    });
+
     it('should detect ~/.gemini directory path', () => {
       vi.mocked(os.homedir).mockReturnValue('/home/testuser');
       expect(isSensitiveHostPath('/home/testuser/.gemini')).toBe(true);
@@ -318,6 +322,18 @@ describe('sandboxUtils', () => {
       vi.mocked(resolveToRealPath).mockImplementation((p: string) =>
         path.resolve(p),
       );
+
+      expect(
+        isSensitiveHostPath('/home/testuser/.gemini/non-existent-sub'),
+      ).toBe(true);
+      expect(isSensitiveHostPath('/workspace/safe-path/non-existent-sub')).toBe(
+        false,
+      );
+    });
+
+    it('should fall back to path.resolve when path does not exist on disk', () => {
+      vi.mocked(os.homedir).mockReturnValue('/home/testuser');
+      vi.mocked(fs.existsSync).mockReturnValue(false);
 
       expect(
         isSensitiveHostPath('/home/testuser/.gemini/non-existent-sub'),

@@ -118,7 +118,9 @@ export function isSensitiveHostPath(hostPath: string): boolean {
         return true;
       }
 
-      const resolvedPath = resolveToRealPath(hostPath);
+      const resolvedPath = fs.existsSync(hostPath)
+        ? resolveToRealPath(hostPath)
+        : path.resolve(hostPath);
 
       const baseName = path.basename(resolvedPath).toLowerCase();
       if (
@@ -136,7 +138,9 @@ export function isSensitiveHostPath(hostPath: string): boolean {
       return false;
     }
 
-    const home = resolveToRealPath(rawHome);
+    const home = fs.existsSync(rawHome)
+      ? resolveToRealPath(rawHome)
+      : path.resolve(rawHome);
 
     let expandedPath = hostPath;
     if (hostPath === '~' || hostPath === '~/' || hostPath === '~\\') {
@@ -145,8 +149,14 @@ export function isSensitiveHostPath(hostPath: string): boolean {
       expandedPath = path.join(home, hostPath.slice(2));
     }
 
-    const normalized = resolveToRealPath(expandedPath);
-    const geminiDir = resolveToRealPath(path.join(home, GEMINI_DIR));
+    const normalized = fs.existsSync(expandedPath)
+      ? resolveToRealPath(expandedPath)
+      : path.resolve(expandedPath);
+
+    const geminiDirCandidate = path.join(home, GEMINI_DIR);
+    const geminiDirOnHost = fs.existsSync(geminiDirCandidate)
+      ? resolveToRealPath(geminiDirCandidate)
+      : path.resolve(geminiDirCandidate);
 
     const isWindows = os.platform() === 'win32';
     const arePathsEqual = (p1: string, p2: string) =>
@@ -163,8 +173,8 @@ export function isSensitiveHostPath(hostPath: string): boolean {
 
     // Block mounting ~/.gemini or anything inside ~/.gemini
     if (
-      arePathsEqual(normalized, geminiDir) ||
-      isSubpathOf(normalized, geminiDir)
+      arePathsEqual(normalized, geminiDirOnHost) ||
+      isSubpathOf(normalized, geminiDirOnHost)
     ) {
       return true;
     }

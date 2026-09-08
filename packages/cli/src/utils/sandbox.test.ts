@@ -19,12 +19,17 @@ import {
 import { createMockSandboxConfig } from '@google/gemini-cli-test-utils';
 import { EventEmitter } from 'node:events';
 
-const { mockedHomedir, mockedGetContainerPath, mockedExecCommands } =
-  vi.hoisted(() => ({
-    mockedHomedir: vi.fn().mockReturnValue('/home/user'),
-    mockedGetContainerPath: vi.fn().mockImplementation((p: string) => p),
-    mockedExecCommands: [] as string[],
-  }));
+const {
+  mockedHomedir,
+  mockedGetContainerPath,
+  mockedExecCommands,
+  mockedChmod,
+} = vi.hoisted(() => ({
+  mockedHomedir: vi.fn().mockReturnValue('/home/user'),
+  mockedGetContainerPath: vi.fn().mockImplementation((p: string) => p),
+  mockedExecCommands: [] as string[],
+  mockedChmod: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock('./sandboxUtils.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./sandboxUtils.js')>();
@@ -36,7 +41,33 @@ vi.mock('./sandboxUtils.js', async (importOriginal) => {
 
 vi.mock('node:child_process');
 vi.mock('node:os');
-vi.mock('node:fs');
+vi.mock('node:fs/promises', () => ({
+  default: { chmod: mockedChmod },
+  chmod: mockedChmod,
+}));
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  const mockedFns: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(actual)) {
+    if (typeof value === 'function') {
+      mockedFns[key] = vi.fn();
+    }
+  }
+  return {
+    ...actual,
+    ...mockedFns,
+    default: {
+      ...actual,
+      ...mockedFns,
+      promises: {
+        chmod: mockedChmod,
+      },
+    },
+    promises: {
+      chmod: mockedChmod,
+    },
+  };
+});
 vi.mock('node:crypto', () => ({
   randomBytes: vi.fn().mockReturnValue(Buffer.from('a1b2c3d4e5f6', 'hex')),
 }));
@@ -140,7 +171,8 @@ describe('sandbox', () => {
     vi.mocked(fs.mkdtempSync).mockImplementation(
       (prefix) => `${prefix}test-tmp`,
     );
-    vi.mocked(fs.chmodSync).mockImplementation(() => {});
+    mockedChmod.mockClear();
+    mockedChmod.mockResolvedValue(undefined);
     vi.mocked(fs.rmSync).mockImplementation(() => {});
     vi.mocked(execSync).mockReturnValue(Buffer.from(''));
   });
@@ -894,10 +926,47 @@ describe('sandbox', () => {
       );
 
       // Verify that ephemeral sandbox directory permissions are restricted to owner (0o700)
-      expect(fs.chmodSync).toHaveBeenCalledWith(
+      expect(mockedChmod).toHaveBeenCalledWith(
         expect.stringContaining('gemini-sandbox-'),
         0o700,
       );
+    });
+
+    it('should tolerate chmod errors on non-POSIX filesystems without crashing', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockedChmod.mockRejectedValueOnce(
+        new Error('EPERM: operation not permitted'),
+      );
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+      await expect(start_sandbox(config)).resolves.toBe(0);
     });
 
     it('should handle allowedPaths in Docker', async () => {
