@@ -115,10 +115,11 @@ export function extractUntrustedContext(history: readonly Content[]): UntrustedC
       for (const match of contentToSearch.matchAll(UNTRUSTED_CONTEXT_REGEX)) {
         const untrustedContent = match[1]?.trim();
         if (untrustedContent) {
-          untrustedTexts.push(untrustedContent);
+          const normalizedContent = untrustedContent.replace(/\\/g, '/');
+          untrustedTexts.push(normalizedContent);
 
           // Tokenize the untrusted text to index specific words/flags
-          const tokens = untrustedContent
+          const tokens = normalizedContent
             .split(/[\s,`"';()|&]+/)
             .map((t) => t.trim())
             .filter((t) => t.length > 1) // Ignore single-character words/punctuation
@@ -249,6 +250,9 @@ export function findUntrustedFlags(
       // (e.g., file paths, URLs, command strings) that is sourced from untrusted context.
       // We only flag it if the token is exactly present as a word/token in the untrusted index
       // OR if it is a substantial substring of any unsegmented untrusted text block.
+      if (token.length <= 1) {
+        continue;
+      }
       const isSensitiveWord =
         token.includes('/') ||
         token.includes('.') ||

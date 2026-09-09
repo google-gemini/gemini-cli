@@ -48,6 +48,17 @@ import {
 import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 import { isShellTool } from './ToolShared.js';
 
+const isLockFile = (filename: string): boolean => {
+  const lower = filename.toLowerCase();
+  return (
+    lower.endsWith('-lock.json') ||
+    lower.endsWith('.lock') ||
+    lower.endsWith('.lockb') ||
+    lower === 'pnpm-lock.yaml' ||
+    lower === 'go.sum'
+  );
+};
+
 export interface ToolConfirmationMessageProps {
   callId: string;
   confirmationDetails: SerializableConfirmationDetails;
@@ -695,9 +706,9 @@ export const ToolConfirmationMessage: React.FC<
                     confirmationDetails.fileDiff,
                   )}
                   filename={sanitizeForDisplay(confirmationDetails.fileName)}
-                  disableTruncation={confirmationDetails.isBuildFile}
+                  disableTruncation={confirmationDetails.isBuildFile && !isLockFile(confirmationDetails.fileName)}
                   availableTerminalHeight={
-                    confirmationDetails.isBuildFile
+                    confirmationDetails.isBuildFile && !isLockFile(confirmationDetails.fileName)
                       ? undefined
                       : bodyHeight !== undefined
                         ? Math.max(bodyHeight - 2, 2)
@@ -1050,7 +1061,8 @@ export const ToolConfirmationMessage: React.FC<
             <MaxSizedBox
               maxHeight={
                 confirmationDetails.type === 'edit' &&
-                confirmationDetails.isBuildFile
+                confirmationDetails.isBuildFile &&
+                !isLockFile(confirmationDetails.fileName)
                   ? undefined
                   : availableBodyContentHeight()
               }
