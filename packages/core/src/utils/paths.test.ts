@@ -21,15 +21,23 @@ import {
   toPathKey,
   isTrustedSystemPath,
   resolveDefensiveToolPath,
+  hasBlockedPathSegment,
   stripExtendedLengthPrefix,
 } from './paths.js';
 
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof fs>();
-  return {
+  const mockRealpath = (p: string) => p;
+  const mockedFs = {
     ...(actual as object),
-    realpathSync: (p: string) => p,
+    realpathSync: mockRealpath,
   };
+  Object.defineProperty(mockRealpath, 'native', {
+    value: (p: string) => mockedFs.realpathSync(p),
+    writable: true,
+    configurable: true,
+  });
+  return mockedFs;
 });
 
 const mockPlatform = (platform: string) => {
@@ -605,6 +613,41 @@ describe('resolveToRealPath', () => {
       /Infinite recursion detected/,
     );
   });
+
+  describe('on Windows realpathSync.native prefixes', () => {
+    beforeEach(() => {
+      mockPlatform('win32');
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('should strip long path prefix \\\\?\\', () => {
+      vi.spyOn(fs.realpathSync, 'native').mockReturnValueOnce(
+        '\\\\?\\C:\\foo\\bar',
+      );
+      expect(resolveToRealPath('C:\\foo\\bar')).toBe('C:\\foo\\bar');
+    });
+
+    it('should strip UNC long path prefix \\\\?\\UNC\\ and keep UNC slash structure', () => {
+      vi.spyOn(fs.realpathSync, 'native').mockReturnValueOnce(
+        '\\\\?\\UNC\\server\\share\\foo',
+      );
+      expect(resolveToRealPath('\\\\server\\share\\foo')).toBe(
+        '\\\\server\\share\\foo',
+      );
+    });
+
+    it('should strip lowercase UNC long path prefix \\\\?\\unc\\ case-insensitively', () => {
+      vi.spyOn(fs.realpathSync, 'native').mockReturnValueOnce(
+        '\\\\?\\unc\\server\\share\\foo',
+      );
+      expect(resolveToRealPath('\\\\server\\share\\foo')).toBe(
+        '\\\\server\\share\\foo',
+      );
+    });
+  });
 });
 
 describe('stripExtendedLengthPrefix', () => {
@@ -956,6 +999,30 @@ describe('normalizePath', () => {
       const filePathWithNull = '@/components/Button.tsx\0';
       const result = resolveDefensiveToolPath(filePathWithNull, targetDir);
       expect(result).toBe('components/Button.tsx');
+    });
+  });
+
+  describe('hasBlockedPathSegment', () => {
+    it('should identify standard blocked segments', () => {
+      expect(hasBlockedPathSegment('src/.git/config')).toBe(true);
+      expect(hasBlockedPathSegment('.env')).toBe(true);
+      expect(hasBlockedPathSegment('node_modules/lodash')).toBe(true);
+      expect(hasBlockedPathSegment('safe/path/here')).toBe(false);
+    });
+
+    it('should identify NTFS 8.3 short name (SFN) blocked segments', () => {
+      expect(hasBlockedPathSegment('git~1/config')).toBe(true);
+      expect(hasBlockedPathSegment('gi1a2b~1/config')).toBe(true);
+      expect(hasBlockedPathSegment('env~1')).toBe(true);
+      expect(hasBlockedPathSegment('node_m~1/lodash')).toBe(true);
+    });
+
+    it('should block standard and SFN patterns for gha-creds-*.json', () => {
+      expect(hasBlockedPathSegment('gha-creds-1234.json')).toBe(true);
+      expect(hasBlockedPathSegment('gha-cr~1.json')).toBe(true);
+      expect(hasBlockedPathSegment('gh1a2b~1.json')).toBe(true);
+      expect(hasBlockedPathSegment('gha-cr~1.jso')).toBe(true);
+      expect(hasBlockedPathSegment('gh1a2b~1.jso')).toBe(true);
     });
   });
 });

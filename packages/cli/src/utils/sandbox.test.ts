@@ -836,6 +836,61 @@ describe('sandbox', () => {
       );
     });
 
+    it('should mount an isolated settings directory rather than exposing host credentials', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+      await start_sandbox(config);
+
+      // Verify that docker run does NOT mount the raw host settings directory directly
+      expect(spawn).toHaveBeenNthCalledWith(
+        2,
+        'docker',
+        expect.not.arrayContaining(['/home/user/.gemini:/home/node/.gemini']),
+        expect.any(Object),
+      );
+
+      // Verify that docker run mounts the isolated settings directory
+      expect(spawn).toHaveBeenNthCalledWith(
+        2,
+        'docker',
+        expect.arrayContaining([
+          '--volume',
+          expect.stringMatching(
+            /gemini-sandbox-settings.*:[\\/]home[\\/]node[\\/]\.gemini/,
+          ),
+        ]),
+        expect.any(Object),
+      );
+    });
+
     it('should handle allowedPaths in Docker', async () => {
       const config: SandboxConfig = createMockSandboxConfig({
         command: 'docker',
