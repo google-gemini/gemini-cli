@@ -13,6 +13,11 @@ export interface UntrustedContextData {
   untrustedTokens: Set<string>;
 }
 
+interface LogResponse {
+  output?: unknown;
+  content?: unknown;
+}
+
 const UNTRUSTED_CONTEXT_REGEX =
   /<untrusted_context(?:\s+[^>]*)?>([\s\S]*?)<\/untrusted_context>/gi;
 
@@ -95,14 +100,13 @@ export function extractUntrustedContext(history: readonly Content[]): UntrustedC
         part.functionResponse.response &&
         typeof part.functionResponse.response === 'object'
       ) {
-        const responseObj = part.functionResponse.response as Record<
-          string,
-          unknown
-        >;
-        if (typeof responseObj['output'] === 'string') {
-          contentToSearch = responseObj['output'];
-        } else if (typeof responseObj['content'] === 'string') {
-          contentToSearch = responseObj['content'];
+        const responseObj = part.functionResponse.response as LogResponse;
+        const output = responseObj.output;
+        const content = responseObj.content;
+        if (typeof output === 'string') {
+          contentToSearch = output;
+        } else if (typeof content === 'string') {
+          contentToSearch = content;
         }
       }
 
