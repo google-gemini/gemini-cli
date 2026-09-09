@@ -353,6 +353,75 @@ describe('sandboxUtils', () => {
       );
     });
 
+    it('should detect broken symlinks pointing into ~/.gemini as sensitive', () => {
+      vi.mocked(os.homedir).mockReturnValue('/home/testuser');
+
+      vi.mocked(resolveToRealPath).mockImplementation((p: string) => {
+        if (p === '/workspace/broken_symlink') {
+          const err = new Error('ENOENT: no such file or directory');
+          (err as NodeJS.ErrnoException).code = 'ENOENT';
+          throw err;
+        }
+        return path.resolve(p);
+      });
+
+      vi.mocked(fs.lstatSync).mockImplementation((p: fs.PathLike) => {
+        if (p === '/workspace/broken_symlink') {
+          return {
+            isSymbolicLink: () => true,
+          } as fs.Stats;
+        }
+        const err = new Error('ENOENT: no such file or directory');
+        (err as NodeJS.ErrnoException).code = 'ENOENT';
+        throw err;
+      });
+
+      vi.mocked(fs.readlinkSync).mockImplementation((p: fs.PathLike) => {
+        if (p === '/workspace/broken_symlink') {
+          return '/home/testuser/.gemini/trusted_hooks.json';
+        }
+        throw new Error('EINVAL: not a symlink');
+      });
+
+      expect(isSensitiveHostPath('/workspace/broken_symlink')).toBe(true);
+    });
+
+    it('should fail closed and block mounts when circular symlinks are encountered', () => {
+      vi.mocked(os.homedir).mockReturnValue('/home/testuser');
+
+      vi.mocked(resolveToRealPath).mockImplementation((p: string) => {
+        if (p === '/workspace/circ1' || p === '/workspace/circ2') {
+          const err = new Error('ENOENT: no such file or directory');
+          (err as NodeJS.ErrnoException).code = 'ENOENT';
+          throw err;
+        }
+        return path.resolve(p);
+      });
+
+      vi.mocked(fs.lstatSync).mockImplementation((p: fs.PathLike) => {
+        if (p === '/workspace/circ1' || p === '/workspace/circ2') {
+          return {
+            isSymbolicLink: () => true,
+          } as fs.Stats;
+        }
+        const err = new Error('ENOENT: no such file or directory');
+        (err as NodeJS.ErrnoException).code = 'ENOENT';
+        throw err;
+      });
+
+      vi.mocked(fs.readlinkSync).mockImplementation((p: fs.PathLike) => {
+        if (p === '/workspace/circ1') {
+          return '/workspace/circ2';
+        }
+        if (p === '/workspace/circ2') {
+          return '/workspace/circ1';
+        }
+        throw new Error('EINVAL: not a symlink');
+      });
+
+      expect(isSensitiveHostPath('/workspace/circ1')).toBe(true);
+    });
+
     it('should handle empty or undetermined homedir without blocking working directory', () => {
       vi.mocked(homedir).mockReturnValue('');
       vi.mocked(os.homedir).mockReturnValue('');

@@ -102,20 +102,23 @@ export class Storage {
       } else {
         runtimeDir = Storage.getGlobalGeminiDir();
       }
-    } else {
-      runtimeDir = Storage.getGlobalGeminiDir();
-    }
 
-    // Ensure the runtime directory exists recursively to prevent ENOENT failures on initial write
-    try {
-      if (!fs.existsSync(runtimeDir)) {
-        fs.mkdirSync(runtimeDir, { recursive: true });
+      // Ensure the runtime directory exists recursively to prevent ENOENT failures on initial write
+      try {
+        if (!fs.existsSync(runtimeDir)) {
+          fs.mkdirSync(runtimeDir, { recursive: true });
+        }
+      } catch {
+        // Silently ignore directory creation failures (e.g., read-only filesystems or permission denials)
       }
-    } catch {
-      // Silently ignore directory creation failures (e.g., read-only filesystems or permission denials)
+
+      return runtimeDir;
     }
 
-    return runtimeDir;
+    // When running in a sandbox, the container launcher mounts an ephemeral
+    // directory at the global gemini directory location (/home/node/.gemini).
+    // For non-sandbox mode, runtime state and global config share the same path.
+    return Storage.getGlobalGeminiDir();
   }
 
   static getInstallationIdPath(): string {

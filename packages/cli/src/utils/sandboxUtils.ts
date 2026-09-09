@@ -100,22 +100,39 @@ export function isCredentialOrSensitivePath(
  * Rethrows unrecoverable errors so callers can fail closed.
  */
 function safeResolveToRealPath(targetPath: string): string {
-  try {
-    return path.resolve(resolveToRealPath(targetPath));
-  } catch (err: unknown) {
-    if (isRecord(err)) {
-      const code = err['code'];
-      const message = err['message'];
-      if (
-        code === 'ENOENT' ||
-        (typeof message === 'string' &&
-          (message.includes('ENOENT') || message.includes('not found')))
-      ) {
-        return path.resolve(targetPath);
-      }
+  let current = path.resolve(targetPath);
+  const parts: string[] = [];
+  const visited = new Set<string>();
+
+  while (current && current !== path.dirname(current)) {
+    if (visited.has(current)) {
+      throw new Error('Circular symlink detected');
     }
-    throw err;
+    visited.add(current);
+
+    try {
+      const real = resolveToRealPath(current);
+      return path.resolve(real, ...parts.slice().reverse());
+    } catch (err: unknown) {
+      if (isRecord(err) && err['code'] === 'ENOENT') {
+        try {
+          const stat = fs.lstatSync(current);
+          if (stat.isSymbolicLink()) {
+            const target = fs.readlinkSync(current);
+            current = path.resolve(path.dirname(current), target);
+            continue;
+          }
+        } catch {
+          // lstat failed, meaning the file or symlink itself does not exist on disk
+        }
+        parts.push(path.basename(current));
+        current = path.dirname(current);
+        continue;
+      }
+      throw err;
+    }
   }
+  return path.resolve(targetPath);
 }
 
 /**
