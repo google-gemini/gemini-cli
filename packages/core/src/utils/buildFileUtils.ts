@@ -81,7 +81,9 @@ export function isBuildFile(filePath: string): boolean {
     return false;
   }
 
-  const basename = path.basename(filePath);
+  // Normalize backslashes to forward slashes to support cross-platform path parsing (e.g. Windows paths on POSIX)
+  const normalizedPath = filePath.replace(/\\/g, '/');
+  const basename = path.basename(normalizedPath);
 
   if (EXACT_BUILD_FILENAMES.has(basename)) {
     return true;

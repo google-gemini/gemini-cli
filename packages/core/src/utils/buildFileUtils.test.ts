@@ -75,5 +75,11 @@ describe('buildFileUtils', () => {
       expect(isBuildFile('config.json')).toBe(false);
       expect(isBuildFile('settings.toml')).toBe(false);
     });
+
+    it('should correctly identify build files using Windows backslashes on POSIX environments', () => {
+      expect(isBuildFile('foo\\bar\\BUILD')).toBe(true);
+      expect(isBuildFile('path\\to\\package.json')).toBe(true);
+    });
   });
 });
+

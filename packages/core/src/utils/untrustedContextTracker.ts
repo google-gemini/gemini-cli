@@ -302,8 +302,16 @@ export function isBuildOrTestCommand(command: string): boolean {
     // Ignore and fallback
   }
   // Fallback if parsing fails or returns empty roots (e.g. parser not initialized yet in fast unit tests)
-  const trimmed = command.trim();
-  const root = trimmed.split(/\s+/)[0];
+  const parts = command.trim().split(/\s+/);
+  let rootIndex = 0;
+  while (
+    rootIndex < parts.length &&
+    (parts[rootIndex].includes('=') ||
+      ['sudo', 'env', 'time'].includes(parts[rootIndex].toLowerCase()))
+  ) {
+    rootIndex++;
+  }
+  const root = parts[rootIndex];
   return root ? BUILD_TEST_COMMAND_ROOTS.has(root.toLowerCase()) : false;
 }
 
