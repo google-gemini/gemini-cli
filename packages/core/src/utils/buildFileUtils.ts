@@ -85,7 +85,12 @@ export function isBuildFile(filePath: string): boolean {
   // Normalize backslashes to forward slashes first to support cross-platform path parsing (e.g. Windows paths on POSIX)
   const normalizedPath = filePath.replace(/\\/g, '/');
   // Consistent path resolution using a single, robust helper to handle traversals (. or ..) and absolute/relative conversions
-  const resolvedPath = resolveToRealPath(normalizedPath);
+  let resolvedPath = normalizedPath;
+  try {
+    resolvedPath = resolveToRealPath(normalizedPath);
+  } catch {
+    resolvedPath = path.resolve(normalizedPath);
+  }
   const basename = path.basename(resolvedPath);
 
   if (EXACT_BUILD_FILENAMES.has(basename)) {
