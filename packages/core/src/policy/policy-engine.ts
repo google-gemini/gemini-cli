@@ -809,7 +809,13 @@ export class PolicyEngine {
           /write|edit|replace|patch|update|create|append|save/i.test(name),
       );
       if (isFileEditTool) {
-        const targetPath = extractFilePathFromArgs(toolCall.args);
+        let targetPath = extractFilePathFromArgs(toolCall.args);
+        if (targetPath) {
+          targetPath = targetPath.trim();
+          if (process.platform === 'win32') {
+            targetPath = targetPath.replace(/[. ]+$/, '');
+          }
+        }
         if (targetPath && isBuildFile(targetPath)) {
           debugLogger.debug(
             `[PolicyEngine.check] Target path '${targetPath}' is a build file. Downgrading to ASK_USER.`,

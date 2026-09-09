@@ -255,7 +255,7 @@ describe('ShellTool', () => {
     } else {
       process.env['ComSpec'] = originalComSpec;
     }
-    resetModifiedBuildFiles();
+    resetModifiedBuildFiles(mockConfig);
   });
 
   describe('build', () => {
@@ -1081,7 +1081,7 @@ EOF`;
       ) as unknown as TestableMockMessageBus;
       mockBus.defaultToolDecision = 'allow';
 
-      recordModifiedBuildFile('/workspace/foo/BUILD');
+      recordModifiedBuildFile('/workspace/foo/BUILD', mockConfig);
 
       const params = { command: 'blaze test //foo:all' };
       const invocation = shellTool.build(params);

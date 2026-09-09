@@ -182,7 +182,8 @@ export function findUntrustedFlags(
   // Parse the command safely using shell-quote to handle quotes and escapes correctly
   let parsed: ReturnType<typeof shellParse>;
   try {
-    parsed = shellParse(command);
+    const normalizedCommand = process.platform === 'win32' ? command.replace(/\\/g, '/') : command;
+    parsed = shellParse(normalizedCommand);
   } catch {
     // Fallback to whitespace split if parsing fails
     parsed = command.trim().split(/\s+/);
@@ -297,13 +298,12 @@ export function isBuildOrTestCommand(command: string): boolean {
   return root ? BUILD_TEST_COMMAND_ROOTS.has(root.toLowerCase()) : false;
 }
 
-const globalSessionKey = {};
 const sessionModifiedBuildFiles = new WeakMap<object, Set<string>>();
 
 /**
  * Records that a build configuration file was modified in this session.
  */
-export function recordModifiedBuildFile(filePath: string, sessionKey: object = globalSessionKey): void {
+export function recordModifiedBuildFile(filePath: string, sessionKey: object): void {
   let files = sessionModifiedBuildFiles.get(sessionKey);
   if (!files) {
     files = new Set<string>();
@@ -315,32 +315,14 @@ export function recordModifiedBuildFile(filePath: string, sessionKey: object = g
 /**
  * Returns all build configuration files that were modified in this session.
  */
-export function getModifiedBuildFiles(sessionKey: object = globalSessionKey): string[] {
-  const merged = new Set<string>();
-  
-  // Scoped files
+export function getModifiedBuildFiles(sessionKey: object): string[] {
   const files = sessionModifiedBuildFiles.get(sessionKey);
-  if (files) {
-    for (const f of files) merged.add(f);
-  }
-
-  // Fallback/Legacy global files (keeps tests that directly write to the global store green)
-  if (sessionKey !== globalSessionKey) {
-    const globalFiles = sessionModifiedBuildFiles.get(globalSessionKey);
-    if (globalFiles) {
-      for (const f of globalFiles) merged.add(f);
-    }
-  }
-
-  return Array.from(merged);
+  return files ? Array.from(files) : [];
 }
 
 /**
  * Resets the tracked modified build files (primarily for testing or session reset).
  */
-export function resetModifiedBuildFiles(sessionKey: object = globalSessionKey): void {
+export function resetModifiedBuildFiles(sessionKey: object): void {
   sessionModifiedBuildFiles.delete(sessionKey);
-  if (sessionKey !== globalSessionKey) {
-    sessionModifiedBuildFiles.delete(globalSessionKey);
-  }
 }
