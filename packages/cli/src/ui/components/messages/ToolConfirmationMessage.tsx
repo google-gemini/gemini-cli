@@ -47,17 +47,7 @@ import {
 } from '../../utils/urlSecurityUtils.js';
 import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 import { isShellTool } from './ToolShared.js';
-
-const isLockFile = (filename: string): boolean => {
-  const lower = filename.toLowerCase();
-  return (
-    lower.endsWith('-lock.json') ||
-    lower.endsWith('.lock') ||
-    lower.endsWith('.lockb') ||
-    lower === 'pnpm-lock.yaml' ||
-    lower === 'go.sum'
-  );
-};
+import { isLockFile } from '../../utils/fileUtils.js';
 
 export interface ToolConfirmationMessageProps {
   callId: string;
