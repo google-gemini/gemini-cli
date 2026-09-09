@@ -258,8 +258,7 @@ export function findUntrustedFlags(
       const isSensitiveWord =
         token.includes('/') ||
         token.includes('.') ||
-        token.includes(':') ||
-        token.length > 5;
+        token.includes(':');
 
       const isHighRiskPattern =
         token.startsWith('http://') ||

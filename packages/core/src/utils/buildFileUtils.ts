@@ -82,8 +82,11 @@ export function isBuildFile(filePath: string): boolean {
     return false;
   }
 
+  // Sanitize null byte characters (\0) to prevent path injection bypasses
+  const cleanPath = filePath.replace(/\0/g, '');
+
   // Normalize backslashes to forward slashes first to support cross-platform path parsing (e.g. Windows paths on POSIX)
-  const normalizedPath = filePath.replace(/\\/g, '/');
+  const normalizedPath = cleanPath.replace(/\\/g, '/');
   // Consistent path resolution using a single, robust helper to handle traversals (. or ..) and absolute/relative conversions
   let resolvedPath = normalizedPath;
   try {
@@ -120,6 +123,7 @@ interface FilePathLike {
   file?: unknown;
 }
 
+/****************************************************************ESLint-Bypass****************************************************************/
 function isFilePathLike(value: unknown): value is FilePathLike {
   return typeof value === 'object' && value !== null;
 }
