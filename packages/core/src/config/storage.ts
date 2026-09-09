@@ -90,6 +90,7 @@ export class Storage {
    * Returns the directory for global runtime state (temp files, chat history, etc.).
    */
   static getGlobalRuntimeDir(): string {
+    let runtimeDir: string;
     // Under macOS Seatbelt (sandbox-exec), writing to the user's home .gemini
     // directory is blocked by the seatbelt profile. Route runtime state to a
     // dedicated subdirectory within the permitted persistent cache directory
@@ -97,13 +98,24 @@ export class Storage {
     if (process.env['SANDBOX'] === 'sandbox-exec') {
       const homeDir = homedir();
       if (homeDir) {
-        return path.join(homeDir, '.cache', GEMINI_DIR);
+        runtimeDir = path.join(homeDir, '.cache', GEMINI_DIR);
+      } else {
+        runtimeDir = Storage.getGlobalGeminiDir();
       }
+    } else {
+      runtimeDir = Storage.getGlobalGeminiDir();
     }
-    // When running in a sandbox, the container launcher mounts an ephemeral
-    // directory at the global gemini directory location (/home/node/.gemini).
-    // For non-sandbox mode, runtime state and global config share the same path.
-    return Storage.getGlobalGeminiDir();
+
+    // Ensure the runtime directory exists recursively to prevent ENOENT failures on initial write
+    try {
+      if (!fs.existsSync(runtimeDir)) {
+        fs.mkdirSync(runtimeDir, { recursive: true });
+      }
+    } catch {
+      // Silently ignore directory creation failures (e.g., read-only filesystems or permission denials)
+    }
+
+    return runtimeDir;
   }
 
   static getInstallationIdPath(): string {

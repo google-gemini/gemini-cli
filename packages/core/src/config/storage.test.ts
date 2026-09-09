@@ -533,5 +533,34 @@ describe('Storage - System Paths', () => {
 
       vi.mocked(homedir).mockReturnValue(os.homedir());
     });
+
+    it('creates runtime directory recursively if it does not exist', () => {
+      vi.stubEnv('SANDBOX', 'sandbox-exec');
+      const expectedDir = path.join(os.homedir(), '.cache', GEMINI_DIR);
+      vi.mocked(fs.mkdirSync).mockClear();
+
+      const existsSpy = vi.spyOn(fs, 'existsSync').mockReturnValueOnce(false);
+
+      const result = Storage.getGlobalRuntimeDir();
+
+      expect(result).toBe(expectedDir);
+      expect(fs.mkdirSync).toHaveBeenCalledWith(expectedDir, {
+        recursive: true,
+      });
+      existsSpy.mockRestore();
+    });
+
+    it('silently ignores directory creation errors in getGlobalRuntimeDir', () => {
+      vi.stubEnv('SANDBOX', 'sandbox-exec');
+      const expectedDir = path.join(os.homedir(), '.cache', GEMINI_DIR);
+      const existsSpy = vi.spyOn(fs, 'existsSync').mockReturnValueOnce(false);
+      vi.mocked(fs.mkdirSync).mockImplementationOnce(() => {
+        throw new Error('EACCES: permission denied');
+      });
+
+      expect(() => Storage.getGlobalRuntimeDir()).not.toThrow();
+      expect(Storage.getGlobalRuntimeDir()).toBe(expectedDir);
+      existsSpy.mockRestore();
+    });
   });
 });
