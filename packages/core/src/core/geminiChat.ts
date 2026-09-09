@@ -227,8 +227,28 @@ function extractCuratedHistory(
       const modelOutput: HistoryTurn[] = [];
       let isValid = true;
       while (i < length && comprehensiveHistory[i].content.role === 'model') {
-        modelOutput.push(comprehensiveHistory[i]);
-        if (isValid && !isValidContent(comprehensiveHistory[i].content)) {
+        let turn = comprehensiveHistory[i];
+        if (
+          turn.content.parts?.some(
+            (part) => part.text === INTERRUPTED_RESPONSE_PLACEHOLDER,
+          )
+        ) {
+          const newParts = turn.content.parts.map((part) => {
+            if (part.text === INTERRUPTED_RESPONSE_PLACEHOLDER) {
+              return { ...part, text: 'Continuing.' };
+            }
+            return part;
+          });
+          turn = {
+            ...turn,
+            content: {
+              ...turn.content,
+              parts: newParts,
+            },
+          };
+        }
+        modelOutput.push(turn);
+        if (isValid && !isValidContent(turn.content)) {
           isValid = false;
         }
         i++;
