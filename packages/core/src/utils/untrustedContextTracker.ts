@@ -255,16 +255,25 @@ export function findUntrustedFlags(
         token.includes(':') ||
         token.length > 5;
 
+      const isHighRiskPattern =
+        token.startsWith('http://') ||
+        token.startsWith('https://') ||
+        token.startsWith('/') ||
+        token.startsWith('\\') ||
+        /^[a-zA-Z]:[\\/]/.test(token);
+
       if (isSensitiveWord) {
         if (untrustedContext.untrustedTokens.has(token)) {
           detected.add(token);
           continue;
         }
 
-        for (const text of untrustedContext.untrustedTexts) {
-          if (text.includes(token)) {
-            detected.add(token);
-            break;
+        if (isHighRiskPattern) {
+          for (const text of untrustedContext.untrustedTexts) {
+            if (text.includes(token)) {
+              detected.add(token);
+              break;
+            }
           }
         }
       }
@@ -298,31 +307,47 @@ export function isBuildOrTestCommand(command: string): boolean {
   return root ? BUILD_TEST_COMMAND_ROOTS.has(root.toLowerCase()) : false;
 }
 
-const sessionModifiedBuildFiles = new WeakMap<object, Set<string>>();
+const MODIFIED_BUILD_FILES_SYMBOL = Symbol('sessionModifiedBuildFiles');
+
+interface SessionRecord {
+  [MODIFIED_BUILD_FILES_SYMBOL]?: Set<string>;
+}
+
+function hasSessionRecord(sessionKey: object): sessionKey is SessionRecord {
+  return typeof sessionKey === 'object' && sessionKey !== null;
+}
 
 /**
  * Records that a build configuration file was modified in this session.
  */
 export function recordModifiedBuildFile(filePath: string, sessionKey: object): void {
-  let files = sessionModifiedBuildFiles.get(sessionKey);
-  if (!files) {
-    files = new Set<string>();
-    sessionModifiedBuildFiles.set(sessionKey, files);
+  if (hasSessionRecord(sessionKey)) {
+    let files = sessionKey[MODIFIED_BUILD_FILES_SYMBOL];
+    if (!files) {
+      files = new Set<string>();
+      sessionKey[MODIFIED_BUILD_FILES_SYMBOL] = files;
+    }
+    files.add(filePath);
   }
-  files.add(filePath);
 }
 
 /**
  * Returns all build configuration files that were modified in this session.
  */
 export function getModifiedBuildFiles(sessionKey: object): string[] {
-  const files = sessionModifiedBuildFiles.get(sessionKey);
-  return files ? Array.from(files) : [];
+  if (hasSessionRecord(sessionKey)) {
+    const files = sessionKey[MODIFIED_BUILD_FILES_SYMBOL];
+    return files ? Array.from(files) : [];
+  }
+  return [];
 }
 
 /**
  * Resets the tracked modified build files (primarily for testing or session reset).
  */
 export function resetModifiedBuildFiles(sessionKey: object): void {
-  sessionModifiedBuildFiles.delete(sessionKey);
+  if (hasSessionRecord(sessionKey)) {
+    delete sessionKey[MODIFIED_BUILD_FILES_SYMBOL];
+  }
 }
+
