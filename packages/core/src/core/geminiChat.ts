@@ -230,11 +230,11 @@ function extractCuratedHistory(
         let turn = comprehensiveHistory[i];
         if (
           turn.content.parts?.some(
-            (part) => part.text === INTERRUPTED_RESPONSE_PLACEHOLDER,
+            (part) => part?.text === INTERRUPTED_RESPONSE_PLACEHOLDER,
           )
         ) {
           const newParts = turn.content.parts.map((part) => {
-            if (part.text === INTERRUPTED_RESPONSE_PLACEHOLDER) {
+            if (part?.text === INTERRUPTED_RESPONSE_PLACEHOLDER) {
               return { ...part, text: 'Continuing.' };
             }
             return part;
