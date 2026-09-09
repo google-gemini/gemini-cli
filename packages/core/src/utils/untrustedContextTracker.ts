@@ -112,10 +112,7 @@ export function extractUntrustedContext(history: readonly Content[]): UntrustedC
 
       if (!contentToSearch) continue;
 
-      let match;
-      // Reset regex index
-      UNTRUSTED_CONTEXT_REGEX.lastIndex = 0;
-      while ((match = UNTRUSTED_CONTEXT_REGEX.exec(contentToSearch)) !== null) {
+      for (const match of contentToSearch.matchAll(UNTRUSTED_CONTEXT_REGEX)) {
         const untrustedContent = match[1]?.trim();
         if (untrustedContent) {
           untrustedTexts.push(untrustedContent);
@@ -192,10 +189,19 @@ export function findUntrustedFlags(
   }
 
   const rawTokens = parsed
-    .map((x) => {
-      if (typeof x === 'string') return x;
-      if (x && typeof x === 'object' && 'pattern' in x) return x.pattern;
-      return '';
+    .flatMap((x) => {
+      if (typeof x === 'string') return [x];
+      if (x && typeof x === 'object') {
+        const tokens: string[] = [];
+        if ('pattern' in x && typeof x.pattern === 'string') {
+          tokens.push(x.pattern);
+        }
+        if ('file' in x && typeof x.file === 'string') {
+          tokens.push(x.file);
+        }
+        return tokens;
+      }
+      return [];
     })
     .filter(Boolean);
 
