@@ -92,9 +92,13 @@ export class Storage {
   static getGlobalRuntimeDir(): string {
     // Under macOS Seatbelt (sandbox-exec), writing to the user's home .gemini
     // directory is blocked by the seatbelt profile. Route runtime state to a
-    // dedicated subdirectory within the permitted TMPDIR.
-    if (process.env['SANDBOX'] === 'sandbox-exec' && process.env['TMPDIR']) {
-      return path.join(process.env['TMPDIR'], GEMINI_DIR);
+    // dedicated subdirectory within the permitted persistent cache directory
+    // to ensure history and session state persist across CLI invocations.
+    if (process.env['SANDBOX'] === 'sandbox-exec') {
+      const homeDir = homedir();
+      if (homeDir) {
+        return path.join(homeDir, '.cache', GEMINI_DIR);
+      }
     }
     // When running in a sandbox, the container launcher mounts an ephemeral
     // directory at the global gemini directory location (/home/node/.gemini).

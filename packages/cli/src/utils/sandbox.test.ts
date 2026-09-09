@@ -663,6 +663,11 @@ describe('sandbox', () => {
       expect(fs.existsSync).toHaveBeenCalledWith(
         path.join('/mock/tmp', GEMINI_DIR, 'settings.json'),
       );
+      expect(fs.writeFileSync).toHaveBeenCalledWith(
+        expect.stringMatching(/settings\.json$/),
+        expect.any(String),
+        { mode: 0o600 },
+      );
     });
 
     it('should preserve the integration-test prefix for random container names', async () => {

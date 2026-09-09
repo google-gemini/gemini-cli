@@ -506,32 +506,32 @@ describe('Storage - System Paths', () => {
       );
     });
 
-    it('routes getGlobalRuntimeDir to TMPDIR/.gemini under macOS Seatbelt (sandbox-exec)', () => {
+    it('routes getGlobalRuntimeDir to ~/.cache/.gemini under macOS Seatbelt (sandbox-exec)', () => {
       vi.stubEnv('SANDBOX', 'sandbox-exec');
-      vi.stubEnv('TMPDIR', '/tmp/test-seatbelt');
 
-      expect(Storage.getGlobalRuntimeDir()).toBe(
-        path.join('/tmp/test-seatbelt', GEMINI_DIR),
-      );
+      const expectedDir = path.join(os.homedir(), '.cache', GEMINI_DIR);
+      expect(Storage.getGlobalRuntimeDir()).toBe(expectedDir);
       expect(Storage.getGoogleAccountsPath()).toBe(
-        path.join('/tmp/test-seatbelt', GEMINI_DIR, 'google_accounts.json'),
+        path.join(expectedDir, 'google_accounts.json'),
       );
       expect(Storage.getMcpOAuthTokensPath()).toBe(
-        path.join('/tmp/test-seatbelt', GEMINI_DIR, 'mcp-oauth-tokens.json'),
+        path.join(expectedDir, 'mcp-oauth-tokens.json'),
       );
       expect(Storage.getA2AOAuthTokensPath()).toBe(
-        path.join('/tmp/test-seatbelt', GEMINI_DIR, 'a2a-oauth-tokens.json'),
+        path.join(expectedDir, 'a2a-oauth-tokens.json'),
       );
       expect(Storage.getTrustedFoldersPath()).toBe(
-        path.join('/tmp/test-seatbelt', GEMINI_DIR, 'trustedFolders.json'),
+        path.join(expectedDir, 'trustedFolders.json'),
       );
     });
 
-    it('falls back to getGlobalGeminiDir under sandbox-exec if TMPDIR is not set', () => {
+    it('falls back to getGlobalGeminiDir under sandbox-exec if homedir is empty', () => {
       vi.stubEnv('SANDBOX', 'sandbox-exec');
-      vi.stubEnv('TMPDIR', '');
+      vi.mocked(homedir).mockReturnValue('');
 
       expect(Storage.getGlobalRuntimeDir()).toBe(Storage.getGlobalGeminiDir());
+
+      vi.mocked(homedir).mockReturnValue(os.homedir());
     });
   });
 });
