@@ -11,6 +11,8 @@
     (subpath (param "CACHE_DIR"))
     ;; Only allow reading essential dotfiles/directories under HOME, not the entire HOME
     (subpath (string-append (param "HOME_DIR") "/.gemini"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/settings.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/keybindings.json"))
     (subpath (string-append (param "HOME_DIR") "/.npm"))
     (subpath (string-append (param "HOME_DIR") "/.cache"))
     (literal (string-append (param "HOME_DIR") "/.gitconfig"))

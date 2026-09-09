@@ -162,6 +162,28 @@ describe('macOS Seatbelt Gemini configuration isolation', () => {
   });
 });
 
+const RESTRICTIVE_AND_STRICT_PROFILES = [
+  'sandbox-macos-restrictive-open.sb',
+  'sandbox-macos-restrictive-proxied.sb',
+  'sandbox-macos-strict-open.sb',
+  'sandbox-macos-strict-proxied.sb',
+];
+
+describe('macOS Seatbelt non-sensitive configuration read access', () => {
+  describe.each(RESTRICTIVE_AND_STRICT_PROFILES)('%s', (profile) => {
+    const rules = readRules(profile);
+
+    it('allows reading settings.json and keybindings.json configuration files', () => {
+      expect(rules).toContain(
+        '(literal (string-append (param "HOME_DIR") "/.gemini/settings.json"))',
+      );
+      expect(rules).toContain(
+        '(literal (string-append (param "HOME_DIR") "/.gemini/keybindings.json"))',
+      );
+    });
+  });
+});
+
 describe('BUILTIN_SEATBELT_PROFILE_CONTENTS consistency', () => {
   const profileKeyMap: Record<string, string> = {
     'sandbox-macos-permissive-open.sb': 'permissive-open',
@@ -200,6 +222,26 @@ describe('BUILTIN_SEATBELT_PROFILE_CONTENTS consistency', () => {
         expect(embeddedContent).toContain(
           '(literal (string-append (param "HOME_DIR") "/.gemini/trusted_hooks.json"))',
         );
+      });
+
+      it('contains settings and keybindings read rules in embedded content for restrictive and strict profiles', () => {
+        if (
+          [
+            'restrictive-open',
+            'restrictive-proxied',
+            'strict-open',
+            'strict-proxied',
+          ].includes(key)
+        ) {
+          const embeddedContent = BUILTIN_SEATBELT_PROFILE_CONTENTS[key];
+          expect(embeddedContent).toBeDefined();
+          expect(embeddedContent).toContain(
+            '(literal (string-append (param "HOME_DIR") "/.gemini/settings.json"))',
+          );
+          expect(embeddedContent).toContain(
+            '(literal (string-append (param "HOME_DIR") "/.gemini/keybindings.json"))',
+          );
+        }
       });
     },
   );
