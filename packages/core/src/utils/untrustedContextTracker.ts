@@ -182,7 +182,7 @@ export function findUntrustedFlags(
   // Parse the command safely using shell-quote to handle quotes and escapes correctly
   let parsed: ReturnType<typeof shellParse>;
   try {
-    const normalizedCommand = process.platform === 'win32' ? command.replace(/\\/g, '/') : command;
+    const normalizedCommand = process.platform === 'win32' ? command.replace(/\\(?!")/g, '/') : command;
     parsed = shellParse(normalizedCommand);
   } catch {
     // Fallback to whitespace split if parsing fails

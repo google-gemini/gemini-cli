@@ -749,6 +749,7 @@ export class PolicyEngine {
             heuristicDecision = await this.applyShellHeuristics(
               command,
               heuristicDecision,
+              shellDirPath,
             );
           }
 

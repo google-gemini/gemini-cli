@@ -1546,6 +1546,24 @@ describe('PolicyEngine', () => {
       expect(result.decision).toBe(PolicyDecision.ALLOW);
     });
 
+    it('should force ASK_USER in default decision path when dir_path escapes workspace boundary', async () => {
+      engine = new PolicyEngine({
+        rules: [],
+        defaultDecision: PolicyDecision.ALLOW,
+        sandboxManager: new NoopSandboxManager({ workspace: '/safe/path' }),
+      });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'pwd', dir_path: '/outside/path' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+    });
+
     it('should upgrade ASK_USER to ALLOW if all sub-commands are allowed', async () => {
       const rules: PolicyRule[] = [
         {
