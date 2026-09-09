@@ -1,0 +1,17 @@
+# Git history - not needed in build context
+.git
+
+# Root node_modules - reinstalled inside container via npm ci
+node_modules
+
+# Package-level node_modules - reinstalled inside container
+packages/*/node_modules
+
+# Development and IDE files
+.github
+.vscode
+npm-debug.log*
+
+# Misc
+.DS_Store
+*.tmp
