@@ -469,7 +469,7 @@ export async function start_sandbox(
     const userHomeDirOnHost = homedir();
     const userSettingsDirOnHost = userHomeDirOnHost
       ? path.join(userHomeDirOnHost, GEMINI_DIR)
-      : path.join(os.tmpdir(), GEMINI_DIR);
+      : fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-'));
     const userSettingsFileOnHost = path.join(
       userSettingsDirOnHost,
       'settings.json',
@@ -487,6 +487,14 @@ export async function start_sandbox(
         debugLogger.warn(
           `Failed to parse host user settings for sandbox: ${err}`,
         );
+      }
+    }
+
+    if (!userHomeDirOnHost) {
+      try {
+        fs.rmSync(userSettingsDirOnHost, { recursive: true, force: true });
+      } catch {
+        // Silently ignore cleanup errors for ephemeral settings fallback
       }
     }
 
