@@ -5,6 +5,7 @@
  */
 
 import path from 'node:path';
+import { resolveToRealPath } from './paths.js';
 
 /**
  * Exact build file basenames that define build targets, dependencies,
@@ -81,9 +82,11 @@ export function isBuildFile(filePath: string): boolean {
     return false;
   }
 
-  // Normalize backslashes to forward slashes to support cross-platform path parsing (e.g. Windows paths on POSIX)
+  // Normalize backslashes to forward slashes first to support cross-platform path parsing (e.g. Windows paths on POSIX)
   const normalizedPath = filePath.replace(/\\/g, '/');
-  const basename = path.basename(normalizedPath);
+  // Consistent path resolution using a single, robust helper to handle traversals (. or ..) and absolute/relative conversions
+  const resolvedPath = resolveToRealPath(normalizedPath);
+  const basename = path.basename(resolvedPath);
 
   if (EXACT_BUILD_FILENAMES.has(basename)) {
     return true;
@@ -109,6 +112,7 @@ interface FilePathLike {
   file_path?: unknown;
   path?: unknown;
   filePath?: unknown;
+  file?: unknown;
 }
 
 function isFilePathLike(value: unknown): value is FilePathLike {
@@ -122,6 +126,6 @@ export function extractFilePathFromArgs(args: unknown): string | undefined {
   if (!isFilePathLike(args)) {
     return undefined;
   }
-  const target = args.file_path ?? args.path ?? args.filePath;
+  const target = args.file_path ?? args.path ?? args.filePath ?? args.file;
   return typeof target === 'string' ? target : undefined;
 }

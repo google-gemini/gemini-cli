@@ -126,17 +126,18 @@ export function extractUntrustedContext(history: readonly Content[]): UntrustedC
             .filter((t) => !BENIGN_SUBCOMMAND_TOKENS.has(t.toLowerCase()));
 
           for (const token of tokens) {
-            untrustedTokens.add(token);
+            const lowerToken = token.toLowerCase();
+            untrustedTokens.add(lowerToken);
             // Also index without common flag prefixes so we can match '--flag' against 'flag'
-            if (token.startsWith('--')) {
-              untrustedTokens.add(token.substring(2));
-            } else if (token.startsWith('-')) {
-              untrustedTokens.add(token.substring(1));
+            if (lowerToken.startsWith('--')) {
+              untrustedTokens.add(lowerToken.substring(2));
+            } else if (lowerToken.startsWith('-')) {
+              untrustedTokens.add(lowerToken.substring(1));
             }
 
             // Split on equals to handle key-value pairs
-            if (token.includes('=')) {
-              const eqParts = token.split('=');
+            if (lowerToken.includes('=')) {
+              const eqParts = lowerToken.split('=');
               for (const eqPart of eqParts) {
                 const trimmedPart = eqPart.trim();
                 if (trimmedPart.length > 1) {
@@ -209,21 +210,22 @@ export function findUntrustedFlags(
 
   for (let i = 0; i < rawTokens.length; i++) {
     const token = rawTokens[i];
+    const lowerToken = token.toLowerCase();
 
     // Check 1: Flags (starting with '-' or '--')
     if (token.startsWith('-')) {
-      let flagToCheck = token;
+      let flagToCheck = lowerToken;
       let valToCheck: string | undefined;
 
       if (token.includes('=')) {
-        const eqIdx = token.indexOf('=');
-        flagToCheck = token.substring(0, eqIdx);
-        valToCheck = token.substring(eqIdx + 1);
+        const eqIdx = lowerToken.indexOf('=');
+        flagToCheck = lowerToken.substring(0, eqIdx);
+        valToCheck = lowerToken.substring(eqIdx + 1);
       }
 
       // Check if full flag or flag name exists in untrusted tokens
       if (
-        untrustedContext.untrustedTokens.has(token) ||
+        untrustedContext.untrustedTokens.has(lowerToken) ||
         untrustedContext.untrustedTokens.has(flagToCheck)
       ) {
         detected.add(token);
@@ -241,7 +243,7 @@ export function findUntrustedFlags(
       if (
         nextToken &&
         !nextToken.startsWith('-') &&
-        untrustedContext.untrustedTokens.has(nextToken)
+        untrustedContext.untrustedTokens.has(nextToken.toLowerCase())
       ) {
         detected.add(nextToken);
       }
@@ -267,14 +269,14 @@ export function findUntrustedFlags(
         /^[a-zA-Z]:[\\/]/.test(token);
 
       if (isSensitiveWord) {
-        if (untrustedContext.untrustedTokens.has(token)) {
+        if (untrustedContext.untrustedTokens.has(lowerToken)) {
           detected.add(token);
           continue;
         }
 
         if (isHighRiskPattern) {
           for (const text of untrustedContext.untrustedTexts) {
-            if (text.includes(token)) {
+            if (text.toLowerCase().includes(lowerToken)) {
               detected.add(token);
               break;
             }
@@ -297,10 +299,17 @@ export function isBuildOrTestCommand(command: string): boolean {
   if (!command) {
     return false;
   }
+  const getBaseName = (cmd: string) => {
+    const base = cmd.replace(/\\/g, '/').split('/').pop();
+    return base ? base.toLowerCase() : cmd.toLowerCase();
+  };
   try {
     const roots = getCommandRoots(command);
     if (roots.length > 0) {
-      return roots.some((root) => BUILD_TEST_COMMAND_ROOTS.has(root.toLowerCase()));
+      return roots.some((root) => {
+        const base = getBaseName(root);
+        return BUILD_TEST_COMMAND_ROOTS.has(base) || BUILD_TEST_COMMAND_ROOTS.has(root.toLowerCase());
+      });
     }
   } catch {
     // Ignore and fallback
@@ -316,7 +325,9 @@ export function isBuildOrTestCommand(command: string): boolean {
     rootIndex++;
   }
   const root = parts[rootIndex];
-  return root ? BUILD_TEST_COMMAND_ROOTS.has(root.toLowerCase()) : false;
+  if (!root) return false;
+  const base = getBaseName(root);
+  return BUILD_TEST_COMMAND_ROOTS.has(base) || BUILD_TEST_COMMAND_ROOTS.has(root.toLowerCase());
 }
 
 const MODIFIED_BUILD_FILES_SYMBOL = Symbol('sessionModifiedBuildFiles');

@@ -153,6 +153,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
           diffContent={contentData.fileDiff}
           filename={contentData.fileName}
           disableTruncation={!isLockFile(contentData.fileName)}
+          availableTerminalHeight={availableHeight}
           terminalWidth={childWidth}
         />
       );
