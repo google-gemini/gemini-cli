@@ -1,0 +1,763 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+
+import type { SlashCommand, CommandContext } from './types.js';
+import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
+import type { Content } from '@google/genai';
+import { AuthType, type GeminiClient } from '@google/gemini-cli-core';
+
+import * as fsPromises from 'node:fs/promises';
+import { chatCommand, debugCommand } from './chatCommand.js';
+import {
+  serializeHistoryToMarkdown,
+  exportHistoryToFile,
+} from '../utils/historyExportUtils.js';
+import type { Stats } from 'node:fs';
+import type { HistoryItemWithoutId } from '../types.js';
+import path from 'node:path';
+
+vi.mock('fs/promises', () => ({
+  stat: vi.fn(),
+  readdir: vi.fn().mockResolvedValue(['file1.txt', 'file2.txt'] as string[]),
+  writeFile: vi.fn(),
+}));
+
+vi.mock('../utils/historyExportUtils.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../utils/historyExportUtils.js')>();
+  return {
+    ...actual,
+    exportHistoryToFile: vi.fn(),
+  };
+});
+
+describe('chatCommand', () => {
+  const mockFs = vi.mocked(fsPromises);
+  const mockExport = vi.mocked(exportHistoryToFile);
+
+  let mockContext: CommandContext;
+  let mockGetChat: ReturnType<typeof vi.fn>;
+  let mockSaveCheckpoint: ReturnType<typeof vi.fn>;
+  let mockLoadCheckpoint: ReturnType<typeof vi.fn>;
+  let mockDeleteCheckpoint: ReturnType<typeof vi.fn>;
+  let mockGetHistory: ReturnType<typeof vi.fn>;
+
+  const getSubCommand = (
+    name: 'list' | 'save' | 'resume' | 'delete' | 'share',
+  ): SlashCommand => {
+    const subCommand = chatCommand.subCommands?.find(
+      (cmd) => cmd.name === name,
+    );
+    if (!subCommand) {
+      throw new Error(`/chat ${name} command not found.`);
+    }
+    return subCommand;
+  };
+
+  beforeEach(() => {
+    mockGetHistory = vi.fn().mockReturnValue([]);
+    mockGetChat = vi.fn().mockReturnValue({
+      getHistory: mockGetHistory,
+    });
+    mockSaveCheckpoint = vi.fn().mockResolvedValue(undefined);
+    mockLoadCheckpoint = vi.fn().mockResolvedValue({ history: [] });
+    mockDeleteCheckpoint = vi.fn().mockResolvedValue(true);
+
+    mockContext = createMockCommandContext({
+      services: {
+        agentContext: {
+          config: {
+            getProjectRoot: () => '/project/root',
+            getContentGeneratorConfig: () => ({
+              authType: AuthType.LOGIN_WITH_GOOGLE,
+            }),
+            storage: {
+              getProjectTempDir: () => '/project/root/.gemini/tmp/mockhash',
+            },
+          },
+          geminiClient: {
+            getChat: mockGetChat,
+          } as unknown as GeminiClient,
+        },
+        logger: {
+          saveCheckpoint: mockSaveCheckpoint,
+          loadCheckpoint: mockLoadCheckpoint,
+          deleteCheckpoint: mockDeleteCheckpoint,
+          initialize: vi.fn().mockResolvedValue(undefined),
+        },
+      },
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should have the correct main command definition', () => {
+    expect(chatCommand.name).toBe('chat');
+    expect(chatCommand.description).toBe(
+      'Browse auto-saved conversations and manage chat checkpoints',
+    );
+    expect(chatCommand.autoExecute).toBe(true);
+    expect(chatCommand.subCommands).toHaveLength(6);
+  });
+
+  describe('list subcommand', () => {
+    let listCommand: SlashCommand;
+
+    beforeEach(() => {
+      listCommand = getSubCommand('list');
+    });
+
+    it('should add a chat_list item to the UI', async () => {
+      const fakeFiles = ['checkpoint-test1.json', 'checkpoint-test2.json'];
+      const date1 = new Date();
+      const date2 = new Date(date1.getTime() + 1000);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mockFs.readdir.mockResolvedValue(fakeFiles as any);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mockFs.stat.mockImplementation(async (path: any): Promise<Stats> => {
+        if (path.endsWith('test1.json')) {
+          return { mtime: date1 } as Stats;
+        }
+        return { mtime: date2 } as Stats;
+      });
+
+      await listCommand?.action?.(mockContext, '');
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: 'chat_list',
+        chats: [
+          {
+            name: 'test1',
+            mtime: date1.toISOString(),
+          },
+          {
+            name: 'test2',
+            mtime: date2.toISOString(),
+          },
+        ],
+      });
+    });
+  });
+  describe('save subcommand', () => {
+    let saveCommand: SlashCommand;
+    const tag = 'my-tag';
+    let mockCheckpointExists: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      saveCommand = getSubCommand('save');
+      mockCheckpointExists = vi.fn().mockResolvedValue(false);
+      mockContext.services.logger.checkpointExists = mockCheckpointExists;
+    });
+
+    it('should return an error if tag is missing', async () => {
+      const result = await saveCommand?.action?.(mockContext, '  ');
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Missing tag. Usage: /resume save <tag>',
+      });
+    });
+
+    it('should inform if conversation history is empty or only contains system context', async () => {
+      mockGetHistory.mockReturnValue([]);
+      let result = await saveCommand?.action?.(mockContext, tag);
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: 'No conversation found to save.',
+      });
+
+      mockGetHistory.mockReturnValue([
+        { role: 'user', parts: [{ text: 'context for our chat' }] },
+      ]);
+      result = await saveCommand?.action?.(mockContext, tag);
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: 'No conversation found to save.',
+      });
+
+      mockGetHistory.mockReturnValue([
+        { role: 'user', parts: [{ text: 'context for our chat' }] },
+        { role: 'model', parts: [{ text: 'Got it. Thanks for the context!' }] },
+        { role: 'user', parts: [{ text: 'Hello, how are you?' }] },
+      ]);
+      result = await saveCommand?.action?.(mockContext, tag);
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: `Conversation checkpoint saved with tag: ${tag}.`,
+      });
+    });
+
+    it('should return confirm_action if checkpoint already exists', async () => {
+      mockCheckpointExists.mockResolvedValue(true);
+      mockContext.invocation = {
+        raw: `/chat save ${tag}`,
+        name: 'save',
+        args: tag,
+      };
+
+      const result = await saveCommand?.action?.(mockContext, tag);
+
+      expect(mockCheckpointExists).toHaveBeenCalledWith(tag);
+      expect(mockSaveCheckpoint).not.toHaveBeenCalled();
+      expect(result).toMatchObject({
+        type: 'confirm_action',
+        originalInvocation: { raw: `/chat save ${tag}` },
+      });
+      // Check that prompt is a React element
+      expect(result).toHaveProperty('prompt');
+    });
+
+    it('should save the conversation if overwrite is confirmed', async () => {
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'context for our chat' }] },
+        { role: 'user', parts: [{ text: 'hello' }] },
+      ];
+      mockGetHistory.mockReturnValue(history);
+      mockContext.overwriteConfirmed = true;
+
+      const result = await saveCommand?.action?.(mockContext, tag);
+
+      expect(mockCheckpointExists).not.toHaveBeenCalled(); // Should skip existence check
+      expect(mockSaveCheckpoint).toHaveBeenCalledWith(
+        { history, authType: AuthType.LOGIN_WITH_GOOGLE },
+        tag,
+      );
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: `Conversation checkpoint saved with tag: ${tag}.`,
+      });
+    });
+  });
+
+  describe('resume subcommand', () => {
+    const goodTag = 'good-tag';
+    const badTag = 'bad-tag';
+
+    let resumeCommand: SlashCommand;
+    beforeEach(() => {
+      resumeCommand = getSubCommand('resume');
+    });
+
+    it('should return an error if tag is missing', async () => {
+      const result = await resumeCommand?.action?.(mockContext, '');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Missing tag. Usage: /resume resume <tag>',
+      });
+    });
+
+    it('should inform if checkpoint is not found', async () => {
+      mockLoadCheckpoint.mockResolvedValue({ history: [] });
+
+      const result = await resumeCommand?.action?.(mockContext, badTag);
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: `No saved checkpoint found with tag: ${badTag}.`,
+      });
+    });
+
+    it('should resume a conversation with matching authType', async () => {
+      const conversation: Content[] = [
+        { role: 'user', parts: [{ text: 'system setup' }] },
+        { role: 'user', parts: [{ text: 'hello gemini' }] },
+        { role: 'model', parts: [{ text: 'hello world' }] },
+      ];
+      mockLoadCheckpoint.mockResolvedValue({
+        history: conversation,
+        authType: AuthType.LOGIN_WITH_GOOGLE,
+      });
+
+      const result = await resumeCommand?.action?.(mockContext, goodTag);
+
+      expect(result).toEqual({
+        type: 'load_history',
+        history: [
+          { type: 'user', text: 'hello gemini' },
+          { type: 'gemini', text: 'hello world' },
+        ] as HistoryItemWithoutId[],
+        clientHistory: conversation,
+      });
+    });
+
+    it('should block resuming a conversation with mismatched authType', async () => {
+      const conversation: Content[] = [
+        { role: 'user', parts: [{ text: 'system setup' }] },
+        { role: 'user', parts: [{ text: 'hello gemini' }] },
+        { role: 'model', parts: [{ text: 'hello world' }] },
+      ];
+      mockLoadCheckpoint.mockResolvedValue({
+        history: conversation,
+        authType: AuthType.USE_GEMINI,
+      });
+
+      const result = await resumeCommand?.action?.(mockContext, goodTag);
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: `Cannot resume chat. It was saved with a different authentication method (${AuthType.USE_GEMINI}) than the current one (${AuthType.LOGIN_WITH_GOOGLE}).`,
+      });
+    });
+
+    it('should resume a legacy conversation without authType', async () => {
+      const conversation: Content[] = [
+        { role: 'user', parts: [{ text: 'system setup' }] },
+        { role: 'user', parts: [{ text: 'hello gemini' }] },
+        { role: 'model', parts: [{ text: 'hello world' }] },
+      ];
+      mockLoadCheckpoint.mockResolvedValue({ history: conversation });
+
+      const result = await resumeCommand?.action?.(mockContext, goodTag);
+
+      expect(result).toEqual({
+        type: 'load_history',
+        history: [
+          { type: 'user', text: 'hello gemini' },
+          { type: 'gemini', text: 'hello world' },
+        ] as HistoryItemWithoutId[],
+        clientHistory: conversation,
+      });
+    });
+
+    describe('completion', () => {
+      it('should provide completion suggestions', async () => {
+        const fakeFiles = ['checkpoint-alpha.json', 'checkpoint-beta.json'];
+        mockFs.readdir.mockImplementation(
+          (async (_: string): Promise<string[]> =>
+            fakeFiles) as unknown as typeof fsPromises.readdir,
+        );
+
+        mockFs.stat.mockImplementation(
+          (async (_: string): Promise<Stats> =>
+            ({
+              mtime: new Date(),
+            }) as Stats) as unknown as typeof fsPromises.stat,
+        );
+
+        const result = await resumeCommand?.completion?.(mockContext, 'a');
+
+        expect(result).toEqual(['alpha']);
+      });
+
+      it('should suggest filenames sorted by modified time (newest first)', async () => {
+        const fakeFiles = ['checkpoint-test1.json', 'checkpoint-test2.json'];
+        const date = new Date();
+        mockFs.readdir.mockImplementation(
+          (async (_: string): Promise<string[]> =>
+            fakeFiles) as unknown as typeof fsPromises.readdir,
+        );
+        mockFs.stat.mockImplementation((async (
+          path: string,
+        ): Promise<Stats> => {
+          if (path.endsWith('test1.json')) {
+            return { mtime: date } as Stats;
+          }
+          return { mtime: new Date(date.getTime() + 1000) } as Stats;
+        }) as unknown as typeof fsPromises.stat);
+
+        const result = await resumeCommand?.completion?.(mockContext, '');
+        // Sort items by last modified time (newest first)
+        expect(result).toEqual(['test2', 'test1']);
+      });
+    });
+  });
+
+  describe('delete subcommand', () => {
+    let deleteCommand: SlashCommand;
+    const tag = 'my-tag';
+    beforeEach(() => {
+      deleteCommand = getSubCommand('delete');
+    });
+
+    it('should return an error if tag is missing', async () => {
+      const result = await deleteCommand?.action?.(mockContext, '  ');
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Missing tag. Usage: /resume delete <tag>',
+      });
+    });
+
+    it('should return an error if checkpoint is not found', async () => {
+      mockDeleteCheckpoint.mockResolvedValue(false);
+      const result = await deleteCommand?.action?.(mockContext, tag);
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: `Error: No checkpoint found with tag '${tag}'.`,
+      });
+    });
+
+    it('should delete the conversation', async () => {
+      const result = await deleteCommand?.action?.(mockContext, tag);
+
+      expect(mockDeleteCheckpoint).toHaveBeenCalledWith(tag);
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: `Conversation checkpoint '${tag}' has been deleted.`,
+      });
+    });
+
+    describe('completion', () => {
+      it('should provide completion suggestions', async () => {
+        const fakeFiles = ['checkpoint-alpha.json', 'checkpoint-beta.json'];
+        mockFs.readdir.mockImplementation(
+          (async (_: string): Promise<string[]> =>
+            fakeFiles) as unknown as typeof fsPromises.readdir,
+        );
+
+        mockFs.stat.mockImplementation(
+          (async (_: string): Promise<Stats> =>
+            ({
+              mtime: new Date(),
+            }) as Stats) as unknown as typeof fsPromises.stat,
+        );
+
+        const result = await deleteCommand?.completion?.(mockContext, 'a');
+
+        expect(result).toEqual(['alpha']);
+      });
+    });
+  });
+
+  describe('share subcommand', () => {
+    let shareCommand: SlashCommand;
+    const mockHistory = [
+      { role: 'user', parts: [{ text: 'context' }] },
+      { role: 'model', parts: [{ text: 'context response' }] },
+      { role: 'user', parts: [{ text: 'Hello' }] },
+      { role: 'model', parts: [{ text: 'Hi there!' }] },
+    ];
+
+    beforeEach(() => {
+      shareCommand = getSubCommand('share');
+      vi.spyOn(process, 'cwd').mockReturnValue(
+        path.resolve('/usr/local/google/home/myuser/gemini-cli'),
+      );
+      vi.spyOn(Date, 'now').mockReturnValue(1234567890);
+      mockGetHistory.mockReturnValue(mockHistory);
+      mockFs.writeFile.mockClear();
+    });
+
+    it('should default to a json file if no path is provided', async () => {
+      const result = await shareCommand?.action?.(mockContext, '');
+      const expectedPath = path.join(
+        process.cwd(),
+        'gemini-conversation-1234567890.json',
+      );
+      expect(mockExport).toHaveBeenCalledWith({
+        history: mockHistory,
+        filePath: expectedPath,
+      });
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: `Conversation shared to ${expectedPath}`,
+      });
+    });
+
+    it('should share the conversation to a JSON file', async () => {
+      const filePath = 'my-chat.json';
+      const result = await shareCommand?.action?.(mockContext, filePath);
+      const expectedPath = path.join(process.cwd(), 'my-chat.json');
+      expect(mockExport).toHaveBeenCalledWith({
+        history: mockHistory,
+        filePath: expectedPath,
+      });
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: `Conversation shared to ${expectedPath}`,
+      });
+    });
+
+    it('should share the conversation to a Markdown file', async () => {
+      const filePath = 'my-chat.md';
+      const result = await shareCommand?.action?.(mockContext, filePath);
+      const expectedPath = path.join(process.cwd(), 'my-chat.md');
+      expect(mockExport).toHaveBeenCalledWith({
+        history: mockHistory,
+        filePath: expectedPath,
+      });
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: `Conversation shared to ${expectedPath}`,
+      });
+    });
+
+    it('should return an error for unsupported file extensions', async () => {
+      const filePath = 'my-chat.txt';
+      const result = await shareCommand?.action?.(mockContext, filePath);
+      expect(mockExport).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Invalid file format. Only .md and .json are supported.',
+      });
+    });
+
+    it('should inform if there is no conversation to share', async () => {
+      mockGetHistory.mockReturnValue([
+        { role: 'user', parts: [{ text: 'context' }] },
+      ]);
+      const result = await shareCommand?.action?.(mockContext, 'my-chat.json');
+      expect(mockExport).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: 'No conversation found to share.',
+      });
+    });
+
+    it('should handle errors during file writing', async () => {
+      const error = new Error('Permission denied');
+      mockExport.mockRejectedValue(error);
+      const result = await shareCommand?.action?.(mockContext, 'my-chat.json');
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: `Error sharing conversation: ${error.message}`,
+      });
+    });
+
+    it('should output valid JSON schema', async () => {
+      const filePath = 'my-chat.json';
+      await shareCommand?.action?.(mockContext, filePath);
+      const expectedPath = path.join(process.cwd(), 'my-chat.json');
+      expect(mockExport).toHaveBeenCalledWith({
+        history: mockHistory,
+        filePath: expectedPath,
+      });
+    });
+
+    it('should output correct markdown format', async () => {
+      const filePath = 'my-chat.md';
+      await shareCommand?.action?.(mockContext, filePath);
+      const expectedPath = path.join(process.cwd(), 'my-chat.md');
+      expect(mockExport).toHaveBeenCalledWith({
+        history: mockHistory,
+        filePath: expectedPath,
+      });
+    });
+  });
+
+  describe('serializeHistoryToMarkdown', () => {
+    it('should correctly serialize chat history to Markdown with icons', () => {
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+        { role: 'model', parts: [{ text: 'Hi there!' }] },
+        { role: 'user', parts: [{ text: 'How are you?' }] },
+      ];
+
+      const expectedMarkdown =
+        '## USER 🧑‍💻\n\nHello\n\n---\n\n' +
+        '## MODEL ✨\n\nHi there!\n\n---\n\n' +
+        '## USER 🧑‍💻\n\nHow are you?';
+
+      const result = serializeHistoryToMarkdown(history);
+      expect(result).toBe(expectedMarkdown);
+    });
+
+    it('should handle empty history', () => {
+      const history: Content[] = [];
+      const result = serializeHistoryToMarkdown(history);
+      expect(result).toBe('');
+    });
+
+    it('should handle items with no text parts', () => {
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+        { role: 'model', parts: [] },
+        { role: 'user', parts: [{ text: 'How are you?' }] },
+      ];
+
+      const expectedMarkdown = `## USER 🧑‍💻
+
+Hello
+
+---
+
+## MODEL ✨
+
+
+
+---
+
+## USER 🧑‍💻
+
+How are you?`;
+
+      const result = serializeHistoryToMarkdown(history);
+      expect(result).toBe(expectedMarkdown);
+    });
+
+    it('should correctly serialize function calls and responses', () => {
+      const history: Content[] = [
+        {
+          role: 'user',
+          parts: [{ text: 'Please call a function.' }],
+        },
+        {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                name: 'my-function',
+                args: { arg1: 'value1' },
+              },
+            },
+          ],
+        },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'my-function',
+                response: { result: 'success' },
+              },
+            },
+          ],
+        },
+      ];
+
+      const expectedMarkdown = `## USER 🧑‍💻
+
+Please call a function.
+
+---
+
+## MODEL ✨
+
+**Tool Command**:
+\`\`\`json
+{
+  "name": "my-function",
+  "args": {
+    "arg1": "value1"
+  }
+}
+\`\`\`
+
+---
+
+## USER 🧑‍💻
+
+**Tool Response**:
+\`\`\`json
+{
+  "name": "my-function",
+  "response": {
+    "result": "success"
+  }
+}
+\`\`\``;
+
+      const result = serializeHistoryToMarkdown(history);
+      expect(result).toBe(expectedMarkdown);
+    });
+
+    it('should handle items with undefined role', () => {
+      const history: Array<Partial<Content>> = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+        { parts: [{ text: 'Hi there!' }] },
+      ];
+
+      const expectedMarkdown = `## USER 🧑‍💻
+
+Hello
+
+---
+
+## MODEL ✨
+
+Hi there!`;
+
+      const result = serializeHistoryToMarkdown(history as Content[]);
+      expect(result).toBe(expectedMarkdown);
+    });
+    describe('debug subcommand', () => {
+      let mockGetLatestApiRequest: ReturnType<typeof vi.fn>;
+
+      beforeEach(() => {
+        mockGetLatestApiRequest = vi.fn();
+        if (!mockContext.services.agentContext!.config) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (mockContext.services.agentContext!.config as any) = {};
+        }
+        mockContext.services.agentContext!.config.getLatestApiRequest =
+          mockGetLatestApiRequest;
+        vi.spyOn(process, 'cwd').mockReturnValue('/project/root');
+        vi.spyOn(Date, 'now').mockReturnValue(1234567890);
+        mockFs.writeFile.mockClear();
+      });
+
+      it('should return an error if no API request is found', async () => {
+        mockGetLatestApiRequest.mockReturnValue(undefined);
+
+        const result = await debugCommand.action?.(mockContext, '');
+
+        expect(result).toEqual({
+          type: 'message',
+          messageType: 'error',
+          content: 'No recent API request found to export.',
+        });
+        expect(mockFs.writeFile).not.toHaveBeenCalled();
+      });
+
+      it('should convert and write the API request to a json file', async () => {
+        const mockRequest = {
+          contents: [{ role: 'user', parts: [{ text: 'test' }] }],
+        };
+        mockGetLatestApiRequest.mockReturnValue(mockRequest);
+
+        const result = await debugCommand.action?.(mockContext, '');
+
+        const expectedFilename = 'gcli-request-1234567890.json';
+        const expectedPath = path.join('/project/root', expectedFilename);
+
+        expect(mockFs.writeFile).toHaveBeenCalledWith(
+          expectedPath,
+          expect.stringContaining('"role": "user"'),
+        );
+        expect(result).toEqual({
+          type: 'message',
+          messageType: 'info',
+          content: `Debug API request saved to ${expectedFilename}`,
+        });
+      });
+
+      it('should handle errors during file write', async () => {
+        const mockRequest = { contents: [] };
+        mockGetLatestApiRequest.mockReturnValue(mockRequest);
+        mockFs.writeFile.mockRejectedValue(new Error('Write failed'));
+
+        const result = await debugCommand.action?.(mockContext, '');
+
+        expect(result).toEqual({
+          type: 'message',
+          messageType: 'error',
+          content: 'Error saving debug request: Write failed',
+        });
+      });
+    });
+  });
+});

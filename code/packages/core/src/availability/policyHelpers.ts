@@ -1,0 +1,347 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import type { GenerateContentConfig } from '@google/genai';
+import type { Config } from '../config/config.js';
+import type {
+  FailureKind,
+  FallbackAction,
+  ModelPolicy,
+  ModelPolicyChain,
+  RetryAvailabilityContext,
+} from './modelPolicy.js';
+import {
+  createDefaultPolicy,
+  createSingleModelChain,
+  getModelPolicyChain,
+  getFlashLitePolicyChain,
+  SILENT_ACTIONS,
+} from './policyCatalog.js';
+import {
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  DEFAULT_GEMINI_MODEL,
+  PREVIEW_GEMINI_MODEL_AUTO,
+  isAutoModel,
+  isGemini3Model,
+  resolveModel,
+} from '../config/models.js';
+import { normalizeModelId } from '../utils/modelUtils.js';
+import type { ModelSelectionResult } from './modelAvailabilityService.js';
+import type { ModelConfigKey } from '../services/modelConfigService.js';
+import { ApprovalMode } from '../policy/types.js';
+
+/**
+ * Resolves the active policy chain for the given config, ensuring the
+ * user-selected active model is represented.
+ */
+export function resolvePolicyChain(
+  config: Config,
+  preferredModel?: string,
+  wrapsAround: boolean = false,
+): ModelPolicyChain {
+  const normalizedPreferredModel = preferredModel
+    ? normalizeModelId(preferredModel)
+    : undefined;
+  const modelFromConfig = normalizeModelId(
+    normalizedPreferredModel ?? config.getActiveModel?.() ?? config.getModel(),
+  );
+  const configuredModel = normalizeModelId(config.getModel());
+
+  let chain: ModelPolicyChain | undefined;
+  const useGemini31 = config.getGemini31LaunchedSync?.() ?? false;
+  const useCustomToolModel = config.getUseCustomToolModelSync?.() ?? false;
+  const hasAccessToPreview = config.getHasAccessToPreviewModel?.() ?? false;
+  const useGemini3_5Flash = config.hasGemini35FlashGAAccess?.() ?? false;
+
+  // Capture the original family intent before any normalization or early downgrade.
+  const isOriginallyGemini3 = isGemini3Model(modelFromConfig, config);
+
+  const resolvedModel = normalizeModelId(
+    resolveModel(
+      modelFromConfig,
+      useGemini31,
+      useCustomToolModel,
+      hasAccessToPreview,
+      config,
+      useGemini3_5Flash,
+    ),
+  );
+  const isAutoPreferred = normalizedPreferredModel
+    ? isAutoModel(normalizedPreferredModel, config)
+    : false;
+  const isAutoConfigured = isAutoModel(configuredModel, config);
+
+  // We always wrap around for Gemini 3 chains to ensure maximum availability
+  // between models in the same family (e.g. fallback to Pro if Flash is exhausted).
+  const effectiveWrapsAround =
+    wrapsAround || isAutoPreferred || isAutoConfigured || isOriginallyGemini3;
+
+  // --- DYNAMIC PATH ---
+  if (config.getExperimentalDynamicModelConfiguration?.() === true) {
+    const context = {
+      useGemini3_1: useGemini31,
+      useCustomTools: useCustomToolModel,
+      useGemini3_5Flash,
+    };
+
+    if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
+      chain = config.modelConfigService.resolveChain('lite', context);
+    } else if (isOriginallyGemini3 || isAutoPreferred || isAutoConfigured) {
+      // 1. Try to find a chain specifically for the current configured alias
+      if (
+        isAutoConfigured &&
+        config.modelConfigService.getModelChain(configuredModel)
+      ) {
+        chain = config.modelConfigService.resolveChain(
+          configuredModel,
+          context,
+        );
+      }
+      // 2. Fallback to family-based auto-routing
+      if (!chain) {
+        const isAutoSelection = isAutoPreferred || isAutoConfigured;
+        const previewEnabled =
+          hasAccessToPreview &&
+          (isGemini3Model(resolvedModel, config) ||
+            normalizedPreferredModel === PREVIEW_GEMINI_MODEL_AUTO ||
+            configuredModel === PREVIEW_GEMINI_MODEL_AUTO);
+        const autoPrefix = isAutoSelection ? 'auto-' : '';
+        const chainKey = previewEnabled ? 'preview' : 'default';
+        chain = config.modelConfigService.resolveChain(
+          `${autoPrefix}${chainKey}`,
+          context,
+        );
+      }
+    }
+    if (!chain) {
+      // No matching modelChains found, default to single model chain
+      chain = createSingleModelChain(modelFromConfig);
+    }
+    chain = applyDynamicSlicing(chain, resolvedModel, effectiveWrapsAround);
+  } else {
+    // --- LEGACY PATH ---
+
+    if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
+      chain = getFlashLitePolicyChain();
+    } else if (isOriginallyGemini3 || isAutoPreferred || isAutoConfigured) {
+      const isAutoSelection = isAutoPreferred || isAutoConfigured;
+      if (hasAccessToPreview) {
+        const previewEnabled =
+          isOriginallyGemini3 ||
+          normalizedPreferredModel === PREVIEW_GEMINI_MODEL_AUTO ||
+          configuredModel === PREVIEW_GEMINI_MODEL_AUTO;
+        chain = getModelPolicyChain({
+          previewEnabled,
+          isAutoSelection,
+          userTier: config.getUserTier(),
+          useGemini31,
+          useCustomToolModel,
+          useGemini3_5Flash,
+        });
+      } else {
+        // User requested Gemini 3 but has no access. Proactively downgrade
+        // to the stable Gemini 2.5 chain.
+        chain = getModelPolicyChain({
+          previewEnabled: false,
+          isAutoSelection,
+          userTier: config.getUserTier(),
+          useGemini31,
+          useCustomToolModel,
+          useGemini3_5Flash,
+        });
+      }
+    } else {
+      chain = createSingleModelChain(modelFromConfig);
+    }
+    chain = applyDynamicSlicing(chain, resolvedModel, effectiveWrapsAround);
+  }
+  // Apply Unified Silent Injection for Plan Mode with defensive checks
+  if (config?.getApprovalMode?.() === ApprovalMode.PLAN) {
+    return chain.map((policy) => ({
+      ...policy,
+      actions: { ...SILENT_ACTIONS },
+    }));
+  }
+
+  return chain;
+}
+
+/**
+ * Applies active-index slicing and wrap-around logic to a chain template.
+ */
+function applyDynamicSlicing(
+  chain: ModelPolicy[],
+  resolvedModel: string,
+  wrapsAround: boolean,
+): ModelPolicyChain {
+  const normalizedResolved = normalizeModelId(resolvedModel);
+  const activeIndex = chain.findIndex(
+    (policy) => normalizeModelId(policy.model) === normalizedResolved,
+  );
+  if (activeIndex !== -1) {
+    return wrapsAround
+      ? [...chain.slice(activeIndex), ...chain.slice(0, activeIndex)]
+      : [...chain.slice(activeIndex)];
+  }
+
+  // If the user specified a model not in the default chain, we assume they want
+  // *only* that model. We do not fallback to the default chain.
+  return [createDefaultPolicy(resolvedModel, { isLastResort: true })];
+}
+
+/**
+ * Produces the failed policy (if it exists in the chain) and the list of
+ * fallback candidates that follow it.
+ * @param chain - The ordered list of available model policies.
+ * @param failedModel - The identifier of the model that failed.
+ * @param wrapsAround - If true, treats the chain as a circular buffer.
+ */
+export function buildFallbackPolicyContext(
+  chain: ModelPolicyChain,
+  failedModel: string,
+  wrapsAround: boolean = false,
+): {
+  failedPolicy?: ModelPolicy;
+  candidates: ModelPolicy[];
+} {
+  const normalizedFailed = normalizeModelId(failedModel);
+  const index = chain.findIndex(
+    (policy) => normalizeModelId(policy.model) === normalizedFailed,
+  );
+  if (index === -1) {
+    return { failedPolicy: undefined, candidates: chain };
+  }
+  // Return [candidates_after, candidates_before] to prioritize downgrades
+  // (continuing the chain) before wrapping around to upgrades.
+  const candidates = wrapsAround
+    ? [...chain.slice(index + 1), ...chain.slice(0, index)]
+    : [...chain.slice(index + 1)];
+  return {
+    failedPolicy: chain[index],
+    candidates,
+  };
+}
+
+export function resolvePolicyAction(
+  failureKind: FailureKind,
+  policy: ModelPolicy,
+): FallbackAction {
+  return policy.actions?.[failureKind] ?? 'prompt';
+}
+
+/**
+ * Creates a context provider for retry logic that returns the availability
+ * sevice and resolves the current model's policy.
+ *
+ * @param modelGetter A function that returns the model ID currently being attempted.
+ *        (Allows handling dynamic model changes during retries).
+ */
+export function createAvailabilityContextProvider(
+  config: Config,
+  modelGetter: () => string,
+): () => RetryAvailabilityContext | undefined {
+  return () => {
+    const service = config.getModelAvailabilityService();
+    const currentModel = modelGetter();
+
+    // Resolve the chain for the specific model we are attempting.
+    const chain = resolvePolicyChain(config, currentModel);
+    const policy = chain.find((p) => p.model === currentModel);
+
+    return policy ? { service, policy } : undefined;
+  };
+}
+
+/**
+ * Selects the model to use for an attempt via the availability service and
+ * returns the selection context.
+ */
+export function selectModelForAvailability(
+  config: Config,
+  requestedModel: string,
+): ModelSelectionResult {
+  const chain = resolvePolicyChain(config, requestedModel);
+  const selection = config
+    .getModelAvailabilityService()
+    .selectFirstAvailable(chain.map((p) => p.model));
+
+  if (selection.selectedModel) return selection;
+
+  const backupModel =
+    chain.find((p) => p.isLastResort)?.model ?? DEFAULT_GEMINI_MODEL;
+
+  return { selectedModel: backupModel, skipped: [] };
+}
+
+/**
+ * Applies the model availability selection logic, including side effects
+ * (setting active model, consuming sticky attempts) and config updates.
+ */
+export function applyModelSelection(
+  config: Config,
+  modelConfigKey: ModelConfigKey,
+  options: { consumeAttempt?: boolean } = {},
+): { model: string; config: GenerateContentConfig; maxAttempts?: number } {
+  const resolved = config.modelConfigService.getResolvedConfig(modelConfigKey);
+  const model = resolved.model;
+  const selection = selectModelForAvailability(config, model);
+
+  if (!selection) {
+    return { model, config: resolved.generateContentConfig };
+  }
+
+  const finalModel = selection.selectedModel ?? model;
+  let generateContentConfig = resolved.generateContentConfig;
+
+  if (finalModel !== model) {
+    const fallbackResolved = config.modelConfigService.getResolvedConfig({
+      ...modelConfigKey,
+      model: finalModel,
+    });
+    generateContentConfig = fallbackResolved.generateContentConfig;
+  }
+
+  if (modelConfigKey.isChatModel) {
+    config.setActiveModel(finalModel);
+  }
+
+  if (selection.attempts && options.consumeAttempt !== false) {
+    config.getModelAvailabilityService().consumeStickyAttempt(finalModel);
+  }
+
+  const chain = resolvePolicyChain(config, finalModel);
+  const policy = chain.find((p) => p.model === finalModel);
+
+  return {
+    model: finalModel,
+    config: generateContentConfig,
+    maxAttempts: selection.attempts ?? policy?.maxAttempts,
+  };
+}
+
+export function applyAvailabilityTransition(
+  getContext: (() => RetryAvailabilityContext | undefined) | undefined,
+  failureKind: FailureKind,
+): void {
+  const context = getContext?.();
+  if (!context) return;
+
+  const transition = context.policy.stateTransitions?.[failureKind];
+  if (!transition) return;
+
+  if (transition === 'terminal') {
+    context.service.markTerminal(
+      context.policy.model,
+      failureKind === 'terminal' ? 'quota' : 'capacity',
+    );
+  } else if (transition === 'sticky_retry') {
+    context.service.markRetryOncePerTurn(
+      context.policy.model,
+      context.policy.maxAttempts,
+    );
+    context.service.consumeStickyAttempt(context.policy.model);
+  }
+}

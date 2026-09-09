@@ -1,0 +1,122 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ThinkingMessage > filters out progress dots and empty lines 1`] = `
+" Thinking... 
+ │
+ │ Thinking
+ │ Done
+"
+`;
+
+exports[`ThinkingMessage > filters out progress dots and empty lines 2`] = `
+" Thinking... 
+ │
+ │ Thinking
+ │ Done"
+`;
+
+exports[`ThinkingMessage > normalizes escaped newline tokens 1`] = `
+" Thinking... 
+ │
+ │ Matching the Blocks
+ │ Some more text
+"
+`;
+
+exports[`ThinkingMessage > normalizes escaped newline tokens 2`] = `
+" Thinking... 
+ │
+ │ Matching the Blocks
+ │ Some more text"
+`;
+
+exports[`ThinkingMessage > renders "Thinking..." header when isFirstThinking is true 1`] = `
+" Thinking... 
+ │
+ │ Summary line
+ │ First body line
+"
+`;
+
+exports[`ThinkingMessage > renders "Thinking..." header when isFirstThinking is true 2`] = `
+" Thinking... 
+ │
+ │ Summary line
+ │ First body line"
+`;
+
+exports[`ThinkingMessage > renders full mode with left border and full text 1`] = `
+" Thinking... 
+ │
+ │ Planning
+ │ I am planning the solution.
+"
+`;
+
+exports[`ThinkingMessage > renders full mode with left border and full text 2`] = `
+" Thinking... 
+ │
+ │ Planning
+ │ I am planning the solution."
+`;
+
+exports[`ThinkingMessage > renders multiple thinking messages sequentially correctly 1`] = `
+" Thinking... 
+ │
+ │ Initial analysis
+ │ This is a multiple line paragraph for the first thinking message of how the
+ │ model analyzes the problem.
+ │
+ │ Planning execution
+ │ This a second multiple line paragraph for the second thinking message
+ │ explaining the plan in detail so that it wraps around the terminal display.
+ │
+ │ Refining approach
+ │ And finally a third multiple line paragraph for the third thinking message to
+ │ refine the solution.
+"
+`;
+
+exports[`ThinkingMessage > renders multiple thinking messages sequentially correctly 2`] = `
+" Thinking... 
+ │
+ │ Initial analysis
+ │ This is a multiple line paragraph for the first thinking message of how the
+ │ model analyzes the problem.
+ │
+ │ Planning execution
+ │ This a second multiple line paragraph for the second thinking message
+ │ explaining the plan in detail so that it wraps around the terminal display.
+ │
+ │ Refining approach
+ │ And finally a third multiple line paragraph for the third thinking message to
+ │ refine the solution."
+`;
+
+exports[`ThinkingMessage > renders subject line with vertical rule and "Thinking..." header 1`] = `
+" Thinking... 
+ │
+ │ Planning
+ │ test
+"
+`;
+
+exports[`ThinkingMessage > renders subject line with vertical rule and "Thinking..." header 2`] = `
+" Thinking... 
+ │
+ │ Planning
+ │ test"
+`;
+
+exports[`ThinkingMessage > uses description when subject is empty 1`] = `
+" Thinking... 
+ │
+ │ Processing details
+"
+`;
+
+exports[`ThinkingMessage > uses description when subject is empty 2`] = `
+" Thinking... 
+ │
+ │ Processing details"
+`;

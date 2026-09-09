@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Test Fixture - Step 2</title>
+  </head>
+  <body>
+    <h1 id="step-heading">Step 2: Confirm Your Selection</h1>
+    <p id="step-description">Choose your preference below.</p>
+    <form id="step2-form" action="/multi-step/result.html" method="GET">
+      <div>
+        <label for="preference">Preference:</label>
+        <select id="preference" name="preference">
+          <option value="option-a">Option A</option>
+          <option value="option-b">Option B</option>
+          <option value="option-c">Option C</option>
+        </select>
+      </div>
+      <button type="submit" id="finish-btn">Finish</button>
+    </form>
+  </body>
+</html>

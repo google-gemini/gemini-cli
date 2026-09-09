@@ -1,0 +1,4 @@
+{"method":"generateContent","response":{"candidates":[{"content":{"parts":[{"text":"{\"complexity_reasoning\":\"simple\",\"complexity_score\":1}"}],"role":"model"},"finishReason":"STOP","index":0}]}}
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"text":"I am a large conversation model response."}],"role":"model"},"finishReason":"STOP","index":0}],"usageMetadata":{"candidatesTokenCount":10,"promptTokenCount":20,"totalTokenCount":30}}]}
+{"method":"generateContent","response":{"candidates":[{"content":{"parts":[{"text":"{\"originalSummary\":\"large chat summary\",\"events\":[]}"}],"role":"model"},"finishReason":"STOP","index":0}]}}
+{"method":"countTokens","response":{"totalTokens":100}}

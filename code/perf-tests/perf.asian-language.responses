@@ -1,0 +1,2 @@
+{"method":"generateContent","response":{"candidates":[{"content":{"parts":[{"text":"0"}],"role":"model"},"finishReason":"STOP","index":0}]}}
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"text":"你好！我是 Gemini CLI，你的 AI 编程助手"}],"role":"model"},"finishReason":"STOP","index":0}],"usageMetadata":{"promptTokenCount":20648,"candidatesTokenCount":12,"totalTokenCount":20769,"promptTokensDetails":[{"modality":"TEXT","tokenCount":5}]}}]}

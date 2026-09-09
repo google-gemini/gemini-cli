@@ -1,0 +1,23 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`TextOutput > should correctly handle ANSI escape codes when determining line breaks 1`] = `
+"[34mhello[39m
+[1mworld[22m[34m
+[39mnext"
+`;
+
+exports[`TextOutput > should handle ANSI codes that do not end with a newline 1`] = `
+"hello[34m
+world"
+`;
+
+exports[`TextOutput > should handle a sequence of calls correctly 1`] = `
+"first
+second part
+third"
+`;
+
+exports[`TextOutput > should handle empty strings with ANSI codes 1`] = `
+"hello[34m[39m
+world"
+`;

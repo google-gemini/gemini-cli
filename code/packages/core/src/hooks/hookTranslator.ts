@@ -1,0 +1,475 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import type {
+  Content,
+  GenerateContentResponse,
+  GenerateContentParameters,
+  Part,
+  ToolConfig,
+  FinishReason,
+  FunctionCallingConfig,
+} from '@google/genai';
+import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import { getResponseText } from '../utils/partUtils.js';
+
+/**
+ * Decoupled LLM request format - stable across Gemini CLI versions
+ */
+export interface LLMRequest {
+  model: string;
+  messages: Array<{
+    role: 'user' | 'model' | 'system';
+    content: string | Array<{ type: string; [key: string]: unknown }>;
+  }>;
+  config?: {
+    temperature?: number;
+    maxOutputTokens?: number;
+    topP?: number;
+    topK?: number;
+    stopSequences?: string[];
+    candidateCount?: number;
+    presencePenalty?: number;
+    frequencyPenalty?: number;
+    [key: string]: unknown;
+  };
+  toolConfig?: HookToolConfig;
+}
+
+/**
+ * Decoupled LLM response format - stable across Gemini CLI versions
+ */
+export interface LLMResponse {
+  text?: string;
+  candidates: Array<{
+    content: {
+      role: 'model';
+      parts: string[];
+    };
+    finishReason?: 'STOP' | 'MAX_TOKENS' | 'SAFETY' | 'RECITATION' | 'OTHER';
+    index?: number;
+    safetyRatings?: Array<{
+      category: string;
+      probability: string;
+      blocked?: boolean;
+    }>;
+  }>;
+  usageMetadata?: {
+    promptTokenCount?: number;
+    candidatesTokenCount?: number;
+    totalTokenCount?: number;
+  };
+}
+
+/**
+ * Decoupled tool configuration - stable across Gemini CLI versions
+ */
+export interface HookToolConfig {
+  mode?: 'AUTO' | 'ANY' | 'NONE';
+  allowedFunctionNames?: string[];
+}
+
+/**
+ * Base class for hook translators - handles version-specific translation logic
+ */
+export abstract class HookTranslator {
+  abstract toHookLLMRequest(sdkRequest: GenerateContentParameters): LLMRequest;
+  abstract fromHookLLMRequest(
+    hookRequest: LLMRequest,
+    baseRequest?: GenerateContentParameters,
+  ): GenerateContentParameters;
+  abstract toHookLLMResponse(sdkResponse: GenerateContentResponse): LLMResponse;
+  abstract fromHookLLMResponse(
+    hookResponse: LLMResponse,
+  ): GenerateContentResponse;
+  abstract toHookToolConfig(sdkToolConfig: ToolConfig): HookToolConfig;
+  abstract fromHookToolConfig(hookToolConfig: HookToolConfig): ToolConfig;
+}
+
+/**
+ * Type guard to check if a value has a text property
+ */
+function hasTextProperty(value: unknown): value is { text: string } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'text' in value &&
+    typeof (value as { text: unknown }).text === 'string'
+  );
+}
+
+/**
+ * Type guard to check if a value is a Content object (i.e. has role and parts
+ * properties). Narrows to Content so callers can access `parts` as Part[].
+ */
+function isContentWithParts(content: unknown): content is Content {
+  return (
+    typeof content === 'object' &&
+    content !== null &&
+    'role' in content &&
+    'parts' in content
+  );
+}
+
+/**
+ * Helper to safely extract generation config from SDK request
+ * The SDK uses a config field that contains generation parameters
+ */
+function extractGenerationConfig(request: GenerateContentParameters):
+  | {
+      temperature?: number;
+      maxOutputTokens?: number;
+      topP?: number;
+      topK?: number;
+    }
+  | undefined {
+  // Access the config field which contains generation settings
+  // Use type assertion after checking the field exists
+  if (request.config && typeof request.config === 'object') {
+    const config = request.config as {
+      temperature?: number;
+      maxOutputTokens?: number;
+      topP?: number;
+      topK?: number;
+    };
+    return {
+      temperature: config.temperature,
+      maxOutputTokens: config.maxOutputTokens,
+      topP: config.topP,
+      topK: config.topK,
+    };
+  }
+
+  return undefined;
+}
+
+/**
+ * Hook translator for GenAI SDK v1.x
+ * Handles translation between GenAI SDK types and stable Hook API types
+ */
+export class HookTranslatorGenAIv1 extends HookTranslator {
+  /**
+   * Convert genai SDK GenerateContentParameters to stable LLMRequest
+   *
+   * Note: This implementation intentionally extracts only text content from parts.
+   * Non-text parts (images, function calls, etc.) are filtered out in v1 to provide
+   * a simplified, stable interface for hooks. This allows hooks to focus on text
+   * manipulation without needing to handle complex multimodal content.
+   * Future versions may expose additional content types if needed.
+   */
+  toHookLLMRequest(sdkRequest: GenerateContentParameters): LLMRequest {
+    const messages: LLMRequest['messages'] = [];
+
+    // Convert contents to messages format (simplified)
+    if (sdkRequest.contents) {
+      const contents = Array.isArray(sdkRequest.contents)
+        ? sdkRequest.contents
+        : [sdkRequest.contents];
+
+      for (const content of contents) {
+        if (typeof content === 'string') {
+          messages.push({
+            role: 'user',
+            content,
+          });
+        } else if (isContentWithParts(content)) {
+          const role =
+            content.role === 'model'
+              ? ('model' as const)
+              : content.role === 'system'
+                ? ('system' as const)
+                : ('user' as const);
+
+          const parts = Array.isArray(content.parts)
+            ? content.parts
+            : [content.parts];
+
+          // Extract only text parts - intentionally filtering out non-text content
+          const textContent = parts
+            .filter(hasTextProperty)
+            .map((part) => part.text)
+            .join('');
+
+          // Only add message if there's text content
+          if (textContent) {
+            messages.push({
+              role,
+              content: textContent,
+            });
+          }
+        }
+      }
+    }
+
+    // Safely extract generation config using proper type access
+    const config = extractGenerationConfig(sdkRequest);
+
+    return {
+      model: sdkRequest.model || DEFAULT_GEMINI_FLASH_MODEL,
+      messages,
+      config: {
+        temperature: config?.temperature,
+        maxOutputTokens: config?.maxOutputTokens,
+        topP: config?.topP,
+        topK: config?.topK,
+      },
+    };
+  }
+
+  /**
+   * Convert stable LLMRequest to genai SDK GenerateContentParameters
+   */
+  fromHookLLMRequest(
+    hookRequest: LLMRequest,
+    baseRequest?: GenerateContentParameters,
+  ): GenerateContentParameters {
+    // Convert hook messages back to SDK Content format.
+    //
+    // When both hookRequest.messages and baseRequest.contents are present, we
+    // merge the hook's text edits back into the original contents in place,
+    // preserving non-text parts (functionCall, functionResponse, inlineData,
+    // thought, etc.) that toHookLLMRequest filtered out for the simplified
+    // hook API. Without this merge, a BeforeModel hook that modifies text
+    // would destroy tool call/response history and cause the model to loop
+    // (see https://github.com/google-gemini/gemini-cli/issues/25558).
+    //
+    // If the hook returned a partial request without messages (e.g. only
+    // overriding `model`), fall back to the base request's contents so the
+    // conversation is preserved.
+    let contents: GenerateContentParameters['contents'];
+
+    if (!hookRequest.messages) {
+      contents = baseRequest?.contents ?? [];
+    } else if (baseRequest?.contents) {
+      // Merge hook messages back into base contents, preserving non-text parts.
+      const baseContents = Array.isArray(baseRequest.contents)
+        ? baseRequest.contents
+        : [baseRequest.contents];
+
+      // The merged result is uniformly Content[] — ContentListUnion does not
+      // allow mixing strings (PartUnion) and Content objects in the same
+      // array, so any string entries from baseContents are normalized to
+      // Content here.
+      const merged: Content[] = [];
+      let messageIndex = 0;
+
+      const messageToContent = (
+        message: LLMRequest['messages'][number],
+      ): Content => ({
+        role: message.role === 'model' ? 'model' : message.role,
+        parts: [
+          {
+            text:
+              typeof message.content === 'string'
+                ? message.content
+                : String(message.content),
+          },
+        ],
+      });
+
+      for (const content of baseContents) {
+        // Normalize each baseContents entry into a Content object so the
+        // merged array is homogeneous.
+        if (typeof content === 'string') {
+          // String entries always contributed one message to the hook view.
+          if (messageIndex < hookRequest.messages.length) {
+            merged.push(messageToContent(hookRequest.messages[messageIndex++]));
+          } else {
+            merged.push({ role: 'user', parts: [{ text: content }] });
+          }
+          continue;
+        }
+
+        if (!isContentWithParts(content)) {
+          // Bare Part object (PartUnion expansion: Content | Part | string).
+          // toHookLLMRequest does not emit a message for these, so preserve
+          // them as a single-part Content with a default role.
+          merged.push({ role: 'user', parts: [content] });
+          continue;
+        }
+
+        const parts: Part[] = content.parts ?? [];
+        const hasText = parts.some(hasTextProperty);
+        const baseContent: Content = { ...content, parts };
+
+        if (!hasText) {
+          // toHookLLMRequest skipped this entry — preserve it untouched so
+          // tool-call/response history is not lost.
+          merged.push(baseContent);
+          continue;
+        }
+
+        // This entry contributed a message — merge the hook's text back in
+        // and keep any non-text parts in their original order.
+        if (messageIndex < hookRequest.messages.length) {
+          const message = hookRequest.messages[messageIndex++];
+          const newText =
+            typeof message.content === 'string'
+              ? message.content
+              : String(message.content);
+          const nonTextParts = parts.filter(
+            (p): p is Part => !hasTextProperty(p),
+          );
+
+          merged.push({
+            ...baseContent,
+            role: message.role === 'model' ? 'model' : message.role,
+            parts: [{ text: newText }, ...nonTextParts],
+          });
+        } else {
+          merged.push(baseContent);
+        }
+      }
+
+      // Append any remaining hook messages beyond baseContents (the hook may
+      // have added new turns).
+      while (messageIndex < hookRequest.messages.length) {
+        merged.push(messageToContent(hookRequest.messages[messageIndex++]));
+      }
+
+      contents = merged;
+    } else {
+      // No baseRequest contents to merge against — fall back to text-only.
+      contents = hookRequest.messages.map((message) => ({
+        role: message.role === 'model' ? 'model' : message.role,
+        parts: [
+          {
+            text:
+              typeof message.content === 'string'
+                ? message.content
+                : String(message.content),
+          },
+        ],
+      }));
+    }
+
+    // Build the result with proper typing.
+    // Use nullish coalescing so a hook that only sets `model` still works --
+    // fall back to the base request's model rather than overwriting with undefined.
+    const result: GenerateContentParameters = {
+      ...baseRequest,
+      model: hookRequest.model ?? baseRequest?.model ?? '',
+      contents,
+    };
+
+    // Add generation config if it exists in the hook request
+    if (hookRequest.config) {
+      const baseConfig = baseRequest
+        ? extractGenerationConfig(baseRequest)
+        : undefined;
+
+      result.config = {
+        ...baseConfig,
+        temperature: hookRequest.config.temperature,
+        maxOutputTokens: hookRequest.config.maxOutputTokens,
+        topP: hookRequest.config.topP,
+        topK: hookRequest.config.topK,
+      } as GenerateContentParameters['config'];
+    }
+
+    return result;
+  }
+
+  /**
+   * Convert genai SDK GenerateContentResponse to stable LLMResponse
+   */
+  toHookLLMResponse(sdkResponse: GenerateContentResponse): LLMResponse {
+    return {
+      text: getResponseText(sdkResponse) ?? undefined,
+      candidates: (sdkResponse.candidates || []).map((candidate) => {
+        // Extract text parts from the candidate
+        const textParts =
+          candidate.content?.parts
+            ?.filter(hasTextProperty)
+            .map((part) => part.text) || [];
+
+        return {
+          content: {
+            role: 'model' as const,
+            parts: textParts,
+          },
+          finishReason:
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            candidate.finishReason as LLMResponse['candidates'][0]['finishReason'],
+          index: candidate.index,
+          safetyRatings: candidate.safetyRatings?.map((rating) => ({
+            category: String(rating.category || ''),
+            probability: String(rating.probability || ''),
+          })),
+        };
+      }),
+      usageMetadata: sdkResponse.usageMetadata
+        ? {
+            promptTokenCount: sdkResponse.usageMetadata.promptTokenCount,
+            candidatesTokenCount:
+              sdkResponse.usageMetadata.candidatesTokenCount,
+            totalTokenCount: sdkResponse.usageMetadata.totalTokenCount,
+          }
+        : undefined,
+    };
+  }
+
+  /**
+   * Convert stable LLMResponse to genai SDK GenerateContentResponse
+   */
+  fromHookLLMResponse(hookResponse: LLMResponse): GenerateContentResponse {
+    // Build response object with proper structure
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const response: GenerateContentResponse = {
+      text: hookResponse.text,
+      candidates: hookResponse.candidates.map((candidate) => ({
+        content: {
+          role: 'model',
+          parts: candidate.content.parts.map((part) => ({
+            text: part,
+          })),
+        },
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        finishReason: candidate.finishReason as FinishReason,
+        index: candidate.index,
+        safetyRatings: candidate.safetyRatings,
+      })),
+      usageMetadata: hookResponse.usageMetadata,
+    } as GenerateContentResponse;
+
+    return response;
+  }
+
+  /**
+   * Convert genai SDK ToolConfig to stable HookToolConfig
+   */
+  toHookToolConfig(sdkToolConfig: ToolConfig): HookToolConfig {
+    return {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      mode: sdkToolConfig.functionCallingConfig?.mode as HookToolConfig['mode'],
+      allowedFunctionNames:
+        sdkToolConfig.functionCallingConfig?.allowedFunctionNames,
+    };
+  }
+
+  /**
+   * Convert stable HookToolConfig to genai SDK ToolConfig
+   */
+  fromHookToolConfig(hookToolConfig: HookToolConfig): ToolConfig {
+    const functionCallingConfig: FunctionCallingConfig | undefined =
+      hookToolConfig.mode || hookToolConfig.allowedFunctionNames
+        ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          ({
+            mode: hookToolConfig.mode,
+            allowedFunctionNames: hookToolConfig.allowedFunctionNames,
+          } as FunctionCallingConfig)
+        : undefined;
+
+    return {
+      functionCallingConfig,
+    };
+  }
+}
+
+/**
+ * Default translator instance for current GenAI SDK version
+ */
+export const defaultHookTranslator = new HookTranslatorGenAIv1();

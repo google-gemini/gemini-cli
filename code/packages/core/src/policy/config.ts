@@ -1,0 +1,934 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import * as crypto from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+import { Storage } from '../config/storage.js';
+import { debugLogger } from '../utils/debugLogger.js';
+import {
+  ApprovalMode,
+  type PolicyEngineConfig,
+  PolicyDecision,
+  type PolicyRule,
+  type PolicySettings,
+  type SafetyCheckerRule,
+  ALWAYS_ALLOW_PRIORITY_OFFSET,
+} from './types.js';
+import type { PolicyEngine } from './policy-engine.js';
+import { loadPoliciesFromToml, type PolicyFileError } from './toml-loader.js';
+import { buildArgsPatterns, isSafeRegExp } from './utils.js';
+import toml from '@iarna/toml';
+import {
+  MessageBusType,
+  type UpdatePolicy,
+} from '../confirmation-bus/types.js';
+import { type MessageBus } from '../confirmation-bus/message-bus.js';
+import { coreEvents } from '../utils/events.js';
+import { SHELL_TOOL_NAMES } from '../utils/shell-utils.js';
+import {
+  SHELL_TOOL_NAME,
+  TOOLS_REQUIRING_NARROWING,
+} from '../tools/tool-names.js';
+import { isNodeError } from '../utils/errors.js';
+import { MCP_TOOL_PREFIX } from '../tools/mcp-tool.js';
+
+import { isDirectorySecure } from '../utils/security.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+export const DEFAULT_CORE_POLICIES_DIR = path.join(__dirname, 'policies');
+
+// Cache to prevent duplicate warnings in the same process
+const emittedWarnings = new Set<string>();
+
+/**
+ * Emits a warning feedback event only once per process.
+ */
+function emitWarningOnce(message: string): void {
+  if (!emittedWarnings.has(message)) {
+    coreEvents.emitFeedback('warning', message);
+    emittedWarnings.add(message);
+  }
+}
+
+/**
+ * Clears the emitted warnings cache. Used primarily for tests.
+ */
+export function clearEmittedPolicyWarnings(): void {
+  emittedWarnings.clear();
+}
+
+// Policy tier constants for priority calculation
+export const DEFAULT_POLICY_TIER = 1;
+export const EXTENSION_POLICY_TIER = 2;
+export const WORKSPACE_POLICY_TIER = 3;
+export const USER_POLICY_TIER = 4;
+export const ADMIN_POLICY_TIER = 5;
+
+// Specific priority offsets and derived priorities for dynamic/settings rules.
+
+export const MCP_EXCLUDED_PRIORITY = USER_POLICY_TIER + 0.9;
+export const EXCLUDE_TOOLS_FLAG_PRIORITY = USER_POLICY_TIER + 0.4;
+export const CONFIRMATION_REQUIRED_PRIORITY = USER_POLICY_TIER + 0.35;
+export const ALLOWED_TOOLS_FLAG_PRIORITY = USER_POLICY_TIER + 0.3;
+export const CORE_TOOLS_FLAG_PRIORITY = USER_POLICY_TIER + 0.25;
+export const TRUSTED_MCP_SERVER_PRIORITY = USER_POLICY_TIER + 0.2;
+export const ALLOWED_MCP_SERVER_PRIORITY = USER_POLICY_TIER + 0.1;
+
+// These are added to the tier base (e.g., USER_POLICY_TIER).
+// Workspace tier (3) + high priority (950/1000) = ALWAYS_ALLOW_PRIORITY
+export const ALWAYS_ALLOW_PRIORITY =
+  WORKSPACE_POLICY_TIER + ALWAYS_ALLOW_PRIORITY_OFFSET;
+
+/**
+ * Returns the fractional priority of ALWAYS_ALLOW_PRIORITY scaled to 1000.
+ */
+export function getAlwaysAllowPriorityFraction(): number {
+  return Math.round((ALWAYS_ALLOW_PRIORITY % 1) * 1000);
+}
+
+/**
+ * Gets the list of directories to search for policy files, in order of increasing priority
+ * (Default -> Extension -> Workspace -> User -> Admin).
+ *
+ * Note: Extension policies are loaded separately by the extension manager.
+ *
+ * @param defaultPoliciesDir Optional path to a directory containing default policies.
+ * @param policyPaths Optional user-provided policy paths (from --policy flag).
+ *   When provided, these replace the default user policies directory.
+ * @param workspacePoliciesDir Optional path to a directory containing workspace policies.
+ * @param adminPolicyPaths Optional admin-provided policy paths (from --admin-policy flag).
+ *   When provided, these supplement the default system policies directory.
+ */
+export function getPolicyDirectories(
+  defaultPoliciesDir?: string,
+  policyPaths?: string[],
+  workspacePoliciesDir?: string,
+  adminPolicyPaths?: string[],
+): string[] {
+  return [
+    // Admin tier (highest priority)
+    Storage.getSystemPoliciesDir(),
+    ...(adminPolicyPaths ?? []),
+
+    // User tier (second highest priority)
+    ...(policyPaths && policyPaths.length > 0
+      ? policyPaths
+      : [Storage.getUserPoliciesDir()]),
+
+    // Workspace Tier (third highest)
+    workspacePoliciesDir,
+
+    // Default tier (lowest priority)
+    defaultPoliciesDir ?? DEFAULT_CORE_POLICIES_DIR,
+  ].filter((dir): dir is string => !!dir);
+}
+
+/**
+ * Determines the policy tier (1=default, 2=extension, 3=workspace, 4=user, 5=admin) for a given directory.
+ * This is used by the TOML loader to assign priority bands.
+ */
+export function getPolicyTier(
+  dir: string,
+  context: {
+    defaultPoliciesDir?: string;
+    workspacePoliciesDir?: string;
+    adminPolicyPaths?: Set<string>;
+    systemPoliciesDir: string;
+    userPoliciesDir: string;
+  },
+): number {
+  const normalizedDir = path.resolve(dir);
+
+  if (normalizedDir === context.systemPoliciesDir) {
+    return ADMIN_POLICY_TIER;
+  }
+  if (context.adminPolicyPaths?.has(normalizedDir)) {
+    return ADMIN_POLICY_TIER;
+  }
+  if (normalizedDir === context.userPoliciesDir) {
+    return USER_POLICY_TIER;
+  }
+  if (
+    context.workspacePoliciesDir &&
+    normalizedDir === path.resolve(context.workspacePoliciesDir)
+  ) {
+    return WORKSPACE_POLICY_TIER;
+  }
+  if (
+    context.defaultPoliciesDir &&
+    normalizedDir === path.resolve(context.defaultPoliciesDir)
+  ) {
+    return DEFAULT_POLICY_TIER;
+  }
+  if (normalizedDir === path.resolve(DEFAULT_CORE_POLICIES_DIR)) {
+    return DEFAULT_POLICY_TIER;
+  }
+
+  return DEFAULT_POLICY_TIER;
+}
+
+/**
+ * Formats a policy file error for console logging.
+ */
+export function formatPolicyError(error: PolicyFileError): string {
+  const tierLabel = error.tier.toUpperCase();
+  const severityLabel = error.severity === 'warning' ? 'warning' : 'error';
+  let message = `[${tierLabel}] Policy file ${severityLabel} in ${error.fileName}:\n`;
+  message += `  ${error.message}`;
+  if (error.details) {
+    message += `\n${error.details}`;
+  }
+  if (error.suggestion) {
+    message += `\n  Suggestion: ${error.suggestion}`;
+  }
+  return message;
+}
+
+/**
+ * Filters out insecure policy directories (specifically the system policy directory).
+ * Supplemental admin policy paths are NOT subject to strict security checks as they
+ * are explicitly provided by the user/administrator via flags or settings.
+ * Emits warnings if insecure directories are found.
+ */
+async function filterSecurePolicyDirectories(
+  dirs: string[],
+  systemPoliciesDir: string,
+): Promise<string[]> {
+  const results = await Promise.all(
+    dirs.map(async (dir) => {
+      const normalizedDir = path.resolve(dir);
+      const isSystemPolicy = normalizedDir === systemPoliciesDir;
+
+      if (isSystemPolicy) {
+        const { secure, reason } = await isDirectorySecure(dir);
+        if (!secure) {
+          const msg = `Security Warning: Skipping system policies from ${dir}: ${reason}`;
+          emitWarningOnce(msg);
+          return null;
+        }
+      }
+      return dir;
+    }),
+  );
+
+  return results.filter((dir): dir is string => dir !== null);
+}
+
+/**
+ * Loads and sanitizes policies from an extension's policies directory.
+ * Security: Filters out 'ALLOW' rules and YOLO mode configurations.
+ */
+export async function loadExtensionPolicies(
+  extensionName: string,
+  policyDir: string,
+): Promise<{
+  rules: PolicyRule[];
+  checkers: SafetyCheckerRule[];
+  errors: PolicyFileError[];
+}> {
+  const result = await loadPoliciesFromToml(
+    [policyDir],
+    () => EXTENSION_POLICY_TIER,
+  );
+
+  const rules = result.rules.filter((rule) => {
+    // Security: Extensions are not allowed to automatically approve tool calls.
+    if (rule.decision === PolicyDecision.ALLOW) {
+      debugLogger.warn(
+        `[PolicyConfig] Extension "${extensionName}" attempted to contribute an ALLOW rule for tool "${rule.toolName}". Ignoring this rule for security.`,
+      );
+      return false;
+    }
+
+    // Security: Extensions are not allowed to contribute YOLO mode rules.
+    if (rule.modes?.includes(ApprovalMode.YOLO)) {
+      debugLogger.warn(
+        `[PolicyConfig] Extension "${extensionName}" attempted to contribute a rule for YOLO mode. Ignoring this rule for security.`,
+      );
+      return false;
+    }
+
+    // Prefix source with extension name to avoid collisions and double prefixing.
+    // toml-loader.ts adds "Extension: file.toml", we transform it to "Extension (name): file.toml".
+    rule.source = rule.source?.replace(
+      /^Extension: /,
+      `Extension (${extensionName}): `,
+    );
+    return true;
+  });
+
+  const checkers = result.checkers.filter((checker) => {
+    // Security: Extensions are not allowed to contribute YOLO mode checkers.
+    if (checker.modes?.includes(ApprovalMode.YOLO)) {
+      debugLogger.warn(
+        `[PolicyConfig] Extension "${extensionName}" attempted to contribute a safety checker for YOLO mode. Ignoring this checker for security.`,
+      );
+      return false;
+    }
+
+    // Prefix source with extension name.
+    checker.source = checker.source?.replace(
+      /^Extension: /,
+      `Extension (${extensionName}): `,
+    );
+    return true;
+  });
+
+  return { rules, checkers, errors: result.errors };
+}
+
+export async function createPolicyEngineConfig(
+  settings: PolicySettings,
+  approvalMode: ApprovalMode,
+  defaultPoliciesDir?: string,
+  interactive: boolean = true,
+): Promise<PolicyEngineConfig> {
+  const systemPoliciesDir = path.resolve(Storage.getSystemPoliciesDir());
+  const userPoliciesDir = path.resolve(Storage.getUserPoliciesDir());
+  let adminPolicyPaths = settings.adminPolicyPaths;
+
+  // Security: Ignore supplemental admin policies if the system directory already contains policies.
+  // This prevents flag-based overrides when a central system policy is established.
+  if (adminPolicyPaths?.length) {
+    try {
+      const files = await fs.readdir(systemPoliciesDir);
+      if (files.some((f) => f.endsWith('.toml'))) {
+        const msg = `Security Warning: Ignoring --admin-policy because system policies are already defined in ${systemPoliciesDir}`;
+        emitWarningOnce(msg);
+        adminPolicyPaths = undefined;
+      }
+    } catch (e) {
+      if (!isNodeError(e) || e.code !== 'ENOENT') {
+        debugLogger.warn(
+          `Failed to check system policies in ${systemPoliciesDir}`,
+          e,
+        );
+      }
+    }
+  }
+
+  const policyDirs = getPolicyDirectories(
+    defaultPoliciesDir,
+    settings.policyPaths,
+    settings.workspacePoliciesDir,
+    adminPolicyPaths,
+  );
+
+  const adminPolicyPathsSet = adminPolicyPaths
+    ? new Set(adminPolicyPaths.map((p) => path.resolve(p)))
+    : undefined;
+
+  const securePolicyDirs = await filterSecurePolicyDirectories(
+    policyDirs,
+    systemPoliciesDir,
+  );
+
+  const tierContext = {
+    defaultPoliciesDir,
+    workspacePoliciesDir: settings.workspacePoliciesDir,
+    adminPolicyPaths: adminPolicyPathsSet,
+    systemPoliciesDir,
+    userPoliciesDir,
+  };
+
+  const userProvidedPaths = settings.policyPaths
+    ? new Set(settings.policyPaths.map((p) => path.resolve(p)))
+    : new Set<string>();
+
+  // Load policies from TOML files
+  const {
+    rules: tomlRules,
+    checkers: tomlCheckers,
+    errors,
+  } = await loadPoliciesFromToml(securePolicyDirs, (p) => {
+    const normalizedPath = path.resolve(p);
+    const tier = getPolicyTier(normalizedPath, tierContext);
+
+    // If it's a user-provided path that isn't already categorized as ADMIN, treat it as USER tier.
+    if (userProvidedPaths.has(normalizedPath) && tier !== ADMIN_POLICY_TIER) {
+      return USER_POLICY_TIER;
+    }
+
+    return tier;
+  });
+
+  // Emit any errors encountered during TOML loading to the UI
+  // coreEvents has a buffer that will display these once the UI is ready
+  if (errors.length > 0) {
+    for (const error of errors) {
+      coreEvents.emitFeedback(
+        error.severity ?? 'error',
+        formatPolicyError(error),
+      );
+    }
+  }
+
+  const rules: PolicyRule[] = [...tomlRules];
+  const checkers = [...tomlCheckers];
+
+  // Priority system for policy rules:
+
+  // - Higher priority numbers win over lower priority numbers
+  // - When multiple rules match, the highest priority rule is applied
+  // - Rules are evaluated in order of priority (highest first)
+  //
+  // Priority bands (tiers):
+  // - Default policies (TOML): 1 + priority/1000 (e.g., priority 100 → 1.100)
+  // - Extension policies (TOML): 2 + priority/1000 (e.g., priority 100 → 2.100)
+  // - Workspace policies (TOML): 3 + priority/1000 (e.g., priority 100 → 3.100)
+  // - User policies (TOML): 4 + priority/1000 (e.g., priority 100 → 4.100)
+  // - Admin policies (TOML): 5 + priority/1000 (e.g., priority 100 → 5.100)
+  //
+  // This ensures Admin > User > Workspace > Extension > Default hierarchy is always preserved,
+  // while allowing user-specified priorities to work within each tier.
+  //
+  // Settings-based and dynamic rules (mixed tiers):
+  //   MCP_EXCLUDED_PRIORITY:        MCP servers excluded list (security: persistent server blocks)
+  //   EXCLUDE_TOOLS_FLAG_PRIORITY:  Command line flag --exclude-tools (explicit temporary blocks)
+  //   ALLOWED_TOOLS_FLAG_PRIORITY:  Command line flag --allowed-tools (explicit temporary allows)
+  //   TRUSTED_MCP_SERVER_PRIORITY:  MCP servers with trust=true (persistent trusted servers)
+  //   ALLOWED_MCP_SERVER_PRIORITY:  MCP servers allowed list (persistent general server allows)
+  //   ALWAYS_ALLOW_PRIORITY:        Tools that the user has selected as "Always Allow" in the interactive UI
+  //                                 (Workspace tier 3.x - scoped to the project)
+  //
+  // TOML policy priorities (before transformation):
+  //   10: Write tools default to ASK_USER (becomes 1.010 in default tier)
+  //   15: Auto-edit tool override (becomes 1.015 in default tier)
+  //   30: Unknown subagents (blocked by Plan Mode's 40)
+  //   40: Plan mode catch-all DENY override (becomes 1.040 in default tier)
+  //   50: Read-only tools (becomes 1.050 in default tier)
+  //   70: Mode transition overrides (becomes 1.070 in default tier)
+  //   999: YOLO mode allow-all (becomes 1.999 in default tier)
+
+  // MCP servers that are explicitly excluded in settings.mcp.excluded
+  // Priority: MCP_EXCLUDED_PRIORITY (highest in user tier for security - persistent server blocks)
+  if (settings.mcp?.excluded) {
+    for (const serverName of settings.mcp.excluded) {
+      rules.push({
+        toolName:
+          serverName === '*'
+            ? `${MCP_TOOL_PREFIX}*`
+            : `${MCP_TOOL_PREFIX}${serverName}_*`,
+        mcpName: serverName,
+        decision: PolicyDecision.DENY,
+        priority: MCP_EXCLUDED_PRIORITY,
+        source: 'Settings (MCP Excluded)',
+      });
+    }
+  }
+
+  // Tools that are explicitly excluded in the settings.
+  // Priority: EXCLUDE_TOOLS_FLAG_PRIORITY (user tier - explicit temporary blocks)
+  if (settings.tools?.exclude) {
+    for (const tool of settings.tools.exclude) {
+      rules.push({
+        toolName: tool,
+        decision: PolicyDecision.DENY,
+        priority: EXCLUDE_TOOLS_FLAG_PRIORITY,
+        source: 'Settings (Tools Excluded)',
+      });
+    }
+  }
+
+  const nonPlanModes = [
+    ApprovalMode.DEFAULT,
+    ApprovalMode.AUTO_EDIT,
+    ApprovalMode.YOLO,
+  ];
+
+  const mapToolsToRules = (
+    tools: string[],
+    priority: number,
+    source: string,
+    modes?: ApprovalMode[],
+    addDefaultDenyForTools = false,
+  ) => {
+    const toolsWithNarrowing = new Set<string>();
+    for (const tool of tools) {
+      // Check for legacy format: toolName(args)
+      const match = tool.match(/^([a-zA-Z0-9_-]+)\((.*)\)$/);
+      if (match) {
+        const [, rawToolName, args] = match;
+        // Normalize shell tool aliases
+        const toolName = SHELL_TOOL_NAMES.includes(rawToolName)
+          ? SHELL_TOOL_NAME
+          : rawToolName;
+
+        // Treat args as a command prefix for shell tool
+        if (toolName === SHELL_TOOL_NAME) {
+          toolsWithNarrowing.add(toolName);
+          const patterns = buildArgsPatterns(undefined, args);
+          for (const pattern of patterns) {
+            if (pattern) {
+              rules.push({
+                toolName,
+                decision: PolicyDecision.ALLOW,
+                priority,
+                argsPattern: new RegExp(pattern),
+                source,
+                modes,
+              });
+            }
+          }
+        } else {
+          // For non-shell tools, we allow the tool itself but ignore args
+          // as args matching was only supported for shell tools historically.
+          rules.push({
+            toolName,
+            decision: PolicyDecision.ALLOW,
+            priority,
+            source,
+            modes,
+          });
+        }
+      } else {
+        // Standard tool name
+        const toolName = SHELL_TOOL_NAMES.includes(tool)
+          ? SHELL_TOOL_NAME
+          : tool;
+        rules.push({
+          toolName,
+          decision: PolicyDecision.ALLOW,
+          priority,
+          source,
+          modes,
+        });
+      }
+    }
+
+    if (addDefaultDenyForTools) {
+      for (const toolName of toolsWithNarrowing) {
+        rules.push({
+          toolName,
+          decision: PolicyDecision.DENY,
+          priority: priority - 0.01,
+          source: `${source} (Narrowing Enforcement)`,
+          modes,
+        });
+      }
+    }
+  };
+
+  // Tools that are explicitly allowed in the settings.
+  // Priority: ALLOWED_TOOLS_FLAG_PRIORITY (user tier - explicit temporary allows)
+  if (settings.tools?.allowed) {
+    mapToolsToRules(
+      settings.tools.allowed,
+      ALLOWED_TOOLS_FLAG_PRIORITY,
+      'Settings (Tools Allowed)',
+      undefined,
+      true,
+    );
+  }
+
+  // Tools that explicitly require confirmation in the settings.
+  // Priority: CONFIRMATION_REQUIRED_PRIORITY (overrides allowed and core)
+  if (settings.tools?.confirmationRequired) {
+    for (const tool of settings.tools.confirmationRequired) {
+      rules.push({
+        toolName: SHELL_TOOL_NAMES.includes(tool) ? SHELL_TOOL_NAME : tool,
+        decision: PolicyDecision.ASK_USER,
+        priority: CONFIRMATION_REQUIRED_PRIORITY,
+        source: 'Settings (Confirmation Required)',
+      });
+    }
+  }
+
+  // Core tools that are restricted in the settings.
+  // Priority: CORE_TOOLS_FLAG_PRIORITY (user tier - core tool allowlist)
+  if (settings.tools?.core) {
+    mapToolsToRules(
+      settings.tools.core,
+      CORE_TOOLS_FLAG_PRIORITY,
+      'Settings (Core Tools)',
+      nonPlanModes,
+    );
+
+    // If core tools are restricted, we should add a default DENY rule for everything else
+    // at a slightly lower priority than the explicit allows.
+    rules.push({
+      toolName: '*',
+      decision: PolicyDecision.DENY,
+      priority: CORE_TOOLS_FLAG_PRIORITY - 0.01,
+      source: 'Settings (Core Tools Allowlist Enforcement)',
+      modes: nonPlanModes,
+    });
+  }
+
+  // MCP servers that are trusted in the settings.
+  // Priority: TRUSTED_MCP_SERVER_PRIORITY (user tier - persistent trusted servers)
+  if (settings.mcpServers) {
+    for (const [serverName, serverConfig] of Object.entries(
+      settings.mcpServers,
+    )) {
+      if (serverConfig.trust) {
+        // Trust all tools from this MCP server
+        // Using explicit mcpName metadata and FQN mcp_{serverName}_*
+        rules.push({
+          toolName: `${MCP_TOOL_PREFIX}${serverName}_*`,
+          mcpName: serverName,
+          decision: PolicyDecision.ALLOW,
+          priority: TRUSTED_MCP_SERVER_PRIORITY,
+          source: 'Settings (MCP Trusted)',
+          modes: nonPlanModes,
+        });
+      }
+    }
+  }
+
+  // MCP servers that are explicitly allowed in settings.mcp.allowed
+  // Priority: ALLOWED_MCP_SERVER_PRIORITY (user tier - persistent general server allows)
+  if (settings.mcp?.allowed) {
+    for (const serverName of settings.mcp.allowed) {
+      rules.push({
+        toolName:
+          serverName === '*'
+            ? `${MCP_TOOL_PREFIX}*`
+            : `${MCP_TOOL_PREFIX}${serverName}_*`,
+        mcpName: serverName,
+        decision: PolicyDecision.ALLOW,
+        priority: ALLOWED_MCP_SERVER_PRIORITY,
+        source: 'Settings (MCP Allowed)',
+        modes: nonPlanModes,
+      });
+    }
+  }
+
+  // In non-interactive mode, automatically allow all configured MCP servers if opted-in.
+  // This ensures that tools provided by these servers are available without
+  // requiring explicit entries in settings.mcp.allowed.
+  if (
+    !interactive &&
+    settings.mcp?.autoAllowInHeadless &&
+    settings.mcpServers
+  ) {
+    for (const serverName of Object.keys(settings.mcpServers)) {
+      // Avoid duplicates if already explicitly allowed, allowed via wildcard, or trusted.
+      if (
+        settings.mcp?.allowed?.includes(serverName) ||
+        settings.mcp?.allowed?.includes('*') ||
+        settings.mcpServers[serverName].trust
+      ) {
+        continue;
+      }
+
+      rules.push({
+        toolName:
+          serverName === '*'
+            ? `${MCP_TOOL_PREFIX}*`
+            : `${MCP_TOOL_PREFIX}${serverName}_*`,
+        mcpName: serverName,
+        decision: PolicyDecision.ALLOW,
+        priority: ALLOWED_MCP_SERVER_PRIORITY,
+        source: 'Settings (Headless MCP Auto-Allow)',
+        modes: nonPlanModes,
+      });
+    }
+  }
+
+  return {
+    rules,
+    checkers,
+    defaultDecision: interactive
+      ? PolicyDecision.ASK_USER
+      : PolicyDecision.DENY,
+    nonInteractive: !interactive,
+    approvalMode,
+    disableAlwaysAllow: settings.disableAlwaysAllow,
+  };
+}
+interface TomlRule {
+  toolName?: string;
+  mcpName?: string;
+  decision?: string;
+  priority?: number;
+  commandPrefix?: string | string[];
+  argsPattern?: string;
+  allowRedirection?: boolean;
+  modes?: ApprovalMode[];
+  // Index signature to satisfy Record type if needed for toml.stringify
+  [key: string]: unknown;
+}
+
+/**
+ * Finds a rule in the rule array that matches the given criteria.
+ */
+function findMatchingRule(
+  rules: TomlRule[],
+  criteria: {
+    toolName: string;
+    mcpName?: string;
+    commandPrefix?: string | string[];
+    argsPattern?: string;
+  },
+): TomlRule | undefined {
+  return rules.find(
+    (r) =>
+      r.toolName === criteria.toolName &&
+      r.mcpName === criteria.mcpName &&
+      JSON.stringify(r.commandPrefix) ===
+        JSON.stringify(criteria.commandPrefix) &&
+      r.argsPattern === criteria.argsPattern,
+  );
+}
+
+/**
+ * Creates a new TOML rule object from the given tool name and message.
+ */
+function createTomlRule(toolName: string, message: UpdatePolicy): TomlRule {
+  const rule: TomlRule = {
+    decision: 'allow',
+    priority: getAlwaysAllowPriorityFraction(),
+    toolName,
+  };
+
+  if (message.mcpName) {
+    rule.mcpName = message.mcpName;
+  }
+
+  if (message.commandPrefix) {
+    rule.commandPrefix = message.commandPrefix;
+  } else if (message.argsPattern) {
+    rule.argsPattern = message.argsPattern;
+  }
+
+  if (message.allowRedirection !== undefined) {
+    rule.allowRedirection = message.allowRedirection;
+  }
+
+  if (message.modes) {
+    rule.modes = message.modes;
+  }
+
+  return rule;
+}
+
+export function createPolicyUpdater(
+  policyEngine: PolicyEngine,
+  messageBus: MessageBus,
+  storage: Storage,
+) {
+  // Use a sequential queue for persistence to avoid lost updates from concurrent events.
+  let persistenceQueue = Promise.resolve();
+
+  messageBus.subscribe(
+    MessageBusType.UPDATE_POLICY,
+    async (message: UpdatePolicy) => {
+      const toolName = message.toolName;
+
+      if (message.commandPrefix) {
+        // Convert commandPrefix(es) to argsPatterns for in-memory rules
+        const patterns = buildArgsPatterns(undefined, message.commandPrefix);
+        const tier =
+          message.persistScope === 'user'
+            ? USER_POLICY_TIER
+            : WORKSPACE_POLICY_TIER;
+        const priority = tier + getAlwaysAllowPriorityFraction() / 1000;
+
+        if (TOOLS_REQUIRING_NARROWING.has(toolName) && !message.commandPrefix) {
+          debugLogger.warn(
+            `Attempted to update policy for sensitive tool '${toolName}' without a commandPrefix. Skipping.`,
+          );
+          return;
+        }
+
+        for (const pattern of patterns) {
+          if (pattern) {
+            // Note: patterns from buildArgsPatterns are derived from escapeRegex,
+            // which is safe and won't contain ReDoS patterns.
+            policyEngine.addRule({
+              toolName,
+              decision: PolicyDecision.ALLOW,
+              priority,
+              argsPattern: new RegExp(pattern),
+              mcpName: message.mcpName,
+              modes: message.modes,
+              source: 'Dynamic (Confirmed)',
+              allowRedirection: message.allowRedirection,
+            });
+          }
+        }
+      } else {
+        if (message.argsPattern && !isSafeRegExp(message.argsPattern)) {
+          coreEvents.emitFeedback(
+            'error',
+            `Invalid or unsafe regular expression for tool ${toolName}: ${message.argsPattern}`,
+          );
+          return;
+        }
+
+        const argsPattern = message.argsPattern
+          ? new RegExp(message.argsPattern)
+          : undefined;
+
+        const tier =
+          message.persistScope === 'user'
+            ? USER_POLICY_TIER
+            : WORKSPACE_POLICY_TIER;
+        const priority = tier + getAlwaysAllowPriorityFraction() / 1000;
+
+        if (TOOLS_REQUIRING_NARROWING.has(toolName) && !message.argsPattern) {
+          debugLogger.warn(
+            `Attempted to update policy for sensitive tool '${toolName}' without an argsPattern. Skipping.`,
+          );
+          return;
+        }
+
+        policyEngine.addRule({
+          toolName,
+          decision: PolicyDecision.ALLOW,
+          priority,
+          argsPattern,
+          mcpName: message.mcpName,
+          modes: message.modes,
+          source: 'Dynamic (Confirmed)',
+          allowRedirection: message.allowRedirection,
+        });
+      }
+
+      if (message.persist) {
+        persistenceQueue = persistenceQueue.then(async () => {
+          let tmpFile: string | undefined;
+          try {
+            const policyFile =
+              message.persistScope === 'workspace'
+                ? storage.getWorkspaceAutoSavedPolicyPath()
+                : storage.getAutoSavedPolicyPath();
+            await fs.mkdir(path.dirname(policyFile), { recursive: true });
+
+            // Read existing file
+            let existingData: { rule?: TomlRule[] } = {};
+            try {
+              const fileContent = await fs.readFile(policyFile, 'utf-8');
+              const parsed = toml.parse(fileContent);
+              if (
+                typeof parsed === 'object' &&
+                parsed !== null &&
+                (!('rule' in parsed) || Array.isArray(parsed['rule']))
+              ) {
+                existingData = parsed as { rule?: TomlRule[] };
+              }
+            } catch (error) {
+              if (isNodeError(error) && error.code === 'ENOENT') {
+                // File doesn't exist yet, start fresh
+              } else if (!isNodeError(error)) {
+                // TOML parse error — back up corrupted file and recover
+                coreEvents.emitFeedback(
+                  'warning',
+                  `Syntax error found in policy file. Backing up corrupted file to ${policyFile}.bak and starting fresh.`,
+                );
+                if (
+                  !(
+                    await fs.lstat(policyFile).catch(() => null)
+                  )?.isSymbolicLink()
+                ) {
+                  await fs
+                    .copyFile(policyFile, `${policyFile}.bak`)
+                    .catch(() => {});
+                }
+                existingData = {};
+              } else {
+                // Real filesystem error (e.g. EACCES) — throw to prevent silent failure
+                throw error;
+              }
+            }
+
+            // Initialize rule array if needed
+            if (!existingData.rule) {
+              existingData.rule = [];
+            }
+
+            // Normalize tool name for MCP
+            let normalizedToolName = toolName;
+            if (message.mcpName) {
+              const expectedPrefix = `${MCP_TOOL_PREFIX}${message.mcpName}_`;
+              if (toolName.startsWith(expectedPrefix)) {
+                normalizedToolName = toolName.slice(expectedPrefix.length);
+              }
+            }
+
+            // Look for an existing rule to update
+            const existingRule = findMatchingRule(existingData.rule, {
+              toolName: normalizedToolName,
+              mcpName: message.mcpName,
+              commandPrefix: message.commandPrefix,
+              argsPattern: message.argsPattern,
+            });
+
+            if (existingRule) {
+              if (message.allowRedirection !== undefined) {
+                existingRule.allowRedirection = message.allowRedirection;
+              }
+              if (message.modes) {
+                existingRule.modes = message.modes;
+              }
+            } else {
+              existingData.rule.push(
+                createTomlRule(normalizedToolName, message),
+              );
+            }
+
+            // Serialize back to TOML
+            // @iarna/toml stringify might not produce beautiful output but it handles escaping correctly
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            const newContent = toml.stringify(existingData as toml.JsonMap);
+
+            // Atomic write: write to a unique tmp file then rename to the target file.
+            // Using a unique suffix avoids race conditions where concurrent processes
+            // overwrite each other's temporary files, leading to ENOENT errors on rename.
+            const tmpSuffix = crypto.randomBytes(8).toString('hex');
+            tmpFile = `${policyFile}.${tmpSuffix}.tmp`;
+
+            let handle: fs.FileHandle | undefined;
+            try {
+              // Use 'wx' to create the file exclusively (fails if exists) for security.
+              handle = await fs.open(tmpFile, 'wx');
+              await handle.writeFile(newContent, 'utf-8');
+            } finally {
+              await handle?.close();
+            }
+            try {
+              await fs.rename(tmpFile, policyFile);
+            } catch (renameError) {
+              // Cross-device rename fails with EXDEV on some Linux mount configurations.
+              // Fall back to copy + unlink which works across filesystems.
+              if (
+                isNodeError(renameError) &&
+                (renameError.code === 'EXDEV' || renameError.code === 'EBUSY')
+              ) {
+                if (
+                  (
+                    await fs.lstat(policyFile).catch(() => null)
+                  )?.isSymbolicLink()
+                )
+                  throw renameError;
+                await fs.copyFile(tmpFile, policyFile);
+                await fs.unlink(tmpFile).catch(() => {});
+              } else {
+                throw renameError;
+              }
+            }
+          } catch (error) {
+            // Clean up orphaned tmp file if it was created
+            if (tmpFile) {
+              await fs.unlink(tmpFile).catch(() => {});
+            }
+            const reason =
+              error instanceof Error ? error.message : String(error);
+            coreEvents.emitFeedback(
+              'error',
+              `Failed to persist policy for ${toolName}: ${reason}`,
+              error,
+            );
+          }
+        });
+      }
+    },
+  );
+}

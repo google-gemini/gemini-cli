@@ -1,0 +1,215 @@
+# Release extensions
+
+Release Gemini CLI extensions to your users through a Git repository or GitHub
+Releases. This guide explains how to share your work, list it in the gallery,
+and manage updates.
+
+Git repository releases are the simplest approach and offer the most flexibility
+for managing development branches. GitHub Releases are more efficient for
+initial installations because they ship as single archives rather than requiring
+a full `git clone`. Use GitHub Releases if you need to include platform-specific
+binary files.
+
+## List your extension in the gallery
+
+The [Gemini CLI extension gallery](https://geminicli.com/extensions/browse/)
+automatically indexes public extensions to help users discover your work. You
+don't need to submit an issue or email us to list your extension.
+
+To have your extension automatically discovered and listed:
+
+1.  **Use a public repository:** Ensure your extension is hosted in a public
+    GitHub repository.
+2.  **Add the GitHub topic:** Add the `gemini-cli-extension` topic to your
+    repository's **About** section. Our crawler uses this topic to find new
+    extensions.
+3.  **Place the manifest at the root:** Ensure your `gemini-extension.json` file
+    is in the absolute root of the repository or the release archive.
+
+Our system crawls tagged repositories daily. Once you tag your repository, your
+extension will appear in the gallery if it passes validation.
+
+## Release through a Git repository
+
+Releasing through Git is the most flexible option. Create a public Git
+repository and provide the URL to your users. They can then install your
+extension using `gemini extensions install <your-repo-uri>`.
+
+Users can optionally depend on a specific branch, tag, or commit using the
+`--ref` argument. For example:
+
+```bash
+gemini extensions install <your-repo-uri> --ref=stable
+```
+
+Whenever you push commits to the referenced branch, the CLI prompts users to
+update their installation. The `HEAD` commit is always treated as the latest
+version.
+
+### Manage release channels
+
+You can use branches or tags to manage different release channels, such as
+`stable`, `preview`, or `dev`.
+
+We recommend using your default branch as the stable release channel. This
+ensures that the default installation command always provides the most reliable
+version of your extension. You can then use a `dev` branch for active
+development and merge it into the default branch when you are ready for a
+release.
+
+## Release through GitHub Releases
+
+Distributing extensions through
+[GitHub Releases](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases)
+provides a faster installation experience by avoiding a repository clone.
+
+Gemini CLI checks for updates by looking for the **Latest** release on GitHub.
+Users can also install specific versions using the `--ref` argument with a
+release tag. Use the `--pre-release` flag to install the latest version even if
+it isn't marked as **Latest**.
+
+### Custom pre-built archives
+
+You can attach custom archives directly to your GitHub Release as assets. This
+is useful if your extension requires a build step or includes platform-specific
+binaries.
+
+Custom archives must be fully self-contained and follow the required
+[archive structure](#archive-structure). If your extension is
+platform-independent, provide a single generic asset.
+
+#### Platform-specific archives
+
+To let Gemini CLI find the correct asset for a user's platform, use the
+following naming convention:
+
+1.  **Platform and architecture-specific:**
+    `{platform}.{arch}.{name}.{extension}`
+2.  **Platform-specific:** `{platform}.{name}.{extension}`
+3.  **Generic:** A single asset will be used as a fallback if no specific match
+    is found.
+
+Use these values for the placeholders:
+
+- `{name}`: Your extension name.
+- `{platform}`: Use `darwin` (macOS), `linux`, or `win32` (Windows).
+- `{arch}`: Use `x64` or `arm64`.
+- `{extension}`: Use `.tar.gz` or `.zip`.
+
+**Examples:**
+
+- `darwin.arm64.my-tool.tar.gz` (specific to Apple Silicon Macs)
+- `darwin.my-tool.tar.gz` (fallback for all Macs, for example Intel)
+- `linux.x64.my-tool.tar.gz`
+- `win32.my-tool.zip`
+
+#### Archive structure
+
+Archives must be fully contained extensions. The `gemini-extension.json` file
+must be at the root of the archive. The rest of the layout should match a
+standard extension structure.
+
+#### Example GitHub Actions workflow
+
+Use this example workflow to build and release your extension for multiple
+platforms:
+
+```yaml
+name: Release Extension
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build extension
+        run: npm run build
+
+      - name: Create release assets
+        run: |
+          npm run package -- --platform=darwin --arch=arm64
+          npm run package -- --platform=linux --arch=x64
+          npm run package -- --platform=win32 --arch=x64
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            release/darwin.arm64.my-tool.tar.gz
+            release/linux.arm64.my-tool.tar.gz
+            release/win32.arm64.my-tool.zip
+```
+
+## Migrate an extension repository
+
+If you move your extension to a new repository or rename it, use the
+`migratedTo` property in `gemini-extension.json` to seamlessly transition your
+users.
+
+1.  **Create the new repository:** Set up your extension in its new location.
+2.  **Update the old repository:** In your original repository, update the
+    `gemini-extension.json` file to include the `migratedTo` property pointing
+    to the new repository URL, and increment the version number.
+    ```json
+    {
+      "name": "my-extension",
+      "version": "1.1.0",
+      "migratedTo": "https://github.com/new-owner/new-extension-repo"
+    }
+    ```
+3.  **Release the update:** Publish this new version in your old repository.
+
+When users check for updates, Gemini CLI detects the `migratedTo` field,
+verifies the new repository, and automatically updates their local installation
+to track the new source. All settings migrate automatically.
+
+## How updates work
+
+Gemini CLI automatically checks for extension updates based on the installation
+method. Understanding these mechanisms helps you ensure your users always have
+the latest version.
+
+### Sync manifest and tags
+
+For GitHub releases, always ensure the `version` in `gemini-extension.json`
+matches your GitHub release tag. While the CLI uses tags for update detection,
+it displays the manifest version in the UI. Keeping them in sync prevents
+confusion.
+
+### Update mechanisms
+
+<details>
+<summary>Technical update details</summary>
+
+The CLI uses different strategies depending on the installation type:
+
+- **GitHub releases:** The CLI queries the GitHub API for the latest release
+  tag. It ignores the `version` field in the manifest for detection.
+- **Git clones:** The CLI runs `git ls-remote` to compare the latest remote
+  commit hash with your local `HEAD`.
+- **Local extensions:** The CLI compares the `version` field in the source
+  directory's manifest with the installed version.
+
+To verify an extension's installation type, inspect the `type` field in the
+metadata file at `~/.gemini/extensions/<name>/.gemini-extension-install.json`.
+
+</details>
+
+<!-- prettier-ignore -->
+> [!IMPORTANT]
+> The `migratedTo` flow requires at least one release on the new repository for
+> the CLI to recognize it as a valid update source.

@@ -1,0 +1,245 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import type {
+  ModifiableDeclarativeTool,
+  ModifyContext,
+} from '../tools/modifiable-tool.js';
+import {
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  Kind,
+  type ToolCallConfirmationDetails,
+  type ToolInvocation,
+  type ToolResult,
+  type ExecuteOptions,
+} from '../tools/tools.js';
+import { createMockMessageBus } from './mock-message-bus.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
+
+interface MockToolOptions {
+  name: string;
+  displayName?: string;
+  description?: string;
+  canUpdateOutput?: boolean;
+  isOutputMarkdown?: boolean;
+  kind?: Kind;
+  shouldConfirmExecute?: (
+    params: { [key: string]: unknown },
+    signal: AbortSignal,
+  ) => Promise<ToolCallConfirmationDetails | false>;
+  execute?: (
+    params: { [key: string]: unknown },
+    signal?: AbortSignal,
+    updateOutput?: (output: string) => void,
+    options?: ExecuteOptions,
+  ) => Promise<ToolResult>;
+  params?: object;
+  messageBus?: MessageBus;
+}
+
+class MockToolInvocation extends BaseToolInvocation<
+  { [key: string]: unknown },
+  ToolResult
+> {
+  constructor(
+    private readonly tool: MockTool,
+    params: { [key: string]: unknown },
+    messageBus: MessageBus,
+  ) {
+    super(params, messageBus, tool.name, tool.displayName);
+  }
+
+  execute(options: ExecuteOptions): Promise<ToolResult> {
+    const { abortSignal: signal, updateOutput } = options;
+    return this.tool.execute(
+      this.params,
+      signal,
+      updateOutput as ((output: string) => void) | undefined,
+      options,
+    );
+  }
+
+  override shouldConfirmExecute(
+    abortSignal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    return this.tool.shouldConfirmExecute(this.params, abortSignal);
+  }
+
+  getDescription(): string {
+    return `A mock tool invocation for ${this.tool.name}`;
+  }
+}
+
+/**
+ * A highly configurable mock tool for testing purposes.
+ */
+export class MockTool extends BaseDeclarativeTool<
+  { [key: string]: unknown },
+  ToolResult
+> {
+  readonly shouldConfirmExecute: (
+    params: { [key: string]: unknown },
+    signal: AbortSignal,
+  ) => Promise<ToolCallConfirmationDetails | false>;
+
+  readonly execute: (
+    params: { [key: string]: unknown },
+    signal?: AbortSignal,
+    updateOutput?: (output: string) => void,
+    options?: ExecuteOptions,
+  ) => Promise<ToolResult>;
+
+  constructor(options: MockToolOptions) {
+    super(
+      options.name,
+      options.displayName ?? options.name,
+      options.description ?? options.name,
+      options.kind ?? Kind.Other,
+      options.params,
+      options.messageBus ?? createMockMessageBus(),
+      options.isOutputMarkdown ?? false,
+      options.canUpdateOutput ?? false,
+    );
+
+    if (options.shouldConfirmExecute) {
+      this.shouldConfirmExecute = options.shouldConfirmExecute;
+    } else {
+      this.shouldConfirmExecute = () => Promise.resolve(false);
+    }
+
+    if (options.execute) {
+      this.execute = options.execute;
+    } else {
+      this.execute = () =>
+        Promise.resolve({
+          llmContent: `Tool ${this.name} executed successfully.`,
+          returnDisplay: `Tool ${this.name} executed successfully.`,
+        });
+    }
+  }
+
+  protected createInvocation(
+    params: { [key: string]: unknown },
+    messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
+  ): ToolInvocation<{ [key: string]: unknown }, ToolResult> {
+    return new MockToolInvocation(this, params, messageBus);
+  }
+}
+
+export const MOCK_TOOL_SHOULD_CONFIRM_EXECUTE = () =>
+  Promise.resolve({
+    type: 'exec' as const,
+    title: 'Confirm mockTool',
+    command: 'mockTool',
+    rootCommand: 'mockTool',
+    rootCommands: ['mockTool'],
+    onConfirm: async () => {},
+  });
+
+export class MockModifiableToolInvocation extends BaseToolInvocation<
+  Record<string, unknown>,
+  ToolResult
+> {
+  constructor(
+    private readonly tool: MockModifiableTool,
+    params: Record<string, unknown>,
+    messageBus: MessageBus,
+  ) {
+    super(params, messageBus, tool.name, tool.displayName);
+  }
+
+  async execute({
+    abortSignal: _signal,
+    updateOutput: _updateOutput,
+  }: ExecuteOptions): Promise<ToolResult> {
+    const result = this.tool.executeFn(this.params);
+    return (
+      result ?? {
+        llmContent: `Tool ${this.tool.name} executed successfully.`,
+        returnDisplay: `Tool ${this.tool.name} executed successfully.`,
+      }
+    );
+  }
+
+  override async shouldConfirmExecute(
+    _abortSignal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    if (this.tool.shouldConfirm) {
+      return {
+        type: 'edit',
+        title: 'Confirm Mock Tool',
+        fileName: 'test.txt',
+        filePath: 'test.txt',
+        fileDiff: 'diff',
+        originalContent: 'originalContent',
+        newContent: 'newContent',
+        onConfirm: async () => {},
+      };
+    }
+    return false;
+  }
+
+  getDescription(): string {
+    return `A mock modifiable tool invocation for ${this.tool.name}`;
+  }
+}
+
+/**
+ * Configurable mock modifiable tool for testing.
+ */
+export class MockModifiableTool
+  extends BaseDeclarativeTool<Record<string, unknown>, ToolResult>
+  implements ModifiableDeclarativeTool<Record<string, unknown>>
+{
+  // Should be overridden in test file. Functionality will be updated in follow
+  // up PR which has MockModifiableTool expect MockTool
+  executeFn: (params: Record<string, unknown>) => ToolResult | undefined = () =>
+    undefined;
+  shouldConfirm = true;
+
+  constructor(name = 'mockModifiableTool') {
+    super(
+      name,
+      name,
+      'A mock modifiable tool for testing.',
+      Kind.Other,
+      {
+        type: 'object',
+        properties: { param: { type: 'string' } },
+      },
+      createMockMessageBus(),
+      true,
+      false,
+    );
+  }
+
+  getModifyContext(
+    _abortSignal: AbortSignal,
+  ): ModifyContext<Record<string, unknown>> {
+    return {
+      getFilePath: () => 'test.txt',
+      getCurrentContent: async () => 'old content',
+      getProposedContent: async () => 'new content',
+      createUpdatedParams: (
+        _oldContent: string,
+        modifiedProposedContent: string,
+        _originalParams: Record<string, unknown>,
+      ) => ({ newContent: modifiedProposedContent }),
+    };
+  }
+
+  protected createInvocation(
+    params: Record<string, unknown>,
+    messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
+  ): ToolInvocation<Record<string, unknown>, ToolResult> {
+    return new MockModifiableToolInvocation(this, params, messageBus);
+  }
+}

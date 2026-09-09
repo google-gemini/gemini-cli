@@ -1,0 +1,29 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+
+name: 'PR rate limiter'
+
+permissions: {}
+
+on:
+  pull_request_target:
+    types:
+      - 'opened'
+      - 'reopened'
+
+jobs:
+  limit:
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    permissions:
+      contents: 'read'
+      pull-requests: 'write'
+    steps:
+      - name: 'Limit open pull requests per user'
+        uses: 'Homebrew/actions/limit-pull-requests@9ceb7934560eb61d131dde205a6c2d77b2e1529d' # master
+        with:
+          except-author-associations: 'MEMBER,OWNER,COLLABORATOR'
+          comment-limit: 8
+          comment: >
+            You already have 7 pull requests open. Please work on getting
+            existing PRs merged before opening more.
+          close-limit: 8
+          close: true
