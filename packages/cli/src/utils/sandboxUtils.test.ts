@@ -280,6 +280,11 @@ describe('sandboxUtils', () => {
       );
       expect(isSensitiveHostPath('/any/path/mcp-oauth-tokens.json')).toBe(true);
       expect(isSensitiveHostPath('/any/path/a2a-oauth-tokens.json')).toBe(true);
+      expect(isSensitiveHostPath('/any/path/google_accounts.json')).toBe(true);
+      expect(isSensitiveHostPath('/any/path/trusted_hooks.json')).toBe(true);
+      expect(isSensitiveHostPath('/any/path/trustedFolders.json')).toBe(true);
+      expect(isSensitiveHostPath('/any/path/trustedfolders.json')).toBe(true);
+      expect(isSensitiveHostPath('/any/path/policy_integrity.json')).toBe(true);
     });
 
     it('should detect environment files (.env)', () => {
@@ -438,6 +443,11 @@ describe('sandboxUtils', () => {
       expect(isSensitiveHostPath('/workspace/.env')).toBe(true);
       expect(isSensitiveHostPath('/workspace/oauth_creds.json')).toBe(true);
       expect(isSensitiveHostPath('/workspace/google_accounts.json')).toBe(true);
+      expect(isSensitiveHostPath('/workspace/trustedFolders.json')).toBe(true);
+      expect(isSensitiveHostPath('/workspace/trustedfolders.json')).toBe(true);
+      expect(isSensitiveHostPath('/workspace/policy_integrity.json')).toBe(
+        true,
+      );
     });
   });
 
@@ -513,6 +523,16 @@ describe('sandboxUtils', () => {
       expect(SENSITIVE_SETTINGS_FILENAMES.has('a2a-oauth-tokens.json')).toBe(
         true,
       );
+      expect(SENSITIVE_SETTINGS_FILENAMES.has('trusted_hooks.json')).toBe(true);
+      expect(SENSITIVE_SETTINGS_FILENAMES.has('trustedFolders.json')).toBe(
+        true,
+      );
+      expect(SENSITIVE_SETTINGS_FILENAMES.has('trustedfolders.json')).toBe(
+        true,
+      );
+      expect(SENSITIVE_SETTINGS_FILENAMES.has('policy_integrity.json')).toBe(
+        true,
+      );
     });
 
     it('should identify known credential and auth filenames as sensitive', () => {
@@ -532,6 +552,18 @@ describe('sandboxUtils', () => {
       ).toBe(true);
       expect(
         isCredentialOrSensitivePath('/home/user/.gemini/a2a-oauth-tokens.json'),
+      ).toBe(true);
+      expect(
+        isCredentialOrSensitivePath('/home/user/.gemini/trusted_hooks.json'),
+      ).toBe(true);
+      expect(
+        isCredentialOrSensitivePath('/home/user/.gemini/trustedFolders.json'),
+      ).toBe(true);
+      expect(
+        isCredentialOrSensitivePath('/home/user/.gemini/trustedfolders.json'),
+      ).toBe(true);
+      expect(
+        isCredentialOrSensitivePath('/home/user/.gemini/policy_integrity.json'),
       ).toBe(true);
     });
 
@@ -579,12 +611,6 @@ describe('sandboxUtils', () => {
       ).toBe(false);
       expect(
         isCredentialOrSensitivePath('/home/user/.gemini/keybindings.json'),
-      ).toBe(false);
-      expect(
-        isCredentialOrSensitivePath('/home/user/.gemini/trustedFolders.json'),
-      ).toBe(false);
-      expect(
-        isCredentialOrSensitivePath('/home/user/.gemini/policy_integrity.json'),
       ).toBe(false);
       expect(isCredentialOrSensitivePath('/home/user/.gemini/commands')).toBe(
         false,

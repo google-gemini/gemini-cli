@@ -43,6 +43,10 @@ export const SENSITIVE_SETTINGS_FILENAMES = new Set([
   'gemini-credentials.json',
   'mcp-oauth-tokens.json',
   'a2a-oauth-tokens.json',
+  'trusted_hooks.json',
+  'trustedfolders.json',
+  'trustedFolders.json',
+  'policy_integrity.json',
 ]);
 
 /**
@@ -169,7 +173,9 @@ export function isSensitiveHostPath(hostPath: string): boolean {
         baseName === 'mcp-oauth-tokens.json' ||
         baseName === 'a2a-oauth-tokens.json' ||
         baseName === 'google_accounts.json' ||
-        baseName === 'trusted_hooks.json'
+        baseName === 'trusted_hooks.json' ||
+        baseName === 'trustedfolders.json' ||
+        baseName === 'policy_integrity.json'
       ) {
         return true;
       }
@@ -229,7 +235,9 @@ export function isSensitiveHostPath(hostPath: string): boolean {
       baseName === 'mcp-oauth-tokens.json' ||
       baseName === 'a2a-oauth-tokens.json' ||
       baseName === 'google_accounts.json' ||
-      baseName === 'trusted_hooks.json'
+      baseName === 'trusted_hooks.json' ||
+      baseName === 'trustedfolders.json' ||
+      baseName === 'policy_integrity.json'
     ) {
       return true;
     }

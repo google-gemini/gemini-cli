@@ -148,9 +148,18 @@
     (ipc-posix-name-prefix "com.docker.")
 )
 
-;; Deny writing to user's Gemini CLI configuration directory
+;; Deny writing to user's Gemini CLI configuration directory and sensitive files
 (deny file-write*
     (subpath (string-append (param "HOME_DIR") "/.gemini"))
+    (regex #"/oauth_creds\.json$")
+    (regex #"/gemini-credentials\.json$")
+    (regex #"/mcp-oauth-tokens\.json$")
+    (regex #"/a2a-oauth-tokens\.json$")
+    (regex #"/google_accounts\.json$")
+    (regex #"/trusted_hooks\.json$")
+    (regex #"/trustedFolders\.json$")
+    (regex #"/policy_integrity\.json$")
+    (regex #"/\.env($|\..*)")
 )
 
 ;; Block reading sensitive credentials and environment files
@@ -161,12 +170,16 @@
     (literal (string-append (param "HOME_DIR") "/.gemini/a2a-oauth-tokens.json"))
     (literal (string-append (param "HOME_DIR") "/.gemini/google_accounts.json"))
     (literal (string-append (param "HOME_DIR") "/.gemini/trusted_hooks.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/trustedFolders.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/policy_integrity.json"))
     (regex #"/oauth_creds\.json$")
     (regex #"/gemini-credentials\.json$")
     (regex #"/mcp-oauth-tokens\.json$")
     (regex #"/a2a-oauth-tokens\.json$")
     (regex #"/google_accounts\.json$")
     (regex #"/trusted_hooks\.json$")
+    (regex #"/trustedFolders\.json$")
+    (regex #"/policy_integrity\.json$")
     (regex #"/\.env($|\..*)")
 )
 

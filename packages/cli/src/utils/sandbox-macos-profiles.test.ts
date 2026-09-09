@@ -131,10 +131,13 @@ describe('macOS Seatbelt Gemini configuration isolation', () => {
       );
     });
 
-    it('denies writing to Gemini configuration directory', () => {
+    it('denies writing to Gemini configuration directory and sensitive files', () => {
+      expect(rules).toContain('(deny file-write*');
       expect(rules).toContain(
-        '(deny file-write*\n    (subpath (string-append (param "HOME_DIR") "/.gemini"))\n)',
+        '(subpath (string-append (param "HOME_DIR") "/.gemini"))',
       );
+      expect(rules).toContain('(regex #"/trustedFolders\\.json$")');
+      expect(rules).toContain('(regex #"/policy_integrity\\.json$")');
     });
 
     it('denies reading sensitive credential and environment files', () => {
@@ -156,8 +159,16 @@ describe('macOS Seatbelt Gemini configuration isolation', () => {
       expect(rules).toContain(
         '(literal (string-append (param "HOME_DIR") "/.gemini/trusted_hooks.json"))',
       );
+      expect(rules).toContain(
+        '(literal (string-append (param "HOME_DIR") "/.gemini/trustedFolders.json"))',
+      );
+      expect(rules).toContain(
+        '(literal (string-append (param "HOME_DIR") "/.gemini/policy_integrity.json"))',
+      );
       expect(rules).toContain('(regex #"/google_accounts\\.json$")');
       expect(rules).toContain('(regex #"/trusted_hooks\\.json$")');
+      expect(rules).toContain('(regex #"/trustedFolders\\.json$")');
+      expect(rules).toContain('(regex #"/policy_integrity\\.json$")');
     });
   });
 });
@@ -210,8 +221,13 @@ describe('BUILTIN_SEATBELT_PROFILE_CONTENTS consistency', () => {
       it('contains Gemini config isolation and credential denial rules in embedded content', () => {
         const embeddedContent = BUILTIN_SEATBELT_PROFILE_CONTENTS[key];
         expect(embeddedContent).toBeDefined();
+        expect(embeddedContent).toContain('(deny file-write*');
         expect(embeddedContent).toContain(
-          '(deny file-write*\n    (subpath (string-append (param "HOME_DIR") "/.gemini"))\n)',
+          '(subpath (string-append (param "HOME_DIR") "/.gemini"))',
+        );
+        expect(embeddedContent).toContain('(regex #"/trustedFolders\\.json$")');
+        expect(embeddedContent).toContain(
+          '(regex #"/policy_integrity\\.json$")',
         );
         expect(embeddedContent).toContain(
           '(literal (string-append (param "HOME_DIR") "/.gemini/oauth_creds.json"))',
@@ -221,6 +237,12 @@ describe('BUILTIN_SEATBELT_PROFILE_CONTENTS consistency', () => {
         );
         expect(embeddedContent).toContain(
           '(literal (string-append (param "HOME_DIR") "/.gemini/trusted_hooks.json"))',
+        );
+        expect(embeddedContent).toContain(
+          '(literal (string-append (param "HOME_DIR") "/.gemini/trustedFolders.json"))',
+        );
+        expect(embeddedContent).toContain(
+          '(literal (string-append (param "HOME_DIR") "/.gemini/policy_integrity.json"))',
         );
       });
 
