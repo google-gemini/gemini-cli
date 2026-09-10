@@ -121,7 +121,7 @@ export function extractUntrustedContext(history: readonly Content[]): UntrustedC
 
           // Tokenize the untrusted text to index specific words/flags
           const tokens = normalizedContent
-            .split(/[\s,`"';()|&]+/)
+            .split(/[\s,`"';()|&[\]{}<>]+/)
             .map((t) => t.trim())
             .filter((t) => t.length > 1) // Ignore single-character words/punctuation
             .filter((t) => !BENIGN_SUBCOMMAND_TOKENS.has(t.toLowerCase()));

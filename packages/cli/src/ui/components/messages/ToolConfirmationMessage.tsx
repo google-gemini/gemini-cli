@@ -444,6 +444,7 @@ export const ToolConfirmationMessage: React.FC<
   ]);
 
   const availableBodyContentHeight = useCallback(() => {
+    void terminalWidth;
     if (availableTerminalHeight === undefined) {
       return undefined;
     }
@@ -519,6 +520,7 @@ export const ToolConfirmationMessage: React.FC<
     confirmationDetails,
     config,
     deceptiveUrlWarningText,
+    terminalWidth,
   ]);
 
   const { question, bodyContent, options, securityWarnings, initialIndex } =
