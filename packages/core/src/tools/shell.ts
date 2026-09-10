@@ -280,7 +280,12 @@ export class ShellToolInvocation extends BaseToolInvocation<
       const history = this.getHistory();
       const untrustedContext = extractUntrustedContext(history);
       const untrustedFlags = findUntrustedFlags(command, untrustedContext);
-      if (untrustedFlags.length > 0) {
+      const modifiedBuildFiles = getModifiedBuildFiles(this.context.config);
+      const isBuildCmd = isBuildOrTestCommand(command);
+      if (
+        untrustedFlags.length > 0 ||
+        (isBuildCmd && modifiedBuildFiles.length > 0)
+      ) {
         return undefined;
       }
       const rootCommands = [...new Set(getCommandRoots(command))];

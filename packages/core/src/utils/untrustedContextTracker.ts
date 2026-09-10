@@ -39,6 +39,7 @@ export const BUILD_TEST_COMMAND_ROOTS: ReadonlySet<string> = new Set([
   'cargo',
   'mvn',
   'gradle',
+  'gradlew',
   './gradlew',
   'pytest',
   'python',
@@ -300,7 +301,8 @@ export function isBuildOrTestCommand(command: string): boolean {
   }
   const getBaseName = (cmd: string) => {
     const base = cmd.replace(/\\/g, '/').split('/').pop();
-    return base ? base.toLowerCase() : cmd.toLowerCase();
+    if (!base) return cmd.toLowerCase();
+    return base.toLowerCase().replace(/\.(exe|cmd|bat)$/, '');
   };
   try {
     const roots = getCommandRoots(command);
