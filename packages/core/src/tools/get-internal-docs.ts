@@ -22,7 +22,7 @@ import { glob } from 'glob';
 import { ToolErrorType } from './tool-error.js';
 import { GET_INTERNAL_DOCS_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
-import { isSubpath } from '../utils/paths.js';
+import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 
 /**
  * Parameters for the GetInternalDocs tool.
@@ -122,11 +122,24 @@ class GetInternalDocsInvocation extends BaseToolInvocation<
 
       // Read a specific file
       // Security: Prevent path traversal by resolving and verifying it stays
-      // within docsRoot. A plain startsWith() check is not enough: it also
-      // accepts any sibling directory that shares the prefix, so a docsRoot of
-      // `<repo>/docs` would let `../docs-private/secret.md` through.
-      const resolvedPath = path.resolve(docsRoot, this.params.path);
-      if (!isSubpath(docsRoot, resolvedPath)) {
+      // within docsRoot. Two separate escapes have to be closed here.
+      //
+      // A plain startsWith() check accepts any sibling directory that shares
+      // the prefix, so a docsRoot of `<repo>/docs` would let
+      // `../docs-private/secret.md` through. isSubpath() compares path
+      // segments instead of characters.
+      //
+      // Lexical resolution alone still follows a symlink planted inside the
+      // docs tree: the resolved path stays under docsRoot while the file it
+      // opens does not. Both sides are resolved to their real paths so the
+      // check sees the file that is actually read, and docsRoot is resolved
+      // too so a repository reached through a symlinked parent is not denied
+      // by mistake.
+      const realDocsRoot = resolveToRealPath(docsRoot);
+      const resolvedPath = resolveToRealPath(
+        path.resolve(realDocsRoot, this.params.path),
+      );
+      if (!isSubpath(realDocsRoot, resolvedPath)) {
         throw new Error(
           'Access denied: Requested path is outside the documentation directory.',
         );

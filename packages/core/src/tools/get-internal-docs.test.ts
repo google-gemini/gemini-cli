@@ -87,6 +87,88 @@ describe('GetInternalDocsTool (Integration)', () => {
     }
   });
 
+  it('should prevent access through a symlink that points outside the docs directory', async () => {
+    // The link itself sits inside docsRoot, so a lexical resolve still reports
+    // an internal path. Only resolving the link exposes the real target.
+    const docsRoot = path.resolve(__dirname, '../../../../docs');
+    const outsideDir = `${docsRoot}-symlink-probe`;
+    const secretFile = path.join(outsideDir, 'secret.md');
+    const linkPath = path.join(docsRoot, 'symlink-escape-probe.md');
+    const secret = 'SENSITIVE-SYMLINK-CONTENT';
+
+    await fs.rm(linkPath, { force: true });
+    await fs.mkdir(outsideDir, { recursive: true });
+    await fs.writeFile(secretFile, secret, 'utf8');
+    await fs.symlink(secretFile, linkPath);
+
+    try {
+      const invocation = tool.build({ path: 'symlink-escape-probe.md' });
+      const result = await invocation.execute({ abortSignal });
+
+      expect(result.error).toBeDefined();
+      expect(result.error?.type).toBe(ToolErrorType.EXECUTION_FAILED);
+      expect(result.error?.message).toContain('Access denied');
+      expect(String(result.llmContent)).not.toContain(secret);
+    } finally {
+      await fs.rm(linkPath, { force: true });
+      await fs.rm(outsideDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should prevent access through a symlinked directory that points outside the docs directory', async () => {
+    // Same escape, but the link is an intermediate path segment rather than
+    // the final one, so the whole chain has to be resolved.
+    const docsRoot = path.resolve(__dirname, '../../../../docs');
+    const outsideDir = `${docsRoot}-symlink-dir-probe`;
+    const linkPath = path.join(docsRoot, 'symlink-dir-probe');
+    const secret = 'SENSITIVE-SYMLINK-DIR-CONTENT';
+
+    await fs.rm(linkPath, { force: true, recursive: true });
+    await fs.mkdir(outsideDir, { recursive: true });
+    await fs.writeFile(path.join(outsideDir, 'secret.md'), secret, 'utf8');
+    await fs.symlink(
+      outsideDir,
+      linkPath,
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+
+    try {
+      const invocation = tool.build({ path: 'symlink-dir-probe/secret.md' });
+      const result = await invocation.execute({ abortSignal });
+
+      expect(result.error).toBeDefined();
+      expect(result.error?.type).toBe(ToolErrorType.EXECUTION_FAILED);
+      expect(result.error?.message).toContain('Access denied');
+      expect(String(result.llmContent)).not.toContain(secret);
+    } finally {
+      await fs.rm(linkPath, { force: true, recursive: true });
+      await fs.rm(outsideDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should still allow a symlink that stays inside the docs directory', async () => {
+    // Resolving symlinks must not turn every legitimate link into a denial.
+    const docsRoot = path.resolve(__dirname, '../../../../docs');
+    const targetPath = path.join(docsRoot, 'symlink-target-probe.md');
+    const linkPath = path.join(docsRoot, 'symlink-internal-probe.md');
+    const content = 'INTERNAL-SYMLINK-CONTENT';
+
+    await fs.rm(linkPath, { force: true });
+    await fs.writeFile(targetPath, content, 'utf8');
+    await fs.symlink(targetPath, linkPath);
+
+    try {
+      const invocation = tool.build({ path: 'symlink-internal-probe.md' });
+      const result = await invocation.execute({ abortSignal });
+
+      expect(result.error).toBeUndefined();
+      expect(result.llmContent).toBe(content);
+    } finally {
+      await fs.rm(linkPath, { force: true });
+      await fs.rm(targetPath, { force: true });
+    }
+  });
+
   it('should handle non-existent files', async () => {
     const invocation = tool.build({ path: 'this-file-does-not-exist.md' });
     const result = await invocation.execute({ abortSignal });
