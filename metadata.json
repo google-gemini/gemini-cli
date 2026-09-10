@@ -1,0 +1,6 @@
+{
+  "name": "Gemini CLI",
+  "description": "An open-source AI agent and A2A server powered by Gemini with coding & debugging assistance, GitHub app scaffolding, Odoo Online module & accounting suite, and Vercel public domain deployment.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
