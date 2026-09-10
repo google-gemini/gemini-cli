@@ -141,7 +141,14 @@ async function initOauthClient(
     const useEncryptedStorage = getUseEncryptedStorageFlag();
 
     client.on('tokens', async (tokens: Credentials) => {
-      await persistOAuthCredentials(tokens, useEncryptedStorage);
+      try {
+        await persistOAuthCredentials(tokens, useEncryptedStorage);
+      } catch (error) {
+        debugLogger.warn(
+          'Failed to persist refreshed OAuth credentials:',
+          error,
+        );
+      }
       await triggerPostAuthCallbacks(tokens);
     });
 
@@ -797,7 +804,29 @@ async function cacheCredentials(credentials: Credentials) {
   const filePath = Storage.getOAuthCredsPath();
   await fs.mkdir(path.dirname(filePath), { recursive: true });
 
-  const credString = JSON.stringify(credentials, null, 2);
+  let credentialsToCache = credentials;
+  if (!credentials.refresh_token) {
+    try {
+      const existingCredentials: unknown = JSON.parse(
+        await fs.readFile(filePath, 'utf-8'),
+      );
+      if (
+        typeof existingCredentials === 'object' &&
+        existingCredentials !== null &&
+        'refresh_token' in existingCredentials &&
+        typeof existingCredentials.refresh_token === 'string'
+      ) {
+        credentialsToCache = {
+          ...credentials,
+          refresh_token: existingCredentials.refresh_token,
+        };
+      }
+    } catch {
+      // No existing refresh token to preserve.
+    }
+  }
+
+  const credString = JSON.stringify(credentialsToCache, null, 2);
   await fs.writeFile(filePath, credString, { mode: 0o600 });
   try {
     await fs.chmod(filePath, 0o600);

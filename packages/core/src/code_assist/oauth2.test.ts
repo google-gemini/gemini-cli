@@ -262,12 +262,21 @@ describe('oauth2', () => {
         mockTokens,
       );
 
-      // Manually trigger the 'tokens' event listener
+      // A refresh response may omit the refresh token. Ensure the cached token
+      // remains usable for subsequent refreshes.
+      const refreshedTokens = {
+        access_token: 'refreshed-access-token',
+        expiry_date: Date.now() + 3_600_000,
+      };
       if (tokensListener) {
         await (
           tokensListener as unknown as (tokens: Credentials) => Promise<void>
-        )(mockTokens);
+        )(refreshedTokens);
       }
+      expect(JSON.parse(fs.readFileSync(credsPath, 'utf-8'))).toEqual({
+        ...refreshedTokens,
+        refresh_token: mockTokens.refresh_token,
+      });
 
       // Verify Google Account was cached
       const googleAccountPath = path.join(
@@ -326,6 +335,56 @@ describe('oauth2', () => {
 
       await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
       await eventPromise;
+    });
+
+    it('should run post-auth callbacks when refreshed credentials cannot be persisted', async () => {
+      const cachedCreds = {
+        access_token: 'cached-access-token',
+        refresh_token: 'cached-refresh-token',
+      };
+      const credsPath = path.join(tempHomeDir, GEMINI_DIR, 'oauth_creds.json');
+      await fs.promises.mkdir(path.dirname(credsPath), { recursive: true });
+      await fs.promises.writeFile(credsPath, JSON.stringify(cachedCreds));
+
+      let tokensListener: ((tokens: Credentials) => Promise<void>) | undefined;
+      const mockClient = {
+        credentials: cachedCreds,
+        setCredentials: vi.fn(),
+        getAccessToken: vi.fn().mockResolvedValue({ token: 'test-token' }),
+        getTokenInfo: vi.fn().mockResolvedValue({}),
+        on: vi.fn((event, listener) => {
+          if (event === 'tokens') {
+            tokensListener = listener;
+          }
+        }),
+      };
+      vi.mocked(OAuth2Client).mockImplementation(
+        () => mockClient as unknown as OAuth2Client,
+      );
+
+      await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
+
+      const persistenceError = new Error('disk full');
+      const writeSpy = vi
+        .spyOn(fs.promises, 'writeFile')
+        .mockRejectedValueOnce(persistenceError);
+      const warnSpy = vi
+        .spyOn(debugLogger, 'warn')
+        .mockImplementation(() => {});
+      const postAuthCallback = vi.fn();
+      authEvents.once('post_auth', postAuthCallback);
+
+      expect(tokensListener).toBeDefined();
+      await tokensListener?.({ access_token: 'refreshed-access-token' });
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Failed to persist refreshed OAuth credentials:',
+        persistenceError,
+      );
+      expect(postAuthCallback).toHaveBeenCalledOnce();
+
+      writeSpy.mockRestore();
+      warnSpy.mockRestore();
     });
 
     it('should throw FatalAuthenticationError in non-interactive session when manual auth is required', async () => {
