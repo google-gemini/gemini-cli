@@ -572,4 +572,33 @@ describe('Storage - System Paths', () => {
       existsSpy.mockRestore();
     });
   });
+
+  describe('isWorkspaceHomeDir', () => {
+    it('returns false when homedir is empty without throwing', () => {
+      vi.mocked(homedir).mockReturnValue('');
+      const storage = new Storage('/some/workspace');
+      expect(storage.isWorkspaceHomeDir()).toBe(false);
+      vi.mocked(homedir).mockReturnValue(os.homedir());
+    });
+
+    it('returns true when targetDir is the home directory', () => {
+      vi.mocked(homedir).mockReturnValue(os.homedir());
+      const storage = new Storage(os.homedir());
+      expect(storage.isWorkspaceHomeDir()).toBe(true);
+    });
+
+    it('returns false when targetDir is not the home directory', () => {
+      vi.mocked(homedir).mockReturnValue(os.homedir());
+      const storage = new Storage(
+        path.join(os.homedir(), 'projects', 'my-project'),
+      );
+      expect(storage.isWorkspaceHomeDir()).toBe(false);
+    });
+
+    it('returns false when targetDir is empty', () => {
+      vi.mocked(homedir).mockReturnValue(os.homedir());
+      const storage = new Storage('');
+      expect(storage.isWorkspaceHomeDir()).toBe(false);
+    });
+  });
 });

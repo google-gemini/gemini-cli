@@ -6,6 +6,7 @@
 
 import * as glob from 'glob';
 import * as path from 'node:path';
+import * as os from 'node:os';
 import {
   GEMINI_DIR,
   Storage,
@@ -68,6 +69,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...original,
     Storage: original.Storage,
+    homedir: vi.fn(original.homedir),
     isCommandAllowed: vi.fn(),
     ShellExecutionService: {
       execute: vi.fn(),
@@ -346,6 +348,30 @@ describe('FileCommandLoader', () => {
     expect(names).toContain('another');
     // Verify they are loaded as user commands, not duplicated as workspace commands
     expect(commands.every((c) => c.kind === CommandKind.USER_FILE)).toBe(true);
+  });
+
+  it('handles empty homedir gracefully without throwing when loading commands', async () => {
+    vi.mocked(homedir).mockReturnValue('');
+    const projectCommandsDir = path.join('/workspace', GEMINI_DIR, 'commands');
+    mock({
+      [projectCommandsDir]: {
+        'project.toml': 'prompt = "Project prompt"',
+      },
+    });
+
+    const mockConfig = {
+      getProjectRoot: vi.fn(() => '/workspace'),
+      getExtensions: vi.fn(() => []),
+      getFolderTrust: vi.fn(() => true),
+      isTrustedFolder: vi.fn(() => true),
+    } as unknown as Config;
+    const loader = new FileCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(signal);
+    expect(commands).toBeDefined();
+    expect(commands).toHaveLength(1);
+    expect(commands[0].name).toBe('project');
+    expect(commands[0].kind).toBe(CommandKind.WORKSPACE_FILE);
+    vi.mocked(homedir).mockReturnValue(os.homedir());
   });
 
   it('ignores files with TOML syntax errors', async () => {

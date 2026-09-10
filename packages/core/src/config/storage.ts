@@ -210,10 +210,18 @@ export class Storage {
    * This handles symlinks and platform-specific path normalization.
    */
   isWorkspaceHomeDir(): boolean {
-    return (
-      normalizePath(resolveToRealPath(this.targetDir)) ===
-      normalizePath(resolveToRealPath(homedir()))
-    );
+    const home = homedir();
+    if (!home || !this.targetDir) {
+      return false;
+    }
+    try {
+      return (
+        normalizePath(resolveToRealPath(this.targetDir)) ===
+        normalizePath(resolveToRealPath(home))
+      );
+    } catch {
+      return false;
+    }
   }
 
   getAgentsDir(): string {
