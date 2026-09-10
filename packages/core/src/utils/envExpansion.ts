@@ -36,7 +36,7 @@ export function expandEnvVars(
   // dotenv-expand is designed to process an object of key-value pairs (like a .env file).
   // To expand a single string, we wrap it in an object with a temporary key.
   let dummyKey = '__GCLI_EXPAND_TARGET__';
-  while (Object.hasOwn(env, dummyKey)) {
+  while (Object.hasOwn(env, dummyKey) || processedStr.includes(dummyKey)) {
     dummyKey += '_';
   }
 
