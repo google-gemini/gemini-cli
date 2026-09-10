@@ -669,6 +669,129 @@ describe('sandbox', () => {
         expect.any(String),
         { mode: 0o600 },
       );
+
+      const dockerCall = vi.mocked(spawn).mock.calls.find((call) => {
+        const args = call[1] as string[];
+        return args && args.includes('run');
+      });
+      expect(dockerCall).toBeDefined();
+      const dockerArgs = dockerCall![1] as string[];
+      expect(dockerArgs.some((arg) => arg.includes('.config/gcloud'))).toBe(
+        false,
+      );
+    });
+
+    it('should not mount gcloud config directory when homedir is empty even if relative path exists', async () => {
+      mockedHomedir.mockReturnValue('');
+      vi.mocked(os.tmpdir).mockReturnValue('/mock/tmp');
+
+      vi.mocked(fs.existsSync).mockImplementation((p: fs.PathLike) => {
+        if (typeof p === 'string' && p.includes('.config')) {
+          return true;
+        }
+        return false;
+      });
+
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+      await expect(
+        start_sandbox(config, [], undefined, ['arg1']),
+      ).resolves.toBe(0);
+
+      const dockerCall = vi.mocked(spawn).mock.calls.find((call) => {
+        const args = call[1] as string[];
+        return args && args.includes('run');
+      });
+      expect(dockerCall).toBeDefined();
+      const dockerArgs = dockerCall![1] as string[];
+      expect(dockerArgs.some((arg) => arg.includes('.config/gcloud'))).toBe(
+        false,
+      );
+    });
+
+    it('should mount gcloud config directory when homedir is defined and config exists', async () => {
+      mockedHomedir.mockReturnValue('/home/user');
+      vi.mocked(os.tmpdir).mockReturnValue('/mock/tmp');
+
+      const expectedConfigDir = path.join('/home/user', '.config', 'gcloud');
+      vi.mocked(fs.existsSync).mockImplementation((p: fs.PathLike) => {
+        if (typeof p === 'string' && p === expectedConfigDir) {
+          return true;
+        }
+        return false;
+      });
+
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+      await expect(
+        start_sandbox(config, [], undefined, ['arg1']),
+      ).resolves.toBe(0);
+
+      const dockerCall = vi.mocked(spawn).mock.calls.find((call) => {
+        const args = call[1] as string[];
+        return args && args.includes('run');
+      });
+      expect(dockerCall).toBeDefined();
+      const dockerArgs = dockerCall![1] as string[];
+      expect(
+        dockerArgs.some(
+          (arg) => arg.includes(expectedConfigDir) && arg.endsWith(':ro'),
+        ),
+      ).toBe(true);
     });
 
     it('should preserve the integration-test prefix for random container names', async () => {

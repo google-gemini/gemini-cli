@@ -135,11 +135,15 @@ export async function start_sandbox(
       if (!BUILTIN_SEATBELT_PROFILES.includes(profile)) {
         const safeProfile = path.basename(profile);
         const fileName = `sandbox-macos-${safeProfile}.sb`;
-        const userProfileFile = path.join(homedir(), GEMINI_DIR, fileName);
+        const userHome = homedir();
+        const userProfileFile = userHome
+          ? path.join(userHome, GEMINI_DIR, fileName)
+          : '';
         const projectProfileFile = path.join(GEMINI_DIR, fileName);
-        profileFile = fs.existsSync(userProfileFile)
-          ? userProfileFile
-          : projectProfileFile;
+        profileFile =
+          userProfileFile && fs.existsSync(userProfileFile)
+            ? userProfileFile
+            : projectProfileFile;
       } else {
         // For builtin profiles, if the file doesn't exist on disk (e.g. bundled or bazel environments),
         // write the embedded profile content to a temporary file.
@@ -510,8 +514,10 @@ export async function start_sandbox(
     args.push('--volume', `${sandboxTmpDir}:${userSettingsDirInSandbox}:rw`);
 
     // mount gcloud config directory if it exists
-    const gcloudConfigDir = path.join(homedir(), '.config', 'gcloud');
-    if (fs.existsSync(gcloudConfigDir)) {
+    const gcloudConfigDir = userHomeDirOnHost
+      ? path.join(userHomeDirOnHost, '.config', 'gcloud')
+      : '';
+    if (gcloudConfigDir && fs.existsSync(gcloudConfigDir)) {
       args.push(
         '--volume',
         `${gcloudConfigDir}:${getContainerPath(gcloudConfigDir)}:ro`,
