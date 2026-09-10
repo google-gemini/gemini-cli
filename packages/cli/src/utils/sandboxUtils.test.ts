@@ -267,10 +267,12 @@ describe('sandboxUtils', () => {
       expect(isSensitiveHostPath('~/.gemini')).toBe(true);
     });
 
-    it('should detect user home directory', () => {
+    it('should detect user home directory and its parent directories', () => {
       vi.mocked(os.homedir).mockReturnValue('/home/testuser');
       expect(isSensitiveHostPath('/home/testuser')).toBe(true);
       expect(isSensitiveHostPath('~')).toBe(true);
+      expect(isSensitiveHostPath('/home')).toBe(true);
+      expect(isSensitiveHostPath('/')).toBe(true);
     });
 
     it('should detect sensitive credential files', () => {

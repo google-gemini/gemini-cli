@@ -212,15 +212,16 @@ export function isSensitiveHostPath(hostPath: string): boolean {
         : resolvedChild.startsWith(parentWithSep);
     };
 
-    // Block mounting user home directory root directly
-    if (arePathsEqual(normalized, home)) {
+    // Block mounting user home directory root directly or any of its parent directories (e.g. /home, /)
+    if (arePathsEqual(normalized, home) || isSubpathOf(home, normalized)) {
       return true;
     }
 
-    // Block mounting ~/.gemini or anything inside ~/.gemini
+    // Block mounting ~/.gemini, anything inside ~/.gemini, or any of its parent directories
     if (
       arePathsEqual(normalized, geminiDirOnHost) ||
-      isSubpathOf(normalized, geminiDirOnHost)
+      isSubpathOf(normalized, geminiDirOnHost) ||
+      isSubpathOf(geminiDirOnHost, normalized)
     ) {
       return true;
     }
