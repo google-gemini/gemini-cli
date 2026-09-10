@@ -40,6 +40,7 @@ import {
   parseMcpToolName,
   formatMcpToolName,
   isMcpToolName,
+  normalizeMcpServerName,
 } from '../tools/mcp-tool.js';
 import {
   type SandboxManager,
@@ -86,6 +87,18 @@ function isWildcardPattern(name: string): boolean {
   return name === '*' || name.includes('*');
 }
 
+function mcpToolNameMatchesServer(
+  toolName: string,
+  serverName: string,
+): boolean {
+  const normalizedServerName = normalizeMcpServerName(serverName);
+  const serverPrefix = `${MCP_TOOL_PREFIX}${normalizedServerName}_`;
+
+  // Only the server portion is normalized. The tool name remains unchanged
+  // after the separator and is still subject to the rule's normal matching.
+  return toolName.slice(0, serverPrefix.length).toLowerCase() === serverPrefix;
+}
+
 /**
  * Checks if a tool call matches a wildcard pattern.
  * Supports global (*) and the explicit MCP (*mcp_serverName_**) format.
@@ -108,10 +121,14 @@ function matchesWildcard(
     // 1. Must be an MCP tool call (has serverName)
     // 2. Server name must match
     // 3. Tool name must be properly qualified by that server
-    if (serverName === undefined || serverName !== expectedServerName) {
+    if (
+      serverName === undefined ||
+      normalizeMcpServerName(serverName) !==
+        normalizeMcpServerName(expectedServerName)
+    ) {
       return false;
     }
-    return toolName.startsWith(`${MCP_TOOL_PREFIX}${expectedServerName}_`);
+    return mcpToolNameMatchesServer(toolName, expectedServerName);
   }
 
   // Not a recognized wildcard pattern, fallback to exact match just in case
@@ -149,7 +166,13 @@ function ruleMatches(
       if (serverName === undefined) return false;
     } else {
       // Rule requires it to be a specific MCP server
-      if (serverName !== rule.mcpName) return false;
+      if (
+        serverName === undefined ||
+        normalizeMcpServerName(serverName) !==
+          normalizeMcpServerName(rule.mcpName)
+      ) {
+        return false;
+      }
     }
   }
 

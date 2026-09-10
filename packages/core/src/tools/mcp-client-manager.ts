@@ -23,6 +23,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 
 import { createHash } from 'node:crypto';
 import { stableStringify } from '../policy/stable-stringify.js';
+import { normalizeMcpServerName } from './mcp-tool.js';
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
 import type {
   ResourceRegistry,
@@ -258,10 +259,10 @@ export class McpClientManager {
    * Returns true if blocked, false if allowed.
    */
   private isBlockedBySettings(name: string): boolean {
-    const normalizedName = name.toLowerCase().trim();
+    const normalizedName = normalizeMcpServerName(name);
     const isListed = (serverNames: readonly string[]) =>
       serverNames.some(
-        (serverName) => serverName.toLowerCase().trim() === normalizedName,
+        (serverName) => normalizeMcpServerName(serverName) === normalizedName,
       );
 
     const allowedNames = this.cliConfig.getAllowedMcpServers();

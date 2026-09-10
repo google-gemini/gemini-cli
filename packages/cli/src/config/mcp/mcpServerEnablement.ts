@@ -6,7 +6,11 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { Storage, coreEvents } from '@google/gemini-cli-core';
+import {
+  Storage,
+  coreEvents,
+  normalizeMcpServerName,
+} from '@google/gemini-cli-core';
 
 /**
  * Stored in JSON file - represents persistent enablement state.
@@ -55,7 +59,7 @@ export interface ServerLoadResult {
  * Normalize a server ID to canonical lowercase form.
  */
 export function normalizeServerId(serverId: string): string {
-  return serverId.toLowerCase().trim();
+  return normalizeMcpServerName(serverId);
 }
 
 /**
