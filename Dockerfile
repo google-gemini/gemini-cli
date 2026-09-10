@@ -79,7 +79,8 @@ ENV PATH=$PATH:/usr/local/share/npm-global/bin
 
 # create container-internal .gemini directory owned by non-root node user
 RUN mkdir -p /home/node/.gemini \
-  && chown -R node:node /home/node/.gemini
+  && chown -R node:node /home/node/.gemini \
+  && chmod 777 /home/node
 
 # switch to non-root user node
 USER node
