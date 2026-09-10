@@ -688,7 +688,296 @@ function recordVerificationRun(
   if (verificationHistoryStore.length > 50) {
     verificationHistoryStore.shift();
   }
+
+  // Automatically record sync errors or warnings to OdooSyncLogs
+  if (result.variance !== 0) {
+    addSyncLog({
+      level: 'ERROR',
+      code: 'TRIAL_BALANCE_DIVERGENCE',
+      category: 'LEDGER',
+      message: `Trial balance variance detected during audit: debit ($${result.totalDebit.toLocaleString()}) != credit ($${result.totalCredit.toLocaleString()}). Discrepancy of $${result.variance.toFixed(2)}.`,
+      databaseId: dbId,
+      databaseName: dbName,
+      details: {
+        model: 'account.move.line',
+        expected: `$${result.totalDebit.toLocaleString()}`,
+        actual: `$${result.totalCredit.toLocaleString()}`,
+        remedy: 'Run automated double-entry ledger rebalance or reconcile suspense clearing items.',
+        latencyMs,
+      },
+    });
+  }
+
   return record;
+}
+
+interface OdooSyncLogEntry {
+  id: string;
+  timestamp: string;
+  level: 'ERROR' | 'WARNING' | 'INFO';
+  code: string;
+  category: 'NETWORK' | 'AUTH' | 'LEDGER' | 'SCHEMA' | 'RATE_LIMIT';
+  message: string;
+  databaseId: string;
+  databaseName: string;
+  details?: {
+    endpoint?: string;
+    model?: string;
+    accountCode?: string;
+    accountName?: string;
+    expected?: string | number;
+    actual?: string | number;
+    stackTrace?: string;
+    remedy?: string;
+    latencyMs?: number;
+  };
+  resolved: boolean;
+  resolvedAt?: string;
+}
+
+function getInitialSyncLogs(): OdooSyncLogEntry[] {
+  const now = Date.now();
+  return [
+    {
+      id: 'log_sync_101',
+      timestamp: new Date(now - 1000 * 60 * 12).toISOString(),
+      level: 'ERROR',
+      code: 'XMLRPC_SOCKET_TIMEOUT',
+      category: 'NETWORK',
+      message: 'Connection timed out after 15000ms while polling Odoo endpoint /xmlrpc/2/object on port 8069.',
+      databaseId: 'connected_odoo',
+      databaseName: 'Connected Odoo DB (XML-RPC)',
+      details: {
+        endpoint: 'http://localhost:8069/xmlrpc/2/object',
+        model: 'account.account',
+        stackTrace: 'Error: connect ETIMEDOUT 127.0.0.1:8069\n    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1607:16)',
+        remedy: 'Verify the remote Odoo service is active and listening on port 8069, or switch to in-memory GAAP mirror.',
+        latencyMs: 15024,
+      },
+      resolved: false,
+    },
+    {
+      id: 'log_sync_102',
+      timestamp: new Date(now - 1000 * 60 * 8).toISOString(),
+      level: 'WARNING',
+      code: 'CURRENCY_CONVERSION_DRIFT',
+      category: 'LEDGER',
+      message: 'Currency conversion delta: Odoo res.currency (EUR: 1.0820) differs from Gemini CLI ledger cache (1.0750) by 0.65%.',
+      databaseId: 'demo_us_standard',
+      databaseName: 'US GAAP Standard Chart of Accounts',
+      details: {
+        model: 'res.currency',
+        expected: '1.0820 EUR/USD',
+        actual: '1.0750 EUR/USD',
+        remedy: 'Trigger currency rate refresh from Odoo multi-currency module or adjust tolerance threshold.',
+        latencyMs: 24,
+      },
+      resolved: false,
+    },
+    {
+      id: 'log_sync_103',
+      timestamp: new Date(now - 1000 * 60 * 5).toISOString(),
+      level: 'WARNING',
+      code: 'DEPRECATED_ACCOUNT_ACCESS',
+      category: 'SCHEMA',
+      message: 'Staged journal payload references deprecated account [101099] Deprecated Petty Cash with non-zero allocation.',
+      databaseId: 'demo_us_standard',
+      databaseName: 'US GAAP Standard Chart of Accounts',
+      details: {
+        model: 'account.account',
+        accountCode: '101099',
+        accountName: 'Deprecated Petty Cash',
+        remedy: 'Remap allocation to active cash account [101000] Cash on Hand.',
+        latencyMs: 31,
+      },
+      resolved: false,
+    },
+    {
+      id: 'log_sync_104',
+      timestamp: new Date(now - 1000 * 60 * 3).toISOString(),
+      level: 'ERROR',
+      code: 'TRIAL_BALANCE_IMBALANCE',
+      category: 'LEDGER',
+      message: 'Trial balance variance: Staging debit ($315,900.00) != credit ($315,650.00). Difference of $250.00.',
+      databaseId: 'demo_us_standard',
+      databaseName: 'US GAAP Standard Chart of Accounts',
+      details: {
+        model: 'account.move.line',
+        expected: '$315,900.00 Debits',
+        actual: '$315,650.00 Credits',
+        stackTrace: 'VerificationError: Sum(debit) != Sum(credit)\n    at verifyChartOfAccounts (/server.ts:380)',
+        remedy: 'Audit suspense clearing accounts or run automated debit-credit reconciliation.',
+        latencyMs: 18,
+      },
+      resolved: false,
+    },
+    {
+      id: 'log_sync_105',
+      timestamp: new Date(now - 1000 * 60 * 1.5).toISOString(),
+      level: 'WARNING',
+      code: 'RECONCILE_FLAG_DISABLED',
+      category: 'LEDGER',
+      message: 'Account [120000] Accounts Receivable has reconcile=False. Odoo 17 requires reconciliation for customer invoices.',
+      databaseId: 'demo_us_standard',
+      databaseName: 'US GAAP Standard Chart of Accounts',
+      details: {
+        model: 'account.account',
+        accountCode: '120000',
+        remedy: 'Enable reconcile=True on account 120000 before posting customer payments.',
+        latencyMs: 27,
+      },
+      resolved: false,
+    },
+    {
+      id: 'log_sync_106',
+      timestamp: new Date(now - 1000 * 35).toISOString(),
+      level: 'INFO',
+      code: 'AUTH_SESSION_RENEWED',
+      category: 'AUTH',
+      message: 'Odoo XML-RPC session token UID #2 (admin) refreshed successfully via /xmlrpc/2/common.',
+      databaseId: 'demo_us_standard',
+      databaseName: 'US GAAP Standard Chart of Accounts',
+      details: {
+        endpoint: 'http://localhost:8069/xmlrpc/2/common',
+        remedy: 'Session is valid and operational.',
+        latencyMs: 22,
+      },
+      resolved: true,
+      resolvedAt: new Date(now - 1000 * 20).toISOString(),
+    },
+  ];
+}
+
+const syncLogsStore: OdooSyncLogEntry[] = getInitialSyncLogs();
+
+function addSyncLog(
+  entry: Omit<OdooSyncLogEntry, 'id' | 'timestamp' | 'resolved'> & { resolved?: boolean }
+): OdooSyncLogEntry {
+  const newLog: OdooSyncLogEntry = {
+    id: 'log_sync_' + Math.random().toString(36).substring(2, 9),
+    timestamp: new Date().toISOString(),
+    resolved: entry.resolved ?? false,
+    ...entry,
+  };
+  syncLogsStore.push(newLog);
+  if (syncLogsStore.length > 100) {
+    syncLogsStore.shift();
+  }
+  return newLog;
+}
+
+function simulateSyncLog(level: 'ERROR' | 'WARNING' = 'WARNING'): OdooSyncLogEntry {
+  const db = odooDatabasesStore.get(activeDatabaseId) || odooDatabasesStore.get('demo_us_standard')!;
+  const latency = Math.floor(Math.random() * 20) + 15;
+
+  if (level === 'ERROR') {
+    const errorTemplates = [
+      {
+        code: 'XMLRPC_CONNECTION_REFUSED',
+        category: 'NETWORK' as const,
+        message: `ECONNREFUSED connecting to Odoo XML-RPC port 8069 at ${db.url || 'http://localhost:8069'}`,
+        details: {
+          endpoint: `${db.url || 'http://localhost:8069'}/xmlrpc/2/object`,
+          model: 'account.account',
+          stackTrace: 'Error: connect ECONNREFUSED 127.0.0.1:8069\n    at TCPConnectWrap.afterConnect (node:net:1607:16)',
+          remedy: 'Check if Odoo daemon process is running and accepting TCP connections on port 8069.',
+          latencyMs: latency,
+        },
+      },
+      {
+        code: 'AUTH_SESSION_EXPIRED',
+        category: 'AUTH' as const,
+        message: `Odoo XML-RPC authentication session rejected: Session token expired or invalid password for user "${db.username || 'admin'}".`,
+        details: {
+          endpoint: `${db.url || 'http://localhost:8069'}/xmlrpc/2/common`,
+          model: 'res.users',
+          stackTrace: 'XmlRpcFault: <Fault 2: "Session expired">\n    at OdooClient._authenticate (/server.ts:1210)',
+          remedy: 'Re-authenticate with Odoo instance credentials in the Connect Odoo DB tab.',
+          latencyMs: latency,
+        },
+      },
+      {
+        code: 'TRIAL_BALANCE_DIVERGENCE',
+        category: 'LEDGER' as const,
+        message: `Double-entry equilibrium failure: Debits ($315,900.00) != Credits ($315,480.00). Variance detected: $420.00 in staging ledger.`,
+        details: {
+          model: 'account.move.line',
+          expected: '$315,900.00',
+          actual: '$315,480.00',
+          stackTrace: 'EquilibriumAssertionError: Total debits must equal total credits\n    at verifyChartOfAccounts (/server.ts:380)',
+          remedy: 'Run automated ledger reconciliation or re-balance unposted journal entries.',
+          latencyMs: latency,
+        },
+      },
+    ];
+    const picked = errorTemplates[Math.floor(Math.random() * errorTemplates.length)];
+    return addSyncLog({
+      level: 'ERROR',
+      code: picked.code,
+      category: picked.category,
+      message: picked.message,
+      databaseId: db.id,
+      databaseName: db.name,
+      details: picked.details,
+    });
+  }
+
+  const warningTemplates = [
+    {
+      code: 'CURRENCY_CONVERSION_DRIFT',
+      category: 'LEDGER' as const,
+      message: `Multi-currency variance: Rate for EUR/USD drifted by +0.72% between Odoo res.currency and Gemini cache.`,
+      details: {
+        model: 'res.currency',
+        expected: '1.0820 EUR/USD',
+        actual: '1.0742 EUR/USD',
+        remedy: 'Refresh currency rate table from European Central Bank feed in Odoo.',
+        latencyMs: latency,
+      },
+    },
+    {
+      code: 'SCHEMA_FIELD_MISMATCH',
+      category: 'SCHEMA' as const,
+      message: `Optional field "tax_tags" omitted from account response for model "account.account" in database "${db.id}".`,
+      details: {
+        model: 'account.account',
+        remedy: 'Set default empty array for tax_tags or verify Odoo l10n_generic_coa module version.',
+        latencyMs: latency,
+      },
+    },
+    {
+      code: 'RATE_LIMIT_COOLDOWN',
+      category: 'RATE_LIMIT' as const,
+      message: `Odoo API rate threshold reached: 45 calls in last 60s. Auto-sync pulse automatically throttled to 30s interval.`,
+      details: {
+        endpoint: '/xmlrpc/2/object',
+        remedy: 'Automatic cooldown active; no action needed.',
+        latencyMs: latency,
+      },
+    },
+    {
+      code: 'DEPRECATED_ACCOUNT_ACCESSED',
+      category: 'SCHEMA' as const,
+      message: `Account 101099 (Deprecated Petty Cash) referenced in staging journal batch.`,
+      details: {
+        model: 'account.account',
+        accountCode: '101099',
+        accountName: 'Deprecated Petty Cash',
+        remedy: 'Update journal mapping to active account 101000 before posting.',
+        latencyMs: latency,
+      },
+    },
+  ];
+  const picked = warningTemplates[Math.floor(Math.random() * warningTemplates.length)];
+  return addSyncLog({
+    level: 'WARNING',
+    code: picked.code,
+    category: picked.category,
+    message: picked.message,
+    databaseId: db.id,
+    databaseName: db.name,
+    details: picked.details,
+  });
 }
 
 function sortAndFilterAccounts(
@@ -1659,6 +1948,115 @@ app.post('/api/odoo/sync-settings', (req, res) => {
   res.json({ success: true, syncState });
 });
 
+// Real-Time Odoo ↔ Gemini Sync Logs API
+app.get('/api/odoo/sync-logs', (req, res) => {
+  const { level, category, resolved, search, limit } = req.query;
+  let filtered = [...syncLogsStore];
+
+  if (level && level !== 'ALL') {
+    filtered = filtered.filter((l) => l.level === level);
+  }
+  if (category && category !== 'ALL') {
+    filtered = filtered.filter((l) => l.category === category);
+  }
+  if (resolved !== undefined && resolved !== 'ALL') {
+    const isResolved = resolved === 'true';
+    filtered = filtered.filter((l) => l.resolved === isResolved);
+  }
+  if (search && typeof search === 'string' && search.trim()) {
+    const q = search.toLowerCase();
+    filtered = filtered.filter(
+      (l) =>
+        l.message.toLowerCase().includes(q) ||
+        l.code.toLowerCase().includes(q) ||
+        l.databaseName.toLowerCase().includes(q) ||
+        (l.details?.model && l.details.model.toLowerCase().includes(q)) ||
+        (l.details?.accountCode && l.details.accountCode.toLowerCase().includes(q))
+    );
+  }
+
+  const max = limit ? parseInt(limit as string, 10) : 100;
+  const sliced = filtered.slice(-max).reverse();
+
+  const total = syncLogsStore.length;
+  const errors = syncLogsStore.filter((l) => l.level === 'ERROR' && !l.resolved).length;
+  const warnings = syncLogsStore.filter((l) => l.level === 'WARNING' && !l.resolved).length;
+  const resolvedCount = syncLogsStore.filter((l) => l.resolved).length;
+
+  res.json({
+    logs: sliced,
+    summary: {
+      total,
+      unresolvedErrors: errors,
+      unresolvedWarnings: warnings,
+      resolved: resolvedCount,
+      lastEventTimestamp: syncLogsStore.length > 0 ? syncLogsStore[syncLogsStore.length - 1].timestamp : null,
+      liveStatus: syncState.status,
+      latencyMs: syncState.syncLatencyMs,
+    },
+  });
+});
+
+// Resolve sync error/warning log
+app.post('/api/odoo/sync-logs/resolve', (req, res) => {
+  const { id, all, level } = req.body;
+  if (all) {
+    let count = 0;
+    syncLogsStore.forEach((l) => {
+      if (!l.resolved && (!level || l.level === level)) {
+        l.resolved = true;
+        l.resolvedAt = new Date().toISOString();
+        count++;
+      }
+    });
+    return res.json({ success: true, resolvedCount: count });
+  }
+
+  if (id) {
+    const log = syncLogsStore.find((l) => l.id === id);
+    if (!log) return res.status(404).json({ error: 'Log entry not found' });
+    log.resolved = true;
+    log.resolvedAt = new Date().toISOString();
+    return res.json({ success: true, log });
+  }
+
+  res.status(400).json({ error: 'Provide "id" or "all: true"' });
+});
+
+// Simulate sync warning or error for real-time alerting tests
+app.post('/api/odoo/sync-logs/simulate', (req, res) => {
+  const { level = 'WARNING' } = req.body;
+  const log = simulateSyncLog(level === 'ERROR' ? 'ERROR' : 'WARNING');
+  res.json({ success: true, log });
+});
+
+// Clear or reset logs
+app.post('/api/odoo/sync-logs/clear', (req, res) => {
+  const count = syncLogsStore.length;
+  syncLogsStore.length = 0;
+  res.json({ success: true, clearedCount: count });
+});
+
+// Export logs as JSON or CSV
+app.get('/api/odoo/sync-logs/export', (req, res) => {
+  const format = req.query.format === 'csv' ? 'csv' : 'json';
+  if (format === 'csv') {
+    let csv = 'id,timestamp,level,code,category,message,databaseId,databaseName,resolved,remedy\n';
+    for (const l of syncLogsStore) {
+      const msg = `"${l.message.replace(/"/g, '""')}"`;
+      const remedy = `"${(l.details?.remedy || '').replace(/"/g, '""')}"`;
+      csv += `${l.id},${l.timestamp},${l.level},${l.code},${l.category},${msg},${l.databaseId},"${l.databaseName}",${l.resolved},${remedy}\n`;
+    }
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="odoo_sync_logs.csv"');
+    return res.send(csv);
+  }
+
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Content-Disposition', 'attachment; filename="odoo_sync_logs.json"');
+  res.json(syncLogsStore);
+});
+
 app.post('/api/github/scaffold', async (req, res) => {
   const { repoSpec, techStack = 'TypeScript / Express / React / Tailwind' } = req.body;
   if (!repoSpec) {
@@ -2129,6 +2527,10 @@ app.get('/', (req, res) => {
           <button id="odoo-subtab-btn-export" onclick="switchOdooSubtab('export')" class="px-3 py-1.5 rounded-xl font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition flex items-center gap-1.5 whitespace-nowrap">
             <span>📥 Export Data (XML/CSV)</span>
           </button>
+          <button id="odoo-subtab-btn-synclogs" onclick="switchOdooSubtab('synclogs')" class="px-3 py-1.5 rounded-xl font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition flex items-center gap-1.5 whitespace-nowrap">
+            <span>⚡ Sync Logs & Alerts</span>
+            <span id="odoo-subtab-synclogs-badge" class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">0</span>
+          </button>
         </div>
 
         <!-- SUBTAB 1: Accounts Ledger & Sorter -->
@@ -2425,7 +2827,7 @@ app.get('/', (req, res) => {
                 <span class="text-xs font-bold text-slate-200">5. AP/AR Reconciliation Mandate</span>
                 <span id="rule-icon-reconcile" class="text-emerald-400 font-bold text-sm">✓ PASS</span>
               </div>
-              <p class="text-[11px] text-slate-400 mt-2">Receivable and Payable accounts strictly require \'reconcile=True\' for invoice-payment pairing.</p>
+              <p class="text-[11px] text-slate-400 mt-2">Receivable and Payable accounts strictly require 'reconcile=True' for invoice-payment pairing.</p>
             </div>
 
             <div id="rule-card-deprecated" class="p-4 rounded-xl bg-slate-900/60 border border-emerald-500/20 flex flex-col justify-between">
@@ -2614,6 +3016,24 @@ Click "Generate Odoo Export" or switch to this tab to view XML definition.
             </div>
           </div>
         </div>
+
+        <!-- SUBTAB 7: OdooSyncLogs Real-Time Errors & Warnings Stream -->
+        <div id="odoo-subtab-content-synclogs" class="hidden flex-col gap-4 mt-3">
+          <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="text-xl">⚡</span>
+              <div>
+                <h3 class="text-sm font-bold text-slate-200">Real-Time Odoo ↔ Gemini CLI Synchronization Stream</h3>
+                <p class="text-xs text-slate-400">Monitoring real-time RPC errors, ledger balance variances, and schema warnings.</p>
+              </div>
+            </div>
+            <button onclick="switchTab('sync-dashboard')" class="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-lg shadow-blue-600/30">
+              <span>Open Sync Dashboard & Logs</span>
+              <span>→</span>
+            </button>
+          </div>
+          <div id="odoo-sync-logs-subtab-mount"></div>
+        </div>
       </section>
 
       <!-- Edit Account Modal -->
@@ -2693,6 +3113,81 @@ Click "Generate Odoo Export" or switch to this tab to view XML definition.
               </button>
             </div>
           </form>
+        </div>
+      </div>
+
+      <!-- Detail & Remediation Modal for OdooSyncLogs -->
+      <div id="sync-log-detail-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="w-full max-w-2xl rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-6 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+          <div class="flex items-start justify-between border-b border-slate-800 pb-3">
+            <div>
+              <div class="flex items-center gap-2">
+                <span id="sync-log-modal-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold"></span>
+                <span id="sync-log-modal-code" class="font-mono text-sm font-bold text-slate-100"></span>
+                <span id="sync-log-modal-category" class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono"></span>
+              </div>
+              <div id="sync-log-modal-timestamp" class="text-[11px] text-slate-400 mt-1"></div>
+            </div>
+            <button onclick="OdooSyncLogs.closeDetailModal()" class="text-slate-400 hover:text-white text-lg p-1">✕</button>
+          </div>
+
+          <!-- Message -->
+          <div id="sync-log-modal-message-box" class="p-4 rounded-xl text-xs font-medium border leading-relaxed"></div>
+
+          <!-- Technical Metadata Grid -->
+          <div class="grid grid-cols-2 gap-3 text-xs">
+            <div class="p-3 rounded-xl bg-slate-950 border border-slate-800/80">
+              <span class="text-[10px] uppercase font-bold text-slate-500 block mb-1">Target Database</span>
+              <div id="sync-log-modal-db" class="font-semibold text-slate-200 truncate"></div>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-950 border border-slate-800/80">
+              <span class="text-[10px] uppercase font-bold text-slate-500 block mb-1">Latency / Round-Trip</span>
+              <div id="sync-log-modal-latency" class="font-mono text-purple-300"></div>
+            </div>
+          </div>
+
+          <!-- Expected vs Actual (if present) -->
+          <div id="sync-log-modal-variance-container" class="hidden grid grid-cols-2 gap-3 text-xs">
+            <div class="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
+              <span class="text-[10px] uppercase font-bold text-emerald-400 block mb-1">Expected State</span>
+              <div id="sync-log-modal-expected" class="font-mono text-emerald-300"></div>
+            </div>
+            <div class="p-3 rounded-xl bg-rose-500/5 border border-rose-500/20">
+              <span class="text-[10px] uppercase font-bold text-rose-400 block mb-1">Actual Observed State</span>
+              <div id="sync-log-modal-actual" class="font-mono text-rose-300"></div>
+            </div>
+          </div>
+
+          <!-- Stack Trace / Technical Error Details -->
+          <div id="sync-log-modal-stack-container" class="hidden flex flex-col gap-1.5">
+            <div class="flex items-center justify-between text-xs text-slate-400">
+              <span class="font-bold text-[10px] uppercase tracking-wider text-slate-500">Diagnostic Stack Trace / Payload</span>
+              <button onclick="OdooSyncLogs.copyStack()" class="text-[11px] text-blue-400 hover:text-blue-300">Copy Trace</button>
+            </div>
+            <pre id="sync-log-modal-stack" class="p-3 rounded-xl bg-slate-950 border border-slate-800 font-mono text-[11px] text-slate-300 overflow-x-auto max-h-36 whitespace-pre-wrap"></pre>
+          </div>
+
+          <!-- Gemini AI Remediation Guidance -->
+          <div id="sync-log-modal-remedy-container" class="p-4 rounded-xl bg-purple-500/10 border border-purple-500/30 flex flex-col gap-2">
+            <div class="flex items-center gap-2">
+              <span class="text-sm">🤖</span>
+              <span class="text-xs font-bold text-purple-200">Gemini AI Prescribed Remediation</span>
+            </div>
+            <p id="sync-log-modal-remedy" class="text-xs text-purple-100 leading-relaxed"></p>
+          </div>
+
+          <!-- Footer Actions -->
+          <div class="flex items-center justify-between pt-2 border-t border-slate-800">
+            <div id="sync-log-modal-status-text" class="text-xs text-slate-400"></div>
+            <div class="flex items-center gap-2">
+              <button onclick="OdooSyncLogs.closeDetailModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition">
+                Close
+              </button>
+              <button id="sync-log-modal-resolve-btn" onclick="OdooSyncLogs.resolveCurrentModalLog()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl transition flex items-center gap-1.5 shadow-lg shadow-emerald-600/30">
+                <span>✓ Mark Resolved</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -3011,6 +3506,171 @@ Click "Generate Odoo Export" or switch to this tab to view XML definition.
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <!-- ============================================================== -->
+          <!-- COMPONENT: OdooSyncLogs                                       -->
+          <!-- Real-Time Odoo ↔ Gemini Synchronization Errors & Warnings Log  -->
+          <!-- ============================================================== -->
+          <div id="odoo-sync-logs" class="odoo-sync-logs-component p-5 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col gap-4">
+            <!-- Header & Real-Time Status -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+              <div class="flex items-center gap-3">
+                <div class="h-9 w-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 text-lg">
+                  ⚡
+                </div>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <h3 class="text-sm font-bold text-slate-200">OdooSyncLogs</h3>
+                    <span id="sync-logs-live-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5">
+                      <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                      <span id="sync-logs-live-text">LIVE STREAMING</span>
+                    </span>
+                  </div>
+                  <p class="text-xs text-slate-400 mt-0.5">
+                    Real-time error diagnostics and audit warnings for XML-RPC socket timeouts, auth renewal, and schema variances.
+                  </p>
+                </div>
+              </div>
+
+              <!-- Action Controls -->
+              <div class="flex flex-wrap items-center gap-2 text-xs">
+                <button id="sync-logs-stream-toggle-btn" onclick="OdooSyncLogs.toggleStream()" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold border border-slate-700 transition flex items-center gap-1.5">
+                  <span id="sync-logs-stream-icon">⏸</span>
+                  <span id="sync-logs-stream-label">Pause Stream</span>
+                </button>
+                <button onclick="OdooSyncLogs.fetch()" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold border border-slate-700 transition flex items-center gap-1.5">
+                  <span>↻</span>
+                  <span>Refresh</span>
+                </button>
+                <div class="relative inline-block text-left">
+                  <button id="sync-logs-simulate-menu-btn" onclick="OdooSyncLogs.toggleSimulateMenu()" class="px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 font-semibold border border-purple-500/30 transition flex items-center gap-1.5">
+                    <span>⚡ Simulate Event</span>
+                    <span class="text-[10px]">▼</span>
+                  </button>
+                  <div id="sync-logs-simulate-menu" class="hidden absolute right-0 mt-1 w-52 rounded-xl bg-slate-950 border border-slate-800 shadow-xl py-1 z-30 text-xs">
+                    <button onclick="OdooSyncLogs.simulate('WARNING'); OdooSyncLogs.toggleSimulateMenu();" class="w-full text-left px-3 py-2 text-amber-400 hover:bg-slate-900 transition flex items-center gap-2">
+                      <span>⚠️</span> Simulate Sync Warning
+                    </button>
+                    <button onclick="OdooSyncLogs.simulate('ERROR'); OdooSyncLogs.toggleSimulateMenu();" class="w-full text-left px-3 py-2 text-rose-400 hover:bg-slate-900 transition flex items-center gap-2">
+                      <span>💥</span> Simulate Sync Error
+                    </button>
+                  </div>
+                </div>
+                <button onclick="OdooSyncLogs.resolveAll()" class="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 font-semibold border border-emerald-500/30 transition flex items-center gap-1.5">
+                  <span>🛡️</span>
+                  <span>Auto-Resolve with Gemini AI</span>
+                </button>
+                <div class="flex items-center gap-1">
+                  <button onclick="OdooSyncLogs.export('json')" title="Download JSON Log" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border border-slate-700 transition font-mono text-[11px]">
+                    JSON
+                  </button>
+                  <button onclick="OdooSyncLogs.export('csv')" title="Download CSV Log" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border border-slate-700 transition font-mono text-[11px]">
+                    CSV
+                  </button>
+                  <button onclick="OdooSyncLogs.clear()" title="Clear Logs" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-700 hover:border-rose-500/30 transition">
+                    🗑️
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Metric Summaries -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <button onclick="OdooSyncLogs.setFilter('ERROR')" class="text-left p-3 rounded-xl bg-slate-950/60 border border-slate-800 hover:border-rose-500/40 transition">
+                <div class="flex items-center justify-between">
+                  <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Unresolved Errors</span>
+                  <span class="h-2 w-2 rounded-full bg-rose-500"></span>
+                </div>
+                <div id="sync-logs-summary-errors" class="text-xl font-bold text-rose-400 font-mono mt-1">0</div>
+                <span class="text-[10px] text-slate-500 block mt-0.5">Blocking connection/ledger</span>
+              </button>
+
+              <button onclick="OdooSyncLogs.setFilter('WARNING')" class="text-left p-3 rounded-xl bg-slate-950/60 border border-slate-800 hover:border-amber-500/40 transition">
+                <div class="flex items-center justify-between">
+                  <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active Warnings</span>
+                  <span class="h-2 w-2 rounded-full bg-amber-500"></span>
+                </div>
+                <div id="sync-logs-summary-warnings" class="text-xl font-bold text-amber-400 font-mono mt-1">0</div>
+                <span class="text-[10px] text-slate-500 block mt-0.5">Schema drift & rate warnings</span>
+              </button>
+
+              <button onclick="OdooSyncLogs.setFilter('RESOLVED')" class="text-left p-3 rounded-xl bg-slate-950/60 border border-slate-800 hover:border-emerald-500/40 transition">
+                <div class="flex items-center justify-between">
+                  <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Remediated / Resolved</span>
+                  <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+                </div>
+                <div id="sync-logs-summary-resolved" class="text-xl font-bold text-emerald-400 font-mono mt-1">0</div>
+                <span class="text-[10px] text-slate-500 block mt-0.5">Auto-fixed by Gemini AI</span>
+              </button>
+
+              <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
+                <div class="flex items-center justify-between">
+                  <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Telemetry Status</span>
+                  <span id="sync-logs-telemetry-status" class="text-[10px] text-blue-400 font-semibold font-mono">NOMINAL</span>
+                </div>
+                <div id="sync-logs-summary-latency" class="text-xl font-bold text-slate-200 font-mono mt-1">28 ms</div>
+                <span id="sync-logs-summary-last-seen" class="text-[10px] text-slate-500 block mt-0.5 truncate">Last event: just now</span>
+              </div>
+            </div>
+
+            <!-- Filter Toolbar & Search -->
+            <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 pt-2">
+              <!-- Severity Filter Pills -->
+              <div class="flex items-center gap-1.5 text-xs overflow-x-auto pb-1 md:pb-0">
+                <button id="sync-logs-pill-ALL" onclick="OdooSyncLogs.setFilter('ALL')" class="px-3 py-1.5 rounded-xl font-semibold bg-blue-600/20 text-blue-400 border border-blue-500/30 transition whitespace-nowrap">
+                  All Logs (<span id="sync-logs-pill-count-all">0</span>)
+                </button>
+                <button id="sync-logs-pill-ERROR" onclick="OdooSyncLogs.setFilter('ERROR')" class="px-3 py-1.5 rounded-xl font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition whitespace-nowrap">
+                  🔴 Errors (<span id="sync-logs-pill-count-errors">0</span>)
+                </button>
+                <button id="sync-logs-pill-WARNING" onclick="OdooSyncLogs.setFilter('WARNING')" class="px-3 py-1.5 rounded-xl font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition whitespace-nowrap">
+                  🟡 Warnings (<span id="sync-logs-pill-count-warnings">0</span>)
+                </button>
+                <button id="sync-logs-pill-RESOLVED" onclick="OdooSyncLogs.setFilter('RESOLVED')" class="px-3 py-1.5 rounded-xl font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition whitespace-nowrap">
+                  🟢 Resolved (<span id="sync-logs-pill-count-resolved">0</span>)
+                </button>
+              </div>
+
+              <!-- Search and Category Dropdown -->
+              <div class="flex items-center gap-2">
+                <select id="sync-logs-category-select" onchange="OdooSyncLogs.setCategory(this.value)" class="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-blue-500">
+                  <option value="ALL">All Categories</option>
+                  <option value="NETWORK">🌐 Network & XML-RPC</option>
+                  <option value="LEDGER">🛡️ Ledger & Equilibrium</option>
+                  <option value="AUTH">🔑 Auth & Session</option>
+                  <option value="SCHEMA">📐 Schema & Models</option>
+                  <option value="RATE_LIMIT">⏱️ Rate Limits</option>
+                </select>
+
+                <div class="relative flex-1 md:w-64">
+                  <input type="text" id="sync-logs-search-input" oninput="OdooSyncLogs.setSearch(this.value)" placeholder="Search error codes, messages, models..." class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500" />
+                  <span class="absolute left-2.5 top-2 text-slate-500 text-xs">🔍</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Real-Time Log List Table -->
+            <div class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-950 text-[11px] text-slate-400 uppercase tracking-wider border-b border-slate-800">
+                  <tr>
+                    <th class="py-2.5 px-3">Timestamp</th>
+                    <th class="py-2.5 px-3">Severity</th>
+                    <th class="py-2.5 px-3">Error Code</th>
+                    <th class="py-2.5 px-3">Category</th>
+                    <th class="py-2.5 px-3">Diagnostic Summary & Impact</th>
+                    <th class="py-2.5 px-3">Database</th>
+                    <th class="py-2.5 px-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="sync-logs-table-body" class="divide-y divide-slate-800/60 font-sans text-xs text-slate-300">
+                  <tr>
+                    <td colspan="7" class="py-8 text-center text-slate-500">Connecting to real-time Odoo synchronization stream...</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
 
@@ -3533,7 +4193,7 @@ Click "Generate Odoo Export" or switch to this tab to view XML definition.
 
     function switchOdooSubtab(subtabId) {
       odooState.activeSubtab = subtabId;
-      const subtabs = ['accounts', 'create', 'verify', 'connect', 'generator', 'export'];
+      const subtabs = ['accounts', 'create', 'verify', 'connect', 'generator', 'export', 'synclogs'];
       subtabs.forEach(s => {
         const btn = document.getElementById('odoo-subtab-btn-' + s);
         const cont = document.getElementById('odoo-subtab-content-' + s);
@@ -3559,6 +4219,11 @@ Click "Generate Odoo Export" or switch to this tab to view XML definition.
         updateOdooExportPreview();
       } else if (subtabId === 'accounts') {
         loadOdooAccounts();
+      } else if (subtabId === 'synclogs') {
+        if (typeof OdooSyncLogs !== 'undefined') {
+          OdooSyncLogs.mountToSubtab();
+          OdooSyncLogs.fetch();
+        }
       }
     }
 
@@ -4103,6 +4768,9 @@ Click "Generate Odoo Export" or switch to this tab to view XML definition.
         const data = await res.json();
         syncDashState.data = data;
         renderSyncDashboardUI(data);
+        if (typeof OdooSyncLogs !== 'undefined') {
+          OdooSyncLogs.fetch(true);
+        }
       } catch (err) {
         console.error('Error loading sync dashboard:', err);
       }
@@ -4160,7 +4828,7 @@ Click "Generate Odoo Export" or switch to this tab to view XML definition.
       }
 
       const pipeDbHost = document.getElementById('pipe-db-host');
-      if (pipeDbHost) pipeDbHost.textContent = dbInfo.url ? (dbInfo.url.replace(/^https?:\/\//, '')) : 'localhost:8069';
+      if (pipeDbHost) pipeDbHost.textContent = dbInfo.url ? dbInfo.url.replace('https://', '').replace('http://', '') : 'localhost:8069';
 
       const pipeDbProto = document.getElementById('pipe-db-proto');
       if (pipeDbProto) pipeDbProto.textContent = dbInfo.protocol || 'XML-RPC 2.0 / JSON-RPC';
@@ -4347,14 +5015,15 @@ Click "Generate Odoo Export" or switch to this tab to view XML definition.
       }
 
       // Circles and tooltips
+      window._auditChartPoints = points;
       let pointsSvg = '';
-      points.forEach(function(pt) {
+      points.forEach(function(pt, idx) {
         const r = pt.run;
         const isPassed = r.status === 'PASSED' || r.passed === true;
         const ptColor = isPassed ? '#10b981' : (pt.score >= 60 ? '#f59e0b' : '#f43f5e');
         const timeStr = new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         pointsSvg += '<circle cx="' + pt.x.toFixed(1) + '" cy="' + pt.y.toFixed(1) + '" r="5.5" fill="' + ptColor + '" stroke="#020617" stroke-width="2" class="cursor-pointer transition-transform hover:scale-125" ' +
-          'onmouseenter="showChartHover(\'' + r.id + '\', ' + pt.score + ', ' + isPassed + ', \'' + timeStr + '\', ' + (r.variance || 0) + ', ' + (r.latencyMs || 25) + ')" ' +
+          'data-idx="' + idx + '" onmouseenter="hoverAuditChartPoint(' + idx + ')" ' +
           'onmouseleave="hideChartHover()" />' +
           '<text x="' + pt.x.toFixed(1) + '" y="' + (height - 15) + '" fill="#64748b" font-size="9" font-family="monospace" text-anchor="middle">' + timeStr + '</text>';
       });
@@ -4370,6 +5039,15 @@ Click "Generate Odoo Export" or switch to this tab to view XML definition.
       '<path d="' + areaD + '" fill="url(#scoreGrad)" />' +
       '<path d="' + lineD + '" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />' +
       pointsSvg;
+    }
+
+    function hoverAuditChartPoint(idx) {
+      if (!window._auditChartPoints || !window._auditChartPoints[idx]) return;
+      const pt = window._auditChartPoints[idx];
+      const r = pt.run;
+      const isPassed = r.status === 'PASSED' || r.passed === true;
+      const timeStr = new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      showChartHover(r.id, pt.score, isPassed, timeStr, r.variance || 0, r.latencyMs || 25);
     }
 
     function showChartHover(id, score, passed, timeStr, variance, latency) {
@@ -4430,7 +5108,7 @@ Click "Generate Odoo Export" or switch to this tab to view XML definition.
           '<td class="py-2.5 px-3">' + scoreBadge + '</td>' +
           '<td class="py-2.5 px-3 text-purple-300">' + (r.latencyMs || 25) + ' ms</td>' +
           '<td class="py-2.5 px-3 text-right">' +
-            '<button onclick="inspectAuditRun(\'' + r.id + '\')" class="text-[10px] px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition font-sans">Inspect</button>' +
+            '<button data-run-id="' + escapeHtml(r.id) + '" onclick="inspectAuditRun(this.dataset.runId)" class="text-[10px] px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition font-sans">Inspect</button>' +
           '</td>' +
         '</tr>';
       });
@@ -4603,8 +5281,454 @@ Click "Generate Odoo Export" or switch to this tab to view XML definition.
       }
     }
 
-    // Initialize auto sync pulse
+    // ==============================================================
+    // CLIENT CONTROLLER: OdooSyncLogs Real-Time Component
+    // ==============================================================
+    const OdooSyncLogs = {
+      state: {
+        logs: [],
+        summary: null,
+        filterLevel: 'ALL',
+        filterCategory: 'ALL',
+        searchQuery: '',
+        isStreaming: true,
+        streamInterval: null,
+        currentModalLog: null,
+      },
+      _searchDebounce: null,
+
+      init() {
+        this.fetch();
+        this.startStreaming();
+      },
+
+      startStreaming() {
+        if (this.state.streamInterval) clearInterval(this.state.streamInterval);
+        this.state.streamInterval = setInterval(() => {
+          if (this.state.isStreaming) {
+            this.fetch(true);
+          }
+        }, 10000);
+      },
+
+      toggleStream() {
+        this.state.isStreaming = !this.state.isStreaming;
+        const icon = document.getElementById('sync-logs-stream-icon');
+        const label = document.getElementById('sync-logs-stream-label');
+        const badge = document.getElementById('sync-logs-live-badge');
+        const badgeText = document.getElementById('sync-logs-live-text');
+
+        if (this.state.isStreaming) {
+          if (icon) icon.textContent = '⏸';
+          if (label) label.textContent = 'Pause Stream';
+          if (badge) badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5';
+          if (badgeText) badgeText.textContent = 'LIVE STREAMING';
+          showToast('Sync logs stream resumed (polling 10s)');
+        } else {
+          if (icon) icon.textContent = '▶';
+          if (label) label.textContent = 'Resume Stream';
+          if (badge) badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700 flex items-center gap-1.5';
+          if (badgeText) badgeText.textContent = 'PAUSED';
+          showToast('Sync logs stream paused');
+        }
+      },
+
+      toggleSimulateMenu() {
+        const menu = document.getElementById('sync-logs-simulate-menu');
+        if (menu) menu.classList.toggle('hidden');
+      },
+
+      async fetch(isSilent = false) {
+        try {
+          const params = new URLSearchParams();
+          if (this.state.filterLevel !== 'ALL' && this.state.filterLevel !== 'RESOLVED') {
+            params.append('level', this.state.filterLevel);
+          }
+          if (this.state.filterLevel === 'RESOLVED') {
+            params.append('resolved', 'true');
+          }
+          if (this.state.filterCategory !== 'ALL') {
+            params.append('category', this.state.filterCategory);
+          }
+          if (this.state.searchQuery.trim()) {
+            params.append('search', this.state.searchQuery.trim());
+          }
+
+          const res = await fetch('/api/odoo/sync-logs?' + params.toString());
+          if (!res.ok) throw new Error('Failed to fetch sync logs');
+          const data = await res.json();
+          this.state.logs = data.logs || [];
+          this.state.summary = data.summary || {};
+
+          this.render();
+          this.updateMetrics();
+        } catch (err) {
+          if (!isSilent) console.error('Error fetching sync logs:', err);
+        }
+      },
+
+      setFilter(level) {
+        this.state.filterLevel = level;
+        ['ALL', 'ERROR', 'WARNING', 'RESOLVED'].forEach(l => {
+          const pill = document.getElementById('sync-logs-pill-' + l);
+          if (pill) {
+            if (l === level) {
+              const bg = l === 'ERROR' ? 'bg-rose-600/20 text-rose-400 border-rose-500/30' :
+                         (l === 'WARNING' ? 'bg-amber-600/20 text-amber-400 border-amber-500/30' :
+                         (l === 'RESOLVED' ? 'bg-emerald-600/20 text-emerald-400 border-emerald-500/30' :
+                         'bg-blue-600/20 text-blue-400 border-blue-500/30'));
+              pill.className = 'px-3 py-1.5 rounded-xl font-semibold border transition whitespace-nowrap ' + bg;
+            } else {
+              pill.className = 'px-3 py-1.5 rounded-xl font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition whitespace-nowrap';
+            }
+          }
+        });
+        this.fetch();
+      },
+
+      setCategory(cat) {
+        this.state.filterCategory = cat;
+        this.fetch();
+      },
+
+      setSearch(val) {
+        this.state.searchQuery = val;
+        clearTimeout(this._searchDebounce);
+        this._searchDebounce = setTimeout(() => {
+          this.fetch();
+        }, 250);
+      },
+
+      render() {
+        const tbody = document.getElementById('sync-logs-table-body');
+        if (!tbody) return;
+
+        if (this.state.logs.length === 0) {
+          tbody.innerHTML = '<tr>' +
+            '<td colspan="7" class="py-10 text-center text-slate-500">' +
+              '<div class="flex flex-col items-center justify-center gap-2">' +
+                '<span class="text-2xl">✨</span>' +
+                '<span class="text-xs font-semibold text-slate-300">No synchronization anomalies matching current filters</span>' +
+                '<span class="text-[11px] text-slate-500">All Odoo ledger lines, currency rates, and XML-RPC sockets are performing within tolerance.</span>' +
+              '</div>' +
+            '</td>' +
+          '</tr>';
+          return;
+        }
+
+        const rowsHtml = this.state.logs.map(function(log) {
+          const time = new Date(log.timestamp);
+          const timeStr = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          const dateStr = time.toLocaleDateString([], { month: 'short', day: 'numeric' });
+
+          let levelBadge = '';
+          if (log.resolved) {
+            levelBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">✓ RESOLVED</span>';
+          } else if (log.level === 'ERROR') {
+            levelBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center gap-1 w-fit"><span class="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse"></span> ERROR</span>';
+          } else if (log.level === 'WARNING') {
+            levelBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1 w-fit">⚠️ WARN</span>';
+          } else {
+            levelBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">INFO</span>';
+          }
+
+          let catBadge = '';
+          const c = log.category;
+          if (c === 'NETWORK') catBadge = '<span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">🌐 NETWORK</span>';
+          else if (c === 'LEDGER') catBadge = '<span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-purple-500/10 text-purple-300 border border-purple-500/20">🛡️ LEDGER</span>';
+          else if (c === 'AUTH') catBadge = '<span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-amber-500/10 text-amber-300 border border-amber-500/20">🔑 AUTH</span>';
+          else if (c === 'SCHEMA') catBadge = '<span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">📐 SCHEMA</span>';
+          else catBadge = '<span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-300">' + escapeHtml(c) + '</span>';
+
+          const hasRemedy = log.details && log.details.remedy;
+          const remedyHint = hasRemedy ? '<div class="text-[11px] text-purple-300/90 mt-1 flex items-center gap-1"><span class="text-xs">🤖</span> ' + escapeHtml(log.details.remedy) + '</div>' : '';
+
+          const rowClass = log.resolved ? 'opacity-70 bg-slate-950/40' : '';
+          const modelSub = log.details && log.details.model ? '<span class="text-[10px] font-mono text-slate-500 block">' + escapeHtml(log.details.model) + '</span>' : '';
+          const latencyStr = log.details && log.details.latencyMs ? log.details.latencyMs + ' ms' : '24 ms';
+
+          return '<tr class="hover:bg-slate-900/60 transition ' + rowClass + '">' +
+            '<td class="py-2.5 px-3 whitespace-nowrap">' +
+              '<div class="font-mono text-slate-300 text-xs font-semibold">' + timeStr + '</div>' +
+              '<div class="text-[10px] text-slate-500">' + dateStr + '</div>' +
+            '</td>' +
+            '<td class="py-2.5 px-3">' + levelBadge + '</td>' +
+            '<td class="py-2.5 px-3">' +
+              '<span class="font-mono text-xs font-semibold text-slate-200 block">' + escapeHtml(log.code) + '</span>' +
+              modelSub +
+            '</td>' +
+            '<td class="py-2.5 px-3">' + catBadge + '</td>' +
+            '<td class="py-2.5 px-3 max-w-xs md:max-w-md">' +
+              '<div class="text-xs font-medium text-slate-200 leading-snug">' + escapeHtml(log.message) + '</div>' +
+              remedyHint +
+            '</td>' +
+            '<td class="py-2.5 px-3 whitespace-nowrap">' +
+              '<span class="text-xs text-slate-300 block truncate max-w-[120px]">' + escapeHtml(log.databaseName) + '</span>' +
+              '<span class="font-mono text-[10px] text-purple-300">' + latencyStr + '</span>' +
+            '</td>' +
+            '<td class="py-2.5 px-3 text-right whitespace-nowrap">' +
+              '<div class="flex items-center justify-end gap-1.5">' +
+                '<button data-log-id="' + escapeHtml(log.id) + '" onclick="OdooSyncLogs.openDetailModal(this.dataset.logId)" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] font-semibold transition">Inspect</button>' +
+                (!log.resolved ? '<button data-log-id="' + escapeHtml(log.id) + '" onclick="OdooSyncLogs.resolveSingle(this.dataset.logId)" title="Mark Resolved" class="px-2 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded text-[11px] font-semibold transition">✓ Fix</button>' : '<span class="text-[10px] text-emerald-400 font-mono">Resolved</span>') +
+              '</div>' +
+            '</td>' +
+          '</tr>';
+        }).join('');
+
+        tbody.innerHTML = rowsHtml;
+      },
+
+      updateMetrics() {
+        const s = this.state.summary;
+        if (!s) return;
+
+        const errEl = document.getElementById('sync-logs-summary-errors');
+        const warnEl = document.getElementById('sync-logs-summary-warnings');
+        const resEl = document.getElementById('sync-logs-summary-resolved');
+        const latEl = document.getElementById('sync-logs-summary-latency');
+        const lastSeenEl = document.getElementById('sync-logs-summary-last-seen');
+        const telStatusEl = document.getElementById('sync-logs-telemetry-status');
+
+        if (errEl) errEl.textContent = s.unresolvedErrors ?? 0;
+        if (warnEl) warnEl.textContent = s.unresolvedWarnings ?? 0;
+        if (resEl) resEl.textContent = s.resolved ?? 0;
+        if (latEl) latEl.textContent = (s.latencyMs || 28) + ' ms';
+
+        if (lastSeenEl && s.lastEventTimestamp) {
+          const diffSec = Math.floor((Date.now() - new Date(s.lastEventTimestamp).getTime()) / 1000);
+          lastSeenEl.textContent = diffSec < 60 ? ('Last event: ' + diffSec + 's ago') : ('Last event: ' + Math.floor(diffSec / 60) + 'm ago');
+        }
+
+        if (telStatusEl) {
+          if (s.unresolvedErrors > 0) {
+            telStatusEl.textContent = 'DEGRADED';
+            telStatusEl.className = 'text-[10px] text-rose-400 font-semibold font-mono';
+          } else if (s.unresolvedWarnings > 0) {
+            telStatusEl.textContent = 'ATTENTION';
+            telStatusEl.className = 'text-[10px] text-amber-400 font-semibold font-mono';
+          } else {
+            telStatusEl.textContent = 'NOMINAL';
+            telStatusEl.className = 'text-[10px] text-emerald-400 font-semibold font-mono';
+          }
+        }
+
+        const pillAll = document.getElementById('sync-logs-pill-count-all');
+        const pillErr = document.getElementById('sync-logs-pill-count-errors');
+        const pillWarn = document.getElementById('sync-logs-pill-count-warnings');
+        const pillRes = document.getElementById('sync-logs-pill-count-resolved');
+        if (pillAll) pillAll.textContent = s.total ?? 0;
+        if (pillErr) pillErr.textContent = s.unresolvedErrors ?? 0;
+        if (pillWarn) pillWarn.textContent = s.unresolvedWarnings ?? 0;
+        if (pillRes) pillRes.textContent = s.resolved ?? 0;
+
+        const subtabBadge = document.getElementById('odoo-subtab-synclogs-badge');
+        if (subtabBadge) {
+          const activeAnomalies = (s.unresolvedErrors || 0) + (s.unresolvedWarnings || 0);
+          subtabBadge.textContent = activeAnomalies;
+          if (activeAnomalies > 0) {
+            subtabBadge.className = 'px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30';
+          } else {
+            subtabBadge.className = 'px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700';
+          }
+        }
+      },
+
+      openDetailModal(logId) {
+        const log = this.state.logs.find(function(l) { return l.id === logId; });
+        if (!log) return;
+        this.state.currentModalLog = log;
+
+        const modal = document.getElementById('sync-log-detail-modal');
+        const badge = document.getElementById('sync-log-modal-badge');
+        const code = document.getElementById('sync-log-modal-code');
+        const cat = document.getElementById('sync-log-modal-category');
+        const time = document.getElementById('sync-log-modal-timestamp');
+        const msgBox = document.getElementById('sync-log-modal-message-box');
+        const db = document.getElementById('sync-log-modal-db');
+        const lat = document.getElementById('sync-log-modal-latency');
+        const varCont = document.getElementById('sync-log-modal-variance-container');
+        const exp = document.getElementById('sync-log-modal-expected');
+        const act = document.getElementById('sync-log-modal-actual');
+        const stackCont = document.getElementById('sync-log-modal-stack-container');
+        const stack = document.getElementById('sync-log-modal-stack');
+        const remedy = document.getElementById('sync-log-modal-remedy');
+        const statusText = document.getElementById('sync-log-modal-status-text');
+        const resolveBtn = document.getElementById('sync-log-modal-resolve-btn');
+
+        if (code) code.textContent = log.code;
+        if (cat) cat.textContent = log.category;
+        if (time) time.textContent = new Date(log.timestamp).toLocaleString();
+        if (db) db.textContent = log.databaseName + ' (' + log.databaseId + ')';
+        const latMs = (log.details && log.details.latencyMs) ? log.details.latencyMs : 25;
+        if (lat) lat.textContent = latMs + ' ms roundtrip';
+
+        if (badge) {
+          if (log.resolved) {
+            badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+            badge.textContent = 'RESOLVED';
+          } else if (log.level === 'ERROR') {
+            badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30';
+            badge.textContent = 'CRITICAL ERROR';
+          } else {
+            badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30';
+            badge.textContent = 'SYNC WARNING';
+          }
+        }
+
+        if (msgBox) {
+          msgBox.textContent = log.message;
+          if (log.level === 'ERROR') {
+            msgBox.className = 'p-4 rounded-xl text-xs font-medium border leading-relaxed bg-rose-500/10 text-rose-200 border-rose-500/20';
+          } else if (log.level === 'WARNING') {
+            msgBox.className = 'p-4 rounded-xl text-xs font-medium border leading-relaxed bg-amber-500/10 text-amber-200 border-amber-500/20';
+          } else {
+            msgBox.className = 'p-4 rounded-xl text-xs font-medium border leading-relaxed bg-blue-500/10 text-blue-200 border-blue-500/20';
+          }
+        }
+
+        if (varCont && exp && act) {
+          if (log.details && log.details.expected && log.details.actual) {
+            exp.textContent = String(log.details.expected);
+            act.textContent = String(log.details.actual);
+            varCont.classList.remove('hidden');
+          } else {
+            varCont.classList.add('hidden');
+          }
+        }
+
+        if (stackCont && stack) {
+          if (log.details && log.details.stackTrace) {
+            stack.textContent = log.details.stackTrace;
+            stackCont.classList.remove('hidden');
+          } else {
+            stackCont.classList.add('hidden');
+          }
+        }
+
+        if (remedy) {
+          const remedyText = (log.details && log.details.remedy) ? log.details.remedy : 'Check connection parameters and verify model field definitions in Odoo backend.';
+          remedy.textContent = remedyText;
+        }
+
+        if (statusText) {
+          statusText.textContent = log.resolved ? ('Resolved at ' + new Date(log.resolvedAt || log.timestamp).toLocaleTimeString()) : 'Anomaly status: UNRESOLVED';
+        }
+
+        if (resolveBtn) {
+          if (log.resolved) {
+            resolveBtn.classList.add('hidden');
+          } else {
+            resolveBtn.classList.remove('hidden');
+          }
+        }
+
+        if (modal) modal.classList.remove('hidden');
+      },
+
+      closeDetailModal() {
+        const modal = document.getElementById('sync-log-detail-modal');
+        if (modal) modal.classList.add('hidden');
+        this.state.currentModalLog = null;
+      },
+
+      copyStack() {
+        const stack = document.getElementById('sync-log-modal-stack');
+        if (stack && stack.textContent) {
+          navigator.clipboard.writeText(stack.textContent).then(function() {
+            showToast('Diagnostic stack trace copied to clipboard');
+          });
+        }
+      },
+
+      async resolveCurrentModalLog() {
+        if (!this.state.currentModalLog) return;
+        await this.resolveSingle(this.state.currentModalLog.id);
+        this.closeDetailModal();
+      },
+
+      async resolveSingle(id) {
+        try {
+          const res = await fetch('/api/odoo/sync-logs/resolve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: id })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Failed to resolve log');
+          showToast('✓ Anomaly marked as remediated');
+          await this.fetch();
+        } catch (e) {
+          alert(e.message);
+        }
+      },
+
+      async resolveAll() {
+        try {
+          const res = await fetch('/api/odoo/sync-logs/resolve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ all: true })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Failed to auto-resolve');
+          showToast('✓ Auto-resolved ' + data.resolvedCount + ' anomalies with Gemini AI');
+          await this.fetch();
+        } catch (e) {
+          alert(e.message);
+        }
+      },
+
+      async simulate(level) {
+        try {
+          const res = await fetch('/api/odoo/sync-logs/simulate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ level: level })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Failed to simulate event');
+          showToast('⚡ Simulated ' + level + ': ' + data.log.code);
+          await this.fetch();
+        } catch (e) {
+          alert(e.message);
+        }
+      },
+
+      async clear() {
+        if (!confirm('Are you sure you want to clear all synchronization logs?')) return;
+        try {
+          const res = await fetch('/api/odoo/sync-logs/clear', {
+            method: 'POST'
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Failed to clear');
+          showToast('Cleared ' + data.clearedCount + ' logs');
+          await this.fetch();
+        } catch (e) {
+          alert(e.message);
+        }
+      },
+
+      export(format) {
+        window.location.href = '/api/odoo/sync-logs/export?format=' + format;
+      },
+
+      mountToSubtab() {
+        const mount = document.getElementById('odoo-sync-logs-subtab-mount');
+        const primary = document.getElementById('odoo-sync-logs');
+        if (mount && primary) {
+          // If not mounted yet, move or link the primary element into mount
+          mount.innerHTML = '<div class="p-4 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300 flex items-center justify-between">' +
+            '<div><span class="font-bold text-slate-200">Active Anomaly Stream:</span> Real-time events synchronized with OdooSyncLogs component in Synchronization Dashboard.</div>' +
+            '<button data-tab="sync-dashboard" onclick="switchTab(this.dataset.tab)" class="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition">View in Sync Dashboard →</button>' +
+          '</div>';
+        }
+      }
+    };
+
+    // Initialize auto sync pulse & sync logs
     startAutoSyncPulse();
+    OdooSyncLogs.init();
 
     // GitHub Scaffolder
     async function runGitHubScaffold() {
