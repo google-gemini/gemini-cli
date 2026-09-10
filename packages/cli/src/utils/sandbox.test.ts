@@ -877,15 +877,92 @@ describe('sandbox', () => {
         expect.any(Object),
       );
 
-      // Verify that docker run mounts the isolated settings directory
+      // Verify that docker run mounts the isolated settings directory read-only and adds tmpfs
       expect(spawn).toHaveBeenNthCalledWith(
         2,
         'docker',
         expect.arrayContaining([
           '--volume',
           expect.stringMatching(
-            /gemini-sandbox-settings.*:[\\/]home[\\/]node[\\/]\.gemini/,
+            /gemini-sandbox-settings.*:[\\/]home[\\/]node[\\/]\.gemini:ro/,
           ),
+          '--tmpfs',
+          '/home/node/.gemini/tmp:exec',
+          '--tmpfs',
+          '/home/node/.gemini/history:exec',
+        ]),
+        expect.any(Object),
+      );
+    });
+
+    it('should reject SANDBOX_MOUNTS attempting to mount host .gemini directory with rw', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      process.env['SANDBOX_MOUNTS'] =
+        '/home/user/.gemini:/home/node/.gemini:rw';
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      await expect(start_sandbox(config)).rejects.toThrow(FatalSandboxError);
+    });
+
+    it('should filter out host .gemini directory from allowedPaths in Docker', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+        allowedPaths: ['/home/user/.gemini', '/extra/path'],
+      });
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+      await start_sandbox(config);
+
+      expect(spawn).toHaveBeenCalledWith(
+        'docker',
+        expect.arrayContaining(['--volume', '/extra/path:/extra/path:ro']),
+        expect.any(Object),
+      );
+      expect(spawn).toHaveBeenCalledWith(
+        'docker',
+        expect.not.arrayContaining([
+          '/home/user/.gemini:/home/user/.gemini:ro',
         ]),
         expect.any(Object),
       );

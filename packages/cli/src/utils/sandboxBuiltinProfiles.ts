@@ -61,7 +61,6 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
     (subpath (param "TARGET_DIR"))
     (subpath (param "TMP_DIR"))
     (subpath (param "CACHE_DIR"))
-    (subpath (string-append (param "HOME_DIR") "/.gemini"))
     (subpath (string-append (param "HOME_DIR") "/.npm"))
     (subpath (string-append (param "HOME_DIR") "/.cache"))
     (subpath (param "INCLUDE_DIR_0"))
@@ -140,6 +139,14 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
 (deny ipc-posix-shm*
     (ipc-posix-name-prefix "docker")
     (ipc-posix-name-prefix "com.docker.")
+)
+(deny file-write*
+    (subpath (string-append (param "HOME_DIR") "/.gemini"))
+)
+(deny file-read*
+    (literal (string-append (param "HOME_DIR") "/.gemini/oauth_creds.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/.env"))
+    (regex #"\\.gemini/.*(oauth|cred|token|\\.env).*")
 )`,
 
   'permissive-proxied': `(version 1)
@@ -198,7 +205,6 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
     (subpath (param "TARGET_DIR"))
     (subpath (param "TMP_DIR"))
     (subpath (param "CACHE_DIR"))
-    (subpath (string-append (param "HOME_DIR") "/.gemini"))
     (subpath (string-append (param "HOME_DIR") "/.npm"))
     (subpath (string-append (param "HOME_DIR") "/.cache"))
     (subpath (param "INCLUDE_DIR_0"))
@@ -277,6 +283,14 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
 (deny ipc-posix-shm*
     (ipc-posix-name-prefix "docker")
     (ipc-posix-name-prefix "com.docker.")
+)
+(deny file-write*
+    (subpath (string-append (param "HOME_DIR") "/.gemini"))
+)
+(deny file-read*
+    (literal (string-append (param "HOME_DIR") "/.gemini/oauth_creds.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/.env"))
+    (regex #"\\.gemini/.*(oauth|cred|token|\\.env).*")
 )`,
 
   'restrictive-open': `(version 1)
@@ -335,7 +349,6 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
     (subpath (param "TARGET_DIR"))
     (subpath (param "TMP_DIR"))
     (subpath (param "CACHE_DIR"))
-    (subpath (string-append (param "HOME_DIR") "/.gemini"))
     (subpath (string-append (param "HOME_DIR") "/.npm"))
     (subpath (string-append (param "HOME_DIR") "/.cache"))
     (subpath (param "INCLUDE_DIR_0"))
@@ -391,6 +404,14 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
 (deny ipc-posix-shm*
     (ipc-posix-name-prefix "docker")
     (ipc-posix-name-prefix "com.docker.")
+)
+(deny file-write*
+    (subpath (string-append (param "HOME_DIR") "/.gemini"))
+)
+(deny file-read*
+    (literal (string-append (param "HOME_DIR") "/.gemini/oauth_creds.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/.env"))
+    (regex #"\\.gemini/.*(oauth|cred|token|\\.env).*")
 )`,
 
   'restrictive-proxied': `(version 1)
@@ -449,7 +470,6 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
     (subpath (param "TARGET_DIR"))
     (subpath (param "TMP_DIR"))
     (subpath (param "CACHE_DIR"))
-    (subpath (string-append (param "HOME_DIR") "/.gemini"))
     (subpath (string-append (param "HOME_DIR") "/.npm"))
     (subpath (string-append (param "HOME_DIR") "/.cache"))
     (subpath (param "INCLUDE_DIR_0"))
@@ -505,6 +525,14 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
 (deny ipc-posix-shm*
     (ipc-posix-name-prefix "docker")
     (ipc-posix-name-prefix "com.docker.")
+)
+(deny file-write*
+    (subpath (string-append (param "HOME_DIR") "/.gemini"))
+)
+(deny file-read*
+    (literal (string-append (param "HOME_DIR") "/.gemini/oauth_creds.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/.env"))
+    (regex #"\\.gemini/.*(oauth|cred|token|\\.env).*")
 )`,
 
   'strict-open': `(version 1)
@@ -514,7 +542,6 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
     (subpath (param "TARGET_DIR"))
     (subpath (param "TMP_DIR"))
     (subpath (param "CACHE_DIR"))
-    (subpath (string-append (param "HOME_DIR") "/.gemini"))
     (subpath (string-append (param "HOME_DIR") "/.npm"))
     (subpath (string-append (param "HOME_DIR") "/.cache"))
     (literal (string-append (param "HOME_DIR") "/.gitconfig"))
@@ -592,7 +619,6 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
     (subpath (param "TARGET_DIR"))
     (subpath (param "TMP_DIR"))
     (subpath (param "CACHE_DIR"))
-    (subpath (string-append (param "HOME_DIR") "/.gemini"))
     (subpath (string-append (param "HOME_DIR") "/.npm"))
     (subpath (string-append (param "HOME_DIR") "/.cache"))
     (subpath (param "INCLUDE_DIR_0"))
@@ -648,6 +674,14 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
 (deny ipc-posix-shm*
     (ipc-posix-name-prefix "docker")
     (ipc-posix-name-prefix "com.docker.")
+)
+(deny file-write*
+    (subpath (string-append (param "HOME_DIR") "/.gemini"))
+)
+(deny file-read*
+    (literal (string-append (param "HOME_DIR") "/.gemini/oauth_creds.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/.env"))
+    (regex #"\\.gemini/.*(oauth|cred|token|\\.env).*")
 )`,
 
   'strict-proxied': `(version 1)
@@ -657,7 +691,6 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
     (subpath (param "TARGET_DIR"))
     (subpath (param "TMP_DIR"))
     (subpath (param "CACHE_DIR"))
-    (subpath (string-append (param "HOME_DIR") "/.gemini"))
     (subpath (string-append (param "HOME_DIR") "/.npm"))
     (subpath (string-append (param "HOME_DIR") "/.cache"))
     (literal (string-append (param "HOME_DIR") "/.gitconfig"))
@@ -735,7 +768,6 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
     (subpath (param "TARGET_DIR"))
     (subpath (param "TMP_DIR"))
     (subpath (param "CACHE_DIR"))
-    (subpath (string-append (param "HOME_DIR") "/.gemini"))
     (subpath (string-append (param "HOME_DIR") "/.npm"))
     (subpath (string-append (param "HOME_DIR") "/.cache"))
     (subpath (param "INCLUDE_DIR_0"))
@@ -791,6 +823,14 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
 (deny ipc-posix-shm*
     (ipc-posix-name-prefix "docker")
     (ipc-posix-name-prefix "com.docker.")
+)
+(deny file-write*
+    (subpath (string-append (param "HOME_DIR") "/.gemini"))
+)
+(deny file-read*
+    (literal (string-append (param "HOME_DIR") "/.gemini/oauth_creds.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/.env"))
+    (regex #"\\.gemini/.*(oauth|cred|token|\\.env).*")
 )`,
 };
 

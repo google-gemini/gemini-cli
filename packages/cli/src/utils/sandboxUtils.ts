@@ -11,6 +11,12 @@ import { readFile } from 'node:fs/promises';
 import { quote } from 'shell-quote';
 import { debugLogger, GEMINI_DIR } from '@google/gemini-cli-core';
 
+import stripJsonComments from 'strip-json-comments';
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
 export const LOCAL_DEV_SANDBOX_IMAGE_NAME = 'gemini-cli-sandbox';
 export const SANDBOX_NETWORK_NAME = 'gemini-cli-sandbox';
 export const SANDBOX_PROXY_NAME = 'gemini-cli-sandbox-proxy';
@@ -34,6 +40,10 @@ export const SENSITIVE_SETTINGS_FILENAMES = new Set([
   'gemini-credentials.json',
   'mcp-oauth-tokens.json',
   'a2a-oauth-tokens.json',
+  'trusted_hooks.json',
+  'trustedfolders.json',
+  'trustedFolders.json',
+  'policy_integrity.json',
 ]);
 
 /**
@@ -75,15 +85,48 @@ export function isCredentialOrSensitivePath(
     hasSensitiveSuffix('token') ||
     hasSensitiveSuffix('creds.json') ||
     hasSensitiveSuffix('cred.json') ||
+    base === '.env' ||
+    base.startsWith('.env.') ||
     base.endsWith('.env') ||
     base.endsWith('.key') ||
     base.endsWith('.pem') ||
     base.endsWith('.p12') ||
-    hasSensitiveSuffix('key.json')
+    hasSensitiveSuffix('key.json') ||
+    base === 'id_rsa' ||
+    base === 'id_ecdsa' ||
+    base === 'id_ed25519' ||
+    base === 'id_dsa'
   ) {
     return true;
   }
   return false;
+}
+
+/**
+ * Strips dangerous/sensitive settings such as arbitrary command execution hooks
+ * and API keys before configuration is exposed to the sandbox.
+ */
+export function sanitizeSettingsContent(rawContent: string): string {
+  try {
+    const stripped = stripJsonComments(rawContent);
+    const parsed: unknown = JSON.parse(stripped);
+    if (isRecord(parsed) && !Array.isArray(parsed)) {
+      // Strip hooks to prevent execution of unvalidated or container-altered hooks
+      delete parsed['hooks'];
+      // Strip potential credential keys
+      delete parsed['apiKey'];
+      delete parsed['geminiApiKey'];
+      delete parsed['googleApiKey'];
+      const sec = parsed['security'];
+      if (isRecord(sec) && !Array.isArray(sec)) {
+        delete sec['auth'];
+      }
+      return JSON.stringify(parsed, null, 2);
+    }
+  } catch {
+    return '{}';
+  }
+  return '{}';
 }
 
 /**
@@ -106,6 +149,23 @@ export function prepareIsolatedSettingsDir(
         filter: (source) =>
           !isCredentialOrSensitivePath(source, userSettingsDirOnHost),
       });
+
+      // Sanitize settings.json in the isolated directory
+      const isolatedSettingsFile = path.join(isolatedDir, 'settings.json');
+      if (fs.existsSync(isolatedSettingsFile)) {
+        try {
+          const content = fs.readFileSync(isolatedSettingsFile, 'utf-8');
+          const sanitized = sanitizeSettingsContent(content);
+          fs.writeFileSync(isolatedSettingsFile, sanitized, {
+            mode: 0o400,
+            encoding: 'utf-8',
+          });
+        } catch (err) {
+          debugLogger.warn(
+            `Failed to sanitize settings.json for sandbox: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      }
     } catch (err) {
       debugLogger.warn(
         `Failed to copy user settings to sandbox directory: ${err instanceof Error ? err.message : String(err)}`,

@@ -1107,12 +1107,12 @@ export async function loadCliConfig(
     acceptRawOutputRisk: argv.acceptRawOutputRisk,
     dynamicModelConfiguration: settings.experimental?.dynamicModelConfiguration,
     modelConfigServiceConfig: settings.modelConfigs,
-    // TODO: loading of hooks based on workspace trust
+    // Loading of project hooks requires workspace trust
     enableHooks: settings.hooksConfig.enabled,
     enableHooksUI: settings.hooksConfig.enabled,
     hooks: settings.hooks || {},
     disabledHooks: settings.hooksConfig?.disabled || [],
-    projectHooks: projectHooks || {},
+    projectHooks: trustedFolder ? projectHooks || {} : {},
     onModelChange: (model: string) => saveModelChange(loadSettings(cwd), model),
     onReload: async () => {
       const refreshedSettings = loadSettings(cwd);

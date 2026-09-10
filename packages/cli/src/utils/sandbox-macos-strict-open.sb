@@ -10,7 +10,6 @@
     (subpath (param "TMP_DIR"))
     (subpath (param "CACHE_DIR"))
     ;; Only allow reading essential dotfiles/directories under HOME, not the entire HOME
-    (subpath (string-append (param "HOME_DIR") "/.gemini"))
     (subpath (string-append (param "HOME_DIR") "/.npm"))
     (subpath (string-append (param "HOME_DIR") "/.cache"))
     (literal (string-append (param "HOME_DIR") "/.gitconfig"))
@@ -102,7 +101,6 @@
     (subpath (param "TARGET_DIR"))
     (subpath (param "TMP_DIR"))
     (subpath (param "CACHE_DIR"))
-    (subpath (string-append (param "HOME_DIR") "/.gemini"))
     (subpath (string-append (param "HOME_DIR") "/.npm"))
     (subpath (string-append (param "HOME_DIR") "/.cache"))
     ;; Allow writes to included directories from --include-directories
@@ -177,4 +175,17 @@
     (ipc-posix-name-prefix "docker")
     (ipc-posix-name-prefix "com.docker.")
 )
+
+;; Disallow writing to host gemini directory to prevent configuration poisoning
+(deny file-write*
+    (subpath (string-append (param "HOME_DIR") "/.gemini"))
+)
+
+;; Disallow reading sensitive credentials, auth tokens, and environment files
+(deny file-read*
+    (literal (string-append (param "HOME_DIR") "/.gemini/oauth_creds.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/.env"))
+    (regex #"\.gemini/.*(oauth|cred|token|\.env).*")
+)
+
 

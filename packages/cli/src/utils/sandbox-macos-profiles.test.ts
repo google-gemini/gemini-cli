@@ -119,6 +119,39 @@ describe('macOS Seatbelt container runtime isolation', () => {
   });
 });
 
+describe('macOS Seatbelt ~/.gemini and credential protection', () => {
+  describe.each(ALL_PROFILES)('%s', (profile) => {
+    const rules = readRules(profile);
+
+    it('denies writing to host ~/.gemini directory', () => {
+      expect(rules).toContain('(deny file-write*');
+      expect(rules).toContain(
+        '(subpath (string-append (param "HOME_DIR") "/.gemini"))',
+      );
+    });
+
+    it('does not allow writing to ~/.gemini directory', () => {
+      const fileWriteBlocks =
+        rules.match(/\(allow file-write\*[\s\S]*?\n\)/g) || [];
+      for (const block of fileWriteBlocks) {
+        expect(block).not.toContain(
+          '(subpath (string-append (param "HOME_DIR") "/.gemini"))',
+        );
+      }
+    });
+
+    it('denies reading OAuth credentials and .env files', () => {
+      expect(rules).toContain('(deny file-read*');
+      expect(rules).toContain(
+        '(literal (string-append (param "HOME_DIR") "/.gemini/oauth_creds.json"))',
+      );
+      expect(rules).toContain(
+        '(literal (string-append (param "HOME_DIR") "/.gemini/.env"))',
+      );
+    });
+  });
+});
+
 describe('BUILTIN_SEATBELT_PROFILE_CONTENTS consistency', () => {
   const profileKeyMap: Record<string, string> = {
     'sandbox-macos-permissive-open.sb': 'permissive-open',
@@ -140,6 +173,18 @@ describe('BUILTIN_SEATBELT_PROFILE_CONTENTS consistency', () => {
         expect(embeddedContent).toContain(
           '(xpc-service-name-prefix "com.docker.")',
         );
+      });
+
+      it('contains ~/.gemini and credential deny rules in embedded content', () => {
+        const embeddedContent = BUILTIN_SEATBELT_PROFILE_CONTENTS[key];
+        expect(embeddedContent).toBeDefined();
+        expect(embeddedContent).toContain('(deny file-write*');
+        expect(embeddedContent).toContain(
+          '(subpath (string-append (param "HOME_DIR") "/.gemini"))',
+        );
+        expect(embeddedContent).toContain('(deny file-read*');
+        expect(embeddedContent).toContain('oauth_creds.json');
+        expect(embeddedContent).toContain('.env');
       });
     },
   );

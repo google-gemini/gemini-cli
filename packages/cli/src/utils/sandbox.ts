@@ -469,22 +469,29 @@ export async function start_sandbox(
 
     isolatedSettingsDir = prepareIsolatedSettingsDir(userSettingsDirOnHost);
 
-    args.push('--volume', `${isolatedSettingsDir}:${userSettingsDirInSandbox}`);
+    args.push(
+      '--volume',
+      `${isolatedSettingsDir}:${userSettingsDirInSandbox}:ro`,
+    );
     if (userSettingsDirInSandbox !== getContainerPath(userSettingsDirOnHost)) {
       args.push(
         '--volume',
-        `${isolatedSettingsDir}:${getContainerPath(userSettingsDirOnHost)}`,
+        `${isolatedSettingsDir}:${getContainerPath(userSettingsDirOnHost)}:ro`,
       );
     }
 
-    // mount os.tmpdir() as os.tmpdir() inside container
-    args.push('--volume', `${os.tmpdir()}:${getContainerPath(os.tmpdir())}`);
-
-    // mount homedir() as homedir() inside container
-    if (userHomeDirOnHost !== os.homedir()) {
+    // Ephemeral tmpfs directories for runtime state (tmp, history) so container operations
+    // can write ephemeral session logs without touching host files or violating read-only mounts.
+    args.push('--tmpfs', `${userSettingsDirInSandbox}/tmp:exec`);
+    args.push('--tmpfs', `${userSettingsDirInSandbox}/history:exec`);
+    if (userSettingsDirInSandbox !== getContainerPath(userSettingsDirOnHost)) {
       args.push(
-        '--volume',
-        `${userHomeDirOnHost}:${getContainerPath(userHomeDirOnHost)}`,
+        '--tmpfs',
+        `${getContainerPath(userSettingsDirOnHost)}/tmp:exec`,
+      );
+      args.push(
+        '--tmpfs',
+        `${getContainerPath(userSettingsDirOnHost)}/history:exec`,
       );
     }
 
@@ -517,7 +524,7 @@ export async function start_sandbox(
           let [from, to, opts] = mount.trim().split(':');
           to = to || from; // default to mount at same path inside container
           opts = opts || 'ro'; // default to read-only
-          mount = `${from}:${to}:${opts}`;
+
           // check that from path is absolute
           if (!path.isAbsolute(from)) {
             throw new FatalSandboxError(
@@ -530,6 +537,24 @@ export async function start_sandbox(
               `Missing mount path '${from}' listed in SANDBOX_MOUNTS`,
             );
           }
+
+          // Strictly prohibit mounting the host .gemini directory as read-write
+          const resolvedFrom = path.resolve(from);
+          const hostGeminiDir = path.resolve(userSettingsDirOnHost);
+          const defaultHostGeminiDir = path.resolve(os.homedir(), GEMINI_DIR);
+          if (
+            (resolvedFrom === hostGeminiDir ||
+              resolvedFrom === defaultHostGeminiDir ||
+              resolvedFrom.startsWith(hostGeminiDir + path.sep) ||
+              resolvedFrom.startsWith(defaultHostGeminiDir + path.sep)) &&
+            opts.toLowerCase() !== 'ro'
+          ) {
+            throw new FatalSandboxError(
+              `Mounting host .gemini directory as read-write is prohibited in sandbox mode: ${from}`,
+            );
+          }
+
+          mount = `${from}:${to}:${opts}`;
           debugLogger.log(`SANDBOX_MOUNTS: ${from} -> ${to} (${opts})`);
           args.push('--volume', mount);
         }
@@ -540,6 +565,20 @@ export async function start_sandbox(
     if (config.allowedPaths) {
       for (const hostPath of config.allowedPaths) {
         if (hostPath && path.isAbsolute(hostPath) && fs.existsSync(hostPath)) {
+          const resolvedPath = path.resolve(hostPath);
+          const hostGeminiDir = path.resolve(userSettingsDirOnHost);
+          const defaultHostGeminiDir = path.resolve(os.homedir(), GEMINI_DIR);
+          if (
+            resolvedPath === hostGeminiDir ||
+            resolvedPath === defaultHostGeminiDir ||
+            resolvedPath.startsWith(hostGeminiDir + path.sep) ||
+            resolvedPath.startsWith(defaultHostGeminiDir + path.sep)
+          ) {
+            debugLogger.warn(
+              `Skipping disallowed path in sandbox allowedPaths: ${hostPath}`,
+            );
+            continue;
+          }
           const containerPath = getContainerPath(hostPath);
           debugLogger.log(
             `Config allowedPath: ${hostPath} -> ${containerPath} (ro)`,
@@ -1052,6 +1091,21 @@ async function start_lxc_sandbox(
     if (config.allowedPaths) {
       for (const hostPath of config.allowedPaths) {
         if (hostPath && path.isAbsolute(hostPath) && fs.existsSync(hostPath)) {
+          const resolvedPath = path.resolve(hostPath);
+          const userHomeDirOnHost = homedir();
+          const hostGeminiDir = path.resolve(userHomeDirOnHost, GEMINI_DIR);
+          const defaultHostGeminiDir = path.resolve(os.homedir(), GEMINI_DIR);
+          if (
+            resolvedPath === hostGeminiDir ||
+            resolvedPath === defaultHostGeminiDir ||
+            resolvedPath.startsWith(hostGeminiDir + path.sep) ||
+            resolvedPath.startsWith(defaultHostGeminiDir + path.sep)
+          ) {
+            debugLogger.warn(
+              `Skipping disallowed path in sandbox allowedPaths: ${hostPath}`,
+            );
+            continue;
+          }
           const allowedDeviceName = `gemini-allowed-${randomBytes(4).toString(
             'hex',
           )}`;
