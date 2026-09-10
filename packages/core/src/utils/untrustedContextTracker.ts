@@ -19,7 +19,7 @@ interface LogResponse {
 }
 
 const UNTRUSTED_CONTEXT_REGEX =
-  /<untrusted_context(?:\s+[^>]*)?>([\s\S]*?)<\/untrusted_context>/gi;
+  /<untrusted_context[^>]*>([\s\S]*?)<\/untrusted_context>/gi;
 
 /**
  * Root commands that invoke build engines, test runners, or dependency lifecycles.
@@ -81,7 +81,9 @@ const BENIGN_SUBCOMMAND_TOKENS: ReadonlySet<string> = new Set([
  * @param history The conversation messages history.
  * @returns Struct containing extracted texts and a set of lowercased tokens.
  */
-export function extractUntrustedContext(history: readonly Content[]): UntrustedContextData {
+export function extractUntrustedContext(
+  history: readonly Content[],
+): UntrustedContextData {
   const untrustedTexts: string[] = [];
   const untrustedTokens = new Set<string>();
 
@@ -151,6 +153,17 @@ export function extractUntrustedContext(history: readonly Content[]): UntrustedC
                 }
               }
             }
+
+            // Split on slashes to handle path segments and filenames
+            if (lowerToken.includes('/')) {
+              const pathParts = lowerToken.split('/');
+              for (const part of pathParts) {
+                const trimmedPart = part.trim();
+                if (trimmedPart.length > 1) {
+                  untrustedTokens.add(trimmedPart);
+                }
+              }
+            }
           }
         }
       }
@@ -185,7 +198,8 @@ export function findUntrustedFlags(
   // Parse the command safely using shell-quote to handle quotes and escapes correctly
   let parsed: ReturnType<typeof shellParse>;
   try {
-    const normalizedCommand = process.platform === 'win32' ? command.replace(/\\(?!")/g, '/') : command;
+    const normalizedCommand =
+      process.platform === 'win32' ? command.replace(/\\(?!")/g, '/') : command;
     parsed = shellParse(normalizedCommand);
   } catch {
     // Fallback to whitespace split if parsing fails
@@ -246,6 +260,7 @@ export function findUntrustedFlags(
         !nextToken.startsWith('-') &&
         untrustedContext.untrustedTokens.has(nextToken.toLowerCase())
       ) {
+        detected.add(token);
         detected.add(nextToken);
       }
     } else {
@@ -257,9 +272,7 @@ export function findUntrustedFlags(
         continue;
       }
       const isSensitiveWord =
-        token.includes('/') ||
-        token.includes('.') ||
-        token.includes(':');
+        token.includes('/') || token.includes('.') || token.includes(':');
 
       const isHighRiskPattern =
         token.startsWith('http://') ||
@@ -275,8 +288,9 @@ export function findUntrustedFlags(
         }
 
         if (isHighRiskPattern) {
+          const normalizedLowerToken = lowerToken.replace(/\\/g, '/');
           for (const text of untrustedContext.untrustedTexts) {
-            if (text.toLowerCase().includes(lowerToken)) {
+            if (text.toLowerCase().includes(normalizedLowerToken)) {
               detected.add(token);
               break;
             }
@@ -309,7 +323,10 @@ export function isBuildOrTestCommand(command: string): boolean {
     if (roots.length > 0) {
       return roots.some((root) => {
         const base = getBaseName(root);
-        return BUILD_TEST_COMMAND_ROOTS.has(base) || BUILD_TEST_COMMAND_ROOTS.has(root.toLowerCase());
+        return (
+          BUILD_TEST_COMMAND_ROOTS.has(base) ||
+          BUILD_TEST_COMMAND_ROOTS.has(root.toLowerCase())
+        );
       });
     }
   } catch {
@@ -328,7 +345,10 @@ export function isBuildOrTestCommand(command: string): boolean {
   const root = parts[rootIndex];
   if (!root) return false;
   const base = getBaseName(root);
-  return BUILD_TEST_COMMAND_ROOTS.has(base) || BUILD_TEST_COMMAND_ROOTS.has(root.toLowerCase());
+  return (
+    BUILD_TEST_COMMAND_ROOTS.has(base) ||
+    BUILD_TEST_COMMAND_ROOTS.has(root.toLowerCase())
+  );
 }
 
 const MODIFIED_BUILD_FILES_SYMBOL = Symbol('sessionModifiedBuildFiles');
@@ -344,7 +364,10 @@ function hasSessionRecord(sessionKey: object): sessionKey is SessionRecord {
 /**
  * Records that a build configuration file was modified in this session.
  */
-export function recordModifiedBuildFile(filePath: string, sessionKey: object): void {
+export function recordModifiedBuildFile(
+  filePath: string,
+  sessionKey: object,
+): void {
   if (hasSessionRecord(sessionKey)) {
     let files = sessionKey[MODIFIED_BUILD_FILES_SYMBOL];
     if (!files) {
@@ -374,4 +397,3 @@ export function resetModifiedBuildFiles(sessionKey: object): void {
     delete sessionKey[MODIFIED_BUILD_FILES_SYMBOL];
   }
 }
-

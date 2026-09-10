@@ -828,7 +828,14 @@ export class PolicyEngine {
         if (targetPath) {
           targetPath = targetPath.trim();
           if (process.platform === 'win32') {
-            targetPath = targetPath.replace(/[. ]+$/, '');
+            let end = targetPath.length;
+            while (
+              end > 0 &&
+              (targetPath[end - 1] === '.' || targetPath[end - 1] === ' ')
+            ) {
+              end--;
+            }
+            targetPath = targetPath.slice(0, end);
           }
         }
         if (targetPath && isBuildFile(targetPath)) {

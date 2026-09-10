@@ -82,8 +82,18 @@ export function isBuildFile(filePath: string): boolean {
     return false;
   }
 
-  // Sanitize null byte characters (\0) to prevent path injection bypasses
-  const cleanPath = filePath.replace(/\0/g, '');
+  // Sanitize null byte characters (\0) and trailing dots/spaces on Windows to prevent path injection bypasses
+  let cleanPath = filePath.replace(/\0/g, '');
+  if (process.platform === 'win32') {
+    let end = cleanPath.length;
+    while (
+      end > 0 &&
+      (cleanPath[end - 1] === '.' || cleanPath[end - 1] === ' ')
+    ) {
+      end--;
+    }
+    cleanPath = cleanPath.slice(0, end);
+  }
 
   // Normalize backslashes to forward slashes first to support cross-platform path parsing (e.g. Windows paths on POSIX)
   const normalizedPath = cleanPath.replace(/\\/g, '/');

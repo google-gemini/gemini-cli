@@ -457,6 +457,16 @@ export class ShellToolInvocation extends BaseToolInvocation<
     const rootCommands = [...new Set(getCommandRoots(command))];
     const rootCommand = rootCommands[0] || 'shell';
 
+    const history = this.getHistory();
+    const untrustedContext = extractUntrustedContext(history);
+    const untrustedFlags = findUntrustedFlags(command, untrustedContext);
+    const modifiedBuildFiles = getModifiedBuildFiles(this.context.config);
+    const isBuildCmd = isBuildOrTestCommand(command);
+
+    const hasSecurityWarning =
+      untrustedFlags.length > 0 ||
+      (isBuildCmd && modifiedBuildFiles.length > 0);
+
     // Proactively suggest expansion for known network-heavy tools (npm install, etc.)
     // to avoid hangs when network is restricted by default.
     const effectiveAdditionalPermissions =
@@ -465,8 +475,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
     // Rely entirely on PolicyEngine for interactive confirmation.
     // If we are here, it means PolicyEngine returned ASK_USER (or no message bus),
     // so we must provide confirmation details.
-    // If additional_permissions are provided, it's an expansion request
-    if (effectiveAdditionalPermissions) {
+    // If additional_permissions are provided, and no security warnings are present,
+    // it's an expansion request
+    if (effectiveAdditionalPermissions && !hasSecurityWarning) {
       return {
         type: 'sandbox_expansion',
         title: proactivePermissions
@@ -490,11 +501,6 @@ export class ShellToolInvocation extends BaseToolInvocation<
         },
       };
     }
-    const history = this.getHistory();
-    const untrustedContext = extractUntrustedContext(history);
-    const untrustedFlags = findUntrustedFlags(command, untrustedContext);
-    const modifiedBuildFiles = getModifiedBuildFiles(this.context.config);
-    const isBuildCmd = isBuildOrTestCommand(command);
 
     const confirmationDetails: ToolExecuteConfirmationDetails = {
       type: 'exec',

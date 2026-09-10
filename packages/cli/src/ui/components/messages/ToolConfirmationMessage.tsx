@@ -698,9 +698,13 @@ export const ToolConfirmationMessage: React.FC<
                     confirmationDetails.fileDiff,
                   )}
                   filename={sanitizeForDisplay(confirmationDetails.fileName)}
-                  disableTruncation={confirmationDetails.isBuildFile && !isLockFile(confirmationDetails.fileName)}
+                  disableTruncation={
+                    confirmationDetails.isBuildFile &&
+                    !isLockFile(confirmationDetails.fileName)
+                  }
                   availableTerminalHeight={
-                    confirmationDetails.isBuildFile && !isLockFile(confirmationDetails.fileName)
+                    confirmationDetails.isBuildFile &&
+                    !isLockFile(confirmationDetails.fileName)
                       ? undefined
                       : bodyHeight !== undefined
                         ? Math.max(bodyHeight - 2, 2)
