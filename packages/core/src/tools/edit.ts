@@ -1018,6 +1018,7 @@ class EditToolInvocation
           newContent: editData.newContent,
           diffStat,
           isNewFile: editData.isNewFile,
+          isBuildFile: isBuildFile(this.resolvedPath),
         };
       }
 

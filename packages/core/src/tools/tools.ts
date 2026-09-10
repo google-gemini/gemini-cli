@@ -962,6 +962,7 @@ export interface FileDiff {
   newContent: string;
   diffStat?: DiffStat;
   isNewFile?: boolean;
+  isBuildFile?: boolean;
 }
 
 export const isFileDiff = (res: unknown): res is FileDiff =>

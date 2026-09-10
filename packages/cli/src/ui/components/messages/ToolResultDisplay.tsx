@@ -42,10 +42,18 @@ export interface ToolResultDisplayProps {
 interface FileDiffResult {
   fileDiff: string;
   fileName: string;
+  isBuildFile?: boolean;
 }
 
 function isFileDiffResult(value: unknown): value is FileDiffResult {
-  return typeof value === 'object' && value !== null && 'fileDiff' in value && 'fileName' in value;
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'fileDiff' in value &&
+    typeof value.fileDiff === 'string' &&
+    'fileName' in value &&
+    typeof value.fileName === 'string'
+  );
 }
 
 export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
@@ -152,7 +160,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
         <DiffRenderer
           diffContent={contentData.fileDiff}
           filename={contentData.fileName}
-          disableTruncation={!isLockFile(contentData.fileName)}
+          disableTruncation={contentData.isBuildFile && !isLockFile(contentData.fileName)}
           availableTerminalHeight={availableHeight}
           terminalWidth={childWidth}
         />

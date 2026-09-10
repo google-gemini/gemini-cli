@@ -515,6 +515,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         newContent: correctedContentResult.correctedContent,
         diffStat,
         isNewFile,
+        isBuildFile: isBuildFile(this.resolvedPath),
       };
 
       // Discover JIT subdirectory context for the written file path

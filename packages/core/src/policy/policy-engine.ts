@@ -802,13 +802,27 @@ export class PolicyEngine {
       }
 
       // Build File Protection: Always require user confirmation when modifying build configuration files
-      const isFileEditTool = toolNamesToTry.some(
-        (name) =>
+      const isFileEditTool = toolNamesToTry.some((name) => {
+        if (
           EDIT_TOOL_NAMES.has(name) ||
           name === 'replace' ||
-          name === 'write_file' ||
-          /write|edit|replace|patch|update|create|append|save/i.test(name),
-      );
+          name === 'write_file'
+        ) {
+          return true;
+        }
+        const editKeywords = new Set([
+          'write',
+          'edit',
+          'replace',
+          'patch',
+          'update',
+          'create',
+          'append',
+          'save',
+        ]);
+        const tokens = name.toLowerCase().split(/[^a-z0-9]+/);
+        return tokens.some((token) => editKeywords.has(token));
+      });
       if (isFileEditTool) {
         let targetPath = extractFilePathFromArgs(toolCall.args);
         if (targetPath) {
