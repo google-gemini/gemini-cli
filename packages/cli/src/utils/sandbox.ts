@@ -25,6 +25,8 @@ import {
   FatalSandboxError,
   GEMINI_DIR,
   homedir,
+  isSubpath,
+  resolveToRealPath,
 } from '@google/gemini-cli-core';
 import { ConsolePatcher } from '../ui/utils/ConsolePatcher.js';
 import { randomBytes } from 'node:crypto';
@@ -224,13 +226,36 @@ export async function start_sandbox(
 
         // Add custom allowed paths from config
         if (config.allowedPaths) {
+          const userHomeDirOnHost = homedir();
+          const hostGeminiPath = path.resolve(userHomeDirOnHost, GEMINI_DIR);
+          const hostGeminiDir = fs.existsSync(hostGeminiPath)
+            ? resolveToRealPath(hostGeminiPath)
+            : hostGeminiPath;
+          const defaultHostGeminiPath = path.resolve(os.homedir(), GEMINI_DIR);
+          const defaultHostGeminiDir = fs.existsSync(defaultHostGeminiPath)
+            ? resolveToRealPath(defaultHostGeminiPath)
+            : defaultHostGeminiPath;
+
           for (const hostPath of config.allowedPaths) {
             if (
               hostPath &&
               path.isAbsolute(hostPath) &&
               fs.existsSync(hostPath)
             ) {
-              const realDir = fs.realpathSync(hostPath);
+              const realDir = resolveToRealPath(hostPath);
+              if (
+                realDir === hostGeminiDir ||
+                realDir === defaultHostGeminiDir ||
+                realDir.startsWith(hostGeminiDir + path.sep) ||
+                realDir.startsWith(defaultHostGeminiDir + path.sep) ||
+                isSubpath(hostGeminiDir, realDir) ||
+                isSubpath(defaultHostGeminiDir, realDir)
+              ) {
+                debugLogger.warn(
+                  `Skipping disallowed path in sandbox allowedPaths: ${hostPath}`,
+                );
+                continue;
+              }
               if (!includedDirs.includes(realDir) && realDir !== targetDir) {
                 includedDirs.push(realDir);
               }
@@ -539,14 +564,21 @@ export async function start_sandbox(
           }
 
           // Strictly prohibit mounting the host .gemini directory as read-write
-          const resolvedFrom = path.resolve(from);
-          const hostGeminiDir = path.resolve(userSettingsDirOnHost);
-          const defaultHostGeminiDir = path.resolve(os.homedir(), GEMINI_DIR);
+          const resolvedFrom = resolveToRealPath(from);
+          const hostGeminiDir = fs.existsSync(userSettingsDirOnHost)
+            ? resolveToRealPath(userSettingsDirOnHost)
+            : path.resolve(userSettingsDirOnHost);
+          const defaultHostGeminiPath = path.resolve(os.homedir(), GEMINI_DIR);
+          const defaultHostGeminiDir = fs.existsSync(defaultHostGeminiPath)
+            ? resolveToRealPath(defaultHostGeminiPath)
+            : defaultHostGeminiPath;
           if (
             (resolvedFrom === hostGeminiDir ||
               resolvedFrom === defaultHostGeminiDir ||
               resolvedFrom.startsWith(hostGeminiDir + path.sep) ||
-              resolvedFrom.startsWith(defaultHostGeminiDir + path.sep)) &&
+              resolvedFrom.startsWith(defaultHostGeminiDir + path.sep) ||
+              isSubpath(hostGeminiDir, resolvedFrom) ||
+              isSubpath(defaultHostGeminiDir, resolvedFrom)) &&
             opts.toLowerCase() !== 'ro'
           ) {
             throw new FatalSandboxError(
@@ -565,14 +597,21 @@ export async function start_sandbox(
     if (config.allowedPaths) {
       for (const hostPath of config.allowedPaths) {
         if (hostPath && path.isAbsolute(hostPath) && fs.existsSync(hostPath)) {
-          const resolvedPath = path.resolve(hostPath);
-          const hostGeminiDir = path.resolve(userSettingsDirOnHost);
-          const defaultHostGeminiDir = path.resolve(os.homedir(), GEMINI_DIR);
+          const resolvedPath = resolveToRealPath(hostPath);
+          const hostGeminiDir = fs.existsSync(userSettingsDirOnHost)
+            ? resolveToRealPath(userSettingsDirOnHost)
+            : path.resolve(userSettingsDirOnHost);
+          const defaultHostGeminiPath = path.resolve(os.homedir(), GEMINI_DIR);
+          const defaultHostGeminiDir = fs.existsSync(defaultHostGeminiPath)
+            ? resolveToRealPath(defaultHostGeminiPath)
+            : defaultHostGeminiPath;
           if (
             resolvedPath === hostGeminiDir ||
             resolvedPath === defaultHostGeminiDir ||
             resolvedPath.startsWith(hostGeminiDir + path.sep) ||
-            resolvedPath.startsWith(defaultHostGeminiDir + path.sep)
+            resolvedPath.startsWith(defaultHostGeminiDir + path.sep) ||
+            isSubpath(hostGeminiDir, resolvedPath) ||
+            isSubpath(defaultHostGeminiDir, resolvedPath)
           ) {
             debugLogger.warn(
               `Skipping disallowed path in sandbox allowedPaths: ${hostPath}`,
@@ -1091,15 +1130,23 @@ async function start_lxc_sandbox(
     if (config.allowedPaths) {
       for (const hostPath of config.allowedPaths) {
         if (hostPath && path.isAbsolute(hostPath) && fs.existsSync(hostPath)) {
-          const resolvedPath = path.resolve(hostPath);
+          const resolvedPath = resolveToRealPath(hostPath);
           const userHomeDirOnHost = homedir();
-          const hostGeminiDir = path.resolve(userHomeDirOnHost, GEMINI_DIR);
-          const defaultHostGeminiDir = path.resolve(os.homedir(), GEMINI_DIR);
+          const hostGeminiPath = path.resolve(userHomeDirOnHost, GEMINI_DIR);
+          const hostGeminiDir = fs.existsSync(hostGeminiPath)
+            ? resolveToRealPath(hostGeminiPath)
+            : hostGeminiPath;
+          const defaultHostGeminiPath = path.resolve(os.homedir(), GEMINI_DIR);
+          const defaultHostGeminiDir = fs.existsSync(defaultHostGeminiPath)
+            ? resolveToRealPath(defaultHostGeminiPath)
+            : defaultHostGeminiPath;
           if (
             resolvedPath === hostGeminiDir ||
             resolvedPath === defaultHostGeminiDir ||
             resolvedPath.startsWith(hostGeminiDir + path.sep) ||
-            resolvedPath.startsWith(defaultHostGeminiDir + path.sep)
+            resolvedPath.startsWith(defaultHostGeminiDir + path.sep) ||
+            isSubpath(hostGeminiDir, resolvedPath) ||
+            isSubpath(defaultHostGeminiDir, resolvedPath)
           ) {
             debugLogger.warn(
               `Skipping disallowed path in sandbox allowedPaths: ${hostPath}`,

@@ -19,12 +19,19 @@ import {
 import { createMockSandboxConfig } from '@google/gemini-cli-test-utils';
 import { EventEmitter } from 'node:events';
 
-const { mockedHomedir, mockedGetContainerPath, mockedExecCommands } =
-  vi.hoisted(() => ({
-    mockedHomedir: vi.fn().mockReturnValue('/home/user'),
-    mockedGetContainerPath: vi.fn().mockImplementation((p: string) => p),
-    mockedExecCommands: [] as string[],
-  }));
+const {
+  mockedHomedir,
+  mockedGetContainerPath,
+  mockedExecCommands,
+  mockedExecFileCalls,
+  mockedResolveToRealPath,
+} = vi.hoisted(() => ({
+  mockedHomedir: vi.fn().mockReturnValue('/home/user'),
+  mockedGetContainerPath: vi.fn().mockImplementation((p: string) => p),
+  mockedExecCommands: [] as string[],
+  mockedExecFileCalls: [] as Array<{ file: string; args: string[] }>,
+  mockedResolveToRealPath: vi.fn().mockImplementation((p: string) => p),
+}));
 
 vi.mock('./sandboxUtils.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./sandboxUtils.js')>();
@@ -62,6 +69,7 @@ vi.mock('node:util', async (importOriginal) => {
       }
       if (fn === execFile) {
         return async (file: string, args: string[]) => {
+          mockedExecFileCalls.push({ file, args });
           if (file === 'lxc' && args[0] === 'list') {
             const output = process.env['TEST_LXC_LIST_OUTPUT'];
             if (output === 'throw') {
@@ -106,6 +114,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     },
     GEMINI_DIR: '.gemini',
     homedir: mockedHomedir,
+    resolveToRealPath: mockedResolveToRealPath,
   };
 });
 
@@ -142,6 +151,9 @@ describe('sandbox', () => {
     );
     vi.mocked(fs.rmSync).mockImplementation(() => {});
     vi.mocked(execSync).mockReturnValue(Buffer.from(''));
+    mockedExecFileCalls.length = 0;
+    mockedExecCommands.length = 0;
+    mockedResolveToRealPath.mockImplementation((p: string) => p);
   });
 
   afterEach(() => {
@@ -784,7 +796,7 @@ describe('sandbox', () => {
         command: 'docker',
         image: 'gemini-cli-sandbox',
       });
-      process.env['SANDBOX_MOUNTS'] = '/host/path:/container/path:ro';
+      vi.stubEnv('SANDBOX_MOUNTS', '/host/path:/container/path:ro');
       vi.mocked(fs.existsSync).mockReturnValue(true); // For mount path check
 
       // Mock image check to return true
@@ -900,9 +912,35 @@ describe('sandbox', () => {
         command: 'docker',
         image: 'gemini-cli-sandbox',
       });
-      process.env['SANDBOX_MOUNTS'] =
-        '/home/user/.gemini:/home/node/.gemini:rw';
+      vi.stubEnv('SANDBOX_MOUNTS', '/home/user/.gemini:/home/node/.gemini:rw');
       vi.mocked(fs.existsSync).mockReturnValue(true);
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      await expect(start_sandbox(config)).rejects.toThrow(FatalSandboxError);
+    });
+
+    it('should reject SANDBOX_MOUNTS when path is a symlink pointing to host .gemini directory with rw', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      vi.stubEnv('SANDBOX_MOUNTS', '/symlink/gemini:/home/node/.gemini:rw');
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockedResolveToRealPath.mockImplementation((p: string) =>
+        p === '/symlink/gemini' ? '/home/user/.gemini' : p,
+      );
 
       interface MockProcessWithStdout extends EventEmitter {
         stdout: EventEmitter;
@@ -963,6 +1001,57 @@ describe('sandbox', () => {
         'docker',
         expect.not.arrayContaining([
           '/home/user/.gemini:/home/user/.gemini:ro',
+        ]),
+        expect.any(Object),
+      );
+    });
+
+    it('should filter out symlinks pointing to host .gemini directory from allowedPaths in Docker', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+        allowedPaths: ['/symlink/gemini', '/extra/path'],
+      });
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockedResolveToRealPath.mockImplementation((p: string) =>
+        p === '/symlink/gemini' ? '/home/user/.gemini' : p,
+      );
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+      await start_sandbox(config);
+
+      expect(spawn).toHaveBeenCalledWith(
+        'docker',
+        expect.arrayContaining(['--volume', '/extra/path:/extra/path:ro']),
+        expect.any(Object),
+      );
+      expect(spawn).toHaveBeenCalledWith(
+        'docker',
+        expect.not.arrayContaining([
+          expect.stringContaining('/symlink/gemini'),
         ]),
         expect.any(Object),
       );
@@ -1083,6 +1172,47 @@ describe('sandbox', () => {
       expect(spawn).toHaveBeenCalledWith(
         'sandbox-exec',
         expect.arrayContaining(['INCLUDE_DIR_0=/Users/user/extra']),
+        expect.any(Object),
+      );
+    });
+
+    it('should filter out symlinks pointing to host .gemini directory from allowedPaths in macOS seatbelt', async () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'sandbox-exec',
+        image: 'some-image',
+        allowedPaths: ['/symlink/gemini', '/Users/user/extra'],
+      });
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockedResolveToRealPath.mockImplementation((p: string) =>
+        p === '/symlink/gemini' ? '/home/user/.gemini' : p,
+      );
+
+      interface MockProcess extends EventEmitter {
+        stdout: EventEmitter;
+        stderr: EventEmitter;
+      }
+      const mockSpawnProcess = new EventEmitter() as MockProcess;
+      mockSpawnProcess.stdout = new EventEmitter();
+      mockSpawnProcess.stderr = new EventEmitter();
+      vi.mocked(spawn).mockReturnValue(
+        mockSpawnProcess as unknown as ReturnType<typeof spawn>,
+      );
+
+      const promise = start_sandbox(config);
+      setTimeout(() => mockSpawnProcess.emit('close', 0), 10);
+      await promise;
+
+      expect(spawn).toHaveBeenCalledWith(
+        'sandbox-exec',
+        expect.arrayContaining(['INCLUDE_DIR_0=/Users/user/extra']),
+        expect.any(Object),
+      );
+      expect(spawn).toHaveBeenCalledWith(
+        'sandbox-exec',
+        expect.not.arrayContaining([
+          expect.stringContaining('/symlink/gemini'),
+        ]),
         expect.any(Object),
       );
     });
@@ -1344,6 +1474,51 @@ describe('sandbox', () => {
           'lxc',
           expect.arrayContaining(['exec', 'gemini-sandbox', '--cwd']),
           expect.objectContaining({ stdio: 'inherit' }),
+        );
+      });
+
+      it('should filter out symlinks pointing to host .gemini directory from allowedPaths in LXC', async () => {
+        process.env['TEST_LXC_LIST_OUTPUT'] = LXC_RUNNING;
+        const config: SandboxConfig = createMockSandboxConfig({
+          command: 'lxc',
+          image: 'gemini-sandbox',
+          allowedPaths: ['/symlink/gemini', '/extra/path'],
+        });
+        mockedResolveToRealPath.mockImplementation((p: string) =>
+          p === '/symlink/gemini' ? '/home/user/.gemini' : p,
+        );
+
+        const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+          typeof spawn
+        >;
+        mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+          if (event === 'close') {
+            setTimeout(() => cb(0), 10);
+          }
+          return mockSpawnProcess;
+        });
+
+        vi.mocked(spawn).mockImplementation((cmd) => {
+          if (cmd === 'lxc') {
+            return mockSpawnProcess;
+          }
+          return new EventEmitter() as unknown as ReturnType<typeof spawn>;
+        });
+
+        const promise = start_sandbox(config, [], undefined, ['arg1']);
+        await expect(promise).resolves.toBe(0);
+
+        expect(mockedExecFileCalls).toContainEqual(
+          expect.objectContaining({
+            file: 'lxc',
+            args: expect.arrayContaining(['source=/extra/path']),
+          }),
+        );
+        expect(mockedExecFileCalls).not.toContainEqual(
+          expect.objectContaining({
+            file: 'lxc',
+            args: expect.arrayContaining(['source=/symlink/gemini']),
+          }),
         );
       });
 
