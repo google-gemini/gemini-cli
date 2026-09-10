@@ -195,6 +195,25 @@ describe('macOS Seatbelt non-sensitive configuration read access', () => {
   });
 });
 
+const STRICT_PROFILES = [
+  'sandbox-macos-strict-open.sb',
+  'sandbox-macos-strict-proxied.sb',
+];
+
+describe('macOS Seatbelt strict profile scoped read access', () => {
+  describe.each(STRICT_PROFILES)('%s', (profile) => {
+    const rules = readRules(profile);
+
+    it('does not allow broad read access to ~/.gemini subpath', () => {
+      const allowReadMatch = rules.match(/\(allow file-read\*[\s\S]*?\n\)/);
+      expect(allowReadMatch).not.toBeNull();
+      expect(allowReadMatch![0]).not.toContain(
+        '(subpath (string-append (param "HOME_DIR") "/.gemini"))',
+      );
+    });
+  });
+});
+
 describe('BUILTIN_SEATBELT_PROFILE_CONTENTS consistency', () => {
   const profileKeyMap: Record<string, string> = {
     'sandbox-macos-permissive-open.sb': 'permissive-open',
@@ -262,6 +281,19 @@ describe('BUILTIN_SEATBELT_PROFILE_CONTENTS consistency', () => {
           );
           expect(embeddedContent).toContain(
             '(literal (string-append (param "HOME_DIR") "/.gemini/keybindings.json"))',
+          );
+        }
+      });
+
+      it('does not contain broad .gemini subpath read rule in embedded strict content', () => {
+        if (['strict-open', 'strict-proxied'].includes(key)) {
+          const embeddedContent = BUILTIN_SEATBELT_PROFILE_CONTENTS[key];
+          const allowReadMatch = embeddedContent.match(
+            /\(allow file-read\*[\s\S]*?\n\)/,
+          );
+          expect(allowReadMatch).not.toBeNull();
+          expect(allowReadMatch![0]).not.toContain(
+            '(subpath (string-append (param "HOME_DIR") "/.gemini"))',
           );
         }
       });

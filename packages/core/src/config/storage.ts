@@ -169,7 +169,7 @@ export class Storage {
   }
 
   static getPolicyIntegrityStoragePath(): string {
-    return path.join(Storage.getGlobalGeminiDir(), 'policy_integrity.json');
+    return path.join(Storage.getGlobalRuntimeDir(), 'policy_integrity.json');
   }
 
   private static getSystemConfigDir(): string {

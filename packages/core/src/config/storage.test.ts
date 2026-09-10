@@ -489,6 +489,9 @@ describe('Storage - System Paths', () => {
       expect(Storage.getTrustedFoldersPath()).toBe(
         path.join(Storage.getGlobalGeminiDir(), 'trustedFolders.json'),
       );
+      expect(Storage.getPolicyIntegrityStoragePath()).toBe(
+        path.join(Storage.getGlobalGeminiDir(), 'policy_integrity.json'),
+      );
 
       vi.stubEnv('SANDBOX', 'docker');
       expect(Storage.getGlobalRuntimeDir()).toBe(Storage.getGlobalGeminiDir());
@@ -503,6 +506,9 @@ describe('Storage - System Paths', () => {
       );
       expect(Storage.getTrustedFoldersPath()).toBe(
         path.join(Storage.getGlobalGeminiDir(), 'trustedFolders.json'),
+      );
+      expect(Storage.getPolicyIntegrityStoragePath()).toBe(
+        path.join(Storage.getGlobalGeminiDir(), 'policy_integrity.json'),
       );
     });
 
@@ -522,6 +528,9 @@ describe('Storage - System Paths', () => {
       );
       expect(Storage.getTrustedFoldersPath()).toBe(
         path.join(expectedDir, 'trustedFolders.json'),
+      );
+      expect(Storage.getPolicyIntegrityStoragePath()).toBe(
+        path.join(expectedDir, 'policy_integrity.json'),
       );
     });
 
