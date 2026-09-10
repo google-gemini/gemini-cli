@@ -500,7 +500,7 @@ export async function start_sandbox(
     fs.writeFileSync(
       sanitizedSettingsFile,
       JSON.stringify(sanitizedSettings, null, 2),
-      { mode: 0o600 },
+      { mode: 0o644 },
     );
 
     // Mount isolated sanitized settings directory inside container
