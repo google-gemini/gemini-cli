@@ -149,6 +149,8 @@ describe('oauth2', () => {
     });
 
     it('should perform a web login', async () => {
+      vi.stubEnv('OAUTH_CALLBACK_PORT', '12345');
+
       const mockAuthUrl = 'https://example.com/auth';
       const mockCode = 'test-code';
       const mockState = 'test-state';
@@ -253,6 +255,12 @@ describe('oauth2', () => {
         redirect_uri: `http://127.0.0.1:${capturedPort}/oauth2callback`,
       });
       expect(mockSetCredentials).toHaveBeenCalledWith(mockTokens);
+
+      const credsPath = path.join(tempHomeDir, GEMINI_DIR, 'oauth_creds.json');
+      expect(fs.existsSync(credsPath)).toBe(true);
+      expect(JSON.parse(fs.readFileSync(credsPath, 'utf-8'))).toEqual(
+        mockTokens,
+      );
 
       // Manually trigger the 'tokens' event listener
       if (tokensListener) {
@@ -408,6 +416,12 @@ describe('oauth2', () => {
         redirect_uri: 'https://codeassist.google.com/authcode',
       });
       expect(mockOAuth2Client.setCredentials).toHaveBeenCalledWith(mockTokens);
+
+      const credsPath = path.join(tempHomeDir, GEMINI_DIR, 'oauth_creds.json');
+      expect(fs.existsSync(credsPath)).toBe(true);
+      expect(JSON.parse(fs.readFileSync(credsPath, 'utf-8'))).toEqual(
+        mockTokens,
+      );
     });
 
     it('should cache Google Account when logging in with user code', async () => {

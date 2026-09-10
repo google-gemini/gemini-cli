@@ -141,12 +141,7 @@ async function initOauthClient(
     const useEncryptedStorage = getUseEncryptedStorageFlag();
 
     client.on('tokens', async (tokens: Credentials) => {
-      if (useEncryptedStorage) {
-        await OAuthCredentialStorage.saveCredentials(tokens);
-      } else {
-        await cacheCredentials(tokens);
-      }
-
+      await persistOAuthCredentials(tokens, useEncryptedStorage);
       await triggerPostAuthCallbacks(tokens);
     });
 
@@ -503,6 +498,7 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
         redirect_uri: redirectUri,
       });
       client.setCredentials(tokens);
+      await persistOAuthCredentials(tokens, getUseEncryptedStorageFlag());
     } catch (error) {
       writeToStderr(
         'Failed to authenticate with authorization code:' +
@@ -591,6 +587,7 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
               redirect_uri: redirectUri,
             });
             client.setCredentials(tokens);
+            await persistOAuthCredentials(tokens, getUseEncryptedStorageFlag());
 
             // Retrieve and cache Google Account ID during authentication
             try {
@@ -806,5 +803,16 @@ async function cacheCredentials(credentials: Credentials) {
     await fs.chmod(filePath, 0o600);
   } catch {
     /* empty */
+  }
+}
+
+async function persistOAuthCredentials(
+  credentials: Credentials,
+  useEncryptedStorage: boolean,
+) {
+  if (useEncryptedStorage) {
+    await OAuthCredentialStorage.saveCredentials(credentials);
+  } else {
+    await cacheCredentials(credentials);
   }
 }
