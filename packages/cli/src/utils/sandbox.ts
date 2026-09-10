@@ -492,7 +492,7 @@ export async function start_sandbox(
     }
 
     const sanitizedSettings = sanitizeSettingsForSandbox(rawSettings);
-    const sanitizedSettingsFile = path.join(sandboxTmpDir, 'settings.json');
+    const sanitizedSettingsFile = path.join(sandboxTmpDir!, 'settings.json');
     fs.writeFileSync(
       sanitizedSettingsFile,
       JSON.stringify(sanitizedSettings, null, 2),
