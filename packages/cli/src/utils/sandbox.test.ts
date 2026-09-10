@@ -622,7 +622,7 @@ describe('sandbox', () => {
       );
     });
 
-    it('should fall back to a secure temporary directory for settings when homedir is empty', async () => {
+    it('should not attempt to create a temporary settings directory when homedir is empty', async () => {
       mockedHomedir.mockReturnValue('');
       vi.mocked(os.tmpdir).mockReturnValue('/mock/tmp');
 
@@ -659,15 +659,10 @@ describe('sandbox', () => {
         start_sandbox(config, [], undefined, ['arg1']),
       ).resolves.toBe(0);
 
+      // Should only create the sandbox temp directory, not the settings fallback directory
+      expect(fs.mkdtempSync).toHaveBeenCalledTimes(1);
       expect(fs.mkdtempSync).toHaveBeenCalledWith(
-        path.join('/mock/tmp', 'gemini-'),
-      );
-      expect(fs.existsSync).toHaveBeenCalledWith(
-        path.join('/mock/tmp', 'gemini-test-tmp', 'settings.json'),
-      );
-      expect(fs.rmSync).toHaveBeenCalledWith(
-        path.join('/mock/tmp', 'gemini-test-tmp'),
-        { recursive: true, force: true },
+        path.join('/mock/tmp', 'gemini-sandbox-'),
       );
       expect(fs.writeFileSync).toHaveBeenCalledWith(
         expect.stringMatching(/settings\.json$/),

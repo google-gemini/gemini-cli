@@ -467,34 +467,27 @@ export async function start_sandbox(
     // We STRICTLY do NOT mount ~/.gemini root directory or sensitive credential files
     // (oauth_creds.json, .env, etc.). We only mount the sanitized settings file as read-only (:ro).
     const userHomeDirOnHost = homedir();
-    const userSettingsDirOnHost = userHomeDirOnHost
-      ? path.join(userHomeDirOnHost, GEMINI_DIR)
-      : fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-'));
-    const userSettingsFileOnHost = path.join(
-      userSettingsDirOnHost,
-      'settings.json',
-    );
-
     let rawSettings: Record<string, unknown> = {};
-    if (fs.existsSync(userSettingsFileOnHost)) {
-      try {
-        const rawContent = fs.readFileSync(userSettingsFileOnHost, 'utf8');
-        const parsed = JSON.parse(stripJsonComments(rawContent)) as unknown;
-        if (isRecord(parsed)) {
-          rawSettings = parsed;
-        }
-      } catch (err) {
-        debugLogger.warn(
-          `Failed to parse host user settings for sandbox: ${err}`,
-        );
-      }
-    }
 
-    if (!userHomeDirOnHost) {
-      try {
-        fs.rmSync(userSettingsDirOnHost, { recursive: true, force: true });
-      } catch {
-        // Silently ignore cleanup errors for ephemeral settings fallback
+    if (userHomeDirOnHost) {
+      const userSettingsFileOnHost = path.join(
+        userHomeDirOnHost,
+        GEMINI_DIR,
+        'settings.json',
+      );
+
+      if (fs.existsSync(userSettingsFileOnHost)) {
+        try {
+          const rawContent = fs.readFileSync(userSettingsFileOnHost, 'utf8');
+          const parsed = JSON.parse(stripJsonComments(rawContent)) as unknown;
+          if (isRecord(parsed)) {
+            rawSettings = parsed;
+          }
+        } catch (err) {
+          debugLogger.warn(
+            `Failed to parse host user settings for sandbox: ${err}`,
+          );
+        }
       }
     }
 
