@@ -34,7 +34,7 @@
     "@modelcontextprotocol/sdk": "1.23.0",
     "@opentelemetry/api": "1.9.0",
     "@opentelemetry/api-logs": "0.218.0",
-    "@opentelemetry/core": "2.7.1",
+    "@opentelemetry/core": "2.8.0",
     "@opentelemetry/exporter-logs-otlp-grpc": "0.218.0",
     "@opentelemetry/exporter-logs-otlp-http": "0.218.0",
     "@opentelemetry/exporter-metrics-otlp-grpc": "0.218.0",
