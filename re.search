@@ -1,0 +1,70 @@
+import os
+import openai
+
+# 1. นิยาม Tools Schema ให้ OpenAI รู้จักฟังก์ชันที่มีอยู่จริง
+tools_schema = [
+    {
+        "type": "function",
+        "function": {
+            "name": "google_search_tool",
+            "description": "ค้นหาข้อมูลเรียลไทม์บนอินเทอร์เน็ตด้วยคีย์เวิร์ดที่กำหนด",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "keyword": {
+                        "type": "string",
+                        "desription": "คำค้นหาที่ต้องการ"
+                    }
+                },
+                "required": ["keyword"]
+            }
+        }
+    }
+]
+
+def google_search_tool(keyword: str) -> str:
+    print(f"[Network Client] กำลังส่งคำขอค้นหาด้วยคีย์เวิร์ด: {keyword}")
+    return f"[Result for '{keyword}'] ข้อมูลเชิงลึกจำลอง: สถาปัตยกรรม ReAct Framework และ FastAPI รองรับการทำงานร่วมกับ AI Agent ได้อย่างมีประสิทธิภาพ"
+
+class RobustAutonomousAgent:
+    def __init__(self, api_key: str):
+        self.client = openai.OpenAI(api_key=api_key)
+        
+    def execute_goal(self, user_goal: str) -> str:
+        messages = [
+            {"role": "system", "content": "คุณคือ AI Research Agent ที่มีความสามารถในการค้นหาข้อมูลและวิเคราะห์อย่างแม่นยำ"},
+            {"role": "user", "content": user_goal}
+        ]
+        
+        for _ in range(3):
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=messages,
+                tools=tools_schema,
+                tool_choice="auto",
+                temperature=0.2
+            )
+            
+            response_message = response.choices[0].message
+            messages.append(response_message)
+            
+            # ตรวจสอบว่าโมเดลต้องการเรียกใช้เครื่องมือหรือไม่
+            if response_message.tool_calls:
+                for tool_call in response_message.tool_calls:
+                    if tool_call.function.name == "google_search_tool":
+                        import json
+                        args = json.loads(tool_call.function.arguments)
+                        search_result = google_search_tool(keyword=args.get("keyword"))
+                        
+                        # ส่งผลลัพธ์ Tool กลับไปให้โมเดลประมวลผลต่อ
+                        messages.append({
+                            "tool_call_id": tool_call.id,
+                            "role": "tool",
+                            "name": "google_search_tool",
+                            "content": search_result,
+                        })
+            else:
+                # หากไม่มีการเรียกใช้เครื่องมือ แปลว่าได้คำตอบสุดท้ายแล้ว
+                return response_message.content
+                
+        return "เกินจำนวนรอบการทำงานที่กำหนด (Max Iterations Reached)"
