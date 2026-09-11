@@ -139,7 +139,7 @@ export class McpPromptLoader implements ICommandLoader {
 
               return {
                 type: 'submit_prompt',
-                content: JSON.stringify(maybeContent.text),
+                content: maybeContent.text,
               };
             } catch (error) {
               return {
