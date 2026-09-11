@@ -91,6 +91,10 @@ For named branch points inside a session, use chat checkpoints:
 /resume resume decision-point
 ```
 
+If a checkpoint with the same tag exists, Gemini CLI asks you to confirm before
+overwriting it. Confirming the save keeps a single command entry in your chat
+history. Canceling preserves the existing checkpoint.
+
 Compatibility aliases:
 
 - `/chat ...` works for the same commands.
