@@ -33,6 +33,14 @@ export function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === 'AbortError';
 }
 
+/**
+ * Strips trailing sentence punctuation (`.`, `!`, `?`) from URLs in a message
+ * so that links copied from error text remain valid.
+ */
+export function sanitizeUrlsInMessage(message: string): string {
+  return message.replace(/(https?:\/\/\S+?)([.!?]+)(\s|$)/g, '$1$3');
+}
+
 export function getErrorMessage(error: unknown): string {
   const friendlyError = toFriendlyError(error);
   if (friendlyError instanceof Error) {
