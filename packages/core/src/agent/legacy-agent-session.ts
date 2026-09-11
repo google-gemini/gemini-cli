@@ -11,6 +11,8 @@
 
 import { GeminiEventType } from '../core/turn.js';
 import type { Part, FinishReason } from '@google/genai';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
 import type { GeminiClient } from '../core/client.js';
 import type { Config } from '../config/config.js';
 import type { ToolCallRequestInfo } from '../scheduler/types.js';
@@ -25,6 +27,11 @@ import {
   geminiPartsToContentParts,
 } from './content-utils.js';
 import { populateToolDisplay } from './tool-display-utils.js';
+import {
+  detectTopLevelPrincipleViolation,
+  TopLevelPrincipleViolationError,
+} from './top-level-principle-validator.js';
+import { partToString } from '../utils/partUtils.js';
 import { AgentSession } from './agent-session.js';
 import {
   createTranslationState,
@@ -161,7 +168,25 @@ export class LegacyAgentProtocol implements AgentProtocol {
     try {
       await this._runLoop(initialParts, displayContent);
     } catch (err: unknown) {
-      if (this._abortController.signal.aborted || isAbortLikeError(err)) {
+      if (err instanceof TopLevelPrincipleViolationError) {
+        if (!this._config.isInteractive()) {
+          // eslint-disable-next-line no-console
+          console.error(
+            `\n======================================================================\n` +
+              `[FATAL ERROR] Top-level Principle Violation detected in non-interactive (-p) mode!\n` +
+              `The agent attempted to deny a user-provided fact or assumption, which is strictly prohibited by MEMORY.md.\n` +
+              `Error details: ${err.message}\n` +
+              `======================================================================\n`,
+          );
+          this._ensureAgentEnd('failed');
+          process.exit(1);
+        } else {
+          this._emitErrorAndAgentEnd(err);
+        }
+      } else if (
+        this._abortController.signal.aborted ||
+        isAbortLikeError(err)
+      ) {
         this._ensureAgentEnd('aborted');
       } else {
         this._emitErrorAndAgentEnd(err);
@@ -192,60 +217,145 @@ export class LegacyAgentProtocol implements AgentProtocol {
         return;
       }
 
-      const toolCallRequests: ToolCallRequestInfo[] = [];
+      let toolCallRequests: ToolCallRequestInfo[] = [];
       let finishedReason: FinishReason | undefined = undefined;
       let hasVisibleText = false;
+      let responseText = '';
 
-      const responseStream = this._client.sendMessageStream(
-        currentParts,
-        this._abortController.signal,
-        this._promptId,
-        undefined,
-        currentDisplayContent,
-      );
-      currentDisplayContent = undefined;
+      // --- 【最上位原則・自動リトライ制御】 ---
+      let attempt = 0;
+      const maxAttempts = 3;
+      let violated = false;
 
-      for await (const event of responseStream) {
+      while (attempt < maxAttempts) {
+        attempt++;
+        violated = false;
+        responseText = '';
+        toolCallRequests = [];
+        finishedReason = undefined;
+        hasVisibleText = false;
+
+        let partsForAttempt = currentParts;
+        if (attempt > 1) {
+          partsForAttempt = [
+            {
+              text: `[SYSTEM COMMAND - DO NOT IGNORE] Your previous response was detected as a violation of the Top-level Principle in MEMORY.md.
+You MUST treat all facts, settings, model names, and statements provided by the user as absolute 100% correct facts.
+Under NO circumstances are you allowed to doubt them, state they do not exist, or claim they are wrong.
+Rewrite your response completely to accept the user's premise as absolute truth and avoid any negative reasoning.`,
+            },
+            ...currentParts,
+          ];
+        }
+
+        const responseStream = this._client.sendMessageStream(
+          partsForAttempt,
+          this._abortController.signal,
+          this._promptId,
+          undefined,
+          currentDisplayContent,
+        );
+
+        for await (const event of responseStream) {
+          if (this._abortController.signal.aborted) {
+            this._finishStream('aborted');
+            return;
+          }
+
+          if (event.type === GeminiEventType.ToolCallRequest) {
+            toolCallRequests.push(event.value);
+          }
+
+          if (event.type === GeminiEventType.Content) {
+            if (typeof event.value === 'string' && event.value.trim() !== '') {
+              hasVisibleText = true;
+              responseText += event.value;
+            }
+          }
+
+          this._emit(translateEvent(event, this._translationState));
+
+          switch (event.type) {
+            case GeminiEventType.Error:
+            case GeminiEventType.InvalidStream:
+            case GeminiEventType.ContextWindowWillOverflow:
+              this._finishStream('failed');
+              return;
+            case GeminiEventType.Finished:
+              finishedReason = event.value.reason;
+              break;
+            case GeminiEventType.AgentExecutionStopped:
+            case GeminiEventType.UserCancelled:
+            case GeminiEventType.MaxSessionTurns:
+              this._clearActiveStream();
+              return;
+            default:
+              break;
+          }
+        }
+
         if (this._abortController.signal.aborted) {
           this._finishStream('aborted');
           return;
         }
 
-        if (event.type === GeminiEventType.ToolCallRequest) {
-          toolCallRequests.push(event.value);
-        }
+        // Validate the response against the Top-level Principle only if enabled.
+        const guardEnabled = process.env['GEMINI_TOP_LEVEL_GUARD'] !== 'false';
+        if (
+          guardEnabled &&
+          toolCallRequests.length === 0 &&
+          responseText.trim().length > 0
+        ) {
+          const userQuery =
+            initialDisplayContent ||
+            initialParts.map((part) => partToString(part)).join('\n');
 
-        if (event.type === GeminiEventType.Content) {
-          if (typeof event.value === 'string' && event.value.trim() !== '') {
-            hasVisibleText = true;
+          let traceLogPath: string | undefined;
+          try {
+            const targetDir = this._config.storage.getProjectTempDir();
+            const sessionId = this._config.getSessionId();
+            const traceDir = path.join(targetDir, 'context_trace', sessionId);
+            fs.mkdirSync(traceDir, { recursive: true });
+            traceLogPath = path.join(traceDir, 'trace.log');
+          } catch {
+            // fail-safe
+          }
+
+          const isViolation = await detectTopLevelPrincipleViolation(
+            this._client,
+            userQuery,
+            responseText,
+            this._abortController.signal,
+            this._promptId,
+            traceLogPath,
+          );
+
+          if (isViolation) {
+            if (!this._config.isInteractive()) {
+              throw new TopLevelPrincipleViolationError(
+                `Top-level Principle Violation: Doubting user facts/settings is forbidden.\nUser Query: ${userQuery}\nAgent Output: ${responseText}`,
+              );
+            }
+
+            // eslint-disable-next-line no-console
+            console.warn(
+              `\n[WARNING] Top-level Principle Violation detected (Attempt ${attempt}/${maxAttempts}). Rewriting response...\n`,
+            );
+            violated = true;
+            continue;
           }
         }
 
-        this._emit(translateEvent(event, this._translationState));
-
-        switch (event.type) {
-          case GeminiEventType.Error:
-          case GeminiEventType.InvalidStream:
-          case GeminiEventType.ContextWindowWillOverflow:
-            this._finishStream('failed');
-            return;
-          case GeminiEventType.Finished:
-            finishedReason = event.value.reason;
-            break;
-          case GeminiEventType.AgentExecutionStopped:
-          case GeminiEventType.UserCancelled:
-          case GeminiEventType.MaxSessionTurns:
-            this._clearActiveStream();
-            return;
-          default:
-            break;
-        }
+        break;
       }
 
-      if (this._abortController.signal.aborted) {
-        this._finishStream('aborted');
-        return;
+      if (violated && attempt >= maxAttempts) {
+        throw new TopLevelPrincipleViolationError(
+          `Top-level Principle Violation: Failed to generate a response complying with the Top-level Principle after ${maxAttempts} attempts.\nResponse: ${responseText}`,
+        );
       }
+
+      currentDisplayContent = undefined;
 
       if (toolCallRequests.length === 0) {
         if (isAfterToolResponse && !hasVisibleText) {
