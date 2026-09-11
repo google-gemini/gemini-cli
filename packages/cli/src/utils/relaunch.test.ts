@@ -345,6 +345,92 @@ describe('relaunchAppInChildProcess', () => {
       // Should default to exit code 1
       expect(processExitSpy).toHaveBeenCalledWith(1);
     });
+
+    it('forwards termination signals to the child and removes them on close (#25590)', async () => {
+      process.argv = ['/usr/bin/node', '/app/cli.js'];
+
+      const mockChild = createMockChildProcess(0, false);
+      mockedSpawn.mockImplementation(() => mockChild);
+
+      const before = process.listenerCount('SIGTERM');
+      const killSpy = mockChild.kill as ReturnType<typeof vi.fn>;
+
+      // Start the relaunch process (does not auto-close, so it awaits).
+      const promise = relaunchAppInChildProcess([], []);
+
+      // Drain microtasks so the spawn + forwarder registration runs.
+      await new Promise((r) => setImmediate(r));
+
+      // A forwarder for SIGTERM was installed on the parent process.
+      expect(process.listenerCount('SIGTERM')).toBe(before + 1);
+
+      // Emulate the OS delivering SIGTERM: invoke the registered handler
+      // directly (process.emit would also fire unrelated listeners).
+      const handler = process.listeners('SIGTERM').at(-1) as
+        | (() => void)
+        | undefined;
+      expect(handler).toBeDefined();
+      handler!();
+      expect(killSpy).toHaveBeenCalledWith('SIGTERM');
+
+      // Closing the child must remove the forwarder (no listener leak).
+      mockChild.emit('close', 0);
+      await expect(promise).rejects.toThrow('PROCESS_EXIT_CALLED');
+      expect(process.listenerCount('SIGTERM')).toBe(before);
+    });
+
+    it('keeps the parent alive on SIGINT (no-op) and removes it on close (#25590)', async () => {
+      process.argv = ['/usr/bin/node', '/app/cli.js'];
+
+      const mockChild = createMockChildProcess(0, false);
+      mockedSpawn.mockImplementation(() => mockChild);
+
+      const before = process.listenerCount('SIGINT');
+      const killSpy = mockChild.kill as ReturnType<typeof vi.fn>;
+
+      const promise = relaunchAppInChildProcess([], []);
+      await new Promise((r) => setImmediate(r));
+
+      // A no-op keepalive handler for SIGINT was installed on the parent.
+      expect(process.listenerCount('SIGINT')).toBe(before + 1);
+
+      // Emulate the TTY delivering SIGINT to the whole process group: the
+      // handler must NOT forward it to the child (it already received it).
+      const handler = process.listeners('SIGINT').at(-1) as
+        | (() => void)
+        | undefined;
+      expect(handler).toBeDefined();
+      handler!();
+      expect(killSpy).not.toHaveBeenCalledWith('SIGINT');
+
+      // Closing the child must remove the keepalive handler (no listener leak).
+      mockChild.emit('close', 0);
+      await expect(promise).rejects.toThrow('PROCESS_EXIT_CALLED');
+      expect(process.listenerCount('SIGINT')).toBe(before);
+    });
+
+    it('propagates the child signal termination to the parent process (#25590)', async () => {
+      process.argv = ['/usr/bin/node', '/app/cli.js'];
+
+      const mockChild = createMockChildProcess(0, false);
+      mockedSpawn.mockImplementation(() => mockChild);
+
+      // Mock process.kill so the re-raised signal does not terminate the
+      // Vitest runner; assert the parent re-raises the child's exit signal.
+      const processKillSpy = vi
+        .spyOn(process, 'kill')
+        .mockImplementation(() => true);
+
+      const promise = relaunchAppInChildProcess([], []);
+      await new Promise((r) => setImmediate(r));
+
+      // Child exits with a signal: the parent must re-raise it.
+      mockChild.emit('close', null, 'SIGTERM');
+      await expect(promise).rejects.toThrow('PROCESS_EXIT_CALLED');
+      expect(processKillSpy).toHaveBeenCalledWith(process.pid, 'SIGTERM');
+
+      processKillSpy.mockRestore();
+    });
   });
 });
 
