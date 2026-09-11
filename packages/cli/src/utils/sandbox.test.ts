@@ -1285,13 +1285,16 @@ describe('sandbox', () => {
         command: 'sandbox-exec',
         image: 'some-image',
       });
+      const safeWorkspace = path.resolve('/safe/workspace');
+      const safeOther = path.resolve('/safe/other');
+      const sensitiveUser = path.resolve('/home/user');
       const mockCliConfig = {
-        getTargetDir: vi.fn().mockReturnValue('/safe/workspace'),
+        getTargetDir: vi.fn().mockReturnValue(safeWorkspace),
         getDebugMode: vi.fn().mockReturnValue(false),
         getWorkspaceContext: vi.fn().mockReturnValue({
           getDirectories: vi
             .fn()
-            .mockReturnValue(['/safe/workspace', '/home/user', '/safe/other']),
+            .mockReturnValue([safeWorkspace, sensitiveUser, safeOther]),
         }),
       } as unknown as Config;
 
@@ -1311,11 +1314,13 @@ describe('sandbox', () => {
       await promise;
 
       const spawnArgs = vi.mocked(spawn).mock.calls[0][1] as string[];
-      expect(spawnArgs).toContain('INCLUDE_DIR_0=/safe/other');
+      expect(spawnArgs).toContain(`INCLUDE_DIR_0=${safeOther}`);
       const includeDirs = spawnArgs.filter((arg) =>
         arg.startsWith('INCLUDE_DIR_'),
       );
-      expect(includeDirs.some((arg) => arg.includes('/home/user'))).toBe(false);
+      expect(includeDirs.some((arg) => arg.includes(sensitiveUser))).toBe(
+        false,
+      );
     });
 
     it('should ignore sensitive paths in allowedPaths', async () => {

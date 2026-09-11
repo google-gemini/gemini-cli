@@ -228,7 +228,7 @@ export async function start_sandbox(
         // Always add 5 INCLUDE_DIR parameters to ensure .sb files can reference them
         const MAX_INCLUDE_DIRS = 5;
         const configTargetDir = cliConfig?.getTargetDir()
-          ? fs.realpathSync(cliConfig.getTargetDir())
+          ? resolveToRealPath(cliConfig.getTargetDir())
           : targetDir;
         if (cliConfig?.getTargetDir() && isSensitiveHostPath(configTargetDir)) {
           throw new FatalSandboxError(
