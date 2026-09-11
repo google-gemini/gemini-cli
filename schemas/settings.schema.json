@@ -4297,6 +4297,12 @@
             "symbol": {
               "type": "string"
             },
+            "active": {
+              "type": "string"
+            },
+            "focus": {
+              "type": "string"
+            },
             "gradient": {
               "type": "array",
               "items": {
