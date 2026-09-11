@@ -14,6 +14,7 @@ import { start_sandbox } from './sandbox.js';
 import {
   FatalSandboxError,
   homedir,
+  type Config,
   type SandboxConfig,
 } from '@google/gemini-cli-core';
 import { createMockSandboxConfig } from '@google/gemini-cli-test-utils';
@@ -1173,6 +1174,136 @@ describe('sandbox', () => {
       });
 
       await expect(start_sandbox(config)).rejects.toThrow(FatalSandboxError);
+    });
+
+    it('should reject running container sandbox from a sensitive working directory with FatalSandboxError', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue('/home/user');
+
+      try {
+        interface MockProcessWithStdout extends EventEmitter {
+          stdout: EventEmitter;
+        }
+        const mockImageCheckProcess =
+          new EventEmitter() as MockProcessWithStdout;
+        mockImageCheckProcess.stdout = new EventEmitter();
+        vi.mocked(spawn).mockImplementationOnce(() => {
+          setTimeout(() => {
+            mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+            mockImageCheckProcess.emit('close', 0);
+          }, 1);
+          return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+        });
+
+        await expect(start_sandbox(config)).rejects.toThrow(
+          "Running sandbox from a sensitive host directory '/home/user' is strictly prohibited",
+        );
+      } finally {
+        cwdSpy.mockRestore();
+      }
+    });
+
+    it('should reject running container sandbox when cliConfig targetDir is sensitive with FatalSandboxError', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      const mockCliConfig = {
+        getTargetDir: vi.fn().mockReturnValue('/home/user/.gemini'),
+        getDebugMode: vi.fn().mockReturnValue(false),
+      } as unknown as Config;
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      await expect(start_sandbox(config, [], mockCliConfig)).rejects.toThrow(
+        "Running sandbox from a sensitive host directory '/home/user/.gemini' is strictly prohibited",
+      );
+    });
+
+    it('should reject running macOS seatbelt sandbox from a sensitive working directory with FatalSandboxError', async () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'sandbox-exec',
+        image: 'some-image',
+      });
+      const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue('/home/user');
+
+      try {
+        await expect(start_sandbox(config)).rejects.toThrow(
+          "Running sandbox from a sensitive host directory '/home/user' is strictly prohibited",
+        );
+      } finally {
+        cwdSpy.mockRestore();
+      }
+    });
+
+    it('should reject running LXC sandbox from a sensitive working directory with FatalSandboxError', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'lxc',
+        image: 'gemini-sandbox',
+      });
+      const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue('/home/user');
+
+      try {
+        await expect(start_sandbox(config)).rejects.toThrow(
+          "Running sandbox from a sensitive host directory '/home/user' is strictly prohibited",
+        );
+      } finally {
+        cwdSpy.mockRestore();
+      }
+    });
+
+    it('should skip sensitive workspace directory in macOS seatbelt includedDirs', async () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'sandbox-exec',
+        image: 'some-image',
+      });
+      const mockCliConfig = {
+        getTargetDir: vi.fn().mockReturnValue('/safe/workspace'),
+        getDebugMode: vi.fn().mockReturnValue(false),
+        getWorkspaceContext: vi.fn().mockReturnValue({
+          getDirectories: vi
+            .fn()
+            .mockReturnValue(['/safe/workspace', '/home/user', '/safe/other']),
+        }),
+      } as unknown as Config;
+
+      interface MockProcess extends EventEmitter {
+        stdout: EventEmitter;
+        stderr: EventEmitter;
+      }
+      const mockSpawnProcess = new EventEmitter() as MockProcess;
+      mockSpawnProcess.stdout = new EventEmitter();
+      mockSpawnProcess.stderr = new EventEmitter();
+      vi.mocked(spawn).mockReturnValue(
+        mockSpawnProcess as unknown as ReturnType<typeof spawn>,
+      );
+
+      const promise = start_sandbox(config, [], mockCliConfig);
+      setTimeout(() => mockSpawnProcess.emit('close', 0), 10);
+      await promise;
+
+      const spawnArgs = vi.mocked(spawn).mock.calls[0][1] as string[];
+      expect(spawnArgs).toContain('INCLUDE_DIR_0=/safe/other');
+      const includeDirs = spawnArgs.filter((arg) =>
+        arg.startsWith('INCLUDE_DIR_'),
+      );
+      expect(includeDirs.some((arg) => arg.includes('/home/user'))).toBe(false);
     });
 
     it('should ignore sensitive paths in allowedPaths', async () => {

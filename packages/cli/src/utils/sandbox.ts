@@ -184,6 +184,13 @@ export async function start_sandbox(
           ...nodeArgs,
         ].join(' ');
 
+        const targetDir = fs.realpathSync(process.cwd());
+        if (isSensitiveHostPath(targetDir)) {
+          throw new FatalSandboxError(
+            `Running sandbox from a sensitive host directory '${targetDir}' is strictly prohibited`,
+          );
+        }
+
         const hostTmpDir = fs.realpathSync(os.tmpdir());
         const resolvedTmpDir = fs.mkdtempSync(
           path.join(hostTmpDir, 'gemini-sandbox-'),
@@ -207,7 +214,7 @@ export async function start_sandbox(
 
         const args = [
           '-D',
-          `TARGET_DIR=${fs.realpathSync(process.cwd())}`,
+          `TARGET_DIR=${targetDir}`,
           '-D',
           `TMP_DIR=${resolvedTmpDir}`,
           '-D',
@@ -219,7 +226,14 @@ export async function start_sandbox(
         // Add included directories from the workspace context
         // Always add 5 INCLUDE_DIR parameters to ensure .sb files can reference them
         const MAX_INCLUDE_DIRS = 5;
-        const targetDir = fs.realpathSync(cliConfig?.getTargetDir() || '');
+        const configTargetDir = cliConfig?.getTargetDir()
+          ? fs.realpathSync(cliConfig.getTargetDir())
+          : targetDir;
+        if (cliConfig?.getTargetDir() && isSensitiveHostPath(configTargetDir)) {
+          throw new FatalSandboxError(
+            `Running sandbox from a sensitive host directory '${configTargetDir}' is strictly prohibited`,
+          );
+        }
         const includedDirs: string[] = [];
 
         if (cliConfig) {
@@ -229,7 +243,13 @@ export async function start_sandbox(
           // Filter out TARGET_DIR
           for (const dir of directories) {
             const realDir = fs.realpathSync(dir);
-            if (realDir !== targetDir) {
+            if (realDir !== targetDir && realDir !== configTargetDir) {
+              if (isSensitiveHostPath(realDir)) {
+                debugLogger.warn(
+                  `Skipping sensitive workspace directory '${realDir}' in sandbox`,
+                );
+                continue;
+              }
               includedDirs.push(realDir);
             }
           }
@@ -244,7 +264,17 @@ export async function start_sandbox(
               fs.existsSync(hostPath)
             ) {
               const realDir = fs.realpathSync(hostPath);
-              if (!includedDirs.includes(realDir) && realDir !== targetDir) {
+              if (
+                !includedDirs.includes(realDir) &&
+                realDir !== targetDir &&
+                realDir !== configTargetDir
+              ) {
+                if (isSensitiveHostPath(realDir)) {
+                  debugLogger.warn(
+                    `Skipping sensitive path '${realDir}' in config.allowedPaths`,
+                  );
+                  continue;
+                }
                 includedDirs.push(realDir);
               }
             }
@@ -464,6 +494,19 @@ export async function start_sandbox(
     args.push('--add-host', 'host.docker.internal:host-gateway');
 
     // mount current directory as working directory in sandbox (set via --workdir)
+    if (isSensitiveHostPath(workdir)) {
+      throw new FatalSandboxError(
+        `Running sandbox from a sensitive host directory '${workdir}' is strictly prohibited`,
+      );
+    }
+    if (
+      cliConfig?.getTargetDir() &&
+      isSensitiveHostPath(cliConfig.getTargetDir())
+    ) {
+      throw new FatalSandboxError(
+        `Running sandbox from a sensitive host directory '${cliConfig.getTargetDir()}' is strictly prohibited`,
+      );
+    }
     args.push('--volume', `${workdir}:${containerWorkdir}`);
 
     // Create ephemeral sandbox temp directory on host for sanitized configuration files
@@ -996,6 +1039,12 @@ async function start_lxc_sandbox(
 ): Promise<number> {
   const containerName = config.image || 'gemini-sandbox';
   const workdir = path.resolve(process.cwd());
+
+  if (isSensitiveHostPath(workdir)) {
+    throw new FatalSandboxError(
+      `Running sandbox from a sensitive host directory '${workdir}' is strictly prohibited`,
+    );
+  }
 
   debugLogger.log(
     `starting lxc sandbox (container: ${containerName}, workdir: ${workdir}) ...`,
