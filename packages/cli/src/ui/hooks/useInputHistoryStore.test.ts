@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { act } from 'react';
+import { act, StrictMode } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { useInputHistoryStore } from './useInputHistoryStore.js';
@@ -300,6 +300,123 @@ describe('useInputHistoryStore', () => {
         'current1',
         'current2',
       ]);
+    });
+  });
+
+  describe('state updates stay outside updater functions', () => {
+    // React may call an updater more than once for a single update (StrictMode
+    // double-invoke, replays under batching). addInput used to nest a
+    // setPastSessionMessages call inside the current-session updater and run
+    // recalculateHistory - itself a setState - from there. The resulting
+    // history happened to be idempotent, so the tests below pin both the
+    // history and the render count, which is what the nesting actually cost.
+
+    it('does not schedule extra renders per submit under StrictMode', async () => {
+      const renders: string[][] = [];
+      const { result } = await renderHook(
+        () => {
+          const store = useInputHistoryStore();
+          renders.push(store.inputHistory);
+          return store;
+        },
+        { wrapper: StrictMode as never },
+      );
+
+      const before = renders.length;
+      act(() => {
+        result.current.addInput('only once');
+      });
+      const rendersForOneSubmit = renders.length - before;
+
+      expect(result.current.inputHistory).toEqual(['only once']);
+      // The nested-updater version queued a redundant past-messages update on
+      // top of the history update, costing an extra render pass per submit.
+      expect(rendersForOneSubmit).toBeLessThanOrEqual(2);
+    });
+
+    it('does not grow the render cost as submits accumulate', async () => {
+      // addInput only writes the history state now. Should a redundant
+      // per-submit state write reappear, the extra dispatch shows up here.
+      const renders: string[][] = [];
+      const { result } = await renderHook(
+        () => {
+          const store = useInputHistoryStore();
+          renders.push(store.inputHistory);
+          return store;
+        },
+        { wrapper: StrictMode as never },
+      );
+
+      const first = renders.length;
+      act(() => {
+        result.current.addInput('one');
+      });
+      const costOfFirst = renders.length - first;
+
+      const second = renders.length;
+      act(() => {
+        result.current.addInput('two');
+      });
+      const costOfSecond = renders.length - second;
+
+      expect(result.current.inputHistory).toEqual(['one', 'two']);
+      expect(costOfSecond).toBeLessThanOrEqual(costOfFirst);
+    });
+
+    it('keeps every submit when several are batched into one update', async () => {
+      const { result } = await renderHook(() => useInputHistoryStore(), {
+        wrapper: StrictMode as never,
+      });
+
+      // Same act() means all three updates are queued together, which is what
+      // makes an updater-nested update fire once per queued outer update.
+      act(() => {
+        result.current.addInput('a');
+        result.current.addInput('b');
+        result.current.addInput('c');
+      });
+
+      expect(result.current.inputHistory).toEqual(['a', 'b', 'c']);
+    });
+
+    it('keeps past messages visible after batched submits', async () => {
+      const mockLogger = {
+        getPreviousUserMessages: vi.fn().mockResolvedValue(['past2', 'past1']),
+      };
+
+      const { result } = await renderHook(() => useInputHistoryStore(), {
+        wrapper: StrictMode as never,
+      });
+
+      await act(async () => {
+        await result.current.initializeFromLogger(mockLogger);
+      });
+
+      act(() => {
+        result.current.addInput('new1');
+        result.current.addInput('new2');
+      });
+
+      expect(result.current.inputHistory).toEqual([
+        'past1',
+        'past2',
+        'new1',
+        'new2',
+      ]);
+    });
+
+    it('still deduplicates consecutive duplicates across batched submits', async () => {
+      const { result } = await renderHook(() => useInputHistoryStore(), {
+        wrapper: StrictMode as never,
+      });
+
+      act(() => {
+        result.current.addInput('same');
+        result.current.addInput('same');
+        result.current.addInput('other');
+      });
+
+      expect(result.current.inputHistory).toEqual(['same', 'other']);
     });
   });
 });

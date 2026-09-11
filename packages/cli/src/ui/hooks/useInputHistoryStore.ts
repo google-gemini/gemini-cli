@@ -5,7 +5,7 @@
  */
 
 import { debugLogger } from '@google/gemini-cli-core';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 
 interface Logger {
   getPreviousUserMessages(): Promise<string[]>;
@@ -24,10 +24,14 @@ export interface UseInputHistoryStoreReturn {
 export function useInputHistoryStore(): UseInputHistoryStoreReturn {
   const [inputHistory, setInputHistory] = useState<string[]>([]);
   const [_pastSessionMessages, setPastSessionMessages] = useState<string[]>([]);
-  const [_currentSessionMessages, setCurrentSessionMessages] = useState<
-    string[]
-  >([]);
   const [isInitialized, setIsInitialized] = useState(false);
+
+  // Mirrors of the two message lists, read by addInput so it can derive the
+  // next history without reading state from inside an updater. State updaters
+  // must be pure and may run more than once (StrictMode double-invoke, replays
+  // under batching), so they cannot be used to sequence dependent updates.
+  const pastRef = useRef<string[]>([]);
+  const currentRef = useRef<string[]>([]);
 
   /**
    * Recalculate the complete input history from past and current sessions.
@@ -65,6 +69,7 @@ export function useInputHistoryStore(): UseInputHistoryStoreReturn {
 
       try {
         const pastMessages = (await logger.getPreviousUserMessages()) || [];
+        pastRef.current = pastMessages;
         setPastSessionMessages(pastMessages); // Store as newest first
         recalculateHistory([], pastMessages);
         setIsInitialized(true);
@@ -74,6 +79,7 @@ export function useInputHistoryStore(): UseInputHistoryStoreReturn {
           'Failed to initialize input history from logger:',
           error,
         );
+        pastRef.current = [];
         setPastSessionMessages([]);
         recalculateHistory([], []);
         setIsInitialized(true);
@@ -91,19 +97,16 @@ export function useInputHistoryStore(): UseInputHistoryStoreReturn {
       const trimmedInput = input.trim();
       if (!trimmedInput) return; // Filter empty/whitespace-only inputs
 
-      setCurrentSessionMessages((prevCurrent) => {
-        const newCurrentSession = [...prevCurrent, trimmedInput];
+      // Derive everything up front, then issue a plain state update. Keeping the
+      // derivation out of the updaters means a replayed or double-invoked
+      // updater cannot run recalculateHistory (itself a setState) again.
+      const newCurrentSession = [...currentRef.current, trimmedInput];
+      currentRef.current = newCurrentSession;
 
-        setPastSessionMessages((prevPast) => {
-          recalculateHistory(
-            newCurrentSession.slice().reverse(), // Convert to newest first
-            prevPast,
-          );
-          return prevPast; // No change to past messages
-        });
-
-        return newCurrentSession;
-      });
+      recalculateHistory(
+        newCurrentSession.slice().reverse(), // Convert to newest first
+        pastRef.current,
+      );
     },
     [recalculateHistory],
   );
