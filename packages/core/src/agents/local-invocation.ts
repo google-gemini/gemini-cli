@@ -34,6 +34,7 @@ import {
   sanitizeErrorMessage,
 } from '../utils/agent-sanitization-utils.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { isCancellationError } from '../utils/errors.js';
 
 /**
  * Represents a validated, executable instance of a subagent tool.
@@ -327,9 +328,7 @@ ${output.result}`;
 
       debugLogger.error(`Subagent '${this.definition.name}' failed:`, error);
 
-      const isAbort =
-        (error instanceof Error && error.name === 'AbortError') ||
-        errorMessage.includes('Aborted');
+      const isAbort = isCancellationError(error);
 
       // Mark any running items as error/cancelled
       for (const item of recentActivity) {

@@ -8,6 +8,7 @@ import { describe, it, expect } from 'vitest';
 import {
   isAuthenticationError,
   isAbortError,
+  isCancellationError,
   UnauthorizedError,
   toFriendlyError,
   BadRequestError,
@@ -69,6 +70,35 @@ describe('isAbortError', () => {
     expect(isAbortError({ name: 'AbortError' })).toBe(false);
     expect(isAbortError(null)).toBe(false);
     expect(isAbortError('AbortError')).toBe(false);
+  });
+});
+
+describe('isCancellationError', () => {
+  it('should return true for AbortError', () => {
+    const error = new Error('Aborted');
+    error.name = 'AbortError';
+    expect(isCancellationError(error)).toBe(true);
+  });
+
+  it('should return true for CanceledError', () => {
+    const error = new Error('The operation was canceled.');
+    error.name = 'CanceledError';
+    expect(isCancellationError(error)).toBe(true);
+  });
+
+  it('should return true for lower-level cancellation messages', () => {
+    expect(isCancellationError(new Error('The user aborted a request.'))).toBe(
+      true,
+    );
+    expect(isCancellationError(new Error('Operation cancelled by user'))).toBe(
+      true,
+    );
+    expect(isCancellationError(new Error('Request was aborted'))).toBe(true);
+  });
+
+  it('should return false for unrelated errors', () => {
+    expect(isCancellationError(new Error('Other error'))).toBe(false);
+    expect(isCancellationError({ name: 'AbortError' })).toBe(false);
   });
 });
 
