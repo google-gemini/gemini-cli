@@ -389,6 +389,34 @@ describe('stripShellWrapper', () => {
     ).toEqual('Get-ChildItem');
   });
 
+  it('should strip posix wrappers carrying extra flags (#29202)', () => {
+    expect(stripShellWrapper('bash -x -c "rm -rf /"')).toEqual('rm -rf /');
+    expect(stripShellWrapper('bash -xc "rm -rf /"')).toEqual('rm -rf /');
+    expect(stripShellWrapper('bash --noprofile -c "rm -rf /"')).toEqual(
+      'rm -rf /',
+    );
+    expect(stripShellWrapper('sh -e -c "rm -rf /"')).toEqual('rm -rf /');
+  });
+
+  it('should strip powershell wrappers carrying extra flags (#29202)', () => {
+    expect(
+      stripShellWrapper(
+        'powershell -NoProfile -ExecutionPolicy Bypass -Command "Remove-Item"',
+      ),
+    ).toEqual('Remove-Item');
+  });
+
+  it('should not strip a script-file invocation that merely contains -c (#29202)', () => {
+    expect(stripShellWrapper('bash somescript.sh -c x')).toEqual(
+      'bash somescript.sh -c x',
+    );
+  });
+
+  it('should not backtrack on long flag runs without -Command (#29203)', () => {
+    const input = `powershell ${'-A '.repeat(30)}tail`;
+    expect(stripShellWrapper(input)).toEqual(input.trim());
+  });
+
   it('should not strip anything if no wrapper is present', () => {
     expect(stripShellWrapper('ls -l')).toEqual('ls -l');
   });

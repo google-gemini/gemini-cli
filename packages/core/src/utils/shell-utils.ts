@@ -840,8 +840,15 @@ export function getCommandRoots(command: string): string[] {
 }
 
 export function stripShellWrapper(command: string): string {
+  // Tolerate wrapper flags between the shell name and -c / -Command so the
+  // inner command is always what the policy engine re-checks (#29202):
+  // short clusters (incl. combined -xc), long options, and -Name value
+  // pairs. Middle tokens must look flag-like so `bash script.sh -c x`
+  // (run a script file) never strips. Unquoted flag values must not start
+  // with `-` or flag names double as values and the group backtracks
+  // catastrophically (ReDoS, review on #29203).
   const pattern =
-    /^\s*(?:(?:(?:\S+\/)?(?:sh|bash|zsh))\s+-c|cmd\.exe\s+\/c|powershell(?:\.exe)?\s+(?:-NoProfile\s+)?-Command|pwsh(?:\.exe)?\s+(?:-NoProfile\s+)?-Command)\s+/i;
+    /^\s*(?:(?:(?:\S+\/)?(?:sh|bash|zsh))(?:\s+-\S+)*\s+-(?:[A-Za-z]*c)|cmd\.exe(?:\s+\/\S+)*\s+\/c|powershell(?:\.exe)?(?:\s+-[A-Za-z]+(?:\s+(?:"[^"]*"|'[^']*'|[^\s"'-][^\s"']*))?)*\s+-Command|pwsh(?:\.exe)?(?:\s+-[A-Za-z]+(?:\s+(?:"[^"]*"|'[^']*'|[^\s"'-][^\s"']*))?)*\s+-Command)\s+/i;
   const match = command.match(pattern);
   if (match) {
     let newCommand = command.substring(match[0].length).trim();
