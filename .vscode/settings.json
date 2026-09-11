@@ -19,5 +19,10 @@
   "[markdown]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
-  "vitest.disableWorkspaceWarning": true
+  "vitest.disableWorkspaceWarning": true,
+  "git.ignoreLimitWarning": true,
+  "github.copilot.enable": {
+    "all": true
+  },
+  "github.copilot.inlineSuggest.enable": true
 }

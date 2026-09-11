@@ -14,6 +14,25 @@
     },
     {
       "type": "npm",
+      "script": "start",
+      "problemMatcher": [],
+      "label": "npm: start",
+      "detail": "npm run start"
+    },
+    {
+      "label": "Run Gemini CLI",
+      "type": "shell",
+      "command": "npm run start",
+      "problemMatcher": [],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "dedicated"
+      }
+    },
+    {
+      "type": "npm",
       "script": "build",
       "path": "packages/vscode-ide-companion",
       "group": "build",
