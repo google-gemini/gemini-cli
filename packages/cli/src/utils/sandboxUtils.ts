@@ -156,10 +156,8 @@ export function prepareIsolatedSettingsDir(
         try {
           const content = fs.readFileSync(isolatedSettingsFile, 'utf-8');
           const sanitized = sanitizeSettingsContent(content);
-          fs.writeFileSync(isolatedSettingsFile, sanitized, {
-            mode: 0o400,
-            encoding: 'utf-8',
-          });
+          fs.writeFileSync(isolatedSettingsFile, sanitized, 'utf-8');
+          fs.chmodSync(isolatedSettingsFile, 0o400);
         } catch (err) {
           debugLogger.warn(
             `Failed to sanitize settings.json for sandbox: ${err instanceof Error ? err.message : String(err)}`,

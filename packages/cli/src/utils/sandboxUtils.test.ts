@@ -466,8 +466,9 @@ describe('sandboxUtils', () => {
       expect(fs.writeFileSync).toHaveBeenCalledWith(
         settingsPath,
         expect.not.stringContaining('untrusted-hook'),
-        expect.objectContaining({ mode: 0o400 }),
+        'utf-8',
       );
+      expect(fs.chmodSync).toHaveBeenCalledWith(settingsPath, 0o400);
     });
   });
 
