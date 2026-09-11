@@ -168,14 +168,7 @@ export function isSensitiveHostPath(hostPath: string): boolean {
       if (
         baseName === '.env' ||
         baseName.startsWith('.env.') ||
-        baseName === 'oauth_creds.json' ||
-        baseName === 'gemini-credentials.json' ||
-        baseName === 'mcp-oauth-tokens.json' ||
-        baseName === 'a2a-oauth-tokens.json' ||
-        baseName === 'google_accounts.json' ||
-        baseName === 'trusted_hooks.json' ||
-        baseName === 'trustedfolders.json' ||
-        baseName === 'policy_integrity.json'
+        SENSITIVE_SETTINGS_FILENAMES.has(baseName)
       ) {
         return true;
       }
@@ -231,14 +224,7 @@ export function isSensitiveHostPath(hostPath: string): boolean {
     if (
       baseName === '.env' ||
       baseName.startsWith('.env.') ||
-      baseName === 'oauth_creds.json' ||
-      baseName === 'gemini-credentials.json' ||
-      baseName === 'mcp-oauth-tokens.json' ||
-      baseName === 'a2a-oauth-tokens.json' ||
-      baseName === 'google_accounts.json' ||
-      baseName === 'trusted_hooks.json' ||
-      baseName === 'trustedfolders.json' ||
-      baseName === 'policy_integrity.json'
+      SENSITIVE_SETTINGS_FILENAMES.has(baseName)
     ) {
       return true;
     }
