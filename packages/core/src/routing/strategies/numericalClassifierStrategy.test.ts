@@ -63,6 +63,14 @@ describe('NumericalClassifierStrategy', () => {
       getNumericalRoutingEnabled: vi.fn().mockResolvedValue(true),
       getResolvedClassifierThreshold: vi.fn().mockResolvedValue(90),
       getClassifierThreshold: vi.fn().mockResolvedValue(undefined),
+      hasCustomNumericalRoutingRules: vi.fn().mockReturnValue(false),
+      getNumericalRoutingRules: vi.fn().mockImplementation(async () => {
+        const t = await mockConfig.getResolvedClassifierThreshold();
+        return [
+          { maxScore: t - 1, model: 'flash' },
+          { maxScore: 100, model: 'pro' },
+        ];
+      }),
       getGemini31Launched: vi.fn().mockResolvedValue(false),
       getUseCustomToolModel: vi.fn().mockImplementation(async () => {
         const launched = await mockConfig.getGemini31Launched();
@@ -214,6 +222,42 @@ describe('NumericalClassifierStrategy', () => {
       });
     });
   });
+
+describe('Custom Numerical Routing Rules', () => {
+  it('should route according to custom numerical routing rules', async () => {
+    vi.mocked(mockConfig.hasCustomNumericalRoutingRules).mockReturnValue(true);
+    vi.mocked(mockConfig.getNumericalRoutingRules).mockResolvedValue([
+      { maxScore: 30, model: 'flash' },
+      { maxScore: 70, model: 'pro' },
+      { maxScore: 100, model: 'flash' },
+    ]);
+
+    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue({
+      complexity_reasoning: 'Complex task',
+      complexity_score: 60,
+    });
+
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
+    );
+
+    expect(mockConfig.getNumericalRoutingRules).toHaveBeenCalled();
+
+    expect(decision).toEqual({
+      model: PREVIEW_GEMINI_MODEL,
+      metadata: {
+        source: 'NumericalClassifier (Custom)',
+        latencyMs: expect.any(Number),
+        reasoning: expect.stringContaining(
+          'Score: 60 / Threshold: 70',
+        ),
+      },
+    });
+  });
+});
 
   describe('Remote Threshold Logic', () => {
     it('should use the remote CLASSIFIER_THRESHOLD if provided (int value)', async () => {
