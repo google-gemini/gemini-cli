@@ -367,7 +367,7 @@ export function parseEditedValue(
     }
 
     const numParsed = Number(newValue.trim());
-    if (Number.isNaN(numParsed)) {
+    if (!Number.isFinite(numParsed)) {
       return null;
     }
 

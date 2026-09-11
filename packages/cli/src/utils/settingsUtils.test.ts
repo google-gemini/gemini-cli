@@ -26,6 +26,7 @@ import {
   TEST_ONLY,
   isInSettingsScope,
   getDisplayValue,
+  parseEditedValue,
 } from './settingsUtils.js';
 import {
   getSettingsSchema,
@@ -837,6 +838,32 @@ describe('SettingsUtils', () => {
         );
         expect(result).toBe('30s*');
       });
+    });
+  });
+});
+
+describe('parseEditedValue', () => {
+  describe('number', () => {
+    it('should parse a finite number', () => {
+      expect(parseEditedValue('number', '42')).toBe(42);
+      expect(parseEditedValue('number', ' 3.5 ')).toBe(3.5);
+    });
+
+    it('should return null for an empty string', () => {
+      expect(parseEditedValue('number', '')).toBeNull();
+      expect(parseEditedValue('number', '   ')).toBeNull();
+    });
+
+    it('should return null for non-numeric input', () => {
+      expect(parseEditedValue('number', 'abc')).toBeNull();
+    });
+
+    it('should return null for non-finite values so the dialog keeps the existing setting', () => {
+      // Regression test for #29226: Number('1e309') is Infinity, which the
+      // dialog used to accept and JSON then serialized to null.
+      expect(parseEditedValue('number', '1e309')).toBeNull();
+      expect(parseEditedValue('number', 'Infinity')).toBeNull();
+      expect(parseEditedValue('number', '-Infinity')).toBeNull();
     });
   });
 });
