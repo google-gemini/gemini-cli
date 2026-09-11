@@ -13,6 +13,10 @@ import {
   IdeDiffRejectedNotificationSchema,
 } from './types.js';
 import { getIdeProcessInfo } from './process-utils.js';
+import {
+  IDE_PROCESS_INFO_TIMEOUT_MS,
+  IDE_REQUEST_TIMEOUT_MS,
+} from './constants.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -20,7 +24,6 @@ import {
   CallToolResultSchema,
   ListToolsResultSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { IDE_REQUEST_TIMEOUT_MS } from './constants.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
   getConnectionConfigFromFile,
@@ -92,7 +95,15 @@ export class IdeClient {
     if (!IdeClient.instancePromise) {
       IdeClient.instancePromise = (async () => {
         const client = new IdeClient();
-        client.ideProcessInfo = await getIdeProcessInfo();
+        // getIdeProcessInfo() traverses the process tree with `ps`, which
+        // can hang indefinitely on a bare terminal when a specific ancestor
+        // PID never responds (see #21477). Race it against a timeout so the
+        // TUI does not get stuck on "Initializing..." forever; on timeout,
+        // fall back to a no-IDE client.
+        client.ideProcessInfo = await Promise.race([
+          getIdeProcessInfo(),
+          resolveAfterTimeout(undefined, IDE_PROCESS_INFO_TIMEOUT_MS),
+        ]);
         const connectionConfig = client.ideProcessInfo
           ? await getConnectionConfigFromFile(client.ideProcessInfo.pid)
           : undefined;
@@ -653,4 +664,16 @@ export class IdeClient {
       return false;
     }
   }
+}
+
+/**
+ * Resolves with `value` after `ms`, used to race a long-running promise
+ * against a soft deadline. The timer is unreffed so it does not keep the
+ * process alive solely for the timeout.
+ */
+function resolveAfterTimeout<T>(value: T, ms: number): Promise<T> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(value), ms);
+    timer.unref?.();
+  });
 }
