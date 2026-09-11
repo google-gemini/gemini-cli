@@ -499,6 +499,26 @@ describe('SessionSummaryService', () => {
       expect(summary).toBe('Add dark mode to the app');
     });
 
+    it('should insert conversation text containing $-patterns literally into the prompt', async () => {
+      const dollarMessage = "echo $'\\n' and $$ and $& and $`quote`";
+      const messages: MessageRecord[] = [
+        {
+          id: '1',
+          timestamp: '2025-12-03T00:00:00Z',
+          type: 'user',
+          content: [{ text: dollarMessage }],
+        },
+      ];
+
+      await service.generateSummary({ messages });
+
+      expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+      const callArgs = mockGenerateContent.mock.calls[0][0];
+      const promptText = callArgs.contents[0].parts[0].text;
+
+      expect(promptText).toContain(`User: ${dollarMessage}`);
+    });
+
     it('should handle messages longer than 500 chars', async () => {
       const longMessage = 'a'.repeat(1000);
       const messages: MessageRecord[] = [
