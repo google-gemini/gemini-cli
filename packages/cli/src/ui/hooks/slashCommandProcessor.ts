@@ -643,8 +643,16 @@ export const useSlashCommandProcessor = (
 
                   return await handleSlashCommand(
                     result.originalInvocation.raw,
-                    // Pass the approved commands as a one-time grant for this execution.
-                    new Set(approvedCommands),
+                    // Accumulate with any commands already granted earlier in
+                    // this same confirmation chain. A retry re-runs the
+                    // command action from scratch, so commands approved in a
+                    // prior round must still be carried forward here rather
+                    // than relied upon via `sessionShellAllowlist`, which may
+                    // not have re-rendered into `commandContext` yet.
+                    new Set([
+                      ...(oneTimeShellAllowlist ?? []),
+                      ...approvedCommands,
+                    ]),
                     undefined,
                     false, // Do not add to history again
                   );

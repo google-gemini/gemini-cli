@@ -9,7 +9,11 @@ import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { useSlashCommandProcessor } from './slashCommandProcessor.js';
-import { CommandKind, type SlashCommand } from '../commands/types.js';
+import {
+  CommandKind,
+  type SlashCommand,
+  type CommandContext,
+} from '../commands/types.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import { MessageType } from '../types.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
@@ -20,6 +24,7 @@ import {
   MCPDiscoveryState,
   makeFakeConfig,
   coreEvents,
+  ToolConfirmationOutcome,
   type GeminiClient,
 } from '@google/gemini-cli-core';
 
@@ -812,6 +817,103 @@ describe('useSlashCommandProcessor', () => {
 
       expect(mockAddItem).toHaveBeenCalledWith(
         { type: MessageType.USER, text: '/mcpcmd' },
+        expect.any(Number),
+      );
+    });
+  });
+
+  describe('Shell command confirmation', () => {
+    it('accumulates approvals across multiple confirmation rounds instead of looping forever', async () => {
+      // Simulates a command whose action re-checks the session shell
+      // allowlist from scratch each time it is invoked (as a real
+      // file-based command's ShellProcessor would after a retry), and
+      // requests confirmation for whichever command isn't allowed yet.
+      const action = async (context: CommandContext) => {
+        const allowed = context.session.sessionShellAllowlist;
+        if (!allowed.has('cmd1')) {
+          return {
+            type: 'confirm_shell_commands' as const,
+            commandsToConfirm: ['cmd1'],
+            originalInvocation: { raw: '/multistep' },
+          };
+        }
+        if (!allowed.has('cmd2')) {
+          return {
+            type: 'confirm_shell_commands' as const,
+            commandsToConfirm: ['cmd2'],
+            originalInvocation: { raw: '/multistep' },
+          };
+        }
+        return {
+          type: 'message' as const,
+          messageType: 'info' as const,
+          content: 'both commands confirmed',
+        };
+      };
+
+      const testCommand = createTestCommand({
+        name: 'multistep',
+        action,
+      });
+
+      const result = await setupProcessorHook({
+        builtinCommands: [testCommand],
+      });
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      let finalResultPromise: Promise<unknown> = Promise.resolve();
+      act(() => {
+        finalResultPromise = result.current.handleSlashCommand('/multistep');
+      });
+
+      // Round 1: only cmd1 has been discovered so far.
+      await waitFor(() => {
+        expect(result.current.pendingHistoryItems).toHaveLength(1);
+      });
+      let pending = result.current.pendingHistoryItems[0] as unknown as {
+        tools: Array<{
+          confirmationDetails: {
+            rootCommands: string[];
+            onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
+          };
+        }>;
+      };
+      expect(pending.tools[0].confirmationDetails.rootCommands).toEqual([
+        'cmd1',
+      ]);
+      await act(async () => {
+        await pending.tools[0].confirmationDetails.onConfirm(
+          ToolConfirmationOutcome.ProceedOnce,
+        );
+      });
+
+      // Round 2: cmd1 is now allowed for this retry, so cmd2 is discovered.
+      await waitFor(() => {
+        expect(result.current.pendingHistoryItems).toHaveLength(1);
+      });
+      pending = result.current.pendingHistoryItems[0] as unknown as {
+        tools: Array<{
+          confirmationDetails: {
+            rootCommands: string[];
+            onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
+          };
+        }>;
+      };
+      expect(pending.tools[0].confirmationDetails.rootCommands).toEqual([
+        'cmd2',
+      ]);
+      await act(async () => {
+        await pending.tools[0].confirmationDetails.onConfirm(
+          ToolConfirmationOutcome.ProceedOnce,
+        );
+      });
+
+      // Both commands were approved across the two rounds, so the retry
+      // should now succeed instead of asking for cmd1 a second time.
+      const finalResult = await finalResultPromise;
+      expect(finalResult).toEqual({ type: 'handled' });
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({ text: 'both commands confirmed' }),
         expect.any(Number),
       );
     });
