@@ -25,6 +25,7 @@ import {
   FatalSandboxError,
   GEMINI_DIR,
   homedir,
+  resolveToRealPath,
 } from '@google/gemini-cli-core';
 import { ConsolePatcher } from '../ui/utils/ConsolePatcher.js';
 import { randomBytes } from 'node:crypto';
@@ -242,7 +243,10 @@ export async function start_sandbox(
 
           // Filter out TARGET_DIR
           for (const dir of directories) {
-            const realDir = fs.realpathSync(dir);
+            const realDir = resolveToRealPath(dir);
+            if (!realDir) {
+              continue;
+            }
             if (realDir !== targetDir && realDir !== configTargetDir) {
               if (isSensitiveHostPath(realDir)) {
                 debugLogger.warn(
