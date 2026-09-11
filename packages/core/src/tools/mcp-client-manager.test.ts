@@ -53,7 +53,7 @@ describe('McpClientManager', () => {
         .mockReturnValue({ setResourcesForServer: vi.fn() }),
       getDebugMode: () => false,
       getWorkspaceContext: () => ({ getDirectories: () => [] }),
-      getAllowedMcpServers: vi.fn().mockReturnValue([]),
+      getAllowedMcpServers: vi.fn().mockReturnValue(undefined),
       getBlockedMcpServers: vi.fn().mockReturnValue([]),
       getExcludedMcpServers: vi.fn().mockReturnValue([]),
       getMcpServerCommand: vi.fn().mockReturnValue(''),
@@ -232,7 +232,7 @@ describe('McpClientManager', () => {
     expect(mockedMcpClient.discoverInto).not.toHaveBeenCalled();
   });
 
-  it('should only start allowed servers if allow list is not empty', async () => {
+  it('should only start servers included in the allowlist', async () => {
     mockConfig.getMcpServers.mockReturnValue({
       'test-server': { command: 'node' },
       'another-server': { command: 'node' },
@@ -242,6 +242,45 @@ describe('McpClientManager', () => {
     await manager.startConfiguredMcpServers();
     expect(mockedMcpClient.connect).toHaveBeenCalledOnce();
     expect(mockedMcpClient.discoverInto).toHaveBeenCalledOnce();
+  });
+
+  it('should normalize server names when checking the allowlist', async () => {
+    mockConfig.getMcpServers.mockReturnValue({
+      probe: { command: 'node' },
+    });
+    mockConfig.getAllowedMcpServers.mockReturnValue([' PROBE ']);
+
+    const manager = setupManager(new McpClientManager('0.0.1', mockConfig));
+    await manager.startConfiguredMcpServers();
+
+    expect(mockedMcpClient.connect).toHaveBeenCalledOnce();
+    expect(mockedMcpClient.discoverInto).toHaveBeenCalledOnce();
+  });
+
+  it('should normalize server names when checking the blocklist', async () => {
+    mockConfig.getMcpServers.mockReturnValue({
+      probe: { command: 'node' },
+    });
+    mockConfig.getBlockedMcpServers.mockReturnValue([' probe ']);
+
+    const manager = setupManager(new McpClientManager('0.0.1', mockConfig));
+    await manager.startConfiguredMcpServers();
+
+    expect(mockedMcpClient.connect).not.toHaveBeenCalled();
+    expect(mockedMcpClient.discoverInto).not.toHaveBeenCalled();
+  });
+
+  it('should not start servers when the allowlist is explicitly empty', async () => {
+    mockConfig.getMcpServers.mockReturnValue({
+      probe: { command: 'node' },
+    });
+    mockConfig.getAllowedMcpServers.mockReturnValue([]);
+
+    const manager = setupManager(new McpClientManager('0.0.1', mockConfig));
+    await manager.startConfiguredMcpServers();
+
+    expect(mockedMcpClient.connect).not.toHaveBeenCalled();
+    expect(mockedMcpClient.discoverInto).not.toHaveBeenCalled();
   });
 
   it('should start servers from extensions', async () => {

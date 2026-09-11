@@ -325,6 +325,26 @@ describe('createPolicyEngineConfig', () => {
     expect(rule2?.source).toBe('Settings (Headless MCP Auto-Allow)');
   });
 
+  it('should not auto-allow configured MCP servers with an explicitly empty allowlist', async () => {
+    const config = await createPolicyEngineConfig(
+      {
+        mcp: { autoAllowInHeadless: true, allowed: [] },
+        mcpServers: {
+          'server-1': new MCPServerConfig('node', []),
+          'server-2': new MCPServerConfig('python', []),
+        },
+      },
+      ApprovalMode.DEFAULT,
+      MOCK_DEFAULT_DIR,
+      false, // non-interactive
+    );
+
+    const autoAllowRules = config.rules?.filter(
+      (rule) => rule.source === 'Settings (Headless MCP Auto-Allow)',
+    );
+    expect(autoAllowRules).toHaveLength(0);
+  });
+
   it('should NOT automatically allow configured MCP servers in interactive mode even if opted-in', async () => {
     const config = await createPolicyEngineConfig(
       {

@@ -1027,6 +1027,17 @@ describe('Server Config (config.ts)', () => {
     expect(config.getUserMemory()).toBe('');
   });
 
+  it('preserves an explicitly empty MCP allowlist', () => {
+    const configWithoutAllowlist = new Config(baseParams);
+    const configWithEmptyAllowlist = new Config({
+      ...baseParams,
+      allowedMcpServers: [],
+    });
+
+    expect(configWithoutAllowlist.getAllowedMcpServers()).toBeUndefined();
+    expect(configWithEmptyAllowlist.getAllowedMcpServers()).toEqual([]);
+  });
+
   it('Config constructor should call setGeminiMdFilename with contextFileName if provided', () => {
     const contextFileName = 'CUSTOM_AGENTS.md';
     const paramsWithContextFile: ConfigParameters = {

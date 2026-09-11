@@ -141,6 +141,32 @@ describe('Policy Engine Integration Tests', () => {
       ).toBe(PolicyDecision.ASK_USER);
     });
 
+    it('should normalize MCP server names when matching policy rules', async () => {
+      const settings: Settings = {
+        mcp: {
+          allowed: ['  PROBE  '],
+          excluded: ['  BLOCKED  '],
+        },
+      };
+
+      const config = await createPolicyEngineConfig(
+        settings,
+        ApprovalMode.DEFAULT,
+      );
+      const engine = new PolicyEngine(config);
+
+      // Settings matching is case-insensitive and ignores surrounding whitespace.
+      expect(
+        (await engine.check({ name: 'mcp_probe_tool' }, 'probe')).decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'mcp_probe_tool' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'mcp_blocked_tool' }, 'blocked')).decision,
+      ).toBe(PolicyDecision.DENY);
+    });
+
     it('should handle global MCP wildcard (*) in settings', async () => {
       const settings: Settings = {
         mcp: {

@@ -37,6 +37,17 @@ export const MCP_QUALIFIED_NAME_SEPARATOR = '_';
 export const MCP_TOOL_PREFIX = 'mcp_';
 
 /**
+ * Normalizes an MCP server name for identity comparisons.
+ *
+ * Server names are user-configurable identifiers. Treating case and
+ * surrounding whitespace as significant would make the same server appear
+ * different to the MCP loader and policy engine.
+ */
+export function normalizeMcpServerName(name: string): string {
+  return name.toLowerCase().trim();
+}
+
+/**
  * Returns true if `name` matches the MCP qualified name format: "mcp_server_tool",
  * i.e. starts with the "mcp_" prefix.
  */
