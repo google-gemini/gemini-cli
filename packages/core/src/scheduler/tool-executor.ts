@@ -18,6 +18,7 @@ import {
   type ToolLiveOutput,
 } from '../index.js';
 import { isAbortError } from '../utils/errors.js';
+import { DeadlineTimer } from '../utils/deadlineTimer.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { ToolOutputDistillationService } from '../context/toolDistillationService.js';
@@ -98,6 +99,24 @@ export class ToolExecutor {
 
         let completedToolCall: CompletedToolCall;
 
+        // Apply an optional wall-clock timeout to the tool execution. When it
+        // elapses, the tool's AbortSignal is triggered and the call is reported
+        // as a timeout error so the model can adjust its approach. A value <= 0
+        // disables the timeout.
+        const toolCallTimeoutMs = this.config.getToolCallTimeout();
+        let deadlineTimer: DeadlineTimer | undefined;
+        let effectiveSignal = signal;
+        if (toolCallTimeoutMs > 0) {
+          deadlineTimer = new DeadlineTimer(
+            toolCallTimeoutMs,
+            'Tool call timed out.',
+          );
+          effectiveSignal = AbortSignal.any([signal, deadlineTimer.signal]);
+        }
+        // True only when the timeout (and not the user) aborted execution.
+        const timedOut = () =>
+          deadlineTimer?.signal.aborted === true && !signal.aborted;
+
         try {
           const setExecutionIdCallback = (executionId: number) => {
             const executingCall: ExecutingToolCall = {
@@ -114,7 +133,7 @@ export class ToolExecutor {
           const promise = executeToolWithHooks(
             invocation,
             toolName,
-            signal,
+            effectiveSignal,
             tool,
             liveOutputCallback,
             { shellExecutionConfig, setExecutionIdCallback },
@@ -139,7 +158,12 @@ export class ToolExecutor {
             }
           }
 
-          if (signal.aborted) {
+          if (timedOut()) {
+            completedToolCall = this.createTimeoutResult(
+              call,
+              toolCallTimeoutMs,
+            );
+          } else if (signal.aborted) {
             completedToolCall = await this.createCancelledResult(
               call,
               'User cancelled tool execution.',
@@ -171,7 +195,12 @@ export class ToolExecutor {
             (executionError instanceof Error &&
               executionError.message.includes('Operation cancelled by user'));
 
-          if (signal.aborted || abortedByError) {
+          if (timedOut()) {
+            completedToolCall = this.createTimeoutResult(
+              call,
+              toolCallTimeoutMs,
+            );
+          } else if (signal.aborted || abortedByError) {
             completedToolCall = await this.createCancelledResult(
               call,
               isAbortError(executionError)
@@ -189,6 +218,10 @@ export class ToolExecutor {
               ToolErrorType.UNHANDLED_EXCEPTION,
             );
           }
+        } finally {
+          // Clear any pending timeout so it cannot fire after completion or keep
+          // the event loop alive.
+          deadlineTimer?.abort();
         }
 
         spanMetadata.output = completedToolCall;
@@ -416,6 +449,22 @@ export class ToolExecutor {
       outcome: call.outcome,
       tailToolCallRequest: toolResult.tailToolCallRequest,
     };
+  }
+
+  private createTimeoutResult(
+    call: ToolCall,
+    timeoutMs: number,
+  ): ErroredToolCall {
+    const seconds = timeoutMs / 1000;
+    const message =
+      `Tool execution timed out after ${seconds} second${seconds === 1 ? '' : 's'} ` +
+      `and was aborted (configured via the \`tools.callTimeout\` setting). ` +
+      `Consider breaking the work into smaller steps or increasing the timeout.`;
+    return this.createErrorResult(
+      call,
+      new Error(message),
+      ToolErrorType.TOOL_CALL_TIMEOUT,
+    );
   }
 
   private createErrorResult(

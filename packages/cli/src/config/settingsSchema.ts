@@ -1758,6 +1758,20 @@ const SETTINGS_SCHEMA = {
           'Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation.',
         showInDialog: true,
       },
+      callTimeout: {
+        type: 'number',
+        label: 'Tool Call Timeout',
+        category: 'Tools',
+        requiresRestart: true,
+        default: 0,
+        description: oneLine`
+          Maximum time in seconds that a single tool call may run before it is
+          aborted. Set to 0 (the default) or a negative value to disable.
+          Applies to all tool calls; for shell commands it works alongside
+          tools.shell.inactivityTimeout.
+        `,
+        showInDialog: true,
+      },
       disableLLMCorrection: {
         type: 'boolean',
         label: 'Disable LLM Correction',
