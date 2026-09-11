@@ -88,10 +88,12 @@ export class GitIgnoreParser implements GitIgnoreFilter {
           // Only in nested .gitignore files, the patterns need to be modified according to:
           // - If `a/b/.gitignore` defines `/c` then it needs to be changed to `/a/b/c`
           // - If `a/b/.gitignore` defines `c` then it needs to be changed to `/a/b/**/c`
+          // - If `a/b/.gitignore` defines `c/` then it needs to be changed to `/a/b/**/c/`
           // - If `a/b/.gitignore` defines `c/d` then it needs to be changed to `/a/b/c/d`
 
-          if (!isAnchoredInFile && !p.includes('/')) {
-            // If no slash and not anchored in file, it matches files in any
+          if (!isAnchoredInFile && !p.slice(0, -1).includes('/')) {
+            // If no slash (a trailing one only restricts the match to
+            // directories) and not anchored in file, it matches files in any
             // subdirectory.
             newPattern = path.posix.join('**', p);
           }
