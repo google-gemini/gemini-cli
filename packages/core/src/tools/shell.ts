@@ -929,7 +929,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       if (
         !!result.error ||
         !!result.signal ||
-        (result.exitCode !== undefined && result.exitCode !== 0) ||
+        (result.exitCode !== null && result.exitCode !== 0) ||
         result.aborted
       ) {
         const sandboxDenial =
