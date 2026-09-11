@@ -128,8 +128,10 @@ function safeResolveToRealPath(targetPath: string): string {
             current = path.resolve(path.dirname(current), target);
             continue;
           }
-        } catch {
-          // lstat failed, meaning the file or symlink itself does not exist on disk
+        } catch (lstatErr: unknown) {
+          if (!isRecord(lstatErr) || lstatErr['code'] !== 'ENOENT') {
+            throw lstatErr;
+          }
         }
         parts.push(path.basename(current));
         current = path.dirname(current);
