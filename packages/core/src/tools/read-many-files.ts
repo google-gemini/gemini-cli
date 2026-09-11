@@ -298,16 +298,32 @@ ${finalExclusionPatternsForDescription
             fileType === 'pdf' ||
             fileType === 'audio'
           ) {
-            const fileExtension = path.extname(filePath).toLowerCase();
-            const fileNameWithoutExtension = path.basename(
-              filePath,
-              fileExtension,
+            const rawExtension = path.extname(filePath);
+            const relativePathWithoutExtension = relativePathForDisplay.slice(
+              0,
+              relativePathForDisplay.length - rawExtension.length,
             );
-            const requestedExplicitly = include.some(
-              (pattern: string) =>
-                pattern.toLowerCase().includes(fileExtension) ||
-                pattern.includes(fileNameWithoutExtension),
-            );
+            const requestedExplicitly = include.some((pattern: string) => {
+              const normalizedPattern = pattern.replace(/\\/g, '/');
+              const cleanPattern = normalizedPattern.replace(
+                /\/(\*\*|\*)$/,
+                '',
+              );
+              if (/^[*/]*$/.test(cleanPattern)) {
+                return false;
+              }
+              const escaped = cleanPattern
+                .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+                .replace(/\*\*/g, 'TEMP_DOUBLE_STAR')
+                .replace(/\*/g, '[^/]*')
+                .replace(/\?/g, '[^/]')
+                .replace(/TEMP_DOUBLE_STAR/g, '.*');
+              const regex = new RegExp('^' + escaped + '$', 'i');
+              return (
+                regex.test(relativePathForDisplay) ||
+                regex.test(relativePathWithoutExtension)
+              );
+            });
 
             if (!requestedExplicitly) {
               return {
