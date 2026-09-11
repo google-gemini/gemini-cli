@@ -306,6 +306,105 @@ describe('github.ts', () => {
         ExtensionUpdateState.UPDATE_AVAILABLE,
       );
     });
+
+    it('sets non-interactive environment variables on git instance', async () => {
+      mockGit.getRemotes.mockResolvedValue([
+        { name: 'origin', refs: { fetch: 'https://example.com/repo.git' } },
+      ]);
+      mockGit.listRemote.mockResolvedValue('hash123\tHEAD');
+      mockGit.revparse.mockResolvedValue('hash123');
+
+      const extension = {
+        name: 'test-ext',
+        path: '/path/to/ext',
+        installMetadata: {
+          type: 'git',
+          source: 'https://example.com/repo.git',
+        },
+        version: '1.0.0',
+        config: { name: 'test-ext', version: '1.0.0' },
+      } as unknown as GeminiCLIExtension;
+
+      const state = await checkForExtensionUpdate(
+        extension,
+        mockExtensionManager,
+      );
+
+      expect(mockGit.env).toHaveBeenCalledWith(
+        expect.objectContaining({
+          GIT_TERMINAL_PROMPT: '0',
+          GIT_SSH_COMMAND: expect.stringContaining('BatchMode=yes'),
+        }),
+      );
+      expect(state).toBe(ExtensionUpdateState.UP_TO_DATE);
+    });
+
+    it('gracefully handles terminal prompt suppression error without throwing', async () => {
+      mockGit.getRemotes.mockResolvedValue([
+        {
+          name: 'origin',
+          refs: { fetch: 'https://example.com/private-repo.git' },
+        },
+      ]);
+      mockGit.listRemote.mockRejectedValue(
+        new Error('fatal: could not read Username: terminal prompts disabled'),
+      );
+
+      const extension = {
+        name: 'private-ext',
+        path: '/path/to/ext',
+        installMetadata: {
+          type: 'git',
+          source: 'https://example.com/private-repo.git',
+        },
+        version: '1.0.0',
+        config: { name: 'private-ext', version: '1.0.0' },
+      } as unknown as GeminiCLIExtension;
+
+      const state = await checkForExtensionUpdate(
+        extension,
+        mockExtensionManager,
+      );
+
+      expect(state).toBe(ExtensionUpdateState.ERROR);
+    });
+
+    it('should clear the timeout timer when git.listRemote resolves', async () => {
+      const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
+      mockGit.getRemotes.mockResolvedValue([
+        { name: 'origin', refs: { fetch: 'url' } },
+      ]);
+      mockGit.listRemote.mockResolvedValue('hash\tHEAD');
+      mockGit.revparse.mockResolvedValue('hash');
+
+      const ext = {
+        path: '/path',
+        installMetadata: { type: 'git', source: 'url' },
+      } as unknown as GeminiCLIExtension;
+
+      await checkForExtensionUpdate(ext, mockExtensionManager);
+
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+      clearTimeoutSpy.mockRestore();
+    });
+
+    it('should clear the timeout timer when git.listRemote rejects', async () => {
+      const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
+      mockGit.getRemotes.mockResolvedValue([
+        { name: 'origin', refs: { fetch: 'url' } },
+      ]);
+      mockGit.listRemote.mockRejectedValue(new Error('git error'));
+
+      const ext = {
+        path: '/path',
+        installMetadata: { type: 'git', source: 'url' },
+      } as unknown as GeminiCLIExtension;
+
+      await checkForExtensionUpdate(ext, mockExtensionManager);
+
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+      clearTimeoutSpy.mockRestore();
+    });
   });
 
   describe('downloadFromGitHubRelease', () => {
