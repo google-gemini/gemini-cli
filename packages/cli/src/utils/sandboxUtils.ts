@@ -123,7 +123,7 @@ function safeResolveToRealPath(targetPath: string): string {
       if (isRecord(err) && err['code'] === 'ENOENT') {
         try {
           const stat = fs.lstatSync(current);
-          if (stat.isSymbolicLink()) {
+          if (stat?.isSymbolicLink?.()) {
             const target = fs.readlinkSync(current);
             current = path.resolve(path.dirname(current), target);
             continue;

@@ -1198,8 +1198,11 @@ describe('sandbox', () => {
           return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
         });
 
+        const targetWorkdir = path.resolve('/home/user');
         await expect(start_sandbox(config)).rejects.toThrow(
-          "Running sandbox from a sensitive host directory '/home/user' is strictly prohibited",
+          new RegExp(
+            `Running sandbox from a sensitive host directory '${targetWorkdir.replace(/\\/g, '\\\\')}' is strictly prohibited`,
+          ),
         );
       } finally {
         cwdSpy.mockRestore();
@@ -1211,8 +1214,9 @@ describe('sandbox', () => {
         command: 'docker',
         image: 'gemini-cli-sandbox',
       });
+      const targetDir = path.resolve('/home/user/.gemini');
       const mockCliConfig = {
-        getTargetDir: vi.fn().mockReturnValue('/home/user/.gemini'),
+        getTargetDir: vi.fn().mockReturnValue(targetDir),
         getDebugMode: vi.fn().mockReturnValue(false),
       } as unknown as Config;
 
@@ -1230,7 +1234,9 @@ describe('sandbox', () => {
       });
 
       await expect(start_sandbox(config, [], mockCliConfig)).rejects.toThrow(
-        "Running sandbox from a sensitive host directory '/home/user/.gemini' is strictly prohibited",
+        new RegExp(
+          `Running sandbox from a sensitive host directory '${targetDir.replace(/\\/g, '\\\\')}' is strictly prohibited`,
+        ),
       );
     });
 
@@ -1240,11 +1246,14 @@ describe('sandbox', () => {
         command: 'sandbox-exec',
         image: 'some-image',
       });
-      const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue('/home/user');
+      const targetDir = path.resolve('/home/user');
+      const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(targetDir);
 
       try {
         await expect(start_sandbox(config)).rejects.toThrow(
-          "Running sandbox from a sensitive host directory '/home/user' is strictly prohibited",
+          new RegExp(
+            `Running sandbox from a sensitive host directory '${targetDir.replace(/\\/g, '\\\\')}' is strictly prohibited`,
+          ),
         );
       } finally {
         cwdSpy.mockRestore();
@@ -1256,11 +1265,14 @@ describe('sandbox', () => {
         command: 'lxc',
         image: 'gemini-sandbox',
       });
-      const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue('/home/user');
+      const targetDir = path.resolve('/home/user');
+      const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(targetDir);
 
       try {
         await expect(start_sandbox(config)).rejects.toThrow(
-          "Running sandbox from a sensitive host directory '/home/user' is strictly prohibited",
+          new RegExp(
+            `Running sandbox from a sensitive host directory '${targetDir.replace(/\\/g, '\\\\')}' is strictly prohibited`,
+          ),
         );
       } finally {
         cwdSpy.mockRestore();

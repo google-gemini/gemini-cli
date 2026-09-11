@@ -42,14 +42,19 @@ describe('sandboxUtils', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env = { ...originalEnv };
+    vi.mocked(os.platform).mockReturnValue(process.platform);
     vi.mocked(os.tmpdir).mockReturnValue('/tmp');
     vi.mocked(homedir).mockImplementation(() => os.homedir());
     vi.mocked(resolveToRealPath).mockImplementation((p: string) =>
       path.resolve(p),
     );
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.lstatSync).mockReset();
+    vi.mocked(fs.readlinkSync).mockReset();
     // Clean up these env vars that might affect tests
     delete process.env['NODE_ENV'];
     delete process.env['DEBUG'];
+    delete process.env['GEMINI_CLI_HOME'];
   });
 
   afterEach(() => {
@@ -342,33 +347,41 @@ describe('sandboxUtils', () => {
     });
 
     it('should resolve non-existent paths cleanly via resolveToRealPath', () => {
-      vi.mocked(os.homedir).mockReturnValue('/home/testuser');
+      const homeDir = path.resolve('/home/testuser');
+      const safeDir = path.resolve('/workspace/safe-path');
+      vi.mocked(os.homedir).mockReturnValue(homeDir);
       vi.mocked(resolveToRealPath).mockImplementation((p: string) =>
         path.resolve(p),
       );
 
       expect(
-        isSensitiveHostPath('/home/testuser/.gemini/non-existent-sub'),
+        isSensitiveHostPath(path.join(homeDir, '.gemini', 'non-existent-sub')),
       ).toBe(true);
-      expect(isSensitiveHostPath('/workspace/safe-path/non-existent-sub')).toBe(
+      expect(isSensitiveHostPath(path.join(safeDir, 'non-existent-sub'))).toBe(
         false,
       );
     });
 
     it('should fall back to path.resolve when resolveToRealPath encounters ENOENT', () => {
-      vi.mocked(os.homedir).mockReturnValue('/home/testuser');
+      const homeDir = path.resolve('/home/testuser');
+      const safeDir = path.resolve('/workspace/safe-path');
+      vi.mocked(os.homedir).mockReturnValue(homeDir);
       vi.mocked(resolveToRealPath).mockImplementation((p: string) => {
-        const err = new Error(
-          `ENOENT: no such file or directory, realpath '${p}'`,
-        );
-        (err as NodeJS.ErrnoException).code = 'ENOENT';
-        throw err;
+        const resolvedP = path.resolve(p);
+        if (resolvedP.includes('non-existent')) {
+          const err = new Error(
+            `ENOENT: no such file or directory, realpath '${p}'`,
+          );
+          (err as NodeJS.ErrnoException).code = 'ENOENT';
+          throw err;
+        }
+        return resolvedP;
       });
 
       expect(
-        isSensitiveHostPath('/home/testuser/.gemini/non-existent-sub'),
+        isSensitiveHostPath(path.join(homeDir, '.gemini', 'non-existent-sub')),
       ).toBe(true);
-      expect(isSensitiveHostPath('/workspace/safe-path/non-existent-sub')).toBe(
+      expect(isSensitiveHostPath(path.join(safeDir, 'non-existent-sub'))).toBe(
         false,
       );
     });
