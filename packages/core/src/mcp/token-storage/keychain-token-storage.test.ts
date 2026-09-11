@@ -127,11 +127,11 @@ describe('KeychainTokenStorage', () => {
       expect(emitFeedbackSpy).toHaveBeenCalled();
     });
 
-    it('should aggregate errors in clearAll', async () => {
+    it('should aggregate system errors in clearAll', async () => {
       storageState.set('s1', '...');
       storageState.set('s2', '...');
 
-      // Aggregating a system error (rejection)
+      // Aggregating a system error (rejection) — these should still propagate
       vi.spyOn(KeychainService.prototype, 'deletePassword')
         .mockResolvedValueOnce(true)
         .mockRejectedValueOnce(new Error('system fail'));
@@ -140,14 +140,28 @@ describe('KeychainTokenStorage', () => {
         /Failed to clear some credentials: system fail/,
       );
 
-      // Aggregating a 'not found' error (returns false)
+      // When deletePassword returns false (not found), deleteCredentials treats
+      // it as a no-op — clearAll should succeed without throwing.
       vi.spyOn(KeychainService.prototype, 'deletePassword')
         .mockResolvedValueOnce(true)
         .mockResolvedValueOnce(false);
 
-      await expect(storage.clearAll()).rejects.toThrow(
-        /Failed to clear some credentials: No credentials found/,
-      );
+      await expect(storage.clearAll()).resolves.toBeUndefined();
+    });
+
+    it('deleteCredentials should be a no-op when credential does not exist', async () => {
+      // No credential stored — should resolve without throwing
+      await expect(
+        storage.deleteCredentials('non-existent-server'),
+      ).resolves.toBeUndefined();
+    });
+
+    it('deleteCredentials should successfully remove an existing credential', async () => {
+      await storage.setCredentials(validCredentials);
+      expect(await storage.getCredentials('test-server')).not.toBeNull();
+
+      await storage.deleteCredentials('test-server');
+      expect(await storage.getCredentials('test-server')).toBeNull();
     });
 
     it('should manage secrets with prefix independently', async () => {

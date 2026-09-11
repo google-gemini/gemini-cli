@@ -800,7 +800,35 @@ async function cacheCredentials(credentials: Credentials) {
   const filePath = Storage.getOAuthCredsPath();
   await fs.mkdir(path.dirname(filePath), { recursive: true });
 
-  const credString = JSON.stringify(credentials, null, 2);
+  // Preserve the existing refresh_token when Google's token rotation event
+  // only sends a new access_token (no refresh_token in the payload).
+  let existingRefreshToken: string | undefined;
+  try {
+    const existingStr = await fs.readFile(filePath, 'utf-8');
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const existing = JSON.parse(existingStr);
+     
+    const rawToken: unknown = existing?.refresh_token;
+    // Only use the stored value if it is actually a non-empty string.
+    if (typeof rawToken === 'string' && rawToken.length > 0) {
+      existingRefreshToken = rawToken;
+    }
+  } catch (e) {
+    // Only suppress ENOENT (file doesn't exist yet). All other I/O errors
+    // (EACCES, EMFILE, disk failures, etc.) should still propagate.
+    if (
+      !(e instanceof Error && (e as NodeJS.ErrnoException).code === 'ENOENT')
+    ) {
+      throw e;
+    }
+  }
+
+  const mergedCredentials: Credentials = {
+    ...credentials,
+    refresh_token: credentials.refresh_token ?? existingRefreshToken,
+  };
+
+  const credString = JSON.stringify(mergedCredentials, null, 2);
   await fs.writeFile(filePath, credString, { mode: 0o600 });
   try {
     await fs.chmod(filePath, 0o600);
