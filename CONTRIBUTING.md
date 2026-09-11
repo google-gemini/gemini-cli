@@ -102,12 +102,26 @@ tool to augment, not replace, their manual review process.
 
 ### Self-assigning and unassigning issues
 
-To assign an issue to yourself, simply add a comment with the text `/assign`. To
-unassign yourself from an issue, add a comment with the text `/unassign`.
+We encourage contributors to self-assign issues they are working on to avoid
+duplicate effort. There are two ways to do this:
 
-The comment must contain only that text and nothing else. These commands will
-assign or unassign the issue as requested, provided the conditions are met
-(e.g., an issue must be unassigned to be assigned).
+1.  **Express interest when creating an issue:** One of the best ways to land
+    contributions is to identify issues from using Gemini CLI or exploring the
+    codebase! When filling out a bug report or feature request template, you can
+    check the box: **"I want to contribute to this issue if it is approved."**
+    If a maintainer approves the issue and adds the `help wanted` label, the
+    Gemini bot will automatically assign the issue to you, provided you haven't
+    reached your 3-issue limit.
+2.  **Using the `/assign` command:** You can also assign any issue marked with
+    the `help wanted` label to yourself by adding a comment with the text
+    `/assign`.
+
+To unassign yourself from an issue, add a comment with the text `/unassign`.
+
+The comment for these commands must contain only that text and nothing else.
+These commands will assign or unassign the issue as requested, provided the
+conditions are met (e.g., the issue must be unassigned to be assigned, and must
+have the `help wanted` label).
 
 Please note that you can have a maximum of 3 issues assigned to you at any given
 time and that only
@@ -135,7 +149,13 @@ workflow starts with an issue that has been reviewed and approved by a
 maintainer. Please **open the issue first** and wait for feedback before you
 start coding.
 
-#### 2. Keep it small and focused
+#### 2. Watch out for existing PRs and ongoing discussions
+
+Before opening a pull request, you should take a peak at any existing
+discussions in the linked issue. There may be someone else already assigned,
+existing PRs, or an ongoing discussion that you may consider joining.
+
+#### 3. Keep it small and focused
 
 We favor small, atomic PRs that address a single issue or add a single,
 self-contained feature.
@@ -147,19 +167,19 @@ self-contained feature.
 Large changes should be broken down into a series of smaller, logical PRs that
 can be reviewed and merged independently.
 
-#### 3. Use draft PRs for work in progress
+#### 4. Use draft PRs for work in progress
 
 If you'd like to get early feedback on your work, please use GitHub's **Draft
 Pull Request** feature. This signals to the maintainers that the PR is not yet
 ready for a formal review but is open for discussion and initial feedback.
 
-#### 4. Ensure all checks pass
+#### 5. Ensure all checks pass
 
 Before submitting your PR, ensure that all automated checks are passing by
 running `npm run preflight`. This command runs all tests, linting, and other
 style checks.
 
-#### 5. Update documentation
+#### 6. Update documentation
 
 If your PR introduces a user-facing change (e.g., a new command, a modified
 flag, or a change in behavior), you must also update the relevant documentation
@@ -168,7 +188,7 @@ in the `/docs` directory.
 See more about writing documentation:
 [Documentation contribution process](#documentation-contribution-process).
 
-#### 6. Write clear commit messages and a good PR description
+#### 7. Write clear commit messages and a good PR description
 
 Your PR should have a clear, descriptive title and a detailed description of the
 changes. Follow the [Conventional Commits](https://www.conventionalcommits.org/)
