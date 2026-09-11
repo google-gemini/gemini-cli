@@ -90,7 +90,6 @@ export class Storage {
    * Returns the directory for global runtime state (temp files, chat history, etc.).
    */
   static getGlobalRuntimeDir(): string {
-    let runtimeDir: string;
     // Under macOS Seatbelt (sandbox-exec), writing to the user's home .gemini
     // directory is blocked by the seatbelt profile. Route runtime state to a
     // dedicated subdirectory within the permitted persistent cache directory
@@ -98,27 +97,27 @@ export class Storage {
     if (process.env['SANDBOX'] === 'sandbox-exec') {
       const homeDir = homedir();
       if (homeDir) {
-        runtimeDir = path.join(homeDir, '.cache', GEMINI_DIR);
-      } else {
-        runtimeDir = Storage.getGlobalGeminiDir();
+        return path.join(homeDir, '.cache', GEMINI_DIR);
       }
-
-      // Ensure the runtime directory exists recursively to prevent ENOENT failures on initial write
-      try {
-        if (!fs.existsSync(runtimeDir)) {
-          fs.mkdirSync(runtimeDir, { recursive: true });
-        }
-      } catch {
-        // Silently ignore directory creation failures (e.g., read-only filesystems or permission denials)
-      }
-
-      return runtimeDir;
     }
 
     // When running in a sandbox, the container launcher mounts an ephemeral
     // directory at the global gemini directory location (/home/node/.gemini).
     // For non-sandbox mode, runtime state and global config share the same path.
     return Storage.getGlobalGeminiDir();
+  }
+
+  /**
+   * Asynchronously ensures the global runtime directory exists.
+   */
+  static async ensureGlobalRuntimeDirExists(): Promise<string> {
+    const runtimeDir = Storage.getGlobalRuntimeDir();
+    try {
+      await fs.promises.mkdir(runtimeDir, { recursive: true });
+    } catch {
+      // Silently ignore directory creation failures (e.g., read-only filesystems or permission denials)
+    }
+    return runtimeDir;
   }
 
   static getInstallationIdPath(): string {
@@ -284,6 +283,8 @@ export class Storage {
       if (this.projectIdentifier) {
         return;
       }
+
+      await Storage.ensureGlobalRuntimeDirExists();
 
       const registryPath = path.join(
         Storage.getGlobalRuntimeDir(),

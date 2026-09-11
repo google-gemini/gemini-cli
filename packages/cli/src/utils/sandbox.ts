@@ -195,6 +195,16 @@ export async function start_sandbox(
         }
         sandboxTmpDir = resolvedTmpDir;
 
+        const userHome = homedir();
+        if (userHome) {
+          const seatbeltCacheDir = path.join(userHome, '.cache', GEMINI_DIR);
+          try {
+            fs.mkdirSync(seatbeltCacheDir, { recursive: true });
+          } catch {
+            // Silently ignore directory creation failures
+          }
+        }
+
         const args = [
           '-D',
           `TARGET_DIR=${fs.realpathSync(process.cwd())}`,

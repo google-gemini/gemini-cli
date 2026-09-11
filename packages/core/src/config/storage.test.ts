@@ -543,33 +543,48 @@ describe('Storage - System Paths', () => {
       vi.mocked(homedir).mockReturnValue(os.homedir());
     });
 
-    it('creates runtime directory recursively if it does not exist', () => {
+    it('asynchronously creates runtime directory recursively in ensureGlobalRuntimeDirExists', async () => {
       vi.stubEnv('SANDBOX', 'sandbox-exec');
       const expectedDir = path.join(os.homedir(), '.cache', GEMINI_DIR);
-      vi.mocked(fs.mkdirSync).mockClear();
+      const mkdirSpy = vi
+        .spyOn(fs.promises, 'mkdir')
+        .mockResolvedValue(undefined);
 
-      const existsSpy = vi.spyOn(fs, 'existsSync').mockReturnValueOnce(false);
+      const result = await Storage.ensureGlobalRuntimeDirExists();
+
+      expect(result).toBe(expectedDir);
+      expect(mkdirSpy).toHaveBeenCalledWith(expectedDir, {
+        recursive: true,
+      });
+      mkdirSpy.mockRestore();
+    });
+
+    it('silently ignores directory creation errors in ensureGlobalRuntimeDirExists', async () => {
+      vi.stubEnv('SANDBOX', 'sandbox-exec');
+      const expectedDir = path.join(os.homedir(), '.cache', GEMINI_DIR);
+      const mkdirSpy = vi
+        .spyOn(fs.promises, 'mkdir')
+        .mockRejectedValue(new Error('EACCES: permission denied'));
+
+      await expect(Storage.ensureGlobalRuntimeDirExists()).resolves.toBe(
+        expectedDir,
+      );
+      mkdirSpy.mockRestore();
+    });
+
+    it('does not perform synchronous filesystem operations in getGlobalRuntimeDir', () => {
+      vi.stubEnv('SANDBOX', 'sandbox-exec');
+      const expectedDir = path.join(os.homedir(), '.cache', GEMINI_DIR);
+      const existsSyncSpy = vi.spyOn(fs, 'existsSync');
+      const mkdirSyncSpy = vi.spyOn(fs, 'mkdirSync');
 
       const result = Storage.getGlobalRuntimeDir();
 
       expect(result).toBe(expectedDir);
-      expect(fs.mkdirSync).toHaveBeenCalledWith(expectedDir, {
-        recursive: true,
-      });
-      existsSpy.mockRestore();
-    });
-
-    it('silently ignores directory creation errors in getGlobalRuntimeDir', () => {
-      vi.stubEnv('SANDBOX', 'sandbox-exec');
-      const expectedDir = path.join(os.homedir(), '.cache', GEMINI_DIR);
-      const existsSpy = vi.spyOn(fs, 'existsSync').mockReturnValueOnce(false);
-      vi.mocked(fs.mkdirSync).mockImplementationOnce(() => {
-        throw new Error('EACCES: permission denied');
-      });
-
-      expect(() => Storage.getGlobalRuntimeDir()).not.toThrow();
-      expect(Storage.getGlobalRuntimeDir()).toBe(expectedDir);
-      existsSpy.mockRestore();
+      expect(existsSyncSpy).not.toHaveBeenCalled();
+      expect(mkdirSyncSpy).not.toHaveBeenCalled();
+      existsSyncSpy.mockRestore();
+      mkdirSyncSpy.mockRestore();
     });
   });
 
