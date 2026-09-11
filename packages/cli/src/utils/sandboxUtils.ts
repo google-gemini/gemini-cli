@@ -109,10 +109,12 @@ function safeResolveToRealPath(targetPath: string): string {
   const visited = new Set<string>();
 
   while (current && current !== path.dirname(current)) {
-    if (visited.has(current)) {
+    const visitKey =
+      os.platform() === 'win32' ? current.toLowerCase() : current;
+    if (visited.has(visitKey)) {
       throw new Error('Circular symlink detected');
     }
-    visited.add(current);
+    visited.add(visitKey);
 
     try {
       const real = resolveToRealPath(current);

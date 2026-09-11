@@ -303,19 +303,32 @@ describe('sandboxUtils', () => {
     });
 
     it('should resolve symlinks to detect sensitive targets', () => {
-      vi.mocked(os.homedir).mockReturnValue('/home/testuser');
+      const homeDir = path.resolve('/home/testuser');
+      const symlinkGemini = path.resolve('/var/symlink_to_gemini');
+      const symlinkHome = path.resolve('/var/symlink_to_home');
+
+      vi.mocked(os.homedir).mockReturnValue(homeDir);
       vi.mocked(resolveToRealPath).mockImplementation((p: string) => {
-        if (p === '/var/symlink_to_gemini') {
-          return '/home/testuser/.gemini';
+        const resolvedP = path.resolve(p);
+        if (
+          resolvedP === symlinkGemini ||
+          (os.platform() === 'win32' &&
+            resolvedP.toLowerCase() === symlinkGemini.toLowerCase())
+        ) {
+          return path.join(homeDir, '.gemini');
         }
-        if (p === '/var/symlink_to_home') {
-          return '/home/testuser';
+        if (
+          resolvedP === symlinkHome ||
+          (os.platform() === 'win32' &&
+            resolvedP.toLowerCase() === symlinkHome.toLowerCase())
+        ) {
+          return homeDir;
         }
-        return path.resolve(p);
+        return resolvedP;
       });
 
-      expect(isSensitiveHostPath('/var/symlink_to_gemini')).toBe(true);
-      expect(isSensitiveHostPath('/var/symlink_to_home')).toBe(true);
+      expect(isSensitiveHostPath(symlinkGemini)).toBe(true);
+      expect(isSensitiveHostPath(symlinkHome)).toBe(true);
     });
 
     it('should fail closed when resolveToRealPath encounters an error', () => {
@@ -361,10 +374,23 @@ describe('sandboxUtils', () => {
     });
 
     it('should detect broken symlinks pointing into ~/.gemini as sensitive', () => {
-      vi.mocked(os.homedir).mockReturnValue('/home/testuser');
+      const homeDir = path.resolve('/home/testuser');
+      const brokenSymlink = path.resolve('/workspace/broken_symlink');
+      const targetFile = path.join(homeDir, '.gemini', 'trusted_hooks.json');
+
+      vi.mocked(os.homedir).mockReturnValue(homeDir);
+
+      const matchesBroken = (p: string) => {
+        const resolvedP = path.resolve(p);
+        return (
+          resolvedP === brokenSymlink ||
+          (os.platform() === 'win32' &&
+            resolvedP.toLowerCase() === brokenSymlink.toLowerCase())
+        );
+      };
 
       vi.mocked(resolveToRealPath).mockImplementation((p: string) => {
-        if (p === '/workspace/broken_symlink') {
+        if (matchesBroken(p)) {
           const err = new Error('ENOENT: no such file or directory');
           (err as NodeJS.ErrnoException).code = 'ENOENT';
           throw err;
@@ -373,7 +399,7 @@ describe('sandboxUtils', () => {
       });
 
       vi.mocked(fs.lstatSync).mockImplementation((p: fs.PathLike) => {
-        if (p === '/workspace/broken_symlink') {
+        if (matchesBroken(String(p))) {
           return {
             isSymbolicLink: () => true,
           } as fs.Stats;
@@ -384,20 +410,33 @@ describe('sandboxUtils', () => {
       });
 
       vi.mocked(fs.readlinkSync).mockImplementation((p: fs.PathLike) => {
-        if (p === '/workspace/broken_symlink') {
-          return '/home/testuser/.gemini/trusted_hooks.json';
+        if (matchesBroken(String(p))) {
+          return targetFile;
         }
         throw new Error('EINVAL: not a symlink');
       });
 
-      expect(isSensitiveHostPath('/workspace/broken_symlink')).toBe(true);
+      expect(isSensitiveHostPath(brokenSymlink)).toBe(true);
     });
 
     it('should fail closed and block mounts when circular symlinks are encountered', () => {
-      vi.mocked(os.homedir).mockReturnValue('/home/testuser');
+      const homeDir = path.resolve('/home/testuser');
+      const circ1 = path.resolve('/workspace/circ1');
+      const circ2 = path.resolve('/workspace/circ2');
+
+      vi.mocked(os.homedir).mockReturnValue(homeDir);
+
+      const matchesCirc = (p: string, target: string) => {
+        const resolvedP = path.resolve(p);
+        return (
+          resolvedP === target ||
+          (os.platform() === 'win32' &&
+            resolvedP.toLowerCase() === target.toLowerCase())
+        );
+      };
 
       vi.mocked(resolveToRealPath).mockImplementation((p: string) => {
-        if (p === '/workspace/circ1' || p === '/workspace/circ2') {
+        if (matchesCirc(p, circ1) || matchesCirc(p, circ2)) {
           const err = new Error('ENOENT: no such file or directory');
           (err as NodeJS.ErrnoException).code = 'ENOENT';
           throw err;
@@ -406,7 +445,8 @@ describe('sandboxUtils', () => {
       });
 
       vi.mocked(fs.lstatSync).mockImplementation((p: fs.PathLike) => {
-        if (p === '/workspace/circ1' || p === '/workspace/circ2') {
+        const strP = String(p);
+        if (matchesCirc(strP, circ1) || matchesCirc(strP, circ2)) {
           return {
             isSymbolicLink: () => true,
           } as fs.Stats;
@@ -417,16 +457,17 @@ describe('sandboxUtils', () => {
       });
 
       vi.mocked(fs.readlinkSync).mockImplementation((p: fs.PathLike) => {
-        if (p === '/workspace/circ1') {
-          return '/workspace/circ2';
+        const strP = String(p);
+        if (matchesCirc(strP, circ1)) {
+          return circ2;
         }
-        if (p === '/workspace/circ2') {
-          return '/workspace/circ1';
+        if (matchesCirc(strP, circ2)) {
+          return circ1;
         }
         throw new Error('EINVAL: not a symlink');
       });
 
-      expect(isSensitiveHostPath('/workspace/circ1')).toBe(true);
+      expect(isSensitiveHostPath(circ1)).toBe(true);
     });
 
     it('should handle empty or undetermined homedir without blocking working directory', () => {
