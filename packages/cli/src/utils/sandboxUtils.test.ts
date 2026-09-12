@@ -6,14 +6,18 @@
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import os from 'node:os';
+import path from 'node:path';
 import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { resolveToRealPath, homedir } from '@google/gemini-cli-core';
 import {
   getContainerPath,
   parseImageName,
   ports,
   entrypoint,
   shouldUseCurrentUserInSandbox,
+  isSensitiveHostPath,
+  sanitizeSettingsForSandbox,
   isCredentialOrSensitivePath,
   prepareIsolatedSettingsDir,
   SENSITIVE_SETTINGS_FILENAMES,
@@ -28,6 +32,8 @@ vi.mock('@google/gemini-cli-core', () => ({
     warn: vi.fn(),
   },
   GEMINI_DIR: '.gemini',
+  homedir: vi.fn(() => os.homedir()),
+  resolveToRealPath: vi.fn((p: string) => path.resolve(p)),
 }));
 
 describe('sandboxUtils', () => {
@@ -36,10 +42,19 @@ describe('sandboxUtils', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env = { ...originalEnv };
+    vi.mocked(os.platform).mockReturnValue(process.platform);
     vi.mocked(os.tmpdir).mockReturnValue('/tmp');
+    vi.mocked(homedir).mockImplementation(() => os.homedir());
+    vi.mocked(resolveToRealPath).mockImplementation((p: string) =>
+      path.resolve(p),
+    );
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.lstatSync).mockReset();
+    vi.mocked(fs.readlinkSync).mockReset();
     // Clean up these env vars that might affect tests
     delete process.env['NODE_ENV'];
     delete process.env['DEBUG'];
+    delete process.env['GEMINI_CLI_HOME'];
   });
 
   afterEach(() => {
@@ -243,6 +258,312 @@ describe('sandboxUtils', () => {
     });
   });
 
+  describe('isSensitiveHostPath', () => {
+    beforeEach(() => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+    });
+
+    it('should detect ~/.gemini directory path', () => {
+      vi.mocked(os.homedir).mockReturnValue('/home/testuser');
+      expect(isSensitiveHostPath('/home/testuser/.gemini')).toBe(true);
+      expect(isSensitiveHostPath('/home/testuser/.gemini/settings.json')).toBe(
+        true,
+      );
+      expect(isSensitiveHostPath('~/.gemini')).toBe(true);
+    });
+
+    it('should detect user home directory and its parent directories', () => {
+      vi.mocked(os.homedir).mockReturnValue('/home/testuser');
+      expect(isSensitiveHostPath('/home/testuser')).toBe(true);
+      expect(isSensitiveHostPath('~')).toBe(true);
+      expect(isSensitiveHostPath('/home')).toBe(true);
+      expect(isSensitiveHostPath('/')).toBe(true);
+    });
+
+    it('should detect sensitive credential files', () => {
+      expect(isSensitiveHostPath('/any/path/oauth_creds.json')).toBe(true);
+      expect(isSensitiveHostPath('/any/path/gemini-credentials.json')).toBe(
+        true,
+      );
+      expect(isSensitiveHostPath('/any/path/mcp-oauth-tokens.json')).toBe(true);
+      expect(isSensitiveHostPath('/any/path/a2a-oauth-tokens.json')).toBe(true);
+      expect(isSensitiveHostPath('/any/path/google_accounts.json')).toBe(true);
+      expect(isSensitiveHostPath('/any/path/trusted_hooks.json')).toBe(true);
+      expect(isSensitiveHostPath('/any/path/trustedFolders.json')).toBe(true);
+      expect(isSensitiveHostPath('/any/path/trustedfolders.json')).toBe(true);
+      expect(isSensitiveHostPath('/any/path/policy_integrity.json')).toBe(true);
+    });
+
+    it('should detect environment files (.env)', () => {
+      expect(isSensitiveHostPath('/project/.env')).toBe(true);
+      expect(isSensitiveHostPath('/project/.env.local')).toBe(true);
+      expect(isSensitiveHostPath('/project/.env.production')).toBe(true);
+    });
+
+    it('should allow non-sensitive workspace and project paths', () => {
+      vi.mocked(os.homedir).mockReturnValue('/home/testuser');
+      expect(isSensitiveHostPath('/home/testuser/project')).toBe(false);
+      expect(isSensitiveHostPath('/workspace/app')).toBe(false);
+      expect(isSensitiveHostPath('/tmp/test-dir')).toBe(false);
+    });
+
+    it('should resolve symlinks to detect sensitive targets', () => {
+      const homeDir = path.resolve('/home/testuser');
+      const symlinkGemini = path.resolve('/var/symlink_to_gemini');
+      const symlinkHome = path.resolve('/var/symlink_to_home');
+
+      vi.mocked(os.homedir).mockReturnValue(homeDir);
+      vi.mocked(resolveToRealPath).mockImplementation((p: string) => {
+        const resolvedP = path.resolve(p);
+        if (
+          resolvedP === symlinkGemini ||
+          (os.platform() === 'win32' &&
+            resolvedP.toLowerCase() === symlinkGemini.toLowerCase())
+        ) {
+          return path.join(homeDir, '.gemini');
+        }
+        if (
+          resolvedP === symlinkHome ||
+          (os.platform() === 'win32' &&
+            resolvedP.toLowerCase() === symlinkHome.toLowerCase())
+        ) {
+          return homeDir;
+        }
+        return resolvedP;
+      });
+
+      expect(isSensitiveHostPath(symlinkGemini)).toBe(true);
+      expect(isSensitiveHostPath(symlinkHome)).toBe(true);
+    });
+
+    it('should fail closed when resolveToRealPath encounters an error', () => {
+      vi.mocked(os.homedir).mockReturnValue('/home/testuser');
+      vi.mocked(resolveToRealPath).mockImplementation(() => {
+        throw new Error('Unrecoverable resolution error');
+      });
+
+      expect(isSensitiveHostPath('/home/testuser/.gemini')).toBe(true);
+      expect(isSensitiveHostPath('/workspace/safe-path')).toBe(true);
+    });
+
+    it('should resolve non-existent paths cleanly via resolveToRealPath', () => {
+      const homeDir = path.resolve('/home/testuser');
+      const safeDir = path.resolve('/workspace/safe-path');
+      vi.mocked(os.homedir).mockReturnValue(homeDir);
+      vi.mocked(resolveToRealPath).mockImplementation((p: string) =>
+        path.resolve(p),
+      );
+
+      expect(
+        isSensitiveHostPath(path.join(homeDir, '.gemini', 'non-existent-sub')),
+      ).toBe(true);
+      expect(isSensitiveHostPath(path.join(safeDir, 'non-existent-sub'))).toBe(
+        false,
+      );
+    });
+
+    it('should fall back to path.resolve when resolveToRealPath encounters ENOENT', () => {
+      const homeDir = path.resolve('/home/testuser');
+      const safeDir = path.resolve('/workspace/safe-path');
+      vi.mocked(os.homedir).mockReturnValue(homeDir);
+      vi.mocked(resolveToRealPath).mockImplementation((p: string) => {
+        const resolvedP = path.resolve(p);
+        if (resolvedP.includes('non-existent')) {
+          const err = new Error(
+            `ENOENT: no such file or directory, realpath '${p}'`,
+          );
+          (err as NodeJS.ErrnoException).code = 'ENOENT';
+          throw err;
+        }
+        return resolvedP;
+      });
+
+      expect(
+        isSensitiveHostPath(path.join(homeDir, '.gemini', 'non-existent-sub')),
+      ).toBe(true);
+      expect(isSensitiveHostPath(path.join(safeDir, 'non-existent-sub'))).toBe(
+        false,
+      );
+    });
+
+    it('should detect broken symlinks pointing into ~/.gemini as sensitive', () => {
+      const homeDir = path.resolve('/home/testuser');
+      const brokenSymlink = path.resolve('/workspace/broken_symlink');
+      const targetFile = path.join(homeDir, '.gemini', 'trusted_hooks.json');
+
+      vi.mocked(os.homedir).mockReturnValue(homeDir);
+
+      const matchesBroken = (p: string) => {
+        const resolvedP = path.resolve(p);
+        return (
+          resolvedP === brokenSymlink ||
+          (os.platform() === 'win32' &&
+            resolvedP.toLowerCase() === brokenSymlink.toLowerCase())
+        );
+      };
+
+      vi.mocked(resolveToRealPath).mockImplementation((p: string) => {
+        if (matchesBroken(p)) {
+          const err = new Error('ENOENT: no such file or directory');
+          (err as NodeJS.ErrnoException).code = 'ENOENT';
+          throw err;
+        }
+        return path.resolve(p);
+      });
+
+      vi.mocked(fs.lstatSync).mockImplementation((p: fs.PathLike) => {
+        if (matchesBroken(String(p))) {
+          return {
+            isSymbolicLink: () => true,
+          } as fs.Stats;
+        }
+        const err = new Error('ENOENT: no such file or directory');
+        (err as NodeJS.ErrnoException).code = 'ENOENT';
+        throw err;
+      });
+
+      vi.mocked(fs.readlinkSync).mockImplementation((p: fs.PathLike) => {
+        if (matchesBroken(String(p))) {
+          return targetFile;
+        }
+        throw new Error('EINVAL: not a symlink');
+      });
+
+      expect(isSensitiveHostPath(brokenSymlink)).toBe(true);
+    });
+
+    it('should fail closed and block mounts when circular symlinks are encountered', () => {
+      const homeDir = path.resolve('/home/testuser');
+      const circ1 = path.resolve('/workspace/circ1');
+      const circ2 = path.resolve('/workspace/circ2');
+
+      vi.mocked(os.homedir).mockReturnValue(homeDir);
+
+      const matchesCirc = (p: string, target: string) => {
+        const resolvedP = path.resolve(p);
+        return (
+          resolvedP === target ||
+          (os.platform() === 'win32' &&
+            resolvedP.toLowerCase() === target.toLowerCase())
+        );
+      };
+
+      vi.mocked(resolveToRealPath).mockImplementation((p: string) => {
+        if (matchesCirc(p, circ1) || matchesCirc(p, circ2)) {
+          const err = new Error('ENOENT: no such file or directory');
+          (err as NodeJS.ErrnoException).code = 'ENOENT';
+          throw err;
+        }
+        return path.resolve(p);
+      });
+
+      vi.mocked(fs.lstatSync).mockImplementation((p: fs.PathLike) => {
+        const strP = String(p);
+        if (matchesCirc(strP, circ1) || matchesCirc(strP, circ2)) {
+          return {
+            isSymbolicLink: () => true,
+          } as fs.Stats;
+        }
+        const err = new Error('ENOENT: no such file or directory');
+        (err as NodeJS.ErrnoException).code = 'ENOENT';
+        throw err;
+      });
+
+      vi.mocked(fs.readlinkSync).mockImplementation((p: fs.PathLike) => {
+        const strP = String(p);
+        if (matchesCirc(strP, circ1)) {
+          return circ2;
+        }
+        if (matchesCirc(strP, circ2)) {
+          return circ1;
+        }
+        throw new Error('EINVAL: not a symlink');
+      });
+
+      expect(isSensitiveHostPath(circ1)).toBe(true);
+    });
+
+    it('should handle empty or undetermined homedir without blocking working directory', () => {
+      vi.mocked(homedir).mockReturnValue('');
+      vi.mocked(os.homedir).mockReturnValue('');
+
+      expect(isSensitiveHostPath(process.cwd())).toBe(false);
+      expect(isSensitiveHostPath(path.join(process.cwd(), '.gemini'))).toBe(
+        false,
+      );
+      expect(isSensitiveHostPath('/workspace/safe-project')).toBe(false);
+
+      // Still blocks ~ notations and sensitive credential files
+      expect(isSensitiveHostPath('~')).toBe(true);
+      expect(isSensitiveHostPath('~/.gemini')).toBe(true);
+      expect(isSensitiveHostPath('/workspace/.env')).toBe(true);
+      expect(isSensitiveHostPath('/workspace/oauth_creds.json')).toBe(true);
+      expect(isSensitiveHostPath('/workspace/google_accounts.json')).toBe(true);
+      expect(isSensitiveHostPath('/workspace/trustedFolders.json')).toBe(true);
+      expect(isSensitiveHostPath('/workspace/trustedfolders.json')).toBe(true);
+      expect(isSensitiveHostPath('/workspace/policy_integrity.json')).toBe(
+        true,
+      );
+    });
+  });
+
+  describe('sanitizeSettingsForSandbox', () => {
+    it('should strip hooks and malicious execution commands', () => {
+      const rawSettings = {
+        theme: 'dark',
+        hooks: {
+          beforeCommand: 'evil-script.sh',
+        },
+        tools: {
+          allowed: ['read_file'],
+          callCommand: '/bin/bash',
+          discoveryCommand: '/bin/sh',
+        },
+        apiKey: 'secret-api-key',
+        geminiApiKey: 'secret-gemini-key',
+        googleApiKey: 'secret-google-key',
+        customConfig: {
+          nestedKey: 'safe-value',
+        },
+      };
+
+      const sanitized = sanitizeSettingsForSandbox(rawSettings);
+
+      expect(sanitized['hooks']).toBeUndefined();
+      expect(sanitized['apiKey']).toBeUndefined();
+      expect(sanitized['geminiApiKey']).toBeUndefined();
+      expect(sanitized['googleApiKey']).toBeUndefined();
+
+      const tools = sanitized['tools'] as Record<string, unknown>;
+      expect(tools['allowed']).toEqual(['read_file']);
+      expect(tools['callCommand']).toBeUndefined();
+      expect(tools['discoveryCommand']).toBeUndefined();
+
+      expect(sanitized['theme']).toBe('dark');
+      expect(
+        (sanitized['customConfig'] as Record<string, unknown>)['nestedKey'],
+      ).toBe('safe-value');
+    });
+
+    it('should not mutate the original settings object', () => {
+      const original = {
+        hooks: { test: true },
+        tools: { callCommand: 'run' },
+      };
+      const copy = JSON.parse(JSON.stringify(original));
+      sanitizeSettingsForSandbox(original);
+      expect(original).toEqual(copy);
+    });
+
+    it('should handle tools property when it is an array without runtime errors', () => {
+      const rawSettings = {
+        tools: ['read_file', 'edit_file'],
+      };
+      const sanitized = sanitizeSettingsForSandbox(rawSettings);
+      expect(sanitized['tools']).toEqual(['read_file', 'edit_file']);
+    });
+  });
+
   describe('isCredentialOrSensitivePath', () => {
     it('should include known credential filenames in SENSITIVE_SETTINGS_FILENAMES', () => {
       expect(SENSITIVE_SETTINGS_FILENAMES.has('oauth_creds.json')).toBe(true);
@@ -256,6 +577,16 @@ describe('sandboxUtils', () => {
         true,
       );
       expect(SENSITIVE_SETTINGS_FILENAMES.has('a2a-oauth-tokens.json')).toBe(
+        true,
+      );
+      expect(SENSITIVE_SETTINGS_FILENAMES.has('trusted_hooks.json')).toBe(true);
+      expect(SENSITIVE_SETTINGS_FILENAMES.has('trustedFolders.json')).toBe(
+        true,
+      );
+      expect(SENSITIVE_SETTINGS_FILENAMES.has('trustedfolders.json')).toBe(
+        true,
+      );
+      expect(SENSITIVE_SETTINGS_FILENAMES.has('policy_integrity.json')).toBe(
         true,
       );
     });
@@ -277,6 +608,18 @@ describe('sandboxUtils', () => {
       ).toBe(true);
       expect(
         isCredentialOrSensitivePath('/home/user/.gemini/a2a-oauth-tokens.json'),
+      ).toBe(true);
+      expect(
+        isCredentialOrSensitivePath('/home/user/.gemini/trusted_hooks.json'),
+      ).toBe(true);
+      expect(
+        isCredentialOrSensitivePath('/home/user/.gemini/trustedFolders.json'),
+      ).toBe(true);
+      expect(
+        isCredentialOrSensitivePath('/home/user/.gemini/trustedfolders.json'),
+      ).toBe(true);
+      expect(
+        isCredentialOrSensitivePath('/home/user/.gemini/policy_integrity.json'),
       ).toBe(true);
     });
 
@@ -324,12 +667,6 @@ describe('sandboxUtils', () => {
       ).toBe(false);
       expect(
         isCredentialOrSensitivePath('/home/user/.gemini/keybindings.json'),
-      ).toBe(false);
-      expect(
-        isCredentialOrSensitivePath('/home/user/.gemini/trustedFolders.json'),
-      ).toBe(false);
-      expect(
-        isCredentialOrSensitivePath('/home/user/.gemini/policy_integrity.json'),
       ).toBe(false);
       expect(isCredentialOrSensitivePath('/home/user/.gemini/commands')).toBe(
         false,

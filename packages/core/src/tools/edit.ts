@@ -61,6 +61,8 @@ import { resolveToolDeclaration } from './definitions/resolver.js';
 import { detectOmissionPlaceholders } from './omissionPlaceholderDetector.js';
 import { discoverJitContext, appendJitContext } from './jit-context.js';
 import { resolveAndValidatePlanPath } from '../utils/planUtils.js';
+import { isBuildFile } from '../utils/buildFileUtils.js';
+import { recordModifiedBuildFile } from '../utils/untrustedContextTracker.js';
 
 const ENABLE_FUZZY_MATCH_RECOVERY = true;
 const FUZZY_MATCH_THRESHOLD = 0.1; // Allow up to 10% weighted difference
@@ -852,6 +854,7 @@ class EditToolInvocation
       fileDiff,
       originalContent: editData.currentContent,
       newContent: editData.newContent,
+      isBuildFile: isBuildFile(this.resolvedPath),
       onConfirm: async (_outcome: ToolConfirmationOutcome) => {
         // Mode transitions (e.g. AUTO_EDIT) and policy updates are now
         // handled centrally by the scheduler.
@@ -956,6 +959,10 @@ class EditToolInvocation
         .getFileSystemService()
         .writeTextFile(this.resolvedPath, finalContent);
 
+      if (isBuildFile(this.resolvedPath)) {
+        recordModifiedBuildFile(this.resolvedPath, this.config);
+      }
+
       let displayResult: ToolResultDisplay;
       if (editData.isNewFile) {
         displayResult = `Created ${shortenPath(makeRelative(this.resolvedPath, this.config.getTargetDir()))}`;
@@ -1011,6 +1018,7 @@ class EditToolInvocation
           newContent: editData.newContent,
           diffStat,
           isNewFile: editData.isNewFile,
+          isBuildFile: isBuildFile(this.resolvedPath),
         };
       }
 
