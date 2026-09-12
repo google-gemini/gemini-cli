@@ -223,7 +223,7 @@ recommend using file-based output for local development.
 3.  View logs and metrics in `.gemini/telemetry.log`.
 
 For advanced local telemetry setups (such as Jaeger or Genkit), see the
-[Local development guide](../local-development.md#viewing-traces).
+[Local development guide](../local-development.md#view-traces).
 
 ## Client identification
 

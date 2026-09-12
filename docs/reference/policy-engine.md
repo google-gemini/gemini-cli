@@ -178,7 +178,7 @@ modes specified, it is always active.
 - `autoEdit`: Optimized for automated code editing; some write tools may be
   auto-approved.
 - `plan`: A strict, read-only mode for research and design. See
-  [Customizing Plan Mode Policies](../cli/plan-mode.md#customizing-policies).
+  [Customizing Plan Mode Policies](../cli/plan-mode.md#custom-policies).
 - `yolo`: A mode where all tools are auto-approved (use with extreme caution).
 
 To maintain the integrity of Plan Mode as a safe research environment,

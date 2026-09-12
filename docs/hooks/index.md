@@ -156,7 +156,7 @@ Gemini CLI **fingerprints** project hooks. If a hook's name or command changes
 (for example, via `git pull`), it is treated as a **new, untrusted hook** and
 you will be warned before it executes.
 
-See [Security Considerations](../hooks/best-practices.md#using-hooks-securely)
+See [Security Considerations](../hooks/best-practices.md#hook-security)
 for a detailed threat model.
 
 ## Managing hooks

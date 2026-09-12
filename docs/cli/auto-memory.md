@@ -107,7 +107,7 @@ updates. From there you can:
   `~/.gemini/GEMINI.md` file.
 
 Promoted skills become discoverable in the next session and follow the standard
-[skill discovery precedence](./skills.md#skill-discovery-tiers). Applied memory
+[skill discovery precedence](./skills.md#discovery-tiers). Applied memory
 patches update the underlying memory files and reload memory for the current
 session.
 
