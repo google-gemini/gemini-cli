@@ -567,6 +567,26 @@ describe('Logger', () => {
       );
     });
 
+    it('should return an empty history if checkpoint JSON has non-array history', async () => {
+      const tag = 'corrupt-history-tag';
+      const encodedTag = 'corrupt-history-tag';
+      const taggedFilePath = path.join(
+        TEST_GEMINI_DIR,
+        `checkpoint-${encodedTag}.json`,
+      );
+      await fs.writeFile(taggedFilePath, JSON.stringify({ history: null }));
+      const consoleWarnSpy = vi
+        .spyOn(debugLogger, 'warn')
+        .mockImplementation(() => {});
+      const loadedCheckpoint = await logger.loadCheckpoint(tag);
+      expect(loadedCheckpoint).toEqual({ history: [] });
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'has an unknown format. Returning empty checkpoint.',
+        ),
+      );
+    });
+
     it('should return an empty history if logger is not initialized', async () => {
       const uninitializedLogger = new Logger(
         testSessionId,

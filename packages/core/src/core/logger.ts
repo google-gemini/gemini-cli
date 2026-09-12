@@ -365,7 +365,7 @@ export class Logger {
       if (
         typeof parsedContent === 'object' &&
         parsedContent !== null &&
-        'history' in parsedContent
+        Array.isArray(parsedContent.history)
       ) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         return parsedContent as Checkpoint;
