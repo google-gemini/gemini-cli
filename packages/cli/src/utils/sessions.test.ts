@@ -70,7 +70,7 @@ describe('listSessions', () => {
     await listSessions(mockConfig);
 
     // Assert
-    expect(mockListSessions).toHaveBeenCalledOnce();
+    expect(mockListSessions).toHaveBeenCalledWith('current-session-id');
     expect(mocks.writeToStdout).toHaveBeenCalledWith(
       'No previous sessions found for this project.',
     );
@@ -127,7 +127,7 @@ describe('listSessions', () => {
     await listSessions(mockConfig);
 
     // Assert
-    expect(mockListSessions).toHaveBeenCalledOnce();
+    expect(mockListSessions).toHaveBeenCalledWith('current-session-id');
 
     // Check that the header was displayed
     expect(mocks.writeToStdout).toHaveBeenCalledWith(

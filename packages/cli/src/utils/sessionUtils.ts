@@ -294,8 +294,10 @@ export const getAllSessionFiles = async (
           const firstUserMessage = content.firstUserMessage
             ? cleanMessage(content.firstUserMessage)
             : extractFirstUserMessage(content.messages);
-          const isCurrentSession = currentSessionId
-            ? file.includes(currentSessionId.slice(0, 8))
+          const shortId = currentSessionId?.slice(0, 8);
+          const isCurrentSession = shortId
+            ? file.endsWith(`-${shortId}.json`) ||
+              file.endsWith(`-${shortId}.jsonl`)
             : false;
 
           let fullContent: string | undefined;
@@ -442,9 +444,9 @@ export class SessionSelector {
   /**
    * Lists all available sessions for the current project.
    */
-  async listSessions(): Promise<SessionInfo[]> {
+  async listSessions(currentSessionId?: string): Promise<SessionInfo[]> {
     const chatsDir = path.join(this.storage.getProjectTempDir(), 'chats');
-    return getSessionFiles(chatsDir);
+    return getSessionFiles(chatsDir, currentSessionId);
   }
 
   /**
