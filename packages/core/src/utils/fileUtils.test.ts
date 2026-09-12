@@ -216,6 +216,41 @@ describe('fileUtils', () => {
       const testFile = path.join(tempRootDir, 'ghost.txt');
       expect(await isEmpty(testFile)).toBe(true);
     });
+
+    it('should return true for a UTF-16 LE file containing only whitespace', async () => {
+      const testFile = path.join(tempRootDir, 'utf16le-whitespace.txt');
+      actualNodeFs.writeFileSync(
+        testFile,
+        Buffer.concat([
+          Buffer.from([0xff, 0xfe]),
+          Buffer.from(' \n\t', 'utf16le'),
+        ]),
+      );
+      expect(await isEmpty(testFile)).toBe(true);
+    });
+
+    it('should return false for a UTF-16 LE file containing content', async () => {
+      const testFile = path.join(tempRootDir, 'utf16le-content.txt');
+      actualNodeFs.writeFileSync(
+        testFile,
+        Buffer.concat([
+          Buffer.from([0xff, 0xfe]),
+          Buffer.from('hello', 'utf16le'),
+        ]),
+      );
+      expect(await isEmpty(testFile)).toBe(false);
+    });
+
+    it('should return true for a UTF-16 BE file containing only whitespace', async () => {
+      const testFile = path.join(tempRootDir, 'utf16be-whitespace.txt');
+      const whitespace = Buffer.from(' \n\t', 'utf16le');
+      whitespace.swap16(); // convert to UTF-16 BE
+      actualNodeFs.writeFileSync(
+        testFile,
+        Buffer.concat([Buffer.from([0xfe, 0xff]), whitespace]),
+      );
+      expect(await isEmpty(testFile)).toBe(true);
+    });
   });
 
   describe('fileExists', () => {
