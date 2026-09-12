@@ -36,15 +36,49 @@ export function tmpdir(): string {
 
 /**
  * Replaces the home directory with a tilde.
- * @param path - The path to tildeify.
+ * @param filePath - The path to tildeify.
  * @returns The tildeified path.
  */
-export function tildeifyPath(path: string): string {
-  const homeDir = homedir();
-  if (path.startsWith(homeDir)) {
-    return path.replace(homeDir, '~');
+export function tildeifyPath(filePath: string): string {
+  const pathModule = process.platform === 'win32' ? path.win32 : path.posix;
+  if (!pathModule.isAbsolute(filePath)) {
+    return filePath;
   }
-  return path;
+
+  let homeDir = homedir();
+  const homeRoot = pathModule.parse(homeDir).root;
+  while (
+    homeDir.length > homeRoot.length &&
+    (homeDir.endsWith('/') || homeDir.endsWith('\\'))
+  ) {
+    homeDir = homeDir.slice(0, -1);
+  }
+
+  const relativePath = pathModule.relative(homeDir, filePath);
+  const isWithinHome =
+    relativePath === '' ||
+    (relativePath !== '..' &&
+      !relativePath.startsWith(`..${pathModule.sep}`) &&
+      !pathModule.isAbsolute(relativePath));
+
+  if (!isWithinHome) {
+    return filePath;
+  }
+
+  if (relativePath === '') {
+    return '~';
+  }
+
+  const separator =
+    process.platform === 'win32' && !filePath.includes('/') ? '\\' : '/';
+  const formattedRelativePath =
+    process.platform === 'win32'
+      ? relativePath.replaceAll(pathModule.sep, separator)
+      : relativePath;
+  const trailingSeparator =
+    filePath.endsWith('/') || filePath.endsWith('\\') ? separator : '';
+
+  return `~${separator}${formattedRelativePath}${trailingSeparator}`;
 }
 
 /**
