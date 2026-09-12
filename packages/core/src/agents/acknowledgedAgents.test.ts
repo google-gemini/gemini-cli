@@ -94,4 +94,34 @@ describe('AcknowledgedAgentsService', () => {
       false,
     );
   });
+
+  it.each([
+    'null',
+    '42',
+    '"str"',
+    '[]',
+    '{"/project": "str"}',
+    '{"/project": 42}',
+    '{"/project": null}',
+    '{"/project": []}',
+  ])(
+    'should fall back to empty for valid JSON with the wrong shape (%s, #29207)',
+    async (content) => {
+      const ackPath = Storage.getAcknowledgedAgentsPath();
+      await fs.mkdir(path.dirname(ackPath), { recursive: true });
+      await fs.writeFile(ackPath, content, 'utf-8');
+
+      const service = new AcknowledgedAgentsService();
+
+      await expect(
+        service.isAcknowledged('/project', 'Agent', 'hash'),
+      ).resolves.toBe(false);
+      await expect(
+        service.acknowledge('/project', 'Agent', 'hash'),
+      ).resolves.toBeUndefined();
+      await expect(
+        service.isAcknowledged('/project', 'Agent', 'hash'),
+      ).resolves.toBe(true);
+    },
+  );
 });
