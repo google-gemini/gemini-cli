@@ -63,4 +63,24 @@ describe('getDiffContextSnippet', () => {
 
     expect(snippet).toBe('...\n4\n6\n...');
   });
+
+  it('should ignore CRLF differences when finding changed lines', () => {
+    const original = Array.from({ length: 20 }, (_, i) => `${i + 1}`).join(
+      '\r\n',
+    );
+    const modified = original.replace('10\r\n', 'changed\r\n');
+
+    expect(getDiffContextSnippet(original, modified, 1)).toBe(
+      '...\n9\nchanged\n11\n...',
+    );
+  });
+
+  it('should keep line indexes consistent for standalone CR line endings', () => {
+    const original = ['1', '2', '3', '4'].join('\r');
+    const modified = ['1', 'changed', '3', '4'].join('\r');
+
+    expect(getDiffContextSnippet(original, modified, 1)).toBe(
+      '1\nchanged\n3\n...',
+    );
+  });
 });
