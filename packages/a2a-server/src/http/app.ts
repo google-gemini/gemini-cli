@@ -276,10 +276,10 @@ export async function createApp() {
     expressApp.use((req, res, next) => {
       requestStorage.run({ req }, next);
     });
+    expressApp.use(express.json());
 
     const appBuilder = new A2AExpressApp(requestHandler, customUserBuilder);
     expressApp = appBuilder.setupRoutes(expressApp, '');
-    expressApp.use(express.json());
 
     expressApp.post('/tasks', async (req, res) => {
       try {
