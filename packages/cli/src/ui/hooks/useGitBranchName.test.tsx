@@ -285,6 +285,31 @@ describe('useGitBranchName', () => {
     expect(result.current).toBe('main');
   });
 
+  it('should handle watcher error events gracefully', async () => {
+    vi.spyOn(fsPromises, 'access').mockResolvedValue(undefined);
+    const onMock = vi.fn();
+    const watchMock = vi.spyOn(fs, 'watch').mockReturnValue({
+      on: onMock,
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof fs.watch>);
+
+    await renderGitBranchNameHook(CWD);
+
+    await resolveInitialSpawns('main');
+
+    // Wait for watcher to be set up
+    await waitFor(() => {
+      expect(watchMock).toHaveBeenCalledWith(GIT_DIR, expect.any(Function));
+    });
+
+    expect(onMock).toHaveBeenCalledWith('error', expect.any(Function));
+
+    // Simulate calling the error handler
+    const errorHandler = onMock.mock.calls.find((call) => call[0] === 'error')?.[1];
+    expect(errorHandler).toBeDefined();
+    expect(() => errorHandler(new Error('FSWatcher mock error'))).not.toThrow();
+  });
+
   it('should cleanup watcher on unmount', async () => {
     vi.spyOn(fsPromises, 'access').mockResolvedValue(undefined);
     const closeMock = vi.fn();
