@@ -1017,13 +1017,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             return true;
           }
           if (keyMatchers[Command.COLLAPSE_SUGGESTION](key)) {
-            if (suggestions[activeSuggestionIndex].value.length >= MAX_WIDTH) {
+            if (cpLen(suggestions[activeSuggestionIndex].value) > MAX_WIDTH) {
               setExpandedSuggestionIndex(-1);
               return true;
             }
           }
           if (keyMatchers[Command.EXPAND_SUGGESTION](key)) {
-            if (suggestions[activeSuggestionIndex].value.length >= MAX_WIDTH) {
+            if (cpLen(suggestions[activeSuggestionIndex].value) > MAX_WIDTH) {
               setExpandedSuggestionIndex(activeSuggestionIndex);
               return true;
             }
