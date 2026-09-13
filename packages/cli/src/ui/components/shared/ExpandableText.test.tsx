@@ -11,6 +11,8 @@ import { ExpandableText, MAX_WIDTH } from './ExpandableText.js';
 describe('ExpandableText', () => {
   const color = 'white';
   const flat = (s: string | undefined) => (s ?? '').replace(/\n/g, '');
+  const containsLoneSurrogate = (s: string) =>
+    /[\uD800-\uDFFF]/.test(s.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, ''));
 
   it('renders plain label when no match (short label)', async () => {
     const renderResult = await render(
@@ -152,6 +154,84 @@ describe('ExpandableText', () => {
     const f = flat(out);
     expect(f.endsWith('...')).toBe(true);
     expect(f.length).toBe(customWidth + 3);
+    await expect(renderResult).toMatchSvgSnapshot();
+    unmount();
+  });
+
+  it('keeps an emoji intact when the truncation boundary splits a surrogate pair', async () => {
+    const renderResult = await render(
+      <ExpandableText
+        label="aaaa😀tail"
+        userInput=""
+        textColor={color}
+        isExpanded={false}
+        maxWidth={5}
+      />,
+    );
+    const { lastFrame, unmount } = renderResult;
+    const f = flat(lastFrame());
+    // The cut lands between the surrogates of the emoji, so truncation must
+    // stop before the pair and keep the whole emoji.
+    expect(f).toBe('aaaa😀...');
+    expect(containsLoneSurrogate(f)).toBe(false);
+    await expect(renderResult).toMatchSvgSnapshot();
+    unmount();
+  });
+
+  it('keeps an emoji intact when maxLines truncation hits the boundary', async () => {
+    const renderResult = await render(
+      <ExpandableText
+        label="aaaa😀tail"
+        userInput=""
+        textColor={color}
+        isExpanded={false}
+        maxWidth={5}
+        maxLines={3}
+      />,
+    );
+    const { lastFrame, unmount } = renderResult;
+    const f = flat(lastFrame());
+    expect(f).toBe('aaaa😀...');
+    expect(containsLoneSurrogate(f)).toBe(false);
+    await expect(renderResult).toMatchSvgSnapshot();
+    unmount();
+  });
+
+  it('does not truncate a label that fits when measured in code points', async () => {
+    const renderResult = await render(
+      <ExpandableText
+        label="😀😀😀"
+        userInput=""
+        textColor={color}
+        isExpanded={false}
+        maxWidth={3}
+      />,
+    );
+    const { lastFrame, unmount } = renderResult;
+    const f = flat(lastFrame());
+    expect(f).toBe('😀😀😀');
+    expect(containsLoneSurrogate(f)).toBe(false);
+    await expect(renderResult).toMatchSvgSnapshot();
+    unmount();
+  });
+
+  it('does not split surrogate pairs at match-window edges', async () => {
+    const renderResult = await render(
+      <ExpandableText
+        label="aaaa😀😀git😀😀tail"
+        userInput="git"
+        matchedIndex={8}
+        textColor={color}
+        isExpanded={false}
+        maxWidth={12}
+      />,
+    );
+    const { lastFrame, unmount } = renderResult;
+    const f = flat(lastFrame());
+    expect(f.includes('git')).toBe(true);
+    expect(containsLoneSurrogate(f)).toBe(false);
+    // The emojis adjacent to the window survive instead of being dropped.
+    expect(f).toBe('...😀git😀😀...');
     await expect(renderResult).toMatchSvgSnapshot();
     unmount();
   });

@@ -160,4 +160,51 @@ describe('SuggestionsDisplay', () => {
     expect(frame).toContain('-- auto --');
     expect(frame).toContain('-- checkpoints --');
   });
+
+  it('does not show the expand hint when the value fits when measured in code points', async () => {
+    const { lastFrame } = await render(
+      <SuggestionsDisplay
+        suggestions={[
+          {
+            label: 'emoji',
+            value: '😀'.repeat(100),
+          },
+        ]}
+        activeIndex={0}
+        isLoading={false}
+        width={80}
+        scrollOffset={0}
+        userInput=""
+        mode="reverse"
+      />,
+    );
+
+    // cpLen is 100 (<= MAX_WIDTH) so the label renders in full and must not
+    // offer expansion, even though its UTF-16 length (200) exceeds MAX_WIDTH.
+    const frame = lastFrame() ?? '';
+    expect(frame).not.toContain('→');
+    expect(frame).not.toContain('←');
+  });
+
+  it('shows the expand hint when the value is long in code points', async () => {
+    const { lastFrame } = await render(
+      <SuggestionsDisplay
+        suggestions={[
+          {
+            label: 'emoji',
+            value: '😀'.repeat(200),
+          },
+        ]}
+        activeIndex={0}
+        isLoading={false}
+        width={80}
+        scrollOffset={0}
+        userInput=""
+        mode="reverse"
+      />,
+    );
+
+    const frame = lastFrame() ?? '';
+    expect(frame).toContain('→');
+  });
 });

@@ -5,7 +5,15 @@ exports[`ExpandableText > creates centered window around match when collapsed 1`
 components//and/then/some/more/components//and/..."
 `;
 
+exports[`ExpandableText > does not split surrogate pairs at match-window edges 1`] = `"...😀git😀😀..."`;
+
+exports[`ExpandableText > does not truncate a label that fits when measured in code points 1`] = `"😀😀😀"`;
+
 exports[`ExpandableText > highlights matched substring when expanded (text only visible) 1`] = `"run: git commit -m "feat: add search""`;
+
+exports[`ExpandableText > keeps an emoji intact when maxLines truncation hits the boundary 1`] = `"aaaa😀..."`;
+
+exports[`ExpandableText > keeps an emoji intact when the truncation boundary splits a surrogate pair 1`] = `"aaaa😀..."`;
 
 exports[`ExpandableText > renders plain label when no match (short label) 1`] = `"simple command"`;
 
