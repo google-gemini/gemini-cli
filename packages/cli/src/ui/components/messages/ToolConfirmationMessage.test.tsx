@@ -30,13 +30,15 @@ vi.mock('../../contexts/ToolActionsContext.js', async (importOriginal) => {
 
 describe('ToolConfirmationMessage', () => {
   const mockConfirm = vi.fn();
-  vi.mocked(useToolActions).mockReturnValue({
-    confirm: mockConfirm,
-    cancel: vi.fn(),
-    isDiffingEnabled: false,
-    isExpanded: vi.fn().mockReturnValue(false),
-    toggleExpansion: vi.fn(),
-    toggleAllExpansion: vi.fn(),
+  beforeEach(() => {
+    vi.mocked(useToolActions).mockReturnValue({
+      confirm: mockConfirm,
+      cancel: vi.fn(),
+      isDiffingEnabled: false,
+      isExpanded: vi.fn().mockReturnValue(false),
+      toggleExpansion: vi.fn(),
+      toggleAllExpansion: vi.fn(),
+    });
   });
 
   const mockConfig = {
@@ -904,6 +906,107 @@ describe('ToolConfirmationMessage', () => {
         undefined,
       );
 
+      unmount();
+    });
+  });
+
+  describe('Security Warnings & Build File Protection', () => {
+    it('should display critical security warning and suppress persistent approvals for build files', async () => {
+      const confirmationDetails: SerializableConfirmationDetails = {
+        type: 'edit',
+        title: 'Confirm Edit: BUILD',
+        fileName: 'BUILD',
+        filePath: '/workspace/BUILD',
+        fileDiff:
+          '--- BUILD\n+++ BUILD\n@@ -1,3 +1,3 @@\n-cc_library(name = "a")\n+cc_library(name = "b")',
+        originalContent: 'cc_library(name = "a")',
+        newContent: 'cc_library(name = "b")',
+        isBuildFile: true,
+      };
+
+      const { lastFrame, unmount } = await renderWithProviders(
+        <ToolConfirmationMessage
+          callId="test-build-edit"
+          confirmationDetails={confirmationDetails}
+          config={mockConfig}
+          getPreferredEditor={vi.fn()}
+          availableTerminalHeight={30}
+          terminalWidth={80}
+          toolName="replace"
+        />,
+      );
+
+      const frame = lastFrame();
+      expect(frame).toContain(
+        'CRITICAL SECURITY WARNING: Build File Modification',
+      );
+      expect(frame).toContain('Target: BUILD');
+      expect(frame).toContain('Allow once');
+      expect(frame).not.toContain('Allow for this session');
+      expect(frame).not.toContain('Allow for this file in all future sessions');
+      unmount();
+    });
+
+    it('should display critical security warning and suppress persistent approvals for untrusted command flags', async () => {
+      const confirmationDetails: SerializableConfirmationDetails = {
+        type: 'exec',
+        title: 'Confirm Shell Command',
+        command: 'blaze test //target:all --test_arg=malicious_flag',
+        rootCommand: 'blaze',
+        rootCommands: ['blaze'],
+        untrustedFlags: ['--test_arg=malicious_flag'],
+      };
+
+      const { lastFrame, unmount } = await renderWithProviders(
+        <ToolConfirmationMessage
+          callId="test-untrusted-exec"
+          confirmationDetails={confirmationDetails}
+          config={mockConfig}
+          getPreferredEditor={vi.fn()}
+          availableTerminalHeight={30}
+          terminalWidth={80}
+          toolName="run_shell_command"
+        />,
+      );
+
+      const frame = lastFrame();
+      expect(frame).toContain(
+        'CRITICAL SECURITY WARNING: Untrusted Command Flags Detected',
+      );
+      expect(frame).toContain('--test_arg=malicious_flag');
+      expect(frame).toContain('Allow once');
+      expect(frame).not.toContain('Allow for this session');
+      expect(frame).not.toContain('Allow this command for all future sessions');
+      unmount();
+    });
+
+    it('should display caution warning when build files were modified earlier in session', async () => {
+      const confirmationDetails: SerializableConfirmationDetails = {
+        type: 'exec',
+        title: 'Confirm Shell Command',
+        command: 'blaze test //target:all',
+        rootCommand: 'blaze',
+        rootCommands: ['blaze'],
+        modifiedBuildFiles: ['/workspace/pkg/BUILD'],
+      };
+
+      const { lastFrame, unmount } = await renderWithProviders(
+        <ToolConfirmationMessage
+          callId="test-build-mod-exec"
+          confirmationDetails={confirmationDetails}
+          config={mockConfig}
+          getPreferredEditor={vi.fn()}
+          availableTerminalHeight={30}
+          terminalWidth={80}
+          toolName="run_shell_command"
+        />,
+      );
+
+      const frame = lastFrame();
+      expect(frame).toContain(
+        'CAUTION: Build Configuration Was Recently Modified',
+      );
+      expect(frame).toContain('BUILD');
       unmount();
     });
   });

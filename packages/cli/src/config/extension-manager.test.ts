@@ -8,7 +8,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { ExtensionManager } from './extension-manager.js';
+import {
+  ExtensionManager,
+  resolveContextFilePaths,
+  validateContextFilePath,
+} from './extension-manager.js';
 import { createTestMergedSettings, type MergedSettings } from './settings.js';
 import { createExtension } from '../test-utils/createExtension.js';
 import { EXTENSIONS_DIRECTORY_NAME } from './extensions/variables.js';
@@ -635,6 +639,369 @@ describe('ExtensionManager', () => {
       expect(themeManager.getCustomThemeNames()).not.toContain(
         'MyTheme (disabled-ext)',
       );
+    });
+  });
+
+  describe('contextFileName directory boundary validation and path resolution', () => {
+    it('loads legitimate relative paths within the extension directory (e.g. context/GEMINI.md, ./GEMINI.md)', async () => {
+      const extDir = path.join(userExtensionsDir, 'legit-ext');
+      const contextDir = path.join(extDir, 'context');
+      fs.mkdirSync(contextDir, { recursive: true });
+      fs.writeFileSync(path.join(contextDir, 'GEMINI.md'), 'context content');
+      fs.writeFileSync(path.join(extDir, 'GEMINI.md'), 'root context content');
+      fs.writeFileSync(path.join(extDir, 'DOCS.md'), 'docs content');
+      fs.writeFileSync(
+        path.join(extDir, 'gemini-extension.json'),
+        JSON.stringify({
+          name: 'legit-ext',
+          version: '1.0.0',
+          contextFileName: ['context/GEMINI.md', './GEMINI.md', 'DOCS.md'],
+        }),
+      );
+      fs.writeFileSync(
+        path.join(extDir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: extDir }),
+      );
+
+      const extensions = await extensionManager.loadExtensions();
+      expect(extensions).toHaveLength(1);
+      const ext = extensions[0];
+      expect(ext.contextFiles).toEqual([
+        path.join(extDir, 'context', 'GEMINI.md'),
+        path.join(extDir, 'GEMINI.md'),
+        path.join(extDir, 'DOCS.md'),
+      ]);
+    });
+
+    it('rejects relative parent directory navigation using .. (e.g. ../../../../etc/passwd, ../secret.txt) and skips loading the invalid context file', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const extDir = path.join(userExtensionsDir, 'relative-parent-ext');
+      fs.mkdirSync(extDir, { recursive: true });
+      fs.writeFileSync(path.join(extDir, 'valid.md'), 'valid content');
+      fs.writeFileSync(
+        path.join(extDir, 'gemini-extension.json'),
+        JSON.stringify({
+          name: 'relative-parent-ext',
+          version: '1.0.0',
+          contextFileName: [
+            'valid.md',
+            '../../../../etc/passwd',
+            '../secret.txt',
+            'subdir/../../escaped.txt',
+            '..\\secret.txt',
+            '%2e%2e%2fsecret.txt',
+          ],
+        }),
+      );
+      fs.writeFileSync(
+        path.join(extDir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: extDir }),
+      );
+
+      const extensions = await extensionManager.loadExtensions();
+      expect(extensions).toHaveLength(1);
+      const ext = extensions[0];
+      // Only valid.md should be loaded; all invalid path attempts should be skipped
+      expect(ext.contextFiles).toEqual([path.join(extDir, 'valid.md')]);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('../../../../etc/passwd'),
+      );
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('../secret.txt'),
+      );
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('subdir/../../escaped.txt'),
+      );
+      warnSpy.mockRestore();
+    });
+
+    it('rejects absolute paths (e.g. /etc/hosts or C:\\Windows\\System32) and skips loading the invalid context file', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const extDir = path.join(userExtensionsDir, 'absolute-ext');
+      fs.mkdirSync(extDir, { recursive: true });
+      fs.writeFileSync(path.join(extDir, 'valid.md'), 'valid content');
+      fs.writeFileSync(
+        path.join(extDir, 'gemini-extension.json'),
+        JSON.stringify({
+          name: 'absolute-ext',
+          version: '1.0.0',
+          contextFileName: [
+            'valid.md',
+            '/etc/hosts',
+            '/etc/passwd',
+            'C:\\Windows\\System32',
+            'C:/Windows/System32',
+            '\\\\server\\share\\secret.txt',
+          ],
+        }),
+      );
+      fs.writeFileSync(
+        path.join(extDir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: extDir }),
+      );
+
+      const extensions = await extensionManager.loadExtensions();
+      expect(extensions).toHaveLength(1);
+      const ext = extensions[0];
+      expect(ext.contextFiles).toEqual([path.join(extDir, 'valid.md')]);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('/etc/hosts'),
+      );
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('C:\\Windows\\System32'),
+      );
+      warnSpy.mockRestore();
+    });
+
+    it('skips non-string, empty, or whitespace-only contextFileName entries', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const extDir = path.join(userExtensionsDir, 'empty-ext');
+      fs.mkdirSync(extDir, { recursive: true });
+      fs.writeFileSync(path.join(extDir, 'valid.md'), 'valid content');
+      fs.writeFileSync(
+        path.join(extDir, 'gemini-extension.json'),
+        JSON.stringify({
+          name: 'empty-ext',
+          version: '1.0.0',
+          contextFileName: ['valid.md', '', '   ', null, 123],
+        }),
+      );
+      fs.writeFileSync(
+        path.join(extDir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: extDir }),
+      );
+
+      const extensions = await extensionManager.loadExtensions();
+      expect(extensions).toHaveLength(1);
+      expect(extensions[0].contextFiles).toEqual([
+        path.join(extDir, 'valid.md'),
+      ]);
+      warnSpy.mockRestore();
+    });
+
+    it('rejects context file path with null byte injection', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const extDir = path.join(userExtensionsDir, 'nullbyte-ext');
+      fs.mkdirSync(extDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(extDir, 'gemini-extension.json'),
+        JSON.stringify({
+          name: 'nullbyte-ext',
+          version: '1.0.0',
+          contextFileName: 'context.md\0/etc/hosts',
+        }),
+      );
+      fs.writeFileSync(
+        path.join(extDir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: extDir }),
+      );
+
+      const extensions = await extensionManager.loadExtensions();
+      expect(extensions).toHaveLength(1);
+      expect(extensions[0].contextFiles).toHaveLength(0);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('null bytes are not allowed'),
+      );
+      warnSpy.mockRestore();
+    });
+
+    it('sanitizes plan.directory against relative parent directory navigation', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const extDir = path.join(userExtensionsDir, 'plan-ext');
+      fs.mkdirSync(extDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(extDir, 'gemini-extension.json'),
+        JSON.stringify({
+          name: 'plan-ext',
+          version: '1.0.0',
+          plan: {
+            directory: '../../../../etc',
+          },
+        }),
+      );
+      fs.writeFileSync(
+        path.join(extDir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: extDir }),
+      );
+
+      const extensions = await extensionManager.loadExtensions();
+      expect(extensions).toHaveLength(1);
+      expect(extensions[0].plan).toBeUndefined();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'Invalid plan.directory in extension "plan-ext"',
+        ),
+      );
+      warnSpy.mockRestore();
+    });
+
+    describe('resolveContextFilePaths unit tests', () => {
+      it('returns empty array when context files do not exist', () => {
+        const config = {
+          name: 'test',
+          version: '1.0.0',
+          contextFileName: 'non-existent.md',
+        };
+        const result = resolveContextFilePaths(config, tempWorkspaceDir);
+        expect(result).toEqual([]);
+      });
+
+      it('returns resolved paths for existing valid context files', () => {
+        const testFile = path.join(tempWorkspaceDir, 'valid.md');
+        fs.writeFileSync(testFile, 'test');
+        const config = {
+          name: 'test',
+          version: '1.0.0',
+          contextFileName: 'valid.md',
+        };
+        const result = resolveContextFilePaths(config, tempWorkspaceDir);
+        expect(result).toEqual([testFile]);
+      });
+
+      it('filters out relative parent directory paths even if target file exists on disk', () => {
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const outsideFile = path.join(tempHomeDir, 'outside-secret.txt');
+        fs.writeFileSync(outsideFile, 'secret');
+        const extDir = path.join(tempHomeDir, 'ext-sub');
+        fs.mkdirSync(extDir, { recursive: true });
+
+        const config = {
+          name: 'test',
+          version: '1.0.0',
+          contextFileName: '../outside-secret.txt',
+        };
+        const result = resolveContextFilePaths(config, extDir);
+        expect(result).toEqual([]);
+        expect(warnSpy).toHaveBeenCalled();
+        warnSpy.mockRestore();
+      });
+
+      it('loads context file with percent characters without skipping it', () => {
+        const testFile = path.join(tempWorkspaceDir, '100%_complete.md');
+        fs.writeFileSync(testFile, '100% completed content');
+        const config = {
+          name: 'test',
+          version: '1.0.0',
+          contextFileName: '100%_complete.md',
+        };
+        const result = resolveContextFilePaths(config, tempWorkspaceDir);
+        expect(result).toEqual([testFile]);
+      });
+    });
+
+    describe('validateContextFilePath unit tests', () => {
+      it('validates standard relative context file path', () => {
+        const result = validateContextFilePath('GEMINI.md', tempWorkspaceDir);
+        expect(result.isValid).toBe(true);
+        expect(result.resolvedPath).toBe(
+          path.resolve(tempWorkspaceDir, 'GEMINI.md'),
+        );
+      });
+
+      it('validates context file path in nested subdirectory', () => {
+        const result = validateContextFilePath(
+          'docs/context.md',
+          tempWorkspaceDir,
+        );
+        expect(result.isValid).toBe(true);
+        expect(result.resolvedPath).toBe(
+          path.resolve(tempWorkspaceDir, 'docs/context.md'),
+        );
+      });
+
+      it('validates context file path containing percent characters', () => {
+        const result = validateContextFilePath(
+          'progress_100%_report.md',
+          tempWorkspaceDir,
+        );
+        expect(result.isValid).toBe(true);
+        expect(result.resolvedPath).toBe(
+          path.resolve(tempWorkspaceDir, 'progress_100%_report.md'),
+        );
+      });
+
+      it('rejects relative parent directory navigation', () => {
+        const result = validateContextFilePath(
+          '../secret.txt',
+          tempWorkspaceDir,
+        );
+        expect(result.isValid).toBe(false);
+        expect(result.errorMessage).toContain(
+          'Relative parent directory references ("..") are not allowed.',
+        );
+      });
+
+      it('rejects URL-encoded relative parent directory navigation', () => {
+        const resultLower = validateContextFilePath(
+          '%2e%2e/secret.txt',
+          tempWorkspaceDir,
+        );
+        expect(resultLower.isValid).toBe(false);
+        expect(resultLower.errorMessage).toContain(
+          'Relative parent directory references ("..") are not allowed.',
+        );
+
+        const resultUpper = validateContextFilePath(
+          '%2E%2E/secret.txt',
+          tempWorkspaceDir,
+        );
+        expect(resultUpper.isValid).toBe(false);
+        expect(resultUpper.errorMessage).toContain(
+          'Relative parent directory references ("..") are not allowed.',
+        );
+      });
+
+      it('rejects POSIX and Windows absolute paths', () => {
+        const resultPosix = validateContextFilePath(
+          '/etc/hosts',
+          tempWorkspaceDir,
+        );
+        expect(resultPosix.isValid).toBe(false);
+        expect(resultPosix.errorMessage).toContain(
+          'Absolute paths are not allowed.',
+        );
+
+        const resultWin = validateContextFilePath(
+          'C:\\Windows\\System32',
+          tempWorkspaceDir,
+        );
+        expect(resultWin.isValid).toBe(false);
+        expect(resultWin.errorMessage).toContain(
+          'Absolute paths are not allowed.',
+        );
+      });
+
+      it('rejects null bytes', () => {
+        const result = validateContextFilePath(
+          'context.md\0outside.txt',
+          tempWorkspaceDir,
+        );
+        expect(result.isValid).toBe(false);
+        expect(result.errorMessage).toContain('null bytes are not allowed.');
+      });
+
+      it('rejects empty or non-string inputs', () => {
+        expect(validateContextFilePath('', tempWorkspaceDir).isValid).toBe(
+          false,
+        );
+        expect(validateContextFilePath('   ', tempWorkspaceDir).isValid).toBe(
+          false,
+        );
+        expect(validateContextFilePath(null, tempWorkspaceDir).isValid).toBe(
+          false,
+        );
+        expect(validateContextFilePath(123, tempWorkspaceDir).isValid).toBe(
+          false,
+        );
+      });
+
+      it('validates context files when root path casing varies on case-insensitive platforms', () => {
+        const lowerRoot = tempWorkspaceDir.toLowerCase();
+        const result = validateContextFilePath('GEMINI.md', lowerRoot);
+        if (process.platform === 'darwin' || process.platform === 'win32') {
+          expect(result.isValid).toBe(true);
+        }
+      });
     });
   });
 });
