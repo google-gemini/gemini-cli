@@ -14,6 +14,7 @@ import { start_sandbox } from './sandbox.js';
 import {
   FatalSandboxError,
   homedir,
+  type Config,
   type SandboxConfig,
 } from '@google/gemini-cli-core';
 import { createMockSandboxConfig } from '@google/gemini-cli-test-utils';
@@ -140,8 +141,10 @@ describe('sandbox', () => {
     vi.mocked(fs.mkdtempSync).mockImplementation(
       (prefix) => `${prefix}test-tmp`,
     );
+    vi.mocked(fs.chmodSync).mockImplementation(() => {});
     vi.mocked(fs.rmSync).mockImplementation(() => {});
     vi.mocked(execSync).mockReturnValue(Buffer.from(''));
+    mockedHomedir.mockReturnValue('/home/user');
   });
 
   afterEach(() => {
@@ -620,6 +623,178 @@ describe('sandbox', () => {
       );
     });
 
+    it('should not attempt to create a temporary settings directory when homedir is empty', async () => {
+      mockedHomedir.mockReturnValue('');
+      vi.mocked(os.tmpdir).mockReturnValue('/mock/tmp');
+
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+      await expect(
+        start_sandbox(config, [], undefined, ['arg1']),
+      ).resolves.toBe(0);
+
+      // Should only create the sandbox temp directory, not the settings fallback directory
+      expect(fs.mkdtempSync).toHaveBeenCalledTimes(1);
+      expect(fs.mkdtempSync).toHaveBeenCalledWith(
+        path.join('/mock/tmp', 'gemini-sandbox-'),
+      );
+      expect(fs.writeFileSync).toHaveBeenCalledWith(
+        expect.stringMatching(/settings\.json$/),
+        expect.any(String),
+        { mode: 0o600 },
+      );
+
+      const dockerCall = vi.mocked(spawn).mock.calls.find((call) => {
+        const args = call[1] as string[];
+        return args && args.includes('run');
+      });
+      expect(dockerCall).toBeDefined();
+      const dockerArgs = dockerCall![1] as string[];
+      expect(dockerArgs.some((arg) => arg.includes('.config/gcloud'))).toBe(
+        false,
+      );
+    });
+
+    it('should not mount gcloud config directory when homedir is empty even if relative path exists', async () => {
+      mockedHomedir.mockReturnValue('');
+      vi.mocked(os.tmpdir).mockReturnValue('/mock/tmp');
+
+      vi.mocked(fs.existsSync).mockImplementation((p: fs.PathLike) => {
+        if (typeof p === 'string' && p.includes('.config')) {
+          return true;
+        }
+        return false;
+      });
+
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+      await expect(
+        start_sandbox(config, [], undefined, ['arg1']),
+      ).resolves.toBe(0);
+
+      const dockerCall = vi.mocked(spawn).mock.calls.find((call) => {
+        const args = call[1] as string[];
+        return args && args.includes('run');
+      });
+      expect(dockerCall).toBeDefined();
+      const dockerArgs = dockerCall![1] as string[];
+      expect(dockerArgs.some((arg) => arg.includes('.config/gcloud'))).toBe(
+        false,
+      );
+    });
+
+    it('should mount gcloud config directory when homedir is defined and config exists', async () => {
+      mockedHomedir.mockReturnValue('/home/user');
+      vi.mocked(os.tmpdir).mockReturnValue('/mock/tmp');
+
+      const expectedConfigDir = path.join('/home/user', '.config', 'gcloud');
+      vi.mocked(fs.existsSync).mockImplementation((p: fs.PathLike) => {
+        if (typeof p === 'string' && p === expectedConfigDir) {
+          return true;
+        }
+        return false;
+      });
+
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+      await expect(
+        start_sandbox(config, [], undefined, ['arg1']),
+      ).resolves.toBe(0);
+
+      const dockerCall = vi.mocked(spawn).mock.calls.find((call) => {
+        const args = call[1] as string[];
+        return args && args.includes('run');
+      });
+      expect(dockerCall).toBeDefined();
+      const dockerArgs = dockerCall![1] as string[];
+      expect(
+        dockerArgs.some(
+          (arg) => arg.includes(expectedConfigDir) && arg.endsWith(':ro'),
+        ),
+      ).toBe(true);
+    });
+
     it('should preserve the integration-test prefix for random container names', async () => {
       const config: SandboxConfig = createMockSandboxConfig({
         command: 'docker',
@@ -827,10 +1002,12 @@ describe('sandbox', () => {
         'docker',
         expect.arrayContaining([
           'run',
+          '--env',
+          'HOME=/home/node',
           '--volume',
           '/host/path:/container/path:ro',
           '--volume',
-          expect.stringMatching(/[\\/]home[\\/]user[\\/]\.gemini/),
+          expect.stringMatching(/[\\/]home[\\/]node[\\/]\.gemini:rw$/),
         ]),
         expect.any(Object),
       );
@@ -877,18 +1054,61 @@ describe('sandbox', () => {
         expect.any(Object),
       );
 
-      // Verify that docker run mounts the isolated settings directory
+      // Verify that docker run mounts the isolated sanitized settings directory
       expect(spawn).toHaveBeenNthCalledWith(
         2,
         'docker',
         expect.arrayContaining([
           '--volume',
           expect.stringMatching(
-            /gemini-sandbox-settings.*:[\\/]home[\\/]node[\\/]\.gemini/,
+            /gemini-sandbox.*:[\\/]home[\\/]node[\\/]\.gemini:rw$/,
           ),
         ]),
         expect.any(Object),
       );
+
+      // Verify that ephemeral sandbox directory permissions are restricted to owner (0o700)
+      expect(fs.chmodSync).toHaveBeenCalledWith(
+        expect.stringContaining('gemini-sandbox-'),
+        0o700,
+      );
+    });
+
+    it('should tolerate chmod errors on non-POSIX filesystems without crashing', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.chmodSync).mockImplementationOnce(() => {
+        throw new Error('EPERM: operation not permitted');
+      });
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+      await expect(start_sandbox(config)).resolves.toBe(0);
     });
 
     it('should handle allowedPaths in Docker', async () => {
@@ -931,6 +1151,229 @@ describe('sandbox', () => {
         expect.arrayContaining(['--volume', '/extra/path:/extra/path:ro']),
         expect.any(Object),
       );
+    });
+
+    it('should reject sensitive host mounts in SANDBOX_MOUNTS with FatalSandboxError', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      vi.stubEnv('SANDBOX_MOUNTS', '/home/user/.gemini:/mnt:rw');
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      await expect(start_sandbox(config)).rejects.toThrow(FatalSandboxError);
+    });
+
+    it('should reject running container sandbox from a sensitive working directory with FatalSandboxError', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue('/home/user');
+
+      try {
+        interface MockProcessWithStdout extends EventEmitter {
+          stdout: EventEmitter;
+        }
+        const mockImageCheckProcess =
+          new EventEmitter() as MockProcessWithStdout;
+        mockImageCheckProcess.stdout = new EventEmitter();
+        vi.mocked(spawn).mockImplementationOnce(() => {
+          setTimeout(() => {
+            mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+            mockImageCheckProcess.emit('close', 0);
+          }, 1);
+          return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+        });
+
+        const targetWorkdir = path.resolve('/home/user');
+        await expect(start_sandbox(config)).rejects.toThrow(
+          new RegExp(
+            `Running sandbox from a sensitive host directory '${targetWorkdir.replace(/\\/g, '\\\\')}' is strictly prohibited`,
+          ),
+        );
+      } finally {
+        cwdSpy.mockRestore();
+      }
+    });
+
+    it('should reject running container sandbox when cliConfig targetDir is sensitive with FatalSandboxError', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      const targetDir = path.resolve('/home/user/.gemini');
+      const mockCliConfig = {
+        getTargetDir: vi.fn().mockReturnValue(targetDir),
+        getDebugMode: vi.fn().mockReturnValue(false),
+      } as unknown as Config;
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      await expect(start_sandbox(config, [], mockCliConfig)).rejects.toThrow(
+        new RegExp(
+          `Running sandbox from a sensitive host directory '${targetDir.replace(/\\/g, '\\\\')}' is strictly prohibited`,
+        ),
+      );
+    });
+
+    it('should reject running macOS seatbelt sandbox from a sensitive working directory with FatalSandboxError', async () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'sandbox-exec',
+        image: 'some-image',
+      });
+      const targetDir = path.resolve('/home/user');
+      const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(targetDir);
+
+      try {
+        await expect(start_sandbox(config)).rejects.toThrow(
+          new RegExp(
+            `Running sandbox from a sensitive host directory '${targetDir.replace(/\\/g, '\\\\')}' is strictly prohibited`,
+          ),
+        );
+      } finally {
+        cwdSpy.mockRestore();
+      }
+    });
+
+    it('should reject running LXC sandbox from a sensitive working directory with FatalSandboxError', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'lxc',
+        image: 'gemini-sandbox',
+      });
+      const targetDir = path.resolve('/home/user');
+      const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(targetDir);
+
+      try {
+        await expect(start_sandbox(config)).rejects.toThrow(
+          new RegExp(
+            `Running sandbox from a sensitive host directory '${targetDir.replace(/\\/g, '\\\\')}' is strictly prohibited`,
+          ),
+        );
+      } finally {
+        cwdSpy.mockRestore();
+      }
+    });
+
+    it('should skip sensitive workspace directory in macOS seatbelt includedDirs', async () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'sandbox-exec',
+        image: 'some-image',
+      });
+      const safeWorkspace = path.resolve('/safe/workspace');
+      const safeOther = path.resolve('/safe/other');
+      const sensitiveUser = path.resolve('/home/user');
+      const mockCliConfig = {
+        getTargetDir: vi.fn().mockReturnValue(safeWorkspace),
+        getDebugMode: vi.fn().mockReturnValue(false),
+        getWorkspaceContext: vi.fn().mockReturnValue({
+          getDirectories: vi
+            .fn()
+            .mockReturnValue([safeWorkspace, sensitiveUser, safeOther]),
+        }),
+      } as unknown as Config;
+
+      interface MockProcess extends EventEmitter {
+        stdout: EventEmitter;
+        stderr: EventEmitter;
+      }
+      const mockSpawnProcess = new EventEmitter() as MockProcess;
+      mockSpawnProcess.stdout = new EventEmitter();
+      mockSpawnProcess.stderr = new EventEmitter();
+      vi.mocked(spawn).mockReturnValue(
+        mockSpawnProcess as unknown as ReturnType<typeof spawn>,
+      );
+
+      const promise = start_sandbox(config, [], mockCliConfig);
+      setTimeout(() => mockSpawnProcess.emit('close', 0), 10);
+      await promise;
+
+      const spawnArgs = vi.mocked(spawn).mock.calls[0][1] as string[];
+      expect(spawnArgs).toContain(`INCLUDE_DIR_0=${safeOther}`);
+      const includeDirs = spawnArgs.filter((arg) =>
+        arg.startsWith('INCLUDE_DIR_'),
+      );
+      expect(includeDirs.some((arg) => arg.includes(sensitiveUser))).toBe(
+        false,
+      );
+    });
+
+    it('should ignore sensitive paths in allowedPaths', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+        allowedPaths: ['/home/user/.gemini', '/safe/extra/path'],
+      });
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+      await start_sandbox(config);
+
+      const runCalls = vi
+        .mocked(spawn)
+        .mock.calls.filter(
+          (call) =>
+            call[0] === 'docker' &&
+            Array.isArray(call[1]) &&
+            call[1].includes('run'),
+        );
+      expect(runCalls.length).toBe(1);
+      const runArgs = runCalls[0][1] as string[];
+      expect(runArgs).toContain('/safe/extra/path:/safe/extra/path:ro');
+      expect(
+        runArgs.some(
+          (arg) =>
+            typeof arg === 'string' && arg.includes('/home/user/.gemini:'),
+        ),
+      ).toBe(false);
     });
 
     it('should handle networkAccess: false in Docker', async () => {
@@ -1099,7 +1542,7 @@ describe('sandbox', () => {
 
       expect(spawn).toHaveBeenCalledWith(
         'docker',
-        expect.arrayContaining(['--user', 'root', '--env', 'HOME=/home/user']),
+        expect.arrayContaining(['--user', 'root', '--env', 'HOME=/home/node']),
         expect.any(Object),
       );
       // Check that the entrypoint command includes the defensive useradd check
