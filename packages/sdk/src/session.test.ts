@@ -330,3 +330,95 @@ describe.skip('GeminiCliSession sendStream()', () => {
     expect(mockClient.updateSystemInstruction).not.toHaveBeenCalled();
   });
 });
+
+describe('GeminiCliSession sendStream malformed args guard', () => {
+  it('survives malformed JSON string args without killing the stream', async () => {
+    const { GeminiEventType } = await import('@google/gemini-cli-core');
+
+    mockClient.sendMessageStream.mockImplementation(() =>
+      (async function* () {
+        yield {
+          type: GeminiEventType.ToolCallRequest,
+          value: {
+            callId: 'bad-1',
+            name: 'testTool',
+            args: '{bad json',
+          },
+        };
+        yield {
+          type: GeminiEventType.ToolCallRequest,
+          value: {
+            callId: 'good-1',
+            name: 'testTool',
+            args: { input: 'ok' },
+          },
+        };
+      })(),
+    );
+
+    // Second turn after tool results: empty
+    let callCount = 0;
+    const orig = mockClient.sendMessageStream;
+    mockClient.sendMessageStream.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        return (async function* () {
+          yield {
+            type: GeminiEventType.ToolCallRequest,
+            value: { callId: 'bad-1', name: 'testTool', args: '{bad json' },
+          };
+          yield {
+            type: GeminiEventType.ToolCallRequest,
+            value: {
+              callId: 'good-1',
+              name: 'testTool',
+              args: { input: 'ok' },
+            },
+          };
+        })();
+      }
+      return (async function* () {})();
+    });
+
+    mockScheduleAgentTools.mockResolvedValue([
+      {
+        response: {
+          responseParts: [
+            {
+              functionResponse: {
+                name: 'testTool',
+                response: { result: 'done' },
+              },
+            },
+          ],
+        },
+      },
+    ]);
+
+    // Should not throw
+    const session = new GeminiCliSession(baseOptions, 'session-malformed', mockAgent);
+    await session.initialize();
+    const events: unknown[] = [];
+    await expect(async () => {
+      for await (const e of session.sendStream('Hello')) {
+        events.push(e);
+      }
+    }).not.toThrow();
+
+    // Both tool calls should have been yielded despite malformed args
+    expect(events.length).toBe(2);
+    expect(mockScheduleAgentTools).toHaveBeenCalledOnce();
+    const scheduled = mockScheduleAgentTools.mock.calls[0][1] as Array<{
+      callId: string;
+      args: unknown;
+    }>;
+    expect(scheduled).toHaveLength(2);
+    expect((scheduled[0].args as Record<string, string>)._parseError).toMatch(
+      /Invalid JSON/,
+    );
+    expect((scheduled[1].args as Record<string, string>).input).toBe('ok');
+
+    // restore default mock
+    void orig;
+  });
+});
