@@ -66,6 +66,40 @@ describe('redactSecrets', () => {
     });
   });
 
+  it.each([
+    'total_tokens',
+    'promptTokens',
+    'completion_tokens',
+    'cached_tokens',
+  ])('keeps %s, which is a count and not a credential', (key) => {
+    expect(redactSecrets({ [key]: 1234 })).toEqual({ [key]: 1234 });
+  });
+
+  it('still redacts the singular token keys', () => {
+    expect(
+      redactSecrets({ token: 'a', refreshToken: 'b', id_token: 'c' }),
+    ).toEqual({
+      token: '[REDACTED]',
+      refreshToken: '[REDACTED]',
+      id_token: '[REDACTED]',
+    });
+  });
+
+  it('returns a Date as the Date it was, rather than an empty object', () => {
+    const when = new Date('2026-09-14T12:00:00.000Z');
+
+    expect(redactSecrets({ when })).toEqual({ when });
+  });
+
+  it.each([
+    ['Map', new Map([['token', 'a']])],
+    ['Set', new Set(['a'])],
+    ['Error', new Error('boom')],
+    ['Buffer', Buffer.from('hi')],
+  ])('passes a %s through rather than spreading it away', (_name, value) => {
+    expect((redactSecrets({ value }) as { value: unknown }).value).toBe(value);
+  });
+
   it('passes a primitive through untouched', () => {
     expect(redactSecrets('plain')).toBe('plain');
     expect(redactSecrets(null)).toBeNull();

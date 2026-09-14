@@ -15,7 +15,9 @@ import { redactRecord } from './redaction.js';
  */
 const resolveLevel = (): string => {
   const requested = process.env['LOG_LEVEL']?.trim().toLowerCase();
-  return requested && requested in winston.config.npm.levels
+  // `Object.hasOwn`, not `in`: `in` walks the prototype chain, so `LOG_LEVEL`
+  // of `toString` or `constructor` would pass for a level winston does not have.
+  return requested && Object.hasOwn(winston.config.npm.levels, requested)
     ? requested
     : 'info';
 };

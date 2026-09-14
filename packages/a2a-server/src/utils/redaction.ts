@@ -21,11 +21,38 @@ const SECRET_KEY_PARTS = [
   'token',
 ];
 
+/**
+ * Keys that contain one of the words above and are not credentials. A token
+ * COUNT is the case that matters: `total_tokens`, `prompt_tokens` and
+ * `completion_tokens` are the numbers an operator reads the log for, and
+ * redacting those would make the log useless to keep a secret that was never
+ * there. Credentials are singular -- `token`, `refreshToken`, `id_token` --
+ * so the plural is the tell.
+ */
+const NOT_A_SECRET = /tokens/;
+
 const REDACTED = '[REDACTED]';
 
 const isSecretKey = (key: string): boolean => {
   const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (NOT_A_SECRET.test(normalized)) {
+    return false;
+  }
   return SECRET_KEY_PARTS.some((part) => normalized.includes(part));
+};
+
+/**
+ * Whether recursing into `value` would rebuild it faithfully.
+ *
+ * `{ ...value }` is only lossless for a plain object: spreading a `Date`, a
+ * `Map`, a `Set`, an `Error` or a `Buffer` yields `{}` or drops everything
+ * that made it that type, so a log line would lose the value it came to
+ * report. Anything else is passed through as it is -- it holds no keys for
+ * this to match on anyway.
+ */
+const isPlainObject = (value: object): boolean => {
+  const proto: unknown = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
 };
 
 /**
@@ -51,6 +78,10 @@ export function redactSecrets(value: unknown, seen = new WeakSet()): unknown {
 
   if (Array.isArray(value)) {
     return value.map((item) => redactSecrets(item, seen));
+  }
+
+  if (!isPlainObject(value)) {
+    return value;
   }
 
   return redactRecord({ ...value }, seen);

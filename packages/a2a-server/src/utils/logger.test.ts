@@ -50,6 +50,15 @@ describe('a2a-server logger', () => {
     expect((await loadLogger()).level).toBe('info');
   });
 
+  it.each(['toString', 'constructor', 'hasOwnProperty'])(
+    'does not take %s for a level just because Object has one',
+    async (inherited) => {
+      process.env['LOG_LEVEL'] = inherited;
+
+      expect((await loadLogger()).level).toBe('info');
+    },
+  );
+
   /** What the transport would be handed, straight from the format pipeline. */
   const render = (
     logger: Awaited<ReturnType<typeof loadLogger>>,
