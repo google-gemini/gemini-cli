@@ -181,7 +181,7 @@ describe('Agent Server Endpoints', () => {
     let nonInMemoryWorkspace: string;
 
     beforeAll(async () => {
-      process.env['GCS_BUCKET_NAME'] = 'test-bucket';
+      vi.stubEnv('GCS_BUCKET_NAME', 'test-bucket');
       nonInMemoryWorkspace = fs.mkdtempSync(
         path.join(os.tmpdir(), 'gemini-agent-gcs-test-'),
       );
@@ -194,7 +194,7 @@ describe('Agent Server Endpoints', () => {
     });
 
     afterAll(async () => {
-      delete process.env['GCS_BUCKET_NAME'];
+      vi.unstubAllEnvs();
       if (nonInMemoryServer) {
         await new Promise<void>((resolve, reject) => {
           nonInMemoryServer.close((err) => {
