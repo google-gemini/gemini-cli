@@ -1666,6 +1666,146 @@ describe('oauth2', () => {
     });
   });
 
+  describe('cacheCredentials (file-based path)', () => {
+    let tempHomeDir: string;
+
+    beforeEach(() => {
+      process.env[FORCE_ENCRYPTED_FILE_ENV_VAR] = 'false';
+      tempHomeDir = fs.mkdtempSync(
+        path.join(os.tmpdir(), 'gemini-cli-cache-creds-test-'),
+      );
+      vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
+      vi.mocked(pathsHomedir).mockReturnValue(tempHomeDir);
+    });
+
+    afterEach(() => {
+      fs.rmSync(tempHomeDir, { recursive: true, force: true });
+      vi.clearAllMocks();
+      resetOauthClientForTesting();
+      vi.unstubAllEnvs();
+    });
+
+    it('should preserve the existing refresh_token when a token rotation event omits it', async () => {
+      // Simulate the tokens event handler being triggered for a full initial login
+      // (access_token + refresh_token both present).
+      const credsPath = path.join(tempHomeDir, GEMINI_DIR, 'oauth_creds.json');
+      await fs.promises.mkdir(path.dirname(credsPath), { recursive: true });
+      const initialCreds = {
+        access_token: 'initial-access-token',
+        refresh_token: 'initial-refresh-token',
+      };
+      await fs.promises.writeFile(credsPath, JSON.stringify(initialCreds));
+
+      // Now simulate a token rotation — Google only sends a new access_token.
+      let tokensListener: ((tokens: Credentials) => void) | undefined;
+      const mockOAuth2Client = {
+        generateAuthUrl: vi.fn().mockReturnValue('https://example.com/auth'),
+        getToken: vi.fn(),
+        setCredentials: vi.fn(),
+        getAccessToken: vi
+          .fn()
+          .mockResolvedValue({ token: 'initial-access-token' }),
+        getTokenInfo: vi.fn().mockResolvedValue({}),
+        on: vi.fn((event, listener) => {
+          if (event === 'tokens') {
+            tokensListener = listener;
+          }
+        }),
+        credentials: initialCreds,
+      } as unknown as OAuth2Client;
+      vi.mocked(OAuth2Client).mockImplementation(() => mockOAuth2Client);
+
+      // Initialize the client (loads cached credentials)
+      vi.mocked(global.fetch).mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ email: 'user@example.com' }),
+      } as unknown as Response);
+
+      await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
+      expect(tokensListener).toBeDefined();
+
+      // Fire the tokens event with only a new access_token (no refresh_token).
+      // The listener itself is synchronous but triggers async cacheCredentials internally.
+      tokensListener!({
+        access_token: 'rotated-access-token',
+        refresh_token: null, // Google does NOT resend the refresh_token
+      });
+      // Wait for the async cacheCredentials write to complete.
+      await new Promise((r) => setTimeout(r, 50));
+
+      // The file should contain the rotated access_token but PRESERVE the original refresh_token.
+      const saved = JSON.parse(
+        await fs.promises.readFile(credsPath, 'utf-8'),
+      ) as Credentials;
+      expect(saved.access_token).toBe('rotated-access-token');
+      expect(saved.refresh_token).toBe('initial-refresh-token');
+    });
+
+    it('should write a new credential file when no existing file is present', async () => {
+      const credsPath = path.join(tempHomeDir, GEMINI_DIR, 'oauth_creds.json');
+      // Ensure the directory exists but no credential file
+      await fs.promises.mkdir(path.dirname(credsPath), { recursive: true });
+
+      let tokensListener: ((tokens: Credentials) => void) | undefined;
+      const freshTokens = {
+        access_token: 'brand-new-access-token',
+        refresh_token: 'brand-new-refresh-token',
+      };
+      const mockOAuth2Client = {
+        generateAuthUrl: vi.fn().mockReturnValue('https://example.com/auth'),
+        getToken: vi.fn(),
+        setCredentials: vi.fn(),
+        getAccessToken: vi.fn().mockResolvedValue({ token: null }),
+        getTokenInfo: vi.fn().mockResolvedValue({}),
+        on: vi.fn((event, listener) => {
+          if (event === 'tokens') {
+            tokensListener = listener;
+          }
+        }),
+        credentials: freshTokens,
+      } as unknown as OAuth2Client;
+      vi.mocked(OAuth2Client).mockImplementation(() => mockOAuth2Client);
+      vi.mocked(global.fetch).mockResolvedValue({
+        ok: false,
+      } as unknown as Response);
+
+      // Initialize client without cached creds so it registers the tokens listener
+      // but goes to auth flow. We only need the listener registered, so mock
+      // getAccessToken to return null (no cached token), triggering authWithWeb.
+      // Instead, bypass by writing a dummy cred file first to load the client
+      // then deleting it, but simpler: use the existing-creds path to get the
+      // listener registered, then fire it directly.
+      const dummyCreds = { access_token: 'dummy', refresh_token: 'dummy-rt' };
+      await fs.promises.writeFile(credsPath, JSON.stringify(dummyCreds));
+
+      // Re-mock getAccessToken to succeed so client is built from cached creds
+      (mockOAuth2Client.getAccessToken as Mock).mockResolvedValue({
+        token: 'dummy',
+      });
+      (mockOAuth2Client.getTokenInfo as Mock).mockResolvedValue({});
+
+      await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
+      expect(tokensListener).toBeDefined();
+
+      // Remove the credential file to simulate "no file" for the next write
+      await fs.promises.rm(credsPath, { force: true });
+      expect(fs.existsSync(credsPath)).toBe(false);
+
+      // Fire tokens event with full credentials (initial login, has refresh_token)
+      tokensListener!(freshTokens);
+      // Wait for the async cacheCredentials write to complete.
+      await new Promise((r) => setTimeout(r, 50));
+
+      // The file should now exist with the full token intact
+      expect(fs.existsSync(credsPath)).toBe(true);
+      const saved = JSON.parse(
+        await fs.promises.readFile(credsPath, 'utf-8'),
+      ) as Credentials;
+      expect(saved.access_token).toBe('brand-new-access-token');
+      expect(saved.refresh_token).toBe('brand-new-refresh-token');
+    });
+  });
+
   describe('with encrypted flag true', () => {
     let tempHomeDir: string;
     beforeEach(() => {
