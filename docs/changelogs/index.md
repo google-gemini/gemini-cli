@@ -18,6 +18,18 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.59.0 - 2026-09-08
+
+- **MCP OAuth SSRF Mitigation:** Prevented Server-Side Request Forgery (SSRF)
+  during Model Context Protocol (MCP) OAuth metadata discovery and
+  authentication
+  ([#29081](https://github.com/google-gemini/gemini-cli/pull/29081) by
+  @josebalius).
+- **Fail-Closed Workspace Trust:** Enforced a secure, fail-closed workspace
+  trust policy and filtered available `mcpServers` when operating in restricted
+  mode ([#29099](https://github.com/google-gemini/gemini-cli/pull/29099) by
+  @luisfelipe-alt).
+
 ## Announcements: v0.58.0 - 2026-09-01
 
 - **Core Security & Path Handling:** Enforced consistent symlink evaluation in
