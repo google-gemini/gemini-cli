@@ -37,7 +37,7 @@ import {
 import { isNodeError } from '../utils/errors.js';
 import { MCP_TOOL_PREFIX } from '../tools/mcp-tool.js';
 
-import { isDirectorySecure } from '../utils/security.js';
+import { isDirectorySecure, normalizeSecurityPath } from '../utils/security.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -193,7 +193,8 @@ export function formatPolicyError(error: PolicyFileError): string {
 /**
  * Filters out insecure policy directories.
  *
- * `checkedDirs` holds the resolved paths that have to pass `isDirectorySecure`:
+ * `checkedDirs` holds the normalized paths that have to pass
+ * `isDirectorySecure`:
  * the ones found by convention rather than named by someone. A path an
  * administrator or a user gave explicitly — `adminPolicyPaths`, or
  * `policyPaths` in settings — is their own choice and stays exempt, but a
@@ -209,7 +210,7 @@ async function filterSecurePolicyDirectories(
 ): Promise<string[]> {
   const results = await Promise.all(
     dirs.map(async (dir) => {
-      if (checkedDirs.has(path.resolve(dir))) {
+      if (checkedDirs.has(normalizeSecurityPath(dir))) {
         const { secure, reason } = await isDirectorySecure(dir);
         if (!secure) {
           const msg = `Security Warning: Skipping policies from ${dir}: ${reason}`;
@@ -332,12 +333,18 @@ export async function createPolicyEngineConfig(
   // looks, so their permissions are the only thing vouching for them. A path
   // the user or an administrator gave explicitly is simply not in this set,
   // which is what keeps it exempt.
+  //
+  // `normalizeSecurityPath` rather than `path.resolve`: on Windows the same
+  // directory has many spellings, and a Set lookup is exact. Today both sides
+  // of that lookup come from the same call, so the spellings already agree —
+  // this keeps the check from resting on that coincidence, and makes the
+  // Windows result match the POSIX one when the two sides stop agreeing.
   const discoveredDirs = new Set<string>([
-    path.resolve(systemPoliciesDir),
-    path.resolve(Storage.getUserPoliciesDir()),
+    normalizeSecurityPath(systemPoliciesDir),
+    normalizeSecurityPath(Storage.getUserPoliciesDir()),
   ]);
   if (settings.workspacePoliciesDir) {
-    discoveredDirs.add(path.resolve(settings.workspacePoliciesDir));
+    discoveredDirs.add(normalizeSecurityPath(settings.workspacePoliciesDir));
   }
 
   const securePolicyDirs = await filterSecurePolicyDirectories(
