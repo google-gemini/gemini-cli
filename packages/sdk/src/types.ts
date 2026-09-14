@@ -120,7 +120,9 @@ export interface AgentShellOptions {
   env?: Record<string, string>;
 
   /**
-   * Maximum time in seconds to wait for the command to complete.
+   * Maximum time in seconds to wait for the command to complete. The command
+   * is aborted when the time is up, and the result carries an `error` saying
+   * so. A value of `0` or less means no limit.
    */
   timeoutSeconds?: number;
 

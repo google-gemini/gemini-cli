@@ -65,22 +65,66 @@ export class SdkAgentShell implements AgentShell {
       };
     }
 
+    const shellExecutionConfig = this.config.getShellExecutionConfig();
+
     const handle = await ShellExecutionService.execute(
       command,
       cwd,
       () => {}, // No-op output event handler for now
       abortController.signal,
       false, // shouldUseNodePty: false for headless execution
-      this.config.getShellExecutionConfig(),
+      options?.env
+        ? {
+            ...shellExecutionConfig,
+            // Merged, not replaced: `ShellExecutionService` takes
+            // `config.env` as the WHOLE source environment, while
+            // `AgentShellOptions.env` documents itself as an addition to the
+            // default one.
+            env: {
+              ...(shellExecutionConfig.env ?? process.env),
+              ...options.env,
+            },
+          }
+        : shellExecutionConfig,
     );
 
-    const result = await handle.result;
+    // `timeoutSeconds` bounds the wait on the command. Aborting is what ends
+    // it, so the result below is whatever the command produced before it was
+    // stopped, and the caller gets an error rather than a silent short read.
+    const timeoutMs =
+      options?.timeoutSeconds !== undefined && options.timeoutSeconds > 0
+        ? options.timeoutSeconds * 1000
+        : undefined;
+    let timedOut = false;
+    const timer =
+      timeoutMs === undefined
+        ? undefined
+        : setTimeout(() => {
+            timedOut = true;
+            abortController.abort();
+          }, timeoutMs);
+
+    let result;
+    try {
+      result = await handle.result;
+    } finally {
+      if (timer !== undefined) {
+        clearTimeout(timer);
+      }
+    }
 
     return {
       output: result.output,
       stdout: result.output, // ShellExecutionService combines stdout/stderr usually
       stderr: '', // ShellExecutionService currently combines, so stderr is empty or mixed
       exitCode: result.exitCode,
+      ...(timedOut
+        ? {
+            error: new Error(
+              `Command timed out after ${options?.timeoutSeconds} seconds.`,
+            ),
+          }
+        : {}),
     };
   }
 }
