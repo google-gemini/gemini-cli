@@ -5,7 +5,7 @@
  */
 
 import { debugLogger } from '@google/gemini-cli-core';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 
 interface Logger {
   getPreviousUserMessages(): Promise<string[]>;
@@ -23,11 +23,15 @@ export interface UseInputHistoryStoreReturn {
  */
 export function useInputHistoryStore(): UseInputHistoryStoreReturn {
   const [inputHistory, setInputHistory] = useState<string[]>([]);
-  const [_pastSessionMessages, setPastSessionMessages] = useState<string[]>([]);
-  const [_currentSessionMessages, setCurrentSessionMessages] = useState<
-    string[]
-  >([]);
-  const [isInitialized, setIsInitialized] = useState(false);
+  // Refs, not state: nothing renders these, they are only ever read to
+  // recompute `inputHistory`. As state the only way to read the latest value
+  // was from inside a `setState` updater, and an updater that calls another
+  // one is a side effect in a function React requires to be pure.
+  const pastSessionMessages = useRef<string[]>([]);
+  const currentSessionMessages = useRef<string[]>([]);
+  // A ref as well, because this guard has to hold on the second of two calls
+  // that arrive before any state update has been applied.
+  const isInitialized = useRef(false);
 
   /**
    * Recalculate the complete input history from past and current sessions.
@@ -61,25 +65,24 @@ export function useInputHistoryStore(): UseInputHistoryStoreReturn {
    */
   const initializeFromLogger = useCallback(
     async (logger: Logger | null) => {
-      if (isInitialized || !logger) return;
+      if (isInitialized.current || !logger) return;
+      isInitialized.current = true;
 
       try {
         const pastMessages = (await logger.getPreviousUserMessages()) || [];
-        setPastSessionMessages(pastMessages); // Store as newest first
-        recalculateHistory([], pastMessages);
-        setIsInitialized(true);
+        pastSessionMessages.current = pastMessages; // Store as newest first
+        recalculateHistory(currentSessionMessages.current, pastMessages);
       } catch (error) {
         // Start with empty history even if logger initialization fails
         debugLogger.warn(
           'Failed to initialize input history from logger:',
           error,
         );
-        setPastSessionMessages([]);
-        recalculateHistory([], []);
-        setIsInitialized(true);
+        pastSessionMessages.current = [];
+        recalculateHistory(currentSessionMessages.current, []);
       }
     },
-    [isInitialized, recalculateHistory],
+    [recalculateHistory],
   );
 
   /**
@@ -91,19 +94,15 @@ export function useInputHistoryStore(): UseInputHistoryStoreReturn {
       const trimmedInput = input.trim();
       if (!trimmedInput) return; // Filter empty/whitespace-only inputs
 
-      setCurrentSessionMessages((prevCurrent) => {
-        const newCurrentSession = [...prevCurrent, trimmedInput];
+      currentSessionMessages.current = [
+        ...currentSessionMessages.current,
+        trimmedInput,
+      ];
 
-        setPastSessionMessages((prevPast) => {
-          recalculateHistory(
-            newCurrentSession.slice().reverse(), // Convert to newest first
-            prevPast,
-          );
-          return prevPast; // No change to past messages
-        });
-
-        return newCurrentSession;
-      });
+      recalculateHistory(
+        currentSessionMessages.current.slice().reverse(), // Convert to newest first
+        pastSessionMessages.current,
+      );
     },
     [recalculateHistory],
   );

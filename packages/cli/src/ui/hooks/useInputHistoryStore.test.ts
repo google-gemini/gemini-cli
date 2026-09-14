@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { act } from 'react';
+import { act, StrictMode } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { useInputHistoryStore } from './useInputHistoryStore.js';
@@ -13,6 +13,132 @@ import { debugLogger } from '@google/gemini-cli-core';
 describe('useInputHistoryStore', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  /**
+   * StrictMode invokes a `setState` updater twice on purpose, to surface
+   * updaters that are not pure. The store used to call `setPastSessionMessages`
+   * (and through it `recalculateHistory` -> `setInputHistory`) from inside the
+   * `setCurrentSessionMessages` updater, so the double invocation ran the
+   * recalculation twice against a stale past session and the Up-arrow history
+   * came out wrong (#29313).
+   */
+  describe('under StrictMode', () => {
+    const renderStrict = () =>
+      renderHook(() => useInputHistoryStore(), { wrapper: StrictMode });
+
+    it('keeps the history of two inputs in order, without repeats', async () => {
+      const { result } = await renderStrict();
+
+      act(() => {
+        result.current.addInput('first');
+      });
+      act(() => {
+        result.current.addInput('second');
+      });
+
+      expect(result.current.inputHistory).toEqual(['first', 'second']);
+    });
+
+    it('keeps a non-consecutive repeat that the user really typed twice', async () => {
+      const { result } = await renderStrict();
+
+      act(() => {
+        result.current.addInput('ls');
+      });
+      act(() => {
+        result.current.addInput('cd ..');
+      });
+      act(() => {
+        result.current.addInput('ls');
+      });
+
+      expect(result.current.inputHistory).toEqual(['ls', 'cd ..', 'ls']);
+    });
+
+    it('keeps the past session behind the current one', async () => {
+      const { result } = await renderStrict();
+      const logger = {
+        getPreviousUserMessages: vi.fn().mockResolvedValue(['old-2', 'old-1']),
+      };
+
+      await act(async () => {
+        await result.current.initializeFromLogger(logger);
+      });
+      act(() => {
+        result.current.addInput('new');
+      });
+
+      expect(result.current.inputHistory).toEqual(['old-1', 'old-2', 'new']);
+    });
+
+    it('reads the logger once, however many times the effect runs', async () => {
+      const { result } = await renderStrict();
+      const logger = {
+        getPreviousUserMessages: vi.fn().mockResolvedValue(['old']),
+      };
+
+      await act(async () => {
+        await result.current.initializeFromLogger(logger);
+        await result.current.initializeFromLogger(logger);
+      });
+
+      expect(logger.getPreviousUserMessages).toHaveBeenCalledTimes(1);
+    });
+
+    it('reads the logger once even when both calls are still in flight', async () => {
+      // StrictMode fires the effect twice before the first `await` resolves,
+      // so a guard that is only set after the read is no guard at all.
+      const { result } = await renderStrict();
+      const logger = {
+        getPreviousUserMessages: vi.fn().mockResolvedValue(['old']),
+      };
+
+      await act(async () => {
+        await Promise.all([
+          result.current.initializeFromLogger(logger),
+          result.current.initializeFromLogger(logger),
+        ]);
+      });
+
+      expect(logger.getPreviousUserMessages).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps an input typed before the logger answered', async () => {
+      // The logger read is async, and the user can type while it is in flight.
+      const { result } = await renderStrict();
+      const logger = {
+        getPreviousUserMessages: vi.fn().mockResolvedValue(['old']),
+      };
+
+      act(() => {
+        result.current.addInput('typed-first');
+      });
+      await act(async () => {
+        await result.current.initializeFromLogger(logger);
+      });
+
+      expect(result.current.inputHistory).toEqual(['old', 'typed-first']);
+    });
+  });
+
+  it('keeps an input typed before the logger answered, StrictMode or not', async () => {
+    // Not a StrictMode problem: the logger read is async in every run, and
+    // initialization used to recalculate from an empty current session, so
+    // anything typed while it was in flight was dropped from the history.
+    const { result } = await renderHook(() => useInputHistoryStore());
+    const logger = {
+      getPreviousUserMessages: vi.fn().mockResolvedValue(['old']),
+    };
+
+    act(() => {
+      result.current.addInput('typed-first');
+    });
+    await act(async () => {
+      await result.current.initializeFromLogger(logger);
+    });
+
+    expect(result.current.inputHistory).toEqual(['old', 'typed-first']);
   });
 
   it('should initialize with empty input history', async () => {
