@@ -178,6 +178,11 @@ export class FileDiscoveryService {
    *
    * NOTE: Directory paths must include a trailing slash to be correctly identified and
    * matched against directory-specific ignore patterns (e.g., 'dist/').
+   *
+   * For file paths (no trailing slash), the underlying GitIgnoreParser performs
+   * a hierarchical ancestor-directory walk, so files inside an ignored directory
+   * (e.g., 'pkg/tools/build/out.js' where 'build/' is ignored) are correctly
+   * filtered even without an explicit trailing-slash marker.
    */
   filterFiles(filePaths: string[], options: FilterFilesOptions = {}): string[] {
     return filePaths.filter((filePath) => {
@@ -225,6 +230,38 @@ export class FileDiscoveryService {
     options: FilterFilesOptions = {},
   ): boolean {
     return this._shouldIgnore(dirPath, true, options);
+  }
+
+  /**
+   * Checks if any ancestor directory of the given path is ignored.
+   *
+   * This is useful for tools that receive flat file lists (e.g., from glob or
+   * ripgrep) and need to verify that the file does not reside inside an ignored
+   * directory subtree.  The check walks from the project root toward the file,
+   * stopping as soon as an ignored ancestor is found.
+   */
+  isAncestorDirectoryIgnored(
+    filePath: string,
+    options: FilterFilesOptions = {},
+  ): boolean {
+    const absolutePath = path.isAbsolute(filePath)
+      ? filePath
+      : path.resolve(this.projectRoot, filePath);
+    const relativePath = path.relative(this.projectRoot, absolutePath);
+    if (relativePath.startsWith('..')) {
+      return false;
+    }
+
+    const parts = relativePath.split(path.sep);
+    // Walk each ancestor directory (excluding the file itself)
+    let currentDir = this.projectRoot;
+    for (let i = 0; i < parts.length - 1; i++) {
+      currentDir = path.join(currentDir, parts[i]);
+      if (this._shouldIgnore(currentDir, true, options)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private _checkIgnoreFilters(
