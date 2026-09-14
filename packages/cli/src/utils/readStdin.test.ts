@@ -21,6 +21,7 @@ const mockStdin = {
   on: vi.fn(),
   removeListener: vi.fn(),
   destroy: vi.fn(),
+  pause: vi.fn(),
   listeners: vi.fn().mockReturnValue([]),
   listenerCount: vi.fn().mockReturnValue(0),
 };
@@ -137,7 +138,38 @@ describe('readStdin', () => {
     expect(debugLogger.warn).toHaveBeenCalledWith(
       `Warning: stdin input truncated to ${MAX_STDIN_SIZE} bytes.`,
     );
-    expect(mockStdin.destroy).toHaveBeenCalled();
+    // Paused, not destroyed: a destroyed `process.stdin` cannot be read again
+    // for the life of the process, and this only needs to stop reading.
+    expect(mockStdin.pause).toHaveBeenCalled();
+    expect(mockStdin.destroy).not.toHaveBeenCalled();
+  });
+
+  it('warns when it gives up on stdin instead of resolving empty in silence', async () => {
+    vi.useFakeTimers();
+    mockStdin.read.mockReturnValue(null);
+
+    const promise = readStdin();
+    await vi.advanceTimersByTimeAsync(500);
+    vi.useRealTimers();
+
+    await expect(promise).resolves.toBe('');
+    expect(debugLogger.warn).toHaveBeenCalledWith(
+      'Warning: no stdin input within 500ms; continuing without it.',
+    );
+  });
+
+  it('says nothing when the input arrives in time', async () => {
+    vi.useFakeTimers();
+    mockStdin.read.mockReturnValueOnce('hello').mockReturnValueOnce(null);
+
+    const promise = readStdin();
+    onReadableHandler();
+    onEndHandler();
+    await vi.advanceTimersByTimeAsync(1000);
+    vi.useRealTimers();
+
+    await expect(promise).resolves.toBe('hello');
+    expect(debugLogger.warn).not.toHaveBeenCalled();
   });
 
   it('should truncate multi-byte characters at byte boundary', async () => {
