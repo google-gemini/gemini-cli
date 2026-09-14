@@ -71,7 +71,10 @@ export function useInputHistoryStore(): UseInputHistoryStoreReturn {
       try {
         const pastMessages = (await logger.getPreviousUserMessages()) || [];
         pastSessionMessages.current = pastMessages; // Store as newest first
-        recalculateHistory(currentSessionMessages.current, pastMessages);
+        recalculateHistory(
+          currentSessionMessages.current.slice().reverse(), // Convert to newest first
+          pastMessages,
+        );
       } catch (error) {
         // Start with empty history even if logger initialization fails
         debugLogger.warn(
@@ -79,7 +82,10 @@ export function useInputHistoryStore(): UseInputHistoryStoreReturn {
           error,
         );
         pastSessionMessages.current = [];
-        recalculateHistory(currentSessionMessages.current, []);
+        recalculateHistory(
+          currentSessionMessages.current.slice().reverse(), // Convert to newest first
+          [],
+        );
       }
     },
     [recalculateHistory],

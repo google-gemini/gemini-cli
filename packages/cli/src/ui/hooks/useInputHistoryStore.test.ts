@@ -104,6 +104,32 @@ describe('useInputHistoryStore', () => {
       expect(logger.getPreviousUserMessages).toHaveBeenCalledTimes(1);
     });
 
+    it('keeps several inputs typed before the logger answered, in order', async () => {
+      // `recalculateHistory` wants the current session newest-first. One input
+      // reads the same either way, which is why a single-input cell missed an
+      // initialization that passed it oldest-first.
+      const { result } = await renderStrict();
+      const logger = {
+        getPreviousUserMessages: vi.fn().mockResolvedValue(['old']),
+      };
+
+      act(() => {
+        result.current.addInput('typed-1');
+      });
+      act(() => {
+        result.current.addInput('typed-2');
+      });
+      await act(async () => {
+        await result.current.initializeFromLogger(logger);
+      });
+
+      expect(result.current.inputHistory).toEqual([
+        'old',
+        'typed-1',
+        'typed-2',
+      ]);
+    });
+
     it('keeps an input typed before the logger answered', async () => {
       // The logger read is async, and the user can type while it is in flight.
       const { result } = await renderStrict();
@@ -120,6 +146,25 @@ describe('useInputHistoryStore', () => {
 
       expect(result.current.inputHistory).toEqual(['old', 'typed-first']);
     });
+  });
+
+  it('keeps several inputs typed before the logger answered, in order', async () => {
+    const { result } = await renderHook(() => useInputHistoryStore());
+    const logger = {
+      getPreviousUserMessages: vi.fn().mockResolvedValue(['old']),
+    };
+
+    act(() => {
+      result.current.addInput('typed-1');
+    });
+    act(() => {
+      result.current.addInput('typed-2');
+    });
+    await act(async () => {
+      await result.current.initializeFromLogger(logger);
+    });
+
+    expect(result.current.inputHistory).toEqual(['old', 'typed-1', 'typed-2']);
   });
 
   it('keeps an input typed before the logger answered, StrictMode or not', async () => {
