@@ -278,6 +278,67 @@ describe('isDirectorySecure', () => {
     expect(result.secure).toBe(true);
   });
 
+  it('returns secure=true if owned by current user and allowUserOwnership=true on POSIX', async () => {
+    vi.spyOn(os, 'platform').mockReturnValue('linux');
+    const currentUid = 1000;
+    if (typeof process.getuid === 'function') {
+      vi.spyOn(
+        process as unknown as { getuid: () => number },
+        'getuid',
+      ).mockReturnValue(currentUid);
+    }
+
+    vi.mocked(fs.stat).mockResolvedValue({
+      isDirectory: () => true,
+      uid: currentUid,
+      mode: 0o755, // rwxr-xr-x
+    } as unknown as Stats);
+
+    const result = await isDirectorySecure('/some/path', {
+      allowUserOwnership: true,
+    });
+    expect(result.secure).toBe(true);
+  });
+
+  it('returns secure=false if owned by current user but allowUserOwnership=false on POSIX', async () => {
+    vi.spyOn(os, 'platform').mockReturnValue('linux');
+    const currentUid = 1000;
+    if (typeof process.getuid === 'function') {
+      vi.spyOn(
+        process as unknown as { getuid: () => number },
+        'getuid',
+      ).mockReturnValue(currentUid);
+    }
+
+    vi.mocked(fs.stat).mockResolvedValue({
+      isDirectory: () => true,
+      uid: currentUid,
+      mode: 0o755, // rwxr-xr-x
+    } as unknown as Stats);
+
+    const result = await isDirectorySecure('/some/path', {
+      allowUserOwnership: false,
+    });
+    expect(result.secure).toBe(false);
+    expect(result.reason).toContain('is not owned by root (uid 0)');
+  });
+
+  it('returns secure=true on Windows if owner violation occurs but allowUserOwnership=true', async () => {
+    vi.spyOn(os, 'platform').mockReturnValue('win32');
+    vi.mocked(fs.stat).mockResolvedValue({
+      isDirectory: () => true,
+    } as unknown as Stats);
+    vi.mocked(spawnAsync).mockResolvedValue({
+      stdout: 'OWNER:untrusted_owner\nPATH:C:\\Some\\Path\n',
+      stderr: '',
+    });
+
+    const result = await isDirectorySecure('C:\\Some\\Path', {
+      allowUserOwnership: true,
+    });
+    expect(result.secure).toBe(true);
+  });
+
   it('returns secure=false on Windows if owner is untrusted', async () => {
     vi.spyOn(os, 'platform').mockReturnValue('win32');
     vi.mocked(fs.stat).mockResolvedValue({
