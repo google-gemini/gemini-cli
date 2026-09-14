@@ -191,24 +191,28 @@ export function formatPolicyError(error: PolicyFileError): string {
 }
 
 /**
- * Filters out insecure policy directories (specifically the system policy directory).
- * Supplemental admin policy paths are NOT subject to strict security checks as they
- * are explicitly provided by the user/administrator via flags or settings.
+ * Filters out insecure policy directories.
+ *
+ * `checkedDirs` holds the resolved paths that have to pass `isDirectorySecure`:
+ * the ones found by convention rather than named by someone. A path an
+ * administrator or a user gave explicitly — `adminPolicyPaths`, or
+ * `policyPaths` in settings — is their own choice and stays exempt, but a
+ * directory the CLI decided to read on its own has to earn it, because a
+ * `decision = "allow"` rule dropped into a world-writable one would otherwise
+ * load in silence.
+ *
  * Emits warnings if insecure directories are found.
  */
 async function filterSecurePolicyDirectories(
   dirs: string[],
-  systemPoliciesDir: string,
+  checkedDirs: ReadonlySet<string>,
 ): Promise<string[]> {
   const results = await Promise.all(
     dirs.map(async (dir) => {
-      const normalizedDir = path.resolve(dir);
-      const isSystemPolicy = normalizedDir === systemPoliciesDir;
-
-      if (isSystemPolicy) {
+      if (checkedDirs.has(path.resolve(dir))) {
         const { secure, reason } = await isDirectorySecure(dir);
         if (!secure) {
-          const msg = `Security Warning: Skipping system policies from ${dir}: ${reason}`;
+          const msg = `Security Warning: Skipping policies from ${dir}: ${reason}`;
           emitWarningOnce(msg);
           return null;
         }
@@ -324,9 +328,21 @@ export async function createPolicyEngineConfig(
     ? new Set(adminPolicyPaths.map((p) => path.resolve(p)))
     : undefined;
 
+  // Directories nobody named: the CLI reads them because they are where it
+  // looks, so their permissions are the only thing vouching for them. A path
+  // the user or an administrator gave explicitly is simply not in this set,
+  // which is what keeps it exempt.
+  const discoveredDirs = new Set<string>([
+    path.resolve(systemPoliciesDir),
+    path.resolve(Storage.getUserPoliciesDir()),
+  ]);
+  if (settings.workspacePoliciesDir) {
+    discoveredDirs.add(path.resolve(settings.workspacePoliciesDir));
+  }
+
   const securePolicyDirs = await filterSecurePolicyDirectories(
     policyDirs,
-    systemPoliciesDir,
+    discoveredDirs,
   );
 
   const tierContext = {

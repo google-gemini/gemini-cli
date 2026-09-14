@@ -150,6 +150,96 @@ describe('createPolicyEngineConfig', () => {
     expect(calledDirs).toContain(MOCK_DEFAULT_DIR);
   });
 
+  it('should filter out an insecure user policy directory it found itself', async () => {
+    // `~/.gemini/policies` is read because that is where the CLI looks, not
+    // because anyone named it. A `decision = "allow"` rule dropped into a
+    // world-writable one used to load in silence (#29311).
+    const userPolicyDir = nodePath.resolve('/non/existent/user/policies');
+    vi.mocked(isDirectorySecure).mockImplementation(async (path: string) => {
+      if (nodePath.resolve(path) === userPolicyDir) {
+        return { secure: false, reason: 'Insecure directory' };
+      }
+      return { secure: true };
+    });
+
+    const loadPoliciesSpy = vi
+      .spyOn(tomlLoader, 'loadPoliciesFromToml')
+      .mockResolvedValue({ rules: [], checkers: [], errors: [] });
+
+    await createPolicyEngineConfig({}, ApprovalMode.DEFAULT, MOCK_DEFAULT_DIR);
+
+    const calledDirs = loadPoliciesSpy.mock.calls[0][0];
+    expect(calledDirs).not.toContain(userPolicyDir);
+    // The tiers that are still fine are still loaded.
+    expect(calledDirs).toContain(MOCK_DEFAULT_DIR);
+  });
+
+  it('should filter out an insecure workspace policy directory', async () => {
+    const workspacePolicyDir = nodePath.resolve('/repo/.gemini/policies');
+    vi.mocked(isDirectorySecure).mockImplementation(async (path: string) => {
+      if (nodePath.resolve(path) === workspacePolicyDir) {
+        return { secure: false, reason: 'Insecure directory' };
+      }
+      return { secure: true };
+    });
+
+    const loadPoliciesSpy = vi
+      .spyOn(tomlLoader, 'loadPoliciesFromToml')
+      .mockResolvedValue({ rules: [], checkers: [], errors: [] });
+
+    await createPolicyEngineConfig(
+      { workspacePoliciesDir: workspacePolicyDir },
+      ApprovalMode.DEFAULT,
+      MOCK_DEFAULT_DIR,
+    );
+
+    const calledDirs = loadPoliciesSpy.mock.calls[0][0];
+    expect(calledDirs).not.toContain(workspacePolicyDir);
+  });
+
+  it('should keep a secure workspace policy directory', async () => {
+    const workspacePolicyDir = nodePath.resolve('/repo/.gemini/policies');
+    vi.mocked(isDirectorySecure).mockResolvedValue({ secure: true });
+
+    const loadPoliciesSpy = vi
+      .spyOn(tomlLoader, 'loadPoliciesFromToml')
+      .mockResolvedValue({ rules: [], checkers: [], errors: [] });
+
+    await createPolicyEngineConfig(
+      { workspacePoliciesDir: workspacePolicyDir },
+      ApprovalMode.DEFAULT,
+      MOCK_DEFAULT_DIR,
+    );
+
+    const calledDirs = loadPoliciesSpy.mock.calls[0][0];
+    expect(calledDirs).toContain(workspacePolicyDir);
+  });
+
+  it('should NOT filter out policy paths the user named explicitly', async () => {
+    // `policyPaths` is the user's own choice, the same way `adminPolicyPaths`
+    // is the administrator's. Only what the CLI picked up on its own is vetted.
+    const namedDir = nodePath.resolve('/insecure/named/policies');
+    vi.mocked(isDirectorySecure).mockImplementation(async (path: string) => {
+      if (nodePath.resolve(path) === namedDir) {
+        return { secure: false, reason: 'Insecure directory' };
+      }
+      return { secure: true };
+    });
+
+    const loadPoliciesSpy = vi
+      .spyOn(tomlLoader, 'loadPoliciesFromToml')
+      .mockResolvedValue({ rules: [], checkers: [], errors: [] });
+
+    await createPolicyEngineConfig(
+      { policyPaths: [namedDir] },
+      ApprovalMode.DEFAULT,
+      MOCK_DEFAULT_DIR,
+    );
+
+    const calledDirs = loadPoliciesSpy.mock.calls[0][0];
+    expect(calledDirs).toContain(namedDir);
+  });
+
   it('should NOT filter out insecure supplemental admin policy directories', async () => {
     const adminPolicyDir = nodePath.resolve('/insecure/admin/policies');
     vi.mocked(isDirectorySecure).mockImplementation(async (path: string) => {
