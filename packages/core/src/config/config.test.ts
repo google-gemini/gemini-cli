@@ -843,6 +843,8 @@ describe('Server Config (config.ts)', () => {
       expect(spreadContext.config).toBeDefined();
       expect(spreadContext.promptId).toBeDefined();
       expect(spreadContext.toolRegistry).toBeDefined();
+      expect(spreadContext.promptRegistry).toBeDefined();
+      expect(spreadContext.resourceRegistry).toBeDefined();
       expect(spreadContext.messageBus).toBeDefined();
       expect(spreadContext.geminiClient).toBeDefined();
       expect(spreadContext.sandboxManager).toBeDefined();
@@ -850,6 +852,8 @@ describe('Server Config (config.ts)', () => {
       expect(spreadContext.config).toBe(config);
       expect(spreadContext.promptId).toBe(config.promptId);
       expect(spreadContext.toolRegistry).toBe(config.toolRegistry);
+      expect(spreadContext.promptRegistry).toBe(config.promptRegistry);
+      expect(spreadContext.resourceRegistry).toBe(config.resourceRegistry);
       expect(spreadContext.messageBus).toBe(config.messageBus);
       expect(spreadContext.geminiClient).toBe(config.geminiClient);
       expect(spreadContext.sandboxManager).toBe(config.sandboxManager);
