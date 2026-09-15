@@ -236,7 +236,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
         ) : (
           <Text>{content.text}</Text>
         )}
-        {' '.repeat(paddingNeeded)}
+        {' '.repeat(Math.max(0, Math.floor(paddingNeeded || 0)))}
       </Text>
     );
   };
@@ -251,7 +251,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
 
     const char = chars[type];
     const borderParts = adjustedWidths.map((w) =>
-      char.horizontal.repeat(Math.max(0, w || 0)),
+      char.horizontal.repeat(Math.max(0, Math.floor(w || 0))),
     );
     const border = char.left + borderParts.join(char.middle) + char.right;
 

@@ -156,10 +156,12 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
     resultDisplay,
   );
 
+  const safeTerminalWidth = Math.max(0, Math.floor(terminalWidth || 0));
+
   return (
     <>
       <StickyHeader
-        width={terminalWidth}
+        width={safeTerminalWidth}
         isFirst={isFirst}
         borderColor={borderColor}
         borderDimColor={borderDimColor}
@@ -190,7 +192,8 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
 
       <Box
         ref={contentRef}
-        width={terminalWidth}
+        width={safeTerminalWidth}
+        minWidth={0}
         borderStyle="round"
         borderColor={borderColor}
         borderDimColor={borderDimColor}
@@ -204,7 +207,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
         <ToolResultDisplay
           resultDisplay={resultDisplay}
           availableTerminalHeight={availableTerminalHeight}
-          terminalWidth={terminalWidth}
+          terminalWidth={safeTerminalWidth}
           renderOutputAsMarkdown={renderOutputAsMarkdown}
           hasFocus={isThisShellFocused}
           maxLines={maxLines}

@@ -36,4 +36,21 @@ describe('<ProgressBar />', () => {
     );
     expect(lastFrame()).toMatchSnapshot();
   });
+
+  it('handles negative, zero, and fractional widths without throwing', async () => {
+    const { lastFrame: frameNeg } = await renderWithProviders(
+      <ProgressBar value={50} width={-5} />,
+    );
+    expect(frameNeg({ allowEmpty: true })).toBeDefined();
+
+    const { lastFrame: frameZero } = await renderWithProviders(
+      <ProgressBar value={50} width={0} />,
+    );
+    expect(frameZero({ allowEmpty: true })).toBeDefined();
+
+    const { lastFrame: frameFrac } = await renderWithProviders(
+      <ProgressBar value={50} width={10.7} />,
+    );
+    expect(frameFrac()).toBeDefined();
+  });
 });

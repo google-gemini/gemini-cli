@@ -108,6 +108,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
   disableTruncation = false,
 }) => {
   const settings = useSettings();
+  const safeTerminalWidth = Math.max(0, Math.floor(terminalWidth || 0));
 
   const screenReaderEnabled = useIsScreenReaderEnabled();
 
@@ -161,7 +162,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
         availableHeight: disableTruncation
           ? undefined
           : availableTerminalHeight,
-        maxWidth: terminalWidth,
+        maxWidth: safeTerminalWidth,
         theme,
         settings,
         disableColor,
@@ -175,14 +176,14 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
         <MaxSizedBox
           paddingX={paddingX}
           maxHeight={disableTruncation ? undefined : availableTerminalHeight}
-          maxWidth={terminalWidth}
+          maxWidth={safeTerminalWidth}
           key={key}
         >
           {renderDiffLines({
             parsedLines,
             filename,
             tabWidth,
-            terminalWidth,
+            terminalWidth: safeTerminalWidth,
             disableColor,
           })}
         </MaxSizedBox>
@@ -195,7 +196,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
     isNewFileResult,
     filename,
     availableTerminalHeight,
-    terminalWidth,
+    safeTerminalWidth,
     theme,
     settings,
     tabWidth,
@@ -234,10 +235,13 @@ export const renderDiffLines = ({
   terminalWidth,
   disableColor = false,
 }: RenderDiffLinesOptions): React.ReactNode[] => {
+  const safeTabWidth = Math.max(0, Math.floor(tabWidth || 0));
+  const safeTerminalWidth = Math.max(0, Math.floor(terminalWidth || 0));
+
   // 1. Normalize whitespace (replace tabs with spaces) *before* further processing
   const normalizedLines = parsedLines.map((line) => ({
     ...line,
-    content: line.content.replace(/\t/g, ' '.repeat(tabWidth)),
+    content: line.content.replace(/\t/g, ' '.repeat(safeTabWidth)),
   }));
 
   // Filter out non-displayable lines (hunks, potentially 'other') using the normalized list
@@ -307,7 +311,7 @@ export const renderDiffLines = ({
               borderLeft={false}
               borderRight={false}
               borderBottom={false}
-              width={terminalWidth}
+              width={safeTerminalWidth}
               borderColor={semanticTheme.text.secondary}
             ></Box>
           </Box>,
