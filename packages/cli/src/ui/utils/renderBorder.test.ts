@@ -86,5 +86,6 @@ describe('safeRepeat', () => {
   it('handles non-finite numbers safely', () => {
     expect(safeRepeat('a', NaN)).toBe('');
     expect(safeRepeat('a', Infinity)).toBe('');
+    expect(safeRepeat('a', -Infinity)).toBe('');
   });
 });

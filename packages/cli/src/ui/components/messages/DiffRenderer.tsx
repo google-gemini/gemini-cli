@@ -13,6 +13,7 @@ import { theme as semanticTheme } from '../../semantic-colors.js';
 import type { Theme } from '../../themes/theme.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
 import { getFileExtension } from '../../utils/fileUtils.js';
+import { safeRepeat } from '../../utils/borderStyles.js';
 
 export interface DiffLine {
   type: 'add' | 'del' | 'context' | 'hunk' | 'other';
@@ -241,7 +242,7 @@ export const renderDiffLines = ({
   // 1. Normalize whitespace (replace tabs with spaces) *before* further processing
   const normalizedLines = parsedLines.map((line) => ({
     ...line,
-    content: line.content.replace(/\t/g, ' '.repeat(safeTabWidth)),
+    content: line.content.replace(/\t/g, safeRepeat(' ', safeTabWidth)),
   }));
 
   // Filter out non-displayable lines (hunks, potentially 'other') using the normalized list
