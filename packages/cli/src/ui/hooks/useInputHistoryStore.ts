@@ -5,7 +5,7 @@
  */
 
 import { debugLogger } from '@google/gemini-cli-core';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 
 interface Logger {
   getPreviousUserMessages(): Promise<string[]>;
@@ -27,7 +27,9 @@ export function useInputHistoryStore(): UseInputHistoryStoreReturn {
   const [_currentSessionMessages, setCurrentSessionMessages] = useState<
     string[]
   >([]);
-  const [isInitialized, setIsInitialized] = useState(false);
+  const pastSessionMessagesRef = useRef<string[]>([]);
+  const currentSessionMessagesRef = useRef<string[]>([]);
+  const isInitializedRef = useRef(false);
 
   /**
    * Recalculate the complete input history from past and current sessions.
@@ -61,25 +63,27 @@ export function useInputHistoryStore(): UseInputHistoryStoreReturn {
    */
   const initializeFromLogger = useCallback(
     async (logger: Logger | null) => {
-      if (isInitialized || !logger) return;
+      if (isInitializedRef.current || !logger) return;
 
       try {
         const pastMessages = (await logger.getPreviousUserMessages()) || [];
+        pastSessionMessagesRef.current = pastMessages;
         setPastSessionMessages(pastMessages); // Store as newest first
         recalculateHistory([], pastMessages);
-        setIsInitialized(true);
+        isInitializedRef.current = true;
       } catch (error) {
         // Start with empty history even if logger initialization fails
         debugLogger.warn(
           'Failed to initialize input history from logger:',
           error,
         );
+        pastSessionMessagesRef.current = [];
         setPastSessionMessages([]);
         recalculateHistory([], []);
-        setIsInitialized(true);
+        isInitializedRef.current = true;
       }
     },
-    [isInitialized, recalculateHistory],
+    [recalculateHistory],
   );
 
   /**
@@ -91,19 +95,17 @@ export function useInputHistoryStore(): UseInputHistoryStoreReturn {
       const trimmedInput = input.trim();
       if (!trimmedInput) return; // Filter empty/whitespace-only inputs
 
-      setCurrentSessionMessages((prevCurrent) => {
-        const newCurrentSession = [...prevCurrent, trimmedInput];
+      const newCurrentSession = [
+        ...currentSessionMessagesRef.current,
+        trimmedInput,
+      ];
+      currentSessionMessagesRef.current = newCurrentSession;
+      setCurrentSessionMessages(newCurrentSession);
 
-        setPastSessionMessages((prevPast) => {
-          recalculateHistory(
-            newCurrentSession.slice().reverse(), // Convert to newest first
-            prevPast,
-          );
-          return prevPast; // No change to past messages
-        });
-
-        return newCurrentSession;
-      });
+      recalculateHistory(
+        newCurrentSession.slice().reverse(), // Convert to newest first
+        pastSessionMessagesRef.current,
+      );
     },
     [recalculateHistory],
   );

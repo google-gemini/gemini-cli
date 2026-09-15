@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { act } from 'react';
+import { act, createElement, StrictMode, type ReactNode } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { useInputHistoryStore } from './useInputHistoryStore.js';
@@ -169,6 +169,34 @@ describe('useInputHistoryStore', () => {
     });
 
     expect(result.current.inputHistory).toEqual(['test message']);
+  });
+
+  it('should update history once per add in StrictMode', async () => {
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(StrictMode, null, children);
+    const mockLogger = {
+      getPreviousUserMessages: vi.fn().mockResolvedValue(['past2', 'past1']),
+    };
+
+    const { result } = await renderHook(() => useInputHistoryStore(), {
+      wrapper,
+    });
+
+    await act(async () => {
+      await result.current.initializeFromLogger(mockLogger);
+    });
+
+    act(() => {
+      result.current.addInput('current1');
+      result.current.addInput('current2');
+    });
+
+    expect(result.current.inputHistory).toEqual([
+      'past1',
+      'past2',
+      'current1',
+      'current2',
+    ]);
   });
 
   describe('deduplication logic from previous implementation', () => {
