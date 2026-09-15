@@ -199,12 +199,28 @@ ${reason.stack}`
     }
   });
 
-  process.on('uncaughtException', (error) => {
-    // AbortError is expected when the user cancels a request (e.g. pressing ESC).
-    // It can propagate as an uncaught exception from event listeners, but it is not a bug.
-    if (error instanceof Error && error.name === 'AbortError') {
-      debugLogger.log(`Suppressed uncaught AbortError: ${error.message}`);
-      return;
+  process.on('uncaughtException', async (error) => {
+    if (error instanceof Error) {
+      // Suppress known race condition error in node-pty on Windows and Linux
+      const message = error.message || '';
+      const isPtyResizeError =
+        message === 'Cannot resize a pty that has already exited';
+      const isEbadfError =
+        message.includes('EBADF') ||
+        ('code' in error && error.code === 'EBADF');
+      const isFromNodePty =
+        error.stack?.includes('node-pty') || error.stack?.includes('PtyResize');
+
+      if ((isPtyResizeError || isEbadfError) && isFromNodePty) {
+        return;
+      }
+
+      // AbortError is expected when the user cancels a request (e.g. pressing ESC).
+      // It can propagate as an uncaught exception from event listeners, but it is not a bug.
+      if (error.name === 'AbortError') {
+        debugLogger.log(`Suppressed uncaught AbortError: ${error.message}`);
+        return;
+      }
     }
 
     const errorMessage = `=========================================
@@ -222,6 +238,11 @@ ${error.stack}`
 
     // For general uncaught exceptions, write to stderr and exit
     process.stderr.write(errorMessage + '\n');
+    try {
+      await runExitCleanup();
+    } catch (cleanupError) {
+      debugLogger.error('Error during uncaught exception cleanup:', cleanupError);
+    }
     process.exit(1);
   });
 }

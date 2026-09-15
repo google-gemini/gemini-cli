@@ -10,27 +10,37 @@ import { debugLogger } from '@google/gemini-cli-core';
 
 describe('setupUnhandledRejectionHandler - uncaughtException', () => {
   let initialUncaughtExceptionListeners: readonly unknown[] = [];
+  let initialUnhandledRejectionListeners: readonly unknown[] = [];
 
   beforeEach(() => {
     initialUncaughtExceptionListeners = process.listeners('uncaughtException');
+    initialUnhandledRejectionListeners = process.listeners('unhandledRejection');
     vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
     vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
   });
 
   afterEach(() => {
-    const currentListeners = process.listeners('uncaughtException');
-    currentListeners.forEach((listener) => {
+    const currentUncaughtListeners = process.listeners('uncaughtException');
+    currentUncaughtListeners.forEach((listener) => {
       if (!initialUncaughtExceptionListeners.includes(listener)) {
         process.removeListener('uncaughtException', listener);
       }
     });
+
+    const currentUnhandledListeners = process.listeners('unhandledRejection');
+    currentUnhandledListeners.forEach((listener) => {
+      if (!initialUnhandledRejectionListeners.includes(listener)) {
+        process.removeListener('unhandledRejection', listener);
+      }
+    });
+
     vi.restoreAllMocks();
   });
 
   it('should suppress uncaught AbortError', async () => {
     const debugLoggerErrorSpy = vi.spyOn(debugLogger, 'error');
     const debugLoggerLogSpy = vi.spyOn(debugLogger, 'log');
-    
+
     const abortError = new DOMException(
       'The operation was aborted.',
       'AbortError',
