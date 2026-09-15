@@ -4,7 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  afterAll,
+  beforeEach,
+  afterEach,
+  vi,
+} from 'vitest';
 import request from 'supertest';
 import type express from 'express';
 import * as fs from 'node:fs';
@@ -180,7 +189,7 @@ describe('Agent Server Endpoints', () => {
     let nonInMemoryServer: Server;
     let nonInMemoryWorkspace: string;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       vi.stubEnv('GCS_BUCKET_NAME', 'test-bucket');
       nonInMemoryWorkspace = fs.mkdtempSync(
         path.join(os.tmpdir(), 'gemini-agent-gcs-test-'),
@@ -193,7 +202,7 @@ describe('Agent Server Endpoints', () => {
       });
     });
 
-    afterAll(async () => {
+    afterEach(async () => {
       vi.unstubAllEnvs();
       if (nonInMemoryServer) {
         await new Promise<void>((resolve, reject) => {
