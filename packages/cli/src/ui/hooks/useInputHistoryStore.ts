@@ -23,10 +23,6 @@ export interface UseInputHistoryStoreReturn {
  */
 export function useInputHistoryStore(): UseInputHistoryStoreReturn {
   const [inputHistory, setInputHistory] = useState<string[]>([]);
-  const [_pastSessionMessages, setPastSessionMessages] = useState<string[]>([]);
-  const [_currentSessionMessages, setCurrentSessionMessages] = useState<
-    string[]
-  >([]);
   const pastSessionMessagesRef = useRef<string[]>([]);
   const currentSessionMessagesRef = useRef<string[]>([]);
   const isInitializedRef = useRef(false);
@@ -68,7 +64,6 @@ export function useInputHistoryStore(): UseInputHistoryStoreReturn {
       try {
         const pastMessages = (await logger.getPreviousUserMessages()) || [];
         pastSessionMessagesRef.current = pastMessages;
-        setPastSessionMessages(pastMessages); // Store as newest first
         recalculateHistory([], pastMessages);
         isInitializedRef.current = true;
       } catch (error) {
@@ -78,7 +73,6 @@ export function useInputHistoryStore(): UseInputHistoryStoreReturn {
           error,
         );
         pastSessionMessagesRef.current = [];
-        setPastSessionMessages([]);
         recalculateHistory([], []);
         isInitializedRef.current = true;
       }
@@ -100,7 +94,6 @@ export function useInputHistoryStore(): UseInputHistoryStoreReturn {
         trimmedInput,
       ];
       currentSessionMessagesRef.current = newCurrentSession;
-      setCurrentSessionMessages(newCurrentSession);
 
       recalculateHistory(
         newCurrentSession.slice().reverse(), // Convert to newest first
