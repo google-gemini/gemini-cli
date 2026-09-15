@@ -18,6 +18,20 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.60.0 - 2026-09-15
+
+- **Extension & Tool Safety Hardening:** Prompt for user consent on environment
+  changes and sanitize runtime-altering environment variables, while enforcing
+  envelope metadata provenance for untrusted tool outputs
+  ([#28863](https://github.com/google-gemini/gemini-cli/pull/28863) by
+  @amelidev, [#29215](https://github.com/google-gemini/gemini-cli/pull/29215) by
+  @luisfelipe-alt).
+- **Sandbox Directory Isolation:** Isolated settings and temporary directories
+  inside sandbox containers, including the macOS Seatbelt sandbox
+  ([#29171](https://github.com/google-gemini/gemini-cli/pull/29171),
+  [#29216](https://github.com/google-gemini/gemini-cli/pull/29216) by
+  @jvargassanchez-dot).
+
 ## Announcements: v0.59.0 - 2026-09-08
 
 - **MCP OAuth SSRF Mitigation:** Prevented Server-Side Request Forgery (SSRF)

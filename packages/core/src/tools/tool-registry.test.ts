@@ -874,7 +874,7 @@ describe('ToolRegistry', () => {
   });
 
   describe('DiscoveredToolInvocation', () => {
-    it('should return the stringified params from getDescription', () => {
+    it('should return clean function signature from getDescription and segregate explanation', () => {
       const tool = new DiscoveredTool(
         config,
         'test-tool',
@@ -883,10 +883,16 @@ describe('ToolRegistry', () => {
         {},
         mockMessageBus,
       );
-      const params = { param: 'testValue' };
+      const params = {
+        param: 'testValue',
+        description: 'Explanatory reasoning text',
+      };
       const invocation = tool.build(params);
-      const description = invocation.getDescription();
-      expect(description).toBe(JSON.stringify(params));
+      expect(invocation.getDescription()).toBe('test-tool(param: testValue)');
+      expect(invocation.getDisplayTitle?.()).toBe(
+        'test-tool(param: testValue)',
+      );
+      expect(invocation.getExplanation?.()).toBe('Explanatory reasoning text');
     });
   });
 });
