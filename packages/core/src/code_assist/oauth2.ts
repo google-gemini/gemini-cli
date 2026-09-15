@@ -807,8 +807,15 @@ async function cacheCredentials(credentials: Credentials) {
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
       existing = parsed as Credentials;
     }
-  } catch {
-    // Ignore and start with empty existing if file is missing or invalid JSON
+  } catch (error: unknown) {
+    const isNoEnt =
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      error.code === 'ENOENT';
+    if (!isNoEnt && !(error instanceof SyntaxError)) {
+      throw error;
+    }
   }
 
   const cleanCredentials: Record<string, unknown> = {};
