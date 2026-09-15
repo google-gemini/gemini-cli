@@ -188,12 +188,15 @@ describe('Agent Server Endpoints', () => {
     let nonInMemoryApp: express.Express;
     let nonInMemoryServer: Server;
     let nonInMemoryWorkspace: string;
+    let originalCwd: string;
 
     beforeEach(async () => {
-      vi.stubEnv('GCS_BUCKET_NAME', 'test-bucket');
+      originalCwd = process.cwd();
       nonInMemoryWorkspace = fs.mkdtempSync(
         path.join(os.tmpdir(), 'gemini-agent-gcs-test-'),
       );
+      vi.stubEnv('CODER_AGENT_WORKSPACE_PATH', nonInMemoryWorkspace);
+      vi.stubEnv('GCS_BUCKET_NAME', 'test-bucket');
       nonInMemoryApp = await createApp();
       await new Promise<void>((resolve) => {
         nonInMemoryServer = nonInMemoryApp.listen(0, () => {
@@ -211,6 +214,9 @@ describe('Agent Server Endpoints', () => {
             resolve();
           });
         });
+      }
+      if (originalCwd) {
+        process.chdir(originalCwd);
       }
       if (nonInMemoryWorkspace) {
         try {
