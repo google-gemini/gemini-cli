@@ -229,6 +229,11 @@ ${reason.stack}`
     }
     isHandlingUncaughtException = true;
 
+    // Prevent signals from triggering concurrent cleanup paths
+    process.removeAllListeners('SIGINT');
+    process.removeAllListeners('SIGTERM');
+    process.removeAllListeners('SIGHUP');
+
     const errorMessage = `=========================================
 This is an unexpected error. Please file a bug report using the /bug tool.
 CRITICAL: Uncaught Exception!
