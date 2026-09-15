@@ -280,12 +280,12 @@ export class ExecutionLifecycleService {
       }
     }
 
-    for (const [executionId, resolve] of this.activeResolvers.entries()) {
+    for (const executionId of Array.from(this.activeResolvers.keys())) {
       const execution = this.activeExecutions.get(executionId);
       const output =
         execution?.getBackgroundOutput?.() ?? execution?.output ?? '';
       try {
-        resolve({
+        this.completeWithResult(executionId, {
           rawOutput: Buffer.from(output, 'utf8'),
           output,
           exitCode: 130,

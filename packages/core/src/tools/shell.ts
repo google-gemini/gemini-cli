@@ -792,7 +792,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
               clearPromotionTimer();
             });
 
-          await new Promise((resolve) => setTimeout(resolve, delay));
+          await Promise.race([
+            resultPromise.catch(() => {}),
+            new Promise((resolve) => setTimeout(resolve, delay)),
+          ]);
 
           if (!completed) {
             return {

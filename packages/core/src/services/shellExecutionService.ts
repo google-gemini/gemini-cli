@@ -48,11 +48,7 @@ const { Terminal } = pkg;
 
 const MAX_CHILD_PROCESS_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB
 
-const PTY_FD_SEARCH_SUPPORTED_PLATFORMS: ReadonlySet<NodeJS.Platform> = new Set(
-  ['darwin', 'linux'] as const,
-);
 const PTY_ORPHAN_FD_SEARCH_RANGE = 8;
-const PTY_ORPHAN_FD_SEARCH_LOOKBACK = 2;
 
 /**
  * An environment variable that is set for shell executions. This can be used
@@ -161,7 +157,6 @@ interface ActivePty {
   maxSerializedLines?: number;
   command: string;
   sessionId?: string;
-  orphanSlaveFd?: number;
 }
 
 interface ActiveChildProcess {
@@ -907,10 +902,7 @@ export class ShellExecutionService {
    * Destroys a PTY process to release its file descriptors.
    * This is critical to prevent system-wide PTY exhaustion (see #15945).
    */
-  private static destroyPtyProcess(
-    ptyProcess: DestroyablePty,
-    orphanSlaveFd?: number,
-  ): void {
+  private static destroyPtyProcess(ptyProcess: DestroyablePty): void {
     try {
       if (typeof ptyProcess?.destroy === 'function') {
         ptyProcess.destroy();
@@ -920,26 +912,28 @@ export class ShellExecutionService {
     } catch {
       // ignored
     }
-
-    if (orphanSlaveFd !== undefined) {
-      try {
-        fs.closeSync(orphanSlaveFd);
-      } catch {
-        // ignored
-      }
-    }
   }
 
-  private static resolveOrphanSlaveFd(
+  /**
+   * Synchronously closes the orphan slave PTY file descriptor leaked in the
+   * parent process by @lydell/node-pty on macOS (darwin).
+   *
+   * Must be called immediately and synchronously on the same JS tick as
+   * `pty.spawn()` while `masterFd` is open. Closing synchronously at spawn
+   * time eliminates any risk of asynchronous FD reuse or closing an unrelated
+   * descriptor later in the lifecycle.
+   */
+  private static closeOrphanSlaveFd(
     masterFd: number | undefined,
     ptsName: string | undefined,
   ): number | undefined {
-    if (!PTY_FD_SEARCH_SUPPORTED_PLATFORMS.has(os.platform())) {
+    if (os.platform() !== 'darwin') {
       return undefined;
     }
     if (
       typeof masterFd !== 'number' ||
       !Number.isFinite(masterFd) ||
+      masterFd < 0 ||
       typeof ptsName !== 'string' ||
       ptsName.length === 0
     ) {
@@ -948,23 +942,53 @@ export class ShellExecutionService {
 
     let targetRdev: number;
     try {
-      targetRdev = fs.statSync(ptsName).rdev;
+      const targetStat = fs.statSync(ptsName);
+      if (
+        typeof targetStat.isCharacterDevice === 'function' &&
+        !targetStat.isCharacterDevice()
+      ) {
+        return undefined;
+      }
+      targetRdev = targetStat.rdev;
     } catch {
       return undefined;
     }
 
-    const startFd = Math.max(0, masterFd - PTY_ORPHAN_FD_SEARCH_LOOKBACK);
+    let targetRealPath: string | undefined;
+    try {
+      targetRealPath = fs.realpathSync(ptsName);
+    } catch {
+      // Optional path verification when realpathSync is supported/available
+    }
+
+    const startFd = masterFd + 1;
     const endFd = masterFd + PTY_ORPHAN_FD_SEARCH_RANGE;
 
     for (let candidateFd = startFd; candidateFd <= endFd; candidateFd++) {
-      if (candidateFd === masterFd) {
-        continue;
-      }
       try {
         const candidateStat = fs.fstatSync(candidateFd);
-        if (candidateStat.rdev === targetRdev) {
-          return candidateFd;
+        if (
+          typeof candidateStat.isCharacterDevice === 'function' &&
+          !candidateStat.isCharacterDevice()
+        ) {
+          continue;
         }
+        if (candidateStat.rdev !== targetRdev) {
+          continue;
+        }
+        if (targetRealPath !== undefined) {
+          try {
+            const candidatePath = fs.realpathSync(`/dev/fd/${candidateFd}`);
+            if (candidatePath !== targetRealPath) {
+              continue;
+            }
+          } catch {
+            // If /dev/fd resolution is unavailable (e.g. in mocked unit tests),
+            // rely on the verified character device rdev match.
+          }
+        }
+        fs.closeSync(candidateFd);
+        return candidateFd;
       } catch {
         // ignored
       }
@@ -981,7 +1005,7 @@ export class ShellExecutionService {
     const entry = this.activePtys.get(pid);
     if (!entry) return;
 
-    this.destroyPtyProcess(entry.ptyProcess, entry.orphanSlaveFd);
+    this.destroyPtyProcess(entry.ptyProcess);
 
     try {
       entry.headlessTerminal.dispose();
@@ -1008,7 +1032,6 @@ export class ShellExecutionService {
     let cmdCleanup: (() => void) | undefined;
     let ptyPid: number | undefined;
     let headlessTerminal: pkg.Terminal | undefined;
-    let orphanSlaveFdRef: number | undefined;
     const disposables: Array<{ dispose: () => void }> = [];
 
     try {
@@ -1061,10 +1084,7 @@ export class ShellExecutionService {
       const masterFd = (ptyProcess as unknown as { fd?: number }).fd;
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const ptsName = (ptyProcess as unknown as { ptsName?: string }).ptsName;
-      orphanSlaveFdRef = ShellExecutionService.resolveOrphanSlaveFd(
-        masterFd,
-        ptsName,
-      );
+      ShellExecutionService.closeOrphanSlaveFd(masterFd, ptsName);
 
       headlessTerminal = new Terminal({
         allowProposedApi: true,
@@ -1082,7 +1102,6 @@ export class ShellExecutionService {
         maxSerializedLines: shellExecutionConfig.maxSerializedLines,
         command: shellExecutionConfig.originalCommand ?? commandToExecute,
         sessionId: shellExecutionConfig.sessionId,
-        orphanSlaveFd: orphanSlaveFdRef,
       });
 
       const result = ExecutionLifecycleService.attachExecution(assignedPid, {
@@ -1326,10 +1345,10 @@ export class ShellExecutionService {
         exited = true;
         abortSignal.removeEventListener('abort', abortHandler);
 
-        // Immediately destroy the PTY to release its master FD and orphan slave FD.
+        // Immediately destroy the PTY to release its master FD.
         // The headless terminal is kept alive until finalize() extracts
         // its buffer contents, then disposed to free memory.
-        ShellExecutionService.destroyPtyProcess(pty, orphanSlaveFdRef);
+        ShellExecutionService.destroyPtyProcess(pty);
 
         const finalize = () => {
           render(true);
@@ -1461,7 +1480,7 @@ export class ShellExecutionService {
       }
 
       if (spawnedPty) {
-        ShellExecutionService.destroyPtyProcess(spawnedPty, orphanSlaveFdRef);
+        ShellExecutionService.destroyPtyProcess(spawnedPty);
       }
 
       if (headlessTerminal) {

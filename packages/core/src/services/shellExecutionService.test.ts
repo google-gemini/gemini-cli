@@ -1383,56 +1383,72 @@ describe('ShellExecutionService', () => {
     });
   });
 
-  describe('Orphan PTY slave FD resolution', () => {
-    const resolveOrphanSlaveFd = (
+  describe('Orphan PTY slave FD cleanup', () => {
+    const closeOrphanSlaveFd = (
       masterFd: number | undefined,
       ptsName: string | undefined,
     ): number | undefined =>
       (
         ShellExecutionService as unknown as {
-          resolveOrphanSlaveFd: (
+          closeOrphanSlaveFd: (
             fd: number | undefined,
             name: string | undefined,
           ) => number | undefined;
         }
-      ).resolveOrphanSlaveFd(masterFd, ptsName);
+      ).closeOrphanSlaveFd(masterFd, ptsName);
 
-    it('returns the matching fd when platform is darwin', () => {
+    it('synchronously closes the matching slave fd when platform is darwin', () => {
       mockPlatform.mockReturnValue('darwin');
+      mockCloseSync.mockClear();
       const targetRdev = 0xdead;
-      mockStatSync.mockReturnValue({ rdev: targetRdev });
+      mockStatSync.mockReturnValue({
+        rdev: targetRdev,
+        isCharacterDevice: () => true,
+      });
       mockFstatSync.mockImplementation((fd: number) => {
         if (fd === 12) {
-          return { rdev: targetRdev };
+          return { rdev: targetRdev, isCharacterDevice: () => true };
         }
-        return { rdev: 0x1234 };
+        return { rdev: 0x1234, isCharacterDevice: () => true };
       });
 
-      const result = resolveOrphanSlaveFd(10, '/dev/pts/0');
+      const result = closeOrphanSlaveFd(10, '/dev/ttys001');
       expect(result).toBe(12);
+      expect(mockCloseSync).toHaveBeenCalledTimes(1);
+      expect(mockCloseSync).toHaveBeenCalledWith(12);
     });
 
-    it('returns undefined on win32 without probing fds', () => {
-      mockPlatform.mockReturnValue('win32');
+    it('returns undefined on non-darwin platforms without probing fds', () => {
+      mockPlatform.mockReturnValue('linux');
       mockStatSync.mockClear();
       mockFstatSync.mockClear();
+      mockCloseSync.mockClear();
 
-      const result = resolveOrphanSlaveFd(10, '/dev/pts/0');
+      const result = closeOrphanSlaveFd(10, '/dev/pts/0');
       expect(result).toBeUndefined();
       expect(mockStatSync).not.toHaveBeenCalled();
       expect(mockFstatSync).not.toHaveBeenCalled();
+      expect(mockCloseSync).not.toHaveBeenCalled();
     });
 
     it('returns undefined when no candidate fd matches', () => {
-      mockPlatform.mockReturnValue('linux');
-      mockStatSync.mockReturnValue({ rdev: 0xbeef });
-      mockFstatSync.mockReturnValue({ rdev: 0x1234 });
+      mockPlatform.mockReturnValue('darwin');
+      mockCloseSync.mockClear();
+      mockStatSync.mockReturnValue({
+        rdev: 0xbeef,
+        isCharacterDevice: () => true,
+      });
+      mockFstatSync.mockReturnValue({
+        rdev: 0x1234,
+        isCharacterDevice: () => true,
+      });
 
-      const result = resolveOrphanSlaveFd(10, '/dev/pts/1');
+      const result = closeOrphanSlaveFd(10, '/dev/ttys002');
       expect(result).toBeUndefined();
+      expect(mockCloseSync).not.toHaveBeenCalled();
     });
 
-    it('destroyPtyProcess closes the orphan fd when provided', () => {
+    it('destroyPtyProcess destroys the PTY process without closing arbitrary fds', () => {
       mockCloseSync.mockClear();
       const destroy = vi.fn();
       const fakePty = {
@@ -1442,11 +1458,11 @@ describe('ShellExecutionService', () => {
 
       (
         ShellExecutionService as unknown as {
-          destroyPtyProcess: (p: unknown, orphanFd?: number) => void;
+          destroyPtyProcess: (p: unknown) => void;
         }
-      ).destroyPtyProcess(fakePty, 99);
+      ).destroyPtyProcess(fakePty);
       expect(destroy).toHaveBeenCalled();
-      expect(mockCloseSync).toHaveBeenCalledWith(99);
+      expect(mockCloseSync).not.toHaveBeenCalled();
     });
   });
 
