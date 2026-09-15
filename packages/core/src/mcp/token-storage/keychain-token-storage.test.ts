@@ -142,7 +142,9 @@ describe('KeychainTokenStorage', () => {
     });
 
     it('should handle deleteCredentials for non-existent server gracefully', async () => {
-      await expect(storage.deleteCredentials('non-existent')).resolves.not.toThrow();
+      await expect(
+        storage.deleteCredentials('non-existent'),
+      ).resolves.not.toThrow();
     });
 
     it('should manage secrets with prefix independently', async () => {

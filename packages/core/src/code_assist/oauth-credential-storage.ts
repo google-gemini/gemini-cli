@@ -69,8 +69,7 @@ export class OAuthCredentialStorage {
     const existing = await this.storage.getCredentials(MAIN_ACCOUNT_KEY);
     const mergedRefreshToken =
       credentials.refresh_token ?? existing?.token?.refreshToken;
-    const mergedScope =
-      credentials.scope ?? existing?.token?.scope;
+    const mergedScope = credentials.scope ?? existing?.token?.scope;
     const mergedTokenType =
       credentials.token_type ?? existing?.token?.tokenType;
     const mergedExpiresAt =
