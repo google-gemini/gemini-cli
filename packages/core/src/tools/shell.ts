@@ -792,10 +792,16 @@ export class ShellToolInvocation extends BaseToolInvocation<
               clearPromotionTimer();
             });
 
+          let raceTimeoutId: ReturnType<typeof setTimeout> | undefined;
           await Promise.race([
             resultPromise.catch(() => {}),
-            new Promise((resolve) => setTimeout(resolve, delay)),
+            new Promise<void>((resolve) => {
+              raceTimeoutId = setTimeout(resolve, delay);
+            }),
           ]);
+          if (raceTimeoutId) {
+            clearTimeout(raceTimeoutId);
+          }
 
           if (!completed) {
             return {
