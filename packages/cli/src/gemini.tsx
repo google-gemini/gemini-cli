@@ -172,99 +172,111 @@ export function getNodeMemoryArgs(isDebugMode: boolean): string[] {
 
 export function setupUnhandledRejectionHandler() {
   let unhandledRejectionOccurred = false;
-  process.on('unhandledRejection', (reason, _promise) => {
-    // AbortError is expected when the user cancels a request (e.g. pressing ESC).
-    // It may surface as an unhandled rejection due to async timing in the
-    // streaming pipeline, but it is not a bug.
-    if (reason instanceof Error && reason.name === 'AbortError') {
-      debugLogger.log(`Suppressed unhandled AbortError: ${reason.message}`);
-      return;
-    }
+  const hasUnhandled = process.listeners('unhandledRejection').some(
+    (l) => l.name === 'geminiUnhandledRejectionListener'
+  );
+  if (!hasUnhandled) {
+    const geminiUnhandledRejectionListener = (reason: unknown, _promise: Promise<unknown>) => {
+      // AbortError is expected when the user cancels a request (e.g. pressing ESC).
+      // It may surface as an unhandled rejection due to async timing in the
+      // streaming pipeline, but it is not a bug.
+      if (reason instanceof Error && reason.name === 'AbortError') {
+        debugLogger.log(`Suppressed unhandled AbortError: ${reason.message}`);
+        return;
+      }
 
-    const errorMessage = `=========================================
+      const errorMessage = `=========================================
 This is an unexpected error. Please file a bug report using the /bug tool.
 CRITICAL: Unhandled Promise Rejection!
 =========================================
 Reason: ${reason}${
-      reason instanceof Error && reason.stack
-        ? `
+        reason instanceof Error && reason.stack
+          ? `
 Stack trace:
 ${reason.stack}`
-        : ''
-    }`;
-    debugLogger.error(errorMessage);
-    if (!unhandledRejectionOccurred) {
-      unhandledRejectionOccurred = true;
-      appEvents.emit(AppEvent.OpenDebugConsole);
-    }
-  });
+          : ''
+      }`;
+      debugLogger.error(errorMessage);
+      if (!unhandledRejectionOccurred) {
+        unhandledRejectionOccurred = true;
+        appEvents.emit(AppEvent.OpenDebugConsole);
+      }
+    };
+    process.on('unhandledRejection', geminiUnhandledRejectionListener);
+  }
 
   let isHandlingUncaughtException = false;
-  process.on('uncaughtException', async (error) => {
-    if (error instanceof Error) {
-      // Suppress known race condition error in node-pty on Windows and Linux
-      const message = error.message || '';
-      const isPtyResizeError =
-        message === 'Cannot resize a pty that has already exited';
-      const isEbadfError =
-        message.includes('EBADF') ||
-        ('code' in error && error.code === 'EBADF');
-      const isFromNodePty =
-        error.stack?.includes('node-pty') || error.stack?.includes('PtyResize');
+  const hasUncaught = process.listeners('uncaughtException').some(
+    (l) => l.name === 'geminiUncaughtExceptionListener'
+  );
+  if (!hasUncaught) {
+    const geminiUncaughtExceptionListener = async (error: Error) => {
+      if (error instanceof Error) {
+        // Suppress known race condition error in node-pty on Windows and Linux
+        const message = error.message || '';
+        const isPtyResizeError =
+          message === 'Cannot resize a pty that has already exited';
+        const isEbadfError =
+          message.includes('EBADF') ||
+          ('code' in error && error.code === 'EBADF');
+        const isFromNodePty =
+          error.stack?.includes('node-pty') || error.stack?.includes('PtyResize');
 
-      if ((isPtyResizeError || isEbadfError) && isFromNodePty) {
-        return;
+        if ((isPtyResizeError || isEbadfError) && isFromNodePty) {
+          return;
+        }
+
+        // AbortError is expected when the user cancels a request (e.g. pressing ESC).
+        // It can propagate as an uncaught exception from event listeners, but it is not a bug.
+        if (error.name === 'AbortError') {
+          debugLogger.log(`Suppressed uncaught AbortError: ${error.message}`);
+          return;
+        }
       }
 
-      // AbortError is expected when the user cancels a request (e.g. pressing ESC).
-      // It can propagate as an uncaught exception from event listeners, but it is not a bug.
-      if (error.name === 'AbortError') {
-        debugLogger.log(`Suppressed uncaught AbortError: ${error.message}`);
-        return;
+      if (isHandlingUncaughtException) {
+        process.exit(1);
       }
-    }
+      isHandlingUncaughtException = true;
 
-    if (isHandlingUncaughtException) {
-      process.exit(1);
-    }
-    isHandlingUncaughtException = true;
+      // Prevent signals from triggering concurrent cleanup paths
+      process.removeAllListeners('SIGINT');
+      process.removeAllListeners('SIGTERM');
+      process.removeAllListeners('SIGHUP');
 
-    // Prevent signals from triggering concurrent cleanup paths
-    process.removeAllListeners('SIGINT');
-    process.removeAllListeners('SIGTERM');
-    process.removeAllListeners('SIGHUP');
-
-    const errorMessage = `=========================================
+      const errorMessage = `=========================================
 This is an unexpected error. Please file a bug report using the /bug tool.
 CRITICAL: Uncaught Exception!
 =========================================
 Error: ${error instanceof Error ? error.message : error}${
-      error instanceof Error && error.stack
-        ? `
+        error instanceof Error && error.stack
+          ? `
 Stack trace:
 ${error.stack}`
-        : ''
-    }`;
-    debugLogger.error(errorMessage);
+          : ''
+      }`;
+      debugLogger.error(errorMessage);
 
-    // For general uncaught exceptions, write to stderr and exit
-    process.stderr.write(errorMessage + '\n');
+      // For general uncaught exceptions, write to stderr and exit
+      process.stderr.write(errorMessage + '\n');
 
-    const cleanupTimeout = setTimeout(() => {
-      process.stderr.write('Cleanup timed out, forcing exit...\n');
+      const cleanupTimeout = setTimeout(() => {
+        process.stderr.write('Cleanup timed out, forcing exit...\n');
+        process.exit(1);
+      }, 5000);
+      cleanupTimeout.unref();
+
+      try {
+        await runExitCleanup();
+      } catch (cleanupError) {
+        debugLogger.error('Error during uncaught exception cleanup:', cleanupError);
+      } finally {
+        clearTimeout(cleanupTimeout);
+      }
       process.exit(1);
-    }, 5000);
-    cleanupTimeout.unref();
-
-    try {
-      await runExitCleanup();
-    } catch (cleanupError) {
-      debugLogger.error('Error during uncaught exception cleanup:', cleanupError);
-    } finally {
-      clearTimeout(cleanupTimeout);
-    }
-    process.exit(1);
-  });
+    };
+    process.on('uncaughtException', geminiUncaughtExceptionListener);
+  }
 }
 
 export async function resolveSessionId(
