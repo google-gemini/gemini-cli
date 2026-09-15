@@ -32,7 +32,15 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { isRecord } from '../utils/markdownUtils.js';
 import type { CheckerRunner } from '../safety/checker-runner.js';
 import { SafetyCheckDecision } from '../safety/protocol.js';
-import { getToolAliases, AGENT_TOOL_NAME } from '../tools/tool-names.js';
+import {
+  isBuildFile,
+  extractFilePathFromArgs,
+} from '../utils/buildFileUtils.js';
+import {
+  getToolAliases,
+  AGENT_TOOL_NAME,
+  EDIT_TOOL_NAMES,
+} from '../tools/tool-names.js';
 import { PARAM_ADDITIONAL_PERMISSIONS } from '../tools/definitions/base-declarations.js';
 import {
   MCP_TOOL_PREFIX,
@@ -351,6 +359,7 @@ export class PolicyEngine {
   private async applyShellHeuristics(
     command: string,
     decision: PolicyDecision,
+    dir_path?: string,
   ): Promise<PolicyDecision> {
     if (decision === PolicyDecision.DENY) {
       return PolicyDecision.DENY;
@@ -360,6 +369,25 @@ export class PolicyEngine {
       const parsedObjArgs = shellParse(command);
       const parsedArgs = parsedObjArgs.map(extractStringFromParseEntry);
 
+      const workspace =
+        typeof this.sandboxManager.getWorkspace === 'function'
+          ? this.sandboxManager.getWorkspace()
+          : process.cwd();
+      const effectiveCwd = dir_path
+        ? path.resolve(workspace, dir_path)
+        : workspace;
+
+      if (
+        effectiveCwd !== workspace &&
+        !isSubpath(workspace, effectiveCwd) &&
+        this.approvalMode !== ApprovalMode.YOLO
+      ) {
+        debugLogger.debug(
+          `[PolicyEngine.check] Command working directory is outside workspace, forcing ASK_USER: ${command}`,
+        );
+        return PolicyDecision.ASK_USER;
+      }
+
       if (containsGitCommand(parsedArgs) && !this.isTrustedFolder()) {
         debugLogger.debug(
           `[PolicyEngine.check] Git command evaluated in untrusted workspace. Forcing ASK_USER: ${command}`,
@@ -367,7 +395,7 @@ export class PolicyEngine {
         return PolicyDecision.ASK_USER;
       }
 
-      if (this.sandboxManager.isDangerousCommand(parsedArgs)) {
+      if (this.sandboxManager.isDangerousCommand(parsedArgs, effectiveCwd)) {
         if (this.approvalMode === ApprovalMode.YOLO) {
           debugLogger.debug(
             `[PolicyEngine.check] Command evaluated as dangerous, but YOLO mode is active. Preserving decision: ${command}`,
@@ -382,9 +410,16 @@ export class PolicyEngine {
       }
 
       if (
-        this.sandboxManager.isKnownSafeCommand(parsedArgs) &&
+        this.sandboxManager.isKnownSafeCommand(parsedArgs, effectiveCwd) &&
         decision === PolicyDecision.ASK_USER
       ) {
+        if (effectiveCwd !== workspace && !isSubpath(workspace, effectiveCwd)) {
+          debugLogger.debug(
+            `[PolicyEngine.check] dir_path evaluated outside workspace. Preserving ASK_USER: ${command}`,
+          );
+          return PolicyDecision.ASK_USER;
+        }
+
         if (containsGitCommand(parsedArgs) && !this.isTrustedFolder()) {
           debugLogger.debug(
             `[PolicyEngine.check] Known safe Git command evaluated in untrusted workspace. Preserving ASK_USER: ${command}`,
@@ -667,7 +702,11 @@ export class PolicyEngine {
           !('commandPrefix' in rule) &&
           !rule.argsPattern
         ) {
-          ruleDecision = await this.applyShellHeuristics(command, ruleDecision);
+          ruleDecision = await this.applyShellHeuristics(
+            command,
+            ruleDecision,
+            shellDirPath,
+          );
         }
 
         if (isShellCommand && toolName) {
@@ -699,38 +738,37 @@ export class PolicyEngine {
         debugLogger.debug(
           `[PolicyEngine.check] NO MATCH in YOLO mode - using ALLOW`,
         );
-        return {
-          decision: PolicyDecision.ALLOW,
-        };
-      }
+        decision = PolicyDecision.ALLOW;
+      } else {
+        debugLogger.debug(
+          `[PolicyEngine.check] NO MATCH - using default decision: ${this.defaultDecision}`,
+        );
+        if (toolName && SHELL_TOOL_NAMES.includes(toolName)) {
+          let heuristicDecision = this.defaultDecision;
+          if (!skipHeuristics && command) {
+            heuristicDecision = await this.applyShellHeuristics(
+              command,
+              heuristicDecision,
+              shellDirPath,
+            );
+          }
 
-      debugLogger.debug(
-        `[PolicyEngine.check] NO MATCH - using default decision: ${this.defaultDecision}`,
-      );
-      if (toolName && SHELL_TOOL_NAMES.includes(toolName)) {
-        let heuristicDecision = this.defaultDecision;
-        if (!skipHeuristics && command) {
-          heuristicDecision = await this.applyShellHeuristics(
+          const shellResult = await this.checkShellCommand(
+            toolName,
             command,
             heuristicDecision,
+            serverName,
+            shellDirPath,
+            false,
+            undefined,
+            toolAnnotations,
+            subagent,
           );
+          decision = shellResult.decision;
+          matchedRule = shellResult.rule;
+        } else {
+          decision = this.defaultDecision;
         }
-
-        const shellResult = await this.checkShellCommand(
-          toolName,
-          command,
-          heuristicDecision,
-          serverName,
-          shellDirPath,
-          false,
-          undefined,
-          toolAnnotations,
-          subagent,
-        );
-        decision = shellResult.decision;
-        matchedRule = shellResult.rule;
-      } else {
-        decision = this.defaultDecision;
       }
     }
 
@@ -760,6 +798,61 @@ export class PolicyEngine {
             decision = PolicyDecision.ASK_USER;
             break;
           }
+        }
+      }
+
+      // Build File Protection: Always require user confirmation when modifying build configuration files
+      const isFileEditTool = toolNamesToTry.some((name) => {
+        if (
+          EDIT_TOOL_NAMES.has(name) ||
+          name === 'replace' ||
+          name === 'write_file'
+        ) {
+          return true;
+        }
+        const editKeywords = new Set([
+          'write',
+          'edit',
+          'replace',
+          'patch',
+          'update',
+          'create',
+          'append',
+          'save',
+        ]);
+        const tokens = name.toLowerCase().split(/[^a-z0-9]+/);
+        return tokens.some((token) => editKeywords.has(token));
+      });
+      if (isFileEditTool) {
+        let targetPath = extractFilePathFromArgs(toolCall.args);
+        if (targetPath) {
+          targetPath = targetPath.trim();
+          if (process.platform === 'win32') {
+            let end = targetPath.length;
+            while (
+              end > 0 &&
+              (targetPath[end - 1] === '.' || targetPath[end - 1] === ' ')
+            ) {
+              end--;
+            }
+            targetPath = targetPath.slice(0, end);
+          }
+        }
+        if (targetPath && isBuildFile(targetPath)) {
+          debugLogger.debug(
+            `[PolicyEngine.check] Target path '${targetPath}' is a build file. Downgrading to ASK_USER.`,
+          );
+          decision = this.nonInteractive
+            ? PolicyDecision.DENY
+            : PolicyDecision.ASK_USER;
+          matchedRule = {
+            toolName: toolCall.name ?? 'replace',
+            decision,
+            priority: Number.MAX_SAFE_INTEGER,
+            source: 'Build File Protection',
+            denyMessage:
+              'Modifying build configuration files requires explicit user confirmation',
+          };
         }
       }
     }

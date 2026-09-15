@@ -62,6 +62,8 @@ import {
   resolveModel,
 } from '../config/models.js';
 import { discoverJitContext, appendJitContext } from './jit-context.js';
+import { isBuildFile } from '../utils/buildFileUtils.js';
+import { recordModifiedBuildFile } from '../utils/untrustedContextTracker.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -360,6 +362,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         }
       },
       ideConfirmation,
+      isBuildFile: isBuildFile(this.resolvedPath),
     };
     return confirmationDetails;
   }
@@ -436,6 +439,10 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         .getFileSystemService()
         .writeTextFile(this.resolvedPath, finalContent);
 
+      if (isBuildFile(this.resolvedPath)) {
+        recordModifiedBuildFile(this.resolvedPath, this.config);
+      }
+
       // Generate diff for display result
       const fileName = path.basename(this.resolvedPath);
       // If there was a readError, originalContent in correctedContentResult is '',
@@ -508,6 +515,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         newContent: correctedContentResult.correctedContent,
         diffStat,
         isNewFile,
+        isBuildFile: isBuildFile(this.resolvedPath),
       };
 
       // Discover JIT subdirectory context for the written file path

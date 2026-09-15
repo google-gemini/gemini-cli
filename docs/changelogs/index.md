@@ -18,6 +18,38 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.59.0 - 2026-09-08
+
+- **MCP OAuth SSRF Mitigation:** Prevented Server-Side Request Forgery (SSRF)
+  during Model Context Protocol (MCP) OAuth metadata discovery and
+  authentication
+  ([#29081](https://github.com/google-gemini/gemini-cli/pull/29081) by
+  @josebalius).
+- **Fail-Closed Workspace Trust:** Enforced a secure, fail-closed workspace
+  trust policy and filtered available `mcpServers` when operating in restricted
+  mode ([#29099](https://github.com/google-gemini/gemini-cli/pull/29099) by
+  @luisfelipe-alt).
+
+## Announcements: v0.58.0 - 2026-09-01
+
+- **Core Security & Path Handling:** Enforced consistent symlink evaluation in
+  ignore path handling and declared top-level safety checkers in write policy
+  configuration
+  ([#28915](https://github.com/google-gemini/gemini-cli/pull/28915),
+  [#28961](https://github.com/google-gemini/gemini-cli/pull/28961) by
+  @luisfelipe-alt).
+- **macOS Seatbelt Sandbox:** Isolated Docker and container runtime sockets and
+  binaries to restrict container runtime access in the macOS sandbox
+  ([#28935](https://github.com/google-gemini/gemini-cli/pull/28935) by
+  @josebalius).
+- **Session & Recovery Optimizations:** Optimized history rollback mechanics,
+  retry nudge prompts, and resolved stale cancellation errors in the
+  Agent-to-Agent server
+  ([#28934](https://github.com/google-gemini/gemini-cli/pull/28934) by
+  @DavidAPierce,
+  [#28940](https://github.com/google-gemini/gemini-cli/pull/28940) by
+  @amelidev).
+
 ## Announcements: v0.54.0 - 2026-08-06
 
 - **PR Automation & Antigravity Agent:** Integrated the Antigravity agent runner

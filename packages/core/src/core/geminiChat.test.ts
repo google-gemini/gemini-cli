@@ -2305,6 +2305,39 @@ describe('GeminiChat', () => {
       );
     });
 
+    it('should send an explicit versioned Flash model unchanged when Gemini 3.5 Flash GA is enabled', async () => {
+      vi.mocked(mockConfig.hasGemini35FlashGAAccess).mockReturnValue(true);
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: { parts: [{ text: 'response' }], role: 'model' },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-3.8-flash' },
+        'hello',
+        'prompt-id-explicit-flash',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledWith(
+        expect.objectContaining({ model: 'gemini-3.8-flash' }),
+        'prompt-id-explicit-flash',
+        LlmRole.MAIN,
+      );
+    });
+
     it('should use thinkingLevel and remove thinkingBudget for gemini-3 models', async () => {
       const response = (async function* () {
         yield {
