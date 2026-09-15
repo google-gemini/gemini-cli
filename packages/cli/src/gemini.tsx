@@ -199,6 +199,7 @@ ${reason.stack}`
     }
   });
 
+  let isHandlingUncaughtException = false;
   process.on('uncaughtException', async (error) => {
     if (error instanceof Error) {
       // Suppress known race condition error in node-pty on Windows and Linux
@@ -223,6 +224,11 @@ ${reason.stack}`
       }
     }
 
+    if (isHandlingUncaughtException) {
+      process.exit(1);
+    }
+    isHandlingUncaughtException = true;
+
     const errorMessage = `=========================================
 This is an unexpected error. Please file a bug report using the /bug tool.
 CRITICAL: Uncaught Exception!
@@ -238,10 +244,19 @@ ${error.stack}`
 
     // For general uncaught exceptions, write to stderr and exit
     process.stderr.write(errorMessage + '\n');
+
+    const cleanupTimeout = setTimeout(() => {
+      process.stderr.write('Cleanup timed out, forcing exit...\n');
+      process.exit(1);
+    }, 5000);
+    cleanupTimeout.unref();
+
     try {
       await runExitCleanup();
     } catch (cleanupError) {
       debugLogger.error('Error during uncaught exception cleanup:', cleanupError);
+    } finally {
+      clearTimeout(cleanupTimeout);
     }
     process.exit(1);
   });
