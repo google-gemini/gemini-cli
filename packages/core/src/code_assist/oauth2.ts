@@ -818,24 +818,16 @@ async function cacheCredentials(credentials: Credentials) {
     }
   }
 
-  const cleanCredentials: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(credentials)) {
-    if (value !== undefined && value !== null) {
-      cleanCredentials[key] = value;
-    }
-  }
+  const cleanCredentials = Object.fromEntries(
+    Object.entries(credentials).filter(
+      ([_, v]) => v !== null && v !== undefined,
+    ),
+  );
 
-  const mergedCredentials = {
+  const finalCredentials = {
     ...existing,
     ...cleanCredentials,
   };
-
-  const finalCredentials: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(mergedCredentials)) {
-    if (value !== undefined && value !== null) {
-      finalCredentials[key] = value;
-    }
-  }
 
   const credString = JSON.stringify(finalCredentials, null, 2);
   await fs.writeFile(filePath, credString, { mode: 0o600 });
