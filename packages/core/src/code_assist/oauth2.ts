@@ -804,7 +804,7 @@ async function cacheCredentials(credentials: Credentials) {
   try {
     const existingContent = await fs.readFile(filePath, 'utf-8');
     const parsed: unknown = JSON.parse(existingContent);
-    if (parsed && typeof parsed === 'object') {
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
       existing = parsed as Credentials;
     }
   } catch {
