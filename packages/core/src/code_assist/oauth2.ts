@@ -800,7 +800,35 @@ async function cacheCredentials(credentials: Credentials) {
   const filePath = Storage.getOAuthCredsPath();
   await fs.mkdir(path.dirname(filePath), { recursive: true });
 
-  const credString = JSON.stringify(credentials, null, 2);
+  let existing: Credentials = {};
+  try {
+    const existingContent = await fs.readFile(filePath, 'utf-8');
+    const parsed: unknown = JSON.parse(existingContent);
+    if (parsed && typeof parsed === 'object') {
+      existing = parsed as Credentials;
+    }
+  } catch {
+    // Ignore and start with empty existing if file is missing or invalid JSON
+  }
+
+  const mergedCredentials = {
+    ...existing,
+    ...credentials,
+    refresh_token: credentials.refresh_token || existing.refresh_token,
+    scope: credentials.scope || existing.scope,
+    token_type: credentials.token_type || existing.token_type,
+    expiry_date: credentials.expiry_date || existing.expiry_date,
+    id_token: credentials.id_token || existing.id_token,
+  };
+
+  const finalCredentials: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(mergedCredentials)) {
+    if (value !== undefined && value !== null) {
+      finalCredentials[key] = value;
+    }
+  }
+
+  const credString = JSON.stringify(finalCredentials, null, 2);
   await fs.writeFile(filePath, credString, { mode: 0o600 });
   try {
     await fs.chmod(filePath, 0o600);
