@@ -198,6 +198,32 @@ ${reason.stack}`
       appEvents.emit(AppEvent.OpenDebugConsole);
     }
   });
+
+  process.on('uncaughtException', (error) => {
+    // AbortError is expected when the user cancels a request (e.g. pressing ESC).
+    // It can propagate as an uncaught exception from event listeners, but it is not a bug.
+    if (error instanceof Error && error.name === 'AbortError') {
+      debugLogger.log(`Suppressed uncaught AbortError: ${error.message}`);
+      return;
+    }
+
+    const errorMessage = `=========================================
+This is an unexpected error. Please file a bug report using the /bug tool.
+CRITICAL: Uncaught Exception!
+=========================================
+Error: ${error instanceof Error ? error.message : error}${
+      error instanceof Error && error.stack
+        ? `
+Stack trace:
+${error.stack}`
+        : ''
+    }`;
+    debugLogger.error(errorMessage);
+
+    // For general uncaught exceptions, write to stderr and exit
+    process.stderr.write(errorMessage + '\n');
+    process.exit(1);
+  });
 }
 
 export async function resolveSessionId(

@@ -35,6 +35,11 @@ process.on('uncaughtException', (error) => {
       // It is a race condition in node-pty that we cannot prevent, so we silence it.
       return;
     }
+
+    if (error.name === 'AbortError') {
+      // Suppress AbortError during request cancellation.
+      return;
+    }
   }
 
   // For other errors, we rely on the default behavior, but since we attached a listener,
