@@ -687,6 +687,7 @@ export class TestRig {
         key !== 'GEMINI_CLI_TEST_VAR' &&
         key !== 'GEMINI_CLI_INTEGRATION_TEST' &&
         key !== 'GOOGLE_GEMINI_BASE_URL' &&
+        key !== 'GEMINI_FORCE_FILE_STORAGE' &&
         !key.startsWith('GEMINI_CLI_ACTIVITY_LOG')
       ) {
         delete cleanEnv[key];
@@ -697,6 +698,7 @@ export class TestRig {
       ...cleanEnv,
       GEMINI_CLI_HOME: this.homeDir!,
       GEMINI_PTY_INFO: 'child_process',
+      GEMINI_FORCE_FILE_STORAGE: 'true',
       ...extraEnv,
     };
   }

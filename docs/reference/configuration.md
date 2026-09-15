@@ -2736,10 +2736,10 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - Run the CLI once with this set to generate the file.
 - **`SEATBELT_PROFILE`** (macOS specific):
   - Switches the Seatbelt (`sandbox-exec`) profile on macOS.
-  - `permissive-open`: (Default) Restricts writes to the project folder (and a
-    few other folders, see
-    `packages/cli/src/utils/sandbox-macos-permissive-open.sb`) but allows other
-    operations.
+  - `permissive-open`: (Default) Denies operations by default, confining writes
+    to the project folder (and a few other folders, see
+    `packages/cli/src/utils/sandbox-macos-permissive-open.sb`) while allowing
+    broad file reads and network access.
   - `restrictive-open`: Declines operations by default, allows network.
   - `strict-open`: Restricts both reads and writes to the working directory,
     allows network.

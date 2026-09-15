@@ -290,6 +290,10 @@ export class ReadFileTool extends BaseDeclarativeTool<
     const fileFilteringOptions = this.config.getFileFilteringOptions();
     if (
       this.fileDiscoveryService.shouldIgnoreFile(
+        sanitizedPath,
+        fileFilteringOptions,
+      ) ||
+      this.fileDiscoveryService.shouldIgnoreFile(
         resolvedPath,
         fileFilteringOptions,
       )

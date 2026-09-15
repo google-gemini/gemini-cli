@@ -8,6 +8,7 @@ import { simpleGit } from 'simple-git';
 import {
   debugLogger,
   getErrorMessage,
+  getSafeGitEnv,
   type ExtensionInstallMetadata,
   type GeminiCLIExtension,
 } from '@google/gemini-cli-core';
@@ -33,7 +34,7 @@ export async function cloneFromGit(
   destination: string,
 ): Promise<void> {
   try {
-    const git = simpleGit(destination);
+    const git = simpleGit(destination).env(getSafeGitEnv());
     let sourceUrl = installMetadata.source;
     const token = getGitHubToken();
     if (token) {
@@ -223,7 +224,7 @@ export async function checkForExtensionUpdate(
 
   try {
     if (installMetadata.type === 'git') {
-      const git = simpleGit(extension.path);
+      const git = simpleGit(extension.path).env(getSafeGitEnv());
       const remotes = await git.getRemotes(true);
       if (remotes.length === 0) {
         debugLogger.error('No git remotes found.');

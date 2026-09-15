@@ -74,12 +74,10 @@ async function waitForSessionScratchpad(
 }
 
 describe('memory persistence', () => {
-  const proactiveMemoryFromLongSession =
-    'Agent saves preference from earlier in conversation history';
   evalTest('USUALLY_PASSES', {
     suiteName: 'default',
     suiteType: 'behavioral',
-    name: proactiveMemoryFromLongSession,
+    name: 'Agent saves preference from earlier in conversation history',
     messages: [
       {
         id: 'msg-1',
@@ -195,12 +193,10 @@ describe('memory persistence', () => {
     },
   });
 
-  const memoryRoutesTeamConventionsToProjectGemini =
-    'Agent routes team-shared project conventions to ./GEMINI.md';
   evalTest('USUALLY_PASSES', {
     suiteName: 'default',
     suiteType: 'behavioral',
-    name: memoryRoutesTeamConventionsToProjectGemini,
+    name: 'Agent routes team-shared project conventions to ./GEMINI.md',
     messages: [
       {
         id: 'msg-1',
@@ -303,12 +299,10 @@ describe('memory persistence', () => {
     },
   });
 
-  const memorySessionScratchpad =
-    'Session summary persists memory scratchpad for memory-saving sessions';
   evalTest('USUALLY_PASSES', {
     suiteName: 'default',
     suiteType: 'behavioral',
-    name: memorySessionScratchpad,
+    name: 'Session summary persists memory scratchpad for memory-saving sessions',
     sessionId: 'memory-scratchpad-eval',
     messages: [
       {
@@ -395,12 +389,10 @@ describe('memory persistence', () => {
     },
   });
 
-  const memoryRoutesUserProject =
-    'Agent routes personal-to-user project notes to user-project memory';
   evalTest('USUALLY_PASSES', {
     suiteName: 'default',
     suiteType: 'behavioral',
-    name: memoryRoutesUserProject,
+    name: 'Agent routes personal-to-user project notes to user-project memory',
     prompt: `Please remember my personal local dev setup for THIS project's Postgres database. This is private to my machine — do NOT commit it to the repo.
 
 Connection details:
@@ -486,12 +478,10 @@ Quirks to remember:
     },
   });
 
-  const memoryRoutesCrossProjectToGlobal =
-    'Agent routes cross-project personal preferences to ~/.gemini/GEMINI.md';
   evalTest('USUALLY_PASSES', {
     suiteName: 'default',
     suiteType: 'behavioral',
-    name: memoryRoutesCrossProjectToGlobal,
+    name: 'Agent routes cross-project personal preferences to ~/.gemini/GEMINI.md',
     prompt:
       'Please remember this about me in general: across all my projects I always prefer Prettier with single quotes and trailing commas, and I always prefer tabs over spaces for indentation. These are my personal coding-style defaults that follow me into every workspace.',
     assert: async (rig, result) => {

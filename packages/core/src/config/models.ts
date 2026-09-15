@@ -229,7 +229,7 @@ export function resolveModel(
 
   if (
     useGemini3_5Flash &&
-    isFlashModel(resolved) &&
+    isPromotableFlashModel(resolved) &&
     normalizedModel !== PREVIEW_GEMINI_FLASH_MODEL
   ) {
     return DEFAULT_GEMINI_FLASH_MODEL;
@@ -259,14 +259,15 @@ export function resolveModel(
   return resolved;
 }
 
-function isFlashModel(model: string): boolean {
+function isPromotableFlashModel(model: string): boolean {
+  // Keep explicit versioned model IDs intact so callers can pin newer or older
+  // Flash models. Rollout remapping only applies to known aliases/backend IDs.
   return (
     model === DEFAULT_GEMINI_FLASH_MODEL ||
     model === PREVIEW_GEMINI_FLASH_MODEL ||
     model === DEFAULT_GEMINI_3_5_FLASH_MODEL ||
     model === SECONDARY_GEMINI_3_5_FLASH_MODEL ||
-    model === 'flash' ||
-    model.endsWith('flash')
+    model === GEMINI_MODEL_ALIAS_FLASH
   );
 }
 

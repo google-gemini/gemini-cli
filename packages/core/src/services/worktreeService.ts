@@ -9,6 +9,7 @@ import * as fs from 'node:fs/promises';
 import { realpathSync } from 'node:fs';
 import { execa } from 'execa';
 import { debugLogger } from '../utils/debugLogger.js';
+import { getSafeGitEnv } from '../utils/gitUtils.js';
 
 export interface WorktreeInfo {
   name: string;
@@ -43,6 +44,7 @@ export class WorktreeService {
     // Capture the base commit before creating the worktree
     const { stdout: baseSha } = await execa('git', ['rev-parse', 'HEAD'], {
       cwd: this.projectRoot,
+      env: getSafeGitEnv(),
     });
 
     const worktreePath = await createWorktree(this.projectRoot, worktreeName);
@@ -95,6 +97,7 @@ export async function getProjectRootForWorktree(cwd: string): Promise<string> {
   try {
     const { stdout } = await execa('git', ['rev-parse', '--git-common-dir'], {
       cwd,
+      env: getSafeGitEnv(),
     });
     const gitCommonDir = stdout.trim();
     const absoluteGitDir = path.isAbsolute(gitCommonDir)
@@ -124,6 +127,7 @@ export async function createWorktree(
 
   await execa('git', ['worktree', 'add', worktreePath, '-b', branchName], {
     cwd: projectRoot,
+    env: getSafeGitEnv(),
   });
 
   return worktreePath;
@@ -152,6 +156,7 @@ export async function hasWorktreeChanges(
     // 1. Check for uncommitted changes (index or working tree)
     const { stdout: status } = await execa('git', ['status', '--porcelain'], {
       cwd: dirPath,
+      env: getSafeGitEnv(),
     });
     if (status.trim() !== '') {
       return true;
@@ -161,6 +166,7 @@ export async function hasWorktreeChanges(
     if (baseSha) {
       const { stdout: currentSha } = await execa('git', ['rev-parse', 'HEAD'], {
         cwd: dirPath,
+        env: getSafeGitEnv(),
       });
       if (currentSha.trim() !== baseSha) {
         return true;
@@ -196,6 +202,7 @@ export async function cleanupWorktree(
       ['-C', dirPath, 'branch', '--show-current'],
       {
         cwd: projectRoot,
+        env: getSafeGitEnv(),
       },
     );
     branchName = stdout.trim() || undefined;
@@ -203,6 +210,7 @@ export async function cleanupWorktree(
     // 2. Remove the worktree
     await execa('git', ['worktree', 'remove', dirPath, '--force'], {
       cwd: projectRoot,
+      env: getSafeGitEnv(),
     });
   } catch (e: unknown) {
     debugLogger.debug(
@@ -214,6 +222,7 @@ export async function cleanupWorktree(
       try {
         await execa('git', ['branch', '-D', branchName], {
           cwd: projectRoot,
+          env: getSafeGitEnv(),
         });
       } catch (e: unknown) {
         debugLogger.debug(

@@ -663,10 +663,12 @@ export const AppContainer = (props: AppContainerProps) => {
       enableMouseEvents();
       disableLineWrapping();
       app.rerender();
+    } else if (config.getUseTerminalBuffer()) {
+      app.rerender();
     }
     terminalCapabilityManager.enableSupportedModes();
     refreshStatic();
-  }, [refreshStatic, shouldUseAlternateScreen, app]);
+  }, [refreshStatic, shouldUseAlternateScreen, app, config]);
 
   const [editorError, setEditorError] = useState<string | null>(null);
   const {

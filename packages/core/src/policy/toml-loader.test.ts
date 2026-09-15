@@ -474,6 +474,47 @@ name = "allowed-path"
       expect(result.checkers[0].priority).toBe(1.1); // tier 1 + 100/1000
       expect(result.checkers[0].source).toBe('Default: test.toml');
     });
+
+    it('should load AllowedPathChecker from default write.toml policy file for write and replace tools', async () => {
+      const defaultWritePolicyPath = path.join(
+        __dirname,
+        'policies',
+        'write.toml',
+      );
+      const result = await loadPoliciesFromToml(
+        [defaultWritePolicyPath],
+        (_dir) => 1,
+      );
+
+      const writeCheckers = result.checkers.filter(
+        (c) => c.toolName === 'write_file' || c.toolName === 'replace',
+      );
+
+      expect(writeCheckers).toHaveLength(2);
+      expect(writeCheckers).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            toolName: 'replace',
+            priority: 1.015,
+            modes: ['autoEdit'],
+            checker: expect.objectContaining({
+              name: 'allowed-path',
+              type: 'in-process',
+            }),
+          }),
+          expect.objectContaining({
+            toolName: 'write_file',
+            priority: 1.015,
+            modes: ['autoEdit'],
+            checker: expect.objectContaining({
+              name: 'allowed-path',
+              type: 'in-process',
+            }),
+          }),
+        ]),
+      );
+      expect(getErrors(result)).toHaveLength(0);
+    });
   });
 
   describe('Negative Tests', () => {

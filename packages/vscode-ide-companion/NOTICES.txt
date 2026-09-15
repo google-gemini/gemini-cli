@@ -110,7 +110,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-json-schema-traverse@1.0.0
+json-schema-traverse@0.4.1
 (git+https://github.com/epoberezkin/json-schema-traverse.git)
 
 MIT License

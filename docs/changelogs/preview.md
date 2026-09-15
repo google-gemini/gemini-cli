@@ -1,6 +1,6 @@
-# Preview release: v0.50.0-preview.1
+# Preview release: v0.60.0-preview.0
 
-Released: June 25, 2026
+Released: September 8, 2026
 
 Our preview release includes the latest, new, and experimental features. This
 release may not be as stable as our [latest weekly release](latest.md).
@@ -13,66 +13,61 @@ npm install -g @google/gemini-cli@preview
 
 ## Highlights
 
-- **GDC Service Identity Support**: Added support for GDC air-gapped Service
-  Identity after a major auth library update.
-- **Standardised Tool Outputs**: Standardised tool output formatting to ensure
-  consistency and readability across different CLI commands.
-- **Static Evaluation Analyzer**: Introduced a new static evaluation source
-  analyzer to improve development and testing.
-- **Vulnerability Prevention**: Hardened CLI security by preventing path
-  traversal vulnerabilities during the installation of Skills.
-- **Configuration & Error Hardening**: Migrated the `coreTools` configuration
-  setting to `tools.core` and ensured zero-quota limits fail fast to prevent
-  infinite retry loops.
+- **Workspace and Path Safety**: Enhanced path boundary checks, symlink
+  resolution, and mitigation of NTFS 8.3 short name (SFN) bypasses in command
+  safety and file discovery.
+- **Sandbox Isolation**: Isolated settings directories within sandbox containers
+  and temporary directories for macOS Seatbelt sandbox to restrict access.
+- **Extension Loader Hardening**: Hardened path resolution and boundary
+  validation in extension loader, with new consent prompts for runtime
+  environment changes.
+- **Network and OAuth Security**: Improved destination validation and connection
+  routing in web fetch utilities, and enforced RFC 9207 issuer identification in
+  the MCP OAuth flow.
+- **Tool Output Provenance**: Enforced envelope metadata provenance for
+  untrusted tool outputs to guarantee integrity.
 
 ## What's Changed
 
-- fix/verify release npm ci ignore scripts by @rmedranollamas in
-  [#28116](https://github.com/google-gemini/gemini-cli/pull/28116)
-- fix(ci): prevent workspace binary shadowing in release verification by @galz10
-  in [#28132](https://github.com/google-gemini/gemini-cli/pull/28132)
-- Feat/tool registry discovery by @ved015 in
-  [#28113](https://github.com/google-gemini/gemini-cli/pull/28113)
-- fix(ci): prevent bad NPM releases and promote job crashes by @galz10 in
-  [#28147](https://github.com/google-gemini/gemini-cli/pull/28147)
-- chore(release): bump version to 0.48.0-nightly.20260609.g3a13b8eeb by
+- fix(core): improve destination validation and connection routing in web fetch
+  utilities by @diegogodinezr in
+  [#29120](https://github.com/google-gemini/gemini-cli/pull/29120)
+- fix(core): enforce RFC 9207 issuer identification in MCP OAuth flow by
+  @jvargassanchez-dot in
+  [#29117](https://github.com/google-gemini/gemini-cli/pull/29117)
+- chore(release): bump version to 0.60.0-nightly.20260901.g0bd1d4397 by
   @gemini-cli-robot in
-  [#27779](https://github.com/google-gemini/gemini-cli/pull/27779)
-- ci(dependabot): enable cooldown period for npm packages by @ruomengz in
-  [#27743](https://github.com/google-gemini/gemini-cli/pull/27743)
-- refactor(core): standardize tool output formatting by @galz10 in
-  [#27772](https://github.com/google-gemini/gemini-cli/pull/27772)
-- ci: update workflow logging and policy configurations by @galz10 in
-  [#27853](https://github.com/google-gemini/gemini-cli/pull/27853)
-- fix(core): Ensure zero-quota limits fail fast to prevent retry loop hang by
+  [#29162](https://github.com/google-gemini/gemini-cli/pull/29162)
+- Changelog for v0.58.0 by @gemini-cli-robot in
+  [#29161](https://github.com/google-gemini/gemini-cli/pull/29161)
+- fix(cli): isolate temporary directory for macOS Seatbelt sandbox by
+  @jvargassanchez-dot in
+  [#29171](https://github.com/google-gemini/gemini-cli/pull/29171)
+- feat(extensions): harden path resolution and boundary validation in extension
+  loader by @diegogodinezr in
+  [#29169](https://github.com/google-gemini/gemini-cli/pull/29169)
+- Changelog for v0.59.0-preview.0 by @gemini-cli-robot in
+  [#29159](https://github.com/google-gemini/gemini-cli/pull/29159)
+- fix(core): sanitize and remove hardcoded Google CrUX API key in
+  chrome-devtools-mcp by @amelidev in
+  [#29158](https://github.com/google-gemini/gemini-cli/pull/29158)
+- fix(extensions): prompt for consent on environment changes and sanitize
+  runtime-altering environment variables by @amelidev in
+  [#28863](https://github.com/google-gemini/gemini-cli/pull/28863)
+- fix(core): enhance workspace path boundary checks and symlink resolution in
+  command safety and file discovery by @jesussamuel-byte in
+  [#29170](https://github.com/google-gemini/gemini-cli/pull/29170)
+- fix(config): enforce strict permission and ownership checks on system-wide
+  configuration paths by @jesussamuel-byte in
+  [#29115](https://github.com/google-gemini/gemini-cli/pull/29115)
+- fix(core): mitigate NTFS 8.3 short name (SFN) path by @urielefrenvirtusa in
+  [#29116](https://github.com/google-gemini/gemini-cli/pull/29116)
+- fix(cli): isolate settings directory in sandbox containers by
+  @jvargassanchez-dot in
+  [#29216](https://github.com/google-gemini/gemini-cli/pull/29216)
+- fix(core): enforce envelope metadata provenance for untrusted tool outputs by
   @luisfelipe-alt in
-  [#27698](https://github.com/google-gemini/gemini-cli/pull/27698)
-- fix(core): handle multi-line escaped quotes in stripShellWrapper by
-  @sanchezcoraspe in
-  [#27467](https://github.com/google-gemini/gemini-cli/pull/27467)
-- fix(cli): prevent path traversal vulnerabilities during skill install… by
-  @ompatel-aiml in
-  [#27767](https://github.com/google-gemini/gemini-cli/pull/27767)
-- Fix/pending tools and trust overrides by @jvargassanchez-dot in
-  [#27854](https://github.com/google-gemini/gemini-cli/pull/27854)
-- ci: use internal environment for scheduled nightly releases (#27865) by
-  @rmedranollamas in
-  [#27939](https://github.com/google-gemini/gemini-cli/pull/27939)
-- feat(core): Support GDC air-gapped Service Identity after auth library update
-  by @sidhantgoyal-droid in
-  [#27956](https://github.com/google-gemini/gemini-cli/pull/27956)
-- fix(cli): handle tmux false positive background detection by @amelidev in
-  [#27572](https://github.com/google-gemini/gemini-cli/pull/27572)
-- Add static eval source analyzer by @ved015 in
-  [#27631](https://github.com/google-gemini/gemini-cli/pull/27631)
-- fix(config): migrate coreTools setting to tools.core by @galz10 in
-  [#27947](https://github.com/google-gemini/gemini-cli/pull/27947)
-- fix(core-tools): resolve defensive path resolution for at-reference files by
-  @luisfelipe-alt in
-  [#27943](https://github.com/google-gemini/gemini-cli/pull/27943)
-- Revert "fix(core-tools): resolve defensive path resolution for at-reference
-  files" by @galz10 in
-  [#27992](https://github.com/google-gemini/gemini-cli/pull/27992)
+  [#29215](https://github.com/google-gemini/gemini-cli/pull/29215)
 
 **Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.47.0-preview.0...v0.50.0-preview.1
+https://github.com/google-gemini/gemini-cli/compare/v0.59.0-preview.0...v0.60.0-preview.0

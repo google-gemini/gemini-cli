@@ -10,7 +10,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import semver from 'semver';
 import type { ExtensionConfig } from '../../config/extension.js';
-import { ExtensionManager } from '../../config/extension-manager.js';
+import {
+  ExtensionManager,
+  validateContextFilePath,
+} from '../../config/extension-manager.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 import { loadSettings } from '../../config/settings.js';
@@ -50,12 +53,21 @@ async function validateExtension(args: ValidateArgs) {
       : [extensionConfig.contextFileName];
 
     const missingContextFiles: string[] = [];
+
     for (const contextFilePath of contextFileNames) {
-      const contextFileAbsolutePath = path.resolve(
-        absoluteInputPath,
+      const validation = validateContextFilePath(
         contextFilePath,
+        absoluteInputPath,
       );
-      if (!fs.existsSync(contextFileAbsolutePath)) {
+
+      if (!validation.isValid) {
+        errors.push(
+          `Invalid context file path: "${contextFilePath}". ${validation.errorMessage}`,
+        );
+        continue;
+      }
+
+      if (!fs.existsSync(validation.resolvedPath!)) {
         missingContextFiles.push(contextFilePath);
       }
     }

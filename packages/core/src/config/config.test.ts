@@ -80,13 +80,18 @@ import {
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
+  const mockedRealpath = vi.fn((path) => path);
+  Object.defineProperty(mockedRealpath, 'native', {
+    value: (p: fs.PathLike) => mockedRealpath(p),
+    writable: true,
+  });
   return {
     ...actual,
     existsSync: vi.fn().mockReturnValue(true),
     statSync: vi.fn().mockReturnValue({
       isDirectory: vi.fn().mockReturnValue(true),
     }),
-    realpathSync: vi.fn((path) => path),
+    realpathSync: mockedRealpath,
   };
 });
 
@@ -237,6 +242,7 @@ vi.mock('../utils/events.js', async (importOriginal) => {
 
 vi.mock('../utils/fetch.js', () => ({
   setGlobalProxy: mockSetGlobalProxy,
+  updateGlobalFetchTimeouts: vi.fn(),
 }));
 
 vi.mock('../context/memoryContextManager.js', () => ({
@@ -820,6 +826,55 @@ describe('Server Config (config.ts)', () => {
         } as unknown as ConfigParameters);
         expect(config.getRequestTimeoutMs()).toBeUndefined();
       });
+    });
+  });
+
+  describe('AgentLoopContext spread safety', () => {
+    it('preserves AgentLoopContext properties when cloned with spread operator', async () => {
+      const config = new Config({
+        ...baseParams,
+        checkpointing: false,
+      });
+      await config.initialize();
+
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
+      const spreadContext = { ...config };
+
+      expect(spreadContext.config).toBeDefined();
+      expect(spreadContext.promptId).toBeDefined();
+      expect(spreadContext.toolRegistry).toBeDefined();
+      expect(spreadContext.promptRegistry).toBeDefined();
+      expect(spreadContext.resourceRegistry).toBeDefined();
+      expect(spreadContext.messageBus).toBeDefined();
+      expect(spreadContext.geminiClient).toBeDefined();
+      expect(spreadContext.sandboxManager).toBeDefined();
+
+      expect(spreadContext.config).toBe(config);
+      expect(spreadContext.promptId).toBe(config.promptId);
+      expect(spreadContext.toolRegistry).toBe(config.toolRegistry);
+      expect(spreadContext.promptRegistry).toBe(config.promptRegistry);
+      expect(spreadContext.resourceRegistry).toBe(config.resourceRegistry);
+      expect(spreadContext.messageBus).toBe(config.messageBus);
+      expect(spreadContext.geminiClient).toBe(config.geminiClient);
+      expect(spreadContext.sandboxManager).toBe(config.sandboxManager);
+    });
+
+    it('preserves updated promptId when sessionId is rotated or updated', async () => {
+      const config = new Config({
+        ...baseParams,
+        checkpointing: false,
+      });
+      await config.initialize();
+
+      config.setSessionId('new-session-id-123');
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
+      const spreadContext = { ...config };
+      expect(spreadContext.promptId).toBe('new-session-id-123');
+
+      config.rotateSessionId('rotated-session-id-456');
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
+      const spreadContextRotated = { ...config };
+      expect(spreadContextRotated.promptId).toBe('rotated-session-id-456');
     });
   });
 
@@ -3198,6 +3253,24 @@ describe('Config Quota & Preview Model Access', () => {
       expect(config.getHasAccessToPreviewModel()).toBe(false);
     });
 
+    it('should reverse-map gemini-3-flash back to gemini-3.5-flash in modelQuotas', async () => {
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
+        buckets: [
+          {
+            modelId: 'gemini-3-flash',
+            remainingAmount: '90',
+            remainingFraction: 0.9,
+          },
+        ],
+      });
+
+      config.setModel('gemini-3.5-flash');
+      await config.refreshUserQuota();
+
+      expect(config.getQuotaRemaining()).toBe(90);
+      expect(config.getQuotaLimit()).toBe(100);
+    });
+
     it('should calculate pooled quota correctly for auto models', async () => {
       mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
         buckets: [
@@ -4134,7 +4207,9 @@ describe('Plans Directory Initialization', () => {
 
     const plansDir = config.storage.getPlansDir();
     // Should NOT create the directory eagerly
-    expect(fs.promises.mkdir).not.toHaveBeenCalled();
+    expect(fs.promises.mkdir).not.toHaveBeenCalledWith(plansDir, {
+      recursive: true,
+    });
     // Should check if it exists
     expect(fs.promises.access).toHaveBeenCalledWith(plansDir);
 
@@ -4152,7 +4227,9 @@ describe('Plans Directory Initialization', () => {
     await config.initialize();
 
     const plansDir = config.storage.getPlansDir();
-    expect(fs.promises.mkdir).not.toHaveBeenCalled();
+    expect(fs.promises.mkdir).not.toHaveBeenCalledWith(plansDir, {
+      recursive: true,
+    });
     expect(fs.promises.access).toHaveBeenCalledWith(plansDir);
 
     const context = config.getWorkspaceContext();

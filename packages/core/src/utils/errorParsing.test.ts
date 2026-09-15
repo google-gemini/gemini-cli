@@ -109,6 +109,16 @@ describe('parseAndFormatApiError', () => {
     expect(result).toContain(vertexMessage);
   });
 
+  it('should format a StructuredError with status: undefined', () => {
+    const error: StructuredError = {
+      message: 'Rate limit exceeded (simulated 429 error, limit: 0)',
+      status: undefined,
+    };
+    const expected =
+      '[API Error: Rate limit exceeded (simulated 429 error, limit: 0)]';
+    expect(parseAndFormatApiError(error)).toBe(expected);
+  });
+
   it('should handle an unknown error type', () => {
     const error = 12345;
     const expected = '[API Error: An unknown error occurred.]';

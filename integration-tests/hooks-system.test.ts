@@ -159,8 +159,8 @@ describe.skipIf(skipFlaky)(
         const blockHook = hookLogs.find(
           (log) =>
             log.hookCall.hook_event_name === 'BeforeTool' &&
-            (log.hookCall.stdout.includes('"decision":"deny"') ||
-              log.hookCall.stderr.includes('"decision":"deny"')),
+            ((log.hookCall.stdout?.includes('"decision":"deny"') ?? false) ||
+              (log.hookCall.stderr?.includes('"decision":"deny"') ?? false)),
         );
         expect(blockHook).toBeDefined();
         expect(

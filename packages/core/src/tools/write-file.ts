@@ -55,8 +55,15 @@ import { WRITE_FILE_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { detectOmissionPlaceholders } from './omissionPlaceholderDetector.js';
 import { resolveAndValidatePlanPath } from '../utils/planUtils.js';
-import { isGemini3Model } from '../config/models.js';
+import {
+  isGemini3Model,
+  isGemini2Model,
+  isCustomModel,
+  resolveModel,
+} from '../config/models.js';
 import { discoverJitContext, appendJitContext } from './jit-context.js';
+import { isBuildFile } from '../utils/buildFileUtils.js';
+import { recordModifiedBuildFile } from '../utils/untrustedContextTracker.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -193,15 +200,28 @@ export async function getCorrectedFileContent(
     }
   }
 
-  const aggressiveUnescape = !isGemini3Model(config.getActiveModel());
-
-  correctedContent = await ensureCorrectFileContent(
-    proposedContent,
-    config.getBaseLlmClient(),
-    abortSignal,
-    config.getDisableLLMCorrection(),
-    aggressiveUnescape,
+  const fileExt = path.extname(filePath).toLowerCase();
+  const isJsonOrIpynb = ['.json', '.ipynb', '.jsonc', '.json5'].includes(
+    fileExt,
   );
+
+  if (!isJsonOrIpynb) {
+    const activeModel = config.getActiveModel();
+    const resolvedModel = resolveModel(activeModel, false, false, true, config);
+
+    const aggressiveUnescape =
+      !isGemini3Model(resolvedModel, config) &&
+      !isGemini2Model(resolvedModel) &&
+      !isCustomModel(resolvedModel, config);
+
+    correctedContent = await ensureCorrectFileContent(
+      proposedContent,
+      config.getBaseLlmClient(),
+      abortSignal,
+      config.getDisableLLMCorrection(),
+      aggressiveUnescape,
+    );
+  }
 
   return { originalContent, correctedContent, fileExists };
 }
@@ -342,6 +362,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         }
       },
       ideConfirmation,
+      isBuildFile: isBuildFile(this.resolvedPath),
     };
     return confirmationDetails;
   }
@@ -418,6 +439,10 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         .getFileSystemService()
         .writeTextFile(this.resolvedPath, finalContent);
 
+      if (isBuildFile(this.resolvedPath)) {
+        recordModifiedBuildFile(this.resolvedPath, this.config);
+      }
+
       // Generate diff for display result
       const fileName = path.basename(this.resolvedPath);
       // If there was a readError, originalContent in correctedContentResult is '',
@@ -490,6 +515,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         newContent: correctedContentResult.correctedContent,
         diffStat,
         isNewFile,
+        isBuildFile: isBuildFile(this.resolvedPath),
       };
 
       // Discover JIT subdirectory context for the written file path

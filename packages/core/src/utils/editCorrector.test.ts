@@ -245,5 +245,20 @@ describe('editCorrector', () => {
       expect(result).toBe(content);
       expect(mockGenerateJson).not.toHaveBeenCalled();
     });
+
+    it('should preserve \\n inside string literals even when aggressiveUnescape is false (b-496211054)', async () => {
+      const content =
+        'fmt.Printf("OpenFile with FailIfExists failed: %v\\n", err)';
+
+      const result = await ensureCorrectFileContent(
+        content,
+        mockBaseLlmClientInstance,
+        abortSignal,
+        true, // disableLLMCorrection
+        false, // aggressiveUnescape (now false for Gemini 2.5/3.x/Custom)
+      );
+
+      expect(result).toBe(content);
+    });
   });
 });

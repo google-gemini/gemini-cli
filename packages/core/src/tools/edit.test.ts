@@ -63,7 +63,7 @@ import {
   getMockMessageBusInstance,
 } from '../test-utils/mock-message-bus.js';
 import path from 'node:path';
-import { isSubpath } from '../utils/paths.js';
+import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import { ApprovalMode } from '../policy/types.js';
@@ -87,7 +87,7 @@ describe('EditTool', () => {
     const rawTempDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'edit-tool-test-'),
     );
-    tempDir = fs.realpathSync(rawTempDir);
+    tempDir = resolveToRealPath(rawTempDir);
     rootDir = path.join(tempDir, 'root');
     fs.mkdirSync(rootDir);
 
@@ -817,10 +817,8 @@ function doIt() {
       const result = await invocation.execute({
         abortSignal: new AbortController().signal,
       });
-      expect(result.llmContent).toMatch(/0 occurrences found for old_string/);
-      expect(result.returnDisplay).toMatch(
-        /Failed to edit, could not find the string to replace./,
-      );
+      expect(result.llmContent).toMatch(/Could not find an exact match/);
+      expect(result.returnDisplay).toMatch(/Could not find an exact match/);
       expect(mockFixLLMEditWithInstruction).toHaveBeenCalled();
     });
 
@@ -1330,6 +1328,68 @@ function doIt() {
       await invocation.execute({ abortSignal: new AbortController().signal });
 
       expect(mockFixLLMEditWithInstruction).toHaveBeenCalled();
+    });
+
+    it('should NOT call FixLLMEditWithInstruction for .json files even when disableLLMCorrection is false', async () => {
+      const filePath = path.join(rootDir, 'test.json');
+      fs.writeFileSync(filePath, '{"key": "value"}', 'utf8');
+
+      (mockConfig.getDisableLLMCorrection as Mock).mockReturnValue(false);
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace value',
+        old_string: 'nonexistent',
+        new_string: 'replacement',
+      };
+
+      const invocation = tool.build(params);
+      await invocation.execute({ abortSignal: new AbortController().signal });
+
+      expect(mockFixLLMEditWithInstruction).not.toHaveBeenCalled();
+    });
+
+    it('should NOT call FixLLMEditWithInstruction for .ipynb files even when disableLLMCorrection is false', async () => {
+      const filePath = path.join(rootDir, 'notebook.ipynb');
+      fs.writeFileSync(filePath, '{"cells": []}', 'utf8');
+
+      (mockConfig.getDisableLLMCorrection as Mock).mockReturnValue(false);
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace cell',
+        old_string: 'nonexistent',
+        new_string: 'replacement',
+      };
+
+      const invocation = tool.build(params);
+      await invocation.execute({ abortSignal: new AbortController().signal });
+
+      expect(mockFixLLMEditWithInstruction).not.toHaveBeenCalled();
+    });
+
+    it('fails fast without calling FixLLMEditWithInstruction when old_string is empty', async () => {
+      const filePath = path.join(rootDir, 'empty_old_string_test.txt');
+      fs.writeFileSync(filePath, 'Some content.', 'utf8');
+
+      // Enable LLM correction for this test
+      (mockConfig.getDisableLLMCorrection as Mock).mockReturnValue(false);
+
+      const params = {
+        file_path: filePath,
+        instruction: 'Replace empty text',
+        old_string: '   ',
+        new_string: 'replacement',
+      };
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(mockFixLLMEditWithInstruction).not.toHaveBeenCalled();
+      expect(result.error?.type).toBe(ToolErrorType.INVALID_TOOL_PARAMS);
+      expect(result.error?.message).toContain('ReadFile');
     });
   });
 

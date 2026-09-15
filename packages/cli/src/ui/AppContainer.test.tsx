@@ -46,9 +46,10 @@ const mockIdeClient = vi.hoisted(() => ({
   getInstance: vi.fn().mockReturnValue(new Promise(() => {})),
 }));
 
-// Mock stdout
+// Mock stdout and ink app
 const mocks = vi.hoisted(() => ({
   mockStdout: { write: vi.fn() },
+  mockRerender: vi.fn(),
 }));
 const terminalNotificationsMocks = vi.hoisted(() => ({
   notifyViaTerminal: vi.fn().mockResolvedValue(true),
@@ -113,12 +114,15 @@ import {
   type OverflowActions,
 } from './contexts/OverflowContext.js';
 
-// Mock useStdout to capture terminal title writes
+// Mock useStdout and useApp to capture terminal title writes and spy on re-renders
 vi.mock('ink', async (importOriginal) => {
   const actual = await importOriginal<typeof import('ink')>();
   return {
     ...actual,
     useStdout: () => ({ stdout: mocks.mockStdout }),
+    useApp: () => ({
+      rerender: mocks.mockRerender,
+    }),
     measureElement: vi.fn(),
   };
 });
@@ -2916,6 +2920,33 @@ describe('AppContainer State Management', () => {
         }),
         expect.any(Number),
       );
+      unmount!();
+    });
+
+    it('calls app.rerender() when ExternalEditorClosed event is received in terminalBuffer mode', async () => {
+      vi.spyOn(mockConfig, 'getUseTerminalBuffer').mockReturnValue(true);
+      vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(false);
+      vi.spyOn(mockConfig, 'getScreenReader').mockReturnValue(false);
+
+      mocks.mockRerender.mockClear();
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = await renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      const handler = mockCoreEvents.on.mock.calls.find(
+        (call: unknown[]) => call[0] === CoreEvent.ExternalEditorClosed,
+      )?.[1];
+      expect(handler).toBeDefined();
+
+      act(() => {
+        handler();
+      });
+
+      expect(mocks.mockRerender).toHaveBeenCalledTimes(1);
       unmount!();
     });
 

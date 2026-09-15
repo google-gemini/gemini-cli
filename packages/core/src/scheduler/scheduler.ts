@@ -278,6 +278,7 @@ export class Scheduler {
           CoreToolCallStatus.Cancelled,
           'Operation cancelled by user',
         );
+        this.state.finalizeCall(activeCall.request.callId);
       }
     }
 
@@ -438,6 +439,14 @@ export class Scheduler {
    */
   private async _processNextItem(signal: AbortSignal): Promise<boolean> {
     if (signal.aborted || this.isCancelling) {
+      // Finalize active calls that are terminal
+      const activeCalls = this.state.allActiveCalls;
+      for (const call of activeCalls) {
+        if (this.isTerminal(call.status)) {
+          this.state.finalizeCall(call.request.callId);
+        }
+      }
+
       this.state.cancelAllQueued('Operation cancelled');
       return false;
     }

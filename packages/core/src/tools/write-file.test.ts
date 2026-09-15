@@ -85,7 +85,7 @@ const mockConfigInternal = {
   getIdeMode: vi.fn(() => false),
   getWorkspaceContext: () => new WorkspaceContext(rootDir, [plansDir]),
   getApiKey: () => 'test-key',
-  getModel: () => 'test-model',
+  getModel: () => 'gemini-1.5-flash',
   getSandbox: () => false,
   getDebugMode: () => false,
   getQuestion: () => undefined,
@@ -107,7 +107,7 @@ const mockConfigInternal = {
   isInteractive: () => false,
   getDisableLLMCorrection: vi.fn(() => true),
   isPlanMode: vi.fn(() => false),
-  getActiveModel: () => 'test-model',
+  getActiveModel: () => 'gemini-1.5-flash',
   storage: {
     getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
   },
@@ -137,17 +137,17 @@ describe('WriteFileTool', () => {
     const rawTempDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'write-file-test-external-'),
     );
-    tempDir = fs.realpathSync(rawTempDir);
+    tempDir = resolveToRealPath(rawTempDir);
 
     const rawRootDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'gemini-cli-test-root-'),
     );
-    rootDir = fs.realpathSync(rawRootDir);
+    rootDir = resolveToRealPath(rawRootDir);
 
     const rawPlansDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'gemini-cli-test-plans-'),
     );
-    plansDir = fs.realpathSync(rawPlansDir);
+    plansDir = resolveToRealPath(rawPlansDir);
 
     const workspaceContext = new WorkspaceContext(rootDir, [plansDir]);
     const mockStorage = {
@@ -426,6 +426,39 @@ describe('WriteFileTool', () => {
       expect(result.originalContent).toBe(originalContent);
       expect(result.fileExists).toBe(true);
       expect(result.error).toBeUndefined();
+    });
+
+    it('should not call ensureCorrectFileContent for .json files', async () => {
+      const filePath = path.join(rootDir, 'config.json');
+      const proposedContent = '{"key": "value\\nwith\\nescapes"}';
+      const abortSignal = new AbortController().signal;
+
+      const result = await getCorrectedFileContent(
+        mockConfig,
+        filePath,
+        proposedContent,
+        abortSignal,
+      );
+
+      expect(mockEnsureCorrectFileContent).not.toHaveBeenCalled();
+      expect(result.correctedContent).toBe(proposedContent);
+    });
+
+    it('should not call ensureCorrectFileContent for .ipynb files', async () => {
+      const filePath = path.join(rootDir, 'notebook.ipynb');
+      const proposedContent =
+        '{"cells": [{"source": ["print(\\"hello\\\\n\\")"]}]}';
+      const abortSignal = new AbortController().signal;
+
+      const result = await getCorrectedFileContent(
+        mockConfig,
+        filePath,
+        proposedContent,
+        abortSignal,
+      );
+
+      expect(mockEnsureCorrectFileContent).not.toHaveBeenCalled();
+      expect(result.correctedContent).toBe(proposedContent);
     });
 
     it('should return error if reading an existing file fails (e.g. permissions)', async () => {

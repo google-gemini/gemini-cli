@@ -14,6 +14,7 @@ import {
   type Mock,
 } from 'vitest';
 
+import os from 'node:os';
 import EventEmitter from 'node:events';
 import type { Readable } from 'node:stream';
 import { type ChildProcess } from 'node:child_process';
@@ -1246,6 +1247,92 @@ describe('ShellExecutionService', () => {
       // The catch block must call destroy() on spawnedPty to prevent fd leak
       expect(destroySpy).toHaveBeenCalled();
     });
+
+    it('should dispose of PTY event listeners on process exit', async () => {
+      const dataDisposeSpy = vi.fn();
+      const exitDisposeSpy = vi.fn();
+
+      mockPtyProcess.onData.mockReturnValue({ dispose: dataDisposeSpy });
+      mockPtyProcess.onExit.mockReturnValue({ dispose: exitDisposeSpy });
+
+      await simulateExecution('ls -l', (pty) => {
+        pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+      });
+
+      expect(dataDisposeSpy).toHaveBeenCalled();
+      expect(exitDisposeSpy).toHaveBeenCalled();
+    });
+
+    it('should dispose of PTY event listeners on abort', async () => {
+      const dataDisposeSpy = vi.fn();
+      const exitDisposeSpy = vi.fn();
+
+      mockPtyProcess.onData.mockReturnValue({ dispose: dataDisposeSpy });
+      mockPtyProcess.onExit.mockReturnValue({ dispose: exitDisposeSpy });
+
+      const abortController = new AbortController();
+      const handle = await ShellExecutionService.execute(
+        'long-running',
+        '/test/dir',
+        onOutputEventMock,
+        abortController.signal,
+        true,
+        shellExecutionConfig,
+      );
+
+      await new Promise((resolve) => process.nextTick(resolve));
+      abortController.abort();
+
+      // Simulate PTY process exit resulting from abort/SIGKILL
+      mockPtyProcess.onExit.mock.calls[0][0]({ exitCode: 1, signal: 9 });
+      await handle.result;
+
+      expect(dataDisposeSpy).toHaveBeenCalled();
+      expect(exitDisposeSpy).toHaveBeenCalled();
+    });
+
+    it('should fall back to child_process when PTY creation fails with ENXIO', async () => {
+      const ptyError = new Error('posix_openpt failed: Device not configured');
+      // @ts-expect-error adding custom code property
+      ptyError.code = 'ENXIO';
+      mockPtySpawn.mockImplementationOnce(() => {
+        throw ptyError;
+      });
+
+      // Mock child process fallback
+      const mockFallbackChild = new EventEmitter() as unknown as ChildProcess;
+      Object.defineProperty(mockFallbackChild, 'stdout', {
+        value: new EventEmitter(),
+      });
+      Object.defineProperty(mockFallbackChild, 'stderr', {
+        value: new EventEmitter(),
+      });
+      Object.defineProperty(mockFallbackChild, 'kill', {
+        value: vi.fn(),
+      });
+      Object.defineProperty(mockFallbackChild, 'pid', {
+        value: 9999,
+      });
+      mockCpSpawn.mockReturnValueOnce(mockFallbackChild);
+
+      const abortController = new AbortController();
+      const handle = await ShellExecutionService.execute(
+        'test-fallback',
+        '/test/dir',
+        onOutputEventMock,
+        abortController.signal,
+        true,
+        shellExecutionConfig,
+      );
+
+      // Simulate exit of standard child process fallback to allow handle to resolve
+      mockFallbackChild.emit('exit', 0, null);
+      mockFallbackChild.emit('close', 0, null);
+
+      const result = await handle.result;
+      expect(result.executionMethod).toBe('child_process');
+      expect(mockCpSpawn).toHaveBeenCalled();
+    });
   });
 });
 
@@ -2140,16 +2227,36 @@ describe('ShellExecutionService environment variables', () => {
     expect(cpEnv).toHaveProperty('DISPLAY', '');
     expect(cpEnv).toHaveProperty('DBUS_SESSION_BUS_ADDRESS', '');
 
+    // Global / system config neutralization paths
+    const devNullPath = os.platform() === 'win32' ? 'NUL' : '/dev/null';
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_GLOBAL', devNullPath);
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_SYSTEM', devNullPath);
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_NOSYSTEM', '1');
+
     // Existing values should be preserved
     expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_0', 'core.editor');
     expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_0', 'vim');
     expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_1', 'pull.rebase');
     expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_1', 'true');
 
-    // The new credential.helper override should be appended at index 2
-    expect(cpEnv).toHaveProperty('GIT_CONFIG_COUNT', '3');
+    // The 8 security overrides should be appended at index 2..9
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_COUNT', '10');
     expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_2', 'credential.helper');
     expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_2', '');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_3', 'core.fsmonitor');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_3', '');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_4', 'core.hooksPath');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_4', '');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_5', 'core.sshCommand');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_5', '');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_6', 'core.pager');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_6', 'cat');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_7', 'core.editor');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_7', '');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_8', 'sequence.editor');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_8', '');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_9', 'diff.external');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_9', '');
 
     // Ensure child_process exits
     mockChildProcess.emit('exit', 0, null);
@@ -2159,7 +2266,7 @@ describe('ShellExecutionService environment variables', () => {
     vi.unstubAllEnvs();
   });
 
-  it('should NOT include headless git and gh environment variables in interactive fallback mode', async () => {
+  it('should include headless git and gh environment variables in interactive fallback mode', async () => {
     vi.resetModules();
     vi.stubEnv('GIT_TERMINAL_PROMPT', undefined);
     vi.stubEnv('GIT_ASKPASS', undefined);
@@ -2184,12 +2291,12 @@ describe('ShellExecutionService environment variables', () => {
 
     expect(mockCpSpawn).toHaveBeenCalled();
     const cpEnv = mockCpSpawn.mock.calls[0][2].env;
-    expect(cpEnv).not.toHaveProperty('GIT_TERMINAL_PROMPT');
-    expect(cpEnv).not.toHaveProperty('GIT_ASKPASS');
-    expect(cpEnv).not.toHaveProperty('SSH_ASKPASS');
-    expect(cpEnv).not.toHaveProperty('GH_PROMPT_DISABLED');
-    expect(cpEnv).not.toHaveProperty('GCM_INTERACTIVE');
-    expect(cpEnv).not.toHaveProperty('GIT_CONFIG_COUNT');
+    expect(cpEnv).toHaveProperty('GIT_TERMINAL_PROMPT', '0');
+    expect(cpEnv).toHaveProperty('GIT_ASKPASS', '');
+    expect(cpEnv).toHaveProperty('SSH_ASKPASS', '');
+    expect(cpEnv).toHaveProperty('GH_PROMPT_DISABLED', '1');
+    expect(cpEnv).toHaveProperty('GCM_INTERACTIVE', 'never');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_COUNT');
 
     // Ensure child_process exits
     mockChildProcess.emit('exit', 0, null);

@@ -1,6 +1,6 @@
-# Latest stable release: v0.45.0
+# Latest stable release: v0.59.0
 
-Released: June 03, 2026
+Released: September 8, 2026
 
 For most users, our latest stable release is the recommended release. Install
 the latest stable version with:
@@ -11,55 +11,28 @@ npm install -g @google/gemini-cli
 
 ## Highlights
 
-- **Context Manager Simplification:** Completed a significant refactoring of the
-  context management system to improve reliability and architectural clarity.
-- **A2A Usage Metadata:** Enhanced the Agent-to-Agent protocol to expose usage
-  metadata, enabling more transparent resource monitoring.
-- **Terminal & PTY Robustness:** Resolved several critical issues related to
-  terminal interactions, including Termux relaunch loops and PTY resize errors.
-- **Routing Optimizations:** Updated default auto-routing and bypassed
-  classifiers for specific tool responses to prevent orphaned function errors.
-- **Tool Execution Control:** Forced the `update_topic` tool to execute
-  sequentially, ensuring consistent narrative flow in agent interactions.
+- **SSRF Prevention in MCP OAuth:** Prevented Server-Side Request Forgery (SSRF)
+  in Model Context Protocol (MCP) OAuth metadata discovery and authentication to
+  secure remote integrations.
+- **Fail-Closed Workspace Trust:** Enforced a fail-closed workspace trust model
+  to ensure security by default when accessing untrusted workspaces.
+- **Restricted Mode MCP Filtering:** Filtered available Model Context Protocol
+  (MCP) servers under restricted execution modes to minimize potential attack
+  surfaces.
 
 ## What's Changed
 
-- chore(release): bump version to 0.45.0-nightly.20260521.g854f811be by
+- Changelog for v0.58.0-preview.0 by @gemini-cli-robot in
+  [#29082](https://github.com/google-gemini/gemini-cli/pull/29082)
+- chore(release): bump version to 0.59.0-nightly.20260825.g812f7a2bc by
   @gemini-cli-robot in
-  [#27362](https://github.com/google-gemini/gemini-cli/pull/27362)
-- fix(cli): prevent Termux relaunch and resize remount loops by @saymanq in
-  [#27110](https://github.com/google-gemini/gemini-cli/pull/27110)
-- Feat/a2a expose usage metadata by @jvargassanchez-dot in
-  [#27288](https://github.com/google-gemini/gemini-cli/pull/27288)
-- feat(context): Complete simplification work. by @joshualitt in
-  [#27345](https://github.com/google-gemini/gemini-cli/pull/27345)
-- fix(core): force update_topic tool to execute sequentially by
-  @jvargassanchez-dot in
-  [#27357](https://github.com/google-gemini/gemini-cli/pull/27357)
-- Changelog for v0.44.0-preview.0 by @gemini-cli-robot in
-  [#27360](https://github.com/google-gemini/gemini-cli/pull/27360)
-- Changelog for v0.43.0 by @gemini-cli-robot in
-  [#27361](https://github.com/google-gemini/gemini-cli/pull/27361)
-- Revert "fix(core): prevent SIGHUP kills in PTY environments" by @bbiggs in
-  [#27401](https://github.com/google-gemini/gemini-cli/pull/27401)
-- fix(cli): filter internal session context from history during resumption by
-  @rmedranollamas in
-  [#27391](https://github.com/google-gemini/gemini-cli/pull/27391)
-- Update default auto routing by @DavidAPierce in
-  [#27071](https://github.com/google-gemini/gemini-cli/pull/27071)
-- fix(core): bypass routing classifiers to prevent orphaned function response
-  errors by @danielweis in
-  [#27389](https://github.com/google-gemini/gemini-cli/pull/27389)
-- fix(core): suppress PTY resize EBADF errors by @scidomino in
-  [#27461](https://github.com/google-gemini/gemini-cli/pull/27461)
-- fix(core): prevent blacklist bypass in mcp list by @ompatel-aiml in
-  [#27377](https://github.com/google-gemini/gemini-cli/pull/27377)
-- fix(cli): ignore unmapped vim normal keys by @MukundaKatta in
-  [#27102](https://github.com/google-gemini/gemini-cli/pull/27102)
-- fix(patch): cherry-pick bd53951 to release/v0.45.0-preview.0-pr-27496 to patch
-  version v0.45.0-preview.0 and create version 0.45.0-preview.1 by
-  @gemini-cli-robot in
-  [#27535](https://github.com/google-gemini/gemini-cli/pull/27535)
+  [#29083](https://github.com/google-gemini/gemini-cli/pull/29083)
+- fix(core): prevent SSRF in MCP OAuth metadata discovery and authentication by
+  @josebalius in
+  [#29081](https://github.com/google-gemini/gemini-cli/pull/29081)
+- fix(core): enforce fail-closed workspace trust and filter mcpServers in
+  restricted mode by @luisfelipe-alt in
+  [#29099](https://github.com/google-gemini/gemini-cli/pull/29099)
 
 **Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.44.1...v0.45.0
+https://github.com/google-gemini/gemini-cli/compare/v0.58.0...v0.59.0

@@ -289,6 +289,17 @@ describe('AgentRegistry', () => {
       ).not.toHaveBeenCalled();
     });
 
+    it('should NOT load built-in agents when enableAgents is false (without per-agent overrides)', async () => {
+      const disabledConfig = makeMockedConfig({
+        enableAgents: false,
+      });
+      const disabledRegistry = new TestableAgentRegistry(disabledConfig);
+
+      await disabledRegistry.initialize();
+
+      expect(disabledRegistry.getAllDefinitions()).toHaveLength(0);
+    });
+
     it('should register CLI help agent by default', async () => {
       const config = makeMockedConfig();
       const registry = new TestableAgentRegistry(config);

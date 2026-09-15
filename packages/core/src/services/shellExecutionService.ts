@@ -139,6 +139,7 @@ export interface ShellExecutionConfig {
   backgroundCompletionBehavior?: 'inject' | 'notify' | 'silent';
   originalCommand?: string;
   sessionId?: string;
+  env?: Record<string, string | undefined>;
 }
 
 /**
@@ -461,12 +462,11 @@ export class ShellExecutionService {
     const spawnArgs = [...argsPrefix, finalCommand];
 
     // 2. Prepare Environment
+    const sourceEnv = shellExecutionConfig.env ?? process.env;
     const gitConfigKeys: string[] = [];
-    if (!isInteractive) {
-      for (const key in process.env) {
-        if (key.startsWith('GIT_CONFIG_')) {
-          gitConfigKeys.push(key);
-        }
+    for (const key in sourceEnv) {
+      if (key.startsWith('GIT_CONFIG_')) {
+        gitConfigKeys.push(key);
       }
     }
 
@@ -479,7 +479,7 @@ export class ShellExecutionService {
       ],
     };
 
-    const sanitizedEnv = sanitizeEnvironment(process.env, sanitizationConfig);
+    const sanitizedEnv = sanitizeEnvironment(sourceEnv, sanitizationConfig);
 
     const baseEnv: Record<string, string | undefined> = {
       ...sanitizedEnv,
@@ -490,36 +490,56 @@ export class ShellExecutionService {
       GIT_PAGER: shellExecutionConfig.pager ?? 'cat',
     };
 
-    if (!isInteractive) {
-      // Ensure all GIT_CONFIG_* variables are preserved even if they were redacted
-      for (const key of gitConfigKeys) {
-        baseEnv[key] = process.env[key];
-      }
-
-      const gitConfigCount = parseInt(baseEnv['GIT_CONFIG_COUNT'] || '0', 10);
-      const newKey = `GIT_CONFIG_KEY_${gitConfigCount}`;
-      const newValue = `GIT_CONFIG_VALUE_${gitConfigCount}`;
-
-      // Ensure these new keys are allowed through sanitization
-      sanitizationConfig.allowedEnvironmentVariables.push(
-        'GIT_CONFIG_COUNT',
-        newKey,
-        newValue,
-      );
-
-      Object.assign(baseEnv, {
-        GIT_TERMINAL_PROMPT: '0',
-        GIT_ASKPASS: '',
-        SSH_ASKPASS: '',
-        GH_PROMPT_DISABLED: '1',
-        GCM_INTERACTIVE: 'never',
-        DISPLAY: '',
-        DBUS_SESSION_BUS_ADDRESS: '',
-        GIT_CONFIG_COUNT: (gitConfigCount + 1).toString(),
-        [newKey]: 'credential.helper',
-        [newValue]: '',
-      });
+    // Ensure all GIT_CONFIG_* variables are preserved even if they were redacted
+    for (const key of gitConfigKeys) {
+      baseEnv[key] = sourceEnv[key];
     }
+
+    let gitConfigCount = parseInt(baseEnv['GIT_CONFIG_COUNT'] || '0', 10);
+    const devNullPath = os.platform() === 'win32' ? 'NUL' : '/dev/null';
+
+    baseEnv['GIT_CONFIG_GLOBAL'] = devNullPath;
+    baseEnv['GIT_CONFIG_SYSTEM'] = devNullPath;
+    baseEnv['GIT_CONFIG_NOSYSTEM'] = '1';
+
+    sanitizationConfig.allowedEnvironmentVariables.push(
+      'GIT_CONFIG_COUNT',
+      'GIT_CONFIG_GLOBAL',
+      'GIT_CONFIG_SYSTEM',
+      'GIT_CONFIG_NOSYSTEM',
+    );
+
+    const defaultGitOverrides: Array<[string, string]> = [
+      ['credential.helper', ''],
+      ['core.fsmonitor', ''],
+      ['core.hooksPath', ''],
+      ['core.sshCommand', ''],
+      ['core.pager', 'cat'],
+      ['core.editor', ''],
+      ['sequence.editor', ''],
+      ['diff.external', ''],
+    ];
+
+    for (const [overrideKey, overrideVal] of defaultGitOverrides) {
+      const keyVar = `GIT_CONFIG_KEY_${gitConfigCount}`;
+      const valVar = `GIT_CONFIG_VALUE_${gitConfigCount}`;
+      sanitizationConfig.allowedEnvironmentVariables.push(keyVar, valVar);
+      baseEnv[keyVar] = overrideKey;
+      baseEnv[valVar] = overrideVal;
+      gitConfigCount++;
+    }
+
+    baseEnv['GIT_CONFIG_COUNT'] = gitConfigCount.toString();
+
+    Object.assign(baseEnv, {
+      GIT_TERMINAL_PROMPT: '0',
+      GIT_ASKPASS: '',
+      SSH_ASKPASS: '',
+      GH_PROMPT_DISABLED: '1',
+      GCM_INTERACTIVE: 'never',
+      DISPLAY: '',
+      DBUS_SESSION_BUS_ADDRESS: '',
+    });
 
     // 3. Prepare Sandboxed Command
     const sandboxedCommand = await sandboxManager.prepareCommand({
@@ -926,6 +946,8 @@ export class ShellExecutionService {
     }
     let spawnedPty: DestroyablePty | undefined;
     let cmdCleanup: (() => void) | undefined;
+    let headlessTerminal: pkg.Terminal | undefined;
+    const disposables: Array<{ dispose: () => void }> = [];
 
     try {
       const cols = shellExecutionConfig.terminalWidth ?? 80;
@@ -969,9 +991,10 @@ export class ShellExecutionService {
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       spawnedPty = ptyProcess as DestroyablePty;
-      const ptyPid = Number(ptyProcess.pid);
+      const pty = spawnedPty;
+      const ptyPid = Number(pty.pid);
 
-      const headlessTerminal = new Terminal({
+      headlessTerminal = new Terminal({
         allowProposedApi: true,
         cols,
         rows,
@@ -979,9 +1002,10 @@ export class ShellExecutionService {
       });
       headlessTerminal.scrollToTop();
 
+      const terminal = headlessTerminal;
+
       this.activePtys.set(ptyPid, {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        ptyProcess,
+        ptyProcess: pty,
         headlessTerminal,
         maxSerializedLines: shellExecutionConfig.maxSerializedLines,
         command: shellExecutionConfig.originalCommand ?? commandToExecute,
@@ -994,13 +1018,12 @@ export class ShellExecutionService {
           if (!ExecutionLifecycleService.isActive(ptyPid)) {
             return;
           }
-          ptyProcess.write(input);
+          pty.write(input);
         },
         kill: () => {
           killProcessGroup({
             pid: ptyPid,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-            pty: ptyProcess,
+            pty,
           }).catch(() => {});
         },
         isActive: () => {
@@ -1017,15 +1040,15 @@ export class ShellExecutionService {
             return false;
           }
         },
-        getBackgroundOutput: () => getFullBufferText(headlessTerminal),
+        getBackgroundOutput: () => getFullBufferText(terminal),
         getSubscriptionSnapshot: () => {
-          const endLine = headlessTerminal.buffer.active.length;
+          const endLine = terminal.buffer.active.length;
           const startLine = Math.max(
             0,
             endLine - (shellExecutionConfig.maxSerializedLines ?? 2000),
           );
           const bufferData = serializeTerminalToObject(
-            headlessTerminal,
+            terminal,
             startLine,
             endLine,
           );
@@ -1066,7 +1089,7 @@ export class ShellExecutionService {
 
         if (!shellExecutionConfig.disableDynamicLineTrimming) {
           if (!hasStartedOutput) {
-            const bufferText = getFullBufferText(headlessTerminal);
+            const bufferText = getFullBufferText(terminal);
             if (bufferText.trim().length === 0) {
               return;
             }
@@ -1074,7 +1097,7 @@ export class ShellExecutionService {
           }
         }
 
-        const buffer = headlessTerminal.buffer.active;
+        const buffer = terminal.buffer.active;
         const endLine = buffer.length;
         const startLine = Math.max(
           0,
@@ -1083,15 +1106,10 @@ export class ShellExecutionService {
 
         let newOutput: AnsiOutput;
         if (shellExecutionConfig.showColor) {
-          newOutput = serializeTerminalToObject(
-            headlessTerminal,
-            startLine,
-            endLine,
-          );
+          newOutput = serializeTerminalToObject(terminal, startLine, endLine);
         } else {
           newOutput = (
-            serializeTerminalToObject(headlessTerminal, startLine, endLine) ||
-            []
+            serializeTerminalToObject(terminal, startLine, endLine) || []
           ).map((line) =>
             line.map((token) => {
               token.fg = '';
@@ -1203,7 +1221,7 @@ export class ShellExecutionService {
                 }
 
                 isWriting = true;
-                headlessTerminal.write(decodedChunk, () => {
+                terminal.write(decodedChunk, () => {
                   render();
                   isWriting = false;
                   resolveChunk();
@@ -1222,103 +1240,114 @@ export class ShellExecutionService {
         );
       };
 
-      ptyProcess.onData((data: string) => {
+      const dataListener = pty.onData((data) => {
         const bufferData = Buffer.from(data, 'utf-8');
         handleOutput(bufferData);
       });
+      disposables.push(dataListener);
 
-      ptyProcess.onExit(
-        ({ exitCode, signal }: { exitCode: number; signal?: number }) => {
-          exited = true;
-          abortSignal.removeEventListener('abort', abortHandler);
+      const exitListener = pty.onExit(({ exitCode, signal }) => {
+        exited = true;
+        abortSignal.removeEventListener('abort', abortHandler);
 
-          // Immediately destroy the PTY to release its master FD.
-          // The headless terminal is kept alive until finalize() extracts
-          // its buffer contents, then disposed to free memory.
-          ShellExecutionService.destroyPtyProcess(ptyProcess);
+        // Immediately destroy the PTY to release its master FD.
+        // The headless terminal is kept alive until finalize() extracts
+        // its buffer contents, then disposed to free memory.
+        ShellExecutionService.destroyPtyProcess(pty);
 
-          const finalize = () => {
-            render(true);
-            cmdCleanup?.();
+        const finalize = () => {
+          render(true);
+          cmdCleanup?.();
 
-            const event: ShellOutputEvent = {
-              type: 'exit',
-              exitCode,
-              signal: signal ?? null,
-            };
-
-            const sessionId = shellExecutionConfig.sessionId ?? 'default';
-            const history =
-              ShellExecutionService.backgroundProcessHistory.get(sessionId);
-            const historyItem = history?.get(ptyPid);
-            if (historyItem) {
-              historyItem.status = 'exited';
-              historyItem.exitCode = exitCode;
-              historyItem.signal = signal ?? null;
-              historyItem.endTime = Date.now();
-            }
-            onOutputEvent(event);
-
-            const endLine = headlessTerminal.buffer.active.length;
-            const startLine = Math.max(
-              0,
-              endLine - (shellExecutionConfig.maxSerializedLines ?? 2000),
-            );
-            const ansiOutputSnapshot = serializeTerminalToObject(
-              headlessTerminal,
-              startLine,
-              endLine,
-            );
-            const finalOutput = getFullBufferText(headlessTerminal);
-
-            // Dispose the headless terminal to free scrollback buffers.
-            // This must happen after getFullBufferText() extracts the output.
+          // Explicitly dispose of all node-pty event listeners to prevent closures from leaking
+          disposables.forEach((d) => {
             try {
-              headlessTerminal.dispose();
+              d.dispose();
             } catch {
-              // Ignore errors during terminal cleanup
+              // Ignore
             }
+          });
 
-            // eslint-disable-next-line @typescript-eslint/no-floating-promises
-            ShellExecutionService.cleanupLogStream(ptyPid).then(() => {
-              ShellExecutionService.activePtys.delete(ptyPid);
-            });
-
-            ExecutionLifecycleService.completeWithResult(ptyPid, {
-              rawOutput: Buffer.from(''),
-              output: finalOutput,
-              ansiOutput: ansiOutputSnapshot,
-              exitCode,
-              signal: signal ?? null,
-              error,
-              aborted: abortSignal.aborted,
-              pid: ptyPid,
-              executionMethod: ptyInfo?.name ?? 'node-pty',
-            });
+          const event: ShellOutputEvent = {
+            type: 'exit',
+            exitCode,
+            signal: signal ?? null,
           };
 
-          if (abortSignal.aborted) {
-            finalize();
-            return;
+          const sessionId = shellExecutionConfig.sessionId ?? 'default';
+          const history =
+            ShellExecutionService.backgroundProcessHistory.get(sessionId);
+          const historyItem = history?.get(ptyPid);
+          if (historyItem) {
+            historyItem.status = 'exited';
+            historyItem.exitCode = exitCode;
+            historyItem.signal = signal ?? null;
+            historyItem.endTime = Date.now();
+          }
+          onOutputEvent(event);
+
+          const endLine = headlessTerminal
+            ? headlessTerminal.buffer.active.length
+            : 0;
+          const startLine = Math.max(
+            0,
+            endLine - (shellExecutionConfig.maxSerializedLines ?? 2000),
+          );
+          const ansiOutputSnapshot = headlessTerminal
+            ? serializeTerminalToObject(headlessTerminal, startLine, endLine)
+            : [];
+          const finalOutput = headlessTerminal
+            ? getFullBufferText(headlessTerminal)
+            : '';
+
+          // Dispose the headless terminal to free scrollback buffers.
+          // This must happen after getFullBufferText() extracts the output.
+          try {
+            headlessTerminal?.dispose();
+          } catch {
+            // Ignore errors during terminal cleanup
           }
 
-          const processingComplete = processingChain.then(() => 'processed');
-          const abortFired = new Promise<'aborted'>((res) => {
-            if (abortSignal.aborted) {
-              res('aborted');
-              return;
-            }
-            abortSignal.addEventListener('abort', () => res('aborted'), {
-              once: true,
-            });
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
+          ShellExecutionService.cleanupLogStream(ptyPid).then(() => {
+            ShellExecutionService.activePtys.delete(ptyPid);
           });
 
-          // eslint-disable-next-line @typescript-eslint/no-floating-promises
-          Promise.race([processingComplete, abortFired]).then(() => {
-            finalize();
+          ExecutionLifecycleService.completeWithResult(ptyPid, {
+            rawOutput: Buffer.from(''),
+            output: finalOutput,
+            ansiOutput: ansiOutputSnapshot,
+            exitCode,
+            signal: signal ?? null,
+            error,
+            aborted: abortSignal.aborted,
+            pid: ptyPid,
+            executionMethod: ptyInfo?.name ?? 'node-pty',
           });
-        },
-      );
+        };
+
+        if (abortSignal.aborted) {
+          finalize();
+          return;
+        }
+
+        const processingComplete = processingChain.then(() => 'processed');
+        const abortFired = new Promise<'aborted'>((res) => {
+          if (abortSignal.aborted) {
+            res('aborted');
+            return;
+          }
+          abortSignal.addEventListener('abort', () => res('aborted'), {
+            once: true,
+          });
+        });
+
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        Promise.race([processingComplete, abortFired]).then(() => {
+          finalize();
+        });
+      });
+      disposables.push(exitListener);
 
       const abortHandler = async () => {
         if (ptyProcess.pid && !exited) {
@@ -1344,11 +1373,34 @@ export class ShellExecutionService {
         ShellExecutionService.destroyPtyProcess(spawnedPty);
       }
 
-      if (error?.message?.includes('posix_spawnp failed')) {
+      if (headlessTerminal) {
+        try {
+          headlessTerminal.dispose();
+        } catch {
+          // Ignore
+        }
+      }
+
+      // Dispose any registered event listeners to prevent leaks
+      disposables.forEach((d) => {
+        try {
+          d.dispose();
+        } catch {
+          // Ignore
+        }
+      });
+
+      const isPtyCreationFailure =
+        error?.message?.includes('posix_spawnp failed') ||
+        error?.message?.includes('ENXIO') ||
+        (isNodeError(error) && error.code === 'ENXIO') ||
+        error?.message?.includes('Device not configured');
+
+      if (isPtyCreationFailure) {
         onOutputEvent({
           type: 'data',
           chunk:
-            '[GEMINI_CLI_WARNING] PTY execution failed, falling back to child_process. This may be due to sandbox restrictions.\n',
+            '[GEMINI_CLI_WARNING] PTY execution failed, falling back to child_process. This may be due to terminal exhaustion or sandbox restrictions.\n',
         });
         throw e;
       } else {

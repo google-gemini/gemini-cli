@@ -34,6 +34,10 @@ describe('CheckerRunner', () => {
 
   beforeEach(() => {
     mockContextBuilder = new ContextBuilder({} as Config);
+    vi.spyOn(mockContextBuilder, 'config', 'get').mockReturnValue({
+      env: {},
+      getWorkingDir: vi.fn().mockReturnValue('/mock/cwd'),
+    } as unknown as Config);
     mockRegistry = new CheckerRegistry('/mock/dist');
     CheckerRegistry.prototype.resolveInProcess = vi.fn();
 

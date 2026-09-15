@@ -109,23 +109,90 @@ priority = 50
 modes = ["plan"]
 interactive = true
 
-# Allow write_file and replace for .md files in the plans directory (cross-platform)
-# We split this into two rules to avoid ReDoS checker issues with nested optional segments.
-# This rule handles the case where there is a session ID in the plan file path
-[[rule]]
-toolName = ["write_file", "replace"]
-decision = "allow"
-priority = 70
-modes = ["plan"]
-argsPattern = "\\x00\"file_path\":\"[^\"]+[\\\\/]+\\.gemini[\\\\/]+tmp[\\\\/]+[\\w-]+[\\\\/]+[\\w-]+[\\\\/]+plans[\\\\/]+[\\w-]+\\.md\"\\x00"
+# Allow write_file and replace for .md files in the plans directory (cross-platform).
+# This rule employs split, traversal-safe, and ReDoS-safe patterns to provide defense-in-depth:
+# - Absolute paths must strictly be inside the designated plans directory under `.gemini/tmp/`
+# - Relative paths must be clean (no path traversal `..` and no absolute prefixes)
 
-# This rule handles the case where there isn't a session ID in the plan file path
+# 1. Absolute paths with session ID
 [[rule]]
 toolName = ["write_file", "replace"]
 decision = "allow"
 priority = 70
 modes = ["plan"]
-argsPattern = "\\x00\"file_path\":\"[^\"]+[\\\\/]+\\.gemini[\\\\/]+tmp[\\\\/]+[\\w-]+[\\\\/]+plans[\\\\/]+[\\w-]+\\.md\"\\x00"
+argsPattern = "\\x00\"file_path\":\"[^\\\"]+[\\\\/]+\\.gemini[\\\\/]+tmp[\\\\/]+[\\w-]+[\\\\/]+[\\w-]+[\\\\/]+plans[\\\\/]+[\\w-]+\\.md\"\\x00"
+
+# 2. Absolute paths without session ID
+[[rule]]
+toolName = ["write_file", "replace"]
+decision = "allow"
+priority = 70
+modes = ["plan"]
+argsPattern = "\\x00\"file_path\":\"[^\\\"]+[\\\\/]+\\.gemini[\\\\/]+tmp[\\\\/]+[\\w-]+[\\\\/]+plans[\\\\/]+[\\w-]+\\.md\"\\x00"
+
+# 3. Relative paths starting with .gemini (with session ID)
+[[rule]]
+toolName = ["write_file", "replace"]
+decision = "allow"
+priority = 70
+modes = ["plan"]
+argsPattern = "\\x00\"file_path\":\"\\.gemini[\\\\/]+tmp[\\\\/]+[\\w-]+[\\\\/]+[\\w-]+[\\\\/]+plans[\\\\/]+[\\w-]+\\.md\"\\x00"
+
+# 4. Relative paths starting with .gemini (without session ID)
+[[rule]]
+toolName = ["write_file", "replace"]
+decision = "allow"
+priority = 70
+modes = ["plan"]
+argsPattern = "\\x00\"file_path\":\"\\.gemini[\\\\/]+tmp[\\\\/]+[\\w-]+[\\\\/]+plans[\\\\/]+[\\w-]+\\.md\"\\x00"
+
+# 5. Relative paths starting with ./.gemini (with session ID)
+[[rule]]
+toolName = ["write_file", "replace"]
+decision = "allow"
+priority = 70
+modes = ["plan"]
+argsPattern = "\\x00\"file_path\":\"\\.[\\\\/]+\\.gemini[\\\\/]+tmp[\\\\/]+[\\w-]+[\\\\/]+[\\w-]+[\\\\/]+plans[\\\\/]+[\\w-]+\\.md\"\\x00"
+
+# 6. Relative paths starting with ./.gemini (without session ID)
+[[rule]]
+toolName = ["write_file", "replace"]
+decision = "allow"
+priority = 70
+modes = ["plan"]
+argsPattern = "\\x00\"file_path\":\"\\.[\\\\/]+\\.gemini[\\\\/]+tmp[\\\\/]+[\\w-]+[\\\\/]+plans[\\\\/]+[\\w-]+\\.md\"\\x00"
+
+# 7. Clean relative filename (no directories, e.g. plan.md)
+[[rule]]
+toolName = ["write_file", "replace"]
+decision = "allow"
+priority = 70
+modes = ["plan"]
+argsPattern = "\\x00\"file_path\":\"[\\w-]+\\.md\"\\x00"
+
+# 8. Clean relative path starting with ./ (no directories, e.g. ./plan.md)
+[[rule]]
+toolName = ["write_file", "replace"]
+decision = "allow"
+priority = 70
+modes = ["plan"]
+argsPattern = "\\x00\"file_path\":\"\\.[\\\\/]+[\\w-]+\\.md\"\\x00"
+
+# 9. Clean relative path under plans directory (e.g. plans/plan.md)
+[[rule]]
+toolName = ["write_file", "replace"]
+decision = "allow"
+priority = 70
+modes = ["plan"]
+argsPattern = "\\x00\"file_path\":\"plans[\\\\/]+[\\w-]+\\.md\"\\x00"
+
+# 10. Clean relative path under plans directory starting with ./ (e.g. ./plans/plan.md)
+[[rule]]
+toolName = ["write_file", "replace"]
+decision = "allow"
+priority = 70
+modes = ["plan"]
+argsPattern = "\\x00\"file_path\":\"\\.[\\\\/]+plans[\\\\/]+[\\w-]+\\.md\"\\x00"
 
 # Explicitly Deny other write operations in Plan mode with a clear message.
 [[rule]]

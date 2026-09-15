@@ -680,6 +680,64 @@ describe('oauth2', () => {
         expect(mockFromJSON).toHaveBeenCalledWith(byoidCredentials);
         expect(client).toBe(mockExternalAccountClient);
       });
+
+      it('should fall back to GOOGLE_APPLICATION_CREDENTIALS if default cached credentials are invalid or expired', async () => {
+        // Setup default cached credentials that are expired/invalid
+        const defaultCreds = { refresh_token: 'expired-token' };
+        const defaultCredsPath = path.join(
+          tempHomeDir,
+          GEMINI_DIR,
+          'oauth_creds.json',
+        );
+        await fs.promises.mkdir(path.dirname(defaultCredsPath), {
+          recursive: true,
+        });
+        await fs.promises.writeFile(
+          defaultCredsPath,
+          JSON.stringify(defaultCreds),
+        );
+
+        // Setup valid fallback credentials via environment variable
+        const envCreds = { refresh_token: 'valid-env-token' };
+        const envCredsPath = path.join(tempHomeDir, 'env_creds.json');
+        await fs.promises.writeFile(envCredsPath, JSON.stringify(envCreds));
+        vi.stubEnv('GOOGLE_APPLICATION_CREDENTIALS', envCredsPath);
+
+        let currentCredentials: Credentials | null = null;
+        const mockClient = {
+          setCredentials: vi.fn((creds) => {
+            currentCredentials = creds as Credentials;
+          }),
+          getAccessToken: vi.fn(async () => {
+            if (
+              currentCredentials &&
+              currentCredentials.refresh_token === 'expired-token'
+            ) {
+              throw new Error('Token is expired or revoked');
+            }
+            return { token: 'valid-token' };
+          }),
+          getTokenInfo: vi.fn(async (_token) => {
+            if (
+              currentCredentials &&
+              currentCredentials.refresh_token === 'expired-token'
+            ) {
+              throw new Error('Token is expired or revoked');
+            }
+            return {};
+          }),
+          on: vi.fn(),
+        };
+
+        vi.mocked(OAuth2Client).mockImplementation(
+          () => mockClient as unknown as OAuth2Client,
+        );
+
+        await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
+
+        // Assert that fallback envCreds were eventually loaded and used
+        expect(mockClient.setCredentials).toHaveBeenCalledWith(envCreds);
+      });
     });
 
     describe('with GCP environment variables', () => {
