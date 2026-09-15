@@ -735,4 +735,38 @@ describe('ExecutionLifecycleService', () => {
       expect(injectionListener).not.toHaveBeenCalled();
     });
   });
+
+  describe('resetForTest teardown', () => {
+    it('kills active executions and resolves pending resolvers with an aborted result', async () => {
+      const terminate = vi.fn();
+      const handle = ExecutionLifecycleService.attachExecution(6000, {
+        executionMethod: 'child_process',
+        initialOutput: 'hello',
+        kill: terminate,
+      });
+
+      ExecutionLifecycleService.resetForTest();
+
+      const result = await handle.result;
+      expect(terminate).toHaveBeenCalledTimes(1);
+      expect(result.aborted).toBe(true);
+      expect(result.exitCode).toBe(130);
+      expect(result.error?.message).toContain('Aborted by test reset.');
+    });
+
+    it('invokes onKill for virtual executions during reset', async () => {
+      const onKill = vi.fn();
+      const handle = ExecutionLifecycleService.createExecution(
+        'partial output',
+        onKill,
+      );
+
+      ExecutionLifecycleService.resetForTest();
+
+      const result = await handle.result;
+      expect(onKill).toHaveBeenCalledTimes(1);
+      expect(result.aborted).toBe(true);
+      expect(result.output).toBe('partial output');
+    });
+  });
 });
