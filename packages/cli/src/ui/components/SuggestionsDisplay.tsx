@@ -17,6 +17,7 @@ export interface Suggestion {
   insertValue?: string;
   description?: string;
   matchedIndex?: number;
+  matchedLength?: number;
   commandKind?: CommandKind;
   sectionTitle?: string;
   submitValue?: string;
@@ -99,6 +100,7 @@ export function SuggestionsDisplay({
           <ExpandableText
             label={suggestion.value}
             matchedIndex={suggestion.matchedIndex}
+            matchedLength={suggestion.matchedLength}
             userInput={userInput}
             textColor={textColor}
             isExpanded={isExpanded}
