@@ -811,14 +811,16 @@ async function cacheCredentials(credentials: Credentials) {
     // Ignore and start with empty existing if file is missing or invalid JSON
   }
 
+  const cleanCredentials: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(credentials)) {
+    if (value !== undefined && value !== null) {
+      cleanCredentials[key] = value;
+    }
+  }
+
   const mergedCredentials = {
     ...existing,
-    ...credentials,
-    refresh_token: credentials.refresh_token || existing.refresh_token,
-    scope: credentials.scope || existing.scope,
-    token_type: credentials.token_type || existing.token_type,
-    expiry_date: credentials.expiry_date || existing.expiry_date,
-    id_token: credentials.id_token || existing.id_token,
+    ...cleanCredentials,
   };
 
   const finalCredentials: Record<string, unknown> = {};
