@@ -173,7 +173,7 @@ export function getNodeMemoryArgs(isDebugMode: boolean): string[] {
 export function setupUnhandledRejectionHandler() {
   let unhandledRejectionOccurred = false;
   const hasUnhandled = process.listeners('unhandledRejection').some(
-    (l) => l.name === 'geminiUnhandledRejectionListener'
+    (l) => Object.getOwnPropertyDescriptor(l, 'geminiListener')?.value === true
   );
   if (!hasUnhandled) {
     const geminiUnhandledRejectionListener = (reason: unknown, _promise: Promise<unknown>) => {
@@ -202,12 +202,13 @@ ${reason.stack}`
         appEvents.emit(AppEvent.OpenDebugConsole);
       }
     };
+    Object.assign(geminiUnhandledRejectionListener, { geminiListener: true });
     process.on('unhandledRejection', geminiUnhandledRejectionListener);
   }
 
   let isHandlingUncaughtException = false;
   const hasUncaught = process.listeners('uncaughtException').some(
-    (l) => l.name === 'geminiUncaughtExceptionListener'
+    (l) => Object.getOwnPropertyDescriptor(l, 'geminiListener')?.value === true
   );
   if (!hasUncaught) {
     const geminiUncaughtExceptionListener = async (error: Error) => {
@@ -275,6 +276,7 @@ ${error.stack}`
       }
       process.exit(1);
     };
+    Object.assign(geminiUncaughtExceptionListener, { geminiListener: true });
     process.on('uncaughtException', geminiUncaughtExceptionListener);
   }
 }
