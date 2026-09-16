@@ -20,12 +20,17 @@ import {
 import { createMockSandboxConfig } from '@google/gemini-cli-test-utils';
 import { EventEmitter } from 'node:events';
 
-const { mockedHomedir, mockedGetContainerPath, mockedExecCommands } =
-  vi.hoisted(() => ({
-    mockedHomedir: vi.fn().mockReturnValue('/home/user'),
-    mockedGetContainerPath: vi.fn().mockImplementation((p: string) => p),
-    mockedExecCommands: [] as string[],
-  }));
+const {
+  mockedHomedir,
+  mockedGetContainerPath,
+  mockedExecCommands,
+  mockedExecFileCommands,
+} = vi.hoisted(() => ({
+  mockedHomedir: vi.fn().mockReturnValue('/home/user'),
+  mockedGetContainerPath: vi.fn().mockImplementation((p: string) => p),
+  mockedExecCommands: [] as string[],
+  mockedExecFileCommands: [] as string[],
+}));
 
 vi.mock('./sandboxUtils.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./sandboxUtils.js')>();
@@ -78,6 +83,13 @@ vi.mock('node:util', async (importOriginal) => {
           ) {
             return { stdout: '', stderr: '' };
           }
+          if (file === 'podman' && args[0] === 'info') {
+            mockedExecFileCommands.push([file, ...args].join(' '));
+            return {
+              stdout: process.env['TEST_PODMAN_INFO'] ?? '{}',
+              stderr: '',
+            };
+          }
           return { stdout: '', stderr: '' };
         };
       }
@@ -122,6 +134,7 @@ describe('sandbox', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockedExecCommands.length = 0;
+    mockedExecFileCommands.length = 0;
     process.env = { ...originalEnv };
     process.argv = [...originalArgv];
     mockProcessIn = {
@@ -1559,6 +1572,110 @@ describe('sandbox', () => {
       expect(entrypointCmd).toContain('Error: Failed to map host UID 1000');
       expect(entrypointCmd).toContain('exit 1');
       expect(entrypointCmd).toContain("Error: 'useradd' not found");
+    });
+
+    describe('rootless podman user namespace', () => {
+      const rootlessInfo = JSON.stringify({
+        host: { security: { rootless: true } },
+      });
+
+      function mockContainerRun() {
+        interface MockProcessWithStdout extends EventEmitter {
+          stdout: EventEmitter;
+        }
+        const mockImageCheckProcess =
+          new EventEmitter() as MockProcessWithStdout;
+        mockImageCheckProcess.stdout = new EventEmitter();
+        vi.mocked(spawn).mockImplementationOnce(() => {
+          setTimeout(() => {
+            mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+            mockImageCheckProcess.emit('close', 0);
+          }, 1);
+          return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+        });
+
+        const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+          typeof spawn
+        >;
+        mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+          if (event === 'close') {
+            setTimeout(() => cb(0), 10);
+          }
+          return mockSpawnProcess;
+        });
+        vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+      }
+
+      function runArgs(): string[] {
+        return vi.mocked(spawn).mock.calls[1][1] as string[];
+      }
+
+      beforeEach(() => {
+        process.env['SANDBOX_SET_UID_GID'] = 'true';
+        vi.mocked(os.platform).mockReturnValue('linux');
+      });
+
+      it('should add --userns=keep-id for rootless podman', async () => {
+        process.env['TEST_PODMAN_INFO'] = rootlessInfo;
+        mockContainerRun();
+
+        await start_sandbox(
+          createMockSandboxConfig({
+            command: 'podman',
+            image: 'gemini-cli-sandbox',
+          }),
+        );
+
+        expect(runArgs()).toContain('--userns=keep-id');
+      });
+
+      it('should not add --userns=keep-id when SANDBOX_FLAGS already sets --userns', async () => {
+        process.env['TEST_PODMAN_INFO'] = rootlessInfo;
+        process.env['SANDBOX_FLAGS'] = '--userns=nomap';
+        mockContainerRun();
+
+        await start_sandbox(
+          createMockSandboxConfig({
+            command: 'podman',
+            image: 'gemini-cli-sandbox',
+          }),
+        );
+
+        const args = runArgs();
+        expect(args).toContain('--userns=nomap');
+        expect(args).not.toContain('--userns=keep-id');
+      });
+
+      it('should not add --userns=keep-id for rootful podman', async () => {
+        process.env['TEST_PODMAN_INFO'] = JSON.stringify({
+          host: { security: { rootless: false } },
+        });
+        mockContainerRun();
+
+        await start_sandbox(
+          createMockSandboxConfig({
+            command: 'podman',
+            image: 'gemini-cli-sandbox',
+          }),
+        );
+
+        expect(runArgs()).not.toContain('--userns=keep-id');
+      });
+
+      it('should not query podman or add --userns=keep-id for docker', async () => {
+        process.env['TEST_PODMAN_INFO'] = rootlessInfo;
+        mockContainerRun();
+
+        await start_sandbox(
+          createMockSandboxConfig({
+            command: 'docker',
+            image: 'gemini-cli-sandbox',
+          }),
+        );
+
+        expect(runArgs()).not.toContain('--userns=keep-id');
+        expect(mockedExecFileCommands).toEqual([]);
+      });
     });
 
     it('should correctly escape home directory with spaces and special characters', async () => {
