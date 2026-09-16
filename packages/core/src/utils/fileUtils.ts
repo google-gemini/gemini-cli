@@ -15,7 +15,7 @@ import { ToolErrorType } from '../tools/tool-error.js';
 import { BINARY_EXTENSIONS } from './ignorePatterns.js';
 import { createRequire as createModuleRequire } from 'node:module';
 import { debugLogger } from './debugLogger.js';
-import { resolveToRealPath } from './paths.js';
+import { isSubpath, resolveToRealPath } from './paths.js';
 
 import {
   DEFAULT_MAX_LINES_TEXT_FILE,
@@ -302,34 +302,16 @@ export function isWithinRoot(
     path.resolve(rootDirectory),
   );
 
-  // Ensure the rootDirectory path ends with a separator for correct startsWith comparison,
-  // unless it's the root path itself (e.g., '/' or 'C:\').
-  const rootWithSeparator =
-    normalizedRootDirectory === path.sep ||
-    normalizedRootDirectory.endsWith(path.sep)
-      ? normalizedRootDirectory
-      : normalizedRootDirectory + path.sep;
-
-  if (
-    normalizedPathToCheck === normalizedRootDirectory ||
-    normalizedPathToCheck.startsWith(rootWithSeparator)
-  ) {
+  if (isSubpath(normalizedRootDirectory, normalizedPathToCheck)) {
     return true;
   }
 
   // Cross-platform check for macOS /private symlink aliases
   if (process.platform === 'darwin') {
     try {
-      const realPathToCheck = resolveToRealPath(normalizedPathToCheck);
-      const realRootDirectory = resolveToRealPath(normalizedRootDirectory);
-      const realRootWithSeparator =
-        realRootDirectory === path.sep || realRootDirectory.endsWith(path.sep)
-          ? realRootDirectory
-          : realRootDirectory + path.sep;
-
-      return (
-        realPathToCheck === realRootDirectory ||
-        realPathToCheck.startsWith(realRootWithSeparator)
+      return isSubpath(
+        resolveToRealPath(normalizedRootDirectory),
+        resolveToRealPath(normalizedPathToCheck),
       );
     } catch {
       return false;
