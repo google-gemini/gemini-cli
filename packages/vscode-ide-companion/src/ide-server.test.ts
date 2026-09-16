@@ -13,6 +13,8 @@ import * as http from 'node:http';
 import { IDEServer } from './ide-server.js';
 import type { DiffManager } from './diff-manager.js';
 
+const { vscodeMock: baseVscodeMock } = await vi.hoisted(() => import('./utils/vscode-mock.js'));
+
 vi.mock('node:crypto', () => ({
   randomUUID: vi.fn(() => 'test-auth-token'),
 }));
@@ -48,7 +50,9 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 });
 
 const vscodeMock = vi.hoisted(() => ({
+  ...baseVscodeMock,
   workspace: {
+    ...baseVscodeMock.workspace,
     workspaceFolders: [
       {
         uri: {

@@ -12,11 +12,13 @@
      * type checking error in ../../node_modules/@types/request/index.d.ts.
      */
     "skipLibCheck": true,
-    "rootDir": "src",
+    "rootDir": ".",
     "strict": true /* enable all strict type-checking options */
     /* Additional Checks */
     // "noImplicitReturns": true, /* Report error when not all code paths in function return a value. */
     // "noFallthroughCasesInSwitch": true, /* Report errors for fallthrough cases in switch statement. */
     // "noUnusedParameters": true,  /* Report errors on unused parameters. */
-  }
+  },
+  "include": ["src", "vitest.config.ts"],
+  "exclude": ["dist", "node_modules", "src/integration-tests"]
 }
