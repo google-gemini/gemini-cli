@@ -61,7 +61,7 @@ export async function run(): Promise<void> {
         await runFn();
       } else {
         console.error(
-          `Could not find a valid run function in ${test.file}. Module keys: ${Object.keys(testModule)}`
+          `Could not find a valid run function in ${test.file}. Module keys: ${Object.keys(testModule)}`,
         );
         throw new Error(`Invalid test module: ${test.file}`);
       }

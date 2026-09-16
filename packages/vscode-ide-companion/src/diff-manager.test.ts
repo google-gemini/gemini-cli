@@ -41,7 +41,9 @@ describe('DiffManager Comprehensive Unit Tests', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(vscode.workspace.fs.stat).mockResolvedValue({} as unknown as vscode.FileStat); // Default to existing file
+    vi.mocked(vscode.workspace.fs.stat).mockResolvedValue(
+      {} as unknown as vscode.FileStat,
+    ); // Default to existing file
     log = vi.fn();
     eventsFired = [];
     diffContentProvider = new DiffContentProvider();
@@ -111,7 +113,9 @@ describe('DiffManager Comprehensive Unit Tests', () => {
     it('should fallback to untitled schema when the original file does not exist', async () => {
       const filePath = '/test/new-file.ts';
       const newContent = 'new content';
-      vi.mocked(vscode.workspace.fs.stat).mockRejectedValue(new Error('ENOENT')); // Mock missing file
+      vi.mocked(vscode.workspace.fs.stat).mockRejectedValue(
+        new Error('ENOENT'),
+      ); // Mock missing file
 
       await diffManager.showDiff(filePath, newContent);
 
@@ -264,8 +268,7 @@ describe('DiffManager Comprehensive Unit Tests', () => {
         vscode.window.onDidChangeActiveTextEditor,
       );
       expect(onDidChangeActiveTextEditor).toHaveBeenCalled();
-      const activeEditorListener =
-        onDidChangeActiveTextEditor.mock.calls[0][0];
+      const activeEditorListener = onDidChangeActiveTextEditor.mock.calls[0][0];
 
       // Simulate editor change to our tracked rightDocUri
       const mockEditor = {
@@ -288,7 +291,9 @@ describe('DiffManager Comprehensive Unit Tests', () => {
           uri: vscode.Uri.file('/test/unrelated.ts'),
         },
       };
-      await activeEditorListener(mockUnrelatedEditor as unknown as vscode.TextEditor);
+      await activeEditorListener(
+        mockUnrelatedEditor as unknown as vscode.TextEditor,
+      );
 
       // Verify isVisible updated to false
       expect(vscode.commands.executeCommand).toHaveBeenLastCalledWith(

@@ -13,7 +13,9 @@ import * as http from 'node:http';
 import { IDEServer } from './ide-server.js';
 import type { DiffManager } from './diff-manager.js';
 
-const { vscodeMock: baseVscodeMock } = await vi.hoisted(() => import('./utils/vscode-mock.js'));
+const { vscodeMock: baseVscodeMock } = await vi.hoisted(
+  () => import('./utils/vscode-mock.js'),
+);
 
 vi.mock('node:crypto', () => ({
   randomUUID: vi.fn(() => 'test-auth-token'),

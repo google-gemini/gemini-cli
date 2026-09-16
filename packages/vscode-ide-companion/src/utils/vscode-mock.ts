@@ -163,7 +163,10 @@ export const createMockTextEditor = (
   uri: vscode.Uri,
   content: string = '',
 ): any => ({
-  document: createMockTextDocument(uri, content) as unknown as vscode.TextDocument,
+  document: createMockTextDocument(
+    uri,
+    content,
+  ) as unknown as vscode.TextDocument,
   selection: {
     active: { line: 0, character: 0 },
   },
