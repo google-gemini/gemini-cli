@@ -27,6 +27,11 @@ exports[`SuggestionsDisplay > renders MCP tag for MCP prompts 1`] = `
 "
 `;
 
+exports[`SuggestionsDisplay > renders Skill tag for skills 1`] = `
+" skill-tool [Skill]                                                            
+"
+`;
+
 exports[`SuggestionsDisplay > renders loading state 1`] = `
 " Loading suggestions...
 "
