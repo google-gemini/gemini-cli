@@ -85,6 +85,9 @@ vi.mock('node:util', async (importOriginal) => {
           }
           if (file === 'podman' && args[0] === 'info') {
             mockedExecFileCommands.push([file, ...args].join(' '));
+            if (process.env['TEST_PODMAN_INFO'] === 'throw') {
+              throw new Error('podman info timed out');
+            }
             return {
               stdout: process.env['TEST_PODMAN_INFO'] ?? '{}',
               stderr: '',
@@ -1659,6 +1662,21 @@ describe('sandbox', () => {
           }),
         );
 
+        expect(runArgs()).not.toContain('--userns=keep-id');
+      });
+
+      it('should not add --userns=keep-id when podman info fails', async () => {
+        process.env['TEST_PODMAN_INFO'] = 'throw';
+        mockContainerRun();
+
+        await start_sandbox(
+          createMockSandboxConfig({
+            command: 'podman',
+            image: 'gemini-cli-sandbox',
+          }),
+        );
+
+        expect(mockedExecFileCommands).toEqual(['podman info --format json']);
         expect(runArgs()).not.toContain('--userns=keep-id');
       });
 

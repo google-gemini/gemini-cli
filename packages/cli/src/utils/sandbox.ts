@@ -57,11 +57,11 @@ async function isRootlessPodman(command: string): Promise<boolean> {
     return false;
   }
   try {
-    const { stdout } = await execFileAsync('podman', [
-      'info',
-      '--format',
-      'json',
-    ]);
+    const { stdout } = await execFileAsync(
+      'podman',
+      ['info', '--format', 'json'],
+      { timeout: 5000 },
+    );
     const info: unknown = JSON.parse(stdout);
     const host = isRecord(info) ? info['host'] : undefined;
     const security = isRecord(host) ? host['security'] : undefined;
