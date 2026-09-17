@@ -106,8 +106,8 @@ describe('setupUnhandledRejectionHandler - uncaughtException', () => {
     expect(geminiListener).toBeDefined();
 
     // Create a circular reference object
-    const circularObj: any = {};
-    circularObj.self = circularObj;
+    const circularObj: Record<string, unknown> = {};
+    circularObj['self'] = circularObj;
 
     await (geminiListener as (error: unknown) => Promise<void>)(circularObj);
 

@@ -245,6 +245,9 @@ ${reason.stack}`
         }
       }
 
+      // Set exit code synchronously before any async operations to ensure
+      // the process exits with a failure code if the event loop empties prematurely.
+      process.exitCode = 1;
       if (isHandlingUncaughtException) {
         process.exit(1);
       }
@@ -284,11 +287,13 @@ Error: ${errorDetails}${stackDetails}`;
       // For general uncaught exceptions, write to stderr and exit
       process.stderr.write(errorMessage + '\n');
 
+      // Do not unref the timeout. Keeping it active ensures the event loop
+      // stays alive to allow the async cleanup to run, even if other active
+      // handles temporarily drop to zero.
       const cleanupTimeout = setTimeout(() => {
         process.stderr.write('Cleanup timed out, forcing exit...\n');
         process.exit(1);
       }, 5000);
-      cleanupTimeout.unref();
 
       try {
         await runExitCleanup();
