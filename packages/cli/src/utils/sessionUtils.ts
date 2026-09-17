@@ -228,6 +228,13 @@ export const formatRelativeTime = (
 export interface GetSessionOptions {
   /** Whether to load full message content (needed for search) */
   includeFullContent?: boolean;
+  /**
+   * Whether to include sessions without resumable conversation content
+   * (e.g. header-only files). Listing flows keep this off; explicit
+   * ID-based resolution turns it on so a session file that exists on
+   * disk is not reported as an invalid identifier.
+   */
+  includeNonResumable?: boolean;
 }
 
 /**
@@ -280,8 +287,9 @@ export const getAllSessionFiles = async (
 
           // Skip sessions with no resumable conversation content, including
           // startup-only, system-only, command-only, and internal-context-only
-          // sessions.
-          if (!content.hasResumableContent) {
+          // sessions. Explicit ID-based resolution opts out of this filter
+          // via includeNonResumable so existing files stay loadable.
+          if (!content.hasResumableContent && !options.includeNonResumable) {
             return { fileName: file, sessionInfo: null };
           }
 
@@ -458,10 +466,6 @@ export class SessionSelector {
     const trimmedIdentifier = identifier.trim();
     const sessions = await this.listSessions();
 
-    if (sessions.length === 0) {
-      throw SessionError.noSessionsFound();
-    }
-
     // Sort by startTime (oldest first, so newest sessions get highest numbers)
     const sortedSessions = sessions.sort(
       (a, b) =>
@@ -487,7 +491,29 @@ export class SessionSelector {
       return sortedSessions[index - 1];
     }
 
+    // Fallback for explicit IDs: the resumable listing above drops session
+    // files without resumable content, so a file that exists on disk with a
+    // matching header (e.g. created at session/new before any conversation
+    // was recorded) would otherwise resolve as an invalid identifier — the
+    // same condition also hides it from --list-sessions. Resolve it directly
+    // instead. Subagent sessions stay excluded. See #29288.
     const chatsDir = path.join(this.storage.getProjectTempDir(), 'chats');
+    if (!/^\d+$/.test(trimmedIdentifier)) {
+      const unfilteredSessions = await getSessionFiles(chatsDir, undefined, {
+        includeNonResumable: true,
+      });
+      const sessionById = unfilteredSessions.find(
+        (session) => session.id === trimmedIdentifier,
+      );
+      if (sessionById) {
+        return sessionById;
+      }
+    }
+
+    if (sessions.length === 0) {
+      throw SessionError.noSessionsFound();
+    }
+
     throw SessionError.invalidSessionIdentifier(trimmedIdentifier, chatsDir);
   }
 
