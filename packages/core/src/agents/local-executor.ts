@@ -525,6 +525,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           Date.now() - recoveryStartTime,
           success,
           turnCounter,
+          success, // salvaged: recovery output was captured but not promoted to GOAL
         ),
       );
     }
