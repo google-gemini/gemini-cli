@@ -222,7 +222,7 @@ ${reason.stack}`
         Object.getOwnPropertyDescriptor(l, 'geminiListener')?.value === true,
     );
   if (!hasUncaught) {
-    const geminiUncaughtExceptionListener = async (error: unknown) => {
+    const geminiUncaughtExceptionListener = (error: unknown) => {
       if (error instanceof Error) {
         // Suppress known race condition error in node-pty on Windows and Linux
         const message = error.message || '';
@@ -296,17 +296,20 @@ Error: ${errorDetails}${stackDetails}`;
         process.exit(1);
       }, 5000);
 
-      try {
-        await runExitCleanup();
-      } catch (cleanupError) {
-        debugLogger.error(
-          'Error during uncaught exception cleanup:',
-          cleanupError,
-        );
-      } finally {
-        clearTimeout(cleanupTimeout);
-      }
-      process.exit(1);
+      // Run async cleanup
+      void (async () => {
+        try {
+          await runExitCleanup();
+        } catch (cleanupError) {
+          debugLogger.error(
+            'Error during uncaught exception cleanup:',
+            cleanupError,
+          );
+        } finally {
+          clearTimeout(cleanupTimeout);
+          process.exit(1);
+        }
+      })();
     };
     Object.assign(geminiUncaughtExceptionListener, { geminiListener: true });
     process.on('uncaughtException', geminiUncaughtExceptionListener);

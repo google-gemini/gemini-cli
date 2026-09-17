@@ -67,8 +67,8 @@ describe('setupUnhandledRejectionHandler - uncaughtException', () => {
     );
     expect(geminiListener).toBeDefined();
 
-    // Directly await the asynchronous listener
-    await (geminiListener as (error: unknown) => Promise<void>)(abortError);
+    // Directly invoke the synchronous listener
+    (geminiListener as (error: unknown) => void)(abortError);
 
     // Expect that the error was suppressed, so debugLogger.error was NOT called
     // and instead debugLogger.log was called with the suppression log message.
@@ -92,9 +92,10 @@ describe('setupUnhandledRejectionHandler - uncaughtException', () => {
     expect(geminiListener).toBeDefined();
 
     const plainObjectError = { foo: 'bar', details: 123 };
-    await (geminiListener as (error: unknown) => Promise<void>)(
-      plainObjectError,
-    );
+    (geminiListener as (error: unknown) => void)(plainObjectError);
+
+    // Flush the microtask queue to allow the async cleanup to run
+    await new Promise((resolve) => process.nextTick(resolve));
 
     expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining('{"foo":"bar","details":123}'),
@@ -118,7 +119,10 @@ describe('setupUnhandledRejectionHandler - uncaughtException', () => {
     const circularObj: Record<string, unknown> = {};
     circularObj['self'] = circularObj;
 
-    await (geminiListener as (error: unknown) => Promise<void>)(circularObj);
+    (geminiListener as (error: unknown) => void)(circularObj);
+
+    // Flush the microtask queue to allow the async cleanup to run
+    await new Promise((resolve) => process.nextTick(resolve));
 
     expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining('[Unserializable Object]'),
