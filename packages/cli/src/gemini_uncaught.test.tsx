@@ -8,6 +8,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { setupUnhandledRejectionHandler } from './gemini.js';
 import { debugLogger } from '@google/gemini-cli-core';
 
+vi.mock('./utils/cleanup.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./utils/cleanup.js')>();
+  return {
+    ...actual,
+    runExitCleanup: vi.fn().mockResolvedValue(undefined),
+  };
+});
+
 describe('setupUnhandledRejectionHandler - uncaughtException', () => {
   let initialUncaughtExceptionListeners: readonly unknown[] = [];
   let initialUnhandledRejectionListeners: readonly unknown[] = [];
