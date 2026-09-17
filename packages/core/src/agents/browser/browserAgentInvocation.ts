@@ -30,7 +30,6 @@ import {
   type SubagentActivityEvent,
   type SubagentProgress,
   type SubagentActivityItem,
-  AgentTerminateMode,
   isToolActivityError,
   SubagentState,
   getSubagentStateFromTermination,
