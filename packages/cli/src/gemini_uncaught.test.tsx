@@ -59,13 +59,60 @@ describe('setupUnhandledRejectionHandler - uncaughtException', () => {
     expect(geminiListener).toBeDefined();
 
     // Directly await the asynchronous listener
-    await (geminiListener as any)(abortError);
+    await (geminiListener as (error: unknown) => Promise<void>)(abortError);
 
     // Expect that the error was suppressed, so debugLogger.error was NOT called
     // and instead debugLogger.log was called with the suppression log message.
     expect(debugLoggerErrorSpy).not.toHaveBeenCalled();
     expect(debugLoggerLogSpy).toHaveBeenCalledWith(
       expect.stringContaining('Suppressed uncaught AbortError'),
+    );
+  });
+
+  it('should format non-Error objects safely', async () => {
+    const debugLoggerErrorSpy = vi.spyOn(debugLogger, 'error');
+
+    // Call setupUnhandledRejectionHandler to register the listeners under test
+    setupUnhandledRejectionHandler();
+
+    const listeners = process.listeners('uncaughtException');
+    const geminiListener = listeners.find(
+      (l) =>
+        Object.getOwnPropertyDescriptor(l, 'geminiListener')?.value === true,
+    );
+    expect(geminiListener).toBeDefined();
+
+    const plainObjectError = { foo: 'bar', details: 123 };
+    await (geminiListener as (error: unknown) => Promise<void>)(
+      plainObjectError,
+    );
+
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('{"foo":"bar","details":123}'),
+    );
+  });
+
+  it('should format unserializable objects safely', async () => {
+    const debugLoggerErrorSpy = vi.spyOn(debugLogger, 'error');
+
+    // Call setupUnhandledRejectionHandler to register the listeners under test
+    setupUnhandledRejectionHandler();
+
+    const listeners = process.listeners('uncaughtException');
+    const geminiListener = listeners.find(
+      (l) =>
+        Object.getOwnPropertyDescriptor(l, 'geminiListener')?.value === true,
+    );
+    expect(geminiListener).toBeDefined();
+
+    // Create a circular reference object
+    const circularObj: any = {};
+    circularObj.self = circularObj;
+
+    await (geminiListener as (error: unknown) => Promise<void>)(circularObj);
+
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[Unserializable Object]'),
     );
   });
 });

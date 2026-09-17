@@ -220,7 +220,7 @@ ${reason.stack}`
         Object.getOwnPropertyDescriptor(l, 'geminiListener')?.value === true,
     );
   if (!hasUncaught) {
-    const geminiUncaughtExceptionListener = async (error: Error) => {
+    const geminiUncaughtExceptionListener = async (error: unknown) => {
       if (error instanceof Error) {
         // Suppress known race condition error in node-pty on Windows and Linux
         const message = error.message || '';
@@ -255,17 +255,30 @@ ${reason.stack}`
       process.removeAllListeners('SIGTERM');
       process.removeAllListeners('SIGHUP');
 
+      let errorDetails: string;
+      if (error instanceof Error) {
+        errorDetails = error.message;
+      } else {
+        try {
+          errorDetails =
+            typeof error === 'object' && error !== null
+              ? JSON.stringify(error)
+              : String(error);
+        } catch {
+          errorDetails = '[Unserializable Object]';
+        }
+      }
+
+      const stackDetails =
+        error instanceof Error && error.stack
+          ? `\nStack trace:\n${error.stack}`
+          : '';
+
       const errorMessage = `=========================================
 This is an unexpected error. Please file a bug report using the /bug tool.
 CRITICAL: Uncaught Exception!
 =========================================
-Error: ${error instanceof Error ? error.message : error}${
-        error instanceof Error && error.stack
-          ? `
-Stack trace:
-${error.stack}`
-          : ''
-      }`;
+Error: ${errorDetails}${stackDetails}`;
       debugLogger.error(errorMessage);
 
       // For general uncaught exceptions, write to stderr and exit
