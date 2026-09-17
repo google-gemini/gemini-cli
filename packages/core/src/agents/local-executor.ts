@@ -803,17 +803,19 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         }
       }
 
-      if (terminateReason === AgentTerminateMode.GOAL) {
-        // Save the session summary upon completion
-        if (finalResult && chat) {
-          try {
-            const summary = this.getTruncatedSummary(finalResult);
-            chat.getChatRecordingService()?.saveSummary(summary);
-          } catch (error) {
-            debugLogger.warn('Failed to save subagent session summary.', error);
-          }
+      // Save the session summary whenever we have meaningful output —
+      // whether from a genuine GOAL completion or from a recovery turn
+      // that captured partial results before budget exhaustion.
+      if (finalResult && chat) {
+        try {
+          const summary = this.getTruncatedSummary(finalResult);
+          chat.getChatRecordingService()?.saveSummary(summary);
+        } catch (error) {
+          debugLogger.warn('Failed to save subagent session summary.', error);
         }
+      }
 
+      if (terminateReason === AgentTerminateMode.GOAL) {
         return {
           result: finalResult || 'Task completed.',
           terminate_reason: terminateReason,

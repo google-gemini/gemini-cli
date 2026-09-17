@@ -233,7 +233,9 @@ describe('LocalSubagentInvocation', () => {
 
       const display = result.returnDisplay as SubagentProgress;
       expect(display.isSubagentProgress).toBe(true);
-      expect(display.state).toBe(SubagentState.COMPLETED);
+      // TIMEOUT should be INCOMPLETE, not COMPLETED — the agent
+      // did not finish its task. Fixes #22323.
+      expect(display.state).toBe(SubagentState.INCOMPLETE);
       expect(display.result).toBe('Partial progress...');
       expect(display.terminateReason).toBe(AgentTerminateMode.TIMEOUT);
     });
