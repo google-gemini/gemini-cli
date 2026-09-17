@@ -1010,4 +1010,35 @@ describe('ToolConfirmationMessage', () => {
       unmount();
     });
   });
+
+  describe('narrow and negative terminal widths for edit confirmations', () => {
+    const editConfirmationDetails: SerializableConfirmationDetails = {
+      type: 'edit',
+      title: 'Confirm Edit',
+      fileName: 'test.txt',
+      filePath: '/test.txt',
+      fileDiff: '--- a/test.txt\n+++ b/test.txt\n@@ -1 +1 @@\n-old\n+new',
+      originalContent: 'old',
+      newContent: 'new',
+    };
+
+    it.each([-5, -1, 0, 1, 2, 4, 10])(
+      'renders edit confirmation without throwing RangeError when terminalWidth is %i',
+      async (terminalWidth) => {
+        const { lastFrame, unmount } = await renderWithProviders(
+          <ToolConfirmationMessage
+            callId="test-narrow-edit"
+            confirmationDetails={editConfirmationDetails}
+            config={mockConfig}
+            getPreferredEditor={vi.fn()}
+            availableTerminalHeight={30}
+            terminalWidth={terminalWidth}
+            toolName="edit"
+          />,
+        );
+        expect(lastFrame()).toBeDefined();
+        unmount();
+      },
+    );
+  });
 });

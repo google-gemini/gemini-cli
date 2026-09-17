@@ -72,6 +72,7 @@ export const ToolConfirmationMessage: React.FC<
   terminalWidth,
   toolName,
 }) => {
+  const safeTerminalWidth = Math.max(0, Math.floor(terminalWidth || 0));
   const keyMatchers = useKeyMatchers();
   const { confirm, isDiffingEnabled } = useToolActions();
   const [mcpDetailsExpansionState, setMcpDetailsExpansionState] = useState<{
@@ -635,7 +636,7 @@ export const ToolConfirmationMessage: React.FC<
             onCancel={() => {
               handleConfirm(ToolConfirmationOutcome.Cancel);
             }}
-            width={terminalWidth}
+            width={safeTerminalWidth}
             availableHeight={bodyHeight}
           />
         );
@@ -668,7 +669,7 @@ export const ToolConfirmationMessage: React.FC<
             onCancel={() => {
               handleConfirm(ToolConfirmationOutcome.Cancel);
             }}
-            width={terminalWidth}
+            width={safeTerminalWidth}
             availableHeight={bodyHeight}
           />
         );
@@ -710,7 +711,7 @@ export const ToolConfirmationMessage: React.FC<
                         ? Math.max(bodyHeight - 2, 2)
                         : undefined
                   }
-                  terminalWidth={Math.max(terminalWidth, 1) - 4}
+                  terminalWidth={Math.max(0, safeTerminalWidth - 4)}
                 />
               </Box>
             </>
@@ -738,7 +739,7 @@ export const ToolConfirmationMessage: React.FC<
               {colorizeCode({
                 code: command.trim(),
                 language: 'bash',
-                maxWidth: Math.max(terminalWidth, 1) - 6,
+                maxWidth: Math.max(0, safeTerminalWidth - 6),
                 settings,
                 theme: activeTheme,
                 hideLineNumbers: true,
@@ -850,7 +851,7 @@ export const ToolConfirmationMessage: React.FC<
                     ? Math.max(bodyHeight - 2, 2)
                     : undefined
                 }
-                maxWidth={Math.max(terminalWidth, 1) - 4}
+                maxWidth={Math.max(0, safeTerminalWidth - 4)}
               >
                 <Box flexDirection="column">
                   {commandsToDisplay.map((cmd, idx) => (
@@ -862,7 +863,7 @@ export const ToolConfirmationMessage: React.FC<
                       {colorizeCode({
                         code: cmd.trim(),
                         language: 'bash',
-                        maxWidth: Math.max(terminalWidth, 1) - 6,
+                        maxWidth: Math.max(0, safeTerminalWidth - 6),
                         settings,
                         theme: activeTheme,
                         hideLineNumbers: true,
@@ -942,7 +943,7 @@ export const ToolConfirmationMessage: React.FC<
                       {colorizeCode({
                         code: mcpToolDetailsText || '',
                         language: 'json',
-                        maxWidth: Math.max(terminalWidth, 1) - 4,
+                        maxWidth: Math.max(0, safeTerminalWidth - 4),
                         settings,
                         theme: activeTheme,
                         hideLineNumbers: true,
@@ -969,7 +970,7 @@ export const ToolConfirmationMessage: React.FC<
       confirmationDetails,
       getOptions,
       availableBodyContentHeight,
-      terminalWidth,
+      safeTerminalWidth,
       handleConfirm,
       deceptiveUrlWarningText,
       isMcpToolDetailsExpanded,
@@ -1018,7 +1019,8 @@ export const ToolConfirmationMessage: React.FC<
     if (confirmationDetails.isModifying) {
       return (
         <Box
-          width={terminalWidth}
+          width={safeTerminalWidth}
+          minWidth={0}
           borderStyle="round"
           borderColor={theme.border.default}
           justifyContent="space-around"
@@ -1062,7 +1064,7 @@ export const ToolConfirmationMessage: React.FC<
                   ? undefined
                   : availableBodyContentHeight()
               }
-              maxWidth={terminalWidth}
+              maxWidth={safeTerminalWidth}
               overflowDirection={bodyOverflowDirection}
             >
               {bodyContent}
