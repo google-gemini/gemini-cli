@@ -105,14 +105,73 @@ export function isIgnoredUserContent(trimmedContent: string): boolean {
 }
 
 /**
+ * Collects the ids of tool responses recorded as user messages between
+ * `start` and the next model message.
+ */
+function getRecordedResponseIds(
+  messages: ConversationRecord['messages'],
+  start: number,
+): Set<string> {
+  const ids = new Set<string>();
+  for (let i = start; i < messages.length; i++) {
+    const msg = messages[i];
+    if (msg.type === 'gemini') {
+      break;
+    }
+    if (
+      msg.type !== 'user' ||
+      isIgnoredUserContent(partListUnionToString(msg.content).trim())
+    ) {
+      continue;
+    }
+    for (const part of ensurePartArray(msg.content)) {
+      if (part.functionResponse?.id) {
+        ids.add(part.functionResponse.id);
+      }
+    }
+  }
+  return ids;
+}
+
+/**
+ * Drops tool responses whose call has already been answered, recording the
+ * ids it keeps. Returns an empty array when every response was a duplicate.
+ */
+function takeUnansweredParts(
+  parts: Part[],
+  answeredCallIds: Set<string>,
+): Part[] {
+  const kept: Part[] = [];
+  let hasResponses = false;
+  let keptResponses = false;
+  for (const part of parts) {
+    if (part.functionResponse) {
+      hasResponses = true;
+      const callId = part.functionResponse.id;
+      if (callId && answeredCallIds.has(callId)) {
+        continue;
+      }
+      if (callId) {
+        answeredCallIds.add(callId);
+      }
+      keptResponses = true;
+    }
+    kept.push(part);
+  }
+  return hasResponses && !keptResponses ? [] : kept;
+}
+
+/**
  * Converts session/conversation data into Gemini client history formats.
  */
 export function convertSessionToClientHistory(
   messages: ConversationRecord['messages'],
 ): HistoryTurn[] {
   const clientHistory: HistoryTurn[] = [];
+  let answeredCallIds = new Set<string>();
 
-  for (const msg of messages) {
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
     if (msg.type === 'info' || msg.type === 'error' || msg.type === 'warning') {
       continue;
     }
@@ -124,11 +183,19 @@ export function convertSessionToClientHistory(
         continue;
       }
 
+      const parts = takeUnansweredParts(
+        ensurePartArray(msg.content),
+        answeredCallIds,
+      );
+      if (parts.length === 0) {
+        continue;
+      }
+
       clientHistory.push({
         id: msg.id,
         content: {
           role: 'user',
-          parts: ensurePartArray(msg.content),
+          parts,
         },
       });
     } else if (msg.type === 'gemini') {
@@ -181,12 +248,15 @@ export function convertSessionToClientHistory(
             parts: modelParts,
           },
         });
+        answeredCallIds = new Set();
 
-        // 4. Generate tool response turns
+        // 4. Generate tool response turns for calls whose response was not
+        // recorded as its own user message
         if (msg.toolCalls && msg.toolCalls.length > 0) {
+          const recordedResponseIds = getRecordedResponseIds(messages, i + 1);
           const functionResponseParts: Part[] = [];
           for (const toolCall of msg.toolCalls) {
-            if (toolCall.result) {
+            if (toolCall.result && !recordedResponseIds.has(toolCall.id)) {
               let responseData: Part;
 
               if (typeof toolCall.result === 'string') {
@@ -210,12 +280,16 @@ export function convertSessionToClientHistory(
             }
           }
 
-          if (functionResponseParts.length > 0) {
+          const responseParts = takeUnansweredParts(
+            functionResponseParts,
+            answeredCallIds,
+          );
+          if (responseParts.length > 0) {
             clientHistory.push({
               id: `${msg.id}_response`,
               content: {
                 role: 'user',
-                parts: functionResponseParts,
+                parts: responseParts,
               },
             });
           }
