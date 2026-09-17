@@ -20,7 +20,10 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   warningThreshold = 80,
 }) => {
   const safeWidth = Math.max(0, Math.floor(width || 0));
-  const safeValue = Math.min(Math.max(value, 0), 100);
+  const safeValue = Math.min(
+    Math.max(Number.isFinite(value) ? value : 0, 0),
+    100,
+  );
   const activeChars = Math.min(
     safeWidth,
     Math.max(0, Math.ceil((safeValue / 100) * safeWidth)),

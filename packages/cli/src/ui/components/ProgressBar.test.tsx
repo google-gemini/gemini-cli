@@ -53,4 +53,14 @@ describe('<ProgressBar />', () => {
     );
     expect(frameFrac()).toBeDefined();
   });
+
+  it.each([NaN, undefined as unknown as number, Infinity, -Infinity])(
+    'handles non-finite value (%s) without throwing',
+    async (val) => {
+      const { lastFrame } = await renderWithProviders(
+        <ProgressBar value={val} width={10} />,
+      );
+      expect(lastFrame()).toBeDefined();
+    },
+  );
 });
