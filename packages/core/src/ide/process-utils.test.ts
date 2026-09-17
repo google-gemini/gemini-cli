@@ -214,6 +214,41 @@ describe('getIdeProcessInfo', () => {
       expect(result).toEqual({ pid: 1000, command: 'node.exe' });
     });
 
+    it('should query a single PID via Get-CimInstance (not Unix ps) when the snapshot omits the current PID', async () => {
+      (os.platform as Mock).mockReturnValue('win32');
+      // Full snapshot succeeds but doesn't include our own PID (1000).
+      const processes = [
+        {
+          ProcessId: 999,
+          ParentProcessId: 0,
+          Name: 'other.exe',
+          CommandLine: 'other.exe',
+        },
+      ];
+      mockedExec
+        .mockResolvedValueOnce({ stdout: JSON.stringify(processes) }) // full snapshot
+        .mockResolvedValueOnce({
+          stdout: JSON.stringify({
+            ParentProcessId: 500,
+            Name: 'node.exe',
+            CommandLine: 'C:\\node.exe --my-flag',
+          }),
+        }); // single-PID CIM fallback query
+
+      const result = await getIdeProcessInfo();
+
+      expect(result).toEqual({
+        pid: 1000,
+        command: 'C:\\node.exe --my-flag',
+      });
+      expect(mockedExec).toHaveBeenCalledTimes(2);
+      const secondCallArgs = mockedExec.mock.calls[1];
+      expect(secondCallArgs[0]).toContain(
+        'Get-CimInstance Win32_Process -Filter "ProcessId=1000"',
+      );
+      expect(secondCallArgs[0]).not.toContain('ps -o');
+    });
+
     it('should handle missing process in map during traversal', async () => {
       (os.platform as Mock).mockReturnValue('win32');
       // process (1000) -> parent (900) -> missing (800)
