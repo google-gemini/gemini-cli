@@ -253,8 +253,22 @@ export class GeminiCliSession {
           const toolCall = event.value;
           let args = toolCall.args;
           if (typeof args === 'string') {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-            args = JSON.parse(args);
+            try {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+              args = JSON.parse(args);
+            } catch (e) {
+              const errorMessage =
+                e instanceof Error ? e.message : String(e);
+              // Don't kill the whole stream on one malformed tool call;
+              // surface an error so the model can retry.
+              toolCallsToSchedule.push({
+                ...toolCall,
+                args: { _parseError: `Invalid JSON args: ${errorMessage}` },
+                isClientInitiated: false,
+                prompt_id: sessionId,
+              });
+              continue;
+            }
           }
           toolCallsToSchedule.push({
             ...toolCall,
