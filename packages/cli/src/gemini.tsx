@@ -172,11 +172,17 @@ export function getNodeMemoryArgs(isDebugMode: boolean): string[] {
 
 export function setupUnhandledRejectionHandler() {
   let unhandledRejectionOccurred = false;
-  const hasUnhandled = process.listeners('unhandledRejection').some(
-    (l) => Object.getOwnPropertyDescriptor(l, 'geminiListener')?.value === true
-  );
+  const hasUnhandled = process
+    .listeners('unhandledRejection')
+    .some(
+      (l) =>
+        Object.getOwnPropertyDescriptor(l, 'geminiListener')?.value === true,
+    );
   if (!hasUnhandled) {
-    const geminiUnhandledRejectionListener = (reason: unknown, _promise: Promise<unknown>) => {
+    const geminiUnhandledRejectionListener = (
+      reason: unknown,
+      _promise: Promise<unknown>,
+    ) => {
       // AbortError is expected when the user cancels a request (e.g. pressing ESC).
       // It may surface as an unhandled rejection due to async timing in the
       // streaming pipeline, but it is not a bug.
@@ -207,9 +213,12 @@ ${reason.stack}`
   }
 
   let isHandlingUncaughtException = false;
-  const hasUncaught = process.listeners('uncaughtException').some(
-    (l) => Object.getOwnPropertyDescriptor(l, 'geminiListener')?.value === true
-  );
+  const hasUncaught = process
+    .listeners('uncaughtException')
+    .some(
+      (l) =>
+        Object.getOwnPropertyDescriptor(l, 'geminiListener')?.value === true,
+    );
   if (!hasUncaught) {
     const geminiUncaughtExceptionListener = async (error: Error) => {
       if (error instanceof Error) {
@@ -221,7 +230,8 @@ ${reason.stack}`
           message.includes('EBADF') ||
           ('code' in error && error.code === 'EBADF');
         const isFromNodePty =
-          error.stack?.includes('node-pty') || error.stack?.includes('PtyResize');
+          error.stack?.includes('node-pty') ||
+          error.stack?.includes('PtyResize');
 
         if ((isPtyResizeError || isEbadfError) && isFromNodePty) {
           return;
@@ -270,7 +280,10 @@ ${error.stack}`
       try {
         await runExitCleanup();
       } catch (cleanupError) {
-        debugLogger.error('Error during uncaught exception cleanup:', cleanupError);
+        debugLogger.error(
+          'Error during uncaught exception cleanup:',
+          cleanupError,
+        );
       } finally {
         clearTimeout(cleanupTimeout);
       }
