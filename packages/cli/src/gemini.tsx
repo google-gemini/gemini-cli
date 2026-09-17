@@ -170,6 +170,9 @@ export function getNodeMemoryArgs(isDebugMode: boolean): string[] {
   return args;
 }
 
+const UNEXPECTED_ERROR_PREFIX = `=========================================
+This is an unexpected error. Please file a bug report using the /bug tool.`;
+
 export function setupUnhandledRejectionHandler() {
   let unhandledRejectionOccurred = false;
   const hasUnhandled = process
@@ -191,8 +194,7 @@ export function setupUnhandledRejectionHandler() {
         return;
       }
 
-      const errorMessage = `=========================================
-This is an unexpected error. Please file a bug report using the /bug tool.
+      const errorMessage = `${UNEXPECTED_ERROR_PREFIX}
 CRITICAL: Unhandled Promise Rejection!
 =========================================
 Reason: ${reason}${
@@ -277,8 +279,7 @@ ${reason.stack}`
           ? `\nStack trace:\n${error.stack}`
           : '';
 
-      const errorMessage = `=========================================
-This is an unexpected error. Please file a bug report using the /bug tool.
+      const errorMessage = `${UNEXPECTED_ERROR_PREFIX}
 CRITICAL: Uncaught Exception!
 =========================================
 Error: ${errorDetails}${stackDetails}`;
