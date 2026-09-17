@@ -270,5 +270,26 @@ describe('activate', () => {
 
       expect(showInformationMessageMock).not.toHaveBeenCalled();
     });
+
+    it('should register gemini.diff.open command and handle empty or partial arguments safely', async () => {
+      const registerCommandMock = vi.mocked(vscode.commands.registerCommand);
+
+      await activate(context);
+
+      const openCommandCall = registerCommandMock.mock.calls.find(
+        (call) => call[0] === 'gemini.diff.open',
+      );
+      expect(openCommandCall).toBeDefined();
+
+      const handler = openCommandCall![1] as (args?: {
+        filePath?: string;
+        newContent?: string;
+      }) => Promise<void>;
+      expect(handler).toBeInstanceOf(Function);
+
+      // Call handler with empty or partial args to ensure it doesn't throw or crash
+      await expect(handler()).resolves.not.toThrow();
+      await expect(handler({ filePath: '/test.ts' })).resolves.not.toThrow();
+    });
   });
 });

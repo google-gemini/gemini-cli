@@ -137,8 +137,10 @@ export async function activate(context: vscode.ExtensionContext) {
       ? { dispose: () => {} }
       : vscode.commands.registerCommand(
           'gemini.diff.open',
-          async (args: { filePath: string; newContent: string }) => {
-            await diffManager.showDiff(args.filePath, args.newContent);
+          async (args?: { filePath: string; newContent: string }) => {
+            if (args?.filePath && args?.newContent !== undefined) {
+              await diffManager.showDiff(args.filePath, args.newContent);
+            }
           },
         ),
     (vscode.commands.registerCommand(
