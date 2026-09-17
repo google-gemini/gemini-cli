@@ -684,6 +684,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleInput = useCallback(
     (key: Key) => {
+      appEvents.emit(AppEvent.UserTyping);
+
       if (handleVoiceInput(key)) return true;
 
       // Determine if this keypress is a history navigation command
@@ -1657,15 +1659,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         cursorVisualColAbsolute === cpLen(lineText) &&
         currentLineGhost;
       return (
-        <Box height={1}>
-          <Text
-            terminalCursorFocus={showCursor && isOnCursorLine}
-            terminalCursorPosition={cpIndexToOffset(
-              lineText,
-              cursorVisualColAbsolute,
-            )}
-          >
-            {renderedLine}
+       <Box height={1}>
+         <Text>
+           {renderedLine}
             {showCursorBeforeGhost && (showCursor ? chalk.inverse(' ') : ' ')}
             {currentLineGhost && (
               <Text color={theme.text.secondary}>{currentLineGhost}</Text>
@@ -1848,10 +1844,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             {buffer.text.length === 0 ? (
               effectivePlaceholder ? (
                 showCursor ? (
-                  <Text
-                    terminalCursorFocus={showCursor}
-                    terminalCursorPosition={0}
-                  >
+                  <Text>
                     {chalk.inverse(effectivePlaceholder.slice(0, 1))}
                     <Text color={theme.text.secondary}>
                       {effectivePlaceholder.slice(1)}

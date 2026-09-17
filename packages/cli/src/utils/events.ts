@@ -24,6 +24,7 @@ export enum AppEvent {
   TerminalBackground = 'terminal-background',
   TransientMessage = 'transient-message',
   ScrollToBottom = 'scroll-to-bottom',
+  UserTyping = 'user-typing',
 }
 
 export interface AppEvents {
@@ -34,6 +35,7 @@ export interface AppEvents {
   [AppEvent.TerminalBackground]: [string];
   [AppEvent.TransientMessage]: [TransientMessagePayload];
   [AppEvent.ScrollToBottom]: never[];
+  [AppEvent.UserTyping]: never[];
 }
 
 export const appEvents = new EventEmitter<AppEvents>();
