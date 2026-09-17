@@ -177,8 +177,8 @@ export const SubagentProgressDisplay: React.FC<
           <MarkdownDisplay
             text={safeJsonToMarkdown(progress.result)}
             isPending={
-              progress.state !== SubagentState.COMPLETED &&
-              progress.state !== SubagentState.INCOMPLETE
+              progress.state === SubagentState.RUNNING ||
+              progress.state === undefined
             }
             terminalWidth={terminalWidth}
           />
