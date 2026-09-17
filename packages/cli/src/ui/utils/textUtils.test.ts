@@ -33,6 +33,14 @@ describe('textUtils', () => {
       expect(sanitizeForDisplay(longInput, 20)).toBe('a'.repeat(17) + '...');
     });
 
+    it('should not split a surrogate pair when truncating', () => {
+      const input = 'a'.repeat(96) + '\u{1F600}' + 'b'.repeat(50);
+
+      expect(sanitizeForDisplay(input, 100)).toBe(
+        'a'.repeat(96) + '\u{1F600}' + '...',
+      );
+    });
+
     it('should handle empty or null input', () => {
       expect(sanitizeForDisplay('')).toBe('');
       expect(sanitizeForDisplay(null as unknown as string)).toBe('');
