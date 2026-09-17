@@ -555,5 +555,87 @@ describe('LocalSubagentInvocation', () => {
         }),
       );
     });
+
+    describe('terminate_reason → SubagentState mapping (regression for #22323)', () => {
+      it('should map MAX_TURNS to INCOMPLETE and say "did not complete" in llmContent', async () => {
+        mockExecutorInstance.run.mockResolvedValue({
+          result: 'Partial findings before budget ran out.',
+          terminate_reason: AgentTerminateMode.MAX_TURNS,
+        });
+
+        const result = await invocation.execute({
+          abortSignal: signal,
+          updateOutput,
+        });
+
+        const display = result.returnDisplay as SubagentProgress;
+        expect(display.state).toBe(SubagentState.INCOMPLETE);
+        expect(display.terminateReason).toBe(AgentTerminateMode.MAX_TURNS);
+        expect(display.result).toBe(
+          'Partial findings before budget ran out.',
+        );
+
+        const text = Array.isArray(result.llmContent)
+          ? (result.llmContent[0] as { text: string }).text
+          : (result.llmContent as string);
+        expect(text).toContain('did not complete');
+        expect(text).toContain('MAX_TURNS');
+        expect(text).not.toContain("finished");
+      });
+
+      it('should map GOAL to COMPLETED and say "finished" in llmContent', async () => {
+        mockExecutorInstance.run.mockResolvedValue({
+          result: 'All done.',
+          terminate_reason: AgentTerminateMode.GOAL,
+        });
+
+        const result = await invocation.execute({
+          abortSignal: signal,
+          updateOutput,
+        });
+
+        const display = result.returnDisplay as SubagentProgress;
+        expect(display.state).toBe(SubagentState.COMPLETED);
+
+        const text = Array.isArray(result.llmContent)
+          ? (result.llmContent[0] as { text: string }).text
+          : (result.llmContent as string);
+        expect(text).toContain('finished');
+        expect(text).not.toContain('did not complete');
+      });
+
+      it('should map ERROR to ERROR state', async () => {
+        mockExecutorInstance.run.mockResolvedValue({
+          result: 'Something went wrong.',
+          terminate_reason: AgentTerminateMode.ERROR,
+        });
+
+        const result = await invocation.execute({
+          abortSignal: signal,
+          updateOutput,
+        });
+
+        const display = result.returnDisplay as SubagentProgress;
+        expect(display.state).toBe(SubagentState.ERROR);
+      });
+
+      it('should map ERROR_NO_COMPLETE_TASK_CALL to ERROR state', async () => {
+        mockExecutorInstance.run.mockResolvedValue({
+          result: 'Agent stopped without calling complete_task.',
+          terminate_reason: AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
+        });
+
+        const result = await invocation.execute({
+          abortSignal: signal,
+          updateOutput,
+        });
+
+        const display = result.returnDisplay as SubagentProgress;
+        expect(display.state).toBe(SubagentState.ERROR);
+        expect(display.terminateReason).toBe(
+          AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
+        );
+      });
+    });
   });
 });
