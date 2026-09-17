@@ -2688,7 +2688,7 @@ describe('LocalAgentExecutor', () => {
       ]);
     };
 
-    it('should recover successfully if complete_task is called during the grace turn after MAX_TURNS', async () => {
+    it('should preserve MAX_TURNS terminate_reason even when recovery captures output via complete_task', async () => {
       const MAX = 1;
       const definition = createTestDefinition([LS_TOOL_NAME], {
         maxTurns: MAX,
@@ -2702,7 +2702,7 @@ describe('LocalAgentExecutor', () => {
       // Turn 1 (hits max_turns)
       mockWorkResponse('t1');
 
-      // Recovery Turn (succeeds)
+      // Recovery Turn (calls complete_task with salvaged output)
       mockModelResponse(
         [
           {
@@ -2716,7 +2716,10 @@ describe('LocalAgentExecutor', () => {
 
       const output = await executor.run({ goal: 'Turns recovery' }, signal);
 
-      expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
+      // CRITICAL: terminate_reason must stay MAX_TURNS, NOT be promoted to GOAL.
+      // The parent needs to know this was a budget-exhausted salvage,
+      // not a genuine task completion. Fixes #22323.
+      expect(output.terminate_reason).toBe(AgentTerminateMode.MAX_TURNS);
       expect(output.result).toBe('Recovered!');
       expect(mockSendMessageStream).toHaveBeenCalledTimes(MAX + 1); // 1 regular + 1 recovery
 
@@ -2805,7 +2808,10 @@ describe('LocalAgentExecutor', () => {
       const output = await executor.run({ goal: 'Violation recovery' }, signal);
 
       expect(mockSendMessageStream).toHaveBeenCalledTimes(3);
-      expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
+      // Recovery captures output but preserves the original terminate reason
+      expect(output.terminate_reason).toBe(
+        AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
+      );
       expect(output.result).toBe('Recovered from violation!');
 
       expect(activities).toContainEqual(
@@ -2904,7 +2910,8 @@ describe('LocalAgentExecutor', () => {
       const output = await runPromise;
 
       expect(mockSendMessageStream).toHaveBeenCalledTimes(2); // 1 failed + 1 recovery
-      expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
+      // Recovery captures output but preserves TIMEOUT as the reason
+      expect(output.terminate_reason).toBe(AgentTerminateMode.TIMEOUT);
       expect(output.result).toBe('Recovered from timeout!');
 
       expect(activities).toContainEqual(
