@@ -19,17 +19,20 @@ vi.mock('./utils/cleanup.js', async (importOriginal) => {
 describe('setupUnhandledRejectionHandler - uncaughtException', () => {
   let initialUncaughtExceptionListeners: readonly unknown[] = [];
   let initialUnhandledRejectionListeners: readonly unknown[] = [];
+  let originalExitCode: number | undefined;
 
   beforeEach(() => {
     initialUncaughtExceptionListeners = process.listeners('uncaughtException');
     initialUnhandledRejectionListeners =
       process.listeners('unhandledRejection');
+    originalExitCode = process.exitCode;
     vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
     vi.spyOn(process, 'removeAllListeners').mockImplementation(() => process);
     vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
   });
 
   afterEach(() => {
+    process.exitCode = originalExitCode;
     const currentUncaughtListeners = process.listeners('uncaughtException');
     currentUncaughtListeners.forEach((listener) => {
       if (!initialUncaughtExceptionListeners.includes(listener)) {
