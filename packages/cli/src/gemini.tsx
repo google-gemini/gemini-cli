@@ -228,7 +228,7 @@ ${reason.stack}`
           message === 'Cannot resize a pty that has already exited';
         const isEbadfError =
           message.includes('EBADF') ||
-          ('code' in error && error.code === 'EBADF');
+          ('code' in error && (error as { code?: unknown }).code === 'EBADF');
         const isFromNodePty =
           error.stack?.includes('node-pty') ||
           error.stack?.includes('PtyResize');
