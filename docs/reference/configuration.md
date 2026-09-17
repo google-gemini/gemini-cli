@@ -2792,18 +2792,24 @@ from the system or loaded from `.env` files.
 
 **Configuration:**
 
-You can customize this behavior in your `settings.json` file:
+Redaction is off by default. You can enable and customize this behavior in your
+`settings.json` file:
 
-- **`security.allowedEnvironmentVariables`**: A list of variable names to
-  _never_ redact, even if they match sensitive patterns.
-- **`security.blockedEnvironmentVariables`**: A list of variable names to
-  _always_ redact, even if they don't match sensitive patterns.
+- **`security.environmentVariableRedaction.enabled`**: Set to `true` to turn on
+  redaction. Defaults to `false`.
+- **`security.environmentVariableRedaction.allowed`**: A list of variable names
+  to _never_ redact, even if they match sensitive patterns.
+- **`security.environmentVariableRedaction.blocked`**: A list of variable names
+  to _always_ redact, even if they don't match sensitive patterns.
 
 ```json
 {
   "security": {
-    "allowedEnvironmentVariables": ["MY_PUBLIC_KEY", "NOT_A_SECRET_TOKEN"],
-    "blockedEnvironmentVariables": ["INTERNAL_IP_ADDRESS"]
+    "environmentVariableRedaction": {
+      "enabled": true,
+      "allowed": ["MY_PUBLIC_KEY", "NOT_A_SECRET_TOKEN"],
+      "blocked": ["INTERNAL_IP_ADDRESS"]
+    }
   }
 }
 ```
