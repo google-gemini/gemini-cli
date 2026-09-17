@@ -428,6 +428,33 @@ diff --git a/test.txt b/test.txt
           expect(lastFrame()).not.toContain('hidden');
         });
       });
+
+      it('handles negative, zero, and very small terminal widths without throwing RangeError', async () => {
+        const diffWithHunks = `
+diff --git a/test.txt b/test.txt
+--- a/test.txt
++++ b/test.txt
+@@ -1,2 +1,2 @@
+-line 1
++line 1 modified
+@@ -10,2 +10,2 @@
+-line 10
++line 10 modified
+`;
+        for (const terminalWidth of [-5, -1, 0, 1, 2, 4]) {
+          const { lastFrame, unmount } = await renderWithProviders(
+            <OverflowProvider>
+              <DiffRenderer
+                diffContent={diffWithHunks}
+                filename="test.txt"
+                terminalWidth={terminalWidth}
+              />
+            </OverflowProvider>,
+          );
+          expect(lastFrame()).toBeDefined();
+          unmount();
+        }
+      });
     },
   );
 });

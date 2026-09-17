@@ -800,7 +800,36 @@ async function cacheCredentials(credentials: Credentials) {
   const filePath = Storage.getOAuthCredsPath();
   await fs.mkdir(path.dirname(filePath), { recursive: true });
 
-  const credString = JSON.stringify(credentials, null, 2);
+  let existing: Credentials = {};
+  try {
+    const existingContent = await fs.readFile(filePath, 'utf-8');
+    const parsed: unknown = JSON.parse(existingContent);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      existing = parsed as Credentials;
+    }
+  } catch (error: unknown) {
+    const isNoEnt =
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      error.code === 'ENOENT';
+    if (!isNoEnt && !(error instanceof SyntaxError)) {
+      throw error;
+    }
+  }
+
+  const cleanCredentials = Object.fromEntries(
+    Object.entries(credentials).filter(
+      ([_, v]) => v !== null && v !== undefined,
+    ),
+  );
+
+  const finalCredentials = {
+    ...existing,
+    ...cleanCredentials,
+  };
+
+  const credString = JSON.stringify(finalCredentials, null, 2);
   await fs.writeFile(filePath, credString, { mode: 0o600 });
   try {
     await fs.chmod(filePath, 0o600);
