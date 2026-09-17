@@ -6,6 +6,7 @@
 
 import * as glob from 'glob';
 import * as path from 'node:path';
+import * as os from 'node:os';
 import {
   GEMINI_DIR,
   Storage,
@@ -68,6 +69,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...original,
     Storage: original.Storage,
+    homedir: vi.fn(original.homedir),
     isCommandAllowed: vi.fn(),
     ShellExecutionService: {
       execute: vi.fn(),
@@ -346,6 +348,30 @@ describe('FileCommandLoader', () => {
     expect(names).toContain('another');
     // Verify they are loaded as user commands, not duplicated as workspace commands
     expect(commands.every((c) => c.kind === CommandKind.USER_FILE)).toBe(true);
+  });
+
+  it('handles empty homedir gracefully without throwing when loading commands', async () => {
+    vi.mocked(homedir).mockReturnValue('');
+    const projectCommandsDir = path.join('/workspace', GEMINI_DIR, 'commands');
+    mock({
+      [projectCommandsDir]: {
+        'project.toml': 'prompt = "Project prompt"',
+      },
+    });
+
+    const mockConfig = {
+      getProjectRoot: vi.fn(() => '/workspace'),
+      getExtensions: vi.fn(() => []),
+      getFolderTrust: vi.fn(() => true),
+      isTrustedFolder: vi.fn(() => true),
+    } as unknown as Config;
+    const loader = new FileCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(signal);
+    expect(commands).toBeDefined();
+    expect(commands).toHaveLength(1);
+    expect(commands[0].name).toBe('project');
+    expect(commands[0].kind).toBe(CommandKind.WORKSPACE_FILE);
+    vi.mocked(homedir).mockReturnValue(os.homedir());
   });
 
   it('ignores files with TOML syntax errors', async () => {
@@ -1307,25 +1333,76 @@ describe('FileCommandLoader', () => {
       expect(commands).toHaveLength(2);
     });
 
-    it('does not load when folder is not trusted', async () => {
+    it('allows global user commands but excludes project and extension commands when folder is not trusted', async () => {
+      const userCommandsDir = Storage.getUserCommandsDir();
+      const projectCommandsDir = path.join(
+        '/path/to/project',
+        '.gemini',
+        'commands',
+      );
       const mockConfig = {
         getProjectRoot: vi.fn(() => '/path/to/project'),
-        getExtensions: vi.fn(() => []),
+        getExtensions: vi.fn(() => [
+          {
+            name: 'ext1',
+            id: 'ext1-id',
+            path: '/path/to/ext1',
+            isActive: true,
+          },
+        ]),
         getFolderTrust: vi.fn(() => true),
         isTrustedFolder: vi.fn(() => false),
       } as unknown as Config;
-      const userCommandsDir = Storage.getUserCommandsDir();
+
       mock({
         [userCommandsDir]: {
-          'test1.toml': 'prompt = "Prompt 1"',
-          'test2.toml': 'prompt = "Prompt 2"',
+          'user1.toml': 'prompt = "User Prompt 1"',
+          'user2.toml': 'prompt = "User Prompt 2"',
+        },
+        [projectCommandsDir]: {
+          'project1.toml': 'prompt = "Project Prompt 1"',
+        },
+        '/path/to/ext1/commands': {
+          'ext_cmd.toml': 'prompt = "Extension Prompt"',
         },
       });
 
       const loader = new FileCommandLoader(mockConfig);
       const commands = await loader.loadCommands(signal);
 
-      expect(commands).toHaveLength(0);
+      expect(commands).toHaveLength(2);
+      expect(commands.map((c) => c.name).sort()).toEqual(['user1', 'user2']);
+    });
+
+    it('allows global user commands in listAvailableFiles when folder is not trusted', async () => {
+      const userCommandsDir = Storage.getUserCommandsDir();
+      const projectCommandsDir = path.join(
+        '/path/to/project',
+        '.gemini',
+        'commands',
+      );
+      mock({
+        [userCommandsDir]: {
+          'user_cmd.toml': 'prompt = "User prompt"',
+        },
+        [projectCommandsDir]: {
+          'project_cmd.toml': 'prompt = "Project prompt"',
+        },
+      });
+
+      const mockConfig = {
+        getProjectRoot: vi.fn(() => '/path/to/project'),
+        getExtensions: vi.fn(() => []),
+        getFolderTrust: vi.fn(() => true),
+        isTrustedFolder: vi.fn(() => false),
+      } as unknown as Config;
+
+      const loader = new FileCommandLoader(mockConfig);
+      const groups = await loader.listAvailableFiles();
+
+      expect(groups).toHaveLength(1);
+      expect(groups[0]?.displayName).toBe('User');
+      expect(groups[0]?.files).toEqual(['user_cmd.toml']);
     });
   });
 

@@ -397,8 +397,15 @@ export class MCPOAuthProvider {
     const preferredPort = getPortFromUrl(config.redirectUri);
 
     // Start callback server first to allocate port
-    // This ensures we only create one server and eliminates race conditions
-    const callbackServer = startCallbackServer(pkceParams.state, preferredPort);
+    // Pass config.issuer for RFC 9207 Authorization Server Issuer Identification / Mix-Up defense
+    debugLogger.debug(
+      `Starting callback server for "${serverName}" (expected issuer: ${config.issuer || 'none'})...`,
+    );
+    const callbackServer = startCallbackServer(
+      pkceParams.state,
+      preferredPort,
+      config.issuer,
+    );
 
     // Wait for server to start and get the allocated port
     // We need this port for client registration and auth URL building

@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'node:fs';
 import { vi } from 'vitest';
 import type { WorkspaceContext } from '../utils/workspaceContext.js';
+import { resolveToRealPath } from '../utils/paths.js';
 
 /**
  * Creates a mock WorkspaceContext for testing
@@ -20,7 +20,7 @@ export function createMockWorkspaceContext(
 ): WorkspaceContext {
   const resolveToRealPathSafe = (p: string) => {
     try {
-      return fs.realpathSync(p);
+      return resolveToRealPath(p);
     } catch {
       return p;
     }

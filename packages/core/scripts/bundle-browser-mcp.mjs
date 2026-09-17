@@ -95,6 +95,44 @@ async function bundle() {
     } else {
       console.warn(`Warning: third_party assets not found at ${srcThirdParty}`);
     }
+
+    // Sanitize any hardcoded sensitive API keys in the bundled and copied output files.
+    // Replace the plaintext Google CrUX API key with dynamic process.env lookup at runtime.
+    const bundleMcpFile = path.resolve(
+      __dirname,
+      '../dist/bundled/chrome-devtools-mcp.mjs',
+    );
+    const destThirdPartyIndex = path.resolve(
+      __dirname,
+      '../dist/bundled/third_party/index.js',
+    );
+
+    const sanitizeFile = (filePath) => {
+      if (fs.existsSync(filePath)) {
+        const content = fs.readFileSync(filePath, 'utf8');
+        const keyPattern = /AIzaSy[A-Za-z0-9_-]{30,40}/;
+        if (keyPattern.test(content)) {
+          console.log(`Sanitizing hardcoded API key in: ${filePath}`);
+          // Replace single-quoted, double-quoted, and backtick occurrences of any matching Google API key with process.env lookup
+          const quotedPattern = /([\x27\x22\x60])AIzaSy[A-Za-z0-9_-]{30,40}\1/g;
+          const sanitizedContent = content.replace(
+            quotedPattern,
+            '(process.env.CRUX_API_KEY || "")',
+          );
+
+          if (keyPattern.test(sanitizedContent)) {
+            throw new Error(
+              `Failed to fully sanitize API key in ${filePath}. The key pattern was detected but could not be safely replaced.`,
+            );
+          }
+
+          fs.writeFileSync(filePath, sanitizedContent, 'utf8');
+        }
+      }
+    };
+
+    sanitizeFile(bundleMcpFile);
+    sanitizeFile(destThirdPartyIndex);
   } catch (error) {
     console.error('Error bundling chrome-devtools-mcp:', error);
     process.exit(1);
