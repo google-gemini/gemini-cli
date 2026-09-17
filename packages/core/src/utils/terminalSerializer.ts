@@ -154,6 +154,7 @@ export function serializeTerminalToObject(
   terminal: Terminal,
   startLine?: number,
   endLine?: number,
+  includeColor = true,
 ): AnsiOutput {
   const buffer = terminal.buffer.active;
   const cursorX = buffer.cursorX;
@@ -199,8 +200,12 @@ export function serializeTerminalToObject(
             inverse:
               lastCell.isAttribute(Attribute.inverse) || lastCell.isCursor(),
             isUninitialized: lastCell.isUninitialized(),
-            fg: convertColorToHex(lastCell.fg, lastCell.fgColorMode, defaultFg),
-            bg: convertColorToHex(lastCell.bg, lastCell.bgColorMode, defaultBg),
+            fg: includeColor
+              ? convertColorToHex(lastCell.fg, lastCell.fgColorMode, defaultFg)
+              : '',
+            bg: includeColor
+              ? convertColorToHex(lastCell.bg, lastCell.bgColorMode, defaultBg)
+              : '',
           };
           currentLine.push(token);
         }
@@ -221,8 +226,12 @@ export function serializeTerminalToObject(
         dim: lastCell.isAttribute(Attribute.dim),
         inverse: lastCell.isAttribute(Attribute.inverse) || lastCell.isCursor(),
         isUninitialized: lastCell.isUninitialized(),
-        fg: convertColorToHex(lastCell.fg, lastCell.fgColorMode, defaultFg),
-        bg: convertColorToHex(lastCell.bg, lastCell.bgColorMode, defaultBg),
+        fg: includeColor
+          ? convertColorToHex(lastCell.fg, lastCell.fgColorMode, defaultFg)
+          : '',
+        bg: includeColor
+          ? convertColorToHex(lastCell.bg, lastCell.bgColorMode, defaultBg)
+          : '',
       };
       currentLine.push(token);
     }

@@ -192,6 +192,25 @@ describe('terminalSerializer', () => {
       expect(result[0][1].text.trim()).toBe('ursor test');
       expect(result[0][1].inverse).toBe(false);
     });
+
+    it('should omit fg and bg colors when includeColor is false', async () => {
+      const terminal = new Terminal({
+        cols: 80,
+        rows: 24,
+        allowProposedApi: true,
+      });
+      await writeToTerminal(terminal, '\x1b[1;31;42mStyled text\x1b[0m');
+      const result = serializeTerminalToObject(
+        terminal,
+        undefined,
+        undefined,
+        false,
+      );
+      expect(result[0][0].bold).toBe(true);
+      expect(result[0][0].fg).toBe('');
+      expect(result[0][0].bg).toBe('');
+      expect(result[0][0].text).toBe('Styled text');
+    });
   });
   describe('convertColorToHex', () => {
     it('should convert RGB color to hex', () => {

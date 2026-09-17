@@ -61,9 +61,9 @@ export const GEMINI_CLI_IDENTIFICATION_ENV_VAR = 'GEMINI_CLI';
 export const GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE = '1';
 
 // We want to allow shell outputs that are close to the context window in size.
-// 300,000 lines is roughly equivalent to a large context window, ensuring
-// we capture significant output from long-running commands.
-export const SCROLLBACK_LIMIT = 300000;
+// 50,000 lines is roughly equivalent to a large context window while preventing
+// excessive V8 heap growth in @xterm/headless circular buffers.
+export const SCROLLBACK_LIMIT = 50000;
 
 const BASH_SHOPT_OPTIONS = 'promptvars nullglob extglob nocaseglob dotglob';
 const BASH_SHOPT_GUARD = `shopt -u ${BASH_SHOPT_OPTIONS};`;
@@ -155,6 +155,7 @@ interface ActivePty {
   maxSerializedLines?: number;
   command: string;
   sessionId?: string;
+  cancelRender?: () => void;
 }
 
 interface ActiveChildProcess {
@@ -168,6 +169,40 @@ interface ActiveChildProcess {
   command: string;
   sessionId?: string;
 }
+
+const isAnsiOutputEqual = (
+  a: string | AnsiOutput | null,
+  b: AnsiOutput,
+): boolean => {
+  if (!Array.isArray(a) || a.length !== b.length) {
+    return false;
+  }
+  for (let i = 0; i < a.length; i++) {
+    const lineA = a[i];
+    const lineB = b[i];
+    if (lineA.length !== lineB.length) {
+      return false;
+    }
+    for (let j = 0; j < lineA.length; j++) {
+      const tokA = lineA[j];
+      const tokB = lineB[j];
+      if (
+        tokA.text !== tokB.text ||
+        tokA.bold !== tokB.bold ||
+        tokA.italic !== tokB.italic ||
+        tokA.underline !== tokB.underline ||
+        tokA.dim !== tokB.dim ||
+        tokA.inverse !== tokB.inverse ||
+        tokA.isUninitialized !== tokB.isUninitialized ||
+        tokA.fg !== tokB.fg ||
+        tokA.bg !== tokB.bg
+      ) {
+        return false;
+      }
+    }
+  }
+  return true;
+};
 
 const findLastContentLine = (
   buffer: pkg.IBuffer,
@@ -183,7 +218,11 @@ const findLastContentLine = (
   return -1;
 };
 
-const getFullBufferText = (terminal: pkg.Terminal, startLine = 0): string => {
+const getFullBufferText = (
+  terminal: pkg.Terminal,
+  startLine = 0,
+  maxBytes = MAX_CHILD_PROCESS_BUFFER_SIZE,
+): string => {
   const buffer = terminal.buffer.active;
   const lines: string[] = [];
 
@@ -215,7 +254,11 @@ const getFullBufferText = (terminal: pkg.Terminal, startLine = 0): string => {
     }
   }
 
-  return lines.join('\n');
+  const fullText = lines.join('\n');
+  if (maxBytes > 0 && fullText.length > maxBytes) {
+    return fullText.slice(-maxBytes);
+  }
+  return fullText;
 };
 
 const writeBufferToLogStream = (
@@ -921,6 +964,7 @@ export class ShellExecutionService {
     const entry = this.activePtys.get(pid);
     if (!entry) return;
 
+    entry.cancelRender?.();
     this.destroyPtyProcess(entry.ptyProcess);
 
     try {
@@ -1004,12 +1048,21 @@ export class ShellExecutionService {
 
       const terminal = headlessTerminal;
 
+      let renderTimeout: NodeJS.Timeout | null = null;
+      const cancelRender = () => {
+        if (renderTimeout) {
+          clearTimeout(renderTimeout);
+          renderTimeout = null;
+        }
+      };
+
       this.activePtys.set(ptyPid, {
         ptyProcess: pty,
         headlessTerminal,
         maxSerializedLines: shellExecutionConfig.maxSerializedLines,
         command: shellExecutionConfig.originalCommand ?? commandToExecute,
         sessionId: shellExecutionConfig.sessionId,
+        cancelRender,
       });
 
       const result = ExecutionLifecycleService.attachExecution(ptyPid, {
@@ -1078,7 +1131,6 @@ export class ShellExecutionService {
       let sniffedBytes = 0;
       let isWriting = false;
       let hasStartedOutput = false;
-      let renderTimeout: NodeJS.Timeout | null = null;
 
       const renderFn = () => {
         renderTimeout = null;
@@ -1104,19 +1156,21 @@ export class ShellExecutionService {
           endLine - (shellExecutionConfig.maxSerializedLines ?? 2000),
         );
 
-        let newOutput: AnsiOutput;
-        if (shellExecutionConfig.showColor) {
-          newOutput = serializeTerminalToObject(terminal, startLine, endLine);
-        } else {
-          newOutput = (
-            serializeTerminalToObject(terminal, startLine, endLine) || []
-          ).map((line) =>
-            line.map((token) => {
+        const newOutput: AnsiOutput =
+          serializeTerminalToObject(
+            terminal,
+            startLine,
+            endLine,
+            Boolean(shellExecutionConfig.showColor),
+          ) || [];
+
+        if (!shellExecutionConfig.showColor) {
+          for (const line of newOutput) {
+            for (const token of line) {
               token.fg = '';
               token.bg = '';
-              return token;
-            }),
-          );
+            }
+          }
         }
 
         let lastNonEmptyLine = -1;
@@ -1146,7 +1200,7 @@ export class ShellExecutionService {
           ? newOutput
           : trimmedOutput;
 
-        if (output !== finalOutput) {
+        if (!isAnsiOutputEqual(output, finalOutput)) {
           output = finalOutput;
           const event: ShellOutputEvent = {
             type: 'data',
@@ -1256,6 +1310,7 @@ export class ShellExecutionService {
         ShellExecutionService.destroyPtyProcess(pty);
 
         const finalize = () => {
+          cancelRender();
           render(true);
           cmdCleanup?.();
 
@@ -1300,6 +1355,10 @@ export class ShellExecutionService {
             ? getFullBufferText(headlessTerminal)
             : '';
 
+          // Release intermediate closure buffers to prevent heap retention
+          output = null;
+          sniffChunks.length = 0;
+
           // Dispose the headless terminal to free scrollback buffers.
           // This must happen after getFullBufferText() extracts the output.
           try {
@@ -1331,19 +1390,24 @@ export class ShellExecutionService {
           return;
         }
 
+        let onAbortDuringDrain: (() => void) | undefined;
         const processingComplete = processingChain.then(() => 'processed');
         const abortFired = new Promise<'aborted'>((res) => {
           if (abortSignal.aborted) {
             res('aborted');
             return;
           }
-          abortSignal.addEventListener('abort', () => res('aborted'), {
+          onAbortDuringDrain = () => res('aborted');
+          abortSignal.addEventListener('abort', onAbortDuringDrain, {
             once: true,
           });
         });
 
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         Promise.race([processingComplete, abortFired]).then(() => {
+          if (onAbortDuringDrain) {
+            abortSignal.removeEventListener('abort', onAbortDuringDrain);
+          }
           finalize();
         });
       });
@@ -1667,6 +1731,23 @@ export class ShellExecutionService {
    * This is intended for use in tests to ensure isolation.
    */
   static resetForTest(): void {
+    for (const pid of Array.from(this.activePtys.keys())) {
+      this.cleanupPtyEntry(pid);
+    }
+    for (const entry of this.activeChildProcesses.values()) {
+      try {
+        entry.process.kill();
+      } catch {
+        // ignored
+      }
+    }
+    for (const stream of this.backgroundLogStreams.values()) {
+      try {
+        stream.end();
+      } catch {
+        // ignored
+      }
+    }
     this.activePtys.clear();
     this.activeChildProcesses.clear();
     this.backgroundLogPids.clear();

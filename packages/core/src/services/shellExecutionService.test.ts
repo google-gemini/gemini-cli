@@ -1291,6 +1291,47 @@ describe('ShellExecutionService', () => {
       expect(exitDisposeSpy).toHaveBeenCalled();
     });
 
+    it('should remove onAbortDuringDrain listener from abortSignal on normal exit', async () => {
+      const abortController = new AbortController();
+      const removeEventListenerSpy = vi.spyOn(
+        abortController.signal,
+        'removeEventListener',
+      );
+
+      const handle = await ShellExecutionService.execute(
+        'ls -l',
+        '/test/dir',
+        onOutputEventMock,
+        abortController.signal,
+        true,
+        shellExecutionConfig,
+      );
+
+      await new Promise((resolve) => process.nextTick(resolve));
+      mockPtyProcess.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+      await handle.result;
+
+      // Both abortHandler and onAbortDuringDrain should be removed on normal exit
+      expect(removeEventListenerSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('should clean up active PTYs in resetForTest', async () => {
+      const abortController = new AbortController();
+      await ShellExecutionService.execute(
+        'running-cmd',
+        '/test/dir',
+        onOutputEventMock,
+        abortController.signal,
+        true,
+        shellExecutionConfig,
+      );
+      await new Promise((resolve) => process.nextTick(resolve));
+
+      ShellExecutionService.resetForTest();
+
+      expect(mockPtyProcess.destroy).toHaveBeenCalled();
+    });
+
     it('should fall back to child_process when PTY creation fails with ENXIO', async () => {
       const ptyError = new Error('posix_openpt failed: Device not configured');
       // @ts-expect-error adding custom code property
