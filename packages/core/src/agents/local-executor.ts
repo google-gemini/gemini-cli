@@ -764,13 +764,22 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
         if (recoveryResult !== null) {
           // Recovery captured partial output, but the agent did NOT
-          // complete its task normally — it was interrupted by the
+          // complete its task normally, it was interrupted by the
           // budget limit.  Preserve the original terminate reason so
           // the parent can distinguish "completed via GOAL" from
           // "budget-exhausted with a salvaged summary".
           // Fixes: https://github.com/google-gemini/gemini-cli/issues/22323
           terminateReason = originalTerminateReason;
           finalResult = recoveryResult;
+
+          // Save session summary with the salvaged output so it is
+          // not lost even though terminate_reason is not GOAL.
+          try {
+            const summary = this.getTruncatedSummary(finalResult);
+            chat.getChatRecordingService()?.saveSummary(summary);
+          } catch (error) {
+            debugLogger.warn('Failed to save subagent session summary.', error);
+          }
         } else {
           // Recovery Failed. Set the final error message based on the *original* reason.
           if (terminateReason === AgentTerminateMode.TIMEOUT) {
@@ -803,10 +812,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         }
       }
 
-      // Save the session summary whenever we have meaningful output —
-      // whether from a genuine GOAL completion or from a recovery turn
-      // that captured partial results before budget exhaustion.
-      if (finalResult && chat) {
+      // Save the session summary upon genuine GOAL completion.
+      if (terminateReason === AgentTerminateMode.GOAL && finalResult && chat) {
         try {
           const summary = this.getTruncatedSummary(finalResult);
           chat.getChatRecordingService()?.saveSummary(summary);

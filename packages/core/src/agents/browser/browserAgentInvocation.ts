@@ -32,6 +32,7 @@ import {
   type SubagentActivityItem,
   isToolActivityError,
   SubagentState,
+  isSuccessfulTermination,
   getSubagentStateFromTermination,
 } from '../types.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
@@ -329,7 +330,10 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
         );
       }
 
-      const resultContent = `Browser agent finished.
+      const wasSuccessful = isSuccessfulTermination(output.terminate_reason);
+      const statusLabel = wasSuccessful ? 'finished' : 'did not complete';
+
+      const resultContent = `Browser agent ${statusLabel}.
 Termination Reason: ${output.terminate_reason}
 Result:
 ${output.result}`;
