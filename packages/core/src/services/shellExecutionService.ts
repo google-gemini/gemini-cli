@@ -149,6 +149,25 @@ export interface ShellExecutionConfig {
  */
 export type ShellOutputEvent = ExecutionOutputEvent;
 
+/**
+ * Internal/undocumented properties of `@lydell/node-pty`'s Windows agent (`WindowsPtyAgent`).
+ *
+ * Rationale & Why Public API Is Insufficient:
+ * The public `IPty` interface only exposes high-level `onExit` and `resize()` methods:
+ * 1. On Windows ConPTY, `IPty.onExit` is only emitted when the named-pipe data socket (`_socket`)
+ *    closes after `conoutSocketWorker` emits `'ready_datapipe'`. For fast-exiting processes,
+ *    the native OS process exit callback (`RegisterWaitForSingleObject` -> `_$onProcessExit`)
+ *    can complete before `'ready_datapipe'` attaches the socket close listener or while
+ *    `conhost.exe` retains open pipe handles, causing `IPty.onExit` to never fire. Accessing
+ *    `_$onProcessExit` and `_exitCode`/`exitCode` allows `ShellExecutionService` to detect
+ *    OS-level process termination and schedule a deterministic drain-and-finalize fallback.
+ * 2. When `IPty.resize()` is called before the first `'data'` event (`_isReady === false`),
+ *    `WindowsTerminal` queues `() => _agent.resize(cols, rows)` into an internal `_deferreds` array
+ *    outside the caller's synchronous `try/catch` block. If the process exits before the first
+ *    `'data'` event arrives, flushing `_deferreds` synchronously inside `net.Socket.emit('data')`
+ *    throws an uncaught `Error('Cannot resize a pty that has already exited')`, aborting
+ *    cleanup. Wrapping `_agent.resize` and checking `_exitCode`/`exitCode` prevents this crash.
+ */
 export interface WindowsPtyAgentInternal {
   _exitCode?: number;
   exitCode?: number;
