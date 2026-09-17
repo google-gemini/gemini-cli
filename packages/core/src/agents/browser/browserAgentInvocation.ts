@@ -33,6 +33,7 @@ import {
   AgentTerminateMode,
   isToolActivityError,
   SubagentState,
+  getSubagentStateFromTermination,
 } from '../types.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import { createBrowserAgentDefinition } from './browserAgentFactory.js';
@@ -334,18 +335,11 @@ Termination Reason: ${output.terminate_reason}
 Result:
 ${output.result}`;
 
-      // Map terminate_reason to the correct SubagentProgress state.
-      // GOAL = agent completed its task normally.
-      // ABORTED = user cancelled.
-      // Others (ERROR, MAX_TURNS, ERROR_NO_COMPLETE_TASK_CALL) = error.
-      let progressState: SubagentState;
-      if (output.terminate_reason === AgentTerminateMode.ABORTED) {
-        progressState = SubagentState.CANCELLED;
-      } else if (output.terminate_reason === AgentTerminateMode.GOAL) {
-        progressState = SubagentState.COMPLETED;
-      } else {
-        progressState = SubagentState.ERROR;
-      }
+      // Map terminate_reason to the correct SubagentProgress state
+      // using the shared helper so all invocation paths are consistent.
+      const progressState = getSubagentStateFromTermination(
+        output.terminate_reason,
+      );
 
       const progress: SubagentProgress = {
         isSubagentProgress: true,
