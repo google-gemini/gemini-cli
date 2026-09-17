@@ -25,6 +25,7 @@ describe('setupUnhandledRejectionHandler - uncaughtException', () => {
     initialUnhandledRejectionListeners =
       process.listeners('unhandledRejection');
     vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+    vi.spyOn(process, 'removeAllListeners').mockImplementation(() => process);
     vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
   });
 
