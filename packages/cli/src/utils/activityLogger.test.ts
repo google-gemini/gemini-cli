@@ -5,6 +5,8 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import http from 'node:http';
+import { EventEmitter } from 'node:events';
 import { ActivityLogger, type NetworkLog } from './activityLogger.js';
 import type { ConsoleLogPayload } from '@google/gemini-cli-core';
 
@@ -76,6 +78,58 @@ describe('ActivityLogger', () => {
     // 1 initial + 5 chunks + 1 response = 7 events, all for 'chunked'
     expect(logs.network.length).toBe(7);
     expect(logs.network.every((l) => l.id === 'chunked')).toBe(true);
+  });
+
+  it('reassembles a multibyte UTF-8 character split across HTTP response chunks', async () => {
+    class FakeClientRequest extends EventEmitter {
+      write() {
+        return true;
+      }
+      end() {
+        return this;
+      }
+      getHeaders() {
+        return {};
+      }
+      method = 'GET';
+    }
+    class FakeIncomingMessage extends EventEmitter {
+      headers = {};
+      statusCode = 200;
+    }
+
+    const fakeReq = new FakeClientRequest();
+    const fakeRes = new FakeIncomingMessage();
+
+    vi.spyOn(http, 'request').mockImplementation(((
+      ..._args: unknown[]
+    ): http.ClientRequest => {
+      queueMicrotask(() => {
+        fakeReq.emit('response', fakeRes);
+        const euro = Buffer.from('€');
+        fakeRes.emit('data', euro.subarray(0, 1));
+        fakeRes.emit('data', euro.subarray(1));
+        fakeRes.emit('end');
+      });
+      return fakeReq as unknown as http.ClientRequest;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    }) as any);
+
+    logger.enable();
+    http.request('https://example.com/');
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const events = logger.getBufferedLogs().network;
+    const streamed = events
+      .flatMap((event) => (event.chunk ? [event.chunk.data] : []))
+      .join('');
+    const completed = events.find((event) => event.response)?.response?.body;
+
+    expect(streamed).toBe('€');
+    expect(completed).toBe('€');
+
+    vi.restoreAllMocks();
   });
 
   it('buffers only the last 10 console logs', () => {

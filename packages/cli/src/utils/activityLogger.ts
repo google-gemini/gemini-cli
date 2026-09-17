@@ -10,6 +10,7 @@ import zlib from 'node:zlib';
 import fs from 'node:fs';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
+import { StringDecoder } from 'node:string_decoder';
 import {
   CoreEvent,
   coreEvents,
@@ -566,6 +567,10 @@ export class ActivityLogger extends EventEmitter {
       req.on('response', (res: http.IncomingMessage) => {
         const responseChunks: Buffer[] = [];
         let chunkIndex = 0;
+        // Chunk boundaries are arbitrary and can split a multibyte UTF-8
+        // character; a per-response decoder retains incomplete sequences
+        // across chunks instead of corrupting them into replacement chars.
+        const streamDecoder = new StringDecoder('utf8');
 
         res.on('data', (chunk: Buffer) => {
           const chunkBuffer = Buffer.from(chunk);
@@ -577,13 +582,26 @@ export class ActivityLogger extends EventEmitter {
             pending: true,
             chunk: {
               index: chunkIndex++,
-              data: chunkBuffer.toString('utf8'),
+              data: streamDecoder.write(chunkBuffer),
               timestamp: Date.now(),
             },
           });
         });
 
         res.on('end', () => {
+          const remaining = streamDecoder.end();
+          if (remaining) {
+            self.safeEmitNetwork({
+              id,
+              pending: true,
+              chunk: {
+                index: chunkIndex++,
+                data: remaining,
+                timestamp: Date.now(),
+              },
+            });
+          }
+
           const buffer = Buffer.concat(responseChunks);
           const encoding = res.headers['content-encoding'];
 
