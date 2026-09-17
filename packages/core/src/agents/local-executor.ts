@@ -776,7 +776,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           // not lost even though terminate_reason is not GOAL.
           try {
             const summary = this.getTruncatedSummary(finalResult);
-            chat.getChatRecordingService()?.saveSummary(summary);
+            chat?.getChatRecordingService()?.saveSummary(summary);
           } catch (error) {
             debugLogger.warn('Failed to save subagent session summary.', error);
           }
