@@ -50,11 +50,16 @@ describe('setupUnhandledRejectionHandler - uncaughtException', () => {
     // Call setupUnhandledRejectionHandler to register the listeners under test
     setupUnhandledRejectionHandler();
 
-    // Trigger the uncaughtException listener manually
-    process.emit('uncaughtException', abortError);
+    // Retrieve the registered geminiListener directly and invoke it
+    const listeners = process.listeners('uncaughtException');
+    const geminiListener = listeners.find(
+      (l) =>
+        Object.getOwnPropertyDescriptor(l, 'geminiListener')?.value === true,
+    );
+    expect(geminiListener).toBeDefined();
 
-    // Give asynchronous tasks a tick to execute if any
-    await new Promise(process.nextTick);
+    // Directly await the asynchronous listener
+    await (geminiListener as any)(abortError);
 
     // Expect that the error was suppressed, so debugLogger.error was NOT called
     // and instead debugLogger.log was called with the suppression log message.
