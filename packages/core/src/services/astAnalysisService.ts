@@ -76,6 +76,16 @@ export class ASTAnalysisService {
     const language = LANG_MAP[ext];
     if (!language) return null;
 
+    // Reject files larger than 2MB to prevent OOM or event loop blocking
+    // on minified bundles, logs, or database dumps.
+    const MAX_FILE_SIZE = 2 * 1024 * 1024;
+    try {
+      const stat = await fs.stat(absPath);
+      if (stat.size > MAX_FILE_SIZE) return null;
+    } catch {
+      return null;
+    }
+
     let content: string;
     try {
       content = await fs.readFile(absPath, 'utf-8');
@@ -300,6 +310,13 @@ export function stripBlockComments(
           j++;
         }
       }
+    }
+    // Reset single-line string state at end of line. If a single or double
+    // quote was not closed (syntax error, unescaped quote, regex), don't let
+    // it bleed into subsequent lines. Multi-line delimiters (backtick, triple
+    // quotes) intentionally persist across lines.
+    if (inString && inString.length === 1 && inString !== '`') {
+      inString = null;
     }
     result.push(out);
   }
