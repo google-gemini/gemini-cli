@@ -224,19 +224,16 @@ const getFullBufferText = (
   maxBytes = MAX_CHILD_PROCESS_BUFFER_SIZE,
 ): string => {
   const buffer = terminal.buffer.active;
-  const lines: string[] = [];
-
   const lastContentLine = findLastContentLine(buffer, startLine);
 
   if (lastContentLine === -1 || lastContentLine < startLine) return '';
 
-  for (let i = startLine; i <= lastContentLine; i++) {
-    const line = buffer.getLine(i);
-    if (!line) {
-      lines.push('');
-      continue;
-    }
+  const logicalLinesReversed: string[] = [];
+  let currentLogicalLineChunks: string[] = [];
+  let accumulatedChars = 0;
 
+  for (let i = lastContentLine; i >= startLine; i--) {
+    const line = buffer.getLine(i);
     let trimRight = true;
     if (i + 1 <= lastContentLine) {
       const nextLine = buffer.getLine(i + 1);
@@ -245,16 +242,30 @@ const getFullBufferText = (
       }
     }
 
-    const lineContent = line.translateToString(trimRight);
+    const lineContent = line ? line.translateToString(trimRight) : '';
+    currentLogicalLineChunks.push(lineContent);
 
-    if (line.isWrapped && lines.length > 0) {
-      lines[lines.length - 1] += lineContent;
-    } else {
-      lines.push(lineContent);
+    if (!line?.isWrapped) {
+      const logicalLine =
+        currentLogicalLineChunks.length === 1
+          ? currentLogicalLineChunks[0]
+          : currentLogicalLineChunks.reverse().join('');
+      currentLogicalLineChunks = [];
+      logicalLinesReversed.push(logicalLine);
+      accumulatedChars +=
+        logicalLine.length + (logicalLinesReversed.length > 1 ? 1 : 0);
+
+      if (maxBytes > 0 && accumulatedChars >= maxBytes) {
+        break;
+      }
     }
   }
 
-  const fullText = lines.join('\n');
+  if (currentLogicalLineChunks.length > 0) {
+    logicalLinesReversed.push(currentLogicalLineChunks.reverse().join(''));
+  }
+
+  const fullText = logicalLinesReversed.reverse().join('\n');
   if (maxBytes > 0 && fullText.length > maxBytes) {
     return fullText.slice(-maxBytes);
   }
@@ -1164,15 +1175,6 @@ export class ShellExecutionService {
             Boolean(shellExecutionConfig.showColor),
           ) || [];
 
-        if (!shellExecutionConfig.showColor) {
-          for (const line of newOutput) {
-            for (const token of line) {
-              token.fg = '';
-              token.bg = '';
-            }
-          }
-        }
-
         let lastNonEmptyLine = -1;
         for (let i = newOutput.length - 1; i >= 0; i--) {
           const line = newOutput[i];
@@ -1349,7 +1351,12 @@ export class ShellExecutionService {
             endLine - (shellExecutionConfig.maxSerializedLines ?? 2000),
           );
           const ansiOutputSnapshot = headlessTerminal
-            ? serializeTerminalToObject(headlessTerminal, startLine, endLine)
+            ? serializeTerminalToObject(
+                headlessTerminal,
+                startLine,
+                endLine,
+                Boolean(shellExecutionConfig.showColor),
+              )
             : [];
           const finalOutput = headlessTerminal
             ? getFullBufferText(headlessTerminal)

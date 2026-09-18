@@ -116,8 +116,26 @@ vi.mock('../utils/terminalSerializer.js', () => ({
   // Avoid passing the heavy Terminal object to the spy to prevent OOM
   serializeTerminalToObject: (
     _terminal: unknown,
-    ...args: [number | undefined, number | undefined]
-  ) => mockSerializeTerminalToObject(...args),
+    startLine?: number,
+    endLine?: number,
+    includeColor = true,
+  ) => {
+    const result = mockSerializeTerminalToObject(
+      startLine,
+      endLine,
+      includeColor,
+    ) as AnsiOutput | undefined;
+    if (!includeColor && Array.isArray(result)) {
+      return result.map((line) =>
+        line.map((token) => ({
+          ...token,
+          fg: '',
+          bg: '',
+        })),
+      );
+    }
+    return result;
+  },
   convertColorToHex: () => '#000000',
   ColorMode: { DEFAULT: 0, PALETTE: 1, RGB: 2 },
 }));

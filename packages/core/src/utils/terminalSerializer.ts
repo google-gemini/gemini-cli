@@ -137,15 +137,22 @@ class Cell {
     return (this.attributes & attribute) !== 0;
   }
 
-  equals(other: Cell): boolean {
+  equals(other: Cell, includeColor = true): boolean {
+    if (
+      this.attributes !== other.attributes ||
+      this.isCursor() !== other.isCursor() ||
+      this.isUninitialized() !== other.isUninitialized()
+    ) {
+      return false;
+    }
+    if (!includeColor) {
+      return true;
+    }
     return (
-      this.attributes === other.attributes &&
       this.fg === other.fg &&
       this.bg === other.bg &&
       this.fgColorMode === other.fgColorMode &&
-      this.bgColorMode === other.bgColorMode &&
-      this.isCursor() === other.isCursor() &&
-      this.isUninitialized() === other.isUninitialized()
+      this.bgColorMode === other.bgColorMode
     );
   }
 }
@@ -189,7 +196,7 @@ export function serializeTerminalToObject(
       const cellData = line.getCell(x, cellBuffer);
       currentCell.update(cellData || null, x, y, cursorX, absoluteCursorY);
 
-      if (x > 0 && !currentCell.equals(lastCell)) {
+      if (x > 0 && !currentCell.equals(lastCell, includeColor)) {
         if (currentText) {
           const token: AnsiToken = {
             text: currentText,
