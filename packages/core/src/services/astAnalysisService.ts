@@ -132,24 +132,14 @@ export class ASTAnalysisService {
 export function extractSymbols(lines: string[], language: string): ASTSymbol[] {
   const symbols: ASTSymbol[] = [];
   const patterns = getDeclarationPatterns(language);
-  let inBlockComment = false;
 
-  for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i].trim();
+  // Pre-process: strip block comments by replacing their content with spaces.
+  // This handles mid-line comments like `code /* comment */ more_code` and
+  // multi-line blocks, while preserving line numbers and offsets.
+  const cleaned = stripBlockComments(lines);
 
-    // Track block comments (/* ... */) to avoid parsing commented-out code
-    if (inBlockComment) {
-      if (trimmed.includes('*/')) {
-        inBlockComment = false;
-      }
-      continue;
-    }
-    if (trimmed.startsWith('/*')) {
-      if (!trimmed.includes('*/')) {
-        inBlockComment = true;
-      }
-      continue;
-    }
+  for (let i = 0; i < cleaned.length; i++) {
+    const trimmed = cleaned[i].trim();
 
     if (
       trimmed === '' ||
@@ -198,6 +188,44 @@ export function extractSymbols(lines: string[], language: string): ASTSymbol[] {
   }
 
   return symbols;
+}
+
+/**
+ * Strips block comments from source lines by replacing comment
+ * characters with spaces. This preserves line count and character offsets
+ * so that line-number-based logic (brace counting, indentation) stays correct.
+ * Handles mid-line comments, multi-line blocks, and lines with code after a comment.
+ */
+export function stripBlockComments(lines: string[]): string[] {
+  const result: string[] = [];
+  let inComment = false;
+  for (const line of lines) {
+    let out = '';
+    let j = 0;
+    while (j < line.length) {
+      if (inComment) {
+        if (j + 1 < line.length && line[j] === '*' && line[j + 1] === '/') {
+          out += '  ';
+          j += 2;
+          inComment = false;
+        } else {
+          out += ' ';
+          j++;
+        }
+      } else {
+        if (j + 1 < line.length && line[j] === '/' && line[j + 1] === '*') {
+          out += '  ';
+          j += 2;
+          inComment = true;
+        } else {
+          out += line[j];
+          j++;
+        }
+      }
+    }
+    result.push(out);
+  }
+  return result;
 }
 
 export function findClosingBrace(lines: string[], startLine: number): number {

@@ -60,11 +60,38 @@ class ASTSearchInvocation extends BaseToolInvocation<
     const astService = new ASTAnalysisService(targetDir);
 
     try {
+      // Trim params to prevent whitespace-only values and search mismatches
+      const filePath = this.params.file_path?.trim();
+      const symbolName = this.params.symbol_name?.trim();
+
       if (scope === 'map') {
-        return await this.handleMapScope(astService);
+        // For map scope, file_path is optional (subdirectory filter)
+        let safeMapPath: string | undefined;
+        if (filePath) {
+          const sanitized = resolveDefensiveToolPath(filePath, targetDir);
+          let resolved: string;
+          try {
+            resolved = resolveToRealPath(path.resolve(targetDir, sanitized));
+          } catch {
+            resolved = path.resolve(targetDir, sanitized);
+          }
+          const err = this.config.validatePathAccess(resolved, 'read');
+          if (err) {
+            return {
+              llmContent: err,
+              returnDisplay: 'Path not in workspace.',
+              error: {
+                message: err,
+                type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
+              },
+            };
+          }
+          safeMapPath = sanitized;
+        }
+        return await this.handleMapScope(astService, safeMapPath);
       }
 
-      if (!this.params.file_path) {
+      if (!filePath) {
         return {
           llmContent:
             'Error: file_path is required for "symbol" and "outline" scopes.',
@@ -73,10 +100,7 @@ class ASTSearchInvocation extends BaseToolInvocation<
       }
 
       // Validate path stays within workspace boundaries
-      const sanitizedPath = resolveDefensiveToolPath(
-        this.params.file_path,
-        targetDir,
-      );
+      const sanitizedPath = resolveDefensiveToolPath(filePath, targetDir);
       let resolvedPath: string;
       try {
         resolvedPath = resolveToRealPath(
@@ -106,14 +130,18 @@ class ASTSearchInvocation extends BaseToolInvocation<
       }
 
       // Default: symbol scope
-      if (!this.params.symbol_name) {
+      if (!symbolName) {
         return {
           llmContent: 'Error: symbol_name is required for "symbol" scope.',
           returnDisplay: 'Missing symbol_name',
         };
       }
 
-      return await this.handleSymbolScope(astService, sanitizedPath);
+      return await this.handleSymbolScope(
+        astService,
+        sanitizedPath,
+        symbolName,
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       debugLogger.warn('[ASTSearchTool] Error:', msg);
@@ -127,16 +155,14 @@ class ASTSearchInvocation extends BaseToolInvocation<
   private async handleSymbolScope(
     astService: ASTAnalysisService,
     safePath: string,
+    symbolName: string,
   ): Promise<ToolResult> {
-    const bounds = await astService.findSymbolBounds(
-      safePath,
-      this.params.symbol_name!,
-    );
+    const bounds = await astService.findSymbolBounds(safePath, symbolName);
 
     if (!bounds) {
       return {
         llmContent:
-          `Symbol "${this.params.symbol_name}" not found in ${safePath}. ` +
+          `Symbol "${symbolName}" not found in ${safePath}. ` +
           'Try using grep_search for a text-based search, or check the symbol name spelling.',
         returnDisplay: 'Symbol not found',
       };
@@ -145,10 +171,10 @@ class ASTSearchInvocation extends BaseToolInvocation<
     const outline = await astService.getFileOutline(safePath);
     const symbol = outline?.symbols
       .flatMap((s) => [s, ...s.children])
-      .find((s) => s.name === this.params.symbol_name);
+      .find((s) => s.name === symbolName);
 
     const result = [
-      `Found "${this.params.symbol_name}" in ${safePath}:`,
+      `Found "${symbolName}" in ${safePath}:`,
       `  Lines: ${bounds.startLine}-${bounds.endLine} (${bounds.endLine - bounds.startLine + 1} lines)`,
       symbol ? `  Kind: ${symbol.kind}` : '',
       symbol ? `  Signature: ${symbol.signature}` : '',
@@ -160,7 +186,7 @@ class ASTSearchInvocation extends BaseToolInvocation<
 
     return {
       llmContent: result,
-      returnDisplay: `${this.params.symbol_name}: L${bounds.startLine}-${bounds.endLine}`,
+      returnDisplay: `${symbolName}: L${bounds.startLine}-${bounds.endLine}`,
       display: {
         name: AST_SEARCH_DISPLAY_NAME,
         description: this.getDescription(),
@@ -197,8 +223,9 @@ class ASTSearchInvocation extends BaseToolInvocation<
 
   private async handleMapScope(
     astService: ASTAnalysisService,
+    safePath?: string,
   ): Promise<ToolResult> {
-    const map = await astService.getCodebaseMap(this.params.file_path);
+    const map = await astService.getCodebaseMap(safePath);
     return {
       llmContent: map,
       returnDisplay: 'Codebase map generated',
@@ -259,24 +286,23 @@ export class ASTSearchTool extends BaseDeclarativeTool<
     params: ASTSearchToolParams,
   ): string | null {
     const scope = params.scope ?? 'symbol';
+    const symbolName = params.symbol_name?.trim();
+    const filePath = params.file_path?.trim();
 
-    if (
-      scope === 'symbol' &&
-      (!params.symbol_name || params.symbol_name.trim() === '')
-    ) {
+    if (scope === 'symbol' && (!symbolName || symbolName === '')) {
       return "The 'symbol_name' parameter must be non-empty when scope is 'symbol'.";
     }
 
     if (
       (scope === 'symbol' || scope === 'outline') &&
-      (!params.file_path || params.file_path.trim() === '')
+      (!filePath || filePath === '')
     ) {
       return "The 'file_path' parameter must be non-empty for 'symbol' and 'outline' scopes.";
     }
 
-    if (params.file_path) {
+    if (filePath) {
       const sanitizedPath = resolveDefensiveToolPath(
-        params.file_path,
+        filePath,
         this.config.getTargetDir(),
       );
       let resolvedPath: string;
