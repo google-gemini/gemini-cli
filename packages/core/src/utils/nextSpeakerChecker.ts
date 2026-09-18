@@ -84,13 +84,16 @@ export async function checkNextSpeaker(
 
   // If the last model message is an interruption placeholder (either the raw
   // or sanitized form), the model should continue without an LLM call.
+  // Use strict single-part matching for the sanitized form to avoid false
+  // positives when a real model response happens to contain "Continuing."
+  // as a transition phrase alongside tool calls.
   const isSanitizedInterruption =
     lastComprehensiveMessage &&
     lastComprehensiveMessage.role === 'model' &&
-    lastComprehensiveMessage.parts?.some(
-      (p) =>
-        p && typeof p.text === 'string' && p.text === BENIGN_INTERRUPTION_REPLACEMENT,
-    );
+    lastComprehensiveMessage.parts?.length === 1 &&
+    lastComprehensiveMessage.parts[0] &&
+    typeof lastComprehensiveMessage.parts[0].text === 'string' &&
+    lastComprehensiveMessage.parts[0].text === BENIGN_INTERRUPTION_REPLACEMENT;
   if (
     lastComprehensiveMessage &&
     (isInterruptionContent(lastComprehensiveMessage) || isSanitizedInterruption)

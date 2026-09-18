@@ -359,4 +359,34 @@ describe('checkNextSpeaker', () => {
     expect(result).toEqual(mockApiResponse);
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
   });
+
+  it('should NOT short-circuit when multi-part response contains "Continuing." alongside a tool call', async () => {
+    // This tests the critical bug fix: a model response like
+    // [{ text: "Continuing." }, { functionCall: ... }] must NOT be
+    // treated as an interruption placeholder.
+    (chatInstance.getHistory as Mock).mockReturnValue([
+      {
+        role: 'model',
+        parts: [
+          { text: 'Continuing.' },
+          { functionCall: { name: 'read_file', args: { path: '/tmp/x' } } },
+        ],
+      },
+    ] as Content[]);
+    const mockApiResponse: NextSpeakerResponse = {
+      reasoning: 'Model is calling a tool.',
+      next_speaker: 'model',
+    };
+    (mockBaseLlmClient.generateJson as Mock).mockResolvedValue(mockApiResponse);
+
+    const result = await checkNextSpeaker(
+      chatInstance,
+      mockBaseLlmClient,
+      abortSignal,
+      promptId,
+    );
+    // Should proceed to LLM call, NOT short-circuit
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
+    expect(result).toEqual(mockApiResponse);
+  });
 });
