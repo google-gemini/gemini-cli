@@ -167,6 +167,18 @@ export {
 export const EDIT_TOOL_NAMES = new Set([EDIT_TOOL_NAME, WRITE_FILE_TOOL_NAME]);
 
 /**
+ * Tools that perform mutating operations on the workspace.
+ * Used by the hold directive guard to block destructive tool calls
+ * when the user explicitly requests the agent to wait or explain first.
+ */
+export const MUTATING_TOOL_NAMES = new Set([
+  WRITE_FILE_TOOL_NAME,
+  EDIT_TOOL_NAME,
+  SHELL_TOOL_NAME,
+  WRITE_TODOS_TOOL_NAME,
+]);
+
+/**
  * Tools that require mandatory argument narrowing (e.g., file paths, command prefixes)
  * when granting persistent or session-wide approval.
  */

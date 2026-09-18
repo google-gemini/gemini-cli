@@ -11,6 +11,7 @@ import type { PromptRegistry } from '../prompts/prompt-registry.js';
 import type { ResourceRegistry } from '../resources/resource-registry.js';
 import type { SandboxManager } from '../services/sandboxManager.js';
 import type { Config } from './config.js';
+import type { HoldDirective } from '../services/userDirectiveService.js';
 
 /**
  * AgentLoopContext represents the execution-scoped view of the world for a single
@@ -43,4 +44,10 @@ export interface AgentLoopContext {
 
   /** The service used to prepare commands for sandboxed execution. */
   readonly sandboxManager: SandboxManager;
+
+  /**
+   * When set, the agent is operating under a user hold directive.
+   * Mutating tool calls will be blocked at the scheduler layer.
+   */
+  readonly activeHoldDirective?: HoldDirective | null;
 }

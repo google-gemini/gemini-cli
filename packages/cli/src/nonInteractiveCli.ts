@@ -23,6 +23,7 @@ import {
   JsonStreamEventType,
   uiTelemetryService,
   debugLogger,
+  detectHoldDirective,
   coreEvents,
   CoreEvent,
   createWorkingStdio,
@@ -306,6 +307,20 @@ export async function runNonInteractive(
           role: 'user',
           content: input,
         });
+      }
+
+      // Detect user hold directives (e.g., "don't apply yet", "explain first")
+      // and configure the scheduler to block mutating tool calls for this turn.
+      const holdDirective = detectHoldDirective(input);
+      if (holdDirective) {
+        scheduler.setActiveHoldDirective(holdDirective);
+        debugLogger.log(
+          `[HoldDirective] Detected "${holdDirective.type}" directive ` +
+            `(matched: "${holdDirective.matchedPhrase}"). ` +
+            `Mutating tools will be blocked for this turn.`,
+        );
+      } else {
+        scheduler.setActiveHoldDirective(null);
       }
 
       let currentMessages: Content[] = [{ role: 'user', parts: query }];
