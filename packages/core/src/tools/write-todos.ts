@@ -212,9 +212,7 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
     const tasksToDelete = existingTasks
       .filter(
         (task) =>
-          !preservedIds.has(task.id) &&
-          (task.type === TaskType.TASK || task.type === TaskType.BUG) &&
-          !hasPreservedDescendants(task.id),
+          !preservedIds.has(task.id) && !hasPreservedDescendants(task.id),
       )
       .map((task) => ({ task, depth: getDepth(task) }))
       .sort((a, b) => b.depth - a.depth)
