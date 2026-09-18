@@ -129,7 +129,7 @@ export class ASTAnalysisService {
     let totalSymbols = 0;
 
     for (const file of files) {
-      const relPath = path.relative(this.targetDir, file);
+      const relPath = path.relative(resolvedTargetDir, file);
       const outline = await this.getFileOutline(relPath);
       if (!outline || outline.symbols.length === 0) continue;
 
@@ -168,8 +168,10 @@ export function extractSymbols(lines: string[], language: string): ASTSymbol[] {
     }
 
     // Only match at top-level indentation (<=8 spaces for brace langs to support
-    // 4-space indented codebases and namespace/module nesting)
-    const indent = cleaned[i].length - cleaned[i].trimStart().length;
+    // 4-space indented codebases and namespace/module nesting).
+    // Use original lines for indent check since cleaned lines may have inflated
+    // indentation from blanked block comments.
+    const indent = lines[i].length - lines[i].trimStart().length;
     if (language !== 'python' && indent > 8) continue;
     if (language === 'python' && indent > 0) continue;
 
@@ -487,7 +489,7 @@ function getMemberPatterns(lang: string) {
       p.push({ regex: /^(\w+)\s*\(/, kind: 'method' });
       break;
     case 'python':
-      p.push({ regex: /^\s+(?:async\s+)?def\s+(\w+)/, kind: 'method' });
+      p.push({ regex: /^(?:async\s+)?def\s+(\w+)/, kind: 'method' });
       break;
     case 'go':
       p.push({ regex: /func\s+\([^)]+\)\s+(\w+)/, kind: 'method' });

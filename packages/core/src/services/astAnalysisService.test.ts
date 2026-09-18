@@ -124,6 +124,9 @@ describe('ASTAnalysisService', () => {
       expect(syms).toHaveLength(2);
       expect(syms[0].name).toBe('Handler');
       expect(syms[0].kind).toBe('class');
+      expect(syms[0].children).toHaveLength(1);
+      expect(syms[0].children[0].name).toBe('run');
+      expect(syms[0].children[0].kind).toBe('method');
       expect(syms[1].name).toBe('util');
     });
 
