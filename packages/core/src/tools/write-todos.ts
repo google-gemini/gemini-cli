@@ -110,27 +110,35 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
       };
     }
 
-    // Index existing tasks by trimmed title for reconciliation
-    const existingByTitle = new Map<string, TrackerTask>();
+    // Group existing tasks by trimmed title to handle duplicate titles
+    const existingByTitle = new Map<string, TrackerTask[]>();
     for (const task of existingTasks) {
-      existingByTitle.set(task.title.trim(), task);
+      const title = task.title.trim();
+      if (!existingByTitle.has(title)) {
+        existingByTitle.set(title, []);
+      }
+      existingByTitle.get(title)!.push(task);
     }
 
     const preservedIds = new Set<string>();
+    const warnings: string[] = [];
 
     for (const todo of todos) {
       const title = todo.description.trim();
-      const existing = existingByTitle.get(title);
+      const candidates = existingByTitle.get(title);
       const targetStatus = mapTodoStatusToTaskStatus(todo.status);
 
-      if (existing) {
-        // Match found: update status only, preserving ID/type/deps/parent
+      if (candidates && candidates.length > 0) {
+        // Shift one match off the array so duplicate titles each get their own match
+        const existing = candidates.shift()!;
         preservedIds.add(existing.id);
         if (existing.status !== targetStatus) {
           try {
             await service.updateTask(existing.id, { status: targetStatus });
-          } catch {
-            // Status transition may be blocked by dependency rules; skip
+          } catch (e) {
+            warnings.push(
+              `Could not update "${title}" (${existing.id}): ${e instanceof Error ? e.message : String(e)}`,
+            );
           }
         }
       } else {
@@ -155,8 +163,10 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
         if (!hasChildren) {
           try {
             await service.deleteTask(task.id);
-          } catch {
-            // Deletion may fail due to child-task guard; skip
+          } catch (e) {
+            warnings.push(
+              `Could not remove "${task.title}" (${task.id}): ${e instanceof Error ? e.message : String(e)}`,
+            );
           }
         }
       }
@@ -168,8 +178,13 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
       )
       .join('\n');
 
+    let llmContent = `Successfully updated the todo list (persisted to disk). The current list is now:\n${todoListString}`;
+    if (warnings.length > 0) {
+      llmContent += `\n\nWarnings (${warnings.length}):\n${warnings.map((w) => `- ${w}`).join('\n')}`;
+    }
+
     return {
-      llmContent: `Successfully updated the todo list (persisted to disk). The current list is now:\n${todoListString}`,
+      llmContent,
       returnDisplay: await buildTodosReturnDisplay(service),
     };
   }

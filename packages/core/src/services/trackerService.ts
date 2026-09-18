@@ -46,10 +46,17 @@ export class TrackerService {
     await this.ensureInitialized();
     let id = this.generateId();
     // Prevent ID collisions by checking existing tasks
+    let unique = false;
     for (let i = 0; i < 10; i++) {
       const existing = await this.getTask(id);
-      if (!existing) break;
+      if (!existing) {
+        unique = true;
+        break;
+      }
       id = this.generateId();
+    }
+    if (!unique) {
+      throw new Error('Failed to generate a unique task ID after 10 attempts.');
     }
     const now = new Date().toISOString();
     const task: TrackerTask = {
