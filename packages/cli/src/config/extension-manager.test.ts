@@ -15,7 +15,10 @@ import {
 } from './extension-manager.js';
 import { createTestMergedSettings, type MergedSettings } from './settings.js';
 import { createExtension } from '../test-utils/createExtension.js';
-import { EXTENSIONS_DIRECTORY_NAME } from './extensions/variables.js';
+import {
+  EXTENSIONS_DIRECTORY_NAME,
+  INSTALL_METADATA_FILENAME,
+} from './extensions/variables.js';
 import { themeManager } from '../ui/themes/theme-manager.js';
 import {
   TrustLevel,
@@ -187,6 +190,49 @@ describe('ExtensionManager', () => {
       await expect(extensionManager.loadExtensions()).rejects.toThrow(
         'Extension with name duplicate-ext already was loaded.',
       );
+    });
+
+    it('should skip a malformed extension directory instead of failing the whole load when allowedExtensions is set', async () => {
+      // Valid extension with metadata, allowed by the pattern below.
+      const validDir = path.join(userExtensionsDir, 'valid-ext');
+      fs.mkdirSync(validDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(validDir, 'gemini-extension.json'),
+        JSON.stringify({ name: 'valid-ext', version: '1.0.0' }),
+      );
+      fs.writeFileSync(
+        path.join(validDir, INSTALL_METADATA_FILENAME),
+        JSON.stringify({ type: 'local', source: validDir }),
+      );
+
+      // Malformed directory: exists, but has no metadata.json at all (e.g.
+      // an interrupted install). Under allowedExtensions this used to throw
+      // outside the per-extension try/catch and reject the whole
+      // Promise.all in loadExtensions(), taking every extension down with
+      // it.
+      const malformedDir = path.join(userExtensionsDir, 'malformed-ext');
+      fs.mkdirSync(malformedDir, { recursive: true });
+
+      const manager = new ExtensionManager({
+        workspaceDir: tempWorkspaceDir,
+        settings: {
+          security: {
+            folderTrust: { enabled: false },
+            allowedExtensions: [getRealPath(validDir).replace(/\\/g, '\\\\')],
+          },
+          experimental: { extensionConfig: false },
+          admin: { extensions: { enabled: true }, mcp: { enabled: true } },
+          hooksConfig: { enabled: true },
+        } as unknown as MergedSettings,
+        requestConsent: vi.fn().mockResolvedValue(true),
+        requestSetting: null,
+        integrityManager: mockIntegrityManager,
+      });
+
+      const extensions = await manager.loadExtensions();
+
+      expect(extensions).toHaveLength(1);
+      expect(extensions[0].name).toBe('valid-ext');
     });
 
     it('should wait for loadExtensions to finish when loadExtension is called concurrently', async () => {
