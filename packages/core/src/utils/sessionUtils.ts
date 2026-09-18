@@ -111,6 +111,19 @@ export function convertSessionToClientHistory(
   messages: ConversationRecord['messages'],
 ): HistoryTurn[] {
   const clientHistory: HistoryTurn[] = [];
+  // Modern recordings persist a tool response both on the ToolCallRecord and as
+  // a durable user turn. Prefer the latter when it exists; regenerating the
+  // former would answer the same function call twice on resume.
+  const recordedResponseIds = new Set(
+    messages.flatMap((message) =>
+      message.type === 'user'
+        ? ensurePartArray(message.content).flatMap((part) =>
+            part.functionResponse?.id ? [part.functionResponse.id] : [],
+          )
+        : [],
+    ),
+  );
+  const emittedResponseIds = new Set<string>();
 
   for (const msg of messages) {
     if (msg.type === 'info' || msg.type === 'error' || msg.type === 'warning') {
@@ -124,13 +137,26 @@ export function convertSessionToClientHistory(
         continue;
       }
 
-      clientHistory.push({
-        id: msg.id,
-        content: {
-          role: 'user',
-          parts: ensurePartArray(msg.content),
-        },
+      // Some already-resumed sessions contain synthetic response turns in
+      // addition to the original durable response turn. Retain the first
+      // response for a call ID so those sessions can be recovered as well.
+      const parts = ensurePartArray(msg.content).filter((part) => {
+        const responseId = part.functionResponse?.id;
+        if (!responseId) return true;
+        if (emittedResponseIds.has(responseId)) return false;
+        emittedResponseIds.add(responseId);
+        return true;
       });
+
+      if (parts.length > 0) {
+        clientHistory.push({
+          id: msg.id,
+          content: {
+            role: 'user',
+            parts,
+          },
+        });
+      }
     } else if (msg.type === 'gemini') {
       const modelParts: Part[] = [];
 
@@ -186,7 +212,7 @@ export function convertSessionToClientHistory(
         if (msg.toolCalls && msg.toolCalls.length > 0) {
           const functionResponseParts: Part[] = [];
           for (const toolCall of msg.toolCalls) {
-            if (toolCall.result) {
+            if (toolCall.result && !recordedResponseIds.has(toolCall.id)) {
               let responseData: Part;
 
               if (typeof toolCall.result === 'string') {
@@ -200,7 +226,14 @@ export function convertSessionToClientHistory(
                   },
                 };
               } else if (Array.isArray(toolCall.result)) {
-                functionResponseParts.push(...ensurePartArray(toolCall.result));
+                // A result belongs only to its matching call. In particular,
+                // do not replay sibling responses that may have been copied
+                // into this result by an older session checkpoint.
+                functionResponseParts.push(
+                  ...ensurePartArray(toolCall.result).filter(
+                    (part) => part.functionResponse?.id === toolCall.id,
+                  ),
+                );
                 continue;
               } else {
                 responseData = toolCall.result;
