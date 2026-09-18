@@ -149,4 +149,17 @@ export const TEST_AGENTS = {
     tools: ['read_file', 'write_file', 'list_directory', 'grep_search', 'glob'],
     body: 'You are the mobile agent.',
   }),
+
+  /**
+   * An agent that answers questions about Gemini CLI itself.
+   * Uses get_cli_reference for authoritative flag/hotkey/command data
+   * and get_internal_docs for documentation lookups.
+   */
+  CLI_HELP_AGENT: createAgent({
+    name: 'cli-help-agent',
+    description:
+      'An expert on Gemini CLI flags, keyboard shortcuts, slash commands, and configuration.',
+    tools: ['get_cli_reference', 'get_internal_docs'],
+    body: 'You are the CLI help agent. Use get_cli_reference for flags, hotkeys, and commands. Use get_internal_docs for deeper documentation topics.',
+  }),
 } as const;
