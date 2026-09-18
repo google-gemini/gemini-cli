@@ -1369,7 +1369,9 @@ export class ShellExecutionService {
                     return;
                   }
 
-                  if (ShellExecutionService.backgroundLogPids.has(assignedPid)) {
+                  if (
+                    ShellExecutionService.backgroundLogPids.has(assignedPid)
+                  ) {
                     ShellExecutionService.syncBackgroundLog(
                       assignedPid,
                       decodedChunk,
