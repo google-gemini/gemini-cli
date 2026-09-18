@@ -602,8 +602,8 @@ class TrackerDeleteTaskInvocation extends BaseToolInvocation<
   }: ExecuteOptions): Promise<ToolResult> {
     try {
       // Validate ID format at tool boundary to catch bad input early
-      const id = this.params.id?.trim();
-      if (!id || !/^[0-9a-f]{6}$/i.test(id)) {
+      const rawId = this.params.id;
+      if (typeof rawId !== 'string' || !/^[0-9a-f]{6}$/i.test(rawId.trim())) {
         return {
           llmContent: `Invalid task ID format: "${this.params.id}". ID must be a 6-character hex string.`,
           returnDisplay: 'Invalid task ID.',
@@ -613,6 +613,7 @@ class TrackerDeleteTaskInvocation extends BaseToolInvocation<
           },
         };
       }
+      const id = rawId.trim();
 
       const task = await this.service.getTask(id);
       if (!task) {

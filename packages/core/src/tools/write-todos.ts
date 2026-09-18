@@ -113,7 +113,7 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
     // Group existing tasks by trimmed title to handle duplicate titles
     const existingByTitle = new Map<string, TrackerTask[]>();
     for (const task of existingTasks) {
-      const title = task.title.trim();
+      const title = task.title.trim().toLowerCase();
       if (!existingByTitle.has(title)) {
         existingByTitle.set(title, []);
       }
@@ -124,8 +124,9 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
     const warnings: string[] = [];
 
     for (const todo of todos) {
-      const title = todo.description.trim();
-      const candidates = existingByTitle.get(title);
+      const originalTitle = todo.description.trim();
+      const lookupKey = originalTitle.toLowerCase();
+      const candidates = existingByTitle.get(lookupKey);
       const targetStatus = mapTodoStatusToTaskStatus(todo.status);
 
       if (candidates && candidates.length > 0) {
@@ -137,16 +138,16 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
             await service.updateTask(existing.id, { status: targetStatus });
           } catch (e) {
             warnings.push(
-              `Could not update "${title}" (${existing.id}): ${e instanceof Error ? e.message : String(e)}`,
+              `Could not update "${originalTitle}" (${existing.id}): ${e instanceof Error ? e.message : String(e)}`,
             );
           }
         }
       } else {
-        // New task: create it
+        // New task: create it (use original casing for the stored title)
         try {
           const created = await service.createTask({
-            title,
-            description: title,
+            title: originalTitle,
+            description: originalTitle,
             type: TaskType.TASK,
             status: targetStatus,
             dependencies: [],
@@ -154,7 +155,7 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
           preservedIds.add(created.id);
         } catch (e) {
           warnings.push(
-            `Could not create task "${title}": ${e instanceof Error ? e.message : String(e)}`,
+            `Could not create task "${originalTitle}": ${e instanceof Error ? e.message : String(e)}`,
           );
         }
       }
@@ -212,7 +213,7 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
       .filter(
         (task) =>
           !preservedIds.has(task.id) &&
-          task.type === TaskType.TASK &&
+          (task.type === TaskType.TASK || task.type === TaskType.BUG) &&
           !hasPreservedDescendants(task.id),
       )
       .map((task) => ({ task, depth: getDepth(task) }))

@@ -232,8 +232,7 @@ export class TrackerService {
     // mid-operation leaves the DB in a consistent state (orphaned refs
     // would break validateCanClose and validateNoCircularDependencies).
     const now = new Date().toISOString();
-    const remaining = await this.listTasks();
-    for (const other of remaining) {
+    for (const other of allTasks) {
       if (other.id === normalizedId) continue;
       const hasDep = other.dependencies.includes(normalizedId);
       const hasParent = other.parentId === normalizedId;
