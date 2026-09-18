@@ -2764,10 +2764,10 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
 
 ### Environment variable redaction
 
-To prevent accidental leakage of sensitive information, Gemini CLI automatically
-redacts potential secrets from environment variables when executing tools (such
-as shell commands). This "best effort" redaction applies to variables inherited
-from the system or loaded from `.env` files.
+When enabled, Gemini CLI redacts potential secrets from environment variables to
+prevent accidental leakage when executing tools (such as shell commands). This
+"best effort" redaction applies to variables inherited from the system or loaded
+from `.env` files. Redaction is disabled by default.
 
 **Default Redaction Rules:**
 
@@ -2794,16 +2794,21 @@ from the system or loaded from `.env` files.
 
 You can customize this behavior in your `settings.json` file:
 
-- **`security.allowedEnvironmentVariables`**: A list of variable names to
+- **`security.environmentVariableRedaction.enabled`**: Set to `true` to enable
+  environment variable redaction. Defaults to `false`.
+- **`security.environmentVariableRedaction.allowed`**: A list of variable names to
   _never_ redact, even if they match sensitive patterns.
-- **`security.blockedEnvironmentVariables`**: A list of variable names to
+- **`security.environmentVariableRedaction.blocked`**: A list of variable names to
   _always_ redact, even if they don't match sensitive patterns.
 
 ```json
 {
   "security": {
-    "allowedEnvironmentVariables": ["MY_PUBLIC_KEY", "NOT_A_SECRET_TOKEN"],
-    "blockedEnvironmentVariables": ["INTERNAL_IP_ADDRESS"]
+    "environmentVariableRedaction": {
+      "enabled": true,
+      "allowed": ["MY_PUBLIC_KEY", "NOT_A_SECRET_TOKEN"],
+      "blocked": ["INTERNAL_IP_ADDRESS"]
+    }
   }
 }
 ```
