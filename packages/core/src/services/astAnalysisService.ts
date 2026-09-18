@@ -270,10 +270,11 @@ export function findClosingBrace(lines: string[], startLine: number): number {
   let parenDepth = 0;
   let opened = false;
   for (let i = startLine; i < lines.length; i++) {
-    // Strip string literals to avoid false brace matches.
-    // NOTE: This regex does not handle escaped quotes inside strings
-    // (e.g. "a \" {"). This is a known limitation of the heuristic parser.
-    let stripped = lines[i].replace(/'[^']*'|"[^"]*"|`[^`]*`/g, '');
+    // Strip string literals (including escaped quotes) to avoid false brace matches.
+    let stripped = lines[i].replace(
+      /'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`/g,
+      '',
+    );
     // Strip single-line comments which may contain braces (e.g. "// }")
     const commentIdx = stripped.indexOf('//');
     if (commentIdx >= 0) {
@@ -302,16 +303,33 @@ export function findIndentEnd(lines: string[], startLine: number): number {
   const baseIndent =
     lines[startLine].length - lines[startLine].trimStart().length;
   let last = startLine;
-  let inTripleQuote = false;
+  let tripleQuoteChar: '"""' | "'''" | null = null;
   for (let i = startLine + 1; i < lines.length; i++) {
     const trimmed = lines[i].trim();
 
-    // Track Python triple-quoted strings which can have arbitrary indentation
-    const tripleCount = (trimmed.match(/"""|'''/g) || []).length;
-    if (tripleCount % 2 !== 0) {
-      inTripleQuote = !inTripleQuote;
+    // Track Python triple-quoted strings - must match the same quote type
+    let j = 0;
+    while (j < trimmed.length) {
+      if (tripleQuoteChar) {
+        if (trimmed.startsWith(tripleQuoteChar, j)) {
+          tripleQuoteChar = null;
+          j += 3;
+        } else {
+          j++;
+        }
+      } else {
+        if (trimmed.startsWith('"""', j)) {
+          tripleQuoteChar = '"""';
+          j += 3;
+        } else if (trimmed.startsWith("'''", j)) {
+          tripleQuoteChar = "'''";
+          j += 3;
+        } else {
+          j++;
+        }
+      }
     }
-    if (inTripleQuote) {
+    if (tripleQuoteChar) {
       last = i;
       continue;
     }
@@ -499,7 +517,7 @@ function countSymbols(syms: ASTSymbol[]): number {
 async function collectSourceFiles(dir: string, max: number): Promise<string[]> {
   const files: string[] = [];
   async function walk(d: string, depth: number) {
-    if (depth > 6 || files.length >= max) return;
+    if (depth > 15 || files.length >= max) return;
     let entries;
     try {
       entries = await fs.readdir(d, { withFileTypes: true });
