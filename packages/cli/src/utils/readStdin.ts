@@ -35,6 +35,14 @@ export async function readStdin(): Promise<string> {
       // stop reading if input is not available yet, this is needed
       // in terminals where stdin is never TTY and nothing's piped
       // which causes the program to get stuck expecting data from stdin
+      //
+      // A pipe that has produced nothing yet is indistinguishable from no
+      // pipe at all, so a slow one resolves empty here and the prompt runs
+      // without the input the user piped into it. Say so, rather than
+      // leaving the user to work out why their context vanished.
+      debugLogger.warn(
+        `Warning: no stdin input within ${pipedInputShouldBeAvailableInMs}ms; continuing without it.`,
+      );
       onEnd();
     }, pipedInputShouldBeAvailableInMs);
 
@@ -54,7 +62,10 @@ export async function readStdin(): Promise<string> {
           debugLogger.warn(
             `Warning: stdin input truncated to ${MAX_STDIN_SIZE} bytes.`,
           );
-          process.stdin.destroy(); // Stop reading further
+          // Pause rather than destroy: this only needs to stop reading, and a
+          // destroyed `process.stdin` cannot be read again for the life of the
+          // process, so a later reader gets nothing instead of the rest.
+          process.stdin.pause();
           onEnd();
           break;
         }
