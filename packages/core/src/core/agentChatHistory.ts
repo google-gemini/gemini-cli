@@ -5,6 +5,7 @@
  */
 
 import type { Content } from '@google/genai';
+import { isInterruptionContent } from '../utils/interruptionSanitizer.js';
 
 /**
  * A durable wrapper for Gemini Content that carries a stable ID.
@@ -85,5 +86,32 @@ export class AgentChatHistory {
 
   get length(): number {
     return this.history.length;
+  }
+
+  /**
+   * Returns `true` if any model turn in the history contains the raw
+   * interruption placeholder text that causes session context poisoning.
+   *
+   * This is a diagnostic helper for debugging and assertions — the actual
+   * sanitization happens in `extractCuratedHistory()` and the scrub pipeline.
+   */
+  containsInterruptionPlaceholder(): boolean {
+    return this.history.some(
+      (turn) =>
+        turn.content.role === 'model' && isInterruptionContent(turn.content),
+    );
+  }
+
+  /**
+   * Returns the last model turn, or `undefined` if there is none.
+   * Useful for quick inspection without copying the whole history array.
+   */
+  getLastModelTurn(): HistoryTurn | undefined {
+    for (let i = this.history.length - 1; i >= 0; i--) {
+      if (this.history[i].content.role === 'model') {
+        return this.history[i];
+      }
+    }
+    return undefined;
   }
 }

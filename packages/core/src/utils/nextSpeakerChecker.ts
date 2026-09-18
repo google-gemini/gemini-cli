@@ -8,6 +8,7 @@ import type { Content } from '@google/genai';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { GeminiChat } from '../core/geminiChat.js';
 import { isFunctionResponse } from './messageInspectors.js';
+import { isInterruptionContent, BENIGN_INTERRUPTION_REPLACEMENT } from './interruptionSanitizer.js';
 import { debugLogger } from './debugLogger.js';
 import { LlmRole } from '../telemetry/types.js';
 
@@ -77,6 +78,30 @@ export async function checkNextSpeaker(
     return {
       reasoning:
         'The last message was a function response, so the model should speak next.',
+      next_speaker: 'model',
+    };
+  }
+
+  // If the last model message is an interruption placeholder (either the raw
+  // or sanitized form), the model should continue without an LLM call.
+  // Use strict single-part matching for the sanitized form to avoid false
+  // positives when a real model response happens to contain "Continuing."
+  // as a transition phrase alongside tool calls.
+  const isSanitizedInterruption =
+    lastComprehensiveMessage &&
+    lastComprehensiveMessage.role === 'model' &&
+    lastComprehensiveMessage.parts?.length === 1 &&
+    lastComprehensiveMessage.parts[0] &&
+    !lastComprehensiveMessage.parts[0].thought &&
+    typeof lastComprehensiveMessage.parts[0].text === 'string' &&
+    lastComprehensiveMessage.parts[0].text === BENIGN_INTERRUPTION_REPLACEMENT;
+  if (
+    lastComprehensiveMessage &&
+    (isInterruptionContent(lastComprehensiveMessage) || isSanitizedInterruption)
+  ) {
+    return {
+      reasoning:
+        'The last model response was an interruption placeholder, so the model should speak next to provide a real response.',
       next_speaker: 'model',
     };
   }
