@@ -20,15 +20,26 @@ const mod = rawProxyAgent as unknown as InteropShape;
 const defaultMod = mod.default as InteropShape | undefined;
 const defaultNamedCtor = defaultMod?.HttpProxyAgent;
 
-let resolvedCtor = rawProxyAgent as unknown as HttpProxyAgentCtor;
+let resolvedCtor: HttpProxyAgentCtor | undefined;
 if (typeof mod.HttpProxyAgent === 'function') {
   resolvedCtor = mod.HttpProxyAgent;
 } else if (typeof mod.default === 'function') {
   resolvedCtor = mod.default;
 } else if (typeof defaultNamedCtor === 'function') {
   resolvedCtor = defaultNamedCtor;
+} else if (typeof rawProxyAgent === 'function') {
+  resolvedCtor = rawProxyAgent as unknown as HttpProxyAgentCtor;
 }
-const HttpProxyAgent = resolvedCtor;
+
+const HttpProxyAgent =
+  resolvedCtor ??
+  (class {
+    constructor() {
+      throw new Error(
+        'HttpProxyAgent constructor could not be resolved from http-proxy-agent',
+      );
+    }
+  } as unknown as HttpProxyAgentCtor);
 
 if (typeof HttpProxyAgent === 'function') {
   try {
