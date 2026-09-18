@@ -117,13 +117,13 @@ async function main() {
 
   // Dynamic import of the built module
   const geminiChatModule = await import(
-    path.resolve('packages/core/dist/src/core/geminiChat.js')
+    new URL('dist/src/core/geminiChat.js', import.meta.url).href
   );
   const { INTERRUPTED_RESPONSE_PLACEHOLDER, GeminiChat } = geminiChatModule;
 
   // Import the sanitizer to verify exports work
   const sanitizerModule = await import(
-    path.resolve('packages/core/dist/src/utils/interruptionSanitizer.js')
+    new URL('dist/src/utils/interruptionSanitizer.js', import.meta.url).href
   );
   const {
     BENIGN_INTERRUPTION_REPLACEMENT,
@@ -183,7 +183,7 @@ async function main() {
 
   // Read the source to verify the fix is in place
   const sourceCode = fs.readFileSync(
-    'packages/core/src/core/geminiChat.ts',
+    new URL('src/core/geminiChat.ts', import.meta.url),
     'utf-8',
   );
   const usesRawPlaceholder = sourceCode.includes(
@@ -208,7 +208,7 @@ async function main() {
   console.log('─── Test 3: nextSpeakerChecker import verification ───');
 
   const nextSpeakerSource = fs.readFileSync(
-    'packages/core/src/utils/nextSpeakerChecker.ts',
+    new URL('src/utils/nextSpeakerChecker.ts', import.meta.url),
     'utf-8',
   );
   assert(
@@ -226,7 +226,7 @@ async function main() {
   console.log('─── Test 4: chatCompressionService import verification ───');
 
   const compressionSource = fs.readFileSync(
-    'packages/core/src/context/chatCompressionService.ts',
+    new URL('src/context/chatCompressionService.ts', import.meta.url),
     'utf-8',
   );
   assert(

@@ -4233,7 +4233,7 @@ describe('LocalAgentExecutor', () => {
   describe('session context poisoning prevention (Issue #29264)', () => {
     it('should not include raw interruption placeholder in default abort result messages', async () => {
       const fs = await import('node:fs');
-      const source = fs.readFileSync('src/agents/local-executor.ts', 'utf-8');
+      const source = fs.readFileSync(new URL('local-executor.ts', import.meta.url), 'utf-8');
       // The fallback message must NOT contain the raw poisoning placeholder
       expect(source).not.toContain('INTERRUPTED_RESPONSE_PLACEHOLDER');
       expect(source).not.toContain('INTERRUPTED_RESPONSE_TEXT');
