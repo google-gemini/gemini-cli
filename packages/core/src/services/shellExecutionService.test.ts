@@ -2593,3 +2593,222 @@ describe('ShellExecutionService environment variables', () => {
     vi.unstubAllEnvs();
   });
 });
+
+describe('Windows ConPTY exit desynchronization and hang regression (#25166)', () => {
+  let mockPtyProcess: EventEmitter & {
+    pid: number;
+    write: Mock;
+    resize: Mock;
+    kill: Mock;
+    destroy: Mock;
+    onData: Mock;
+    onExit: Mock;
+    _agent?: {
+      _exitCode?: number;
+      exitCode?: number;
+      _$onProcessExit?: (code: number) => void;
+      resize?: (cols: number, rows: number) => void;
+    };
+  };
+  let onOutputEventMock: Mock;
+  const shellExecutionConfig: ShellExecutionConfig = {
+    sanitizationConfig: {
+      enableEnvironmentVariableRedaction: false,
+      allowedEnvironmentVariables: [],
+      blockedEnvironmentVariables: [],
+    },
+    sandboxManager: new NoopSandboxManager(),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ExecutionLifecycleService.resetForTest();
+    onOutputEventMock = vi.fn();
+    mockPlatform.mockReturnValue('win32');
+    mockHomedir.mockReturnValue('/home/user');
+    mockIsBinary.mockReturnValue(false);
+    mockSerializeTerminalToObject.mockReturnValue([
+      [
+        {
+          text: 'hello',
+          fg: '',
+          bg: '',
+          bold: false,
+          dim: false,
+          italic: false,
+          underline: false,
+          inverse: false,
+          isUninitialized: false,
+        },
+      ],
+    ]);
+
+    mockPtyProcess = Object.assign(new EventEmitter(), {
+      pid: 54321,
+      write: vi.fn(),
+      resize: vi.fn(),
+      kill: vi.fn(),
+      destroy: vi.fn(),
+      onData: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+      onExit: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+    });
+
+    mockPtySpawn.mockReturnValue(mockPtyProcess);
+    mockGetPty.mockResolvedValue({
+      name: 'lydell-node-pty',
+      module: { spawn: mockPtySpawn },
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('should resolve execution when Windows ConPTY native _agent._$onProcessExit fires but pty.onExit is lost due to ConPTY pipe retention', async () => {
+    vi.useFakeTimers();
+
+    const mockAgent = {
+      _exitCode: undefined as number | undefined,
+      get exitCode() {
+        return this._exitCode;
+      },
+      _$onProcessExit: vi.fn(function (
+        this: { _exitCode?: number },
+        code: number,
+      ) {
+        this._exitCode = code;
+      }),
+      resize: vi.fn(),
+    };
+    mockPtyProcess._agent = mockAgent;
+
+    const abortController = new AbortController();
+    const handle = await ShellExecutionService.execute(
+      'echo hello',
+      '/test/dir',
+      onOutputEventMock,
+      abortController.signal,
+      true,
+      shellExecutionConfig,
+    );
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    // Command produces output
+    mockPtyProcess.onData.mock.calls[0][0]('hello\r\n');
+    await vi.advanceTimersByTimeAsync(10);
+
+    // Native Win32 WaitForSingleObject triggers _$onProcessExit(0) on hShell exit,
+    // but node-pty's _socket 'close' / pty.onExit never fires due to ready_datapipe race or ConPTY pipe retention.
+    mockAgent._$onProcessExit(0);
+
+    // Advance past the ConPTY flush window
+    await vi.advanceTimersByTimeAsync(2000);
+
+    let resolved = false;
+    void handle.result.then(() => {
+      resolved = true;
+    });
+    await vi.advanceTimersByTimeAsync(10);
+
+    expect(resolved).toBe(true);
+    const result = await handle.result;
+    expect(result.exitCode).toBe(0);
+    expect(ShellExecutionService.isPtyActive(handle.pid!)).toBe(false);
+  });
+
+  it('should prevent deferred WindowsTerminal _agent.resize from throwing synchronously during _socket data event after process exit', async () => {
+    const deferreds: Array<{ run: () => void }> = [];
+    let isReady = false;
+    const mockAgent = {
+      _exitCode: undefined as number | undefined,
+      get exitCode() {
+        return this._exitCode;
+      },
+      _$onProcessExit: vi.fn(function (
+        this: { _exitCode?: number },
+        code: number,
+      ) {
+        this._exitCode = code;
+      }),
+      resize: vi.fn(function (
+        this: { _exitCode?: number },
+        _cols: number,
+        _rows: number,
+      ) {
+        if (this._exitCode !== undefined) {
+          throw new Error('Cannot resize a pty that has already exited');
+        }
+      }),
+    };
+    mockPtyProcess._agent = mockAgent;
+    mockPtyProcess.resize.mockImplementation((cols: number, rows: number) => {
+      if (!isReady) {
+        deferreds.push({ run: () => mockAgent.resize(cols, rows) });
+      } else {
+        mockAgent.resize(cols, rows);
+      }
+    });
+
+    const abortController = new AbortController();
+    const handle = await ShellExecutionService.execute(
+      'echo hello',
+      '/test/dir',
+      onOutputEventMock,
+      abortController.signal,
+      true,
+      shellExecutionConfig,
+    );
+
+    // ShellToolMessage mounts and resizes PTY while _isReady is false (queued in _deferreds)
+    ShellExecutionService.resizePty(handle.pid!, 100, 40);
+
+    // Process exits quickly before first 'data' event arrives
+    mockAgent._$onProcessExit(0);
+
+    // First 'data' event arrives on _socket and flushes _deferreds
+    expect(() => {
+      isReady = true;
+      deferreds.forEach((d) => d.run());
+    }).not.toThrow();
+
+    // Clean up
+    mockPtyProcess.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+    await handle.result;
+  });
+
+  it('should still finalize and resolve execution when pty.onExit fires even if an output chunk handler in processingChain rejected', async () => {
+    let throwOnce = true;
+    onOutputEventMock.mockImplementation((event: ShellOutputEvent) => {
+      if (event.type === 'data' && throwOnce) {
+        throwOnce = false;
+        throw new Error('Simulated downstream UI listener error');
+      }
+    });
+
+    const abortController = new AbortController();
+    const handle = await ShellExecutionService.execute(
+      'echo hello',
+      '/test/dir',
+      onOutputEventMock,
+      abortController.signal,
+      true,
+      shellExecutionConfig,
+    );
+
+    await new Promise((resolve) => process.nextTick(resolve));
+
+    mockPtyProcess.onData.mock.calls[0][0]('hello\r\n');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    mockPtyProcess.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+
+    const timeoutPromise = new Promise<'timeout'>((resolve) =>
+      setTimeout(() => resolve('timeout'), 500),
+    );
+    const outcome = await Promise.race([handle.result, timeoutPromise]);
+
+    expect(outcome).not.toBe('timeout');
+    expect((outcome as { exitCode: number }).exitCode).toBe(0);
+  });
+});
