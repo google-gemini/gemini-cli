@@ -62,6 +62,7 @@
     "test:perf:update-baselines": "cross-env UPDATE_PERF_BASELINES=true vitest run --root ./perf-tests",
     "test:integration:sandbox:docker": "cross-env GEMINI_SANDBOX=docker npm run build:sandbox && cross-env GEMINI_SANDBOX=docker vitest run --root ./integration-tests",
     "test:integration:sandbox:podman": "cross-env GEMINI_SANDBOX=podman vitest run --root ./integration-tests",
+    "test:integration:vscode": "npm run test:integration -w gemini-cli-vscode-ide-companion",
     "lint": "cross-env NODE_OPTIONS=\"--max-old-space-size=8192\" eslint . --cache --max-warnings 0",
     "lint:fix": "eslint . --fix --ext .ts,.tsx && eslint integration-tests --fix && eslint scripts --fix && npm run format",
     "lint:ci": "npm run lint:all",
