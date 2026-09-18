@@ -71,6 +71,13 @@ export interface SchedulerOptions {
   onWaitingForConfirmation?: (waiting: boolean) => void;
 }
 
+/**
+ * How many times one tool call may ask to expand the sandbox before the
+ * scheduler stops. Each attempt re-prompts the user, so the bound is also
+ * what keeps a buggy tool from asking for ever.
+ */
+const MAX_SANDBOX_EXPANSIONS = 3;
+
 const createErrorResponse = (
   request: ToolCallRequestInfo,
   error: Error,
@@ -730,6 +737,7 @@ export class Scheduler {
   private async _execute(
     toolCall: ScheduledToolCall,
     signal: AbortSignal,
+    sandboxExpansions = 0,
   ): Promise<boolean> {
     const callId = toolCall.request.callId;
     if (signal.aborted) {
@@ -845,6 +853,29 @@ export class Scheduler {
     }
 
     if (isSandboxError) {
+      if (sandboxExpansions >= MAX_SANDBOX_EXPANSIONS) {
+        // A tool that asks for more permissions on every attempt would loop
+        // here for ever, and the user would be re-prompted every time. Stop
+        // before asking again, and say why rather than falling through to the
+        // generic shell error.
+        type LegacyHack = ToolCallResponseInfo & {
+          llmContent?: string;
+          returnDisplay?: string;
+        };
+        const errorResponse = { ...result.response } as LegacyHack;
+        errorResponse.llmContent =
+          `The command asked to expand the sandbox ${MAX_SANDBOX_EXPANSIONS} times and still failed. ` +
+          'Giving up rather than asking again. Shell output:\n' +
+          String(errorResponse.returnDisplay);
+
+        this.state.updateStatus(
+          callId,
+          CoreToolCallStatus.Error,
+          errorResponse,
+        );
+        return false;
+      }
+
       try {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const parsedError = JSON.parse(sandboxDetailsStr) as {
@@ -931,6 +962,7 @@ export class Scheduler {
             status: CoreToolCallStatus.Scheduled,
           } as ScheduledToolCall,
           signal,
+          sandboxExpansions + 1,
         );
       } catch {
         // Fallback to normal error handling if parsing/looping fails
