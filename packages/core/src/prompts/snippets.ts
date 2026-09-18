@@ -750,7 +750,7 @@ function workflowStepStrategy(options: PrimaryWorkflowsOptions): string {
   if (options.enableWriteTodosTool) {
     return `2. **Strategy:** Formulate a grounded plan based on your research.${
       options.interactive ? ' Share a concise summary of your strategy.' : ''
-    } For complex tasks, break them down into smaller, manageable subtasks and use the ${formatToolName(WRITE_TODOS_TOOL_NAME)} tool to track your progress.`;
+    } For complex tasks, break them down into smaller, manageable subtasks and use the ${formatToolName(WRITE_TODOS_TOOL_NAME)} tool to track your progress. The todo list is now **persistent**: tasks survive session restarts, so you can pick up exactly where you left off. Prefer the dedicated tracker tools (${formatToolName(TRACKER_CREATE_TASK_TOOL_NAME)}, ${formatToolName(TRACKER_UPDATE_TASK_TOOL_NAME)}, ${formatToolName(TRACKER_LIST_TASKS_TOOL_NAME)}) for fine-grained CRUD operations.`;
   }
   return `2. **Strategy:** Formulate a grounded plan based on your research.${
     options.interactive ? ' Share a concise summary of your strategy.' : ''

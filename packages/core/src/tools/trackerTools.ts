@@ -9,6 +9,7 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import {
   TRACKER_ADD_DEPENDENCY_DEFINITION,
   TRACKER_CREATE_TASK_DEFINITION,
+  TRACKER_DELETE_TASK_DEFINITION,
   TRACKER_GET_TASK_DEFINITION,
   TRACKER_LIST_TASKS_DEFINITION,
   TRACKER_UPDATE_TASK_DEFINITION,
@@ -18,6 +19,7 @@ import { resolveToolDeclaration } from './definitions/resolver.js';
 import {
   TRACKER_ADD_DEPENDENCY_TOOL_NAME,
   TRACKER_CREATE_TASK_TOOL_NAME,
+  TRACKER_DELETE_TASK_TOOL_NAME,
   TRACKER_GET_TASK_TOOL_NAME,
   TRACKER_LIST_TASKS_TOOL_NAME,
   TRACKER_UPDATE_TASK_TOOL_NAME,
@@ -566,6 +568,114 @@ export class TrackerAddDependencyTool extends BaseDeclarativeTool<
   }
   override getSchema(modelId?: string) {
     return resolveToolDeclaration(TRACKER_ADD_DEPENDENCY_DEFINITION, modelId);
+  }
+}
+
+// --- tracker_delete_task ---
+
+interface DeleteTaskParams {
+  id: string;
+}
+
+class TrackerDeleteTaskInvocation extends BaseToolInvocation<
+  DeleteTaskParams,
+  ToolResult
+> {
+  constructor(
+    private readonly config: Config,
+    params: DeleteTaskParams,
+    messageBus: MessageBus,
+    toolName: string,
+  ) {
+    super(params, messageBus, toolName);
+  }
+
+  private get service() {
+    return this.config.getTrackerService();
+  }
+  getDescription(): string {
+    return `Deleting task ${this.params.id}`;
+  }
+
+  override async execute({
+    abortSignal: _signal,
+  }: ExecuteOptions): Promise<ToolResult> {
+    try {
+      const task = await this.service.getTask(this.params.id);
+      if (!task) {
+        return {
+          llmContent: `Task ${this.params.id} not found.`,
+          returnDisplay: 'Task not found.',
+          error: {
+            message: `Task ${this.params.id} not found.`,
+            type: ToolErrorType.EXECUTION_FAILED,
+          },
+        };
+      }
+
+      // Block deletion if this task has child tasks
+      const allTasks = await this.service.listTasks();
+      const children = allTasks.filter((t) => t.parentId === this.params.id);
+      if (children.length > 0) {
+        const childIds = children.map((c) => c.id).join(', ');
+        return {
+          llmContent: `Cannot delete task ${this.params.id}: it has ${children.length} child task(s) (${childIds}). Delete or re-parent them first.`,
+          returnDisplay: 'Deletion blocked by child tasks.',
+          error: {
+            message: `Task has child tasks: ${childIds}`,
+            type: ToolErrorType.EXECUTION_FAILED,
+          },
+        };
+      }
+
+      await this.service.deleteTask(this.params.id);
+      return {
+        llmContent: `Deleted task ${this.params.id}: ${task.title}`,
+        returnDisplay: await buildTodosReturnDisplay(this.service),
+      };
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      return {
+        llmContent: `Error deleting task: ${errorMessage}`,
+        returnDisplay: 'Failed to delete task.',
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.EXECUTION_FAILED,
+        },
+      };
+    }
+  }
+}
+
+export class TrackerDeleteTaskTool extends BaseDeclarativeTool<
+  DeleteTaskParams,
+  ToolResult
+> {
+  static readonly Name = TRACKER_DELETE_TASK_TOOL_NAME;
+  constructor(
+    private config: Config,
+    messageBus: MessageBus,
+  ) {
+    super(
+      TrackerDeleteTaskTool.Name,
+      'Delete Task',
+      TRACKER_DELETE_TASK_DEFINITION.base.description!,
+      Kind.Delete,
+      TRACKER_DELETE_TASK_DEFINITION.base.parametersJsonSchema,
+      messageBus,
+    );
+  }
+  protected createInvocation(params: DeleteTaskParams, messageBus: MessageBus) {
+    return new TrackerDeleteTaskInvocation(
+      this.config,
+      params,
+      messageBus,
+      this.name,
+    );
+  }
+  override getSchema(modelId?: string) {
+    return resolveToolDeclaration(TRACKER_DELETE_TASK_DEFINITION, modelId);
   }
 }
 

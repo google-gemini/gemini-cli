@@ -117,5 +117,38 @@ describe('tool-names', () => {
       const aliases = getToolAliases('unknown_tool');
       expect(aliases).toEqual(['unknown_tool']);
     });
+
+    it('should include write_todos as a legacy alias', () => {
+      const aliases = getToolAliases('write_todos');
+      expect(aliases).toContain('write_todos');
+      expect(aliases).toContain('tracker_list_tasks');
+    });
+  });
+
+  describe('ALL_BUILTIN_TOOL_NAMES', () => {
+    it('should include tracker_delete_task', () => {
+      expect(
+        (ALL_BUILTIN_TOOL_NAMES as readonly string[]).includes(
+          'tracker_delete_task',
+        ),
+      ).toBe(true);
+    });
+
+    it('should include all tracker tools', () => {
+      const trackerTools = [
+        'tracker_create_task',
+        'tracker_update_task',
+        'tracker_get_task',
+        'tracker_list_tasks',
+        'tracker_add_dependency',
+        'tracker_delete_task',
+        'tracker_visualize',
+      ];
+      for (const name of trackerTools) {
+        expect(
+          (ALL_BUILTIN_TOOL_NAMES as readonly string[]).includes(name),
+        ).toBe(true);
+      }
+    });
   });
 });

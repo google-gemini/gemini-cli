@@ -104,6 +104,7 @@ import {
   TrackerGetTaskTool,
   TrackerListTasksTool,
   TrackerAddDependencyTool,
+  TrackerDeleteTaskTool,
   TrackerVisualizeTool,
 } from '../tools/trackerTools.js';
 import {
@@ -1295,7 +1296,7 @@ export class Config implements McpContext, AgentLoopContext {
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD;
     const isGemini2 = isGemini2Model(this.model);
     this.useWriteTodos =
-      isGemini2 && !isPreviewModel(this.model, this) && !this.trackerEnabled
+      isGemini2 && !isPreviewModel(this.model, this)
         ? (params.useWriteTodos ?? true)
         : false;
     this.workspacePoliciesDir = params.workspacePoliciesDir;
@@ -4041,7 +4042,9 @@ export class Config implements McpContext, AgentLoopContext {
     );
     if (this.getUseWriteTodos()) {
       maybeRegister(WriteTodosTool, () =>
-        registry.registerTool(new WriteTodosTool(this.messageBus)),
+        registry.registerTool(
+          new WriteTodosTool(this.messageBus, this.getTrackerService()),
+        ),
       );
     }
     if (this.isPlanEnabled()) {
@@ -4070,6 +4073,9 @@ export class Config implements McpContext, AgentLoopContext {
         registry.registerTool(
           new TrackerAddDependencyTool(this, this.messageBus),
         ),
+      );
+      maybeRegister(TrackerDeleteTaskTool, () =>
+        registry.registerTool(new TrackerDeleteTaskTool(this, this.messageBus)),
       );
       maybeRegister(TrackerVisualizeTool, () =>
         registry.registerTool(new TrackerVisualizeTool(this, this.messageBus)),

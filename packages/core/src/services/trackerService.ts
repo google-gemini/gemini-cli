@@ -45,9 +45,12 @@ export class TrackerService {
   async createTask(taskData: Omit<TrackerTask, 'id'>): Promise<TrackerTask> {
     await this.ensureInitialized();
     const id = this.generateId();
+    const now = new Date().toISOString();
     const task: TrackerTask = {
       ...taskData,
       id,
+      createdAt: taskData.createdAt ?? now,
+      updatedAt: taskData.updatedAt ?? now,
     };
 
     if (task.parentId) {
@@ -149,7 +152,12 @@ export class TrackerService {
       throw new Error(`Task with ID ${id} not found.`);
     }
 
-    const updatedTask = { ...task, ...updates, id: task.id };
+    const updatedTask = {
+      ...task,
+      ...updates,
+      id: task.id,
+      updatedAt: new Date().toISOString(),
+    };
 
     if (updatedTask.parentId) {
       const parentExists = !!(await this.getTask(updatedTask.parentId));
@@ -172,6 +180,42 @@ export class TrackerService {
 
     await this.saveTask(updatedTask);
     return updatedTask;
+  }
+
+  /**
+   * Deletes a task by ID. Removes it from any other task's dependency lists.
+   */
+  async deleteTask(id: string): Promise<void> {
+    await this.ensureInitialized();
+    const task = await this.getTask(id);
+    if (!task) {
+      throw new Error(`Task with ID ${id} not found.`);
+    }
+
+    // Remove the task file
+    const taskPath = path.join(this.tasksDir, `${id}.json`);
+    await fs.unlink(taskPath);
+
+    // Remove this task from any other task's dependency lists
+    const allTasks = await this.listTasks();
+    for (const other of allTasks) {
+      if (other.dependencies.includes(id)) {
+        const filteredDeps = other.dependencies.filter((d) => d !== id);
+        await this.saveTask({ ...other, dependencies: filteredDeps });
+      }
+    }
+  }
+
+  /**
+   * Clears all tasks from the tracker directory.
+   */
+  async clearTasks(): Promise<void> {
+    await this.ensureInitialized();
+    const files = await fs.readdir(this.tasksDir);
+    const jsonFiles = files.filter((f: string) => f.endsWith('.json'));
+    await Promise.all(
+      jsonFiles.map((f: string) => fs.unlink(path.join(this.tasksDir, f))),
+    );
   }
 
   /**
