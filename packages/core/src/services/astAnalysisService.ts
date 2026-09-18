@@ -163,8 +163,8 @@ export function extractSymbols(lines: string[], language: string): ASTSymbol[] {
 
       const endLine =
         language === 'python'
-          ? findIndentEnd(lines, i)
-          : findClosingBrace(lines, i);
+          ? findIndentEnd(cleaned, i)
+          : findClosingBrace(cleaned, i);
 
       const sym: ASTSymbol = {
         name: match[1],
@@ -175,7 +175,7 @@ export function extractSymbols(lines: string[], language: string): ASTSymbol[] {
           trimmed.length > 120 ? trimmed.slice(0, 117) + '...' : trimmed,
         children:
           kind === 'class' || kind === 'interface'
-            ? extractMembers(lines, i + 1, endLine, language)
+            ? extractMembers(cleaned, i + 1, endLine, language)
             : [],
       };
 
@@ -256,8 +256,9 @@ export function findClosingBrace(lines: string[], startLine: number): number {
       }
     }
   }
-  // If brace matching failed, return end of file rather than an arbitrary offset
-  return lines.length - 1;
+  // If brace matching failed, return startLine rather than the end of the file
+  // to prevent skipping the entire rest of the file during parsing.
+  return startLine;
 }
 
 export function findIndentEnd(lines: string[], startLine: number): number {
