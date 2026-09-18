@@ -191,27 +191,46 @@ export function formatPolicyError(error: PolicyFileError): string {
 }
 
 /**
- * Filters out insecure policy directories (specifically the system policy directory).
- * Supplemental admin policy paths are NOT subject to strict security checks as they
- * are explicitly provided by the user/administrator via flags or settings.
+ * Filters out insecure policy directories.
+ * Policies must reside in secure directories to be loaded. System and supplemental
+ * admin policies require root ownership. Default, workspace, and user policies can be owned
+ * by either root or the current user. World-writable directories are rejected in all tiers.
  * Emits warnings if insecure directories are found.
  */
 async function filterSecurePolicyDirectories(
   dirs: string[],
-  systemPoliciesDir: string,
+  context: {
+    defaultPoliciesDir?: string;
+    workspacePoliciesDir?: string;
+    adminPolicyPaths?: Set<string>;
+    systemPoliciesDir: string;
+    userPoliciesDir: string;
+  },
 ): Promise<string[]> {
   const results = await Promise.all(
     dirs.map(async (dir) => {
       const normalizedDir = path.resolve(dir);
-      const isSystemPolicy = normalizedDir === systemPoliciesDir;
+      const tier = getPolicyTier(normalizedDir, context);
 
-      if (isSystemPolicy) {
-        const { secure, reason } = await isDirectorySecure(dir);
-        if (!secure) {
-          const msg = `Security Warning: Skipping system policies from ${dir}: ${reason}`;
-          emitWarningOnce(msg);
-          return null;
+      const requiresStrictRoot = tier === ADMIN_POLICY_TIER;
+      const { secure, reason } = await isDirectorySecure(dir, {
+        allowUserOwnership: !requiresStrictRoot,
+      });
+
+      if (!secure) {
+        let tierLabel = 'default';
+        if (tier === ADMIN_POLICY_TIER) {
+          tierLabel = 'system/admin';
+        } else if (tier === USER_POLICY_TIER) {
+          tierLabel = 'user';
+        } else if (tier === WORKSPACE_POLICY_TIER) {
+          tierLabel = 'workspace';
+        } else if (tier === EXTENSION_POLICY_TIER) {
+          tierLabel = 'extension';
         }
+        const msg = `Security Warning: Skipping ${tierLabel} policies from ${dir}: ${reason}`;
+        emitWarningOnce(msg);
+        return null;
       }
       return dir;
     }),
@@ -324,11 +343,6 @@ export async function createPolicyEngineConfig(
     ? new Set(adminPolicyPaths.map((p) => path.resolve(p)))
     : undefined;
 
-  const securePolicyDirs = await filterSecurePolicyDirectories(
-    policyDirs,
-    systemPoliciesDir,
-  );
-
   const tierContext = {
     defaultPoliciesDir,
     workspacePoliciesDir: settings.workspacePoliciesDir,
@@ -336,6 +350,11 @@ export async function createPolicyEngineConfig(
     systemPoliciesDir,
     userPoliciesDir,
   };
+
+  const securePolicyDirs = await filterSecurePolicyDirectories(
+    policyDirs,
+    tierContext,
+  );
 
   const userProvidedPaths = settings.policyPaths
     ? new Set(settings.policyPaths.map((p) => path.resolve(p)))

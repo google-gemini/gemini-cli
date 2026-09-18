@@ -172,10 +172,16 @@ function parseWindowsSecurityOutput(
   stdout: string,
   targetPath: string,
   isDirectory: boolean,
+  allowUserOwnership = false,
 ): SecurityCheckResult {
   const map = parseWindowsBatchSecurityOutput(stdout, [targetPath]);
   const parsed = map.get(targetPath) ?? {};
-  return formatWindowsSecurityResult(parsed, targetPath, isDirectory);
+  return formatWindowsSecurityResult(
+    parsed,
+    targetPath,
+    isDirectory,
+    allowUserOwnership,
+  );
 }
 
 function parseWindowsBatchSecurityOutput(
@@ -267,6 +273,7 @@ function formatWindowsSecurityResult(
   parsed: ParsedPathViolation,
   targetPath: string,
   isDirectory: boolean,
+  allowUserOwnership = false,
 ): SecurityCheckResult {
   if (parsed.error) {
     return {
@@ -278,7 +285,7 @@ function formatWindowsSecurityResult(
   const itemType = isDirectory ? 'Directory' : 'File';
   const reasons: string[] = [];
 
-  if (parsed.ownerViolation !== undefined) {
+  if (parsed.ownerViolation !== undefined && !allowUserOwnership) {
     reasons.push(
       `${itemType} '${targetPath}' is not owned by a trusted administrator or SYSTEM account. Current owner: ${parsed.ownerViolation}.`,
     );
@@ -370,11 +377,25 @@ function checkPosixStatsSecurity(
   stats: Stats,
   targetPath: string,
   isDirectory: boolean,
+  allowUserOwnership = false,
 ): SecurityCheckResult {
   const itemType = isDirectory ? 'Directory' : 'File';
 
-  // Check ownership: must be root (uid 0)
-  if (stats.uid !== 0) {
+  // Check ownership: must be root (uid 0) or current user if allowed
+  const currentUid = process.getuid ? process.getuid() : undefined;
+  const isOwnerSecure =
+    stats.uid === 0 ||
+    (allowUserOwnership &&
+      currentUid !== undefined &&
+      stats.uid === currentUid);
+
+  if (!isOwnerSecure) {
+    if (allowUserOwnership && currentUid !== undefined) {
+      return {
+        secure: false,
+        reason: `${itemType} '${targetPath}' is not owned by root (uid 0) or the current user (uid ${currentUid}). Current uid: ${stats.uid}.`,
+      };
+    }
     return {
       secure: false,
       reason: `${itemType} '${targetPath}' is not owned by root (uid 0). Current uid: ${stats.uid}. To fix this, run: sudo chown root:root "${targetPath}"`,
@@ -405,7 +426,9 @@ function checkPosixStatsSecurity(
  */
 export async function isDirectorySecure(
   dirPath: string,
+  options?: { allowUserOwnership?: boolean },
 ): Promise<SecurityCheckResult> {
+  const allowUserOwnership = options?.allowUserOwnership ?? false;
   try {
     const stats = await fs.stat(dirPath);
 
@@ -433,7 +456,12 @@ export async function isDirectorySecure(
           { timeout: 5000 },
         );
 
-        return parseWindowsSecurityOutput(stdout, dirPath, true);
+        return parseWindowsSecurityOutput(
+          stdout,
+          dirPath,
+          true,
+          allowUserOwnership,
+        );
       } catch (error) {
         return {
           secure: false,
@@ -446,7 +474,20 @@ export async function isDirectorySecure(
     // POSIX checks:
     try {
       const lstats = await fs.lstat(dirPath);
-      if (lstats.isSymbolicLink() && lstats.uid !== 0) {
+      const currentUid = process.getuid ? process.getuid() : undefined;
+      const isSymlinkOwnerSecure =
+        lstats.uid === 0 ||
+        (allowUserOwnership &&
+          currentUid !== undefined &&
+          lstats.uid === currentUid);
+
+      if (lstats.isSymbolicLink() && !isSymlinkOwnerSecure) {
+        if (allowUserOwnership && currentUid !== undefined) {
+          return {
+            secure: false,
+            reason: `Symlink '${dirPath}' is not owned by root (uid 0) or the current user (uid ${currentUid}). Current uid: ${lstats.uid}.`,
+          };
+        }
         return {
           secure: false,
           reason: `Symlink '${dirPath}' is not owned by root (uid 0). Current uid: ${lstats.uid}. To fix this, run: sudo chown -h root:root "${dirPath}"`,
@@ -456,7 +497,7 @@ export async function isDirectorySecure(
       // Ignore lstat failure if stat succeeded
     }
 
-    return checkPosixStatsSecurity(stats, dirPath, true);
+    return checkPosixStatsSecurity(stats, dirPath, true, allowUserOwnership);
   } catch (error) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
