@@ -9,7 +9,6 @@ import { reportError } from '../utils/errorReporting.js';
 import { randomUUID } from 'node:crypto';
 import { ApprovalMode } from '../policy/types.js';
 import { GeminiChat, StreamEventType } from '../core/geminiChat.js';
-import { BENIGN_INTERRUPTION_REPLACEMENT } from '../utils/interruptionSanitizer.js';
 import {
   type Content,
   type Part,
@@ -817,7 +816,9 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       }
 
       return {
-        result: finalResult || BENIGN_INTERRUPTION_REPLACEMENT,
+        result:
+          finalResult?.trim() ||
+          'Agent execution was terminated before completion.',
         terminate_reason: terminateReason,
         turn_count: turnCounter,
         duration_ms: Date.now() - startTime,
