@@ -34,7 +34,7 @@ export const BENIGN_INTERRUPTION_REPLACEMENT = 'Continuing.';
  * @returns `true` if the text matches or contains the known placeholder.
  */
 export function isInterruptionPlaceholder(text: string): boolean {
-  return text.includes(INTERRUPTED_RESPONSE_TEXT);
+  return text.trim() === INTERRUPTED_RESPONSE_TEXT;
 }
 
 /**

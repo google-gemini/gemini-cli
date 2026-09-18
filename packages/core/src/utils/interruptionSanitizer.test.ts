@@ -24,12 +24,12 @@ describe('interruptionSanitizer', () => {
       expect(isInterruptionPlaceholder(INTERRUPTED_RESPONSE_TEXT)).toBe(true);
     });
 
-    it('should match when placeholder is embedded in surrounding text', () => {
+    it('should not match when placeholder is embedded in surrounding text', () => {
       expect(
         isInterruptionPlaceholder(
           `Some prefix ${INTERRUPTED_RESPONSE_TEXT} some suffix`,
         ),
-      ).toBe(true);
+      ).toBe(false);
     });
 
     it('should not match unrelated text', () => {
