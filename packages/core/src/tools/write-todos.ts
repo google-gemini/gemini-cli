@@ -18,7 +18,11 @@ import { WRITE_TODOS_TOOL_NAME } from './tool-names.js';
 import { WRITE_TODOS_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import type { TrackerService } from '../services/trackerService.js';
-import { TaskStatus, TaskType } from '../services/trackerTypes.js';
+import {
+  TaskStatus,
+  TaskType,
+  type TrackerTask,
+} from '../services/trackerTypes.js';
 import { buildTodosReturnDisplay } from './trackerTools.js';
 
 const TODO_STATUSES = [
@@ -90,34 +94,72 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
   }
 
   /**
-   * Persists todos via the TrackerService. Clears existing tasks and
-   * recreates them from the provided list so the on-disk state matches
-   * what the model declared.
+   * Persists todos via the TrackerService using a reconciliation strategy
+   * that preserves existing task IDs, types, parent-child relationships,
+   * and dependencies. Only status is updated for matched tasks; new tasks
+   * are created; tasks absent from the list are removed.
    */
   private async executeWithPersistence(todos: Todo[]): Promise<ToolResult> {
     const service = this.trackerService!;
+    const existingTasks = await service.listTasks();
 
-    // Clear existing tasks so the file-based tracker matches the
-    // model's declared list exactly.
-    await service.clearTasks();
-
-    if (todos.length === 0) {
+    if (todos.length === 0 && existingTasks.length === 0) {
       return {
-        llmContent:
-          'Successfully cleared the todo list. Tasks have been removed from persistent storage.',
+        llmContent: 'Todo list is already empty.',
         returnDisplay: { todos: [] },
       };
     }
 
-    // Create each todo as a persistent tracker task.
+    // Index existing tasks by trimmed title for reconciliation
+    const existingByTitle = new Map<string, TrackerTask>();
+    for (const task of existingTasks) {
+      existingByTitle.set(task.title.trim(), task);
+    }
+
+    const preservedIds = new Set<string>();
+
     for (const todo of todos) {
-      await service.createTask({
-        title: todo.description,
-        description: todo.description,
-        type: TaskType.TASK,
-        status: mapTodoStatusToTaskStatus(todo.status),
-        dependencies: [],
-      });
+      const title = todo.description.trim();
+      const existing = existingByTitle.get(title);
+      const targetStatus = mapTodoStatusToTaskStatus(todo.status);
+
+      if (existing) {
+        // Match found: update status only, preserving ID/type/deps/parent
+        preservedIds.add(existing.id);
+        if (existing.status !== targetStatus) {
+          try {
+            await service.updateTask(existing.id, { status: targetStatus });
+          } catch {
+            // Status transition may be blocked by dependency rules; skip
+          }
+        }
+      } else {
+        // New task: create it
+        const created = await service.createTask({
+          title,
+          description: title,
+          type: TaskType.TASK,
+          status: targetStatus,
+          dependencies: [],
+        });
+        preservedIds.add(created.id);
+      }
+    }
+
+    // Remove tasks that are no longer in the todo list, but only
+    // simple TASK-type entries without children (preserve epics/bugs
+    // and parent tasks created by the dedicated tracker tools).
+    for (const task of existingTasks) {
+      if (!preservedIds.has(task.id) && task.type === TaskType.TASK) {
+        const hasChildren = existingTasks.some((t) => t.parentId === task.id);
+        if (!hasChildren) {
+          try {
+            await service.deleteTask(task.id);
+          } catch {
+            // Deletion may fail due to child-task guard; skip
+          }
+        }
+      }
     }
 
     const todoListString = todos

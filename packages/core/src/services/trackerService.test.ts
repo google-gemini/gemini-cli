@@ -167,6 +167,68 @@ describe('TrackerService', () => {
     );
   });
 
+  it('should reject invalid task ID formats (path traversal guard)', async () => {
+    await expect(service.deleteTask('../../etc')).rejects.toThrow(
+      /Invalid task ID format/,
+    );
+    await expect(service.deleteTask('')).rejects.toThrow(
+      /Invalid task ID format/,
+    );
+    await expect(service.deleteTask('abc')).rejects.toThrow(
+      /Invalid task ID format/,
+    );
+    await expect(service.deleteTask('ZZZZZZ')).rejects.toThrow(
+      /Invalid task ID format/,
+    );
+  });
+
+  it('should block deletion of tasks with children at service layer', async () => {
+    const parent = await service.createTask({
+      title: 'Parent',
+      description: 'Has children',
+      type: TaskType.EPIC,
+      status: TaskStatus.OPEN,
+      dependencies: [],
+    });
+    await service.createTask({
+      title: 'Child',
+      description: 'Belongs to parent',
+      type: TaskType.TASK,
+      status: TaskStatus.OPEN,
+      dependencies: [],
+      parentId: parent.id,
+    });
+
+    await expect(service.deleteTask(parent.id)).rejects.toThrow(
+      /Cannot delete task.*child task/,
+    );
+  });
+
+  it('should update updatedAt when cascading dep removal', async () => {
+    const dep = await service.createTask({
+      title: 'Dep',
+      description: 'D',
+      type: TaskType.TASK,
+      status: TaskStatus.OPEN,
+      dependencies: [],
+    });
+    const main = await service.createTask({
+      title: 'Main',
+      description: 'M',
+      type: TaskType.TASK,
+      status: TaskStatus.OPEN,
+      dependencies: [dep.id],
+    });
+    const mainUpdatedBefore = main.updatedAt;
+
+    // Small delay to ensure timestamp differs
+    await new Promise((r) => setTimeout(r, 10));
+    await service.deleteTask(dep.id);
+
+    const mainAfter = await service.getTask(main.id);
+    expect(mainAfter?.updatedAt).not.toBe(mainUpdatedBefore);
+  });
+
   it('should remove deleted task from other tasks dependencies', async () => {
     const dep = await service.createTask({
       title: 'Dependency',

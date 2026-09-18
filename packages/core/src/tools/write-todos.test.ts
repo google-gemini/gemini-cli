@@ -175,8 +175,7 @@ describe('WriteTodosTool', () => {
       expect(byTitle.get('Blocked')).toBe('blocked');
     });
 
-    it('should clear persistent tasks when given an empty list', async () => {
-      // First create some tasks
+    it('should remove tasks absent from the new list via reconciliation', async () => {
       await tool.buildAndExecute(
         {
           todos: [{ description: 'Will be removed', status: 'pending' }],
@@ -185,33 +184,47 @@ describe('WriteTodosTool', () => {
       );
       expect((await trackerService.listTasks()).length).toBe(1);
 
-      // Now clear
-      const result = await tool.buildAndExecute({ todos: [] }, signal);
-      expect(result.llmContent).toContain('removed from persistent storage');
+      // Empty list should remove the task
+      await tool.buildAndExecute({ todos: [] }, signal);
       expect((await trackerService.listTasks()).length).toBe(0);
     });
 
-    it('should replace all existing tasks when called again', async () => {
+    it('should preserve task IDs when titles match (reconciliation)', async () => {
       await tool.buildAndExecute(
         {
           todos: [
-            { description: 'Old A', status: 'pending' },
-            { description: 'Old B', status: 'pending' },
+            { description: 'Stable task', status: 'pending' },
+            { description: 'Old task', status: 'pending' },
           ],
         },
         signal,
       );
-      expect((await trackerService.listTasks()).length).toBe(2);
+      const before = await trackerService.listTasks();
+      expect(before.length).toBe(2);
+      const stableId = before.find((t) => t.title === 'Stable task')!.id;
 
+      // Update: keep Stable, drop Old, add New
       await tool.buildAndExecute(
         {
-          todos: [{ description: 'New X', status: 'in_progress' }],
+          todos: [
+            { description: 'Stable task', status: 'in_progress' },
+            { description: 'New task', status: 'pending' },
+          ],
         },
         signal,
       );
-      const tasks = await trackerService.listTasks();
-      expect(tasks.length).toBe(1);
-      expect(tasks[0].title).toBe('New X');
+      const after = await trackerService.listTasks();
+      expect(after.length).toBe(2);
+
+      // Stable task should keep its ID
+      const stableAfter = after.find((t) => t.title === 'Stable task');
+      expect(stableAfter?.id).toBe(stableId);
+      expect(stableAfter?.status).toBe('in_progress');
+
+      // Old task should be gone
+      expect(after.find((t) => t.title === 'Old task')).toBeUndefined();
+      // New task should exist
+      expect(after.find((t) => t.title === 'New task')).toBeDefined();
     });
 
     it('should survive service restart by reading from disk', async () => {

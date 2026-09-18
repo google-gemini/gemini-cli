@@ -601,36 +601,35 @@ class TrackerDeleteTaskInvocation extends BaseToolInvocation<
     abortSignal: _signal,
   }: ExecuteOptions): Promise<ToolResult> {
     try {
-      const task = await this.service.getTask(this.params.id);
+      // Validate ID format at tool boundary to catch bad input early
+      const id = this.params.id?.trim();
+      if (!id || !/^[0-9a-f]{6}$/i.test(id)) {
+        return {
+          llmContent: `Invalid task ID format: "${this.params.id}". ID must be a 6-character hex string.`,
+          returnDisplay: 'Invalid task ID.',
+          error: {
+            message: `Invalid task ID format: ${this.params.id}`,
+            type: ToolErrorType.EXECUTION_FAILED,
+          },
+        };
+      }
+
+      const task = await this.service.getTask(id);
       if (!task) {
         return {
-          llmContent: `Task ${this.params.id} not found.`,
+          llmContent: `Task ${id} not found.`,
           returnDisplay: 'Task not found.',
           error: {
-            message: `Task ${this.params.id} not found.`,
+            message: `Task ${id} not found.`,
             type: ToolErrorType.EXECUTION_FAILED,
           },
         };
       }
 
-      // Block deletion if this task has child tasks
-      const allTasks = await this.service.listTasks();
-      const children = allTasks.filter((t) => t.parentId === this.params.id);
-      if (children.length > 0) {
-        const childIds = children.map((c) => c.id).join(', ');
-        return {
-          llmContent: `Cannot delete task ${this.params.id}: it has ${children.length} child task(s) (${childIds}). Delete or re-parent them first.`,
-          returnDisplay: 'Deletion blocked by child tasks.',
-          error: {
-            message: `Task has child tasks: ${childIds}`,
-            type: ToolErrorType.EXECUTION_FAILED,
-          },
-        };
-      }
-
-      await this.service.deleteTask(this.params.id);
+      // Service layer handles child-task guard and cascade cleanup
+      await this.service.deleteTask(id);
       return {
-        llmContent: `Deleted task ${this.params.id}: ${task.title}`,
+        llmContent: `Deleted task ${id}: ${task.title}`,
         returnDisplay: await buildTodosReturnDisplay(this.service),
       };
     } catch (error) {

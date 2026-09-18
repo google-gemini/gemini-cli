@@ -44,7 +44,13 @@ export class TrackerService {
    */
   async createTask(taskData: Omit<TrackerTask, 'id'>): Promise<TrackerTask> {
     await this.ensureInitialized();
-    const id = this.generateId();
+    let id = this.generateId();
+    // Prevent ID collisions by checking existing tasks
+    for (let i = 0; i < 10; i++) {
+      const existing = await this.getTask(id);
+      if (!existing) break;
+      id = this.generateId();
+    }
     const now = new Date().toISOString();
     const task: TrackerTask = {
       ...taskData,
@@ -183,25 +189,53 @@ export class TrackerService {
   }
 
   /**
-   * Deletes a task by ID. Removes it from any other task's dependency lists.
+   * Deletes a task by ID. Validates the ID format to prevent path traversal,
+   * blocks deletion when child tasks exist, clears parentId references on
+   * children if the guard is removed in future, removes the task from other
+   * tasks' dependency lists, and updates timestamps on affected tasks.
    */
   async deleteTask(id: string): Promise<void> {
+    // Path traversal guard: IDs must be exactly 6 hex chars
+    if (!id || !/^[0-9a-f]{6}$/i.test(id)) {
+      throw new Error(`Invalid task ID format: ${id}`);
+    }
     await this.ensureInitialized();
     const task = await this.getTask(id);
     if (!task) {
       throw new Error(`Task with ID ${id} not found.`);
     }
 
+    // Block deletion if this task has child tasks (referential integrity)
+    const allTasks = await this.listTasks();
+    const children = allTasks.filter((t) => t.parentId === id);
+    if (children.length > 0) {
+      const childIds = children.map((c) => c.id).join(', ');
+      throw new Error(
+        `Cannot delete task ${id}: it has ${children.length} child task(s) (${childIds}). Delete or re-parent them first.`,
+      );
+    }
+
     // Remove the task file
     const taskPath = path.join(this.tasksDir, `${id}.json`);
     await fs.unlink(taskPath);
 
-    // Remove this task from any other task's dependency lists
-    const allTasks = await this.listTasks();
-    for (const other of allTasks) {
+    // Clean up references in other tasks: dependencies and orphaned parentId
+    const now = new Date().toISOString();
+    const remaining = await this.listTasks();
+    for (const other of remaining) {
+      let needsSave = false;
+      const updated = { ...other };
       if (other.dependencies.includes(id)) {
-        const filteredDeps = other.dependencies.filter((d) => d !== id);
-        await this.saveTask({ ...other, dependencies: filteredDeps });
+        updated.dependencies = other.dependencies.filter((d) => d !== id);
+        needsSave = true;
+      }
+      if (other.parentId === id) {
+        delete updated.parentId;
+        needsSave = true;
+      }
+      if (needsSave) {
+        updated.updatedAt = now;
+        await this.saveTask(updated);
       }
     }
   }
