@@ -62,6 +62,10 @@ import {
   ensureStableToolIds,
 } from '../utils/sessionUtils.js';
 import { BINARY_INJECTION_KEY } from '../utils/generateContentResponseUtilities.js';
+import {
+  sanitizeInterruptedTurns,
+  BENIGN_INTERRUPTION_REPLACEMENT,
+} from '../utils/interruptionSanitizer.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
 import {
@@ -234,7 +238,10 @@ function extractCuratedHistory(
         i++;
       }
       if (isValid) {
-        curatedHistory.push(...modelOutput);
+        // Sanitize any interrupted-response placeholders before they reach
+        // the curated history. The raw placeholder causes model parroting
+        // (context poisoning) when replayed in subsequent API requests.
+        curatedHistory.push(...sanitizeInterruptedTurns(modelOutput));
       }
     }
   }
@@ -841,7 +848,9 @@ export class GeminiChat {
       id: randomUUID(),
       content: {
         role: 'model',
-        parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+        // Use a benign replacement instead of the raw placeholder to prevent
+        // session context poisoning. The model will not parrot this back.
+        parts: [{ text: BENIGN_INTERRUPTION_REPLACEMENT }],
       },
     });
   }

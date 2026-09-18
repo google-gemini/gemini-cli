@@ -8,6 +8,7 @@ import { type Part, type Content } from '@google/genai';
 import { debugLogger } from './debugLogger.js';
 import { type HistoryTurn } from '../core/agentChatHistory.js';
 import { deriveStableId } from './cryptoUtils.js';
+import { sanitizePart as sanitizeInterruptionPart } from './interruptionSanitizer.js';
 
 export const SYNTHETIC_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
 
@@ -388,7 +389,11 @@ export function scrubHistory(history: HistoryTurn[]): HistoryTurn[] {
     );
     if (nonThoughtParts.length === 0) continue; // Skip turns that became empty
 
-    const scrubbedParts = nonThoughtParts.map((p) => scrubPart(p));
+    // Scrub non-standard properties, then sanitize any residual interruption
+    // placeholders that may have leaked from aborted streams (issue #29264).
+    const scrubbedParts = nonThoughtParts
+      .map((p) => scrubPart(p))
+      .map((p) => sanitizeInterruptionPart(p));
 
     const lastIdx = result.length - 1;
     const last = result[lastIdx];
@@ -426,7 +431,9 @@ export function scrubContents(contents: Content[]): Content[] {
     );
     if (nonThoughtParts.length === 0) continue; // Skip turns that became empty after thought stripping
 
-    const scrubbedParts = nonThoughtParts.map((p) => scrubPart(p));
+    const scrubbedParts = nonThoughtParts
+      .map((p) => scrubPart(p))
+      .map((p) => sanitizeInterruptionPart(p));
 
     const lastIdx = result.length - 1;
     const last = result[lastIdx];

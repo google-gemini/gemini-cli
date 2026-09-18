@@ -13,6 +13,10 @@ import {
 } from './historyHardening.js';
 import type { HistoryTurn } from '../core/agentChatHistory.js';
 import { deriveStableId } from './cryptoUtils.js';
+import {
+  INTERRUPTED_RESPONSE_TEXT,
+  BENIGN_INTERRUPTION_REPLACEMENT,
+} from './interruptionSanitizer.js';
 import type { Part, Content } from '@google/genai';
 
 describe('hardenHistory', () => {
@@ -577,5 +581,86 @@ describe('scrubHistory', () => {
       { text: 'Hello' },
       { text: 'World' },
     ]);
+  });
+
+  it('should sanitize interruption placeholders in scrubHistory (Issue #29264)', () => {
+    const history: HistoryTurn[] = [
+      {
+        id: 'u1',
+        content: { role: 'user', parts: [{ text: 'do something' }] },
+      },
+      {
+        id: 'm1',
+        content: {
+          role: 'model',
+          parts: [{ text: INTERRUPTED_RESPONSE_TEXT }],
+        },
+      },
+      {
+        id: 'u2',
+        content: { role: 'user', parts: [{ text: 'follow up' }] },
+      },
+    ];
+
+    const scrubbed = scrubHistory(history);
+    const modelTurn = scrubbed.find((t) => t.content.role === 'model');
+    expect(modelTurn).toBeDefined();
+    expect(modelTurn!.content.parts![0].text).toBe(
+      BENIGN_INTERRUPTION_REPLACEMENT,
+    );
+    expect(modelTurn!.content.parts![0].text).not.toBe(
+      INTERRUPTED_RESPONSE_TEXT,
+    );
+  });
+
+  it('should sanitize interruption placeholders in scrubContents (Issue #29264)', () => {
+    const contents = [
+      { role: 'user' as const, parts: [{ text: 'prompt' }] },
+      {
+        role: 'model' as const,
+        parts: [{ text: INTERRUPTED_RESPONSE_TEXT }],
+      },
+      { role: 'user' as const, parts: [{ text: 'next' }] },
+      { role: 'model' as const, parts: [{ text: 'Normal answer' }] },
+    ];
+
+    const scrubbed = scrubContents(contents);
+    const modelTurns = scrubbed.filter((c) => c.role === 'model');
+    expect(modelTurns[0].parts![0].text).toBe(BENIGN_INTERRUPTION_REPLACEMENT);
+    expect(modelTurns[1].parts![0].text).toBe('Normal answer');
+  });
+
+  it('should sanitize placeholder even when embedded among other parts in scrubHistory', () => {
+    const history: HistoryTurn[] = [
+      {
+        id: 'u1',
+        content: { role: 'user', parts: [{ text: 'go' }] },
+      },
+      {
+        id: 'm1',
+        content: {
+          role: 'model',
+          parts: [
+            { text: 'Thinking...', thought: true },
+            { text: INTERRUPTED_RESPONSE_TEXT },
+          ],
+        },
+      },
+    ];
+
+    const scrubbed = scrubHistory(history);
+    // Thought parts get stripped by scrub, only the sanitized part remains
+    const modelTurn = scrubbed.find((t) => t.content.role === 'model');
+    expect(modelTurn).toBeDefined();
+    // The remaining text part should be the benign replacement
+    const textParts = modelTurn!.content.parts!.filter(
+      (p) => typeof p.text === 'string',
+    );
+    expect(textParts.some((p) => p.text === INTERRUPTED_RESPONSE_TEXT)).toBe(
+      false,
+    );
+    expect(
+      textParts.some((p) => p.text === BENIGN_INTERRUPTION_REPLACEMENT),
+    ).toBe(true);
   });
 });

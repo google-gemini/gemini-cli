@@ -23,6 +23,7 @@ import {
   calculateRequestTokenCount,
   estimateTokenCountSync,
 } from '../utils/tokenCalculation.js';
+import { sanitizeContentHistory } from '../utils/interruptionSanitizer.js';
 import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
@@ -246,7 +247,11 @@ export class ChatCompressionService {
     hasFailedCompressionAttempt: boolean,
     abortSignal?: AbortSignal,
   ): Promise<{ newHistory: Content[] | null; info: ChatCompressionInfo }> {
-    const curatedHistory = chat.getHistory(true);
+    // Sanitize any residual interruption placeholders from curated history
+    // before they are included in the compression summary. These placeholders
+    // can mislead the summarizer and propagate context poisoning into the
+    // compressed snapshot.
+    const curatedHistory = sanitizeContentHistory(chat.getHistory(true));
 
     // Regardless of `force`, don't do anything if the history is empty.
     if (curatedHistory.length === 0) {

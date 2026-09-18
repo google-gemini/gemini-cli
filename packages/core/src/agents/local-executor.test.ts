@@ -106,6 +106,7 @@ import {
   type OutputConfig,
   SubagentActivityErrorType,
 } from './types.js';
+import { BENIGN_INTERRUPTION_REPLACEMENT } from '../utils/interruptionSanitizer.js';
 import { ApprovalMode } from '../policy/types.js';
 import {
   ToolConfirmationOutcome,
@@ -4227,6 +4228,30 @@ describe('LocalAgentExecutor', () => {
         expect(memoryPart?.text).not.toContain('<extension_context>');
         expect(memoryPart?.text).not.toContain('Extension memory rule');
       });
+    });
+  });
+
+  describe('session context poisoning prevention (Issue #29264)', () => {
+    it('should use BENIGN_INTERRUPTION_REPLACEMENT as the fallback termination result', () => {
+      // Verify the constant is the short benign string, not the poisoning placeholder
+      expect(BENIGN_INTERRUPTION_REPLACEMENT).toBe('Continuing.');
+      expect(BENIGN_INTERRUPTION_REPLACEMENT).not.toContain('interrupted');
+      expect(BENIGN_INTERRUPTION_REPLACEMENT).not.toContain('[');
+    });
+
+    it('should not include raw interruption placeholder in default abort result messages', async () => {
+      // Read the source code to verify no raw placeholder is used in fallback results
+      const fs = await import('node:fs');
+      const source = fs.readFileSync('src/agents/local-executor.ts', 'utf-8');
+      // The old string 'Agent execution was terminated before completion.' has been
+      // replaced with BENIGN_INTERRUPTION_REPLACEMENT to prevent context poisoning
+      // when the executor result is injected back into the parent agent's history
+      expect(source).not.toContain(
+        "finalResult || 'Agent execution was terminated before completion.'",
+      );
+      expect(source).toContain(
+        'finalResult || BENIGN_INTERRUPTION_REPLACEMENT',
+      );
     });
   });
 });
