@@ -143,14 +143,20 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
         }
       } else {
         // New task: create it
-        const created = await service.createTask({
-          title,
-          description: title,
-          type: TaskType.TASK,
-          status: targetStatus,
-          dependencies: [],
-        });
-        preservedIds.add(created.id);
+        try {
+          const created = await service.createTask({
+            title,
+            description: title,
+            type: TaskType.TASK,
+            status: targetStatus,
+            dependencies: [],
+          });
+          preservedIds.add(created.id);
+        } catch (e) {
+          warnings.push(
+            `Could not create task "${title}": ${e instanceof Error ? e.message : String(e)}`,
+          );
+        }
       }
     }
 

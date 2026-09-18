@@ -207,7 +207,7 @@ export class TrackerService {
    */
   async deleteTask(id: string): Promise<void> {
     // Path traversal guard: IDs must be exactly 6 hex chars
-    if (!id || !/^[0-9a-f]{6}$/i.test(id)) {
+    if (typeof id !== 'string' || !/^[0-9a-f]{6}$/i.test(id)) {
       throw new Error(`Invalid task ID format: ${id}`);
     }
     // Normalize to lowercase for case-sensitive filesystems
