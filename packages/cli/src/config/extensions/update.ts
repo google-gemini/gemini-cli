@@ -20,6 +20,7 @@ import {
 import * as fs from 'node:fs';
 import { copyExtension, type ExtensionManager } from '../extension-manager.js';
 import { ExtensionStorage } from './storage.js';
+import { removeDirectoryWithRetry } from '../../utils/retry.js';
 
 export interface ExtensionUpdateInfo {
   name: string;
@@ -145,7 +146,7 @@ export async function updateExtension(
     await copyExtension(tempDir, extension.path);
     throw e;
   } finally {
-    await fs.promises.rm(tempDir, { recursive: true, force: true });
+    await removeDirectoryWithRetry(tempDir);
   }
 }
 
