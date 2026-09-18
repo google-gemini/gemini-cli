@@ -1225,6 +1225,23 @@ describe('E2E Tests', () => {
     });
   });
 
+  describe('body parsing order', () => {
+    it('parses JSON body for A2A route before setupRoutes handlers', async () => {
+      // Regression for express.json() after setupRoutes (req.body undefined)
+      // This hits the A2A JSON-RPC handler mounted by A2AExpressApp.setupRoutes.
+      sendMessageStreamSpy.mockImplementation(async function* () {
+        yield* [{ type: 'content', value: 'ok' }];
+      });
+      const agent = request.agent(app);
+      const res = await agent
+        .post('/')
+        .send(createStreamMessageRequest('hello-body', 'body-parse-test'))
+        .set('Content-Type', 'application/json')
+        .expect(200);
+      expect(res.text).toContain('task');
+    });
+  });
+
   describe('main', () => {
     it('should listen on localhost only', async () => {
       const listenSpy = vi
