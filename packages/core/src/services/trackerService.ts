@@ -117,7 +117,8 @@ export class TrackerService {
    */
   async getTask(id: string): Promise<TrackerTask | null> {
     await this.ensureInitialized();
-    const taskPath = path.join(this.tasksDir, `${id}.json`);
+    const normalizedId = id.toLowerCase();
+    const taskPath = path.join(this.tasksDir, `${normalizedId}.json`);
     return this.readJsonFile(taskPath, TrackerTaskSchema);
   }
 
@@ -206,19 +207,21 @@ export class TrackerService {
     if (!id || !/^[0-9a-f]{6}$/i.test(id)) {
       throw new Error(`Invalid task ID format: ${id}`);
     }
+    // Normalize to lowercase for case-sensitive filesystems
+    const normalizedId = id.toLowerCase();
     await this.ensureInitialized();
-    const task = await this.getTask(id);
+    const task = await this.getTask(normalizedId);
     if (!task) {
-      throw new Error(`Task with ID ${id} not found.`);
+      throw new Error(`Task with ID ${normalizedId} not found.`);
     }
 
     // Block deletion if this task has child tasks (referential integrity)
     const allTasks = await this.listTasks();
-    const children = allTasks.filter((t) => t.parentId === id);
+    const children = allTasks.filter((t) => t.parentId === normalizedId);
     if (children.length > 0) {
       const childIds = children.map((c) => c.id).join(', ');
       throw new Error(
-        `Cannot delete task ${id}: it has ${children.length} child task(s) (${childIds}). Delete or re-parent them first.`,
+        `Cannot delete task ${normalizedId}: it has ${children.length} child task(s) (${childIds}). Delete or re-parent them first.`,
       );
     }
 
@@ -228,14 +231,16 @@ export class TrackerService {
     const now = new Date().toISOString();
     const remaining = await this.listTasks();
     for (const other of remaining) {
-      if (other.id === id) continue;
+      if (other.id === normalizedId) continue;
       let needsSave = false;
       const updated = { ...other };
-      if (other.dependencies.includes(id)) {
-        updated.dependencies = other.dependencies.filter((d) => d !== id);
+      if (other.dependencies.includes(normalizedId)) {
+        updated.dependencies = other.dependencies.filter(
+          (d) => d !== normalizedId,
+        );
         needsSave = true;
       }
-      if (other.parentId === id) {
+      if (other.parentId === normalizedId) {
         delete updated.parentId;
         needsSave = true;
       }
@@ -246,7 +251,7 @@ export class TrackerService {
     }
 
     // Remove the task file last
-    const taskPath = path.join(this.tasksDir, `${id}.json`);
+    const taskPath = path.join(this.tasksDir, `${normalizedId}.json`);
     await fs.unlink(taskPath);
   }
 

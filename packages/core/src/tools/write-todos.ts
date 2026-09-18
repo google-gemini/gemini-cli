@@ -158,14 +158,29 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
     // deletion (deepest children first) so the service-layer child guard
     // doesn't block parent deletion. Skip any task whose subtree still
     // contains a preserved task (to avoid orphaning active work).
+    //
+    // Pre-index by id and parentId for O(1) lookups instead of O(N) scans.
+    const tasksById = new Map<string, TrackerTask>(
+      existingTasks.map((t) => [t.id, t]),
+    );
+    const childrenByParent = new Map<string, TrackerTask[]>();
+    for (const t of existingTasks) {
+      if (t.parentId) {
+        if (!childrenByParent.has(t.parentId)) {
+          childrenByParent.set(t.parentId, []);
+        }
+        childrenByParent.get(t.parentId)!.push(t);
+      }
+    }
+
     const getDepth = (task: TrackerTask): number => {
       let depth = 0;
       let current = task;
       const visited = new Set<string>();
       while (current.parentId) {
-        if (visited.has(current.id)) break; // cycle guard
+        if (visited.has(current.id)) break;
         visited.add(current.id);
-        const parent = existingTasks.find((t) => t.id === current.parentId);
+        const parent = tasksById.get(current.parentId);
         if (!parent) break;
         depth++;
         current = parent;
@@ -177,12 +192,14 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
       id: string,
       visited = new Set<string>(),
     ): boolean => {
-      if (visited.has(id)) return false; // cycle guard
+      if (visited.has(id)) return false;
       visited.add(id);
-      const children = existingTasks.filter((t) => t.parentId === id);
-      return children.some(
+      const children = childrenByParent.get(id) ?? [];
+      const result = children.some(
         (c) => preservedIds.has(c.id) || hasPreservedDescendants(c.id, visited),
       );
+      visited.delete(id); // backtrack for sibling subtrees
+      return result;
     };
 
     const tasksToDelete = existingTasks
