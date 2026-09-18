@@ -47,7 +47,7 @@ describe('PersistentState', () => {
     expect(value).toBeUndefined();
   });
 
-  it('should save state to file', () => {
+  it('should save state through a temporary file and publish it atomically', () => {
     vi.mocked(fs.existsSync).mockReturnValue(false);
     persistentState.set('defaultBannerShownCount', { banner1: 1 });
 
@@ -55,8 +55,32 @@ describe('PersistentState', () => {
       recursive: true,
     });
     expect(fs.writeFileSync).toHaveBeenCalledWith(
-      mockFilePath,
+      expect.stringMatching(/state\.json\..+\.tmp$/),
       JSON.stringify({ defaultBannerShownCount: { banner1: 1 } }, null, 2),
+      { encoding: 'utf-8', flag: 'wx' },
+    );
+    expect(fs.openSync).toHaveBeenCalledWith(
+      expect.stringMatching(/state\.json\..+\.tmp$/),
+      'r+',
+    );
+    expect(fs.fsyncSync).toHaveBeenCalled();
+    expect(fs.closeSync).toHaveBeenCalled();
+    expect(fs.renameSync).toHaveBeenCalledWith(
+      expect.stringMatching(/state\.json\..+\.tmp$/),
+      mockFilePath,
+    );
+  });
+
+  it('should keep the previous state in a backup before replacing it', () => {
+    vi.mocked(fs.existsSync).mockImplementation(
+      (filePath) => filePath === mockDir || filePath === mockFilePath,
+    );
+
+    persistentState.set('defaultBannerShownCount', { banner1: 1 });
+
+    expect(fs.copyFileSync).toHaveBeenCalledWith(
+      mockFilePath,
+      `${mockFilePath}.bak`,
     );
   });
 
@@ -69,6 +93,26 @@ describe('PersistentState', () => {
     const value = persistentState.get('defaultBannerShownCount');
     expect(value).toBeUndefined();
     expect(debugLogger.warn).toHaveBeenCalled();
+  });
+
+  it('should preserve corrupt state and restore the backup', () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockImplementation((filePath) =>
+      filePath === mockFilePath ? '{"broken":' : '{"tipsShown": 2}',
+    );
+
+    const value = persistentState.get('defaultBannerShownCount');
+
+    expect(value).toBeUndefined();
+    expect(persistentState.get('tipsShown')).toBe(2);
+    expect(fs.renameSync).toHaveBeenCalledWith(
+      mockFilePath,
+      `${mockFilePath}.corrupt`,
+    );
+    expect(debugLogger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('corrupt'),
+      expect.any(Error),
+    );
   });
 
   it('should handle save errors', () => {
