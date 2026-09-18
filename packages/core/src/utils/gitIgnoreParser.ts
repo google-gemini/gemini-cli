@@ -7,6 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import ignorePkg, { type Ignore } from 'ignore';
+import { hasContentSlash } from './ignorePatternUtils.js';
 // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
 const ignore = ((ignorePkg as unknown as { default?: () => Ignore }).default ??
   ignorePkg) as () => Ignore;
@@ -88,11 +89,16 @@ export class GitIgnoreParser implements GitIgnoreFilter {
           // Only in nested .gitignore files, the patterns need to be modified according to:
           // - If `a/b/.gitignore` defines `/c` then it needs to be changed to `/a/b/c`
           // - If `a/b/.gitignore` defines `c` then it needs to be changed to `/a/b/**/c`
+          // - If `a/b/.gitignore` defines `c/` then it needs to be changed to `/a/b/**/c/`
+          //   (trailing slash restricts to directories, does NOT anchor the pattern)
           // - If `a/b/.gitignore` defines `c/d` then it needs to be changed to `/a/b/c/d`
 
-          if (!isAnchoredInFile && !p.includes('/')) {
-            // If no slash and not anchored in file, it matches files in any
-            // subdirectory.
+          if (!isAnchoredInFile && !hasContentSlash(p)) {
+            // If no content slash (i.e. no slash that anchors the pattern to a
+            // specific subdirectory) and not anchored in file, it matches at any
+            // depth.  A trailing slash only restricts the match to directories
+            // (gitignore(5): "a trailing '/' matches only directories") and must
+            // not prevent the '**/' prefix.
             newPattern = path.posix.join('**', p);
           }
 

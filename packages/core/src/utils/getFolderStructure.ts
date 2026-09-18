@@ -138,15 +138,19 @@ async function readFullStructure(
 
     // Process files first in the current directory
     for (const entry of entries) {
-      if (entry.isFile()) {
+      if (entry.isFile() || (entry.isSymbolicLink() && !entry.isDirectory())) {
         if (currentItemCount >= options.maxItems) {
           folderInfo.hasMoreFiles = true;
           break;
         }
         const fileName = entry.name;
         const filePath = path.join(currentPath, fileName);
+        const entryFilterOptions: FilterFilesOptions = {
+          ...filterFileOptions,
+          isSymbolicLink: entry.isSymbolicLink(),
+        };
         if (
-          options.fileService?.shouldIgnoreFile(filePath, filterFileOptions)
+          options.fileService?.shouldIgnoreFile(filePath, entryFilterOptions)
         ) {
           continue;
         }
@@ -179,10 +183,14 @@ async function readFullStructure(
         const subFolderName = entry.name;
         const subFolderPath = path.join(currentPath, subFolderName);
 
+        const dirFilterOptions: FilterFilesOptions = {
+          ...filterFileOptions,
+          isSymbolicLink: entry.isSymbolicLink(),
+        };
         const isIgnored =
           options.fileService?.shouldIgnoreDirectory(
             subFolderPath,
-            filterFileOptions,
+            dirFilterOptions,
           ) ?? false;
 
         if (options.ignoredFolders.has(subFolderName) || isIgnored) {
