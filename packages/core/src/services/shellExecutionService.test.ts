@@ -35,6 +35,9 @@ const mockPlatform = vi.hoisted(() => vi.fn());
 const mockHomedir = vi.hoisted(() => vi.fn());
 const mockMkdirSync = vi.hoisted(() => vi.fn());
 const mockCreateWriteStream = vi.hoisted(() => vi.fn());
+const mockStatSync = vi.hoisted(() => vi.fn());
+const mockFstatSync = vi.hoisted(() => vi.fn());
+const mockCloseSync = vi.hoisted(() => vi.fn());
 const mockGetPty = vi.hoisted(() => vi.fn());
 const mockSerializeTerminalToObject = vi.hoisted(() => vi.fn());
 const mockResolveExecutable = vi.hoisted(() => vi.fn());
@@ -65,9 +68,15 @@ vi.mock('node:fs', async (importOriginal) => {
       ...actual,
       mkdirSync: mockMkdirSync,
       createWriteStream: mockCreateWriteStream,
+      statSync: mockStatSync,
+      fstatSync: mockFstatSync,
+      closeSync: mockCloseSync,
     },
     mkdirSync: mockMkdirSync,
     createWriteStream: mockCreateWriteStream,
+    statSync: mockStatSync,
+    fstatSync: mockFstatSync,
+    closeSync: mockCloseSync,
   };
 });
 vi.mock('../utils/shell-utils.js', async (importOriginal) => {
@@ -1332,6 +1341,284 @@ describe('ShellExecutionService', () => {
       const result = await handle.result;
       expect(result.executionMethod).toBe('child_process');
       expect(mockCpSpawn).toHaveBeenCalled();
+    });
+
+    it('should fully roll back state when catch block fires after activePtys insertion', async () => {
+      mockPlatform.mockReturnValue('win32');
+      const destroySpy = vi.fn();
+      let pidReadCount = 0;
+      const tricksyPty = {
+        onData: vi.fn(() => {
+          throw new Error('Post-insertion failure during wiring');
+        }),
+        onExit: vi.fn(),
+        write: vi.fn(),
+        kill: vi.fn(),
+        resize: vi.fn(),
+        destroy: destroySpy,
+        fd: 42,
+        ptsName: '/dev/pts/tricksy',
+        get pid(): number {
+          pidReadCount += 1;
+          return 77777;
+        },
+      };
+      mockPtySpawn.mockReturnValueOnce(tricksyPty);
+
+      const handle = await ShellExecutionService.execute(
+        'fail-after-insertion',
+        '/test/dir',
+        onOutputEventMock,
+        new AbortController().signal,
+        true,
+        shellExecutionConfig,
+      );
+
+      const result = await handle.result;
+      expect(result.exitCode).toBe(1);
+      expect(result.error).toBeTruthy();
+      expect(destroySpy).toHaveBeenCalled();
+      expect(ShellExecutionService['activePtys'].has(77777)).toBe(false);
+      expect(pidReadCount).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Orphan PTY slave FD cleanup', () => {
+    const closeOrphanSlaveFd = (
+      masterFd: number | undefined,
+      ptsName: string | undefined,
+    ): number | undefined =>
+      (
+        ShellExecutionService as unknown as {
+          closeOrphanSlaveFd: (
+            fd: number | undefined,
+            name: string | undefined,
+          ) => number | undefined;
+        }
+      ).closeOrphanSlaveFd(masterFd, ptsName);
+
+    it('synchronously closes the matching slave fd when platform is darwin', () => {
+      mockPlatform.mockReturnValue('darwin');
+      mockCloseSync.mockClear();
+      const targetRdev = 0xdead;
+      mockStatSync.mockReturnValue({
+        rdev: targetRdev,
+        isCharacterDevice: () => true,
+      });
+      mockFstatSync.mockImplementation((fd: number) => {
+        if (fd === 12) {
+          return { rdev: targetRdev, isCharacterDevice: () => true };
+        }
+        return { rdev: 0x1234, isCharacterDevice: () => true };
+      });
+
+      const result = closeOrphanSlaveFd(10, '/dev/ttys001');
+      expect(result).toBe(12);
+      expect(mockCloseSync).toHaveBeenCalledTimes(1);
+      expect(mockCloseSync).toHaveBeenCalledWith(12);
+    });
+
+    it('returns undefined on non-darwin platforms without probing fds', () => {
+      mockPlatform.mockReturnValue('linux');
+      mockStatSync.mockClear();
+      mockFstatSync.mockClear();
+      mockCloseSync.mockClear();
+
+      const result = closeOrphanSlaveFd(10, '/dev/pts/0');
+      expect(result).toBeUndefined();
+      expect(mockStatSync).not.toHaveBeenCalled();
+      expect(mockFstatSync).not.toHaveBeenCalled();
+      expect(mockCloseSync).not.toHaveBeenCalled();
+    });
+
+    it('returns undefined when no candidate fd matches', () => {
+      mockPlatform.mockReturnValue('darwin');
+      mockCloseSync.mockClear();
+      mockStatSync.mockReturnValue({
+        rdev: 0xbeef,
+        isCharacterDevice: () => true,
+      });
+      mockFstatSync.mockReturnValue({
+        rdev: 0x1234,
+        isCharacterDevice: () => true,
+      });
+
+      const result = closeOrphanSlaveFd(10, '/dev/ttys002');
+      expect(result).toBeUndefined();
+      expect(mockCloseSync).not.toHaveBeenCalled();
+    });
+
+    it('destroyPtyProcess destroys the PTY process without closing arbitrary fds', () => {
+      mockCloseSync.mockClear();
+      const destroy = vi.fn();
+      const fakePty = {
+        destroy,
+        kill: vi.fn(),
+      };
+
+      (
+        ShellExecutionService as unknown as {
+          destroyPtyProcess: (p: unknown) => void;
+        }
+      ).destroyPtyProcess(fakePty);
+      expect(destroy).toHaveBeenCalled();
+      expect(mockCloseSync).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Background promotion guard', () => {
+    let mockWriteStream: { write: Mock; end: Mock; on: Mock };
+
+    beforeEach(() => {
+      mockWriteStream = {
+        write: vi.fn(),
+        end: vi.fn().mockImplementation((cb) => cb?.()),
+        on: vi.fn(),
+      };
+      mockMkdirSync.mockReturnValue(undefined);
+      mockCreateWriteStream.mockReturnValue(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        mockWriteStream as any,
+      );
+      mockHomedir.mockReturnValue('/mock/home');
+    });
+
+    it('opens only one log stream when background() is invoked twice for the same pid', async () => {
+      const abortController = new AbortController();
+      const handle = await ShellExecutionService.execute(
+        'double-background',
+        '/',
+        onOutputEventMock,
+        abortController.signal,
+        true,
+        shellExecutionConfig,
+      );
+
+      ShellExecutionService.background(
+        handle.pid!,
+        'default',
+        'double-background',
+      );
+      ShellExecutionService.background(
+        handle.pid!,
+        'default',
+        'double-background',
+      );
+
+      expect(mockCreateWriteStream).toHaveBeenCalledTimes(1);
+
+      await ShellExecutionService.kill(handle.pid!);
+    });
+  });
+
+  describe('Abort listener hygiene', () => {
+    it('does not accumulate abort listeners across repeated PTY executions', async () => {
+      const ADDED_LISTENER_TOLERANCE = 1;
+      const listeners = new Set<() => void>();
+      const abortController = new AbortController();
+      const originalAdd = abortController.signal.addEventListener.bind(
+        abortController.signal,
+      );
+      const originalRemove = abortController.signal.removeEventListener.bind(
+        abortController.signal,
+      );
+      abortController.signal.addEventListener = ((
+        type: string,
+        listener: EventListenerOrEventListenerObject,
+        options?: AddEventListenerOptions | boolean,
+      ) => {
+        if (type === 'abort' && typeof listener === 'function') {
+          listeners.add(listener as () => void);
+        }
+        return originalAdd(type, listener, options);
+      }) as typeof abortController.signal.addEventListener;
+      abortController.signal.removeEventListener = ((
+        type: string,
+        listener: EventListenerOrEventListenerObject,
+        options?: EventListenerOptions | boolean,
+      ) => {
+        if (type === 'abort' && typeof listener === 'function') {
+          listeners.delete(listener as () => void);
+        }
+        return originalRemove(type, listener, options);
+      }) as typeof abortController.signal.removeEventListener;
+
+      const executions = 5;
+      for (let i = 0; i < executions; i++) {
+        mockPtyProcess = new EventEmitter() as typeof mockPtyProcess;
+        mockPtyProcess.pid = 10000 + i;
+        mockPtyProcess.kill = vi.fn();
+        mockPtyProcess.onData = vi.fn().mockReturnValue({ dispose: vi.fn() });
+        mockPtyProcess.onExit = vi.fn().mockReturnValue({ dispose: vi.fn() });
+        mockPtyProcess.write = vi.fn();
+        mockPtyProcess.resize = vi.fn();
+        mockPtyProcess.destroy = vi.fn();
+        mockPtySpawn.mockReturnValueOnce(mockPtyProcess);
+
+        const handle = await ShellExecutionService.execute(
+          'repeat-command',
+          '/test/dir',
+          onOutputEventMock,
+          abortController.signal,
+          true,
+          shellExecutionConfig,
+        );
+        mockPtyProcess.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+        await handle.result;
+      }
+
+      expect(listeners.size).toBeLessThanOrEqual(ADDED_LISTENER_TOLERANCE);
+    });
+  });
+
+  describe('resetForTest teardown', () => {
+    it('tears down active PTYs, child processes, and background log streams', async () => {
+      const destroySpy = vi.fn();
+      const killSpy = vi.fn();
+      const endSpy = vi.fn();
+      const headlessDisposeSpy = vi.fn();
+
+      (
+        ShellExecutionService as unknown as {
+          activePtys: Map<number, unknown>;
+        }
+      ).activePtys.set(11111, {
+        ptyProcess: { destroy: destroySpy, kill: vi.fn() },
+        headlessTerminal: { dispose: headlessDisposeSpy },
+        command: 'cmd-11111',
+      });
+
+      (
+        ShellExecutionService as unknown as {
+          activeChildProcesses: Map<number, unknown>;
+        }
+      ).activeChildProcesses.set(22222, {
+        process: { kill: killSpy },
+        state: { output: '' },
+        command: 'cmd-22222',
+      });
+
+      (
+        ShellExecutionService as unknown as {
+          backgroundLogStreams: Map<number, unknown>;
+        }
+      ).backgroundLogStreams.set(33333, { end: endSpy });
+      (
+        ShellExecutionService as unknown as {
+          backgroundLogPids: Set<number>;
+        }
+      ).backgroundLogPids.add(33333);
+
+      ShellExecutionService.resetForTest();
+
+      expect(destroySpy).toHaveBeenCalled();
+      expect(headlessDisposeSpy).toHaveBeenCalled();
+      expect(killSpy).toHaveBeenCalled();
+      expect(endSpy).toHaveBeenCalled();
+      expect(ShellExecutionService['activePtys'].size).toBe(0);
+      expect(ShellExecutionService['activeChildProcesses'].size).toBe(0);
+      expect(ShellExecutionService['backgroundLogStreams'].size).toBe(0);
+      expect(ShellExecutionService['backgroundLogPids'].size).toBe(0);
     });
   });
 });
