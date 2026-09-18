@@ -84,6 +84,38 @@ describe('createCustomTheme', () => {
     // Interpolate between #000000 and #cccccc -> #525252
     expect(theme.colors.DarkGray).toBe('#525252');
   });
+
+  it('should apply ui.active and ui.focus custom overrides', () => {
+    const customTheme: CustomTheme = {
+      type: 'custom',
+      name: 'Test',
+      ui: {
+        active: '#FF0000',
+        focus: '#00FF00',
+      },
+      background: {
+        primary: '#000000',
+      },
+    };
+    const theme = createCustomTheme(customTheme);
+    expect(theme.semanticColors.ui.active).toBe('#FF0000');
+    expect(theme.semanticColors.ui.focus).toBe('#00FF00');
+  });
+
+  it('should apply border.focused custom override', () => {
+    const customTheme: CustomTheme = {
+      type: 'custom',
+      name: 'Test',
+      border: {
+        focused: '#FF00FF',
+      },
+      background: {
+        primary: '#000000',
+      },
+    };
+    const theme = createCustomTheme(customTheme);
+    expect(theme.semanticColors.border.focused).toBe('#FF00FF');
+  });
 });
 
 describe('validateCustomTheme', () => {

@@ -105,6 +105,8 @@ nested configuration objects. For example:
 - **`ui`**: Other UI elements.
   - `comment`: Color for code comments.
   - `symbol`: Color for code symbols and operators.
+  - `active`: Color for the active/selected UI element.
+  - `focus`: Color for focused UI elements.
   - `gradient`: An array of colors used for gradient effects.
 
 **Required properties:**
@@ -177,6 +179,8 @@ custom theme defined in `settings.json`.
   "ui": {
     "comment": "#928374",
     "symbol": "#8ec07c",
+    "active": "#458588",
+    "focus": "#b8bb26",
     "gradient": ["#cc241d", "#d65d0e", "#d79921"]
   }
 }
