@@ -222,14 +222,13 @@ export class TrackerService {
       );
     }
 
-    // Remove the task file
-    const taskPath = path.join(this.tasksDir, `${id}.json`);
-    await fs.unlink(taskPath);
-
-    // Clean up references in other tasks: dependencies and orphaned parentId
+    // Clean up references BEFORE deleting the task file, so a crash
+    // mid-operation leaves the DB in a consistent state (orphaned refs
+    // would break validateCanClose and validateNoCircularDependencies).
     const now = new Date().toISOString();
     const remaining = await this.listTasks();
     for (const other of remaining) {
+      if (other.id === id) continue;
       let needsSave = false;
       const updated = { ...other };
       if (other.dependencies.includes(id)) {
@@ -245,6 +244,10 @@ export class TrackerService {
         await this.saveTask(updated);
       }
     }
+
+    // Remove the task file last
+    const taskPath = path.join(this.tasksDir, `${id}.json`);
+    await fs.unlink(taskPath);
   }
 
   /**

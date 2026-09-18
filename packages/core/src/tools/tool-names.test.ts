@@ -117,12 +117,6 @@ describe('tool-names', () => {
       const aliases = getToolAliases('unknown_tool');
       expect(aliases).toEqual(['unknown_tool']);
     });
-
-    it('should include write_todos as a legacy alias', () => {
-      const aliases = getToolAliases('write_todos');
-      expect(aliases).toContain('write_todos');
-      expect(aliases).toContain('tracker_list_tasks');
-    });
   });
 
   describe('ALL_BUILTIN_TOOL_NAMES', () => {

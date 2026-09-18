@@ -210,7 +210,6 @@ export const READ_MANY_FILES_DISPLAY_NAME = 'ReadManyFiles';
 export const TOOL_LEGACY_ALIASES: Record<string, string> = {
   // Add future renames here, e.g.:
   search_file_content: GREP_TOOL_NAME,
-  write_todos: TRACKER_LIST_TASKS_TOOL_NAME,
 };
 
 /**
