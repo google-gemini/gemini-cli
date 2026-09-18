@@ -128,8 +128,26 @@ vi.mock('../utils/terminalSerializer.js', () => ({
   // Avoid passing the heavy Terminal object to the spy to prevent OOM
   serializeTerminalToObject: (
     _terminal: unknown,
-    ...args: [number | undefined, number | undefined]
-  ) => mockSerializeTerminalToObject(...args),
+    startLine?: number,
+    endLine?: number,
+    includeColor = true,
+  ) => {
+    const result = mockSerializeTerminalToObject(
+      startLine,
+      endLine,
+      includeColor,
+    ) as AnsiOutput | undefined;
+    if (!includeColor && Array.isArray(result)) {
+      return result.map((line) =>
+        line.map((token) => ({
+          ...token,
+          fg: '',
+          bg: '',
+        })),
+      );
+    }
+    return result;
+  },
   convertColorToHex: () => '#000000',
   ColorMode: { DEFAULT: 0, PALETTE: 1, RGB: 2 },
 }));
@@ -1301,6 +1319,47 @@ describe('ShellExecutionService', () => {
 
       expect(dataDisposeSpy).toHaveBeenCalled();
       expect(exitDisposeSpy).toHaveBeenCalled();
+    });
+
+    it('should remove onAbortDuringDrain listener from abortSignal on normal exit', async () => {
+      const abortController = new AbortController();
+      const removeEventListenerSpy = vi.spyOn(
+        abortController.signal,
+        'removeEventListener',
+      );
+
+      const handle = await ShellExecutionService.execute(
+        'ls -l',
+        '/test/dir',
+        onOutputEventMock,
+        abortController.signal,
+        true,
+        shellExecutionConfig,
+      );
+
+      await new Promise((resolve) => process.nextTick(resolve));
+      mockPtyProcess.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+      await handle.result;
+
+      // Both abortHandler and onAbortDuringDrain should be removed on normal exit
+      expect(removeEventListenerSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('should clean up active PTYs in resetForTest', async () => {
+      const abortController = new AbortController();
+      await ShellExecutionService.execute(
+        'running-cmd',
+        '/test/dir',
+        onOutputEventMock,
+        abortController.signal,
+        true,
+        shellExecutionConfig,
+      );
+      await new Promise((resolve) => process.nextTick(resolve));
+
+      ShellExecutionService.resetForTest();
+
+      expect(mockPtyProcess.destroy).toHaveBeenCalled();
     });
 
     it('should fall back to child_process when PTY creation fails with ENXIO', async () => {

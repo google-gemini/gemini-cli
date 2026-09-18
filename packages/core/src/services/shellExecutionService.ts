@@ -63,9 +63,9 @@ export const GEMINI_CLI_IDENTIFICATION_ENV_VAR = 'GEMINI_CLI';
 export const GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE = '1';
 
 // We want to allow shell outputs that are close to the context window in size.
-// 300,000 lines is roughly equivalent to a large context window, ensuring
-// we capture significant output from long-running commands.
-export const SCROLLBACK_LIMIT = 300000;
+// 50,000 lines is roughly equivalent to a large context window while preventing
+// excessive V8 heap growth in @xterm/headless circular buffers.
+export const SCROLLBACK_LIMIT = 50000;
 
 const BASH_SHOPT_OPTIONS = 'promptvars nullglob extglob nocaseglob dotglob';
 const BASH_SHOPT_GUARD = `shopt -u ${BASH_SHOPT_OPTIONS};`;
@@ -186,6 +186,7 @@ interface ActivePty {
   maxSerializedLines?: number;
   command: string;
   sessionId?: string;
+  cancelRender?: () => void;
 }
 
 interface ActiveChildProcess {
@@ -199,6 +200,40 @@ interface ActiveChildProcess {
   command: string;
   sessionId?: string;
 }
+
+const isAnsiOutputEqual = (
+  a: string | AnsiOutput | null,
+  b: AnsiOutput,
+): boolean => {
+  if (!Array.isArray(a) || a.length !== b.length) {
+    return false;
+  }
+  for (let i = 0; i < a.length; i++) {
+    const lineA = a[i];
+    const lineB = b[i];
+    if (lineA.length !== lineB.length) {
+      return false;
+    }
+    for (let j = 0; j < lineA.length; j++) {
+      const tokA = lineA[j];
+      const tokB = lineB[j];
+      if (
+        tokA.text !== tokB.text ||
+        tokA.bold !== tokB.bold ||
+        tokA.italic !== tokB.italic ||
+        tokA.underline !== tokB.underline ||
+        tokA.dim !== tokB.dim ||
+        tokA.inverse !== tokB.inverse ||
+        tokA.isUninitialized !== tokB.isUninitialized ||
+        tokA.fg !== tokB.fg ||
+        tokA.bg !== tokB.bg
+      ) {
+        return false;
+      }
+    }
+  }
+  return true;
+};
 
 const findLastContentLine = (
   buffer: pkg.IBuffer,
@@ -214,21 +249,22 @@ const findLastContentLine = (
   return -1;
 };
 
-const getFullBufferText = (terminal: pkg.Terminal, startLine = 0): string => {
+const getFullBufferText = (
+  terminal: pkg.Terminal,
+  startLine = 0,
+  maxBytes = MAX_CHILD_PROCESS_BUFFER_SIZE,
+): string => {
   const buffer = terminal.buffer.active;
-  const lines: string[] = [];
-
   const lastContentLine = findLastContentLine(buffer, startLine);
 
   if (lastContentLine === -1 || lastContentLine < startLine) return '';
 
-  for (let i = startLine; i <= lastContentLine; i++) {
-    const line = buffer.getLine(i);
-    if (!line) {
-      lines.push('');
-      continue;
-    }
+  const logicalLinesReversed: string[] = [];
+  let currentLogicalLineChunks: string[] = [];
+  let accumulatedChars = 0;
 
+  for (let i = lastContentLine; i >= startLine; i--) {
+    const line = buffer.getLine(i);
     let trimRight = true;
     if (i + 1 <= lastContentLine) {
       const nextLine = buffer.getLine(i + 1);
@@ -237,16 +273,34 @@ const getFullBufferText = (terminal: pkg.Terminal, startLine = 0): string => {
       }
     }
 
-    const lineContent = line.translateToString(trimRight);
+    const lineContent = line ? line.translateToString(trimRight) : '';
+    currentLogicalLineChunks.push(lineContent);
 
-    if (line.isWrapped && lines.length > 0) {
-      lines[lines.length - 1] += lineContent;
-    } else {
-      lines.push(lineContent);
+    if (!line?.isWrapped) {
+      const logicalLine =
+        currentLogicalLineChunks.length === 1
+          ? currentLogicalLineChunks[0]
+          : currentLogicalLineChunks.reverse().join('');
+      currentLogicalLineChunks = [];
+      logicalLinesReversed.push(logicalLine);
+      accumulatedChars +=
+        logicalLine.length + (logicalLinesReversed.length > 1 ? 1 : 0);
+
+      if (maxBytes > 0 && accumulatedChars >= maxBytes) {
+        break;
+      }
     }
   }
 
-  return lines.join('\n');
+  if (currentLogicalLineChunks.length > 0) {
+    logicalLinesReversed.push(currentLogicalLineChunks.reverse().join(''));
+  }
+
+  const fullText = logicalLinesReversed.reverse().join('\n');
+  if (maxBytes > 0 && fullText.length > maxBytes) {
+    return fullText.slice(-maxBytes);
+  }
+  return fullText;
 };
 
 const writeBufferToLogStream = (
@@ -1034,6 +1088,7 @@ export class ShellExecutionService {
     const entry = this.activePtys.get(pid);
     if (!entry) return;
 
+    entry.cancelRender?.();
     this.destroyPtyProcess(entry.ptyProcess);
 
     try {
@@ -1145,12 +1200,21 @@ export class ShellExecutionService {
 
       const terminal = headlessTerminal;
 
+      let renderTimeout: NodeJS.Timeout | null = null;
+      const cancelRender = () => {
+        if (renderTimeout) {
+          clearTimeout(renderTimeout);
+          renderTimeout = null;
+        }
+      };
+
       this.activePtys.set(assignedPid, {
         ptyProcess: pty,
         headlessTerminal,
         maxSerializedLines: shellExecutionConfig.maxSerializedLines,
         command: shellExecutionConfig.originalCommand ?? commandToExecute,
         sessionId: shellExecutionConfig.sessionId,
+        cancelRender,
       });
 
       const result = ExecutionLifecycleService.attachExecution(assignedPid, {
@@ -1219,7 +1283,6 @@ export class ShellExecutionService {
       let sniffedBytes = 0;
       let isWriting = false;
       let hasStartedOutput = false;
-      let renderTimeout: NodeJS.Timeout | null = null;
 
       const renderFn = () => {
         renderTimeout = null;
@@ -1245,20 +1308,13 @@ export class ShellExecutionService {
           endLine - (shellExecutionConfig.maxSerializedLines ?? 2000),
         );
 
-        let newOutput: AnsiOutput;
-        if (shellExecutionConfig.showColor) {
-          newOutput = serializeTerminalToObject(terminal, startLine, endLine);
-        } else {
-          newOutput = (
-            serializeTerminalToObject(terminal, startLine, endLine) || []
-          ).map((line) =>
-            line.map((token) => {
-              token.fg = '';
-              token.bg = '';
-              return token;
-            }),
-          );
-        }
+        const newOutput: AnsiOutput =
+          serializeTerminalToObject(
+            terminal,
+            startLine,
+            endLine,
+            Boolean(shellExecutionConfig.showColor),
+          ) || [];
 
         let lastNonEmptyLine = -1;
         for (let i = newOutput.length - 1; i >= 0; i--) {
@@ -1287,7 +1343,7 @@ export class ShellExecutionService {
           ? newOutput
           : trimmedOutput;
 
-        if (output !== finalOutput) {
+        if (!isAnsiOutputEqual(output, finalOutput)) {
           output = finalOutput;
           const event: ShellOutputEvent = {
             type: 'data',
@@ -1428,6 +1484,7 @@ export class ShellExecutionService {
         ShellExecutionService.destroyPtyProcess(pty);
 
         const finalize = () => {
+          cancelRender();
           try {
             render(true);
           } catch (err) {
@@ -1474,11 +1531,20 @@ export class ShellExecutionService {
             endLine - (shellExecutionConfig.maxSerializedLines ?? 2000),
           );
           const ansiOutputSnapshot = headlessTerminal
-            ? serializeTerminalToObject(headlessTerminal, startLine, endLine)
+            ? serializeTerminalToObject(
+                headlessTerminal,
+                startLine,
+                endLine,
+                Boolean(shellExecutionConfig.showColor),
+              )
             : [];
           const finalOutput = headlessTerminal
             ? getFullBufferText(headlessTerminal)
             : '';
+
+          // Release intermediate closure buffers to prevent heap retention
+          output = null;
+          sniffChunks.length = 0;
 
           // Dispose the headless terminal to free scrollback buffers.
           // This must happen after getFullBufferText() extracts the output.
