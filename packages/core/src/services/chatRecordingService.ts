@@ -1003,13 +1003,17 @@ export class ChatRecordingService {
             if (geminiMsg && geminiMsg.type === 'gemini') {
               const tc = geminiMsg.toolCalls!.find((tc) => tc.id === callId);
               if (tc) {
-                // If the history version is different (e.g. masked), sync it into the record
-                // We sync the entire parts array of the user turn to ensure sibling parts are preserved
+                // If the history version is different (e.g. masked), sync it into the record.
+                // Do not copy responses for sibling calls: doing so causes each
+                // ToolCallRecord to replay every response in a parallel turn.
+                const matchingPart = (turn.content.parts || []).find(
+                  (candidate) => candidate.functionResponse?.id === callId,
+                );
                 if (
-                  JSON.stringify(tc.result) !==
-                  JSON.stringify(turn.content.parts)
+                  matchingPart &&
+                  JSON.stringify(tc.result) !== JSON.stringify([matchingPart])
                 ) {
-                  tc.result = turn.content.parts || [];
+                  tc.result = [matchingPart];
                   updated = true;
                 }
               }
