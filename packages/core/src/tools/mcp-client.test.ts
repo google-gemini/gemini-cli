@@ -3234,4 +3234,118 @@ describe('connectToMcpServer - OAuth with transport fallback', () => {
     expect(mockedClient.connect).toHaveBeenCalledTimes(3);
     expect(mockAuthProvider.authenticate).toHaveBeenCalledOnce();
   });
+
+  describe('connectAndDiscover discovery timeout (#28355)', () => {
+    it('uses a short discovery timeout by default, not the 10m active-call default', async () => {
+      // Regression for #28355: a misbehaving MCP server that replies with a
+      // mismatched JSON-RPC id used to keep gemini-cli silently blocked for
+      // 10 minutes on startup (MCP_DEFAULT_TIMEOUT_MSEC). Discovery is now
+      // bounded to MCP_DISCOVERY_TIMEOUT_MSEC (10s).
+      const { connectAndDiscover, MCP_DISCOVERY_TIMEOUT_MSEC } = await import(
+        './mcp-client.js'
+      );
+
+      const localMockedClient = {
+        connect: vi.fn().mockResolvedValue(undefined),
+        getServerCapabilities: vi
+          .fn()
+          .mockReturnValue({ tools: { listChanged: true } }),
+        setNotificationHandler: vi.fn(),
+        listTools: vi.fn().mockResolvedValue({ tools: [] }),
+        listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
+        listResources: vi.fn().mockResolvedValue({ resources: [] }),
+        request: vi.fn().mockResolvedValue({}),
+        registerCapabilities: vi.fn().mockResolvedValue({}),
+        setRequestHandler: vi.fn().mockResolvedValue({}),
+        close: vi.fn().mockResolvedValue(undefined),
+        onerror: undefined,
+      };
+      vi.mocked(ClientLib.Client).mockReturnValue(
+        localMockedClient as unknown as ClientLib.Client,
+      );
+
+      const mockedToolRegistry = {
+        registerTool: vi.fn(),
+        sortTools: vi.fn(),
+        messageBus: { publish: vi.fn() },
+      } as unknown as ToolRegistry;
+      const mockedPromptRegistry = {
+        registerPrompt: vi.fn(),
+      } as unknown as PromptRegistry;
+
+      const emitMcpDiagnostic = vi.fn();
+      await connectAndDiscover(
+        '0.0.1',
+        'test-server',
+        // no `timeout` set: should fall back to MCP_DISCOVERY_TIMEOUT_MSEC
+        { command: 'noop' },
+        mockedToolRegistry,
+        mockedPromptRegistry,
+        false,
+        workspaceContext,
+        { ...MOCK_CONTEXT, emitMcpDiagnostic },
+      );
+
+      // The default must be the short discovery window, not MCP_DEFAULT_TIMEOUT_MSEC.
+      expect(localMockedClient.listTools).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          timeout: MCP_DISCOVERY_TIMEOUT_MSEC,
+        }),
+      );
+      expect(MCP_DISCOVERY_TIMEOUT_MSEC).toBeLessThan(
+        60 * 1000, // < 1 minute
+      );
+    });
+
+    it('honors an explicit serverConfig.timeout over the discovery default', async () => {
+      // When the user configures an explicit timeout in mcpServers config,
+      // that value must win over the discovery default.
+      const { connectAndDiscover } = await import('./mcp-client.js');
+
+      const localMockedClient = {
+        connect: vi.fn().mockResolvedValue(undefined),
+        getServerCapabilities: vi
+          .fn()
+          .mockReturnValue({ tools: { listChanged: true } }),
+        setNotificationHandler: vi.fn(),
+        listTools: vi.fn().mockResolvedValue({ tools: [] }),
+        listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
+        listResources: vi.fn().mockResolvedValue({ resources: [] }),
+        request: vi.fn().mockResolvedValue({}),
+        registerCapabilities: vi.fn().mockResolvedValue({}),
+        setRequestHandler: vi.fn().mockResolvedValue({}),
+        close: vi.fn().mockResolvedValue(undefined),
+        onerror: undefined,
+      };
+      vi.mocked(ClientLib.Client).mockReturnValue(
+        localMockedClient as unknown as ClientLib.Client,
+      );
+
+      const mockedToolRegistry = {
+        registerTool: vi.fn(),
+        sortTools: vi.fn(),
+        messageBus: { publish: vi.fn() },
+      } as unknown as ToolRegistry;
+      const mockedPromptRegistry = {
+        registerPrompt: vi.fn(),
+      } as unknown as PromptRegistry;
+
+      await connectAndDiscover(
+        '0.0.1',
+        'test-server',
+        { command: 'noop', timeout: 1234 },
+        mockedToolRegistry,
+        mockedPromptRegistry,
+        false,
+        workspaceContext,
+        MOCK_CONTEXT,
+      );
+
+      expect(localMockedClient.listTools).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ timeout: 1234 }),
+      );
+    });
+  });
 });
