@@ -92,6 +92,7 @@ export async function checkNextSpeaker(
     lastComprehensiveMessage.role === 'model' &&
     lastComprehensiveMessage.parts?.length === 1 &&
     lastComprehensiveMessage.parts[0] &&
+    !lastComprehensiveMessage.parts[0].thought &&
     typeof lastComprehensiveMessage.parts[0].text === 'string' &&
     lastComprehensiveMessage.parts[0].text === BENIGN_INTERRUPTION_REPLACEMENT;
   if (
