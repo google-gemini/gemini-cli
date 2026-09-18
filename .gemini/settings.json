@@ -11,5 +11,18 @@
   },
   "general": {
     "devtools": true
+  },
+  {
+  "mcpServers": {
+    "genesysCloud": {
+      "command": "npx",
+      "args": ["-y", "@makingchatbots/genesys-cloud-mcp-server"],
+      "env": {
+        "GENESYSCLOUD_REGION": "${GENESYSCLOUD_REGION}",
+        "GENESYSCLOUD_OAUTHCLIENT_ID": "${GENESYSCLOUD_OAUTHCLIENT_ID}",
+        "GENESYSCLOUD_OAUTHCLIENT_SECRET": "${GENESYSCLOUD_OAUTHCLIENT_SECRET}"
+      }
+    }
   }
+}
 }
