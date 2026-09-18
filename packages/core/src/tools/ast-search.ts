@@ -23,6 +23,7 @@ import { resolveToolDeclaration } from './definitions/resolver.js';
 import {
   ASTAnalysisService,
   type ASTFileOutline,
+  type ASTSymbol,
 } from '../services/astAnalysisService.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
@@ -169,9 +170,17 @@ class ASTSearchInvocation extends BaseToolInvocation<
     }
 
     const outline = await astService.getFileOutline(safePath);
-    const symbol = outline?.symbols
-      .flatMap((s) => [s, ...s.children])
-      .find((s) => s.name === symbolName);
+    const findSymbolRecursive = (
+      symbols: ASTSymbol[],
+    ): ASTSymbol | undefined => {
+      for (const s of symbols) {
+        if (s.name === symbolName) return s;
+        const found = findSymbolRecursive(s.children);
+        if (found) return found;
+      }
+      return undefined;
+    };
+    const symbol = outline ? findSymbolRecursive(outline.symbols) : undefined;
 
     const result = [
       `Found "${symbolName}" in ${safePath}:`,

@@ -249,7 +249,7 @@ export function stripBlockComments(
           j++;
         }
       } else if (inLineComment) {
-        out += line[j];
+        out += ' ';
         j++;
       } else if (inString) {
         // Inside string: blank contents but preserve delimiters
