@@ -154,21 +154,47 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
       }
     }
 
-    // Remove tasks that are no longer in the todo list, but only
-    // simple TASK-type entries without children (preserve epics/bugs
-    // and parent tasks created by the dedicated tracker tools).
-    for (const task of existingTasks) {
-      if (!preservedIds.has(task.id) && task.type === TaskType.TASK) {
-        const hasChildren = existingTasks.some((t) => t.parentId === task.id);
-        if (!hasChildren) {
-          try {
-            await service.deleteTask(task.id);
-          } catch (e) {
-            warnings.push(
-              `Could not remove "${task.title}" (${task.id}): ${e instanceof Error ? e.message : String(e)}`,
-            );
-          }
-        }
+    // Remove tasks that are no longer in the todo list. Use depth-sorted
+    // deletion (deepest children first) so the service-layer child guard
+    // doesn't block parent deletion. Skip any task whose subtree still
+    // contains a preserved task (to avoid orphaning active work).
+    const getDepth = (task: TrackerTask): number => {
+      let depth = 0;
+      let current = task;
+      while (current.parentId) {
+        const parent = existingTasks.find((t) => t.id === current.parentId);
+        if (!parent) break;
+        depth++;
+        current = parent;
+      }
+      return depth;
+    };
+
+    const hasPreservedDescendants = (id: string): boolean => {
+      const children = existingTasks.filter((t) => t.parentId === id);
+      return children.some(
+        (c) => preservedIds.has(c.id) || hasPreservedDescendants(c.id),
+      );
+    };
+
+    const tasksToDelete = existingTasks
+      .filter(
+        (task) =>
+          !preservedIds.has(task.id) &&
+          task.type === TaskType.TASK &&
+          !hasPreservedDescendants(task.id),
+      )
+      .map((task) => ({ task, depth: getDepth(task) }))
+      .sort((a, b) => b.depth - a.depth)
+      .map((item) => item.task);
+
+    for (const task of tasksToDelete) {
+      try {
+        await service.deleteTask(task.id);
+      } catch (e) {
+        warnings.push(
+          `Could not remove "${task.title}" (${task.id}): ${e instanceof Error ? e.message : String(e)}`,
+        );
       }
     }
 
