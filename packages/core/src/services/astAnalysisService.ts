@@ -208,7 +208,12 @@ export function findClosingBrace(lines: string[], startLine: number): number {
     // Strip string literals to avoid false brace matches.
     // NOTE: This regex does not handle escaped quotes inside strings
     // (e.g. "a \" {"). This is a known limitation of the heuristic parser.
-    const stripped = lines[i].replace(/'[^']*'|"[^"]*"|`[^`]*`/g, '');
+    let stripped = lines[i].replace(/'[^']*'|"[^"]*"|`[^`]*`/g, '');
+    // Strip single-line comments which may contain braces (e.g. "// }")
+    const commentIdx = stripped.indexOf('//');
+    if (commentIdx >= 0) {
+      stripped = stripped.slice(0, commentIdx);
+    }
     for (const ch of stripped) {
       if (ch === '(') parenDepth++;
       else if (ch === ')') parenDepth--;
@@ -246,6 +251,12 @@ export function findIndentEnd(lines: string[], startLine: number): number {
     }
 
     if (trimmed === '') continue;
+    // Skip comment lines - they may have arbitrary indentation and should
+    // not terminate the block (e.g. a top-level # comment inside a function)
+    if (trimmed.startsWith('#') || trimmed.startsWith('//')) {
+      last = i;
+      continue;
+    }
     const indent = lines[i].length - lines[i].trimStart().length;
     if (indent <= baseIndent) return last;
     last = i;

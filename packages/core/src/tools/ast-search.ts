@@ -102,7 +102,7 @@ class ASTSearchInvocation extends BaseToolInvocation<
       }
 
       if (scope === 'outline') {
-        return await this.handleOutlineScope(astService);
+        return await this.handleOutlineScope(astService, sanitizedPath);
       }
 
       // Default: symbol scope
@@ -113,7 +113,7 @@ class ASTSearchInvocation extends BaseToolInvocation<
         };
       }
 
-      return await this.handleSymbolScope(astService);
+      return await this.handleSymbolScope(astService, sanitizedPath);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       debugLogger.warn('[ASTSearchTool] Error:', msg);
@@ -126,28 +126,29 @@ class ASTSearchInvocation extends BaseToolInvocation<
 
   private async handleSymbolScope(
     astService: ASTAnalysisService,
+    safePath: string,
   ): Promise<ToolResult> {
     const bounds = await astService.findSymbolBounds(
-      this.params.file_path!,
+      safePath,
       this.params.symbol_name!,
     );
 
     if (!bounds) {
       return {
         llmContent:
-          `Symbol "${this.params.symbol_name}" not found in ${this.params.file_path}. ` +
+          `Symbol "${this.params.symbol_name}" not found in ${safePath}. ` +
           'Try using grep_search for a text-based search, or check the symbol name spelling.',
         returnDisplay: 'Symbol not found',
       };
     }
 
-    const outline = await astService.getFileOutline(this.params.file_path!);
+    const outline = await astService.getFileOutline(safePath);
     const symbol = outline?.symbols
       .flatMap((s) => [s, ...s.children])
       .find((s) => s.name === this.params.symbol_name);
 
     const result = [
-      `Found "${this.params.symbol_name}" in ${this.params.file_path}:`,
+      `Found "${this.params.symbol_name}" in ${safePath}:`,
       `  Lines: ${bounds.startLine}-${bounds.endLine} (${bounds.endLine - bounds.startLine + 1} lines)`,
       symbol ? `  Kind: ${symbol.kind}` : '',
       symbol ? `  Signature: ${symbol.signature}` : '',
@@ -171,8 +172,9 @@ class ASTSearchInvocation extends BaseToolInvocation<
 
   private async handleOutlineScope(
     astService: ASTAnalysisService,
+    safePath: string,
   ): Promise<ToolResult> {
-    const outline = await astService.getFileOutline(this.params.file_path!);
+    const outline = await astService.getFileOutline(safePath);
     if (!outline) {
       return {
         llmContent: `Could not outline "${this.params.file_path}". File may not exist or its language is not supported.`,
