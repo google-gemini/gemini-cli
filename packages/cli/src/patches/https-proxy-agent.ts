@@ -13,19 +13,40 @@ type HttpsProxyAgentCtor = typeof rawProxyAgent.HttpsProxyAgent;
 
 interface InteropShape {
   HttpsProxyAgent?: HttpsProxyAgentCtor;
-  default?: HttpsProxyAgentCtor;
+  default?: HttpsProxyAgentCtor | InteropShape;
 }
 
 const mod = rawProxyAgent as unknown as InteropShape;
-const HttpsProxyAgent: HttpsProxyAgentCtor =
-  mod.HttpsProxyAgent ||
-  mod.default ||
-  (rawProxyAgent as unknown as HttpsProxyAgentCtor);
+const defaultMod = mod.default as InteropShape | undefined;
+const defaultNamedCtor = defaultMod?.HttpsProxyAgent;
+
+let resolvedCtor = rawProxyAgent as unknown as HttpsProxyAgentCtor;
+if (typeof mod.HttpsProxyAgent === 'function') {
+  resolvedCtor = mod.HttpsProxyAgent;
+} else if (typeof mod.default === 'function') {
+  resolvedCtor = mod.default;
+} else if (typeof defaultNamedCtor === 'function') {
+  resolvedCtor = defaultNamedCtor;
+}
+const HttpsProxyAgent = resolvedCtor;
 
 if (typeof HttpsProxyAgent === 'function') {
-  const ctorRecord = HttpsProxyAgent as unknown as Record<string, unknown>;
-  ctorRecord['HttpsProxyAgent'] = HttpsProxyAgent;
-  ctorRecord['default'] = HttpsProxyAgent;
+  try {
+    Object.defineProperty(HttpsProxyAgent, 'HttpsProxyAgent', {
+      value: HttpsProxyAgent,
+      configurable: true,
+      writable: true,
+      enumerable: true,
+    });
+    Object.defineProperty(HttpsProxyAgent, 'default', {
+      value: HttpsProxyAgent,
+      configurable: true,
+      writable: true,
+      enumerable: true,
+    });
+  } catch {
+    // Safely ignore if the constructor is frozen or properties are non-configurable
+  }
 }
 
 export { HttpsProxyAgent };
