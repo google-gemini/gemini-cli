@@ -161,7 +161,10 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
     const getDepth = (task: TrackerTask): number => {
       let depth = 0;
       let current = task;
+      const visited = new Set<string>();
       while (current.parentId) {
+        if (visited.has(current.id)) break; // cycle guard
+        visited.add(current.id);
         const parent = existingTasks.find((t) => t.id === current.parentId);
         if (!parent) break;
         depth++;
@@ -170,10 +173,15 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
       return depth;
     };
 
-    const hasPreservedDescendants = (id: string): boolean => {
+    const hasPreservedDescendants = (
+      id: string,
+      visited = new Set<string>(),
+    ): boolean => {
+      if (visited.has(id)) return false; // cycle guard
+      visited.add(id);
       const children = existingTasks.filter((t) => t.parentId === id);
       return children.some(
-        (c) => preservedIds.has(c.id) || hasPreservedDescendants(c.id),
+        (c) => preservedIds.has(c.id) || hasPreservedDescendants(c.id, visited),
       );
     };
 
