@@ -354,7 +354,7 @@ export const DEFAULT_LEGACY_SET: CoreToolSet = {
       
       Expectation for required parameters:
       1. \`old_string\` MUST be the exact literal text to replace (including all whitespace, indentation, newlines, and surrounding code etc.).
-      2. \`new_string\` MUST be the exact literal text to replace \`old_string\` with (also including all whitespace, indentation, newlines, and surrounding code etc.). Ensure the resulting code is correct and idiomatic and that \`old_string\` and \`new_string\` are different.
+      2. \`new_string\` MUST be the exact literal text to replace \`old_string\` with (also including all whitespace, indentation, newlines, and surrounding code etc.). Make the smallest possible replacement and copy every unaffected line from \`old_string\` into \`new_string\` verbatim, including comments, docstrings, whitespace, and formatting. Never remove, shorten, rewrite, or clean up surrounding code or comments unless the instruction explicitly requires it. Ensure the resulting code is correct and idiomatic and that \`old_string\` and \`new_string\` are different.
       3. \`instruction\` is the detailed instruction of what needs to be changed. It is important to Make it specific and detailed so developers or large language models can understand what needs to be changed and perform the changes on their own if necessary. 
       4. NEVER escape \`old_string\` or \`new_string\`, that would break the exact literal text requirement.
       **Important:** If ANY of the above are not satisfied, the tool will fail. CRITICAL for \`old_string\`: Must uniquely identify the instance(s) to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations and \`allow_multiple\` is not true, the tool will fail.
@@ -392,7 +392,7 @@ A good instruction should concisely answer:
         },
         [EDIT_PARAM_NEW_STRING]: {
           description:
-            "The exact literal text to replace `old_string` with, preferably unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic. Do not use omission placeholders like '(rest of methods ...)', '...', or 'unchanged code'; provide exact literal code.",
+            "The exact literal text to replace `old_string` with, preferably unescaped. Provide the EXACT text. Preserve every unaffected line from `old_string` verbatim, including comments, docstrings, whitespace, and formatting; do not remove or rewrite surrounding content unless the instruction explicitly requires it. Ensure the resulting code is correct and idiomatic. Do not use omission placeholders like '(rest of methods ...)', '...', or 'unchanged code'; provide exact literal code.",
           type: 'string',
         },
         [EDIT_PARAM_ALLOW_MULTIPLE]: {

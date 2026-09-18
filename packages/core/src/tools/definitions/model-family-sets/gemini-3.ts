@@ -355,7 +355,7 @@ export const GEMINI_3_SET: CoreToolSet = {
 
   replace: {
     name: EDIT_TOOL_NAME,
-    description: `Replaces text within a file. By default, the tool expects to find and replace exactly ONE occurrence of \`old_string\`. If you want to replace multiple occurrences of the exact same string, set \`allow_multiple\` to true. This tool is preferred for surgical edits to existing files as it minimizes token usage, simplifies code reviews, and avoids accidental deletions. This tool requires providing significant context around the change to ensure precise targeting.
+    description: `Replaces text within a file. By default, the tool expects to find and replace exactly ONE occurrence of \`old_string\`. If you want to replace multiple occurrences of the exact same string, set \`allow_multiple\` to true. This tool is preferred for surgical edits to existing files as it minimizes token usage, simplifies code reviews, and avoids accidental deletions. This tool requires providing significant context around the change to ensure precise targeting. Make the smallest possible replacement and copy every unaffected line from \`old_string\` into \`new_string\` verbatim, including comments, docstrings, whitespace, and formatting. Never remove, shorten, rewrite, or clean up surrounding code or comments unless the instruction explicitly requires it. If changes affect distant regions, use separate calls instead of replacing the intervening content.
 The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.`,
     parametersJsonSchema: {
       type: 'object',
@@ -375,7 +375,7 @@ The user has the ability to modify the \`new_string\` content. If modified, this
         },
         [EDIT_PARAM_NEW_STRING]: {
           description:
-            "The exact literal text to replace `old_string` with, unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic. Do not use omission placeholders like '(rest of methods ...)', '...', or 'unchanged code'; provide exact literal code.",
+            "The exact literal text to replace `old_string` with, unescaped. Provide the EXACT text. Preserve every unaffected line from `old_string` verbatim, including comments, docstrings, whitespace, and formatting; do not remove or rewrite surrounding content unless the instruction explicitly requires it. Ensure the resulting code is correct and idiomatic. Do not use omission placeholders like '(rest of methods ...)', '...', or 'unchanged code'; provide exact literal code.",
           type: 'string',
         },
         [EDIT_PARAM_ALLOW_MULTIPLE]: {
