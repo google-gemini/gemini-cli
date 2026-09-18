@@ -553,5 +553,45 @@ describe('ToolConfirmationQueue', () => {
       await expect({ lastFrame, generateSvg }).toMatchSvgSnapshot();
       unmount();
     });
+
+    it.each([-5, -1, 0, 1, 2, 4])(
+      'renders edit confirmation without throwing when mainAreaWidth is %i',
+      async (width) => {
+        const confirmingTool = {
+          tool: {
+            callId: 'call-narrow-edit',
+            name: 'Edit',
+            description: 'Editing src/main.ts',
+            status: CoreToolCallStatus.AwaitingApproval,
+            confirmationDetails: {
+              type: 'edit' as const,
+              title: 'Confirm edit',
+              fileName: 'main.ts',
+              filePath: '/src/main.ts',
+              fileDiff: '--- a/main.ts\n+++ b/main.ts\n@@ -1 +1 @@\n-old\n+new',
+              originalContent: 'old',
+              newContent: 'new',
+            },
+          },
+          index: 1,
+          total: 1,
+        };
+
+        const { lastFrame, unmount } = await renderWithProviders(
+          <ToolConfirmationQueue
+            confirmingTool={confirmingTool as unknown as ConfirmingToolState}
+          />,
+          {
+            config: mockConfig,
+            uiState: {
+              mainAreaWidth: width,
+              terminalWidth: width,
+            },
+          },
+        );
+        expect(lastFrame()).toBeDefined();
+        unmount();
+      },
+    );
   });
 });

@@ -480,10 +480,6 @@ describe('ShellTool', () => {
       });
       const promise = invocation.execute({ abortSignal: mockAbortSignal });
 
-      // We need to provide a PID for the background logic to trigger
-      resolveShellExecution({ pid: 12345 });
-
-      // Advance time to trigger the background timeout
       await vi.advanceTimersByTimeAsync(250);
 
       expect(mockShellBackground).toHaveBeenCalledWith(
@@ -491,6 +487,23 @@ describe('ShellTool', () => {
         'default',
         'sleep 10',
       );
+
+      await promise;
+    });
+
+    it('should cancel the promotion timer when the command completes before the delay elapses', async () => {
+      vi.useFakeTimers();
+      const invocation = shellTool.build({
+        command: 'echo done',
+        is_background: true,
+      });
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
+
+      resolveShellExecution({ pid: 12345, output: 'done' });
+
+      await vi.advanceTimersByTimeAsync(500);
+
+      expect(mockShellBackground).not.toHaveBeenCalled();
 
       await promise;
     });
@@ -944,10 +957,6 @@ EOF`;
         mockShellOutputCallback({ type: 'data', chunk: 'some output' });
         expect(updateOutputMock).not.toHaveBeenCalled();
 
-        // We need to provide a PID for the background logic to trigger
-        resolveShellExecution({ pid: 12345 });
-
-        // Advance time to trigger the background timeout
         await vi.advanceTimersByTimeAsync(250);
 
         expect(mockShellBackground).toHaveBeenCalledWith(

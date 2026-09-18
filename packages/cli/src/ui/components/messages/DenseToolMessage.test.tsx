@@ -613,5 +613,33 @@ describe('DenseToolMessage', () => {
       await renderResult.waitUntilReady();
       await expect(renderResult).toMatchSvgSnapshot();
     });
+
+    it.each([0, -5, NaN])(
+      'handles edge case terminalWidth (%s) without throwing',
+      async (width) => {
+        const diffResult: FileDiff = {
+          fileName: 'test.ts',
+          filePath: '/test.ts',
+          fileDiff: '--- a/test.ts\n+++ b/test.ts\n@@ -1 +1 @@\n-old\n+new',
+          originalContent: 'old',
+          newContent: 'new',
+        };
+
+        const renderResult = await renderWithProviders(
+          <DenseToolMessage
+            {...defaultProps}
+            terminalWidth={width}
+            name="edit"
+            description="Editing test.ts"
+            resultDisplay={diffResult as ToolResultDisplay}
+            status={CoreToolCallStatus.Success}
+          />,
+        );
+
+        await renderResult.waitUntilReady();
+        expect(renderResult.lastFrame({ allowEmpty: true })).toBeDefined();
+        renderResult.unmount();
+      },
+    );
   });
 });
