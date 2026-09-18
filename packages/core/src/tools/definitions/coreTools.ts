@@ -99,6 +99,10 @@ export {
   TOPIC_PARAM_TITLE,
   TOPIC_PARAM_SUMMARY,
   TOPIC_PARAM_STRATEGIC_INTENT,
+  AST_SEARCH_TOOL_NAME,
+  AST_SEARCH_PARAM_SYMBOL_NAME,
+  AST_SEARCH_PARAM_FILE_PATH,
+  AST_SEARCH_PARAM_SCOPE,
 } from './base-declarations.js';
 
 // Re-export sets for compatibility
@@ -286,4 +290,11 @@ export const LIST_MCP_RESOURCES_DEFINITION: ToolDefinition = {
     return DEFAULT_LEGACY_SET.list_mcp_resources;
   },
   overrides: (modelId) => getToolSet(modelId).list_mcp_resources,
+};
+
+export const AST_SEARCH_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.ast_search;
+  },
+  overrides: (modelId) => getToolSet(modelId).ast_search,
 };

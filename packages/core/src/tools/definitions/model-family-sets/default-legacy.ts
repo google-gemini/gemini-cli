@@ -73,6 +73,10 @@ import {
   ASK_USER_OPTION_PARAM_LABEL,
   ASK_USER_OPTION_PARAM_DESCRIPTION,
   PLAN_MODE_PARAM_REASON,
+  AST_SEARCH_TOOL_NAME,
+  AST_SEARCH_PARAM_SYMBOL_NAME,
+  AST_SEARCH_PARAM_FILE_PATH,
+  AST_SEARCH_PARAM_SCOPE,
 } from '../base-declarations.js';
 import {
   getShellDeclaration,
@@ -756,6 +760,41 @@ The agent did not use the todo list because this task could be completed by a ti
           description:
             'Optional filter to list resources from a specific server.',
           type: 'string',
+        },
+      },
+      required: [],
+    },
+  },
+
+  ast_search: {
+    name: AST_SEARCH_TOOL_NAME,
+    description:
+      'Searches for a named code symbol (class, function, method, interface, type, enum) ' +
+      'and returns its precise line boundaries and structural signature. ' +
+      'Use this to read a specific function or class without guessing line numbers. ' +
+      'When scope is "outline", returns the full structural outline of the file instead. ' +
+      'When scope is "map", returns a compressed map of the codebase showing all top-level symbols.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        [AST_SEARCH_PARAM_SYMBOL_NAME]: {
+          description:
+            'The exact name of the symbol to locate (e.g. "MyClass", "processData"). ' +
+            'Required when scope is "symbol" (the default). Ignored when scope is "outline" or "map".',
+          type: 'string',
+        },
+        [AST_SEARCH_PARAM_FILE_PATH]: {
+          description:
+            'The path to the file to search in. Required for "symbol" and "outline" scopes. ' +
+            'Optional for "map" scope (defaults to working directory).',
+          type: 'string',
+        },
+        [AST_SEARCH_PARAM_SCOPE]: {
+          description:
+            'The type of AST query: "symbol" (default) to find one symbol\'s bounds, ' +
+            '"outline" to get a file\'s structural skeleton, or "map" to get a compressed codebase overview.',
+          type: 'string',
+          enum: ['symbol', 'outline', 'map'],
         },
       },
       required: [],
