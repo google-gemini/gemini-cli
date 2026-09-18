@@ -80,6 +80,9 @@ export enum ToolErrorType {
 
   // Hook-specific Errors
   STOP_EXECUTION = 'stop_execution',
+
+  // Hold Directive Errors
+  HOLD_DIRECTIVE_VIOLATION = 'hold_directive_violation',
 }
 
 /**

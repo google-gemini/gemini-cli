@@ -188,6 +188,9 @@ export * from './resources/resource-registry.js';
 // Export prompt logic
 export * from './prompts/mcp-prompts.js';
 
+// Export user directive detection
+export * from './services/userDirectiveService.js';
+
 // Export agent definitions
 export * from './agents/types.js';
 export * from './agents/agentLoader.js';
