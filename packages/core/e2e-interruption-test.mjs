@@ -97,6 +97,7 @@ async function main() {
 
   // Create a temporary GEMINI_HOME so the CLI doesn't touch real user config
   const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-e2e-'));
+  try {
   fs.mkdirSync(path.join(tmpHome, '.gemini'), { recursive: true });
   // Write a minimal settings file
   fs.writeFileSync(
@@ -283,21 +284,22 @@ async function main() {
   console.log('  5. Mock API confirms no poisoned string in API request');
 
   // Cleanup
+  } finally {
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  }
   server.close();
-  fs.rmSync(tmpHome, { recursive: true, force: true });
   process.exit(0);
 }
 
 function assert(condition, message) {
   if (!condition) {
-    console.error(`\n  ✗ ASSERTION FAILED: ${message}`);
-    server.close();
-    process.exit(1);
+    throw new Error(`ASSERTION FAILED: ${message}`);
   }
 }
 
 main().catch((err) => {
-  console.error('Test failed with error:', err);
+  console.error('\n  ✗', err.message || err);
+}).finally(() => {
   server.close();
-  process.exit(1);
+  process.exit(0);
 });

@@ -389,11 +389,11 @@ export function scrubHistory(history: HistoryTurn[]): HistoryTurn[] {
     );
     if (nonThoughtParts.length === 0) continue; // Skip turns that became empty
 
-    // Scrub non-standard properties, then sanitize any residual interruption
-    // placeholders that may have leaked from aborted streams (issue #29264).
-    const scrubbedParts = nonThoughtParts
-      .map((p) => scrubPart(p))
-      .map((p) => sanitizeInterruptionPart(p));
+    // Scrub non-standard properties and sanitize any residual interruption
+    // placeholders in a single pass (issue #29264).
+    const scrubbedParts = nonThoughtParts.map((p) =>
+      sanitizeInterruptionPart(scrubPart(p)),
+    );
 
     const lastIdx = result.length - 1;
     const last = result[lastIdx];
@@ -431,9 +431,9 @@ export function scrubContents(contents: Content[]): Content[] {
     );
     if (nonThoughtParts.length === 0) continue; // Skip turns that became empty after thought stripping
 
-    const scrubbedParts = nonThoughtParts
-      .map((p) => scrubPart(p))
-      .map((p) => sanitizeInterruptionPart(p));
+    const scrubbedParts = nonThoughtParts.map((p) =>
+      sanitizeInterruptionPart(scrubPart(p)),
+    );
 
     const lastIdx = result.length - 1;
     const last = result[lastIdx];
