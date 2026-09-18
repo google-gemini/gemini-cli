@@ -28,6 +28,7 @@ import {
   vi,
 } from 'vitest';
 import { createApp, main } from './app.js';
+import { requestStorage } from './requestStorage.js';
 import { commandRegistry } from '../commands/command-registry.js';
 import {
   assertUniqueFinalEventIsLast,
@@ -163,6 +164,30 @@ describe('E2E Tests', () => {
 
     assertUniqueFinalEventIsLast(events);
     expect(events.length).toBe(4);
+  });
+
+  it('should parse JSON-RPC request body when POSTing to A2A route', async () => {
+    let capturedBody: unknown;
+    sendMessageStreamSpy.mockImplementationOnce(async function* () {
+      capturedBody = requestStorage.getStore()?.req.body;
+      yield* [{ type: 'content', value: 'Hello' }];
+    });
+
+    const payload = createStreamMessageRequest(
+      'verify req.body is parsed',
+      'a2a-test-body-parsed',
+    );
+    const agent = request.agent(app);
+    const res = await agent
+      .post('/')
+      .send(payload)
+      .set('Content-Type', 'application/json')
+      .expect(200);
+
+    const events = streamToSSEEvents(res.text);
+    expect(events.length).toBeGreaterThan(0);
+    expect(capturedBody).toBeDefined();
+    expect(capturedBody).toEqual(payload);
   });
 
   it('should create a new task, schedule a tool call, and wait for approval', async () => {
