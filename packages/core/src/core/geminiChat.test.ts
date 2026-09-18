@@ -27,6 +27,7 @@ import {
   THINKING_ONLY_NUDGE_MESSAGE,
   NO_RESPONSE_TEXT_NUDGE_MESSAGE,
   applyRetryNudge,
+  INTERRUPTED_RESPONSE_PLACEHOLDER,
 } from './geminiChat.js';
 import {
   type CompletedToolCall,
@@ -3831,6 +3832,50 @@ describe('GeminiChat', () => {
       expect(modelTurn.content.parts![0].thoughtSignature).toBe(
         'existing-sig-on-call',
       );
+    });
+  });
+
+  describe('interruption handling in getHistoryTurns', () => {
+    it('should replace INTERRUPTED_RESPONSE_PLACEHOLDER with a benign continuing message in curated history to prevent poisoning while preventing turn fusion', () => {
+      vi.mocked(mockConfig.isContextManagementEnabled).mockReturnValue(false);
+      vi.mocked(mockConfig.getModel).mockReturnValue('gemini-2.5-pro');
+
+      chat.setHistory([
+        { role: 'user', parts: [{ text: 'search for files' }] },
+        {
+          role: 'model',
+          parts: [{ functionCall: { name: 'glob', args: {} } }],
+        },
+        {
+          role: 'user',
+          parts: [{ functionResponse: { name: 'glob', response: { files: [] } } }],
+        },
+        {
+          role: 'model',
+          parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+        },
+        { role: 'user', parts: [{ text: 'continue search' }] },
+      ]);
+
+      const turns = chat.getHistoryTurns(true);
+
+      // The interrupted response turn should be mapped to "Continuing.".
+      // The turns should NOT be coalesced, and their roles must alternate perfectly.
+      expect(turns).toHaveLength(5);
+      expect(turns[0].content.role).toBe('user');
+      expect(turns[0].content.parts![0].text).toBe('search for files');
+
+      expect(turns[1].content.role).toBe('model');
+      expect(turns[1].content.parts![0].functionCall?.name).toBe('glob');
+
+      expect(turns[2].content.role).toBe('user');
+      expect(turns[2].content.parts![0].functionResponse?.name).toBe('glob');
+
+      expect(turns[3].content.role).toBe('model');
+      expect(turns[3].content.parts![0].text).toBe('Continuing.');
+
+      expect(turns[4].content.role).toBe('user');
+      expect(turns[4].content.parts![0].text).toBe('continue search');
     });
   });
 
