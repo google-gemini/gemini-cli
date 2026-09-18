@@ -235,21 +235,29 @@ export class TrackerService {
     const remaining = await this.listTasks();
     for (const other of remaining) {
       if (other.id === normalizedId) continue;
-      let needsSave = false;
-      const updated = { ...other };
-      if (other.dependencies.includes(normalizedId)) {
-        updated.dependencies = other.dependencies.filter(
-          (d) => d !== normalizedId,
-        );
-        needsSave = true;
-      }
-      if (other.parentId === normalizedId) {
-        delete updated.parentId;
-        needsSave = true;
-      }
-      if (needsSave) {
-        updated.updatedAt = now;
-        await this.saveTask(updated);
+      const hasDep = other.dependencies.includes(normalizedId);
+      const hasParent = other.parentId === normalizedId;
+      if (hasDep || hasParent) {
+        // Re-read fresh state to avoid race conditions with concurrent
+        // deletions/updates (prevents resurrecting deleted tasks or
+        // overwriting concurrent writes).
+        const fresh = await this.getTask(other.id);
+        if (!fresh) continue;
+        let freshNeedsSave = false;
+        if (fresh.dependencies.includes(normalizedId)) {
+          fresh.dependencies = fresh.dependencies.filter(
+            (d) => d !== normalizedId,
+          );
+          freshNeedsSave = true;
+        }
+        if (fresh.parentId === normalizedId) {
+          delete fresh.parentId;
+          freshNeedsSave = true;
+        }
+        if (freshNeedsSave) {
+          fresh.updatedAt = now;
+          await this.saveTask(fresh);
+        }
       }
     }
 
