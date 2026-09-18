@@ -246,7 +246,12 @@ export function stripBlockComments(
         if (line[j] === '\\' && j + 1 < line.length) {
           out += '  ';
           j += 2;
-        } else if (line[j] === inString) {
+        } else if (inString.length === 3 && line.startsWith(inString, j)) {
+          // Closing triple-quote
+          out += inString;
+          inString = null;
+          j += 3;
+        } else if (inString.length === 1 && line[j] === inString) {
           out += line[j];
           inString = null;
           j++;
@@ -278,6 +283,14 @@ export function stripBlockComments(
           out += '  ';
           j += 2;
           inComment = true;
+        } else if (
+          isPython &&
+          (line.startsWith('"""', j) || line.startsWith("'''", j))
+        ) {
+          // Python triple-quoted string
+          inString = line.startsWith('"""', j) ? '"""' : "'''";
+          out += inString;
+          j += 3;
         } else if (line[j] === "'" || line[j] === '"' || line[j] === '`') {
           inString = line[j];
           out += line[j];
