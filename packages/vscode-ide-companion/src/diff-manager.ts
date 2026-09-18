@@ -247,7 +247,10 @@ export class DiffManager {
           tab.input instanceof vscode.TabInputTextDiff &&
           tab.input.modified.toString() === rightDocUri.toString()
         ) {
-          await vscode.window.tabGroups.close(tab);
+          // Pass preserveFocus=true so closing the background diff tab does
+          // not move keyboard focus into the editor area. This keeps focus in
+          // the integrated terminal where the Gemini CLI is running. See #22193.
+          await vscode.window.tabGroups.close(tab, true);
           return;
         }
       }
