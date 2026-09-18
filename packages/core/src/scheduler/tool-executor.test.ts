@@ -10,6 +10,7 @@ import {
   type Config,
   type ToolResult,
   type AnyToolInvocation,
+  ToolErrorType,
 } from '../index.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { MockTool } from '../test-utils/mock-tool.js';
@@ -813,5 +814,115 @@ describe('ToolExecutor', () => {
       expect(response['output']).toBe('TruncatedContent...');
       expect(result.response.outputFile).toBe('/tmp/truncated_output.txt');
     }
+  });
+
+  describe('Tool Call Timeout', () => {
+    const makeScheduledCall = (callId: string): ScheduledToolCall => {
+      const mockTool = new MockTool({
+        name: 'slowTool',
+        description: 'Mock description',
+      });
+      const invocation = mockTool.build({});
+      return {
+        status: CoreToolCallStatus.Scheduled,
+        request: {
+          callId,
+          name: 'slowTool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-timeout',
+        },
+        tool: mockTool,
+        invocation: invocation as unknown as AnyToolInvocation,
+        startTime: Date.now(),
+      };
+    };
+
+    // A tool implementation that only settles once its AbortSignal fires.
+    const mockAbortAwareExecution = () =>
+      vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockImplementation(
+        (
+          _invocation: unknown,
+          _toolName: unknown,
+          signal: AbortSignal,
+        ): Promise<ToolResult> =>
+          new Promise<ToolResult>((_resolve, reject) => {
+            const onAbort = () =>
+              reject(
+                new DOMException('The operation was aborted.', 'AbortError'),
+              );
+            if (signal.aborted) {
+              onAbort();
+            } else {
+              signal.addEventListener('abort', onAbort, { once: true });
+            }
+          }),
+      );
+
+    it('reports a timeout error when execution exceeds tools.callTimeout', async () => {
+      vi.useFakeTimers();
+      try {
+        vi.spyOn(config, 'getToolCallTimeout').mockReturnValue(1000);
+        mockAbortAwareExecution();
+
+        const resultPromise = executor.execute({
+          call: makeScheduledCall('call-timeout-1'),
+          signal: new AbortController().signal,
+          onUpdateToolCall: vi.fn(),
+        });
+
+        await vi.advanceTimersByTimeAsync(1000);
+        const result = await resultPromise;
+
+        expect(result.status).toBe(CoreToolCallStatus.Error);
+        if (result.status === CoreToolCallStatus.Error) {
+          expect(result.response.errorType).toBe(
+            ToolErrorType.TOOL_CALL_TIMEOUT,
+          );
+          expect(result.response.error?.message).toContain(
+            'timed out after 1 second',
+          );
+        }
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('does not apply a timeout when tools.callTimeout is disabled (0)', async () => {
+      vi.spyOn(config, 'getToolCallTimeout').mockReturnValue(0);
+      vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockResolvedValue({
+        llmContent: 'done',
+        returnDisplay: 'done',
+      } as ToolResult);
+
+      const passedSignal = new AbortController().signal;
+      const result = await executor.execute({
+        call: makeScheduledCall('call-timeout-2'),
+        signal: passedSignal,
+        onUpdateToolCall: vi.fn(),
+      });
+
+      expect(result.status).toBe(CoreToolCallStatus.Success);
+      // The original signal is forwarded unwrapped when the timeout is disabled.
+      const signalArg = vi.mocked(coreToolHookTriggers.executeToolWithHooks)
+        .mock.calls[0][2];
+      expect(signalArg).toBe(passedSignal);
+    });
+
+    it('reports user cancellation (not timeout) when the user aborts', async () => {
+      vi.spyOn(config, 'getToolCallTimeout').mockReturnValue(60000);
+      mockAbortAwareExecution();
+
+      const controller = new AbortController();
+      controller.abort();
+
+      const result = await executor.execute({
+        call: makeScheduledCall('call-timeout-3'),
+        signal: controller.signal,
+        onUpdateToolCall: vi.fn(),
+      });
+
+      expect(result.status).toBe(CoreToolCallStatus.Cancelled);
+    });
   });
 });

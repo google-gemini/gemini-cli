@@ -22,6 +22,10 @@ export enum ToolErrorType {
   UNHANDLED_EXCEPTION = 'unhandled_exception',
   TOOL_NOT_REGISTERED = 'tool_not_registered',
   EXECUTION_FAILED = 'execution_failed',
+  /**
+   * The tool call exceeded the configured `tools.callTimeout` and was aborted.
+   */
+  TOOL_CALL_TIMEOUT = 'tool_call_timeout',
 
   // File System Errors
   FILE_NOT_FOUND = 'file_not_found',
