@@ -73,6 +73,24 @@ describe('expandEnvVars', () => {
     ])('should handle %s', (_, input, env, expected) => {
       expect(expandEnvVars(input, env)).toBe(expected);
     });
+
+    it('should preserve an environment value that collides with the temporary key', () => {
+      expect(
+        expandEnvVars('Hello $USER from $__GCLI_EXPAND_TARGET__', {
+          ...defaultEnv,
+          __GCLI_EXPAND_TARGET__: 'the Citadel',
+        }),
+      ).toBe('Hello morty from the Citadel');
+    });
+
+    it('should avoid collisions with fallback temporary keys', () => {
+      expect(
+        expandEnvVars('${__GCLI_EXPAND_TARGET__}:${__GCLI_EXPAND_TARGET___}', {
+          __GCLI_EXPAND_TARGET__: 'first',
+          __GCLI_EXPAND_TARGET___: 'second',
+        }),
+      ).toBe('first:second');
+    });
   });
 
   describe('Windows behavior', () => {
