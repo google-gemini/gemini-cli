@@ -133,8 +133,9 @@ export const vscodeMock = {
     ) {}
   },
   ExtensionMode: {
-    Development: 1,
-    Production: 2,
+    Production: 1,
+    Development: 2,
+    Test: 3,
   },
   TextEditorSelectionChangeKind: {
     Mouse: 2,
