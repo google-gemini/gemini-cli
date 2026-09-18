@@ -1118,14 +1118,14 @@ their corresponding top-level category object in your `settings.json` file.
           {
             "condition": {
               "hasAccessToPreview": false,
-              "useGemini3_5Flash": true
+              "useLatestFlash": true
             },
-            "target": "gemini-3.5-flash"
+            "target": "gemini-3.8-flash"
           },
           {
             "condition": {
               "hasAccessToPreview": false,
-              "useGemini3_5Flash": false
+              "useLatestFlash": false
             },
             "target": "gemini-2.5-flash"
           }
@@ -1136,16 +1136,26 @@ their corresponding top-level category object in your `settings.json` file.
         "contexts": [
           {
             "condition": {
-              "useGemini3_5Flash": false,
-              "hasAccessToPreview": false
+              "useLatestFlash": true
             },
-            "target": "gemini-2.5-flash"
+            "target": "gemini-3.8-flash"
           },
           {
             "condition": {
-              "useGemini3_5Flash": false
+              "hasAccessToPreview": false
             },
-            "target": "gemini-3-flash-preview"
+            "target": "gemini-2.5-flash"
+          }
+        ]
+      },
+      "gemini-3.8-flash": {
+        "default": "gemini-3.8-flash",
+        "contexts": [
+          {
+            "condition": {
+              "useLatestFlash": false
+            },
+            "target": "gemini-3.5-flash"
           }
         ]
       },
@@ -1154,9 +1164,9 @@ their corresponding top-level category object in your `settings.json` file.
         "contexts": [
           {
             "condition": {
-              "useGemini3_5Flash": true
+              "useLatestFlash": true
             },
-            "target": "gemini-3.5-flash"
+            "target": "gemini-3.8-flash"
           }
         ]
       },
@@ -1233,27 +1243,54 @@ their corresponding top-level category object in your `settings.json` file.
         ]
       },
       "gemini-3.1-flash-lite": {
-        "default": "gemini-3.1-flash-lite"
+        "default": "gemini-3.1-flash-lite",
+        "contexts": [
+          {
+            "condition": {
+              "useLatestFlashLite": true
+            },
+            "target": "gemini-3.5-flash-lite"
+          }
+        ]
+      },
+      "gemini-3.5-flash-lite": {
+        "default": "gemini-3.5-flash-lite",
+        "contexts": [
+          {
+            "condition": {
+              "useLatestFlashLite": false
+            },
+            "target": "gemini-3.1-flash-lite"
+          }
+        ]
       },
       "flash": {
         "default": "gemini-3-flash-preview",
         "contexts": [
           {
             "condition": {
-              "useGemini3_5Flash": true
+              "useLatestFlash": true
             },
-            "target": "gemini-3.5-flash"
+            "target": "gemini-3.8-flash"
           },
           {
             "condition": {
               "hasAccessToPreview": false
             },
-            "target": "gemini-2.5-flash"
+            "target": "gemini-3.5-flash"
           }
         ]
       },
       "flash-lite": {
-        "default": "gemini-3.1-flash-lite"
+        "default": "gemini-3.1-flash-lite",
+        "contexts": [
+          {
+            "condition": {
+              "useLatestFlashLite": true
+            },
+            "target": "gemini-3.5-flash-lite"
+          }
+        ]
       },
       "auto-gemini-3": {
         "default": "gemini-3-pro-preview",
@@ -1300,9 +1337,9 @@ their corresponding top-level category object in your `settings.json` file.
         "contexts": [
           {
             "condition": {
-              "useGemini3_5Flash": true
+              "useLatestFlash": true
             },
-            "target": "gemini-3.5-flash"
+            "target": "gemini-3.8-flash"
           },
           {
             "condition": {

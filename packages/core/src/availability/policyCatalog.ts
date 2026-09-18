@@ -31,8 +31,10 @@ export interface ModelPolicyOptions {
   isAutoSelection?: boolean;
   userTier?: UserTierId;
   useGemini31?: boolean;
+  useLatestFlashLite?: boolean;
   useGemini31FlashLite?: boolean;
   useCustomToolModel?: boolean;
+  useLatestFlash?: boolean;
   useGemini3_5Flash?: boolean;
 }
 
@@ -97,7 +99,8 @@ export function getModelPolicyChain(
       options.useCustomToolModel,
       true,
       undefined,
-      options.useGemini3_5Flash,
+      options.useLatestFlash,
+      options.useLatestFlashLite,
     );
     return [
       definePolicy({

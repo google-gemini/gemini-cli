@@ -3280,7 +3280,7 @@ describe('Config Quota & Preview Model Access', () => {
             remainingFraction: 0.2,
           },
           {
-            modelId: 'gemini-2.5-flash',
+            modelId: 'gemini-3.5-flash',
             remainingAmount: '80',
             remainingFraction: 0.8,
           },
@@ -4425,7 +4425,7 @@ describe('ADKSettings', () => {
   });
 });
 
-describe('hasGemini35FlashGAAccess model setting', () => {
+describe('hasLatestFlashGAAccess model setting', () => {
   const baseParams: ConfigParameters = {
     sessionId: 'test',
     targetDir: '.',
@@ -4434,7 +4434,7 @@ describe('hasGemini35FlashGAAccess model setting', () => {
     cwd: '.',
   };
 
-  it('should set DEFAULT_GEMINI_FLASH_MODEL to gemini-3.5-flash and PREVIEW_GEMINI_FLASH_MODEL to gemini-3-flash-preview if hasGemini35FlashGAAccess returns true and authType is USE_GEMINI', () => {
+  it('should set DEFAULT_GEMINI_FLASH_MODEL to gemini-3.5-flash and PREVIEW_GEMINI_FLASH_MODEL to gemini-3-flash-preview if hasLatestFlashGAAccess returns true and authType is USE_GEMINI', () => {
     const config = new Config(baseParams);
     config['contentGeneratorConfig'] = { authType: AuthType.USE_GEMINI };
 
@@ -4449,14 +4449,14 @@ describe('hasGemini35FlashGAAccess model setting', () => {
     });
 
     // Call the method
-    const result = config.hasGemini35FlashGAAccess();
+    const result = config.hasLatestFlashGAAccess();
     expect(result).toBe(true);
 
-    expect(DEFAULT_GEMINI_FLASH_MODEL).toBe('gemini-3.5-flash');
+    expect(DEFAULT_GEMINI_FLASH_MODEL).toBe('gemini-3.8-flash');
     expect(PREVIEW_GEMINI_FLASH_MODEL).toBe('gemini-3-flash-preview');
   });
 
-  it('should set DEFAULT_GEMINI_FLASH_MODEL and PREVIEW_GEMINI_FLASH_MODEL to gemini-3.5-flash if hasGemini35FlashGAAccess returns true and authType is not USE_GEMINI', () => {
+  it('should set DEFAULT_GEMINI_FLASH_MODEL and PREVIEW_GEMINI_FLASH_MODEL to gemini-3.8-flash if hasLatestFlashGAAccess returns true and authType is not USE_GEMINI', () => {
     const config = new Config(baseParams);
     config['contentGeneratorConfig'] = { authType: AuthType.LOGIN_WITH_GOOGLE };
 
@@ -4471,10 +4471,10 @@ describe('hasGemini35FlashGAAccess model setting', () => {
     });
 
     // Call the method
-    const result = config.hasGemini35FlashGAAccess();
+    const result = config.hasLatestFlashGAAccess();
     expect(result).toBe(true);
 
-    expect(DEFAULT_GEMINI_FLASH_MODEL).toBe('gemini-3.5-flash');
-    expect(PREVIEW_GEMINI_FLASH_MODEL).toBe('gemini-3.5-flash');
+    expect(DEFAULT_GEMINI_FLASH_MODEL).toBe('gemini-3.8-flash');
+    expect(PREVIEW_GEMINI_FLASH_MODEL).toBe('gemini-3.8-flash');
   });
 });

@@ -25,7 +25,6 @@ import {
 } from '../utils/tokenCalculation.js';
 import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
-  DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
@@ -114,7 +113,7 @@ export function modelStringToModelConfigAlias(model: string): string {
       return 'chat-compression-2.5-flash-lite';
     case DEFAULT_GEMINI_MODEL:
       return 'chat-compression-2.5-pro';
-    case DEFAULT_GEMINI_FLASH_MODEL:
+    case 'gemini-2.5-flash':
       return 'chat-compression-2.5-flash';
     default:
       return 'chat-compression-default';
