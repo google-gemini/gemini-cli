@@ -44,12 +44,15 @@ export function isInterruptionPlaceholder(text: string): boolean {
  * Checks whether a Content object is a synthetic interruption placeholder turn.
  */
 export function isInterruptionContent(content: Content): boolean {
-  if (content.role !== 'model') return false;
-  if (!content.parts || content.parts.length === 0) return false;
+  if (!content || content.role !== 'model') return false;
+  const parts = content.parts ?? [];
+  if (parts.length === 0) return false;
 
-  return content.parts.some(
+  return parts.some(
     (part) =>
-      typeof part.text === 'string' && isInterruptionPlaceholder(part.text),
+      part &&
+      typeof part.text === 'string' &&
+      isInterruptionPlaceholder(part.text),
   );
 }
 
@@ -58,7 +61,11 @@ export function isInterruptionContent(content: Content): boolean {
  * replacement, returning a new Part. Non-matching parts are returned as-is.
  */
 export function sanitizePart(part: Part): Part {
-  if (typeof part.text !== 'string' || !isInterruptionPlaceholder(part.text)) {
+  if (
+    !part ||
+    typeof part.text !== 'string' ||
+    !isInterruptionPlaceholder(part.text)
+  ) {
     return part;
   }
   return { ...part, text: BENIGN_INTERRUPTION_REPLACEMENT };
@@ -69,12 +76,12 @@ export function sanitizePart(part: Part): Part {
  * its parts. Returns a new Content object; the original is not mutated.
  */
 export function sanitizeContent(content: Content): Content {
-  if (!isInterruptionContent(content)) {
+  if (!content || !isInterruptionContent(content)) {
     return content;
   }
   return {
     ...content,
-    parts: (content.parts || []).map(sanitizePart),
+    parts: (content.parts ?? []).map(sanitizePart),
   };
 }
 
@@ -83,9 +90,12 @@ export function sanitizeContent(content: Content): Content {
  * model turns with the benign replacement. Non-matching turns are returned
  * by reference (zero-copy for the common path).
  */
-export function sanitizeInterruptedTurns(turns: HistoryTurn[]): HistoryTurn[] {
+export function sanitizeInterruptedTurns(
+  turns: HistoryTurn[],
+): HistoryTurn[] {
+  if (!turns) return [];
   return turns.map((turn) => {
-    if (!isInterruptionContent(turn.content)) {
+    if (!turn || !turn.content || !isInterruptionContent(turn.content)) {
       return turn;
     }
     return {
@@ -100,5 +110,6 @@ export function sanitizeInterruptedTurns(turns: HistoryTurn[]): HistoryTurn[] {
  * next-speaker checker). Returns a new array with placeholders replaced.
  */
 export function sanitizeContentHistory(history: Content[]): Content[] {
+  if (!history) return [];
   return history.map(sanitizeContent);
 }

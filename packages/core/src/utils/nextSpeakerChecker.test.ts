@@ -297,39 +297,45 @@ describe('checkNextSpeaker', () => {
     expect(generateJsonCall.promptId).toBe(promptId);
   });
 
-  it("should return { next_speaker: 'model' } when last message is an interruption placeholder", async () => {
-    (chatInstance.getHistory as Mock).mockImplementation(
-      (curated?: boolean) => {
-        if (curated) {
+  it.each([
+    ['raw placeholder', INTERRUPTED_RESPONSE_PLACEHOLDER],
+    ['sanitized placeholder', 'Continuing.'],
+  ])(
+    "should return { next_speaker: 'model' } when last message is %s",
+    async (_label, placeholderText) => {
+      (chatInstance.getHistory as Mock).mockImplementation(
+        (curated?: boolean) => {
+          if (curated) {
+            return [
+              {
+                role: 'model',
+                parts: [{ text: placeholderText }],
+              },
+            ] as Content[];
+          }
           return [
             {
               role: 'model',
-              parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+              parts: [{ text: placeholderText }],
             },
           ] as Content[];
-        }
-        return [
-          {
-            role: 'model',
-            parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
-          },
-        ] as Content[];
-      },
-    );
-    const result = await checkNextSpeaker(
-      chatInstance,
-      mockBaseLlmClient,
-      abortSignal,
-      promptId,
-    );
-    expect(result).toEqual({
-      reasoning:
-        'The last model response was an interruption placeholder, so the model should speak next to provide a real response.',
-      next_speaker: 'model',
-    });
-    // Should NOT make an LLM call — this is a short-circuit
-    expect(mockBaseLlmClient.generateJson).not.toHaveBeenCalled();
-  });
+        },
+      );
+      const result = await checkNextSpeaker(
+        chatInstance,
+        mockBaseLlmClient,
+        abortSignal,
+        promptId,
+      );
+      expect(result).toEqual({
+        reasoning:
+          'The last model response was an interruption placeholder, so the model should speak next to provide a real response.',
+        next_speaker: 'model',
+      });
+      // Should NOT make an LLM call - this is a short-circuit
+      expect(mockBaseLlmClient.generateJson).not.toHaveBeenCalled();
+    },
+  );
 
   it('should not short-circuit for normal model responses containing the word interrupted', async () => {
     (chatInstance.getHistory as Mock).mockReturnValue([

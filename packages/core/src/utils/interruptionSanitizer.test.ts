@@ -98,6 +98,21 @@ describe('interruptionSanitizer', () => {
       };
       expect(isInterruptionContent(content)).toBe(false);
     });
+
+    it('should handle null/undefined content defensively', () => {
+      expect(isInterruptionContent(null as unknown as Content)).toBe(false);
+      expect(isInterruptionContent(undefined as unknown as Content)).toBe(
+        false,
+      );
+    });
+
+    it('should handle parts array with null entries', () => {
+      const content: Content = {
+        role: 'model',
+        parts: [null as unknown as any, { text: INTERRUPTED_RESPONSE_TEXT }],
+      };
+      expect(isInterruptionContent(content)).toBe(true);
+    });
   });
 
   describe('sanitizePart', () => {
@@ -123,6 +138,11 @@ describe('interruptionSanitizer', () => {
       const part = { functionCall: { name: 'test', args: {} } };
       const result = sanitizePart(part);
       expect(result).toBe(part);
+    });
+
+    it('should handle null/undefined part defensively', () => {
+      expect(sanitizePart(null as unknown as any)).toBe(null);
+      expect(sanitizePart(undefined as unknown as any)).toBe(undefined);
     });
   });
 
@@ -153,6 +173,11 @@ describe('interruptionSanitizer', () => {
       };
       const result = sanitizeContent(content);
       expect(result).toBe(content);
+    });
+
+    it('should handle null/undefined content defensively', () => {
+      expect(sanitizeContent(null as unknown as Content)).toBe(null);
+      expect(sanitizeContent(undefined as unknown as Content)).toBe(undefined);
     });
 
     it('should handle content with mixed parts', () => {
@@ -204,6 +229,15 @@ describe('interruptionSanitizer', () => {
       expect(sanitizeInterruptedTurns([])).toEqual([]);
     });
 
+    it('should handle null/undefined input defensively', () => {
+      expect(
+        sanitizeInterruptedTurns(null as unknown as HistoryTurn[]),
+      ).toEqual([]);
+      expect(
+        sanitizeInterruptedTurns(undefined as unknown as HistoryTurn[]),
+      ).toEqual([]);
+    });
+
     it('should handle arrays with no interruption', () => {
       const turns: HistoryTurn[] = [
         {
@@ -249,6 +283,13 @@ describe('interruptionSanitizer', () => {
 
     it('should handle empty history', () => {
       expect(sanitizeContentHistory([])).toEqual([]);
+    });
+
+    it('should handle null/undefined history defensively', () => {
+      expect(sanitizeContentHistory(null as unknown as Content[])).toEqual([]);
+      expect(sanitizeContentHistory(undefined as unknown as Content[])).toEqual(
+        [],
+      );
     });
   });
 });
