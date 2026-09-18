@@ -63,7 +63,15 @@ export class ASTAnalysisService {
    * Returns the structural outline of a single source file.
    */
   async getFileOutline(filePath: string): Promise<ASTFileOutline | null> {
-    const absPath = path.resolve(this.targetDir, filePath);
+    const resolvedTargetDir = path.resolve(this.targetDir);
+    const absPath = path.resolve(resolvedTargetDir, filePath);
+
+    // Guard against path traversal
+    const relative = path.relative(resolvedTargetDir, absPath);
+    if (relative.startsWith('..') || path.isAbsolute(relative)) {
+      return null;
+    }
+
     const ext = path.extname(absPath);
     const language = LANG_MAP[ext];
     if (!language) return null;
@@ -105,9 +113,16 @@ export class ASTAnalysisService {
     subDir?: string,
     maxFiles: number = 100,
   ): Promise<string> {
+    const resolvedTargetDir = path.resolve(this.targetDir);
     const searchDir = subDir
-      ? path.resolve(this.targetDir, subDir)
-      : this.targetDir;
+      ? path.resolve(resolvedTargetDir, subDir)
+      : resolvedTargetDir;
+
+    // Guard against path traversal
+    const relative = path.relative(resolvedTargetDir, searchDir);
+    if (relative.startsWith('..') || path.isAbsolute(relative)) {
+      return 'Error: path traversal detected, directory must be within workspace.';
+    }
 
     const files = await collectSourceFiles(searchDir, maxFiles);
     const sections: string[] = [];
@@ -136,7 +151,7 @@ export function extractSymbols(lines: string[], language: string): ASTSymbol[] {
   // Pre-process: strip block comments by replacing their content with spaces.
   // This handles mid-line comments like `code /* comment */ more_code` and
   // multi-line blocks, while preserving line numbers and offsets.
-  const cleaned = stripBlockComments(lines);
+  const cleaned = stripBlockComments(lines, language);
 
   for (let i = 0; i < cleaned.length; i++) {
     const trimmed = cleaned[i].trim();
@@ -197,19 +212,22 @@ export function extractSymbols(lines: string[], language: string): ASTSymbol[] {
  * so that line-number-based logic (brace counting, indentation) stays correct.
  * Handles mid-line comments, multi-line blocks, and lines with code after a comment.
  */
-export function stripBlockComments(lines: string[]): string[] {
+export function stripBlockComments(
+  lines: string[],
+  language?: string,
+): string[] {
   const result: string[] = [];
   let inComment = false;
+  let inString: string | null = null;
+  const isPython = language === 'python';
+
   for (const line of lines) {
     let out = '';
     let j = 0;
-    // Track whether we are inside a string or single-line comment on this line.
-    // Delimiters inside strings or // comments must not toggle block comment state.
-    let inString: string | null = null; // tracks quote char: ' " or `
     let inLineComment = false;
+
     while (j < line.length) {
       if (inComment) {
-        // Inside a block comment: look for */
         if (j + 1 < line.length && line[j] === '*' && line[j + 1] === '/') {
           out += '  ';
           j += 2;
@@ -219,30 +237,38 @@ export function stripBlockComments(lines: string[]): string[] {
           j++;
         }
       } else if (inLineComment) {
-        // Rest of line is a single-line comment, emit as-is
         out += line[j];
         j++;
       } else if (inString) {
-        // Inside a string literal: look for closing quote (skip escaped)
+        // Inside string: blank contents but preserve delimiters
         if (line[j] === '\\' && j + 1 < line.length) {
-          out += line[j] + line[j + 1];
+          out += '  ';
           j += 2;
         } else if (line[j] === inString) {
           out += line[j];
-          j++;
           inString = null;
+          j++;
         } else {
-          out += line[j];
+          out += ' ';
           j++;
         }
       } else {
-        // Normal code context
-        if (j + 1 < line.length && line[j] === '/' && line[j + 1] === '/') {
-          // Single-line comment start: rest of line is not a block comment
+        // Normal code context - language-aware comment detection
+        if (
+          !isPython &&
+          j + 1 < line.length &&
+          line[j] === '/' &&
+          line[j + 1] === '/'
+        ) {
           inLineComment = true;
-          out += line[j];
+          out += '//';
+          j += 2;
+        } else if (isPython && line[j] === '#') {
+          inLineComment = true;
+          out += '#';
           j++;
         } else if (
+          !isPython &&
           j + 1 < line.length &&
           line[j] === '/' &&
           line[j + 1] === '*'
