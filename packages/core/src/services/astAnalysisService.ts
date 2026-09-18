@@ -152,9 +152,10 @@ export function extractSymbols(lines: string[], language: string): ASTSymbol[] {
       continue;
     }
 
-    // Only match at top-level indentation (<=2 spaces for brace langs)
-    const indent = lines[i].length - lines[i].trimStart().length;
-    if (language !== 'python' && indent > 2) continue;
+    // Only match at top-level indentation (<=8 spaces for brace langs to support
+    // 4-space indented codebases and namespace/module nesting)
+    const indent = cleaned[i].length - cleaned[i].trimStart().length;
+    if (language !== 'python' && indent > 8) continue;
     if (language === 'python' && indent > 0) continue;
 
     for (const { regex, kind } of patterns) {
@@ -202,8 +203,13 @@ export function stripBlockComments(lines: string[]): string[] {
   for (const line of lines) {
     let out = '';
     let j = 0;
+    // Track whether we are inside a string or single-line comment on this line.
+    // Delimiters inside strings or // comments must not toggle block comment state.
+    let inString: string | null = null; // tracks quote char: ' " or `
+    let inLineComment = false;
     while (j < line.length) {
       if (inComment) {
+        // Inside a block comment: look for */
         if (j + 1 < line.length && line[j] === '*' && line[j + 1] === '/') {
           out += '  ';
           j += 2;
@@ -212,11 +218,42 @@ export function stripBlockComments(lines: string[]): string[] {
           out += ' ';
           j++;
         }
+      } else if (inLineComment) {
+        // Rest of line is a single-line comment, emit as-is
+        out += line[j];
+        j++;
+      } else if (inString) {
+        // Inside a string literal: look for closing quote (skip escaped)
+        if (line[j] === '\\' && j + 1 < line.length) {
+          out += line[j] + line[j + 1];
+          j += 2;
+        } else if (line[j] === inString) {
+          out += line[j];
+          j++;
+          inString = null;
+        } else {
+          out += line[j];
+          j++;
+        }
       } else {
-        if (j + 1 < line.length && line[j] === '/' && line[j + 1] === '*') {
+        // Normal code context
+        if (j + 1 < line.length && line[j] === '/' && line[j + 1] === '/') {
+          // Single-line comment start: rest of line is not a block comment
+          inLineComment = true;
+          out += line[j];
+          j++;
+        } else if (
+          j + 1 < line.length &&
+          line[j] === '/' &&
+          line[j + 1] === '*'
+        ) {
           out += '  ';
           j += 2;
           inComment = true;
+        } else if (line[j] === "'" || line[j] === '"' || line[j] === '`') {
+          inString = line[j];
+          out += line[j];
+          j++;
         } else {
           out += line[j];
           j++;
