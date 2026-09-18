@@ -37,10 +37,13 @@ export function expandEnvVars(
   // To expand a single string, we wrap it in an object with a temporary key.
   const dummyKey = '__GCLI_EXPAND_TARGET__';
 
-  // Filter out undefined values to satisfy the Record<string, string> requirement safely
+  // Filter out undefined values to satisfy the Record<string, string> requirement safely.
+  // Also drop the internal dummyKey if the caller's env happens to define it: dotenv-expand
+  // gives processEnv priority over parsed, so leaving it in would let a caller-controlled
+  // environment variable silently replace the string we are trying to expand.
   const processEnv: Record<string, string> = {};
   for (const [key, value] of Object.entries(env)) {
-    if (value !== undefined) {
+    if (value !== undefined && key !== dummyKey) {
       processEnv[key] = value;
     }
   }
