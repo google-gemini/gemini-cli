@@ -241,6 +241,7 @@ describe('ToolRegistry', () => {
       isDirectory: () => true,
     } as fs.Stats);
     config = new Config(baseConfigParams);
+    vi.spyOn(config.storage, 'getPlansDir').mockReturnValue('/tmp/plans');
     toolRegistry = new ToolRegistry(config, mockMessageBus);
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -614,6 +615,294 @@ describe('ToolRegistry', () => {
       );
       expect(result.llmContent).toContain('Stderr: Something went wrong');
       expect(result.llmContent).toContain('Exit Code: 1');
+    });
+
+    it('should correctly parse canUpdateOutput during discovery', async () => {
+      const discoveryCommand = 'my-discovery-command';
+      mockConfigGetToolDiscoveryCommand.mockReturnValue(discoveryCommand);
+
+      const toolWithStreaming: any = {
+        name: 'streaming-tool',
+        description: 'A tool that supports streaming',
+        parametersJsonSchema: { type: 'object', properties: {} },
+        canUpdateOutput: true,
+      };
+
+      const mockSpawn = vi.mocked(spawn);
+      mockSpawn.mockReturnValueOnce(
+        createDiscoveryProcess([toolWithStreaming]) as any,
+      );
+
+      await toolRegistry.discoverAllTools();
+      const discoveredTool = toolRegistry.getTool(
+        DISCOVERED_TOOL_PREFIX + 'streaming-tool',
+      );
+
+      expect(discoveredTool).toBeDefined();
+      expect(discoveredTool?.canUpdateOutput).toBe(true);
+    });
+
+    it('should relay live tool output to the UI during execution', async () => {
+      vi.spyOn(config, 'getToolDiscoveryCommand').mockReturnValue('discovery');
+      vi.spyOn(config, 'getToolCallCommand').mockReturnValue('call');
+
+      const tool = new DiscoveredTool(
+        config,
+        'streaming-tool',
+        DISCOVERED_TOOL_PREFIX + 'streaming-tool',
+        'desc',
+        {},
+        mockMessageBus,
+        true, // canUpdateOutput
+      );
+
+      const mockProcess: any = {
+        stdout: { on: vi.fn(), removeListener: vi.fn() },
+        stderr: { on: vi.fn(), removeListener: vi.fn() },
+        stdin: { write: vi.fn(), end: vi.fn() },
+        on: vi.fn(),
+        connected: true,
+        disconnect: vi.fn(),
+        removeListener: vi.fn(),
+      };
+
+      mockProcess.on.mockImplementation((event: string, callback: any) => {
+        if (event === 'close') {
+          callback(0);
+        }
+      });
+
+      mockProcess.stdout.on.mockImplementation(
+        (event: string, callback: any) => {
+          if (event === 'data') {
+            callback(Buffer.from('Live stdout update'));
+          }
+        },
+      );
+
+      mockProcess.stderr.on.mockImplementation(
+        (event: string, callback: any) => {
+          if (event === 'data') {
+            callback(Buffer.from('Live stderr update'));
+          }
+        },
+      );
+
+      vi.mocked(spawn).mockReturnValue(mockProcess);
+
+      const updateOutput = vi.fn();
+      const invocation = tool.build({});
+      await invocation.execute({
+        abortSignal: new AbortController().signal,
+        updateOutput,
+      });
+
+      expect(updateOutput).toHaveBeenCalledWith('Live stdout update');
+      expect(updateOutput).toHaveBeenCalledWith('Live stderr update');
+    });
+
+    it('should kill subprocess and resolve with error if output exceeds memory limit', async () => {
+      vi.spyOn(config, 'getToolCallCommand').mockReturnValue('call');
+
+      const tool = new DiscoveredTool(
+        config,
+        'runaway-tool',
+        DISCOVERED_TOOL_PREFIX + 'runaway-tool',
+        'desc',
+        {},
+        mockMessageBus,
+        true,
+      );
+
+      const mockProcess: any = {
+        stdout: { on: vi.fn(), removeListener: vi.fn() },
+        stderr: { on: vi.fn(), removeListener: vi.fn() },
+        stdin: { write: vi.fn(), end: vi.fn() },
+        on: vi.fn(),
+        connected: true,
+        disconnect: vi.fn(),
+        kill: vi.fn(),
+        removeListener: vi.fn(),
+      };
+
+      // Mock a huge chunk (11MB)
+      const hugeChunk = Buffer.alloc(11 * 1024 * 1024);
+
+      mockProcess.stdout.on.mockImplementation(
+        (event: string, callback: any) => {
+          if (event === 'data') {
+            callback(hugeChunk);
+          }
+        },
+      );
+
+      mockProcess.on.mockImplementation((event: string, callback: any) => {
+        if (event === 'close') {
+          callback(null, 'SIGTERM'); // Process killed
+        }
+      });
+
+      vi.mocked(spawn).mockReturnValue(mockProcess);
+
+      const invocation = tool.build({});
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(result.error?.message).toContain(
+        'Tool execution exceeded memory limit',
+      );
+      expect(mockProcess.kill).toHaveBeenCalled();
+    });
+
+    it('should ignore nullish chunks and not append "undefined"', async () => {
+      vi.spyOn(config, 'getToolCallCommand').mockReturnValue('call');
+
+      const tool = new DiscoveredTool(
+        config,
+        'clean-tool',
+        DISCOVERED_TOOL_PREFIX + 'clean-tool',
+        'desc',
+        {},
+        mockMessageBus,
+        true,
+      );
+
+      const mockProcess: any = {
+        stdout: { on: vi.fn(), removeListener: vi.fn() },
+        stderr: { on: vi.fn(), removeListener: vi.fn() },
+        stdin: { write: vi.fn(), end: vi.fn() },
+        on: vi.fn(),
+        connected: true,
+        disconnect: vi.fn(),
+        removeListener: vi.fn(),
+      };
+
+      mockProcess.stdout.on.mockImplementation(
+        (event: string, callback: any) => {
+          if (event === 'data') {
+            callback(null); // Send nullish chunk
+            callback(Buffer.from('Valid data'));
+          }
+        },
+      );
+
+      mockProcess.on.mockImplementation((event: string, callback: any) => {
+        if (event === 'close') {
+          callback(0);
+        }
+      });
+
+      vi.mocked(spawn).mockReturnValue(mockProcess);
+
+      const updateOutput = vi.fn();
+      const invocation = tool.build({});
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+        updateOutput,
+      });
+
+      expect(updateOutput).toHaveBeenCalledWith('Valid data');
+      expect(updateOutput).not.toHaveBeenCalledWith('undefined');
+      expect(result.llmContent).toBe('Valid data');
+    });
+
+    it('should treat stderr as failure for standard tools even with exit code 0', async () => {
+      vi.spyOn(config, 'getToolCallCommand').mockReturnValue('call');
+
+      const tool = new DiscoveredTool(
+        config,
+        'strict-tool',
+        DISCOVERED_TOOL_PREFIX + 'strict-tool',
+        'desc',
+        {},
+        mockMessageBus,
+        false, // canUpdateOutput is false
+      );
+
+      const mockProcess: any = {
+        stdout: { on: vi.fn(), removeListener: vi.fn() },
+        stderr: { on: vi.fn(), removeListener: vi.fn() },
+        stdin: { write: vi.fn(), end: vi.fn() },
+        on: vi.fn(),
+        connected: true,
+        disconnect: vi.fn(),
+        removeListener: vi.fn(),
+      };
+
+      mockProcess.stderr.on.mockImplementation(
+        (event: string, callback: any) => {
+          if (event === 'data') {
+            callback(Buffer.from('Unauthorized warning'));
+          }
+        },
+      );
+
+      mockProcess.on.mockImplementation((event: string, callback: any) => {
+        if (event === 'close') {
+          callback(0); // Exit code 0 BUT has stderr
+        }
+      });
+
+      vi.mocked(spawn).mockReturnValue(mockProcess);
+
+      const invocation = tool.build({});
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(result.error?.type).toBe(
+        ToolErrorType.DISCOVERED_TOOL_EXECUTION_ERROR,
+      );
+      expect(result.llmContent).toContain('Stderr: Unauthorized warning');
+    });
+
+    it('should treat stderr as success for streaming tools with exit code 0 or 1', async () => {
+      vi.spyOn(config, 'getToolCallCommand').mockReturnValue('call');
+
+      const tool = new DiscoveredTool(
+        config,
+        'pragmatic-tool',
+        DISCOVERED_TOOL_PREFIX + 'pragmatic-tool',
+        'desc',
+        {},
+        mockMessageBus,
+        true, // canUpdateOutput is true
+      );
+
+      const mockProcess: any = {
+        stdout: { on: vi.fn(), removeListener: vi.fn() },
+        stderr: { on: vi.fn(), removeListener: vi.fn() },
+        stdin: { write: vi.fn(), end: vi.fn() },
+        on: vi.fn(),
+        connected: true,
+        disconnect: vi.fn(),
+        removeListener: vi.fn(),
+      };
+
+      mockProcess.stderr.on.mockImplementation(
+        (event: string, callback: any) => {
+          if (event === 'data') {
+            callback(Buffer.from('Progress update'));
+          }
+        },
+      );
+
+      mockProcess.on.mockImplementation((event: string, callback: any) => {
+        if (event === 'close') {
+          callback(1); // Exit code 1 AND has stderr
+        }
+      });
+
+      vi.mocked(spawn).mockReturnValue(mockProcess);
+
+      const invocation = tool.build({});
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(result.error).toBeUndefined();
+      expect(result.llmContent).toBe('Progress update');
     });
 
     it('should pass MessageBus to DiscoveredTool and its invocations', async () => {
