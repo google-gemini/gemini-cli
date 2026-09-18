@@ -662,6 +662,7 @@ describe('WebFetchTool', () => {
             selectors: [
               { selector: 'a', options: { ignoreHref: true } },
               { selector: 'img', format: 'skip' },
+              { selector: 'table', format: 'dataTable' },
             ],
           });
           expect(result.llmContent).toContain(
@@ -1018,6 +1019,7 @@ describe('WebFetchTool', () => {
               selector: 'a',
               options: { ignoreHref: false, baseUrl: 'https://example.com/' },
             }),
+            { selector: 'table', format: 'dataTable' },
           ],
         }),
       );
