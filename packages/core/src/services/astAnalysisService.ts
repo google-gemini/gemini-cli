@@ -132,13 +132,30 @@ export class ASTAnalysisService {
 export function extractSymbols(lines: string[], language: string): ASTSymbol[] {
   const symbols: ASTSymbol[] = [];
   const patterns = getDeclarationPatterns(language);
+  let inBlockComment = false;
 
   for (let i = 0; i < lines.length; i++) {
     const trimmed = lines[i].trim();
+
+    // Track block comments (/* ... */) to avoid parsing commented-out code
+    if (inBlockComment) {
+      if (trimmed.includes('*/')) {
+        inBlockComment = false;
+      }
+      continue;
+    }
+    if (trimmed.startsWith('/*')) {
+      if (!trimmed.includes('*/')) {
+        inBlockComment = true;
+      }
+      continue;
+    }
+
     if (
       trimmed === '' ||
       trimmed.startsWith('//') ||
       trimmed.startsWith('#') ||
+      trimmed.startsWith('*') ||
       trimmed.startsWith('import ') ||
       trimmed.startsWith('from ')
     ) {
@@ -173,7 +190,9 @@ export function extractSymbols(lines: string[], language: string): ASTSymbol[] {
       };
 
       symbols.push(sym);
-      if (kind !== 'type' && kind !== 'enum') i = endLine;
+      // Skip past the symbol body for all block declarations (class, function, enum, etc.)
+      // Only 'type' aliases are single-line and should not advance
+      if (kind !== 'type') i = endLine;
       break;
     }
   }
@@ -183,10 +202,18 @@ export function extractSymbols(lines: string[], language: string): ASTSymbol[] {
 
 export function findClosingBrace(lines: string[], startLine: number): number {
   let depth = 0;
+  let parenDepth = 0;
   let opened = false;
   for (let i = startLine; i < lines.length; i++) {
+    // Strip string literals to avoid false brace matches.
+    // NOTE: This regex does not handle escaped quotes inside strings
+    // (e.g. "a \" {"). This is a known limitation of the heuristic parser.
     const stripped = lines[i].replace(/'[^']*'|"[^"]*"|`[^`]*`/g, '');
     for (const ch of stripped) {
+      if (ch === '(') parenDepth++;
+      else if (ch === ')') parenDepth--;
+      // Ignore braces inside parentheses (inline object types in params)
+      if (parenDepth > 0) continue;
       if (ch === '{') {
         depth++;
         opened = true;
@@ -196,15 +223,29 @@ export function findClosingBrace(lines: string[], startLine: number): number {
       }
     }
   }
-  return Math.min(startLine + 50, lines.length - 1);
+  // If brace matching failed, return end of file rather than an arbitrary offset
+  return lines.length - 1;
 }
 
 export function findIndentEnd(lines: string[], startLine: number): number {
   const baseIndent =
     lines[startLine].length - lines[startLine].trimStart().length;
   let last = startLine;
+  let inTripleQuote = false;
   for (let i = startLine + 1; i < lines.length; i++) {
-    if (lines[i].trim() === '') continue;
+    const trimmed = lines[i].trim();
+
+    // Track Python triple-quoted strings which can have arbitrary indentation
+    const tripleCount = (trimmed.match(/"""|'''/g) || []).length;
+    if (tripleCount % 2 !== 0) {
+      inTripleQuote = !inTripleQuote;
+    }
+    if (inTripleQuote) {
+      last = i;
+      continue;
+    }
+
+    if (trimmed === '') continue;
     const indent = lines[i].length - lines[i].trimStart().length;
     if (indent <= baseIndent) return last;
     last = i;
@@ -368,6 +409,16 @@ function countSymbols(syms: ASTSymbol[]): number {
   return n;
 }
 
+/**
+ * Walks directories to collect source files with known extensions.
+ * Note: This does not currently respect .gitignore or .geminiignore patterns.
+ * When called through the `ast_search` tool, path access is validated by the
+ * tool's validateToolParamValues and the Config.validatePathAccess check, so
+ * ignored files will not be exposed to the user. For codebase map generation,
+ * the SKIP_DIRS set covers the most common build/dependency directories.
+ * Full ignore-pattern integration should be added via FileDiscoveryService
+ * in a follow-up PR.
+ */
 async function collectSourceFiles(dir: string, max: number): Promise<string[]> {
   const files: string[] = [];
   async function walk(d: string, depth: number) {

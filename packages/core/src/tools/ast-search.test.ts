@@ -121,22 +121,16 @@ describe('ASTSearchTool', () => {
       await fs.writeFile(path.join(tmpDir, 'f.ts'), 'class A {}\n');
 
       const tool = makeTool();
-      const invocation = tool.build({ file_path: 'f.ts', scope: 'symbol' });
-      const result = await invocation.execute({
-        abortSignal: new AbortController().signal,
-      });
-
-      expect(result.llmContent).toContain('symbol_name is required');
+      expect(() => tool.build({ file_path: 'f.ts', scope: 'symbol' })).toThrow(
+        'symbol_name',
+      );
     });
 
     it('should error when file_path is missing', async () => {
       const tool = makeTool();
-      const invocation = tool.build({ symbol_name: 'X', scope: 'symbol' });
-      const result = await invocation.execute({
-        abortSignal: new AbortController().signal,
-      });
-
-      expect(result.llmContent).toContain('file_path is required');
+      expect(() => tool.build({ symbol_name: 'X', scope: 'symbol' })).toThrow(
+        'file_path',
+      );
     });
   });
 

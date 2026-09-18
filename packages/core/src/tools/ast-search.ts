@@ -5,6 +5,9 @@
  */
 
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import path from 'node:path';
+import { resolveDefensiveToolPath, resolveToRealPath } from '../utils/paths.js';
+import { ToolErrorType } from './tool-error.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
@@ -53,7 +56,8 @@ class ASTSearchInvocation extends BaseToolInvocation<
 
   async execute(_options: ExecuteOptions): Promise<ToolResult> {
     const scope = this.params.scope ?? 'symbol';
-    const astService = new ASTAnalysisService(this.config.getTargetDir());
+    const targetDir = this.config.getTargetDir();
+    const astService = new ASTAnalysisService(targetDir);
 
     try {
       if (scope === 'map') {
@@ -65,6 +69,35 @@ class ASTSearchInvocation extends BaseToolInvocation<
           llmContent:
             'Error: file_path is required for "symbol" and "outline" scopes.',
           returnDisplay: 'Missing file_path',
+        };
+      }
+
+      // Validate path stays within workspace boundaries
+      const sanitizedPath = resolveDefensiveToolPath(
+        this.params.file_path,
+        targetDir,
+      );
+      let resolvedPath: string;
+      try {
+        resolvedPath = resolveToRealPath(
+          path.resolve(targetDir, sanitizedPath),
+        );
+      } catch {
+        resolvedPath = path.resolve(targetDir, sanitizedPath);
+      }
+
+      const validationError = this.config.validatePathAccess(
+        resolvedPath,
+        'read',
+      );
+      if (validationError) {
+        return {
+          llmContent: validationError,
+          returnDisplay: 'Path not in workspace.',
+          error: {
+            message: validationError,
+            type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
+          },
         };
       }
 
@@ -218,6 +251,50 @@ export class ASTSearchTool extends BaseDeclarativeTool<
       true,
       false,
     );
+  }
+
+  protected override validateToolParamValues(
+    params: ASTSearchToolParams,
+  ): string | null {
+    const scope = params.scope ?? 'symbol';
+
+    if (
+      scope === 'symbol' &&
+      (!params.symbol_name || params.symbol_name.trim() === '')
+    ) {
+      return "The 'symbol_name' parameter must be non-empty when scope is 'symbol'.";
+    }
+
+    if (
+      (scope === 'symbol' || scope === 'outline') &&
+      (!params.file_path || params.file_path.trim() === '')
+    ) {
+      return "The 'file_path' parameter must be non-empty for 'symbol' and 'outline' scopes.";
+    }
+
+    if (params.file_path) {
+      const sanitizedPath = resolveDefensiveToolPath(
+        params.file_path,
+        this.config.getTargetDir(),
+      );
+      let resolvedPath: string;
+      try {
+        resolvedPath = resolveToRealPath(
+          path.resolve(this.config.getTargetDir(), sanitizedPath),
+        );
+      } catch (err) {
+        return `Failed to resolve path: ${err instanceof Error ? err.message : String(err)}`;
+      }
+      const validationError = this.config.validatePathAccess(
+        resolvedPath,
+        'read',
+      );
+      if (validationError) {
+        return validationError;
+      }
+    }
+
+    return null;
   }
 
   protected createInvocation(
