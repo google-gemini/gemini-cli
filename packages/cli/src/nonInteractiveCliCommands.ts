@@ -25,7 +25,8 @@ import type { SessionStatsState } from './ui/contexts/SessionContext.js';
  * Processes a slash command in a non-interactive environment.
  *
  * @returns A Promise that resolves to `PartListUnion` if a valid command is
- *   found and results in a prompt, or `undefined` otherwise.
+ *   found and results in a prompt, `'handled'` if the command was processed
+ *   locally (e.g. /stats), or `undefined` otherwise.
  * @throws {FatalInputError} if the command result is not supported in
  *   non-interactive mode.
  */
@@ -34,7 +35,7 @@ export const handleSlashCommand = async (
   abortController: AbortController,
   config: Config,
   settings: LoadedSettings,
-): Promise<PartListUnion | undefined> => {
+): Promise<PartListUnion | 'handled' | undefined> => {
   const trimmed = rawQuery.trim();
   if (!trimmed.startsWith('/')) {
     return;
@@ -72,7 +73,7 @@ export const handleSlashCommand = async (
           git: undefined,
           logger,
         },
-        ui: createNonInteractiveUI(),
+        ui: createNonInteractiveUI(config),
         session: {
           stats: sessionStats,
           sessionShellAllowlist: new Set(),
@@ -106,6 +107,7 @@ export const handleSlashCommand = async (
             );
         }
       }
+      return 'handled';
     }
   }
 
