@@ -18,7 +18,7 @@ export function useTips(): UseTipsResult {
 
   useEffect(() => {
     if (showTips) {
-      persistentState.set('tipsShown', tipsCount + 1);
+      void persistentState.set('tipsShown', tipsCount + 1);
     }
   }, [tipsCount, showTips]);
 

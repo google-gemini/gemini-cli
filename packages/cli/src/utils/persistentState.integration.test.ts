@@ -30,7 +30,7 @@ describe('PersistentState filesystem behavior', () => {
     vi.resetAllMocks();
   });
 
-  it('publishes valid state and keeps the previous snapshot as a backup', () => {
+  it('publishes valid state and keeps the previous snapshot as a backup', async () => {
     const directory = fs.mkdtempSync(
       path.join(os.tmpdir(), 'gemini-persistent-state-'),
     );
@@ -38,8 +38,30 @@ describe('PersistentState filesystem behavior', () => {
     vi.mocked(Storage.getGlobalGeminiDir).mockReturnValue(directory);
 
     const state = new PersistentState();
-    state.set('tipsShown', 1);
-    state.set('tipsShown', 2);
+    await state.set('tipsShown', 1);
+    await state.set('tipsShown', 2);
+    expect(
+      JSON.parse(fs.readFileSync(path.join(directory, 'state.json'), 'utf8')),
+    ).toEqual({ tipsShown: 2 });
+    expect(
+      JSON.parse(
+        fs.readFileSync(path.join(directory, 'state.json.bak'), 'utf8'),
+      ),
+    ).toEqual({ tipsShown: 1 });
+  });
+
+  it('serializes consecutive saves in call order', async () => {
+    const directory = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-persistent-state-'),
+    );
+    temporaryDirectories.push(directory);
+    vi.mocked(Storage.getGlobalGeminiDir).mockReturnValue(directory);
+
+    const state = new PersistentState();
+    const firstSave = state.set('tipsShown', 1);
+    const secondSave = state.set('tipsShown', 2);
+    await Promise.all([firstSave, secondSave]);
+
     expect(
       JSON.parse(fs.readFileSync(path.join(directory, 'state.json'), 'utf8')),
     ).toEqual({ tipsShown: 2 });

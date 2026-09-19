@@ -509,7 +509,7 @@ export function useTerminalSetupPrompt({
       const shouldPrompt = await shouldPromptForTerminalSetup();
       if (!shouldPrompt || cancelled) return;
 
-      persistentState.set('terminalSetupPromptShown', true);
+      await persistentState.set('terminalSetupPromptShown', true);
 
       const confirmed = await requestConsentInteractive(
         TERMINAL_SETUP_CONSENT_MESSAGE,

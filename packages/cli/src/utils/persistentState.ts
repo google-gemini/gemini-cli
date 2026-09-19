@@ -26,6 +26,7 @@ interface PersistentStateData {
 export class PersistentState {
   private cache: PersistentStateData | null = null;
   private filePath: string | null = null;
+  private saveQueue: Promise<void> = Promise.resolve();
 
   private getPath(): string {
     if (!this.filePath) {
@@ -110,53 +111,55 @@ export class PersistentState {
     }
   }
 
-  private save() {
-    if (!this.cache) return;
-    let temporaryPath: string | undefined;
-    let fileDescriptor: number | undefined;
+  private save(): Promise<void> {
+    if (!this.cache) return this.saveQueue;
 
-    try {
-      const filePath = this.getPath();
-      const dir = path.dirname(filePath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
+    const serializedState = JSON.stringify(this.cache, null, 2);
+    this.saveQueue = this.saveQueue
+      .catch(() => {})
+      .then(async () => {
+        const filePath = this.getPath();
+        const dir = path.dirname(filePath);
+        let temporaryPath: string | undefined;
+        let fileHandle: fs.promises.FileHandle | undefined;
 
-      temporaryPath = `${filePath}.${randomUUID()}.tmp`;
-      fs.writeFileSync(temporaryPath, JSON.stringify(this.cache, null, 2), {
-        encoding: 'utf-8',
-        flag: 'wx',
+        try {
+          await fs.promises.mkdir(dir, { recursive: true });
+
+          temporaryPath = `${filePath}.${randomUUID()}.tmp`;
+          fileHandle = await fs.promises.open(temporaryPath, 'wx');
+          await fileHandle.writeFile(serializedState, 'utf-8');
+          await fileHandle.sync();
+          await fileHandle.close();
+          fileHandle = undefined;
+
+          try {
+            await fs.promises.copyFile(filePath, `${filePath}${BACKUP_SUFFIX}`);
+          } catch (error) {
+            if (
+              typeof error !== 'object' ||
+              error === null ||
+              !('code' in error) ||
+              error.code !== 'ENOENT'
+            ) {
+              throw error;
+            }
+          }
+
+          await fs.promises.rename(temporaryPath, filePath);
+          temporaryPath = undefined;
+        } catch (error) {
+          if (fileHandle) {
+            await fileHandle.close().catch(() => {});
+          }
+          if (temporaryPath) {
+            await fs.promises.unlink(temporaryPath).catch(() => {});
+          }
+          debugLogger.warn('Failed to save persistent state:', error);
+        }
       });
 
-      // A writable descriptor is required for fsyncSync on Windows.
-      fileDescriptor = fs.openSync(temporaryPath, 'r+');
-      fs.fsyncSync(fileDescriptor);
-      fs.closeSync(fileDescriptor);
-      fileDescriptor = undefined;
-
-      if (fs.existsSync(filePath)) {
-        fs.copyFileSync(filePath, `${filePath}${BACKUP_SUFFIX}`);
-      }
-
-      fs.renameSync(temporaryPath, filePath);
-      temporaryPath = undefined;
-    } catch (error) {
-      if (fileDescriptor !== undefined) {
-        try {
-          fs.closeSync(fileDescriptor);
-        } catch {
-          // Preserve the original save error.
-        }
-      }
-      if (temporaryPath) {
-        try {
-          fs.unlinkSync(temporaryPath);
-        } catch {
-          // Preserve the original save error.
-        }
-      }
-      debugLogger.warn('Failed to save persistent state:', error);
-    }
+    return this.saveQueue;
   }
 
   get<K extends keyof PersistentStateData>(
@@ -168,10 +171,10 @@ export class PersistentState {
   set<K extends keyof PersistentStateData>(
     key: K,
     value: PersistentStateData[K],
-  ): void {
+  ): Promise<void> {
     this.load(); // ensure loaded
     this.cache![key] = value;
-    this.save();
+    return this.save();
   }
 }
 
