@@ -80,7 +80,7 @@ export class A2AClientManager {
   /**
    * Loads an agent by fetching its AgentCard and caches the client.
    * @param name The name to assign to the agent.
-   * @param agentCardUrl The full URL to the agent's card.
+   * @param options Load options, including the resolved agent card URL.
    * @param authHandler Optional authentication handler to use for this agent.
    * @returns The loaded AgentCard.
    */
