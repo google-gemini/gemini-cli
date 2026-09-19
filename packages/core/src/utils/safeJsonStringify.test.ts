@@ -14,6 +14,12 @@ describe('safeJsonStringify', () => {
     expect(result).toBe('{"name":"test","value":42}');
   });
 
+  it('should preserve repeated references that are not circular', () => {
+    const shared = { value: 42 };
+    const result = safeJsonStringify({ first: shared, second: shared });
+    expect(result).toBe('{"first":{"value":42},"second":{"value":42}}');
+  });
+
   it('should handle circular references by replacing them with [Circular]', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const obj: any = { name: 'test' };
