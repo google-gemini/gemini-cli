@@ -272,6 +272,37 @@ describe('TrackerService', () => {
     expect(tasks.length).toBe(0);
   });
 
+  it('should update preloadedTasks in-place when cleaning up deps during delete', async () => {
+    const dep = await service.createTask({
+      title: 'Dep',
+      description: 'D',
+      type: TaskType.TASK,
+      status: TaskStatus.OPEN,
+      dependencies: [],
+    });
+    const main = await service.createTask({
+      title: 'Main',
+      description: 'M',
+      type: TaskType.TASK,
+      status: TaskStatus.OPEN,
+      dependencies: [dep.id],
+    });
+
+    // Pre-load the task list and pass it to deleteTask
+    const preloaded = await service.listTasks();
+    expect(preloaded.length).toBe(2);
+
+    await service.deleteTask(dep.id, preloaded);
+
+    // The dep task should be spliced out
+    expect(preloaded.length).toBe(1);
+    expect(preloaded[0].id).toBe(main.id);
+    // The main task in the preloaded array should have its deps cleaned
+    expect(preloaded[0].dependencies).toEqual([]);
+    // updatedAt should be refreshed in-place
+    expect(preloaded[0].updatedAt).not.toBe(main.updatedAt);
+  });
+
   it('should detect circular dependencies', async () => {
     const taskA = await service.createTask({
       title: 'Task A',

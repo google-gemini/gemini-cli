@@ -253,6 +253,15 @@ export class TrackerService {
         if (freshNeedsSave) {
           fresh.updatedAt = now;
           await this.saveTask(fresh);
+          // Keep the in-memory preloaded array consistent so subsequent
+          // bulk deletes in the same reconciliation pass see updated
+          // deps/parentId instead of stale references.
+          if (preloadedTasks) {
+            const idx = preloadedTasks.findIndex((t) => t.id === fresh.id);
+            if (idx !== -1) {
+              preloadedTasks[idx] = fresh;
+            }
+          }
         }
       }
     }
