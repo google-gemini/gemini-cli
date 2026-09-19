@@ -504,15 +504,15 @@ function getDeclarationPatterns(lang: string) {
       break;
     case 'java':
       p.push({
-        regex: /(?:public|private|protected)?\s*class\s+(\w+)/,
+        regex: /\bclass\s+(\w+)/,
         kind: 'class',
       });
       p.push({
-        regex: /(?:public|private|protected)?\s*interface\s+(\w+)/,
+        regex: /\binterface\s+(\w+)/,
         kind: 'interface',
       });
       p.push({
-        regex: /(?:public|private|protected)?\s*enum\s+(\w+)/,
+        regex: /\benum\s+(\w+)/,
         kind: 'enum',
       });
       break;
@@ -545,7 +545,8 @@ function getMemberPatterns(lang: string) {
       break;
     case 'java':
       p.push({
-        regex: /(?:public|private|protected|static)?\s*\w+\s+(\w+)\s*\(/,
+        regex:
+          /(?:(?:public|private|protected|static|final|synchronized|abstract|default)\s+)*[\w<>[{\]}]+\s+(\w+)\s*\(/,
         kind: 'method',
       });
       break;
