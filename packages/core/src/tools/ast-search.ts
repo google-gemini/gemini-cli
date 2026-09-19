@@ -170,6 +170,14 @@ class ASTSearchInvocation extends BaseToolInvocation<
     // Single getFileOutline call to avoid reading and parsing the file twice
     // (findSymbolBounds internally calls getFileOutline, so calling both is redundant).
     const outline = await astService.getFileOutline(safePath);
+
+    if (!outline) {
+      return {
+        llmContent: `Could not search "${safePath}". File may not exist, is ignored, or its language is not supported.`,
+        returnDisplay: 'File not parsed',
+      };
+    }
+
     const findSymbolRecursive = (
       symbols: ASTSymbol[],
     ): ASTSymbol | undefined => {
@@ -180,7 +188,7 @@ class ASTSearchInvocation extends BaseToolInvocation<
       }
       return undefined;
     };
-    const symbol = outline ? findSymbolRecursive(outline.symbols) : undefined;
+    const symbol = findSymbolRecursive(outline.symbols);
 
     if (!symbol) {
       return {

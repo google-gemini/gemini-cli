@@ -178,6 +178,10 @@ export function extractSymbols(lines: string[], language: string): ASTSymbol[] {
   // multi-line blocks, while preserving line numbers and offsets.
   const cleaned = stripBlockComments(lines, language);
 
+  // Pre-strip string/regex literals once for the entire file so that
+  // findClosingBrace does not re-run the regex on every call (O(N) instead of O(M*N)).
+  const stripped = language !== 'python' ? preStripLines(cleaned) : undefined;
+
   for (let i = 0; i < cleaned.length; i++) {
     const trimmed = cleaned[i].trim();
 
@@ -207,7 +211,7 @@ export function extractSymbols(lines: string[], language: string): ASTSymbol[] {
       const endLine =
         language === 'python'
           ? findIndentEnd(cleaned, i)
-          : findClosingBrace(cleaned, i);
+          : findClosingBrace(cleaned, i, stripped);
 
       const sym: ASTSymbol = {
         name: match[1],
@@ -218,7 +222,7 @@ export function extractSymbols(lines: string[], language: string): ASTSymbol[] {
           trimmed.length > 120 ? trimmed.slice(0, 117) + '...' : trimmed,
         children:
           kind === 'class' || kind === 'interface'
-            ? extractMembers(cleaned, i + 1, endLine, language)
+            ? extractMembers(cleaned, i + 1, endLine, language, stripped)
             : [],
       };
 
@@ -338,24 +342,37 @@ export function stripBlockComments(
   return result;
 }
 
-export function findClosingBrace(lines: string[], startLine: number): number {
-  let depth = 0;
-  let parenDepth = 0;
-  let opened = false;
-  for (let i = startLine; i < lines.length; i++) {
-    // Strip string literals (including escaped quotes) and regex literals
-    // to avoid false brace matches from patterns like /[{}]/ or /a{1,3}/.
-    // The regex-literal pattern excludes semicolons to prevent matching across
-    // separate division statements (e.g. `const a = b / c; if (a) {`).
-    let stripped = lines[i].replace(
-      /'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`|\/(?:[^/;\\]|\\.)+\//g,
-      '',
-    );
-    // Strip single-line comments which may contain braces (e.g. "// }")
+/**
+ * Pre-strips string/regex literals and single-line comments from source lines.
+ * Call once per file and pass the result to findClosingBrace to avoid O(M*N)
+ * repeated regex replacements when parsing multiple declarations.
+ */
+export function preStripLines(lines: string[]): string[] {
+  const re =
+    /'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`|\/(?:[^/;\\]|\\.)+\//g;
+  return lines.map((line) => {
+    let stripped = line.replace(re, '');
     const commentIdx = stripped.indexOf('//');
     if (commentIdx >= 0) {
       stripped = stripped.slice(0, commentIdx);
     }
+    return stripped;
+  });
+}
+
+export function findClosingBrace(
+  lines: string[],
+  startLine: number,
+  strippedLines?: string[],
+): number {
+  // When no pre-stripped lines are provided, compute them on the fly
+  // so that direct callers (tests, extractMembers without cache) still work.
+  const effective = strippedLines ?? preStripLines(lines);
+  let depth = 0;
+  let parenDepth = 0;
+  let opened = false;
+  for (let i = startLine; i < lines.length; i++) {
+    const stripped = effective[i];
     for (const ch of stripped) {
       if (ch === '(') parenDepth++;
       else if (ch === ')') parenDepth--;
@@ -429,6 +446,7 @@ function extractMembers(
   start: number,
   end: number,
   language: string,
+  strippedLines?: string[],
 ): ASTSymbol[] {
   const members: ASTSymbol[] = [];
   const patterns = getMemberPatterns(language);
@@ -442,7 +460,7 @@ function extractMembers(
       const memberEnd =
         language === 'python'
           ? Math.min(findIndentEnd(lines, i), end)
-          : Math.min(findClosingBrace(lines, i), end);
+          : Math.min(findClosingBrace(lines, i, strippedLines), end);
       members.push({
         name: match[1],
         kind,
