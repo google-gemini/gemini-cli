@@ -79,7 +79,7 @@ export const Notifications = () => {
         }
       });
       if (changed) {
-        persistentState.set('startupWarningCounts', counts);
+        void persistentState.set('startupWarningCounts', counts);
       }
       hasIncrementedRef.current = true;
     }
@@ -103,7 +103,7 @@ export const Notifications = () => {
 
       try {
         await fs.access(screenReaderNudgeFilePath);
-        persistentState.set('hasSeenScreenReaderNudge', true);
+        await persistentState.set('hasSeenScreenReaderNudge', true);
         setHasSeenScreenReaderNudge(true);
         // Best effort cleanup of legacy file
         await fs.unlink(screenReaderNudgeFilePath).catch(() => {});
@@ -123,7 +123,7 @@ export const Notifications = () => {
 
   useEffect(() => {
     if (showScreenReaderNudge) {
-      persistentState.set('hasSeenScreenReaderNudge', true);
+      void persistentState.set('hasSeenScreenReaderNudge', true);
     }
   }, [showScreenReaderNudge]);
 

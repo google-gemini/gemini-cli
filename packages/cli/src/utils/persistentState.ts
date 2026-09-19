@@ -5,10 +5,13 @@
  */
 
 import { Storage, debugLogger } from '@google/gemini-cli-core';
+import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 const STATE_FILENAME = 'state.json';
+const BACKUP_SUFFIX = '.bak';
+const CORRUPT_SUFFIX = '.corrupt';
 
 interface PersistentStateData {
   defaultBannerShownCount?: Record<string, number>;
@@ -23,6 +26,7 @@ interface PersistentStateData {
 export class PersistentState {
   private cache: PersistentStateData | null = null;
   private filePath: string | null = null;
+  private saveQueue: Promise<void> = Promise.resolve();
 
   private getPath(): string {
     if (!this.filePath) {
@@ -39,31 +43,171 @@ export class PersistentState {
       const filePath = this.getPath();
       if (fs.existsSync(filePath)) {
         const content = fs.readFileSync(filePath, 'utf-8');
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        this.cache = JSON.parse(content);
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          this.cache = JSON.parse(content);
+        } catch (error) {
+          this.cache = this.recoverFromCorruptState(filePath, error);
+          this.saveSync();
+        }
       } else {
         this.cache = {};
       }
     } catch (error) {
       debugLogger.warn('Failed to load persistent state:', error);
-      // If error reading (e.g. corrupt JSON), start fresh
       this.cache = {};
     }
     return this.cache!;
   }
 
-  private save() {
+  private recoverFromCorruptState(
+    filePath: string,
+    parseError: unknown,
+  ): PersistentStateData {
+    const corruptPath = `${filePath}${CORRUPT_SUFFIX}`;
+    let preservedPath: string | undefined;
+
+    try {
+      fs.renameSync(filePath, corruptPath);
+      preservedPath = corruptPath;
+    } catch {
+      const uniqueCorruptPath = `${corruptPath}.${randomUUID()}`;
+      try {
+        fs.renameSync(filePath, uniqueCorruptPath);
+        preservedPath = uniqueCorruptPath;
+      } catch (preserveError) {
+        debugLogger.warn(
+          `Failed to preserve corrupt persistent state at ${filePath}:`,
+          preserveError,
+        );
+      }
+    }
+
+    const backupPath = `${filePath}${BACKUP_SUFFIX}`;
+    try {
+      if (!fs.existsSync(backupPath)) {
+        throw new Error(`No persistent state backup found at ${backupPath}`);
+      }
+
+      const backupContent = fs.readFileSync(backupPath, 'utf-8');
+      const backupState: unknown = JSON.parse(backupContent);
+      if (
+        typeof backupState !== 'object' ||
+        backupState === null ||
+        Array.isArray(backupState)
+      ) {
+        throw new Error(`Invalid persistent state backup at ${backupPath}`);
+      }
+      debugLogger.warn(
+        `Persistent state was corrupt; preserved it at ${preservedPath ?? filePath} and restored ${backupPath}.`,
+        parseError,
+      );
+      return backupState as PersistentStateData;
+    } catch (backupError) {
+      debugLogger.warn(
+        `Failed to restore persistent state backup at ${backupPath}:`,
+        backupError,
+      );
+      return {};
+    }
+  }
+
+  private saveSync(): void {
     if (!this.cache) return;
+
+    let temporaryPath: string | undefined;
+    let fileDescriptor: number | undefined;
+
     try {
       const filePath = this.getPath();
       const dir = path.dirname(filePath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      fs.writeFileSync(filePath, JSON.stringify(this.cache, null, 2));
+      fs.mkdirSync(dir, { recursive: true });
+
+      temporaryPath = `${filePath}.${randomUUID()}.tmp`;
+      fileDescriptor = fs.openSync(temporaryPath, 'wx');
+      fs.writeSync(
+        fileDescriptor,
+        JSON.stringify(this.cache, null, 2),
+        null,
+        'utf-8',
+      );
+      fs.fsyncSync(fileDescriptor);
+      fs.closeSync(fileDescriptor);
+      fileDescriptor = undefined;
+
+      fs.renameSync(temporaryPath, filePath);
+      temporaryPath = undefined;
     } catch (error) {
-      debugLogger.warn('Failed to save persistent state:', error);
+      if (fileDescriptor !== undefined) {
+        try {
+          fs.closeSync(fileDescriptor);
+        } catch {
+          // Preserve the original save error.
+        }
+      }
+      if (temporaryPath) {
+        try {
+          fs.unlinkSync(temporaryPath);
+        } catch {
+          // Preserve the original save error.
+        }
+      }
+      debugLogger.warn(
+        'Failed to synchronously restore persistent state:',
+        error,
+      );
     }
+  }
+
+  private save(): Promise<void> {
+    if (!this.cache) return this.saveQueue;
+
+    const serializedState = JSON.stringify(this.cache, null, 2);
+    this.saveQueue = this.saveQueue
+      .catch(() => {})
+      .then(async () => {
+        const filePath = this.getPath();
+        const dir = path.dirname(filePath);
+        let temporaryPath: string | undefined;
+        let fileHandle: fs.promises.FileHandle | undefined;
+
+        try {
+          await fs.promises.mkdir(dir, { recursive: true });
+
+          temporaryPath = `${filePath}.${randomUUID()}.tmp`;
+          fileHandle = await fs.promises.open(temporaryPath, 'wx');
+          await fileHandle.writeFile(serializedState, 'utf-8');
+          await fileHandle.sync();
+          await fileHandle.close();
+          fileHandle = undefined;
+
+          try {
+            await fs.promises.copyFile(filePath, `${filePath}${BACKUP_SUFFIX}`);
+          } catch (error) {
+            if (
+              typeof error !== 'object' ||
+              error === null ||
+              !('code' in error) ||
+              error.code !== 'ENOENT'
+            ) {
+              throw error;
+            }
+          }
+
+          await fs.promises.rename(temporaryPath, filePath);
+          temporaryPath = undefined;
+        } catch (error) {
+          if (fileHandle) {
+            await fileHandle.close().catch(() => {});
+          }
+          if (temporaryPath) {
+            await fs.promises.unlink(temporaryPath).catch(() => {});
+          }
+          debugLogger.warn('Failed to save persistent state:', error);
+        }
+      });
+
+    return this.saveQueue;
   }
 
   get<K extends keyof PersistentStateData>(
@@ -75,10 +219,10 @@ export class PersistentState {
   set<K extends keyof PersistentStateData>(
     key: K,
     value: PersistentStateData[K],
-  ): void {
+  ): Promise<void> {
     this.load(); // ensure loaded
     this.cache![key] = value;
-    this.save();
+    return this.save();
   }
 }
 

@@ -65,7 +65,7 @@ export function useBanner(bannerData: BannerData) {
         const allCounts = persistentState.get('defaultBannerShownCount') || {};
         const current = allCounts[hashedText] || 0;
 
-        persistentState.set('defaultBannerShownCount', {
+        void persistentState.set('defaultBannerShownCount', {
           ...allCounts,
           [hashedText]: current + 1,
         });
