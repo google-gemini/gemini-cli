@@ -345,8 +345,10 @@ export function findClosingBrace(lines: string[], startLine: number): number {
   for (let i = startLine; i < lines.length; i++) {
     // Strip string literals (including escaped quotes) and regex literals
     // to avoid false brace matches from patterns like /[{}]/ or /a{1,3}/.
+    // The regex-literal pattern excludes semicolons to prevent matching across
+    // separate division statements (e.g. `const a = b / c; if (a) {`).
     let stripped = lines[i].replace(
-      /'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`|\/(?:[^/\\]|\\.)+\//g,
+      /'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`|\/(?:[^/;\\]|\\.)+\//g,
       '',
     );
     // Strip single-line comments which may contain braces (e.g. "// }")

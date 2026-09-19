@@ -26,7 +26,7 @@ import {
   type ASTSymbol,
 } from '../services/astAnalysisService.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
+import type { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 
 export interface ASTSearchToolParams {
   symbol_name?: string;
@@ -60,13 +60,10 @@ class ASTSearchInvocation extends BaseToolInvocation<
     const scope = this.params.scope ?? 'symbol';
     const targetDir = this.config.getTargetDir();
 
-    // Build shouldIgnore callback backed by FileDiscoveryService to enforce
-    // .gitignore and .geminiignore patterns during outline and map operations.
+    // Use the centralized, cached FileDiscoveryService from config to avoid
+    // re-reading and re-parsing .gitignore/.geminiignore on every tool call.
     const fileFilteringOptions = this.config.getFileFilteringOptions();
-    const fileDiscoveryService = new FileDiscoveryService(
-      targetDir,
-      fileFilteringOptions,
-    );
+    const fileDiscoveryService = this.config.getFileService();
     const shouldIgnore = (filePath: string): boolean =>
       fileDiscoveryService.shouldIgnoreFile(filePath, fileFilteringOptions);
 
@@ -300,10 +297,7 @@ export class ASTSearchTool extends BaseDeclarativeTool<
       true,
       false,
     );
-    this.fileDiscoveryService = new FileDiscoveryService(
-      config.getTargetDir(),
-      config.getFileFilteringOptions(),
-    );
+    this.fileDiscoveryService = config.getFileService();
   }
 
   protected override validateToolParamValues(
