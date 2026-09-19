@@ -124,12 +124,13 @@ export class PersistentState {
       fs.mkdirSync(dir, { recursive: true });
 
       temporaryPath = `${filePath}.${randomUUID()}.tmp`;
-      fs.writeFileSync(temporaryPath, JSON.stringify(this.cache, null, 2), {
-        encoding: 'utf-8',
-        flag: 'wx',
-      });
-
-      fileDescriptor = fs.openSync(temporaryPath, 'r+');
+      fileDescriptor = fs.openSync(temporaryPath, 'wx');
+      fs.writeSync(
+        fileDescriptor,
+        JSON.stringify(this.cache, null, 2),
+        null,
+        'utf-8',
+      );
       fs.fsyncSync(fileDescriptor);
       fs.closeSync(fileDescriptor);
       fileDescriptor = undefined;
