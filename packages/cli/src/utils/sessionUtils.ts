@@ -508,13 +508,15 @@ export class SessionSelector {
         throw SessionError.noSessionsFound();
       }
 
-      // Sort by startTime (oldest first, so newest sessions get highest numbers)
-      sessions.sort(
-        (a, b) =>
-          new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
+      // 'latest' means the most recently active session, not the most
+      // recently started one: bare `--resume` should reopen the session
+      // the user just left.
+      selectedSession = sessions.reduce((newest, session) =>
+        new Date(session.lastUpdated).getTime() >
+        new Date(newest.lastUpdated).getTime()
+          ? session
+          : newest,
       );
-
-      selectedSession = sessions[sessions.length - 1];
     } else {
       try {
         selectedSession = await this.findSession(trimmedResumeArg);
