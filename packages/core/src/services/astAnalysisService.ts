@@ -573,9 +573,12 @@ function countSymbols(syms: ASTSymbol[]): number {
  * in a follow-up PR.
  */
 async function collectSourceFiles(dir: string, max: number): Promise<string[]> {
+  // Collect ALL matching files first, then sort and truncate.
+  // This ensures a deterministic, platform-independent subset when the workspace
+  // contains more files than `max`, since fs.readdir order is OS-dependent.
   const files: string[] = [];
   async function walk(d: string, depth: number) {
-    if (depth > 15 || files.length >= max) return;
+    if (depth > 15) return;
     let entries;
     try {
       entries = await fs.readdir(d, { withFileTypes: true });
@@ -583,7 +586,6 @@ async function collectSourceFiles(dir: string, max: number): Promise<string[]> {
       return;
     }
     for (const e of entries) {
-      if (files.length >= max) return;
       const full = path.join(d, e.name);
       if (
         e.isDirectory() &&
@@ -597,5 +599,5 @@ async function collectSourceFiles(dir: string, max: number): Promise<string[]> {
     }
   }
   await walk(dir, 0);
-  return files.sort();
+  return files.sort().slice(0, max);
 }
