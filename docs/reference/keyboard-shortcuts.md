@@ -4,6 +4,9 @@ Gemini CLI ships with a set of default keyboard shortcuts for editing input,
 navigating history, and controlling the UI. Use this reference to learn the
 available combinations.
 
+Press `Ctrl+R` and type part of a previous prompt to search your history.
+Matching text is highlighted in the results.
+
 <!-- KEYBINDINGS-AUTOGEN:START -->
 
 #### Basic Controls

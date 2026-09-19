@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="37" viewBox="0 0 920 37">
+  <style>
+    text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+  </style>
+  <rect width="920" height="37" fill="#000000" />
+  <g transform="translate(10, 10)">
+    <rect x="9" y="0" width="63" height="17" fill="#001a00" />
+    <text x="9" y="2" fill="#00cd00" textLength="63" lengthAdjust="spacingAndGlyphs">echo İ </text>
+    <rect x="72" y="0" width="27" height="17" fill="#00cd00" />
+    <text x="72" y="2" fill="#001a00" textLength="27" lengthAdjust="spacingAndGlyphs">abc</text>
+    <rect x="99" y="0" width="612" height="17" fill="#001a00" />
+  </g>
+</svg>

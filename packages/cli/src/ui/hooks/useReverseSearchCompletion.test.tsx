@@ -6,9 +6,13 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act } from 'react';
-import { renderHookWithProviders } from '../../test-utils/render.js';
+import {
+  renderHookWithProviders,
+  renderWithProviders,
+} from '../../test-utils/render.js';
 import { useReverseSearchCompletion } from './useReverseSearchCompletion.js';
 import { useTextBuffer } from '../components/shared/text-buffer.js';
+import { SuggestionsDisplay } from '../components/SuggestionsDisplay.js';
 
 describe('useReverseSearchCompletion', () => {
   beforeEach(() => {
@@ -239,6 +243,111 @@ describe('useReverseSearchCompletion', () => {
   });
 
   describe('Filtering', () => {
+    it.each([
+      ['echo İ abc', 'abc', 'abc'],
+      ['echo İ abc', 'i\u0307', 'İ'],
+      ['echo i\u0307 abc', 'İ', 'i\u0307'],
+    ])(
+      'highlights the original match in %j for %j',
+      async (label, query, expected) => {
+        const history = [label];
+
+        function ReverseSearchHistory() {
+          const completion = useReverseSearchCompletion(
+            useTextBufferForTest(query),
+            history,
+            true,
+          );
+
+          return (
+            <SuggestionsDisplay
+              suggestions={completion.suggestions}
+              activeIndex={completion.activeSuggestionIndex}
+              isLoading={completion.isLoadingSuggestions}
+              width={80}
+              scrollOffset={completion.visibleStartIndex}
+              userInput={query}
+              mode="reverse"
+            />
+          );
+        }
+
+        const rendered = await renderWithProviders(<ReverseSearchHistory />);
+        await rendered.waitUntilReady();
+        await expect(rendered).toMatchSvgSnapshot();
+        expect(rendered.lastFrame()).toContain(history[0]);
+
+        const highlighted: string[] = [];
+        const buffer = rendered.terminal.buffer.active;
+        for (let row = 0; row < buffer.length; row++) {
+          const line = buffer.getLine(row);
+          if (!line) continue;
+          for (let column = 0; column < line.length; column++) {
+            const cell = line.getCell(column);
+            if (cell?.isInverse()) highlighted.push(cell.getChars());
+          }
+        }
+        expect(highlighted.join('')).toBe(expected);
+        rendered.unmount();
+      },
+    );
+
+    it.each([
+      ['echo İ abc', 'ABC', 7, 3],
+      ['İİ abc', 'abc', 3, 3],
+      ['echo İX', 'i\u0307x', 5, 2],
+      ['echo İ abc', '\u0307', 5, 1],
+      ['😀 İ ABC', 'abc', 5, 3],
+      ['ΟΣ ABC', 'ος', 0, 2],
+      ['ΟΣΑ ABC', 'οσα', 0, 3],
+      ['echo a.b [x]', 'a.b', 5, 3],
+    ])(
+      'preserves the matching span in %j for %j',
+      async (label, query, matchedIndex, matchedLength) => {
+        const history = [label];
+        const { result, unmount } = await renderHookWithProviders(() =>
+          useReverseSearchCompletion(
+            useTextBufferForTest(query),
+            history,
+            true,
+          ),
+        );
+
+        expect(result.current.suggestions).toEqual([
+          { label, value: label, matchedIndex, matchedLength },
+        ]);
+        unmount();
+      },
+    );
+
+    it('preserves case-insensitive matching while narrowing cached results', async () => {
+      const history = ['echo İ ABC', 'echo İ ABD', 'echo AB', 'nothing'];
+      const { result, unmount } = await renderHookWithProviders(() => {
+        const buffer = useTextBufferForTest('a');
+        const completion = useReverseSearchCompletion(buffer, history, true);
+        return { buffer, completion };
+      });
+
+      expect(result.current.completion.suggestions.map((s) => s.value)).toEqual(
+        history.slice(0, 3),
+      );
+      await act(async () => {
+        result.current.buffer.setText('ABC');
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
+      expect(result.current.completion.suggestions).toEqual([
+        {
+          label: history[0],
+          value: history[0],
+          matchedIndex: 7,
+          matchedLength: 3,
+        },
+      ]);
+      unmount();
+    });
+
     it('filters history by buffer.text and sets showSuggestions', async () => {
       const history = ['foo', 'barfoo', 'baz'];
       const { result } = await renderHookWithProviders(() =>
