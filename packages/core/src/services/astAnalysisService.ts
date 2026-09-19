@@ -457,12 +457,27 @@ function extractMembers(
     for (const { regex, kind } of patterns) {
       const match = regex.exec(trimmed);
       if (!match?.[1]) continue;
+      const name = match[1];
+      // Skip control flow keywords that look like function calls
+      if (
+        [
+          'if',
+          'for',
+          'while',
+          'switch',
+          'catch',
+          'synchronized',
+          'return',
+        ].includes(name)
+      ) {
+        continue;
+      }
       const memberEnd =
         language === 'python'
           ? Math.min(findIndentEnd(lines, i), end)
           : Math.min(findClosingBrace(lines, i, strippedLines), end);
       members.push({
-        name: match[1],
+        name,
         kind,
         startLine: i + 1,
         endLine: memberEnd + 1,
