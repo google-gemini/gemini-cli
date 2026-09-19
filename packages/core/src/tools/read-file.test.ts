@@ -338,6 +338,7 @@ describe('ReadFileTool', () => {
         'IMPORTANT: The file content has been truncated',
       );
       expect(result.llmContent).toContain('--- FILE CONTENT (truncated) ---');
+      expect(result.llmContent).toContain('ast_search');
       expect(result.returnDisplay).toContain('some lines were shortened');
     });
 

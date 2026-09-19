@@ -73,6 +73,10 @@ import {
   ASK_USER_OPTION_PARAM_LABEL,
   ASK_USER_OPTION_PARAM_DESCRIPTION,
   PLAN_MODE_PARAM_REASON,
+  AST_SEARCH_TOOL_NAME,
+  AST_SEARCH_PARAM_SYMBOL_NAME,
+  AST_SEARCH_PARAM_FILE_PATH,
+  AST_SEARCH_PARAM_SCOPE,
 } from '../base-declarations.js';
 import {
   getShellDeclaration,
@@ -740,6 +744,31 @@ The agent did not use the todo list because this task could be completed by a ti
           description:
             'Optional filter to list resources from a specific server.',
           type: 'string',
+        },
+      },
+      required: [],
+    },
+  },
+
+  ast_search: {
+    name: AST_SEARCH_TOOL_NAME,
+    description:
+      'AST-aware structural search. Finds symbol bounds, file outlines, or codebase maps.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        [AST_SEARCH_PARAM_SYMBOL_NAME]: {
+          description: 'Symbol name to locate.',
+          type: 'string',
+        },
+        [AST_SEARCH_PARAM_FILE_PATH]: {
+          description: 'File to search in.',
+          type: 'string',
+        },
+        [AST_SEARCH_PARAM_SCOPE]: {
+          description: '"symbol", "outline", or "map".',
+          type: 'string',
+          enum: ['symbol', 'outline', 'map'],
         },
       },
       required: [],

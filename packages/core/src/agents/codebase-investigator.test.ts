@@ -11,6 +11,7 @@ import {
   GREP_TOOL_NAME,
   LS_TOOL_NAME,
   READ_FILE_TOOL_NAME,
+  AST_SEARCH_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 import { makeFakeConfig } from '../test-utils/config.js';
@@ -50,6 +51,7 @@ describe('CodebaseInvestigatorAgent', () => {
       READ_FILE_TOOL_NAME,
       GLOB_TOOL_NAME,
       GREP_TOOL_NAME,
+      AST_SEARCH_TOOL_NAME,
     ]);
   });
 
@@ -76,5 +78,16 @@ describe('CodebaseInvestigatorAgent', () => {
     mockPlatform('linux');
     const agent = CodebaseInvestigatorAgent(config);
     expect(agent.promptConfig.systemPrompt).toContain('`ls -R`');
+  });
+
+  it('should mention ast_search tool in system prompt', () => {
+    const agent = CodebaseInvestigatorAgent(config);
+    expect(agent.promptConfig.systemPrompt).toContain('ast_search');
+    expect(agent.promptConfig.systemPrompt).toContain('scope');
+  });
+
+  it('should include ast_search in tool config', () => {
+    const agent = CodebaseInvestigatorAgent(config);
+    expect(agent.toolConfig?.tools).toContain(AST_SEARCH_TOOL_NAME);
   });
 });
