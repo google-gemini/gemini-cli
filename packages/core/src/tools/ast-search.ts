@@ -26,6 +26,7 @@ import {
   type ASTSymbol,
 } from '../services/astAnalysisService.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 
 export interface ASTSearchToolParams {
   symbol_name?: string;
@@ -58,7 +59,20 @@ class ASTSearchInvocation extends BaseToolInvocation<
   async execute(_options: ExecuteOptions): Promise<ToolResult> {
     const scope = this.params.scope ?? 'symbol';
     const targetDir = this.config.getTargetDir();
-    const astService = new ASTAnalysisService(targetDir);
+
+    // Build shouldIgnore callback backed by FileDiscoveryService to enforce
+    // .gitignore and .geminiignore patterns during outline and map operations.
+    const fileFilteringOptions = this.config.getFileFilteringOptions();
+    const fileDiscoveryService = new FileDiscoveryService(
+      targetDir,
+      fileFilteringOptions,
+    );
+    const shouldIgnore = (filePath: string): boolean => fileDiscoveryService.shouldIgnoreFile(
+        filePath,
+        fileFilteringOptions,
+      );
+
+    const astService = new ASTAnalysisService(targetDir, shouldIgnore);
 
     try {
       // Trim params to prevent whitespace-only values and search mismatches
@@ -274,6 +288,7 @@ export class ASTSearchTool extends BaseDeclarativeTool<
   ToolResult
 > {
   static readonly Name = AST_SEARCH_TOOL_NAME;
+  private readonly fileDiscoveryService: FileDiscoveryService;
 
   constructor(
     private config: Config,
@@ -288,6 +303,10 @@ export class ASTSearchTool extends BaseDeclarativeTool<
       messageBus,
       true,
       false,
+    );
+    this.fileDiscoveryService = new FileDiscoveryService(
+      config.getTargetDir(),
+      config.getFileFilteringOptions(),
     );
   }
 
@@ -328,6 +347,21 @@ export class ASTSearchTool extends BaseDeclarativeTool<
       );
       if (validationError) {
         return validationError;
+      }
+
+      // Enforce .gitignore / .geminiignore patterns, matching ReadFileTool
+      const fileFilteringOptions = this.config.getFileFilteringOptions();
+      if (
+        this.fileDiscoveryService.shouldIgnoreFile(
+          sanitizedPath,
+          fileFilteringOptions,
+        ) ||
+        this.fileDiscoveryService.shouldIgnoreFile(
+          resolvedPath,
+          fileFilteringOptions,
+        )
+      ) {
+        return `File path '${resolvedPath}' is ignored by configured ignore patterns.`;
       }
     }
 

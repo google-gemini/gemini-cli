@@ -57,7 +57,10 @@ const SKIP_DIRS = new Set([
  *   3. Compressed codebase mapping (class/function/signature outlines)
  */
 export class ASTAnalysisService {
-  constructor(private readonly targetDir: string) {}
+  constructor(
+    private readonly targetDir: string,
+    private readonly shouldIgnore?: (filePath: string) => boolean,
+  ) {}
 
   /**
    * Returns the structural outline of a single source file.
@@ -69,6 +72,14 @@ export class ASTAnalysisService {
     // Guard against path traversal
     const relative = path.relative(resolvedTargetDir, absPath);
     if (relative.startsWith('..') || path.isAbsolute(relative)) {
+      return null;
+    }
+
+    // Enforce ignore patterns (e.g. .gitignore, .geminiignore) when provided
+    if (
+      this.shouldIgnore &&
+      (this.shouldIgnore(filePath) || this.shouldIgnore(absPath))
+    ) {
       return null;
     }
 
@@ -134,7 +145,11 @@ export class ASTAnalysisService {
       return 'Error: path traversal detected, directory must be within workspace.';
     }
 
-    const files = await collectSourceFiles(searchDir, maxFiles);
+    const files = await collectSourceFiles(
+      searchDir,
+      maxFiles,
+      this.shouldIgnore,
+    );
     const sections: string[] = [];
     let totalSymbols = 0;
 
@@ -565,21 +580,26 @@ function countSymbols(syms: ASTSymbol[]): number {
 
 /**
  * Walks directories to collect source files with known extensions.
- * Note: This does not currently respect .gitignore or .geminiignore patterns.
- * When called through the `ast_search` tool, path access is validated by the
- * tool's validateToolParamValues and the Config.validatePathAccess check, so
- * ignored files will not be exposed to the user. For codebase map generation,
- * the SKIP_DIRS set covers the most common build/dependency directories.
- * Full ignore-pattern integration should be added via FileDiscoveryService
- * in a follow-up PR.
+ * When a `shouldIgnore` callback is provided (backed by FileDiscoveryService),
+ * .gitignore and .geminiignore patterns are respected during traversal.
+ * The SKIP_DIRS set provides an additional hard-coded fast path that always
+ * applies regardless of ignore patterns.
  */
-async function collectSourceFiles(dir: string, max: number): Promise<string[]> {
+async function collectSourceFiles(
+  dir: string,
+  max: number,
+  shouldIgnore?: (filePath: string) => boolean,
+): Promise<string[]> {
   // Collect matching files with a hard cap to prevent OOM in huge repos.
   // Entries are sorted at each directory level for deterministic output
   // regardless of OS readdir order, then the final list is sorted and sliced.
   const HARD_CAP = 10_000;
   const files: string[] = [];
-  async function walk(d: string, depth: number) {
+  async function walk(
+    d: string,
+    depth: number,
+    shouldIgnore?: (filePath: string) => boolean,
+  ) {
     if (depth > 15 || files.length >= HARD_CAP) return;
     let entries;
     try {
@@ -592,18 +612,21 @@ async function collectSourceFiles(dir: string, max: number): Promise<string[]> {
     for (const e of entries) {
       if (files.length >= HARD_CAP) return;
       const full = path.join(d, e.name);
+      if (shouldIgnore && shouldIgnore(full)) {
+        continue;
+      }
       if (
         e.isDirectory() &&
         !SKIP_DIRS.has(e.name) &&
         !e.name.startsWith('.')
       ) {
-        await walk(full, depth + 1);
+        await walk(full, depth + 1, shouldIgnore);
       } else if (e.isFile() && LANG_MAP[path.extname(e.name)]) {
         files.push(full);
       }
     }
   }
-  await walk(dir, 0);
+  await walk(dir, 0, shouldIgnore);
   // Already mostly sorted due to per-directory sort; final sort ensures
   // cross-directory ordering, then slice to requested max.
   return files.sort().slice(0, max);

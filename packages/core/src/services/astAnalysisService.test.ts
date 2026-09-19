@@ -242,4 +242,54 @@ describe('ASTAnalysisService', () => {
       expect(map).not.toContain('node_modules');
     });
   });
+
+  describe('shouldIgnore callback', () => {
+    it('getFileOutline should return null for ignored files', async () => {
+      await fs.writeFile(
+        path.join(tmpDir, 'secret.ts'),
+        'export class Secret {}\n',
+      );
+      const ignoreFn = (p: string) => p.includes('secret');
+      const svc = new ASTAnalysisService(tmpDir, ignoreFn);
+      expect(await svc.getFileOutline('secret.ts')).toBeNull();
+    });
+
+    it('getFileOutline should still work for non-ignored files', async () => {
+      await fs.writeFile(
+        path.join(tmpDir, 'public.ts'),
+        'export class Public {}\n',
+      );
+      const ignoreFn = (p: string) => p.includes('secret');
+      const svc = new ASTAnalysisService(tmpDir, ignoreFn);
+      const outline = await svc.getFileOutline('public.ts');
+      expect(outline).not.toBeNull();
+      expect(outline!.symbols[0].name).toBe('Public');
+    });
+
+    it('getCodebaseMap should exclude ignored files', async () => {
+      await fs.writeFile(
+        path.join(tmpDir, 'visible.ts'),
+        'export class Visible {}\n',
+      );
+      await fs.writeFile(
+        path.join(tmpDir, 'hidden.ts'),
+        'export class Hidden {}\n',
+      );
+      const ignoreFn = (p: string) => p.includes('hidden');
+      const svc = new ASTAnalysisService(tmpDir, ignoreFn);
+      const map = await svc.getCodebaseMap();
+      expect(map).toContain('Visible');
+      expect(map).not.toContain('Hidden');
+    });
+
+    it('findSymbolBounds should return null for ignored files', async () => {
+      await fs.writeFile(
+        path.join(tmpDir, 'ignored.ts'),
+        'export function target() { return 1; }\n',
+      );
+      const ignoreFn = (p: string) => p.includes('ignored');
+      const svc = new ASTAnalysisService(tmpDir, ignoreFn);
+      expect(await svc.findSymbolBounds('ignored.ts', 'target')).toBeNull();
+    });
+  });
 });
