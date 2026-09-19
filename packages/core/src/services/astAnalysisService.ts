@@ -83,7 +83,7 @@ export class ASTAnalysisService {
       return null;
     }
 
-    const ext = path.extname(absPath);
+    const ext = path.extname(absPath).toLowerCase();
     const language = LANG_MAP[ext];
     if (!language) return null;
 
@@ -348,8 +348,7 @@ export function stripBlockComments(
  * repeated regex replacements when parsing multiple declarations.
  */
 export function preStripLines(lines: string[]): string[] {
-  const re =
-    /'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`|\/(?:[^/;\\]|\\.)+\//g;
+  const re = /'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`/g;
   return lines.map((line) => {
     let stripped = line.replace(re, '');
     const commentIdx = stripped.indexOf('//');
@@ -365,6 +364,9 @@ export function findClosingBrace(
   startLine: number,
   strippedLines?: string[],
 ): number {
+  if (startLine < 0 || startLine >= lines.length) {
+    return startLine;
+  }
   // When no pre-stripped lines are provided, compute them on the fly
   // so that direct callers (tests, extractMembers without cache) still work.
   const effective = strippedLines ?? preStripLines(lines);
@@ -372,7 +374,7 @@ export function findClosingBrace(
   let parenDepth = 0;
   let opened = false;
   for (let i = startLine; i < lines.length; i++) {
-    const stripped = effective[i];
+    const stripped = effective[i] ?? '';
     for (const ch of stripped) {
       if (ch === '(') parenDepth++;
       else if (ch === ')') parenDepth = Math.max(0, parenDepth - 1);
@@ -393,6 +395,9 @@ export function findClosingBrace(
 }
 
 export function findIndentEnd(lines: string[], startLine: number): number {
+  if (startLine < 0 || startLine >= lines.length) {
+    return startLine;
+  }
   const baseIndent =
     lines[startLine].length - lines[startLine].trimStart().length;
   let last = startLine;
@@ -452,7 +457,9 @@ function extractMembers(
   const patterns = getMemberPatterns(language);
 
   for (let i = start; i < end; i++) {
-    const trimmed = lines[i].trim();
+    const line = lines[i];
+    if (line === undefined) continue;
+    const trimmed = line.trim();
     if (trimmed === '' || trimmed === '{' || trimmed === '}') continue;
     for (const { regex, kind } of patterns) {
       const match = regex.exec(trimmed);
@@ -675,7 +682,7 @@ async function collectSourceFiles(
         !e.name.startsWith('.')
       ) {
         await walk(full, depth + 1, shouldIgnore);
-      } else if (e.isFile() && LANG_MAP[path.extname(e.name)]) {
+      } else if (e.isFile() && LANG_MAP[path.extname(e.name).toLowerCase()]) {
         files.push(full);
       }
     }
