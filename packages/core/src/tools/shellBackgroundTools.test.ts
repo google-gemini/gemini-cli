@@ -102,6 +102,117 @@ describe('Background Tools', () => {
     );
   });
 
+  it('list_background_processes should omit exit-code clause when exitCode is null', async () => {
+    const pid = 98990;
+    const history = new Map();
+    history.set(pid, {
+      command: 'killed command',
+      status: 'exited',
+      exitCode: null,
+      startTime: Date.now(),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (ShellExecutionService as any).backgroundProcessHistory.set(
+      'default',
+      history,
+    );
+
+    const invocation = listTool.build({});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (invocation as any).context = { config: { getSessionId: () => 'default' } };
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
+
+    expect(result.llmContent).toContain(
+      `- [PID ${pid}] EXITED: \`killed command\``,
+    );
+    expect(result.llmContent).not.toContain('(Exit Code:');
+  });
+
+  it('list_background_processes should omit exit-code clause when exitCode is undefined', async () => {
+    const pid = 98991;
+    const history = new Map();
+    history.set(pid, {
+      command: 'unknown exit command',
+      status: 'exited',
+      startTime: Date.now(),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (ShellExecutionService as any).backgroundProcessHistory.set(
+      'default',
+      history,
+    );
+
+    const invocation = listTool.build({});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (invocation as any).context = { config: { getSessionId: () => 'default' } };
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
+
+    expect(result.llmContent).toContain(
+      `- [PID ${pid}] EXITED: \`unknown exit command\``,
+    );
+    expect(result.llmContent).not.toContain('(Exit Code:');
+  });
+
+  it('list_background_processes should show exit code 0', async () => {
+    const pid = 98992;
+    const history = new Map();
+    history.set(pid, {
+      command: 'success command',
+      status: 'exited',
+      exitCode: 0,
+      startTime: Date.now(),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (ShellExecutionService as any).backgroundProcessHistory.set(
+      'default',
+      history,
+    );
+
+    const invocation = listTool.build({});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (invocation as any).context = { config: { getSessionId: () => 'default' } };
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
+
+    expect(result.llmContent).toContain(
+      `- [PID ${pid}] EXITED: \`success command\` (Exit Code: 0)`,
+    );
+  });
+
+  it('list_background_processes should show signal without exit-code when exitCode is null', async () => {
+    const pid = 98993;
+    const history = new Map();
+    history.set(pid, {
+      command: 'signaled command',
+      status: 'exited',
+      exitCode: null,
+      signal: 15,
+      startTime: Date.now(),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (ShellExecutionService as any).backgroundProcessHistory.set(
+      'default',
+      history,
+    );
+
+    const invocation = listTool.build({});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (invocation as any).context = { config: { getSessionId: () => 'default' } };
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
+
+    expect(result.llmContent).toContain(
+      `- [PID ${pid}] EXITED: \`signaled command\` (Signal: 15)`,
+    );
+    expect(result.llmContent).not.toContain('(Exit Code:');
+  });
+
   it('read_background_output should return error if log file does not exist', async () => {
     const pid = 12345 + Math.floor(Math.random() * 1000);
     const history = new Map();
