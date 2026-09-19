@@ -500,9 +500,16 @@ function getDeclarationPatterns(lang: string) {
       break;
     case 'rust':
       p.push({ regex: /(?:pub\s+)?struct\s+(\w+)/, kind: 'class' });
+      p.push({
+        regex: /^impl(?:\s*<[^>]+>)?\s+(?:[\w:]+\s+for\s+)?(\w+)/,
+        kind: 'class',
+      });
       p.push({ regex: /(?:pub\s+)?trait\s+(\w+)/, kind: 'interface' });
       p.push({ regex: /(?:pub\s+)?enum\s+(\w+)/, kind: 'enum' });
-      p.push({ regex: /(?:pub\s+)?(?:async\s+)?fn\s+(\w+)/, kind: 'function' });
+      p.push({
+        regex: /(?:pub\s+)?(?:async\s+)?fn\s+(\w+)/,
+        kind: 'function',
+      });
       break;
     case 'java':
       p.push({
@@ -516,6 +523,10 @@ function getDeclarationPatterns(lang: string) {
       p.push({
         regex: /\benum\s+(\w+)/,
         kind: 'enum',
+      });
+      p.push({
+        regex: /\brecord\s+(\w+)/,
+        kind: 'class',
       });
       break;
     default:
@@ -541,6 +552,7 @@ function getMemberPatterns(lang: string) {
       break;
     case 'go':
       p.push({ regex: /func\s+\([^)]+\)\s+(\w+)/, kind: 'method' });
+      p.push({ regex: /^(\w+)\s*\(/, kind: 'method' });
       break;
     case 'rust':
       p.push({ regex: /(?:pub\s+)?(?:async\s+)?fn\s+(\w+)/, kind: 'method' });
@@ -549,6 +561,12 @@ function getMemberPatterns(lang: string) {
       p.push({
         regex:
           /(?:(?:public|private|protected|static|final|synchronized|abstract|default)\s+)*[\w<>[{\]}]+\s+(\w+)\s*\(/,
+        kind: 'method',
+      });
+      // Constructors have no return type, match modifier(s) + name + (
+      p.push({
+        regex:
+          /(?:(?:public|private|protected|static|final|synchronized|abstract|default)\s+)*(\w+)\s*\(/,
         kind: 'method',
       });
       break;
