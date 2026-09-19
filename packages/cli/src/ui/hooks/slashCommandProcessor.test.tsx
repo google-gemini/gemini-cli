@@ -17,10 +17,12 @@ import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 import { McpPromptLoader } from '../../services/McpPromptLoader.js';
 import {
   SlashCommandStatus,
+  ToolConfirmationOutcome,
   MCPDiscoveryState,
   makeFakeConfig,
   coreEvents,
   type GeminiClient,
+  type ToolExecuteConfirmationDetails,
 } from '@google/gemini-cli-core';
 
 const {
@@ -1041,6 +1043,106 @@ describe('useSlashCommandProcessor', () => {
       expect(abortSpy).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe.each(['confirm_action', 'confirm_shell_commands'] as const)(
+    '%s continuations',
+    (confirmationType) => {
+      it.each(['success', 'failure', 'cancel'] as const)(
+        'records one history entry and one terminal event on %s',
+        async (outcome) => {
+          const action = vi
+            .fn<NonNullable<SlashCommand['action']>>()
+            .mockResolvedValueOnce(
+              confirmationType === 'confirm_action'
+                ? {
+                    type: 'confirm_action',
+                    prompt: 'Overwrite the checkpoint?',
+                    originalInvocation: { raw: '/test' },
+                  }
+                : {
+                    type: 'confirm_shell_commands',
+                    commandsToConfirm: ['echo test'],
+                    originalInvocation: { raw: '/test' },
+                  },
+            );
+          if (outcome === 'failure') {
+            action.mockRejectedValue(new Error('Command failed'));
+          } else {
+            action.mockResolvedValue({
+              type: 'message',
+              messageType: 'info',
+              content: 'Command completed',
+            });
+          }
+
+          const result = await setupProcessorHook({
+            builtinCommands: [createTestCommand({ action })],
+          });
+          let commandPromise!: ReturnType<
+            typeof result.current.handleSlashCommand
+          >;
+          await act(async () => {
+            commandPromise = result.current.handleSlashCommand('/test');
+          });
+
+          expect(action).toHaveBeenCalledTimes(1);
+          expect(logSlashCommand).not.toHaveBeenCalled();
+
+          // An unrelated update must not expose a duplicate command after
+          // confirmation, even when consecutive-history deduplication cannot help.
+          result.current.commandContext.ui.addItem({
+            type: MessageType.INFO,
+            text: 'Background update',
+          });
+
+          await act(async () => {
+            if (confirmationType === 'confirm_action') {
+              expect(result.current.confirmationRequest).not.toBeNull();
+              result.current.confirmationRequest!.onConfirm(
+                outcome !== 'cancel',
+              );
+            } else {
+              const pendingItem = result.current.pendingHistoryItems[0];
+              if (pendingItem?.type !== 'tool_group') {
+                throw new Error('Expected a pending shell confirmation');
+              }
+              // Client-initiated shell confirmations retain their callback.
+              const confirmation = pendingItem.tools[0]
+                .confirmationDetails as ToolExecuteConfirmationDetails;
+              expect(confirmation).toBeDefined();
+              await confirmation.onConfirm(
+                outcome === 'cancel'
+                  ? ToolConfirmationOutcome.Cancel
+                  : ToolConfirmationOutcome.ProceedOnce,
+              );
+            }
+            await commandPromise;
+          });
+
+          expect(action).toHaveBeenCalledTimes(outcome === 'cancel' ? 1 : 2);
+          expect(
+            mockAddItem.mock.calls.filter(
+              ([item]) => item.type === MessageType.USER,
+            ),
+          ).toEqual([
+            [{ type: MessageType.USER, text: '/test' }, expect.any(Number)],
+          ]);
+          expect(logSlashCommand).toHaveBeenCalledExactlyOnceWith(
+            mockConfig,
+            expect.objectContaining({
+              command: 'test',
+              status:
+                outcome === 'failure'
+                  ? SlashCommandStatus.ERROR
+                  : SlashCommandStatus.SUCCESS,
+            }),
+          );
+          expect(result.current.confirmationRequest).toBeNull();
+          expect(result.current.pendingHistoryItems).toEqual([]);
+        },
+      );
+    },
+  );
 
   describe('Slash Command Logging', () => {
     const mockCommandAction = vi.fn().mockResolvedValue({ type: 'handled' });

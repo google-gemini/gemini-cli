@@ -411,6 +411,7 @@ export const useSlashCommandProcessor = (
       }
 
       let hasError = false;
+      let commandReinvoked = false;
 
       const subcommand =
         resolvedCommandPath.length > 1
@@ -641,6 +642,7 @@ export const useSlashCommandProcessor = (
                     );
                   }
 
+                  commandReinvoked = true;
                   return await handleSlashCommand(
                     result.originalInvocation.raw,
                     // Pass the approved commands as a one-time grant for this execution.
@@ -673,10 +675,12 @@ export const useSlashCommandProcessor = (
                     return { type: 'handled' };
                   }
 
+                  commandReinvoked = true;
                   return await handleSlashCommand(
                     result.originalInvocation.raw,
                     undefined,
                     true,
+                    false, // Do not add to history again
                   );
                 }
                 case 'custom_dialog': {
@@ -727,7 +731,13 @@ export const useSlashCommandProcessor = (
         );
         return { type: 'handled' };
       } finally {
-        if (config && resolvedCommandPath[0] && !hasError) {
+        // A confirmed command's resumed invocation records its final outcome.
+        if (
+          config &&
+          resolvedCommandPath[0] &&
+          !hasError &&
+          !commandReinvoked
+        ) {
           const event = makeSlashCommandEvent({
             command: resolvedCommandPath[0],
             subcommand,
