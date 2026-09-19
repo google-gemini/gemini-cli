@@ -87,9 +87,15 @@ describe('PersistentState filesystem behavior', () => {
     const state = new PersistentState();
 
     expect(state.get('tipsShown')).toBe(3);
+    expect(
+      JSON.parse(fs.readFileSync(path.join(directory, 'state.json'), 'utf8')),
+    ).toEqual({ tipsShown: 3 });
     expect(fs.existsSync(path.join(directory, 'state.json.corrupt'))).toBe(
       true,
     );
     expect(debugLogger.warn).toHaveBeenCalled();
+
+    const nextState = new PersistentState();
+    expect(nextState.get('tipsShown')).toBe(3);
   });
 });

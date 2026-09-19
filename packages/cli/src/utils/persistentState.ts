@@ -48,6 +48,7 @@ export class PersistentState {
           this.cache = JSON.parse(content);
         } catch (error) {
           this.cache = this.recoverFromCorruptState(filePath, error);
+          this.saveSync();
         }
       } else {
         this.cache = {};
@@ -108,6 +109,52 @@ export class PersistentState {
         backupError,
       );
       return {};
+    }
+  }
+
+  private saveSync(): void {
+    if (!this.cache) return;
+
+    let temporaryPath: string | undefined;
+    let fileDescriptor: number | undefined;
+
+    try {
+      const filePath = this.getPath();
+      const dir = path.dirname(filePath);
+      fs.mkdirSync(dir, { recursive: true });
+
+      temporaryPath = `${filePath}.${randomUUID()}.tmp`;
+      fs.writeFileSync(temporaryPath, JSON.stringify(this.cache, null, 2), {
+        encoding: 'utf-8',
+        flag: 'wx',
+      });
+
+      fileDescriptor = fs.openSync(temporaryPath, 'r+');
+      fs.fsyncSync(fileDescriptor);
+      fs.closeSync(fileDescriptor);
+      fileDescriptor = undefined;
+
+      fs.renameSync(temporaryPath, filePath);
+      temporaryPath = undefined;
+    } catch (error) {
+      if (fileDescriptor !== undefined) {
+        try {
+          fs.closeSync(fileDescriptor);
+        } catch {
+          // Preserve the original save error.
+        }
+      }
+      if (temporaryPath) {
+        try {
+          fs.unlinkSync(temporaryPath);
+        } catch {
+          // Preserve the original save error.
+        }
+      }
+      debugLogger.warn(
+        'Failed to synchronously restore persistent state:',
+        error,
+      );
     }
   }
 
