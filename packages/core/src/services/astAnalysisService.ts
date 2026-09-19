@@ -375,7 +375,7 @@ export function findClosingBrace(
     const stripped = effective[i];
     for (const ch of stripped) {
       if (ch === '(') parenDepth++;
-      else if (ch === ')') parenDepth--;
+      else if (ch === ')') parenDepth = Math.max(0, parenDepth - 1);
       // Ignore braces inside parentheses (inline object types in params)
       if (parenDepth > 0) continue;
       if (ch === '{') {
@@ -578,13 +578,13 @@ function getMemberPatterns(lang: string) {
     case 'java':
       p.push({
         regex:
-          /(?:(?:public|private|protected|static|final|synchronized|abstract|default)\s+)*[\w<>[{\]}]+\s+(\w+)\s*\(/,
+          /^(?:(?:public|private|protected|static|final|synchronized|abstract|default)\s+)*[\w<>[\]]+\s+(\w+)\s*\(/,
         kind: 'method',
       });
       // Constructors have no return type, match modifier(s) + name + (
       p.push({
         regex:
-          /(?:(?:public|private|protected|static|final|synchronized|abstract|default)\s+)*(\w+)\s*\(/,
+          /^(?:(?:public|private|protected|static|final|synchronized|abstract|default)\s+)*(\w+)\s*\(/,
         kind: 'method',
       });
       break;
