@@ -44,10 +44,26 @@ export class TrackerService {
    */
   async createTask(taskData: Omit<TrackerTask, 'id'>): Promise<TrackerTask> {
     await this.ensureInitialized();
-    const id = this.generateId();
+    let id = this.generateId();
+    // Prevent ID collisions by checking existing tasks
+    let unique = false;
+    for (let i = 0; i < 10; i++) {
+      const existing = await this.getTask(id);
+      if (!existing) {
+        unique = true;
+        break;
+      }
+      id = this.generateId();
+    }
+    if (!unique) {
+      throw new Error('Failed to generate a unique task ID after 10 attempts.');
+    }
+    const now = new Date().toISOString();
     const task: TrackerTask = {
       ...taskData,
       id,
+      createdAt: taskData.createdAt ?? now,
+      updatedAt: taskData.updatedAt ?? now,
     };
 
     if (task.parentId) {
@@ -100,8 +116,12 @@ export class TrackerService {
    * Reads a task by ID.
    */
   async getTask(id: string): Promise<TrackerTask | null> {
+    if (typeof id !== 'string' || !/^[0-9a-f]{6}$/i.test(id)) {
+      return null;
+    }
     await this.ensureInitialized();
-    const taskPath = path.join(this.tasksDir, `${id}.json`);
+    const normalizedId = id.toLowerCase();
+    const taskPath = path.join(this.tasksDir, `${normalizedId}.json`);
     return this.readJsonFile(taskPath, TrackerTaskSchema);
   }
 
@@ -149,7 +169,12 @@ export class TrackerService {
       throw new Error(`Task with ID ${id} not found.`);
     }
 
-    const updatedTask = { ...task, ...updates, id: task.id };
+    const updatedTask = {
+      ...task,
+      ...updates,
+      id: task.id,
+      updatedAt: new Date().toISOString(),
+    };
 
     if (updatedTask.parentId) {
       const parentExists = !!(await this.getTask(updatedTask.parentId));
@@ -172,6 +197,97 @@ export class TrackerService {
 
     await this.saveTask(updatedTask);
     return updatedTask;
+  }
+
+  /**
+   * Deletes a task by ID. Validates the ID format to prevent path traversal,
+   * blocks deletion when child tasks exist, clears parentId references on
+   * children if the guard is removed in future, removes the task from other
+   * tasks' dependency lists, and updates timestamps on affected tasks.
+   */
+  async deleteTask(id: string, preloadedTasks?: TrackerTask[]): Promise<void> {
+    // Path traversal guard: IDs must be exactly 6 hex chars
+    if (typeof id !== 'string' || !/^[0-9a-f]{6}$/i.test(id)) {
+      throw new Error(`Invalid task ID format: ${id}`);
+    }
+    // Normalize to lowercase for case-sensitive filesystems
+    const normalizedId = id.toLowerCase();
+    await this.ensureInitialized();
+    const task = await this.getTask(normalizedId);
+    if (!task) {
+      throw new Error(`Task with ID ${normalizedId} not found.`);
+    }
+
+    // Reuse pre-loaded tasks when available (bulk-delete perf: avoids
+    // re-reading the entire tracker directory for each deleted task).
+    const allTasks = preloadedTasks ?? (await this.listTasks());
+    const children = allTasks.filter((t) => t.parentId === normalizedId);
+    if (children.length > 0) {
+      const childIds = children.map((c) => c.id).join(', ');
+      throw new Error(
+        `Cannot delete task ${normalizedId}: it has ${children.length} child task(s) (${childIds}). Delete or re-parent them first.`,
+      );
+    }
+
+    // Clean up references BEFORE deleting the task file, so a crash
+    // mid-operation leaves the DB in a consistent state.
+    const now = new Date().toISOString();
+    for (const other of allTasks) {
+      if (other.id === normalizedId) continue;
+      const hasDep = other.dependencies.includes(normalizedId);
+      const hasParent = other.parentId === normalizedId;
+      if (hasDep || hasParent) {
+        const fresh = await this.getTask(other.id);
+        if (!fresh) continue;
+        let freshNeedsSave = false;
+        if (fresh.dependencies.includes(normalizedId)) {
+          fresh.dependencies = fresh.dependencies.filter(
+            (d) => d !== normalizedId,
+          );
+          freshNeedsSave = true;
+        }
+        if (fresh.parentId === normalizedId) {
+          delete fresh.parentId;
+          freshNeedsSave = true;
+        }
+        if (freshNeedsSave) {
+          fresh.updatedAt = now;
+          await this.saveTask(fresh);
+          // Keep the in-memory preloaded array consistent so subsequent
+          // bulk deletes in the same reconciliation pass see updated
+          // deps/parentId instead of stale references.
+          if (preloadedTasks) {
+            const idx = preloadedTasks.findIndex((t) => t.id === fresh.id);
+            if (idx !== -1) {
+              preloadedTasks[idx] = fresh;
+            }
+          }
+        }
+      }
+    }
+
+    // Remove the task file last
+    const taskPath = path.join(this.tasksDir, `${normalizedId}.json`);
+    await fs.unlink(taskPath);
+
+    // Remove from the in-memory array so subsequent bulk deletes in
+    // the same reconciliation pass see consistent state.
+    if (preloadedTasks) {
+      const idx = preloadedTasks.findIndex((t) => t.id === normalizedId);
+      if (idx !== -1) preloadedTasks.splice(idx, 1);
+    }
+  }
+
+  /**
+   * Clears all tasks from the tracker directory.
+   */
+  async clearTasks(): Promise<void> {
+    await this.ensureInitialized();
+    const files = await fs.readdir(this.tasksDir);
+    const jsonFiles = files.filter((f: string) => f.endsWith('.json'));
+    await Promise.all(
+      jsonFiles.map((f: string) => fs.unlink(path.join(this.tasksDir, f))),
+    );
   }
 
   /**

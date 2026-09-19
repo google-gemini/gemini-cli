@@ -11,6 +11,7 @@ import {
   TRACKER_GET_TASK_TOOL_NAME,
   TRACKER_LIST_TASKS_TOOL_NAME,
   TRACKER_ADD_DEPENDENCY_TOOL_NAME,
+  TRACKER_DELETE_TASK_TOOL_NAME,
   TRACKER_VISUALIZE_TOOL_NAME,
 } from '../tool-names.js';
 
@@ -147,6 +148,24 @@ export const TRACKER_ADD_DEPENDENCY_DEFINITION: ToolDefinition = {
         },
       },
       required: ['taskId', 'dependencyId'],
+    },
+  },
+};
+
+export const TRACKER_DELETE_TASK_DEFINITION: ToolDefinition = {
+  base: {
+    name: TRACKER_DELETE_TASK_TOOL_NAME,
+    description:
+      "Deletes a task from the tracker. Automatically removes the task from any other task's dependency lists. Use this to clean up cancelled or erroneously created tasks.",
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          description: 'The 6-character hex ID of the task to delete.',
+        },
+      },
+      required: ['id'],
     },
   },
 };
