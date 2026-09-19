@@ -103,6 +103,24 @@ describe('isAuthenticationError', () => {
     expect(isAuthenticationError(new Error('401 Unauthorized'))).toBe(true);
     expect(isAuthenticationError(new Error('HTTP 401'))).toBe(true);
     expect(isAuthenticationError(new Error('Status code: 401'))).toBe(true);
+    expect(
+      isAuthenticationError(
+        new Error('Error POSTing to endpoint (HTTP 401): denied'),
+      ),
+    ).toBe(true);
+  });
+
+  it('should not match 401 as a substring of a larger number', () => {
+    expect(isAuthenticationError(new Error('listening on port 4012'))).toBe(
+      false,
+    );
+    expect(
+      isAuthenticationError(new Error('connection refused at 127.0.0.1:4015')),
+    ).toBe(false);
+    expect(isAuthenticationError(new Error('processed 24013 records'))).toBe(
+      false,
+    );
+    expect(isAuthenticationError(new Error('error at line 1401'))).toBe(false);
   });
 });
 
