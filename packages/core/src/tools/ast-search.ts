@@ -67,10 +67,8 @@ class ASTSearchInvocation extends BaseToolInvocation<
       targetDir,
       fileFilteringOptions,
     );
-    const shouldIgnore = (filePath: string): boolean => fileDiscoveryService.shouldIgnoreFile(
-        filePath,
-        fileFilteringOptions,
-      );
+    const shouldIgnore = (filePath: string): boolean =>
+      fileDiscoveryService.shouldIgnoreFile(filePath, fileFilteringOptions);
 
     const astService = new ASTAnalysisService(targetDir, shouldIgnore);
 
@@ -172,17 +170,8 @@ class ASTSearchInvocation extends BaseToolInvocation<
     safePath: string,
     symbolName: string,
   ): Promise<ToolResult> {
-    const bounds = await astService.findSymbolBounds(safePath, symbolName);
-
-    if (!bounds) {
-      return {
-        llmContent:
-          `Symbol "${symbolName}" not found in ${safePath}. ` +
-          'Try using grep_search for a text-based search, or check the symbol name spelling.',
-        returnDisplay: 'Symbol not found',
-      };
-    }
-
+    // Single getFileOutline call to avoid reading and parsing the file twice
+    // (findSymbolBounds internally calls getFileOutline, so calling both is redundant).
     const outline = await astService.getFileOutline(safePath);
     const findSymbolRecursive = (
       symbols: ASTSymbol[],
@@ -196,24 +185,31 @@ class ASTSearchInvocation extends BaseToolInvocation<
     };
     const symbol = outline ? findSymbolRecursive(outline.symbols) : undefined;
 
+    if (!symbol) {
+      return {
+        llmContent:
+          `Symbol "${symbolName}" not found in ${safePath}. ` +
+          'Try using grep_search for a text-based search, or check the symbol name spelling.',
+        returnDisplay: 'Symbol not found',
+      };
+    }
+
     const result = [
       `Found "${symbolName}" in ${safePath}:`,
-      `  Lines: ${bounds.startLine}-${bounds.endLine} (${bounds.endLine - bounds.startLine + 1} lines)`,
-      symbol ? `  Kind: ${symbol.kind}` : '',
-      symbol ? `  Signature: ${symbol.signature}` : '',
+      `  Lines: ${symbol.startLine}-${symbol.endLine} (${symbol.endLine - symbol.startLine + 1} lines)`,
+      `  Kind: ${symbol.kind}`,
+      `  Signature: ${symbol.signature}`,
       '',
-      `TIP: Use read_file with start_line=${bounds.startLine} and end_line=${bounds.endLine} to read the exact symbol body.`,
-    ]
-      .filter(Boolean)
-      .join('\n');
+      `TIP: Use read_file with start_line=${symbol.startLine} and end_line=${symbol.endLine} to read the exact symbol body.`,
+    ].join('\n');
 
     return {
       llmContent: result,
-      returnDisplay: `${symbolName}: L${bounds.startLine}-${bounds.endLine}`,
+      returnDisplay: `${symbolName}: L${symbol.startLine}-${symbol.endLine}`,
       display: {
         name: AST_SEARCH_DISPLAY_NAME,
         description: this.getDescription(),
-        resultSummary: `L${bounds.startLine}-${bounds.endLine}`,
+        resultSummary: `L${symbol.startLine}-${symbol.endLine}`,
         result: { type: 'text', text: result },
       },
     };
