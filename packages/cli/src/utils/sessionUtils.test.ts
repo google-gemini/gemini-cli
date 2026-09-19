@@ -421,6 +421,46 @@ describe('SessionSelector', () => {
     );
   });
 
+  it('should resolve a session by UUID even without resumable content (regression #29288)', async () => {
+    const sessionId = randomUUID();
+
+    // Header-only main session, as written at session/new before any
+    // conversation is recorded: matching header, kind main, no messages.
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(
+        {
+          sessionId,
+          projectHash: 'test-hash',
+          startTime: '2024-01-01T10:00:00.000Z',
+          lastUpdated: '2024-01-01T10:00:00.000Z',
+          kind: 'main',
+          messages: [],
+        },
+        null,
+        2,
+      ),
+    );
+
+    const sessionSelector = new SessionSelector(storage);
+
+    // The file exists with a matching header, so explicit ID resolution
+    // must succeed instead of reporting an invalid identifier.
+    const result = await sessionSelector.resolveSession(sessionId);
+    expect(result.sessionData.sessionId).toBe(sessionId);
+
+    // The resumable listing behavior is unchanged: header-only files stay
+    // hidden from --list-sessions.
+    const sessions = await sessionSelector.listSessions();
+    expect(sessions.find((s) => s.id === sessionId)).toBeUndefined();
+  });
+
   it('should throw SessionError with NO_SESSIONS_FOUND when resolving latest with no sessions', async () => {
     // Empty chats directory — no session files
     const chatsDir = path.join(tmpDir, 'chats');
