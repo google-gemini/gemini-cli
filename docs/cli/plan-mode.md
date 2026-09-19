@@ -119,10 +119,10 @@ Plan Mode enforces strict safety policies to prevent accidental changes.
 These are the only allowed tools:
 
 - **FileSystem (Read):**
-  [`read_file`](../tools/file-system.md#2-read_file-readfile),
-  [`list_directory`](../tools/file-system.md#1-list_directory-readfolder),
-  [`glob`](../tools/file-system.md#4-glob-findfiles)
-- **Search:** [`grep_search`](../tools/file-system.md#5-grep_search-searchtext),
+  [`read_file`](../tools/file-system.md#read_file-readfile),
+  [`list_directory`](../tools/file-system.md#list_directory-readfolder),
+  [`glob`](../tools/file-system.md#glob-findfiles)
+- **Search:** [`grep_search`](../tools/file-system.md#grep_search-searchtext),
   [`google_web_search`](../tools/web-search.md),
   [`web_fetch`](../tools/web-fetch.md) (requires explicit confirmation),
   [`get_internal_docs`](../tools/internal-docs.md)
@@ -135,8 +135,8 @@ These are the only allowed tools:
   [MCP resource tools](../tools/mcp-resources.md) (`list_mcp_resources`,
   `read_mcp_resource`) are allowed.
 - **Planning (Write):**
-  [`write_file`](../tools/file-system.md#3-write_file-writefile) and
-  [`replace`](../tools/file-system.md#6-replace-edit) only allowed for `.md`
+  [`write_file`](../tools/file-system.md#write_file-writefile) and
+  [`replace`](../tools/file-system.md#replace-edit) only allowed for `.md`
   files in the `~/.gemini/tmp/<project>/<session-id>/plans/` directory or your
   [custom plans directory](#custom-plan-directory-and-policies).
 - **Skills:** [`activate_skill`](../cli/skills.md) (allows loading specialized
