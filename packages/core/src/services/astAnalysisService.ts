@@ -328,9 +328,10 @@ export function findClosingBrace(lines: string[], startLine: number): number {
   let parenDepth = 0;
   let opened = false;
   for (let i = startLine; i < lines.length; i++) {
-    // Strip string literals (including escaped quotes) to avoid false brace matches.
+    // Strip string literals (including escaped quotes) and regex literals
+    // to avoid false brace matches from patterns like /[{}]/ or /a{1,3}/.
     let stripped = lines[i].replace(
-      /'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`/g,
+      /'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`|\/(?:[^/\\]|\\.)+\//g,
       '',
     );
     // Strip single-line comments which may contain braces (e.g. "// }")
@@ -573,19 +574,23 @@ function countSymbols(syms: ASTSymbol[]): number {
  * in a follow-up PR.
  */
 async function collectSourceFiles(dir: string, max: number): Promise<string[]> {
-  // Collect ALL matching files first, then sort and truncate.
-  // This ensures a deterministic, platform-independent subset when the workspace
-  // contains more files than `max`, since fs.readdir order is OS-dependent.
+  // Collect matching files with a hard cap to prevent OOM in huge repos.
+  // Entries are sorted at each directory level for deterministic output
+  // regardless of OS readdir order, then the final list is sorted and sliced.
+  const HARD_CAP = 10_000;
   const files: string[] = [];
   async function walk(d: string, depth: number) {
-    if (depth > 15) return;
+    if (depth > 15 || files.length >= HARD_CAP) return;
     let entries;
     try {
       entries = await fs.readdir(d, { withFileTypes: true });
     } catch {
       return;
     }
+    // Sort entries alphabetically for deterministic traversal order
+    entries.sort((a, b) => a.name.localeCompare(b.name));
     for (const e of entries) {
+      if (files.length >= HARD_CAP) return;
       const full = path.join(d, e.name);
       if (
         e.isDirectory() &&
@@ -599,5 +604,7 @@ async function collectSourceFiles(dir: string, max: number): Promise<string[]> {
     }
   }
   await walk(dir, 0);
+  // Already mostly sorted due to per-directory sort; final sort ensures
+  // cross-directory ordering, then slice to requested max.
   return files.sort().slice(0, max);
 }
