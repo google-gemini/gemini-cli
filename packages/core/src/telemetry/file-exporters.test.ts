@@ -78,6 +78,37 @@ describe('FileSpanExporter', () => {
     expect(writtenData).toContain('test-span');
   });
 
+  it('should preserve shared span values in exported JSON', () => {
+    const endTime = [1, 0];
+    const span = {
+      name: 'shared-values-span',
+      kind: 0,
+      spanContext: () => ({
+        traceId: 'abc123',
+        spanId: 'def456',
+        traceFlags: 1,
+      }),
+      status: { code: 0 },
+      attributes: {},
+      startTime: [0, 0],
+      endTime,
+      duration: endTime,
+      events: [],
+      links: [],
+    } as unknown as ReadableSpan;
+
+    const resultCallback = vi.fn();
+    exporter.export([span], resultCallback);
+
+    const writtenData = mockWriteStream.write.mock.calls[0][0] as string;
+    const serializedSpan = JSON.parse(writtenData) as {
+      endTime: number[];
+      duration: number[];
+    };
+    expect(serializedSpan.endTime).toEqual([1, 0]);
+    expect(serializedSpan.duration).toEqual([1, 0]);
+  });
+
   it('should handle circular references without crashing', () => {
     // Simulate the circular reference structure found in OTel spans
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -179,6 +210,62 @@ describe('FileMetricExporter', () => {
     const writtenData = mockWriteStream.write.mock.calls[0][0] as string;
     expect(writtenData).toContain('[Circular]');
     expect(writtenData).toContain('test');
+  });
+
+  it('should preserve shared metric end times and histogram boundaries', () => {
+    const exporter = new FileMetricExporter('/tmp/test-metrics.log');
+    const sharedValues = [1, 0];
+    const sharedBoundaries = [10, 20];
+    const dataPoint = {
+      startTime: [0, 0],
+      endTime: sharedValues,
+      attributes: {},
+      value: {
+        count: 1,
+        buckets: { boundaries: sharedBoundaries, counts: [1, 0, 0] },
+      },
+    };
+    const metrics = {
+      resource: { attributes: {} },
+      scopeMetrics: [
+        {
+          scope: { name: 'test' },
+          metrics: [
+            {
+              descriptor: {
+                name: 'test-histogram',
+                description: '',
+                unit: 'ms',
+                valueType: 1,
+              },
+              aggregationTemporality: 2,
+              dataPointType: 0,
+              dataPoints: [dataPoint, { ...dataPoint }],
+            },
+          ],
+        },
+      ],
+    } as unknown as ResourceMetrics;
+
+    const resultCallback = vi.fn();
+    exporter.export(metrics, resultCallback);
+
+    const writtenData = mockWriteStream.write.mock.calls[0][0] as string;
+    const serializedMetrics = JSON.parse(writtenData) as {
+      scopeMetrics: Array<{
+        metrics: Array<{
+          dataPoints: Array<{
+            endTime: number[];
+            value: { buckets: { boundaries: number[] } };
+          }>;
+        }>;
+      }>;
+    };
+    const dataPoints = serializedMetrics.scopeMetrics[0].metrics[0].dataPoints;
+    for (const dataPoint of dataPoints) {
+      expect(dataPoint.endTime).toEqual(sharedValues);
+      expect(dataPoint.value.buckets.boundaries).toEqual(sharedBoundaries);
+    }
   });
 
   it('should return CUMULATIVE aggregation temporality', () => {
