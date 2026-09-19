@@ -220,7 +220,7 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
 
     for (const task of tasksToDelete) {
       try {
-        await service.deleteTask(task.id);
+        await service.deleteTask(task.id, existingTasks);
       } catch (e) {
         warnings.push(
           `Could not remove "${task.title}" (${task.id}): ${e instanceof Error ? e.message : String(e)}`,

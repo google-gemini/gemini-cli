@@ -205,7 +205,7 @@ export class TrackerService {
    * children if the guard is removed in future, removes the task from other
    * tasks' dependency lists, and updates timestamps on affected tasks.
    */
-  async deleteTask(id: string): Promise<void> {
+  async deleteTask(id: string, preloadedTasks?: TrackerTask[]): Promise<void> {
     // Path traversal guard: IDs must be exactly 6 hex chars
     if (typeof id !== 'string' || !/^[0-9a-f]{6}$/i.test(id)) {
       throw new Error(`Invalid task ID format: ${id}`);
@@ -218,8 +218,9 @@ export class TrackerService {
       throw new Error(`Task with ID ${normalizedId} not found.`);
     }
 
-    // Block deletion if this task has child tasks (referential integrity)
-    const allTasks = await this.listTasks();
+    // Reuse pre-loaded tasks when available (bulk-delete perf: avoids
+    // re-reading the entire tracker directory for each deleted task).
+    const allTasks = preloadedTasks ?? (await this.listTasks());
     const children = allTasks.filter((t) => t.parentId === normalizedId);
     if (children.length > 0) {
       const childIds = children.map((c) => c.id).join(', ');
@@ -229,17 +230,13 @@ export class TrackerService {
     }
 
     // Clean up references BEFORE deleting the task file, so a crash
-    // mid-operation leaves the DB in a consistent state (orphaned refs
-    // would break validateCanClose and validateNoCircularDependencies).
+    // mid-operation leaves the DB in a consistent state.
     const now = new Date().toISOString();
     for (const other of allTasks) {
       if (other.id === normalizedId) continue;
       const hasDep = other.dependencies.includes(normalizedId);
       const hasParent = other.parentId === normalizedId;
       if (hasDep || hasParent) {
-        // Re-read fresh state to avoid race conditions with concurrent
-        // deletions/updates (prevents resurrecting deleted tasks or
-        // overwriting concurrent writes).
         const fresh = await this.getTask(other.id);
         if (!fresh) continue;
         let freshNeedsSave = false;
@@ -263,6 +260,13 @@ export class TrackerService {
     // Remove the task file last
     const taskPath = path.join(this.tasksDir, `${normalizedId}.json`);
     await fs.unlink(taskPath);
+
+    // Remove from the in-memory array so subsequent bulk deletes in
+    // the same reconciliation pass see consistent state.
+    if (preloadedTasks) {
+      const idx = preloadedTasks.findIndex((t) => t.id === normalizedId);
+      if (idx !== -1) preloadedTasks.splice(idx, 1);
+    }
   }
 
   /**
