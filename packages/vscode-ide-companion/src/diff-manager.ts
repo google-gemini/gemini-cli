@@ -247,7 +247,7 @@ export class DiffManager {
           tab.input instanceof vscode.TabInputTextDiff &&
           tab.input.modified.toString() === rightDocUri.toString()
         ) {
-          await vscode.window.tabGroups.close(tab);
+          await vscode.window.tabGroups.close(tab, true);
           return;
         }
       }

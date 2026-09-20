@@ -281,6 +281,72 @@ describe('oauth2', () => {
       );
     });
 
+    it('should merge credentials on token refresh preserving refresh_token and other fields', async () => {
+      const mockAuthUrl = 'https://example.com/auth';
+      const mockTokens = {
+        access_token: 'test-access-token',
+        refresh_token: 'test-refresh-token',
+      };
+      const credsPath = path.join(tempHomeDir, GEMINI_DIR, 'oauth_creds.json');
+      await fs.promises.mkdir(path.dirname(credsPath), { recursive: true });
+
+      const initialCreds = {
+        access_token: 'old-access-token',
+        refresh_token: 'persistent-refresh-token',
+        expiry_date: 111111,
+        scope: 'email profile',
+        token_type: 'Bearer',
+      };
+      await fs.promises.writeFile(credsPath, JSON.stringify(initialCreds));
+
+      const mockGenerateAuthUrl = vi.fn().mockReturnValue(mockAuthUrl);
+      const mockGetToken = vi.fn().mockResolvedValue({ tokens: mockTokens });
+      const mockSetCredentials = vi.fn();
+      const mockGetAccessToken = vi
+        .fn()
+        .mockResolvedValue({ token: 'mock-access-token' });
+      const mockGetTokenInfo = vi.fn().mockResolvedValue({});
+      let tokensListener: ((tokens: Credentials) => void) | undefined;
+      const mockOAuth2Client = {
+        generateAuthUrl: mockGenerateAuthUrl,
+        getToken: mockGetToken,
+        setCredentials: mockSetCredentials,
+        getAccessToken: mockGetAccessToken,
+        getTokenInfo: mockGetTokenInfo,
+        credentials: mockTokens,
+        on: vi.fn((event, listener) => {
+          if (event === 'tokens') {
+            tokensListener = listener;
+          }
+        }),
+      } as unknown as OAuth2Client;
+      vi.mocked(OAuth2Client).mockImplementation(() => mockOAuth2Client);
+
+      await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
+
+      // Trigger token event with refresh payload (missing refresh_token, scope, token_type etc.)
+      const refreshPayload: Credentials = {
+        access_token: 'new-access-token',
+        expiry_date: 222222,
+      };
+
+      if (tokensListener) {
+        await (
+          tokensListener as unknown as (tokens: Credentials) => Promise<void>
+        )(refreshPayload);
+      }
+
+      expect(fs.existsSync(credsPath)).toBe(true);
+      const updatedCreds = JSON.parse(fs.readFileSync(credsPath, 'utf-8'));
+      expect(updatedCreds).toEqual({
+        access_token: 'new-access-token',
+        refresh_token: 'persistent-refresh-token',
+        expiry_date: 222222,
+        scope: 'email profile',
+        token_type: 'Bearer',
+      });
+    });
+
     it('should clear credentials file', async () => {
       // Setup initial state with files
       const credsPath = path.join(tempHomeDir, GEMINI_DIR, 'oauth_creds.json');
