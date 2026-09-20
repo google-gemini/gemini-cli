@@ -45,5 +45,11 @@ export async function validateAuthMethod(
     return null;
   }
 
+  // Gateway auth is triggered by GOOGLE_GEMINI_BASE_URL and requires
+  // no additional validation — the API key is optional for gateway endpoints.
+  if (authMethod === AuthType.GATEWAY) {
+    return null;
+  }
+
   return 'Invalid auth method selected.';
 }

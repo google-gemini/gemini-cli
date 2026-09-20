@@ -291,6 +291,10 @@ export * from './utils/stdio.js';
 export * from './utils/terminal.js';
 export * from './services/worktreeService.js';
 
+// Export CPU compatibility detection and platform diagnostics
+export * from './services/cpuCompatibility.js';
+export * from './services/platformDiagnostics.js';
+
 // Export voice utilities
 export * from './voice/responseFormatter.js';
 

@@ -576,6 +576,15 @@ export enum EventMetadataKey {
   // Logs total RAM in GB of user machine.
   GEMINI_CLI_RAM_TOTAL_GB = 140,
 
+  // Logs the CPU microarchitecture level (x86-64-v1, v2, v3, v4, non-x86).
+  GEMINI_CLI_CPU_MICROARCH_LEVEL = 203,
+
+  // Logs whether the CPU is compatible with the Antigravity CLI binary.
+  GEMINI_CLI_CPU_ANTIGRAVITY_COMPAT = 204,
+
+  // Logs the missing CPU instruction sets if Antigravity is incompatible.
+  GEMINI_CLI_CPU_MISSING_FEATURES = 205,
+
   // ==========================================================================
   // Approval Mode Event Keys
   // ==========================================================================

@@ -5,6 +5,7 @@
  */
 
 import process from 'node:process';
+import { getCachedCpuCompatibility } from '@google/gemini-cli-core';
 
 const ANTIGRAVITY_SH_INSTALL =
   'curl -fsSL https://antigravity.google/cli/install.sh | bash';
@@ -12,6 +13,12 @@ const ANTIGRAVITY_SH_INSTALL =
 export interface AntigravityInstallInfo {
   platformName: string;
   installCmd: string;
+}
+
+export interface AntigravityCompatibilityInfo {
+  installInfo: AntigravityInstallInfo | null;
+  cpuCompatible: boolean;
+  incompatibilityReason: string;
 }
 
 /**
@@ -44,4 +51,34 @@ export function getAntigravityInstallInfo(): AntigravityInstallInfo | null {
     };
   }
   return null;
+}
+
+/**
+ * Gets the full Antigravity compatibility info including CPU feature
+ * validation. When the CPU lacks required instruction sets (AVX/AVX2),
+ * the installInfo is still returned but cpuCompatible is false with a
+ * reason string.
+ *
+ * @see https://github.com/google-gemini/gemini-cli/issues/27342
+ */
+export function getAntigravityCompatibility(): AntigravityCompatibilityInfo {
+  const installInfo = getAntigravityInstallInfo();
+  const cpuCompat = getCachedCpuCompatibility();
+
+  let incompatibilityReason = '';
+
+  if (!cpuCompat.compatible) {
+    const missing = cpuCompat.missingFeatures.join(', ');
+    incompatibilityReason =
+      `Your CPU (${cpuCompat.cpuModel}) lacks required instruction sets: ${missing}. ` +
+      `Detected microarchitecture: ${cpuCompat.microarchLevel}. ` +
+      `The Antigravity CLI requires x86-64-v3 (AVX2) and will crash with ` +
+      `"Illegal instruction" (SIGILL, exit code 132) on this hardware.`;
+  }
+
+  return {
+    installInfo,
+    cpuCompatible: cpuCompat.compatible,
+    incompatibilityReason,
+  };
 }

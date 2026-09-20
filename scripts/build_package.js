@@ -56,6 +56,24 @@ if (packageName === 'core') {
   }
 }
 
+// For the CLI package, log CPU compatibility status at build time.
+// This helps developers verify that the detection module is being
+// included in the build and catches module resolution issues early.
+if (packageName === 'cli') {
+  const cpuCompatPath = join(
+    process.cwd(),
+    'dist',
+    'ui',
+    'utils',
+    'antigravityUtils.js',
+  );
+  if (existsSync(cpuCompatPath)) {
+    console.log(
+      'CPU compatibility module included in build (antigravityUtils.js)',
+    );
+  }
+}
+
 // touch dist/.last_build
 writeFileSync(join(process.cwd(), 'dist', '.last_build'), '');
 process.exit(0);

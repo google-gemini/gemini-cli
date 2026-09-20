@@ -8,7 +8,7 @@ import { useState, useEffect } from 'react';
 import { persistentState } from '../../utils/persistentState.js';
 import crypto from 'node:crypto';
 import chalk from 'chalk';
-import { getAntigravityInstallInfo } from '../utils/antigravityUtils.js';
+import { getAntigravityCompatibility } from '../utils/antigravityUtils.js';
 
 const DEFAULT_MAX_BANNER_SHOWN_COUNT = 5;
 
@@ -51,9 +51,17 @@ export function useBanner(bannerData: BannerData) {
   let bannerText = rawBannerText.replace(/\\n/g, '\n');
 
   if (showBanner && activeText.includes('Antigravity')) {
-    const info = getAntigravityInstallInfo();
-    if (info) {
-      bannerText += `\n \nTo install run "${chalk.bold(info.installCmd)}"`;
+    const compat = getAntigravityCompatibility();
+
+    if (!compat.cpuCompatible) {
+      // CPU lacks required instruction sets — show a hardware warning
+      // instead of the install command so users aren't told to install
+      // a binary that will crash immediately with SIGILL.
+      bannerText += `\n \n${chalk.yellow('⚠ Your CPU is not compatible with the Antigravity CLI binary.')}`;
+      bannerText += `\n${chalk.dim(compat.incompatibilityReason)}`;
+      bannerText += `\n${chalk.dim('You can continue using Gemini CLI (Node.js) on this machine.')}`;
+    } else if (compat.installInfo) {
+      bannerText += `\n \nTo install run "${chalk.bold(compat.installInfo.installCmd)}"`;
     }
   }
 

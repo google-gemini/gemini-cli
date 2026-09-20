@@ -688,6 +688,7 @@ export class TestRig {
         key !== 'GEMINI_CLI_INTEGRATION_TEST' &&
         key !== 'GOOGLE_GEMINI_BASE_URL' &&
         key !== 'GEMINI_FORCE_FILE_STORAGE' &&
+        key !== 'GEMINI_CPU_COMPAT_SKIP' &&
         !key.startsWith('GEMINI_CLI_ACTIVITY_LOG')
       ) {
         delete cleanEnv[key];

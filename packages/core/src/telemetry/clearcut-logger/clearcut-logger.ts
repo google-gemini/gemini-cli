@@ -722,6 +722,34 @@ export class ClearcutLogger {
       },
     );
 
+    // Add CPU compatibility information for Antigravity migration tracking.
+    // This helps the team understand how many users have legacy CPUs that
+    // cannot run the Go-based binary (issue #27342).
+    try {
+      const { getCachedCpuCompatibility } = await import(
+        '../../services/platformDiagnostics.js'
+      );
+      const cpuCompat = getCachedCpuCompatibility();
+      data.push(
+        {
+          gemini_cli_key: EventMetadataKey.GEMINI_CLI_CPU_MICROARCH_LEVEL,
+          value: cpuCompat.microarchLevel,
+        },
+        {
+          gemini_cli_key: EventMetadataKey.GEMINI_CLI_CPU_ANTIGRAVITY_COMPAT,
+          value: cpuCompat.compatible.toString(),
+        },
+      );
+      if (cpuCompat.missingFeatures.length > 0) {
+        data.push({
+          gemini_cli_key: EventMetadataKey.GEMINI_CLI_CPU_MISSING_FEATURES,
+          value: cpuCompat.missingFeatures.join(','),
+        });
+      }
+    } catch {
+      debugLogger.debug('Failed to add CPU compatibility telemetry');
+    }
+
     const gpuInfo = await getGpuInfo();
     data.push({
       gemini_cli_key: EventMetadataKey.GEMINI_CLI_GPU_INFO,

@@ -43,6 +43,17 @@ vi.mock('../colors.js', () => ({
   },
 }));
 
+const mockGetAntigravityCompatibility = vi.fn();
+vi.mock('../utils/antigravityUtils.js', async () => {
+  const actual = await vi.importActual<
+    typeof import('../utils/antigravityUtils.js')
+  >('../utils/antigravityUtils.js');
+  return {
+    ...actual,
+    getAntigravityCompatibility: () => mockGetAntigravityCompatibility(),
+  };
+});
+
 describe('useBanner', () => {
   const mockedPersistentStateGet = persistentState.get as MockedFunction<
     typeof persistentState.get
@@ -86,6 +97,12 @@ describe('useBanner', () => {
       defaultText: 'Antigravity is coming to town!',
       warningText: '',
     };
+
+    mockGetAntigravityCompatibility.mockReturnValue({
+      installInfo: { platformName: 'Linux', installCmd: 'curl ...' },
+      cpuCompatible: true,
+      incompatibilityReason: '',
+    });
 
     mockedPersistentStateGet.mockReturnValue({
       [crypto
@@ -145,13 +162,26 @@ describe('useBanner', () => {
   describe('Antigravity installation commands', () => {
     const originalPlatform = process.platform;
 
+    beforeEach(() => {
+      mockGetAntigravityCompatibility.mockReset();
+    });
+
     afterEach(() => {
       Object.defineProperty(process, 'platform', { value: originalPlatform });
       vi.unstubAllEnvs();
     });
 
-    it('should append macOS & Linux install command when on darwin', async () => {
+    it('should append macOS & Linux install command when on compatible darwin', async () => {
       Object.defineProperty(process, 'platform', { value: 'darwin' });
+      mockGetAntigravityCompatibility.mockReturnValue({
+        installInfo: {
+          platformName: 'macOS',
+          installCmd:
+            'curl -fsSL https://antigravity.google/cli/install.sh | bash',
+        },
+        cpuCompatible: true,
+        incompatibilityReason: '',
+      });
       const data = { defaultText: 'Welcome to Antigravity!', warningText: '' };
 
       const { result } = await renderHook(() => useBanner(data));
@@ -161,8 +191,17 @@ describe('useBanner', () => {
       );
     });
 
-    it('should append macOS & Linux install command when on linux', async () => {
+    it('should append macOS & Linux install command when on compatible linux', async () => {
       Object.defineProperty(process, 'platform', { value: 'linux' });
+      mockGetAntigravityCompatibility.mockReturnValue({
+        installInfo: {
+          platformName: 'Linux',
+          installCmd:
+            'curl -fsSL https://antigravity.google/cli/install.sh | bash',
+        },
+        cpuCompatible: true,
+        incompatibilityReason: '',
+      });
       const data = { defaultText: 'Welcome to Antigravity!', warningText: '' };
 
       const { result } = await renderHook(() => useBanner(data));
@@ -172,9 +211,17 @@ describe('useBanner', () => {
       );
     });
 
-    it('should append Windows PowerShell install command when on win32 and PSModulePath is set', async () => {
+    it('should append Windows PowerShell install command when on compatible win32 and PSModulePath is set', async () => {
       Object.defineProperty(process, 'platform', { value: 'win32' });
       vi.stubEnv('PSModulePath', 'C:\\some\\path');
+      mockGetAntigravityCompatibility.mockReturnValue({
+        installInfo: {
+          platformName: 'Windows (PowerShell)',
+          installCmd: 'irm https://antigravity.google/cli/install.ps1 | iex',
+        },
+        cpuCompatible: true,
+        incompatibilityReason: '',
+      });
       const data = { defaultText: 'Welcome to Antigravity!', warningText: '' };
 
       const { result } = await renderHook(() => useBanner(data));
@@ -184,9 +231,18 @@ describe('useBanner', () => {
       );
     });
 
-    it('should append Windows CMD install command when on win32 and PSModulePath is not set', async () => {
+    it('should append Windows CMD install command when on compatible win32 and PSModulePath is not set', async () => {
       Object.defineProperty(process, 'platform', { value: 'win32' });
       vi.stubEnv('PSModulePath', '');
+      mockGetAntigravityCompatibility.mockReturnValue({
+        installInfo: {
+          platformName: 'Windows (Command Prompt)',
+          installCmd:
+            'curl -fsSL https://antigravity.google/cli/install.cmd -o install.cmd && install.cmd && del install.cmd',
+        },
+        cpuCompatible: true,
+        incompatibilityReason: '',
+      });
       const data = { defaultText: 'Welcome to Antigravity!', warningText: '' };
 
       const { result } = await renderHook(() => useBanner(data));
@@ -207,11 +263,44 @@ describe('useBanner', () => {
 
     it('should not append install command if process.platform is an unsupported platform', async () => {
       Object.defineProperty(process, 'platform', { value: 'freebsd' });
+      mockGetAntigravityCompatibility.mockReturnValue({
+        installInfo: null,
+        cpuCompatible: true,
+        incompatibilityReason: '',
+      });
       const data = { defaultText: 'Welcome to Antigravity!', warningText: '' };
 
       const { result } = await renderHook(() => useBanner(data));
 
       expect(result.current.bannerText).toBe('Welcome to Antigravity!');
+    });
+
+    it('should show CPU incompatibility warning instead of install command for legacy CPUs (issue #27342)', async () => {
+      Object.defineProperty(process, 'platform', { value: 'linux' });
+      mockGetAntigravityCompatibility.mockReturnValue({
+        installInfo: {
+          platformName: 'Linux',
+          installCmd:
+            'curl -fsSL https://antigravity.google/cli/install.sh | bash',
+        },
+        cpuCompatible: false,
+        incompatibilityReason:
+          'Your CPU (AMD A6-3420M APU) lacks required instruction sets: AVX, AVX2. ' +
+          'Detected microarchitecture: x86-64-v2. ' +
+          'The Antigravity CLI requires x86-64-v3 (AVX2) and will crash with ' +
+          '"Illegal instruction" (SIGILL, exit code 132) on this hardware.',
+      });
+      const data = { defaultText: 'Welcome to Antigravity!', warningText: '' };
+
+      const { result } = await renderHook(() => useBanner(data));
+
+      expect(result.current.bannerText).toContain(
+        'Your CPU is not compatible with the Antigravity CLI binary',
+      );
+      expect(result.current.bannerText).toContain('AMD A6-3420M');
+      expect(result.current.bannerText).toContain('continue using Gemini CLI');
+      // Should NOT contain the install command
+      expect(result.current.bannerText).not.toContain('To install run');
     });
   });
 });
