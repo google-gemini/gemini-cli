@@ -801,7 +801,7 @@ describe('resolveModel Gemini 3.5 Flash GA', () => {
     },
   );
 
-  it('should resolve known non-preview flash models to gemini-3.5-flash when useGemini3_5Flash is true (dynamic)', () => {
+  it('should resolve flash alias to gemini-3.5-flash when useGemini3_5Flash is true (dynamic)', () => {
     const mockDynamicConfig = {
       getExperimentalDynamicModelConfiguration: () => true,
       modelConfigService,
@@ -826,7 +826,7 @@ describe('resolveModel Gemini 3.5 Flash GA', () => {
         mockDynamicConfig,
         true,
       ),
-    ).toBe('gemini-3.5-flash');
+    ).toBe(DEFAULT_GEMINI_FLASH_MODEL);
     expect(
       resolveModel(
         PREVIEW_GEMINI_FLASH_MODEL,
@@ -837,6 +837,34 @@ describe('resolveModel Gemini 3.5 Flash GA', () => {
         true,
       ),
     ).toBe(PREVIEW_GEMINI_FLASH_MODEL);
+  });
+
+  it('should preserve explicit gemini-3-pro-preview when useGemini3_1 is true', () => {
+    const mockDynamicConfig = {
+      getExperimentalDynamicModelConfiguration: () => true,
+      modelConfigService,
+    } as unknown as Config;
+
+    expect(
+      resolveModel(
+        PREVIEW_GEMINI_MODEL,
+        true,
+        false,
+        true,
+        mockDynamicConfig,
+        false,
+      ),
+    ).toBe(PREVIEW_GEMINI_MODEL);
+    expect(
+      resolveModel(
+        PREVIEW_GEMINI_MODEL,
+        true,
+        false,
+        true,
+        undefined,
+        false,
+      ),
+    ).toBe(PREVIEW_GEMINI_MODEL);
   });
 
   it('should NOT resolve flash models to DEFAULT_GEMINI_FLASH_MODEL when useGemini3_5Flash is false', () => {
