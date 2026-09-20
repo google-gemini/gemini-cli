@@ -13,6 +13,15 @@ import { waitForUpdateCompletion } from './handleAutoUpdate.js';
 export const RELAUNCH_EXIT_CODE = 199;
 
 /**
+ * Returns `true` when the current process is a relaunched child
+ * (i.e. GEMINI_CLI_NO_RELAUNCH is set), meaning it should install its
+ * own signal handlers rather than relying on forwarding from the parent.
+ */
+export function isChildProcess(): boolean {
+  return !!process.env['GEMINI_CLI_NO_RELAUNCH'];
+}
+
+/**
  * Exits the process with a special code to signal that the parent process should relaunch it.
  */
 let isRelaunching = false;

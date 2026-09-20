@@ -142,6 +142,17 @@ async function gracefulShutdown(_reason: string) {
   process.exit(ExitCodes.SUCCESS);
 }
 
+/**
+ * Installs signal handlers for the **child** (worker) process.
+ *
+ * These handlers run inside the relaunched child (GEMINI_CLI_NO_RELAUNCH=true)
+ * and trigger graceful cleanup + exit. The *parent* process installs separate
+ * signal **forwarders** (see `SignalForwarder` in `@google/gemini-cli-core`)
+ * that proxy signals it receives to the child, ensuring the child eventually
+ * reaches this handler and cleans up rather than being orphaned.
+ *
+ * @see https://github.com/google-gemini/gemini-cli/issues/25590
+ */
 export function setupSignalHandlers() {
   process.on('SIGHUP', () => gracefulShutdown('SIGHUP'));
   process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

@@ -319,3 +319,11 @@ export * from './voice/whisperTranscriptionProvider.js';
 export * from './voice/transcriptionFactory.js';
 export * from './voice/whisperModelManager.js';
 export { isBinaryAvailable } from './utils/binaryCheck.js';
+
+// Export signal forwarding utilities
+export {
+  SignalForwarder,
+  installSignalForwarders,
+  FORWARDED_SIGNALS,
+  DEFAULT_SIGNAL_GRACE_MS,
+} from './services/signalForwarding.js';

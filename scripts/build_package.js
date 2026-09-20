@@ -56,6 +56,22 @@ if (packageName === 'core') {
   }
 }
 
+// Verify critical modules are built (signal forwarding, etc.)
+if (packageName === 'core') {
+  const signalForwardingPath = join(
+    process.cwd(),
+    'dist',
+    'services',
+    'signalForwarding.js',
+  );
+  if (!existsSync(signalForwardingPath)) {
+    console.warn(
+      'Warning: signalForwarding.js not found in dist/services/. ' +
+        'Signal forwarding for child processes may not work correctly.',
+    );
+  }
+}
+
 // touch dist/.last_build
 writeFileSync(join(process.cwd(), 'dist', '.last_build'), '');
 process.exit(0);

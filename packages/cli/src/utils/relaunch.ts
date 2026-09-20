@@ -12,6 +12,7 @@ import {
 } from './processUtils.js';
 import {
   writeToStderr,
+  SignalForwarder,
   type AdminControlsSettings,
 } from '@google/gemini-cli-core';
 
@@ -61,6 +62,13 @@ export async function relaunchAppInChildProcess(
       env: newEnv,
     });
 
+    // Install signal forwarders so that termination signals (SIGTERM, SIGHUP,
+    // etc.) sent to the parent are proxied to the child. Without this the child
+    // is orphaned when a process manager kills the parent.
+    // See: https://github.com/google-gemini/gemini-cli/issues/25590
+    const signalForwarder = new SignalForwarder(child);
+    signalForwarder.install();
+
     if (latestAdminSettings) {
       child.send({ type: 'admin-settings', settings: latestAdminSettings });
     }
@@ -72,8 +80,14 @@ export async function relaunchAppInChildProcess(
     });
 
     return new Promise<number>((resolve, reject) => {
-      child.on('error', reject);
+      child.on('error', (err) => {
+        signalForwarder.remove();
+        reject(err);
+      });
       child.on('close', (code) => {
+        // Remove signal forwarders before resolving to avoid listener leaks
+        // across relaunch iterations (relaunchOnExitCode may call runner again).
+        signalForwarder.remove();
         // Resume stdin before the parent process exits.
         process.stdin.resume();
         resolve(code ?? 1);

@@ -699,6 +699,10 @@ export class TestRig {
       GEMINI_CLI_HOME: this.homeDir!,
       GEMINI_PTY_INFO: 'child_process',
       GEMINI_FORCE_FILE_STORAGE: 'true',
+      // Skip the relaunch path in integration tests to avoid signal-forwarding
+      // complexity in test harnesses. The signal forwarding logic is tested
+      // directly in signalForwarding.integration.test.ts.
+      GEMINI_CLI_NO_RELAUNCH: 'true',
       ...extraEnv,
     };
   }

@@ -13,6 +13,7 @@ import {
   getScriptArgs,
   isSeaEnvironment,
   getSpawnConfig,
+  isChildProcess,
   type ProcessWithSea,
 } from './processUtils.js';
 import * as cleanup from './cleanup.js';
@@ -191,6 +192,29 @@ describe('SEA handling utilities', () => {
       expect(() => {
         getSpawnConfig(['--title=A\\B'], []);
       }).toThrow();
+    });
+
+    it('sets GEMINI_CLI_NO_RELAUNCH in spawned environment', () => {
+      process.argv = ['/bin/node', '/path/to/script.js'];
+      const config = getSpawnConfig([], []);
+      expect(config.env['GEMINI_CLI_NO_RELAUNCH']).toBe('true');
+    });
+  });
+
+  describe('isChildProcess', () => {
+    it('returns true when GEMINI_CLI_NO_RELAUNCH is set', () => {
+      vi.stubEnv('GEMINI_CLI_NO_RELAUNCH', 'true');
+      expect(isChildProcess()).toBe(true);
+    });
+
+    it('returns false when GEMINI_CLI_NO_RELAUNCH is empty', () => {
+      vi.stubEnv('GEMINI_CLI_NO_RELAUNCH', '');
+      expect(isChildProcess()).toBe(false);
+    });
+
+    it('returns false when GEMINI_CLI_NO_RELAUNCH is not set', () => {
+      delete process.env['GEMINI_CLI_NO_RELAUNCH'];
+      expect(isChildProcess()).toBe(false);
     });
   });
 });

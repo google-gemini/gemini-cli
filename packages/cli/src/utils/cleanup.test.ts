@@ -226,6 +226,35 @@ describe('signal and TTY handling', () => {
       // eslint-disable-next-line no-restricted-syntax
       expect(typeof sigtermHandlers[0]).toBe('function');
     });
+
+    it('should use process.on (not process.once) so signal forwarding from parent can coexist', () => {
+      // The parent process installs signal forwarders (SignalForwarder) that
+      // also listen to SIGTERM/SIGHUP/SIGINT. The child's cleanup handlers
+      // must use process.on(), not process.once(), so that both the forwarder
+      // and the cleanup handler can fire.
+      // See: https://github.com/google-gemini/gemini-cli/issues/25590
+      setupSignalHandlers();
+
+      // Verify each signal has at least one handler
+      expect(processOnHandlers.get('SIGHUP')?.length).toBeGreaterThan(0);
+      expect(processOnHandlers.get('SIGTERM')?.length).toBeGreaterThan(0);
+      expect(processOnHandlers.get('SIGINT')?.length).toBeGreaterThan(0);
+    });
+
+    it('should handle shutdown idempotently when both signal forwarding and direct signal arrive', async () => {
+      // Simulates the scenario where the parent forwards SIGTERM to the child
+      // and the OS also delivers SIGTERM to the process group.
+      setupSignalHandlers();
+
+      const sigtermHandlers = processOnHandlers.get('SIGTERM') || [];
+      // Call the handler twice (simulating two SIGTERM deliveries)
+      await sigtermHandlers[0]?.();
+      await sigtermHandlers[0]?.();
+
+      // process.exit should only be called once (isShuttingDown guard)
+      expect(process.exit).toHaveBeenCalledTimes(1);
+      expect(process.exit).toHaveBeenCalledWith(0);
+    });
   });
 
   describe('setupTtyCheck', () => {

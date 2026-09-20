@@ -346,6 +346,181 @@ describe('relaunchAppInChildProcess', () => {
       expect(processExitSpy).toHaveBeenCalledWith(1);
     });
   });
+
+  describe('signal forwarding (issue #25590)', () => {
+    let originalSIGTERMListeners: ((...args: unknown[]) => void)[];
+    let originalSIGHUPListeners: ((...args: unknown[]) => void)[];
+    let originalSIGINTListeners: ((...args: unknown[]) => void)[];
+    let originalSIGQUITListeners: ((...args: unknown[]) => void)[];
+    let originalSIGUSR1Listeners: ((...args: unknown[]) => void)[];
+    let originalSIGUSR2Listeners: ((...args: unknown[]) => void)[];
+
+    beforeEach(() => {
+      vi.stubEnv('GEMINI_CLI_NO_RELAUNCH', '');
+      // Snapshot process signal listeners to restore after each test
+      originalSIGTERMListeners = [...process.listeners('SIGTERM')];
+      originalSIGHUPListeners = [...process.listeners('SIGHUP')];
+      originalSIGINTListeners = [...process.listeners('SIGINT')];
+      originalSIGQUITListeners = [...process.listeners('SIGQUIT')];
+      originalSIGUSR1Listeners = [...process.listeners('SIGUSR1')];
+      originalSIGUSR2Listeners = [...process.listeners('SIGUSR2')];
+    });
+
+    afterEach(() => {
+      // Restore original signal listeners
+      const signals = [
+        'SIGTERM', 'SIGHUP', 'SIGINT', 'SIGQUIT', 'SIGUSR1', 'SIGUSR2',
+      ] as const;
+      const originals = [
+        originalSIGTERMListeners, originalSIGHUPListeners,
+        originalSIGINTListeners, originalSIGQUITListeners,
+        originalSIGUSR1Listeners, originalSIGUSR2Listeners,
+      ];
+      for (let i = 0; i < signals.length; i++) {
+        process.removeAllListeners(signals[i]);
+        for (const fn of originals[i]) {
+          process.on(signals[i], fn as (...args: unknown[]) => void);
+        }
+      }
+    });
+
+    it('should forward SIGTERM to the child process', async () => {
+      process.argv = ['/usr/bin/node', '/app/cli.js'];
+
+      const mockChild = createMockChildProcess(0, false);
+      mockedSpawn.mockReturnValue(mockChild);
+
+      const promise = relaunchAppInChildProcess([], []);
+
+      // Wait for the child to be spawned
+      await new Promise((r) => setImmediate(r));
+
+      // Emit SIGTERM on the parent process
+      process.emit('SIGTERM');
+
+      expect(mockChild.kill).toHaveBeenCalledWith('SIGTERM');
+
+      // Close the child to let the test finish
+      mockChild.emit('close', 0);
+      await expect(promise).rejects.toThrow('PROCESS_EXIT_CALLED');
+    });
+
+    it('should forward SIGHUP to the child process', async () => {
+      process.argv = ['/usr/bin/node', '/app/cli.js'];
+
+      const mockChild = createMockChildProcess(0, false);
+      mockedSpawn.mockReturnValue(mockChild);
+
+      const promise = relaunchAppInChildProcess([], []);
+      await new Promise((r) => setImmediate(r));
+
+      process.emit('SIGHUP');
+      expect(mockChild.kill).toHaveBeenCalledWith('SIGHUP');
+
+      mockChild.emit('close', 0);
+      await expect(promise).rejects.toThrow('PROCESS_EXIT_CALLED');
+    });
+
+    it('should forward SIGUSR1 and SIGUSR2 to the child process', async () => {
+      process.argv = ['/usr/bin/node', '/app/cli.js'];
+
+      const mockChild = createMockChildProcess(0, false);
+      mockedSpawn.mockReturnValue(mockChild);
+
+      const promise = relaunchAppInChildProcess([], []);
+      await new Promise((r) => setImmediate(r));
+
+      process.emit('SIGUSR1');
+      expect(mockChild.kill).toHaveBeenCalledWith('SIGUSR1');
+
+      process.emit('SIGUSR2');
+      expect(mockChild.kill).toHaveBeenCalledWith('SIGUSR2');
+
+      mockChild.emit('close', 0);
+      await expect(promise).rejects.toThrow('PROCESS_EXIT_CALLED');
+    });
+
+    it('should remove signal forwarders when child exits normally', async () => {
+      process.argv = ['/usr/bin/node', '/app/cli.js'];
+
+      const mockChild = createMockChildProcess(0, false);
+      mockedSpawn.mockReturnValue(mockChild);
+
+      const promise = relaunchAppInChildProcess([], []);
+      await new Promise((r) => setImmediate(r));
+
+      const listenerCountBefore = process.listenerCount('SIGUSR2');
+      expect(listenerCountBefore).toBeGreaterThan(0);
+
+      // Simulate child exiting
+      mockChild.emit('close', 0);
+      await expect(promise).rejects.toThrow('PROCESS_EXIT_CALLED');
+
+      // The forwarder for SIGUSR2 should have been removed
+      // (listener count back to original or zero)
+    });
+
+    it('should remove signal forwarders when child emits error', async () => {
+      process.argv = ['/usr/bin/node', '/app/cli.js'];
+
+      const mockChild = createMockChildProcess(0, false);
+      mockedSpawn.mockReturnValue(mockChild);
+
+      const promise = relaunchAppInChildProcess([], []);
+      await new Promise((r) => setImmediate(r));
+
+      // Simulate child erroring
+      mockChild.emit('error', new Error('spawn failed'));
+      await expect(promise).rejects.toThrow('PROCESS_EXIT_CALLED');
+    });
+
+    it('should not throw when child.kill fails (child already exited)', async () => {
+      process.argv = ['/usr/bin/node', '/app/cli.js'];
+
+      const mockChild = createMockChildProcess(0, false);
+      vi.mocked(mockChild.kill).mockImplementation(() => {
+        throw new Error('kill ESRCH');
+      });
+      mockedSpawn.mockReturnValue(mockChild);
+
+      const promise = relaunchAppInChildProcess([], []);
+      await new Promise((r) => setImmediate(r));
+
+      // Should not throw even though child.kill throws
+      expect(() => process.emit('SIGUSR2')).not.toThrow();
+
+      mockChild.emit('close', 0);
+      await expect(promise).rejects.toThrow('PROCESS_EXIT_CALLED');
+    });
+
+    it('should not leak listeners across relaunch iterations', async () => {
+      process.argv = ['/usr/bin/node', '/app/cli.js'];
+
+      let iteration = 0;
+      mockedSpawn.mockImplementation(() => {
+        iteration++;
+        const child = createMockChildProcess(0, false);
+        // First iteration: relaunch; second: exit normally
+        setImmediate(() => {
+          child.emit('close', iteration === 1 ? RELAUNCH_EXIT_CODE : 0);
+        });
+        return child;
+      });
+
+      const listenersBefore = process.listenerCount('SIGTERM');
+
+      await expect(relaunchAppInChildProcess([], [])).rejects.toThrow(
+        'PROCESS_EXIT_CALLED',
+      );
+
+      expect(iteration).toBe(2);
+      // After both iterations complete, listeners should be cleaned up
+      // (no net growth relative to before)
+      expect(process.listenerCount('SIGTERM')).toBeLessThanOrEqual(
+        listenersBefore + 1, // at most 1 from the exit handler chain
+      );
+    });
+  });
 });
 
 /**

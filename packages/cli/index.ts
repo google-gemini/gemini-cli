@@ -62,11 +62,12 @@ async function run() {
 
     let latestAdminSettings: unknown = undefined;
 
-    // Prevent the parent process from exiting prematurely on signals.
-    // The child process will receive the same signals and handle its own cleanup.
-    for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
-      process.on(sig as NodeJS.Signals, () => {});
-    }
+    // Signal forwarding constants ,  kept inline to avoid importing
+    // @google/gemini-cli-core in the lightweight parent (saves ~1.5s startup).
+    const FORWARDED_SIGNALS: readonly NodeJS.Signals[] = [
+      'SIGTERM', 'SIGHUP', 'SIGINT', 'SIGQUIT', 'SIGUSR1', 'SIGUSR2',
+    ];
+    const SIGNAL_GRACE_MS = 5_000;
 
     const runner = () => {
       process.stdin.pause();
@@ -75,6 +76,50 @@ async function run() {
         stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
         env: newEnv,
       });
+
+      // Forward termination signals from the parent to the child.
+      // Without this, `kill -TERM <parent-pid>` orphans the child because
+      // the parent exits on its default signal disposition while the child
+      // keeps running (reparented to PID 1 / systemd user manager).
+      // See: https://github.com/google-gemini/gemini-cli/issues/25590
+      const signalHandlers = new Map<NodeJS.Signals, () => void>();
+      let escalationTimer: ReturnType<typeof setTimeout> | null = null;
+
+      for (const sig of FORWARDED_SIGNALS) {
+        const handler = () => {
+          try {
+            child.kill(sig);
+          } catch {
+            // Child may have already exited ,  ignore ESRCH.
+          }
+          // For fatal signals, escalate to SIGKILL after grace period.
+          if (
+            (sig === 'SIGTERM' || sig === 'SIGHUP' || sig === 'SIGQUIT') &&
+            escalationTimer === null
+          ) {
+            escalationTimer = setTimeout(() => {
+              escalationTimer = null;
+              try { child.kill('SIGKILL'); } catch { /* already gone */ }
+            }, SIGNAL_GRACE_MS);
+            if (typeof escalationTimer.unref === 'function') {
+              escalationTimer.unref();
+            }
+          }
+        };
+        signalHandlers.set(sig, handler);
+        process.on(sig, handler);
+      }
+
+      const removeSignalHandlers = () => {
+        for (const [sig, handler] of signalHandlers) {
+          process.off(sig, handler);
+        }
+        signalHandlers.clear();
+        if (escalationTimer !== null) {
+          clearTimeout(escalationTimer);
+          escalationTimer = null;
+        }
+      };
 
       if (latestAdminSettings) {
         child.send({ type: 'admin-settings', settings: latestAdminSettings });
@@ -88,12 +133,14 @@ async function run() {
 
       return new Promise<number>((resolve) => {
         child.on('error', (err) => {
+          removeSignalHandlers();
           process.stderr.write(
             'Error: Failed to start child process: ' + err.message + '\n',
           );
           resolve(1);
         });
         child.on('close', (code) => {
+          removeSignalHandlers();
           process.stdin.resume();
           resolve(code ?? 1);
         });
