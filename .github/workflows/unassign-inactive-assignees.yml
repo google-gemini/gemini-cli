@@ -44,6 +44,12 @@ jobs:
         with:
           app-id: '${{ secrets.APP_ID }}'
           private-key: '${{ secrets.PRIVATE_KEY }}'
+          # Only what the script uses: issues for the timeline plus
+          # removeAssignees/createComment, pull requests for the linked-PR
+          # lookup, and administration for the collaborator permission check.
+          permission-issues: 'write'
+          permission-pull-requests: 'read'
+          permission-administration: 'read'
 
       - name: 'Unassign inactive assignees'
         uses: 'actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b' # ratchet:actions/github-script@v7
