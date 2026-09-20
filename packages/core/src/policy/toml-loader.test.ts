@@ -409,6 +409,164 @@ priority = 100
       expect(result.errors[0].details).toContain('git (status|branch');
     });
 
+    it.each([
+      ['an empty tool name', 'toolName = ""'],
+      ['an empty name in an array', 'toolName = ["read_file", ""]'],
+      ['an empty MCP tool name', 'toolName = ""\nmcpName = "server"'],
+      [
+        'commandPrefix on a non-shell tool',
+        'toolName = "glob"\ncommandPrefix = "git"',
+      ],
+      [
+        'commandRegex on a non-shell tool',
+        'toolName = "glob"\ncommandRegex = ".*"',
+      ],
+      [
+        'commandPrefix with a tool name array',
+        'toolName = ["run_shell_command"]\ncommandPrefix = "git"',
+      ],
+      [
+        'commandPrefix combined with argsPattern',
+        'toolName = "run_shell_command"\ncommandPrefix = "git"\nargsPattern = ".*"',
+      ],
+      [
+        'commandRegex combined with argsPattern',
+        'toolName = "run_shell_command"\ncommandRegex = ".*"\nargsPattern = ".*"',
+      ],
+      [
+        'commandPrefix combined with commandRegex',
+        'toolName = "run_shell_command"\ncommandPrefix = "git"\ncommandRegex = ".*"',
+      ],
+    ])(
+      'should skip %s while preserving valid sibling rules',
+      async (_, rule) => {
+        const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "read_file"
+decision = "allow"
+priority = 100
+
+[[rule]]
+${rule}
+decision = "allow"
+priority = 900
+
+[[rule]]
+toolName = "glob"
+decision = "deny"
+priority = 100
+`);
+
+        expect(getErrors(result)).toEqual([
+          expect.objectContaining({
+            errorType: 'rule_validation',
+            ruleIndex: 1,
+            fileName: 'test.toml',
+          }),
+        ]);
+        expect(result.rules.map((loadedRule) => loadedRule.toolName)).toEqual([
+          'read_file',
+          'glob',
+        ]);
+
+        const engine = new PolicyEngine({ rules: result.rules });
+        expect(
+          (await engine.check({ name: 'read_file' }, undefined)).decision,
+        ).toBe(PolicyDecision.ALLOW);
+        expect((await engine.check({ name: 'glob' }, undefined)).decision).toBe(
+          PolicyDecision.DENY,
+        );
+        expect(
+          (
+            await engine.check(
+              { name: 'run_shell_command', args: { command: 'git push' } },
+              undefined,
+            )
+          ).decision,
+        ).toBe(PolicyDecision.ASK_USER);
+      },
+    );
+
+    it.each(['""', '["read_file", ""]'])(
+      'should skip a safety checker with toolName = %s',
+      async (toolName) => {
+        const result = await runLoadPoliciesFromToml(`
+[[safety_checker]]
+toolName = "read_file"
+[safety_checker.checker]
+type = "external"
+name = "valid-checker"
+
+[[safety_checker]]
+toolName = ${toolName}
+[safety_checker.checker]
+type = "external"
+name = "invalid-checker"
+`);
+
+        expect(getErrors(result)).toEqual([
+          expect.objectContaining({
+            errorType: 'rule_validation',
+            ruleIndex: 1,
+            message:
+              'Invalid safety checker rule: toolName cannot be empty string',
+          }),
+        ]);
+        expect(result.checkers).toEqual([
+          expect.objectContaining({
+            toolName: 'read_file',
+            checker: expect.objectContaining({ name: 'valid-checker' }),
+          }),
+        ]);
+      },
+    );
+
+    it('should preserve valid rules and checkers in later policy files', async () => {
+      const invalidFile = path.join(tempDir, 'invalid.toml');
+      const validFile = path.join(tempDir, 'valid.toml');
+      await fs.writeFile(
+        invalidFile,
+        `
+[[rule]]
+toolName = ""
+decision = "allow"
+priority = 100
+[[safety_checker]]
+toolName = ""
+[safety_checker.checker]
+type = "external"
+name = "invalid-checker"
+`,
+      );
+      await fs.writeFile(
+        validFile,
+        `
+[[rule]]
+toolName = "read_file"
+decision = "allow"
+priority = 100
+[[safety_checker]]
+toolName = "read_file"
+[safety_checker.checker]
+type = "external"
+name = "valid-checker"
+`,
+      );
+
+      const result = await loadPoliciesFromToml(
+        [invalidFile, validFile],
+        () => 1,
+      );
+
+      expect(getErrors(result)).toHaveLength(2);
+      expect(result.rules).toEqual([
+        expect.objectContaining({ toolName: 'read_file' }),
+      ]);
+      expect(result.checkers).toEqual([
+        expect.objectContaining({ toolName: 'read_file' }),
+      ]);
+    });
+
     it('should escape regex special characters in commandPrefix', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
