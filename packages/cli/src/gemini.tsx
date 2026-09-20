@@ -50,6 +50,7 @@ import dns from 'node:dns';
 import * as path from 'node:path';
 import * as fsPromises from 'node:fs/promises';
 import { start_sandbox } from './utils/sandbox.js';
+import { ensureHostFolderTrust } from './utils/ensureHostFolderTrust.js';
 import {
   loadSettings,
   SettingScope,
@@ -611,6 +612,8 @@ export async function main() {
       };
 
       const sandboxArgs = injectStdinIntoArgs(process.argv, stdinData);
+
+      await ensureHostFolderTrust(settings, process.cwd());
 
       await relaunchOnExitCode(() =>
         start_sandbox(sandboxConfig, memoryArgs, partialConfig, sandboxArgs),

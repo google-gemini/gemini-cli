@@ -59,6 +59,20 @@ describe('FolderTrustDialog', () => {
     unmount();
   });
 
+  it('should render when explicit terminal dimensions are provided', async () => {
+    const { lastFrame, unmount } = await renderWithProviders(
+      <FolderTrustDialog
+        onSelect={vi.fn()}
+        terminalHeight={24}
+        terminalWidth={80}
+        constrainHeight={true}
+      />,
+    );
+
+    expect(lastFrame()).toContain('Do you trust the files in this folder?');
+    unmount();
+  });
+
   it('should truncate discovery results when they exceed maxDiscoveryHeight', async () => {
     // maxDiscoveryHeight = 24 - 15 = 9.
     const discoveryResults = {

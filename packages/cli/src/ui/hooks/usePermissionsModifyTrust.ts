@@ -12,6 +12,10 @@ import {
   TrustLevel,
   isWorkspaceTrusted,
 } from '../../config/trustedFolders.js';
+import {
+  persistHostTrust,
+  writeTrustRequest,
+} from '../../utils/sandboxTrust.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 
 import { MessageType } from '../types.js';
@@ -57,6 +61,17 @@ function getInitialTrustState(
   };
 }
 
+async function saveTrustLevel(
+  folderPath: string,
+  level: TrustLevel,
+): Promise<void> {
+  if (process.env['SANDBOX']) {
+    await writeTrustRequest(folderPath, level);
+    return;
+  }
+  await persistHostTrust(folderPath, level);
+}
+
 export const usePermissionsModifyTrust = (
   onExit: () => void,
   addItem: UseHistoryManagerReturn['addItem'],
@@ -96,17 +111,22 @@ export const usePermissionsModifyTrust = (
       // If we are not editing the current workspace, the logic is simple:
       // just save the setting and exit. No restart or warnings are needed.
       if (!isCurrentWorkspace) {
-        const folders = loadTrustedFolders();
-        await folders.setValue(cwd, trustLevel);
+        await saveTrustLevel(cwd, trustLevel);
         onExit();
         return;
       }
 
       // All logic below only applies when editing the current workspace.
-      const wasTrusted = isWorkspaceTrusted(
-        settings.merged,
-        process.cwd(),
-      ).isTrusted;
+      const wasTrusted =
+        process.env['GEMINI_CLI_TRUST_WORKSPACE'] === 'true'
+          ? true
+          : process.env['GEMINI_CLI_TRUST_WORKSPACE'] === 'false'
+            ? false
+            : isWorkspaceTrusted(settings.merged, process.cwd()).isTrusted;
+
+      const willBeTrusted =
+        trustLevel === TrustLevel.TRUST_FOLDER ||
+        trustLevel === TrustLevel.TRUST_PARENT;
 
       // Create a temporary config to check the new trust status without writing
       const currentConfig = loadTrustedFolders().user.config;
@@ -134,13 +154,12 @@ export const usePermissionsModifyTrust = (
         );
       }
 
-      if (wasTrusted !== isTrusted) {
+      if (wasTrusted !== willBeTrusted) {
         setPendingTrustLevel(trustLevel);
         setNeedsRestart(true);
       } else {
-        const folders = loadTrustedFolders();
         try {
-          await folders.setValue(cwd, trustLevel);
+          await saveTrustLevel(cwd, trustLevel);
         } catch {
           coreEvents.emitFeedback(
             'error',
@@ -155,9 +174,8 @@ export const usePermissionsModifyTrust = (
 
   const commitTrustLevelChange = useCallback(async () => {
     if (pendingTrustLevel) {
-      const folders = loadTrustedFolders();
       try {
-        await folders.setValue(cwd, pendingTrustLevel);
+        await saveTrustLevel(cwd, pendingTrustLevel);
         return true;
       } catch {
         coreEvents.emitFeedback(

@@ -31,8 +31,10 @@ import { loadSandboxConfig } from './config/sandboxConfig.js';
 import { createMockSandboxConfig } from '@google/gemini-cli-test-utils';
 import { terminalCapabilityManager } from './ui/utils/terminalCapabilityManager.js';
 import { start_sandbox } from './utils/sandbox.js';
+import { ensureHostFolderTrust } from './utils/ensureHostFolderTrust.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import os from 'node:os';
+import path from 'node:path';
 import v8 from 'node:v8';
 import { loadSettings, type LoadedSettings } from './config/settings.js';
 import {
@@ -50,6 +52,7 @@ import {
   coreEvents,
   AuthType,
   ExitCodes,
+  Storage,
 } from '@google/gemini-cli-core';
 import { act } from 'react';
 import { type InitializationResult } from './core/initializer.js';
@@ -175,6 +178,17 @@ class MockProcessExitError extends Error {
   }
 }
 
+function stubStorageInitialize() {
+  vi.spyOn(Storage.prototype, 'initialize').mockImplementation(async function (
+    this: Storage,
+  ) {
+    Object.assign(this, { projectIdentifier: 'test-project' });
+  });
+  vi.spyOn(Storage.prototype, 'getProjectTempDir').mockReturnValue(
+    path.join(os.tmpdir(), 'gemini-cli-test-storage'),
+  );
+}
+
 // Mock dependencies
 vi.mock('./config/settings.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./config/settings.js')>();
@@ -240,6 +254,10 @@ import * as readStdinModule from './utils/readStdin.js';
 vi.mock('./utils/sandbox.js', () => ({
   sandbox_command: vi.fn(() => ''), // Default to no sandbox command
   start_sandbox: vi.fn(() => Promise.resolve()), // Mock as an async function that resolves
+}));
+
+vi.mock('./utils/ensureHostFolderTrust.js', () => ({
+  ensureHostFolderTrust: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('./utils/relaunch.js', () => ({
@@ -772,6 +790,10 @@ describe('gemini.tsx main function kitty protocol', () => {
       delete process.env['GEMINI_API_KEY'];
     }
 
+    expect(ensureHostFolderTrust).toHaveBeenCalled();
+    expect(
+      vi.mocked(ensureHostFolderTrust).mock.invocationCallOrder[0],
+    ).toBeLessThan(vi.mocked(start_sandbox).mock.invocationCallOrder[0]);
     expect(start_sandbox).toHaveBeenCalled();
     expect(processExitSpy).toHaveBeenCalledWith(0);
     processExitSpy.mockRestore();
@@ -833,6 +855,7 @@ describe('gemini.tsx main function kitty protocol', () => {
   });
 
   it('should handle session selector error', async () => {
+    stubStorageInitialize();
     // eslint-disable-next-line prefer-arrow-callback
     vi.mocked(SessionSelector).mockImplementation(function () {
       return {
@@ -872,6 +895,7 @@ describe('gemini.tsx main function kitty protocol', () => {
         getSandbox: () => undefined,
       }),
     );
+    vi.mocked(loadSandboxConfig).mockResolvedValue(undefined);
 
     try {
       await main();
@@ -889,6 +913,7 @@ describe('gemini.tsx main function kitty protocol', () => {
   });
 
   it('should start normally with a warning when no sessions found for resume', async () => {
+    stubStorageInitialize();
     // eslint-disable-next-line prefer-arrow-callback
     vi.mocked(SessionSelector).mockImplementation(function () {
       return {
@@ -1064,6 +1089,10 @@ describe('gemini.tsx main function kitty protocol', () => {
 });
 
 describe('resolveSessionId', () => {
+  beforeEach(() => {
+    stubStorageInitialize();
+  });
+
   it('should return a new session ID when neither resume nor sessionId is provided', async () => {
     const { sessionId, resumedSessionData } = await resolveSessionId(
       undefined,
@@ -1352,6 +1381,7 @@ describe('gemini.tsx main function exit codes', () => {
   });
 
   it('should exit with 42 for session resume failure', async () => {
+    stubStorageInitialize();
     vi.mocked(loadCliConfig).mockResolvedValue(
       createMockConfig({
         isInteractive: () => false,
