@@ -829,6 +829,55 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
+  describe('AgentLoopContext spread safety', () => {
+    it('preserves AgentLoopContext properties when cloned with spread operator', async () => {
+      const config = new Config({
+        ...baseParams,
+        checkpointing: false,
+      });
+      await config.initialize();
+
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
+      const spreadContext = { ...config };
+
+      expect(spreadContext.config).toBeDefined();
+      expect(spreadContext.promptId).toBeDefined();
+      expect(spreadContext.toolRegistry).toBeDefined();
+      expect(spreadContext.promptRegistry).toBeDefined();
+      expect(spreadContext.resourceRegistry).toBeDefined();
+      expect(spreadContext.messageBus).toBeDefined();
+      expect(spreadContext.geminiClient).toBeDefined();
+      expect(spreadContext.sandboxManager).toBeDefined();
+
+      expect(spreadContext.config).toBe(config);
+      expect(spreadContext.promptId).toBe(config.promptId);
+      expect(spreadContext.toolRegistry).toBe(config.toolRegistry);
+      expect(spreadContext.promptRegistry).toBe(config.promptRegistry);
+      expect(spreadContext.resourceRegistry).toBe(config.resourceRegistry);
+      expect(spreadContext.messageBus).toBe(config.messageBus);
+      expect(spreadContext.geminiClient).toBe(config.geminiClient);
+      expect(spreadContext.sandboxManager).toBe(config.sandboxManager);
+    });
+
+    it('preserves updated promptId when sessionId is rotated or updated', async () => {
+      const config = new Config({
+        ...baseParams,
+        checkpointing: false,
+      });
+      await config.initialize();
+
+      config.setSessionId('new-session-id-123');
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
+      const spreadContext = { ...config };
+      expect(spreadContext.promptId).toBe('new-session-id-123');
+
+      config.rotateSessionId('rotated-session-id-456');
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
+      const spreadContextRotated = { ...config };
+      expect(spreadContextRotated.promptId).toBe('rotated-session-id-456');
+    });
+  });
+
   describe('refreshAuth', () => {
     it('should refresh auth and update config', async () => {
       const config = new Config(baseParams);

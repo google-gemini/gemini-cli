@@ -326,7 +326,7 @@ describe('useAuth', () => {
       });
 
       expect(result.current.authError).toBe(
-        'This account requires setting the GOOGLE_CLOUD_PROJECT or GOOGLE_CLOUD_PROJECT_ID env var. See https://goo.gle/gemini-cli-auth-docs#workspace-gca',
+        'This account requires setting the GOOGLE_CLOUD_PROJECT or GOOGLE_CLOUD_PROJECT_ID env var. See https://geminicli.com/docs/get-started/authentication/#set-gcp',
       );
       expect(result.current.authError).not.toContain('Failed to login');
       expect(result.current.authState).toBe(AuthState.Updating);

@@ -702,6 +702,76 @@ describe('Session', () => {
     );
   });
 
+  it('should include both diff and explanation in request_permission content for edit tools', async () => {
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'edit_file(file_path: test.ts)',
+      getDisplayTitle: () => 'edit_file(file_path: test.ts)',
+      getExplanation: () => 'Updating configuration value',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue({
+        type: 'edit',
+        filePath: 'test.ts',
+        originalContent: 'old',
+        newContent: 'new',
+        onConfirm: vi.fn(),
+      }),
+      execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
+    });
+
+    mockConnection.requestPermission.mockResolvedValue({
+      outcome: {
+        outcome: 'selected',
+        optionId: 'proceed_once',
+      },
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: GeminiEventType.ToolCallRequest,
+        value: {
+          callId: 'call-edit-1',
+          name: 'test_tool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-1',
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: GeminiEventType.Content,
+        value: '',
+      },
+    ]);
+
+    mockSendMessageStream
+      .mockReturnValueOnce(stream1)
+      .mockReturnValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Edit file' }],
+    });
+
+    expect(mockConnection.requestPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolCall: expect.objectContaining({
+          title: 'edit_file(file_path: test.ts)',
+          content: [
+            expect.objectContaining({
+              type: 'diff',
+              path: 'test.ts',
+            }),
+            {
+              type: 'content',
+              content: { type: 'text', text: 'Updating configuration value' },
+            },
+          ],
+        }),
+      }),
+    );
+  });
+
   it('should add explanation to tool_call update content instead of thought chunk when no permission required', async () => {
     mockTool.build.mockReturnValue({
       getDescription: () => 'Test Tool',

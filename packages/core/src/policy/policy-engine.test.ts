@@ -1546,6 +1546,24 @@ describe('PolicyEngine', () => {
       expect(result.decision).toBe(PolicyDecision.ALLOW);
     });
 
+    it('should force ASK_USER in default decision path when dir_path escapes workspace boundary', async () => {
+      engine = new PolicyEngine({
+        rules: [],
+        defaultDecision: PolicyDecision.ALLOW,
+        sandboxManager: new NoopSandboxManager({ workspace: '/safe/path' }),
+      });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'pwd', dir_path: '/outside/path' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+    });
+
     it('should upgrade ASK_USER to ALLOW if all sub-commands are allowed', async () => {
       const rules: PolicyRule[] = [
         {
@@ -4112,6 +4130,126 @@ describe('PolicyEngine', () => {
       expect((await engine.check(call, undefined)).decision).toBe(
         PolicyDecision.ALLOW,
       );
+    });
+  });
+
+  describe('Build File Protection', () => {
+    it('should allow regular files in AUTO_EDIT mode but require ASK_USER for build files', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'replace',
+          decision: PolicyDecision.ALLOW,
+          modes: [ApprovalMode.AUTO_EDIT],
+        },
+        {
+          toolName: 'write_file',
+          decision: PolicyDecision.ALLOW,
+          modes: [ApprovalMode.AUTO_EDIT],
+        },
+      ];
+      const engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.AUTO_EDIT,
+      });
+
+      // Regular source file should be ALLOWed
+      const regularCheck = await engine.check(
+        {
+          name: 'replace',
+          args: { file_path: 'src/index.ts', instruction: 'edit' },
+        },
+        undefined,
+      );
+      expect(regularCheck.decision).toBe(PolicyDecision.ALLOW);
+
+      // Bazel BUILD file should require ASK_USER
+      const buildCheck = await engine.check(
+        {
+          name: 'replace',
+          args: { file_path: 'pkg/BUILD', instruction: 'edit' },
+        },
+        undefined,
+      );
+      expect(buildCheck.decision).toBe(PolicyDecision.ASK_USER);
+      expect(buildCheck.rule?.source).toBe('Build File Protection');
+
+      // WORKSPACE file should require ASK_USER
+      const workspaceCheck = await engine.check(
+        {
+          name: 'replace',
+          args: { file_path: 'WORKSPACE', instruction: 'edit' },
+        },
+        undefined,
+      );
+      expect(workspaceCheck.decision).toBe(PolicyDecision.ASK_USER);
+
+      // package.json should require ASK_USER
+      const packageJsonCheck = await engine.check(
+        {
+          name: 'write_file',
+          args: { file_path: 'package.json', content: '{}' },
+        },
+        undefined,
+      );
+      expect(packageJsonCheck.decision).toBe(PolicyDecision.ASK_USER);
+
+      // Makefile should require ASK_USER
+      const makefileCheck = await engine.check(
+        {
+          name: 'write_file',
+          args: { file_path: 'Makefile', content: 'all:\n\techo hi' },
+        },
+        undefined,
+      );
+      expect(makefileCheck.decision).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should require ASK_USER for build files even in YOLO mode', async () => {
+      const engine = new PolicyEngine({
+        approvalMode: ApprovalMode.YOLO,
+      });
+
+      // Regular file should be ALLOWed in YOLO mode
+      const regularCheck = await engine.check(
+        {
+          name: 'replace',
+          args: { file_path: 'src/main.py', instruction: 'edit' },
+        },
+        undefined,
+      );
+      expect(regularCheck.decision).toBe(PolicyDecision.ALLOW);
+
+      // BUILD.bazel must still require ASK_USER
+      const buildCheck = await engine.check(
+        {
+          name: 'replace',
+          args: { file_path: 'BUILD.bazel', instruction: 'edit' },
+        },
+        undefined,
+      );
+      expect(buildCheck.decision).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should return DENY for build files in nonInteractive mode when otherwise ALLOWed', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'replace',
+          decision: PolicyDecision.ALLOW,
+        },
+      ];
+      const engine = new PolicyEngine({
+        rules,
+        nonInteractive: true,
+      });
+
+      const buildCheck = await engine.check(
+        {
+          name: 'replace',
+          args: { file_path: 'BUILD', instruction: 'edit' },
+        },
+        undefined,
+      );
+      expect(buildCheck.decision).toBe(PolicyDecision.DENY);
     });
   });
 });
