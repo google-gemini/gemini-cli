@@ -122,6 +122,29 @@ describe('SuggestionsDisplay', () => {
     expect(lastFrame()).toMatchSnapshot();
   });
 
+  it('renders Skill tag for skills', async () => {
+    const skillSuggestions = [
+      {
+        label: 'Skill Tool',
+        value: 'skill-tool',
+        commandKind: CommandKind.SKILL,
+      },
+    ];
+
+    const { lastFrame } = await render(
+      <SuggestionsDisplay
+        suggestions={skillSuggestions}
+        activeIndex={0}
+        isLoading={false}
+        width={80}
+        scrollOffset={0}
+        userInput=""
+        mode="reverse"
+      />,
+    );
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
   it('renders command section separators for slash mode', async () => {
     const groupedSuggestions = [
       {
