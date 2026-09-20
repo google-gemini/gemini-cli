@@ -122,9 +122,10 @@ export function useQuotaAndFallback({
           paidTier?.availableCredits &&
           isOverageEligibleModel(failedModel)
         ) {
-          const resetTime = error.retryDelayMs
-            ? getResetTimeMessage(error.retryDelayMs)
-            : undefined;
+          const resetTime = getResetTimeMessage(
+            error.retryDelayMs,
+            error.resetTime,
+          );
 
           const overageStrategy = config.getBillingSettings().overageStrategy;
 
@@ -145,23 +146,32 @@ export function useQuotaAndFallback({
           if (creditsResult) return creditsResult;
         }
 
+        const resetMessage = getResetTimeMessage(
+          error.retryDelayMs,
+          error.resetTime,
+        );
+
+        // The server knows which limit was hit — often one that
+        // `/stats model` cannot show, such as a subscription-wide cap. Keep
+        // its explanation when it marked the message as user-facing.
+        const serverExplanation = error.isUserFacingMessage
+          ? stripServerCountdown(error.message)
+          : '';
+
         // Default: Show existing ProQuotaDialog (for overageStrategy: 'never' or non-G1 users)
         if (isCapacityExceeded) {
           const messageLines = [
             `We are currently experiencing high demand for ${usageLimitReachedModel}.`,
             'We apologize and appreciate your patience.',
-            error.retryDelayMs
-              ? `Access resets at ${getResetTimeMessage(error.retryDelayMs)}.`
-              : null,
+            resetMessage ? `Access resets at ${resetMessage}.` : null,
             `/model to switch models.`,
           ].filter(Boolean);
           message = messageLines.join('\n');
         } else {
           const messageLines = [
             `Usage limit reached for ${usageLimitReachedModel}.`,
-            error.retryDelayMs
-              ? `Access resets at ${getResetTimeMessage(error.retryDelayMs)}.`
-              : null,
+            serverExplanation || null,
+            resetMessage ? `Access resets at ${resetMessage}.` : null,
             `/stats model for usage details`,
             `/model to switch models.`,
             contentGeneratorConfig?.authType === AuthType.LOGIN_WITH_GOOGLE
@@ -370,14 +380,49 @@ export function useQuotaAndFallback({
   };
 }
 
-function getResetTimeMessage(delayMs: number): string {
-  const resetDate = new Date(Date.now() + delayMs);
+/**
+ * Formats the instant a quota resets.
+ *
+ * Prefers the absolute `resetTime` the server reported over a relative delay,
+ * and includes the date whenever the reset lands on a different day, so a
+ * window hours or days out is never mistaken for one later today.
+ */
+function getResetTimeMessage(
+  delayMs: number | undefined,
+  resetTime: string | undefined,
+): string | undefined {
+  let resetDate: Date | undefined;
+  if (resetTime) {
+    const parsed = new Date(resetTime);
+    if (!isNaN(parsed.getTime())) {
+      resetDate = parsed;
+    }
+  }
+  if (!resetDate && delayMs) {
+    resetDate = new Date(Date.now() + delayMs);
+  }
+  if (!resetDate) {
+    return undefined;
+  }
 
+  const isToday = resetDate.toDateString() === new Date().toDateString();
   const timeFormatter = new Intl.DateTimeFormat('en-US', {
+    ...(isToday ? {} : { month: 'short', day: 'numeric' }),
     hour: 'numeric',
     minute: '2-digit',
     timeZoneName: 'short',
   });
 
   return timeFormatter.format(resetDate);
+}
+
+/**
+ * The server appends its own countdown to some quota messages. We render the
+ * reset window from the structured metadata instead, so drop the sentence
+ * rather than show two answers that can disagree.
+ */
+function stripServerCountdown(message: string): string {
+  return message
+    .replace(/\s*Your quota will reset after [^.]*\.?/gi, '')
+    .trim();
 }

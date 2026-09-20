@@ -160,6 +160,7 @@ import { HookSystem } from '../hooks/index.js';
 import type {
   UserTierId,
   GeminiUserTier,
+  BucketInfo,
   RetrieveUserQuotaResponse,
   AdminControlsSettings,
 } from '../code_assist/types.js';
@@ -2316,6 +2317,11 @@ export class Config implements McpContext, AgentLoopContext {
         this.lastRetrievedQuota = quota;
         this.lastQuotaFetchTime = Date.now();
 
+        // A model can have several buckets (one per `tokenType`), and a request
+        // is rejected as soon as any one of them is exhausted. Keep the most
+        // constrained bucket per model so the CLI never reports headroom that
+        // the server will not honor.
+        const bindingBuckets = new Map<string, BucketInfo>();
         for (const bucket of quota.buckets) {
           if (!bucket.modelId || bucket.remainingFraction == null) {
             continue;
@@ -2326,19 +2332,35 @@ export class Config implements McpContext, AgentLoopContext {
             modelId = DEFAULT_GEMINI_3_5_FLASH_MODEL;
           }
 
-          let remaining: number;
-          let limit: number;
+          const existing = bindingBuckets.get(modelId);
+          if (
+            !existing ||
+            bucket.remainingFraction < existing.remainingFraction!
+          ) {
+            bindingBuckets.set(modelId, bucket);
+          }
+        }
+
+        for (const [modelId, bucket] of bindingBuckets) {
+          const remainingFraction = bucket.remainingFraction!;
+          let remaining = Number.NaN;
+          let limit = 0;
 
           if (bucket.remainingAmount) {
             remaining = parseInt(bucket.remainingAmount, 10);
             limit =
-              bucket.remainingFraction > 0
-                ? Math.round(remaining / bucket.remainingFraction)
+              remainingFraction > 0
+                ? Math.round(remaining / remainingFraction)
                 : (this.modelQuotas.get(modelId)?.limit ?? 0);
-          } else {
-            // Server only sent remainingFraction — use a normalized scale.
+          }
+
+          if (!Number.isFinite(limit) || limit <= 0) {
+            // Either the server sent only a fraction, or the bucket is spent
+            // and its limit cannot be derived from it. Fall back to a
+            // normalized scale so an exhausted model still reports as
+            // exhausted instead of dropping out of the quota display.
             limit = 100;
-            remaining = Math.round(bucket.remainingFraction * limit);
+            remaining = Math.round(remainingFraction * limit);
           }
 
           if (!isNaN(remaining) && Number.isFinite(limit) && limit > 0) {
@@ -2389,9 +2411,18 @@ export class Config implements McpContext, AgentLoopContext {
         resetTime?: string;
       }
     | undefined {
-    const bucket = this.lastRetrievedQuota?.buckets?.find(
-      (b) => b.modelId === modelId,
-    );
+    // Report the bucket that binds first, not just the first one listed: a
+    // model's buckets can disagree, and the smallest remainder is what the
+    // server enforces.
+    const bucket = this.lastRetrievedQuota?.buckets?.reduce<
+      BucketInfo | undefined
+    >((binding, b) => {
+      if (b.modelId !== modelId) return binding;
+      if (!binding) return b;
+      if (b.remainingFraction == null) return binding;
+      if (binding.remainingFraction == null) return b;
+      return b.remainingFraction < binding.remainingFraction ? b : binding;
+    }, undefined);
     if (!bucket) return undefined;
 
     return {

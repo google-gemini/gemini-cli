@@ -3271,6 +3271,53 @@ describe('Config Quota & Preview Model Access', () => {
       expect(config.getQuotaLimit()).toBe(100);
     });
 
+    it('should report the most constrained bucket when a model has several token types', async () => {
+      // The request bucket still looks healthy while another bucket for the
+      // same model is spent; the server rejects on the spent one.
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
+        buckets: [
+          {
+            modelId: 'gemini-3.5-flash',
+            tokenType: 'REQUESTS',
+            remainingAmount: '958',
+            remainingFraction: 0.958,
+          },
+          {
+            modelId: 'gemini-3.5-flash',
+            tokenType: 'TOKENS',
+            remainingAmount: '0',
+            remainingFraction: 0,
+          },
+        ],
+      });
+
+      config.setModel('gemini-3.5-flash');
+      await config.refreshUserQuota();
+
+      expect(config.getQuotaRemaining()).toBe(0);
+      expect(config.getRemainingQuotaForModel('gemini-3.5-flash')).toEqual(
+        expect.objectContaining({ remainingFraction: 0, remainingAmount: 0 }),
+      );
+    });
+
+    it('should keep an exhausted model in the quota display', async () => {
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
+        buckets: [
+          {
+            modelId: 'gemini-3.5-flash',
+            remainingAmount: '0',
+            remainingFraction: 0,
+          },
+        ],
+      });
+
+      config.setModel('gemini-3.5-flash');
+      await config.refreshUserQuota();
+
+      expect(config.getQuotaRemaining()).toBe(0);
+      expect(config.getQuotaLimit()).toBe(100);
+    });
+
     it('should calculate pooled quota correctly for auto models', async () => {
       mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
         buckets: [
