@@ -140,6 +140,10 @@ export class Scheduler {
   dispose(): void {
     coreEvents.off(CoreEvent.McpProgress, this.handleMcpProgress);
     this.disposeController.abort();
+
+    for (const request of this.requestQueue.splice(0)) {
+      request.reject(new Error('Scheduler disposed'));
+    }
   }
 
   private readonly handleMcpProgress = (payload: McpProgressPayload) => {
@@ -204,6 +208,10 @@ export class Scheduler {
         sessionId: this.context.config.getSessionId(),
       },
       async ({ metadata: spanMetadata }) => {
+        if (this.disposeController.signal.aborted) {
+          throw new Error('Scheduler disposed');
+        }
+
         const requests = Array.isArray(request) ? request : [request];
 
         spanMetadata.input = requests;
