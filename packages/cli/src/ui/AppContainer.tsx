@@ -974,8 +974,17 @@ Logging in with Google... Restarting Gemini CLI to continue.
         closeThemeDialog();
         setQuittingMessages(messages);
         setTimeout(async () => {
-          await runExitCleanup();
-          process.exit(0);
+          const forceExitTimer = setTimeout(() => {
+            process.exit(0);
+          }, 5000);
+          forceExitTimer.unref();
+
+          try {
+            await runExitCleanup();
+          } finally {
+            clearTimeout(forceExitTimer);
+            process.exit(0);
+          }
         }, 100);
       },
       setDebugMessage,

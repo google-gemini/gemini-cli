@@ -80,7 +80,12 @@ export async function runExitCleanup() {
   runSyncCleanup();
   for (const fn of cleanupFunctions) {
     try {
-      await fn();
+      await Promise.race([
+        Promise.resolve(fn()),
+        new Promise<void>((_, reject) =>
+          setTimeout(() => reject(new Error('Cleanup step timed out')), 3000),
+        ),
+      ]);
     } catch {
       // Ignore errors during cleanup.
     }
@@ -89,14 +94,24 @@ export async function runExitCleanup() {
 
   // Close persistent browser sessions before disposing config
   try {
-    await resetBrowserSession();
+    await Promise.race([
+      resetBrowserSession(),
+      new Promise<void>((_, reject) =>
+        setTimeout(() => reject(new Error('Browser cleanup timed out')), 2000),
+      ),
+    ]);
   } catch {
     // Ignore errors during browser cleanup
   }
 
   if (configForTelemetry) {
     try {
-      await configForTelemetry.dispose();
+      await Promise.race([
+        configForTelemetry.dispose(),
+        new Promise<void>((_, reject) =>
+          setTimeout(() => reject(new Error('Config dispose timed out')), 5000),
+        ),
+      ]);
     } catch {
       // Ignore errors during disposal
     }
@@ -106,7 +121,12 @@ export async function runExitCleanup() {
   // This ensures SessionEnd hooks and other telemetry are properly flushed
   if (configForTelemetry && isTelemetrySdkInitialized()) {
     try {
-      await shutdownTelemetry(configForTelemetry);
+      await Promise.race([
+        shutdownTelemetry(configForTelemetry),
+        new Promise<void>((_, reject) =>
+          setTimeout(() => reject(new Error('Telemetry shutdown timed out')), 3000),
+        ),
+      ]);
     } catch {
       // Ignore errors during telemetry shutdown
     }
@@ -123,6 +143,13 @@ async function drainStdin() {
     .on('data', () => {});
   // Give it a moment to flush the OS buffer.
   await new Promise((resolve) => setTimeout(resolve, 50));
+  try {
+    process.stdin.pause();
+    process.stdin.removeAllListeners('data');
+    process.stdin.unref();
+  } catch {
+    // Ignore errors pausing stdin.
+  }
 }
 
 /**
@@ -130,16 +157,35 @@ async function drainStdin() {
  * Guards against concurrent shutdown from signals (SIGHUP, SIGTERM, SIGINT)
  * and TTY loss detection racing each other.
  *
+ * If a second SIGINT is received while shutting down, immediately force-exits
+ * to prevent zombie processes.
+ *
  * @see https://github.com/google-gemini/gemini-cli/issues/15874
+ * @see https://github.com/google-gemini/gemini-cli/issues/29424
  */
-async function gracefulShutdown(_reason: string) {
+async function gracefulShutdown(reason: string) {
   if (isShuttingDown) {
+    if (reason === 'SIGINT') {
+      // User pressed Ctrl+C again while waiting for shutdown: force exit immediately
+      process.exit(130);
+    }
     return;
   }
   isShuttingDown = true;
 
-  await runExitCleanup();
-  process.exit(ExitCodes.SUCCESS);
+  // Set a watchdog timer to guarantee process exit even if cleanup hangs
+  const forceExitTimeout = setTimeout(() => {
+    process.stderr.write(`Shutdown timed out after ${reason}, forcing exit...\n`);
+    process.exit(ExitCodes.SUCCESS);
+  }, 5000);
+  forceExitTimeout.unref();
+
+  try {
+    await runExitCleanup();
+  } finally {
+    clearTimeout(forceExitTimeout);
+    process.exit(ExitCodes.SUCCESS);
+  }
 }
 
 export function setupSignalHandlers() {

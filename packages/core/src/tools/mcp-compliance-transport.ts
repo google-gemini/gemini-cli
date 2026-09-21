@@ -47,6 +47,17 @@ export class McpComplianceTransport extends EventEmitter implements Transport {
     await this.transport.start();
   }
 
+  get pid(): number | null | undefined {
+    if (
+      this.transport &&
+      'pid' in this.transport &&
+      (typeof this.transport.pid === 'number' || this.transport.pid === null)
+    ) {
+      return this.transport.pid;
+    }
+    return undefined;
+  }
+
   async close(): Promise<void> {
     await this.transport.close();
   }

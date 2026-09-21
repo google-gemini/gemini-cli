@@ -52,6 +52,7 @@ import { DiscoveredMCPTool } from './mcp-tool.js';
 import { McpComplianceTransport } from './mcp-compliance-transport.js';
 
 import type { CallableTool, FunctionCall, Part, Tool } from '@google/genai';
+import type { ChildProcess } from 'node:child_process';
 import { basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
@@ -145,6 +146,130 @@ export interface RegistrySet {
 }
 
 /**
+ * Safely closes an MCP transport with timeouts and aggressive process termination (SIGKILL)
+ * if graceful closure fails, ensuring no zombie processes or dangling stdio streams remain.
+ */
+export async function closeTransportSafely(
+  transport: Transport,
+  serverName: string,
+  timeoutMs: number = 2000,
+): Promise<void> {
+  // Unwrap nested transports to locate underlying transport and child process if stdio
+  let underlying: unknown = transport;
+  while (
+    underlying &&
+    typeof underlying === 'object' &&
+    'transport' in underlying &&
+    (underlying as { transport?: unknown }).transport
+  ) {
+    underlying = (underlying as { transport: unknown }).transport;
+  }
+
+  interface StdioTransportLike {
+    _process?: ChildProcess;
+    pid?: number | null;
+    _stderrStream?: { destroy?: () => void };
+  }
+
+  function isStdioTransportLike(val: unknown): val is StdioTransportLike {
+    return typeof val === 'object' && val !== null;
+  }
+
+  const stdioTransport: StdioTransportLike | undefined = isStdioTransportLike(
+    underlying,
+  )
+    ? underlying
+    : undefined;
+
+  const childProcess = stdioTransport?._process;
+  const childPid = stdioTransport?.pid ?? childProcess?.pid ?? null;
+
+  try {
+    await Promise.race([
+      Promise.resolve(transport.close()),
+      new Promise<void>((_, reject) =>
+        setTimeout(
+          () =>
+            reject(
+              new Error(
+                `MCP transport close timed out for server '${serverName}'`,
+              ),
+            ),
+          timeoutMs,
+        ),
+      ),
+    ]);
+  } catch (error) {
+    debugLogger.warn(`Warning closing transport for '${serverName}':`, error);
+  }
+
+  if (childPid && typeof childPid === 'number') {
+    const isAlive = (pid: number): boolean => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch (e: unknown) {
+        return (
+          typeof e === 'object' &&
+          e !== null &&
+          'code' in e &&
+          Boolean((e as Record<string, unknown>)['code'] === 'EPERM')
+        );
+      }
+    };
+
+    if (isAlive(childPid)) {
+      try {
+        childProcess?.stdin?.destroy();
+        childProcess?.stdout?.destroy();
+        childProcess?.stderr?.destroy();
+        stdioTransport?._stderrStream?.destroy?.();
+      } catch {
+        // Ignore stream destroy errors
+      }
+
+      try {
+        childProcess?.kill('SIGTERM');
+      } catch {
+        // Ignore kill errors
+      }
+      try {
+        process.kill(childPid, 'SIGTERM');
+      } catch {
+        // Ignore kill errors
+      }
+
+      const start = Date.now();
+      while (isAlive(childPid) && Date.now() - start < 500) {
+        await new Promise((r) => setTimeout(r, 50));
+      }
+
+      if (isAlive(childPid)) {
+        debugLogger.warn(
+          `MCP server '${serverName}' (pid ${childPid}) did not exit gracefully after SIGTERM, sending SIGKILL.`,
+        );
+        try {
+          childProcess?.kill('SIGKILL');
+        } catch {
+          // Ignore kill errors
+        }
+        try {
+          process.kill(childPid, 'SIGKILL');
+        } catch {
+          // Ignore kill errors
+        }
+      }
+
+      try {
+        childProcess?.unref?.();
+      } catch {
+        // Ignore unref errors
+      }
+    }
+  }
+}
+
+/**
  * A client for a single MCP server.
  *
  * This class is responsible for connecting to, discovering tools from, and
@@ -202,6 +327,7 @@ export class McpClient implements McpProgressReporter {
         this.workspaceContext,
         this.cliConfig,
       );
+      this.transport = this.client.transport;
 
       this.registerNotificationHandlers();
 
@@ -283,9 +409,16 @@ export class McpClient implements McpProgressReporter {
   }
 
   /**
+   * Returns the underlying transport instance, if connected.
+   */
+  getTransport(): Transport | undefined {
+    return this.transport ?? this.client?.transport;
+  }
+
+  /**
    * Disconnects from the MCP server.
    */
-  async disconnect(): Promise<void> {
+  async disconnect(timeoutMs: number = 2000): Promise<void> {
     if (this.status !== MCPServerStatus.CONNECTED) {
       return;
     }
@@ -296,14 +429,28 @@ export class McpClient implements McpProgressReporter {
     }
     this.updateStatus(MCPServerStatus.DISCONNECTING);
     const client = this.client;
+    const transport = this.transport ?? client?.transport;
     this.client = undefined;
-    if (this.transport) {
-      await this.transport.close();
+    this.transport = undefined;
+
+    try {
+      if (transport) {
+        await closeTransportSafely(transport, this.serverName, timeoutMs);
+      }
+      if (client) {
+        await Promise.race([
+          Promise.resolve(client.close()).catch(() => {}),
+          new Promise<void>((resolve) => setTimeout(resolve, 500)),
+        ]);
+      }
+    } catch (error) {
+      debugLogger.warn(
+        `Error disconnecting MCP client '${this.serverName}':`,
+        error,
+      );
+    } finally {
+      this.updateStatus(MCPServerStatus.DISCONNECTED);
     }
-    if (client) {
-      await client.close();
-    }
-    this.updateStatus(MCPServerStatus.DISCONNECTED);
   }
 
   /**
@@ -1701,7 +1848,9 @@ async function connectWithSSETransport(
   config: MCPServerConfig,
   accessToken?: string | null,
 ): Promise<void> {
-  const transport = createSSETransportWithAuth(config, accessToken);
+  const transport = new McpComplianceTransport(
+    createSSETransportWithAuth(config, accessToken),
+  );
   await client.connect(transport, {
     timeout: config.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
   });

@@ -226,6 +226,48 @@ describe('signal and TTY handling', () => {
       // eslint-disable-next-line no-restricted-syntax
       expect(typeof sigtermHandlers[0]).toBe('function');
     });
+
+    it('should force exit with code 130 on second SIGINT during shutdown', async () => {
+      setupSignalHandlers();
+
+      const sigintHandlers = processOnHandlers.get('SIGINT') || [];
+      expect(sigintHandlers.length).toBeGreaterThan(0);
+
+      // Trigger first SIGINT (starts shutdown)
+      const shutdownPromise = sigintHandlers[0]?.();
+
+      // Trigger second SIGINT while isShuttingDown is true
+      void sigintHandlers[0]?.();
+
+      expect(process.exit).toHaveBeenCalledWith(130);
+      await shutdownPromise;
+    });
+
+    it('should pause and unref stdin after draining in runExitCleanup', async () => {
+      const originalIsTTY = process.stdin.isTTY;
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: true,
+        configurable: true,
+      });
+      const pauseSpy = vi
+        .spyOn(process.stdin, 'pause')
+        .mockImplementation(() => process.stdin);
+      const unrefSpy = vi
+        .spyOn(process.stdin, 'unref')
+        .mockImplementation(() => process.stdin);
+
+      await runExitCleanup();
+
+      expect(pauseSpy).toHaveBeenCalled();
+      expect(unrefSpy).toHaveBeenCalled();
+
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: originalIsTTY,
+        configurable: true,
+      });
+      pauseSpy.mockRestore();
+      unrefSpy.mockRestore();
+    });
   });
 
   describe('setupTtyCheck', () => {

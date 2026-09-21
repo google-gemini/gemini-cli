@@ -123,7 +123,21 @@ async function run() {
     );
     const { runExitCleanup } = await import('./src/utils/cleanup.js');
 
-    main().catch(async (error: unknown) => {
+    main()
+      .then(async () => {
+        const cleanupTimeout = setTimeout(() => {
+          process.exit(0);
+        }, 5000);
+        cleanupTimeout.unref();
+
+        try {
+          await runExitCleanup();
+        } finally {
+          clearTimeout(cleanupTimeout);
+          process.exit(0);
+        }
+      })
+      .catch(async (error: unknown) => {
       // Set a timeout to force exit if cleanup hangs
       const cleanupTimeout = setTimeout(() => {
         writeToStderr('Cleanup timed out, forcing exit...\n');
