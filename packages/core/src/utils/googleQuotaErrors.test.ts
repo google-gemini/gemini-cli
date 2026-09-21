@@ -518,6 +518,44 @@ describe('classifyGoogleError', () => {
     expect(quotaError.retryDelayMs).toBeLessThanOrEqual(60_000);
   });
 
+  it('should carry the reset window from a real Code Assist rejection', () => {
+    // Captured from a gcp-standard-tier account whose request buckets still
+    // reported 95.8-100% remaining (#29425).
+    const apiError: GoogleApiError = {
+      code: 429,
+      message:
+        'Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 9h22m20s.',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'QUOTA_EXHAUSTED',
+          domain: 'cloudcode-pa.googleapis.com',
+          metadata: {
+            quotaResetTimeStamp: '2026-09-20T21:03:14Z',
+            quotaResetDelay: '33740.910400305s',
+            uiMessage: 'true',
+            model: 'gemini-3.5-flash',
+          },
+        },
+        {
+          '@type': 'type.googleapis.com/google.rpc.RetryInfo',
+          retryDelay: '33740.910400305s',
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+
+    const result = classifyGoogleError(new Error());
+
+    expect(result).toBeInstanceOf(TerminalQuotaError);
+    const quotaError = result as TerminalQuotaError;
+    expect(quotaError.reason).toBe('QUOTA_EXHAUSTED');
+    expect(quotaError.resetTime).toBe('2026-09-20T21:03:14.000Z');
+    expect(quotaError.isUserFacingMessage).toBe(true);
+    // RetryInfo still supplies the delay when the server sends one.
+    expect(quotaError.retryDelayMs).toBeCloseTo(33_740_910.4, 0);
+  });
+
   it('should not derive a retry delay from a reset timestamp in the past', () => {
     const resetTime = new Date(Date.now() - 60_000).toISOString();
     const apiError: GoogleApiError = {

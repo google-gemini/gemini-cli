@@ -417,12 +417,13 @@ function getResetTimeMessage(
 }
 
 /**
- * The server appends its own countdown to some quota messages. We render the
- * reset window from the structured metadata instead, so drop the sentence
- * rather than show two answers that can disagree.
+ * The server appends its own countdown to some quota messages, in more than
+ * one phrasing ("Your quota will reset after 0s.", "Resets in 9h22m20s."). We
+ * render the reset window from the structured metadata instead, so drop the
+ * sentence rather than show two answers that drift apart as time passes.
  */
 function stripServerCountdown(message: string): string {
   return message
-    .replace(/\s*Your quota will reset after [^.]*\.?/gi, '')
+    .replace(/\s*(?:Your quota will reset after|Resets in)\s*[^.]*\.?/gi, '')
     .trim();
 }

@@ -498,6 +498,51 @@ describe('useQuotaAndFallback', () => {
         await promise!;
       });
 
+      it('should drop the server countdown in favor of the reset instant', async () => {
+        const { result } = await renderHook(() =>
+          useQuotaAndFallback({
+            config: mockConfig,
+            historyManager: mockHistoryManager,
+            userTier: UserTierId.FREE,
+            setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+            onShowAuthSelection: mockOnShowAuthSelection,
+            paidTier: null,
+            settings: mockSettings,
+          }),
+        );
+
+        const handler = setFallbackHandlerSpy.mock
+          .calls[0][0] as FallbackModelHandler;
+
+        const resetTime = new Date(
+          Date.now() + 9 * 60 * 60 * 1000 + 22 * 60 * 1000,
+        ).toISOString();
+        let promise: Promise<FallbackIntent | null>;
+        const error = new TerminalQuotaError(
+          'Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 9h22m20s.',
+          mockGoogleApiError,
+          33_740.9,
+          'QUOTA_EXHAUSTED',
+          { resetTime, isUserFacingMessage: true },
+        );
+        act(() => {
+          promise = handler('gemini-3.5-flash', 'gemini-flash', error);
+        });
+
+        const message = result.current.proQuotaRequest!.message;
+        expect(message).toContain(
+          'Individual quota reached. Please upgrade your subscription to increase your limits.',
+        );
+        // The stale countdown goes; the reset instant stays.
+        expect(message).not.toContain('Resets in');
+        expect(message).toContain('Access resets at');
+
+        act(() => {
+          result.current.handleProQuotaChoice('retry_later');
+        });
+        await promise!;
+      });
+
       it('should not repeat a server message that is not marked user-facing', async () => {
         const { result } = await renderHook(() =>
           useQuotaAndFallback({
