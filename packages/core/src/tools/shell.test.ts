@@ -247,6 +247,12 @@ describe('ShellTool', () => {
   });
 
   afterEach(() => {
+    if (extractedTmpFile) {
+      const extractedDir = path.dirname(extractedTmpFile);
+      if (fs.existsSync(extractedDir)) {
+        fs.rmSync(extractedDir, { recursive: true, force: true });
+      }
+    }
     if (fs.existsSync(tempRootDir)) {
       fs.rmSync(tempRootDir, { recursive: true, force: true });
     }
@@ -482,16 +488,20 @@ describe('ShellTool', () => {
 
       await vi.advanceTimersByTimeAsync(250);
 
+      const expectedTempDir = path.dirname(extractedTmpFile);
       expect(mockShellBackground).toHaveBeenCalledWith(
         12345,
         'default',
         'sleep 10',
+        expectedTempDir,
       );
 
       await promise;
+      // Ownership was transferred to ShellExecutionService, so shell.ts should not delete it prematurely
+      expect(fs.existsSync(expectedTempDir)).toBe(true);
     });
 
-    it('should cancel the promotion timer when the command completes before the delay elapses', async () => {
+    it('should cancel the promotion timer and clean up tempDir when the command completes before the delay elapses', async () => {
       vi.useFakeTimers();
       const invocation = shellTool.build({
         command: 'echo done',
@@ -506,6 +516,8 @@ describe('ShellTool', () => {
       expect(mockShellBackground).not.toHaveBeenCalled();
 
       await promise;
+      const expectedTempDir = path.dirname(extractedTmpFile);
+      expect(fs.existsSync(expectedTempDir)).toBe(false);
     });
 
     itWindowsOnly(
@@ -963,6 +975,7 @@ EOF`;
           12345,
           'default',
           'sleep 10',
+          path.dirname(extractedTmpFile),
         );
 
         await promise;
