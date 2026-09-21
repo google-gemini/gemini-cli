@@ -48,7 +48,11 @@ const HttpsProxyAgent = new Proxy(baseCtor, {
     if (prop === 'HttpsProxyAgent' || prop === 'default') {
       return receiver;
     }
-    return Reflect.get(target, prop, receiver);
+    const value = Reflect.get(target, prop);
+    if (typeof value === 'function') {
+      return value.bind(target);
+    }
+    return value;
   },
 });
 
