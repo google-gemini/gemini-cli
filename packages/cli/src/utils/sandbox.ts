@@ -1035,7 +1035,14 @@ export async function start_sandbox(
           finish();
           return;
         }
-        void applyTrustRequestFromSandbox(tmpDir, workdir).finally(finish);
+        void applyTrustRequestFromSandbox(tmpDir, workdir)
+          .catch((err) => {
+            debugLogger.error(
+              'Failed to apply trust request from sandbox:',
+              err,
+            );
+          })
+          .finally(finish);
       });
     });
   } finally {

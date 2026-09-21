@@ -6,7 +6,6 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render } from 'ink';
-import { isHeadlessMode } from '@google/gemini-cli-core';
 import { createMockSettings } from '../test-utils/settings.js';
 import {
   FolderTrustChoice,
@@ -23,15 +22,6 @@ import { ensureHostFolderTrust } from './ensureHostFolderTrust.js';
 vi.mock('ink', () => ({
   render: vi.fn(),
 }));
-
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
-  return {
-    ...actual,
-    isHeadlessMode: vi.fn(),
-  };
-});
 
 vi.mock('../config/trustedFolders.js', async (importOriginal) => {
   const actual =
@@ -78,7 +68,6 @@ describe('ensureHostFolderTrust', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(isHeadlessMode).mockReturnValue(false);
     vi.mocked(isFolderTrustEnabled).mockReturnValue(true);
     vi.mocked(isWorkspaceTrusted).mockReturnValue({
       isTrusted: undefined,
@@ -92,7 +81,7 @@ describe('ensureHostFolderTrust', () => {
   it('does nothing when folder trust is disabled', async () => {
     vi.mocked(isFolderTrustEnabled).mockReturnValue(false);
 
-    await ensureHostFolderTrust(settings, cwd);
+    await ensureHostFolderTrust(settings, cwd, true);
 
     expect(render).not.toHaveBeenCalled();
     expect(persistHostTrust).not.toHaveBeenCalled();
@@ -104,16 +93,14 @@ describe('ensureHostFolderTrust', () => {
       source: 'file',
     });
 
-    await ensureHostFolderTrust(settings, cwd);
+    await ensureHostFolderTrust(settings, cwd, true);
 
     expect(render).not.toHaveBeenCalled();
     expect(persistHostTrust).not.toHaveBeenCalled();
   });
 
-  it('does nothing in headless mode', async () => {
-    vi.mocked(isHeadlessMode).mockReturnValue(true);
-
-    await ensureHostFolderTrust(settings, cwd);
+  it('does nothing when the session is not interactive', async () => {
+    await ensureHostFolderTrust(settings, cwd, false);
 
     expect(render).not.toHaveBeenCalled();
     expect(persistHostTrust).not.toHaveBeenCalled();
@@ -126,7 +113,7 @@ describe('ensureHostFolderTrust', () => {
   ] as const)(
     'persists %s on the host and unmounts the dialog',
     async (choice, level) => {
-      const promise = ensureHostFolderTrust(settings, cwd);
+      const promise = ensureHostFolderTrust(settings, cwd, true);
 
       expect(render).toHaveBeenCalledTimes(1);
       const element = vi.mocked(render).mock.calls[0][0];
@@ -142,7 +129,7 @@ describe('ensureHostFolderTrust', () => {
   );
 
   it('renders FolderTrustDialog with explicit terminal dimensions', async () => {
-    const promise = ensureHostFolderTrust(settings, cwd);
+    const promise = ensureHostFolderTrust(settings, cwd, true);
     const element = vi.mocked(render).mock.calls[0][0];
     const dialog = findDialogElement(element);
 

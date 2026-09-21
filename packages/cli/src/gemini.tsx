@@ -613,7 +613,11 @@ export async function main() {
 
       const sandboxArgs = injectStdinIntoArgs(process.argv, stdinData);
 
-      await ensureHostFolderTrust(settings, process.cwd());
+      await ensureHostFolderTrust(
+        settings,
+        process.cwd(),
+        partialConfig.isInteractive(),
+      );
 
       await relaunchOnExitCode(() =>
         start_sandbox(sandboxConfig, memoryArgs, partialConfig, sandboxArgs),

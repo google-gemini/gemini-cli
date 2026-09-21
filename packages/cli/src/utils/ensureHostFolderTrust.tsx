@@ -5,7 +5,6 @@
  */
 
 import { render } from 'ink';
-import { isHeadlessMode } from '@google/gemini-cli-core';
 import {
   FolderTrustChoice,
   FolderTrustDialog,
@@ -23,6 +22,7 @@ import { persistHostTrust } from './sandboxTrust.js';
 export async function ensureHostFolderTrust(
   settings: LoadedSettings,
   cwd: string,
+  isInteractive: boolean,
 ): Promise<void> {
   if (!isFolderTrustEnabled(settings.merged)) {
     return;
@@ -30,7 +30,7 @@ export async function ensureHostFolderTrust(
   if (isWorkspaceTrusted(settings.merged, cwd).isTrusted !== undefined) {
     return;
   }
-  if (isHeadlessMode()) {
+  if (!isInteractive) {
     return;
   }
 
