@@ -226,13 +226,22 @@ export function resolveModel(
       ? String(requestedModel ?? '').trim() || ''
       : requestedModel.trim() || '';
 
+  const effectiveUseLatestFlash =
+    useLatestFlash ||
+    (config?.hasLatestFlashGAAccess?.() ?? false) ||
+    DEFAULT_GEMINI_FLASH_MODEL === LATEST_GEMINI_FLASH_MODEL;
+  const effectiveUseLatestFlashLite =
+    useLatestFlashLite ||
+    (config?.hasLatestFlashLiteGAAccess?.() ?? false) ||
+    DEFAULT_GEMINI_FLASH_LITE_MODEL === LATEST_GEMINI_FLASH_LITE_MODEL;
+
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     const resolved = config.modelConfigService.resolveModelId(normalizedModel, {
       useGemini3_1,
       useCustomTools: useCustomToolModel,
       hasAccessToPreview,
-      useLatestFlash,
-      useLatestFlashLite,
+      useLatestFlash: effectiveUseLatestFlash,
+      useLatestFlashLite: effectiveUseLatestFlashLite,
     });
 
     if (!hasAccessToPreview && isPreviewModel(resolved, config)) {
@@ -275,13 +284,13 @@ export function resolveModel(
       break;
     }
     case GEMINI_MODEL_ALIAS_FLASH: {
-      resolved = useLatestFlash
+      resolved = effectiveUseLatestFlash
         ? LATEST_GEMINI_FLASH_MODEL
         : PREVIEW_GEMINI_FLASH_MODEL;
       break;
     }
     case GEMINI_MODEL_ALIAS_FLASH_LITE: {
-      resolved = useLatestFlashLite
+      resolved = effectiveUseLatestFlashLite
         ? LATEST_GEMINI_FLASH_LITE_MODEL
         : DEFAULT_GEMINI_FLASH_LITE_MODEL;
       break;
@@ -297,14 +306,14 @@ export function resolveModel(
   }
 
   if (
-    useLatestFlash &&
+    effectiveUseLatestFlash &&
     isPromotableFlashModel(resolved) &&
     normalizedModel !== PREVIEW_GEMINI_FLASH_MODEL
   ) {
     return LATEST_GEMINI_FLASH_MODEL;
   }
 
-  if (useLatestFlashLite && isPromotableFlashLiteModel(resolved)) {
+  if (effectiveUseLatestFlashLite && isPromotableFlashLiteModel(resolved)) {
     return LATEST_GEMINI_FLASH_LITE_MODEL;
   }
 
@@ -312,7 +321,9 @@ export function resolveModel(
     // Downgrade to stable models if user lacks preview access.
     switch (resolved) {
       case PREVIEW_GEMINI_FLASH_MODEL:
-        return DEFAULT_GEMINI_FLASH_MODEL;
+        return effectiveUseLatestFlash
+          ? LATEST_GEMINI_FLASH_MODEL
+          : DEFAULT_GEMINI_FLASH_MODEL;
       case PREVIEW_GEMINI_MODEL:
       case PREVIEW_GEMINI_3_1_MODEL:
       case PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL:
@@ -374,6 +385,17 @@ export function resolveClassifierModel(
   useLatestFlash: boolean = false,
   useLatestFlashLite: boolean = false,
 ): string {
+  const effectiveUseLatestFlash =
+    useLatestFlash ||
+    (config?.hasLatestFlashGAAccess?.() ?? false) ||
+    DEFAULT_GEMINI_FLASH_MODEL === LATEST_GEMINI_FLASH_MODEL;
+  const effectiveUseLatestFlashLite =
+    useLatestFlashLite ||
+    (config?.hasLatestFlashLiteGAAccess?.() ?? false) ||
+    DEFAULT_GEMINI_FLASH_LITE_MODEL === LATEST_GEMINI_FLASH_LITE_MODEL;
+  const effectiveHasAccessToPreview =
+    hasAccessToPreview || (config?.getHasAccessToPreviewModel?.() ?? false);
+
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     return config.modelConfigService.resolveClassifierModelId(
       modelAlias,
@@ -381,23 +403,12 @@ export function resolveClassifierModel(
       {
         useGemini3_1,
         useCustomTools: useCustomToolModel,
-        hasAccessToPreview,
-        useLatestFlash,
-        useLatestFlashLite,
+        hasAccessToPreview: effectiveHasAccessToPreview,
+        useLatestFlash: effectiveUseLatestFlash,
+        useLatestFlashLite: effectiveUseLatestFlashLite,
       },
     );
   }
-
-  const effectiveUseLatestFlash =
-    useLatestFlash ||
-    config?.hasLatestFlashGAAccess?.() ||
-    DEFAULT_GEMINI_FLASH_MODEL === LATEST_GEMINI_FLASH_MODEL;
-  const effectiveUseLatestFlashLite =
-    useLatestFlashLite ||
-    config?.hasLatestFlashLiteGAAccess?.() ||
-    DEFAULT_GEMINI_FLASH_LITE_MODEL === LATEST_GEMINI_FLASH_LITE_MODEL;
-  const effectiveHasAccessToPreview =
-    hasAccessToPreview || config?.getHasAccessToPreviewModel?.() || false;
 
   if (modelAlias === GEMINI_MODEL_ALIAS_FLASH) {
     if (

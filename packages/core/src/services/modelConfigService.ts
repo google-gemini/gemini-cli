@@ -279,6 +279,8 @@ export class ModelConfigService {
           return value === context.useCustomTools;
         case 'hasAccessToPreview':
           return value === context.hasAccessToPreview;
+        case 'hasAccessToProModel':
+          return value === context.hasAccessToProModel;
         case 'requestedModels':
           return (
             Array.isArray(value) &&

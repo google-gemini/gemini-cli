@@ -120,10 +120,22 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         model: 'gemini-3.1-flash-lite',
       },
     },
+    'gemini-3.5-flash-lite': {
+      extends: 'chat-base-3',
+      modelConfig: {
+        model: 'gemini-3.5-flash-lite',
+      },
+    },
     'gemini-3.5-flash': {
       extends: 'chat-base-3',
       modelConfig: {
         model: 'gemini-3.5-flash',
+      },
+    },
+    'gemini-3.8-flash': {
+      extends: 'chat-base-3',
+      modelConfig: {
+        model: 'gemini-3.8-flash',
       },
     },
     'gemma-4-31b-it': {
@@ -337,6 +349,13 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       isVisible: true,
       features: { thinking: false, multimodalToolUse: true },
     },
+    'gemini-3.5-flash-lite': {
+      tier: 'flash-lite',
+      family: 'gemini-3',
+      isPreview: false,
+      isVisible: true,
+      features: { thinking: false, multimodalToolUse: true },
+    },
     'gemini-3.1-pro-preview': {
       tier: 'pro',
       family: 'gemini-3',
@@ -366,6 +385,13 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       features: { thinking: false, multimodalToolUse: true },
     },
     'gemini-3.5-flash': {
+      tier: 'flash',
+      family: 'gemini-3',
+      isPreview: false,
+      isVisible: true,
+      features: { thinking: false, multimodalToolUse: true },
+    },
+    'gemini-3.8-flash': {
       tier: 'flash',
       family: 'gemini-3',
       isPreview: false,
@@ -492,10 +518,6 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         {
           condition: { useLatestFlash: true },
           target: LATEST_GEMINI_FLASH_MODEL,
-        },
-        {
-          condition: { hasAccessToPreview: false },
-          target: 'gemini-2.5-flash',
         },
       ],
     },

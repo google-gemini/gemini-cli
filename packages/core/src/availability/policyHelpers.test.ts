@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   resolvePolicyChain,
   buildFallbackPolicyContext,
@@ -20,6 +20,7 @@ import {
   DEFAULT_GEMINI_MODEL_AUTO,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
+  resetModelsForTesting,
 } from '../config/models.js';
 import { AuthType } from '../core/contentGenerator.js';
 import { ModelConfigService } from '../services/modelConfigService.js';
@@ -48,6 +49,14 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config => {
 };
 
 describe('policyHelpers', () => {
+  beforeEach(() => {
+    resetModelsForTesting();
+  });
+
+  afterEach(() => {
+    resetModelsForTesting();
+  });
+
   describe('resolvePolicyChain', () => {
     it('returns a single-model chain for a custom model', () => {
       const config = createMockConfig({

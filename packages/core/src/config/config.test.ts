@@ -70,6 +70,7 @@ import {
   PREVIEW_GEMINI_MODEL_AUTO,
   PREVIEW_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
+  resetModelsForTesting,
 } from './models.js';
 import { Storage } from './storage.js';
 import type { AgentLoopContext } from './agent-loop-context.js';
@@ -4434,7 +4435,15 @@ describe('hasLatestFlashGAAccess model setting', () => {
     cwd: '.',
   };
 
-  it('should set DEFAULT_GEMINI_FLASH_MODEL to gemini-3.5-flash and PREVIEW_GEMINI_FLASH_MODEL to gemini-3-flash-preview if hasLatestFlashGAAccess returns true and authType is USE_GEMINI', () => {
+  beforeEach(() => {
+    resetModelsForTesting();
+  });
+
+  afterEach(() => {
+    resetModelsForTesting();
+  });
+
+  it('should set DEFAULT_GEMINI_FLASH_MODEL to gemini-3.8-flash and PREVIEW_GEMINI_FLASH_MODEL to gemini-3-flash-preview if hasLatestFlashGAAccess returns true and authType is USE_GEMINI', () => {
     const config = new Config(baseParams);
     config['contentGeneratorConfig'] = { authType: AuthType.USE_GEMINI };
 
@@ -4476,5 +4485,25 @@ describe('hasLatestFlashGAAccess model setting', () => {
 
     expect(DEFAULT_GEMINI_FLASH_MODEL).toBe('gemini-3.8-flash');
     expect(PREVIEW_GEMINI_FLASH_MODEL).toBe('gemini-3.8-flash');
+  });
+
+  it('should return false if experiment flag is false even when authType is USE_GEMINI', () => {
+    const config = new Config(baseParams);
+    config['contentGeneratorConfig'] = { authType: AuthType.USE_GEMINI };
+
+    config.setExperiments({
+      experimentIds: [],
+      flags: {
+        [ExperimentFlags.LATEST_FLASH_GA_LAUNCHED]: {
+          boolValue: false,
+        },
+      },
+    });
+
+    const result = config.hasLatestFlashGAAccess();
+    expect(result).toBe(false);
+
+    expect(DEFAULT_GEMINI_FLASH_MODEL).toBe('gemini-3.5-flash');
+    expect(PREVIEW_GEMINI_FLASH_MODEL).toBe('gemini-3-flash-preview');
   });
 });

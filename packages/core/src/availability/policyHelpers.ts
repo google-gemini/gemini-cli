@@ -88,6 +88,7 @@ export function resolvePolicyChain(
       useGemini3_1: useGemini31,
       useCustomTools: useCustomToolModel,
       useLatestFlash,
+      useLatestFlashLite,
     };
 
     if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {

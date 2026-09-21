@@ -3595,15 +3595,9 @@ export class Config implements McpContext, AgentLoopContext {
    */
   hasLatestFlashGAAccess(): boolean {
     const authType = this.contentGeneratorConfig?.authType;
-    const hasAccess = (() => {
-      if (this.isGemini31LaunchedForAuthType(authType)) {
-        return true;
-      }
-      return (
-        this.experiments?.flags[ExperimentFlags.LATEST_FLASH_GA_LAUNCHED]
-          ?.boolValue ?? false
-      );
-    })();
+    const hasAccess =
+      this.experiments?.flags[ExperimentFlags.LATEST_FLASH_GA_LAUNCHED]
+        ?.boolValue ?? false;
 
     if (hasAccess) {
       if (authType === AuthType.USE_GEMINI) {
