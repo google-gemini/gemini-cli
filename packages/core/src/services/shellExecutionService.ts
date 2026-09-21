@@ -1810,13 +1810,6 @@ export class ShellExecutionService {
 
     const resolvedTempDir =
       tempDir ?? activePty?.tempDir ?? activeChild?.tempDir;
-    if (resolvedTempDir) {
-      this.backgroundTempDirs.set(pid, resolvedTempDir);
-    }
-
-    if (this.backgroundLogPids.has(pid)) {
-      return;
-    }
 
     const resolvedSessionId =
       sessionId ?? activePty?.sessionId ?? activeChild?.sessionId;
@@ -1828,6 +1821,23 @@ export class ShellExecutionService {
 
     if (!resolvedSessionId) {
       throw new Error('Session ID is required for background operations');
+    }
+
+    if (!activePty && !activeChild) {
+      if (resolvedTempDir) {
+        fsPromises
+          .rm(resolvedTempDir, { recursive: true, force: true })
+          .catch(() => {});
+      }
+      return;
+    }
+
+    if (resolvedTempDir) {
+      this.backgroundTempDirs.set(pid, resolvedTempDir);
+    }
+
+    if (this.backgroundLogPids.has(pid)) {
+      return;
     }
 
     const MAX_BACKGROUND_PROCESS_HISTORY_SIZE = 100;
@@ -2036,9 +2046,7 @@ export class ShellExecutionService {
     }
     for (const tempDir of this.backgroundTempDirs.values()) {
       try {
-        fsPromises
-          .rm(tempDir, { recursive: true, force: true })
-          .catch(() => {});
+        fs.rmSync(tempDir, { recursive: true, force: true });
       } catch {
         // ignored
       }

@@ -520,6 +520,25 @@ describe('ShellTool', () => {
       expect(fs.existsSync(expectedTempDir)).toBe(false);
     });
 
+    it('should clean up tempDir in finally if ShellExecutionService.background throws an error', async () => {
+      vi.useFakeTimers();
+      mockShellBackground.mockImplementationOnce(() => {
+        throw new Error('Background failed');
+      });
+
+      const invocation = shellTool.build({
+        command: 'sleep 10',
+        is_background: true,
+      });
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
+
+      await vi.advanceTimersByTimeAsync(250);
+      await promise;
+
+      const expectedTempDir = path.dirname(extractedTmpFile);
+      expect(fs.existsSync(expectedTempDir)).toBe(false);
+    });
+
     itWindowsOnly(
       'should not wrap command on windows',
       async () => {

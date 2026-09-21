@@ -1043,6 +1043,34 @@ describe('ShellExecutionService', () => {
         expect(actualFs.existsSync(tempDir)).toBe(false);
       });
     });
+
+    it('should return early and clean up tempDir if background() is called for an untracked or already-exited process', async () => {
+      const actualFs =
+        await vi.importActual<typeof import('node:fs')>('node:fs');
+      const actualOs =
+        await vi.importActual<typeof import('node:os')>('node:os');
+      const tempDir = actualFs.mkdtempSync(
+        path.join(actualOs.tmpdir(), 'gemini-shell-bg-untracked-'),
+      );
+
+      ShellExecutionService.background(
+        99999,
+        'default',
+        'echo exited',
+        tempDir,
+      );
+
+      const backgroundTempDirs = (
+        ShellExecutionService as unknown as {
+          backgroundTempDirs: Map<number, string>;
+        }
+      ).backgroundTempDirs;
+      expect(backgroundTempDirs.has(99999)).toBe(false);
+
+      await vi.waitFor(() => {
+        expect(actualFs.existsSync(tempDir)).toBe(false);
+      });
+    });
   });
 
   describe('Binary Output', () => {

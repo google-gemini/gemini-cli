@@ -767,13 +767,20 @@ export class ShellToolInvocation extends BaseToolInvocation<
             () => {
               promotionTimer = null;
               if (!completed) {
-                isBackgrounded = true;
-                ShellExecutionService.background(
-                  pid,
-                  sessionId,
-                  strippedCommand,
-                  tempDir,
-                );
+                try {
+                  ShellExecutionService.background(
+                    pid,
+                    sessionId,
+                    strippedCommand,
+                    tempDir,
+                  );
+                  isBackgrounded = true;
+                } catch (err) {
+                  debugLogger.error(
+                    'Failed to background shell execution:',
+                    err,
+                  );
+                }
               }
             },
             delay,
