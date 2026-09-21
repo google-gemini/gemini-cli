@@ -6,6 +6,8 @@
 
 /* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
 /* eslint-disable import/no-relative-packages */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+/* eslint-disable no-restricted-syntax */
 
 import * as rawProxyAgent from '../../../../node_modules/https-proxy-agent/dist/index.js';
 
@@ -31,7 +33,7 @@ if (typeof mod.HttpsProxyAgent === 'function') {
   resolvedCtor = rawProxyAgent as unknown as HttpsProxyAgentCtor;
 }
 
-const HttpsProxyAgent =
+const baseCtor =
   resolvedCtor ??
   (class {
     constructor() {
@@ -41,24 +43,14 @@ const HttpsProxyAgent =
     }
   } as unknown as HttpsProxyAgentCtor);
 
-if (typeof HttpsProxyAgent === 'function') {
-  try {
-    Object.defineProperty(HttpsProxyAgent, 'HttpsProxyAgent', {
-      value: HttpsProxyAgent,
-      configurable: true,
-      writable: true,
-      enumerable: true,
-    });
-    Object.defineProperty(HttpsProxyAgent, 'default', {
-      value: HttpsProxyAgent,
-      configurable: true,
-      writable: true,
-      enumerable: true,
-    });
-  } catch {
-    // Safely ignore if the constructor is frozen or properties are non-configurable
-  }
-}
+const HttpsProxyAgent = new Proxy(baseCtor, {
+  get(target, prop, receiver) {
+    if (prop === 'HttpsProxyAgent' || prop === 'default') {
+      return receiver;
+    }
+    return Reflect.get(target, prop, receiver);
+  },
+});
 
 export { HttpsProxyAgent };
 // eslint-disable-next-line import/no-default-export
