@@ -1361,7 +1361,7 @@ describe('Scheduler (Orchestrator)', () => {
   });
 
   describe('Cleanup', () => {
-    async function startBlockedBatch() {
+    async function startBlockedBatch(requests: ToolCallRequestInfo[] = [req1]) {
       let finishExecution!: () => void;
       let notifyStarted!: () => void;
       const executionFinished = new Promise<void>((resolve) => {
@@ -1389,7 +1389,7 @@ describe('Scheduler (Orchestrator)', () => {
         };
       });
 
-      const activeBatch = scheduler.schedule(req1, signal);
+      const activeBatch = scheduler.schedule(requests, signal);
       await executionStarted;
       return { activeBatch, finishExecution };
     }
@@ -1440,6 +1440,105 @@ describe('Scheduler (Orchestrator)', () => {
       expect(mockExecutor.execute).toHaveBeenCalledTimes(1);
       expect(mockStateManager.finalizeCall).toHaveBeenCalledExactlyOnceWith(
         req1.callId,
+      );
+    });
+
+    describe('Disposal within a batch', () => {
+      beforeEach(async () => {
+        scheduler.dispose();
+        const actual =
+          await vi.importActual<typeof import('./state-manager.js')>(
+            './state-manager.js',
+          );
+        vi.mocked(SchedulerStateManager).mockImplementation(
+          (...args) => new actual.SchedulerStateManager(...args),
+        );
+        scheduler = new Scheduler({
+          context: mockConfig,
+          messageBus: mockMessageBus,
+          getPreferredEditor,
+          schedulerId: 'root',
+        });
+      });
+
+      afterEach(() => scheduler.dispose());
+
+      it('should finish executing tools and cancel remaining serial tools', async () => {
+        const { activeBatch, finishExecution } = await startBlockedBatch([
+          req1,
+          req2,
+          { ...req2, callId: 'call-3' },
+        ]);
+        scheduler.dispose();
+        finishExecution();
+
+        const results = await activeBatch;
+
+        expect(mockExecutor.execute).toHaveBeenCalledTimes(1);
+        expect(
+          results.map((call) => [call.request.callId, call.status]),
+        ).toEqual([
+          ['call-1', CoreToolCallStatus.Success],
+          ['call-2', CoreToolCallStatus.Cancelled],
+          ['call-3', CoreToolCallStatus.Cancelled],
+        ]);
+        expect(results[1].response.responseParts).toEqual([
+          expect.objectContaining({
+            functionResponse: expect.objectContaining({
+              response: {
+                error: expect.stringContaining('Scheduler disposed'),
+              },
+            }),
+          }),
+        ]);
+        expect(signal.aborted).toBe(false);
+        expect(scheduler.completedCalls).toEqual([]);
+      });
+
+      it.each(['policy', 'confirmation'] as const)(
+        'should not execute tools when disposed during %s validation',
+        async (phase) => {
+          let release!: () => void;
+          let entered!: () => void;
+          const gate = new Promise<void>((resolve) => {
+            release = resolve;
+          });
+          const started = new Promise<void>((resolve) => {
+            entered = resolve;
+          });
+          if (phase === 'policy') {
+            vi.mocked(checkPolicy).mockImplementationOnce(async () => {
+              entered();
+              await gate;
+              return { decision: PolicyDecision.ALLOW };
+            });
+          } else {
+            vi.mocked(checkPolicy).mockResolvedValueOnce({
+              decision: PolicyDecision.ASK_USER,
+            });
+            vi.mocked(resolveConfirmation).mockImplementationOnce(async () => {
+              entered();
+              await gate;
+              return { outcome: ToolConfirmationOutcome.ProceedOnce };
+            });
+          }
+          const batch = scheduler.schedule([req1, req2], signal);
+          await started;
+          scheduler.dispose();
+          release();
+
+          const results = await batch;
+
+          expect(mockExecutor.execute).not.toHaveBeenCalled();
+          expect(
+            results.map((call) => [call.request.callId, call.status]),
+          ).toEqual([
+            ['call-1', CoreToolCallStatus.Cancelled],
+            ['call-2', CoreToolCallStatus.Cancelled],
+          ]);
+          expect(signal.aborted).toBe(false);
+          expect(scheduler.completedCalls).toEqual([]);
+        },
       );
     });
 

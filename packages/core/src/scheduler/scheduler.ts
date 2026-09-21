@@ -446,7 +446,11 @@ export class Scheduler {
    * @returns true if the loop should continue, false if it should terminate.
    */
   private async _processNextItem(signal: AbortSignal): Promise<boolean> {
-    if (signal.aborted || this.isCancelling) {
+    if (
+      signal.aborted ||
+      this.isCancelling ||
+      this.disposeController.signal.aborted
+    ) {
       // Finalize active calls that are terminal
       const activeCalls = this.state.allActiveCalls;
       for (const call of activeCalls) {
@@ -455,7 +459,11 @@ export class Scheduler {
         }
       }
 
-      this.state.cancelAllQueued('Operation cancelled');
+      this.state.cancelAllQueued(
+        this.disposeController.signal.aborted
+          ? 'Scheduler disposed'
+          : 'Operation cancelled',
+      );
       return false;
     }
 
@@ -740,11 +748,13 @@ export class Scheduler {
     signal: AbortSignal,
   ): Promise<boolean> {
     const callId = toolCall.request.callId;
-    if (signal.aborted) {
+    if (signal.aborted || this.disposeController.signal.aborted) {
       this.state.updateStatus(
         callId,
         CoreToolCallStatus.Cancelled,
-        'Operation cancelled',
+        this.disposeController.signal.aborted
+          ? 'Scheduler disposed'
+          : 'Operation cancelled',
       );
       return false;
     }
