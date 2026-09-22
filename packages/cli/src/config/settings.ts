@@ -913,7 +913,7 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
       ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         (envAuthOverride as AuthType)
       : undefined;
-  if (authOverride && !userSettings.security?.auth?.selectedType) {
+  if (authOverride) {
     if (!userSettings.security) {
       userSettings.security = {};
     }

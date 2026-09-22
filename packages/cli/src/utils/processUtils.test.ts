@@ -72,6 +72,36 @@ describe('processUtils', () => {
       });
     }
   });
+
+  it('should fall back to timeout if process.send callback is never called', async () => {
+    vi.useFakeTimers();
+    const originalSend = process.send;
+    const sendMock = vi.fn(() => false);
+    Object.defineProperty(process, 'send', {
+      value: sendMock,
+      configurable: true,
+      writable: true,
+    });
+    vi.stubEnv('VITEST', '');
+
+    try {
+      const relaunchPromise = relaunchApp({
+        overrideAuthType: 'login_with_google',
+      });
+      await vi.advanceTimersByTimeAsync(500);
+      await relaunchPromise;
+
+      expect(sendMock).toHaveBeenCalled();
+      expect(processExit).toHaveBeenCalledWith(RELAUNCH_EXIT_CODE);
+    } finally {
+      Object.defineProperty(process, 'send', {
+        value: originalSend,
+        configurable: true,
+        writable: true,
+      });
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe('SEA handling utilities', () => {

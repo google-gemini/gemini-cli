@@ -31,21 +31,28 @@ export async function relaunchApp(options?: {
 
   if (process.send && !process.env['VITEST'] && options?.overrideAuthType) {
     await new Promise<void>((resolve) => {
+      let resolved = false;
+      const done = () => {
+        if (!resolved) {
+          resolved = true;
+          resolve();
+        }
+      };
+      const timeout = setTimeout(done, 500);
       try {
-        const success = process.send!(
+        process.send!(
           {
             type: 'auth-selected-type',
             authType: options.overrideAuthType,
           },
           () => {
-            resolve();
+            clearTimeout(timeout);
+            done();
           },
         );
-        if (!success) {
-          resolve();
-        }
       } catch {
-        resolve();
+        clearTimeout(timeout);
+        done();
       }
     });
   }

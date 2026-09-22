@@ -261,6 +261,42 @@ describe('Settings Loading and Merging', () => {
       },
     );
 
+    it('should unconditionally override selectedType when GEMINI_CLI_AUTH_OVERRIDE is present', () => {
+      (mockFsExistsSync as Mock).mockImplementation(
+        (pathLike: fs.PathLike) =>
+          path.normalize(pathLike.toString()) ===
+          path.normalize(USER_SETTINGS_PATH),
+      );
+      (fs.readFileSync as Mock).mockImplementation(
+        (pathDesc: fs.PathOrFileDescriptor) => {
+          if (
+            path.normalize(pathDesc.toString()) ===
+            path.normalize(USER_SETTINGS_PATH)
+          ) {
+            return JSON.stringify({
+              security: {
+                auth: {
+                  selectedType: AuthType.USE_GEMINI,
+                },
+              },
+            });
+          }
+          return '{}';
+        },
+      );
+
+      vi.stubEnv('GEMINI_CLI_AUTH_OVERRIDE', AuthType.LOGIN_WITH_GOOGLE);
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.user.settings.security?.auth?.selectedType).toBe(
+        AuthType.LOGIN_WITH_GOOGLE,
+      );
+      expect(settings.merged.security.auth.selectedType).toBe(
+        AuthType.LOGIN_WITH_GOOGLE,
+      );
+    });
+
     it('should merge system, user and workspace settings, with system taking precedence over workspace, and workspace over user', () => {
       (mockFsExistsSync as Mock).mockImplementation((p: fs.PathLike) => {
         const normP = path.normalize(p.toString());
