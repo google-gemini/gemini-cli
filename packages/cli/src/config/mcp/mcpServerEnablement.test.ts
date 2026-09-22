@@ -5,6 +5,7 @@
  */
 
 import fs from 'node:fs/promises';
+import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -121,7 +122,10 @@ describe('McpServerEnablementManager', () => {
   });
 
   it('should fail closed and preserve the config file when JSON is malformed', async () => {
-    const configPath = '/virtual-home/.gemini/mcp-server-enablement.json';
+    const configPath = path.join(
+      '/virtual-home/.gemini',
+      'mcp-server-enablement.json',
+    );
     const malformedContent =
       '{\n  "disabled-server": { "enabled": false },\n  "truncated": ';
     inMemoryFs[configPath] = malformedContent;
@@ -145,7 +149,10 @@ describe('McpServerEnablementManager', () => {
   });
 
   it('should fail closed and preserve the config file when JSON root is not a plain object', async () => {
-    const configPath = '/virtual-home/.gemini/mcp-server-enablement.json';
+    const configPath = path.join(
+      '/virtual-home/.gemini',
+      'mcp-server-enablement.json',
+    );
     inMemoryFs[configPath] = '["not-an-object"]';
 
     expect(await manager.isFileEnabled('server')).toBe(false);
