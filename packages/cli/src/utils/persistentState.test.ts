@@ -107,11 +107,13 @@ describe('PersistentState', () => {
     expect(debugLogger.warn).toHaveBeenCalled();
   });
 
-  it('should preserve corrupt state and restore the backup', () => {
+  it('should persist a restored backup synchronously', () => {
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.readFileSync).mockImplementation((filePath) =>
       filePath === mockFilePath ? '{"broken":' : '{"tipsShown": 2}',
     );
+    vi.mocked(fs.openSync).mockReturnValue(7);
+    vi.mocked(fs.writeSync).mockReturnValue(0);
 
     const value = persistentState.get('defaultBannerShownCount');
 
@@ -120,6 +122,24 @@ describe('PersistentState', () => {
     expect(fs.renameSync).toHaveBeenCalledWith(
       mockFilePath,
       `${mockFilePath}.corrupt`,
+    );
+    expect(fs.openSync).toHaveBeenCalledWith(
+      expect.stringMatching(/state\.json\..+\.tmp$/),
+      'wx',
+    );
+    expect(fs.openSync).toHaveBeenCalledTimes(1);
+    expect(fs.writeSync).toHaveBeenCalledWith(
+      7,
+      JSON.stringify({ tipsShown: 2 }, null, 2),
+      null,
+      'utf-8',
+    );
+    expect(fs.fsyncSync).toHaveBeenCalledWith(7);
+    expect(fs.closeSync).toHaveBeenCalledWith(7);
+    expect(fs.renameSync).toHaveBeenNthCalledWith(
+      2,
+      expect.stringMatching(/state\.json\..+\.tmp$/),
+      mockFilePath,
     );
     expect(debugLogger.warn).toHaveBeenCalledWith(
       expect.stringContaining('corrupt'),
