@@ -24,6 +24,7 @@ describe('SdkAgentShell', () => {
         publish: vi.fn(),
         subscribe: vi.fn(),
       },
+      validatePathAccess: vi.fn().mockReturnValue(null),
       getPolicyEngine: () => ({
         checkCommand: () => ({ allowed: true }),
       }),
@@ -121,4 +122,47 @@ describe('SdkAgentShell', () => {
 
     executeSpy.mockRestore();
   });
+
+  it('rejects execution when cwd fails workspace validation', async () => {
+    const mockConfig = createMockConfig();
+    vi.mocked(mockConfig.validatePathAccess).mockReturnValue(
+      'Path is outside workspace boundaries.',
+    );
+    const executeSpy = vi.spyOn(ShellExecutionService, 'execute');
+
+    const shell = new SdkAgentShell(mockConfig);
+    const result = await shell.exec('ls', { cwd: '/etc' });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.error).toBeDefined();
+    expect(result.error?.message).toBe('Path is outside workspace boundaries.');
+    expect(executeSpy).not.toHaveBeenCalled();
+
+    executeSpy.mockRestore();
+  });
+
+  it('adds custom env keys to allowedEnvironmentVariables', async () => {
+    const mockConfig = createMockConfig();
+    const executeSpy = vi.spyOn(ShellExecutionService, 'execute').mockResolvedValue({
+      pid: 1234,
+      result: Promise.resolve({
+        output: 'custom-var-output',
+        exitCode: 0,
+      }),
+    } as any);
+
+    const shell = new SdkAgentShell(mockConfig);
+    await shell.exec('echo $NEW_SECRET_VAR', {
+      env: { NEW_SECRET_VAR: 'value123' },
+    });
+
+    expect(executeSpy).toHaveBeenCalled();
+    const passedConfig = executeSpy.mock.calls[0][5];
+    expect(
+      passedConfig.sanitizationConfig.allowedEnvironmentVariables,
+    ).toContain('NEW_SECRET_VAR');
+
+    executeSpy.mockRestore();
+  });
 });
+

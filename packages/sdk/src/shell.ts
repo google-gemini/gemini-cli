@@ -114,6 +114,11 @@ export class SdkAgentShell implements AgentShell {
           }
         : baseExecutionConfig;
 
+      const validationError = this.config.validatePathAccess(cwd);
+      if (validationError) {
+        throw new Error(validationError);
+      }
+
       const handle = await ShellExecutionService.execute(
         command,
         cwd,
