@@ -14,12 +14,24 @@ import { coreEvents } from '@google/gemini-cli-core';
  */
 type CommentedRecord = Record<string | symbol, unknown>;
 
+function isDangerousKey(key: string): boolean {
+  return key === '__proto__' || key === 'constructor' || key === 'prototype';
+}
+
 function readFileWithRetry(filePath: string, retries = 3): string {
   let attempt = 0;
   while (attempt < retries) {
     try {
       return fs.readFileSync(filePath, 'utf-8');
     } catch (err: unknown) {
+      if (
+        err &&
+        typeof err === 'object' &&
+        'code' in err &&
+        err.code === 'ENOENT'
+      ) {
+        throw err;
+      }
       attempt++;
       if (attempt >= retries) {
         throw err;
@@ -89,7 +101,16 @@ export function updateSettingsFilePreservingFormat(
     const originalContent = readFileWithRetry(filePath);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     parsed = parse(originalContent) as Record<string, unknown>;
-  } catch (error) {
+  } catch (error: unknown) {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      error.code === 'ENOENT'
+    ) {
+      writeAtomicSync(filePath, JSON.stringify(updates, null, 2));
+      return;
+    }
     coreEvents.emitFeedback(
       'error',
       'Error parsing settings file. Please check the JSON syntax.',
@@ -116,6 +137,9 @@ function preserveCommentsOnPropertyDeletion(
   container: Record<string, unknown>,
   propName: string,
 ): void {
+  if (isDangerousKey(propName)) {
+    return;
+  }
   const target = container as CommentedRecord;
   const beforeSym = Symbol.for(`before:${propName}`);
   const afterSym = Symbol.for(`after:${propName}`);
@@ -175,6 +199,9 @@ function applyKeyDiff(
   desired: Record<string, unknown>,
 ): void {
   for (const existingKey of Object.getOwnPropertyNames(base)) {
+    if (isDangerousKey(existingKey)) {
+      continue;
+    }
     if (!Object.prototype.hasOwnProperty.call(desired, existingKey)) {
       preserveCommentsOnPropertyDeletion(base, existingKey);
       delete base[existingKey];
@@ -182,6 +209,9 @@ function applyKeyDiff(
   }
 
   for (const nextKey of Object.getOwnPropertyNames(desired)) {
+    if (isDangerousKey(nextKey)) {
+      continue;
+    }
     const nextVal = desired[nextKey];
     const baseVal = base[nextKey];
 
