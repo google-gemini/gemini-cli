@@ -166,7 +166,7 @@ describe('GeminiChat', () => {
       getTelemetryLogPromptsEnabled: () => true,
       getTelemetryTracesEnabled: () => false,
       getUsageStatisticsEnabled: () => true,
-      hasGemini35FlashGAAccess: vi.fn().mockReturnValue(false),
+      hasLatestFlashGAAccess: vi.fn().mockReturnValue(false),
       getDebugMode: () => false,
       getContentGeneratorConfig: vi.fn().mockImplementation(() => ({
         authType: 'oauth-personal',
@@ -2305,6 +2305,42 @@ describe('GeminiChat', () => {
       );
     });
 
+<<<<<<< HEAD
+=======
+    it('should send an explicit versioned Flash model unchanged when Gemini 3.5 Flash GA is enabled', async () => {
+      vi.mocked(mockConfig.hasLatestFlashGAAccess).mockReturnValue(true);
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: { parts: [{ text: 'response' }], role: 'model' },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-3.8-flash' },
+        'hello',
+        'prompt-id-explicit-flash',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledWith(
+        expect.objectContaining({ model: 'gemini-3.8-flash' }),
+        'prompt-id-explicit-flash',
+        LlmRole.MAIN,
+      );
+    });
+
+>>>>>>> 62364cb20 (Feat/gemini 3.8 flash 3.5 flash lite (#29443))
     it('should use thinkingLevel and remove thinkingBudget for gemini-3 models', async () => {
       const response = (async function* () {
         yield {
