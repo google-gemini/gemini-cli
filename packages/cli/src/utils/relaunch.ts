@@ -72,6 +72,7 @@ export async function relaunchAppInChildProcess(
           latestAdminSettings = msg.settings as AdminControlsSettings;
         }
         if (msg.type === 'auth-selected-type' && msg.authType) {
+          process.env['GEMINI_CLI_AUTH_OVERRIDE'] = msg.authType;
           newEnv['GEMINI_CLI_AUTH_OVERRIDE'] = msg.authType;
         }
       },
