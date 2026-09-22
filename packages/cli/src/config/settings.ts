@@ -876,6 +876,25 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
   userSettings = userResult.settings;
   workspaceSettings = workspaceResult.settings;
 
+  // Support environment variable override from relaunch supervisor across exit code 199
+  const envAuthOverride = process.env['GEMINI_CLI_AUTH_OVERRIDE'];
+  const authOverride =
+    envAuthOverride &&
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    Object.values(AuthType).includes(envAuthOverride as AuthType)
+      ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        (envAuthOverride as AuthType)
+      : undefined;
+  if (authOverride && !userSettings.security?.auth?.selectedType) {
+    if (!userSettings.security) {
+      userSettings.security = {};
+    }
+    if (!userSettings.security.auth) {
+      userSettings.security.auth = {};
+    }
+    userSettings.security.auth.selectedType = authOverride;
+  }
+
   // Support legacy theme names
   if (userSettings.ui?.theme === 'VS') {
     userSettings.ui.theme = DefaultLight.name;

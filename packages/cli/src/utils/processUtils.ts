@@ -22,11 +22,30 @@ export function _resetRelaunchStateForTesting(): void {
   isRelaunching = false;
 }
 
-export async function relaunchApp(): Promise<void> {
+export async function relaunchApp(options?: {
+  overrideAuthType?: string;
+}): Promise<void> {
   if (isRelaunching) return;
   isRelaunching = true;
   await waitForUpdateCompletion();
+
+  if (process.send && !process.env['VITEST'] && options?.overrideAuthType) {
+    try {
+      process.send({
+        type: 'auth-selected-type',
+        authType: options.overrideAuthType,
+      });
+    } catch {
+      // ignore
+    }
+  }
+
   await runExitCleanup();
+
+  if (process.send && !process.env['VITEST']) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+
   process.exit(RELAUNCH_EXIT_CODE);
 }
 

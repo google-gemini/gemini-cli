@@ -302,6 +302,25 @@ describe('KeychainService', () => {
     });
   });
 
+  describe('WSL / Headless Linux Probing', () => {
+    beforeEach(() => {
+      vi.mocked(os.platform).mockReturnValue('linux');
+    });
+
+    it('should fallback to FileKeychain when running in WSL', async () => {
+      vi.stubEnv('WSL_DISTRO_NAME', 'Ubuntu');
+
+      const available = await service.isAvailable();
+
+      expect(available).toBe(true);
+      expect(mockKeytar.setPassword).not.toHaveBeenCalled();
+      expect(FileKeychain).toHaveBeenCalled();
+      expect(debugLogger.debug).toHaveBeenCalledWith(
+        expect.stringContaining('WSL / headless Linux environment detected'),
+      );
+    });
+  });
+
   describe('Password Operations', () => {
     beforeEach(async () => {
       await service.isAvailable();

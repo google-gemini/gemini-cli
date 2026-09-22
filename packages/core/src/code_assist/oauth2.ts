@@ -798,10 +798,33 @@ export function resetOauthClientForTesting() {
 
 async function cacheCredentials(credentials: Credentials) {
   const filePath = Storage.getOAuthCredsPath();
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  const dirPath = path.dirname(filePath);
+  await fs.mkdir(dirPath, { recursive: true });
 
   const credString = JSON.stringify(credentials, null, 2);
-  await fs.writeFile(filePath, credString, { mode: 0o600 });
+  const tempPath = path.join(
+    dirPath,
+    `.${path.basename(filePath)}.${process.pid}.${Date.now()}.tmp`,
+  );
+
+  try {
+    await fs.writeFile(tempPath, credString, { mode: 0o600 });
+    try {
+      await fs.chmod(tempPath, 0o600);
+    } catch {
+      /* empty */
+    }
+    await fs.rename(tempPath, filePath);
+  } catch {
+    try {
+      await fs.rm(tempPath, { force: true });
+    } catch {
+      /* empty */
+    }
+    // Fallback to direct write if rename fails
+    await fs.writeFile(filePath, credString, { mode: 0o600 });
+  }
+
   try {
     await fs.chmod(filePath, 0o600);
   } catch {
