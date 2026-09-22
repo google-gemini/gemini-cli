@@ -35,7 +35,12 @@ import {
 } from '@google/gemini-cli-core';
 
 import { logger } from '../utils/logger.js';
-import { type Settings, loadSettings } from './settings.js';
+import {
+  type Settings,
+  loadSettings,
+  migrateDeprecatedSettings,
+  attachLegacyCompatibilityGetters,
+} from './settings.js';
 import { type AgentSettings, CoderAgentEvent } from '../types.js';
 
 export const envStorage = new AsyncLocalStorage<TaskEnv>();
@@ -255,6 +260,10 @@ export async function loadConfig(
   trusted: boolean = false,
   workspaceDir: string = process.cwd(),
 ): Promise<Config> {
+  // Ensure direct callers passing unmigrated V1 or partial V2 objects are normalized
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  settings = migrateDeprecatedSettings(settings as Record<string, unknown>);
+
   const workspaceEnv = await loadEnvironment(trusted, workspaceDir);
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const envVars: Record<string, string> = { ...process.env } as Record<
@@ -266,12 +275,13 @@ export async function loadConfig(
   const getEnvLocal = (key: string) => envVars[key];
 
   const folderTrust =
-    settings.folderTrust === true ||
-    getEnvLocal('GEMINI_FOLDER_TRUST') === 'true';
+    (settings.security?.folderTrust?.enabled ?? settings.folderTrust) ===
+      true || getEnvLocal('GEMINI_FOLDER_TRUST') === 'true';
 
   let checkpointing = getEnvLocal('CHECKPOINTING')
     ? getEnvLocal('CHECKPOINTING') === 'true'
-    : settings.checkpointing?.enabled;
+    : (settings.general?.checkpointing?.enabled ??
+      settings.checkpointing?.enabled);
 
   if (checkpointing) {
     if (!(await GitService.verifyGitAvailability())) {
@@ -313,14 +323,18 @@ export async function loadConfig(
         '[Configuration] Untrusted workspace detected. Stripping repository telemetry definitions to prevent unintended data routing.',
       );
     }
-    settings = {
+    settings = attachLegacyCompatibilityGetters({
       ...settings,
       mcpServers: undefined,
       policyPaths: undefined,
       adminPolicyPaths: undefined,
       tools: undefined,
       telemetry: undefined,
-    };
+    });
+  }
+
+  if (settings.logging?.level) {
+    logger.level = settings.logging.level;
   }
   const safeMcpServers = settings.mcpServers;
 
@@ -342,6 +356,9 @@ export async function loadConfig(
     true,
   );
 
+  const resolvedFileFiltering =
+    settings.context?.fileFiltering ?? settings.fileFiltering;
+
   const configParams: ConfigParameters = {
     sessionId: taskId,
     clientName: 'a2a-server',
@@ -356,7 +373,8 @@ export async function loadConfig(
     coreTools: settings.tools?.core || undefined,
     excludeTools: settings.tools?.exclude || undefined,
     allowedTools: settings.tools?.allowed || undefined,
-    showMemoryUsage: settings.showMemoryUsage || false,
+    showMemoryUsage:
+      (settings.ui?.showMemoryUsage ?? settings.showMemoryUsage) || false,
     approvalMode,
     policyEngineConfig,
     mcpServers: safeMcpServers,
@@ -372,12 +390,12 @@ export async function loadConfig(
     },
     // Git-aware file filtering settings
     fileFiltering: {
-      respectGitIgnore: settings.fileFiltering?.respectGitIgnore,
-      respectGeminiIgnore: settings.fileFiltering?.respectGeminiIgnore,
+      respectGitIgnore: resolvedFileFiltering?.respectGitIgnore,
+      respectGeminiIgnore: resolvedFileFiltering?.respectGeminiIgnore,
       enableRecursiveFileSearch:
-        settings.fileFiltering?.enableRecursiveFileSearch,
+        resolvedFileFiltering?.enableRecursiveFileSearch,
       customIgnoreFilePaths: [
-        ...(settings.fileFiltering?.customIgnoreFilePaths || []),
+        ...(resolvedFileFiltering?.customIgnoreFilePaths || []),
         ...(getEnvLocal('CUSTOM_IGNORE_FILE_PATHS')
           ? getEnvLocal('CUSTOM_IGNORE_FILE_PATHS').split(path.delimiter)
           : []),
@@ -451,14 +469,17 @@ export function setIsTrusted(
     return agentSettings.isTrusted;
   }
   const cliTrustEnv = getEnv('GEMINI_CLI_TRUST_WORKSPACE');
-  if (cliTrustEnv !== undefined) {
+  if (cliTrustEnv !== undefined && cliTrustEnv !== '') {
     return cliTrustEnv === 'true';
   }
   if (workspaceRoot) {
     const initialSettings = loadSettings(workspaceRoot, false);
     const { isTrusted } = checkPathTrust({
       path: workspaceRoot,
-      isFolderTrustEnabled: initialSettings.folderTrust ?? true,
+      isFolderTrustEnabled:
+        initialSettings.security?.folderTrust?.enabled ??
+        initialSettings.folderTrust ??
+        true,
       isHeadless: isHeadlessMode(),
     });
     return isTrusted ?? false;
