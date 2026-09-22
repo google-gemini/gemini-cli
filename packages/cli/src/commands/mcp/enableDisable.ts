@@ -5,7 +5,7 @@
  */
 
 import type { CommandModule } from 'yargs';
-import { debugLogger } from '@google/gemini-cli-core';
+import { debugLogger, getErrorMessage } from '@google/gemini-cli-core';
 import {
   McpServerEnablementManager,
   canLoadServer,
@@ -60,7 +60,12 @@ async function handleEnable(args: Args): Promise<void> {
     manager.clearSessionDisable(name);
     debugLogger.log(`${GREEN}✓${RESET} Session disable cleared for '${name}'.`);
   } else {
-    await manager.enable(name);
+    try {
+      await manager.enable(name);
+    } catch (error) {
+      debugLogger.log(`${RED}Error:${RESET} ${getErrorMessage(error)}`);
+      return;
+    }
     debugLogger.log(`${GREEN}✓${RESET} MCP server '${name}' enabled.`);
   }
 
@@ -91,7 +96,12 @@ async function handleDisable(args: Args): Promise<void> {
       `${GREEN}✓${RESET} MCP server '${name}' disabled for this session.`,
     );
   } else {
-    await manager.disable(name);
+    try {
+      await manager.disable(name);
+    } catch (error) {
+      debugLogger.log(`${RED}Error:${RESET} ${getErrorMessage(error)}`);
+      return;
+    }
     debugLogger.log(`${GREEN}✓${RESET} MCP server '${name}' disabled.`);
   }
 }

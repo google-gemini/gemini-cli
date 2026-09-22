@@ -23,6 +23,55 @@ export interface McpServerEnablementConfig {
 }
 
 /**
+ * Outcome of reading the enablement file.
+ *
+ * `missing` and `unreadable` must stay distinct. A file that exists but cannot
+ * be read or parsed says nothing about which servers the user disabled, so it
+ * can neither be treated as an empty config nor be overwritten.
+ */
+type ReadConfigResult =
+  | { status: 'ok' | 'missing'; config: McpServerEnablementConfig }
+  | { status: 'unreadable' };
+
+/**
+ * Thrown when a write is refused because the config on disk is unreadable.
+ * Writing would drop every entry the file still holds.
+ */
+export class McpServerEnablementConfigError extends Error {
+  constructor(configFilePath: string) {
+    super(
+      `Cannot update MCP server enablement: ${configFilePath} exists but could not be read. ` +
+        `Repair or delete that file and retry. Until then every MCP server is treated as disabled.`,
+    );
+    this.name = 'McpServerEnablementConfigError';
+  }
+}
+
+/**
+ * Validate the parsed file shape. Valid JSON of the wrong shape fails open the
+ * same way a parse error does: `{"playwright": "off"}` leaves `state.enabled`
+ * undefined, which `isFileEnabled` would read as enabled.
+ *
+ * Unknown extra fields on an entry are accepted so older clients keep working
+ * against configs written by newer ones.
+ */
+function isEnablementConfig(
+  value: unknown,
+): value is McpServerEnablementConfig {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+  return Object.values(value).every(
+    (state) =>
+      typeof state === 'object' &&
+      state !== null &&
+      !Array.isArray(state) &&
+      'enabled' in state &&
+      typeof state.enabled === 'boolean',
+  );
+}
+
+/**
  * For UI display - combines file and session state.
  */
 export interface McpServerDisplayState {
@@ -196,6 +245,7 @@ export class McpServerEnablementManager {
   private readonly configFilePath: string;
   private readonly configDir: string;
   private readonly sessionDisabled = new Set<string>();
+  private hasReportedUnreadable = false;
 
   /**
    * Get the singleton instance.
@@ -224,8 +274,13 @@ export class McpServerEnablementManager {
    * Does NOT include session state.
    */
   async isFileEnabled(serverName: string): Promise<boolean> {
-    const config = await this.readConfig();
-    const state = config[normalizeServerId(serverName)];
+    const result = await this.readConfig();
+    if (result.status === 'unreadable') {
+      // Fail closed. The file may disable this server and we cannot tell, so
+      // reporting it enabled would reconnect a server the user switched off.
+      return false;
+    }
+    const state = result.config[normalizeServerId(serverName)];
     return state?.enabled ?? true;
   }
 
@@ -253,11 +308,14 @@ export class McpServerEnablementManager {
    */
   async enable(serverName: string): Promise<void> {
     const normalizedName = normalizeServerId(serverName);
-    const config = await this.readConfig();
+    const result = await this.readConfig();
+    if (result.status === 'unreadable') {
+      throw new McpServerEnablementConfigError(this.configFilePath);
+    }
 
-    if (normalizedName in config) {
-      delete config[normalizedName];
-      await this.writeConfig(config);
+    if (normalizedName in result.config) {
+      delete result.config[normalizedName];
+      await this.writeConfig(result.config);
     }
   }
 
@@ -266,9 +324,12 @@ export class McpServerEnablementManager {
    * Adds server to config file with enabled: false.
    */
   async disable(serverName: string): Promise<void> {
-    const config = await this.readConfig();
-    config[normalizeServerId(serverName)] = { enabled: false };
-    await this.writeConfig(config);
+    const result = await this.readConfig();
+    if (result.status === 'unreadable') {
+      throw new McpServerEnablementConfigError(this.configFilePath);
+    }
+    result.config[normalizeServerId(serverName)] = { enabled: false };
+    await this.writeConfig(result.config);
   }
 
   /**
@@ -336,7 +397,17 @@ export class McpServerEnablementManager {
 
       let wasDisabled = false;
       if (state.isPersistentDisabled) {
-        await this.enable(normalizedName);
+        try {
+          await this.enable(normalizedName);
+        } catch (error) {
+          if (error instanceof McpServerEnablementConfigError) {
+            // Nothing can be re-enabled while the file is unreadable, and
+            // readConfig has already reported why. Enabling an extension is
+            // not worth failing over this, so stop and report what was done.
+            return enabledServers;
+          }
+          throw error;
+        }
         wasDisabled = true;
       }
       if (state.isSessionDisabled) {
@@ -355,26 +426,58 @@ export class McpServerEnablementManager {
   /**
    * Read config from file asynchronously.
    */
-  private async readConfig(): Promise<McpServerEnablementConfig> {
+  private async readConfig(): Promise<ReadConfigResult> {
+    let content: string;
     try {
-      const content = await fs.readFile(this.configFilePath, 'utf-8');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      return JSON.parse(content) as McpServerEnablementConfig;
+      content = await fs.readFile(this.configFilePath, 'utf-8');
     } catch (error) {
       if (
         error instanceof Error &&
         'code' in error &&
         error.code === 'ENOENT'
       ) {
-        return {};
+        this.hasReportedUnreadable = false;
+        return { status: 'missing', config: {} };
       }
-      coreEvents.emitFeedback(
-        'error',
-        'Failed to read MCP server enablement config.',
-        error,
-      );
-      return {};
+      this.reportUnreadable(error);
+      return { status: 'unreadable' };
     }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(content);
+    } catch (error) {
+      this.reportUnreadable(error);
+      return { status: 'unreadable' };
+    }
+
+    if (!isEnablementConfig(parsed)) {
+      this.reportUnreadable(
+        new Error('Expected a map of server ID to { enabled: boolean }.'),
+      );
+      return { status: 'unreadable' };
+    }
+
+    this.hasReportedUnreadable = false;
+    return { status: 'ok', config: parsed };
+  }
+
+  /**
+   * Report an unreadable config once per stretch of failures. `isFileEnabled`
+   * runs for every server on every connection attempt, so emitting on each
+   * read would bury the message in copies of itself.
+   */
+  private reportUnreadable(error: unknown): void {
+    if (this.hasReportedUnreadable) {
+      return;
+    }
+    this.hasReportedUnreadable = true;
+    coreEvents.emitFeedback(
+      'error',
+      `Failed to read MCP server enablement config at ${this.configFilePath}. ` +
+        `Every MCP server is treated as disabled until the file is repaired or deleted.`,
+      error,
+    );
   }
 
   /**

@@ -22,11 +22,14 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 
 import {
   McpServerEnablementManager,
+  McpServerEnablementConfigError,
   canLoadServer,
   normalizeServerId,
   isInSettingsList,
   type EnablementCallbacks,
 } from './mcpServerEnablement.js';
+
+const CONFIG_PATH = '/virtual-home/.gemini/mcp-server-enablement.json';
 
 let inMemoryFs: Record<string, string> = {};
 
@@ -118,6 +121,111 @@ describe('McpServerEnablementManager', () => {
 
     expect(instance2.isSessionDisabled('test-server')).toBe(true);
     expect(instance1).toBe(instance2);
+  });
+});
+
+describe('McpServerEnablementManager with an unreadable config file', () => {
+  let manager: McpServerEnablementManager;
+
+  beforeEach(() => {
+    inMemoryFs = {};
+    setupFsMocks();
+    McpServerEnablementManager.resetInstance();
+    manager = McpServerEnablementManager.getInstance();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    McpServerEnablementManager.resetInstance();
+  });
+
+  it.each([
+    ['malformed JSON', '{"playwright": {"enabled": false'],
+    ['a JSON array', '["playwright"]'],
+    ['a JSON scalar', '"playwright"'],
+    ['entries that are not enablement states', '{"playwright": "off"}'],
+    [
+      'an entry with a non-boolean enabled',
+      '{"playwright": {"enabled": "no"}}',
+    ],
+  ])(
+    'fails closed on %s rather than reporting every server enabled',
+    async (_label, content) => {
+      inMemoryFs[CONFIG_PATH] = content;
+
+      expect(await manager.isFileEnabled('playwright')).toBe(false);
+      expect(await manager.isFileEnabled('never-configured')).toBe(false);
+    },
+  );
+
+  it('reports servers as persistently disabled in the display state', async () => {
+    inMemoryFs[CONFIG_PATH] = '{ truncated';
+
+    expect(await manager.getDisplayState('playwright')).toEqual({
+      enabled: false,
+      isSessionDisabled: false,
+      isPersistentDisabled: true,
+    });
+  });
+
+  it('refuses to disable a server and leaves the file untouched', async () => {
+    const original = '{"playwright": {"enabled": false}, "github": ';
+    inMemoryFs[CONFIG_PATH] = original;
+
+    await expect(manager.disable('other')).rejects.toBeInstanceOf(
+      McpServerEnablementConfigError,
+    );
+    expect(inMemoryFs[CONFIG_PATH]).toBe(original);
+  });
+
+  it('refuses to enable a server and leaves the file untouched', async () => {
+    const original = '{"playwright": {"enabled": false}, "github": ';
+    inMemoryFs[CONFIG_PATH] = original;
+
+    await expect(manager.enable('playwright')).rejects.toBeInstanceOf(
+      McpServerEnablementConfigError,
+    );
+    expect(inMemoryFs[CONFIG_PATH]).toBe(original);
+  });
+
+  it('names the config file so the user can repair it', async () => {
+    inMemoryFs[CONFIG_PATH] = '{ truncated';
+
+    await expect(manager.disable('playwright')).rejects.toThrow(CONFIG_PATH);
+  });
+
+  it('auto-enable re-enables nothing and does not throw', async () => {
+    inMemoryFs[CONFIG_PATH] = '{ truncated';
+
+    await expect(manager.autoEnableServers(['playwright'])).resolves.toEqual(
+      [],
+    );
+    expect(inMemoryFs[CONFIG_PATH]).toBe('{ truncated');
+  });
+
+  it('recovers once the file is repaired', async () => {
+    inMemoryFs[CONFIG_PATH] = '{ truncated';
+    expect(await manager.isFileEnabled('playwright')).toBe(false);
+
+    inMemoryFs[CONFIG_PATH] = '{"playwright": {"enabled": false}}';
+    expect(await manager.isFileEnabled('playwright')).toBe(false);
+    expect(await manager.isFileEnabled('github')).toBe(true);
+
+    await manager.enable('playwright');
+    expect(await manager.isFileEnabled('playwright')).toBe(true);
+  });
+
+  it('still treats a missing file as an empty config', async () => {
+    expect(await manager.isFileEnabled('playwright')).toBe(true);
+    await expect(manager.enable('playwright')).resolves.toBeUndefined();
+  });
+
+  it('accepts entries carrying unknown extra fields', async () => {
+    inMemoryFs[CONFIG_PATH] =
+      '{"playwright": {"enabled": false, "disabledAt": "2026-01-01"}}';
+
+    expect(await manager.isFileEnabled('playwright')).toBe(false);
+    expect(await manager.isFileEnabled('github')).toBe(true);
   });
 });
 

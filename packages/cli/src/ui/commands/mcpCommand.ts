@@ -458,7 +458,15 @@ async function handleEnableDisable(
     if (isSession) {
       manager.clearSessionDisable(name);
     } else {
-      await manager.enable(name);
+      try {
+        await manager.enable(name);
+      } catch (error) {
+        return {
+          type: 'message',
+          messageType: 'error',
+          content: getErrorMessage(error),
+        };
+      }
     }
     if (result.blockType === 'admin') {
       context.ui.addItem(
@@ -473,7 +481,15 @@ async function handleEnableDisable(
     if (isSession) {
       manager.disableForSession(name);
     } else {
-      await manager.disable(name);
+      try {
+        await manager.disable(name);
+      } catch (error) {
+        return {
+          type: 'message',
+          messageType: 'error',
+          content: getErrorMessage(error),
+        };
+      }
     }
   }
 
