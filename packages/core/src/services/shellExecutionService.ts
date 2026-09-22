@@ -63,9 +63,9 @@ export const GEMINI_CLI_IDENTIFICATION_ENV_VAR = 'GEMINI_CLI';
 export const GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE = '1';
 
 // We want to allow shell outputs that are close to the context window in size.
-// 300,000 lines is roughly equivalent to a large context window, ensuring
-// we capture significant output from long-running commands.
-export const SCROLLBACK_LIMIT = 300000;
+// 50,000 lines is roughly equivalent to a large context window while preventing
+// excessive V8 heap growth in @xterm/headless circular buffers.
+export const SCROLLBACK_LIMIT = 50000;
 
 const BASH_SHOPT_OPTIONS = 'promptvars nullglob extglob nocaseglob dotglob';
 const BASH_SHOPT_GUARD = `shopt -u ${BASH_SHOPT_OPTIONS};`;
@@ -149,7 +149,36 @@ export interface ShellExecutionConfig {
  */
 export type ShellOutputEvent = ExecutionOutputEvent;
 
-export type DestroyablePty = IPty & { destroy?: () => void };
+/**
+ * Internal/undocumented properties of `@lydell/node-pty`'s Windows agent (`WindowsPtyAgent`).
+ *
+ * Rationale & Why Public API Is Insufficient:
+ * The public `IPty` interface only exposes high-level `onExit` and `resize()` methods:
+ * 1. On Windows ConPTY, `IPty.onExit` is only emitted when the named-pipe data socket (`_socket`)
+ *    closes after `conoutSocketWorker` emits `'ready_datapipe'`. For fast-exiting processes,
+ *    the native OS process exit callback (`RegisterWaitForSingleObject` -> `_$onProcessExit`)
+ *    can complete before `'ready_datapipe'` attaches the socket close listener or while
+ *    `conhost.exe` retains open pipe handles, causing `IPty.onExit` to never fire. Accessing
+ *    `_$onProcessExit` and `_exitCode`/`exitCode` allows `ShellExecutionService` to detect
+ *    OS-level process termination and schedule a deterministic drain-and-finalize fallback.
+ * 2. When `IPty.resize()` is called before the first `'data'` event (`_isReady === false`),
+ *    `WindowsTerminal` queues `() => _agent.resize(cols, rows)` into an internal `_deferreds` array
+ *    outside the caller's synchronous `try/catch` block. If the process exits before the first
+ *    `'data'` event arrives, flushing `_deferreds` synchronously inside `net.Socket.emit('data')`
+ *    throws an uncaught `Error('Cannot resize a pty that has already exited')`, aborting
+ *    cleanup. Wrapping `_agent.resize` and checking `_exitCode`/`exitCode` prevents this crash.
+ */
+export interface WindowsPtyAgentInternal {
+  _exitCode?: number;
+  exitCode?: number;
+  resize?: (cols: number, rows: number) => void;
+  _$onProcessExit?: (exitCode: number) => void;
+}
+
+export type DestroyablePty = IPty & {
+  destroy?: () => void;
+  _agent?: WindowsPtyAgentInternal;
+};
 
 interface ActivePty {
   ptyProcess: DestroyablePty;
@@ -157,6 +186,7 @@ interface ActivePty {
   maxSerializedLines?: number;
   command: string;
   sessionId?: string;
+  cancelRender?: () => void;
 }
 
 interface ActiveChildProcess {
@@ -170,6 +200,40 @@ interface ActiveChildProcess {
   command: string;
   sessionId?: string;
 }
+
+const isAnsiOutputEqual = (
+  a: string | AnsiOutput | null,
+  b: AnsiOutput,
+): boolean => {
+  if (!Array.isArray(a) || a.length !== b.length) {
+    return false;
+  }
+  for (let i = 0; i < a.length; i++) {
+    const lineA = a[i];
+    const lineB = b[i];
+    if (lineA.length !== lineB.length) {
+      return false;
+    }
+    for (let j = 0; j < lineA.length; j++) {
+      const tokA = lineA[j];
+      const tokB = lineB[j];
+      if (
+        tokA.text !== tokB.text ||
+        tokA.bold !== tokB.bold ||
+        tokA.italic !== tokB.italic ||
+        tokA.underline !== tokB.underline ||
+        tokA.dim !== tokB.dim ||
+        tokA.inverse !== tokB.inverse ||
+        tokA.isUninitialized !== tokB.isUninitialized ||
+        tokA.fg !== tokB.fg ||
+        tokA.bg !== tokB.bg
+      ) {
+        return false;
+      }
+    }
+  }
+  return true;
+};
 
 const findLastContentLine = (
   buffer: pkg.IBuffer,
@@ -185,21 +249,22 @@ const findLastContentLine = (
   return -1;
 };
 
-const getFullBufferText = (terminal: pkg.Terminal, startLine = 0): string => {
+const getFullBufferText = (
+  terminal: pkg.Terminal,
+  startLine = 0,
+  maxBytes = MAX_CHILD_PROCESS_BUFFER_SIZE,
+): string => {
   const buffer = terminal.buffer.active;
-  const lines: string[] = [];
-
   const lastContentLine = findLastContentLine(buffer, startLine);
 
   if (lastContentLine === -1 || lastContentLine < startLine) return '';
 
-  for (let i = startLine; i <= lastContentLine; i++) {
-    const line = buffer.getLine(i);
-    if (!line) {
-      lines.push('');
-      continue;
-    }
+  const logicalLinesReversed: string[] = [];
+  let currentLogicalLineChunks: string[] = [];
+  let accumulatedChars = 0;
 
+  for (let i = lastContentLine; i >= startLine; i--) {
+    const line = buffer.getLine(i);
     let trimRight = true;
     if (i + 1 <= lastContentLine) {
       const nextLine = buffer.getLine(i + 1);
@@ -208,16 +273,34 @@ const getFullBufferText = (terminal: pkg.Terminal, startLine = 0): string => {
       }
     }
 
-    const lineContent = line.translateToString(trimRight);
+    const lineContent = line ? line.translateToString(trimRight) : '';
+    currentLogicalLineChunks.push(lineContent);
 
-    if (line.isWrapped && lines.length > 0) {
-      lines[lines.length - 1] += lineContent;
-    } else {
-      lines.push(lineContent);
+    if (!line?.isWrapped) {
+      const logicalLine =
+        currentLogicalLineChunks.length === 1
+          ? currentLogicalLineChunks[0]
+          : currentLogicalLineChunks.reverse().join('');
+      currentLogicalLineChunks = [];
+      logicalLinesReversed.push(logicalLine);
+      accumulatedChars +=
+        logicalLine.length + (logicalLinesReversed.length > 1 ? 1 : 0);
+
+      if (maxBytes > 0 && accumulatedChars >= maxBytes) {
+        break;
+      }
     }
   }
 
-  return lines.join('\n');
+  if (currentLogicalLineChunks.length > 0) {
+    logicalLinesReversed.push(currentLogicalLineChunks.reverse().join(''));
+  }
+
+  const fullText = logicalLinesReversed.reverse().join('\n');
+  if (maxBytes > 0 && fullText.length > maxBytes) {
+    return fullText.slice(-maxBytes);
+  }
+  return fullText;
 };
 
 const writeBufferToLogStream = (
@@ -1005,6 +1088,7 @@ export class ShellExecutionService {
     const entry = this.activePtys.get(pid);
     if (!entry) return;
 
+    entry.cancelRender?.();
     this.destroyPtyProcess(entry.ptyProcess);
 
     try {
@@ -1086,6 +1170,26 @@ export class ShellExecutionService {
       const ptsName = (ptyProcess as unknown as { ptsName?: string }).ptsName;
       ShellExecutionService.closeOrphanSlaveFd(masterFd, ptsName);
 
+      const agent = pty._agent;
+      if (agent && typeof agent.resize === 'function') {
+        const originalAgentResize = agent.resize.bind(agent);
+        agent.resize = (c: number, r: number) => {
+          if (agent._exitCode !== undefined || agent.exitCode !== undefined) {
+            return;
+          }
+          try {
+            originalAgentResize(c, r);
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            if (
+              !message.includes('Cannot resize a pty that has already exited')
+            ) {
+              throw err;
+            }
+          }
+        };
+      }
+
       headlessTerminal = new Terminal({
         allowProposedApi: true,
         cols,
@@ -1096,12 +1200,21 @@ export class ShellExecutionService {
 
       const terminal = headlessTerminal;
 
+      let renderTimeout: NodeJS.Timeout | null = null;
+      const cancelRender = () => {
+        if (renderTimeout) {
+          clearTimeout(renderTimeout);
+          renderTimeout = null;
+        }
+      };
+
       this.activePtys.set(assignedPid, {
         ptyProcess: pty,
         headlessTerminal,
         maxSerializedLines: shellExecutionConfig.maxSerializedLines,
         command: shellExecutionConfig.originalCommand ?? commandToExecute,
         sessionId: shellExecutionConfig.sessionId,
+        cancelRender,
       });
 
       const result = ExecutionLifecycleService.attachExecution(assignedPid, {
@@ -1170,7 +1283,6 @@ export class ShellExecutionService {
       let sniffedBytes = 0;
       let isWriting = false;
       let hasStartedOutput = false;
-      let renderTimeout: NodeJS.Timeout | null = null;
 
       const renderFn = () => {
         renderTimeout = null;
@@ -1196,20 +1308,13 @@ export class ShellExecutionService {
           endLine - (shellExecutionConfig.maxSerializedLines ?? 2000),
         );
 
-        let newOutput: AnsiOutput;
-        if (shellExecutionConfig.showColor) {
-          newOutput = serializeTerminalToObject(terminal, startLine, endLine);
-        } else {
-          newOutput = (
-            serializeTerminalToObject(terminal, startLine, endLine) || []
-          ).map((line) =>
-            line.map((token) => {
-              token.fg = '';
-              token.bg = '';
-              return token;
-            }),
-          );
-        }
+        const newOutput: AnsiOutput =
+          serializeTerminalToObject(
+            terminal,
+            startLine,
+            endLine,
+            Boolean(shellExecutionConfig.showColor),
+          ) || [];
 
         let lastNonEmptyLine = -1;
         for (let i = newOutput.length - 1; i >= 0; i--) {
@@ -1238,14 +1343,18 @@ export class ShellExecutionService {
           ? newOutput
           : trimmedOutput;
 
-        if (output !== finalOutput) {
+        if (!isAnsiOutputEqual(output, finalOutput)) {
           output = finalOutput;
           const event: ShellOutputEvent = {
             type: 'data',
             chunk: finalOutput,
           };
-          onOutputEvent(event);
-          ExecutionLifecycleService.emitEvent(assignedPid, event);
+          try {
+            onOutputEvent(event);
+            ExecutionLifecycleService.emitEvent(assignedPid, event);
+          } catch (err) {
+            debugLogger.warn('Error emitting shell output event:', err);
+          }
         }
       };
 
@@ -1275,74 +1384,98 @@ export class ShellExecutionService {
       });
 
       const handleOutput = (data: Buffer) => {
-        processingChain = processingChain.then(
-          () =>
-            new Promise<void>((resolveChunk) => {
-              if (!decoder) {
-                decoder = new TextDecoder('utf-8');
-              }
-
-              if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
-                sniffChunks.push(data);
-              } else if (!isStreamingRawContent) {
-                binaryBytesReceived += data.length;
-              }
-
-              if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
-                const sniffBuffer = Buffer.concat(sniffChunks);
-                sniffedBytes = sniffBuffer.length;
-
-                if (isBinary(sniffBuffer, 512, true)) {
-                  isStreamingRawContent = false;
-                  binaryBytesReceived = sniffBuffer.length;
-                  const event: ShellOutputEvent = { type: 'binary_detected' };
-                  onOutputEvent(event);
-                  ExecutionLifecycleService.emitEvent(assignedPid, event);
+        processingChain = processingChain
+          .then(
+            () =>
+              new Promise<void>((resolveChunk) => {
+                if (!decoder) {
+                  decoder = new TextDecoder('utf-8');
                 }
-              }
 
-              if (isStreamingRawContent) {
-                const decodedChunk = decoder.decode(data, { stream: true });
-                if (decodedChunk.length === 0) {
+                if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
+                  sniffChunks.push(data);
+                } else if (!isStreamingRawContent) {
+                  binaryBytesReceived += data.length;
+                }
+
+                if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
+                  const sniffBuffer = Buffer.concat(sniffChunks);
+                  sniffedBytes = sniffBuffer.length;
+
+                  if (isBinary(sniffBuffer, 512, true)) {
+                    isStreamingRawContent = false;
+                    binaryBytesReceived = sniffBuffer.length;
+                    const event: ShellOutputEvent = { type: 'binary_detected' };
+                    try {
+                      onOutputEvent(event);
+                      ExecutionLifecycleService.emitEvent(assignedPid, event);
+                    } catch (err) {
+                      debugLogger.warn(
+                        'Error emitting binary detected event:',
+                        err,
+                      );
+                    }
+                  }
+                }
+
+                if (isStreamingRawContent) {
+                  const decodedChunk = decoder.decode(data, { stream: true });
+                  if (decodedChunk.length === 0) {
+                    resolveChunk();
+                    return;
+                  }
+
+                  if (
+                    ShellExecutionService.backgroundLogPids.has(assignedPid)
+                  ) {
+                    ShellExecutionService.syncBackgroundLog(
+                      assignedPid,
+                      decodedChunk,
+                    );
+                  }
+
+                  isWriting = true;
+                  terminal.write(decodedChunk, () => {
+                    render();
+                    isWriting = false;
+                    resolveChunk();
+                  });
+                } else {
+                  const totalBytes = binaryBytesReceived;
+                  const event: ShellOutputEvent = {
+                    type: 'binary_progress',
+                    bytesReceived: totalBytes,
+                  };
+                  try {
+                    onOutputEvent(event);
+                    ExecutionLifecycleService.emitEvent(assignedPid, event);
+                  } catch (err) {
+                    debugLogger.warn(
+                      'Error emitting binary progress event:',
+                      err,
+                    );
+                  }
                   resolveChunk();
-                  return;
                 }
-
-                if (ShellExecutionService.backgroundLogPids.has(assignedPid)) {
-                  ShellExecutionService.syncBackgroundLog(
-                    assignedPid,
-                    decodedChunk,
-                  );
-                }
-
-                isWriting = true;
-                terminal.write(decodedChunk, () => {
-                  render();
-                  isWriting = false;
-                  resolveChunk();
-                });
-              } else {
-                const totalBytes = binaryBytesReceived;
-                const event: ShellOutputEvent = {
-                  type: 'binary_progress',
-                  bytesReceived: totalBytes,
-                };
-                onOutputEvent(event);
-                ExecutionLifecycleService.emitEvent(assignedPid, event);
-                resolveChunk();
-              }
-            }),
-        );
+              }),
+          )
+          .catch((err) => {
+            debugLogger.warn('Error in PTY output processing chain:', err);
+          });
       };
 
-      const dataListener = pty.onData((data) => {
-        const bufferData = Buffer.from(data, 'utf-8');
-        handleOutput(bufferData);
-      });
-      disposables.push(dataListener);
+      let ptyExitFlushTimer: NodeJS.Timeout | null = null;
+      let nativeExitCode: number | undefined;
 
-      const exitListener = pty.onExit(({ exitCode, signal }) => {
+      const handlePtyExit = (exitCode: number, signal?: number | null) => {
+        if (exited) {
+          return;
+        }
         exited = true;
+        if (ptyExitFlushTimer) {
+          clearTimeout(ptyExitFlushTimer);
+          ptyExitFlushTimer = null;
+        }
         abortSignal.removeEventListener('abort', abortHandler);
 
         // Immediately destroy the PTY to release its master FD.
@@ -1351,7 +1484,12 @@ export class ShellExecutionService {
         ShellExecutionService.destroyPtyProcess(pty);
 
         const finalize = () => {
-          render(true);
+          cancelRender();
+          try {
+            render(true);
+          } catch (err) {
+            debugLogger.warn('Error during final PTY render:', err);
+          }
           cmdCleanup?.();
 
           // Explicitly dispose of all node-pty event listeners to prevent closures from leaking
@@ -1379,7 +1517,11 @@ export class ShellExecutionService {
             historyItem.signal = signal ?? null;
             historyItem.endTime = Date.now();
           }
-          onOutputEvent(event);
+          try {
+            onOutputEvent(event);
+          } catch (err) {
+            debugLogger.warn('Error in exit output event listener:', err);
+          }
 
           const endLine = headlessTerminal
             ? headlessTerminal.buffer.active.length
@@ -1389,11 +1531,20 @@ export class ShellExecutionService {
             endLine - (shellExecutionConfig.maxSerializedLines ?? 2000),
           );
           const ansiOutputSnapshot = headlessTerminal
-            ? serializeTerminalToObject(headlessTerminal, startLine, endLine)
+            ? serializeTerminalToObject(
+                headlessTerminal,
+                startLine,
+                endLine,
+                Boolean(shellExecutionConfig.showColor),
+              )
             : [];
           const finalOutput = headlessTerminal
             ? getFullBufferText(headlessTerminal)
             : '';
+
+          // Release intermediate closure buffers to prevent heap retention
+          output = null;
+          sniffChunks.length = 0;
 
           // Dispose the headless terminal to free scrollback buffers.
           // This must happen after getFullBufferText() extracts the output.
@@ -1402,6 +1553,8 @@ export class ShellExecutionService {
           } catch {
             // Ignore errors during terminal cleanup
           }
+
+          ShellExecutionService.activePtys.delete(assignedPid);
 
           // eslint-disable-next-line @typescript-eslint/no-floating-promises
           ShellExecutionService.cleanupLogStream(assignedPid).then(() => {
@@ -1426,7 +1579,10 @@ export class ShellExecutionService {
           return;
         }
 
-        const processingComplete = processingChain.then(() => 'processed');
+        const processingComplete = processingChain.then(
+          () => 'processed' as const,
+          () => 'processed' as const,
+        );
         const onRaceAbort = () => {
           raceAbortResolve?.('aborted');
         };
@@ -1447,6 +1603,51 @@ export class ShellExecutionService {
           abortSignal.removeEventListener('abort', onRaceAbort);
           finalize();
         });
+      };
+
+      const scheduleNativeExitFallback = (code: number) => {
+        nativeExitCode = code;
+        if (exited) {
+          return;
+        }
+        if (ptyExitFlushTimer) {
+          clearTimeout(ptyExitFlushTimer);
+        }
+        ptyExitFlushTimer = setTimeout(() => {
+          ptyExitFlushTimer = null;
+          if (!exited) {
+            handlePtyExit(nativeExitCode ?? code, null);
+          }
+        }, 150);
+      };
+
+      if (agent) {
+        if (typeof agent._$onProcessExit === 'function') {
+          const originalOnProcessExit = agent._$onProcessExit.bind(agent);
+          agent._$onProcessExit = (code: number) => {
+            try {
+              originalOnProcessExit(code);
+            } finally {
+              scheduleNativeExitFallback(code);
+            }
+          };
+        }
+        if (agent._exitCode !== undefined || agent.exitCode !== undefined) {
+          scheduleNativeExitFallback(agent._exitCode ?? agent.exitCode ?? 0);
+        }
+      }
+
+      const dataListener = pty.onData((data) => {
+        if (nativeExitCode !== undefined && !exited) {
+          scheduleNativeExitFallback(nativeExitCode);
+        }
+        const bufferData = Buffer.from(data, 'utf-8');
+        handleOutput(bufferData);
+      });
+      disposables.push(dataListener);
+
+      const exitListener = pty.onExit(({ exitCode, signal }) => {
+        handlePtyExit(exitCode, signal);
       });
       disposables.push(exitListener);
 
@@ -1541,6 +1742,9 @@ export class ShellExecutionService {
   }
 
   static isPtyActive(pid: number): boolean {
+    if (!this.activePtys.get(pid) && !this.activeChildProcesses.get(pid)) {
+      return false;
+    }
     return ExecutionLifecycleService.isActive(pid);
   }
 
@@ -1675,6 +1879,14 @@ export class ShellExecutionService {
 
     const activePty = this.activePtys.get(pid);
     if (!activePty) {
+      return;
+    }
+
+    const agent = activePty.ptyProcess._agent;
+    if (
+      agent &&
+      (agent._exitCode !== undefined || agent.exitCode !== undefined)
+    ) {
       return;
     }
 
