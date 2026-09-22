@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import path from 'node:path';
 import type React from 'react';
 import { useEffect, useMemo, useCallback, useState, useRef } from 'react';
 import { Box, Text, ResizeObserver, type DOMElement } from 'ink';
@@ -46,6 +47,7 @@ import {
 } from '../../utils/urlSecurityUtils.js';
 import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 import { isShellTool } from './ToolShared.js';
+import { isLockFile } from '../../utils/fileUtils.js';
 
 export interface ToolConfirmationMessageProps {
   callId: string;
@@ -70,6 +72,7 @@ export const ToolConfirmationMessage: React.FC<
   terminalWidth,
   toolName,
 }) => {
+  const safeTerminalWidth = Math.max(0, Math.floor(terminalWidth || 0));
   const keyMatchers = useKeyMatchers();
   const { confirm, isDiffingEnabled } = useToolActions();
   const [mcpDetailsExpansionState, setMcpDetailsExpansionState] = useState<{
@@ -290,7 +293,7 @@ export const ToolConfirmationMessage: React.FC<
           value: ToolConfirmationOutcome.ProceedOnce,
           key: 'Allow once',
         });
-        if (isTrustedFolder) {
+        if (isTrustedFolder && !confirmationDetails.isBuildFile) {
           options.push({
             label: 'Allow for this session',
             value: ToolConfirmationOutcome.ProceedAlways,
@@ -351,7 +354,13 @@ export const ToolConfirmationMessage: React.FC<
         value: ToolConfirmationOutcome.ProceedOnce,
         key: 'Allow once',
       });
-      if (isTrustedFolder) {
+      const hasUntrustedFlags =
+        confirmationDetails.untrustedFlags &&
+        confirmationDetails.untrustedFlags.length > 0;
+      const hasModifiedBuildFiles =
+        confirmationDetails.modifiedBuildFiles &&
+        confirmationDetails.modifiedBuildFiles.length > 0;
+      if (isTrustedFolder && !hasUntrustedFlags && !hasModifiedBuildFiles) {
         options.push({
           label: `Allow for this session`,
           value: ToolConfirmationOutcome.ProceedAlways,
@@ -436,6 +445,7 @@ export const ToolConfirmationMessage: React.FC<
   ]);
 
   const availableBodyContentHeight = useCallback(() => {
+    void terminalWidth;
     if (availableTerminalHeight === undefined) {
       return undefined;
     }
@@ -455,7 +465,17 @@ export const ToolConfirmationMessage: React.FC<
 
     const optionsCount = getOptions().length;
 
-    const securityWarningsHeight = deceptiveUrlWarningText
+    const hasSecurityWarnings =
+      !!deceptiveUrlWarningText ||
+      (confirmationDetails.type === 'edit' &&
+        confirmationDetails.isBuildFile) ||
+      (confirmationDetails.type === 'exec' &&
+        ((confirmationDetails.untrustedFlags &&
+          confirmationDetails.untrustedFlags.length > 0) ||
+          (confirmationDetails.modifiedBuildFiles &&
+            confirmationDetails.modifiedBuildFiles.length > 0)));
+
+    const securityWarningsHeight = hasSecurityWarnings
       ? measuredSecurityWarningsHeight + SECURITY_WARNING_BOTTOM_MARGIN
       : 0;
 
@@ -498,9 +518,10 @@ export const ToolConfirmationMessage: React.FC<
     handlesOwnUI,
     getOptions,
     measuredSecurityWarningsHeight,
-    deceptiveUrlWarningText,
     confirmationDetails,
     config,
+    deceptiveUrlWarningText,
+    terminalWidth,
   ]);
 
   const { question, bodyContent, options, securityWarnings, initialIndex } =
@@ -542,6 +563,67 @@ export const ToolConfirmationMessage: React.FC<
         securityWarnings = <WarningMessage text={deceptiveUrlWarningText} />;
       }
 
+      if (
+        confirmationDetails.type === 'edit' &&
+        confirmationDetails.isBuildFile
+      ) {
+        const buildWarningText =
+          `⚠️ CRITICAL SECURITY WARNING: Build File Modification\n` +
+          `Target: ${confirmationDetails.fileName}\n` +
+          `Modifying build configuration files can introduce malicious rules, test runners, or dependency hooks that execute arbitrary code during subsequent commands (e.g., blaze test, npm test, make).\n` +
+          `Inspect every line of the change below carefully before approving.`;
+        securityWarnings = securityWarnings ? (
+          <>
+            {securityWarnings}
+            <WarningMessage text={buildWarningText} />
+          </>
+        ) : (
+          <WarningMessage text={buildWarningText} />
+        );
+      }
+
+      if (confirmationDetails.type === 'exec') {
+        if (
+          confirmationDetails.untrustedFlags &&
+          confirmationDetails.untrustedFlags.length > 0
+        ) {
+          const flagsWarningText =
+            `⚠️ CRITICAL SECURITY WARNING: Untrusted Command Flags Detected\n` +
+            `The following flags/arguments were sourced from external untrusted input (e.g., Buganizer ticket, external document):\n` +
+            confirmationDetails.untrustedFlags
+              .map((f) => `  • ${f}`)
+              .join('\n') +
+            `\nExecuting commands with flags sourced from untrusted input can execute arbitrary code on your machine.\n` +
+            `Carefully verify these flags before approving.`;
+          securityWarnings = securityWarnings ? (
+            <>
+              {securityWarnings}
+              <WarningMessage text={flagsWarningText} />
+            </>
+          ) : (
+            <WarningMessage text={flagsWarningText} />
+          );
+        }
+
+        if (
+          confirmationDetails.modifiedBuildFiles &&
+          confirmationDetails.modifiedBuildFiles.length > 0
+        ) {
+          const buildModWarningText =
+            `⚠️ CAUTION: Build Configuration Was Recently Modified\n` +
+            `Build file(s) (${confirmationDetails.modifiedBuildFiles.map((f) => path.basename(f)).join(', ')}) were modified earlier in this session. Running '${confirmationDetails.rootCommand}' will execute the updated build definitions.\n` +
+            `Ensure you trust all modifications made to build files before approving execution.`;
+          securityWarnings = securityWarnings ? (
+            <>
+              {securityWarnings}
+              <WarningMessage text={buildModWarningText} />
+            </>
+          ) : (
+            <WarningMessage text={buildModWarningText} />
+          );
+        }
+      }
+
       const bodyHeight = availableBodyContentHeight();
 
       if (confirmationDetails.type === 'ask_user') {
@@ -554,7 +636,7 @@ export const ToolConfirmationMessage: React.FC<
             onCancel={() => {
               handleConfirm(ToolConfirmationOutcome.Cancel);
             }}
-            width={terminalWidth}
+            width={safeTerminalWidth}
             availableHeight={bodyHeight}
           />
         );
@@ -587,7 +669,7 @@ export const ToolConfirmationMessage: React.FC<
             onCancel={() => {
               handleConfirm(ToolConfirmationOutcome.Cancel);
             }}
-            width={terminalWidth}
+            width={safeTerminalWidth}
             availableHeight={bodyHeight}
           />
         );
@@ -617,12 +699,19 @@ export const ToolConfirmationMessage: React.FC<
                     confirmationDetails.fileDiff,
                   )}
                   filename={sanitizeForDisplay(confirmationDetails.fileName)}
-                  availableTerminalHeight={
-                    bodyHeight !== undefined
-                      ? Math.max(bodyHeight - 2, 2)
-                      : undefined
+                  disableTruncation={
+                    confirmationDetails.isBuildFile &&
+                    !isLockFile(confirmationDetails.fileName)
                   }
-                  terminalWidth={Math.max(terminalWidth, 1) - 4}
+                  availableTerminalHeight={
+                    confirmationDetails.isBuildFile &&
+                    !isLockFile(confirmationDetails.fileName)
+                      ? undefined
+                      : bodyHeight !== undefined
+                        ? Math.max(bodyHeight - 2, 2)
+                        : undefined
+                  }
+                  terminalWidth={Math.max(0, safeTerminalWidth - 4)}
                 />
               </Box>
             </>
@@ -650,7 +739,7 @@ export const ToolConfirmationMessage: React.FC<
               {colorizeCode({
                 code: command.trim(),
                 language: 'bash',
-                maxWidth: Math.max(terminalWidth, 1) - 6,
+                maxWidth: Math.max(0, safeTerminalWidth - 6),
                 settings,
                 theme: activeTheme,
                 hideLineNumbers: true,
@@ -762,7 +851,7 @@ export const ToolConfirmationMessage: React.FC<
                     ? Math.max(bodyHeight - 2, 2)
                     : undefined
                 }
-                maxWidth={Math.max(terminalWidth, 1) - 4}
+                maxWidth={Math.max(0, safeTerminalWidth - 4)}
               >
                 <Box flexDirection="column">
                   {commandsToDisplay.map((cmd, idx) => (
@@ -774,7 +863,7 @@ export const ToolConfirmationMessage: React.FC<
                       {colorizeCode({
                         code: cmd.trim(),
                         language: 'bash',
-                        maxWidth: Math.max(terminalWidth, 1) - 6,
+                        maxWidth: Math.max(0, safeTerminalWidth - 6),
                         settings,
                         theme: activeTheme,
                         hideLineNumbers: true,
@@ -854,7 +943,7 @@ export const ToolConfirmationMessage: React.FC<
                       {colorizeCode({
                         code: mcpToolDetailsText || '',
                         language: 'json',
-                        maxWidth: Math.max(terminalWidth, 1) - 4,
+                        maxWidth: Math.max(0, safeTerminalWidth - 4),
                         settings,
                         theme: activeTheme,
                         hideLineNumbers: true,
@@ -881,7 +970,7 @@ export const ToolConfirmationMessage: React.FC<
       confirmationDetails,
       getOptions,
       availableBodyContentHeight,
-      terminalWidth,
+      safeTerminalWidth,
       handleConfirm,
       deceptiveUrlWarningText,
       isMcpToolDetailsExpanded,
@@ -930,7 +1019,8 @@ export const ToolConfirmationMessage: React.FC<
     if (confirmationDetails.isModifying) {
       return (
         <Box
-          width={terminalWidth}
+          width={safeTerminalWidth}
+          minWidth={0}
           borderStyle="round"
           borderColor={theme.border.default}
           justifyContent="space-around"
@@ -967,8 +1057,14 @@ export const ToolConfirmationMessage: React.FC<
             marginBottom={!question && !securityWarnings ? 1 : 0}
           >
             <MaxSizedBox
-              maxHeight={availableBodyContentHeight()}
-              maxWidth={terminalWidth}
+              maxHeight={
+                confirmationDetails.type === 'edit' &&
+                confirmationDetails.isBuildFile &&
+                !isLockFile(confirmationDetails.fileName)
+                  ? undefined
+                  : availableBodyContentHeight()
+              }
+              maxWidth={safeTerminalWidth}
               overflowDirection={bodyOverflowDirection}
             >
               {bodyContent}

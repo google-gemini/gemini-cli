@@ -1,6 +1,6 @@
-# Preview release: v0.58.0-preview.0
+# Preview release: v0.61.0-preview.0
 
-Released: August 25, 2026
+Released: September 15, 2026
 
 Our preview release includes the latest, new, and experimental features. This
 release may not be as stable as our [latest weekly release](latest.md).
@@ -13,37 +13,37 @@ npm install -g @google/gemini-cli@preview
 
 ## Highlights
 
-- **Sandbox Security Enhancements**: Isolated Docker and container runtime
-  sockets and binaries in macOS Seatbelt to improve sandbox safety.
-- **Core Path Resolution Fixes**: Ensured consistent symlink evaluation in
-  ignore path handling within core services.
-- **History & Retry Optimizations**: Enhanced history rollback and optimized
-  retry nudges for smoother session management.
-- **A2A Server Resilience**: Cleared stale cancellation errors on new message
-  turns to prevent incorrect error states.
-- **Write Policy & Safety Improvements**: Declared top-level safety checkers in
-  the write policy configuration to strengthen execution guardrails.
+- **Sandbox Isolation**: Enhanced filesystem boundaries and isolated runtime
+  state within the sandbox environments to restrict untrusted execution.
+- **Prompt Injection Defense**: Prevented potential indirect prompt injection
+  vulnerabilities related to build file modifications and untrusted command
+  flags.
+- **Flash Model ID Preservation**: Fixed core logic to properly preserve
+  explicit, versioned Flash model IDs without overriding them.
+- **Agent Loop Reliability**: Resolved an issue where crucial `AgentLoopContext`
+  properties were discarded during object spread, stabilizing the main agent
+  loop.
 
 ## What's Changed
 
-- Changelog for v0.57.0-preview.0 by @gemini-cli-robot in
-  [#28918](https://github.com/google-gemini/gemini-cli/pull/28918)
-- fix(core): ensure consistent symlink evaluation in ignore path handling by
-  @luisfelipe-alt in
-  [#28915](https://github.com/google-gemini/gemini-cli/pull/28915)
-- refactor(core): remove eslint-disable and type-asserts from
-  shellExecutionService by @DavidAPierce in
-  [#28862](https://github.com/google-gemini/gemini-cli/pull/28862)
-- fix(sandbox): isolate Docker and container runtime sockets and binaries in
-  macOS Seatbelt by @josebalius in
-  [#28935](https://github.com/google-gemini/gemini-cli/pull/28935)
-- fix(a2a-server): clear stale cancellation error on new message turns by
-  @amelidev in [#28940](https://github.com/google-gemini/gemini-cli/pull/28940)
-- fix(core): declare top-level safety checkers in write policy configuration by
-  @luisfelipe-alt in
-  [#28961](https://github.com/google-gemini/gemini-cli/pull/28961)
-- (FIX) history rollback and retry nudge optimizations by @DavidAPierce in
-  [#28934](https://github.com/google-gemini/gemini-cli/pull/28934)
+- Changelog for v0.60.0-preview.0 by @gemini-cli-robot in
+  [#29251](https://github.com/google-gemini/gemini-cli/pull/29251)
+- chore(release): bump version to 0.61.0-nightly.20260908.gc647533d6 by
+  @gemini-cli-robot in
+  [#29254](https://github.com/google-gemini/gemini-cli/pull/29254)
+- Changelog for v0.59.0 by @gemini-cli-robot in
+  [#29253](https://github.com/google-gemini/gemini-cli/pull/29253)
+- fix(core): preserve explicit versioned Flash model IDs by @SandyTao520 in
+  [#29252](https://github.com/google-gemini/gemini-cli/pull/29252)
+- fix(core): prevent indirect prompt injection via build file modifications and
+  untrusted flags by @villahernandez-coder in
+  [#29250](https://github.com/google-gemini/gemini-cli/pull/29250)
+- fix(sandbox): harden filesystem boundaries and isolate runtime state by
+  @diegogodinezr in
+  [#29214](https://github.com/google-gemini/gemini-cli/pull/29214)
+- fix(core): ensure AgentLoopContext properties are preserved across object
+  spread by @diegogodinezr in
+  [#29335](https://github.com/google-gemini/gemini-cli/pull/29335)
 
 **Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.57.0-preview.1...v0.58.0-preview.0
+https://github.com/google-gemini/gemini-cli/compare/v0.60.0-preview.0...v0.61.0-preview.0

@@ -137,17 +137,17 @@ describe('WriteFileTool', () => {
     const rawTempDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'write-file-test-external-'),
     );
-    tempDir = fs.realpathSync(rawTempDir);
+    tempDir = resolveToRealPath(rawTempDir);
 
     const rawRootDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'gemini-cli-test-root-'),
     );
-    rootDir = fs.realpathSync(rawRootDir);
+    rootDir = resolveToRealPath(rawRootDir);
 
     const rawPlansDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'gemini-cli-test-plans-'),
     );
-    plansDir = fs.realpathSync(rawPlansDir);
+    plansDir = resolveToRealPath(rawPlansDir);
 
     const workspaceContext = new WorkspaceContext(rootDir, [plansDir]);
     const mockStorage = {

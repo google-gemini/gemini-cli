@@ -17,36 +17,6 @@ import {
 
 // --- Global Entry Point ---
 
-// Suppress known race condition error in node-pty on Windows and Linux
-// Tracking bug: https://github.com/microsoft/node-pty/issues/827
-process.on('uncaughtException', (error) => {
-  if (error instanceof Error) {
-    const message = error.message || '';
-    const isPtyResizeError =
-      message === 'Cannot resize a pty that has already exited';
-    const isEbadfError =
-      message.includes('EBADF') ||
-      (error as { code?: string }).code === 'EBADF';
-    const isFromNodePty =
-      error.stack?.includes('node-pty') || error.stack?.includes('PtyResize');
-
-    if ((isPtyResizeError || isEbadfError) && isFromNodePty) {
-      // This error happens with node-pty when resizing a pty that has just exited.
-      // It is a race condition in node-pty that we cannot prevent, so we silence it.
-      return;
-    }
-  }
-
-  // For other errors, we rely on the default behavior, but since we attached a listener,
-  // we must manually replicate it.
-  if (error instanceof Error) {
-    process.stderr.write(error.stack + '\n');
-  } else {
-    process.stderr.write(String(error) + '\n');
-  }
-  process.exit(1);
-});
-
 async function getMemoryNodeArgs(): Promise<string[]> {
   let autoConfigureMemory = true;
   try {
