@@ -105,7 +105,9 @@ export class KeychainService {
       process.env['WSLENV'] ||
       process.env['WSL_INTEROP']
     );
-    return isWsl;
+    const isHeadless =
+      !process.env['DISPLAY'] && !process.env['WAYLAND_DISPLAY'];
+    return isWsl || isHeadless;
   }
 
   // High-level orchestration of the loading and testing cycle.

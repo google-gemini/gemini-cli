@@ -24,9 +24,18 @@ function readFileWithRetry(filePath: string, retries = 3): string {
       if (attempt >= retries) {
         throw err;
       }
-      const end = Date.now() + 25 * attempt;
-      while (Date.now() < end) {
-        /* empty */
+      try {
+        Atomics.wait(
+          new Int32Array(new SharedArrayBuffer(4)),
+          0,
+          0,
+          25 * attempt,
+        );
+      } catch {
+        const end = Date.now() + 25 * attempt;
+        while (Date.now() < end) {
+          /* empty */
+        }
       }
     }
   }

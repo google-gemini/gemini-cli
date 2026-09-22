@@ -319,6 +319,23 @@ describe('KeychainService', () => {
         expect.stringContaining('WSL / headless Linux environment detected'),
       );
     });
+
+    it('should fallback to FileKeychain when running in headless Linux (no display)', async () => {
+      vi.stubEnv('WSL_DISTRO_NAME', '');
+      vi.stubEnv('WSLENV', '');
+      vi.stubEnv('WSL_INTEROP', '');
+      vi.stubEnv('DISPLAY', '');
+      vi.stubEnv('WAYLAND_DISPLAY', '');
+
+      const available = await service.isAvailable();
+
+      expect(available).toBe(true);
+      expect(mockKeytar.setPassword).not.toHaveBeenCalled();
+      expect(FileKeychain).toHaveBeenCalled();
+      expect(debugLogger.debug).toHaveBeenCalledWith(
+        expect.stringContaining('WSL / headless Linux environment detected'),
+      );
+    });
   });
 
   describe('Password Operations', () => {
