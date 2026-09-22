@@ -5,7 +5,10 @@
  */
 
 import type { CommandModule } from 'yargs';
-import { debugLogger } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  getAdminBlockedMcpServersMessage,
+} from '@google/gemini-cli-core';
 import {
   McpServerEnablementManager,
   canLoadServer,
@@ -25,22 +28,50 @@ interface Args {
   session?: boolean;
 }
 
+/**
+ * Resolve a server name against what is actually configured.
+ *
+ * `getMcpServersFromConfig()` returns `{ mcpServers, blockedServerNames }`.
+ * Calling `Object.keys()` on that wrapper yields those two field names, so no
+ * real server name ever matched and both commands reported "not found" for
+ * every server. `Object.keys()` accepts any object, so the compiler had
+ * nothing to complain about when the return shape changed.
+ *
+ * Servers the admin allowlist removed are gone from `mcpServers`, so they are
+ * matched separately. They exist; they just cannot be used. Telling the user
+ * "not found" sends them hunting for a typo instead of at their admin policy.
+ */
+async function resolveServerName(
+  rawName: string,
+): Promise<{ name: string } | { error: string }> {
+  const name = normalizeServerId(rawName);
+  const { mcpServers, blockedServerNames } = await getMcpServersFromConfig();
+
+  if (Object.keys(mcpServers).map(normalizeServerId).includes(name)) {
+    return { name };
+  }
+
+  if (blockedServerNames.map(normalizeServerId).includes(name)) {
+    return { error: getAdminBlockedMcpServersMessage([rawName], undefined) };
+  }
+
+  return {
+    error: `Server '${rawName}' not found. Use 'gemini mcp' to see available servers.`,
+  };
+}
+
 async function handleEnable(args: Args): Promise<void> {
   const manager = McpServerEnablementManager.getInstance();
-  const name = normalizeServerId(args.name);
 
   // Check settings blocks
   const settings = loadSettings();
 
-  // Get all servers including extensions
-  const servers = await getMcpServersFromConfig();
-  const normalizedServerNames = Object.keys(servers).map(normalizeServerId);
-  if (!normalizedServerNames.includes(name)) {
-    debugLogger.log(
-      `${RED}Error:${RESET} Server '${args.name}' not found. Use 'gemini mcp' to see available servers.`,
-    );
+  const resolved = await resolveServerName(args.name);
+  if ('error' in resolved) {
+    debugLogger.log(`${RED}Error:${RESET} ${resolved.error}`);
     return;
   }
+  const { name } = resolved;
 
   const result = await canLoadServer(name, {
     adminMcpEnabled: settings.merged.admin?.mcp?.enabled ?? true,
@@ -73,17 +104,13 @@ async function handleEnable(args: Args): Promise<void> {
 
 async function handleDisable(args: Args): Promise<void> {
   const manager = McpServerEnablementManager.getInstance();
-  const name = normalizeServerId(args.name);
 
-  // Get all servers including extensions
-  const servers = await getMcpServersFromConfig();
-  const normalizedServerNames = Object.keys(servers).map(normalizeServerId);
-  if (!normalizedServerNames.includes(name)) {
-    debugLogger.log(
-      `${RED}Error:${RESET} Server '${args.name}' not found. Use 'gemini mcp' to see available servers.`,
-    );
+  const resolved = await resolveServerName(args.name);
+  if ('error' in resolved) {
+    debugLogger.log(`${RED}Error:${RESET} ${resolved.error}`);
     return;
   }
+  const { name } = resolved;
 
   if (args.session) {
     manager.disableForSession(name);
