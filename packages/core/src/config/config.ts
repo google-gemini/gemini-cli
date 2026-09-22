@@ -3595,9 +3595,15 @@ export class Config implements McpContext, AgentLoopContext {
    */
   hasLatestFlashGAAccess(): boolean {
     const authType = this.contentGeneratorConfig?.authType;
-    const hasAccess =
-      this.experiments?.flags[ExperimentFlags.LATEST_FLASH_GA_LAUNCHED]
-        ?.boolValue ?? false;
+    const hasAccess = (() => {
+      if (this.isGemini31LaunchedForAuthType(authType)) {
+        return true;
+      }
+      return (
+        this.experiments?.flags[ExperimentFlags.LATEST_FLASH_GA_LAUNCHED]
+          ?.boolValue ?? false
+      );
+    })();
 
     if (hasAccess) {
       if (authType === AuthType.USE_GEMINI) {
@@ -3620,9 +3626,16 @@ export class Config implements McpContext, AgentLoopContext {
    * Returns whether the latest Flash Lite GA model (currently Gemini 3.5 Flash Lite) has been launched.
    */
   hasLatestFlashLiteGAAccess(): boolean {
-    const hasAccess =
-      this.experiments?.flags[ExperimentFlags.LATEST_FLASH_LITE_GA_LAUNCHED]
-        ?.boolValue ?? false;
+    const authType = this.contentGeneratorConfig?.authType;
+    const hasAccess = (() => {
+      if (this.isGemini31LaunchedForAuthType(authType)) {
+        return true;
+      }
+      return (
+        this.experiments?.flags[ExperimentFlags.LATEST_FLASH_LITE_GA_LAUNCHED]
+          ?.boolValue ?? false
+      );
+    })();
 
     setFlashLiteModel(
       hasAccess ? LATEST_GEMINI_FLASH_LITE_MODEL : BASE_GEMINI_FLASH_LITE_MODEL,
