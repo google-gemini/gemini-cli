@@ -22,7 +22,7 @@ export const ExperimentFlags = {
   LATEST_FLASH_GA_LAUNCHED: 45842815,
   LATEST_FLASH_LITE_GA_LAUNCHED: 45827489,
   /** @deprecated Use LATEST_FLASH_GA_LAUNCHED */
-  GEMINI_3_5_FLASH_GA_LAUNCHED: 45842815,
+  GEMINI_3_5_FLASH_GA_LAUNCHED: 45780819,
 } as const;
 
 export type ExperimentFlagName =

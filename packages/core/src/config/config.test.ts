@@ -281,6 +281,7 @@ vi.mock('../code_assist/experiments/experiments.js');
 
 afterEach(() => {
   vi.clearAllMocks();
+  resetModelsForTesting();
 });
 
 describe('Server Config (config.ts)', () => {
@@ -4435,14 +4436,6 @@ describe('hasLatestFlashGAAccess model setting', () => {
     model: 'test-model',
     cwd: '.',
   };
-
-  beforeEach(() => {
-    resetModelsForTesting();
-  });
-
-  afterEach(() => {
-    resetModelsForTesting();
-  });
 
   it('should set DEFAULT_GEMINI_FLASH_MODEL to gemini-3.8-flash and PREVIEW_GEMINI_FLASH_MODEL to gemini-3-flash-preview if hasLatestFlashGAAccess returns true and authType is USE_GEMINI', () => {
     const config = new Config(baseParams);

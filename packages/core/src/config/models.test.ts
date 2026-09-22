@@ -49,6 +49,10 @@ import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
 
 const modelConfigService = new ModelConfigService(DEFAULT_MODEL_CONFIGS);
 
+afterEach(() => {
+  resetModelsForTesting();
+});
+
 const dynamicConfig = {
   getExperimentalDynamicModelConfiguration: () => true,
   modelConfigService,
@@ -737,7 +741,7 @@ describe('getAutoModelDescription', () => {
   it('should return Gemini 2.5 description when hasAccessToPreview is false', () => {
     const desc = getAutoModelDescription(false, false);
     expect(desc).toContain('gemini-2.5-pro');
-    expect(desc).toContain(DEFAULT_GEMINI_FLASH_MODEL);
+    expect(desc).toContain('gemini-3.5-flash');
   });
 
   it('should return Gemini 3.0 description when hasAccessToPreview is true', () => {
