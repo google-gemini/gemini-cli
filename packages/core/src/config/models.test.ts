@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   resolveModel,
   resolveClassifierModel,
@@ -18,6 +18,11 @@ import {
   PREVIEW_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  BASE_GEMINI_FLASH_MODEL,
+  BASE_GEMINI_FLASH_LITE_MODEL,
+  setFlashModels,
+  setFlashLiteModel,
+  resetModelsForTesting,
   supportsMultimodalFunctionResponse,
   GEMINI_MODEL_ALIAS_PRO,
   GEMINI_MODEL_ALIAS_FLASH,
@@ -33,6 +38,7 @@ import {
   isPreviewModel,
   isProModel,
   LATEST_GEMINI_FLASH_MODEL,
+  LATEST_GEMINI_FLASH_LITE_MODEL,
   GEMMA_4_31B_IT_MODEL,
   GEMMA_4_26B_A4B_IT_MODEL,
   getAutoModelDescription,
@@ -1061,6 +1067,135 @@ describe('resolveModel Gemini 3.5 Flash GA', () => {
           true, // useGemini3_5Flash
         ),
       ).toBe(PREVIEW_GEMINI_MODEL);
+    });
+  });
+
+  describe('multi-session isolation and global state leakage prevention', () => {
+    beforeEach(() => {
+      resetModelsForTesting();
+    });
+
+    afterEach(() => {
+      resetModelsForTesting();
+    });
+
+    it('should NOT leak latest flash or flash lite models to sessions without access even if global models are mutated', () => {
+      // Simulate Session A (which has access) mutating global models via setFlashModels / setFlashLiteModel
+      setFlashModels('gemini-3-flash-preview', LATEST_GEMINI_FLASH_MODEL);
+      setFlashLiteModel(LATEST_GEMINI_FLASH_LITE_MODEL);
+
+      // Verify global variables were indeed mutated to the latest models
+      expect(DEFAULT_GEMINI_FLASH_MODEL).toBe(LATEST_GEMINI_FLASH_MODEL);
+      expect(DEFAULT_GEMINI_FLASH_LITE_MODEL).toBe(
+        LATEST_GEMINI_FLASH_LITE_MODEL,
+      );
+
+      // Session B has NO access (experiment flags false / hasLatestFlashGAAccess returns false)
+      const sessionBConfig = {
+        getExperimentalDynamicModelConfiguration: () => false,
+        hasLatestFlashGAAccess: () => false,
+        hasLatestFlashLiteGAAccess: () => false,
+        getHasAccessToPreviewModel: () => true,
+        modelConfigService,
+      } as unknown as Config;
+
+      // Session B resolving 'flash' should NOT get LATEST_GEMINI_FLASH_MODEL
+      expect(
+        resolveModel(
+          GEMINI_MODEL_ALIAS_FLASH,
+          false,
+          false,
+          true,
+          sessionBConfig,
+          false,
+          false,
+        ),
+      ).toBe(PREVIEW_GEMINI_FLASH_MODEL);
+
+      // Session B resolving 'flash-lite' should NOT get LATEST_GEMINI_FLASH_LITE_MODEL
+      expect(
+        resolveModel(
+          GEMINI_MODEL_ALIAS_FLASH_LITE,
+          false,
+          false,
+          true,
+          sessionBConfig,
+          false,
+          false,
+        ),
+      ).toBe(BASE_GEMINI_FLASH_LITE_MODEL);
+
+      // Session B resolving without preview access should get BASE models, NOT LATEST
+      expect(
+        resolveModel(
+          PREVIEW_GEMINI_FLASH_MODEL,
+          false,
+          false,
+          false,
+          sessionBConfig,
+          false,
+          false,
+        ),
+      ).toBe(BASE_GEMINI_FLASH_MODEL);
+
+      // Session B classifier resolving flash should NOT get LATEST_GEMINI_FLASH_MODEL
+      expect(
+        resolveClassifierModel(
+          GEMINI_MODEL_ALIAS_AUTO,
+          GEMINI_MODEL_ALIAS_FLASH,
+          false,
+          false,
+          true,
+          sessionBConfig,
+          false,
+          false,
+        ),
+      ).toBe(PREVIEW_GEMINI_FLASH_MODEL);
+
+      // Session B getDisplayString should NOT return latest models
+      expect(getDisplayString(BASE_GEMINI_FLASH_MODEL, sessionBConfig)).toBe(
+        BASE_GEMINI_FLASH_MODEL,
+      );
+      expect(
+        getDisplayString(BASE_GEMINI_FLASH_LITE_MODEL, sessionBConfig),
+      ).toBe(BASE_GEMINI_FLASH_LITE_MODEL);
+    });
+
+    it('should NOT leak latest models in dynamic configuration mode when global models are mutated', () => {
+      setFlashModels('gemini-3-flash-preview', LATEST_GEMINI_FLASH_MODEL);
+      setFlashLiteModel(LATEST_GEMINI_FLASH_LITE_MODEL);
+
+      const sessionBDynamicConfig = {
+        getExperimentalDynamicModelConfiguration: () => true,
+        hasLatestFlashGAAccess: () => false,
+        hasLatestFlashLiteGAAccess: () => false,
+        getHasAccessToPreviewModel: () => true,
+        modelConfigService,
+      } as unknown as Config;
+
+      expect(
+        resolveModel(
+          GEMINI_MODEL_ALIAS_FLASH,
+          false,
+          false,
+          true,
+          sessionBDynamicConfig,
+          false,
+          false,
+        ),
+      ).toBe(PREVIEW_GEMINI_FLASH_MODEL);
+
+      expect(
+        resolveModel(
+          GEMINI_MODEL_ALIAS_FLASH_LITE,
+          false,
+          false,
+          true,
+          sessionBDynamicConfig,
+          false,
+          false,
+        ),
+      ).toBe(BASE_GEMINI_FLASH_LITE_MODEL);
     });
   });
 });

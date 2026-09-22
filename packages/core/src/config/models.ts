@@ -227,13 +227,9 @@ export function resolveModel(
       : requestedModel.trim() || '';
 
   const effectiveUseLatestFlash =
-    useLatestFlash ||
-    (config?.hasLatestFlashGAAccess?.() ?? false) ||
-    DEFAULT_GEMINI_FLASH_MODEL === LATEST_GEMINI_FLASH_MODEL;
+    useLatestFlash || (config?.hasLatestFlashGAAccess?.() ?? false);
   const effectiveUseLatestFlashLite =
-    useLatestFlashLite ||
-    (config?.hasLatestFlashLiteGAAccess?.() ?? false) ||
-    DEFAULT_GEMINI_FLASH_LITE_MODEL === LATEST_GEMINI_FLASH_LITE_MODEL;
+    useLatestFlashLite || (config?.hasLatestFlashLiteGAAccess?.() ?? false);
 
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     const resolved = config.modelConfigService.resolveModelId(normalizedModel, {
@@ -247,10 +243,14 @@ export function resolveModel(
     if (!hasAccessToPreview && isPreviewModel(resolved, config)) {
       // Fallback for unknown preview models.
       if (resolved.includes('flash-lite')) {
-        return DEFAULT_GEMINI_FLASH_LITE_MODEL;
+        return effectiveUseLatestFlashLite
+          ? LATEST_GEMINI_FLASH_LITE_MODEL
+          : BASE_GEMINI_FLASH_LITE_MODEL;
       }
       if (resolved.includes('flash')) {
-        return DEFAULT_GEMINI_FLASH_MODEL;
+        return effectiveUseLatestFlash
+          ? LATEST_GEMINI_FLASH_MODEL
+          : BASE_GEMINI_FLASH_MODEL;
       }
       return DEFAULT_GEMINI_MODEL;
     }
@@ -292,7 +292,7 @@ export function resolveModel(
     case GEMINI_MODEL_ALIAS_FLASH_LITE: {
       resolved = effectiveUseLatestFlashLite
         ? LATEST_GEMINI_FLASH_LITE_MODEL
-        : DEFAULT_GEMINI_FLASH_LITE_MODEL;
+        : BASE_GEMINI_FLASH_LITE_MODEL;
       break;
     }
     default: {
@@ -302,7 +302,9 @@ export function resolveModel(
   }
 
   if (resolved === 'none') {
-    return DEFAULT_GEMINI_FLASH_LITE_MODEL;
+    return effectiveUseLatestFlashLite
+      ? LATEST_GEMINI_FLASH_LITE_MODEL
+      : BASE_GEMINI_FLASH_LITE_MODEL;
   }
 
   if (
@@ -323,7 +325,7 @@ export function resolveModel(
       case PREVIEW_GEMINI_FLASH_MODEL:
         return effectiveUseLatestFlash
           ? LATEST_GEMINI_FLASH_MODEL
-          : DEFAULT_GEMINI_FLASH_MODEL;
+          : BASE_GEMINI_FLASH_MODEL;
       case PREVIEW_GEMINI_MODEL:
       case PREVIEW_GEMINI_3_1_MODEL:
       case PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL:
@@ -331,10 +333,14 @@ export function resolveModel(
       default:
         // Fallback for unknown preview models, preserving original logic.
         if (resolved.includes('flash-lite')) {
-          return DEFAULT_GEMINI_FLASH_LITE_MODEL;
+          return effectiveUseLatestFlashLite
+            ? LATEST_GEMINI_FLASH_LITE_MODEL
+            : BASE_GEMINI_FLASH_LITE_MODEL;
         }
         if (resolved.includes('flash')) {
-          return DEFAULT_GEMINI_FLASH_MODEL;
+          return effectiveUseLatestFlash
+            ? LATEST_GEMINI_FLASH_MODEL
+            : BASE_GEMINI_FLASH_MODEL;
         }
         return DEFAULT_GEMINI_MODEL;
     }
@@ -386,13 +392,9 @@ export function resolveClassifierModel(
   useLatestFlashLite: boolean = false,
 ): string {
   const effectiveUseLatestFlash =
-    useLatestFlash ||
-    (config?.hasLatestFlashGAAccess?.() ?? false) ||
-    DEFAULT_GEMINI_FLASH_MODEL === LATEST_GEMINI_FLASH_MODEL;
+    useLatestFlash || (config?.hasLatestFlashGAAccess?.() ?? false);
   const effectiveUseLatestFlashLite =
-    useLatestFlashLite ||
-    (config?.hasLatestFlashLiteGAAccess?.() ?? false) ||
-    DEFAULT_GEMINI_FLASH_LITE_MODEL === LATEST_GEMINI_FLASH_LITE_MODEL;
+    useLatestFlashLite || (config?.hasLatestFlashLiteGAAccess?.() ?? false);
   const effectiveHasAccessToPreview =
     hasAccessToPreview || (config?.getHasAccessToPreviewModel?.() ?? false);
 
@@ -417,7 +419,7 @@ export function resolveClassifierModel(
     ) {
       return effectiveUseLatestFlash
         ? LATEST_GEMINI_FLASH_MODEL
-        : DEFAULT_GEMINI_FLASH_MODEL;
+        : BASE_GEMINI_FLASH_MODEL;
     }
     if (
       requestedModel === PREVIEW_GEMINI_MODEL_AUTO ||
@@ -429,7 +431,7 @@ export function resolveClassifierModel(
       }
       return effectiveHasAccessToPreview
         ? PREVIEW_GEMINI_FLASH_MODEL
-        : DEFAULT_GEMINI_FLASH_MODEL;
+        : BASE_GEMINI_FLASH_MODEL;
     }
     return resolveModel(
       GEMINI_MODEL_ALIAS_FLASH,
@@ -476,12 +478,8 @@ export function getDisplayString(
     }
   }
 
-  const useLatestFlash =
-    config?.hasLatestFlashGAAccess?.() ||
-    DEFAULT_GEMINI_FLASH_MODEL === LATEST_GEMINI_FLASH_MODEL;
-  const useLatestFlashLite =
-    config?.hasLatestFlashLiteGAAccess?.() ||
-    DEFAULT_GEMINI_FLASH_LITE_MODEL === LATEST_GEMINI_FLASH_LITE_MODEL;
+  const useLatestFlash = config?.hasLatestFlashGAAccess?.() ?? false;
+  const useLatestFlashLite = config?.hasLatestFlashLiteGAAccess?.() ?? false;
 
   switch (model) {
     case LEGACY_CCPA_FLASH_MODEL:
