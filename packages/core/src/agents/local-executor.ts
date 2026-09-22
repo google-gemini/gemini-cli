@@ -31,7 +31,15 @@ import {
 } from '../tools/mcp-tool.js';
 import { CompressionStatus } from '../core/turn.js';
 import { type ToolCallRequestInfo } from '../scheduler/types.js';
-import { ChatCompressionService } from '../context/chatCompressionService.js';
+import {
+  ChatCompressionService,
+  collapseOlderFunctionResponses,
+} from '../context/chatCompressionService.js';
+import { MAX_STORED_TOOL_OUTPUT_BYTES } from '../utils/constants.js';
+import {
+  truncateFunctionResponsePart,
+  truncateToolOutput,
+} from '../utils/tool-utils.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
 import { renderUserMemory, renderAgentSkills } from '../prompts/snippets.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
@@ -907,6 +915,16 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     prompt_id: string,
     abortSignal?: AbortSignal,
   ): Promise<void> {
+    const currentHistory = chat.getHistory(false);
+    const collapsedHistory = collapseOlderFunctionResponses(currentHistory);
+    if (collapsedHistory !== currentHistory) {
+      const turns = collapsedHistory.map((c) => ({
+        id: randomUUID(),
+        content: c,
+      }));
+      chat.setHistory(turns);
+    }
+
     const model = this.definition.modelConfig.model ?? DEFAULT_GEMINI_MODEL;
 
     const { newHistory, info } = await this.compressionService.compress(
@@ -1228,6 +1246,25 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         },
       );
 
+      // Truncate response parts and display results before recording to prevent unbounded memory growth
+      for (const call of completedCalls) {
+        if (call.response?.responseParts) {
+          call.response.responseParts = call.response.responseParts.map((p) =>
+            truncateFunctionResponsePart(p, MAX_STORED_TOOL_OUTPUT_BYTES),
+          );
+        }
+        if (
+          typeof call.response?.resultDisplay === 'string' &&
+          Buffer.byteLength(call.response.resultDisplay, 'utf8') >
+            MAX_STORED_TOOL_OUTPUT_BYTES
+        ) {
+          call.response.resultDisplay = truncateToolOutput(
+            call.response.resultDisplay,
+            MAX_STORED_TOOL_OUTPUT_BYTES,
+          );
+        }
+      }
+
       // Record completed tool calls for persistent chat history
       chat.recordCompletedToolCalls(model, completedCalls);
 
@@ -1314,7 +1351,9 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       const part = syncResults.get(callId);
 
       if (part) {
-        toolResponseParts.push(part);
+        toolResponseParts.push(
+          truncateFunctionResponsePart(part, MAX_STORED_TOOL_OUTPUT_BYTES),
+        );
         continue;
       }
 

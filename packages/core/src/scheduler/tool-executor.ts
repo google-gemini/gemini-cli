@@ -27,6 +27,8 @@ import {
   formatTruncatedToolOutput,
 } from '../utils/fileUtils.js';
 import { convertToFunctionResponse } from '../utils/generateContentResponseUtilities.js';
+import { truncateToolOutput } from '../utils/tool-utils.js';
+import { MAX_STORED_TOOL_OUTPUT_BYTES } from '../utils/constants.js';
 import {
   CoreToolCallStatus,
   type CompletedToolCall,
@@ -227,7 +229,7 @@ export class ToolExecutor {
           this.context.promptId,
         );
         outputFile = savedPath;
-        const truncatedContent = formatTruncatedToolOutput(
+        let truncatedContent = formatTruncatedToolOutput(
           content,
           outputFile,
           threshold,
@@ -242,6 +244,17 @@ export class ToolExecutor {
             threshold,
           }),
         );
+
+        if (
+          typeof truncatedContent === 'string' &&
+          Buffer.byteLength(truncatedContent, 'utf8') >
+            MAX_STORED_TOOL_OUTPUT_BYTES
+        ) {
+          truncatedContent = truncateToolOutput(
+            truncatedContent,
+            MAX_STORED_TOOL_OUTPUT_BYTES,
+          );
+        }
 
         return { truncatedContent, outputFile };
       }
@@ -266,11 +279,22 @@ export class ToolExecutor {
             this.context.promptId,
           );
           outputFile = savedPath;
-          const truncatedText = formatTruncatedToolOutput(
+          let truncatedText = formatTruncatedToolOutput(
             textContent,
             outputFile,
             threshold,
           );
+
+          if (
+            typeof truncatedText === 'string' &&
+            Buffer.byteLength(truncatedText, 'utf8') >
+              MAX_STORED_TOOL_OUTPUT_BYTES
+          ) {
+            truncatedText = truncateToolOutput(
+              truncatedText,
+              MAX_STORED_TOOL_OUTPUT_BYTES,
+            );
+          }
 
           // We need to return a NEW array to avoid mutating the original toolResult if it matters,
           // though here we are creating the response so it's probably fine to mutate or return new.
@@ -293,7 +317,41 @@ export class ToolExecutor {
       }
     }
 
-    return { truncatedContent: content, outputFile };
+    let finalContent: PartListUnion = content;
+    if (typeof finalContent === 'string') {
+      if (
+        Buffer.byteLength(finalContent, 'utf8') > MAX_STORED_TOOL_OUTPUT_BYTES
+      ) {
+        finalContent = truncateToolOutput(
+          finalContent,
+          MAX_STORED_TOOL_OUTPUT_BYTES,
+        );
+      }
+    } else if (Array.isArray(finalContent)) {
+      finalContent = finalContent.map((part) => {
+        if (
+          typeof part === 'string' &&
+          Buffer.byteLength(part, 'utf8') > MAX_STORED_TOOL_OUTPUT_BYTES
+        ) {
+          return truncateToolOutput(part, MAX_STORED_TOOL_OUTPUT_BYTES);
+        }
+        if (
+          typeof part === 'object' &&
+          part &&
+          'text' in part &&
+          typeof part.text === 'string' &&
+          Buffer.byteLength(part.text, 'utf8') > MAX_STORED_TOOL_OUTPUT_BYTES
+        ) {
+          return {
+            ...part,
+            text: truncateToolOutput(part.text, MAX_STORED_TOOL_OUTPUT_BYTES),
+          };
+        }
+        return part;
+      });
+    }
+
+    return { truncatedContent: finalContent, outputFile };
   }
 
   private async createCancelledResult(

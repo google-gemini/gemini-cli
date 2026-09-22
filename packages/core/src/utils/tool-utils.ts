@@ -12,6 +12,8 @@ import {
 import { SHELL_TOOL_NAMES } from './shell-utils.js';
 import levenshtein from 'fast-levenshtein';
 import type { ToolCallResponseInfo } from '../scheduler/types.js';
+import type { Part } from '@google/genai';
+import { MAX_STORED_TOOL_OUTPUT_BYTES } from './constants.js';
 
 /**
  * Validates if an object is a ToolCallResponseInfo.
@@ -134,4 +136,114 @@ export function doesToolInvocationMatch(
   }
 
   return false;
+}
+
+/**
+ * Truncates large tool execution output to stay within a maximum byte cap.
+ * When the output exceeds the limit, it truncates the middle and appends a clear indicator:
+ * "... [Tool output truncated: X bytes omitted to conserve memory] ..."
+ *
+ * @param output The raw tool output string.
+ * @param maxBytes Maximum allowed bytes (defaults to MAX_STORED_TOOL_OUTPUT_BYTES = 64 KB).
+ * @returns The output truncated to at most maxBytes.
+ */
+export function truncateToolOutput(
+  output: string,
+  maxBytes: number = MAX_STORED_TOOL_OUTPUT_BYTES,
+): string {
+  const totalBytes = Buffer.byteLength(output, 'utf8');
+  if (totalBytes <= maxBytes) {
+    return output;
+  }
+
+  // Reserve space for indicator:
+  // e.g. "\n... [Tool output truncated: 12345678 bytes omitted to conserve memory] ...\n"
+  const sampleIndicator = `\n... [Tool output truncated: ${totalBytes} bytes omitted to conserve memory] ...\n`;
+  const reservedBytes = Buffer.byteLength(sampleIndicator, 'utf8') + 8;
+  const availableBytes = maxBytes - reservedBytes;
+
+  if (availableBytes <= 0) {
+    return `... [Tool output truncated: ${totalBytes} bytes omitted to conserve memory] ...`;
+  }
+
+  const headTargetBytes = Math.floor(availableBytes / 2);
+  const tailTargetBytes = availableBytes - headTargetBytes;
+
+  const buf = Buffer.from(output, 'utf8');
+  let headSlice = buf.subarray(0, headTargetBytes).toString('utf8');
+  while (Buffer.byteLength(headSlice, 'utf8') > headTargetBytes) {
+    headSlice = headSlice.slice(0, -1);
+  }
+
+  let tailSlice = buf.subarray(buf.length - tailTargetBytes).toString('utf8');
+  while (Buffer.byteLength(tailSlice, 'utf8') > tailTargetBytes) {
+    tailSlice = tailSlice.slice(1);
+  }
+
+  const retainedBytes =
+    Buffer.byteLength(headSlice, 'utf8') + Buffer.byteLength(tailSlice, 'utf8');
+  const omittedBytes = totalBytes - retainedBytes;
+  const indicator = `\n... [Tool output truncated: ${omittedBytes} bytes omitted to conserve memory] ...\n`;
+
+  return headSlice + indicator + tailSlice;
+}
+
+/**
+ * Truncates large tool response fields in a Gemini Part to keep stored chat history bounded.
+ */
+export function truncateFunctionResponsePart(
+  part: Part,
+  maxBytes: number = MAX_STORED_TOOL_OUTPUT_BYTES,
+): Part {
+  if (part.text && Buffer.byteLength(part.text, 'utf8') > maxBytes) {
+    return {
+      ...part,
+      text: truncateToolOutput(part.text, maxBytes),
+    };
+  }
+
+  if (!part.functionResponse?.response) {
+    return part;
+  }
+
+  const resp: unknown = part.functionResponse.response;
+  if (typeof resp === 'string') {
+    if (Buffer.byteLength(resp, 'utf8') > maxBytes) {
+      return {
+        ...part,
+        functionResponse: {
+          // eslint-disable-next-line @typescript-eslint/no-misused-spread
+          ...part.functionResponse,
+          response: { output: truncateToolOutput(resp, maxBytes) },
+        },
+      };
+    }
+    return part;
+  }
+
+  if (typeof resp === 'object' && resp !== null) {
+    let modified = false;
+    const newResp: Record<string, unknown> = { ...resp };
+    for (const [key, value] of Object.entries(newResp)) {
+      if (
+        typeof value === 'string' &&
+        Buffer.byteLength(value, 'utf8') > maxBytes
+      ) {
+        newResp[key] = truncateToolOutput(value, maxBytes);
+        modified = true;
+      }
+    }
+    if (modified) {
+      return {
+        ...part,
+        functionResponse: {
+          // eslint-disable-next-line @typescript-eslint/no-misused-spread
+          ...part.functionResponse,
+          response: newResp,
+        },
+      };
+    }
+  }
+
+  return part;
 }

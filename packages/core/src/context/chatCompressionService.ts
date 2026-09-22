@@ -45,6 +45,148 @@ import { PreCompressTrigger } from '../hooks/types.js';
 const DEFAULT_COMPRESSION_TOKEN_THRESHOLD = 0.5;
 
 /**
+ * Safety watermark for chat history token count. If history exceeds this
+ * watermark, automatic compression is triggered even if the model limit fraction is not reached.
+ */
+export const COMPRESSION_SAFETY_WATERMARK_TOKENS = 50_000;
+
+/**
+ * Safety watermark for stored chat history byte size (512 KB). If accumulated history
+ * byte size exceeds this watermark, automatic compression is triggered to prevent heap explosion.
+ */
+export const COMPRESSION_SAFETY_WATERMARK_BYTES = 512 * 1024; // 512 KB
+
+export const COLLAPSED_FUNCTION_RESPONSE_MAX_BYTES = 2048; // 2 KB
+
+/**
+ * Computes the total byte size of text and payload content across all turns in history.
+ */
+export function calculateHistoryByteSize(history: readonly Content[]): number {
+  let bytes = 0;
+  for (const turn of history) {
+    if (turn.parts) {
+      for (const part of turn.parts) {
+        if (part.text) {
+          bytes += Buffer.byteLength(part.text, 'utf8');
+        }
+        if (part.functionResponse?.response) {
+          const resp = part.functionResponse.response;
+          if (typeof resp === 'string') {
+            bytes += Buffer.byteLength(resp, 'utf8');
+          } else if (typeof resp === 'object' && resp !== null) {
+            try {
+              bytes += Buffer.byteLength(JSON.stringify(resp), 'utf8');
+            } catch {
+              // ignore JSON errors
+            }
+          }
+        }
+        if (part.inlineData?.data) {
+          bytes += Buffer.byteLength(part.inlineData.data, 'utf8');
+        }
+      }
+    }
+  }
+  return bytes;
+}
+
+/**
+ * Collapses detailed logs in older functionResponse payloads from completed previous turns.
+ * The most recent functionResponse turn is preserved intact for immediate context fidelity.
+ */
+export function collapseOlderFunctionResponses(
+  history: Content[],
+  maxBytesPerOldResponse: number = COLLAPSED_FUNCTION_RESPONSE_MAX_BYTES,
+): Content[] {
+  // Find all indices of user messages that contain functionResponse
+  const toolIndices: number[] = [];
+  for (let i = 0; i < history.length; i++) {
+    if (
+      history[i].role === 'user' &&
+      history[i].parts?.some((p) => !!p.functionResponse)
+    ) {
+      toolIndices.push(i);
+    }
+  }
+
+  if (toolIndices.length <= 1) {
+    return history;
+  }
+
+  // The last tool index represents the most recent tool turn.
+  // All prior tool indices are older completed turns whose subsequent turns have finished.
+  const lastToolIndex = toolIndices[toolIndices.length - 1];
+
+  let modified = false;
+  const newHistory = history.map((content, idx) => {
+    // Only process older tool response turns
+    if (idx >= lastToolIndex || content.role !== 'user' || !content.parts) {
+      return content;
+    }
+
+    let partsModified = false;
+    const newParts = content.parts.map((part) => {
+      if (!part.functionResponse?.response) {
+        return part;
+      }
+
+      const responseObj = part.functionResponse.response;
+      let outputStr: string | null = null;
+      let outputKey = 'output';
+
+      const responseUnknown: unknown = responseObj;
+      if (typeof responseUnknown === 'string') {
+        outputStr = responseUnknown;
+      } else if (responseObj && typeof responseObj === 'object') {
+        const outputVal = responseObj['output'];
+        const contentVal = responseObj['content'];
+        if (typeof outputVal === 'string') {
+          outputStr = outputVal;
+          outputKey = 'output';
+        } else if (typeof contentVal === 'string') {
+          outputStr = contentVal;
+          outputKey = 'content';
+        }
+      }
+
+      if (
+        outputStr &&
+        Buffer.byteLength(outputStr, 'utf8') > maxBytesPerOldResponse
+      ) {
+        partsModified = true;
+        const totalBytes = Buffer.byteLength(outputStr, 'utf8');
+        const previewBytes = Math.min(maxBytesPerOldResponse, 512);
+        const preview = outputStr.slice(0, previewBytes);
+        const omittedBytes = totalBytes - Buffer.byteLength(preview, 'utf8');
+        const collapsedMessage = `${preview}\n... [Tool output collapsed from previous turn: ${omittedBytes} bytes omitted to conserve memory] ...`;
+
+        return {
+          ...part,
+          functionResponse: {
+            // eslint-disable-next-line @typescript-eslint/no-misused-spread
+            ...part.functionResponse,
+            response:
+              typeof responseUnknown === 'string'
+                ? { output: collapsedMessage }
+                : { ...responseObj, [outputKey]: collapsedMessage },
+          },
+        };
+      }
+
+      return part;
+    });
+
+    if (partsModified) {
+      modified = true;
+      return { ...content, parts: newParts };
+    }
+    return content;
+  });
+
+  return modified ? newHistory : history;
+}
+
+/**
  * The fraction of the latest chat history to keep. A value of 0.3
  * means that only the last 30% of the chat history will be kept after compression.
  */
@@ -274,14 +416,30 @@ export class ChatCompressionService {
     const trigger = force ? PreCompressTrigger.Manual : PreCompressTrigger.Auto;
     await config.getHookSystem()?.firePreCompressEvent(trigger);
 
-    const originalTokenCount = chat.getLastPromptTokenCount();
+    const lastPromptTokenCount = chat.getLastPromptTokenCount();
+    const originalTokenCount =
+      lastPromptTokenCount > 0
+        ? lastPromptTokenCount
+        : estimateTokenCountSync(curatedHistory.flatMap((c) => c.parts || []));
 
     // Don't compress if not forced and we are under the limit.
     if (!force) {
       const threshold =
         (await config.getCompressionThreshold()) ??
         DEFAULT_COMPRESSION_TOKEN_THRESHOLD;
-      if (originalTokenCount < threshold * tokenLimit(model)) {
+      const historyByteSize = calculateHistoryByteSize(curatedHistory);
+      const isOverModelThreshold =
+        originalTokenCount >= threshold * tokenLimit(model);
+      const isOverWatermarkTokens =
+        originalTokenCount >= COMPRESSION_SAFETY_WATERMARK_TOKENS;
+      const isOverWatermarkBytes =
+        historyByteSize >= COMPRESSION_SAFETY_WATERMARK_BYTES;
+
+      if (
+        !isOverModelThreshold &&
+        !isOverWatermarkTokens &&
+        !isOverWatermarkBytes
+      ) {
         return {
           newHistory: null,
           info: {
@@ -479,6 +637,10 @@ export class ChatCompressionService {
         },
       };
     } else {
+      // Explicitly dereference old history slices so V8 GC can immediately reclaim memory
+      historyToCompressTruncated.length = 0;
+      originalHistoryToCompress.length = 0;
+
       return {
         newHistory: extraHistory,
         info: {

@@ -132,11 +132,18 @@ const mockSetHistory = vi.fn((newHistory: Content[]) => {
   mockChatHistory = newHistory;
 });
 
-vi.mock('../context/chatCompressionService.js', () => ({
-  ChatCompressionService: vi.fn().mockImplementation(() => ({
-    compress: mockCompress,
-  })),
-}));
+vi.mock('../context/chatCompressionService.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import('../context/chatCompressionService.js')
+    >();
+  return {
+    ...actual,
+    ChatCompressionService: vi.fn().mockImplementation(() => ({
+      compress: mockCompress,
+    })),
+  };
+});
 
 vi.mock('../core/geminiChat.js', () => ({
   StreamEventType: {
