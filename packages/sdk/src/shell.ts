@@ -103,6 +103,14 @@ export class SdkAgentShell implements AgentShell {
               ...(baseExecutionConfig.env ?? process.env),
               ...options.env,
             },
+            sanitizationConfig: {
+              ...baseExecutionConfig.sanitizationConfig,
+              allowedEnvironmentVariables: [
+                ...(baseExecutionConfig.sanitizationConfig
+                  ?.allowedEnvironmentVariables ?? []),
+                ...Object.keys(options.env),
+              ],
+            },
           }
         : baseExecutionConfig;
 
