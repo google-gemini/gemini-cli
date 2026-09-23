@@ -32,6 +32,22 @@ export class ConfirmationRequiredError extends Error {
 }
 
 /**
+ * Ceiling for a single `!{...}` injection. A command that never exits would
+ * otherwise hold the prompt pipeline open with no way out, since the pipeline
+ * has no per-command budget of its own.
+ */
+export const SHELL_INJECTION_TIMEOUT_MS = 60_000;
+
+/**
+ * Builds the signal a single injection is executed under: the caller's
+ * cancellation (when there is one) combined with the per-command timeout.
+ */
+function getCommandAbortSignal(caller?: AbortSignal): AbortSignal {
+  const timeoutSignal = AbortSignal.timeout(SHELL_INJECTION_TIMEOUT_MS);
+  return caller ? AbortSignal.any([timeoutSignal, caller]) : timeoutSignal;
+}
+
+/**
  * Represents a single detected shell injection site in the prompt,
  * after resolution of arguments. Extends the base Injection interface.
  */
@@ -172,7 +188,7 @@ export class ShellProcessor implements IPromptProcessor {
           injection.resolvedCommand,
           config.getTargetDir(),
           () => {},
-          new AbortController().signal,
+          getCommandAbortSignal(context.signal),
           config.getEnableInteractiveShell(),
           shellExecutionConfig,
         );

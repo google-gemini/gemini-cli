@@ -577,6 +577,112 @@ describe('ShellProcessor', () => {
     });
   });
 
+  describe('Command cancellation', () => {
+    /**
+     * A command that never exits on its own, whose result only settles once the
+     * signal it was executed with is aborted.
+     */
+    function mockHangingCommand(): () => AbortSignal | undefined {
+      let executedWith: AbortSignal | undefined;
+      mockShellExecute.mockImplementation(
+        (
+          _command: string,
+          _cwd: string,
+          _onOutput: unknown,
+          signal: AbortSignal,
+        ) => {
+          executedWith = signal;
+          return {
+            result: new Promise((resolve) => {
+              signal.addEventListener(
+                'abort',
+                () =>
+                  resolve({
+                    ...SUCCESS_RESULT,
+                    output: 'partial output',
+                    exitCode: null,
+                    aborted: true,
+                  }),
+                { once: true },
+              );
+            }),
+          };
+        },
+      );
+      return () => executedWith;
+    }
+
+    it('should forward the caller signal to shell execution', async () => {
+      const processor = new ShellProcessor('test-command');
+      const prompt: PromptPipelineContent = createPromptPipelineContent(
+        '!{long-running-command}',
+      );
+      const controller = new AbortController();
+      const executedWith = mockHangingCommand();
+
+      context.signal = controller.signal;
+      const processed = processor.process(prompt, context);
+
+      // The command is still running and the caller has not cancelled yet.
+      await vi.waitFor(() => expect(executedWith()).toBeDefined());
+      expect(executedWith()?.aborted).toBe(false);
+
+      controller.abort();
+
+      // Cancelling the caller must reach the subprocess.
+      expect(executedWith()?.aborted).toBe(true);
+      expect(await processed).toEqual([
+        {
+          text: "partial output\n[Shell command 'long-running-command' aborted]",
+        },
+      ]);
+    });
+
+    it('should abort a hung command once the injection timeout elapses', async () => {
+      const processor = new ShellProcessor('test-command');
+      const prompt: PromptPipelineContent =
+        createPromptPipelineContent('!{hanging-command}');
+      const timeoutController = new AbortController();
+      const timeoutSpy = vi
+        .spyOn(AbortSignal, 'timeout')
+        .mockReturnValue(timeoutController.signal);
+      const executedWith = mockHangingCommand();
+
+      try {
+        const processed = processor.process(prompt, context);
+        await vi.waitFor(() => expect(executedWith()).toBeDefined());
+
+        // Every injection is executed under a timeout, so a hang cannot hold
+        // the prompt pipeline open forever.
+        expect(timeoutSpy).toHaveBeenCalledWith(expect.any(Number));
+        expect(executedWith()?.aborted).toBe(false);
+
+        timeoutController.abort();
+
+        expect(await processed).toEqual([
+          {
+            text: "partial output\n[Shell command 'hanging-command' aborted]",
+          },
+        ]);
+      } finally {
+        timeoutSpy.mockRestore();
+      }
+    });
+
+    it('should execute with a live signal when the caller provides none', async () => {
+      const processor = new ShellProcessor('test-command');
+      const prompt: PromptPipelineContent =
+        createPromptPipelineContent('!{list-command}');
+
+      const result = await processor.process(prompt, context);
+
+      expect(result).toEqual([{ text: 'default shell output' }]);
+      const signal = mockShellExecute.mock.calls[0][3] as AbortSignal;
+      expect(signal).toBeInstanceOf(AbortSignal);
+      expect(signal.aborted).toBe(false);
+    });
+  });
+
   describe('Context-Aware Argument Interpolation ({{args}})', () => {
     const rawArgs = 'user input';
 
