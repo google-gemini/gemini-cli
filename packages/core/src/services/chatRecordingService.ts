@@ -511,10 +511,12 @@ export class ChatRecordingService {
         if (this.kind === 'subagent') {
           filename = `${safeSessionId}.jsonl`;
         } else {
-          filename = `${SESSION_FILE_PREFIX}${timestamp}-${safeSessionId.slice(
-            0,
-            8,
-          )}.jsonl`;
+          const shortId = safeSessionId.slice(0, 8);
+          filename = `${SESSION_FILE_PREFIX}${timestamp}-${shortId}.jsonl`;
+          let collisionIndex = 1;
+          while (fs.existsSync(path.join(chatsDir, filename))) {
+            filename = `${SESSION_FILE_PREFIX}${timestamp}-${collisionIndex++}-${shortId}.jsonl`;
+          }
         }
         this.conversationFile = path.join(chatsDir, filename);
 
