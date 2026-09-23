@@ -1017,13 +1017,17 @@ describe('InputPrompt', () => {
   });
 
   describe('clipboard text paste', () => {
-    it('should insert text from clipboard on Ctrl+V', async () => {
+    it('should escape @ symbols in clipboard text on Ctrl+V', async () => {
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
-      vi.mocked(clipboardy.read).mockResolvedValue('pasted text');
+      vi.mocked(clipboardy.read).mockResolvedValue(
+        'user@host:~/project$ cat @id_rsa',
+      );
       vi.mocked(mockBuffer.replaceRangeByOffset).mockClear();
+      const settings = createMockSettings();
 
       const { stdin, unmount } = await renderWithProviders(
         <TestInputPrompt {...props} />,
+        { settings },
       );
 
       await act(async () => {
@@ -1033,8 +1037,30 @@ describe('InputPrompt', () => {
       await waitFor(() => {
         expect(clipboardy.read).toHaveBeenCalled();
         expect(mockBuffer.insert).toHaveBeenCalledWith(
-          'pasted text',
+          'user\\@host:~/project$ cat \\@id_rsa',
           expect.objectContaining({ paste: true }),
+        );
+      });
+      unmount();
+    });
+
+    it('should escape @ symbols in bracketed terminal paste', async () => {
+      const settings = createMockSettings();
+      const { stdin, unmount } = await renderWithProviders(
+        <TestInputPrompt {...props} />,
+        { settings },
+      );
+
+      await act(async () => {
+        stdin.write('\x1B[200~user@host:~/project$ cat @id_rsa\x1B[201~');
+      });
+
+      await waitFor(() => {
+        expect(mockBuffer.handleInput).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'paste',
+            sequence: 'user\\@host:~/project$ cat \\@id_rsa',
+          }),
         );
       });
       unmount();
