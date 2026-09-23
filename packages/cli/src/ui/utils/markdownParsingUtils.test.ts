@@ -142,7 +142,7 @@ describe('parsingUtils', () => {
       const input = 'Visit https://google.com now';
       const output = parseMarkdownToANSI(input);
       expect(output).toBe(
-        `${primary('Visit ')}${link('https://google.com')}${primary(' now')}`,
+        `${primary('Visit ')}\x1b]8;;https://google.com\x1b\\${link('https://google.com')}\x1b]8;;\x1b\\${primary(' now')}`,
       );
     });
 
@@ -267,6 +267,37 @@ describe('parsingUtils', () => {
         const input = 'It costs $5.99 total';
         const output = parseMarkdownToANSI(input);
         expect(output).toBe(primary('It costs $5.99 total'));
+      });
+    });
+
+    describe('OSC 8 terminal hyperlinks for bare URLs', () => {
+      const OSC = '\x1b]8;;';
+      const ST = '\x1b\\';
+
+      it('wraps bare https URLs in an OSC 8 hyperlink sequence', () => {
+        const url =
+          'https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=x';
+        const result = parseMarkdownToANSI(url);
+        // Must begin with the OSC 8 opening sequence containing the full URL
+        expect(result).toContain(`${OSC}${url}${ST}`);
+        // Must close with the OSC 8 terminator
+        expect(result).toContain(`${OSC}${ST}`);
+        // The full URL string must appear as visible text
+        expect(result).toContain(url);
+      });
+
+      it('does not drop OAuth query parameters', () => {
+        const url =
+          'https://example.com/auth?redirect_uri=http%3A%2F%2F127.0.0.1%3A1234%2Foauth2callback&response_type=code';
+        const result = parseMarkdownToANSI(url);
+        expect(result).toContain('response_type=code');
+        expect(result).toContain('redirect_uri=http%3A%2F%2F127.0.0.1');
+      });
+
+      it('updates the existing bare-URL test to expect OSC 8 wrapping', () => {
+        const url = 'https://google.com';
+        const result = parseMarkdownToANSI(`Visit ${url} now`);
+        expect(result).toContain(`${OSC}${url}${ST}`);
       });
     });
   });
