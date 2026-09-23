@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -127,7 +127,9 @@ describe('mcp enable/disable server lookup', () => {
   it('points an admin-blocked server at the admin policy, not at a typo', async () => {
     mockGetMcpServersFromConfig.mockResolvedValue({
       mcpServers: {},
-      blockedServerNames: ['playwright'],
+      // Mixed case on purpose: an all-lowercase fixture never exercises the
+      // normalisation of blockedServerNames, so dropping it stayed green.
+      blockedServerNames: ['PlayWright'],
     });
 
     await runEnable('playwright');
