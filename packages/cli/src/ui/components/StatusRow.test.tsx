@@ -360,4 +360,40 @@ describe('<StatusRow />', () => {
     const output = lastFrame();
     expect(output).toContain('Trying to reach gemini-2.5-flash (Attempt 1/5)');
   });
+
+  it('renders statusPhrase even when showLoadingIndicator is false', async () => {
+    (useComposerStatus as Mock).mockReturnValue({
+      isInteractiveShellWaiting: false,
+      showLoadingIndicator: false,
+      showTips: false,
+      showWit: false,
+      modeContentObj: null,
+      showMinimalContext: false,
+    });
+
+    const uiState: Partial<UIState> = {
+      ...defaultUiState,
+      statusPhrase: 'Trying to reach gemini-2.5-flash (Attempt 2/5)',
+      elapsedTime: 4,
+    };
+
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
+      <StatusRow
+        showUiDetails={false}
+        isNarrow={false}
+        terminalWidth={100}
+        hideContextSummary={false}
+        hideUiDetailsForSuggestions={false}
+        hasPendingActionRequired={false}
+      />,
+      {
+        width: 100,
+        uiState,
+      },
+    );
+
+    await waitUntilReady();
+    const output = lastFrame();
+    expect(output).toContain('Trying to reach gemini-2.5-flash (Attempt 2/5)');
+  });
 });

@@ -108,7 +108,9 @@ export const StatusNode: React.FC<{
     [onResize],
   );
 
-  if (activeHooks.length === 0 && !showLoadingIndicator) return null;
+  if (activeHooks.length === 0 && !showLoadingIndicator && !statusPhrase) {
+    return null;
+  }
 
   let currentLoadingPhrase: string | undefined = undefined;
   let currentThought: ThoughtSummary | null = null;
@@ -251,7 +253,10 @@ export const StatusRow: React.FC<StatusRowProps> = ({
   );
 
   const showRow1Minimal =
-    showLoadingIndicator || uiState.activeHooks.length > 0 || showTipLine;
+    showLoadingIndicator ||
+    uiState.activeHooks.length > 0 ||
+    showTipLine ||
+    Boolean(statusPhrase);
   const showRow2Minimal =
     (Boolean(modeContentObj) && !hideUiDetailsForSuggestions) ||
     showMinimalContext;
