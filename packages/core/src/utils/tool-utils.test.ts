@@ -5,7 +5,12 @@
  */
 
 import { expect, describe, it } from 'vitest';
-import { doesToolInvocationMatch, getToolSuggestion } from './tool-utils.js';
+import {
+  doesToolInvocationMatch,
+  getToolSuggestion,
+  truncateToolOutput,
+} from './tool-utils.js';
+import { MAX_STORED_TOOL_OUTPUT_BYTES } from './constants.js';
 import { ReadFileTool, type AnyToolInvocation, type Config } from '../index.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
@@ -127,5 +132,65 @@ describe('doesToolInvocationMatch', () => {
       const result = doesToolInvocationMatch('read_file', invocation, patterns);
       expect(result).toBe(true);
     });
+  });
+});
+
+describe('truncateToolOutput', () => {
+  it('preserves text when within maxBytes limit', () => {
+    const input = 'short text';
+    expect(truncateToolOutput(input, 100)).toBe(input);
+  });
+
+  it('truncates ASCII text exceeding maxBytes and appends indicator', () => {
+    const input = 'a'.repeat(200);
+    const maxBytes = 100;
+    const result = truncateToolOutput(input, maxBytes);
+
+    expect(Buffer.byteLength(result, 'utf8')).toBeLessThanOrEqual(maxBytes);
+    expect(result).toContain(
+      '\n... [Tool output truncated to conserve memory]',
+    );
+  });
+
+  it('handles multi-byte graphemes cleanly without breaking clusters or creating replacement characters', () => {
+    // 👩‍👩‍👦‍👦 consists of 4 people emojis connected with Zero Width Joiner (\u200D), totaling 25 UTF-8 bytes.
+    const familyEmoji = '👩‍👩‍👦‍👦';
+    const accented = 'caffè';
+    const suffix = '\n... [Tool output truncated to conserve memory]';
+    const suffixBytes = Buffer.byteLength(suffix, 'utf8');
+
+    // Case 1: Not enough space for the full 25-byte emoji
+    // Available space for text is 10 bytes (< 25 bytes), input is 135 bytes
+    const inputLong = familyEmoji + ' extra text'.repeat(10);
+    const tightMaxBytes = suffixBytes + 10;
+    const resultTight = truncateToolOutput(inputLong, tightMaxBytes);
+    expect(resultTight).toBe(suffix);
+    expect(resultTight.includes('\uFFFD')).toBe(false);
+    expect(Buffer.byteLength(resultTight, 'utf8')).toBeLessThanOrEqual(
+      tightMaxBytes,
+    );
+
+    // Case 2: Enough space for the emoji, but not enough for following text
+    const emojiBytes = Buffer.byteLength(familyEmoji, 'utf8');
+    const exactMaxBytes = suffixBytes + emojiBytes;
+    const resultExact = truncateToolOutput(inputLong, exactMaxBytes);
+    expect(resultExact).toBe(familyEmoji + suffix);
+    expect(resultExact.includes('\uFFFD')).toBe(false);
+    expect(Buffer.byteLength(resultExact, 'utf8')).toBeLessThanOrEqual(
+      exactMaxBytes,
+    );
+
+    // Case 3: Large text with mixed emojis and accented characters
+    const largeMixed = `${familyEmoji} ${accented} `.repeat(2000);
+    const resultLarge = truncateToolOutput(
+      largeMixed,
+      MAX_STORED_TOOL_OUTPUT_BYTES,
+    );
+    expect(Buffer.byteLength(resultLarge, 'utf8')).toBeLessThanOrEqual(
+      MAX_STORED_TOOL_OUTPUT_BYTES,
+    );
+    expect(resultLarge).toContain(suffix);
+    expect(resultLarge.includes('\uFFFD')).toBe(false);
+    expect(Buffer.from(resultLarge, 'utf8').toString('utf8')).toBe(resultLarge);
   });
 });

@@ -138,54 +138,41 @@ export function doesToolInvocationMatch(
   return false;
 }
 
+const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+
 /**
- * Truncates large tool execution output to stay within a maximum byte cap.
- * When the output exceeds the limit, it truncates the middle and appends a clear indicator:
- * "... [Tool output truncated: X bytes omitted to conserve memory] ..."
+ * Truncates large tool execution output to stay within a maximum byte cap using
+ * grapheme-cluster-aware segmentation (Intl.Segmenter). This prevents cutting in
+ * the middle of surrogate pairs or multi-byte Unicode characters / emojis.
  *
- * @param output The raw tool output string.
+ * @param text The raw tool output string.
  * @param maxBytes Maximum allowed bytes (defaults to MAX_STORED_TOOL_OUTPUT_BYTES = 64 KB).
  * @returns The output truncated to at most maxBytes.
  */
 export function truncateToolOutput(
-  output: string,
+  text: string,
   maxBytes: number = MAX_STORED_TOOL_OUTPUT_BYTES,
 ): string {
-  const totalBytes = Buffer.byteLength(output, 'utf8');
-  if (totalBytes <= maxBytes) {
-    return output;
+  if (Buffer.byteLength(text, 'utf8') <= maxBytes) {
+    return text;
   }
 
-  // Reserve space for indicator:
-  // e.g. "\n... [Tool output truncated: 12345678 bytes omitted to conserve memory] ...\n"
-  const sampleIndicator = `\n... [Tool output truncated: ${totalBytes} bytes omitted to conserve memory] ...\n`;
-  const reservedBytes = Buffer.byteLength(sampleIndicator, 'utf8') + 8;
-  const availableBytes = maxBytes - reservedBytes;
+  const suffix = '\n... [Tool output truncated to conserve memory]';
+  const targetBytes = Math.max(0, maxBytes - Buffer.byteLength(suffix, 'utf8'));
 
-  if (availableBytes <= 0) {
-    return `... [Tool output truncated: ${totalBytes} bytes omitted to conserve memory] ...`;
+  let accumulatedBytes = 0;
+  let truncatedText = '';
+
+  for (const { segment } of segmenter.segment(text)) {
+    const segmentBytes = Buffer.byteLength(segment, 'utf8');
+    if (accumulatedBytes + segmentBytes > targetBytes) {
+      break;
+    }
+    accumulatedBytes += segmentBytes;
+    truncatedText += segment;
   }
 
-  const headTargetBytes = Math.floor(availableBytes / 2);
-  const tailTargetBytes = availableBytes - headTargetBytes;
-
-  const buf = Buffer.from(output, 'utf8');
-  let headSlice = buf.subarray(0, headTargetBytes).toString('utf8');
-  while (Buffer.byteLength(headSlice, 'utf8') > headTargetBytes) {
-    headSlice = headSlice.slice(0, -1);
-  }
-
-  let tailSlice = buf.subarray(buf.length - tailTargetBytes).toString('utf8');
-  while (Buffer.byteLength(tailSlice, 'utf8') > tailTargetBytes) {
-    tailSlice = tailSlice.slice(1);
-  }
-
-  const retainedBytes =
-    Buffer.byteLength(headSlice, 'utf8') + Buffer.byteLength(tailSlice, 'utf8');
-  const omittedBytes = totalBytes - retainedBytes;
-  const indicator = `\n... [Tool output truncated: ${omittedBytes} bytes omitted to conserve memory] ...\n`;
-
-  return headSlice + indicator + tailSlice;
+  return truncatedText + suffix;
 }
 
 /**

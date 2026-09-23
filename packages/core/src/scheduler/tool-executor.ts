@@ -337,7 +337,7 @@ export class ToolExecutor {
         }
         if (
           typeof part === 'object' &&
-          part &&
+          part !== null &&
           'text' in part &&
           typeof part.text === 'string' &&
           Buffer.byteLength(part.text, 'utf8') > MAX_STORED_TOOL_OUTPUT_BYTES
@@ -349,6 +349,21 @@ export class ToolExecutor {
         }
         return part;
       });
+    } else if (
+      typeof finalContent === 'object' &&
+      finalContent !== null &&
+      'text' in finalContent &&
+      typeof finalContent.text === 'string' &&
+      Buffer.byteLength(finalContent.text, 'utf8') >
+        MAX_STORED_TOOL_OUTPUT_BYTES
+    ) {
+      finalContent = {
+        ...finalContent,
+        text: truncateToolOutput(
+          finalContent.text,
+          MAX_STORED_TOOL_OUTPUT_BYTES,
+        ),
+      };
     }
 
     return { truncatedContent: finalContent, outputFile };

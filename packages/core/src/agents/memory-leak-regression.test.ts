@@ -38,10 +38,9 @@ describe('GH-28537 / b/561554750 Memory Leak Regression Tests', () => {
       );
 
       expect(Buffer.byteLength(truncated, 'utf8')).toBeLessThanOrEqual(
-        MAX_STORED_TOOL_OUTPUT_BYTES + 256,
+        MAX_STORED_TOOL_OUTPUT_BYTES,
       );
-      expect(truncated).toContain('[Tool output truncated:');
-      expect(truncated).toContain('omitted to conserve memory');
+      expect(truncated).toContain('[Tool output truncated to conserve memory]');
     });
 
     it('preserves tool outputs within MAX_STORED_TOOL_OUTPUT_BYTES', () => {
@@ -72,9 +71,11 @@ describe('GH-28537 / b/561554750 Memory Leak Regression Tests', () => {
         output: string;
       };
       expect(response).toBeDefined();
-      expect(response.output).toContain('[Tool output truncated:');
+      expect(response.output).toContain(
+        '[Tool output truncated to conserve memory]',
+      );
       expect(Buffer.byteLength(response.output, 'utf8')).toBeLessThanOrEqual(
-        MAX_STORED_TOOL_OUTPUT_BYTES + 256,
+        MAX_STORED_TOOL_OUTPUT_BYTES,
       );
     });
   });
