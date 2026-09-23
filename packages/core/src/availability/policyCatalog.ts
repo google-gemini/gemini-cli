@@ -31,8 +31,10 @@ export interface ModelPolicyOptions {
   isAutoSelection?: boolean;
   userTier?: UserTierId;
   useGemini31?: boolean;
+  useLatestFlashLite?: boolean;
   useGemini31FlashLite?: boolean;
   useCustomToolModel?: boolean;
+  useLatestFlash?: boolean;
   useGemini3_5Flash?: boolean;
 }
 
@@ -66,22 +68,6 @@ const AUTO_ROUTING_OVERRIDES = {
   } as ModelPolicyStateMap,
 };
 
-const FLASH_LITE_CHAIN: ModelPolicyChain = [
-  definePolicy({
-    model: DEFAULT_GEMINI_FLASH_LITE_MODEL,
-    actions: SILENT_ACTIONS,
-  }),
-  definePolicy({
-    model: DEFAULT_GEMINI_FLASH_MODEL,
-    actions: SILENT_ACTIONS,
-  }),
-  definePolicy({
-    model: DEFAULT_GEMINI_MODEL,
-    isLastResort: true,
-    actions: SILENT_ACTIONS,
-  }),
-];
-
 /**
  * Returns the default ordered model policy chain for the user.
  */
@@ -97,7 +83,8 @@ export function getModelPolicyChain(
       options.useCustomToolModel,
       true,
       undefined,
-      options.useGemini3_5Flash,
+      options.useLatestFlash,
+      options.useLatestFlashLite,
     );
     return [
       definePolicy({
@@ -136,7 +123,21 @@ export function createSingleModelChain(model: string): ModelPolicyChain {
 }
 
 export function getFlashLitePolicyChain(): ModelPolicyChain {
-  return cloneChain(FLASH_LITE_CHAIN);
+  return [
+    definePolicy({
+      model: DEFAULT_GEMINI_FLASH_LITE_MODEL,
+      actions: SILENT_ACTIONS,
+    }),
+    definePolicy({
+      model: DEFAULT_GEMINI_FLASH_MODEL,
+      actions: SILENT_ACTIONS,
+    }),
+    definePolicy({
+      model: DEFAULT_GEMINI_MODEL,
+      isLastResort: true,
+      actions: SILENT_ACTIONS,
+    }),
+  ];
 }
 
 /**
@@ -177,16 +178,4 @@ function definePolicy(config: PolicyConfig): ModelPolicy {
       ...(config.stateTransitions ?? {}),
     },
   };
-}
-
-function clonePolicy(policy: ModelPolicy): ModelPolicy {
-  return {
-    ...policy,
-    actions: { ...policy.actions },
-    stateTransitions: { ...policy.stateTransitions },
-  };
-}
-
-function cloneChain(chain: ModelPolicyChain): ModelPolicyChain {
-  return chain.map(clonePolicy);
 }
