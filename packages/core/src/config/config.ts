@@ -87,8 +87,12 @@ import {
   PREVIEW_GEMINI_FLASH_MODEL,
   resolveModel,
   setFlashModels,
-  DEFAULT_GEMINI_3_5_FLASH_MODEL,
-  SECONDARY_GEMINI_3_5_FLASH_MODEL,
+  BASE_GEMINI_FLASH_MODEL,
+  LATEST_GEMINI_FLASH_MODEL,
+  LEGACY_CCPA_FLASH_MODEL,
+  BASE_GEMINI_FLASH_LITE_MODEL,
+  LATEST_GEMINI_FLASH_LITE_MODEL,
+  setFlashLiteModel,
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
@@ -2066,7 +2070,8 @@ export class Config implements McpContext, AgentLoopContext {
       this.getUseCustomToolModelSync(),
       this.getHasAccessToPreviewModel(),
       this,
-      this.hasGemini35FlashGAAccess(),
+      this.hasLatestFlashGAAccess(),
+      this.hasLatestFlashLiteGAAccess(),
     );
 
     const isPreview = isPreviewModel(primaryModel, this);
@@ -2106,7 +2111,8 @@ export class Config implements McpContext, AgentLoopContext {
       this.getUseCustomToolModelSync(),
       this.getHasAccessToPreviewModel(),
       this,
-      this.hasGemini35FlashGAAccess(),
+      this.hasLatestFlashGAAccess(),
+      this.hasLatestFlashLiteGAAccess(),
     );
     return this.modelQuotas.get(primaryModel)?.remaining;
   }
@@ -2122,7 +2128,8 @@ export class Config implements McpContext, AgentLoopContext {
       this.getUseCustomToolModelSync(),
       this.getHasAccessToPreviewModel(),
       this,
-      this.hasGemini35FlashGAAccess(),
+      this.hasLatestFlashGAAccess(),
+      this.hasLatestFlashLiteGAAccess(),
     );
     return this.modelQuotas.get(primaryModel)?.limit;
   }
@@ -2138,7 +2145,8 @@ export class Config implements McpContext, AgentLoopContext {
       this.getUseCustomToolModelSync(),
       this.getHasAccessToPreviewModel(),
       this,
-      this.hasGemini35FlashGAAccess(),
+      this.hasLatestFlashGAAccess(),
+      this.hasLatestFlashLiteGAAccess(),
     );
     return this.modelQuotas.get(primaryModel)?.resetTime;
   }
@@ -2322,8 +2330,21 @@ export class Config implements McpContext, AgentLoopContext {
           }
 
           let modelId = bucket.modelId;
-          if (modelId === SECONDARY_GEMINI_3_5_FLASH_MODEL) {
-            modelId = DEFAULT_GEMINI_3_5_FLASH_MODEL;
+          if (
+            modelId === LEGACY_CCPA_FLASH_MODEL ||
+            modelId === BASE_GEMINI_FLASH_MODEL ||
+            modelId === LATEST_GEMINI_FLASH_MODEL
+          ) {
+            modelId = this.hasLatestFlashGAAccess()
+              ? LATEST_GEMINI_FLASH_MODEL
+              : BASE_GEMINI_FLASH_MODEL;
+          } else if (
+            modelId === BASE_GEMINI_FLASH_LITE_MODEL ||
+            modelId === LATEST_GEMINI_FLASH_LITE_MODEL
+          ) {
+            modelId = this.hasLatestFlashLiteGAAccess()
+              ? LATEST_GEMINI_FLASH_LITE_MODEL
+              : BASE_GEMINI_FLASH_LITE_MODEL;
           }
 
           let remaining: number;
@@ -3570,34 +3591,55 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   /**
-   * Returns whether Gemini 3.5 Flash GA has been launched.
-   *
-   * Note: This method should only be called after startup, once experiments have been loaded.
+   * Returns whether the latest Flash GA model (currently Gemini 3.8 Flash) has been launched.
    */
-  hasGemini35FlashGAAccess(): boolean {
+  hasLatestFlashGAAccess(): boolean {
     const authType = this.contentGeneratorConfig?.authType;
     const hasAccess = (() => {
       if (this.isGemini31LaunchedForAuthType(authType)) {
         return true;
       }
       return (
-        this.experiments?.flags[ExperimentFlags.GEMINI_3_5_FLASH_GA_LAUNCHED]
+        this.experiments?.flags[ExperimentFlags.LATEST_FLASH_GA_LAUNCHED]
           ?.boolValue ?? false
       );
     })();
-    // Used to set default flash models based on access
-    // TODO: Remove once the experiment for 3_5 flash rollut can be cleaned up.
+
     if (hasAccess) {
-      // Gemini API key users should have the ability to manually select the
-      // old preview flash model.
       if (authType === AuthType.USE_GEMINI) {
-        setFlashModels('gemini-3-flash-preview', 'gemini-3.5-flash');
+        setFlashModels('gemini-3-flash-preview', LATEST_GEMINI_FLASH_MODEL);
       } else {
-        setFlashModels('gemini-3.5-flash', 'gemini-3.5-flash');
+        setFlashModels(LATEST_GEMINI_FLASH_MODEL, LATEST_GEMINI_FLASH_MODEL);
       }
     } else {
-      setFlashModels('gemini-3-flash-preview', 'gemini-2.5-flash');
+      setFlashModels('gemini-3-flash-preview', BASE_GEMINI_FLASH_MODEL);
     }
+    return hasAccess;
+  }
+
+  /** @deprecated Use hasLatestFlashGAAccess() */
+  hasGemini35FlashGAAccess(): boolean {
+    return this.hasLatestFlashGAAccess();
+  }
+
+  /**
+   * Returns whether the latest Flash Lite GA model (currently Gemini 3.5 Flash Lite) has been launched.
+   */
+  hasLatestFlashLiteGAAccess(): boolean {
+    const authType = this.contentGeneratorConfig?.authType;
+    const hasAccess = (() => {
+      if (this.isGemini31LaunchedForAuthType(authType)) {
+        return true;
+      }
+      return (
+        this.experiments?.flags[ExperimentFlags.LATEST_FLASH_LITE_GA_LAUNCHED]
+          ?.boolValue ?? false
+      );
+    })();
+
+    setFlashLiteModel(
+      hasAccess ? LATEST_GEMINI_FLASH_LITE_MODEL : BASE_GEMINI_FLASH_LITE_MODEL,
+    );
     return hasAccess;
   }
 
@@ -4173,6 +4215,8 @@ export class Config implements McpContext, AgentLoopContext {
       compact: false,
     });
     debugLogger.debug('Experiments loaded', summaryString);
+    this.hasLatestFlashGAAccess();
+    this.hasLatestFlashLiteGAAccess();
   }
 
   private onAgentsRefreshed = async () => {

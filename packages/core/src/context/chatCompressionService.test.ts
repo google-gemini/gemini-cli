@@ -129,6 +129,21 @@ describe('modelStringToModelConfigAlias', () => {
     expect(modelStringToModelConfigAlias('gemini-2.5-flash-lite')).toBe(
       'chat-compression-2.5-flash-lite',
     );
+    expect(modelStringToModelConfigAlias('gemini-3.5-flash')).toBe(
+      'chat-compression-3-flash',
+    );
+    expect(modelStringToModelConfigAlias('gemini-3.8-flash')).toBe(
+      'chat-compression-3-flash',
+    );
+    expect(modelStringToModelConfigAlias('gemini-3-flash')).toBe(
+      'chat-compression-3-flash',
+    );
+    expect(modelStringToModelConfigAlias('gemini-3.1-flash-lite')).toBe(
+      'chat-compression-3.1-flash-lite',
+    );
+    expect(modelStringToModelConfigAlias('gemini-3.5-flash-lite')).toBe(
+      'chat-compression-3.1-flash-lite',
+    );
   });
 });
 
