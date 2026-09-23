@@ -1066,5 +1066,129 @@ describe('ChatCompressionService', () => {
         ),
       ).toBe(true);
     });
+
+    it('recursively collapses custom keys (stdout, stderr, logs, nested objects) in older responses while leaving latest turn intact', () => {
+      const largeStdout = 'stdout line\n'.repeat(500);
+      const largeStderr = 'stderr error\n'.repeat(500);
+      const largeLog = 'log trace\n'.repeat(500);
+      const largeNested = 'nested deep detail\n'.repeat(500);
+
+      const history: Content[] = [
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'customTool',
+                response: {
+                  stdout: largeStdout,
+                  stderr: largeStderr,
+                  exitCode: 1,
+                  logs: [largeLog, 'small log'],
+                  meta: {
+                    details: {
+                      deepMessage: largeNested,
+                      timestamp: 123456789,
+                    },
+                  },
+                },
+              },
+            },
+          ],
+        },
+        { role: 'model', parts: [{ text: 'acknowledged' }] },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'customTool',
+                response: {
+                  stdout: largeStdout,
+                  meta: { deepMessage: largeNested },
+                },
+              },
+            },
+          ],
+        },
+      ];
+
+      const collapsed = collapseOlderFunctionResponses(history, 512);
+
+      // Verify older turn (index 0) was collapsed recursively
+      const oldResp = collapsed[0].parts?.[0]?.functionResponse?.response as {
+        stdout: string;
+        stderr: string;
+        exitCode: number;
+        logs: string[];
+        meta: {
+          details: {
+            deepMessage: string;
+            timestamp: number;
+          };
+        };
+      };
+
+      expect(oldResp).toBeDefined();
+      expect(oldResp.stdout).toContain(
+        '[Tool output collapsed from previous turn:',
+      );
+      expect(oldResp.stderr).toContain(
+        '[Tool output collapsed from previous turn:',
+      );
+      expect(oldResp.logs[0]).toContain(
+        '[Tool output collapsed from previous turn:',
+      );
+      expect(oldResp.logs[1]).toBe('small log');
+      expect(oldResp.exitCode).toBe(1);
+      expect(oldResp.meta.details.deepMessage).toContain(
+        '[Tool output collapsed from previous turn:',
+      );
+      expect(oldResp.meta.details.timestamp).toBe(123456789);
+
+      // Verify latest turn (index 2) was preserved intact
+      const latestResp = collapsed[2].parts?.[0]?.functionResponse
+        ?.response as {
+        stdout: string;
+        meta: { deepMessage: string };
+      };
+      expect(latestResp.stdout).toBe(largeStdout);
+      expect(latestResp.meta.deepMessage).toBe(largeNested);
+    });
+
+    it('preserves object references when no properties in older responses exceed maxBytesPerOldResponse', () => {
+      const history: Content[] = [
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'customTool',
+                response: {
+                  stdout: 'short',
+                  meta: { message: 'also short' },
+                },
+              },
+            },
+          ],
+        },
+        { role: 'model', parts: [{ text: 'done' }] },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'customTool',
+                response: { stdout: 'latest' },
+              },
+            },
+          ],
+        },
+      ];
+
+      const collapsed = collapseOlderFunctionResponses(history, 2048);
+      expect(collapsed).toBe(history);
+      expect(collapsed[0]).toBe(history[0]);
+    });
   });
 });

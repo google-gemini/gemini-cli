@@ -122,6 +122,67 @@ export function collapseOlderFunctionResponses(
   // All prior tool indices are older completed turns whose subsequent turns have finished.
   const lastToolIndex = toolIndices[toolIndices.length - 1];
 
+  const collapseString = (str: string): string => {
+    const totalBytes = Buffer.byteLength(str, 'utf8');
+    if (totalBytes <= maxBytesPerOldResponse) {
+      return str;
+    }
+
+    const previewBytes = Math.min(maxBytesPerOldResponse, 512);
+    let preview = '';
+    let currentBytes = 0;
+
+    for (const { segment } of segmenter.segment(str)) {
+      const segmentBytes = Buffer.byteLength(segment, 'utf8');
+      if (currentBytes + segmentBytes > previewBytes) {
+        break;
+      }
+      preview += segment;
+      currentBytes += segmentBytes;
+    }
+
+    const omittedBytes = totalBytes - currentBytes;
+    return `${preview}\n... [Tool output collapsed from previous turn: ${omittedBytes} bytes omitted to conserve memory] ...`;
+  };
+
+  const collapseValue = (val: unknown): unknown => {
+    if (typeof val === 'string') {
+      return collapseString(val);
+    }
+
+    if (Array.isArray(val)) {
+      let arrayModified = false;
+      const newVal = val.map((item) => {
+        const collapsed = collapseValue(item);
+        if (collapsed !== item) {
+          arrayModified = true;
+        }
+        return collapsed;
+      });
+      return arrayModified ? newVal : val;
+    }
+
+    if (typeof val === 'object' && val !== null) {
+      const proto: unknown = Object.getPrototypeOf(val);
+      if (proto !== Object.prototype && proto !== null) {
+        return val;
+      }
+
+      let objModified = false;
+      const copy: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(val)) {
+        const collapsed = collapseValue(v);
+        if (collapsed !== v) {
+          objModified = true;
+        }
+        copy[k] = collapsed;
+      }
+      return objModified ? copy : val;
+    }
+
+    return val;
+  };
+
   let modified = false;
   const newHistory = history.map((content, idx) => {
     // Only process older tool response turns
@@ -135,59 +196,18 @@ export function collapseOlderFunctionResponses(
         return part;
       }
 
-      const responseObj = part.functionResponse.response;
-      let outputStr: string | null = null;
-      let outputKey = 'output';
+      const resp: unknown = part.functionResponse.response;
+      const newResp = collapseValue(resp);
 
-      const responseUnknown: unknown = responseObj;
-      if (typeof responseUnknown === 'string') {
-        outputStr = responseUnknown;
-      } else if (responseObj && typeof responseObj === 'object') {
-        const outputVal = responseObj['output'];
-        const contentVal = responseObj['content'];
-        if (typeof outputVal === 'string') {
-          outputStr = outputVal;
-          outputKey = 'output';
-        } else if (typeof contentVal === 'string') {
-          outputStr = contentVal;
-          outputKey = 'content';
-        }
-      }
-
-      if (
-        outputStr &&
-        Buffer.byteLength(outputStr, 'utf8') > maxBytesPerOldResponse
-      ) {
+      if (newResp !== resp) {
         partsModified = true;
-        const totalBytes = Buffer.byteLength(outputStr, 'utf8');
-        const previewBytes = Math.min(maxBytesPerOldResponse, 512);
-        let preview = '';
-        let currentBytes = 0;
-
-        for (const { segment } of segmenter.segment(outputStr)) {
-          const segmentBytes = Buffer.byteLength(segment, 'utf8');
-          if (currentBytes + segmentBytes > previewBytes) {
-            break;
-          }
-          preview += segment;
-          currentBytes += segmentBytes;
-        }
-
-        const omittedBytes = totalBytes - currentBytes;
-        const collapsedMessage = `${preview}\n... [Tool output collapsed from previous turn: ${omittedBytes} bytes omitted to conserve memory] ...`;
-
         return {
           ...part,
           functionResponse: {
             // eslint-disable-next-line @typescript-eslint/no-misused-spread
             ...part.functionResponse,
             // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            response: (typeof responseUnknown === 'string'
-              ? collapsedMessage
-              : {
-                  ...responseObj,
-                  [outputKey]: collapsedMessage,
-                }) as Record<string, unknown>,
+            response: newResp as Record<string, unknown>,
           },
         };
       }
