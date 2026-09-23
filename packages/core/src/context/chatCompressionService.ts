@@ -135,7 +135,7 @@ export function collapseOlderFunctionResponses(
         return part;
       }
 
-      const responseObj = part.functionResponse.response as Record<string, unknown>;
+      const responseObj = part.functionResponse.response;
       let outputStr: string | null = null;
       let outputKey = 'output';
 
@@ -181,10 +181,13 @@ export function collapseOlderFunctionResponses(
           functionResponse: {
             // eslint-disable-next-line @typescript-eslint/no-misused-spread
             ...part.functionResponse,
-            response:
-              typeof responseUnknown === 'string'
-                ? { output: collapsedMessage }
-                : { ...responseObj, [outputKey]: collapsedMessage },
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            response: (typeof responseUnknown === 'string'
+              ? collapsedMessage
+              : {
+                  ...responseObj,
+                  [outputKey]: collapsedMessage,
+                }) as Record<string, unknown>,
           },
         };
       }

@@ -337,4 +337,28 @@ describe('truncateFunctionResponsePart', () => {
       ),
     ).toBe(true);
   });
+
+  it('preserves primitive string response type when truncating', () => {
+    const largeStr = 'S'.repeat(100_000);
+    const part: Part = {
+      functionResponse: {
+        name: 'stringTool',
+        response: largeStr as unknown as Record<string, unknown>,
+      },
+    };
+
+    const truncated = truncateFunctionResponsePart(
+      part,
+      MAX_STORED_TOOL_OUTPUT_BYTES,
+    );
+    const res: unknown = truncated.functionResponse?.response;
+    expect(typeof res).toBe('string');
+    const strRes = res as string;
+    expect(
+      strRes.endsWith('\n... [Tool output truncated to conserve memory]'),
+    ).toBe(true);
+    expect(Buffer.byteLength(strRes, 'utf8')).toBeLessThanOrEqual(
+      MAX_STORED_TOOL_OUTPUT_BYTES,
+    );
+  });
 });

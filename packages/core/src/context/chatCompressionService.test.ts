@@ -1028,5 +1028,43 @@ describe('ChatCompressionService', () => {
         resWithDefault[0].parts?.[0]?.functionResponse?.response,
       );
     });
+
+    it('preserves primitive string response type when collapsing older responses', () => {
+      const longString = 'output line '.repeat(1000);
+      const history: Content[] = [
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'rawTool',
+                response: longString as unknown as Record<string, unknown>,
+              },
+            },
+          ],
+        },
+        { role: 'model', parts: [{ text: 'done' }] },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'rawTool',
+                response: 'latest' as unknown as Record<string, unknown>,
+              },
+            },
+          ],
+        },
+      ];
+
+      const collapsed = collapseOlderFunctionResponses(history, 512);
+      const resp = collapsed[0].parts?.[0]?.functionResponse?.response;
+      expect(typeof resp).toBe('string');
+      expect(
+        (resp as unknown as string).includes(
+          '[Tool output collapsed from previous turn:',
+        ),
+      ).toBe(true);
+    });
   });
 });

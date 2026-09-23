@@ -201,7 +201,11 @@ export function truncateFunctionResponsePart(
         functionResponse: {
           // eslint-disable-next-line @typescript-eslint/no-misused-spread
           ...part.functionResponse,
-          response: { output: truncateToolOutput(resp, maxBytes) },
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          response: truncateToolOutput(resp, maxBytes) as unknown as Record<
+            string,
+            unknown
+          >,
         },
       };
     }

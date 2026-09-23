@@ -975,7 +975,7 @@ export class ShellExecutionService {
             // Ignore errors during stream destruction
           }
         }
-        const stdin = child.stdin;
+        const stdin = child.stdin as Writable | null;
         if (stdin) {
           stdin.removeAllListeners();
           try {
