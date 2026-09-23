@@ -20,6 +20,7 @@ import { getErrorMessage } from '../utils/errors.js';
 import * as fsPromises from 'node:fs/promises';
 import * as path from 'node:path';
 import { glob, escape } from 'glob';
+import picomatch from 'picomatch';
 import { buildParamArgsPattern } from '../policy/utils.js';
 import {
   detectFileType,
@@ -109,6 +110,71 @@ type FileProcessingResult =
       fileReadResult?: undefined;
       reason: string;
     };
+
+/**
+ * Determines whether an asset file (image, PDF, audio) was explicitly requested
+ * by name or extension in the include patterns, rather than implicitly matched
+ * by a broad glob pattern (e.g. generic wildcard or directory patterns).
+ */
+export function isAssetExplicitlyRequested(
+  includePatterns: string[],
+  filePath: string,
+  relativePathForDisplay: string,
+): boolean {
+  const fileExtension = path.extname(filePath);
+  const fileName = path.basename(filePath);
+  const normalizedRelativePath = relativePathForDisplay.replace(/\\/g, '/');
+  const normalizedFilePath = filePath.replace(/\\/g, '/');
+
+  return includePatterns.some((pattern) => {
+    const normalizedPattern = pattern.replace(/\\/g, '/').trim();
+    if (!normalizedPattern) return false;
+
+    // Check if pattern matches this file (by relative path, full path, or by filename if pattern has no slashes)
+    const fileMatcher = picomatch(normalizedPattern, {
+      nocase: true,
+      dot: true,
+    });
+    const matchesPath =
+      fileMatcher(normalizedRelativePath) || fileMatcher(normalizedFilePath);
+    const matchesFileName =
+      !normalizedPattern.includes('/') && fileMatcher(fileName);
+
+    if (!matchesPath && !matchesFileName) {
+      return false;
+    }
+
+    // Now verify the match is explicit (by extension or by name)
+    const cleanPattern = normalizedPattern.replace(/\/+$/, '');
+    const patternLeaf = path.posix.basename(cleanPattern);
+    const patternExt = path.posix.extname(patternLeaf);
+    const patternStem = path.posix.basename(patternLeaf, patternExt);
+
+    // 1. Explicit by extension:
+    // Pattern leaf has a non-wildcard extension (e.g., '*.png', '**/*.png', 'assets/*.PNG', '*.{png,jpg}')
+    // and that extension pattern matches the file's extension case-insensitively.
+    if (
+      patternExt &&
+      !patternExt.includes('*') &&
+      !patternExt.includes('?') &&
+      picomatch(patternExt, { nocase: true })(fileExtension)
+    ) {
+      return true;
+    }
+
+    // 2. Explicit by name:
+    // Pattern leaf specifies a non-wildcard filename/stem (e.g., 'logo.png', 'myExactImage.png', 'report-final.pdf', 'logo.*')
+    // i.e. patternStem is not empty, not '*' or '**', and contains no glob characters.
+    if (patternStem && patternStem !== '*' && patternStem !== '**') {
+      const scan = picomatch.scan(patternStem);
+      if (!scan.isGlob) {
+        return true;
+      }
+    }
+
+    return false;
+  });
+}
 
 /**
  * Creates the default exclusion patterns including dynamic patterns.
@@ -298,15 +364,10 @@ ${finalExclusionPatternsForDescription
             fileType === 'pdf' ||
             fileType === 'audio'
           ) {
-            const fileExtension = path.extname(filePath).toLowerCase();
-            const fileNameWithoutExtension = path.basename(
+            const requestedExplicitly = isAssetExplicitlyRequested(
+              include,
               filePath,
-              fileExtension,
-            );
-            const requestedExplicitly = include.some(
-              (pattern: string) =>
-                pattern.toLowerCase().includes(fileExtension) ||
-                pattern.includes(fileNameWithoutExtension),
+              relativePathForDisplay,
             );
 
             if (!requestedExplicitly) {
