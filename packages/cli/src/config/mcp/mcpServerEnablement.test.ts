@@ -5,6 +5,7 @@
  */
 
 import fs from 'node:fs/promises';
+import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -20,6 +21,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 
+import { coreEvents } from '@google/gemini-cli-core';
 import {
   McpServerEnablementManager,
   McpServerEnablementConfigError,
@@ -29,7 +31,12 @@ import {
   type EnablementCallbacks,
 } from './mcpServerEnablement.js';
 
-const CONFIG_PATH = '/virtual-home/.gemini/mcp-server-enablement.json';
+// Derived the same way the manager derives it. A POSIX literal would not match
+// the path.join() result on win32, where the whole suite runs in CI.
+const CONFIG_PATH = path.join(
+  '/virtual-home/.gemini',
+  'mcp-server-enablement.json',
+);
 
 let inMemoryFs: Record<string, string> = {};
 
@@ -218,6 +225,44 @@ describe('McpServerEnablementManager with an unreadable config file', () => {
   it('still treats a missing file as an empty config', async () => {
     expect(await manager.isFileEnabled('playwright')).toBe(true);
     await expect(manager.enable('playwright')).resolves.toBeUndefined();
+  });
+
+  it('fails closed when the file exists but cannot be read at all', async () => {
+    // Every other case here supplies readable bytes and fails at JSON.parse or
+    // the shape check, so without this the non-ENOENT arm of the read catch is
+    // never driven.
+    vi.spyOn(fs, 'readFile').mockImplementation(async () => {
+      const error = new Error('EACCES: permission denied');
+      (error as NodeJS.ErrnoException).code = 'EACCES';
+      throw error;
+    });
+
+    expect(await manager.isFileEnabled('playwright')).toBe(false);
+    await expect(manager.disable('playwright')).rejects.toBeInstanceOf(
+      McpServerEnablementConfigError,
+    );
+  });
+
+  it('reports an unreadable config once per stretch, not once per read', async () => {
+    // isFileEnabled runs for every server on every connection attempt, so an
+    // unconditional emit would bury the message in copies of itself.
+    const emitFeedback = vi
+      .spyOn(coreEvents, 'emitFeedback')
+      .mockImplementation(() => {});
+    inMemoryFs[CONFIG_PATH] = '{ truncated';
+
+    await manager.isFileEnabled('playwright');
+    await manager.isFileEnabled('github');
+    await manager.isFileEnabled('other');
+    expect(emitFeedback).toHaveBeenCalledTimes(1);
+    expect(emitFeedback.mock.calls[0][1]).toContain(CONFIG_PATH);
+
+    // A successful read rearms it, so a second episode is reported again.
+    inMemoryFs[CONFIG_PATH] = '{"playwright": {"enabled": false}}';
+    await manager.isFileEnabled('playwright');
+    inMemoryFs[CONFIG_PATH] = '{ truncated again';
+    await manager.isFileEnabled('playwright');
+    expect(emitFeedback).toHaveBeenCalledTimes(2);
   });
 
   it('accepts entries carrying unknown extra fields', async () => {
