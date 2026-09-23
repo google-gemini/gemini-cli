@@ -49,6 +49,7 @@ interface StatusRowProps {
   hideContextSummary: boolean;
   hideUiDetailsForSuggestions: boolean;
   hasPendingActionRequired: boolean;
+  statusPhrase?: string;
 }
 
 /**
@@ -63,6 +64,7 @@ export const StatusNode: React.FC<{
   activeHooks: ActiveHook[];
   showLoadingIndicator: boolean;
   errorVerbosity: 'low' | 'full' | undefined;
+  statusPhrase?: string | undefined;
   onResize?: (width: number) => void;
 }> = ({
   showTips,
@@ -73,6 +75,7 @@ export const StatusNode: React.FC<{
   activeHooks,
   showLoadingIndicator,
   errorVerbosity,
+  statusPhrase,
   onResize,
 }) => {
   const observerRef = useRef<ResizeObserver | null>(null);
@@ -145,6 +148,7 @@ export const StatusNode: React.FC<{
         errorVerbosity={errorVerbosity}
         thought={currentThought}
         currentLoadingPhrase={currentLoadingPhrase}
+        statusPhrase={statusPhrase}
         elapsedTime={elapsedTime}
         forceRealStatusOnly={false}
         wittyPhrase={currentWittyPhrase}
@@ -162,8 +166,10 @@ export const StatusRow: React.FC<StatusRowProps> = ({
   hideContextSummary,
   hideUiDetailsForSuggestions,
   hasPendingActionRequired,
+  statusPhrase: propStatusPhrase,
 }) => {
   const uiState = useUIState();
+  const statusPhrase = propStatusPhrase ?? uiState.statusPhrase;
   const inputState = useInputState();
   const settings = useSettings();
   const {
@@ -269,6 +275,7 @@ export const StatusRow: React.FC<StatusRowProps> = ({
       errorVerbosity={
         settings.merged.ui.errorVerbosity as 'low' | 'full' | undefined
       }
+      statusPhrase={statusPhrase}
       onResize={onStatusResize}
     />
   );
