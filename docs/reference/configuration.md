@@ -322,8 +322,8 @@ their corresponding top-level category object in your `settings.json` file.
 - **`ui.escapePastedAtSymbols`** (boolean):
 
   - **Description:** When enabled, @ symbols in pasted text are escaped to
-    prevent unintended @path expansion.
-  - **Default:** `false`
+    prevent unintended @path expansion. Type @path manually to include a file.
+  - **Default:** `true`
 
 - **`ui.showShortcutsHint`** (boolean):
 
