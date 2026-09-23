@@ -172,12 +172,6 @@ export interface Settings {
   agents?: Record<string, unknown>;
   policyPaths?: string[];
   adminPolicyPaths?: string[];
-
-  // Legacy V1 compatibility aliases (resolved via non-enumerable getters to V2 paths)
-  showMemoryUsage?: boolean;
-  checkpointing?: CheckpointingSettings;
-  folderTrust?: boolean;
-  fileFiltering?: FileFilteringSettings;
 }
 
 export interface SettingsError {
@@ -281,7 +275,11 @@ export function getMergeStrategyForPath(
 }
 
 function isPlainObject(item: unknown): item is MergeableObject {
-  return !!item && typeof item === 'object' && !Array.isArray(item);
+  if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+    return false;
+  }
+  const proto: unknown = Object.getPrototypeOf(item);
+  return proto === null || proto === Object.prototype;
 }
 
 function isUnsafeKey(key: string): boolean {
@@ -424,49 +422,6 @@ function migrateInvertedBoolean(
 }
 
 /**
- * Attaches non-enumerable legacy V1 accessors for every migrated key in
- * `MIGRATION_MAP` (and `telemetryDisabled`) so any consumer reading or writing
- * V1 top-level properties transparently accesses the canonical V2 nested paths
- * without adding enumerable V1 keys to the V2 object.
- */
-export function attachLegacyCompatibilityGetters(settings: Settings): Settings {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const record = settings as Record<string, unknown>;
-
-  for (const [v1Key, v2Path] of Object.entries(MIGRATION_MAP)) {
-    if (v1Key === v2Path || KNOWN_V2_CONTAINERS.has(v1Key)) {
-      continue;
-    }
-    Object.defineProperty(record, v1Key, {
-      get(): unknown {
-        return getNestedProperty(record, v2Path);
-      },
-      set(val: unknown) {
-        setNestedProperty(record, v2Path, val);
-      },
-      enumerable: false,
-      configurable: true,
-    });
-  }
-
-  Object.defineProperty(record, 'telemetryDisabled', {
-    get(): boolean | undefined {
-      const enabled = getNestedProperty(record, 'telemetry.enabled');
-      return typeof enabled === 'boolean' ? !enabled : undefined;
-    },
-    set(val: boolean | undefined) {
-      if (typeof val === 'boolean') {
-        setNestedProperty(record, 'telemetry.enabled', !val);
-      }
-    },
-    enumerable: false,
-    configurable: true,
-  });
-
-  return settings;
-}
-
-/**
  * Intercepts a V1 (flat) or hybrid settings object in memory and converts
  * legacy/deprecated keys into the V2 hierarchical structure.
  */
@@ -474,7 +429,7 @@ export function migrateDeprecatedSettings(
   rawSettings: Record<string, unknown>,
 ): Settings {
   if (!isPlainObject(rawSettings)) {
-    return attachLegacyCompatibilityGetters({});
+    return {};
   }
 
   const v2Settings: Record<string, unknown> = {};
@@ -608,7 +563,7 @@ export function migrateDeprecatedSettings(
     }
   }
 
-  return attachLegacyCompatibilityGetters(v2Settings as Settings);
+  return v2Settings as Settings;
 }
 
 const booleanPreprocess = z.preprocess((val) => {
@@ -895,7 +850,7 @@ function loadAndMigrateFile(
         });
         return migrated;
       }
-      return attachLegacyCompatibilityGetters(validation.data ?? migrated);
+      return validation.data ?? migrated;
     }
   } catch (error: unknown) {
     settingsErrors.push({
@@ -924,9 +879,7 @@ export function loadSettings(
   let isTrusted = isTrustedOverride;
   if (isTrusted === undefined) {
     const isFolderTrustEnabled =
-      userSettings.security?.folderTrust?.enabled ??
-      userSettings.folderTrust ??
-      true;
+      userSettings.security?.folderTrust?.enabled ?? true;
     const { isTrusted: trustResult } = checkPathTrust({
       path: workspaceDir,
       isFolderTrustEnabled,
@@ -967,7 +920,7 @@ export function loadSettings(
   mergedSettings.policyPaths = userSettings.policyPaths;
   mergedSettings.adminPolicyPaths = userSettings.adminPolicyPaths;
 
-  return attachLegacyCompatibilityGetters(mergedSettings);
+  return mergedSettings;
 }
 
 export function resolveEnvVarsInString(value: string): string {
@@ -1033,13 +986,16 @@ function resolveEnvVarsInObjectInternal<T>(
   }
 
   if (typeof obj === 'object') {
+    if (!isPlainObject(obj)) {
+      return obj;
+    }
     const objRef = obj as object;
     if (visited.has(objRef)) {
       return { ...obj } as T;
     }
     visited.add(objRef);
     const newObj: Record<string, unknown> = {};
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+     
     const sourceRecord = obj as Record<string, unknown>;
     for (const key of Object.keys(sourceRecord)) {
       if (isUnsafeKey(key)) {

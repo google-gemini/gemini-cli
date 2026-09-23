@@ -246,11 +246,13 @@ describe('loadConfig', () => {
     ]);
   });
 
-  it('should set customIgnoreFilePaths when settings.fileFiltering.customIgnoreFilePaths is present', async () => {
+  it('should set customIgnoreFilePaths when settings.context.fileFiltering.customIgnoreFilePaths is present', async () => {
     const testPath = '/settings/ignore';
     const settings: Settings = {
-      fileFiltering: {
-        customIgnoreFilePaths: [testPath],
+      context: {
+        fileFiltering: {
+          customIgnoreFilePaths: [testPath],
+        },
       },
     };
     const config = await loadConfig(settings, mockExtensionLoader, taskId);
@@ -265,8 +267,10 @@ describe('loadConfig', () => {
     const settingsPath = '/settings/ignore';
     vi.stubEnv('CUSTOM_IGNORE_FILE_PATHS', envPath);
     const settings: Settings = {
-      fileFiltering: {
-        customIgnoreFilePaths: [settingsPath],
+      context: {
+        fileFiltering: {
+          customIgnoreFilePaths: [settingsPath],
+        },
       },
     };
     const config = await loadConfig(settings, mockExtensionLoader, taskId);
@@ -656,9 +660,9 @@ describe('loadConfig V1 and V2 settings compatibility', () => {
     );
   });
 
-  it('should normalize direct V1 flat settings passed to loadConfig', async () => {
-    const { logger } = await import('../utils/logger.js');
-    const v1Settings = {
+  it('should not support unmigrated V1 flat settings directly in loadConfig', async () => {
+    const { validateSettings } = await import('./settings.js');
+    const rawV1Settings = {
       folderTrust: true,
       checkpointing: { enabled: false },
       showMemoryUsage: true,
@@ -671,9 +675,60 @@ describe('loadConfig V1 and V2 settings compatibility', () => {
       coreTools: ['read_file'],
       excludeTools: ['shell'],
       allowedTools: ['fetch'],
-    } as unknown as Settings;
+    };
 
-    await loadConfig(v1Settings, mockExtensionLoader, taskId, true);
+    // V1 settings fail V2 schema validation when not migrated
+    expect(validateSettings(rawV1Settings).success).toBe(false);
+
+    await loadConfig(
+      rawV1Settings as unknown as Settings,
+      mockExtensionLoader,
+      taskId,
+      true,
+    );
+
+    // Unmigrated V1 flat properties are ignored by loadConfig
+    expect(Config).toHaveBeenCalledWith(
+      expect.objectContaining({
+        folderTrust: false,
+        checkpointing: undefined,
+        showMemoryUsage: false,
+        coreTools: undefined,
+        excludeTools: undefined,
+        allowedTools: undefined,
+        telemetry: expect.objectContaining({ enabled: undefined }),
+        fileFiltering: expect.objectContaining({
+          respectGitIgnore: undefined,
+          customIgnoreFilePaths: [],
+        }),
+      }),
+    );
+  });
+
+  it('should succeed when V1 flat settings are migrated via migrateDeprecatedSettings and passed to loadConfig', async () => {
+    const { logger } = await import('../utils/logger.js');
+    const { migrateDeprecatedSettings, validateSettings } = await import(
+      './settings.js'
+    );
+    const rawV1Settings = {
+      folderTrust: true,
+      checkpointing: { enabled: false },
+      showMemoryUsage: true,
+      fileFiltering: {
+        respectGitIgnore: true,
+        customIgnoreFilePaths: ['/v1/ignore'],
+      },
+      logLevel: 'warn',
+      telemetryDisabled: true,
+      coreTools: ['read_file'],
+      excludeTools: ['shell'],
+      allowedTools: ['fetch'],
+    };
+
+    const migratedSettings = migrateDeprecatedSettings(rawV1Settings);
+    expect(validateSettings(migratedSettings).success).toBe(true);
+
+    await loadConfig(migratedSettings, mockExtensionLoader, taskId, true);
 
     expect(logger.level).toBe('warn');
     expect(Config).toHaveBeenCalledWith(

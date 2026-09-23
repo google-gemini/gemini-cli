@@ -110,10 +110,10 @@ describe('loadSettings', () => {
     fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(settings));
 
     const result = loadSettings(mockWorkspaceDir);
-    expect(result.showMemoryUsage).toBe(true);
+    expect(result.ui?.showMemoryUsage).toBe(true);
     expect(result.tools?.core).toEqual(['tool1', 'tool2']);
     expect(result.mcpServers).toHaveProperty('server1');
-    expect(result.fileFiltering?.respectGitIgnore).toBe(true);
+    expect(result.context?.fileFiltering?.respectGitIgnore).toBe(true);
   });
 
   it('should load experimental settings correctly', () => {
@@ -152,12 +152,9 @@ describe('loadSettings', () => {
 
     const result = loadSettings(mockWorkspaceDir, true);
     // Primitive value overwritten
-    expect(result.showMemoryUsage).toBe(true);
     expect(result.ui?.showMemoryUsage).toBe(true);
 
     // Nested object values deep-merged across user and workspace scopes
-    expect(result.fileFiltering?.respectGitIgnore).toBe(false);
-    expect(result.fileFiltering?.enableRecursiveFileSearch).toBe(true);
     expect(result.context?.fileFiltering?.respectGitIgnore).toBe(false);
     expect(result.context?.fileFiltering?.enableRecursiveFileSearch).toBe(true);
   });
@@ -179,7 +176,7 @@ describe('loadSettings', () => {
 
       // checkPathTrust is mocked to return isTrusted: false by default
       const result = loadSettings(mockWorkspaceDir);
-      expect(result.showMemoryUsage).toBe(false);
+      expect(result.ui?.showMemoryUsage).toBe(false);
     });
 
     it('should load workspace settings if workspace IS trusted', () => {
@@ -201,7 +198,7 @@ describe('loadSettings', () => {
       );
 
       const result = loadSettings(mockWorkspaceDir);
-      expect(result.showMemoryUsage).toBe(true);
+      expect(result.ui?.showMemoryUsage).toBe(true);
     });
 
     it('should NOT allow workspace settings to override adminPolicyPaths or policyPaths even if trusted', () => {
@@ -230,7 +227,7 @@ describe('loadSettings', () => {
       );
 
       const result = loadSettings(mockWorkspaceDir);
-      expect(result.showMemoryUsage).toBe(true);
+      expect(result.ui?.showMemoryUsage).toBe(true);
       expect(result.adminPolicyPaths).toEqual(['/trusted/admin']);
       expect(result.policyPaths).toEqual(['/trusted/user']);
     });
@@ -349,38 +346,34 @@ describe('loadSettings', () => {
       vi.unstubAllEnvs();
     });
 
-    it('should provide bidirectional compatibility between V1 aliases and V2 nested paths across all migrated keys', () => {
-      const v2Settings = {
-        telemetry: { enabled: false },
-        logging: { level: 'debug' },
-        tools: { core: ['read_file'], exclude: ['shell'], allowed: ['fetch'] },
-        ui: { showMemoryUsage: true, theme: 'DefaultDark' },
-        security: { folderTrust: { enabled: true } },
-        general: { checkpointing: { enabled: true }, vimMode: true },
-        context: { fileFiltering: { respectGitIgnore: true } },
+    it('should remove deprecated V1 root keys after migrating to V2 nested paths', () => {
+      const v1Settings = {
+        telemetryDisabled: true,
+        logLevel: 'debug',
+        coreTools: ['read_file'],
+        excludeTools: ['shell'],
+        allowedTools: ['fetch'],
+        showMemoryUsage: true,
+        theme: 'DefaultDark',
+        folderTrust: true,
+        checkpointing: { enabled: true },
+        vimMode: true,
+        fileFiltering: { respectGitIgnore: true },
       };
-      fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(v2Settings));
+      fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(v1Settings));
 
       const result = loadSettings(mockWorkspaceDir) as Record<string, unknown>;
-      // V1 aliases read from V2 paths transparently
-      expect(result['telemetryDisabled']).toBe(true);
-      expect(result['logLevel']).toBe('debug');
-      expect(result['coreTools']).toEqual(['read_file']);
-      expect(result['excludeTools']).toEqual(['shell']);
-      expect(result['allowedTools']).toEqual(['fetch']);
-      expect(result['showMemoryUsage']).toBe(true);
-      expect(result['theme']).toBe('DefaultDark');
-      expect(result['folderTrust']).toBe(true);
-      expect(result['checkpointing']).toEqual({ enabled: true });
-      expect(result['vimMode']).toBe(true);
-      expect(result['fileFiltering']).toEqual({ respectGitIgnore: true });
-
-      // Enumerable keys remain strictly V2 (no V1 flat keys leaked into Object.keys)
-      expect(Object.keys(result)).not.toContain('telemetryDisabled');
-      expect(Object.keys(result)).not.toContain('logLevel');
-      expect(Object.keys(result)).not.toContain('coreTools');
-      expect(Object.keys(result)).not.toContain('showMemoryUsage');
-      expect(Object.keys(result)).not.toContain('folderTrust');
+      expect(result['telemetryDisabled']).toBeUndefined();
+      expect(result['logLevel']).toBeUndefined();
+      expect(result['coreTools']).toBeUndefined();
+      expect(result['excludeTools']).toBeUndefined();
+      expect(result['allowedTools']).toBeUndefined();
+      expect(result['showMemoryUsage']).toBeUndefined();
+      expect(result['theme']).toBeUndefined();
+      expect(result['folderTrust']).toBeUndefined();
+      expect(result['checkpointing']).toBeUndefined();
+      expect(result['vimMode']).toBeUndefined();
+      expect(result['fileFiltering']).toBeUndefined();
     });
 
     it('should handle edge cases: boolean checkpointing, hybrid V1+V2 precedence, and non-object inputs', async () => {
@@ -416,6 +409,96 @@ describe('loadSettings', () => {
       expect(migrated.ui?.showMemoryUsage).toBe(true);
       expect(migrated.ui?.theme).toBe('DefaultLight');
       expect(validateSettings(migrated).success).toBe(true);
+    });
+
+    it('should reject unmigrated V1 settings when passed directly to validateSettings', async () => {
+      const { validateSettings } = await import('./settings.js');
+      const v1Config = {
+        telemetryDisabled: true,
+        logLevel: 'debug',
+        coreTools: ['read_file'],
+        excludeTools: ['shell'],
+        allowedTools: ['fetch'],
+        folderTrust: false,
+        showMemoryUsage: true,
+        checkpointing: { enabled: true },
+        fileFiltering: { respectGitIgnore: true },
+      };
+
+      const validation = validateSettings(v1Config);
+      expect(validation.success).toBe(false);
+      expect(validation.error?.issues.length).toBeGreaterThan(0);
+    });
+
+    it('should pass validateSettings when a V1 configuration is migrated using migrateDeprecatedSettings', async () => {
+      const { migrateDeprecatedSettings, validateSettings } = await import(
+        './settings.js'
+      );
+      const v1Config = {
+        telemetryDisabled: true,
+        logLevel: 'debug',
+        coreTools: ['read_file'],
+        excludeTools: ['shell'],
+        allowedTools: ['fetch'],
+        folderTrust: false,
+        showMemoryUsage: true,
+        checkpointing: { enabled: true },
+        fileFiltering: { respectGitIgnore: true },
+      };
+
+      const migratedConfig = migrateDeprecatedSettings(v1Config);
+      const validation = validateSettings(migratedConfig);
+
+      expect(validation.success).toBe(true);
+      expect(migratedConfig.telemetry?.enabled).toBe(false);
+      expect(migratedConfig.logging?.level).toBe('debug');
+      expect(migratedConfig.tools?.core).toEqual(['read_file']);
+      expect(migratedConfig.tools?.exclude).toEqual(['shell']);
+      expect(migratedConfig.tools?.allowed).toEqual(['fetch']);
+      expect(migratedConfig.security?.folderTrust?.enabled).toBe(false);
+      expect(migratedConfig.ui?.showMemoryUsage).toBe(true);
+      expect(migratedConfig.general?.checkpointing?.enabled).toBe(true);
+      expect(migratedConfig.context?.fileFiltering?.respectGitIgnore).toBe(
+        true,
+      );
+    });
+
+    it('should preserve non-plain objects (such as Date and RegExp) without stripping their prototypes in customDeepMerge and resolveEnvVarsInObject', async () => {
+      const { customDeepMerge, resolveEnvVarsInObject } = await import(
+        './settings.js'
+      );
+      vi.stubEnv('A2A_TEST_HOST', 'localhost');
+
+      const dateInstance = new Date('2026-09-24T00:00:00.000Z');
+      const regexInstance = /^gemini-.*$/i;
+
+      const resolved = resolveEnvVarsInObject({
+        endpoint: 'http://${A2A_TEST_HOST}:8080',
+        createdAt: dateInstance,
+        pattern: regexInstance,
+      });
+
+      expect(resolved.endpoint).toBe('http://localhost:8080');
+      expect(resolved.createdAt).toBe(dateInstance);
+      expect(resolved.createdAt).toBeInstanceOf(Date);
+      expect(resolved.pattern).toBe(regexInstance);
+      expect(resolved.pattern).toBeInstanceOf(RegExp);
+
+      const merged = customDeepMerge(
+        () => undefined,
+        {
+          nested: { createdAt: new Date('2025-01-01T00:00:00.000Z'), keep: 1 },
+        },
+        { nested: { createdAt: dateInstance, pattern: regexInstance } },
+      ) as { nested: { createdAt: Date; pattern: RegExp; keep: number } };
+
+      expect(merged.nested.keep).toBe(1);
+      expect(merged.nested.createdAt).toBe(dateInstance);
+      expect(merged.nested.createdAt).toBeInstanceOf(Date);
+      expect(merged.nested.pattern).toBe(regexInstance);
+      expect(merged.nested.pattern).toBeInstanceOf(RegExp);
+
+      vi.unstubAllEnvs();
     });
   });
 });
