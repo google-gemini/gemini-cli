@@ -135,7 +135,7 @@ export function collapseOlderFunctionResponses(
         return part;
       }
 
-      const responseObj = part.functionResponse.response;
+      const responseObj = part.functionResponse.response as Record<string, unknown>;
       let outputStr: string | null = null;
       let outputKey = 'output';
 
