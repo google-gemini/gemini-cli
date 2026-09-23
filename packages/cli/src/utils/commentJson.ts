@@ -18,42 +18,6 @@ function isDangerousKey(key: string): boolean {
   return key === '__proto__' || key === 'constructor' || key === 'prototype';
 }
 
-function readFileWithRetry(filePath: string, retries = 3): string {
-  let attempt = 0;
-  while (attempt < retries) {
-    try {
-      return fs.readFileSync(filePath, 'utf-8');
-    } catch (err: unknown) {
-      if (
-        err &&
-        typeof err === 'object' &&
-        'code' in err &&
-        err.code === 'ENOENT'
-      ) {
-        throw err;
-      }
-      attempt++;
-      if (attempt >= retries) {
-        throw err;
-      }
-      try {
-        Atomics.wait(
-          new Int32Array(new SharedArrayBuffer(4)),
-          0,
-          0,
-          25 * attempt,
-        );
-      } catch {
-        const end = Date.now() + 25 * attempt;
-        while (Date.now() < end) {
-          /* empty */
-        }
-      }
-    }
-  }
-  return '';
-}
-
 function writeAtomicSync(filePath: string, content: string): void {
   const dir = path.dirname(filePath);
   if (!fs.existsSync(dir)) {
@@ -61,7 +25,7 @@ function writeAtomicSync(filePath: string, content: string): void {
   }
   const tempPath = path.join(
     dir,
-    `.${path.basename(filePath)}.${process.pid}.${Date.now()}.tmp`,
+    `.${path.basename(filePath)}.${process.pid}.${Math.random().toString(36).slice(2, 8)}.tmp`,
   );
   try {
     fs.writeFileSync(tempPath, content, 'utf-8');
@@ -98,7 +62,7 @@ export function updateSettingsFilePreservingFormat(
 
   let parsed: Record<string, unknown>;
   try {
-    const originalContent = readFileWithRetry(filePath);
+    const originalContent = fs.readFileSync(filePath, 'utf-8');
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     parsed = parse(originalContent) as Record<string, unknown>;
   } catch (error: unknown) {
