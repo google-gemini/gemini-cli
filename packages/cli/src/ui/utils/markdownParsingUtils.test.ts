@@ -299,6 +299,21 @@ describe('parsingUtils', () => {
         const result = parseMarkdownToANSI(`Visit ${url} now`);
         expect(result).toContain(`${OSC}${url}${ST}`);
       });
+
+      it('does not emit OSC 8 when chalk.level is 0 (NO_COLOR / non-TTY)', () => {
+        const originalLevel = chalk.level;
+        try {
+          chalk.level = 0;
+          const url = 'https://example.com/path?q=1';
+          const result = parseMarkdownToANSI(url);
+          // Must not contain the OSC 8 opening sequence
+          expect(result).not.toContain('\x1b]8;;');
+          // The URL text itself must still be present
+          expect(result).toContain(url);
+        } finally {
+          chalk.level = originalLevel;
+        }
+      });
     });
   });
 });
