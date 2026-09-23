@@ -690,6 +690,33 @@ export function getAvailablePort(): Promise<number> {
   });
 }
 
+export async function readOAuthCredsWithRetry(
+  filePath: string,
+  getMaxRetries: () => number = () => 3,
+): Promise<string> {
+  let attempt = 0;
+  while (attempt < getMaxRetries()) {
+    try {
+      return await fs.readFile(filePath, 'utf-8');
+    } catch (err: unknown) {
+      if (
+        err &&
+        typeof err === 'object' &&
+        'code' in err &&
+        err.code === 'ENOENT'
+      ) {
+        throw err;
+      }
+      attempt++;
+      if (attempt >= getMaxRetries()) {
+        throw err;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 25 * attempt));
+    }
+  }
+  return '';
+}
+
 async function fetchCachedCredentialsList(): Promise<
   Array<Credentials | JWTInput>
 > {
@@ -716,7 +743,7 @@ async function fetchCachedCredentialsList(): Promise<
 
   for (const keyFile of pathsToTry) {
     try {
-      const keyFileString = await fs.readFile(keyFile, 'utf-8');
+      const keyFileString = await readOAuthCredsWithRetry(keyFile);
       const parsed: unknown = JSON.parse(keyFileString);
       const isOAuthCreds = (val: unknown): val is Credentials | JWTInput =>
         typeof val === 'object' && val !== null;
@@ -803,7 +830,7 @@ async function cacheCredentials(credentials: Credentials) {
 
   let existing: Credentials = {};
   try {
-    const existingContent = await fs.readFile(filePath, 'utf-8');
+    const existingContent = await readOAuthCredsWithRetry(filePath);
     const parsed: unknown = JSON.parse(existingContent);
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
       existing = parsed as Credentials;
