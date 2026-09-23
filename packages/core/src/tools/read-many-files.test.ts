@@ -497,8 +497,76 @@ describe('ReadManyFilesTool', () => {
         '**Skipped 1 item(s):**',
       );
       expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
-        '- `document.pdf` (Reason: asset file (image/pdf/audio) was not explicitly requested by name or extension)',
+        '- `document.pdf` (Reason: asset file (image/pdf/audio/video) was not explicitly requested by name or extension)',
       );
+    });
+
+    it('should skip video files if not explicitly requested by extension or name', async () => {
+      createBinaryFile(
+        'movie.mp4',
+        Buffer.from([0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70]),
+      );
+      createFile('notes.txt', 'text notes');
+      const params = { include: ['*'] }; // Generic glob, not specific to .mp4
+      const invocation = tool.build(params);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      const content = result.llmContent as string[];
+      expect(
+        content.some(
+          (c) => typeof c === 'object' && c !== null && 'inlineData' in c,
+        ),
+      ).toBe(false);
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
+        '- `movie.mp4` (Reason: asset file (image/pdf/audio/video) was not explicitly requested by name or extension)',
+      );
+    });
+
+    it('should include video files as inlineData parts if explicitly requested by extension', async () => {
+      createBinaryFile(
+        'clip.mp4',
+        Buffer.from([0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70]),
+      );
+      const params = { include: ['*.mp4'] };
+      const invocation = tool.build(params);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.llmContent).toEqual([
+        {
+          inlineData: {
+            data: Buffer.from([
+              0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70,
+            ]).toString('base64'),
+            mimeType: 'video/mp4',
+          },
+        },
+        '\n--- End of content ---',
+      ]);
+    });
+
+    it('should include video files as inlineData parts if explicitly requested by name', async () => {
+      createBinaryFile(
+        'presentation.mp4',
+        Buffer.from([0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70]),
+      );
+      const params = { include: ['presentation.mp4'] };
+      const invocation = tool.build(params);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.llmContent).toEqual([
+        {
+          inlineData: {
+            data: Buffer.from([
+              0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70,
+            ]).toString('base64'),
+            mimeType: 'video/mp4',
+          },
+        },
+        '\n--- End of content ---',
+      ]);
     });
 
     it('should include PDF files as inlineData parts if explicitly requested by extension', async () => {
@@ -555,7 +623,8 @@ describe('ReadManyFilesTool', () => {
       // Text file summary.txt should be included
       expect(
         content.some(
-          (c) => typeof c === 'string' && c.includes('quarterly summary text'),
+          (c) =>
+            typeof c === 'string' && c.includes('quarterly summary text'),
         ),
       ).toBe(true);
 
@@ -571,7 +640,7 @@ describe('ReadManyFilesTool', () => {
         '**Skipped 1 item(s):**',
       );
       expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
-        '- `reports/quarterlyreport.png` (Reason: asset file (image/pdf/audio) was not explicitly requested by name or extension)',
+        '- `reports/quarterlyreport.png` (Reason: asset file (image/pdf/audio/video) was not explicitly requested by name or extension)',
       );
     });
 
