@@ -209,24 +209,51 @@ export function truncateFunctionResponsePart(
   }
 
   if (typeof resp === 'object' && resp !== null) {
-    let modified = false;
-    const newResp: Record<string, unknown> = { ...resp };
-    for (const [key, value] of Object.entries(newResp)) {
-      if (
-        typeof value === 'string' &&
-        Buffer.byteLength(value, 'utf8') > maxBytes
-      ) {
-        newResp[key] = truncateToolOutput(value, maxBytes);
-        modified = true;
+    const truncateValue = (val: unknown): unknown => {
+      if (typeof val === 'string') {
+        if (Buffer.byteLength(val, 'utf8') > maxBytes) {
+          return truncateToolOutput(val, maxBytes);
+        }
+        return val;
       }
-    }
-    if (modified) {
+
+      if (Array.isArray(val)) {
+        let arrayModified = false;
+        const newVal = val.map((item) => {
+          const truncated = truncateValue(item);
+          if (truncated !== item) {
+            arrayModified = true;
+          }
+          return truncated;
+        });
+        return arrayModified ? newVal : val;
+      }
+
+      if (typeof val === 'object' && val !== null) {
+        let objModified = false;
+        const copy: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(val)) {
+          const truncated = truncateValue(v);
+          if (truncated !== v) {
+            objModified = true;
+          }
+          copy[k] = truncated;
+        }
+        return objModified ? copy : val;
+      }
+
+      return val;
+    };
+
+    const newResp = truncateValue(resp);
+    if (newResp !== resp) {
       return {
         ...part,
         functionResponse: {
           // eslint-disable-next-line @typescript-eslint/no-misused-spread
           ...part.functionResponse,
-          response: newResp,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          response: newResp as Record<string, unknown>,
         },
       };
     }

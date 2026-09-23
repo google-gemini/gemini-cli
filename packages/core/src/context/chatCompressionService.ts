@@ -156,8 +156,22 @@ export function collapseOlderFunctionResponses(
         partsModified = true;
         const totalBytes = Buffer.byteLength(outputStr, 'utf8');
         const previewBytes = Math.min(maxBytesPerOldResponse, 512);
-        const preview = outputStr.slice(0, previewBytes);
-        const omittedBytes = totalBytes - Buffer.byteLength(preview, 'utf8');
+        const segmenter = new Intl.Segmenter(undefined, {
+          granularity: 'grapheme',
+        });
+        let preview = '';
+        let currentBytes = 0;
+
+        for (const { segment } of segmenter.segment(outputStr)) {
+          const segmentBytes = Buffer.byteLength(segment, 'utf8');
+          if (currentBytes + segmentBytes > previewBytes) {
+            break;
+          }
+          preview += segment;
+          currentBytes += segmentBytes;
+        }
+
+        const omittedBytes = totalBytes - currentBytes;
         const collapsedMessage = `${preview}\n... [Tool output collapsed from previous turn: ${omittedBytes} bytes omitted to conserve memory] ...`;
 
         return {

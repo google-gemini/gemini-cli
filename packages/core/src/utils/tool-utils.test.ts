@@ -9,7 +9,9 @@ import {
   doesToolInvocationMatch,
   getToolSuggestion,
   truncateToolOutput,
+  truncateFunctionResponsePart,
 } from './tool-utils.js';
+import type { Part } from '@google/genai';
 import { MAX_STORED_TOOL_OUTPUT_BYTES } from './constants.js';
 import { ReadFileTool, type AnyToolInvocation, type Config } from '../index.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
@@ -192,5 +194,91 @@ describe('truncateToolOutput', () => {
     expect(resultLarge).toContain(suffix);
     expect(resultLarge.includes('\uFFFD')).toBe(false);
     expect(Buffer.from(resultLarge, 'utf8').toString('utf8')).toBe(resultLarge);
+  });
+});
+
+describe('truncateFunctionResponsePart', () => {
+  it('recursively deep-truncates nested objects and arrays while leaving small values untouched', () => {
+    const largeA = 'A'.repeat(100_000);
+    const largeB = 'B'.repeat(100_000);
+    const largeC = 'C'.repeat(100_000);
+    const suffix = '\n... [Tool output truncated to conserve memory]';
+
+    const part: Part = {
+      functionResponse: {
+        name: 'complexTool',
+        response: {
+          details: { logs: largeA, status: 'ok', count: 42 },
+          items: [largeB, 'small item', true],
+          deep: { a: [{ b: { c: largeC, flag: false } }] },
+        },
+      },
+    };
+
+    const truncatedPart = truncateFunctionResponsePart(
+      part,
+      MAX_STORED_TOOL_OUTPUT_BYTES,
+    );
+    const res = truncatedPart.functionResponse?.response as Record<
+      string,
+      unknown
+    >;
+
+    expect(res).toBeDefined();
+
+    // Nested object check: logs is truncated, status and count are untouched
+    const details = res['details'] as {
+      logs: string;
+      status: string;
+      count: number;
+    };
+    expect(typeof details.logs).toBe('string');
+    expect(details.logs.endsWith(suffix)).toBe(true);
+    expect(Buffer.byteLength(details.logs, 'utf8')).toBeLessThanOrEqual(
+      MAX_STORED_TOOL_OUTPUT_BYTES,
+    );
+    expect(details.status).toBe('ok');
+    expect(details.count).toBe(42);
+
+    // Nested array check: large string item is truncated, small item and boolean untouched
+    const items = res['items'] as [string, string, boolean];
+    const firstItem = items[0];
+    expect(typeof firstItem).toBe('string');
+    expect(firstItem.endsWith(suffix)).toBe(true);
+    expect(Buffer.byteLength(firstItem, 'utf8')).toBeLessThanOrEqual(
+      MAX_STORED_TOOL_OUTPUT_BYTES,
+    );
+    expect(items[1]).toBe('small item');
+    expect(items[2]).toBe(true);
+
+    // Deeply nested check: deep.a[0].b.c is truncated, flag is untouched
+    const deep = res['deep'] as {
+      a: Array<{ b: { c: string; flag: boolean } }>;
+    };
+    const nestedC = deep.a[0].b.c;
+    expect(typeof nestedC).toBe('string');
+    expect(nestedC.endsWith(suffix)).toBe(true);
+    expect(Buffer.byteLength(nestedC, 'utf8')).toBeLessThanOrEqual(
+      MAX_STORED_TOOL_OUTPUT_BYTES,
+    );
+    expect(deep.a[0].b.flag).toBe(false);
+  });
+
+  it('returns original part reference when no nested truncation was needed', () => {
+    const part: Part = {
+      functionResponse: {
+        name: 'smallTool',
+        response: {
+          details: { logs: 'short' },
+          items: ['item1', 123],
+        },
+      },
+    };
+
+    const result = truncateFunctionResponsePart(
+      part,
+      MAX_STORED_TOOL_OUTPUT_BYTES,
+    );
+    expect(result).toBe(part);
   });
 });

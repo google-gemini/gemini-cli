@@ -9,6 +9,7 @@ import {
   ChatCompressionService,
   findCompressSplitPoint,
   modelStringToModelConfigAlias,
+  collapseOlderFunctionResponses,
 } from './chatCompressionService.js';
 import type { Content, GenerateContentResponse, Part } from '@google/genai';
 import { CompressionStatus } from '../core/turn.js';
@@ -910,6 +911,80 @@ describe('ChatCompressionService', () => {
       expect(summarizerGrepResponse?.response?.['output']).toContain(
         'Output too large.',
       );
+    });
+  });
+
+  describe('collapseOlderFunctionResponses', () => {
+    it('truncates older responses on valid grapheme boundaries with multi-byte characters and emojis', () => {
+      // 🔥 is a 4-byte emoji (\uD83D\uDD25)
+      // Romanian diacritics: ă (2 bytes), î (2 bytes), ș (2 bytes), ț (2 bytes), â (2 bytes)
+      const diacritics = 'ăîșțâ';
+      const emojis = '🔥'.repeat(300);
+      const multiBytePayload = `${diacritics} ${emojis} `.repeat(10); // > 12 KB
+
+      const history: Content[] = [
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'shell',
+                response: { output: multiBytePayload },
+              },
+            },
+          ],
+        },
+        {
+          role: 'model',
+          parts: [{ text: 'Intermediate response' }],
+        },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'shell',
+                response: { output: 'Latest tool response preserved' },
+              },
+            },
+          ],
+        },
+      ];
+
+      const collapsedHistory = collapseOlderFunctionResponses(history);
+      const oldResponse = collapsedHistory[0].parts?.[0]?.functionResponse
+        ?.response as {
+        output: string;
+      };
+      expect(oldResponse).toBeDefined();
+      expect(oldResponse.output).toContain(
+        '[Tool output collapsed from previous turn:',
+      );
+
+      // Extract the preview portion before the collapse indicator
+      const preview = oldResponse.output.split(
+        '\n... [Tool output collapsed',
+      )[0];
+
+      // Assert preview does not contain replacement character (\uFFFD)
+      expect(preview.includes('\uFFFD')).toBe(false);
+
+      // Assert preview contains no corrupt/unpaired surrogate halves (\uD800–\uDFFF)
+      const hasLoneSurrogates =
+        /(?:[^\uD800-\uDBFF]|^)[\uDC00-\uDFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(
+          preview,
+        );
+      expect(hasLoneSurrogates).toBe(false);
+
+      // Assert preview is valid UTF-8 roundtrip
+      expect(Buffer.from(preview, 'utf8').toString('utf8')).toBe(preview);
+
+      // Assert latest tool turn is preserved untouched
+      const latestResponse = collapsedHistory[2].parts?.[0]?.functionResponse
+        ?.response as {
+        output: string;
+      };
+      expect(latestResponse.output).toBe('Latest tool response preserved');
     });
   });
 });
