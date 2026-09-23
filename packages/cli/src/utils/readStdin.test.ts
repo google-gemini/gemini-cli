@@ -21,7 +21,6 @@ const mockStdin = {
   on: vi.fn(),
   removeListener: vi.fn(),
   destroy: vi.fn(),
-  pause: vi.fn(),
   listeners: vi.fn().mockReturnValue([]),
   listenerCount: vi.fn().mockReturnValue(0),
 };
@@ -138,10 +137,7 @@ describe('readStdin', () => {
     expect(debugLogger.warn).toHaveBeenCalledWith(
       `Warning: stdin input truncated to ${MAX_STDIN_SIZE} bytes.`,
     );
-    // Paused, not destroyed: a destroyed `process.stdin` cannot be read again
-    // for the life of the process, and this only needs to stop reading.
-    expect(mockStdin.pause).toHaveBeenCalled();
-    expect(mockStdin.destroy).not.toHaveBeenCalled();
+    expect(mockStdin.destroy).toHaveBeenCalled();
   });
 
   it('warns when it gives up on stdin instead of resolving empty in silence', async () => {
