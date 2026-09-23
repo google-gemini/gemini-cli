@@ -112,7 +112,7 @@ type FileProcessingResult =
     };
 
 /**
- * Determines whether an asset file (image, PDF, audio) was explicitly requested
+ * Determines whether an asset file (image, PDF, audio, video) was explicitly requested
  * by name or extension in the include patterns, rather than implicitly matched
  * by a broad glob pattern (e.g. generic wildcard or directory patterns).
  */
@@ -362,7 +362,8 @@ ${finalExclusionPatternsForDescription
           if (
             fileType === 'image' ||
             fileType === 'pdf' ||
-            fileType === 'audio'
+            fileType === 'audio' ||
+            fileType === 'video'
           ) {
             const requestedExplicitly = isAssetExplicitlyRequested(
               include,
@@ -376,7 +377,7 @@ ${finalExclusionPatternsForDescription
                 filePath,
                 relativePathForDisplay,
                 reason:
-                  'asset file (image/pdf/audio) was not explicitly requested by name or extension',
+                  'asset file (image/pdf/audio/video) was not explicitly requested by name or extension',
               };
             }
           }
