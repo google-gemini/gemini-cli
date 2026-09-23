@@ -90,6 +90,10 @@ export function calculateHistoryByteSize(history: readonly Content[]): number {
   return bytes;
 }
 
+const defaultGraphemeSegmenter = new Intl.Segmenter(undefined, {
+  granularity: 'grapheme',
+});
+
 /**
  * Collapses detailed logs in older functionResponse payloads from completed previous turns.
  * The most recent functionResponse turn is preserved intact for immediate context fidelity.
@@ -97,6 +101,7 @@ export function calculateHistoryByteSize(history: readonly Content[]): number {
 export function collapseOlderFunctionResponses(
   history: Content[],
   maxBytesPerOldResponse: number = COLLAPSED_FUNCTION_RESPONSE_MAX_BYTES,
+  segmenter: Intl.Segmenter = defaultGraphemeSegmenter,
 ): Content[] {
   // Find all indices of user messages that contain functionResponse
   const toolIndices: number[] = [];
@@ -156,9 +161,6 @@ export function collapseOlderFunctionResponses(
         partsModified = true;
         const totalBytes = Buffer.byteLength(outputStr, 'utf8');
         const previewBytes = Math.min(maxBytesPerOldResponse, 512);
-        const segmenter = new Intl.Segmenter(undefined, {
-          granularity: 'grapheme',
-        });
         let preview = '';
         let currentBytes = 0;
 

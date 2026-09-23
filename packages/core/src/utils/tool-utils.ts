@@ -230,6 +230,12 @@ export function truncateFunctionResponsePart(
       }
 
       if (typeof val === 'object' && val !== null) {
+        // Safeguard: do not recursively traverse non-plain objects like Buffer, TypedArray, Date, etc.
+        const proto: unknown = Object.getPrototypeOf(val);
+        if (proto !== Object.prototype && proto !== null) {
+          return val;
+        }
+
         let objModified = false;
         const copy: Record<string, unknown> = {};
         for (const [k, v] of Object.entries(val)) {

@@ -986,5 +986,47 @@ describe('ChatCompressionService', () => {
       };
       expect(latestResponse.output).toBe('Latest tool response preserved');
     });
+
+    it('supports custom segmenter and functions identically with reused default segmenter', () => {
+      const customSegmenter = new Intl.Segmenter(undefined, {
+        granularity: 'grapheme',
+      });
+      const history: Content[] = [
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'shell',
+                response: { output: 'ABC '.repeat(2000) },
+              },
+            },
+          ],
+        },
+        { role: 'model', parts: [{ text: 'response' }] },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'shell',
+                response: { output: 'latest' },
+              },
+            },
+          ],
+        },
+      ];
+
+      const resWithCustom = collapseOlderFunctionResponses(
+        history,
+        2048,
+        customSegmenter,
+      );
+      const resWithDefault = collapseOlderFunctionResponses(history, 2048);
+
+      expect(resWithCustom[0].parts?.[0]?.functionResponse?.response).toEqual(
+        resWithDefault[0].parts?.[0]?.functionResponse?.response,
+      );
+    });
   });
 });

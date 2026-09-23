@@ -281,4 +281,60 @@ describe('truncateFunctionResponsePart', () => {
     );
     expect(result).toBe(part);
   });
+
+  it('leaves Buffer, Uint8Array, and non-plain object payloads intact without converting to dictionary objects', () => {
+    const bufferPayload = Buffer.from('raw binary content \x00\x01\x02');
+    const uint8Payload = new Uint8Array([10, 20, 30, 40]);
+    const datePayload = new Date(1700000000000);
+    const regexPayload = /test-pattern/gi;
+
+    const part: Part = {
+      functionResponse: {
+        name: 'binaryTool',
+        response: {
+          buf: bufferPayload,
+          uint8: uint8Payload,
+          createdAt: datePayload,
+          pattern: regexPayload,
+          nested: {
+            subBuf: bufferPayload,
+            largeString: 'A'.repeat(100_000),
+          },
+        },
+      },
+    };
+
+    const result = truncateFunctionResponsePart(
+      part,
+      MAX_STORED_TOOL_OUTPUT_BYTES,
+    );
+    const res = result.functionResponse?.response as {
+      buf: Buffer;
+      uint8: Uint8Array;
+      createdAt: Date;
+      pattern: RegExp;
+      nested: { subBuf: Buffer; largeString: string };
+    };
+
+    expect(res).toBeDefined();
+    // Verify instances are preserved and not turned into plain objects {}
+    expect(Buffer.isBuffer(res.buf)).toBe(true);
+    expect(Buffer.compare(res.buf, bufferPayload)).toBe(0);
+
+    expect(res.uint8 instanceof Uint8Array).toBe(true);
+    expect(Array.from(res.uint8)).toEqual([10, 20, 30, 40]);
+
+    expect(res.createdAt instanceof Date).toBe(true);
+    expect(res.createdAt.getTime()).toBe(1700000000000);
+
+    expect(res.pattern instanceof RegExp).toBe(true);
+    expect(res.pattern.source).toBe('test-pattern');
+
+    expect(Buffer.isBuffer(res.nested.subBuf)).toBe(true);
+    expect(
+      res.nested.largeString.endsWith(
+        '\n... [Tool output truncated to conserve memory]',
+      ),
+    ).toBe(true);
+  });
 });
