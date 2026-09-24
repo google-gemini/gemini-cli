@@ -8,8 +8,16 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import nodeFs from 'node:fs';
+import * as nodeFs from 'node:fs';
 import { spawnSync } from 'node:child_process';
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    existsSync: vi.fn(actual.existsSync),
+  };
+});
 import {
   getSafeGitEnv,
   isGitRepository,
@@ -200,12 +208,15 @@ describe('gitUtils', () => {
     });
 
     it('should safely return false/null on filesystem errors', () => {
-      vi.spyOn(nodeFs, 'existsSync').mockImplementation(() => {
-        throw new Error('EACCES: permission denied');
-      });
+      const existsSyncSpy = vi
+        .spyOn(nodeFs, 'existsSync')
+        .mockImplementation(() => {
+          throw new Error('EACCES: permission denied');
+        });
 
       expect(isGitRepository(tempDir)).toBe(false);
       expect(findGitRoot(tempDir)).toBeNull();
+      expect(existsSyncSpy).toHaveBeenCalled();
     });
 
     it('should get absolute git dir for standard repo and subdirectories', async () => {
