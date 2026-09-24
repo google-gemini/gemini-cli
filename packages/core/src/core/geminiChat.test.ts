@@ -166,7 +166,7 @@ describe('GeminiChat', () => {
       getTelemetryLogPromptsEnabled: () => true,
       getTelemetryTracesEnabled: () => false,
       getUsageStatisticsEnabled: () => true,
-      hasGemini35FlashGAAccess: vi.fn().mockReturnValue(false),
+      hasLatestFlashGAAccess: vi.fn().mockReturnValue(false),
       getDebugMode: () => false,
       getContentGeneratorConfig: vi.fn().mockImplementation(() => ({
         authType: 'oauth-personal',
@@ -2306,7 +2306,7 @@ describe('GeminiChat', () => {
     });
 
     it('should send an explicit versioned Flash model unchanged when Gemini 3.5 Flash GA is enabled', async () => {
-      vi.mocked(mockConfig.hasGemini35FlashGAAccess).mockReturnValue(true);
+      vi.mocked(mockConfig.hasLatestFlashGAAccess).mockReturnValue(true);
       vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
         (async function* () {
           yield {
