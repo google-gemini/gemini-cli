@@ -70,6 +70,8 @@ import {
   PREVIEW_GEMINI_MODEL_AUTO,
   PREVIEW_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  resetModelsForTesting,
 } from './models.js';
 import { Storage } from './storage.js';
 import type { AgentLoopContext } from './agent-loop-context.js';
@@ -279,6 +281,7 @@ vi.mock('../code_assist/experiments/experiments.js');
 
 afterEach(() => {
   vi.clearAllMocks();
+  resetModelsForTesting();
 });
 
 describe('Server Config (config.ts)', () => {
@@ -3280,7 +3283,7 @@ describe('Config Quota & Preview Model Access', () => {
             remainingFraction: 0.2,
           },
           {
-            modelId: 'gemini-2.5-flash',
+            modelId: 'gemini-3.5-flash',
             remainingAmount: '80',
             remainingFraction: 0.8,
           },
@@ -4425,7 +4428,7 @@ describe('ADKSettings', () => {
   });
 });
 
-describe('hasGemini35FlashGAAccess model setting', () => {
+describe('hasLatestFlashGAAccess model setting', () => {
   const baseParams: ConfigParameters = {
     sessionId: 'test',
     targetDir: '.',
@@ -4434,47 +4437,170 @@ describe('hasGemini35FlashGAAccess model setting', () => {
     cwd: '.',
   };
 
-  it('should set DEFAULT_GEMINI_FLASH_MODEL to gemini-3.5-flash and PREVIEW_GEMINI_FLASH_MODEL to gemini-3-flash-preview if hasGemini35FlashGAAccess returns true and authType is USE_GEMINI', () => {
+  it('should set DEFAULT_GEMINI_FLASH_MODEL to gemini-3.8-flash and PREVIEW_GEMINI_FLASH_MODEL to gemini-3-flash-preview if hasLatestFlashGAAccess returns true and authType is USE_GEMINI', () => {
     const config = new Config(baseParams);
     config['contentGeneratorConfig'] = { authType: AuthType.USE_GEMINI };
 
-    // Set experiment to return true for GEMINI_3_5_FLASH_GA_LAUNCHED
+    // Set experiment to return true for LATEST_FLASH_GA_LAUNCHED
     config.setExperiments({
       experimentIds: [],
       flags: {
-        [ExperimentFlags.GEMINI_3_5_FLASH_GA_LAUNCHED]: {
+        [ExperimentFlags.LATEST_FLASH_GA_LAUNCHED]: {
           boolValue: true,
         },
       },
     });
 
     // Call the method
-    const result = config.hasGemini35FlashGAAccess();
+    const result = config.hasLatestFlashGAAccess();
     expect(result).toBe(true);
+
+    expect(DEFAULT_GEMINI_FLASH_MODEL).toBe('gemini-3.8-flash');
+    expect(PREVIEW_GEMINI_FLASH_MODEL).toBe('gemini-3-flash-preview');
+  });
+
+  it('should set DEFAULT_GEMINI_FLASH_MODEL and PREVIEW_GEMINI_FLASH_MODEL to gemini-3.8-flash if hasLatestFlashGAAccess returns true and authType is not USE_GEMINI', () => {
+    const config = new Config(baseParams);
+    config['contentGeneratorConfig'] = { authType: AuthType.LOGIN_WITH_GOOGLE };
+
+    // Set experiment to return true for LATEST_FLASH_GA_LAUNCHED
+    config.setExperiments({
+      experimentIds: [],
+      flags: {
+        [ExperimentFlags.LATEST_FLASH_GA_LAUNCHED]: {
+          boolValue: true,
+        },
+      },
+    });
+
+    // Call the method
+    const result = config.hasLatestFlashGAAccess();
+    expect(result).toBe(true);
+
+    expect(DEFAULT_GEMINI_FLASH_MODEL).toBe('gemini-3.8-flash');
+    expect(PREVIEW_GEMINI_FLASH_MODEL).toBe('gemini-3.8-flash');
+  });
+
+  it.each([AuthType.USE_GEMINI, AuthType.USE_VERTEX_AI, AuthType.GATEWAY])(
+    'should return true even if experiment flag is false when authType is %s',
+    (authType) => {
+      const config = new Config(baseParams);
+      config['contentGeneratorConfig'] = { authType };
+
+      config.setExperiments({
+        experimentIds: [],
+        flags: {
+          [ExperimentFlags.LATEST_FLASH_GA_LAUNCHED]: {
+            boolValue: false,
+          },
+        },
+      });
+
+      const result = config.hasLatestFlashGAAccess();
+      expect(result).toBe(true);
+
+      if (authType === AuthType.USE_GEMINI) {
+        expect(DEFAULT_GEMINI_FLASH_MODEL).toBe('gemini-3.8-flash');
+        expect(PREVIEW_GEMINI_FLASH_MODEL).toBe('gemini-3-flash-preview');
+      } else {
+        expect(DEFAULT_GEMINI_FLASH_MODEL).toBe('gemini-3.8-flash');
+        expect(PREVIEW_GEMINI_FLASH_MODEL).toBe('gemini-3.8-flash');
+      }
+    },
+  );
+
+  it('should return false if experiment flag is false when authType is not in launch list (e.g. LOGIN_WITH_GOOGLE)', () => {
+    const config = new Config(baseParams);
+    config['contentGeneratorConfig'] = { authType: AuthType.LOGIN_WITH_GOOGLE };
+
+    config.setExperiments({
+      experimentIds: [],
+      flags: {
+        [ExperimentFlags.LATEST_FLASH_GA_LAUNCHED]: {
+          boolValue: false,
+        },
+      },
+    });
+
+    const result = config.hasLatestFlashGAAccess();
+    expect(result).toBe(false);
 
     expect(DEFAULT_GEMINI_FLASH_MODEL).toBe('gemini-3.5-flash');
     expect(PREVIEW_GEMINI_FLASH_MODEL).toBe('gemini-3-flash-preview');
   });
+});
 
-  it('should set DEFAULT_GEMINI_FLASH_MODEL and PREVIEW_GEMINI_FLASH_MODEL to gemini-3.5-flash if hasGemini35FlashGAAccess returns true and authType is not USE_GEMINI', () => {
+describe('hasLatestFlashLiteGAAccess model setting', () => {
+  const baseParams: ConfigParameters = {
+    sessionId: 'test',
+    targetDir: '.',
+    debugMode: false,
+    model: 'test-model',
+    cwd: '.',
+  };
+
+  beforeEach(() => {
+    resetModelsForTesting();
+  });
+
+  afterEach(() => {
+    resetModelsForTesting();
+  });
+
+  it.each([AuthType.USE_GEMINI, AuthType.USE_VERTEX_AI, AuthType.GATEWAY])(
+    'should return true and set DEFAULT_GEMINI_FLASH_LITE_MODEL even if experiment flag is false when authType is %s',
+    (authType) => {
+      const config = new Config(baseParams);
+      config['contentGeneratorConfig'] = { authType };
+
+      config.setExperiments({
+        experimentIds: [],
+        flags: {
+          [ExperimentFlags.LATEST_FLASH_LITE_GA_LAUNCHED]: {
+            boolValue: false,
+          },
+        },
+      });
+
+      const result = config.hasLatestFlashLiteGAAccess();
+      expect(result).toBe(true);
+      expect(DEFAULT_GEMINI_FLASH_LITE_MODEL).toBe('gemini-3.5-flash-lite');
+    },
+  );
+
+  it('should return true and set DEFAULT_GEMINI_FLASH_LITE_MODEL if experiment flag is true for other auth types', () => {
     const config = new Config(baseParams);
     config['contentGeneratorConfig'] = { authType: AuthType.LOGIN_WITH_GOOGLE };
 
-    // Set experiment to return true for GEMINI_3_5_FLASH_GA_LAUNCHED
     config.setExperiments({
       experimentIds: [],
       flags: {
-        [ExperimentFlags.GEMINI_3_5_FLASH_GA_LAUNCHED]: {
+        [ExperimentFlags.LATEST_FLASH_LITE_GA_LAUNCHED]: {
           boolValue: true,
         },
       },
     });
 
-    // Call the method
-    const result = config.hasGemini35FlashGAAccess();
+    const result = config.hasLatestFlashLiteGAAccess();
     expect(result).toBe(true);
+    expect(DEFAULT_GEMINI_FLASH_LITE_MODEL).toBe('gemini-3.5-flash-lite');
+  });
 
-    expect(DEFAULT_GEMINI_FLASH_MODEL).toBe('gemini-3.5-flash');
-    expect(PREVIEW_GEMINI_FLASH_MODEL).toBe('gemini-3.5-flash');
+  it('should return false and keep base model if experiment flag is false for other auth types', () => {
+    const config = new Config(baseParams);
+    config['contentGeneratorConfig'] = { authType: AuthType.LOGIN_WITH_GOOGLE };
+
+    config.setExperiments({
+      experimentIds: [],
+      flags: {
+        [ExperimentFlags.LATEST_FLASH_LITE_GA_LAUNCHED]: {
+          boolValue: false,
+        },
+      },
+    });
+
+    const result = config.hasLatestFlashLiteGAAccess();
+    expect(result).toBe(false);
+    expect(DEFAULT_GEMINI_FLASH_LITE_MODEL).toBe('gemini-3.1-flash-lite');
   });
 });

@@ -25,12 +25,16 @@ import {
 } from '../utils/tokenCalculation.js';
 import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
-  DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_FLASH_LITE_MODEL,
+  BASE_GEMINI_FLASH_MODEL,
+  LATEST_GEMINI_FLASH_MODEL,
+  LEGACY_CCPA_FLASH_MODEL,
+  BASE_GEMINI_FLASH_LITE_MODEL,
+  LATEST_GEMINI_FLASH_LITE_MODEL,
 } from '../config/models.js';
 import { PreCompressTrigger } from '../hooks/types.js';
 
@@ -105,16 +109,21 @@ export function modelStringToModelConfigAlias(model: string): string {
     case PREVIEW_GEMINI_3_1_MODEL:
       return 'chat-compression-3-pro';
     case PREVIEW_GEMINI_FLASH_MODEL:
+    case BASE_GEMINI_FLASH_MODEL:
+    case LATEST_GEMINI_FLASH_MODEL:
+    case LEGACY_CCPA_FLASH_MODEL:
       return 'chat-compression-3-flash';
     case PREVIEW_GEMINI_FLASH_LITE_MODEL:
     // fallthrough
+    case BASE_GEMINI_FLASH_LITE_MODEL:
     case DEFAULT_GEMINI_FLASH_LITE_MODEL:
+    case LATEST_GEMINI_FLASH_LITE_MODEL:
       return 'chat-compression-3.1-flash-lite';
     case 'gemini-2.5-flash-lite':
       return 'chat-compression-2.5-flash-lite';
     case DEFAULT_GEMINI_MODEL:
       return 'chat-compression-2.5-pro';
-    case DEFAULT_GEMINI_FLASH_MODEL:
+    case 'gemini-2.5-flash':
       return 'chat-compression-2.5-flash';
     default:
       return 'chat-compression-default';
