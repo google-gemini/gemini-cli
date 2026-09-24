@@ -3054,10 +3054,8 @@ const SETTINGS_SCHEMA = {
         label: 'Decision Endpoint',
         category: 'Advanced',
         requiresRestart: false,
-        default: undefined as string | undefined,
-        description:
-          'Full URL of the Jev-compatible /v1/systemone endpoint (default ' +
-          'http://localhost:8000/v1/systemone).',
+        default: 'http://localhost:8000/v1/systemone',
+        description: 'Full URL of the Jev-compatible /v1/systemone endpoint.',
         showInDialog: false,
       },
       model: {
@@ -3065,8 +3063,8 @@ const SETTINGS_SCHEMA = {
         label: 'Decision Model',
         category: 'Advanced',
         requiresRestart: false,
-        default: undefined as string | undefined,
-        description: 'Model id sent to the decision endpoint (e.g. von-1.2.0).',
+        default: 'von-1.2.0',
+        description: 'Model id sent to the decision endpoint.',
         showInDialog: false,
       },
       timeoutMs: {
@@ -3074,10 +3072,9 @@ const SETTINGS_SCHEMA = {
         label: 'Decision Timeout (ms)',
         category: 'Advanced',
         requiresRestart: false,
-        default: undefined as number | undefined,
+        default: 150,
         description:
-          'Hard timeout for a single decision call. On timeout the gate fails ' +
-          'open. Default 150ms.',
+          'Hard timeout for a single decision call. On timeout the gate fails open.',
         showInDialog: false,
       },
     },

@@ -35,10 +35,6 @@ export const vonInstallCommand: CommandModule = {
         default: false,
         describe: 'Only report whether the backend is already installed',
       })
-      .option('port', {
-        type: 'number',
-        describe: 'Port the server will use (informational; default 8000)',
-      })
       .strict(),
   handler: async (argv) => {
     const { spawnSync } = await import('node:child_process');
@@ -101,13 +97,9 @@ export const vonInstallCommand: CommandModule = {
       return;
     }
 
-    let port = 8000;
-    if (argv['port'] !== undefined) {
-      port = Number(argv['port']);
-    }
     out('Von installed.');
     out('Next steps:');
-    out(`  1. Start the decision server:  von serve --port ${port}`);
+    out('  1. Start the decision server:  von serve --port 8000');
     out('  2. In Gemini CLI:              /superfast on');
     out(
       '  (The gate fails open, so Gemini CLI keeps working even if the ' +
