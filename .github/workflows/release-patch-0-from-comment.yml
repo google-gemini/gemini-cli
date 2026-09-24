@@ -59,6 +59,8 @@ jobs:
         uses: 'actions/github-script@00f12e3e20659f42342b1c0226afda7f7c042325'
         env:
           COMMENT_BODY: '${{ github.event.comment.body }}'
+          MERGE_COMMIT_SHA: '${{ steps.pr_status.outputs.MERGE_COMMIT_SHA }}'
+          ORIGINAL_PR: '${{ github.event.issue.number }}'
         with:
           github-token: '${{ secrets.GITHUB_TOKEN }}'
           script: |
@@ -102,9 +104,9 @@ jobs:
                 workflow_id: 'release-patch-1-create-pr.yml',
                 ref: 'main',
                 inputs: {
-                  commit: '${{ steps.pr_status.outputs.MERGE_COMMIT_SHA }}',
+                  commit: process.env.MERGE_COMMIT_SHA,
                   channel: channel,
-                  original_pr: '${{ github.event.issue.number }}',
+                  original_pr: process.env.ORIGINAL_PR,
                   environment: 'prod'
                 }
               });
