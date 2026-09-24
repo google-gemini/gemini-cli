@@ -161,7 +161,7 @@ describe('ToolActionsContext', () => {
     let deferredIdeClient: { resolve: (c: IdeClient) => void };
     const mockIdeClient = {
       isDiffingEnabled: vi.fn().mockReturnValue(true),
-      resolveDiffFromCli: vi.fn(),
+      resolveDiffFromCli: vi.fn().mockResolvedValue(undefined),
       addStatusChangeListener: vi.fn(),
       removeStatusChangeListener: vi.fn(),
     } as unknown as IdeClient;
@@ -194,6 +194,86 @@ describe('ToolActionsContext', () => {
     expect(mockMessageBus.publish).toHaveBeenCalledWith(
       expect.objectContaining({
         correlationId: 'corr-edit',
+      }),
+    );
+  });
+
+  it('does not block MessageBus publication when resolveDiffFromCli hangs or takes time', async () => {
+    let deferredIdeClient: { resolve: (c: IdeClient) => void };
+    const hangingDiffPromise = new Promise<void>(() => {});
+
+    const mockIdeClient = {
+      isDiffingEnabled: vi.fn().mockReturnValue(true),
+      resolveDiffFromCli: vi.fn().mockReturnValue(hangingDiffPromise),
+      addStatusChangeListener: vi.fn(),
+      removeStatusChangeListener: vi.fn(),
+    } as unknown as IdeClient;
+
+    vi.mocked(IdeClient.getInstance).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          deferredIdeClient = { resolve };
+        }),
+    );
+    vi.mocked(mockConfig.getIdeMode).mockReturnValue(true);
+
+    const { result } = await renderHook(() => useToolActions(), {
+      wrapper: WrapperReactComp,
+    });
+
+    await act(async () => {
+      deferredIdeClient.resolve(mockIdeClient);
+    });
+
+    await result.current.confirm(
+      'edit-call',
+      ToolConfirmationOutcome.ProceedOnce,
+    );
+
+    expect(mockMessageBus.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        correlationId: 'corr-edit',
+        confirmed: true,
+        outcome: ToolConfirmationOutcome.ProceedOnce,
+      }),
+    );
+  });
+
+  it('does not fail MessageBus publication when resolveDiffFromCli rejects with an error', async () => {
+    let deferredIdeClient: { resolve: (c: IdeClient) => void };
+    const mockIdeClient = {
+      isDiffingEnabled: vi.fn().mockReturnValue(true),
+      resolveDiffFromCli: vi.fn().mockRejectedValue(new Error('TypeError: fetch failed (UND_ERR_HEADERS_TIMEOUT)')),
+      addStatusChangeListener: vi.fn(),
+      removeStatusChangeListener: vi.fn(),
+    } as unknown as IdeClient;
+
+    vi.mocked(IdeClient.getInstance).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          deferredIdeClient = { resolve };
+        }),
+    );
+    vi.mocked(mockConfig.getIdeMode).mockReturnValue(true);
+
+    const { result } = await renderHook(() => useToolActions(), {
+      wrapper: WrapperReactComp,
+    });
+
+    await act(async () => {
+      deferredIdeClient.resolve(mockIdeClient);
+    });
+
+    await result.current.confirm(
+      'edit-call',
+      ToolConfirmationOutcome.ProceedOnce,
+    );
+
+    expect(mockMessageBus.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        correlationId: 'corr-edit',
+        confirmed: true,
+        outcome: ToolConfirmationOutcome.ProceedOnce,
       }),
     );
   });
