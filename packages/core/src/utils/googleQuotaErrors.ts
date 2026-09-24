@@ -339,7 +339,9 @@ export function classifyGoogleError(error: unknown): unknown {
 
   if (retryInfo?.retryDelay) {
     const parsedDelay = parseDurationInSeconds(retryInfo.retryDelay);
-    if (parsedDelay) {
+    // `null` means the duration could not be parsed; `0` is a valid delay
+    // meaning "retry immediately", so it must not be discarded.
+    if (parsedDelay !== null) {
       delaySeconds = parsedDelay;
     }
   }
@@ -408,7 +410,7 @@ export function classifyGoogleError(error: unknown): unknown {
   }
 
   // 2. Check for delays in RetryInfo
-  if (retryInfo?.retryDelay && delaySeconds) {
+  if (retryInfo?.retryDelay && delaySeconds !== undefined) {
     if (delaySeconds > MAX_RETRYABLE_DELAY_SECONDS) {
       return new TerminalQuotaError(
         `${googleApiError.message}\nSuggested retry after ${retryInfo.retryDelay}.`,
