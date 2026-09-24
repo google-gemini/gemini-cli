@@ -89,6 +89,8 @@ import {
   ACTIVATE_SKILL_TOOL_NAME,
   UPDATE_TOPIC_TOOL_NAME,
 } from '../tools/definitions/base-declarations.js';
+import { AGENT_TOOL_NAME, ALL_AGENTS_WILDCARD } from '../tools/tool-names.js';
+import { AgentTool, MAX_AGENT_DEPTH } from './agent-tool.js';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
@@ -188,10 +190,13 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     }
 
     const parentToolRegistry = context.toolRegistry;
+    const agentRegistry = context.config.getAgentRegistry();
+
+    // Agents named in `toolConfig.tools`. Empty means no `invoke_agent` tool.
+    const allowedAgentNames = new Set<string>();
 
     const registerToolInstance = (tool: AnyDeclarativeTool) => {
-      // Check if the tool is an agent tool to prevent recursion.
-      // We do not allow agents to call other agents.
+      // Agent tools are never inherited; delegation is granted explicitly below.
       if (tool.kind === Kind.Agent) {
         return;
       }
@@ -206,6 +211,14 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     };
 
     const registerToolByName = (toolName: string) => {
+      // `invoke_agent` / `agent_*` grant access to every registered agent.
+      if (toolName === AGENT_TOOL_NAME || toolName === ALL_AGENTS_WILDCARD) {
+        for (const agentName of agentRegistry?.getAllAgentNames() ?? []) {
+          allowedAgentNames.add(agentName);
+        }
+        return;
+      }
+
       // Handle global wildcard
       if (toolName === '*') {
         for (const tool of parentToolRegistry.getAllTools()) {
@@ -241,7 +254,18 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       const tool = parentToolRegistry.getTool(toolName);
       if (tool) {
         registerToolInstance(tool);
+        return;
       }
+
+      // Not a tool, so it may name another agent (or this agent itself).
+      if (agentRegistry?.getDefinition(toolName)) {
+        allowedAgentNames.add(toolName);
+        return;
+      }
+
+      debugLogger.warn(
+        `Agent '${definition.name}' lists '${toolName}' in its tools, which matches no known tool or agent. Ignoring it.`,
+      );
     };
 
     if (definition.toolConfig) {
@@ -260,8 +284,46 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       }
     } else {
       // If no tools are explicitly configured, default to all available tools.
+      // Delegation stays opt-in, so agent tools are not inherited here.
       for (const toolName of parentToolRegistry.getAllToolNames()) {
+        if (toolName === AGENT_TOOL_NAME) {
+          continue;
+        }
         registerToolByName(toolName);
+      }
+    }
+
+    // Grant an `invoke_agent` tool scoped to the agents this one listed.
+    const nestedDepth = (context.agentDepth ?? 0) + 1;
+    if (allowedAgentNames.size > 0) {
+      if (nestedDepth >= MAX_AGENT_DEPTH) {
+        debugLogger.warn(
+          `Agent '${definition.name}' is running at depth ${nestedDepth}; ` +
+            `not granting it agent delegation (max depth ${MAX_AGENT_DEPTH}).`,
+        );
+      } else {
+        const nestedContext: AgentLoopContext = {
+          config: context.config,
+          promptId: context.promptId,
+          parentSessionId: context.parentSessionId,
+          // Resolution source for the child's own declared tools. Narrowing it
+          // to this agent's registry would intersect the child's toolset with
+          // its caller's, leaving a coordinator's delegates nothing to resolve.
+          toolRegistry: context.toolRegistry,
+          // The rest nests, keeping the child inside this agent's isolation
+          // boundary and its confirmations attributed `parent/child`.
+          promptRegistry: agentPromptRegistry,
+          resourceRegistry: agentResourceRegistry,
+          messageBus: subagentMessageBus,
+          geminiClient: context.geminiClient,
+          sandboxManager: context.sandboxManager,
+          agentDepth: nestedDepth,
+        };
+        agentToolRegistry.registerTool(
+          new AgentTool(nestedContext, subagentMessageBus, undefined, {
+            allowedAgentNames: [...allowedAgentNames].sort(),
+          }),
+        );
       }
     }
 
