@@ -1279,6 +1279,10 @@ provide tools. Enablement state is stored in
 The same commands are available as slash commands during an active session:
 `/mcp enable <name>` and `/mcp disable <name>`.
 
+If `mcp-server-enablement.json` exists but cannot be read or parsed, every MCP
+server is treated as disabled until the file is repaired or deleted, and
+`/mcp enable|disable` refuse to write rather than overwrite it.
+
 ## Instructions
 
 Gemini CLI supports

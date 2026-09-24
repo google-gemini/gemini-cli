@@ -6,6 +6,7 @@
 
 export {
   McpServerEnablementManager,
+  McpServerEnablementConfigError,
   canLoadServer,
   normalizeServerId,
   isInSettingsList,
