@@ -18,6 +18,22 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.61.0 - 2026-09-23
+
+- **Core Security Hardening:** Prevented indirect prompt injection
+  vulnerabilities via build file modifications and untrusted flags, while
+  hardening filesystem boundaries and isolating runtime state
+  ([#29250](https://github.com/google-gemini/gemini-cli/pull/29250) by
+  @villahernandez-coder,
+  [#29214](https://github.com/google-gemini/gemini-cli/pull/29214) by
+  @diegogodinezr).
+- **Agent Loop and Model Stability:** Ensured AgentLoopContext state
+  preservation across spread operations and preserved explicit versioned Flash
+  model IDs ([#29335](https://github.com/google-gemini/gemini-cli/pull/29335) by
+  @diegogodinezr,
+  [#29252](https://github.com/google-gemini/gemini-cli/pull/29252) by
+  @SandyTao520).
+
 ## Announcements: v0.60.0 - 2026-09-15
 
 - **Extension & Tool Safety Hardening:** Prompt for user consent on environment
