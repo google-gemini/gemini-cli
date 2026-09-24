@@ -995,7 +995,7 @@ function resolveEnvVarsInObjectInternal<T>(
     }
     visited.add(objRef);
     const newObj: Record<string, unknown> = {};
-     
+
     const sourceRecord = obj as Record<string, unknown>;
     for (const key of Object.keys(sourceRecord)) {
       if (isUnsafeKey(key)) {
