@@ -18,6 +18,8 @@ function isDangerousKey(key: string): boolean {
   return key === '__proto__' || key === 'constructor' || key === 'prototype';
 }
 
+let tempCounter = 0;
+
 function readFileWithRetry(filePath: string, retries = 3): string {
   let attempt = 0;
   while (attempt < retries) {
@@ -36,18 +38,10 @@ function readFileWithRetry(filePath: string, retries = 3): string {
       if (attempt >= retries) {
         throw err;
       }
-      try {
-        Atomics.wait(
-          new Int32Array(new SharedArrayBuffer(4)),
-          0,
-          0,
-          25 * attempt,
-        );
-      } catch {
-        const end = Date.now() + 25 * attempt;
-        while (Date.now() < end) {
-          /* empty */
-        }
+      // Node.js main thread disallows Atomics.wait; use synchronous busy-wait for short delays
+      const end = Date.now() + 25 * attempt;
+      while (Date.now() < end) {
+        /* empty */
       }
     }
   }
@@ -61,7 +55,7 @@ function writeAtomicSync(filePath: string, content: string): void {
   }
   const tempPath = path.join(
     dir,
-    `.${path.basename(filePath)}.${process.pid}.${Date.now()}.tmp`,
+    `.${path.basename(filePath)}.${process.pid}.${Date.now()}.${tempCounter++}.tmp`,
   );
   try {
     fs.writeFileSync(tempPath, content, 'utf-8');

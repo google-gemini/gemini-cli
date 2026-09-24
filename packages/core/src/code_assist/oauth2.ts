@@ -823,6 +823,8 @@ export function resetOauthClientForTesting() {
   oauthClientPromises.clear();
 }
 
+let tempCounter = 0;
+
 async function cacheCredentials(credentials: Credentials) {
   const filePath = Storage.getOAuthCredsPath();
   const dirPath = path.dirname(filePath);
@@ -860,7 +862,7 @@ async function cacheCredentials(credentials: Credentials) {
   const credString = JSON.stringify(finalCredentials, null, 2);
   const tempPath = path.join(
     dirPath,
-    `.${path.basename(filePath)}.${process.pid}.${Date.now()}.tmp`,
+    `.${path.basename(filePath)}.${process.pid}.${Date.now()}.${tempCounter++}.tmp`,
   );
 
   try {
