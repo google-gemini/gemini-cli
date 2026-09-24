@@ -26,11 +26,16 @@ describe('Windows commandSafety', () => {
       expect(isKnownSafeCommand(['git', 'diff', '--stat'])).toBe(true);
       expect(isKnownSafeCommand(['git', 'log', '--oneline'])).toBe(true);
       expect(isKnownSafeCommand(['git.exe', 'branch', '--list'])).toBe(true);
+      expect(isKnownSafeCommand(['git', 'diff', '--text'])).toBe(true);
     });
 
     it('should reject git commands with file-writing or executing flags', () => {
       const unsafe = [
-        ['git', 'diff', '--no-index', 'a', 'b', '--output=C:\target.conf'],
+        ['git', 'diff', '--no-index', 'a', 'b', '--output=C:\\target.conf'],
+        ['git', '--exec-path=C:\\temp', 'diff'],
+        ['git', '--git-dir=C:\\other', 'log'],
+        ['git', '--work-tree', 'C:\\other', 'status'],
+        ['git', '-C', 'C:\\other', 'diff'],
         ['git', 'diff', '--output', 'target.conf'],
         ['git', 'diff', '--out=target.conf'],
         ['git', 'log', '--ext-diff'],

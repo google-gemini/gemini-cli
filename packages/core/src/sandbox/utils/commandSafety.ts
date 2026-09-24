@@ -598,6 +598,12 @@ export function isReadOnlyGitCommand(args: string[]): boolean {
     return false;
   }
 
+  // Global options placed before the subcommand can redirect git to an
+  // attacker-controlled exec path, repository, or working tree.
+  if (gitHasDangerousGlobalOption(args.slice(1, idx))) {
+    return false;
+  }
+
   const subcommandArgs = args.slice(idx + 1);
 
   if (['status', 'log', 'diff', 'show'].includes(subcommand)) {
@@ -691,6 +697,27 @@ function gitHasConfigOverrideGlobalOption(args: string[]): boolean {
 }
 
 /**
+ * Checks git's global options (those before the subcommand) for ones that
+ * change where git loads helpers, repository data, or the working tree from:
+ * `--exec-path`, `--git-dir`, `--work-tree`, and `-C`.
+ *
+ * @param globalArgs - The arguments between `git` and the subcommand.
+ * @returns true if a dangerous global option is present.
+ */
+function gitHasDangerousGlobalOption(globalArgs: string[]): boolean {
+  return globalArgs.some(
+    (arg) =>
+      arg === '--exec-path' ||
+      arg.startsWith('--exec-path=') ||
+      arg === '--git-dir' ||
+      arg.startsWith('--git-dir=') ||
+      arg === '--work-tree' ||
+      arg.startsWith('--work-tree=') ||
+      arg.startsWith('-C'),
+  );
+}
+
+/**
  * Validates that the arguments for safe git subcommands (like `status`, `log`,
  * `diff`, `show`) do not contain flags that could cause mutations or execute
  * arbitrary commands (e.g., `--output`, `--exec`).
@@ -714,8 +741,11 @@ function gitSubcommandArgsAreReadOnly(args: string[]): boolean {
       return false;
     }
     const name = arg.split('=', 1)[0];
+    // `--text` is an exact, safe diff option that merely prefixes `--textconv`.
     return (
-      name.length >= 3 && unsafeFlags.some((flag) => flag.startsWith(name))
+      name !== '--text' &&
+      name.length >= 3 &&
+      unsafeFlags.some((flag) => flag.startsWith(name))
     );
   });
 }
