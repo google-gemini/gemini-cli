@@ -61,6 +61,16 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         },
       },
     },
+    'chat-base-3-flash-lite': {
+      extends: 'chat-base',
+      modelConfig: {
+        generateContentConfig: {
+          thinkingConfig: {
+            thinkingBudget: 0,
+          },
+        },
+      },
+    },
     // Because `gemini-2.5-pro` and related model configs are "user-facing"
     // today, i.e. they could be passed via `--model`, we have to be careful to
     // ensure these model configs can be used interactively.
@@ -91,7 +101,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       },
     },
     'gemini-3.1-flash-lite-preview': {
-      extends: 'chat-base-3',
+      extends: 'chat-base-3-flash-lite',
       modelConfig: {
         model: 'gemini-3.1-flash-lite-preview',
       },
@@ -115,13 +125,13 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       },
     },
     'gemini-3.1-flash-lite': {
-      extends: 'chat-base-3',
+      extends: 'chat-base-3-flash-lite',
       modelConfig: {
         model: 'gemini-3.1-flash-lite',
       },
     },
     'gemini-3.5-flash-lite': {
-      extends: 'chat-base-3',
+      extends: 'chat-base-3-flash-lite',
       modelConfig: {
         model: 'gemini-3.5-flash-lite',
       },
