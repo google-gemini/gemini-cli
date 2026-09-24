@@ -23,6 +23,7 @@ export function getSafeGitEnv(
 
   return {
     ...cleanedEnv,
+    GIT_TERMINAL_PROMPT: '0',
     GIT_CONFIG_GLOBAL: devNullPath,
     GIT_CONFIG_SYSTEM: devNullPath,
     GIT_CONFIG_NOSYSTEM: '1',
