@@ -7,6 +7,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GeminiCliSession } from './session.js';
 import type { GeminiCliAgent } from './agent.js';
 import type { GeminiCliAgentOptions } from './types.js';
+import {
+  GeminiEventType,
+  type AnyDeclarativeTool,
+  type ToolCallRequestInfo,
+  type ToolRegistry,
+} from '@google/gemini-cli-core';
 
 // Mutable mock client so individual tests can override sendMessageStream
 const mockClient = {
@@ -16,8 +22,46 @@ const mockClient = {
   updateSystemInstruction: vi.fn(),
 };
 
+function mockSingleToolCall(args: string, callId = 'bad-1'): void {
+  let callCount = 0;
+  mockClient.sendMessageStream.mockImplementation(() => {
+    callCount++;
+    if (callCount > 1) return (async function* () {})();
+    return (async function* () {
+      yield {
+        type: GeminiEventType.ToolCallRequest,
+        value: { callId, name: 'testTool', args },
+      };
+    })();
+  });
+}
+
+const mockInvocation = {
+  execute: vi.fn().mockResolvedValue({
+    llmContent: 'result',
+    returnDisplay: 'result',
+  }),
+};
+const mockToolBuild = vi.fn(() => mockInvocation);
+const createMockTool = (): AnyDeclarativeTool =>
+  ({
+    name: 'testTool',
+    build: mockToolBuild,
+    clone: vi.fn(() => createMockTool()),
+  }) as unknown as AnyDeclarativeTool;
+const mockTool = createMockTool();
+const mockToolRegistry = {
+  clone: vi.fn(() => ({
+    getTool: vi.fn(() => mockTool),
+    getAllToolNames: vi.fn(() => ['testTool']),
+    messageBus: {},
+  })),
+} as unknown as ToolRegistry;
+
 // Mutable mock config so individual tests can spy on setUserMemory etc.
 const mockConfig = {
+  toolRegistry: mockToolRegistry,
+  geminiClient: mockClient,
   initialize: vi.fn().mockResolvedValue(undefined),
   refreshAuth: vi.fn().mockResolvedValue(undefined),
   getSkillManager: vi.fn().mockReturnValue({
@@ -39,22 +83,37 @@ const mockConfig = {
 // Mock scheduleAgentTools at module level so tests can override it
 const mockScheduleAgentTools = vi.fn().mockResolvedValue([]);
 
+async function buildAndExecuteScheduledTool(
+  requests: ToolCallRequestInfo[],
+  options: { toolRegistry: ToolRegistry },
+): Promise<unknown> {
+  const request = requests[0];
+  const tool = options.toolRegistry.getTool(request.name);
+  const invocation = tool!.build(request.args);
+  return invocation.execute({
+    abortSignal: new AbortController().signal,
+  });
+}
+
 // Mock @google/gemini-cli-core to avoid heavy filesystem/auth/telemetry setup
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
-  return {
-    ...actual,
-    Config: vi.fn().mockImplementation(() => mockConfig),
-    getAuthTypeFromEnv: vi.fn().mockReturnValue(null),
-    scheduleAgentTools: (...args: unknown[]) => mockScheduleAgentTools(...args),
-    loadSkillsFromDir: vi.fn().mockResolvedValue([]),
-    ActivateSkillTool: class {
-      static Name = 'activate_skill';
-    },
-    PolicyDecision: actual.PolicyDecision,
-  };
-});
+vi.mock('@google/gemini-cli-core', () => ({
+  Config: vi.fn().mockImplementation(() => mockConfig),
+  AuthType: { COMPUTE_ADC: 'compute-adc' },
+  PREVIEW_GEMINI_MODEL_AUTO: 'gemini-auto',
+  GeminiEventType: { ToolCallRequest: 'tool_call_request' },
+  scheduleAgentTools: (...args: unknown[]) => mockScheduleAgentTools(...args),
+  getAuthTypeFromEnv: vi.fn().mockReturnValue(null),
+  loadSkillsFromDir: vi.fn().mockResolvedValue([]),
+  ActivateSkillTool: class {
+    static Name = 'activate_skill';
+  },
+  PolicyDecision: { ALLOW: 'allow' },
+  BaseDeclarativeTool: class {},
+  BaseToolInvocation: class {},
+  Kind: { Other: 'other' },
+  ShellExecutionService: { execute: vi.fn() },
+  ShellTool: class {},
+}));
 
 const mockAgent = {} as unknown as GeminiCliAgent;
 
@@ -332,93 +391,105 @@ describe.skip('GeminiCliSession sendStream()', () => {
 });
 
 describe('GeminiCliSession sendStream malformed args guard', () => {
-  it('survives malformed JSON string args without killing the stream', async () => {
-    const { GeminiEventType } = await import('@google/gemini-cli-core');
-
-    mockClient.sendMessageStream.mockImplementation(() =>
-      (async function* () {
-        yield {
-          type: GeminiEventType.ToolCallRequest,
-          value: {
-            callId: 'bad-1',
-            name: 'testTool',
-            args: '{bad json',
-          },
-        };
-        yield {
-          type: GeminiEventType.ToolCallRequest,
-          value: {
-            callId: 'good-1',
-            name: 'testTool',
-            args: { input: 'ok' },
-          },
-        };
-      })(),
-    );
-
-    // Second turn after tool results: empty
-    let callCount = 0;
-    const orig = mockClient.sendMessageStream;
-    mockClient.sendMessageStream.mockImplementation(() => {
-      callCount++;
-      if (callCount === 1) {
-        return (async function* () {
-          yield {
-            type: GeminiEventType.ToolCallRequest,
-            value: { callId: 'bad-1', name: 'testTool', args: '{bad json' },
-          };
-          yield {
-            type: GeminiEventType.ToolCallRequest,
-            value: {
-              callId: 'good-1',
-              name: 'testTool',
-              args: { input: 'ok' },
-            },
-          };
-        })();
-      }
-      return (async function* () {})();
-    });
-
-    mockScheduleAgentTools.mockResolvedValue([
-      {
-        response: {
-          responseParts: [
+  it.each([
+    ['malformed JSON', '{bad json'],
+    ['null', 'null'],
+    ['an array', '[]'],
+    ['a string', '"value"'],
+    ['a number', '42'],
+    ['a boolean', 'true'],
+  ])(
+    'returns an error for %s args without building or executing the tool',
+    async (_description, rawArgs) => {
+      mockSingleToolCall(rawArgs);
+      let error: unknown;
+      mockScheduleAgentTools.mockImplementation(
+        async (
+          _config: unknown,
+          requests: ToolCallRequestInfo[],
+          options: { toolRegistry: ToolRegistry },
+        ) => {
+          const request = requests[0];
+          try {
+            await buildAndExecuteScheduledTool(requests, options);
+          } catch (caughtError) {
+            error = caughtError;
+          }
+          return [
             {
-              functionResponse: {
-                name: 'testTool',
-                response: { result: 'done' },
+              response: {
+                responseParts: [
+                  {
+                    functionResponse: {
+                      id: request.callId,
+                      name: request.name,
+                      response: {
+                        error:
+                          error instanceof Error
+                            ? error.message
+                            : 'unexpected success',
+                      },
+                    },
+                  },
+                ],
               },
             },
-          ],
+          ];
         },
-      },
-    ]);
+      );
 
-    // Should not throw
-    const session = new GeminiCliSession(baseOptions, 'session-malformed', mockAgent);
-    await session.initialize();
-    const events: unknown[] = [];
-    await expect(async () => {
-      for await (const e of session.sendStream('Hello')) {
-        events.push(e);
+      const session = new GeminiCliSession(
+        baseOptions,
+        'session-invalid-args',
+        mockAgent,
+      );
+      await session.initialize();
+      const events: unknown[] = [];
+      for await (const event of session.sendStream('Hello')) {
+        events.push(event);
       }
-    }).not.toThrow();
 
-    // Both tool calls should have been yielded despite malformed args
-    expect(events.length).toBe(2);
-    expect(mockScheduleAgentTools).toHaveBeenCalledOnce();
-    const scheduled = mockScheduleAgentTools.mock.calls[0][1] as Array<{
-      callId: string;
-      args: unknown;
-    }>;
-    expect(scheduled).toHaveLength(2);
-    expect((scheduled[0].args as Record<string, string>)._parseError).toMatch(
-      /Invalid JSON/,
+      expect(events).toHaveLength(1);
+      expect(mockToolBuild).not.toHaveBeenCalled();
+      expect(mockInvocation.execute).not.toHaveBeenCalled();
+      expect(mockClient.sendMessageStream).toHaveBeenCalledTimes(2);
+      expect(mockClient.sendMessageStream.mock.calls[1][0]).toEqual([
+        expect.objectContaining({
+          functionResponse: expect.objectContaining({
+            response: { error: expect.stringMatching(/Invalid JSON args/) },
+          }),
+        }),
+      ]);
+    },
+  );
+
+  it('preserves valid object args containing _parseError', async () => {
+    mockSingleToolCall('{"_parseError":"model supplied"}', 'valid-1');
+    mockScheduleAgentTools.mockImplementation(
+      async (
+        _config: unknown,
+        requests: ToolCallRequestInfo[],
+        options: { toolRegistry: ToolRegistry },
+      ) => {
+        await buildAndExecuteScheduledTool(requests, options);
+        return [{ response: { responseParts: [] } }];
+      },
     );
-    expect((scheduled[1].args as Record<string, string>).input).toBe('ok');
 
-    // restore default mock
-    void orig;
+    const session = new GeminiCliSession(
+      baseOptions,
+      'session-valid-args',
+      mockAgent,
+    );
+    await session.initialize();
+    for await (const _event of session.sendStream('Hello')) {
+      void _event;
+    }
+
+    expect(mockToolBuild).toHaveBeenCalledOnce();
+    expect(mockToolBuild).toHaveBeenCalledWith({
+      _parseError: 'model supplied',
+    });
+    expect(mockInvocation.execute).toHaveBeenCalledOnce();
   });
 });
