@@ -5,7 +5,13 @@
  */
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { spawn, exec, execFile, execSync } from 'node:child_process';
+import {
+  spawn,
+  exec,
+  execFile,
+  execSync,
+  execFileSync,
+} from 'node:child_process';
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -1382,6 +1388,12 @@ describe('sandbox', () => {
         image: 'gemini-cli-sandbox',
         networkAccess: false,
       });
+      vi.mocked(execFileSync).mockImplementation((_cmd, args) => {
+        if (args?.[0] === 'network' && args[1] === 'inspect') {
+          throw new Error('no such network');
+        }
+        return Buffer.from('');
+      });
 
       // Mock image check
       interface MockProcessWithStdout extends EventEmitter {
@@ -1410,8 +1422,9 @@ describe('sandbox', () => {
 
       await start_sandbox(config);
 
-      expect(execSync).toHaveBeenCalledWith(
-        expect.stringContaining('network create --internal gemini-cli-sandbox'),
+      expect(execFileSync).toHaveBeenCalledWith(
+        'docker',
+        ['network', 'create', '--internal', 'gemini-cli-sandbox'],
         expect.any(Object),
       );
       expect(spawn).toHaveBeenCalledWith(

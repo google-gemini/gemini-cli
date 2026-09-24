@@ -7,7 +7,7 @@
 import {
   exec,
   execFile,
-  execSync,
+  execFileSync,
   spawn,
   spawnSync,
   type ChildProcess,
@@ -434,25 +434,30 @@ export async function start_sandbox(
         debugLogger.log('building sandbox ...');
         const gcRoot = gcPath.split('/packages/')[0];
         // if project folder has sandbox.Dockerfile under project settings folder, use that
-        let buildArgs = '';
+        const buildArgs: string[] = [];
         const projectSandboxDockerfile = path.join(
           GEMINI_DIR,
           'sandbox.Dockerfile',
         );
         if (isCustomProjectSandbox) {
           debugLogger.log(`using ${projectSandboxDockerfile} for sandbox`);
-          buildArgs += `-f ${path.resolve(projectSandboxDockerfile)} -i ${image}`;
+          buildArgs.push(
+            '-f',
+            path.resolve(projectSandboxDockerfile),
+            '-i',
+            image,
+          );
         }
-        execSync(
-          `cd ${gcRoot} && node scripts/build_sandbox.js -s ${buildArgs}`,
-          {
-            stdio: 'inherit',
-            env: {
-              ...process.env,
-              GEMINI_SANDBOX: command, // in case sandbox is enabled via flags (see config.ts under cli package)
-            },
+        // Pass paths as argv (no shell) so metacharacters in the checkout or
+        // project path cannot be interpreted as shell syntax.
+        execFileSync('node', ['scripts/build_sandbox.js', '-s', ...buildArgs], {
+          cwd: gcRoot,
+          stdio: 'inherit',
+          env: {
+            ...process.env,
+            GEMINI_SANDBOX: command, // in case sandbox is enabled via flags (see config.ts under cli package)
           },
-        );
+        });
       }
     }
 
@@ -682,22 +687,26 @@ export async function start_sandbox(
     // handle network access and proxy configuration
     if (!config.networkAccess || proxyCommand) {
       const isInternal = !config.networkAccess || !!proxyCommand;
-      const networkFlags = isInternal ? '--internal' : '';
+      const ensureNetwork = (name: string, createFlags: string[]) => {
+        try {
+          execFileSync(command, ['network', 'inspect', name], {
+            stdio: 'ignore',
+          });
+        } catch {
+          execFileSync(command, ['network', 'create', ...createFlags, name], {
+            stdio: 'ignore',
+          });
+        }
+      };
 
-      execSync(
-        `${command} network inspect ${SANDBOX_NETWORK_NAME} || ${command} network create ${networkFlags} ${SANDBOX_NETWORK_NAME}`,
-        { stdio: 'ignore' },
-      );
+      ensureNetwork(SANDBOX_NETWORK_NAME, isInternal ? ['--internal'] : []);
       args.push('--network', SANDBOX_NETWORK_NAME);
 
       if (proxyCommand) {
         // if proxy command is set, create a separate network w/ host access (i.e. non-internal)
         // we will run proxy in its own container connected to both host network and internal network
         // this allows proxy to work even on rootless podman on macos with host<->vm<->container isolation
-        execSync(
-          `${command} network inspect ${SANDBOX_PROXY_NAME} || ${command} network create ${SANDBOX_PROXY_NAME}`,
-          { stdio: 'ignore' },
-        );
+        ensureNetwork(SANDBOX_PROXY_NAME, []);
       }
     }
 
