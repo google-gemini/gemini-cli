@@ -11,6 +11,9 @@ export * from './config/memory.js';
 export * from './config/defaultModelConfigs.js';
 export * from './config/models.js';
 export * from './config/constants.js';
+
+// Superfast System One decision gate
+export * from './superfast/decision-gate.js';
 export * from './output/types.js';
 export * from './output/json-formatter.js';
 export * from './output/stream-json-formatter.js';
