@@ -73,6 +73,7 @@ describe('github.ts', () => {
       getRemotes: ReturnType<typeof vi.fn>;
       fetch: ReturnType<typeof vi.fn>;
       checkout: ReturnType<typeof vi.fn>;
+      submoduleUpdate: ReturnType<typeof vi.fn>;
       listRemote: ReturnType<typeof vi.fn>;
       revparse: ReturnType<typeof vi.fn>;
       env: ReturnType<typeof vi.fn>;
@@ -84,6 +85,7 @@ describe('github.ts', () => {
         getRemotes: vi.fn(),
         fetch: vi.fn(),
         checkout: vi.fn(),
+        submoduleUpdate: vi.fn(),
         listRemote: vi.fn(),
         revparse: vi.fn(),
         env: vi.fn().mockReturnThis(),
@@ -110,6 +112,10 @@ describe('github.ts', () => {
       );
       expect(mockGit.fetch).toHaveBeenCalledWith('origin', 'v1.0.0');
       expect(mockGit.checkout).toHaveBeenCalledWith('FETCH_HEAD');
+      expect(mockGit.submoduleUpdate).toHaveBeenCalledWith([
+        '--init',
+        '--recursive',
+      ]);
     });
 
     it('should throw if no remotes found', async () => {
