@@ -95,7 +95,7 @@ describe('gitUtils', () => {
 
     it('should allow git diff to run successfully on a repository with modifications', async () => {
       // 1. Initialize a git repository with a committed file
-      spawnSync('git', ['init', '-b', 'main'], {
+      spawnSync('git', ['init'], {
         cwd: tempDir,
         stdio: 'ignore',
       });
@@ -130,7 +130,7 @@ describe('gitUtils', () => {
     });
 
     it('should allow git diff between commits to run successfully', async () => {
-      spawnSync('git', ['init', '-b', 'main'], {
+      spawnSync('git', ['init'], {
         cwd: tempDir,
         stdio: 'ignore',
       });
@@ -174,7 +174,7 @@ describe('gitUtils', () => {
       expect(isGitRepository(tempDir)).toBe(false);
       expect(findGitRoot(tempDir)).toBeNull();
 
-      spawnSync('git', ['init', '-b', 'main'], {
+      spawnSync('git', ['init'], {
         cwd: tempDir,
         stdio: 'ignore',
       });
@@ -220,7 +220,7 @@ describe('gitUtils', () => {
     });
 
     it('should get absolute git dir for standard repo and subdirectories', async () => {
-      spawnSync('git', ['init', '-b', 'main'], {
+      spawnSync('git', ['init'], {
         cwd: tempDir,
         stdio: 'ignore',
       });
