@@ -386,7 +386,8 @@ class WriteFileToolInvocation extends BaseToolInvocation<
     // Serialize against other writers of this path, so that the existence
     // check and content read that produce the diff cannot be interleaved with
     // another write to the same file.
-    return withPathLock(this.resolvedPath, () => this.applyWrite(abortSignal));
+    const lockKey = path.resolve(this.config.getTargetDir(), this.resolvedPath);
+    return withPathLock(lockKey, () => this.applyWrite(abortSignal));
   }
 
   /**

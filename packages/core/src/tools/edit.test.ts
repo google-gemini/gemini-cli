@@ -1530,5 +1530,39 @@ function doIt() {
       expect(finalContent).toContain('ALPHA');
       expect(finalContent).toContain('BETA');
     });
+
+    it('serializes concurrent edits with different path spellings (relative vs absolute)', async () => {
+      const fileName = 'spelling.txt';
+      const absolutePath = path.join(rootDir, fileName);
+      const relativePath = `./${fileName}`;
+      fs.writeFileSync(absolutePath, 'line1\nline2\n', 'utf8');
+
+      const first = tool.build({
+        file_path: absolutePath,
+        instruction: 'Uppercase line1',
+        old_string: 'line1',
+        new_string: 'LINE1',
+      });
+      const second = tool.build({
+        file_path: relativePath,
+        instruction: 'Uppercase line2',
+        old_string: 'line2',
+        new_string: 'LINE2',
+      });
+
+      const signal = new AbortController().signal;
+      const results = await Promise.all([
+        first.execute({ abortSignal: signal }),
+        second.execute({ abortSignal: signal }),
+      ]);
+
+      for (const result of results) {
+        expect(result.error).toBeUndefined();
+      }
+
+      const finalContent = fs.readFileSync(absolutePath, 'utf8');
+      expect(finalContent).toContain('LINE1');
+      expect(finalContent).toContain('LINE2');
+    });
   });
 });

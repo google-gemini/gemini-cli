@@ -919,7 +919,8 @@ class EditToolInvocation
     // path. Two edits scheduled in parallel (common with sub-agents) would
     // otherwise both read the original content, and whichever wrote second
     // would silently discard the other's edit while still reporting success.
-    return withPathLock(this.resolvedPath, () => this.applyEdit(signal));
+    const lockKey = path.resolve(this.config.getTargetDir(), this.resolvedPath);
+    return withPathLock(lockKey, () => this.applyEdit(signal));
   }
 
   /**

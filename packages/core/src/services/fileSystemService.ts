@@ -7,6 +7,7 @@
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import { isNodeError } from '../utils/errors.js';
+import { resolveToRealPath } from '../utils/paths.js';
 
 /**
  * Interface for file system operations that may be delegated to different implementations
@@ -49,15 +50,25 @@ export class StandardFileSystemService implements FileSystemService {
    * place means an observer sees either the old file or the new one.
    */
   async writeTextFile(filePath: string, content: string): Promise<void> {
+    // When filePath is a symlink, resolve to its real target path so that the
+    // rename updates the underlying target file rather than replacing the
+    // symlink itself with a regular file.
+    let realPath = filePath;
+    try {
+      realPath = resolveToRealPath(filePath);
+    } catch {
+      realPath = filePath;
+    }
+
     // The temp file must share a directory with the destination so that the
     // rename stays within one filesystem, and must be uniquely named so that
     // concurrent writers do not clobber each other's temp file.
-    const tmpPath = `${filePath}.${randomUUID()}.tmp`;
+    const tmpPath = `${realPath}.${randomUUID()}.tmp`;
 
     // A fresh temp file does not inherit the destination's permissions, so
     // without this, replacing a 0600 file would silently widen it to the
     // default mode.
-    const existingMode = await this.getFileMode(filePath);
+    const existingMode = await this.getFileMode(realPath);
 
     try {
       // Create the temp file already carrying the destination's mode, so the
@@ -80,7 +91,7 @@ export class StandardFileSystemService implements FileSystemService {
         }
       }
 
-      await this.renameWithRetry(tmpPath, filePath);
+      await this.renameWithRetry(tmpPath, realPath);
     } catch (error) {
       await fs.rm(tmpPath, { force: true }).catch(() => {
         // Best effort: the original error is the one worth reporting.

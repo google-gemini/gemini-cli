@@ -95,4 +95,17 @@ describe('StandardFileSystemService atomicity', () => {
 
     await expect(fsp.readdir(dir)).resolves.toEqual(['clean.txt']);
   });
+
+  it('updates the target of a symlink without replacing the symlink itself', async () => {
+    const targetPath = path.join(dir, 'target.txt');
+    const symlinkPath = path.join(dir, 'link.txt');
+    await fsp.writeFile(targetPath, 'original');
+    await fsp.symlink(targetPath, symlinkPath);
+
+    await service.writeTextFile(symlinkPath, 'updated');
+
+    await expect(fsp.readFile(targetPath, 'utf-8')).resolves.toBe('updated');
+    const lstat = await fsp.lstat(symlinkPath);
+    expect(lstat.isSymbolicLink()).toBe(true);
+  });
 });
