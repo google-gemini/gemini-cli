@@ -921,6 +921,13 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
       userSettings.security.auth = {};
     }
     userSettings.security.auth.selectedType = authOverride;
+    if (!userOriginalSettings.security) {
+      userOriginalSettings.security = {};
+    }
+    if (!userOriginalSettings.security.auth) {
+      userOriginalSettings.security.auth = {};
+    }
+    userOriginalSettings.security.auth.selectedType = authOverride;
   }
 
   // Support legacy theme names

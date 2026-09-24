@@ -99,8 +99,21 @@ export function updateSettingsFilePreservingFormat(
   let parsed: Record<string, unknown>;
   try {
     const originalContent = readFileWithRetry(filePath);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    parsed = parse(originalContent) as Record<string, unknown>;
+    if (!originalContent.trim()) {
+      parsed = {};
+    } else {
+      const rawParsed: unknown = parse(originalContent);
+      if (
+        typeof rawParsed !== 'object' ||
+        rawParsed === null ||
+        Array.isArray(rawParsed)
+      ) {
+        parsed = {};
+      } else {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        parsed = rawParsed as Record<string, unknown>;
+      }
+    }
   } catch (error: unknown) {
     if (
       error &&
