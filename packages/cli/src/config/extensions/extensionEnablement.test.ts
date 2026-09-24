@@ -8,7 +8,11 @@ import * as path from 'node:path';
 import fs from 'node:fs';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ExtensionEnablementManager, Override } from './extensionEnablement.js';
+import {
+  ExtensionEnablementConfigError,
+  ExtensionEnablementManager,
+  Override,
+} from './extensionEnablement.js';
 
 import { ExtensionStorage } from './storage.js';
 
@@ -420,6 +424,89 @@ describe('ExtensionEnablementManager', () => {
       const manager = new ExtensionEnablementManager(['none']);
       manager.validateExtensionOverrides([]);
       expect(coreEventsEmitSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('when the enablement config cannot be read', () => {
+    const SCOPE = '/virtual-home/work';
+    const configPath = () =>
+      path.join(testDir.path, GEMINI_DIR, 'extension-enablement.json');
+
+    /** Corrupt the file the way a truncated write would. */
+    const truncateConfig = () => {
+      const whole = inMemoryFs[configPath()];
+      expect(whole).toBeTruthy();
+      inMemoryFs[configPath()] = whole.slice(0, whole.length - 3);
+      return inMemoryFs[configPath()];
+    };
+
+    it('keeps a disabled extension disabled rather than silently re-enabling it', () => {
+      manager.disable('alpha', true, SCOPE);
+      expect(manager.isEnabled('alpha', SCOPE)).toBe(false);
+
+      truncateConfig();
+
+      // Extensions default to enabled, so an unreadable config that reads as
+      // {} turns every deliberate disable back on -- and extensions can carry
+      // MCP servers, tools and hooks.
+      expect(manager.isEnabled('alpha', SCOPE)).toBe(false);
+    });
+
+    it('refuses to write and leaves the file untouched', () => {
+      manager.disable('alpha', true, SCOPE);
+      const corrupt = truncateConfig();
+
+      expect(() => manager.enable('beta', true, SCOPE)).toThrow(
+        ExtensionEnablementConfigError,
+      );
+      expect(inMemoryFs[configPath()]).toBe(corrupt);
+    });
+
+    it('refuses to remove an entry while the file is unreadable', () => {
+      manager.disable('alpha', true, SCOPE);
+      const corrupt = truncateConfig();
+
+      expect(() => manager.remove('alpha')).toThrow(
+        ExtensionEnablementConfigError,
+      );
+      expect(inMemoryFs[configPath()]).toBe(corrupt);
+    });
+
+    it('names the file so the user can repair it', () => {
+      manager.disable('alpha', true, SCOPE);
+      truncateConfig();
+
+      expect(() => manager.enable('beta', true, SCOPE)).toThrow(configPath());
+    });
+
+    it('reports once per stretch of failures, not once per read', () => {
+      manager.disable('alpha', true, SCOPE);
+      truncateConfig();
+      // isEnabled runs per extension on every startup, so an unconditional
+      // emit buries the message in copies of itself.
+      const emitSpy = vi
+        .spyOn(coreEvents, 'emitFeedback')
+        .mockImplementation(() => {});
+
+      manager.isEnabled('alpha', SCOPE);
+      manager.isEnabled('beta', SCOPE);
+      manager.isEnabled('gamma', SCOPE);
+
+      expect(emitSpy).toHaveBeenCalledTimes(1);
+      emitSpy.mockRestore();
+    });
+
+    it('treats valid JSON of the wrong shape as unreadable too', () => {
+      inMemoryFs[configPath()] = '{"alpha": "disabled"}';
+
+      expect(manager.isEnabled('alpha', SCOPE)).toBe(false);
+    });
+
+    it('still treats a missing file as an empty config', () => {
+      delete inMemoryFs[configPath()];
+
+      expect(manager.isEnabled('alpha', SCOPE)).toBe(true);
+      expect(() => manager.enable('alpha', true, SCOPE)).not.toThrow();
     });
   });
 });
