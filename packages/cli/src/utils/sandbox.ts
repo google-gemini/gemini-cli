@@ -1003,9 +1003,12 @@ export async function start_sandbox(
       );
       // connect proxy container to sandbox network
       // (workaround for older versions of docker that don't support multiple --network args)
-      await execAsync(
-        `${command} network connect ${SANDBOX_NETWORK_NAME} ${SANDBOX_PROXY_NAME}`,
-      );
+      await execFileAsync(command, [
+        'network',
+        'connect',
+        SANDBOX_NETWORK_NAME,
+        SANDBOX_PROXY_NAME,
+      ]);
     }
 
     // spawn child and let it inherit stdio
