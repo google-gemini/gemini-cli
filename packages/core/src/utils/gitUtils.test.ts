@@ -22,7 +22,10 @@ describe('gitUtils', () => {
   let tempDir: string;
 
   beforeEach(async () => {
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'git-utils-test-'));
+    const rawTempDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'git-utils-test-'),
+    );
+    tempDir = await fs.realpath(rawTempDir);
   });
 
   afterEach(async () => {
@@ -210,15 +213,17 @@ describe('gitUtils', () => {
         cwd: tempDir,
         stdio: 'ignore',
       });
-      const expectedGitDir = path.join(tempDir, '.git');
+      const expectedGitDir = await fs.realpath(path.join(tempDir, '.git'));
 
-      const actualGitDir = await getAbsoluteGitDir(tempDir);
-      expect(path.resolve(actualGitDir)).toBe(path.resolve(expectedGitDir));
+      const actualGitDir = await fs.realpath(await getAbsoluteGitDir(tempDir));
+      expect(actualGitDir).toBe(expectedGitDir);
 
       const subDir = path.join(tempDir, 'deep', 'sub');
       await fs.mkdir(subDir, { recursive: true });
-      const actualSubGitDir = await getAbsoluteGitDir(subDir);
-      expect(path.resolve(actualSubGitDir)).toBe(path.resolve(expectedGitDir));
+      const actualSubGitDir = await fs.realpath(
+        await getAbsoluteGitDir(subDir),
+      );
+      expect(actualSubGitDir).toBe(expectedGitDir);
     });
   });
 });
