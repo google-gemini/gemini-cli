@@ -1564,5 +1564,32 @@ function doIt() {
       expect(finalContent).toContain('LINE1');
       expect(finalContent).toContain('LINE2');
     });
+
+    it('aborts immediately if signal is aborted while waiting for path lock', async () => {
+      const filePath = path.join(rootDir, 'abort_test.txt');
+      fs.writeFileSync(filePath, 'original content', 'utf8');
+
+      const first = tool.build({
+        file_path: filePath,
+        instruction: 'Change to first',
+        old_string: 'original',
+        new_string: 'FIRST',
+      });
+      const second = tool.build({
+        file_path: filePath,
+        instruction: 'Change to second',
+        old_string: 'original',
+        new_string: 'SECOND',
+      });
+
+      const controller = new AbortController();
+
+      const p1 = first.execute({ abortSignal: new AbortController().signal });
+      controller.abort();
+      const p2 = second.execute({ abortSignal: controller.signal });
+
+      await expect(p2).rejects.toThrow('Edit aborted');
+      await p1;
+    });
   });
 });

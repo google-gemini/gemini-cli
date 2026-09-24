@@ -931,6 +931,9 @@ class EditToolInvocation
    * interleaved with another writer of the same file.
    */
   private async applyEdit(signal: AbortSignal): Promise<ToolResult> {
+    if (signal.aborted) {
+      throw new Error('Edit aborted');
+    }
     let editData: CalculatedEdit;
     try {
       editData = await this.calculateEdit(this.params, signal);

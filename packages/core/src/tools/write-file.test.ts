@@ -1219,5 +1219,20 @@ describe('WriteFileTool', () => {
         messages.filter((m) => m.startsWith('Successfully overwrote file')),
       ).toHaveLength(1);
     });
+
+    it('aborts immediately if signal is aborted while waiting for path lock', async () => {
+      const filePath = path.join(rootDir, 'abort_test.txt');
+      const first = tool.build({ file_path: filePath, content: 'first' });
+      const second = tool.build({ file_path: filePath, content: 'second' });
+
+      const controller = new AbortController();
+
+      const p1 = first.execute({ abortSignal: new AbortController().signal });
+      controller.abort();
+      const p2 = second.execute({ abortSignal: controller.signal });
+
+      await expect(p2).rejects.toThrow('Write aborted');
+      await p1;
+    });
   });
 });

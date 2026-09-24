@@ -396,6 +396,9 @@ class WriteFileToolInvocation extends BaseToolInvocation<
    * Must be called while holding the path lock for `this.resolvedPath`.
    */
   private async applyWrite(abortSignal: AbortSignal): Promise<ToolResult> {
+    if (abortSignal.aborted) {
+      throw new Error('Write aborted');
+    }
     const { content, ai_proposed_content, modified_by_user } = this.params;
     const correctedContentResult = await getCorrectedFileContent(
       this.config,
