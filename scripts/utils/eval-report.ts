@@ -81,12 +81,53 @@ export function getModelFromPath(reportPath: string): string {
 }
 
 /**
+ * Resolves an absolute path and turns it into a checkout-independent relative path.
+ * If the path contains standard repository subdirectories, it extracts starting from there
+ * to support cross-checkout/CI-produced absolute paths.
+ */
+export function getRelativePath(filePath: string, rootDir: string): string {
+  const normalizedPath = filePath.replace(/\\/g, '/');
+  const root = path.resolve(rootDir).replace(/\\/g, '/');
+
+  // Handle Windows absolute paths with drive letters on POSIX systems
+  if (/^[a-zA-Z]:\//.test(normalizedPath)) {
+    if (normalizedPath.startsWith(root + '/')) {
+      return normalizedPath.slice(root.length + 1);
+    }
+    const match = normalizedPath.match(
+      /(?:^|\/)(evals|packages|scripts|integration-tests|memory-tests)\/(.+)$/,
+    );
+    if (match) {
+      return `${match[1]}/${match[2]}`;
+    }
+    return normalizedPath.split('/').pop() || '';
+  }
+
+  const absolute = path.resolve(rootDir, filePath).replace(/\\/g, '/');
+  if (absolute.startsWith(root + '/')) {
+    return absolute.slice(root.length + 1);
+  } else if (absolute === root) {
+    return '';
+  }
+  // Try matching standard subdirectories of the repository
+  const match = absolute.match(
+    /(?:^|\/)(evals|packages|scripts|integration-tests|memory-tests)\/(.+)$/,
+  );
+  if (match) {
+    return `${match[1]}/${match[2]}`;
+  }
+  return path.basename(filePath);
+}
+
+/**
  * Summarizes the pass rate stats by test case and model from report.json files.
  */
 export async function summarizeReports(
   reportsDir: string,
   inventory?: InventoryResult,
+  repoRoot?: string,
 ): Promise<ReportSummaryResult> {
+  const rootDir = repoRoot || process.cwd();
   const reportPaths = findReportFiles(reportsDir);
   const modelSummariesMap = new Map<
     string,
@@ -114,14 +155,20 @@ export async function summarizeReports(
           if (filePath.includes('\0')) {
             continue;
           }
-          const normalizedPath = path.resolve(filePath).replace(/\\/g, '/');
+          const relTestPath = getRelativePath(filePath, rootDir);
           if (Array.isArray(fileResult.assertionResults)) {
             for (const assertion of fileResult.assertionResults) {
               if (!assertion || typeof assertion.title !== 'string') {
                 continue;
               }
+              if (
+                assertion.status !== 'passed' &&
+                assertion.status !== 'failed'
+              ) {
+                continue;
+              }
               const testName = assertion.title;
-              const compoundKey = `${normalizedPath}::${testName}`;
+              const compoundKey = `${relTestPath}::${testName}`;
               if (!testCasesMap.has(compoundKey)) {
                 testCasesMap.set(compoundKey, {
                   name: testName,
@@ -148,10 +195,8 @@ export async function summarizeReports(
   const policyMap = new Map<string, string>();
   if (inventory) {
     for (const caseRec of inventory.cases) {
-      const normalizedCasePath = path
-        .resolve(caseRec.filePath)
-        .replace(/\\/g, '/');
-      const key = `${normalizedCasePath}::${caseRec.name}`;
+      const relCasePath = getRelativePath(caseRec.filePath, rootDir);
+      const key = `${relCasePath}::${caseRec.name}`;
       policyMap.set(key, caseRec.policy);
     }
   }
@@ -163,8 +208,8 @@ export async function summarizeReports(
     let passedRuns = 0;
 
     for (const stats of testCasesMap.values()) {
-      const normalizedPath = path.resolve(stats.filePath).replace(/\\/g, '/');
-      const key = `${normalizedPath}::${stats.name}`;
+      const relTestPath = getRelativePath(stats.filePath, rootDir);
+      const key = `${relTestPath}::${stats.name}`;
       const policy = policyMap.get(key) || 'unknown';
       const passRate = stats.total > 0 ? stats.passed / stats.total : 0;
       cases.push({
@@ -232,10 +277,9 @@ export function formatReportSummary(
     lines.push('');
     lines.push('  Test Cases:');
     for (const c of model.cases) {
-      const relPath =
-        repoRoot && path.isAbsolute(c.filePath)
-          ? path.relative(repoRoot, c.filePath).replace(/\\/g, '/')
-          : c.filePath;
+      const relPath = repoRoot
+        ? getRelativePath(c.filePath, repoRoot)
+        : c.filePath;
       const indicator =
         c.passRate === 1.0 ? '✓' : c.passRate === 0 ? '✗' : '⚠';
       lines.push(
@@ -279,10 +323,7 @@ export function formatReportSummaryJson(
         total: c.total,
         passRate: c.passRate,
         policy: c.policy,
-        filePath:
-          repoRoot && path.isAbsolute(c.filePath)
-            ? path.relative(repoRoot, c.filePath).replace(/\\/g, '/')
-            : c.filePath,
+        filePath: repoRoot ? getRelativePath(c.filePath, repoRoot) : c.filePath,
       })),
     })),
   };
