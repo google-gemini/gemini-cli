@@ -35,6 +35,12 @@ export async function readStdin(): Promise<string> {
       // stop reading if input is not available yet, this is needed
       // in terminals where stdin is never TTY and nothing's piped
       // which causes the program to get stuck expecting data from stdin
+      //
+      // A slow pipe looks the same as no pipe here, so its input is dropped;
+      // say so instead of running the prompt without it in silence.
+      debugLogger.warn(
+        `Warning: no stdin input within ${pipedInputShouldBeAvailableInMs}ms; continuing without it.`,
+      );
       onEnd();
     }, pipedInputShouldBeAvailableInMs);
 

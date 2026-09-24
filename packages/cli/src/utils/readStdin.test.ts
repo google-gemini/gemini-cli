@@ -140,6 +140,34 @@ describe('readStdin', () => {
     expect(mockStdin.destroy).toHaveBeenCalled();
   });
 
+  it('warns when it gives up on stdin instead of resolving empty in silence', async () => {
+    vi.useFakeTimers();
+    mockStdin.read.mockReturnValue(null);
+
+    const promise = readStdin();
+    await vi.advanceTimersByTimeAsync(500);
+    vi.useRealTimers();
+
+    await expect(promise).resolves.toBe('');
+    expect(debugLogger.warn).toHaveBeenCalledWith(
+      'Warning: no stdin input within 500ms; continuing without it.',
+    );
+  });
+
+  it('says nothing when the input arrives in time', async () => {
+    vi.useFakeTimers();
+    mockStdin.read.mockReturnValueOnce('hello').mockReturnValueOnce(null);
+
+    const promise = readStdin();
+    onReadableHandler();
+    onEndHandler();
+    await vi.advanceTimersByTimeAsync(1000);
+    vi.useRealTimers();
+
+    await expect(promise).resolves.toBe('hello');
+    expect(debugLogger.warn).not.toHaveBeenCalled();
+  });
+
   it('should truncate multi-byte characters at byte boundary', async () => {
     const MAX_STDIN_SIZE = 8 * 1024 * 1024;
     // '한' is 3 bytes. 2,796,202 * 3 = 8,388,606 bytes.
