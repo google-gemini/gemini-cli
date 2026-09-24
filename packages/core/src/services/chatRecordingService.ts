@@ -1416,7 +1416,12 @@ export class ChatRecordingService {
             if (!callId) continue;
             const tcMeta = this.toolCallMetaMap.get(callId);
             if (tcMeta) {
-              if (updateFingerprintIfChanged(tcMeta.resultFp, turnParts)) {
+              // Sync parts belonging to this callId while preserving sibling non-functionResponse parts
+              // (e.g. multi-modal inlineData), but excluding function responses of other parallel calls.
+              const relevantParts = turnParts.filter(
+                (p) => !p.functionResponse || p.functionResponse.id === callId,
+              );
+              if (updateFingerprintIfChanged(tcMeta.resultFp, relevantParts)) {
                 anyChange = true;
                 const geminiMsg = this.cachedConversation.messages.find(
                   (m) => m.id === tcMeta.messageId && m.type === 'gemini',
@@ -1428,7 +1433,7 @@ export class ChatRecordingService {
                 ) {
                   const tc = geminiMsg.toolCalls.find((t) => t.id === callId);
                   if (tc) {
-                    tc.result = turnParts;
+                    tc.result = relevantParts;
                   }
                 }
                 const patch = getOrCreatePatch(tcMeta.messageId);
@@ -1439,9 +1444,9 @@ export class ChatRecordingService {
                   (t) => t.id === callId,
                 );
                 if (existingTcPatch) {
-                  existingTcPatch.result = turnParts;
+                  existingTcPatch.result = relevantParts;
                 } else {
-                  patch.toolCalls.push({ id: callId, result: turnParts });
+                  patch.toolCalls.push({ id: callId, result: relevantParts });
                 }
               }
             }
