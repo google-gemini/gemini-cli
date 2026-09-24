@@ -32,11 +32,13 @@ jobs:
         if: "startsWith(github.event.comment.body, '/patch')"
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          ACTOR: '${{ github.actor }}'
+          REPO: '${{ github.repository }}'
         run: |
           PERM=$(gh api \
-            "repos/${{ github.repository }}/collaborators/${{ github.actor }}/permission" \
+            "repos/${REPO}/collaborators/${ACTOR}/permission" \
             --jq '.permission' 2>/dev/null || echo "none")
-          echo "Commenter '${{ github.actor }}' permission: $PERM"
+          echo "Commenter '${ACTOR}' permission: $PERM"
           if [[ "$PERM" != "write" && "$PERM" != "maintain" && "$PERM" != "admin" ]]; then
             echo "ERROR: Commenter does not have write access (got: $PERM). Blocking workflow."
             exit 1
