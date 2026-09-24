@@ -14,6 +14,7 @@ import {
   stripShellWrapper,
 } from '../../utils/shell-utils.js';
 import { isSubpath, resolveToRealPath } from '../../utils/paths.js';
+import { isReadOnlyGitCommand } from '../utils/commandSafety.js';
 
 /**
  * Determines if a command is strictly approved for execution on Windows.
@@ -293,12 +294,9 @@ export function isKnownSafeCommand(
     return true;
   }
 
-  // We allow git on Windows if it's read-only, using the same logic as POSIX
+  // Git is allowed only for known read-only invocations (same rules as POSIX).
   if (cmd === 'git') {
-    // For simplicity in this branch, we'll allow standard git read operations
-    // In a full implementation, we'd port the sub-command validation too.
-    const sub = args[1]?.toLowerCase();
-    return ['status', 'log', 'diff', 'show', 'branch'].includes(sub);
+    return isReadOnlyGitCommand(args);
   }
 
   return false;

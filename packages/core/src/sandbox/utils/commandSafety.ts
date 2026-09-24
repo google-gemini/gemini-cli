@@ -553,35 +553,7 @@ function isSafeToCallWithExec(
   }
 
   if (cmd === 'git') {
-    if (gitHasConfigOverrideGlobalOption(args)) {
-      return false;
-    }
-
-    const { idx, subcommand } = findGitSubcommand(args, [
-      'status',
-      'log',
-      'diff',
-      'show',
-      'branch',
-    ]);
-    if (!subcommand) {
-      return false;
-    }
-
-    const subcommandArgs = args.slice(idx + 1);
-
-    if (['status', 'log', 'diff', 'show'].includes(subcommand)) {
-      return gitSubcommandArgsAreReadOnly(subcommandArgs);
-    }
-
-    if (subcommand === 'branch') {
-      return (
-        gitSubcommandArgsAreReadOnly(subcommandArgs) &&
-        gitBranchIsReadOnly(subcommandArgs)
-      );
-    }
-
-    return false;
+    return isReadOnlyGitCommand(args);
   }
 
   if (cmd === 'sed') {
@@ -600,6 +572,42 @@ function isSafeToCallWithExec(
   }
 
   return false;
+}
+
+/**
+ * Checks whether a git invocation is a known read-only operation: an allowed
+ * subcommand (`status`, `log`, `diff`, `show`, `branch`) with no config
+ * overrides and no flags that write files or execute programs.
+ *
+ * @param args - The full git command arguments, starting with `git`.
+ * @returns true if the command is safe to run without confirmation.
+ */
+export function isReadOnlyGitCommand(args: string[]): boolean {
+  if (gitHasConfigOverrideGlobalOption(args)) {
+    return false;
+  }
+
+  const { idx, subcommand } = findGitSubcommand(args, [
+    'status',
+    'log',
+    'diff',
+    'show',
+    'branch',
+  ]);
+  if (!subcommand) {
+    return false;
+  }
+
+  const subcommandArgs = args.slice(idx + 1);
+
+  if (['status', 'log', 'diff', 'show'].includes(subcommand)) {
+    return gitSubcommandArgsAreReadOnly(subcommandArgs);
+  }
+
+  return (
+    gitSubcommandArgsAreReadOnly(subcommandArgs) &&
+    gitBranchIsReadOnly(subcommandArgs)
+  );
 }
 
 /**
@@ -691,20 +699,25 @@ function gitHasConfigOverrideGlobalOption(args: string[]): boolean {
  * @returns true if the arguments only represent read-only operations.
  */
 function gitSubcommandArgsAreReadOnly(args: string[]): boolean {
-  const unsafeFlags = new Set([
+  const unsafeFlags = [
     '--output',
     '--ext-diff',
     '--textconv',
     '--exec',
     '--paginate',
-  ]);
+  ];
 
-  return !args.some(
-    (arg) =>
-      unsafeFlags.has(arg) ||
-      arg.startsWith('--output=') ||
-      arg.startsWith('--exec='),
-  );
+  // Git accepts any unambiguous prefix of a long option (e.g. `--out=file`),
+  // so treat any prefix of an unsafe flag as unsafe too.
+  return !args.some((arg) => {
+    if (!arg.startsWith('--')) {
+      return false;
+    }
+    const name = arg.split('=', 1)[0];
+    return (
+      name.length >= 3 && unsafeFlags.some((flag) => flag.startsWith(name))
+    );
+  });
 }
 
 /**

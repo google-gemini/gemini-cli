@@ -21,6 +21,29 @@ describe('Windows commandSafety', () => {
       expect(isKnownSafeCommand(['WHOAMI.exe'])).toBe(true);
     });
 
+    it('should allow read-only git commands', () => {
+      expect(isKnownSafeCommand(['git', 'status'])).toBe(true);
+      expect(isKnownSafeCommand(['git', 'diff', '--stat'])).toBe(true);
+      expect(isKnownSafeCommand(['git', 'log', '--oneline'])).toBe(true);
+      expect(isKnownSafeCommand(['git.exe', 'branch', '--list'])).toBe(true);
+    });
+
+    it('should reject git commands with file-writing or executing flags', () => {
+      const unsafe = [
+        ['git', 'diff', '--no-index', 'a', 'b', '--output=C:\target.conf'],
+        ['git', 'diff', '--output', 'target.conf'],
+        ['git', 'diff', '--out=target.conf'],
+        ['git', 'log', '--ext-diff'],
+        ['git', 'show', '--textconv'],
+        ['git', '-c', 'core.pager=calc', 'diff'],
+        ['git', 'branch', '-D', 'main'],
+        ['git', 'push'],
+      ];
+      for (const args of unsafe) {
+        expect(isKnownSafeCommand(args)).toBe(false);
+      }
+    });
+
     it('should reject unknown commands', () => {
       expect(isKnownSafeCommand(['unknown'])).toBe(false);
       expect(isKnownSafeCommand(['npm', 'install'])).toBe(false);
