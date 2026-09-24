@@ -1003,13 +1003,18 @@ export class ChatRecordingService {
             if (geminiMsg && geminiMsg.type === 'gemini') {
               const tc = geminiMsg.toolCalls!.find((tc) => tc.id === callId);
               if (tc) {
-                // If the history version is different (e.g. masked), sync it into the record
-                // We sync the entire parts array of the user turn to ensure sibling parts are preserved
+                // If the history version is different (e.g. masked), sync it into the record.
+                // Sync parts belonging to this callId while preserving sibling non-functionResponse parts
+                // (e.g. multi-modal inlineData), but excluding function responses of other parallel calls.
+                const relevantParts =
+                  turn.content.parts?.filter(
+                    (p) =>
+                      !p.functionResponse || p.functionResponse.id === callId,
+                  ) || [];
                 if (
-                  JSON.stringify(tc.result) !==
-                  JSON.stringify(turn.content.parts)
+                  JSON.stringify(tc.result) !== JSON.stringify(relevantParts)
                 ) {
-                  tc.result = turn.content.parts || [];
+                  tc.result = relevantParts;
                   updated = true;
                 }
               }

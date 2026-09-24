@@ -112,6 +112,21 @@ export function convertSessionToClientHistory(
 ): HistoryTurn[] {
   const clientHistory: HistoryTurn[] = [];
 
+  // Pre-scan messages to find all tool call IDs already answered by recorded user messages.
+  // In modern sessions, geminiChat records tool execution responses as synthetic 'user' messages.
+  const answeredToolCallIds = new Set<string>();
+  for (const msg of messages) {
+    if (msg.type === 'user' && msg.content) {
+      for (const part of ensurePartArray(msg.content)) {
+        if (part.functionResponse?.id) {
+          answeredToolCallIds.add(part.functionResponse.id);
+        }
+      }
+    }
+  }
+
+  const seenFunctionResponseIds = new Set<string>();
+
   for (const msg of messages) {
     if (msg.type === 'info' || msg.type === 'error' || msg.type === 'warning') {
       continue;
@@ -124,11 +139,29 @@ export function convertSessionToClientHistory(
         continue;
       }
 
+      let parts = ensurePartArray(msg.content);
+      const hasFunctionResponses = parts.some((p) => !!p.functionResponse);
+      if (hasFunctionResponses) {
+        // Prevent duplicate functionResponse turns if session was previously checkpointed with duplicates
+        parts = parts.filter((p) => {
+          if (p.functionResponse?.id) {
+            if (seenFunctionResponseIds.has(p.functionResponse.id)) {
+              return false;
+            }
+            seenFunctionResponseIds.add(p.functionResponse.id);
+          }
+          return true;
+        });
+        if (parts.length === 0) {
+          continue;
+        }
+      }
+
       clientHistory.push({
         id: msg.id,
         content: {
           role: 'user',
-          parts: ensurePartArray(msg.content),
+          parts,
         },
       });
     } else if (msg.type === 'gemini') {
@@ -182,10 +215,16 @@ export function convertSessionToClientHistory(
           },
         });
 
-        // 4. Generate tool response turns
+        // 4. Generate tool response turns for legacy sessions where tool responses
+        // were only recorded in toolCalls[].result and not as separate user messages.
         if (msg.toolCalls && msg.toolCalls.length > 0) {
           const functionResponseParts: Part[] = [];
           for (const toolCall of msg.toolCalls) {
+            // Skip regenerating tool calls that are already answered by recorded user messages
+            if (toolCall.id && answeredToolCallIds.has(toolCall.id)) {
+              continue;
+            }
+
             if (toolCall.result) {
               let responseData: Part;
 
@@ -200,10 +239,30 @@ export function convertSessionToClientHistory(
                   },
                 };
               } else if (Array.isArray(toolCall.result)) {
-                functionResponseParts.push(...ensurePartArray(toolCall.result));
+                // Only include parts for this tool call and avoid duplicate function responses
+                const parts = ensurePartArray(toolCall.result).filter((p) => {
+                  if (p.functionResponse?.id) {
+                    if (toolCall.id && p.functionResponse.id !== toolCall.id) {
+                      return false;
+                    }
+                    if (seenFunctionResponseIds.has(p.functionResponse.id)) {
+                      return false;
+                    }
+                    seenFunctionResponseIds.add(p.functionResponse.id);
+                  }
+                  return true;
+                });
+                functionResponseParts.push(...parts);
                 continue;
               } else {
                 responseData = toolCall.result;
+              }
+
+              if (responseData.functionResponse?.id) {
+                if (seenFunctionResponseIds.has(responseData.functionResponse.id)) {
+                  continue;
+                }
+                seenFunctionResponseIds.add(responseData.functionResponse.id);
               }
 
               functionResponseParts.push(responseData);
