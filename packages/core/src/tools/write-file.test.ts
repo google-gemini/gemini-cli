@@ -133,6 +133,7 @@ describe('WriteFileTool', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(mockConfigInternal.isPlanMode).mockReturnValue(false);
     // Create a unique temporary directory for files created outside the root
     const rawTempDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'write-file-test-external-'),
@@ -1184,6 +1185,39 @@ describe('WriteFileTool', () => {
       const expectedWritePath = path.join(plansDir, 'conductor/tracks/test.md');
       expect(fs.existsSync(expectedWritePath)).toBe(true);
       expect(fs.readFileSync(expectedWritePath, 'utf8')).toBe('nested content');
+    });
+  });
+
+  describe('concurrent writes to the same file', () => {
+    it('does not report two creations of the same new file', async () => {
+      const abortSignal = new AbortController().signal;
+      const filePath = path.join(rootDir, 'concurrent_new_file.txt');
+      mockEnsureCorrectFileContent.mockImplementation(
+        async (content: string) => content,
+      );
+
+      const first = tool.build({ file_path: filePath, content: 'first' });
+      const second = tool.build({ file_path: filePath, content: 'second' });
+
+      const results = await Promise.all([
+        first.execute({ abortSignal }),
+        second.execute({ abortSignal }),
+      ]);
+
+      // Whichever call lands second must observe the file the other created,
+      // otherwise both report a creation and the second one's diff claims the
+      // file was empty beforehand.
+      const messages = results.map((r) =>
+        typeof r.llmContent === 'string' ? r.llmContent : '',
+      );
+      expect(
+        messages.filter((m) =>
+          m.startsWith('Successfully created and wrote to new file'),
+        ),
+      ).toHaveLength(1);
+      expect(
+        messages.filter((m) => m.startsWith('Successfully overwrote file')),
+      ).toHaveLength(1);
     });
   });
 });
