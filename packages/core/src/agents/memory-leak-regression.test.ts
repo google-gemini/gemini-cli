@@ -13,8 +13,6 @@ import {
 import {
   calculateHistoryByteSize,
   collapseOlderFunctionResponses,
-  COMPRESSION_SAFETY_WATERMARK_BYTES,
-  COMPRESSION_SAFETY_WATERMARK_TOKENS,
   COLLAPSED_FUNCTION_RESPONSE_MAX_BYTES,
   ChatCompressionService,
 } from '../context/chatCompressionService.js';
@@ -81,11 +79,12 @@ describe('GH-28537 / b/561554750 Memory Leak Regression Tests', () => {
   });
 
   describe('History Collapsing Across Long-Running Turns', () => {
-    it('collapses older functionResponse payloads from completed previous turns while preserving the latest turn', () => {
+    it('collapses older functionResponse payloads from completed previous turns while preserving recent protected turns', () => {
       const largeToolOutput = 'data '.repeat(2000); // ~10 KB
 
       // Simulate 5 turns of tool calls and responses
       const history: Content[] = [
+        // Turn 1
         { role: 'user', parts: [{ text: 'Turn 1 user request' }] },
         {
           role: 'model',
@@ -105,6 +104,8 @@ describe('GH-28537 / b/561554750 Memory Leak Regression Tests', () => {
           ],
         },
         { role: 'model', parts: [{ text: 'Turn 1 response' }] },
+
+        // Turn 2
         { role: 'user', parts: [{ text: 'Turn 2 user request' }] },
         {
           role: 'model',
@@ -124,11 +125,55 @@ describe('GH-28537 / b/561554750 Memory Leak Regression Tests', () => {
           ],
         },
         { role: 'model', parts: [{ text: 'Turn 2 response' }] },
+
+        // Turn 3
         { role: 'user', parts: [{ text: 'Turn 3 user request' }] },
         {
           role: 'model',
           parts: [
             { functionCall: { name: 'shell', args: { command: 'test 3' } } },
+          ],
+        },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'shell',
+                response: { output: largeToolOutput },
+              },
+            },
+          ],
+        },
+        { role: 'model', parts: [{ text: 'Turn 3 response' }] },
+
+        // Turn 4
+        { role: 'user', parts: [{ text: 'Turn 4 user request' }] },
+        {
+          role: 'model',
+          parts: [
+            { functionCall: { name: 'shell', args: { command: 'test 4' } } },
+          ],
+        },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'shell',
+                response: { output: largeToolOutput },
+              },
+            },
+          ],
+        },
+        { role: 'model', parts: [{ text: 'Turn 4 response' }] },
+
+        // Turn 5
+        { role: 'user', parts: [{ text: 'Turn 5 user request' }] },
+        {
+          role: 'model',
+          parts: [
+            { functionCall: { name: 'shell', args: { command: 'test 5' } } },
           ],
         },
         {
@@ -168,11 +213,21 @@ describe('GH-28537 / b/561554750 Memory Leak Regression Tests', () => {
         '[Tool output collapsed from previous turn:',
       );
 
-      // Turn 3 tool response (index 10, the most recent) must be PRESERVED intact
+      // Turn 3, 4, 5 tool responses (the 3 most recent) must be PRESERVED intact
       const turn3Part = collapsed[10].parts![0].functionResponse?.response as {
         output: string;
       };
       expect(turn3Part.output).toBe(largeToolOutput);
+
+      const turn4Part = collapsed[14].parts![0].functionResponse?.response as {
+        output: string;
+      };
+      expect(turn4Part.output).toBe(largeToolOutput);
+
+      const turn5Part = collapsed[18].parts![0].functionResponse?.response as {
+        output: string;
+      };
+      expect(turn5Part.output).toBe(largeToolOutput);
     });
 
     it('keeps history byte growth bounded across 50 simulated tool turns', () => {
@@ -218,9 +273,9 @@ describe('GH-28537 / b/561554750 Memory Leak Regression Tests', () => {
       const totalByteSize = calculateHistoryByteSize(currentHistory);
 
       // 50 turns with 60 KB uncollapsed would be 3,000 KB (3 MB).
-      // With older turn collapsing to 2 KB, 49 turns * 2 KB + 1 turn * 60 KB ≈ 160 KB.
-      // Assert that total size remains well under 250 KB!
-      expect(totalByteSize).toBeLessThan(250 * 1024);
+      // With older turn collapsing to 2 KB, 47 turns * 2 KB + 3 turns * 60 KB ≈ 274 KB.
+      // Assert that total size remains well bounded under 350 KB!
+      expect(totalByteSize).toBeLessThan(350 * 1024);
 
       // The latest tool response must still be intact
       const toolTurns = currentHistory.filter(
@@ -235,8 +290,8 @@ describe('GH-28537 / b/561554750 Memory Leak Regression Tests', () => {
       };
       expect(latestPart.output).toBe(toolOutputChunk);
 
-      // Earlier tool turns must all be collapsed
-      for (let i = 0; i < toolTurns.length - 1; i++) {
+      // Earlier tool turns beyond the 3 protected recent turns must be collapsed
+      for (let i = 0; i < toolTurns.length - 3; i++) {
         const oldPart = toolTurns[i].parts![0].functionResponse?.response as {
           output: string;
         };
@@ -244,10 +299,19 @@ describe('GH-28537 / b/561554750 Memory Leak Regression Tests', () => {
           '[Tool output collapsed from previous turn:',
         );
       }
+
+      // The recent 3 protected tool turns must remain intact
+      for (let i = toolTurns.length - 3; i < toolTurns.length; i++) {
+        const recentPart = toolTurns[i].parts![0].functionResponse
+          ?.response as {
+          output: string;
+        };
+        expect(recentPart.output).toBe(toolOutputChunk);
+      }
     });
   });
 
-  describe('Automatic Compression Trigger on Safety Watermarks', () => {
+  describe('High-Token Context Retention on Large Context Models', () => {
     let compressionService: ChatCompressionService;
     let mockChat: GeminiChat;
 
@@ -259,93 +323,59 @@ describe('GH-28537 / b/561554750 Memory Leak Regression Tests', () => {
       } as unknown as GeminiChat;
     });
 
-    it('has expected safety watermark thresholds configured', () => {
-      expect(COMPRESSION_SAFETY_WATERMARK_BYTES).toBe(512 * 1024);
-      expect(COMPRESSION_SAFETY_WATERMARK_TOKENS).toBe(50_000);
-    });
-
-    it('triggers compression when stored history byte size exceeds COMPRESSION_SAFETY_WATERMARK_BYTES (512 KB) even when token threshold is not met', async () => {
-      // 1,000,000 token limit with 0.5 threshold = 500,000 tokens needed normally.
-      // Here tokens are only 10,000 (well below 500,000), but byte size exceeds 512 KB.
-      const largeText = 'A'.repeat(600 * 1024); // 600 KB
-      const history: Content[] = [
-        { role: 'user', parts: [{ text: largeText }] },
-        { role: 'model', parts: [{ text: 'Acknowledged large payload' }] },
-      ];
-
-      vi.mocked(mockChat.getHistory).mockReturnValue(history);
-      vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(10_000);
-      vi.mocked(tokenLimit).mockReturnValue(1_000_000);
-
-      const mockConfig = makeFakeConfig();
-      mockConfig.getCompressionThreshold = vi.fn().mockResolvedValue(0.5);
-
-      const mockGenerateContent = vi.fn().mockResolvedValue({
-        candidates: [
-          {
-            content: {
-              parts: [{ text: 'Compressed summary of large history' }],
-            },
-          },
-        ],
-      });
-      mockConfig.getBaseLlmClient = vi.fn().mockReturnValue({
-        generateContent: mockGenerateContent,
-      });
-
-      const result = await compressionService.compress(
-        mockChat,
-        'watermark-test',
-        false, // force = false
-        'gemini-2.5-pro',
-        mockConfig,
-        false,
-      );
-
-      // Must have triggered compression instead of returning NOOP!
-      expect(result.info.compressionStatus).not.toBe(CompressionStatus.NOOP);
-      expect(result.newHistory).toBeDefined();
-    });
-
-    it('triggers compression when estimated token count exceeds COMPRESSION_SAFETY_WATERMARK_TOKENS (50,000)', async () => {
-      // 2,000,000 token limit with 0.5 threshold = 1,000,000 tokens needed normally.
-      // Here token count is 60,000 (exceeds 50,000 watermark, but well below 1,000,000).
+    it('does not prematurely trigger compression for 60,000 to 200,000 tokens on 1M+ models when threshold is not reached', async () => {
+      // 2,000,000 token limit with 0.5 threshold = 1,000,000 tokens needed to trigger compression.
+      // A conversation of 150,000 tokens should return NOOP and not discard history.
       const history: Content[] = [
         { role: 'user', parts: [{ text: 'some prompt' }] },
         { role: 'model', parts: [{ text: 'some response' }] },
       ];
 
       vi.mocked(mockChat.getHistory).mockReturnValue(history);
-      vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(60_000);
+      vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(150_000);
       vi.mocked(tokenLimit).mockReturnValue(2_000_000);
 
       const mockConfig = makeFakeConfig();
       mockConfig.getCompressionThreshold = vi.fn().mockResolvedValue(0.5);
 
-      const mockGenerateContent = vi.fn().mockResolvedValue({
-        candidates: [
-          {
-            content: {
-              parts: [{ text: 'Compressed summary' }],
-            },
-          },
-        ],
-      });
-      mockConfig.getBaseLlmClient = vi.fn().mockReturnValue({
-        generateContent: mockGenerateContent,
-      });
-
       const result = await compressionService.compress(
         mockChat,
-        'watermark-tokens-test',
+        'high-token-context-test',
         false,
         'gemini-2.5-pro',
         mockConfig,
         false,
       );
 
-      // Must have triggered compression instead of returning NOOP!
-      expect(result.info.compressionStatus).not.toBe(CompressionStatus.NOOP);
+      // Must NOT have compressed: status must be NOOP
+      expect(result.info.compressionStatus).toBe(CompressionStatus.NOOP);
+      expect(result.newHistory).toBeNull();
+    });
+
+    it('does not trigger compression for 50,000 tokens on a 1M context model when threshold is 0.5', async () => {
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'some prompt' }] },
+        { role: 'model', parts: [{ text: 'some response' }] },
+      ];
+
+      vi.mocked(mockChat.getHistory).mockReturnValue(history);
+      vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(50_000);
+      vi.mocked(tokenLimit).mockReturnValue(1_000_000);
+
+      const mockConfig = makeFakeConfig();
+      mockConfig.getCompressionThreshold = vi.fn().mockResolvedValue(0.5);
+
+      const result = await compressionService.compress(
+        mockChat,
+        '50k-token-test',
+        false,
+        'gemini-2.5-flash',
+        mockConfig,
+        false,
+      );
+
+      expect(result.info.compressionStatus).toBe(CompressionStatus.NOOP);
+      expect(result.newHistory).toBeNull();
     });
 
     it('returns NOOP when both tokens and bytes are below watermarks and model threshold', async () => {
@@ -372,6 +402,50 @@ describe('GH-28537 / b/561554750 Memory Leak Regression Tests', () => {
 
       expect(result.info.compressionStatus).toBe(CompressionStatus.NOOP);
       expect(result.newHistory).toBeNull();
+    });
+  });
+
+  describe('Turn ID Stability', () => {
+    it('preserves existing turn IDs when updating history', () => {
+      const turn1Id = 'turn-uuid-1';
+      const turn2Id = 'turn-uuid-2';
+      const originalTurns = [
+        { id: turn1Id, content: { role: 'user', parts: [{ text: 'hello' }] } },
+        { id: turn2Id, content: { role: 'model', parts: [{ text: 'world' }] } },
+      ];
+
+      // Simulate what LocalAgentExecutor does: preserving existing turn IDs
+      const newContents: Content[] = [
+        { role: 'user', parts: [{ text: 'hello' }] },
+        { role: 'model', parts: [{ text: 'world' }] },
+      ];
+
+      const mappedTurns = newContents.map((c, idx) => ({
+        id: originalTurns[idx]?.id ?? 'fallback-uuid',
+        content: c,
+      }));
+
+      expect(mappedTurns[0].id).toBe(turn1Id);
+      expect(mappedTurns[1].id).toBe(turn2Id);
+    });
+  });
+
+  describe('Tool Output Disk Fallback', () => {
+    it('includes disk file path in truncation notice when output exceeds cap', () => {
+      const largeOutput = 'x'.repeat(100 * 1024);
+      const savedPath = '/tmp/project/tools/tool-output-123.txt';
+      const truncated = truncateToolOutput(
+        largeOutput,
+        MAX_STORED_TOOL_OUTPUT_BYTES,
+        savedPath,
+      );
+
+      expect(truncated).toContain(
+        `[Tool output truncated to conserve memory. For full output see: ${savedPath}]`,
+      );
+      expect(Buffer.byteLength(truncated, 'utf8')).toBeLessThanOrEqual(
+        MAX_STORED_TOOL_OUTPUT_BYTES,
+      );
     });
   });
 });

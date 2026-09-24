@@ -857,7 +857,15 @@ describe('ToolExecutor', () => {
           ?.response as Record<string, unknown>;
         expect(response).toBeDefined();
         const output = response['output'] as string;
-        expect(output).toContain('[Tool output truncated to conserve memory]');
+        expect(output).toContain('[Tool output truncated to conserve memory');
+        expect(output).toContain('/tmp/truncated_output.txt');
+        expect(fileUtils.saveTruncatedToolOutput).toHaveBeenCalledWith(
+          largeText,
+          'partTool',
+          'call-part-single',
+          expect.any(String),
+          expect.any(String),
+        );
         expect(Buffer.byteLength(output, 'utf8')).toBeLessThanOrEqual(
           MAX_STORED_TOOL_OUTPUT_BYTES,
         );
@@ -910,7 +918,15 @@ describe('ToolExecutor', () => {
         expect(response).toBeDefined();
         const output = response['output'] as string;
         expect(output).toContain(normalText);
-        expect(output).toContain('[Tool output truncated to conserve memory]');
+        expect(output).toContain('[Tool output truncated to conserve memory');
+        expect(output).toContain('/tmp/truncated_output.txt');
+        expect(fileUtils.saveTruncatedToolOutput).toHaveBeenCalledWith(
+          largeText,
+          'multiPartTool',
+          'call-part-array',
+          expect.any(String),
+          expect.any(String),
+        );
         // Verify inlineData part was preserved in responseParts
         expect(
           result.response.responseParts.some((p) => p.inlineData !== undefined),
@@ -963,7 +979,15 @@ describe('ToolExecutor', () => {
         expect(response).toBeDefined();
         const output = response['output'] as string;
 
-        expect(output).toContain('[Tool output truncated to conserve memory]');
+        expect(output).toContain('[Tool output truncated to conserve memory');
+        expect(output).toContain('/tmp/truncated_output.txt');
+        expect(fileUtils.saveTruncatedToolOutput).toHaveBeenCalledWith(
+          repeatedGraphemes,
+          'graphemeTool',
+          'call-graphemes',
+          expect.any(String),
+          expect.any(String),
+        );
         expect(Buffer.byteLength(output, 'utf8')).toBeLessThanOrEqual(
           MAX_STORED_TOOL_OUTPUT_BYTES,
         );

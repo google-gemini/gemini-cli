@@ -34,6 +34,7 @@ import { type ToolCallRequestInfo } from '../scheduler/types.js';
 import {
   ChatCompressionService,
   collapseOlderFunctionResponses,
+  DEFAULT_COMPRESSION_TOKEN_THRESHOLD,
 } from '../context/chatCompressionService.js';
 import { MAX_STORED_TOOL_OUTPUT_BYTES } from '../utils/constants.js';
 import {
@@ -70,6 +71,8 @@ import {
 import { getErrorMessage } from '../utils/errors.js';
 import { templateString } from './utils.js';
 import { DEFAULT_GEMINI_MODEL, isAutoModel } from '../config/models.js';
+import { tokenLimit } from '../core/tokenLimits.js';
+import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
 import { LRUCache } from 'mnemonist';
 import { parseThought } from '../utils/thoughtUtils.js';
@@ -915,17 +918,31 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     prompt_id: string,
     abortSignal?: AbortSignal,
   ): Promise<void> {
-    const currentHistory = chat.getHistory(false);
-    const collapsedHistory = collapseOlderFunctionResponses(currentHistory);
-    if (collapsedHistory !== currentHistory) {
-      const turns = collapsedHistory.map((c) => ({
-        id: randomUUID(),
-        content: c,
-      }));
-      chat.setHistory(turns);
-    }
-
     const model = this.definition.modelConfig.model ?? DEFAULT_GEMINI_MODEL;
+    const threshold =
+      (await this.context.config.getCompressionThreshold()) ??
+      DEFAULT_COMPRESSION_TOKEN_THRESHOLD;
+    const modelLimit = tokenLimit(model);
+
+    const lastPromptTokenCount = chat.getLastPromptTokenCount();
+    const currentHistory = chat.getHistory(false);
+    const originalTokenCount =
+      lastPromptTokenCount > 0
+        ? lastPromptTokenCount
+        : estimateTokenCountSync(currentHistory.flatMap((c) => c.parts || []));
+
+    // Only collapse older function responses when under context or memory pressure
+    if (originalTokenCount >= threshold * modelLimit) {
+      const collapsedHistory = collapseOlderFunctionResponses(currentHistory);
+      if (collapsedHistory !== currentHistory) {
+        const existingTurns = chat.getHistoryTurns?.(false) ?? [];
+        const turns = collapsedHistory.map((c, idx) => ({
+          id: existingTurns[idx]?.id ?? randomUUID(),
+          content: c,
+        }));
+        chat.setHistory(turns);
+      }
+    }
 
     const { newHistory, info } = await this.compressionService.compress(
       chat,
@@ -944,8 +961,9 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       this.hasFailedCompressionAttempt = true;
     } else if (info.compressionStatus === CompressionStatus.COMPRESSED) {
       if (newHistory) {
-        const turns = newHistory.map((c) => ({
-          id: randomUUID(),
+        const existingTurns = chat.getHistoryTurns?.(false) ?? [];
+        const turns = newHistory.map((c, idx) => ({
+          id: existingTurns[idx]?.id ?? randomUUID(),
           content: c,
         }));
         chat.setHistory(turns);
@@ -953,8 +971,9 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       }
     } else if (info.compressionStatus === CompressionStatus.CONTENT_TRUNCATED) {
       if (newHistory) {
-        const turns = newHistory.map((c) => ({
-          id: randomUUID(),
+        const existingTurns = chat.getHistoryTurns?.(false) ?? [];
+        const turns = newHistory.map((c, idx) => ({
+          id: existingTurns[idx]?.id ?? randomUUID(),
           content: c,
         }));
         chat.setHistory(turns);
@@ -1248,9 +1267,14 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
       // Truncate response parts and display results before recording to prevent unbounded memory growth
       for (const call of completedCalls) {
+        const outputFile = call.response?.outputFile;
         if (call.response?.responseParts) {
           call.response.responseParts = call.response.responseParts.map((p) =>
-            truncateFunctionResponsePart(p, MAX_STORED_TOOL_OUTPUT_BYTES),
+            truncateFunctionResponsePart(
+              p,
+              MAX_STORED_TOOL_OUTPUT_BYTES,
+              outputFile,
+            ),
           );
         }
         if (
@@ -1261,6 +1285,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           call.response.resultDisplay = truncateToolOutput(
             call.response.resultDisplay,
             MAX_STORED_TOOL_OUTPUT_BYTES,
+            outputFile,
           );
         }
       }

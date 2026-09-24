@@ -42,19 +42,48 @@ import { PreCompressTrigger } from '../hooks/types.js';
  * Default threshold for compression token count as a fraction of the model's
  * token limit. If the chat history exceeds this threshold, it will be compressed.
  */
-const DEFAULT_COMPRESSION_TOKEN_THRESHOLD = 0.5;
+export const DEFAULT_COMPRESSION_TOKEN_THRESHOLD = 0.5;
 
 /**
- * Safety watermark for chat history token count. If history exceeds this
- * watermark, automatic compression is triggered even if the model limit fraction is not reached.
+ * Number of recent tool response turns that must be preserved at full fidelity.
  */
-export const COMPRESSION_SAFETY_WATERMARK_TOKENS = 50_000;
+export const RECENT_TURNS_PROTECTED = 3;
 
 /**
- * Safety watermark for stored chat history byte size (512 KB). If accumulated history
- * byte size exceeds this watermark, automatic compression is triggered to prevent heap explosion.
+ * Tools that retrieve file content, documentation, or search results whose outputs
+ * are essential for multi-step reasoning and must be exempted from collapsing into snippets.
  */
-export const COMPRESSION_SAFETY_WATERMARK_BYTES = 512 * 1024; // 512 KB
+export const RETRIEVAL_TOOL_NAMES_EXEMPT_FROM_COLLAPSE: ReadonlySet<string> =
+  new Set([
+    'read_file',
+    'read_many_files',
+    'get_internal_docs',
+    'read_mcp_resource',
+    'grep',
+    'rip_grep',
+    'glob',
+    'search_file_content',
+    'find_files',
+  ]);
+
+export function isExemptRetrievalTool(
+  toolName?: string,
+  exemptTools: ReadonlySet<string> = RETRIEVAL_TOOL_NAMES_EXEMPT_FROM_COLLAPSE,
+): boolean {
+  if (!toolName) {
+    return false;
+  }
+  const normalized = toolName.toLowerCase();
+  if (exemptTools.has(normalized)) {
+    return true;
+  }
+  return (
+    normalized.endsWith('read_file') ||
+    normalized.endsWith('read_files') ||
+    normalized.endsWith('read_many_files') ||
+    normalized.endsWith('read_resource')
+  );
+}
 
 export const COLLAPSED_FUNCTION_RESPONSE_MAX_BYTES = 2048; // 2 KB
 
@@ -96,12 +125,15 @@ const defaultGraphemeSegmenter = new Intl.Segmenter(undefined, {
 
 /**
  * Collapses detailed logs in older functionResponse payloads from completed previous turns.
- * The most recent functionResponse turn is preserved intact for immediate context fidelity.
+ * The most recent N tool response turns (default 3) and retrieval tools (read_file, etc.)
+ * are preserved intact for immediate context fidelity and multi-step reasoning.
  */
 export function collapseOlderFunctionResponses(
   history: Content[],
   maxBytesPerOldResponse: number = COLLAPSED_FUNCTION_RESPONSE_MAX_BYTES,
   segmenter: Intl.Segmenter = defaultGraphemeSegmenter,
+  protectedTurns: number = RECENT_TURNS_PROTECTED,
+  exemptTools: ReadonlySet<string> = RETRIEVAL_TOOL_NAMES_EXEMPT_FROM_COLLAPSE,
 ): Content[] {
   // Find all indices of user messages that contain functionResponse
   const toolIndices: number[] = [];
@@ -114,13 +146,13 @@ export function collapseOlderFunctionResponses(
     }
   }
 
-  if (toolIndices.length <= 1) {
+  if (toolIndices.length <= protectedTurns) {
     return history;
   }
 
-  // The last tool index represents the most recent tool turn.
-  // All prior tool indices are older completed turns whose subsequent turns have finished.
-  const lastToolIndex = toolIndices[toolIndices.length - 1];
+  // The last N tool indices represent recent tool turns that must be protected.
+  // Only prior tool indices are older completed turns eligible for collapsing.
+  const cutoffToolIndex = toolIndices[toolIndices.length - protectedTurns];
 
   const collapseString = (str: string): string => {
     const totalBytes = Buffer.byteLength(str, 'utf8');
@@ -128,7 +160,7 @@ export function collapseOlderFunctionResponses(
       return str;
     }
 
-    const previewBytes = Math.min(maxBytesPerOldResponse, 512);
+    const previewBytes = maxBytesPerOldResponse;
     let preview = '';
     let currentBytes = 0;
 
@@ -185,14 +217,19 @@ export function collapseOlderFunctionResponses(
 
   let modified = false;
   const newHistory = history.map((content, idx) => {
-    // Only process older tool response turns
-    if (idx >= lastToolIndex || content.role !== 'user' || !content.parts) {
+    // Only process older tool response turns before the protected recent window
+    if (idx >= cutoffToolIndex || content.role !== 'user' || !content.parts) {
       return content;
     }
 
     let partsModified = false;
     const newParts = content.parts.map((part) => {
       if (!part.functionResponse?.response) {
+        return part;
+      }
+
+      // Exempt retrieval and file reading tools from collapsing
+      if (isExemptRetrievalTool(part.functionResponse.name, exemptTools)) {
         return part;
       }
 
@@ -466,19 +503,10 @@ export class ChatCompressionService {
       const threshold =
         (await config.getCompressionThreshold()) ??
         DEFAULT_COMPRESSION_TOKEN_THRESHOLD;
-      const historyByteSize = calculateHistoryByteSize(curatedHistory);
       const isOverModelThreshold =
         originalTokenCount >= threshold * tokenLimit(model);
-      const isOverWatermarkTokens =
-        originalTokenCount >= COMPRESSION_SAFETY_WATERMARK_TOKENS;
-      const isOverWatermarkBytes =
-        historyByteSize >= COMPRESSION_SAFETY_WATERMARK_BYTES;
 
-      if (
-        !isOverModelThreshold &&
-        !isOverWatermarkTokens &&
-        !isOverWatermarkBytes
-      ) {
+      if (!isOverModelThreshold) {
         return {
           newHistory: null,
           info: {

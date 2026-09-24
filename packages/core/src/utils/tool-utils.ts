@@ -147,17 +147,21 @@ const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
  *
  * @param text The raw tool output string.
  * @param maxBytes Maximum allowed bytes (defaults to MAX_STORED_TOOL_OUTPUT_BYTES = 64 KB).
+ * @param savedFilePath Optional file path where the complete raw output was saved.
  * @returns The output truncated to at most maxBytes.
  */
 export function truncateToolOutput(
   text: string,
   maxBytes: number = MAX_STORED_TOOL_OUTPUT_BYTES,
+  savedFilePath?: string,
 ): string {
   if (Buffer.byteLength(text, 'utf8') <= maxBytes) {
     return text;
   }
 
-  const suffix = '\n... [Tool output truncated to conserve memory]';
+  const suffix = savedFilePath
+    ? `\n... [Tool output truncated to conserve memory. For full output see: ${savedFilePath}]`
+    : '\n... [Tool output truncated to conserve memory]';
   const targetBytes = Math.max(0, maxBytes - Buffer.byteLength(suffix, 'utf8'));
 
   let accumulatedBytes = 0;
@@ -181,11 +185,12 @@ export function truncateToolOutput(
 export function truncateFunctionResponsePart(
   part: Part,
   maxBytes: number = MAX_STORED_TOOL_OUTPUT_BYTES,
+  savedFilePath?: string,
 ): Part {
   if (part.text && Buffer.byteLength(part.text, 'utf8') > maxBytes) {
     return {
       ...part,
-      text: truncateToolOutput(part.text, maxBytes),
+      text: truncateToolOutput(part.text, maxBytes, savedFilePath),
     };
   }
 
@@ -202,10 +207,11 @@ export function truncateFunctionResponsePart(
           // eslint-disable-next-line @typescript-eslint/no-misused-spread
           ...part.functionResponse,
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          response: truncateToolOutput(resp, maxBytes) as unknown as Record<
-            string,
-            unknown
-          >,
+          response: truncateToolOutput(
+            resp,
+            maxBytes,
+            savedFilePath,
+          ) as unknown as Record<string, unknown>,
         },
       };
     }
@@ -216,7 +222,7 @@ export function truncateFunctionResponsePart(
     const truncateValue = (val: unknown): unknown => {
       if (typeof val === 'string') {
         if (Buffer.byteLength(val, 'utf8') > maxBytes) {
-          return truncateToolOutput(val, maxBytes);
+          return truncateToolOutput(val, maxBytes, savedFilePath);
         }
         return val;
       }

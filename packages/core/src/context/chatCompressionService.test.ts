@@ -10,6 +10,7 @@ import {
   findCompressSplitPoint,
   modelStringToModelConfigAlias,
   collapseOlderFunctionResponses,
+  RECENT_TURNS_PROTECTED,
 } from './chatCompressionService.js';
 import type { Content, GenerateContentResponse, Part } from '@google/genai';
 import { CompressionStatus } from '../core/turn.js';
@@ -214,6 +215,7 @@ describe('ChatCompressionService', () => {
     vi.mocked(getInitialChatHistory).mockImplementation(
       async (_config, extraHistory) => (extraHistory ? [...extraHistory] : []),
     );
+    vi.mocked(tokenLimit).mockReturnValue(1_000_000);
   });
 
   afterEach(() => {
@@ -915,6 +917,32 @@ describe('ChatCompressionService', () => {
   });
 
   describe('collapseOlderFunctionResponses', () => {
+    const createRecentToolTurns = (
+      count = RECENT_TURNS_PROTECTED,
+    ): Content[] => {
+      const turns: Content[] = [];
+      for (let i = 1; i <= count; i++) {
+        turns.push(
+          {
+            role: 'model',
+            parts: [{ text: `Intermediate model response ${i}` }],
+          },
+          {
+            role: 'user',
+            parts: [
+              {
+                functionResponse: {
+                  name: 'shell',
+                  response: { output: `Recent tool response ${i}` },
+                },
+              },
+            ],
+          },
+        );
+      }
+      return turns;
+    };
+
     it('truncates older responses on valid grapheme boundaries with multi-byte characters and emojis', () => {
       // 🔥 is a 4-byte emoji (\uD83D\uDD25)
       // Romanian diacritics: ă (2 bytes), î (2 bytes), ș (2 bytes), ț (2 bytes), â (2 bytes)
@@ -934,21 +962,7 @@ describe('ChatCompressionService', () => {
             },
           ],
         },
-        {
-          role: 'model',
-          parts: [{ text: 'Intermediate response' }],
-        },
-        {
-          role: 'user',
-          parts: [
-            {
-              functionResponse: {
-                name: 'shell',
-                response: { output: 'Latest tool response preserved' },
-              },
-            },
-          ],
-        },
+        ...createRecentToolTurns(3),
       ];
 
       const collapsedHistory = collapseOlderFunctionResponses(history);
@@ -980,11 +994,11 @@ describe('ChatCompressionService', () => {
       expect(Buffer.from(preview, 'utf8').toString('utf8')).toBe(preview);
 
       // Assert latest tool turn is preserved untouched
-      const latestResponse = collapsedHistory[2].parts?.[0]?.functionResponse
-        ?.response as {
+      const latestResponse = collapsedHistory[collapsedHistory.length - 1]
+        .parts?.[0]?.functionResponse?.response as {
         output: string;
       };
-      expect(latestResponse.output).toBe('Latest tool response preserved');
+      expect(latestResponse.output).toBe('Recent tool response 3');
     });
 
     it('supports custom segmenter and functions identically with reused default segmenter', () => {
@@ -1003,18 +1017,7 @@ describe('ChatCompressionService', () => {
             },
           ],
         },
-        { role: 'model', parts: [{ text: 'response' }] },
-        {
-          role: 'user',
-          parts: [
-            {
-              functionResponse: {
-                name: 'shell',
-                response: { output: 'latest' },
-              },
-            },
-          ],
-        },
+        ...createRecentToolTurns(3),
       ];
 
       const resWithCustom = collapseOlderFunctionResponses(
@@ -1043,18 +1046,7 @@ describe('ChatCompressionService', () => {
             },
           ],
         },
-        { role: 'model', parts: [{ text: 'done' }] },
-        {
-          role: 'user',
-          parts: [
-            {
-              functionResponse: {
-                name: 'rawTool',
-                response: 'latest' as unknown as Record<string, unknown>,
-              },
-            },
-          ],
-        },
+        ...createRecentToolTurns(3),
       ];
 
       const collapsed = collapseOlderFunctionResponses(history, 512);
@@ -1097,6 +1089,30 @@ describe('ChatCompressionService', () => {
           ],
         },
         { role: 'model', parts: [{ text: 'acknowledged' }] },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'customTool',
+                response: { output: 'recent 1' },
+              },
+            },
+          ],
+        },
+        { role: 'model', parts: [{ text: 'acknowledged 2' }] },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'customTool',
+                response: { output: 'recent 2' },
+              },
+            },
+          ],
+        },
+        { role: 'model', parts: [{ text: 'acknowledged 3' }] },
         {
           role: 'user',
           parts: [
@@ -1146,8 +1162,8 @@ describe('ChatCompressionService', () => {
       );
       expect(oldResp.meta.details.timestamp).toBe(123456789);
 
-      // Verify latest turn (index 2) was preserved intact
-      const latestResp = collapsed[2].parts?.[0]?.functionResponse
+      // Verify latest turn (index 6) was preserved intact
+      const latestResp = collapsed[6].parts?.[0]?.functionResponse
         ?.response as {
         stdout: string;
         meta: { deepMessage: string };
@@ -1172,23 +1188,174 @@ describe('ChatCompressionService', () => {
             },
           ],
         },
-        { role: 'model', parts: [{ text: 'done' }] },
+        ...createRecentToolTurns(3),
+      ];
+
+      const collapsed = collapseOlderFunctionResponses(history, 2048);
+      expect(collapsed).toBe(history);
+      expect(collapsed[0]).toBe(history[0]);
+    });
+
+    it('preserves all tool responses intact when total tool turns <= RECENT_TURNS_PROTECTED (3)', () => {
+      const largePayload = 'lots of tool output data '.repeat(200); // ~5 KB
+      // 3 tool turns
+      const history: Content[] = [
         {
           role: 'user',
           parts: [
             {
               functionResponse: {
-                name: 'customTool',
-                response: { stdout: 'latest' },
+                name: 'shell',
+                response: { output: largePayload },
+              },
+            },
+          ],
+        },
+        { role: 'model', parts: [{ text: 'step 1 done' }] },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'shell',
+                response: { output: largePayload },
+              },
+            },
+          ],
+        },
+        { role: 'model', parts: [{ text: 'step 2 done' }] },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'shell',
+                response: { output: largePayload },
               },
             },
           ],
         },
       ];
 
-      const collapsed = collapseOlderFunctionResponses(history, 2048);
-      expect(collapsed).toBe(history);
-      expect(collapsed[0]).toBe(history[0]);
+      const result = collapseOlderFunctionResponses(history);
+      // All 3 turns should remain completely unmodified
+      expect(result).toBe(history);
+      expect(
+        (result[0].parts![0].functionResponse!.response as { output: string })
+          .output,
+      ).toBe(largePayload);
+      expect(
+        (result[2].parts![0].functionResponse!.response as { output: string })
+          .output,
+      ).toBe(largePayload);
+      expect(
+        (result[4].parts![0].functionResponse!.response as { output: string })
+          .output,
+      ).toBe(largePayload);
+    });
+
+    it('exempts retrieval tools (read_file, read_many_files, grep, glob) from collapsing even in older turns', () => {
+      const largeFileContent = 'const x = 1;\n'.repeat(500); // ~6.5 KB
+      const history: Content[] = [
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'read_file',
+                response: { content: largeFileContent },
+              },
+            },
+          ],
+        },
+        { role: 'model', parts: [{ text: 'read file A' }] },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'grep',
+                response: { output: largeFileContent },
+              },
+            },
+          ],
+        },
+        ...createRecentToolTurns(3),
+      ];
+
+      const collapsed = collapseOlderFunctionResponses(history);
+      // read_file and grep in older turns are exempt from collapse
+      const readFileResp = collapsed[0].parts![0].functionResponse
+        ?.response as { content: string };
+      expect(readFileResp.content).toBe(largeFileContent);
+
+      const grepResp = collapsed[2].parts![0].functionResponse?.response as {
+        output: string;
+      };
+      expect(grepResp.output).toBe(largeFileContent);
+    });
+
+    it('preserves multi-turn context retention across file reading workflows', () => {
+      // Turn 1: read_file('fileA.ts') 15 KB
+      const fileA = 'export const A = "value";\n'.repeat(600); // ~15 KB
+      // Turn 2: read_file('fileB.ts') 15 KB
+      const fileB = 'export const B = "value";\n'.repeat(600); // ~15 KB
+
+      const history: Content[] = [
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'read_file',
+                response: { content: fileA },
+              },
+            },
+          ],
+        },
+        { role: 'model', parts: [{ text: 'Inspected fileA.ts' }] },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'read_file',
+                response: { content: fileB },
+              },
+            },
+          ],
+        },
+        { role: 'model', parts: [{ text: 'Inspected fileB.ts' }] },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'shell',
+                response: { output: 'build succeeded' },
+              },
+            },
+          ],
+        },
+      ];
+
+      // Even when collapsed is called, both read_file turns are retained at full fidelity
+      const collapsed = collapseOlderFunctionResponses(history);
+      const turn1Content = (
+        collapsed[0].parts![0].functionResponse!.response as {
+          content: string;
+        }
+      ).content;
+      const turn2Content = (
+        collapsed[2].parts![0].functionResponse!.response as {
+          content: string;
+        }
+      ).content;
+
+      expect(turn1Content).toBe(fileA);
+      expect(turn2Content).toBe(fileB);
+      expect(turn1Content).not.toContain('[Tool output collapsed');
+      expect(turn2Content).not.toContain('[Tool output collapsed');
     });
   });
 });

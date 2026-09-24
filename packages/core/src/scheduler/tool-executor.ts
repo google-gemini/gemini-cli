@@ -317,38 +317,72 @@ export class ToolExecutor {
       }
     }
 
+    const ensureOutputFile = async (
+      rawText: string,
+    ): Promise<string | undefined> => {
+      if (!outputFile) {
+        try {
+          const { outputFile: savedPath } = await saveTruncatedToolOutput(
+            rawText,
+            toolName,
+            callId,
+            this.config.storage.getProjectTempDir(),
+            this.context.promptId,
+          );
+          outputFile = savedPath;
+        } catch {
+          // Ignore error during disk save
+        }
+      }
+      return outputFile;
+    };
+
     let finalContent: PartListUnion = content;
     if (typeof finalContent === 'string') {
       if (
         Buffer.byteLength(finalContent, 'utf8') > MAX_STORED_TOOL_OUTPUT_BYTES
       ) {
+        const savedPath = await ensureOutputFile(finalContent);
         finalContent = truncateToolOutput(
           finalContent,
           MAX_STORED_TOOL_OUTPUT_BYTES,
+          savedPath,
         );
       }
     } else if (Array.isArray(finalContent)) {
-      finalContent = finalContent.map((part) => {
-        if (
-          typeof part === 'string' &&
-          Buffer.byteLength(part, 'utf8') > MAX_STORED_TOOL_OUTPUT_BYTES
-        ) {
-          return truncateToolOutput(part, MAX_STORED_TOOL_OUTPUT_BYTES);
-        }
-        if (
-          typeof part === 'object' &&
-          part !== null &&
-          'text' in part &&
-          typeof part.text === 'string' &&
-          Buffer.byteLength(part.text, 'utf8') > MAX_STORED_TOOL_OUTPUT_BYTES
-        ) {
-          return {
-            ...part,
-            text: truncateToolOutput(part.text, MAX_STORED_TOOL_OUTPUT_BYTES),
-          };
-        }
-        return part;
-      });
+      finalContent = await Promise.all(
+        finalContent.map(async (part) => {
+          if (
+            typeof part === 'string' &&
+            Buffer.byteLength(part, 'utf8') > MAX_STORED_TOOL_OUTPUT_BYTES
+          ) {
+            const savedPath = await ensureOutputFile(part);
+            return truncateToolOutput(
+              part,
+              MAX_STORED_TOOL_OUTPUT_BYTES,
+              savedPath,
+            );
+          }
+          if (
+            typeof part === 'object' &&
+            part !== null &&
+            'text' in part &&
+            typeof part.text === 'string' &&
+            Buffer.byteLength(part.text, 'utf8') > MAX_STORED_TOOL_OUTPUT_BYTES
+          ) {
+            const savedPath = await ensureOutputFile(part.text);
+            return {
+              ...part,
+              text: truncateToolOutput(
+                part.text,
+                MAX_STORED_TOOL_OUTPUT_BYTES,
+                savedPath,
+              ),
+            };
+          }
+          return part;
+        }),
+      );
     } else if (
       typeof finalContent === 'object' &&
       finalContent !== null &&
@@ -357,11 +391,13 @@ export class ToolExecutor {
       Buffer.byteLength(finalContent.text, 'utf8') >
         MAX_STORED_TOOL_OUTPUT_BYTES
     ) {
+      const savedPath = await ensureOutputFile(finalContent.text);
       finalContent = {
         ...finalContent,
         text: truncateToolOutput(
           finalContent.text,
           MAX_STORED_TOOL_OUTPUT_BYTES,
+          savedPath,
         ),
       };
     }
