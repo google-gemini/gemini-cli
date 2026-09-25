@@ -100,7 +100,6 @@ describe('withPathLock', () => {
     });
 
     const controller = new AbortController();
-    const start = Date.now();
     const p2 = withPathLock(
       key,
       async () => {
@@ -116,8 +115,7 @@ describe('withPathLock', () => {
     });
 
     await expect(p2).rejects.toThrow('Aborted');
-    const elapsed = Date.now() - start;
-    expect(elapsed).toBeLessThan(45);
+    expect(events).toEqual(['p1:start']);
 
     await p1;
     await p3;
