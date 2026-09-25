@@ -65,7 +65,9 @@ describe('StandardFileSystemService atomicity', () => {
     // Guard against a vacuous pass where the observer never ran.
     expect(sizes.size).toBeGreaterThan(0);
 
-    const partialStates = [...sizes].filter((size) => size !== SIZE && size !== -1);
+    const partialStates = [...sizes].filter(
+      (size) => size !== SIZE && size !== -1,
+    );
     expect(partialStates).toEqual([]);
   });
 
