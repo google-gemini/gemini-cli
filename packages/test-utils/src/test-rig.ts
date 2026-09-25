@@ -418,7 +418,12 @@ export class TestRig {
     if (fs.existsSync(dir)) {
       for (let i = 0; i < 10; i++) {
         try {
-          fs.rmSync(dir, { recursive: true, force: true });
+          fs.rmSync(dir, {
+            recursive: true,
+            force: true,
+            maxRetries: 5,
+            retryDelay: 50,
+          });
           return;
         } catch (err) {
           if (i === 9) {
@@ -428,16 +433,10 @@ export class TestRig {
             );
             throw err;
           }
-          const delay = Math.min(Math.pow(2, i) * 1000, 10000); // Max 10s delay
-          try {
-            const sharedBuffer = new Int32Array(new SharedArrayBuffer(4));
-            Atomics.wait(sharedBuffer, 0, 0, delay);
-          } catch {
-            // Fallback for environments where SharedArrayBuffer might be restricted
-            const start = Date.now();
-            while (Date.now() - start < delay) {
-              /* busy wait */
-            }
+          const delay = Math.min(50 * (i + 1), 500);
+          const start = Date.now();
+          while (Date.now() - start < delay) {
+            /* busy wait */
           }
         }
       }
