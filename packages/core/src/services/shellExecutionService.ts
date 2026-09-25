@@ -615,7 +615,6 @@ export class ShellExecutionService {
       ['core.pager', 'cat'],
       ['core.editor', ''],
       ['sequence.editor', ''],
-      ['diff.external', ''],
     ];
 
     for (const [overrideKey, overrideVal] of defaultGitOverrides) {
@@ -857,6 +856,7 @@ export class ShellExecutionService {
         cmdCleanup?.();
 
         let combinedOutput = state.output;
+        state.output = ''; // Dereference buffer immediately to avoid heap retention
         if (state.truncated) {
           const truncationMessage = `\n[GEMINI_CLI_WARNING: Output truncated. The buffer is limited to ${
             MAX_CHILD_PROCESS_BUFFER_SIZE / (1024 * 1024)
@@ -902,10 +902,9 @@ export class ShellExecutionService {
           }
           onOutputEvent(event);
 
+          ShellExecutionService.activeChildProcesses.delete(pid);
           // eslint-disable-next-line @typescript-eslint/no-floating-promises
-          ShellExecutionService.cleanupLogStream(pid).then(() => {
-            ShellExecutionService.activeChildProcesses.delete(pid);
-          });
+          ShellExecutionService.cleanupLogStream(pid);
 
           ExecutionLifecycleService.completeWithResult(pid, resultPayload);
         } else {
@@ -971,6 +970,38 @@ export class ShellExecutionService {
             }
           }
         }
+
+        // Release child process streams, event listeners, and native buffers
+        if (child.stdout) {
+          child.stdout.removeAllListeners();
+          try {
+            child.stdout.destroy();
+          } catch {
+            // Ignore errors during stream destruction
+          }
+        }
+        if (child.stderr) {
+          child.stderr.removeAllListeners();
+          try {
+            child.stderr.destroy();
+          } catch {
+            // Ignore errors during stream destruction
+          }
+        }
+        const stdin = child.stdin as Writable | null;
+        if (stdin) {
+          stdin.removeAllListeners();
+          try {
+            stdin.destroy();
+          } catch {
+            // Ignore errors during stream destruction
+          }
+        }
+        child.removeAllListeners('error');
+        child.removeAllListeners('close');
+        state.sniffChunks.length = 0;
+        stdoutDecoder = null;
+        stderrDecoder = null;
 
         return;
       }
