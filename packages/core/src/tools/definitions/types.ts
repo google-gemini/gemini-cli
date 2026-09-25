@@ -45,6 +45,7 @@ export interface CoreToolSet {
   read_many_files: FunctionDeclaration;
   write_todos: FunctionDeclaration;
   get_internal_docs: FunctionDeclaration;
+  get_cli_reference: FunctionDeclaration;
   ask_user: FunctionDeclaration;
   enter_plan_mode: FunctionDeclaration;
   exit_plan_mode: () => FunctionDeclaration;
