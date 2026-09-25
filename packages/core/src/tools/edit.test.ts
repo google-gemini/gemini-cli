@@ -1496,4 +1496,100 @@ function doIt() {
       fs.rmSync(plansDir, { recursive: true, force: true });
     });
   });
+
+  describe('concurrent edits to the same file', () => {
+    it('applies both edits rather than losing one', async () => {
+      const filePath = path.join(rootDir, 'shared.txt');
+      fs.writeFileSync(filePath, 'alpha\nbeta\n', 'utf8');
+
+      const first = tool.build({
+        file_path: filePath,
+        instruction: 'Uppercase alpha',
+        old_string: 'alpha',
+        new_string: 'ALPHA',
+      });
+      const second = tool.build({
+        file_path: filePath,
+        instruction: 'Uppercase beta',
+        old_string: 'beta',
+        new_string: 'BETA',
+      });
+
+      const signal = new AbortController().signal;
+      const results = await Promise.all([
+        first.execute({ abortSignal: signal }),
+        second.execute({ abortSignal: signal }),
+      ]);
+
+      for (const result of results) {
+        expect(result.error).toBeUndefined();
+      }
+
+      // Both tool calls reported success, so neither edit may be missing.
+      const finalContent = fs.readFileSync(filePath, 'utf8');
+      expect(finalContent).toContain('ALPHA');
+      expect(finalContent).toContain('BETA');
+    });
+
+    it('serializes concurrent edits with different path spellings (relative vs absolute)', async () => {
+      const fileName = 'spelling.txt';
+      const absolutePath = path.join(rootDir, fileName);
+      const relativePath = `./${fileName}`;
+      fs.writeFileSync(absolutePath, 'line1\nline2\n', 'utf8');
+
+      const first = tool.build({
+        file_path: absolutePath,
+        instruction: 'Uppercase line1',
+        old_string: 'line1',
+        new_string: 'LINE1',
+      });
+      const second = tool.build({
+        file_path: relativePath,
+        instruction: 'Uppercase line2',
+        old_string: 'line2',
+        new_string: 'LINE2',
+      });
+
+      const signal = new AbortController().signal;
+      const results = await Promise.all([
+        first.execute({ abortSignal: signal }),
+        second.execute({ abortSignal: signal }),
+      ]);
+
+      for (const result of results) {
+        expect(result.error).toBeUndefined();
+      }
+
+      const finalContent = fs.readFileSync(absolutePath, 'utf8');
+      expect(finalContent).toContain('LINE1');
+      expect(finalContent).toContain('LINE2');
+    });
+
+    it('aborts immediately if signal is aborted while waiting for path lock', async () => {
+      const filePath = path.join(rootDir, 'abort_test.txt');
+      fs.writeFileSync(filePath, 'original content', 'utf8');
+
+      const first = tool.build({
+        file_path: filePath,
+        instruction: 'Change to first',
+        old_string: 'original',
+        new_string: 'FIRST',
+      });
+      const second = tool.build({
+        file_path: filePath,
+        instruction: 'Change to second',
+        old_string: 'original',
+        new_string: 'SECOND',
+      });
+
+      const controller = new AbortController();
+
+      const p1 = first.execute({ abortSignal: new AbortController().signal });
+      controller.abort();
+      const p2 = second.execute({ abortSignal: controller.signal });
+
+      await expect(p2).rejects.toThrow('Edit aborted');
+      await p1;
+    });
+  });
 });
