@@ -243,7 +243,11 @@ describe('ToolActionsContext', () => {
     let deferredIdeClient: { resolve: (c: IdeClient) => void };
     const mockIdeClient = {
       isDiffingEnabled: vi.fn().mockReturnValue(true),
-      resolveDiffFromCli: vi.fn().mockRejectedValue(new Error('TypeError: fetch failed (UND_ERR_HEADERS_TIMEOUT)')),
+      resolveDiffFromCli: vi
+        .fn()
+        .mockRejectedValue(
+          new Error('TypeError: fetch failed (UND_ERR_HEADERS_TIMEOUT)'),
+        ),
       addStatusChangeListener: vi.fn(),
       removeStatusChangeListener: vi.fn(),
     } as unknown as IdeClient;
