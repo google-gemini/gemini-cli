@@ -1965,13 +1965,14 @@ describe('PolicyEngine', () => {
       expect(result.decision).toBe(PolicyDecision.ASK_USER);
     });
 
-    it('should allow redirected shell commands in AUTO_EDIT mode if individual commands are allowed', async () => {
+    it('should allow redirected shell commands in AUTO_EDIT mode if allowRedirection is true', async () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'run_shell_command',
           argsPattern: /"command":"echo\b/,
           decision: PolicyDecision.ALLOW,
           priority: 20,
+          allowRedirection: true,
         },
       ];
 
@@ -1990,6 +1991,88 @@ describe('PolicyEngine', () => {
       );
 
       expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should downgrade restricted argsPattern shell command with redirection in AUTO_EDIT mode', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"echo\b/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        sandboxManager: new LocalSandboxManager(),
+      });
+      engine.setApprovalMode(ApprovalMode.AUTO_EDIT);
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo hello > file.txt' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should downgrade restricted argsPattern shell command with redirection in YOLO mode', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"echo\b/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.YOLO,
+        sandboxManager: new NoopSandboxManager(),
+      });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo hello > file.txt' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should return DENY for restricted argsPattern shell command with redirection in nonInteractive YOLO mode', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"echo\b/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.YOLO,
+        nonInteractive: true,
+        sandboxManager: new NoopSandboxManager(),
+      });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo hello > file.txt' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.DENY);
     });
 
     it('should allow compound commands with safe operators (&&, ||) if individual commands are allowed', async () => {

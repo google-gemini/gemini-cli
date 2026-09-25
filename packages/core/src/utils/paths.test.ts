@@ -1010,10 +1010,25 @@ describe('normalizePath', () => {
       expect(hasBlockedPathSegment('safe/path/here')).toBe(false);
     });
 
+    it('should block .env variants while allowing safe templates', () => {
+      expect(hasBlockedPathSegment('.env.local')).toBe(true);
+      expect(hasBlockedPathSegment('.env.production')).toBe(true);
+      expect(hasBlockedPathSegment('config/.env.stage')).toBe(true);
+      expect(hasBlockedPathSegment('.env.development.local')).toBe(true);
+      expect(hasBlockedPathSegment('.env.example')).toBe(false);
+      expect(hasBlockedPathSegment('.env.sample')).toBe(false);
+      expect(hasBlockedPathSegment('.env.template')).toBe(false);
+      expect(hasBlockedPathSegment('.env.dist')).toBe(false);
+      expect(hasBlockedPathSegment('docs/.env.example')).toBe(false);
+    });
+
     it('should identify NTFS 8.3 short name (SFN) blocked segments', () => {
       expect(hasBlockedPathSegment('git~1/config')).toBe(true);
       expect(hasBlockedPathSegment('gi1a2b~1/config')).toBe(true);
       expect(hasBlockedPathSegment('env~1')).toBe(true);
+      expect(hasBlockedPathSegment('ENV~1.LOC')).toBe(true);
+      expect(hasBlockedPathSegment('env~1.loc')).toBe(true);
+      expect(hasBlockedPathSegment('en1a2b~1.pro')).toBe(true);
       expect(hasBlockedPathSegment('node_m~1/lodash')).toBe(true);
     });
 

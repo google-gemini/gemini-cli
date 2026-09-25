@@ -17,7 +17,8 @@ import {
   trimTrailingSpacesAndDots,
 } from '../utils/paths.js';
 
-const VSCODE_SFN_REGEX = /^(vscode|vs[0-9a-f]{4})~\d+$/;
+const VSCODE_SFN_REGEX = /^(vscode|vs[0-9a-f]{4})~\d+(\..+)?$/i;
+const GEMINI_SFN_REGEX = /^(gemini|ge[0-9a-f]{4})~\d+(\..+)?$/i;
 
 /**
  * Interface for all in-process safety checkers.
@@ -71,6 +72,7 @@ export class AllowedPathChecker implements InProcessChecker {
       // Check for blocked segments case-insensitively
       let hasBlockedSegment = false;
       let isVscodePath = false;
+      let isGeminiPath = false;
 
       for (const resolvedDir of resolvedAllowedDirs) {
         if (!this.isPathAllowed(resolvedPath, resolvedDir)) continue;
@@ -86,6 +88,9 @@ export class AllowedPathChecker implements InProcessChecker {
           if (clean === '.vscode' || VSCODE_SFN_REGEX.test(clean)) {
             isVscodePath = true;
           }
+          if (clean === '.gemini' || GEMINI_SFN_REGEX.test(clean)) {
+            isGeminiPath = true;
+          }
         }
       }
 
@@ -93,6 +98,13 @@ export class AllowedPathChecker implements InProcessChecker {
         return {
           decision: SafetyCheckDecision.DENY,
           reason: `Access to sensitive path "${p}" in argument "${argName}" is blocked.`,
+        };
+      }
+
+      if (isGeminiPath) {
+        return {
+          decision: SafetyCheckDecision.ASK_USER,
+          reason: `Modifying .gemini configuration files requires explicit user confirmation.`,
         };
       }
 

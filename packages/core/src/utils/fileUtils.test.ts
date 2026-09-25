@@ -30,6 +30,7 @@ import {
   processSingleFileContent,
   detectBOM,
   readFileWithEncoding,
+  readSecureFileBuffer,
   fileExists,
   readWasmBinaryFromDisk,
   saveTruncatedToolOutput,
@@ -503,6 +504,90 @@ describe('fileUtils', () => {
 
         const result = await readFileWithEncoding(filePath);
         expect(result).toBe('');
+      });
+
+      it('should abort file read if file device or inode changes on open (fstat mismatch)', async () => {
+        const filePath = path.join(testDir, 'file-open.txt');
+        await fsPromises.writeFile(filePath, 'safe content');
+
+        const realStats = await fsPromises.stat(filePath);
+        const openSpy = vi.spyOn(fsPromises, 'open').mockResolvedValueOnce({
+          stat: vi.fn().mockResolvedValue({
+            dev: realStats.dev,
+            ino: realStats.ino + 9999,
+          }),
+          close: vi.fn().mockResolvedValue(undefined),
+        } as unknown as fsPromises.FileHandle);
+
+        try {
+          await expect(readFileWithEncoding(filePath)).rejects.toThrow(
+            /File device or inode changed during read/,
+          );
+        } finally {
+          openSpy.mockRestore();
+        }
+      });
+
+      it('should abort file read if file device or inode changes after read (post-stat mismatch)', async () => {
+        const filePath = path.join(testDir, 'file-post.txt');
+        await fsPromises.writeFile(filePath, 'safe content');
+
+        const realStats = await fsPromises.stat(filePath);
+        let statCallCount = 0;
+        const statSpy = vi
+          .spyOn(fsPromises, 'stat')
+          .mockImplementation(async () => {
+            statCallCount++;
+            if (statCallCount === 1) {
+              return realStats;
+            }
+            return {
+              dev: realStats.dev,
+              ino: realStats.ino + 8888,
+              isDirectory: () => false,
+              isFile: () => true,
+            } as unknown as fs.Stats;
+          });
+
+        try {
+          await expect(readFileWithEncoding(filePath)).rejects.toThrow(
+            /File device or inode changed during read/,
+          );
+        } finally {
+          statSpy.mockRestore();
+        }
+      });
+    });
+
+    describe('readSecureFileBuffer', () => {
+      it('should successfully read file buffer', async () => {
+        const filePath = path.join(testDir, 'secure-buffer.txt');
+        await fsPromises.writeFile(filePath, 'hello secure');
+
+        const buffer = await readSecureFileBuffer(filePath);
+        expect(buffer.toString('utf-8')).toBe('hello secure');
+      });
+
+      it('should abort if fstat dev/ino does not match initial stats', async () => {
+        const filePath = path.join(testDir, 'secure-buffer-mismatch.txt');
+        await fsPromises.writeFile(filePath, 'hello secure');
+
+        const realStats = await fsPromises.stat(filePath);
+        const openSpy = vi.spyOn(fsPromises, 'open').mockResolvedValueOnce({
+          stat: vi.fn().mockResolvedValue({
+            dev: realStats.dev,
+            ino: realStats.ino + 7777,
+          }),
+          close: vi.fn().mockResolvedValue(undefined),
+        } as unknown as fsPromises.FileHandle);
+
+        try {
+          await expect(readSecureFileBuffer(filePath)).rejects.toThrow(
+            /File device or inode changed during read/,
+          );
+        } finally {
+          openSpy.mockRestore();
+        }
       });
     });
 
@@ -1204,6 +1289,34 @@ describe('fileUtils', () => {
         expect(result.llmContent).toContain('File size exceeds the 20MB limit');
       } finally {
         statSpy.mockRestore();
+      }
+    });
+
+    it('should catch dev/ino mismatch and return READ_CONTENT_FAILURE with security error', async () => {
+      actualNodeFs.writeFileSync(testTextFilePath, 'sample content');
+      const realStats = actualNodeFs.statSync(testTextFilePath);
+
+      const openSpy = vi.spyOn(fsPromises, 'open').mockResolvedValueOnce({
+        stat: vi.fn().mockResolvedValue({
+          dev: realStats.dev,
+          ino: realStats.ino + 12345,
+        }),
+        close: vi.fn().mockResolvedValue(undefined),
+      } as unknown as fsPromises.FileHandle);
+
+      try {
+        const result = await processSingleFileContent(
+          testTextFilePath,
+          tempRootDir,
+          new StandardFileSystemService(),
+        );
+
+        expect(result.errorType).toBe(ToolErrorType.READ_CONTENT_FAILURE);
+        expect(result.error).toContain(
+          'File device or inode changed during read',
+        );
+      } finally {
+        openSpy.mockRestore();
       }
     });
   });

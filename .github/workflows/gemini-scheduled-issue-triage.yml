@@ -194,7 +194,6 @@ jobs:
               "maxSessionTurns": 25,
               "tools": {
                 "core": [
-                  "run_shell_command(echo)",
                   "read_file"
                 ]
               },
@@ -212,7 +211,7 @@ jobs:
 
             ## Steps
 
-            1. You are only able to use the echo and read_file commands. Review the available labels in the environment variable: "${AVAILABLE_LABELS}".
+            1. You are only able to use the read_file command. Review the available labels in the environment variable: "${AVAILABLE_LABELS}".
             2. Use the read_file tool to read the file "standard_issues_to_triage.json" which contains the JSON array of issues to triage (including their current labels).
             3. Review the issue title, body, current labels, and any comments provided in the JSON file.
             4. Identify the most relevant labels from the existing labels, specifically focusing on area/*, kind/*, and priority/*.
@@ -319,7 +318,6 @@ jobs:
               "maxSessionTurns": 30,
               "tools": {
                 "core": [
-                  "run_shell_command(echo)",
                   "grep_search",
                   "glob",
                   "read_file"

@@ -89,9 +89,7 @@ jobs:
               },
               "maxSessionTurns": 25,
               "tools": {
-                "core": [
-                  "run_shell_command(echo)"
-                ]
+                "core": []
               },
               "telemetry": {
                 "enabled": true,
