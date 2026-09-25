@@ -690,6 +690,33 @@ export function getAvailablePort(): Promise<number> {
   });
 }
 
+export async function readOAuthCredsWithRetry(
+  filePath: string,
+  getMaxRetries: () => number = () => 3,
+): Promise<string> {
+  let attempt = 0;
+  while (attempt < getMaxRetries()) {
+    try {
+      return await fs.readFile(filePath, 'utf-8');
+    } catch (err: unknown) {
+      if (
+        err &&
+        typeof err === 'object' &&
+        'code' in err &&
+        err.code === 'ENOENT'
+      ) {
+        throw err;
+      }
+      attempt++;
+      if (attempt >= getMaxRetries()) {
+        throw err;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 25 * attempt));
+    }
+  }
+  return '';
+}
+
 async function fetchCachedCredentialsList(): Promise<
   Array<Credentials | JWTInput>
 > {
@@ -716,7 +743,7 @@ async function fetchCachedCredentialsList(): Promise<
 
   for (const keyFile of pathsToTry) {
     try {
-      const keyFileString = await fs.readFile(keyFile, 'utf-8');
+      const keyFileString = await readOAuthCredsWithRetry(keyFile);
       const parsed: unknown = JSON.parse(keyFileString);
       const isOAuthCreds = (val: unknown): val is Credentials | JWTInput =>
         typeof val === 'object' && val !== null;
@@ -796,13 +823,16 @@ export function resetOauthClientForTesting() {
   oauthClientPromises.clear();
 }
 
+let tempCounter = 0;
+
 async function cacheCredentials(credentials: Credentials) {
   const filePath = Storage.getOAuthCredsPath();
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  const dirPath = path.dirname(filePath);
+  await fs.mkdir(dirPath, { recursive: true });
 
   let existing: Credentials = {};
   try {
-    const existingContent = await fs.readFile(filePath, 'utf-8');
+    const existingContent = await readOAuthCredsWithRetry(filePath);
     const parsed: unknown = JSON.parse(existingContent);
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
       existing = parsed as Credentials;
@@ -830,7 +860,29 @@ async function cacheCredentials(credentials: Credentials) {
   };
 
   const credString = JSON.stringify(finalCredentials, null, 2);
-  await fs.writeFile(filePath, credString, { mode: 0o600 });
+  const tempPath = path.join(
+    dirPath,
+    `.${path.basename(filePath)}.${process.pid}.${Date.now()}.${tempCounter++}.tmp`,
+  );
+
+  try {
+    await fs.writeFile(tempPath, credString, { mode: 0o600 });
+    try {
+      await fs.chmod(tempPath, 0o600);
+    } catch {
+      /* empty */
+    }
+    await fs.rename(tempPath, filePath);
+  } catch {
+    try {
+      await fs.rm(tempPath, { force: true });
+    } catch {
+      /* empty */
+    }
+    // Fallback to direct write if rename fails
+    await fs.writeFile(filePath, credString, { mode: 0o600 });
+  }
+
   try {
     await fs.chmod(filePath, 0o600);
   } catch {
