@@ -451,9 +451,11 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
       code_challenge: codeVerifier.codeChallenge,
       state,
     });
+    const osc8Link = (url: string) =>
+      `\x1b]8;;${url}\x1b\\${url}\x1b]8;;\x1b\\`;
     writeToStdout(
       'Please visit the following URL to authorize the application:\n\n' +
-        authUrl +
+        osc8Link(authUrl) +
         '\n\n',
     );
 
