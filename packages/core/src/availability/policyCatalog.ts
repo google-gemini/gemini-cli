@@ -14,9 +14,10 @@ import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
+  PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+  PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL,
-  resolveModel,
 } from '../config/models.js';
 import type { UserTierId } from '../code_assist/types.js';
 
@@ -77,15 +78,14 @@ export function getModelPolicyChain(
   const isAuto = options.isAutoSelection ?? false;
 
   if (options.previewEnabled) {
-    const proModel = resolveModel(
-      PREVIEW_GEMINI_MODEL,
-      options.useGemini31,
-      options.useCustomToolModel,
-      true,
-      undefined,
-      options.useLatestFlash,
-      options.useLatestFlashLite,
-    );
+    // This catalog selects the rollout default; it is not resolving a model ID
+    // requested by a user. Keep that selection distinct so an explicit
+    // gemini-3-pro-preview request can remain pinned to its version.
+    const proModel = options.useGemini31
+      ? options.useCustomToolModel
+        ? PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL
+        : PREVIEW_GEMINI_3_1_MODEL
+      : PREVIEW_GEMINI_MODEL;
     return [
       definePolicy({
         model: proModel,

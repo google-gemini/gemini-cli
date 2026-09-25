@@ -35,7 +35,10 @@ import {
 import { MockTool } from '../test-utils/mock-tool.js';
 import type { Config } from '../config/config.js';
 import { setSimulate429 } from '../utils/testUtils.js';
-import { DEFAULT_THINKING_MODE } from '../config/models.js';
+import {
+  DEFAULT_THINKING_MODE,
+  PREVIEW_GEMINI_MODEL,
+} from '../config/models.js';
 import { AuthType } from './contentGenerator.js';
 import { TerminalQuotaError } from '../utils/googleQuotaErrors.js';
 import { type RetryOptions } from '../utils/retry.js';
@@ -2334,6 +2337,48 @@ describe('GeminiChat', () => {
       expect(mockContentGenerator.generateContentStream).toHaveBeenCalledWith(
         expect.objectContaining({ model: 'gemini-3.8-flash' }),
         'prompt-id-explicit-flash',
+        LlmRole.MAIN,
+      );
+    });
+
+    it('should send an explicit Pro preview model unchanged when the Gemini 3.1 rollout is enabled', async () => {
+      // The rollout must rewrite the auto/pro aliases (see models.test.ts),
+      // but a user-requested explicit model ID pins that version.
+      mockConfig.getGemini31Launched = vi.fn().mockResolvedValue(true);
+      mockConfig.getHasAccessToPreviewModel = vi.fn().mockReturnValue(true);
+      vi.mocked(mockConfig.getModelAvailabilityService).mockReturnValue(
+        createAvailabilityServiceMock({
+          selectedModel: PREVIEW_GEMINI_MODEL,
+          skipped: [],
+        }),
+      );
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: { parts: [{ text: 'response' }], role: 'model' },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: PREVIEW_GEMINI_MODEL },
+        'hello',
+        'prompt-id-explicit-pro-preview',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledWith(
+        expect.objectContaining({ model: PREVIEW_GEMINI_MODEL }),
+        'prompt-id-explicit-pro-preview',
         LlmRole.MAIN,
       );
     });

@@ -268,7 +268,6 @@ export function resolveModel(
       }
       // fallthrough
     }
-    case PREVIEW_GEMINI_MODEL:
     case PREVIEW_GEMINI_MODEL_AUTO: {
       if (useGemini3_1) {
         resolved = useCustomToolModel
@@ -277,6 +276,12 @@ export function resolveModel(
       } else {
         resolved = PREVIEW_GEMINI_MODEL;
       }
+      break;
+    }
+    case PREVIEW_GEMINI_MODEL: {
+      // An explicit model ID pins that version: only the aliases above follow
+      // the Gemini 3.1 rollout. The preview-access downgrade below still applies.
+      resolved = PREVIEW_GEMINI_MODEL;
       break;
     }
     case DEFAULT_GEMINI_MODEL_AUTO: {
