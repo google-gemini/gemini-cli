@@ -6,7 +6,6 @@
 
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
-import path from 'node:path';
 import { isNodeError } from '../utils/errors.js';
 import { resolveToRealPath } from '../utils/paths.js';
 
@@ -54,18 +53,7 @@ export class StandardFileSystemService implements FileSystemService {
     // When filePath is a symlink, resolve to its real target path so that the
     // rename updates the underlying target file rather than replacing the
     // symlink itself with a regular file.
-    let realPath = filePath;
-    try {
-      realPath = resolveToRealPath(filePath);
-    } catch {
-      try {
-        const dir = path.dirname(filePath);
-        const base = path.basename(filePath);
-        realPath = path.join(resolveToRealPath(dir), base);
-      } catch {
-        realPath = filePath;
-      }
-    }
+    const realPath = resolveToRealPath(filePath);
 
     // The temp file must share a directory with the destination so that the
     // rename stays within one filesystem, and must be uniquely named so that
