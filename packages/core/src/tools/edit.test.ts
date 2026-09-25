@@ -1496,4 +1496,34 @@ function doIt() {
       fs.rmSync(plansDir, { recursive: true, force: true });
     });
   });
+
+  describe('concurrent edits on the same file', () => {
+    it('serializes parallel EditTool executions so neither edit is lost', async () => {
+      const filePath = path.join(rootDir, 'concurrent-edits.txt');
+      fs.writeFileSync(filePath, 'alpha\nbeta\n', 'utf8');
+
+      const inv1 = tool.build({
+        file_path: filePath,
+        instruction: 'Capitalize alpha',
+        old_string: 'alpha',
+        new_string: 'ALPHA',
+      });
+      const inv2 = tool.build({
+        file_path: filePath,
+        instruction: 'Capitalize beta',
+        old_string: 'beta',
+        new_string: 'BETA',
+      });
+
+      const signal = new AbortController().signal;
+      const [res1, res2] = await Promise.all([
+        inv1.execute({ abortSignal: signal }),
+        inv2.execute({ abortSignal: signal }),
+      ]);
+
+      expect(res1.error).toBeUndefined();
+      expect(res2.error).toBeUndefined();
+      expect(fs.readFileSync(filePath, 'utf8')).toBe('ALPHA\nBETA\n');
+    });
+  });
 });

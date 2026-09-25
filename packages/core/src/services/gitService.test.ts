@@ -490,5 +490,41 @@ describe('GitService', () => {
       expect(hoistedMockRaw).toHaveBeenCalledWith('rev-parse', 'HEAD');
       expect(commitHash).toBe('current-head-hash');
     });
+
+    it('should serialize concurrent createFileSnapshot calls without interleaving add/status/commit', async () => {
+      const steps: string[] = [];
+      let callIndex = 0;
+
+      hoistedMockAdd.mockImplementation(async () => {
+        const idx = ++callIndex;
+        steps.push(`add:${idx}`);
+        await new Promise((resolve) => setTimeout(resolve, 15));
+      });
+      hoistedMockStatus.mockImplementation(async () => {
+        steps.push(`status:${callIndex}`);
+        return { isClean: () => false };
+      });
+      hoistedMockCommit.mockImplementation(async (msg: string) => {
+        steps.push(`commit:${msg}`);
+        return { commit: `hash-${msg}` };
+      });
+
+      const service = new GitService(projectRoot, storage);
+      const [h1, h2] = await Promise.all([
+        service.createFileSnapshot('snap-1'),
+        service.createFileSnapshot('snap-2'),
+      ]);
+
+      expect(h1).toBe('hash-snap-1');
+      expect(h2).toBe('hash-snap-2');
+      expect(steps).toEqual([
+        'add:1',
+        'status:1',
+        'commit:snap-1',
+        'add:2',
+        'status:2',
+        'commit:snap-2',
+      ]);
+    });
   });
 });

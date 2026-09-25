@@ -1186,4 +1186,46 @@ describe('WriteFileTool', () => {
       expect(fs.readFileSync(expectedWritePath, 'utf8')).toBe('nested content');
     });
   });
+
+  describe('concurrent writes to the same new file', () => {
+    it('serializes parallel WriteFileTool executions so only the first reports new file creation and the second reports overwrite', async () => {
+      vi.mocked(mockConfig.isPlanMode).mockReturnValue(false);
+      const filePath = path.join(rootDir, 'concurrent-new-file.txt');
+      mockEnsureCorrectFileContent.mockImplementation(
+        async (content: string) => {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+          return content;
+        },
+      );
+
+      const inv1 = tool.build({
+        file_path: filePath,
+        content: 'first content\n',
+      });
+      const inv2 = tool.build({
+        file_path: filePath,
+        content: 'second content\n',
+      });
+
+      const abortSignal = new AbortController().signal;
+      const [res1, res2] = await Promise.all([
+        inv1.execute({ abortSignal }),
+        inv2.execute({ abortSignal }),
+      ]);
+
+      expect(res1.error).toBeUndefined();
+      expect(res2.error).toBeUndefined();
+
+      const messages = [String(res1.llmContent), String(res2.llmContent)];
+      const createdCount = messages.filter((m) =>
+        m.includes('Successfully created and wrote to new file'),
+      ).length;
+      const overwroteCount = messages.filter((m) =>
+        m.includes('Successfully overwrote file'),
+      ).length;
+
+      expect(createdCount).toBe(1);
+      expect(overwroteCount).toBe(1);
+    });
+  });
 });

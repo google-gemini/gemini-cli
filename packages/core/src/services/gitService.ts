@@ -21,6 +21,7 @@ import {
   getSecureSanitizationConfig,
 } from './environmentSanitization.js';
 import { getSafeGitEnv } from '../utils/gitUtils.js';
+import { withPathLock } from '../utils/pathMutex.js';
 
 export const SHADOW_REPO_AUTHOR_NAME = 'Gemini CLI';
 export const SHADOW_REPO_AUTHOR_EMAIL = 'gemini-cli@google.com';
@@ -194,29 +195,33 @@ export class GitService {
   }
 
   async createFileSnapshot(message: string): Promise<string> {
-    try {
-      const repo = this.shadowGitRepository;
-      await repo.add('.');
-      const status = await repo.status();
-      if (status.isClean()) {
-        // If no changes are staged, return the current HEAD commit hash
-        return await this.getCurrentCommitHash();
+    return withPathLock(this.getHistoryDir(), async () => {
+      try {
+        const repo = this.shadowGitRepository;
+        await repo.add('.');
+        const status = await repo.status();
+        if (status.isClean()) {
+          // If no changes are staged, return the current HEAD commit hash
+          return await this.getCurrentCommitHash();
+        }
+        const commitResult = await repo.commit(message, {
+          '--no-verify': null,
+        });
+        return commitResult.commit;
+      } catch (error) {
+        throw new Error(
+          `Failed to create checkpoint snapshot: ${error instanceof Error ? error.message : 'Unknown error'}. Checkpointing may not be working properly.`,
+        );
       }
-      const commitResult = await repo.commit(message, {
-        '--no-verify': null,
-      });
-      return commitResult.commit;
-    } catch (error) {
-      throw new Error(
-        `Failed to create checkpoint snapshot: ${error instanceof Error ? error.message : 'Unknown error'}. Checkpointing may not be working properly.`,
-      );
-    }
+    });
   }
 
   async restoreProjectFromSnapshot(commitHash: string): Promise<void> {
-    const repo = this.shadowGitRepository;
-    await repo.raw(['restore', '--source', commitHash, '.']);
-    // Removes any untracked files that were introduced post snapshot.
-    await repo.clean('f', ['-d']);
+    return withPathLock(this.getHistoryDir(), async () => {
+      const repo = this.shadowGitRepository;
+      await repo.raw(['restore', '--source', commitHash, '.']);
+      // Removes any untracked files that were introduced post snapshot.
+      await repo.clean('f', ['-d']);
+    });
   }
 }

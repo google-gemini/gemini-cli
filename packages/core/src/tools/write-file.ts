@@ -64,6 +64,7 @@ import {
 import { discoverJitContext, appendJitContext } from './jit-context.js';
 import { isBuildFile } from '../utils/buildFileUtils.js';
 import { recordModifiedBuildFile } from '../utils/untrustedContextTracker.js';
+import { withPathLock } from '../utils/pathMutex.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -382,6 +383,17 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       };
     }
 
+    const lockKey = resolveToRealPath(
+      path.resolve(this.config.getTargetDir(), this.resolvedPath),
+    );
+    return withPathLock(
+      lockKey,
+      () => this.applyWrite(abortSignal),
+      abortSignal,
+    );
+  }
+
+  private async applyWrite(abortSignal: AbortSignal): Promise<ToolResult> {
     const { content, ai_proposed_content, modified_by_user } = this.params;
     const correctedContentResult = await getCorrectedFileContent(
       this.config,

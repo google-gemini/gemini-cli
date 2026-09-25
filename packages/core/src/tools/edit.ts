@@ -63,6 +63,7 @@ import { discoverJitContext, appendJitContext } from './jit-context.js';
 import { resolveAndValidatePlanPath } from '../utils/planUtils.js';
 import { isBuildFile } from '../utils/buildFileUtils.js';
 import { recordModifiedBuildFile } from '../utils/untrustedContextTracker.js';
+import { withPathLock } from '../utils/pathMutex.js';
 
 const ENABLE_FUZZY_MATCH_RECOVERY = true;
 const FUZZY_MATCH_THRESHOLD = 0.1; // Allow up to 10% weighted difference
@@ -914,6 +915,13 @@ class EditToolInvocation
       };
     }
 
+    const lockKey = resolveToRealPath(
+      path.resolve(this.config.getTargetDir(), this.resolvedPath),
+    );
+    return withPathLock(lockKey, () => this.applyEdit(signal), signal);
+  }
+
+  private async applyEdit(signal: AbortSignal): Promise<ToolResult> {
     let editData: CalculatedEdit;
     try {
       editData = await this.calculateEdit(this.params, signal);
