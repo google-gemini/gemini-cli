@@ -31,6 +31,18 @@ export const IMAGE_EXTENSIONS = [
 /** Matches strings that start with a path prefix (/, ~, ., Windows drive letter, or UNC path) */
 const PATH_PREFIX_PATTERN = /^([/~.]|[a-zA-Z]:|\\\\)/;
 
+const isWSL = (): boolean =>
+  Boolean(
+    process.env['WSL_DISTRO_NAME'] ||
+      process.env['WSLENV'] ||
+      process.env['WSL_INTEROP'],
+  );
+
+const stdoutHasLine = (stdout: string, expected: string): boolean =>
+  stdout
+    .split(/\r?\n/)
+    .some((line) => line.replace(/^\uFEFF/, '').trim() === expected);
+
 // Track which tool works on Linux to avoid redundant checks/failures
 let linuxClipboardTool: 'wl-paste' | 'xclip' | null = null;
 
@@ -163,6 +175,20 @@ async function checkXclipForImage() {
  */
 export async function clipboardHasImage(): Promise<boolean> {
   if (process.platform === 'linux') {
+    if (isWSL()) {
+      try {
+        const { stdout } = await spawnAsync('powershell.exe', [
+          '-NoProfile',
+          '-Command',
+          'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::ContainsImage()',
+        ]);
+        return stdoutHasLine(stdout, 'True');
+      } catch (error) {
+        debugLogger.warn('Error checking WSL clipboard for image:', error);
+        return false;
+      }
+    }
+
     const tool = getUserLinuxClipboardTool();
     if (tool === 'wl-paste') {
       if (await checkWlPasteForImage()) return true;
@@ -179,7 +205,7 @@ export async function clipboardHasImage(): Promise<boolean> {
         '-Command',
         'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::ContainsImage()',
       ]);
-      return stdout.trim() === 'True';
+      return stdoutHasLine(stdout, 'True');
     } catch (error) {
       debugLogger.warn('Error checking clipboard for image:', error);
       return false;
@@ -244,6 +270,41 @@ const saveFileWithXclip = async (tempFilePath: string) => {
   return false;
 };
 
+async function saveFileWithPowerShell(
+  command: 'powershell' | 'powershell.exe',
+  tempFilePath: string,
+  powershellPath: string,
+): Promise<boolean> {
+  const psPath = powershellPath.replace(/'/g, "''");
+
+  const script = `
+    Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName System.Drawing
+    if ([System.Windows.Forms.Clipboard]::ContainsImage()) {
+      $image = [System.Windows.Forms.Clipboard]::GetImage()
+      $image.Save('${psPath}', [System.Drawing.Imaging.ImageFormat]::Png)
+      Write-Output "success"
+    }
+  `;
+
+  const { stdout } = await spawnAsync(command, [
+    '-NoProfile',
+    '-Command',
+    script,
+  ]);
+
+  if (!stdoutHasLine(stdout, 'success')) {
+    return false;
+  }
+
+  try {
+    const stats = await fs.stat(tempFilePath);
+    return stats.size > 0;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Gets the directory where clipboard images should be stored for a specific project.
  *
@@ -281,6 +342,27 @@ export async function saveClipboardImage(
 
     if (process.platform === 'linux') {
       const tempFilePath = path.join(tempDir, `clipboard-${timestamp}.png`);
+
+      if (isWSL()) {
+        try {
+          const { stdout } = await spawnAsync('wslpath', ['-w', tempFilePath]);
+          const windowsPath = stdout.trim();
+          if (
+            windowsPath &&
+            (await saveFileWithPowerShell(
+              'powershell.exe',
+              tempFilePath,
+              windowsPath,
+            ))
+          ) {
+            return tempFilePath;
+          }
+        } catch (error) {
+          debugLogger.warn('Error saving WSL clipboard image:', error);
+        }
+        return null;
+      }
+
       const tool = getUserLinuxClipboardTool();
 
       if (tool === 'wl-paste') {
@@ -296,34 +378,10 @@ export async function saveClipboardImage(
 
     if (process.platform === 'win32') {
       const tempFilePath = path.join(tempDir, `clipboard-${timestamp}.png`);
-      // The path is used directly in the PowerShell script.
-      const psPath = tempFilePath.replace(/'/g, "''");
-
-      const script = `
-        Add-Type -AssemblyName System.Windows.Forms
-        Add-Type -AssemblyName System.Drawing
-        if ([System.Windows.Forms.Clipboard]::ContainsImage()) {
-          $image = [System.Windows.Forms.Clipboard]::GetImage()
-          $image.Save('${psPath}', [System.Drawing.Imaging.ImageFormat]::Png)
-          Write-Output "success"
-        }
-      `;
-
-      const { stdout } = await spawnAsync('powershell', [
-        '-NoProfile',
-        '-Command',
-        script,
-      ]);
-
-      if (stdout.trim() === 'success') {
-        try {
-          const stats = await fs.stat(tempFilePath);
-          if (stats.size > 0) {
-            return tempFilePath;
-          }
-        } catch {
-          // File doesn't exist
-        }
+      if (
+        await saveFileWithPowerShell('powershell', tempFilePath, tempFilePath)
+      ) {
+        return tempFilePath;
       }
       return null;
     }
@@ -359,7 +417,7 @@ export async function saveClipboardImage(
 
       const { stdout } = await spawnAsync('osascript', ['-e', script]);
 
-      if (stdout.trim() === 'success') {
+      if (stdoutHasLine(stdout, 'success')) {
         // Verify the file was created and has content
         try {
           const stats = await fs.stat(tempFilePath);
