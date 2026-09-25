@@ -82,7 +82,8 @@ function isTaintRiskDetectable(
     typeof invocation === 'object' &&
     invocation !== null &&
     'hasTaintedOrBuildFileRisk' in invocation &&
-    typeof invocation.hasTaintedOrBuildFileRisk === 'function'
+    typeof (invocation as { hasTaintedOrBuildFileRisk?: unknown })
+      .hasTaintedOrBuildFileRisk === 'function'
   );
 }
 
