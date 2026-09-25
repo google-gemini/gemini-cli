@@ -278,8 +278,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
     const isBuildCmd = isBuildOrTestCommand(command);
 
     return (
-      untrustedFlags.length > 0 ||
-      (isBuildCmd && modifiedBuildFiles.length > 0)
+      untrustedFlags.length > 0 || (isBuildCmd && modifiedBuildFiles.length > 0)
     );
   }
 
