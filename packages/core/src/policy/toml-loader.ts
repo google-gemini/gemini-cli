@@ -390,6 +390,7 @@ export async function loadPoliciesFromToml(
 
         // Validate shell command convenience syntax
         const tomlRules = validationResult.data.rule ?? [];
+        const invalidRuleIndices = new Set<number>();
 
         for (let i = 0; i < tomlRules.length; i++) {
           const rule = tomlRules[i];
@@ -404,6 +405,7 @@ export async function loadPoliciesFromToml(
               message: 'Invalid shell command syntax',
               details: validationError,
             });
+            invalidRuleIndices.add(i);
             // Continue to next rule, don't skip the entire file
           }
         }
@@ -426,6 +428,7 @@ export async function loadPoliciesFromToml(
               message: 'Invalid policy rule: toolName cannot be empty string',
               details: `Rule #${i + 1} contains an empty toolName string. Use "*" to match all tools.`,
             });
+            invalidRuleIndices.add(i);
             continue;
           }
 
@@ -452,7 +455,8 @@ export async function loadPoliciesFromToml(
         }
 
         // Transform rules
-        const parsedRules: PolicyRule[] = (validationResult.data.rule ?? [])
+        const parsedRules: PolicyRule[] = tomlRules
+          .filter((_, i) => !invalidRuleIndices.has(i))
           .flatMap((rule) => {
             const argsPatterns = buildArgsPatterns(
               rule.argsPattern,
@@ -545,6 +549,7 @@ export async function loadPoliciesFromToml(
 
         // Validate tool names in safety checker rules
         const tomlCheckerRules = validationResult.data.safety_checker ?? [];
+        const invalidCheckerIndices = new Set<number>();
         for (let i = 0; i < tomlCheckerRules.length; i++) {
           const checker = tomlCheckerRules[i];
 
@@ -563,6 +568,7 @@ export async function loadPoliciesFromToml(
                 'Invalid safety checker rule: toolName cannot be empty string',
               details: `Checker #${i + 1} contains an empty toolName string. Use "*" to match all tools.`,
             });
+            invalidCheckerIndices.add(i);
             continue;
           }
 
@@ -588,9 +594,8 @@ export async function loadPoliciesFromToml(
         }
 
         // Transform checkers
-        const parsedCheckers: SafetyCheckerRule[] = (
-          validationResult.data.safety_checker ?? []
-        )
+        const parsedCheckers: SafetyCheckerRule[] = tomlCheckerRules
+          .filter((_, i) => !invalidCheckerIndices.has(i))
           .flatMap((checker) => {
             const argsPatterns = buildArgsPatterns(
               checker.argsPattern,

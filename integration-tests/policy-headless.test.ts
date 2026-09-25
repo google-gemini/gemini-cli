@@ -166,6 +166,51 @@ describe('Policy Engine Headless Mode', () => {
       expectAllowed: true,
     },
     {
+      name: 'should skip an empty tool name and use a valid sibling policy',
+      responsesFile: 'policy-headless-shell-allowed.responses',
+      promptCommand: ECHO_PROMPT,
+      policyContent: `
+        [[rule]]
+        toolName = ""
+        decision = "allow"
+        priority = 900
+
+        [[rule]]
+        toolName = "run_shell_command"
+        commandPrefix = "echo"
+        decision = "allow"
+        priority = 100
+      `,
+      expectAllowed: true,
+    },
+    {
+      name: 'should skip conflicting shell fields and enforce a valid sibling policy',
+      responsesFile: 'policy-headless-shell-denied.responses',
+      promptCommand: ECHO_PROMPT,
+      policyContent: `
+        [[rule]]
+        toolName = "run_shell_command"
+        commandPrefix = "echo"
+        commandRegex = ".*"
+        decision = "allow"
+        priority = 900
+
+        [[rule]]
+        toolName = "run_shell_command"
+        commandPrefix = "echo"
+        decision = "deny"
+        priority = 100
+
+        [[rule]]
+        toolName = "run_shell_command"
+        commandPrefix = "node"
+        decision = "allow"
+        priority = 90
+      `,
+      expectAllowed: false,
+      expectedDenialString: 'Tool execution denied by policy',
+    },
+    {
       name: 'should allow specific shell commands in policy file',
       responsesFile: 'policy-headless-shell-allowed.responses',
       promptCommand: ECHO_PROMPT,

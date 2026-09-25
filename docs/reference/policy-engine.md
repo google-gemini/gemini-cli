@@ -285,6 +285,11 @@ directory are **ignored**.
 
 This section describes the fields available in a TOML policy rule.
 
+Gemini CLI reports and skips individual rules with empty tool names or invalid
+shell-command syntax. Valid rules in the same file remain active. Safety checker
+rules with empty tool names are also skipped. Warnings about unrecognized tool
+names do not prevent rules from loading.
+
 For valid built-in `toolName` values and their argument structures (used by
 `argsPattern`), see the
 [Tools reference](/docs/reference/tools#available-tools).
@@ -306,8 +311,9 @@ mcpName = "my-custom-server"
 # key-value pairs provided here are present in the tool's annotations.
 toolAnnotations = { readOnlyHint = true }
 
+# Choose only one of argsPattern, commandPrefix, or commandRegex.
 # (Optional) A regex to match against the tool's arguments.
-argsPattern = '"command":"(git|npm)'
+# argsPattern = '"command":"(git|npm)'
 
 # (Optional) A string or array of strings that a shell command must start with.
 # This is syntactic sugar for `toolName = "run_shell_command"` and an
@@ -322,7 +328,7 @@ commandPrefix = "git"
 # Anchors like `^` or `$` apply to the full JSON string,
 # so `^` should usually be avoided here.
 # You cannot use commandPrefix and commandRegex in the same rule.
-commandRegex = "git (commit|push)"
+# commandRegex = "git (commit|push)"
 
 # The decision to take. Must be "allow", "deny", or "ask_user".
 decision = "ask_user"
