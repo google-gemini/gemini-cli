@@ -8,6 +8,7 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import os from 'node:os';
 import path from 'node:path';
+import { debugLogger } from '../utils/debugLogger.js';
 
 const execAsync = promisify(exec);
 
@@ -77,6 +78,55 @@ async function getProcessTableWindows(): Promise<Map<number, ProcessInfo>> {
     // Fallback or error handling if PowerShell fails
   }
   return processMap;
+}
+
+/**
+ * Fetches the parent process ID, name, and command for a single process ID
+ * on Windows via CIM. Used as a fallback when the full process-table
+ * snapshot (getProcessTableWindows) fails or omits the requested PID.
+ */
+async function getProcessInfoWindowsSingle(pid: number): Promise<{
+  parentPid: number;
+  name: string;
+  command: string;
+}> {
+  try {
+    const powershellCommand =
+      `Get-CimInstance Win32_Process -Filter "ProcessId=${pid}" | ` +
+      'Select-Object ParentProcessId,Name,CommandLine | ConvertTo-Json -Compress';
+    const { stdout } = await execAsync(
+      'powershell -NoProfile -NonInteractive -Command "' +
+        powershellCommand +
+        '"',
+      {
+        maxBuffer: 1024 * 1024,
+        timeout: 5000,
+      },
+    );
+
+    if (!stdout.trim()) {
+      return { parentPid: 0, name: '', command: '' };
+    }
+
+    let proc: RawProcessInfo;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      proc = JSON.parse(stdout);
+    } catch {
+      return { parentPid: 0, name: '', command: '' };
+    }
+
+    return {
+      parentPid: proc.ParentProcessId || 0,
+      name: proc.Name || '',
+      command: proc.CommandLine || '',
+    };
+  } catch {
+    debugLogger.warn(
+      `[process-utils] Failed to query Windows process info for PID ${pid} via Get-CimInstance.`,
+    );
+    return { parentPid: 0, name: '', command: '' };
+  }
 }
 
 /**
@@ -178,8 +228,10 @@ async function getIdeProcessInfoForWindows(): Promise<{
   const myProc = processMap.get(myPid);
 
   if (!myProc) {
-    // Fallback: try to get info for current process directly if snapshot fails
-    const { command } = await getProcessInfo(myPid);
+    // Fallback: query CIM directly for this single PID if the full snapshot
+    // failed or didn't include us. getProcessInfo() shells out to the
+    // Unix-only `ps` command, which doesn't exist on Windows.
+    const { command } = await getProcessInfoWindowsSingle(myPid);
     return { pid: myPid, command };
   }
 
