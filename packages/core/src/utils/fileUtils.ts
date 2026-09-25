@@ -176,30 +176,24 @@ export async function readSecureFileBuffer(
     if (typeof fs.promises.open === 'function') {
       try {
         fileHandle = await fs.promises.open(filePath, 'r');
-        if (fileHandle && typeof fileHandle.stat === 'function') {
-          const handleStats = await fileHandle.stat();
-          if (
-            initialStats.dev !== undefined &&
-            initialStats.ino !== undefined &&
-            handleStats &&
-            handleStats.dev !== undefined &&
-            handleStats.ino !== undefined &&
-            (initialStats.dev !== handleStats.dev ||
-              initialStats.ino !== handleStats.ino)
-          ) {
-            throw new Error(
-              `File device or inode changed during read: ${filePath}`,
-            );
-          }
-        }
-      } catch (err: unknown) {
-        if (
-          err instanceof Error &&
-          err.message.includes('File device or inode changed during read')
-        ) {
-          throw err;
-        }
+      } catch {
         // If opening file descriptor failed or is mocked without stat, continue to readFile
+      }
+      if (fileHandle && typeof fileHandle.stat === 'function') {
+        const handleStats = await fileHandle.stat();
+        if (
+          initialStats.dev !== undefined &&
+          initialStats.ino !== undefined &&
+          handleStats &&
+          handleStats.dev !== undefined &&
+          handleStats.ino !== undefined &&
+          (initialStats.dev !== handleStats.dev ||
+            initialStats.ino !== handleStats.ino)
+        ) {
+          throw new Error(
+            `File device or inode changed during read: ${filePath}`,
+          );
+        }
       }
     }
 
@@ -208,29 +202,24 @@ export async function readSecureFileBuffer(
       : await fs.promises.readFile(filePath);
 
     // Verify post-read stats to ensure file consistency during or right after reading
+    let postStats: fs.Stats | undefined;
     try {
-      const postStats = await fs.promises.stat(filePath);
-      if (
-        initialStats.dev !== undefined &&
-        initialStats.ino !== undefined &&
-        postStats &&
-        postStats.dev !== undefined &&
-        postStats.ino !== undefined &&
-        (initialStats.dev !== postStats.dev ||
-          initialStats.ino !== postStats.ino)
-      ) {
-        throw new Error(
-          `File device or inode changed during read: ${filePath}`,
-        );
-      }
-    } catch (err: unknown) {
-      if (
-        err instanceof Error &&
-        err.message.includes('File device or inode changed during read')
-      ) {
-        throw err;
-      }
+      postStats = await fs.promises.stat(filePath);
+    } catch {
       // If post-stat failed due to file removal, ignore here
+    }
+    if (
+      postStats &&
+      initialStats.dev !== undefined &&
+      initialStats.ino !== undefined &&
+      postStats.dev !== undefined &&
+      postStats.ino !== undefined &&
+      (initialStats.dev !== postStats.dev ||
+        initialStats.ino !== postStats.ino)
+    ) {
+      throw new Error(
+        `File device or inode changed during read: ${filePath}`,
+      );
     }
 
     return contentBuffer;

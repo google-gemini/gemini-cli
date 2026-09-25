@@ -141,9 +141,12 @@ jobs:
             duplicate issues for a given issue.
 
             Original Issue #${{ steps.get_issue_data.outputs.issue_number }}:
-            Title: ${{ steps.get_issue_data.outputs.title }}
-            Body:
+            <issue_title>
+            ${{ steps.get_issue_data.outputs.title }}
+            </issue_title>
+            <issue_body>
             ${{ steps.get_issue_data.outputs.body }}
+            </issue_body>
 
             ## Steps
             1.  **Find Potential Duplicates:**
@@ -181,11 +184,12 @@ jobs:
             if (csvLine) {
               csv = csvLine.replace(/#/g, '').split(',').map(s => s.trim()).filter(Boolean).join(',');
             } else {
-              // Fallback: match any issue numbers formatted like #123 or standalone numbers
-              const matches = output.match(/\b\d+\b/g);
+              // Fallback: only match explicit issue numbers (e.g., #123)
+              const matches = output.match(/#(\d+)\b/g);
               if (matches) {
                 const original = String(process.env.ORIGINAL_ISSUE_NUMBER);
-                const duplicates = Array.from(new Set(matches)).filter(num => num !== original);
+                const duplicates = Array.from(new Set(matches.map(m => m.replace('#', ''))))
+                  .filter(num => num !== original && num !== '0');
                 csv = duplicates.join(',');
               }
             }
