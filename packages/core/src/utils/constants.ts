@@ -11,6 +11,12 @@ export const DEFAULT_MAX_LINES_TEXT_FILE = 2000;
 export const MAX_LINE_LENGTH_TEXT_FILE = 2000;
 export const MAX_FILE_SIZE_MB = 20;
 
+/**
+ * Maximum character/byte cap on tool execution outputs stored in conversation history.
+ * Any tool output exceeding this limit is truncated to conserve memory and avoid RSS explosion.
+ */
+export const MAX_STORED_TOOL_OUTPUT_BYTES = 64 * 1024; // 64 KB
+
 export const EMPTY_RESPONSE_COMPRESS_SUGGESTION =
   'The model returned an empty text response. If your context window is near capacity, try using /compress.';
 
