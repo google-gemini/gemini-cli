@@ -6,6 +6,7 @@
 
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
+import path from 'node:path';
 import { isNodeError } from '../utils/errors.js';
 import { resolveToRealPath } from '../utils/paths.js';
 
@@ -57,7 +58,13 @@ export class StandardFileSystemService implements FileSystemService {
     try {
       realPath = resolveToRealPath(filePath);
     } catch {
-      realPath = filePath;
+      try {
+        const dir = path.dirname(filePath);
+        const base = path.basename(filePath);
+        realPath = path.join(resolveToRealPath(dir), base);
+      } catch {
+        realPath = filePath;
+      }
     }
 
     // The temp file must share a directory with the destination so that the
@@ -119,7 +126,8 @@ export class StandardFileSystemService implements FileSystemService {
         // Windows can transiently refuse a rename while another process has
         // the destination open (antivirus, editors, watchers).
         const code = isNodeError(error) ? error.code : '';
-        const isRetryable = code === 'EBUSY' || code === 'EPERM';
+        const isRetryable =
+          code === 'EBUSY' || code === 'EPERM' || code === 'EACCES';
         if (!isRetryable || attempt === RENAME_MAX_RETRIES - 1) {
           throw error;
         }

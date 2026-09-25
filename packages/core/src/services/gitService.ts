@@ -8,6 +8,7 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { isNodeError } from '../utils/errors.js';
 import { withPathLock } from '../utils/pathMutex.js';
+import { resolveToRealPath } from '../utils/paths.js';
 import { spawnAsync } from '../utils/shell-utils.js';
 import {
   simpleGit,
@@ -198,7 +199,13 @@ export class GitService {
     // `add('.')` stages the entire working tree, so two snapshots running at
     // once fold each other's files into whichever commit lands first. Serialize
     // stage -> status -> commit per shadow repository.
-    return withPathLock(`git-snapshot:${this.projectRoot}`, async () => {
+    let realProjectRoot = this.projectRoot;
+    try {
+      realProjectRoot = resolveToRealPath(this.projectRoot);
+    } catch {
+      // Keep unresolved
+    }
+    return withPathLock(`git-snapshot:${realProjectRoot}`, async () => {
       try {
         const repo = this.shadowGitRepository;
         await repo.add('.');

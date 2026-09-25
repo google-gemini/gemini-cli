@@ -109,5 +109,22 @@ describe('StandardFileSystemService', () => {
       const [removed] = vi.mocked(fs.rm).mock.calls[0] as [string];
       expect(removed).toMatch(/^\/test\/file\.txt\..*\.tmp$/);
     });
+
+    it('should retry rename when encountering EACCES', async () => {
+      vi.mocked(fs.writeFile).mockResolvedValue();
+      vi.mocked(fs.stat).mockRejectedValue(new Error('ENOENT'));
+      const eaccesError = Object.assign(new Error('permission denied'), {
+        code: 'EACCES',
+      });
+      vi.mocked(fs.rename)
+        .mockRejectedValueOnce(eaccesError)
+        .mockResolvedValueOnce();
+
+      await expect(
+        fileSystem.writeTextFile('/test/file.txt', 'Hello, World!'),
+      ).resolves.toBeUndefined();
+
+      expect(fs.rename).toHaveBeenCalledTimes(2);
+    });
   });
 });
