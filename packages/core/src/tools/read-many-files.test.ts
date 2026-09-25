@@ -14,7 +14,10 @@ import {
   type Mock,
 } from 'vitest';
 import { mockControl } from '../__mocks__/fs/promises.js';
-import { ReadManyFilesTool } from './read-many-files.js';
+import {
+  ReadManyFilesTool,
+  isAssetExplicitlyRequested,
+} from './read-many-files.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import path from 'node:path';
 import { isSubpath, resolveToRealPath } from '../utils/paths.js';
@@ -37,19 +40,20 @@ vi.mock('glob', { spy: true });
 
 vi.mock('mime', () => {
   const getType = (filename: string) => {
-    if (filename.endsWith('.ts') || filename.endsWith('.js')) {
+    const lower = filename.toLowerCase();
+    if (lower.endsWith('.ts') || lower.endsWith('.js')) {
       return 'text/plain';
     }
-    if (filename.endsWith('.png')) {
+    if (lower.endsWith('.png')) {
       return 'image/png';
     }
-    if (filename.endsWith('.pdf')) {
+    if (lower.endsWith('.pdf')) {
       return 'application/pdf';
     }
-    if (filename.endsWith('.mp3') || filename.endsWith('.wav')) {
+    if (lower.endsWith('.mp3') || lower.endsWith('.wav')) {
       return 'audio/mpeg';
     }
-    if (filename.endsWith('.mp4') || filename.endsWith('.mov')) {
+    if (lower.endsWith('.mp4') || lower.endsWith('.mov')) {
       return 'video/mp4';
     }
     return false;
@@ -493,8 +497,76 @@ describe('ReadManyFilesTool', () => {
         '**Skipped 1 item(s):**',
       );
       expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
-        '- `document.pdf` (Reason: asset file (image/pdf/audio) was not explicitly requested by name or extension)',
+        '- `document.pdf` (Reason: asset file (image/pdf/audio/video) was not explicitly requested by name or extension)',
       );
+    });
+
+    it('should skip video files if not explicitly requested by extension or name', async () => {
+      createBinaryFile(
+        'movie.mp4',
+        Buffer.from([0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70]),
+      );
+      createFile('notes.txt', 'text notes');
+      const params = { include: ['*'] }; // Generic glob, not specific to .mp4
+      const invocation = tool.build(params);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      const content = result.llmContent as string[];
+      expect(
+        content.some(
+          (c) => typeof c === 'object' && c !== null && 'inlineData' in c,
+        ),
+      ).toBe(false);
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
+        '- `movie.mp4` (Reason: asset file (image/pdf/audio/video) was not explicitly requested by name or extension)',
+      );
+    });
+
+    it('should include video files as inlineData parts if explicitly requested by extension', async () => {
+      createBinaryFile(
+        'clip.mp4',
+        Buffer.from([0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70]),
+      );
+      const params = { include: ['*.mp4'] };
+      const invocation = tool.build(params);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.llmContent).toEqual([
+        {
+          inlineData: {
+            data: Buffer.from([
+              0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70,
+            ]).toString('base64'),
+            mimeType: 'video/mp4',
+          },
+        },
+        '\n--- End of content ---',
+      ]);
+    });
+
+    it('should include video files as inlineData parts if explicitly requested by name', async () => {
+      createBinaryFile(
+        'presentation.mp4',
+        Buffer.from([0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70]),
+      );
+      const params = { include: ['presentation.mp4'] };
+      const invocation = tool.build(params);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.llmContent).toEqual([
+        {
+          inlineData: {
+            data: Buffer.from([
+              0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70,
+            ]).toString('base64'),
+            mimeType: 'video/mp4',
+          },
+        },
+        '\n--- End of content ---',
+      ]);
     });
 
     it('should include PDF files as inlineData parts if explicitly requested by extension', async () => {
@@ -527,6 +599,135 @@ describe('ReadManyFilesTool', () => {
           inlineData: {
             data: Buffer.from('%PDF-1.4...').toString('base64'),
             mimeType: 'application/pdf',
+          },
+        },
+        '\n--- End of content ---',
+      ]);
+    });
+
+    // Test case A: Bug b/561554390 / Issue #29045
+    it('should not mark binary file as explicitly requested when matched by broad glob pattern like **/*report*/** (Test case A)', async () => {
+      createBinaryFile(
+        'reports/quarterlyreport.png',
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      );
+      createFile('reports/summary.txt', 'quarterly summary text');
+
+      const params = { include: ['**/*report*/**'] };
+      const invocation = tool.build(params);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      const content = result.llmContent as string[];
+      // Text file summary.txt should be included
+      expect(
+        content.some(
+          (c) =>
+            typeof c === 'string' && c.includes('quarterly summary text'),
+        ),
+      ).toBe(true);
+
+      // quarterlyreport.png should NOT be inlined as inlineData
+      expect(
+        content.some(
+          (c) => typeof c === 'object' && c !== null && 'inlineData' in c,
+        ),
+      ).toBe(false);
+
+      // quarterlyreport.png should be skipped with reason
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
+        '**Skipped 1 item(s):**',
+      );
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
+        '- `reports/quarterlyreport.png` (Reason: asset file (image/pdf/audio/video) was not explicitly requested by name or extension)',
+      );
+    });
+
+    // Test case B: Bug b/561554390 / Issue #29045
+    it('should include binary files when explicitly requested by path (e.g., assets/logo.png) (Test case B)', async () => {
+      createBinaryFile(
+        'assets/logo.png',
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      );
+      const params = { include: ['assets/logo.png'] };
+      const invocation = tool.build(params);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(result.llmContent).toEqual([
+        {
+          inlineData: {
+            data: Buffer.from([
+              0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+            ]).toString('base64'),
+            mimeType: 'image/png',
+          },
+        },
+        '\n--- End of content ---',
+      ]);
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
+        'Successfully read and concatenated content from **1 file(s)**',
+      );
+    });
+
+    // Test case C: Bug b/561554390 / Issue #29045
+    it('should handle path separator and casing according to repository standards (Test case C)', async () => {
+      createBinaryFile(
+        'assets/logo.png',
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      );
+
+      // Windows-style backslash in include pattern
+      const backslashParams = { include: ['assets\\logo.png'] };
+      const backslashInvocation = tool.build(backslashParams);
+      const backslashResult = await backslashInvocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(backslashResult.llmContent).toEqual([
+        {
+          inlineData: {
+            data: Buffer.from([
+              0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+            ]).toString('base64'),
+            mimeType: 'image/png',
+          },
+        },
+        '\n--- End of content ---',
+      ]);
+
+      // Case-insensitive extension: assets/*.PNG matching assets/logo.png
+      const upperExtParams = { include: ['assets/*.PNG'] };
+      const upperExtInvocation = tool.build(upperExtParams);
+      const upperExtResult = await upperExtInvocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(upperExtResult.llmContent).toEqual([
+        {
+          inlineData: {
+            data: Buffer.from([
+              0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+            ]).toString('base64'),
+            mimeType: 'image/png',
+          },
+        },
+        '\n--- End of content ---',
+      ]);
+
+      // Case-insensitive file path/name: assets/Logo.png matching assets/logo.png
+      const caseNameParams = { include: ['assets/Logo.png'] };
+      const caseNameInvocation = tool.build(caseNameParams);
+      const caseNameResult = await caseNameInvocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(caseNameResult.llmContent).toEqual([
+        {
+          inlineData: {
+            data: Buffer.from([
+              0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+            ]).toString('base64'),
+            mimeType: 'image/png',
           },
         },
         '\n--- End of content ---',
@@ -970,6 +1171,154 @@ Content of file[1]
       // Parent context should appear only once (from the first call), not duplicated
       const parentMatches = llmContent.match(/Parent context/g);
       expect(parentMatches).toHaveLength(1);
+    });
+  });
+
+  describe('isAssetExplicitlyRequested', () => {
+    it('should return false for broad directory and wildcard glob patterns', () => {
+      expect(
+        isAssetExplicitlyRequested(
+          ['**/*report*/**'],
+          '/root/reports/quarterlyreport.png',
+          'reports/quarterlyreport.png',
+        ),
+      ).toBe(false);
+      expect(
+        isAssetExplicitlyRequested(
+          ['**/*report*/**'],
+          '/root/quarterlyreport.png',
+          'quarterlyreport.png',
+        ),
+      ).toBe(false);
+      expect(
+        isAssetExplicitlyRequested(['*'], '/root/document.pdf', 'document.pdf'),
+      ).toBe(false);
+      expect(
+        isAssetExplicitlyRequested(
+          ['**/*'],
+          '/root/document.pdf',
+          'document.pdf',
+        ),
+      ).toBe(false);
+      expect(
+        isAssetExplicitlyRequested(
+          ['*.*'],
+          '/root/document.pdf',
+          'document.pdf',
+        ),
+      ).toBe(false);
+      expect(
+        isAssetExplicitlyRequested(
+          ['src/**'],
+          '/root/src/photo.jpg',
+          'src/photo.jpg',
+        ),
+      ).toBe(false);
+      expect(
+        isAssetExplicitlyRequested(
+          ['assets/*'],
+          '/root/assets/photo.jpg',
+          'assets/photo.jpg',
+        ),
+      ).toBe(false);
+      expect(
+        isAssetExplicitlyRequested(
+          ['backup.png/**'],
+          '/root/backup.png/file.png',
+          'backup.png/file.png',
+        ),
+      ).toBe(false);
+    });
+
+    it('should return true for explicit extension requests case-insensitively', () => {
+      expect(
+        isAssetExplicitlyRequested(['*.png'], '/root/image.png', 'image.png'),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(['*.PNG'], '/root/image.png', 'image.png'),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(['*.png'], '/root/image.PNG', 'image.PNG'),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['**/*.png'],
+          '/root/assets/image.png',
+          'assets/image.png',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['assets/*.png'],
+          '/root/assets/image.png',
+          'assets/image.png',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['assets/*.png'],
+          '/root/other/image.png',
+          'other/image.png',
+        ),
+      ).toBe(false);
+      expect(
+        isAssetExplicitlyRequested(
+          ['*.{png,jpg}'],
+          '/root/photo.jpg',
+          'photo.jpg',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(['*.{png,jpg}'], '/root/doc.pdf', 'doc.pdf'),
+      ).toBe(false);
+    });
+
+    it('should return true for explicit name and path requests', () => {
+      expect(
+        isAssetExplicitlyRequested(
+          ['assets/logo.png'],
+          '/root/assets/logo.png',
+          'assets/logo.png',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['assets\\logo.png'],
+          '/root/assets/logo.png',
+          'assets/logo.png',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['assets/Logo.png'],
+          '/root/assets/logo.png',
+          'assets/logo.png',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['myExactImage.png'],
+          '/root/myExactImage.png',
+          'myExactImage.png',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['report-final.pdf'],
+          '/root/report-final.pdf',
+          'report-final.pdf',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['**/logo.png'],
+          '/root/assets/logo.png',
+          'assets/logo.png',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(['logo.*'], '/root/logo.png', 'logo.png'),
+      ).toBe(true);
     });
   });
 });

@@ -40,6 +40,68 @@ describe('processUtils', () => {
     expect(runExitCleanup).toHaveBeenCalledTimes(1);
     expect(processExit).toHaveBeenCalledWith(RELAUNCH_EXIT_CODE);
   });
+
+  it('should send auth override IPC message with callback if options.overrideAuthType is provided', async () => {
+    const originalSend = process.send;
+    const sendMock = vi.fn((_msg: unknown, cb?: () => void) => {
+      if (cb) cb();
+      return true;
+    });
+    Object.defineProperty(process, 'send', {
+      value: sendMock,
+      configurable: true,
+      writable: true,
+    });
+    vi.stubEnv('VITEST', '');
+
+    try {
+      await relaunchApp({ overrideAuthType: 'login_with_google' });
+      expect(sendMock).toHaveBeenCalledWith(
+        {
+          type: 'auth-selected-type',
+          authType: 'login_with_google',
+        },
+        expect.any(Function),
+      );
+      expect(processExit).toHaveBeenCalledWith(RELAUNCH_EXIT_CODE);
+    } finally {
+      Object.defineProperty(process, 'send', {
+        value: originalSend,
+        configurable: true,
+        writable: true,
+      });
+    }
+  });
+
+  it('should fall back to timeout if process.send callback is never called', async () => {
+    vi.useFakeTimers();
+    const originalSend = process.send;
+    const sendMock = vi.fn(() => false);
+    Object.defineProperty(process, 'send', {
+      value: sendMock,
+      configurable: true,
+      writable: true,
+    });
+    vi.stubEnv('VITEST', '');
+
+    try {
+      const relaunchPromise = relaunchApp({
+        overrideAuthType: 'login_with_google',
+      });
+      await vi.advanceTimersByTimeAsync(500);
+      await relaunchPromise;
+
+      expect(sendMock).toHaveBeenCalled();
+      expect(processExit).toHaveBeenCalledWith(RELAUNCH_EXIT_CODE);
+    } finally {
+      Object.defineProperty(process, 'send', {
+        value: originalSend,
+        configurable: true,
+        writable: true,
+      });
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe('SEA handling utilities', () => {
