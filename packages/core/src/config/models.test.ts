@@ -735,6 +735,32 @@ describe('Gemini 3.1 Config Resolution', () => {
       ).toBeDefined();
     }
   });
+
+  it('BASE_GEMINI_FLASH_LITE_MODEL should resolve to chat-base-3-flash-lite config with thinkingBudget 0', () => {
+    const resolved = modelConfigService.getResolvedConfig({
+      model: BASE_GEMINI_FLASH_LITE_MODEL,
+      isChatModel: true,
+    });
+    expect(
+      resolved.generateContentConfig?.thinkingConfig?.thinkingBudget,
+    ).toBe(0);
+    expect(
+      resolved.generateContentConfig?.thinkingConfig?.thinkingLevel,
+    ).toBeUndefined();
+  });
+
+  it('LATEST_GEMINI_FLASH_LITE_MODEL should resolve to chat-base-3-flash-lite config with thinkingBudget 0', () => {
+    const resolved = modelConfigService.getResolvedConfig({
+      model: LATEST_GEMINI_FLASH_LITE_MODEL,
+      isChatModel: true,
+    });
+    expect(
+      resolved.generateContentConfig?.thinkingConfig?.thinkingBudget,
+    ).toBe(0);
+    expect(
+      resolved.generateContentConfig?.thinkingConfig?.thinkingLevel,
+    ).toBeUndefined();
+  });
 });
 
 describe('getAutoModelDescription', () => {
