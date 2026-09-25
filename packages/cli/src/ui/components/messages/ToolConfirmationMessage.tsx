@@ -1097,6 +1097,7 @@ export const ToolConfirmationMessage: React.FC<
               onSelect={handleSelect}
               isFocused={isFocused}
               initialIndex={initialIndex}
+              priority={isFocused}
               renderItem={renderRadioItem}
             />
           </Box>

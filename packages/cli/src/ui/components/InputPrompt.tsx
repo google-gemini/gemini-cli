@@ -684,6 +684,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleInput = useCallback(
     (key: Key) => {
+      // TODO(jacobr): this special case is likely not needed anymore.
+      // We should probably stop supporting paste if the InputPrompt is not
+      // focused.
+      /// We want to handle paste even when not focused to support drag and drop.
+      if (!focus && key.name !== 'paste') {
+        return false;
+      }
+
       if (handleVoiceInput(key)) return true;
 
       // Determine if this keypress is a history navigation command
@@ -731,14 +739,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         if (key.name !== 'tab') {
           setForceShowShellSuggestions(false);
         }
-      }
-
-      // TODO(jacobr): this special case is likely not needed anymore.
-      // We should probably stop supporting paste if the InputPrompt is not
-      // focused.
-      /// We want to handle paste even when not focused to support drag and drop.
-      if (!focus && key.name !== 'paste') {
-        return false;
       }
 
       // Handle escape to close shortcuts panel first, before letting it bubble
@@ -1421,7 +1421,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   );
   useKeypress(handleInput, {
     isActive: !isEmbeddedShellFocused && !copyModeEnabled,
-    priority: true,
+    priority: focus,
   });
 
   const [cursorVisualRowAbsolute, cursorVisualColAbsolute] =

@@ -47,6 +47,7 @@ vi.mock('../hooks/useTerminalSize.js', () => ({
 const composerTestControls = vi.hoisted(() => ({
   suggestionsVisible: false,
   isAlternateBuffer: false,
+  lastInputPromptFocus: undefined as boolean | undefined,
 }));
 
 // Mock child components
@@ -100,11 +101,14 @@ vi.mock('./DetailedMessagesDisplay.js', () => ({
 vi.mock('./InputPrompt.js', () => ({
   InputPrompt: ({
     placeholder,
+    focus,
     onSuggestionsVisibilityChange,
   }: {
     placeholder?: string;
+    focus?: boolean;
     onSuggestionsVisibilityChange?: (visible: boolean) => void;
   }) => {
+    composerTestControls.lastInputPromptFocus = focus;
     useEffect(() => {
       onSuggestionsVisibilityChange?.(composerTestControls.suggestionsVisible);
     }, [onSuggestionsVisibilityChange]);
@@ -633,6 +637,26 @@ describe('Composer', () => {
       const { lastFrame } = await renderComposer(uiState);
 
       expect(lastFrame()).toContain('InputPrompt');
+      expect(composerTestControls.lastInputPromptFocus).toBe(true);
+    });
+
+    it('unfocuses InputPrompt when an action is required and collapseDrawerDuringApproval is false', async () => {
+      const uiState = createMockUIState({
+        isInputActive: true,
+        customDialog: (
+          <Box>
+            <Text>Test Dialog</Text>
+          </Box>
+        ),
+      });
+      const settings = createMockSettings({
+        ui: { collapseDrawerDuringApproval: false },
+      });
+
+      const { lastFrame } = await renderComposer(uiState, settings);
+
+      expect(lastFrame()).toContain('InputPrompt');
+      expect(composerTestControls.lastInputPromptFocus).toBe(false);
     });
 
     it('does not render InputPrompt when input is inactive', async () => {
