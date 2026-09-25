@@ -676,12 +676,10 @@ export class Scheduler {
       isTaintRiskDetectable(toolCall.invocation) &&
       toolCall.invocation.hasTaintedOrBuildFileRisk();
 
-    if (
-      decision === PolicyDecision.ALLOW &&
-      (this.config.isInteractive?.() ?? true) &&
-      hasTaintRisk
-    ) {
-      decision = PolicyDecision.ASK_USER;
+    if (decision === PolicyDecision.ALLOW && hasTaintRisk) {
+      decision = (this.config.isInteractive?.() ?? true)
+        ? PolicyDecision.ASK_USER
+        : PolicyDecision.DENY;
     }
 
     if (decision === PolicyDecision.DENY) {
