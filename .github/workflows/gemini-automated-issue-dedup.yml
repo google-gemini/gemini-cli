@@ -54,10 +54,12 @@ jobs:
       - name: 'Fetch Issue Details'
         id: 'get_issue_data'
         uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        env:
+          ISSUE_NUMBER: '${{ github.event.issue.number || github.event.inputs.issue_number }}'
         with:
           github-token: '${{ secrets.GITHUB_TOKEN }}'
           script: |
-            const issueNumber = ${{ github.event.issue.number || github.event.inputs.issue_number }};
+            const issueNumber = Number(process.env.ISSUE_NUMBER);
             const { data: issue } = await github.rest.issues.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -75,7 +77,7 @@ jobs:
           password: '${{ secrets.GITHUB_TOKEN }}'
 
       - name: 'Find Duplicate Issues'
-        uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
+        uses: 'google-github-actions/run-gemini-cli@f77273f4c914e4bf38440cf36a0369cb64a37489' # ratchet:google-github-actions/run-gemini-cli@v0
         id: 'gemini_issue_deduplication'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
