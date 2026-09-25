@@ -15,6 +15,7 @@ import {
   type Mocked,
 } from 'vitest';
 import { randomUUID } from 'node:crypto';
+import { getEventListeners } from 'node:events';
 
 vi.mock('node:crypto', () => ({
   randomUUID: vi.fn(),
@@ -1360,6 +1361,231 @@ describe('Scheduler (Orchestrator)', () => {
   });
 
   describe('Cleanup', () => {
+    async function startBlockedBatch(requests: ToolCallRequestInfo[] = [req1]) {
+      let finishExecution!: () => void;
+      let notifyStarted!: () => void;
+      const executionFinished = new Promise<void>((resolve) => {
+        finishExecution = resolve;
+      });
+      const executionStarted = new Promise<void>((resolve) => {
+        notifyStarted = resolve;
+      });
+
+      mockExecutor.execute.mockImplementationOnce(async () => {
+        notifyStarted();
+        await executionFinished;
+        return {
+          status: CoreToolCallStatus.Success,
+          request: req1,
+          tool: mockTool,
+          invocation: mockInvocation as unknown as AnyToolInvocation,
+          response: {
+            callId: req1.callId,
+            responseParts: [],
+            resultDisplay: 'Completed',
+            error: undefined,
+            errorType: undefined,
+          },
+        };
+      });
+
+      const activeBatch = scheduler.schedule(requests, signal);
+      await executionStarted;
+      return { activeBatch, finishExecution };
+    }
+
+    it('should reject queued batches and remove abort listeners on dispose()', async () => {
+      const { activeBatch, finishExecution } = await startBlockedBatch();
+      const queuedSignals = [
+        new AbortController().signal,
+        new AbortController().signal,
+      ];
+      const queuedBatches = queuedSignals.map((queuedSignal, index) =>
+        scheduler.schedule(
+          { ...req2, callId: `queued-${index}` },
+          queuedSignal,
+        ),
+      );
+      const onSettled = vi.fn();
+      const queuedResults = Promise.allSettled(queuedBatches).then(onSettled);
+
+      try {
+        for (const queuedSignal of queuedSignals) {
+          expect(getEventListeners(queuedSignal, 'abort')).toHaveLength(1);
+        }
+
+        scheduler.dispose();
+        scheduler.dispose();
+
+        // Let promise reactions run while the active execution stays blocked.
+        await new Promise<void>((resolve) => setImmediate(resolve));
+
+        expect(onSettled).toHaveBeenCalledExactlyOnceWith([
+          { status: 'rejected', reason: new Error('Scheduler disposed') },
+          { status: 'rejected', reason: new Error('Scheduler disposed') },
+        ]);
+        for (const queuedSignal of queuedSignals) {
+          expect(getEventListeners(queuedSignal, 'abort')).toHaveLength(0);
+          expect(queuedSignal.aborted).toBe(false);
+        }
+        expect(signal.aborted).toBe(false);
+        expect(mockStateManager.cancelAllQueued).not.toHaveBeenCalled();
+        expect(mockExecutor.execute).toHaveBeenCalledTimes(1);
+      } finally {
+        finishExecution();
+        await activeBatch;
+        await queuedResults;
+      }
+
+      expect(mockExecutor.execute).toHaveBeenCalledTimes(1);
+      expect(mockStateManager.finalizeCall).toHaveBeenCalledExactlyOnceWith(
+        req1.callId,
+      );
+    });
+
+    describe('Disposal within a batch', () => {
+      beforeEach(async () => {
+        scheduler.dispose();
+        const actual =
+          await vi.importActual<typeof import('./state-manager.js')>(
+            './state-manager.js',
+          );
+        vi.mocked(SchedulerStateManager).mockImplementation(
+          (...args) => new actual.SchedulerStateManager(...args),
+        );
+        scheduler = new Scheduler({
+          context: mockConfig,
+          messageBus: mockMessageBus,
+          getPreferredEditor,
+          schedulerId: 'root',
+        });
+      });
+
+      afterEach(() => scheduler.dispose());
+
+      it('should finish executing tools and cancel remaining serial tools', async () => {
+        const { activeBatch, finishExecution } = await startBlockedBatch([
+          req1,
+          req2,
+          { ...req2, callId: 'call-3' },
+        ]);
+        scheduler.dispose();
+        finishExecution();
+
+        const results = await activeBatch;
+
+        expect(mockExecutor.execute).toHaveBeenCalledTimes(1);
+        expect(
+          results.map((call) => [call.request.callId, call.status]),
+        ).toEqual([
+          ['call-1', CoreToolCallStatus.Success],
+          ['call-2', CoreToolCallStatus.Cancelled],
+          ['call-3', CoreToolCallStatus.Cancelled],
+        ]);
+        expect(results[1].response.responseParts).toEqual([
+          expect.objectContaining({
+            functionResponse: expect.objectContaining({
+              response: {
+                error: expect.stringContaining('Scheduler disposed'),
+              },
+            }),
+          }),
+        ]);
+        expect(signal.aborted).toBe(false);
+        expect(scheduler.completedCalls).toEqual([]);
+      });
+
+      it.each(['policy', 'confirmation'] as const)(
+        'should not execute tools when disposed during %s validation',
+        async (phase) => {
+          let release!: () => void;
+          let entered!: () => void;
+          const gate = new Promise<void>((resolve) => {
+            release = resolve;
+          });
+          const started = new Promise<void>((resolve) => {
+            entered = resolve;
+          });
+          if (phase === 'policy') {
+            vi.mocked(checkPolicy).mockImplementationOnce(async () => {
+              entered();
+              await gate;
+              return { decision: PolicyDecision.ALLOW };
+            });
+          } else {
+            vi.mocked(checkPolicy).mockResolvedValueOnce({
+              decision: PolicyDecision.ASK_USER,
+            });
+            vi.mocked(resolveConfirmation).mockImplementationOnce(async () => {
+              entered();
+              await gate;
+              return { outcome: ToolConfirmationOutcome.ProceedOnce };
+            });
+          }
+          const batch = scheduler.schedule([req1, req2], signal);
+          await started;
+          scheduler.dispose();
+          release();
+
+          const results = await batch;
+
+          expect(mockExecutor.execute).not.toHaveBeenCalled();
+          expect(
+            results.map((call) => [call.request.callId, call.status]),
+          ).toEqual([
+            ['call-1', CoreToolCallStatus.Cancelled],
+            ['call-2', CoreToolCallStatus.Cancelled],
+          ]);
+          expect(signal.aborted).toBe(false);
+          expect(scheduler.completedCalls).toEqual([]);
+        },
+      );
+    });
+
+    it('should reject new batches after dispose()', async () => {
+      scheduler.dispose();
+
+      await expect(scheduler.schedule(req1, signal)).rejects.toThrow(
+        'Scheduler disposed',
+      );
+      expect(mockStateManager.enqueue).not.toHaveBeenCalled();
+      expect(mockExecutor.execute).not.toHaveBeenCalled();
+      expect(getEventListeners(signal, 'abort')).toHaveLength(0);
+    });
+
+    it('should preserve caller cancellation for queued batches before dispose()', async () => {
+      const { activeBatch, finishExecution } = await startBlockedBatch();
+      const queuedController = new AbortController();
+      const queuedBatch = scheduler.schedule(req2, queuedController.signal);
+      const queuedResult = Promise.allSettled([queuedBatch]);
+
+      try {
+        queuedController.abort();
+
+        await expect(queuedResult).resolves.toEqual([
+          {
+            status: 'rejected',
+            reason: new Error('Tool call cancelled while in queue.'),
+          },
+        ]);
+        expect(
+          getEventListeners(queuedController.signal, 'abort'),
+        ).toHaveLength(0);
+
+        await expect(
+          scheduler.schedule(req2, queuedController.signal),
+        ).rejects.toThrow('Operation cancelled');
+
+        scheduler.dispose();
+        expect(signal.aborted).toBe(false);
+      } finally {
+        finishExecution();
+        await activeBatch;
+      }
+
+      expect(mockExecutor.execute).toHaveBeenCalledTimes(1);
+    });
+
     it('should unregister McpProgress listener on dispose()', () => {
       const onSpy = vi.spyOn(coreEvents, 'on');
       const offSpy = vi.spyOn(coreEvents, 'off');
