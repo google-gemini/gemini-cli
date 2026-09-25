@@ -549,6 +549,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
     const isWindows = os.platform() === 'win32';
     let tempFilePath = '';
     let tempDir = '';
+    let isBackgrounded = false;
 
     const timeoutMs = this.context.config.getShellToolInactivityTimeout();
     const timeoutController = new AbortController();
@@ -747,6 +748,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
             backgroundCompletionBehavior:
               this.context.config.getShellBackgroundCompletionBehavior(),
             originalCommand: strippedCommand,
+            tempDir,
           },
         );
 
@@ -763,11 +765,20 @@ export class ShellToolInvocation extends BaseToolInvocation<
             () => {
               promotionTimer = null;
               if (!completed) {
-                ShellExecutionService.background(
-                  pid,
-                  sessionId,
-                  strippedCommand,
-                );
+                try {
+                  ShellExecutionService.background(
+                    pid,
+                    sessionId,
+                    strippedCommand,
+                    tempDir,
+                  );
+                  isBackgrounded = true;
+                } catch (err) {
+                  debugLogger.error(
+                    'Failed to background shell execution:',
+                    err,
+                  );
+                }
               }
             },
             delay,
@@ -811,7 +822,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
       }
 
       const result = await resultPromise;
-      if (!result.backgrounded) {
+      if (result.backgrounded) {
+        isBackgrounded = true;
+      } else {
         flushOutput();
       }
 
@@ -1152,9 +1165,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
       timeoutController.signal.removeEventListener('abort', onAbort);
 
       // Only clean up if NOT running in background.
-      // Background processes need the temp directory and PID file to remain
-      // available until they exit.
-      if (!this.params.is_background) {
+      // Background processes transfer ownership of the temp directory to
+      // ShellExecutionService, which removes it once the process exits.
+      if (!isBackgrounded) {
         if (tempFilePath) {
           try {
             await fsPromises.unlink(tempFilePath);
