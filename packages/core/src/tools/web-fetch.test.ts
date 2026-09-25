@@ -375,6 +375,77 @@ describe('WebFetchTool', () => {
   });
 
   describe('execute', () => {
+    it.each([
+      {
+        name: 'ASCII text',
+        text: 'ABC DEF',
+        endIndices: [3],
+        expected: 'ABC[1] DEF',
+      },
+      {
+        name: 'Chinese text',
+        text: '中文 ABC',
+        endIndices: [6],
+        expected: '中文[1] ABC',
+      },
+      {
+        name: 'Japanese text',
+        text: '日本語 ABC',
+        endIndices: [9],
+        expected: '日本語[1] ABC',
+      },
+      {
+        name: 'accented text followed by an emoji',
+        text: 'é😀 text',
+        endIndices: [2, 6],
+        expected: 'é[1]😀[1] text',
+      },
+      {
+        name: 'multiple citations in unsorted order',
+        text: '中文 日本語 😀 end',
+        endIndices: [6, 21, 16],
+        expected: '中文[1] 日本語[1] 😀[1] end',
+      },
+    ])(
+      'should insert citations at UTF-8 byte offsets for $name',
+      async ({ text, endIndices, expected }) => {
+        vi.spyOn(fetchUtils, 'isPrivateIp').mockResolvedValue(false);
+        mockGenerateContent.mockResolvedValueOnce({
+          candidates: [
+            {
+              content: { parts: [{ text }] },
+              groundingMetadata: {
+                groundingChunks: [
+                  {
+                    web: {
+                      title: 'Source',
+                      uri: 'https://citations.example.com/',
+                    },
+                  },
+                ],
+                groundingSupports: endIndices.map((endIndex) => ({
+                  segment: { startIndex: 0, endIndex },
+                  groundingChunkIndices: [0],
+                })),
+              },
+            },
+          ],
+        });
+
+        const tool = new WebFetchTool(mockConfig, bus);
+        const invocation = tool.build({
+          prompt: 'fetch https://citations.example.com',
+        });
+        const result = await invocation.execute({
+          abortSignal: new AbortController().signal,
+        });
+
+        expect(result.llmContent).toBe(
+          `<untrusted_context>\n${expected}\n\nSources:\n[1] Source (https://citations.example.com/)\n</untrusted_context>`,
+        );
+      },
+    );
+
     it('should return WEB_FETCH_PROCESSING_ERROR on rate limit exceeded', async () => {
       vi.spyOn(fetchUtils, 'isPrivateIp').mockResolvedValue(false);
       mockGenerateContent.mockResolvedValue({
