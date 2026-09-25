@@ -118,4 +118,31 @@ describe('tool-names', () => {
       expect(aliases).toEqual(['unknown_tool']);
     });
   });
+
+  describe('ALL_BUILTIN_TOOL_NAMES', () => {
+    it('should include tracker_delete_task', () => {
+      expect(
+        (ALL_BUILTIN_TOOL_NAMES as readonly string[]).includes(
+          'tracker_delete_task',
+        ),
+      ).toBe(true);
+    });
+
+    it('should include all tracker tools', () => {
+      const trackerTools = [
+        'tracker_create_task',
+        'tracker_update_task',
+        'tracker_get_task',
+        'tracker_list_tasks',
+        'tracker_add_dependency',
+        'tracker_delete_task',
+        'tracker_visualize',
+      ];
+      for (const name of trackerTools) {
+        expect(
+          (ALL_BUILTIN_TOOL_NAMES as readonly string[]).includes(name),
+        ).toBe(true);
+      }
+    });
+  });
 });

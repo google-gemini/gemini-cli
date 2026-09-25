@@ -1820,7 +1820,8 @@ const SETTINGS_SCHEMA = {
     category: 'Advanced',
     requiresRestart: false,
     default: true,
-    description: 'Enable the write_todos tool.',
+    description:
+      'Enable the write_todos tool. When enabled, todos are persisted to disk via the task tracker so they survive session restarts. Consider using the dedicated tracker tools for fine-grained CRUD operations.',
     showInDialog: false,
   },
   security: {
