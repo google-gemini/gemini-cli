@@ -27,6 +27,8 @@ import {
   formatTruncatedToolOutput,
 } from '../utils/fileUtils.js';
 import { convertToFunctionResponse } from '../utils/generateContentResponseUtilities.js';
+import { truncateToolOutput } from '../utils/tool-utils.js';
+import { MAX_STORED_TOOL_OUTPUT_BYTES } from '../utils/constants.js';
 import {
   CoreToolCallStatus,
   type CompletedToolCall,
@@ -227,7 +229,7 @@ export class ToolExecutor {
           this.context.promptId,
         );
         outputFile = savedPath;
-        const truncatedContent = formatTruncatedToolOutput(
+        let truncatedContent = formatTruncatedToolOutput(
           content,
           outputFile,
           threshold,
@@ -242,6 +244,17 @@ export class ToolExecutor {
             threshold,
           }),
         );
+
+        if (
+          typeof truncatedContent === 'string' &&
+          Buffer.byteLength(truncatedContent, 'utf8') >
+            MAX_STORED_TOOL_OUTPUT_BYTES
+        ) {
+          truncatedContent = truncateToolOutput(
+            truncatedContent,
+            MAX_STORED_TOOL_OUTPUT_BYTES,
+          );
+        }
 
         return { truncatedContent, outputFile };
       }
@@ -266,11 +279,22 @@ export class ToolExecutor {
             this.context.promptId,
           );
           outputFile = savedPath;
-          const truncatedText = formatTruncatedToolOutput(
+          let truncatedText = formatTruncatedToolOutput(
             textContent,
             outputFile,
             threshold,
           );
+
+          if (
+            typeof truncatedText === 'string' &&
+            Buffer.byteLength(truncatedText, 'utf8') >
+              MAX_STORED_TOOL_OUTPUT_BYTES
+          ) {
+            truncatedText = truncateToolOutput(
+              truncatedText,
+              MAX_STORED_TOOL_OUTPUT_BYTES,
+            );
+          }
 
           // We need to return a NEW array to avoid mutating the original toolResult if it matters,
           // though here we are creating the response so it's probably fine to mutate or return new.
@@ -293,7 +317,92 @@ export class ToolExecutor {
       }
     }
 
-    return { truncatedContent: content, outputFile };
+    const ensureOutputFile = async (
+      rawText: string,
+    ): Promise<string | undefined> => {
+      if (!outputFile) {
+        try {
+          const { outputFile: savedPath } = await saveTruncatedToolOutput(
+            rawText,
+            toolName,
+            callId,
+            this.config.storage.getProjectTempDir(),
+            this.context.promptId,
+          );
+          outputFile = savedPath;
+        } catch {
+          // Ignore error during disk save
+        }
+      }
+      return outputFile;
+    };
+
+    let finalContent: PartListUnion = content;
+    if (typeof finalContent === 'string') {
+      if (
+        Buffer.byteLength(finalContent, 'utf8') > MAX_STORED_TOOL_OUTPUT_BYTES
+      ) {
+        const savedPath = await ensureOutputFile(finalContent);
+        finalContent = truncateToolOutput(
+          finalContent,
+          MAX_STORED_TOOL_OUTPUT_BYTES,
+          savedPath,
+        );
+      }
+    } else if (Array.isArray(finalContent)) {
+      finalContent = await Promise.all(
+        finalContent.map(async (part) => {
+          if (
+            typeof part === 'string' &&
+            Buffer.byteLength(part, 'utf8') > MAX_STORED_TOOL_OUTPUT_BYTES
+          ) {
+            const savedPath = await ensureOutputFile(part);
+            return truncateToolOutput(
+              part,
+              MAX_STORED_TOOL_OUTPUT_BYTES,
+              savedPath,
+            );
+          }
+          if (
+            typeof part === 'object' &&
+            part !== null &&
+            'text' in part &&
+            typeof part.text === 'string' &&
+            Buffer.byteLength(part.text, 'utf8') > MAX_STORED_TOOL_OUTPUT_BYTES
+          ) {
+            const savedPath = await ensureOutputFile(part.text);
+            return {
+              ...part,
+              text: truncateToolOutput(
+                part.text,
+                MAX_STORED_TOOL_OUTPUT_BYTES,
+                savedPath,
+              ),
+            };
+          }
+          return part;
+        }),
+      );
+    } else if (
+      typeof finalContent === 'object' &&
+      finalContent !== null &&
+      'text' in finalContent &&
+      typeof finalContent.text === 'string' &&
+      Buffer.byteLength(finalContent.text, 'utf8') >
+        MAX_STORED_TOOL_OUTPUT_BYTES
+    ) {
+      const savedPath = await ensureOutputFile(finalContent.text);
+      finalContent = {
+        ...finalContent,
+        text: truncateToolOutput(
+          finalContent.text,
+          MAX_STORED_TOOL_OUTPUT_BYTES,
+          savedPath,
+        ),
+      };
+    }
+
+    return { truncatedContent: finalContent, outputFile };
   }
 
   private async createCancelledResult(
