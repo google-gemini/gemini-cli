@@ -175,6 +175,7 @@ export interface OAuthAuthorizationServerMetadata {
   grant_types_supported?: string[];
   code_challenge_methods_supported?: string[];
   scopes_supported?: string[];
+  authorization_response_iss_parameter_supported?: boolean;
 }
 
 /**
@@ -314,6 +315,8 @@ export class OAuthUtils {
       tokenUrl: metadata.token_endpoint,
       scopes: metadata.scopes_supported || [],
       registrationUrl: metadata.registration_endpoint,
+      authorizationResponseIssParameterSupported:
+        metadata.authorization_response_iss_parameter_supported,
     };
   }
 

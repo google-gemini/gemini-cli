@@ -53,6 +53,7 @@ export interface MCPOAuthConfig {
   redirectUri?: string;
   tokenParamName?: string; // For SSE connections, specifies the query parameter name for the token
   registrationUrl?: string;
+  authorizationResponseIssParameterSupported?: boolean; // RFC 9207 §3: true means the AS supports iss in authorization responses
 }
 
 /**
@@ -399,12 +400,13 @@ export class MCPOAuthProvider {
     // Start callback server first to allocate port
     // Pass config.issuer for RFC 9207 Authorization Server Issuer Identification / Mix-Up defense
     debugLogger.debug(
-      `Starting callback server for "${serverName}" (expected issuer: ${config.issuer || 'none'})...`,
+      `Starting callback server for "${serverName}" (expected issuer: ${config.issuer || 'none'}, iss required: ${config.authorizationResponseIssParameterSupported ?? false})...`,
     );
     const callbackServer = startCallbackServer(
       pkceParams.state,
       preferredPort,
       config.issuer,
+      config.authorizationResponseIssParameterSupported,
     );
 
     // Wait for server to start and get the allocated port
