@@ -921,6 +921,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
         onSelect={handleSelect}
         onHighlight={handleHighlight}
         focusKey={isCustomOptionFocused ? 'other' : undefined}
+        priority={!isCustomOptionFocused}
         maxItemsToShow={maxItemsToShow}
         showScrollArrows={true}
         renderItem={(item, context) => {
