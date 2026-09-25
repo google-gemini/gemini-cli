@@ -155,8 +155,8 @@ export function sanitizeForDisplay(str: string, maxLength?: number): string {
 
   let sanitized = stripUnsafeCharacters(str).replace(/\s+/g, ' ');
 
-  if (maxLength && sanitized.length > maxLength) {
-    sanitized = sanitized.substring(0, maxLength - 3) + '...';
+  if (maxLength && cpLen(sanitized) > maxLength) {
+    sanitized = cpSlice(sanitized, 0, maxLength - 3) + '...';
   }
 
   return sanitized;
