@@ -15,6 +15,7 @@ import {
 } from 'vitest';
 
 import os from 'node:os';
+import path from 'node:path';
 import EventEmitter from 'node:events';
 import type { Readable } from 'node:stream';
 import { type ChildProcess } from 'node:child_process';
@@ -998,6 +999,77 @@ describe('ShellExecutionService', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ShellExecutionService.listBackgroundProcesses(undefined as any),
       ).toThrow('Session ID is required');
+    });
+
+    it('should accept tempDir in background() and delete it when the background process exits', async () => {
+      const actualFs =
+        await vi.importActual<typeof import('node:fs')>('node:fs');
+      const actualOs =
+        await vi.importActual<typeof import('node:os')>('node:os');
+      const tempDir = actualFs.mkdtempSync(
+        path.join(actualOs.tmpdir(), 'gemini-shell-bg-unit-'),
+      );
+      actualFs.writeFileSync(path.join(tempDir, 'bgpids.tmp'), '123\n');
+
+      let triggerExit:
+        | ((args: { exitCode: number; signal?: number }) => void)
+        | undefined;
+
+      await simulateExecution('sleep 1', (pty) => {
+        triggerExit = pty.onExit.mock.calls[0][0];
+
+        ShellExecutionService.background(
+          pty.pid,
+          'default',
+          'sleep 1',
+          tempDir,
+        );
+      });
+
+      const history = (
+        ShellExecutionService as unknown as {
+          backgroundProcessHistory: Map<
+            string,
+            Map<number, { tempDir?: string }>
+          >;
+        }
+      ).backgroundProcessHistory.get('default');
+      expect(history?.get(12345)?.tempDir).toBe(tempDir);
+      expect(actualFs.existsSync(tempDir)).toBe(true);
+
+      triggerExit?.({ exitCode: 0 });
+
+      await vi.waitFor(() => {
+        expect(actualFs.existsSync(tempDir)).toBe(false);
+      });
+    });
+
+    it('should return early and clean up tempDir if background() is called for an untracked or already-exited process', async () => {
+      const actualFs =
+        await vi.importActual<typeof import('node:fs')>('node:fs');
+      const actualOs =
+        await vi.importActual<typeof import('node:os')>('node:os');
+      const tempDir = actualFs.mkdtempSync(
+        path.join(actualOs.tmpdir(), 'gemini-shell-bg-untracked-'),
+      );
+
+      ShellExecutionService.background(
+        99999,
+        'default',
+        'echo exited',
+        tempDir,
+      );
+
+      const backgroundTempDirs = (
+        ShellExecutionService as unknown as {
+          backgroundTempDirs: Map<number, string>;
+        }
+      ).backgroundTempDirs;
+      expect(backgroundTempDirs.has(99999)).toBe(false);
+
+      await vi.waitFor(() => {
+        expect(actualFs.existsSync(tempDir)).toBe(false);
+      });
     });
   });
 
