@@ -12,6 +12,10 @@ import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { start_sandbox } from './sandbox.js';
 import {
+  applyTrustRequestFromSandbox,
+  getTrustEnvForSandbox,
+} from './sandboxTrust.js';
+import {
   FatalSandboxError,
   homedir,
   type Config,
@@ -26,6 +30,11 @@ const { mockedHomedir, mockedGetContainerPath, mockedExecCommands } =
     mockedGetContainerPath: vi.fn().mockImplementation((p: string) => p),
     mockedExecCommands: [] as string[],
   }));
+
+vi.mock('./sandboxTrust.js', () => ({
+  getTrustEnvForSandbox: vi.fn(() => undefined),
+  applyTrustRequestFromSandbox: vi.fn(() => Promise.resolve()),
+}));
 
 vi.mock('./sandboxUtils.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./sandboxUtils.js')>();
@@ -620,6 +629,114 @@ describe('sandbox', () => {
           `SANDBOX=${containerName}`,
         ]),
         expect.objectContaining({ stdio: 'inherit' }),
+      );
+    });
+
+    it('should pass GEMINI_CLI_TRUST_WORKSPACE into the container when trust is known', async () => {
+      vi.mocked(getTrustEnvForSandbox).mockReturnValue('true');
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      const mockCliConfig = {
+        getTargetDir: vi.fn().mockReturnValue('/home/user/project'),
+        getDebugMode: vi.fn().mockReturnValue(false),
+        getFolderTrust: vi.fn().mockReturnValue(true),
+      } as unknown as Config;
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce((_cmd, args) => {
+        if (args && args[0] === 'images') {
+          setTimeout(() => {
+            mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+            mockImageCheckProcess.emit('close', 0);
+          }, 1);
+          return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+        }
+        return new EventEmitter() as unknown as ReturnType<typeof spawn>;
+      });
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce((cmd, args) => {
+        if (cmd === 'docker' && args && args[0] === 'run') {
+          return mockSpawnProcess;
+        }
+        return new EventEmitter() as unknown as ReturnType<typeof spawn>;
+      });
+
+      await expect(
+        start_sandbox(config, [], mockCliConfig, ['arg1']),
+      ).resolves.toBe(0);
+
+      expect(getTrustEnvForSandbox).toHaveBeenCalledWith(
+        path.resolve(process.cwd()),
+        true,
+      );
+      expect(spawn).toHaveBeenNthCalledWith(
+        2,
+        'docker',
+        expect.arrayContaining(['--env', 'GEMINI_CLI_TRUST_WORKSPACE=true']),
+        expect.objectContaining({ stdio: 'inherit' }),
+      );
+    });
+
+    it('should apply a sandbox trust request after the container exits', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce((_cmd, args) => {
+        if (args && args[0] === 'images') {
+          setTimeout(() => {
+            mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+            mockImageCheckProcess.emit('close', 0);
+          }, 1);
+          return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+        }
+        return new EventEmitter() as unknown as ReturnType<typeof spawn>;
+      });
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce((cmd, args) => {
+        if (cmd === 'docker' && args && args[0] === 'run') {
+          return mockSpawnProcess;
+        }
+        return new EventEmitter() as unknown as ReturnType<typeof spawn>;
+      });
+
+      await expect(
+        start_sandbox(config, [], undefined, ['arg1']),
+      ).resolves.toBe(0);
+
+      expect(applyTrustRequestFromSandbox).toHaveBeenCalledWith(
+        expect.stringContaining('gemini-sandbox-'),
+        path.resolve(process.cwd()),
       );
     });
 
