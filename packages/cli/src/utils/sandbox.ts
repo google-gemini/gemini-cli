@@ -52,6 +52,25 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
+async function isRootlessPodman(command: string): Promise<boolean> {
+  if (command !== 'podman') {
+    return false;
+  }
+  try {
+    const { stdout } = await execFileAsync(
+      'podman',
+      ['info', '--format', 'json'],
+      { timeout: 5000 },
+    );
+    const info: unknown = JSON.parse(stdout);
+    const host = isRecord(info) ? info['host'] : undefined;
+    const security = isRecord(host) ? host['security'] : undefined;
+    return isRecord(security) && security['rootless'] === true;
+  } catch {
+    return false;
+  }
+}
+
 export async function start_sandbox(
   config: SandboxConfig,
   nodeArgs: string[] = [],
@@ -481,13 +500,12 @@ export async function start_sandbox(
     }
 
     // add custom flags from SANDBOX_FLAGS
-    if (process.env['SANDBOX_FLAGS']) {
-      const flags = parse(process.env['SANDBOX_FLAGS'], process.env).filter(
-        (f): f is string => typeof f === 'string',
-      );
-
-      args.push(...flags);
-    }
+    const sandboxFlags = process.env['SANDBOX_FLAGS']
+      ? parse(process.env['SANDBOX_FLAGS'], process.env).filter(
+          (f): f is string => typeof f === 'string',
+        )
+      : [];
+    args.push(...sandboxFlags);
 
     // add TTY only if stdin is TTY as well, i.e. for piped input don't init TTY in container
     if (process.stdin.isTTY) {
@@ -873,6 +891,17 @@ export async function start_sandbox(
       // For the user-creation logic to work, the container must start as root.
       // The entrypoint script then handles dropping privileges to the correct user.
       args.push('--user', 'root');
+
+      // rootless podman maps container UIDs into the host's subuid range, so the
+      // UID created below would not own the bind-mounted workdir on the host.
+      if (
+        !sandboxFlags.some(
+          (f) => f === '--userns' || f.startsWith('--userns='),
+        ) &&
+        (await isRootlessPodman(command))
+      ) {
+        args.push('--userns=keep-id');
+      }
 
       const uid = (await execAsync('id -u')).stdout.trim();
       const gid = (await execAsync('id -g')).stdout.trim();

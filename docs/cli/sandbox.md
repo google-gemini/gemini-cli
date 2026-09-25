@@ -416,6 +416,12 @@ $env:SANDBOX_SET_UID_GID="true"   # Force host UID/GID
 $env:SANDBOX_SET_UID_GID="false"  # Disable UID/GID mapping
 ```
 
+When UID/GID mapping is active and the sandbox runs on rootless Podman, the CLI
+also passes `--userns=keep-id` so that files written to the mounted working
+directory stay owned by your host user. Passing your own `--userns` option
+through `SANDBOX_FLAGS` overrides this. Docker and rootful Podman are
+unaffected.
+
 ## Troubleshooting
 
 ### Common issues
