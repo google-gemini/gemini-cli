@@ -568,6 +568,36 @@ describe('fileUtils', () => {
         expect(buffer.toString('utf-8')).toBe('hello secure');
       });
 
+      it('should read directly from fileHandle when open succeeds', async () => {
+        const filePath = path.join(testDir, 'secure-buffer-handle.txt');
+        await fsPromises.writeFile(filePath, 'hello from disk');
+
+        const realStats = await fsPromises.stat(filePath);
+        const mockReadFile = vi
+          .fn()
+          .mockResolvedValue(Buffer.from('hello from handle'));
+        const openSpy = vi.spyOn(fsPromises, 'open').mockResolvedValueOnce({
+          stat: vi.fn().mockResolvedValue({
+            dev: realStats.dev,
+            ino: realStats.ino,
+          }),
+          readFile: mockReadFile,
+          close: vi.fn().mockResolvedValue(undefined),
+        } as unknown as fsPromises.FileHandle);
+
+        const readFileSpy = vi.spyOn(fsPromises, 'readFile');
+
+        try {
+          const buffer = await readSecureFileBuffer(filePath);
+          expect(buffer.toString('utf-8')).toBe('hello from handle');
+          expect(mockReadFile).toHaveBeenCalledTimes(1);
+          expect(readFileSpy).not.toHaveBeenCalled();
+        } finally {
+          openSpy.mockRestore();
+          readFileSpy.mockRestore();
+        }
+      });
+
       it('should abort if fstat dev/ino does not match initial stats', async () => {
         const filePath = path.join(testDir, 'secure-buffer-mismatch.txt');
         await fsPromises.writeFile(filePath, 'hello secure');
@@ -907,6 +937,7 @@ describe('fileUtils', () => {
     it('should handle read errors for text files', async () => {
       actualNodeFs.writeFileSync(testTextFilePath, 'content'); // File must exist for initial statSync
       const readError = new Error('Simulated read error');
+      vi.spyOn(fsPromises, 'open').mockRejectedValueOnce(readError);
       vi.spyOn(fsPromises, 'readFile').mockRejectedValueOnce(readError);
 
       const result = await processSingleFileContent(
@@ -922,6 +953,7 @@ describe('fileUtils', () => {
       actualNodeFs.writeFileSync(testImageFilePath, 'content'); // File must exist
       mockMimeGetType.mockReturnValue('image/png');
       const readError = new Error('Simulated image read error');
+      vi.spyOn(fsPromises, 'open').mockRejectedValueOnce(readError);
       vi.spyOn(fsPromises, 'readFile').mockRejectedValueOnce(readError);
 
       const result = await processSingleFileContent(

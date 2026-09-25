@@ -203,7 +203,9 @@ export async function readSecureFileBuffer(
       }
     }
 
-    const contentBuffer = await fs.promises.readFile(filePath);
+    const contentBuffer = fileHandle
+      ? await fileHandle.readFile()
+      : await fs.promises.readFile(filePath);
 
     // Verify post-read stats to ensure file consistency during or right after reading
     try {
