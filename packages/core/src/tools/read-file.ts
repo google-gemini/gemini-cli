@@ -204,13 +204,13 @@ ${result.llmContent}`;
         FileOperation.READ,
         lines,
         mimetype,
-        path.extname(this.resolvedPath),
+        path.extname(targetPathToRead),
         programming_language,
       ),
     );
 
     // Discover JIT subdirectory context for the accessed file path
-    const jitContext = await discoverJitContext(this.config, this.resolvedPath);
+    const jitContext = await discoverJitContext(this.config, targetPathToRead);
     if (jitContext) {
       if (typeof llmContent === 'string') {
         llmContent = appendJitContext(llmContent, jitContext);

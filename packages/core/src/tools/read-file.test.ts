@@ -477,6 +477,47 @@ describe('ReadFileTool', () => {
       expect(result.returnDisplay).toBe('');
     });
 
+    it('should use targetPathToRead consistently for file extension telemetry and JIT context discovery', async () => {
+      const { logFileOperation } = await import('../telemetry/loggers.js');
+      const { discoverJitContext } = await import('./jit-context.js');
+
+      const target1 = path.join(tempRootDir, 'initial.txt');
+      const target2 = path.join(tempRootDir, 'updated.py');
+      await fsp.writeFile(target1, 'text content', 'utf-8');
+      await fsp.writeFile(target2, 'print("hello")', 'utf-8');
+
+      const symlinkPath = path.join(tempRootDir, 'dynamic-symlink');
+      await fsp.symlink(target1, symlinkPath);
+
+      // Build invocation when symlink points to target1 (.txt)
+      const invocation = tool.build({ file_path: symlinkPath });
+
+      // Update symlink to point to target2 (.py) before execute()
+      await fsp.unlink(symlinkPath);
+      await fsp.symlink(target2, symlinkPath);
+
+      vi.mocked(logFileOperation).mockClear();
+      vi.mocked(discoverJitContext).mockClear();
+
+      const result = await invocation.execute({ abortSignal });
+      expect(result.llmContent).toBe('print("hello")');
+
+      // Telemetry must record extension for target2 (.py), not the stale target1 (.txt)
+      expect(logFileOperation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          extension: '.py',
+          programming_language: 'python',
+        }),
+      );
+
+      // JIT context discovery must query the actual targetPathToRead (updated.py)
+      expect(discoverJitContext).toHaveBeenCalledWith(
+        expect.anything(),
+        target2,
+      );
+    });
+
     describe('with .geminiignore', () => {
       beforeEach(async () => {
         await fsp.writeFile(
