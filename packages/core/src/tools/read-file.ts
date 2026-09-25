@@ -164,6 +164,7 @@ class ReadFileToolInvocation extends BaseToolInvocation<
 IMPORTANT: The file content has been truncated.
 Status: Showing lines ${start}-${end} of ${total} total lines.
 Action: To read more of the file, you can use the 'start_line' and 'end_line' parameters in a subsequent 'read_file' call. For example, to read the next section of the file, use start_line: ${end + 1}.
+TIP: Use 'ast_search' with scope "outline" to see the file's structural skeleton, or with scope "symbol" to jump directly to a specific function or class.
 
 --- FILE CONTENT (truncated) ---
 ${result.llmContent}`;

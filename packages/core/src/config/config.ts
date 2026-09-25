@@ -41,6 +41,7 @@ import { EditTool } from '../tools/edit.js';
 import { ShellTool } from '../tools/shell.js';
 import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
+import { ASTSearchTool } from '../tools/ast-search.js';
 import {
   setGeminiMdFilename,
   getCurrentGeminiMdFilename,
@@ -4061,6 +4062,9 @@ export class Config implements McpContext, AgentLoopContext {
     );
     maybeRegister(ListMcpResourcesTool, () =>
       registry.registerTool(new ListMcpResourcesTool(this, this.messageBus)),
+    );
+    maybeRegister(ASTSearchTool, () =>
+      registry.registerTool(new ASTSearchTool(this, this.messageBus)),
     );
     maybeRegister(ShellTool, () =>
       registry.registerTool(new ShellTool(this, this.messageBus)),

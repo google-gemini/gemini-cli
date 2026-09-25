@@ -136,3 +136,9 @@ export const COMPLETE_TASK_DISPLAY_NAME = 'Complete Task';
 // -- MCP Resources --
 export const READ_MCP_RESOURCE_TOOL_NAME = 'read_mcp_resource';
 export const LIST_MCP_RESOURCES_TOOL_NAME = 'list_mcp_resources';
+
+// -- ast_search (AST-aware structural search) --
+export const AST_SEARCH_TOOL_NAME = 'ast_search';
+export const AST_SEARCH_PARAM_SYMBOL_NAME = 'symbol_name';
+export const AST_SEARCH_PARAM_FILE_PATH = 'file_path';
+export const AST_SEARCH_PARAM_SCOPE = 'scope';

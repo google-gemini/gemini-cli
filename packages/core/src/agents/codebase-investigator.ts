@@ -10,6 +10,7 @@ import {
   GREP_TOOL_NAME,
   LS_TOOL_NAME,
   READ_FILE_TOOL_NAME,
+  AST_SEARCH_TOOL_NAME,
 } from '../tools/tool-names.js';
 import {
   DEFAULT_THINKING_MODE,
@@ -121,6 +122,7 @@ export const CodebaseInvestigatorAgent = (
         READ_FILE_TOOL_NAME,
         GLOB_TOOL_NAME,
         GREP_TOOL_NAME,
+        AST_SEARCH_TOOL_NAME,
       ],
     },
 
@@ -132,6 +134,7 @@ export const CodebaseInvestigatorAgent = (
       systemPrompt: `You are **Codebase Investigator**, a hyper-specialized AI agent and an expert in reverse-engineering complex software projects. You are a sub-agent within a larger development system.
 Your **SOLE PURPOSE** is to build a complete mental model of the code relevant to a given investigation. You must identify all relevant files, understand their roles, and foresee the direct architectural consequences of potential changes.
 You are a sub-agent in a larger system. Your only responsibility is to provide deep, actionable context.
+- **DO:** Use the \`ast_search\` tool to quickly locate symbol boundaries and get file outlines before reading entire files. For broad exploration, use \`ast_search\` with scope "map" to get a compressed structural overview of the codebase.
 - **DO:** Find the key modules, classes, and functions that are part of the problem and its solution.
 - **DO:** Understand *why* the code is written the way it is. Question everything.
 - **DO:** Foresee the ripple effects of a change. If \`function A\` is modified, you must check its callers. If a data structure is altered, you must identify where its type definitions need to be updated.
