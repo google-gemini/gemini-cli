@@ -920,7 +920,14 @@ class EditToolInvocation
     // otherwise both read the original content, and whichever wrote second
     // would silently discard the other's edit while still reporting success.
     const lockKey = path.resolve(this.config.getTargetDir(), this.resolvedPath);
-    return withPathLock(lockKey, () => this.applyEdit(signal));
+    try {
+      return await withPathLock(lockKey, () => this.applyEdit(signal), signal);
+    } catch (err) {
+      if (err instanceof Error && err.message === 'Aborted') {
+        throw new Error('Edit aborted');
+      }
+      throw err;
+    }
   }
 
   /**

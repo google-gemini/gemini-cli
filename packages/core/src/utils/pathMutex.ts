@@ -27,34 +27,79 @@ const chains = new Map<string, Promise<unknown>>();
  *
  * @param key - The resolved path (or other identifier) to lock.
  * @param fn - The critical section.
+ * @param signal - Optional abort signal for immediate cancellation while waiting.
  * @returns Whatever `fn` resolves to.
  */
 export async function withPathLock<T>(
   key: string,
   fn: () => Promise<T>,
+  signal?: AbortSignal,
 ): Promise<T> {
-  // The stored chain is deliberately non-rejecting (see below), so waiting for
-  // our turn cannot fail just because the previous lock holder threw.
+  if (signal?.aborted) {
+    throw new Error('Aborted');
+  }
+
   const previous = chains.get(key) ?? Promise.resolve();
-  const run = previous.then(fn);
 
-  // Store a settled-either-way view of our run, so a throwing critical section
-  // neither blocks the next waiter nor raises an unhandled rejection.
-  const chained = run.then(
-    () => undefined,
-    () => undefined,
-  );
-  chains.set(key, chained);
+  let resolveLockReleased: () => void = () => {};
+  const lockReleased = new Promise<void>((resolve) => {
+    resolveLockReleased = resolve;
+  });
 
-  try {
-    return await run;
-  } finally {
-    // Drop the entry once we are the last waiter, so the map does not grow
-    // without bound across a long session.
-    if (chains.get(key) === chained) {
+  chains.set(key, lockReleased);
+
+  const cleanup = () => {
+    if (chains.get(key) === lockReleased) {
       chains.delete(key);
     }
-  }
+  };
+
+  return new Promise<T>((resolve, reject) => {
+    let active = true;
+
+    const onAbort = () => {
+      if (!active) return;
+      active = false;
+      if (signal) {
+        signal.removeEventListener('abort', onAbort);
+      }
+      // When the lock holder before us finishes, release our lock for subsequent waiters.
+      void previous.then(() => {
+        resolveLockReleased();
+        cleanup();
+      });
+      reject(new Error('Aborted'));
+    };
+
+    if (signal) {
+      signal.addEventListener('abort', onAbort);
+    }
+
+    void previous.then(async () => {
+      if (!active) {
+        return;
+      }
+      if (signal) {
+        signal.removeEventListener('abort', onAbort);
+      }
+      if (signal?.aborted) {
+        onAbort();
+        return;
+      }
+      try {
+        const result = await fn();
+        resolve(result);
+      } catch (err) {
+        reject(err);
+      } finally {
+        if (active) {
+          active = false;
+          resolveLockReleased();
+          cleanup();
+        }
+      }
+    });
+  });
 }
 
 /**

@@ -387,7 +387,18 @@ class WriteFileToolInvocation extends BaseToolInvocation<
     // check and content read that produce the diff cannot be interleaved with
     // another write to the same file.
     const lockKey = path.resolve(this.config.getTargetDir(), this.resolvedPath);
-    return withPathLock(lockKey, () => this.applyWrite(abortSignal));
+    try {
+      return await withPathLock(
+        lockKey,
+        () => this.applyWrite(abortSignal),
+        abortSignal,
+      );
+    } catch (err) {
+      if (err instanceof Error && err.message === 'Aborted') {
+        throw new Error('Write aborted');
+      }
+      throw err;
+    }
   }
 
   /**

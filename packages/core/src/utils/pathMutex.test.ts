@@ -88,4 +88,41 @@ describe('withPathLock', () => {
 
     expect(pendingPathLockCount()).toBe(0);
   });
+
+  it('aborts immediately while queued behind an active lock holder', async () => {
+    const key = '/tmp/abort_immediate.txt';
+    const events: string[] = [];
+
+    const p1 = withPathLock(key, async () => {
+      events.push('p1:start');
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      events.push('p1:end');
+    });
+
+    const controller = new AbortController();
+    const start = Date.now();
+    const p2 = withPathLock(
+      key,
+      async () => {
+        events.push('p2:run');
+      },
+      controller.signal,
+    );
+
+    setTimeout(() => controller.abort(), 10);
+
+    const p3 = withPathLock(key, async () => {
+      events.push('p3:run');
+    });
+
+    await expect(p2).rejects.toThrow('Aborted');
+    const elapsed = Date.now() - start;
+    expect(elapsed).toBeLessThan(45);
+
+    await p1;
+    await p3;
+
+    expect(events).toEqual(['p1:start', 'p1:end', 'p3:run']);
+    expect(pendingPathLockCount()).toBe(0);
+  });
 });
