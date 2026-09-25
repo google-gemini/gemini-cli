@@ -3,7 +3,6 @@ name: 'Release: Patch (0) from Comment'
 on:
   issue_comment:
     types: ['created']
-
 jobs:
   slash-command:
     runs-on: 'ubuntu-latest'
@@ -48,8 +47,9 @@ jobs:
         if: "startsWith(github.event.comment.body, '/patch')"
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          PR_NUMBER: '${{ github.event.issue.number }}'
         run: |
-          gh pr view "${{ github.event.issue.number }}" --json mergeCommit,state > pr_status.json
+          gh pr view "${PR_NUMBER}" --json mergeCommit,state > pr_status.json
           echo "MERGE_COMMIT_SHA=$(jq -r .mergeCommit.oid pr_status.json)" >> "$GITHUB_OUTPUT"
           echo "STATE=$(jq -r .state pr_status.json)" >> "$GITHUB_OUTPUT"
 
