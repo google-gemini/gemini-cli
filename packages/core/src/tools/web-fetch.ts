@@ -22,6 +22,17 @@ import { getResponseText } from '../utils/partUtils.js';
 import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
 import { truncateString, wrapUntrusted } from '../utils/textUtils.js';
 import { convert } from 'html-to-text';
+
+/**
+ * html-to-text renders a `<table>` as a block by default, which joins every
+ * cell with nothing at all: a three-column row arrives as `Starter9 EUR3`, so
+ * the values run into each other and nothing records the row or the column
+ * they came from. `dataTable` lays the cells out as the table they are.
+ */
+export const TABLE_SELECTOR = {
+  selector: 'table',
+  format: 'dataTable',
+} as const;
 import {
   logWebFetchFallbackAttempt,
   WebFetchFallbackAttemptEvent,
@@ -338,6 +349,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
         selectors: [
           { selector: 'a', options: { ignoreHref: true } },
           { selector: 'img', format: 'skip' },
+          TABLE_SELECTOR,
         ],
       });
     } else {
@@ -711,6 +723,7 @@ Response: ${rawResponseText}`;
           wordwrap: false,
           selectors: [
             { selector: 'a', options: { ignoreHref: false, baseUrl: url } },
+            TABLE_SELECTOR,
           ],
         });
         if (!this.context.config.isContextManagementEnabled()) {
