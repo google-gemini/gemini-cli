@@ -485,6 +485,96 @@ describe('Scheduler (Orchestrator)', () => {
     });
   });
 
+  describe('sandbox expansion', () => {
+    /**
+     * A tool that asks to expand the sandbox on every attempt used to recurse
+     * into `_execute` for ever: each round re-prompts the user, and the
+     * surrounding `catch {}` swallowed anything that went wrong (#29309).
+     */
+    const sandboxDenial = () =>
+      ({
+        status: CoreToolCallStatus.Error,
+        response: {
+          callId: 'call-1',
+          responseParts: [],
+          errorType: 'sandbox_expansion_required',
+          error: {
+            message: JSON.stringify({
+              rootCommand: 'git',
+              additionalPermissions: { write: ['/tmp'] },
+            }),
+          },
+          returnDisplay: 'denied by sandbox',
+        } as unknown as ToolCallResponseInfo,
+      }) as unknown as ErroredToolCall;
+
+    beforeEach(() => {
+      vi.mocked(resolveConfirmation).mockResolvedValue({
+        outcome: ToolConfirmationOutcome.ProceedOnce,
+        lastDetails: undefined,
+      });
+    });
+
+    it('gives up after a bounded number of expansions', async () => {
+      mockExecutor.execute.mockResolvedValue(sandboxDenial());
+
+      await scheduler.schedule(req1, signal);
+
+      // The first attempt plus three expansions, and then it stops.
+      expect(mockExecutor.execute).toHaveBeenCalledTimes(4);
+    });
+
+    it('ends the call in error rather than prompting again', async () => {
+      mockExecutor.execute.mockResolvedValue(sandboxDenial());
+
+      await scheduler.schedule(req1, signal);
+
+      // Three prompts, not one per attempt for ever.
+      expect(resolveConfirmation).toHaveBeenCalledTimes(3);
+      expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
+        'call-1',
+        CoreToolCallStatus.Error,
+        expect.objectContaining({
+          llmContent: expect.stringContaining('asked to expand the sandbox'),
+        }),
+      );
+    });
+
+    it('still lets an expansion that succeeds through', async () => {
+      mockExecutor.execute
+        .mockResolvedValueOnce(sandboxDenial())
+        .mockResolvedValue({
+          status: CoreToolCallStatus.Success,
+          response: {
+            callId: 'call-1',
+            responseParts: [],
+          } as unknown as ToolCallResponseInfo,
+        } as unknown as SuccessfulToolCall);
+
+      await scheduler.schedule(req1, signal);
+
+      expect(mockExecutor.execute).toHaveBeenCalledTimes(2);
+      expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
+        'call-1',
+        CoreToolCallStatus.Success,
+        expect.anything(),
+      );
+    });
+
+    it('stops as soon as the caller aborts', async () => {
+      const controller = new AbortController();
+      mockExecutor.execute.mockImplementation(async () => {
+        controller.abort();
+        return sandboxDenial();
+      });
+
+      await scheduler.schedule(req1, controller.signal);
+
+      // The abort check at the top of `_execute` ends the loop on the retry.
+      expect(mockExecutor.execute).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('Phase 2: Queue Management', () => {
     it('should drain the queue if multiple calls are scheduled', async () => {
       // Execute is the end of the loop, stub it
