@@ -85,6 +85,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     coreEvents: {
       emitAdminSettingsChanged: vi.fn(),
     },
+    checkPathTrust: vi.fn(() => ({ isTrusted: false })),
   };
 });
 
@@ -245,11 +246,13 @@ describe('loadConfig', () => {
     ]);
   });
 
-  it('should set customIgnoreFilePaths when settings.fileFiltering.customIgnoreFilePaths is present', async () => {
+  it('should set customIgnoreFilePaths when settings.context.fileFiltering.customIgnoreFilePaths is present', async () => {
     const testPath = '/settings/ignore';
     const settings: Settings = {
-      fileFiltering: {
-        customIgnoreFilePaths: [testPath],
+      context: {
+        fileFiltering: {
+          customIgnoreFilePaths: [testPath],
+        },
       },
     };
     const config = await loadConfig(settings, mockExtensionLoader, taskId);
@@ -264,8 +267,10 @@ describe('loadConfig', () => {
     const settingsPath = '/settings/ignore';
     vi.stubEnv('CUSTOM_IGNORE_FILE_PATHS', envPath);
     const settings: Settings = {
-      fileFiltering: {
-        customIgnoreFilePaths: [settingsPath],
+      context: {
+        fileFiltering: {
+          customIgnoreFilePaths: [settingsPath],
+        },
       },
     };
     const config = await loadConfig(settings, mockExtensionLoader, taskId);
@@ -581,5 +586,165 @@ describe('setIsTrusted', () => {
     const { setIsTrusted } = await import('./config.js');
     expect(setIsTrusted(undefined)).toBe(false);
     expect(setIsTrusted({} as AgentSettings)).toBe(false);
+  });
+
+  it('should respect V2 security.folderTrust.enabled when checking workspace trust', async () => {
+    const settingsModule = await import('./settings.js');
+    const coreModule = await import('@google/gemini-cli-core');
+    vi.spyOn(settingsModule, 'loadSettings').mockReturnValue({
+      security: { folderTrust: { enabled: false } },
+    });
+    vi.mocked(coreModule.checkPathTrust).mockReturnValueOnce({
+      isTrusted: true,
+      source: 'file',
+    });
+
+    const { setIsTrusted } = await import('./config.js');
+    expect(setIsTrusted(undefined, '/tmp/workspace')).toBe(true);
+    expect(coreModule.checkPathTrust).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: '/tmp/workspace',
+        isFolderTrustEnabled: false,
+      }),
+    );
+  });
+});
+
+describe('loadConfig V1 and V2 settings compatibility', () => {
+  const mockExtensionLoader = {} as ExtensionLoader;
+  const taskId = 'test-task-v2';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubEnv('GEMINI_API_KEY', 'test-key');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('should read V2 nested settings (security.folderTrust.enabled, general.checkpointing.enabled, ui.showMemoryUsage, context.fileFiltering, logging.level)', async () => {
+    const { logger } = await import('../utils/logger.js');
+    const v2Settings: Settings = {
+      security: { folderTrust: { enabled: true } },
+      general: { checkpointing: { enabled: false } },
+      ui: { showMemoryUsage: true },
+      context: {
+        fileFiltering: {
+          respectGitIgnore: false,
+          respectGeminiIgnore: true,
+          enableRecursiveFileSearch: true,
+          customIgnoreFilePaths: ['/v2/ignore'],
+        },
+      },
+      logging: { level: 'debug' },
+      telemetry: { enabled: false },
+    };
+
+    await loadConfig(v2Settings, mockExtensionLoader, taskId, true);
+
+    expect(logger.level).toBe('debug');
+    expect(Config).toHaveBeenCalledWith(
+      expect.objectContaining({
+        folderTrust: true,
+        checkpointing: false,
+        showMemoryUsage: true,
+        telemetry: expect.objectContaining({ enabled: false }),
+        fileFiltering: expect.objectContaining({
+          respectGitIgnore: false,
+          respectGeminiIgnore: true,
+          enableRecursiveFileSearch: true,
+          customIgnoreFilePaths: ['/v2/ignore'],
+        }),
+      }),
+    );
+  });
+
+  it('should not support unmigrated V1 flat settings directly in loadConfig', async () => {
+    const { validateSettings } = await import('./settings.js');
+    const rawV1Settings = {
+      folderTrust: true,
+      checkpointing: { enabled: false },
+      showMemoryUsage: true,
+      fileFiltering: {
+        respectGitIgnore: true,
+        customIgnoreFilePaths: ['/v1/ignore'],
+      },
+      logLevel: 'warn',
+      telemetryDisabled: true,
+      coreTools: ['read_file'],
+      excludeTools: ['shell'],
+      allowedTools: ['fetch'],
+    };
+
+    // V1 settings fail V2 schema validation when not migrated
+    expect(validateSettings(rawV1Settings).success).toBe(false);
+
+    await loadConfig(
+      rawV1Settings as unknown as Settings,
+      mockExtensionLoader,
+      taskId,
+      true,
+    );
+
+    // Unmigrated V1 flat properties are ignored by loadConfig
+    expect(Config).toHaveBeenCalledWith(
+      expect.objectContaining({
+        folderTrust: false,
+        checkpointing: undefined,
+        showMemoryUsage: false,
+        coreTools: undefined,
+        excludeTools: undefined,
+        allowedTools: undefined,
+        telemetry: expect.objectContaining({ enabled: undefined }),
+        fileFiltering: expect.objectContaining({
+          respectGitIgnore: undefined,
+          customIgnoreFilePaths: [],
+        }),
+      }),
+    );
+  });
+
+  it('should succeed when V1 flat settings are migrated via migrateDeprecatedSettings and passed to loadConfig', async () => {
+    const { logger } = await import('../utils/logger.js');
+    const { migrateDeprecatedSettings, validateSettings } = await import(
+      './settings.js'
+    );
+    const rawV1Settings = {
+      folderTrust: true,
+      checkpointing: { enabled: false },
+      showMemoryUsage: true,
+      fileFiltering: {
+        respectGitIgnore: true,
+        customIgnoreFilePaths: ['/v1/ignore'],
+      },
+      logLevel: 'warn',
+      telemetryDisabled: true,
+      coreTools: ['read_file'],
+      excludeTools: ['shell'],
+      allowedTools: ['fetch'],
+    };
+
+    const migratedSettings = migrateDeprecatedSettings(rawV1Settings);
+    expect(validateSettings(migratedSettings).success).toBe(true);
+
+    await loadConfig(migratedSettings, mockExtensionLoader, taskId, true);
+
+    expect(logger.level).toBe('warn');
+    expect(Config).toHaveBeenCalledWith(
+      expect.objectContaining({
+        folderTrust: true,
+        checkpointing: false,
+        showMemoryUsage: true,
+        coreTools: ['read_file'],
+        excludeTools: ['shell'],
+        allowedTools: ['fetch'],
+        telemetry: expect.objectContaining({ enabled: false }),
+        fileFiltering: expect.objectContaining({
+          respectGitIgnore: true,
+          customIgnoreFilePaths: ['/v1/ignore'],
+        }),
+      }),
+    );
   });
 });

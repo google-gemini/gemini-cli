@@ -1263,4 +1263,53 @@ describe('E2E Tests', () => {
       exitSpy.mockRestore();
     });
   });
+
+  describe('createApp V2 settings compatibility', () => {
+    it('should read V2 security.folderTrust.enabled from loadSettings during app initialization', async () => {
+      const settingsMod = await import('../config/settings.js');
+      const coreMod = await import('@google/gemini-cli-core');
+      const configMod = await import('../config/config.js');
+
+      const loadSettingsSpy = vi
+        .spyOn(settingsMod, 'loadSettings')
+        .mockReturnValue({
+          security: {
+            folderTrust: {
+              enabled: false,
+            },
+          },
+          logging: {
+            level: 'debug',
+          },
+        });
+      const checkPathTrustSpy = vi
+        .spyOn(coreMod, 'checkPathTrust')
+        .mockReturnValue({ isTrusted: true, source: 'file' });
+
+      await createApp();
+
+      expect(loadSettingsSpy).toHaveBeenCalled();
+      expect(checkPathTrustSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          isFolderTrustEnabled: false,
+        }),
+      );
+      expect(configMod.loadConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          security: {
+            folderTrust: {
+              enabled: false,
+            },
+          },
+        }),
+        expect.anything(),
+        'a2a-server',
+        true,
+        expect.any(String),
+      );
+
+      loadSettingsSpy.mockRestore();
+      checkPathTrustSpy.mockRestore();
+    });
+  });
 });
