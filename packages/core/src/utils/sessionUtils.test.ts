@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { describe, it, expect } from 'vitest';
+import { type Part } from '@google/genai';
 import { convertSessionToClientHistory } from './sessionUtils.js';
 import { type ConversationRecord } from '../services/chatRecordingService.js';
+import { type HistoryTurn } from '../core/agentChatHistory.js';
 import { CoreToolCallStatus } from '../scheduler/types.js';
 
 describe('convertSessionToClientHistory', () => {
@@ -210,5 +212,192 @@ describe('convertSessionToClientHistory', () => {
         ],
       },
     ]);
+  });
+
+  describe('tool responses recorded as user messages', () => {
+    const fr = (id: string, output = `${id} output`): Part => ({
+      functionResponse: { id, name: 'read_file', response: { output } },
+    });
+
+    const toolCall = (id: string, result: Part[] | string) => ({
+      id,
+      name: 'read_file',
+      args: {},
+      status: CoreToolCallStatus.Success,
+      timestamp: '2024-01-01T10:01:05Z',
+      result,
+    });
+
+    const responseIds = (history: HistoryTurn[]) =>
+      history.flatMap((h) =>
+        (h.content.parts ?? []).flatMap((p) =>
+          p.functionResponse ? [p.functionResponse.id] : [],
+        ),
+      );
+
+    it('should not regenerate a response that is already recorded', () => {
+      const messages: ConversationRecord['messages'] = [
+        {
+          id: 'u1',
+          type: 'user',
+          timestamp: '2024-01-01T10:00:00Z',
+          content: 'Read the note',
+        },
+        {
+          id: 'm1',
+          type: 'gemini',
+          timestamp: '2024-01-01T10:01:00Z',
+          content: '',
+          toolCalls: [toolCall('call_a', [fr('call_a')])],
+        },
+        {
+          id: 'r1',
+          type: 'user',
+          timestamp: '2024-01-01T10:01:06Z',
+          content: [fr('call_a')],
+        },
+      ];
+
+      const history = convertSessionToClientHistory(messages);
+
+      expect(history.map((h) => h.id)).toEqual(['u1', 'm1', 'r1']);
+      expect(responseIds(history)).toEqual(['call_a']);
+    });
+
+    it('should keep one response per parallel call', () => {
+      const messages: ConversationRecord['messages'] = [
+        {
+          id: 'm1',
+          type: 'gemini',
+          timestamp: '2024-01-01T10:01:00Z',
+          content: '',
+          toolCalls: [
+            toolCall('call_a', [fr('call_a')]),
+            toolCall('call_b', [fr('call_b')]),
+          ],
+        },
+        {
+          id: 'r1',
+          type: 'user',
+          timestamp: '2024-01-01T10:01:06Z',
+          content: [fr('call_a'), fr('call_b')],
+        },
+      ];
+
+      const history = convertSessionToClientHistory(messages);
+
+      expect(history.map((h) => h.id)).toEqual(['m1', 'r1']);
+      expect(responseIds(history)).toEqual(['call_a', 'call_b']);
+    });
+
+    it('should collapse duplicate responses persisted by earlier resumes', () => {
+      const bloated = [fr('call_a'), fr('call_b')];
+      const messages: ConversationRecord['messages'] = [
+        {
+          id: 'm1',
+          type: 'gemini',
+          timestamp: '2024-01-01T10:01:00Z',
+          content: '',
+          toolCalls: [toolCall('call_a', bloated), toolCall('call_b', bloated)],
+        },
+        {
+          id: 'm1_response',
+          type: 'user',
+          timestamp: '2024-01-01T10:01:06Z',
+          content: [...bloated, ...bloated],
+        },
+        {
+          id: 'r1',
+          type: 'user',
+          timestamp: '2024-01-01T10:01:06Z',
+          content: bloated,
+        },
+        {
+          id: 'u2',
+          type: 'user',
+          timestamp: '2024-01-01T10:02:00Z',
+          content: 'What did it say?',
+        },
+      ];
+
+      const history = convertSessionToClientHistory(messages);
+
+      expect(history.map((h) => h.id)).toEqual(['m1', 'm1_response', 'u2']);
+      expect(responseIds(history)).toEqual(['call_a', 'call_b']);
+    });
+
+    it('should regenerate only the calls without a recorded response', () => {
+      const messages: ConversationRecord['messages'] = [
+        {
+          id: 'm1',
+          type: 'gemini',
+          timestamp: '2024-01-01T10:01:00Z',
+          content: '',
+          toolCalls: [
+            toolCall('call_a', [fr('call_a')]),
+            toolCall('call_b', [fr('call_b')]),
+          ],
+        },
+        {
+          id: 'r1',
+          type: 'user',
+          timestamp: '2024-01-01T10:01:06Z',
+          content: [fr('call_a')],
+        },
+      ];
+
+      const history = convertSessionToClientHistory(messages);
+
+      expect(history.map((h) => h.id)).toEqual(['m1', 'm1_response', 'r1']);
+      expect(responseIds(history)).toEqual(['call_b', 'call_a']);
+    });
+
+    it('should treat a call id reused in a later turn as a separate call', () => {
+      const messages: ConversationRecord['messages'] = [
+        {
+          id: 'm1',
+          type: 'gemini',
+          timestamp: '2024-01-01T10:01:00Z',
+          content: '',
+          toolCalls: [toolCall('call_0', 'first')],
+        },
+        {
+          id: 'u2',
+          type: 'user',
+          timestamp: '2024-01-01T10:02:00Z',
+          content: 'Again',
+        },
+        {
+          id: 'm2',
+          type: 'gemini',
+          timestamp: '2024-01-01T10:03:00Z',
+          content: '',
+          toolCalls: [toolCall('call_0', [fr('call_0', 'second')])],
+        },
+        {
+          id: 'r2',
+          type: 'user',
+          timestamp: '2024-01-01T10:03:06Z',
+          content: [fr('call_0', 'second')],
+        },
+      ];
+
+      const history = convertSessionToClientHistory(messages);
+
+      expect(history.map((h) => h.id)).toEqual([
+        'm1',
+        'm1_response',
+        'u2',
+        'm2',
+        'r2',
+      ]);
+      expect(
+        history.flatMap((h) =>
+          (h.content.parts ?? []).flatMap((p) =>
+            p.functionResponse ? [p.functionResponse.response] : [],
+          ),
+        ),
+      ).toEqual([{ output: 'first' }, { output: 'second' }]);
+    });
   });
 });
