@@ -1,0 +1,7 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`useReverseSearchCompletion > Filtering > highlights the original match in "echo i̇ abc" for "İ" 1`] = `" echo i̇ abc                                                                    "`;
+
+exports[`useReverseSearchCompletion > Filtering > highlights the original match in "echo İ abc" for "abc" 1`] = `" echo İ abc                                                                    "`;
+
+exports[`useReverseSearchCompletion > Filtering > highlights the original match in "echo İ abc" for "i̇" 1`] = `" echo İ abc                                                                    "`;

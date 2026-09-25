@@ -13,6 +13,7 @@ export const MAX_WIDTH = 150;
 export interface ExpandableTextProps {
   label: string;
   matchedIndex?: number;
+  matchedLength?: number;
   userInput?: string;
   textColor?: string;
   isExpanded?: boolean;
@@ -23,6 +24,7 @@ export interface ExpandableTextProps {
 const _ExpandableText: React.FC<ExpandableTextProps> = ({
   label,
   matchedIndex,
+  matchedLength,
   userInput = '',
   textColor = theme.text.primary,
   isExpanded = false,
@@ -65,7 +67,7 @@ const _ExpandableText: React.FC<ExpandableTextProps> = ({
     );
   }
 
-  const matchLength = userInput.length;
+  const matchLength = matchedLength ?? userInput.length;
   let before = '';
   let match = '';
   let after = '';

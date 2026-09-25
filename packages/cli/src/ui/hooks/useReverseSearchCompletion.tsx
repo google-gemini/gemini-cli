@@ -73,9 +73,40 @@ export function useReverseSearchCompletion(
       const out: Suggestion[] = [];
       for (let i = 0; i < items.length; i++) {
         const cmd = items[i];
-        const idx = cmd.toLowerCase().indexOf(query);
+        const lowerCommand = cmd.toLowerCase();
+        const idx = lowerCommand.indexOf(query);
         if (idx !== -1) {
-          out.push({ label: cmd, value: cmd, matchedIndex: idx });
+          let matchedIndex = idx;
+          let matchedLength = query.length;
+
+          // Match against the whole lowercased string, but highlight UTF-16
+          // offsets in the original label. For example, İ lowercases to i + ◌̇.
+          if (lowerCommand.length !== cmd.length) {
+            let originalOffset = 0;
+            let lowerOffset = 0;
+            const matchEnd = idx + query.length;
+            for (const character of cmd) {
+              const lowerLength = character.toLowerCase().length;
+              const nextLowerOffset = lowerOffset + lowerLength;
+              if (lowerOffset <= idx && idx < nextLowerOffset) {
+                matchedIndex =
+                  originalOffset +
+                  (lowerLength === character.length ? idx - lowerOffset : 0);
+              }
+              if (matchEnd <= nextLowerOffset) {
+                const originalEnd =
+                  originalOffset +
+                  (lowerLength === character.length
+                    ? matchEnd - lowerOffset
+                    : character.length);
+                matchedLength = originalEnd - matchedIndex;
+                break;
+              }
+              originalOffset += character.length;
+              lowerOffset = nextLowerOffset;
+            }
+          }
+          out.push({ label: cmd, value: cmd, matchedIndex, matchedLength });
         }
       }
       return out;
