@@ -10,6 +10,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { WorkspaceContext } from './workspaceContext.js';
 import { debugLogger } from './debugLogger.js';
+import { resolveToRealPath } from './paths.js';
 
 describe('WorkspaceContext with real filesystem', () => {
   let tempDir: string;
@@ -18,8 +19,8 @@ describe('WorkspaceContext with real filesystem', () => {
 
   beforeEach(() => {
     // os.tmpdir() can return a path using a symlink (this is standard on macOS)
-    // Use fs.realpathSync to fully resolve the absolute path.
-    tempDir = fs.realpathSync(
+    // Use resolveToRealPath to fully resolve the absolute path canonically.
+    tempDir = resolveToRealPath(
       fs.mkdtempSync(path.join(os.tmpdir(), 'workspace-context-test-')),
     );
 
@@ -453,7 +454,7 @@ describe('WorkspaceContext with optional directories', () => {
   let nonExistentDir: string;
 
   beforeEach(() => {
-    tempDir = fs.realpathSync(
+    tempDir = resolveToRealPath(
       fs.mkdtempSync(path.join(os.tmpdir(), 'workspace-context-optional-')),
     );
     cwd = path.join(tempDir, 'project');
@@ -491,5 +492,68 @@ describe('WorkspaceContext with optional directories', () => {
     const directories = workspaceContext.getDirectories();
     expect(directories).toEqual([cwd, existingDir1]);
     expect(debugLogger.warn).not.toHaveBeenCalled();
+  });
+
+  describe('Security Regression: Case-Insensitive Sensitive Path Blocklist', () => {
+    it('should reject sensitive paths like .git, .env, and node_modules case-insensitively, including Windows trailing character and NTFS ADS bypasses', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+
+      const sensitivePaths = [
+        path.join(cwd, '.git', 'config'),
+        path.join(cwd, '.GIT', 'config'),
+        path.join(cwd, '.Git', 'config'),
+        path.join(cwd, '.env'),
+        path.join(cwd, '.Env'),
+        path.join(cwd, '.ENV'),
+        path.join(cwd, 'node_modules', 'package', 'index.js'),
+        path.join(cwd, 'NODE_MODULES', 'package', 'index.js'),
+        // Windows trailing character bypasses
+        path.join(cwd, '.git ', 'config'),
+        path.join(cwd, '.git.', 'config'),
+        path.join(cwd, '.env ', 'config'),
+        path.join(cwd, '.env.', 'config'),
+        path.join(cwd, 'node_modules ', 'package', 'index.js'),
+        // NTFS Alternate Data Stream bypasses
+        path.join(cwd, '.git::$DATA', 'config'),
+        path.join(cwd, '.env::$DATA'),
+        path.join(cwd, 'node_modules::$DATA', 'package', 'index.js'),
+      ];
+
+      for (const p of sensitivePaths) {
+        expect(workspaceContext.isPathWithinWorkspace(p)).toBe(false);
+      }
+    });
+
+    it('should reject GitHub Actions Workload Identity credentials', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+
+      const sensitivePaths = [
+        path.join(cwd, 'gha-creds-12345.json'),
+        path.join(cwd, 'gha-creds-abcde.json'),
+        path.join(cwd, 'GHA-CREDS-abcde.JSON'), // Case-insensitivity check
+        path.join(cwd, 'subfolder', 'gha-creds-12345.json'), // Nested
+      ];
+
+      for (const p of sensitivePaths) {
+        expect(workspaceContext.isPathWithinWorkspace(p)).toBe(false);
+      }
+    });
+
+    it('should allow standard non-sensitive paths', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+
+      const safePaths = [
+        path.join(cwd, 'src', 'index.ts'),
+        path.join(cwd, '.gitignore'),
+        path.join(cwd, '.env.example'),
+        path.join(cwd, 'package.json'),
+        path.join(cwd, 'tsconfig.json'),
+        path.join(cwd, 'gha-creds.json'), // Doesn't match the pattern
+      ];
+
+      for (const p of safePaths) {
+        expect(workspaceContext.isPathWithinWorkspace(p)).toBe(true);
+      }
+    });
   });
 });

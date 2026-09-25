@@ -222,8 +222,15 @@ export function translateEvent(
       out.push(
         makeEvent('error', state, {
           status: 'INTERNAL',
-          message: 'Invalid stream received from model',
+          message:
+            event.value?.message?.trim() ||
+            'Invalid stream received from model',
           fatal: true,
+          _meta: {
+            code: 'INVALID_STREAM',
+            errorType: event.value?.type,
+            rawMessage: event.value?.message,
+          },
         }),
       );
       break;

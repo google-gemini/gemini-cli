@@ -27,7 +27,10 @@ vi.mock('../utils.js', () => ({
 
 describe('extensions validate command', () => {
   it('should fail if no path is provided', () => {
-    const validationParser = yargs([]).command(validateCommand).fail(false);
+    const validationParser = yargs([])
+      .locale('en')
+      .command(validateCommand)
+      .fail(false);
     expect(() => validationParser.parse('validate')).toThrow(
       'Not enough non-option arguments: got 0, need at least 1',
     );
@@ -130,5 +133,74 @@ describe('handleValidate', () => {
       ),
     );
     expect(processSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('should throw an error if context file uses relative parent directory navigation', async () => {
+    createExtension({
+      extensionsDir: tempWorkspaceDir,
+      name: 'parent-nav-ext',
+      version: '1.0.0',
+      contextFileName: '../secret.txt',
+    });
+    await handleValidate({
+      path: 'parent-nav-ext',
+    });
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Invalid context file path: "../secret.txt". Relative parent directory references ("..") are not allowed.',
+      ),
+    );
+    expect(processSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('should throw an error if context file uses URL-encoded relative parent directory navigation', async () => {
+    createExtension({
+      extensionsDir: tempWorkspaceDir,
+      name: 'encoded-nav-ext',
+      version: '1.0.0',
+      contextFileName: '%2e%2e/secret.txt',
+    });
+    await handleValidate({
+      path: 'encoded-nav-ext',
+    });
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Invalid context file path: "%2e%2e/secret.txt". Relative parent directory references ("..") are not allowed.',
+      ),
+    );
+    expect(processSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('should throw an error if context file uses absolute path', async () => {
+    createExtension({
+      extensionsDir: tempWorkspaceDir,
+      name: 'abs-path-ext',
+      version: '1.0.0',
+      contextFileName: '/etc/hosts',
+    });
+    await handleValidate({
+      path: 'abs-path-ext',
+    });
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Invalid context file path: "/etc/hosts". Absolute paths are not allowed.',
+      ),
+    );
+    expect(processSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('should successfully validate an extension with context file containing percent characters', async () => {
+    createExtension({
+      extensionsDir: tempWorkspaceDir,
+      name: 'percent-name-ext',
+      version: '1.0.0',
+      contextFileName: '100%_complete.md',
+    });
+    await handleValidate({
+      path: 'percent-name-ext',
+    });
+    expect(debugLoggerLogSpy).toHaveBeenCalledWith(
+      'Extension percent-name-ext has been successfully validated.',
+    );
   });
 });

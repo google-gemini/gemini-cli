@@ -631,6 +631,35 @@ describe('Task', () => {
 
       expect(handleEventDrivenToolCallSpy).toHaveBeenCalled();
     });
+
+    describe('Pending Tools state', () => {
+      it('should correctly report pending tools presence and count', () => {
+        const mockConfig = createMockConfig();
+        const mockEventBus: ExecutionEventBus = {
+          publish: vi.fn(),
+          on: vi.fn(),
+          off: vi.fn(),
+          once: vi.fn(),
+          removeAllListeners: vi.fn(),
+          finished: vi.fn(),
+        };
+
+        // @ts-expect-error - Calling private constructor
+        const task = new Task(
+          'task-id',
+          'context-id',
+          mockConfig as Config,
+          mockEventBus,
+        );
+
+        expect(task.hasPendingTools).toBe(false);
+        expect(task.pendingToolsCount).toBe(0);
+
+        task['_registerToolCall']('tool-1', 'scheduled');
+        expect(task.hasPendingTools).toBe(true);
+        expect(task.pendingToolsCount).toBe(1);
+      });
+    });
   });
 
   describe('Serialization and Mapping', () => {
@@ -721,6 +750,167 @@ describe('Task', () => {
         toolCall2 as unknown as ToolCall,
       );
       expect(changed3).toBe(true);
+    });
+  });
+
+  describe('getProposedContent (CRLF Line Ending Normalization)', () => {
+    it('should successfully replace LF-based strings in CRLF-based files', async () => {
+      const fs = await import('node:fs');
+      const path = await import('node:path');
+      const os = await import('node:os');
+
+      const mockConfig = createMockConfig({
+        getTargetDir: () => os.tmpdir(),
+        validatePathAccess: () => null,
+      });
+      const mockEventBus: ExecutionEventBus = {
+        publish: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+        once: vi.fn(),
+        removeAllListeners: vi.fn(),
+        finished: vi.fn(),
+      };
+
+      // @ts-expect-error - Calling private constructor
+      const task = new Task(
+        'task-id',
+        'context-id',
+        mockConfig as Config,
+        mockEventBus,
+      );
+
+      const tempFile = path.resolve(os.tmpdir(), 'crlf_test_file.txt');
+      const crlfContent = 'line1\r\nline2\r\nline3\r\n';
+      fs.writeFileSync(tempFile, crlfContent, 'utf8');
+
+      try {
+        const oldString = 'line2\n';
+        const newString = 'line2-optimized\n';
+
+        const result = await task['getProposedContent'](
+          tempFile,
+          oldString,
+          newString,
+        );
+
+        expect(result).toContain('line2-optimized');
+        expect(result).toContain('\r\n'); // It should preserve the original CRLF line endings
+      } finally {
+        if (fs.existsSync(tempFile)) {
+          fs.unlinkSync(tempFile);
+        }
+      }
+    });
+
+    it('should successfully replace CRLF-based strings in CRLF-based files by normalizing all to LF', async () => {
+      const fs = await import('node:fs');
+      const path = await import('node:path');
+      const os = await import('node:os');
+
+      const mockConfig = createMockConfig({
+        getTargetDir: () => os.tmpdir(),
+        validatePathAccess: () => null,
+      });
+      const mockEventBus: ExecutionEventBus = {
+        publish: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+        once: vi.fn(),
+        removeAllListeners: vi.fn(),
+        finished: vi.fn(),
+      };
+
+      // @ts-expect-error - Calling private constructor
+      const task = new Task(
+        'task-id',
+        'context-id',
+        mockConfig as Config,
+        mockEventBus,
+      );
+
+      const tempFile = path.resolve(
+        os.tmpdir(),
+        'crlf_test_file_crlf_inputs.txt',
+      );
+      const crlfContent = 'line1\r\nline2\r\nline3\r\n';
+      fs.writeFileSync(tempFile, crlfContent, 'utf8');
+
+      try {
+        const oldString = 'line2\r\n';
+        const newString = 'line2-optimized\r\n';
+
+        const result = await task['getProposedContent'](
+          tempFile,
+          oldString,
+          newString,
+        );
+
+        expect(result).toContain('line2-optimized');
+        expect(result).toContain('\r\n'); // It should preserve the original CRLF line endings
+      } finally {
+        if (fs.existsSync(tempFile)) {
+          fs.unlinkSync(tempFile);
+        }
+      }
+    });
+  });
+
+  describe('Stale Cancellation Error Cleanup', () => {
+    it('should clear any previous execution cancellation error on acceptUserMessage', async () => {
+      const mockConfig = createMockConfig();
+      mockConfig.getGeminiClient = vi.fn().mockReturnValue({
+        sendMessageStream: vi.fn().mockReturnValue((async function* () {})()),
+      });
+      mockConfig.getSessionId = () => 'test-session-id';
+
+      const mockEventBus: ExecutionEventBus = {
+        publish: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+        once: vi.fn(),
+        removeAllListeners: vi.fn(),
+        finished: vi.fn(),
+      };
+
+      // @ts-expect-error - Calling private constructor
+      const task = new Task(
+        'task-id',
+        'context-id',
+        mockConfig as Config,
+        mockEventBus,
+      );
+
+      // Simulate cancellation from a previous aborted execution turn
+      task.cancelPendingTools('Execution aborted');
+
+      // Verify cancellationError is set and would throw on wait
+      expect(task['cancellationError']).toBeDefined();
+      await expect(task.waitForPendingTools()).rejects.toThrow(
+        'Execution aborted',
+      );
+
+      // Call acceptUserMessage to start a new user turn
+      const userMessage = {
+        userMessage: {
+          parts: [{ kind: 'text', text: 'new prompt' }],
+        },
+      } as RequestContext;
+      const abortController = new AbortController();
+
+      // Drain the generator to let acceptUserMessage execute
+      for await (const _ of task.acceptUserMessage(
+        userMessage,
+        abortController.signal,
+      )) {
+        // no-op
+      }
+
+      // Verify cancellationError is cleared
+      expect(task['cancellationError']).toBeUndefined();
+
+      // Verify waiting for pending tools now succeeds/does not throw
+      await expect(task.waitForPendingTools()).resolves.toBeUndefined();
     });
   });
 });

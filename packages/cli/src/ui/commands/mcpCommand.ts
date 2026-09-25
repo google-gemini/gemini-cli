@@ -284,7 +284,8 @@ const listAction = async (
     type: MessageType.MCP_STATUS,
     servers: mcpServers,
     tools: mcpTools.map((tool) => ({
-      serverName: tool.serverName,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      serverName: (tool as unknown as { serverName: string }).serverName,
       name: tool.name,
       description: tool.description,
       schema: tool.schema,

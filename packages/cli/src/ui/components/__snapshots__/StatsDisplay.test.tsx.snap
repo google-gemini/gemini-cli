@@ -292,3 +292,30 @@ exports[`<StatsDisplay /> > renders role breakdown correctly under models 1`] = 
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "
 `;
+
+exports[`<StatsDisplay /> > resolves gemini-3-flash to gemini-3.5-flash in the model usage table 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│  Session Stats                                                                                   │
+│                                                                                                  │
+│  Interaction Summary                                                                             │
+│  Session ID:                 test-session-id                                                     │
+│  Tool Calls:                 0 ( ✓ 0 x 0 )                                                       │
+│  Success Rate:               0.0%                                                                │
+│                                                                                                  │
+│  Performance                                                                                     │
+│  Wall Time:                  1s                                                                  │
+│  Agent Active:               3.0s                                                                │
+│    » API Time:               3.0s (100.0%)                                                       │
+│    » Tool Time:              0s (0.0%)                                                           │
+│                                                                                                  │
+│                                                                                                  │
+│  Model Usage                                                                                     │
+│  Use /model to view model quota information                                                      │
+│                                                                                                  │
+│  Model                           Reqs  Input Tokens   Cache Reads Output Tokens                  │
+│  ──────────────────────────────────────────────────────────────────────────────────────────────  │
+│  gemini-3.5-flash                   5         2,000           500         3,000                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;

@@ -1,0 +1,107 @@
+name: 'PR Size Labeler (Batch)'
+
+on:
+  workflow_dispatch:
+    inputs:
+      process_all:
+        description: 'Process all PRs (open and closed) or open only'
+        required: true
+        default: 'false'
+        type: 'choice'
+        options:
+          - 'true'
+          - 'false'
+      limit:
+        description: 'Max number of PRs to fetch and check'
+        required: true
+        default: '100'
+        type: 'string'
+
+permissions:
+  pull-requests: 'write'
+
+jobs:
+  batch-label:
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: 'Batch label PRs'
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          GH_REPO: '${{ github.repository }}'
+        run: |
+          # Determine the state filter
+          STATE="open"
+          if [ "${{ github.event.inputs.process_all }}" = "true" ]; then
+            STATE="all"
+          fi
+
+          LIMIT="${{ github.event.inputs.limit }}"
+          echo "Batch labeling up to $LIMIT $STATE PRs..."
+
+          # 1. Ensure standard premium size labels exist in the repository (self-healing)
+          gh label create "size/XS" --color "7ee081" --description "XS: <10 lines changed" 2>/dev/null || true
+          gh label create "size/S"  --color "a6d49f" --description "S: 10-49 lines changed" 2>/dev/null || true
+          gh label create "size/M"  --color "f7d070" --description "M: 50-249 lines changed" 2>/dev/null || true
+          gh label create "size/L"  --color "f48c06" --description "L: 250-999 lines changed" 2>/dev/null || true
+          gh label create "size/XL" --color "dc2f02" --description "XL: >=1000 lines changed" 2>/dev/null || true
+
+          # 2. Query PR list with all required fields in ONE call to prevent N+1 queries
+          PR_LIST=$(gh pr list --state "$STATE" --limit "$LIMIT" --json number,additions,deletions,labels)
+          if [ -z "$PR_LIST" ] || [ "$PR_LIST" = "[]" ]; then
+            echo "ℹ️ No PRs found matching the criteria."
+            exit 0
+          fi
+
+          # Parse and iterate over PRs
+          UPDATED_COUNT=0
+          SKIPPED_COUNT=0
+
+          echo "$PR_LIST" | jq -c '.[]' | while read -r PR_JSON; do
+            PR_NUMBER=$(echo "$PR_JSON" | jq '.number')
+            ADDITIONS=$(echo "$PR_JSON" | jq '.additions')
+            DELETIONS=$(echo "$PR_JSON" | jq '.deletions')
+            TOTAL=$((ADDITIONS + DELETIONS))
+
+            # Calculate target size
+            if [ $TOTAL -lt 10 ]; then
+              SIZE="size/XS"
+            elif [ $TOTAL -lt 50 ]; then
+              SIZE="size/S"
+            elif [ $TOTAL -lt 250 ]; then
+              SIZE="size/M"
+            elif [ $TOTAL -lt 1000 ]; then
+              SIZE="size/L"
+            else
+              SIZE="size/XL"
+            fi
+
+            # Inspect existing labels to detect discrepancies
+            EXISTING_LABELS=$(echo "$PR_JSON" | jq -r '.labels[].name' 2>/dev/null || echo "")
+
+            LABELS_TO_REMOVE=()
+            for L in size/XS size/S size/M size/L size/XL; do
+              if echo "$EXISTING_LABELS" | grep -Fq "$L" && [ "$L" != "$SIZE" ]; then
+                LABELS_TO_REMOVE+=("--remove-label" "$L")
+              fi
+            done
+
+            LABEL_TO_ADD=()
+            if ! echo "$EXISTING_LABELS" | grep -Fq "$SIZE"; then
+              LABEL_TO_ADD+=("--add-label" "$SIZE")
+            fi
+
+            # Update labels if there's a difference
+            if [ ${#LABELS_TO_REMOVE[@]} -gt 0 ] || [ ${#LABEL_TO_ADD[@]} -gt 0 ]; then
+              echo "🔄 PR #$PR_NUMBER (+$ADDITIONS/-$DELETIONS = $TOTAL lines): updating size to $SIZE"
+              gh pr edit "$PR_NUMBER" "${LABELS_TO_REMOVE[@]}" "${LABEL_TO_ADD[@]}" 2>/dev/null || true
+              UPDATED_COUNT=$((UPDATED_COUNT + 1))
+            else
+              echo "✅ PR #$PR_NUMBER (+$ADDITIONS/-$DELETIONS = $TOTAL lines): already has correct label ($SIZE). Skipping."
+              SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+            fi
+          done
+
+          echo "============================================"
+          echo "🎉 Batch run completed!"
+          echo "Skipped (already correct): $SKIPPED_COUNT"
+          echo "Updated: $UPDATED_COUNT"

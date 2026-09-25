@@ -481,7 +481,7 @@ describe('useCommandCompletion', () => {
   });
 
   describe('handleAutocomplete', () => {
-    it('should complete a partial command and NOT add a space if it has an action', async () => {
+    it('should complete a partial command and ADD a space even if it has an action', async () => {
       setupMocks({
         slashSuggestions: [{ label: 'memory', value: 'memory' }],
         slashCompletionRange: {
@@ -502,7 +502,7 @@ describe('useCommandCompletion', () => {
         result.current.handleAutocomplete(0);
       });
 
-      expect(result.current.textBuffer.text).toBe('/memory');
+      expect(result.current.textBuffer.text).toBe('/memory ');
     });
 
     it('should complete a partial command and ADD a space if it has NO action (e.g. just a parent)', async () => {

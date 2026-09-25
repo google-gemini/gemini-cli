@@ -14,6 +14,7 @@ import {
   type Mock,
 } from 'vitest';
 
+import os from 'node:os';
 import EventEmitter from 'node:events';
 import type { Readable } from 'node:stream';
 import { type ChildProcess } from 'node:child_process';
@@ -34,6 +35,9 @@ const mockPlatform = vi.hoisted(() => vi.fn());
 const mockHomedir = vi.hoisted(() => vi.fn());
 const mockMkdirSync = vi.hoisted(() => vi.fn());
 const mockCreateWriteStream = vi.hoisted(() => vi.fn());
+const mockStatSync = vi.hoisted(() => vi.fn());
+const mockFstatSync = vi.hoisted(() => vi.fn());
+const mockCloseSync = vi.hoisted(() => vi.fn());
 const mockGetPty = vi.hoisted(() => vi.fn());
 const mockSerializeTerminalToObject = vi.hoisted(() => vi.fn());
 const mockResolveExecutable = vi.hoisted(() => vi.fn());
@@ -64,9 +68,15 @@ vi.mock('node:fs', async (importOriginal) => {
       ...actual,
       mkdirSync: mockMkdirSync,
       createWriteStream: mockCreateWriteStream,
+      statSync: mockStatSync,
+      fstatSync: mockFstatSync,
+      closeSync: mockCloseSync,
     },
     mkdirSync: mockMkdirSync,
     createWriteStream: mockCreateWriteStream,
+    statSync: mockStatSync,
+    fstatSync: mockFstatSync,
+    closeSync: mockCloseSync,
   };
 });
 vi.mock('../utils/shell-utils.js', async (importOriginal) => {
@@ -115,8 +125,26 @@ vi.mock('../utils/terminalSerializer.js', () => ({
   // Avoid passing the heavy Terminal object to the spy to prevent OOM
   serializeTerminalToObject: (
     _terminal: unknown,
-    ...args: [number | undefined, number | undefined]
-  ) => mockSerializeTerminalToObject(...args),
+    startLine?: number,
+    endLine?: number,
+    includeColor = true,
+  ) => {
+    const result = mockSerializeTerminalToObject(
+      startLine,
+      endLine,
+      includeColor,
+    ) as AnsiOutput | undefined;
+    if (!includeColor && Array.isArray(result)) {
+      return result.map((line) =>
+        line.map((token) => ({
+          ...token,
+          fg: '',
+          bg: '',
+        })),
+      );
+    }
+    return result;
+  },
   convertColorToHex: () => '#000000',
   ColorMode: { DEFAULT: 0, PALETTE: 1, RGB: 2 },
 }));
@@ -1246,6 +1274,411 @@ describe('ShellExecutionService', () => {
       // The catch block must call destroy() on spawnedPty to prevent fd leak
       expect(destroySpy).toHaveBeenCalled();
     });
+
+    it('should dispose of PTY event listeners on process exit', async () => {
+      const dataDisposeSpy = vi.fn();
+      const exitDisposeSpy = vi.fn();
+
+      mockPtyProcess.onData.mockReturnValue({ dispose: dataDisposeSpy });
+      mockPtyProcess.onExit.mockReturnValue({ dispose: exitDisposeSpy });
+
+      await simulateExecution('ls -l', (pty) => {
+        pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+      });
+
+      expect(dataDisposeSpy).toHaveBeenCalled();
+      expect(exitDisposeSpy).toHaveBeenCalled();
+    });
+
+    it('should dispose of PTY event listeners on abort', async () => {
+      const dataDisposeSpy = vi.fn();
+      const exitDisposeSpy = vi.fn();
+
+      mockPtyProcess.onData.mockReturnValue({ dispose: dataDisposeSpy });
+      mockPtyProcess.onExit.mockReturnValue({ dispose: exitDisposeSpy });
+
+      const abortController = new AbortController();
+      const handle = await ShellExecutionService.execute(
+        'long-running',
+        '/test/dir',
+        onOutputEventMock,
+        abortController.signal,
+        true,
+        shellExecutionConfig,
+      );
+
+      await new Promise((resolve) => process.nextTick(resolve));
+      abortController.abort();
+
+      // Simulate PTY process exit resulting from abort/SIGKILL
+      mockPtyProcess.onExit.mock.calls[0][0]({ exitCode: 1, signal: 9 });
+      await handle.result;
+
+      expect(dataDisposeSpy).toHaveBeenCalled();
+      expect(exitDisposeSpy).toHaveBeenCalled();
+    });
+
+    it('should remove onAbortDuringDrain listener from abortSignal on normal exit', async () => {
+      const abortController = new AbortController();
+      const removeEventListenerSpy = vi.spyOn(
+        abortController.signal,
+        'removeEventListener',
+      );
+
+      const handle = await ShellExecutionService.execute(
+        'ls -l',
+        '/test/dir',
+        onOutputEventMock,
+        abortController.signal,
+        true,
+        shellExecutionConfig,
+      );
+
+      await new Promise((resolve) => process.nextTick(resolve));
+      mockPtyProcess.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+      await handle.result;
+
+      // Both abortHandler and onAbortDuringDrain should be removed on normal exit
+      expect(removeEventListenerSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('should clean up active PTYs in resetForTest', async () => {
+      const abortController = new AbortController();
+      await ShellExecutionService.execute(
+        'running-cmd',
+        '/test/dir',
+        onOutputEventMock,
+        abortController.signal,
+        true,
+        shellExecutionConfig,
+      );
+      await new Promise((resolve) => process.nextTick(resolve));
+
+      ShellExecutionService.resetForTest();
+
+      expect(mockPtyProcess.destroy).toHaveBeenCalled();
+    });
+
+    it('should fall back to child_process when PTY creation fails with ENXIO', async () => {
+      const ptyError = new Error('posix_openpt failed: Device not configured');
+      // @ts-expect-error adding custom code property
+      ptyError.code = 'ENXIO';
+      mockPtySpawn.mockImplementationOnce(() => {
+        throw ptyError;
+      });
+
+      // Mock child process fallback
+      const mockFallbackChild = new EventEmitter() as unknown as ChildProcess;
+      Object.defineProperty(mockFallbackChild, 'stdout', {
+        value: new EventEmitter(),
+      });
+      Object.defineProperty(mockFallbackChild, 'stderr', {
+        value: new EventEmitter(),
+      });
+      Object.defineProperty(mockFallbackChild, 'kill', {
+        value: vi.fn(),
+      });
+      Object.defineProperty(mockFallbackChild, 'pid', {
+        value: 9999,
+      });
+      mockCpSpawn.mockReturnValueOnce(mockFallbackChild);
+
+      const abortController = new AbortController();
+      const handle = await ShellExecutionService.execute(
+        'test-fallback',
+        '/test/dir',
+        onOutputEventMock,
+        abortController.signal,
+        true,
+        shellExecutionConfig,
+      );
+
+      // Simulate exit of standard child process fallback to allow handle to resolve
+      mockFallbackChild.emit('exit', 0, null);
+      mockFallbackChild.emit('close', 0, null);
+
+      const result = await handle.result;
+      expect(result.executionMethod).toBe('child_process');
+      expect(mockCpSpawn).toHaveBeenCalled();
+    });
+
+    it('should fully roll back state when catch block fires after activePtys insertion', async () => {
+      mockPlatform.mockReturnValue('win32');
+      const destroySpy = vi.fn();
+      let pidReadCount = 0;
+      const tricksyPty = {
+        onData: vi.fn(() => {
+          throw new Error('Post-insertion failure during wiring');
+        }),
+        onExit: vi.fn(),
+        write: vi.fn(),
+        kill: vi.fn(),
+        resize: vi.fn(),
+        destroy: destroySpy,
+        fd: 42,
+        ptsName: '/dev/pts/tricksy',
+        get pid(): number {
+          pidReadCount += 1;
+          return 77777;
+        },
+      };
+      mockPtySpawn.mockReturnValueOnce(tricksyPty);
+
+      const handle = await ShellExecutionService.execute(
+        'fail-after-insertion',
+        '/test/dir',
+        onOutputEventMock,
+        new AbortController().signal,
+        true,
+        shellExecutionConfig,
+      );
+
+      const result = await handle.result;
+      expect(result.exitCode).toBe(1);
+      expect(result.error).toBeTruthy();
+      expect(destroySpy).toHaveBeenCalled();
+      expect(ShellExecutionService['activePtys'].has(77777)).toBe(false);
+      expect(pidReadCount).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Orphan PTY slave FD cleanup', () => {
+    const closeOrphanSlaveFd = (
+      masterFd: number | undefined,
+      ptsName: string | undefined,
+    ): number | undefined =>
+      (
+        ShellExecutionService as unknown as {
+          closeOrphanSlaveFd: (
+            fd: number | undefined,
+            name: string | undefined,
+          ) => number | undefined;
+        }
+      ).closeOrphanSlaveFd(masterFd, ptsName);
+
+    it('synchronously closes the matching slave fd when platform is darwin', () => {
+      mockPlatform.mockReturnValue('darwin');
+      mockCloseSync.mockClear();
+      const targetRdev = 0xdead;
+      mockStatSync.mockReturnValue({
+        rdev: targetRdev,
+        isCharacterDevice: () => true,
+      });
+      mockFstatSync.mockImplementation((fd: number) => {
+        if (fd === 12) {
+          return { rdev: targetRdev, isCharacterDevice: () => true };
+        }
+        return { rdev: 0x1234, isCharacterDevice: () => true };
+      });
+
+      const result = closeOrphanSlaveFd(10, '/dev/ttys001');
+      expect(result).toBe(12);
+      expect(mockCloseSync).toHaveBeenCalledTimes(1);
+      expect(mockCloseSync).toHaveBeenCalledWith(12);
+    });
+
+    it('returns undefined on non-darwin platforms without probing fds', () => {
+      mockPlatform.mockReturnValue('linux');
+      mockStatSync.mockClear();
+      mockFstatSync.mockClear();
+      mockCloseSync.mockClear();
+
+      const result = closeOrphanSlaveFd(10, '/dev/pts/0');
+      expect(result).toBeUndefined();
+      expect(mockStatSync).not.toHaveBeenCalled();
+      expect(mockFstatSync).not.toHaveBeenCalled();
+      expect(mockCloseSync).not.toHaveBeenCalled();
+    });
+
+    it('returns undefined when no candidate fd matches', () => {
+      mockPlatform.mockReturnValue('darwin');
+      mockCloseSync.mockClear();
+      mockStatSync.mockReturnValue({
+        rdev: 0xbeef,
+        isCharacterDevice: () => true,
+      });
+      mockFstatSync.mockReturnValue({
+        rdev: 0x1234,
+        isCharacterDevice: () => true,
+      });
+
+      const result = closeOrphanSlaveFd(10, '/dev/ttys002');
+      expect(result).toBeUndefined();
+      expect(mockCloseSync).not.toHaveBeenCalled();
+    });
+
+    it('destroyPtyProcess destroys the PTY process without closing arbitrary fds', () => {
+      mockCloseSync.mockClear();
+      const destroy = vi.fn();
+      const fakePty = {
+        destroy,
+        kill: vi.fn(),
+      };
+
+      (
+        ShellExecutionService as unknown as {
+          destroyPtyProcess: (p: unknown) => void;
+        }
+      ).destroyPtyProcess(fakePty);
+      expect(destroy).toHaveBeenCalled();
+      expect(mockCloseSync).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Background promotion guard', () => {
+    let mockWriteStream: { write: Mock; end: Mock; on: Mock };
+
+    beforeEach(() => {
+      mockWriteStream = {
+        write: vi.fn(),
+        end: vi.fn().mockImplementation((cb) => cb?.()),
+        on: vi.fn(),
+      };
+      mockMkdirSync.mockReturnValue(undefined);
+      mockCreateWriteStream.mockReturnValue(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        mockWriteStream as any,
+      );
+      mockHomedir.mockReturnValue('/mock/home');
+    });
+
+    it('opens only one log stream when background() is invoked twice for the same pid', async () => {
+      const abortController = new AbortController();
+      const handle = await ShellExecutionService.execute(
+        'double-background',
+        '/',
+        onOutputEventMock,
+        abortController.signal,
+        true,
+        shellExecutionConfig,
+      );
+
+      ShellExecutionService.background(
+        handle.pid!,
+        'default',
+        'double-background',
+      );
+      ShellExecutionService.background(
+        handle.pid!,
+        'default',
+        'double-background',
+      );
+
+      expect(mockCreateWriteStream).toHaveBeenCalledTimes(1);
+
+      await ShellExecutionService.kill(handle.pid!);
+    });
+  });
+
+  describe('Abort listener hygiene', () => {
+    it('does not accumulate abort listeners across repeated PTY executions', async () => {
+      const ADDED_LISTENER_TOLERANCE = 1;
+      const listeners = new Set<() => void>();
+      const abortController = new AbortController();
+      const originalAdd = abortController.signal.addEventListener.bind(
+        abortController.signal,
+      );
+      const originalRemove = abortController.signal.removeEventListener.bind(
+        abortController.signal,
+      );
+      abortController.signal.addEventListener = ((
+        type: string,
+        listener: EventListenerOrEventListenerObject,
+        options?: AddEventListenerOptions | boolean,
+      ) => {
+        if (type === 'abort' && typeof listener === 'function') {
+          listeners.add(listener as () => void);
+        }
+        return originalAdd(type, listener, options);
+      }) as typeof abortController.signal.addEventListener;
+      abortController.signal.removeEventListener = ((
+        type: string,
+        listener: EventListenerOrEventListenerObject,
+        options?: EventListenerOptions | boolean,
+      ) => {
+        if (type === 'abort' && typeof listener === 'function') {
+          listeners.delete(listener as () => void);
+        }
+        return originalRemove(type, listener, options);
+      }) as typeof abortController.signal.removeEventListener;
+
+      const executions = 5;
+      for (let i = 0; i < executions; i++) {
+        mockPtyProcess = new EventEmitter() as typeof mockPtyProcess;
+        mockPtyProcess.pid = 10000 + i;
+        mockPtyProcess.kill = vi.fn();
+        mockPtyProcess.onData = vi.fn().mockReturnValue({ dispose: vi.fn() });
+        mockPtyProcess.onExit = vi.fn().mockReturnValue({ dispose: vi.fn() });
+        mockPtyProcess.write = vi.fn();
+        mockPtyProcess.resize = vi.fn();
+        mockPtyProcess.destroy = vi.fn();
+        mockPtySpawn.mockReturnValueOnce(mockPtyProcess);
+
+        const handle = await ShellExecutionService.execute(
+          'repeat-command',
+          '/test/dir',
+          onOutputEventMock,
+          abortController.signal,
+          true,
+          shellExecutionConfig,
+        );
+        mockPtyProcess.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+        await handle.result;
+      }
+
+      expect(listeners.size).toBeLessThanOrEqual(ADDED_LISTENER_TOLERANCE);
+    });
+  });
+
+  describe('resetForTest teardown', () => {
+    it('tears down active PTYs, child processes, and background log streams', async () => {
+      const destroySpy = vi.fn();
+      const killSpy = vi.fn();
+      const endSpy = vi.fn();
+      const headlessDisposeSpy = vi.fn();
+
+      (
+        ShellExecutionService as unknown as {
+          activePtys: Map<number, unknown>;
+        }
+      ).activePtys.set(11111, {
+        ptyProcess: { destroy: destroySpy, kill: vi.fn() },
+        headlessTerminal: { dispose: headlessDisposeSpy },
+        command: 'cmd-11111',
+      });
+
+      (
+        ShellExecutionService as unknown as {
+          activeChildProcesses: Map<number, unknown>;
+        }
+      ).activeChildProcesses.set(22222, {
+        process: { kill: killSpy },
+        state: { output: '' },
+        command: 'cmd-22222',
+      });
+
+      (
+        ShellExecutionService as unknown as {
+          backgroundLogStreams: Map<number, unknown>;
+        }
+      ).backgroundLogStreams.set(33333, { end: endSpy });
+      (
+        ShellExecutionService as unknown as {
+          backgroundLogPids: Set<number>;
+        }
+      ).backgroundLogPids.add(33333);
+
+      ShellExecutionService.resetForTest();
+
+      expect(destroySpy).toHaveBeenCalled();
+      expect(headlessDisposeSpy).toHaveBeenCalled();
+      expect(killSpy).toHaveBeenCalled();
+      expect(endSpy).toHaveBeenCalled();
+      expect(ShellExecutionService['activePtys'].size).toBe(0);
+      expect(ShellExecutionService['activeChildProcesses'].size).toBe(0);
+      expect(ShellExecutionService['backgroundLogStreams'].size).toBe(0);
+      expect(ShellExecutionService['backgroundLogPids'].size).toBe(0);
+    });
   });
 });
 
@@ -2140,16 +2573,36 @@ describe('ShellExecutionService environment variables', () => {
     expect(cpEnv).toHaveProperty('DISPLAY', '');
     expect(cpEnv).toHaveProperty('DBUS_SESSION_BUS_ADDRESS', '');
 
+    // Global / system config neutralization paths
+    const devNullPath = os.platform() === 'win32' ? 'NUL' : '/dev/null';
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_GLOBAL', devNullPath);
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_SYSTEM', devNullPath);
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_NOSYSTEM', '1');
+
     // Existing values should be preserved
     expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_0', 'core.editor');
     expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_0', 'vim');
     expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_1', 'pull.rebase');
     expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_1', 'true');
 
-    // The new credential.helper override should be appended at index 2
-    expect(cpEnv).toHaveProperty('GIT_CONFIG_COUNT', '3');
+    // The 8 security overrides should be appended at index 2..9
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_COUNT', '10');
     expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_2', 'credential.helper');
     expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_2', '');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_3', 'core.fsmonitor');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_3', '');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_4', 'core.hooksPath');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_4', '');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_5', 'core.sshCommand');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_5', '');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_6', 'core.pager');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_6', 'cat');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_7', 'core.editor');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_7', '');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_8', 'sequence.editor');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_8', '');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_9', 'diff.external');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_9', '');
 
     // Ensure child_process exits
     mockChildProcess.emit('exit', 0, null);
@@ -2159,7 +2612,7 @@ describe('ShellExecutionService environment variables', () => {
     vi.unstubAllEnvs();
   });
 
-  it('should NOT include headless git and gh environment variables in interactive fallback mode', async () => {
+  it('should include headless git and gh environment variables in interactive fallback mode', async () => {
     vi.resetModules();
     vi.stubEnv('GIT_TERMINAL_PROMPT', undefined);
     vi.stubEnv('GIT_ASKPASS', undefined);
@@ -2184,12 +2637,12 @@ describe('ShellExecutionService environment variables', () => {
 
     expect(mockCpSpawn).toHaveBeenCalled();
     const cpEnv = mockCpSpawn.mock.calls[0][2].env;
-    expect(cpEnv).not.toHaveProperty('GIT_TERMINAL_PROMPT');
-    expect(cpEnv).not.toHaveProperty('GIT_ASKPASS');
-    expect(cpEnv).not.toHaveProperty('SSH_ASKPASS');
-    expect(cpEnv).not.toHaveProperty('GH_PROMPT_DISABLED');
-    expect(cpEnv).not.toHaveProperty('GCM_INTERACTIVE');
-    expect(cpEnv).not.toHaveProperty('GIT_CONFIG_COUNT');
+    expect(cpEnv).toHaveProperty('GIT_TERMINAL_PROMPT', '0');
+    expect(cpEnv).toHaveProperty('GIT_ASKPASS', '');
+    expect(cpEnv).toHaveProperty('SSH_ASKPASS', '');
+    expect(cpEnv).toHaveProperty('GH_PROMPT_DISABLED', '1');
+    expect(cpEnv).toHaveProperty('GCM_INTERACTIVE', 'never');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_COUNT');
 
     // Ensure child_process exits
     mockChildProcess.emit('exit', 0, null);
@@ -2197,5 +2650,224 @@ describe('ShellExecutionService environment variables', () => {
     await new Promise(process.nextTick);
 
     vi.unstubAllEnvs();
+  });
+});
+
+describe('Windows ConPTY exit desynchronization and hang regression (#25166)', () => {
+  let mockPtyProcess: EventEmitter & {
+    pid: number;
+    write: Mock;
+    resize: Mock;
+    kill: Mock;
+    destroy: Mock;
+    onData: Mock;
+    onExit: Mock;
+    _agent?: {
+      _exitCode?: number;
+      exitCode?: number;
+      _$onProcessExit?: (code: number) => void;
+      resize?: (cols: number, rows: number) => void;
+    };
+  };
+  let onOutputEventMock: Mock;
+  const shellExecutionConfig: ShellExecutionConfig = {
+    sanitizationConfig: {
+      enableEnvironmentVariableRedaction: false,
+      allowedEnvironmentVariables: [],
+      blockedEnvironmentVariables: [],
+    },
+    sandboxManager: new NoopSandboxManager(),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ExecutionLifecycleService.resetForTest();
+    onOutputEventMock = vi.fn();
+    mockPlatform.mockReturnValue('win32');
+    mockHomedir.mockReturnValue('/home/user');
+    mockIsBinary.mockReturnValue(false);
+    mockSerializeTerminalToObject.mockReturnValue([
+      [
+        {
+          text: 'hello',
+          fg: '',
+          bg: '',
+          bold: false,
+          dim: false,
+          italic: false,
+          underline: false,
+          inverse: false,
+          isUninitialized: false,
+        },
+      ],
+    ]);
+
+    mockPtyProcess = Object.assign(new EventEmitter(), {
+      pid: 54321,
+      write: vi.fn(),
+      resize: vi.fn(),
+      kill: vi.fn(),
+      destroy: vi.fn(),
+      onData: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+      onExit: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+    });
+
+    mockPtySpawn.mockReturnValue(mockPtyProcess);
+    mockGetPty.mockResolvedValue({
+      name: 'lydell-node-pty',
+      module: { spawn: mockPtySpawn },
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('should resolve execution when Windows ConPTY native _agent._$onProcessExit fires but pty.onExit is lost due to ConPTY pipe retention', async () => {
+    vi.useFakeTimers();
+
+    const mockAgent = {
+      _exitCode: undefined as number | undefined,
+      get exitCode() {
+        return this._exitCode;
+      },
+      _$onProcessExit: vi.fn(function (
+        this: { _exitCode?: number },
+        code: number,
+      ) {
+        this._exitCode = code;
+      }),
+      resize: vi.fn(),
+    };
+    mockPtyProcess._agent = mockAgent;
+
+    const abortController = new AbortController();
+    const handle = await ShellExecutionService.execute(
+      'echo hello',
+      '/test/dir',
+      onOutputEventMock,
+      abortController.signal,
+      true,
+      shellExecutionConfig,
+    );
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    // Command produces output
+    mockPtyProcess.onData.mock.calls[0][0]('hello\r\n');
+    await vi.advanceTimersByTimeAsync(10);
+
+    // Native Win32 WaitForSingleObject triggers _$onProcessExit(0) on hShell exit,
+    // but node-pty's _socket 'close' / pty.onExit never fires due to ready_datapipe race or ConPTY pipe retention.
+    mockAgent._$onProcessExit(0);
+
+    // Advance past the ConPTY flush window
+    await vi.advanceTimersByTimeAsync(2000);
+
+    let resolved = false;
+    void handle.result.then(() => {
+      resolved = true;
+    });
+    await vi.advanceTimersByTimeAsync(10);
+
+    expect(resolved).toBe(true);
+    const result = await handle.result;
+    expect(result.exitCode).toBe(0);
+    expect(ShellExecutionService.isPtyActive(handle.pid!)).toBe(false);
+  });
+
+  it('should prevent deferred WindowsTerminal _agent.resize from throwing synchronously during _socket data event after process exit', async () => {
+    const deferreds: Array<{ run: () => void }> = [];
+    let isReady = false;
+    const mockAgent = {
+      _exitCode: undefined as number | undefined,
+      get exitCode() {
+        return this._exitCode;
+      },
+      _$onProcessExit: vi.fn(function (
+        this: { _exitCode?: number },
+        code: number,
+      ) {
+        this._exitCode = code;
+      }),
+      resize: vi.fn(function (
+        this: { _exitCode?: number },
+        _cols: number,
+        _rows: number,
+      ) {
+        if (this._exitCode !== undefined) {
+          throw new Error('Cannot resize a pty that has already exited');
+        }
+      }),
+    };
+    mockPtyProcess._agent = mockAgent;
+    mockPtyProcess.resize.mockImplementation((cols: number, rows: number) => {
+      if (!isReady) {
+        deferreds.push({ run: () => mockAgent.resize(cols, rows) });
+      } else {
+        mockAgent.resize(cols, rows);
+      }
+    });
+
+    const abortController = new AbortController();
+    const handle = await ShellExecutionService.execute(
+      'echo hello',
+      '/test/dir',
+      onOutputEventMock,
+      abortController.signal,
+      true,
+      shellExecutionConfig,
+    );
+
+    // ShellToolMessage mounts and resizes PTY while _isReady is false (queued in _deferreds)
+    ShellExecutionService.resizePty(handle.pid!, 100, 40);
+
+    // Process exits quickly before first 'data' event arrives
+    mockAgent._$onProcessExit(0);
+
+    // First 'data' event arrives on _socket and flushes _deferreds
+    expect(() => {
+      isReady = true;
+      deferreds.forEach((d) => d.run());
+    }).not.toThrow();
+
+    // Clean up
+    mockPtyProcess.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+    await handle.result;
+  });
+
+  it('should still finalize and resolve execution when pty.onExit fires even if an output chunk handler in processingChain rejected', async () => {
+    let throwOnce = true;
+    onOutputEventMock.mockImplementation((event: ShellOutputEvent) => {
+      if (event.type === 'data' && throwOnce) {
+        throwOnce = false;
+        throw new Error('Simulated downstream UI listener error');
+      }
+    });
+
+    const abortController = new AbortController();
+    const handle = await ShellExecutionService.execute(
+      'echo hello',
+      '/test/dir',
+      onOutputEventMock,
+      abortController.signal,
+      true,
+      shellExecutionConfig,
+    );
+
+    await new Promise((resolve) => process.nextTick(resolve));
+
+    mockPtyProcess.onData.mock.calls[0][0]('hello\r\n');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    mockPtyProcess.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+
+    const timeoutPromise = new Promise<'timeout'>((resolve) =>
+      setTimeout(() => resolve('timeout'), 500),
+    );
+    const outcome = await Promise.race([handle.result, timeoutPromise]);
+
+    expect(outcome).not.toBe('timeout');
+    expect((outcome as { exitCode: number }).exitCode).toBe(0);
   });
 });

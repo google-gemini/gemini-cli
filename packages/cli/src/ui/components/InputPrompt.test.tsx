@@ -3673,9 +3673,12 @@ describe('InputPrompt', () => {
     });
 
     it('should toggle paste expansion on double-click', async () => {
+      vi.spyOn(Date, 'now').mockReturnValue(1000);
+
       const id = '[Pasted Text: 10 lines]';
       const largeText =
         'line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10';
+      const togglePasteExpansion = vi.fn();
 
       const baseProps = props;
       const TestWrapper = () => {
@@ -3714,8 +3717,9 @@ describe('InputPrompt', () => {
             row: 0,
             col: 2,
           }),
-          togglePasteExpansion: vi.fn().mockImplementation(() => {
-            setIsExpanded(!isExpanded);
+          togglePasteExpansion: vi.fn().mockImplementation((...args) => {
+            togglePasteExpansion(...args);
+            setIsExpanded((expanded) => !expanded);
           }),
           getExpandedPasteAtLine: vi
             .fn()
@@ -3746,7 +3750,8 @@ describe('InputPrompt', () => {
 
       // 2. Verify expanded content is visible
       await waitFor(() => {
-        expect(stdout.lastFrame()).toMatchSnapshot();
+        expect(togglePasteExpansion).toHaveBeenCalledWith(id, 0, 2);
+        expect(stdout.lastFrame()).toContain('line10');
       });
 
       // Simulate double-click to collapse
@@ -3755,6 +3760,8 @@ describe('InputPrompt', () => {
 
       // 3. Verify placeholder is restored
       await waitFor(() => {
+        expect(togglePasteExpansion).toHaveBeenCalledTimes(2);
+        expect(stdout.lastFrame()).toContain(id);
         expect(stdout.lastFrame()).toMatchSnapshot();
       });
 

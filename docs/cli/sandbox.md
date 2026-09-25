@@ -87,8 +87,9 @@ preferred container solution.
 
 Lightweight, built-in sandboxing using `sandbox-exec`.
 
-**Default profile**: `permissive-open` - restricts writes outside project
-directory but allows most other operations.
+**Default profile**: `permissive-open` - denies operations by default; confines
+writes to the project directory while allowing broad file reads and network
+access.
 
 Built-in profiles (set via `SEATBELT_PROFILE` env var):
 

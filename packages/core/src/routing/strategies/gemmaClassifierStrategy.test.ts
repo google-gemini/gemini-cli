@@ -12,6 +12,9 @@ import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
+  PREVIEW_GEMINI_MODEL_AUTO,
+  LATEST_GEMINI_FLASH_MODEL,
+  resetModelsForTesting,
 } from '../../config/models.js';
 import type { Content } from '@google/genai';
 import { debugLogger } from '../../utils/debugLogger.js';
@@ -29,6 +32,7 @@ describe('GemmaClassifierStrategy', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetModelsForTesting();
     mockGenerateJson = vi.fn();
 
     mockConfig = {
@@ -41,6 +45,8 @@ describe('GemmaClassifierStrategy', () => {
       getGemini31Launched: vi.fn().mockResolvedValue(false),
       getUseCustomToolModel: vi.fn().mockResolvedValue(false),
       getHasAccessToPreviewModel: vi.fn().mockReturnValue(true),
+      hasLatestFlashGAAccess: vi.fn().mockReturnValue(false),
+      hasLatestFlashLiteGAAccess: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     strategy = new GemmaClassifierStrategy();
@@ -322,5 +328,25 @@ second message
 `;
 
     expect(lastTurn!.parts!.at(0)!.text).toEqual(expectedLastTurn);
+  });
+
+  it('should route to LATEST_GEMINI_FLASH_MODEL when hasLatestFlashGAAccess is true', async () => {
+    mockConfig.hasLatestFlashGAAccess = vi.fn().mockReturnValue(true);
+    mockConfig.getModel = () => PREVIEW_GEMINI_MODEL_AUTO;
+
+    const mockApiResponse = {
+      reasoning: 'Simple task',
+      model_choice: 'flash',
+    };
+    mockGenerateJson.mockResolvedValue(mockApiResponse);
+
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
+    );
+
+    expect(decision?.model).toBe(LATEST_GEMINI_FLASH_MODEL);
   });
 });

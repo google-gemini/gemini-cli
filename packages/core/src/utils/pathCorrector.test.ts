@@ -12,6 +12,7 @@ import type { Config } from '../config/config.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { correctPath } from './pathCorrector.js';
+import { resolveToRealPath } from './paths.js';
 
 describe('pathCorrector', () => {
   let tempDir: string;
@@ -20,7 +21,10 @@ describe('pathCorrector', () => {
   let mockConfig: Config;
 
   beforeEach(() => {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'path-corrector-test-'));
+    const rawTempDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'path-corrector-test-'),
+    );
+    tempDir = resolveToRealPath(rawTempDir);
     rootDir = path.join(tempDir, 'root');
     otherWorkspaceDir = path.join(tempDir, 'other');
     fs.mkdirSync(rootDir, { recursive: true });

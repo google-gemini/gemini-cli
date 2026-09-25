@@ -353,6 +353,49 @@ describe('<ModelStatsDisplay />', () => {
     unmount();
   });
 
+  it('should resolve gemini-3-flash to gemini-3.5-flash via getDisplayString', async () => {
+    const { lastFrame, unmount } = await renderWithMockedStats({
+      models: {
+        'gemini-3-flash': {
+          api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
+          tokens: {
+            input: 5,
+            prompt: 10,
+            candidates: 20,
+            total: 30,
+            cached: 5,
+            thoughts: 2,
+            tool: 1,
+          },
+          roles: {},
+        },
+      },
+      tools: {
+        totalCalls: 0,
+        totalSuccess: 0,
+        totalFail: 0,
+        totalDurationMs: 0,
+        totalDecisions: {
+          accept: 0,
+          reject: 0,
+          modify: 0,
+          [ToolCallDecision.AUTO_ACCEPT]: 0,
+        },
+        byName: {},
+      },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
+      },
+    });
+
+    const output = lastFrame();
+    expect(output).toContain('gemini-3.5-flash');
+    expect(output).not.toContain('gemini-3-flash');
+    expect(output).toMatchSnapshot();
+    unmount();
+  });
+
   it('should handle models with long names (gemini-3-*-preview) without layout breaking', async () => {
     const { lastFrame, unmount } = await renderWithMockedStats(
       {

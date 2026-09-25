@@ -251,8 +251,11 @@ export class IdeClient {
             const textPart = parsedResultData.content.find(
               (part) => part.type === 'text',
             );
+
             const errorMessage =
-              textPart?.text ?? `Tool 'openDiff' reported an error.`;
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              (textPart as { text?: string })?.text ??
+              `Tool 'openDiff' reported an error.`;
             logger.debug(
               `Request for openDiff ${filePath} failed with isError:`,
               errorMessage,
@@ -332,7 +335,7 @@ export class IdeClient {
       if (resultData.isError) {
         const textPart = resultData.content.find(
           (part) => part.type === 'text',
-        );
+        ) as { type: 'text'; text: string } | undefined;
         const errorMessage =
           textPart?.text ?? `Tool 'closeDiff' reported an error.`;
         logger.debug(
@@ -342,7 +345,9 @@ export class IdeClient {
         return undefined;
       }
 
-      const textPart = resultData.content.find((part) => part.type === 'text');
+      const textPart = resultData.content.find(
+        (part): part is { type: 'text'; text: string } => part.type === 'text',
+      );
 
       if (textPart?.text) {
         try {

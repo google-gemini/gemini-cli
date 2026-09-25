@@ -37,7 +37,10 @@ describe('GlobTool', () => {
 
   beforeEach(async () => {
     // Create a unique root directory for each test run
-    tempRootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'glob-tool-root-'));
+    const rawTempRootDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'glob-tool-root-'),
+    );
+    tempRootDir = await fs.realpath(rawTempRootDir);
     await fs.writeFile(path.join(tempRootDir, '.git'), ''); // Fake git repo
 
     const rootDir = tempRootDir;

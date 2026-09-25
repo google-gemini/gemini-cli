@@ -154,7 +154,35 @@ and will never be auto-unassigned.
   - **Unassign yourself** if you can no longer work on the issue by commenting
     `/unassign`, so other contributors can pick it up right away.
 
-### 6. Release automation
+### 6. Automatically label PRs by size: `PR Size Labeler`
+
+To help maintainers estimate review effort and keep the PR history clean, this
+workflow automatically tags every pull request with a size label representing
+the total volume of line changes.
+
+- **Workflow File**: `.github/workflows/pr-size-labeler.yml`
+- **When it runs**: Immediately after a pull request is created, synchronized
+  (new commits pushed), or reopened. It can also be triggered manually via
+  `workflow_dispatch` with a PR number.
+- **What it does**:
+  - **Calculates total changes**: Summarizes additions and deletions across all
+    changed files in a single consolidated API request.
+  - **Applies standard size labels**:
+    - `size/XS`: < 10 lines changed
+    - `size/S`: 10-49 lines changed
+    - `size/M`: 50-249 lines changed
+    - `size/L`: 250-999 lines changed
+    - `size/XL`: >= 1000 lines changed
+  - **Updates size tag atomically**: Adds the new correct size label and removes
+    any obsolete size labels in one atomic step.
+  - **Updates/Posts PR size info comment**: Instead of spamming a new comment on
+    every commit push, it updates the existing size labeler status comment
+    inline to keep the PR conversation timeline perfectly neat and clean.
+- **What you should do**:
+  - You do not need to take any actions. The workflow runs automatically and
+    updates the label and comment seamlessly as you push new updates.
+
+### 7. Release automation
 
 This workflow handles the process of packaging and publishing new versions of
 Gemini CLI.

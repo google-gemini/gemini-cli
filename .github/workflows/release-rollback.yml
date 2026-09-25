@@ -82,7 +82,8 @@ jobs:
           ORIGIN_TAG: '${{ steps.origin_tag.outputs.ORIGIN_TAG }}'
         shell: 'bash'
         run: |
-          echo "ORIGIN_HASH=$(git rev-parse "${ORIGIN_TAG}")" >> "$GITHUB_OUTPUT"
+          ORIGIN_HASH=$(git rev-parse "${ORIGIN_TAG}")
+          echo "ORIGIN_HASH=${ORIGIN_HASH}" >> "$GITHUB_OUTPUT"
 
       - name: 'Change tag'
         if: "${{ github.event.inputs.rollback_destination != '' }}"

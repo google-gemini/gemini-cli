@@ -938,4 +938,121 @@ describe('retryWithBackoff', () => {
       expect(mockService.markTerminal).not.toHaveBeenCalled();
     });
   });
+
+  describe('Capacity Exhaustion Context-Aware Retries (Option 2)', () => {
+    it('should retry automatically when onPersistent429 is undefined (unattended runs)', async () => {
+      const capacityError = new TerminalQuotaError(
+        'Resource has been exhausted (e.g. MODEL_CAPACITY_EXHAUSTED).',
+        {
+          code: 429,
+          message: 'MODEL_CAPACITY_EXHAUSTED',
+          details: [
+            {
+              '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+              reason: 'MODEL_CAPACITY_EXHAUSTED',
+            },
+          ],
+        },
+        undefined,
+        'MODEL_CAPACITY_EXHAUSTED',
+      );
+
+      const fn = vi
+        .fn()
+        .mockRejectedValueOnce(capacityError)
+        .mockResolvedValue('success');
+
+      const promise = retryWithBackoff(fn, {
+        maxAttempts: 3,
+        initialDelayMs: 1,
+        maxDelayMs: 2,
+        onPersistent429: undefined, // unattended mode
+      });
+
+      await vi.runAllTimersAsync();
+      const result = await promise;
+      expect(result).toBe('success');
+      expect(fn).toHaveBeenCalledTimes(2);
+    });
+
+    it('should silently retry up to 2 times and succeed on the 3rd attempt in interactive mode without calling onPersistent429', async () => {
+      const capacityError = new TerminalQuotaError(
+        'Resource has been exhausted (e.g. MODEL_CAPACITY_EXHAUSTED).',
+        {
+          code: 429,
+          message: 'MODEL_CAPACITY_EXHAUSTED',
+          details: [
+            {
+              '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+              reason: 'MODEL_CAPACITY_EXHAUSTED',
+            },
+          ],
+        },
+        undefined,
+        'MODEL_CAPACITY_EXHAUSTED',
+      );
+
+      const fn = vi
+        .fn()
+        .mockRejectedValueOnce(capacityError)
+        .mockRejectedValueOnce(capacityError)
+        .mockResolvedValue('success');
+
+      const onPersistent429 = vi.fn().mockResolvedValue(null);
+
+      const promise = retryWithBackoff(fn, {
+        maxAttempts: 5,
+        initialDelayMs: 1,
+        maxDelayMs: 2,
+        onPersistent429, // interactive mode
+      });
+
+      await vi.runAllTimersAsync();
+      const result = await promise;
+      expect(result).toBe('success');
+      expect(fn).toHaveBeenCalledTimes(3);
+      expect(onPersistent429).not.toHaveBeenCalled();
+    });
+
+    it('should silently retry up to 2 times and invoke onPersistent429 on the 3rd failure in interactive mode', async () => {
+      const capacityError = new TerminalQuotaError(
+        'Resource has been exhausted (e.g. MODEL_CAPACITY_EXHAUSTED).',
+        {
+          code: 429,
+          message: 'MODEL_CAPACITY_EXHAUSTED',
+          details: [
+            {
+              '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+              reason: 'MODEL_CAPACITY_EXHAUSTED',
+            },
+          ],
+        },
+        undefined,
+        'MODEL_CAPACITY_EXHAUSTED',
+      );
+
+      const fn = vi
+        .fn()
+        .mockRejectedValueOnce(capacityError)
+        .mockRejectedValueOnce(capacityError)
+        .mockRejectedValueOnce(capacityError)
+        .mockResolvedValue('success');
+
+      const onPersistent429 = vi.fn().mockResolvedValue(null);
+
+      const promise = retryWithBackoff(fn, {
+        maxAttempts: 5,
+        initialDelayMs: 1,
+        maxDelayMs: 2,
+        onPersistent429, // interactive mode
+      });
+
+      await Promise.all([
+        expect(promise).rejects.toThrow(TerminalQuotaError),
+        vi.runAllTimersAsync(),
+      ]);
+      expect(fn).toHaveBeenCalledTimes(3);
+      expect(onPersistent429).toHaveBeenCalledTimes(1);
+    });
+  });
 });

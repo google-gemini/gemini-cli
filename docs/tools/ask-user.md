@@ -11,6 +11,7 @@ confirmation.
 - **Display name:** Ask User
 - **File:** `ask-user.ts`
 - **Parameters:**
+
   - `questions` (array of objects, required): A list of 1 to 4 questions to ask.
     Each question object has the following properties:
     - `question` (string, required): The complete question text.
@@ -30,6 +31,7 @@ confirmation.
     - `placeholder` (string, optional): Hint text for input fields.
 
 - **Behavior:**
+
   - Presents an interactive dialog to the user with the specified questions.
   - Pauses execution until the user provides answers or dismisses the dialog.
   - Returns the user's answers to the model.

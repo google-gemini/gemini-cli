@@ -516,10 +516,34 @@ describe('translateEvent', () => {
   });
 
   describe('InvalidStream events', () => {
-    it('emits fatal error', () => {
+    it('emits fatal error with specific message from event', () => {
       state.streamStartEmitted = true;
       const event: ServerGeminiStreamEvent = {
         type: GeminiEventType.InvalidStream,
+        value: {
+          type: 'NO_RESPONSE_TEXT',
+          message: 'Empty response',
+        },
+      };
+      const result = translateEvent(event, state);
+      expect(result).toHaveLength(1);
+      const err = result[0] as AgentEvent<'error'>;
+      expect(err.status).toBe('INTERNAL');
+      expect(err.message).toBe('Empty response');
+      expect(err.fatal).toBe(true);
+      expect(err._meta?.['code']).toBe('INVALID_STREAM');
+      expect(err._meta?.['errorType']).toBe('NO_RESPONSE_TEXT');
+      expect(err._meta?.['rawMessage']).toBe('Empty response');
+    });
+
+    it('falls back to default message when message is missing', () => {
+      state.streamStartEmitted = true;
+      const event: ServerGeminiStreamEvent = {
+        type: GeminiEventType.InvalidStream,
+        value: {
+          type: 'NO_RESPONSE_TEXT',
+          message: '',
+        },
       };
       const result = translateEvent(event, state);
       expect(result).toHaveLength(1);

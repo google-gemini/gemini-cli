@@ -69,7 +69,7 @@ interface CustomMatchers<R = unknown> {
 
 declare module 'vitest' {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-empty-object-type
-  interface Matchers<T = any> extends CustomMatchers<T> {}
+  interface Assertion<T = any> extends CustomMatchers<T> {}
 }
 
 expect.extend({
@@ -929,15 +929,13 @@ describe('ClearcutLogger', () => {
       const { logger } = setup();
 
       server.resetHandlers(
-        http.post(
-          CLEARCUT_URL,
-          () =>
-            new HttpResponse(
-              { 'the system is down': true },
-              {
-                status: 500,
-              },
-            ),
+        http.post(CLEARCUT_URL, () =>
+          HttpResponse.json(
+            { 'the system is down': true },
+            {
+              status: 500,
+            },
+          ),
         ),
       );
 

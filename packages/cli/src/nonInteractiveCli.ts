@@ -30,6 +30,12 @@ import {
   ToolErrorType,
   Scheduler,
   ROOT_SCHEDULER_ID,
+  THINKING_ONLY_COMPRESS_SUGGESTION,
+  MAX_TOKENS_EXCEEDED_SUGGESTION,
+  SAFETY_BLOCKED_MESSAGE,
+  RECITATION_BLOCKED_MESSAGE,
+  OTHER_BLOCKED_MESSAGE,
+  TRUE_EMPTY_RESPONSE_MESSAGE,
 } from '@google/gemini-cli-core';
 
 import type { Content, Part } from '@google/genai';
@@ -433,8 +439,31 @@ export async function runNonInteractive(
             }
             warnings.push(blockMessage);
           } else if (event.type === GeminiEventType.InvalidStream) {
-            invalidStreamError =
-              'Invalid stream: The model returned an empty response or malformed tool call.';
+            const eventValue = event.value;
+            if (eventValue?.type === 'NO_RESPONSE_TEXT') {
+              invalidStreamError = TRUE_EMPTY_RESPONSE_MESSAGE;
+            } else if (eventValue?.type === 'THINKING_ONLY_RESPONSE') {
+              invalidStreamError = THINKING_ONLY_COMPRESS_SUGGESTION;
+            } else if (eventValue?.type === 'MAX_TOKENS_EXCEEDED') {
+              invalidStreamError = MAX_TOKENS_EXCEEDED_SUGGESTION;
+            } else if (eventValue?.type === 'SAFETY_BLOCKED') {
+              invalidStreamError = SAFETY_BLOCKED_MESSAGE;
+            } else if (eventValue?.type === 'RECITATION_BLOCKED') {
+              invalidStreamError = RECITATION_BLOCKED_MESSAGE;
+            } else if (eventValue?.type === 'OTHER_BLOCKED') {
+              invalidStreamError = OTHER_BLOCKED_MESSAGE;
+            } else {
+              invalidStreamError =
+                eventValue?.message?.trim() ||
+                'Invalid stream: The model returned an empty response or malformed tool call.';
+            }
+
+            // Log semantic error telemetry without double-counting requests
+            uiTelemetryService.recordSemanticValidationError(
+              geminiClient.getCurrentSequenceModel() ?? config.getModel(),
+              eventValue?.type || 'INVALID_STREAM',
+            );
+
             if (streamFormatter) {
               streamFormatter.emitEvent({
                 type: JsonStreamEventType.ERROR,

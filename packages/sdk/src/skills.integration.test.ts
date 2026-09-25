@@ -50,7 +50,7 @@ describe('GeminiCliAgent Skills Integration', () => {
 
     const textEvents = events.filter((e) => e.type === 'content');
     const responseText = textEvents
-      .map((e) => (typeof e.value === 'string' ? e.value : ''))
+      .map((e) => ('value' in e && typeof e.value === 'string' ? e.value : ''))
       .join('');
 
     // Expect pirate speak
@@ -83,7 +83,7 @@ describe('GeminiCliAgent Skills Integration', () => {
 
     const textEvents = events.filter((e) => e.type === 'content');
     const responseText = textEvents
-      .map((e) => (typeof e.value === 'string' ? e.value : ''))
+      .map((e) => ('value' in e && typeof e.value === 'string' ? e.value : ''))
       .join('');
 
     // Expect confirmation or pirate speak

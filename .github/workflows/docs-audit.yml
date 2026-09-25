@@ -32,6 +32,7 @@ jobs:
         env:
           GEMINI_CLI_TRUST_WORKSPACE: true
         with:
+          upload_artifacts: 'true'
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
           prompt: |
             Activate the 'docs-writer' skill.

@@ -159,12 +159,37 @@ function detectRollbackAndGetBaseline({ args, npmDistTag } = {}) {
   // Sort by semver to get a list from highest to lowest
   matchingVersions.sort((a, b) => semver.rcompare(a, b));
 
-  // Find the highest non-deprecated version
+  // Find the highest non-deprecated version with a git tag
   let highestExistingVersion = '';
   for (const version of matchingVersions) {
     if (!isVersionDeprecated({ version, args })) {
-      highestExistingVersion = version;
-      break; // Found the one we want
+      try {
+        // Only consider versions that have a corresponding git tag.
+        // This prevents picking up versions that were published to NPM but failed before the github release/tag.
+        let tagExists = false;
+        try {
+          execSync(`git rev-parse v${version}^{commit} 2>/dev/null`);
+          tagExists = true;
+        } catch {
+          const remoteTag = execSync(
+            `git ls-remote --tags origin refs/tags/v${version} 2>/dev/null`,
+          )
+            .toString()
+            .trim();
+          if (remoteTag) {
+            tagExists = true;
+          }
+        }
+        if (!tagExists) {
+          throw new Error(`Tag v${version} not found`);
+        }
+        highestExistingVersion = version;
+        break; // Found the one we want
+      } catch {
+        console.error(
+          `Ignoring version ${version} because it lacks a git tag (likely a failed release).`,
+        );
+      }
     } else {
       console.error(`Ignoring deprecated version: ${version}`);
     }

@@ -46,6 +46,16 @@ export class AgentChatHistory {
     this.history = [];
   }
 
+  /**
+   * Rolls back the history to a specified length.
+   * Useful when a stream fails and we need to remove the un-responded turn(s).
+   */
+  rollback(length: number) {
+    if (length >= 0 && length <= this.history.length) {
+      this.history = this.history.slice(0, length);
+    }
+  }
+
   get(): readonly HistoryTurn[] {
     return this.history;
   }

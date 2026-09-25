@@ -39,6 +39,12 @@ import {
   geminiPartsToContentParts,
   displayContentToString,
   debugLogger,
+  THINKING_ONLY_COMPRESS_SUGGESTION,
+  MAX_TOKENS_EXCEEDED_SUGGESTION,
+  SAFETY_BLOCKED_MESSAGE,
+  RECITATION_BLOCKED_MESSAGE,
+  OTHER_BLOCKED_MESSAGE,
+  TRUE_EMPTY_RESPONSE_MESSAGE,
 } from '@google/gemini-cli-core';
 
 import type { Part } from '@google/genai';
@@ -332,14 +338,17 @@ export async function runNonInteractive({
         return text ? text : undefined;
       };
 
-      const emitFinalSuccessResult = (): void => {
+      const emitFinalResult = (errorPayload?: {
+        type: string;
+        message: string;
+      }): void => {
         if (streamFormatter) {
           const metrics = uiTelemetryService.getMetrics();
           const durationMs = Date.now() - startTime;
           streamFormatter.emitEvent({
             type: JsonStreamEventType.RESULT,
             timestamp: new Date().toISOString(),
-            status: 'success',
+            status: errorPayload ? 'error' : 'success',
             stats: streamFormatter.convertToStreamStats(metrics, durationMs),
           });
         } else if (config.getOutputFormat() === OutputFormat.JSON) {
@@ -350,7 +359,7 @@ export async function runNonInteractive({
               config.getSessionId(),
               responseText,
               stats,
-              undefined,
+              errorPayload,
               warnings,
             ),
           );
@@ -545,6 +554,52 @@ export async function runNonInteractive({
             break;
           }
           case 'error': {
+            if (event._meta?.['code'] === 'INVALID_STREAM') {
+              const errorTypeVal = event._meta?.['errorType'];
+              const errorType =
+                typeof errorTypeVal === 'string' ? errorTypeVal : undefined;
+
+              let errorMessage = event.message;
+              if (errorType === 'NO_RESPONSE_TEXT') {
+                errorMessage = TRUE_EMPTY_RESPONSE_MESSAGE;
+              } else if (errorType === 'THINKING_ONLY_RESPONSE') {
+                errorMessage = THINKING_ONLY_COMPRESS_SUGGESTION;
+              } else if (errorType === 'MAX_TOKENS_EXCEEDED') {
+                errorMessage = MAX_TOKENS_EXCEEDED_SUGGESTION;
+              } else if (errorType === 'SAFETY_BLOCKED') {
+                errorMessage = SAFETY_BLOCKED_MESSAGE;
+              } else if (errorType === 'RECITATION_BLOCKED') {
+                errorMessage = RECITATION_BLOCKED_MESSAGE;
+              } else if (errorType === 'OTHER_BLOCKED') {
+                errorMessage = OTHER_BLOCKED_MESSAGE;
+              }
+
+              if (streamFormatter) {
+                streamFormatter.emitEvent({
+                  type: JsonStreamEventType.ERROR,
+                  timestamp: new Date().toISOString(),
+                  severity: 'error',
+                  message: errorMessage,
+                });
+              } else if (config.getOutputFormat() === OutputFormat.TEXT) {
+                process.stderr.write(`[ERROR] ${errorMessage}\n`);
+              }
+
+              // Log semantic error telemetry without double-counting requests
+              uiTelemetryService.recordSemanticValidationError(
+                geminiClient.getCurrentSequenceModel() ?? config.getModel(),
+                errorType || 'INVALID_STREAM',
+              );
+
+              // If it's a fatal stream error, we should terminate and output final results
+              emitFinalResult({
+                type: 'INVALID_STREAM',
+                message: errorMessage,
+              });
+              streamEnded = true;
+              break;
+            }
+
             if (event.fatal) {
               throw reconstructFatalError(event);
             }
@@ -613,7 +668,7 @@ export async function runNonInteractive({
               process.stderr.write(`Agent execution stopped: ${stopMessage}\n`);
             }
 
-            emitFinalSuccessResult();
+            emitFinalResult();
             streamEnded = true;
             break;
           }

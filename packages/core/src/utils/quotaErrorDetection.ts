@@ -41,7 +41,11 @@ export function isStructuredError(error: unknown): error is StructuredError {
   if (typeof error.message !== 'string') {
     return false;
   }
-  if ('status' in error && typeof error.status !== 'number') {
+  if (
+    'status' in error &&
+    error.status !== undefined &&
+    typeof error.status !== 'number'
+  ) {
     return false;
   }
   return true;

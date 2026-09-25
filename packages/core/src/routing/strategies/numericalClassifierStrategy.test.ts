@@ -20,6 +20,7 @@ import {
   PREVIEW_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_MODEL,
+  LATEST_GEMINI_FLASH_MODEL,
 } from '../../config/models.js';
 import { promptIdContext } from '../../utils/promptIdContext.js';
 import type { Content } from '@google/genai';
@@ -893,6 +894,28 @@ describe('NumericalClassifierStrategy', () => {
       );
 
       expect(decision?.model).toBe(PREVIEW_GEMINI_3_1_MODEL);
+    });
+
+    it('should route to LATEST_GEMINI_FLASH_MODEL when hasLatestFlashGAAccess is true', async () => {
+      mockConfig.hasLatestFlashGAAccess = vi.fn().mockReturnValue(true);
+      vi.mocked(mockConfig.getModel).mockReturnValue(PREVIEW_GEMINI_MODEL_AUTO);
+
+      const mockApiResponse = {
+        complexity_reasoning: 'Simple task',
+        complexity_score: 10,
+      };
+      vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
+        mockApiResponse,
+      );
+
+      const decision = await strategy.route(
+        mockContext,
+        mockConfig,
+        mockBaseLlmClient,
+        mockLocalLiteRtLmClient,
+      );
+
+      expect(decision?.model).toBe(LATEST_GEMINI_FLASH_MODEL);
     });
   });
 });

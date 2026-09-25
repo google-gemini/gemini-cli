@@ -7,7 +7,7 @@
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
-import { quote, type ParseEntry } from 'shell-quote';
+import { quote, parse, type ParseEntry } from 'shell-quote';
 import {
   spawn,
   spawnSync,
@@ -846,10 +846,26 @@ export function stripShellWrapper(command: string): string {
   if (match) {
     let newCommand = command.substring(match[0].length).trim();
     if (
-      (newCommand.startsWith('"') && newCommand.endsWith('"')) ||
-      (newCommand.startsWith("'") && newCommand.endsWith("'"))
+      newCommand.length >= 2 &&
+      ((newCommand.startsWith('"') && newCommand.endsWith('"')) ||
+        (newCommand.startsWith("'") && newCommand.endsWith("'")))
     ) {
-      newCommand = newCommand.substring(1, newCommand.length - 1);
+      const isPosixShell = match[0].trim().endsWith('-c');
+      if (isPosixShell && newCommand.startsWith('"')) {
+        try {
+          const parsed = parse(newCommand, (key) => '$' + key);
+          const firstEntry = parsed[0];
+          if (parsed.length === 1 && typeof firstEntry === 'string') {
+            newCommand = firstEntry;
+          } else {
+            newCommand = newCommand.substring(1, newCommand.length - 1);
+          }
+        } catch {
+          newCommand = newCommand.substring(1, newCommand.length - 1);
+        }
+      } else {
+        newCommand = newCommand.substring(1, newCommand.length - 1);
+      }
     }
     return newCommand;
   }

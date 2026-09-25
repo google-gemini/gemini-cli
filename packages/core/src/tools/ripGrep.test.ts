@@ -46,7 +46,7 @@ vi.mock('../utils/paths.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../utils/paths.js')>();
   return {
     ...actual,
-    resolveToRealPath: vi.fn((p) => p),
+    resolveToRealPath: vi.fn((p) => actual.resolveToRealPath(p)),
     normalizePath: vi.fn((p) =>
       typeof p === 'string' ? p.replace(/\\/g, '/') : p,
     ),
@@ -1351,7 +1351,9 @@ describe('RipGrepTool', () => {
     });
 
     it('should add .geminiignore when enabled and patterns exist', async () => {
-      const geminiIgnorePath = path.join(tempRootDir, GEMINI_IGNORE_FILE_NAME);
+      const geminiIgnorePath = resolveToRealPath(
+        path.join(tempRootDir, GEMINI_IGNORE_FILE_NAME),
+      );
       await fs.writeFile(geminiIgnorePath, 'ignored.log');
 
       const configWithGeminiIgnore = createMockConfig(tempRootDir);
@@ -1395,7 +1397,9 @@ describe('RipGrepTool', () => {
     });
 
     it('should skip .geminiignore when disabled', async () => {
-      const geminiIgnorePath = path.join(tempRootDir, GEMINI_IGNORE_FILE_NAME);
+      const geminiIgnorePath = resolveToRealPath(
+        path.join(tempRootDir, GEMINI_IGNORE_FILE_NAME),
+      );
       await fs.writeFile(geminiIgnorePath, 'ignored.log');
       const configWithoutGeminiIgnore = createMockConfig(tempRootDir);
       vi.spyOn(

@@ -67,6 +67,8 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
 
   const shouldShowPreviewModels = config?.getHasAccessToPreviewModel() ?? false;
   const useGemini31 = config?.getGemini31LaunchedSync?.() ?? false;
+  const useLatestFlash = config?.hasLatestFlashGAAccess?.() ?? false;
+  const useLatestFlashLite = config?.hasLatestFlashLiteGAAccess?.() ?? false;
   const selectedAuthType = settings.merged.security.auth.selectedType;
   const useCustomToolModel =
     useGemini31 && selectedAuthType === AuthType.USE_GEMINI;
@@ -129,6 +131,8 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         .getModelConfigService()
         .getAvailableModelOptions({
           useGemini3_1: useGemini31,
+          useLatestFlash,
+          useLatestFlashLite,
           useCustomTools: useCustomToolModel,
           hasAccessToPreview: shouldShowPreviewModels,
           hasAccessToProModel,
@@ -162,6 +166,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         description: getAutoModelDescription(
           shouldShowPreviewModels,
           useGemini31,
+          useLatestFlash,
         ),
         key: GEMINI_MODEL_ALIAS_AUTO,
       },
@@ -181,6 +186,8 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     shouldShowPreviewModels,
     manualModelSelected,
     useGemini31,
+    useLatestFlash,
+    useLatestFlashLite,
     useCustomToolModel,
     hasAccessToProModel,
   ]);
@@ -195,6 +202,8 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         .getModelConfigService()
         .getAvailableModelOptions({
           useGemini3_1: useGemini31,
+          useLatestFlash,
+          useLatestFlashLite,
           useCustomTools: useCustomToolModel,
           hasAccessToPreview: shouldShowPreviewModels,
           hasAccessToProModel,
@@ -287,6 +296,8 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   }, [
     shouldShowPreviewModels,
     useGemini31,
+    useLatestFlash,
+    useLatestFlashLite,
     useCustomToolModel,
     hasAccessToProModel,
     config,

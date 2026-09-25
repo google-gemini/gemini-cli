@@ -56,6 +56,13 @@ vi.mock('node:readline', () => ({
 
 import * as http from 'node:http';
 import * as crypto from 'node:crypto';
+import * as dnsPromises from 'node:dns/promises';
+import type { LookupAddress, LookupAllOptions } from 'node:dns';
+import ipaddr from 'ipaddr.js';
+
+vi.mock('node:dns/promises', () => ({
+  lookup: vi.fn(),
+}));
 import {
   MCPOAuthProvider,
   type MCPOAuthConfig,
@@ -173,6 +180,18 @@ describe('MCPOAuthProvider', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
+    vi.mocked(
+      dnsPromises.lookup as (
+        hostname: string,
+        options: LookupAllOptions,
+      ) => Promise<LookupAddress[]>,
+    ).mockImplementation(async (hostname: string) => {
+      if (ipaddr.isValid(hostname)) {
+        return [{ address: hostname, family: hostname.includes(':') ? 6 : 4 }];
+      }
+      return [{ address: '93.184.216.34', family: 4 }];
+    });
+
     // Mock crypto functions
     vi.mocked(crypto.randomBytes).mockImplementation((size: number) => {
       if (size === 32) return Buffer.from('code_verifier_mock_32_bytes_long');
@@ -203,6 +222,7 @@ describe('MCPOAuthProvider', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   describe('authenticate', () => {
@@ -219,7 +239,7 @@ describe('MCPOAuthProvider', () => {
         // Simulate OAuth callback
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -401,7 +421,7 @@ describe('MCPOAuthProvider', () => {
         callback?.();
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -436,6 +456,100 @@ describe('MCPOAuthProvider', () => {
         expect.objectContaining({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+    });
+
+    it('should perform dynamic client registration with Cloud Workstations proxy redirect URI when running in Google Cloud Workstations', async () => {
+      vi.stubEnv('GOOGLE_CLOUD_WORKSTATIONS', 'true');
+      vi.stubEnv(
+        'WEB_HOST',
+        'my-workstation.cluster.workstations.cloud.google.com',
+      );
+
+      const configWithoutClient: MCPOAuthConfig = {
+        ...mockConfig,
+        registrationUrl: 'https://auth.example.com/register',
+      };
+      delete configWithoutClient.clientId;
+      delete configWithoutClient.redirectUri;
+
+      const mockRegistrationResponse: OAuthClientRegistrationResponse = {
+        client_id: 'dynamic_client_id',
+        client_secret: 'dynamic_client_secret',
+        redirect_uris: [
+          'https://7777-my-workstation.cluster.workstations.cloud.google.com/oauth/callback',
+        ],
+        grant_types: ['authorization_code', 'refresh_token'],
+        response_types: ['code'],
+        token_endpoint_auth_method: 'none',
+      };
+
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockRegistrationResponse),
+          json: mockRegistrationResponse,
+        }),
+      );
+
+      // Setup callback handler
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
+          };
+          const mockRes = {
+            writeHead: vi.fn(),
+            end: vi.fn(),
+          };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+
+      // Mock token exchange
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockTokenResponse),
+          json: mockTokenResponse,
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      const result = await authProvider.authenticate(
+        'test-server',
+        configWithoutClient,
+      );
+
+      expect(result).toBeDefined();
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://auth.example.com/register',
+        expect.objectContaining({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            client_name: 'Gemini CLI MCP Client',
+            redirect_uris: [
+              'https://7777-my-workstation.cluster.workstations.cloud.google.com/oauth/callback',
+            ],
+            grant_types: ['authorization_code', 'refresh_token'],
+            response_types: ['code'],
+            token_endpoint_auth_method: 'none',
+            scope: 'read write',
+          }),
         }),
       );
     });
@@ -489,7 +603,7 @@ describe('MCPOAuthProvider', () => {
         callback?.();
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -599,7 +713,7 @@ describe('MCPOAuthProvider', () => {
         callback?.();
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -731,7 +845,7 @@ describe('MCPOAuthProvider', () => {
         callback?.();
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -851,7 +965,7 @@ describe('MCPOAuthProvider', () => {
         callback?.();
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -890,7 +1004,7 @@ describe('MCPOAuthProvider', () => {
         callback?.();
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -967,7 +1081,7 @@ describe('MCPOAuthProvider', () => {
         callback?.();
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -1070,7 +1184,7 @@ describe('MCPOAuthProvider', () => {
         callback?.();
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -1122,7 +1236,7 @@ describe('MCPOAuthProvider', () => {
         callback?.();
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -1170,7 +1284,7 @@ describe('MCPOAuthProvider', () => {
         callback?.();
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -1214,7 +1328,7 @@ describe('MCPOAuthProvider', () => {
         // Simulate OAuth callback
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -1256,7 +1370,7 @@ describe('MCPOAuthProvider', () => {
       vi.mocked(http.createServer).mockImplementation((handler) => {
         setTimeout(() => {
           const req = {
-            url: '/oauth/callback?code=code&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=code&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           } as http.IncomingMessage;
           const res = {
             writeHead: vi.fn(),
@@ -1458,6 +1572,50 @@ describe('MCPOAuthProvider', () => {
       );
     });
 
+    it('should refresh with the stored client ID when config has none', async () => {
+      const expiredCredentials = {
+        serverName: 'test-server',
+        token: { ...mockToken, expiresAt: Date.now() - 3600000 },
+        clientId: 'registered-client-id',
+        tokenUrl: 'https://auth.example.com/token',
+        updatedAt: Date.now(),
+      };
+
+      const tokenStorage = new MCPOAuthTokenStorage();
+      vi.mocked(tokenStorage.getCredentials).mockResolvedValue(
+        expiredCredentials,
+      );
+      vi.mocked(tokenStorage.isTokenExpired).mockReturnValue(true);
+
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockTokenResponse),
+          json: mockTokenResponse,
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      const result = await authProvider.getValidToken('test-server', {
+        ...mockConfig,
+        clientId: undefined,
+      });
+
+      expect(result).toBe('access_token_123');
+      expect(mockFetch.mock.calls[0][1].body).toContain(
+        'client_id=registered-client-id',
+      );
+      expect(tokenStorage.saveToken).toHaveBeenCalledWith(
+        'test-server',
+        expect.objectContaining({ accessToken: 'access_token_123' }),
+        'registered-client-id',
+        'https://auth.example.com/token',
+        undefined,
+      );
+      expect(tokenStorage.deleteCredentials).not.toHaveBeenCalled();
+    });
+
     it('should return null when no credentials exist', async () => {
       const tokenStorage = new MCPOAuthTokenStorage();
       vi.mocked(tokenStorage.getCredentials).mockResolvedValue(null);
@@ -1542,6 +1700,90 @@ describe('MCPOAuthProvider', () => {
     });
   });
 
+  describe('getValidTokenWithMetadata', () => {
+    it('should refresh with the stored client ID when config is empty', async () => {
+      // An empty config is what DynamicStoredOAuthProvider passes for servers
+      // configured via OAuth discovery and dynamic client registration.
+      const expiredCredentials = {
+        serverName: 'test-server',
+        token: { ...mockToken, expiresAt: Date.now() - 3600000 },
+        clientId: 'registered-client-id',
+        tokenUrl: 'https://auth.example.com/token',
+        updatedAt: Date.now(),
+      };
+
+      const tokenStorage = new MCPOAuthTokenStorage();
+      vi.mocked(tokenStorage.getCredentials).mockResolvedValue(
+        expiredCredentials,
+      );
+      vi.mocked(tokenStorage.isTokenExpired).mockReturnValue(true);
+
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockTokenResponse),
+          json: mockTokenResponse,
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      const result = await authProvider.getValidTokenWithMetadata(
+        'test-server',
+        {},
+      );
+
+      expect(result?.accessToken).toBe('access_token_123');
+      expect(mockFetch.mock.calls[0][1].body).toContain(
+        'client_id=registered-client-id',
+      );
+      expect(tokenStorage.saveToken).toHaveBeenCalledWith(
+        'test-server',
+        expect.objectContaining({ accessToken: 'access_token_123' }),
+        'registered-client-id',
+        'https://auth.example.com/token',
+        undefined,
+      );
+      expect(tokenStorage.deleteCredentials).not.toHaveBeenCalled();
+    });
+
+    it('should prefer the config client ID over the stored one', async () => {
+      const expiredCredentials = {
+        serverName: 'test-server',
+        token: { ...mockToken, expiresAt: Date.now() - 3600000 },
+        clientId: 'registered-client-id',
+        tokenUrl: 'https://auth.example.com/token',
+        updatedAt: Date.now(),
+      };
+
+      const tokenStorage = new MCPOAuthTokenStorage();
+      vi.mocked(tokenStorage.getCredentials).mockResolvedValue(
+        expiredCredentials,
+      );
+      vi.mocked(tokenStorage.isTokenExpired).mockReturnValue(true);
+
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockTokenResponse),
+          json: mockTokenResponse,
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      const result = await authProvider.getValidTokenWithMetadata(
+        'test-server',
+        { clientId: 'configured-client-id' },
+      );
+
+      expect(result?.accessToken).toBe('access_token_123');
+      expect(mockFetch.mock.calls[0][1].body).toContain(
+        'client_id=configured-client-id',
+      );
+    });
+  });
+
   describe('PKCE parameter generation', () => {
     it('should generate valid PKCE parameters', async () => {
       // Test is implicit in the authenticate flow tests, but we can verify
@@ -1556,7 +1798,7 @@ describe('MCPOAuthProvider', () => {
         callback?.();
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -1606,7 +1848,7 @@ describe('MCPOAuthProvider', () => {
         callback?.();
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -1663,7 +1905,7 @@ describe('MCPOAuthProvider', () => {
         callback?.();
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -1717,7 +1959,7 @@ describe('MCPOAuthProvider', () => {
         callback?.();
         setTimeout(() => {
           const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
           };
           const mockRes = {
             writeHead: vi.fn(),
@@ -1974,8 +2216,8 @@ describe('MCPOAuthProvider', () => {
       expect(
         vi.mocked(OAuthUtils.discoverAuthorizationServerMetadata).mock.calls,
       ).toEqual([
-        ['http://localhost:8888'],
-        ['http://localhost:8888/realms/my-realm'],
+        ['http://localhost:8888', { allowLoopback: true }],
+        ['http://localhost:8888/realms/my-realm', { allowLoopback: true }],
       ]);
       expect(result.issuerUrl).toBe('http://localhost:8888/realms/my-realm');
       expect(result.metadata).toBe(registrationMetadata);
@@ -2025,6 +2267,56 @@ describe('MCPOAuthProvider', () => {
       ]);
       expect(result.issuerUrl).toBe('https://auth.okta.local/oauth2/default');
       expect(result.metadata).toBe(oktaMetadata);
+    });
+  });
+
+  describe('remote MCP server loopback restriction enforcement', () => {
+    it('rejects dynamic client registration to loopback when mcpServerUrl is remote', async () => {
+      const authProvider = new MCPOAuthProvider();
+      const providerWithAccess = authProvider as unknown as {
+        registerClient: (
+          registrationUrl: string,
+          config: MCPOAuthConfig,
+          redirectPort: number,
+          mcpServerUrl?: string,
+        ) => Promise<unknown>;
+      };
+
+      await expect(
+        providerWithAccess.registerClient(
+          'http://127.0.0.1:18080/register',
+          mockConfig,
+          7777,
+          'https://remote-mcp.example.com',
+        ),
+      ).rejects.toThrow();
+    });
+
+    it('passes allowLoopback=false during metadata discovery when mcpServerUrl is remote', async () => {
+      const authProvider = new MCPOAuthProvider();
+      const providerWithAccess = authProvider as unknown as {
+        discoverAuthServerMetadataForRegistration: (
+          issuer: string,
+          mcpServerUrl?: string,
+        ) => Promise<unknown>;
+      };
+
+      const spy = vi
+        .spyOn(OAuthUtils, 'discoverAuthorizationServerMetadata')
+        .mockResolvedValueOnce({
+          issuer: 'https://remote-auth.example.com',
+          authorization_endpoint: 'https://remote-auth.example.com/authorize',
+          token_endpoint: 'https://remote-auth.example.com/token',
+        });
+
+      await providerWithAccess.discoverAuthServerMetadataForRegistration(
+        'https://remote-auth.example.com',
+        'https://remote-mcp.example.com',
+      );
+
+      expect(spy).toHaveBeenCalledWith('https://remote-auth.example.com', {
+        allowLoopback: false,
+      });
     });
   });
 });

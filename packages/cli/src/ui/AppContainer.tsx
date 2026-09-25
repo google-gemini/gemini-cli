@@ -663,10 +663,12 @@ export const AppContainer = (props: AppContainerProps) => {
       enableMouseEvents();
       disableLineWrapping();
       app.rerender();
+    } else if (config.getUseTerminalBuffer()) {
+      app.rerender();
     }
     terminalCapabilityManager.enableSupportedModes();
     refreshStatic();
-  }, [refreshStatic, shouldUseAlternateScreen, app]);
+  }, [refreshStatic, shouldUseAlternateScreen, app, config]);
 
   const [editorError, setEditorError] = useState<string | null>(null);
   const {
@@ -2258,17 +2260,22 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const maxLength = terminalWidth - estimatedStatusLength - 5;
 
-  const { elapsedTime, currentLoadingPhrase, currentTip, currentWittyPhrase } =
-    useLoadingIndicator({
-      streamingState,
-      shouldShowFocusHint,
-      retryStatus,
-      showTips: showStatusTips,
-      showWit: showStatusWit,
-      customWittyPhrases: settings.merged.ui.customWittyPhrases,
-      errorVerbosity: settings.merged.ui.errorVerbosity,
-      maxLength,
-    });
+  const {
+    elapsedTime,
+    currentLoadingPhrase,
+    statusPhrase,
+    currentTip,
+    currentWittyPhrase,
+  } = useLoadingIndicator({
+    streamingState,
+    shouldShowFocusHint,
+    retryStatus,
+    showTips: showStatusTips,
+    showWit: showStatusWit,
+    customWittyPhrases: settings.merged.ui.customWittyPhrases,
+    errorVerbosity: settings.merged.ui.errorVerbosity,
+    maxLength,
+  });
 
   const allowPlanMode =
     config.isPlanEnabled() &&
@@ -2491,6 +2498,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isFocused,
       elapsedTime,
       currentLoadingPhrase,
+      statusPhrase,
       currentTip,
       currentWittyPhrase,
       historyRemountKey,
@@ -2604,6 +2612,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isFocused,
       elapsedTime,
       currentLoadingPhrase,
+      statusPhrase,
       currentTip,
       currentWittyPhrase,
       historyRemountKey,

@@ -510,7 +510,12 @@ export class Session {
             (error.type === 'NO_RESPONSE_TEXT' ||
               error.type === 'NO_FINISH_REASON' ||
               error.type === 'MALFORMED_FUNCTION_CALL' ||
-              error.type === 'UNEXPECTED_TOOL_CALL'))
+              error.type === 'UNEXPECTED_TOOL_CALL' ||
+              error.type === 'MAX_TOKENS_EXCEEDED' ||
+              error.type === 'SAFETY_BLOCKED' ||
+              error.type === 'RECITATION_BLOCKED' ||
+              error.type === 'OTHER_BLOCKED' ||
+              error.type === 'THINKING_ONLY_RESPONSE'))
         ) {
           // The stream ended with an empty response or malformed tool call.
           // Treat this as a graceful end to the model's turn rather than a crash.
@@ -738,12 +743,22 @@ export class Session {
           });
         }
 
-        if (content.length === 0 && explanation) {
+        if (explanation) {
           content.push({
             type: 'content',
             content: { type: 'text', text: explanation },
           });
         }
+
+        await this.sendUpdate({
+          sessionUpdate: 'tool_call',
+          toolCallId: callId,
+          status: 'pending',
+          title: displayTitle,
+          content,
+          locations: invocation.toolLocations(),
+          kind: toAcpToolKind(tool.kind),
+        });
 
         const params: acp.RequestPermissionRequest = {
           sessionId: this.id,
@@ -786,10 +801,24 @@ export class Session {
         );
 
         switch (outcome) {
-          case ToolConfirmationOutcome.Cancel:
-            return errorResponse(
-              new Error(`Tool "${fc.name}" was canceled by the user.`),
+          case ToolConfirmationOutcome.Cancel: {
+            const cancelError = new Error(
+              `Tool "${fc.name}" was canceled by the user.`,
             );
+            await this.sendUpdate({
+              sessionUpdate: 'tool_call_update',
+              toolCallId: callId,
+              status: 'failed',
+              content: [
+                {
+                  type: 'content',
+                  content: { type: 'text', text: cancelError.message },
+                },
+              ],
+              kind: toAcpToolKind(tool.kind),
+            });
+            return errorResponse(cancelError);
+          }
           case ToolConfirmationOutcome.ProceedOnce:
           case ToolConfirmationOutcome.ProceedAlways:
           case ToolConfirmationOutcome.ProceedAlwaysAndSave:
@@ -1382,11 +1411,16 @@ export class Session {
       try {
         const invocation = readManyFilesTool.build(toolArgs);
 
+        const displayTitle =
+          typeof invocation.getDisplayTitle === 'function'
+            ? invocation.getDisplayTitle()
+            : invocation.getDescription();
+
         await this.sendUpdate({
           sessionUpdate: 'tool_call',
           toolCallId: callId,
           status: 'in_progress',
-          title: invocation.getDescription(),
+          title: displayTitle,
           content: [],
           locations: invocation.toolLocations(),
           kind: toAcpToolKind(readManyFilesTool.kind),
@@ -1404,7 +1438,7 @@ export class Session {
           sessionUpdate: 'tool_call_update',
           toolCallId: callId,
           status: 'completed',
-          title: invocation.getDescription(),
+          title: displayTitle,
           content: content ? [content] : [],
           locations: invocation.toolLocations(),
           kind: toAcpToolKind(readManyFilesTool.kind),

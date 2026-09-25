@@ -27,6 +27,7 @@ AI-generated code changes directly within your editor.
 
 - **Workspace context:** The CLI automatically gains awareness of your workspace
   to provide more relevant and accurate responses. This context includes:
+
   - The **10 most recently accessed files** in your workspace.
   - Your active cursor position.
   - Any text you have selected (up to a 16KB limit; longer selections will be
@@ -228,6 +229,7 @@ If you are using Gemini CLI within a sandbox, be aware of the following:
 
 - **Message:**
   `🔴 Disconnected: Failed to connect to IDE companion extension in [IDE Name]. Please ensure the extension is running. To install the extension, run /ide install.`
+
   - **Cause:** Gemini CLI could not find the necessary environment variables
     (`GEMINI_CLI_IDE_WORKSPACE_PATH` or `GEMINI_CLI_IDE_SERVER_PORT`) to connect
     to the IDE. This usually means the IDE companion extension is not running or
@@ -270,6 +272,7 @@ to connect using the provided PID.
 
 - **Message:**
   `🔴 Disconnected: Directory mismatch. Gemini CLI is running in a different location than the open workspace in [IDE Name]. Please run the CLI from one of the following directories: [List of directories]`
+
   - **Cause:** The CLI's current working directory is outside the workspace you
     have open in your IDE.
   - **Solution:** `cd` into the same directory that is open in your IDE and
@@ -284,6 +287,7 @@ to connect using the provided PID.
 
 - **Message:**
   `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: [List of IDEs]`
+
   - **Cause:** You are running Gemini CLI in a terminal or environment that is
     not a supported IDE.
   - **Solution:** Run Gemini CLI from the integrated terminal of a supported

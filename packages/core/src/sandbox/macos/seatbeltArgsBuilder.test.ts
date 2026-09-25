@@ -199,5 +199,23 @@ describe.skipIf(os.platform() === 'win32')('seatbeltArgsBuilder', () => {
         expect(denyIndex).toBeGreaterThan(allowIndex);
       });
     });
+
+    describe('container runtime isolation', () => {
+      it('should include deny rules for Docker sockets and binaries', () => {
+        const profile = buildSeatbeltProfile({
+          resolvedPaths: defaultResolvedPaths,
+          networkAccess: true,
+          workspaceWrite: true,
+        });
+
+        expect(profile).toContain('(literal "/var/run/docker.sock")');
+        expect(profile).toContain('(literal "/private/var/run/docker.sock")');
+        expect(profile).toContain('(regex #"^/Users/[^/]+/\\.docker/run/")');
+        expect(profile).toContain('(literal "/usr/local/bin/docker")');
+        expect(profile).toContain('(literal "/opt/homebrew/bin/docker")');
+        expect(profile).toContain('(xpc-service-name-prefix "com.docker.")');
+        expect(profile).toContain('(ipc-posix-name-prefix "docker")');
+      });
+    });
   });
 });

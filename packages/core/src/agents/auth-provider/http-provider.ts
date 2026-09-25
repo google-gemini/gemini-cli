@@ -15,7 +15,7 @@ import { debugLogger } from '../../utils/debugLogger.js';
  * Supports Bearer, Basic, and any IANA-registered scheme via raw value.
  */
 export class HttpAuthProvider extends BaseA2AAuthProvider {
-  readonly type = 'http' as const;
+  readonly type = 'http';
 
   private resolvedToken?: string;
   private resolvedUsername?: string;

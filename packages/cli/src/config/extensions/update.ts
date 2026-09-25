@@ -156,25 +156,26 @@ export async function updateAllUpdatableExtensions(
   dispatch: (action: ExtensionUpdateAction) => void,
   enableExtensionReloading?: boolean,
 ): Promise<ExtensionUpdateInfo[]> {
-  return (
-    await Promise.all(
-      extensions
-        .filter(
-          (extension) =>
-            extensionsState.get(extension.name)?.status ===
-            ExtensionUpdateState.UPDATE_AVAILABLE,
-        )
-        .map((extension) =>
-          updateExtension(
-            extension,
-            extensionManager,
-            extensionsState.get(extension.name)!.status,
-            dispatch,
-            enableExtensionReloading,
-          ),
+  const results = await Promise.all(
+    extensions
+      .filter(
+        (extension) =>
+          extensionsState.get(extension.name)?.status ===
+          ExtensionUpdateState.UPDATE_AVAILABLE,
+      )
+      .map((extension) =>
+        updateExtension(
+          extension,
+          extensionManager,
+          extensionsState.get(extension.name)!.status,
+          dispatch,
+          enableExtensionReloading,
         ),
-    )
-  ).filter((updateInfo) => !!updateInfo);
+      ),
+  );
+  return results.filter(
+    (updateInfo): updateInfo is ExtensionUpdateInfo => !!updateInfo,
+  );
 }
 
 export interface ExtensionUpdateCheckResult {

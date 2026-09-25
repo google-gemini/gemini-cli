@@ -216,6 +216,8 @@ ${formattedHistory}
           config.getUseCustomToolModel(),
           config.getHasAccessToPreviewModel(),
         ]);
+      const useLatestFlash = config.hasLatestFlashGAAccess?.() ?? false;
+      const useLatestFlashLite = config.hasLatestFlashLiteGAAccess?.() ?? false;
 
       const selectedModel = resolveClassifierModel(
         context.requestedModel ?? config.getModel(),
@@ -224,6 +226,8 @@ ${formattedHistory}
         useCustomToolModel,
         hasAccessToPreview,
         config,
+        useLatestFlash,
+        useLatestFlashLite,
       );
 
       return {

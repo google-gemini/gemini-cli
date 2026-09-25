@@ -267,7 +267,9 @@ export class AgentHistoryProvider {
     ];
 
     if (lastUserText) {
-      summaryParts.push(`- **Last User Intent:** "${lastUserText}"`);
+      summaryParts.push(
+        `- **Previous User Intent (Truncated):** "${lastUserText}"`,
+      );
     }
 
     if (actionPath) {

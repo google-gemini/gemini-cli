@@ -25,9 +25,11 @@ import {
   FatalSandboxError,
   GEMINI_DIR,
   homedir,
+  resolveToRealPath,
 } from '@google/gemini-cli-core';
 import { ConsolePatcher } from '../ui/utils/ConsolePatcher.js';
 import { randomBytes } from 'node:crypto';
+import stripJsonComments from 'strip-json-comments';
 import {
   getContainerPath,
   shouldUseCurrentUserInSandbox,
@@ -38,7 +40,14 @@ import {
   SANDBOX_NETWORK_NAME,
   SANDBOX_PROXY_NAME,
   BUILTIN_SEATBELT_PROFILES,
+  isSensitiveHostPath,
+  sanitizeSettingsForSandbox,
 } from './sandboxUtils.js';
+import { BUILTIN_SEATBELT_PROFILE_CONTENTS } from './sandboxBuiltinProfiles.js';
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -56,6 +65,57 @@ export async function start_sandbox(
   patcher.patch();
 
   let stopProxy: (() => void) | undefined = undefined;
+  let tempProfileFile: string | null = null;
+  let sandboxTmpDir: string | null = null;
+
+  const cleanup = () => {
+    if (sandboxTmpDir) {
+      const dirToDelete = sandboxTmpDir;
+      sandboxTmpDir = null;
+      try {
+        if (fs.existsSync(dirToDelete)) {
+          fs.rmSync(dirToDelete, { recursive: true, force: true });
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    if (tempProfileFile) {
+      const fileToDelete = tempProfileFile;
+      tempProfileFile = null;
+      try {
+        if (fs.existsSync(fileToDelete)) {
+          fs.unlinkSync(fileToDelete);
+        }
+      } catch {
+        // ignore
+      }
+    }
+    if (stopProxy) {
+      try {
+        stopProxy();
+      } catch {
+        // ignore
+      }
+    }
+  };
+
+  const sigintHandler = () => {
+    cleanup();
+    process.off('SIGINT', sigintHandler);
+    process.kill(process.pid, 'SIGINT');
+  };
+
+  const sigtermHandler = () => {
+    cleanup();
+    process.off('SIGTERM', sigtermHandler);
+    process.kill(process.pid, 'SIGTERM');
+  };
+
+  process.on('exit', cleanup);
+  process.on('SIGINT', sigintHandler);
+  process.on('SIGTERM', sigtermHandler);
 
   try {
     if (config.command === 'sandbox-exec') {
@@ -76,166 +136,263 @@ export async function start_sandbox(
       if (!BUILTIN_SEATBELT_PROFILES.includes(profile)) {
         const safeProfile = path.basename(profile);
         const fileName = `sandbox-macos-${safeProfile}.sb`;
-        const userProfileFile = path.join(homedir(), GEMINI_DIR, fileName);
+        const userHome = homedir();
+        const userProfileFile = userHome
+          ? path.join(userHome, GEMINI_DIR, fileName)
+          : '';
         const projectProfileFile = path.join(GEMINI_DIR, fileName);
-        profileFile = fs.existsSync(userProfileFile)
-          ? userProfileFile
-          : projectProfileFile;
-      }
-      if (!fs.existsSync(profileFile)) {
-        throw new FatalSandboxError(
-          `Missing macos seatbelt profile file '${profileFile}'`,
-        );
-      }
-      debugLogger.log(`using macos seatbelt (profile: ${profile}) ...`);
-      // if DEBUG is set, convert to --inspect-brk in NODE_OPTIONS
-      const nodeOptions = [
-        ...(process.env['DEBUG'] ? ['--inspect-brk'] : []),
-        ...nodeArgs,
-      ].join(' ');
-
-      const args = [
-        '-D',
-        `TARGET_DIR=${fs.realpathSync(process.cwd())}`,
-        '-D',
-        `TMP_DIR=${fs.realpathSync(os.tmpdir())}`,
-        '-D',
-        `HOME_DIR=${fs.realpathSync(homedir())}`,
-        '-D',
-        `CACHE_DIR=${fs.realpathSync((await execAsync('getconf DARWIN_USER_CACHE_DIR')).stdout.trim())}`,
-      ];
-
-      // Add included directories from the workspace context
-      // Always add 5 INCLUDE_DIR parameters to ensure .sb files can reference them
-      const MAX_INCLUDE_DIRS = 5;
-      const targetDir = fs.realpathSync(cliConfig?.getTargetDir() || '');
-      const includedDirs: string[] = [];
-
-      if (cliConfig) {
-        const workspaceContext = cliConfig.getWorkspaceContext();
-        const directories = workspaceContext.getDirectories();
-
-        // Filter out TARGET_DIR
-        for (const dir of directories) {
-          const realDir = fs.realpathSync(dir);
-          if (realDir !== targetDir) {
-            includedDirs.push(realDir);
+        profileFile =
+          userProfileFile && fs.existsSync(userProfileFile)
+            ? userProfileFile
+            : projectProfileFile;
+      } else {
+        // For builtin profiles, if the file doesn't exist on disk (e.g. bundled or bazel environments),
+        // write the embedded profile content to a temporary file.
+        if (!fs.existsSync(profileFile)) {
+          const content = BUILTIN_SEATBELT_PROFILE_CONTENTS[profile];
+          if (content) {
+            try {
+              const tempDir = fs.realpathSync(os.tmpdir());
+              const rand = randomBytes(8).toString('hex');
+              tempProfileFile = path.join(
+                tempDir,
+                `gemini-sandbox-macos-${profile}-${rand}.sb`,
+              );
+              fs.writeFileSync(tempProfileFile, content, {
+                encoding: 'utf8',
+                mode: 0o600,
+              });
+              profileFile = tempProfileFile;
+            } catch (err) {
+              debugLogger.warn(
+                `Failed to write temporary seatbelt profile: ${err}`,
+              );
+            }
           }
         }
       }
 
-      // Add custom allowed paths from config
-      if (config.allowedPaths) {
-        for (const hostPath of config.allowedPaths) {
-          if (
-            hostPath &&
-            path.isAbsolute(hostPath) &&
-            fs.existsSync(hostPath)
-          ) {
-            const realDir = fs.realpathSync(hostPath);
-            if (!includedDirs.includes(realDir) && realDir !== targetDir) {
+      try {
+        if (!fs.existsSync(profileFile)) {
+          throw new FatalSandboxError(
+            `Missing macos seatbelt profile file '${profileFile}'`,
+          );
+        }
+        debugLogger.log(`using macos seatbelt (profile: ${profile}) ...`);
+        // if DEBUG is set, convert to --inspect-brk in NODE_OPTIONS
+        const nodeOptions = [
+          ...(process.env['DEBUG'] ? ['--inspect-brk'] : []),
+          ...nodeArgs,
+        ].join(' ');
+
+        const targetDir = fs.realpathSync(process.cwd());
+        if (isSensitiveHostPath(targetDir)) {
+          throw new FatalSandboxError(
+            `Running sandbox from a sensitive host directory '${targetDir}' is strictly prohibited`,
+          );
+        }
+
+        const hostTmpDir = fs.realpathSync(os.tmpdir());
+        const resolvedTmpDir = fs.mkdtempSync(
+          path.join(hostTmpDir, 'gemini-sandbox-'),
+        );
+        try {
+          fs.chmodSync(resolvedTmpDir, 0o700);
+        } catch {
+          // Silently ignore permission errors on non-POSIX filesystems
+        }
+        sandboxTmpDir = resolvedTmpDir;
+
+        const userHome = homedir();
+        if (userHome) {
+          const seatbeltCacheDir = path.join(userHome, '.cache', GEMINI_DIR);
+          try {
+            fs.mkdirSync(seatbeltCacheDir, { recursive: true });
+          } catch {
+            // Silently ignore directory creation failures
+          }
+        }
+
+        const args = [
+          '-D',
+          `TARGET_DIR=${targetDir}`,
+          '-D',
+          `TMP_DIR=${resolvedTmpDir}`,
+          '-D',
+          `HOME_DIR=${fs.realpathSync(homedir())}`,
+          '-D',
+          `CACHE_DIR=${fs.realpathSync((await execAsync('getconf DARWIN_USER_CACHE_DIR')).stdout.trim())}`,
+        ];
+
+        // Add included directories from the workspace context
+        // Always add 5 INCLUDE_DIR parameters to ensure .sb files can reference them
+        const MAX_INCLUDE_DIRS = 5;
+        const configTargetDir = cliConfig?.getTargetDir()
+          ? resolveToRealPath(cliConfig.getTargetDir())
+          : targetDir;
+        if (cliConfig?.getTargetDir() && isSensitiveHostPath(configTargetDir)) {
+          throw new FatalSandboxError(
+            `Running sandbox from a sensitive host directory '${configTargetDir}' is strictly prohibited`,
+          );
+        }
+        const includedDirs: string[] = [];
+
+        if (cliConfig) {
+          const workspaceContext = cliConfig.getWorkspaceContext();
+          const directories = workspaceContext.getDirectories();
+
+          // Filter out TARGET_DIR
+          for (const dir of directories) {
+            const realDir = resolveToRealPath(dir);
+            if (!realDir) {
+              continue;
+            }
+            if (realDir !== targetDir && realDir !== configTargetDir) {
+              if (isSensitiveHostPath(realDir)) {
+                debugLogger.warn(
+                  `Skipping sensitive workspace directory '${realDir}' in sandbox`,
+                );
+                continue;
+              }
               includedDirs.push(realDir);
             }
           }
         }
-      }
 
-      for (let i = 0; i < MAX_INCLUDE_DIRS; i++) {
-        let dirPath = '/dev/null'; // Default to a safe path that won't cause issues
-
-        if (i < includedDirs.length) {
-          dirPath = includedDirs[i];
-        }
-
-        args.push('-D', `INCLUDE_DIR_${i}=${dirPath}`);
-      }
-
-      const finalArgv = cliArgs;
-
-      args.push(
-        '-f',
-        profileFile,
-        'sh',
-        '-c',
-        [
-          `SANDBOX=sandbox-exec`,
-          `NODE_OPTIONS="${nodeOptions}"`,
-          ...finalArgv.map((arg) => quote([arg])),
-        ].join(' '),
-      );
-      // start and set up proxy if GEMINI_SANDBOX_PROXY_COMMAND is set
-      const proxyCommand = process.env['GEMINI_SANDBOX_PROXY_COMMAND'];
-      let proxyProcess: ChildProcess | undefined = undefined;
-      let sandboxProcess: ChildProcess | undefined = undefined;
-      const sandboxEnv = { ...process.env };
-      if (proxyCommand) {
-        const proxy =
-          process.env['HTTPS_PROXY'] ||
-          process.env['https_proxy'] ||
-          process.env['HTTP_PROXY'] ||
-          process.env['http_proxy'] ||
-          'http://localhost:8877';
-        sandboxEnv['HTTPS_PROXY'] = proxy;
-        sandboxEnv['https_proxy'] = proxy; // lower-case can be required, e.g. for curl
-        sandboxEnv['HTTP_PROXY'] = proxy;
-        sandboxEnv['http_proxy'] = proxy;
-        const noProxy = process.env['NO_PROXY'] || process.env['no_proxy'];
-        if (noProxy) {
-          sandboxEnv['NO_PROXY'] = noProxy;
-          sandboxEnv['no_proxy'] = noProxy;
-        }
-        proxyProcess = spawn(proxyCommand, {
-          stdio: ['ignore', 'pipe', 'pipe'],
-          shell: true,
-          detached: true,
-        });
-        // install handlers to stop proxy on exit/signal
-        stopProxy = () => {
-          debugLogger.log('stopping proxy ...');
-          if (proxyProcess?.pid) {
-            try {
-              process.kill(-proxyProcess.pid, 'SIGTERM');
-            } catch {
-              // ignore
+        // Add custom allowed paths from config
+        if (config.allowedPaths) {
+          for (const hostPath of config.allowedPaths) {
+            if (
+              hostPath &&
+              path.isAbsolute(hostPath) &&
+              fs.existsSync(hostPath)
+            ) {
+              const realDir = fs.realpathSync(hostPath);
+              if (
+                !includedDirs.includes(realDir) &&
+                realDir !== targetDir &&
+                realDir !== configTargetDir
+              ) {
+                if (isSensitiveHostPath(realDir)) {
+                  debugLogger.warn(
+                    `Skipping sensitive path '${realDir}' in config.allowedPaths`,
+                  );
+                  continue;
+                }
+                includedDirs.push(realDir);
+              }
             }
           }
-        };
-        process.on('exit', stopProxy);
-        process.on('SIGINT', stopProxy);
-        process.on('SIGTERM', stopProxy);
+        }
 
-        // commented out as it disrupts ink rendering
-        // proxyProcess.stdout?.on('data', (data) => {
-        //   console.info(data.toString());
-        // });
-        proxyProcess.stderr?.on('data', (data) => {
-          debugLogger.debug(`[PROXY STDERR]: ${data.toString().trim()}`);
-        });
-        proxyProcess.on('close', (code, signal) => {
-          if (sandboxProcess?.pid) {
-            process.kill(-sandboxProcess.pid, 'SIGTERM');
+        for (let i = 0; i < MAX_INCLUDE_DIRS; i++) {
+          let dirPath = '/dev/null'; // Default to a safe path that won't cause issues
+
+          if (i < includedDirs.length) {
+            dirPath = includedDirs[i];
           }
-          throw new FatalSandboxError(
-            `Proxy command '${proxyCommand}' exited with code ${code}, signal ${signal}`,
-          );
-        });
-        debugLogger.log('waiting for proxy to start ...');
-        await execAsync(
-          `until timeout 0.25 curl -s http://localhost:8877; do sleep 0.25; done`,
+
+          args.push('-D', `INCLUDE_DIR_${i}=${dirPath}`);
+        }
+
+        const finalArgv = cliArgs;
+
+        args.push(
+          '-f',
+          profileFile,
+          'sh',
+          '-c',
+          [
+            `SANDBOX=sandbox-exec`,
+            'TMPDIR=' + quote([resolvedTmpDir]),
+            'TMP=' + quote([resolvedTmpDir]),
+            'TEMP=' + quote([resolvedTmpDir]),
+            'NODE_OPTIONS=' + quote([nodeOptions]),
+            ...finalArgv.map((arg) => quote([arg])),
+          ].join(' '),
         );
-      }
-      // spawn child and let it inherit stdio
-      process.stdin.pause();
-      sandboxProcess = spawn(config.command, args, {
-        stdio: 'inherit',
-      });
-      return await new Promise((resolve, reject) => {
-        sandboxProcess?.on('error', reject);
-        sandboxProcess?.on('close', (code) => {
-          process.stdin.resume();
-          resolve(code ?? 1);
+        // start and set up proxy if GEMINI_SANDBOX_PROXY_COMMAND is set
+        const proxyCommand = process.env['GEMINI_SANDBOX_PROXY_COMMAND'];
+        let proxyProcess: ChildProcess | undefined = undefined;
+        let sandboxProcess: ChildProcess | undefined = undefined;
+        const sandboxEnv = { ...process.env };
+        sandboxEnv['TMPDIR'] = resolvedTmpDir;
+        sandboxEnv['TMP'] = resolvedTmpDir;
+        sandboxEnv['TEMP'] = resolvedTmpDir;
+        if (proxyCommand) {
+          const proxy =
+            process.env['HTTPS_PROXY'] ||
+            process.env['https_proxy'] ||
+            process.env['HTTP_PROXY'] ||
+            process.env['http_proxy'] ||
+            'http://localhost:8877';
+          sandboxEnv['HTTPS_PROXY'] = proxy;
+          sandboxEnv['https_proxy'] = proxy; // lower-case can be required, e.g. for curl
+          sandboxEnv['HTTP_PROXY'] = proxy;
+          sandboxEnv['http_proxy'] = proxy;
+          const noProxy = process.env['NO_PROXY'] || process.env['no_proxy'];
+          if (noProxy) {
+            sandboxEnv['NO_PROXY'] = noProxy;
+            sandboxEnv['no_proxy'] = noProxy;
+          }
+          proxyProcess = spawn(proxyCommand, {
+            stdio: ['ignore', 'pipe', 'pipe'],
+            shell: true,
+            detached: true,
+          });
+          // install handlers to stop proxy on exit/signal
+          stopProxy = () => {
+            debugLogger.log('stopping proxy ...');
+            if (proxyProcess?.pid) {
+              try {
+                process.kill(-proxyProcess.pid, 'SIGTERM');
+              } catch {
+                // ignore
+              }
+            }
+          };
+
+          // commented out as it disrupts ink rendering
+          // proxyProcess.stdout?.on('data', (data) => {
+          //   console.info(data.toString());
+          // });
+          proxyProcess.stderr?.on('data', (data) => {
+            debugLogger.debug(`[PROXY STDERR]: ${data.toString().trim()}`);
+          });
+          proxyProcess.on('close', (code, signal) => {
+            if (sandboxProcess?.pid) {
+              process.kill(-sandboxProcess.pid, 'SIGTERM');
+            }
+            throw new FatalSandboxError(
+              `Proxy command '${proxyCommand}' exited with code ${code}, signal ${signal}`,
+            );
+          });
+          debugLogger.log('waiting for proxy to start ...');
+          await execAsync(
+            `until timeout 0.25 curl -s http://localhost:8877; do sleep 0.25; done`,
+          );
+        }
+        // spawn child and let it inherit stdio
+        process.stdin.pause();
+        sandboxProcess = spawn(config.command, args, {
+          stdio: 'inherit',
+          env: sandboxEnv,
         });
-      });
+        return await new Promise((resolve, reject) => {
+          sandboxProcess?.on('error', (err) => {
+            cleanup();
+            reject(err);
+          });
+          sandboxProcess?.on('close', (code) => {
+            process.stdin.resume();
+            cleanup();
+            resolve(code ?? 1);
+          });
+        });
+      } catch (err) {
+        cleanup();
+        throw err;
+      }
     }
 
     if (config.command === 'lxc') {
@@ -341,47 +498,83 @@ export async function start_sandbox(
     args.push('--add-host', 'host.docker.internal:host-gateway');
 
     // mount current directory as working directory in sandbox (set via --workdir)
+    if (isSensitiveHostPath(workdir)) {
+      throw new FatalSandboxError(
+        `Running sandbox from a sensitive host directory '${workdir}' is strictly prohibited`,
+      );
+    }
+    if (
+      cliConfig?.getTargetDir() &&
+      isSensitiveHostPath(cliConfig.getTargetDir())
+    ) {
+      throw new FatalSandboxError(
+        `Running sandbox from a sensitive host directory '${cliConfig.getTargetDir()}' is strictly prohibited`,
+      );
+    }
     args.push('--volume', `${workdir}:${containerWorkdir}`);
 
-    // mount user settings directory inside container, after creating if missing
-    // note user/home changes inside sandbox and we mount at BOTH paths for consistency
+    // Create ephemeral sandbox temp directory on host for sanitized configuration files
+    if (!sandboxTmpDir) {
+      const hostTmpDir = fs.realpathSync(os.tmpdir());
+      sandboxTmpDir = fs.mkdtempSync(path.join(hostTmpDir, 'gemini-sandbox-'));
+      try {
+        fs.chmodSync(sandboxTmpDir, 0o700);
+      } catch {
+        // Silently ignore permission errors on non-POSIX filesystems
+      }
+    }
+
+    // Sanitize user settings before mounting into the sandbox container.
+    // We STRICTLY do NOT mount ~/.gemini root directory or sensitive credential files
+    // (oauth_creds.json, .env, etc.). We only mount the sanitized settings file as read-only (:ro).
     const userHomeDirOnHost = homedir();
+    let rawSettings: Record<string, unknown> = {};
+
+    if (userHomeDirOnHost) {
+      const userSettingsFileOnHost = path.join(
+        userHomeDirOnHost,
+        GEMINI_DIR,
+        'settings.json',
+      );
+
+      if (fs.existsSync(userSettingsFileOnHost)) {
+        try {
+          const rawContent = fs.readFileSync(userSettingsFileOnHost, 'utf8');
+          const parsed = JSON.parse(stripJsonComments(rawContent)) as unknown;
+          if (isRecord(parsed)) {
+            rawSettings = parsed;
+          }
+        } catch (err) {
+          debugLogger.warn(
+            `Failed to parse host user settings for sandbox: ${err}`,
+          );
+        }
+      }
+    }
+
+    const sanitizedSettings = sanitizeSettingsForSandbox(rawSettings);
+    const sanitizedSettingsFile = path.join(sandboxTmpDir, 'settings.json');
+    fs.writeFileSync(
+      sanitizedSettingsFile,
+      JSON.stringify(sanitizedSettings, null, 2),
+      { mode: 0o600 },
+    );
+
+    // Mount isolated sanitized settings directory inside container
     const userSettingsDirInSandbox = getContainerPath(
       `/home/node/${GEMINI_DIR}`,
     );
-    if (!fs.existsSync(userHomeDirOnHost)) {
-      fs.mkdirSync(userHomeDirOnHost, { recursive: true });
-    }
-    const userSettingsDirOnHost = path.join(userHomeDirOnHost, GEMINI_DIR);
-    if (!fs.existsSync(userSettingsDirOnHost)) {
-      fs.mkdirSync(userSettingsDirOnHost, { recursive: true });
-    }
 
-    args.push(
-      '--volume',
-      `${userSettingsDirOnHost}:${userSettingsDirInSandbox}`,
-    );
-    if (userSettingsDirInSandbox !== getContainerPath(userSettingsDirOnHost)) {
-      args.push(
-        '--volume',
-        `${userSettingsDirOnHost}:${getContainerPath(userSettingsDirOnHost)}`,
-      );
-    }
+    // Force HOME to /home/node inside the container so that the isolated settings are correctly resolved
+    args.push('--env', 'HOME=/home/node');
 
-    // mount os.tmpdir() as os.tmpdir() inside container
-    args.push('--volume', `${os.tmpdir()}:${getContainerPath(os.tmpdir())}`);
-
-    // mount homedir() as homedir() inside container
-    if (userHomeDirOnHost !== os.homedir()) {
-      args.push(
-        '--volume',
-        `${userHomeDirOnHost}:${getContainerPath(userHomeDirOnHost)}`,
-      );
-    }
+    args.push('--volume', `${sandboxTmpDir}:${userSettingsDirInSandbox}:rw`);
 
     // mount gcloud config directory if it exists
-    const gcloudConfigDir = path.join(homedir(), '.config', 'gcloud');
-    if (fs.existsSync(gcloudConfigDir)) {
+    const gcloudConfigDir = userHomeDirOnHost
+      ? path.join(userHomeDirOnHost, '.config', 'gcloud')
+      : '';
+    if (gcloudConfigDir && fs.existsSync(gcloudConfigDir)) {
       args.push(
         '--volume',
         `${gcloudConfigDir}:${getContainerPath(gcloudConfigDir)}:ro`,
@@ -415,6 +608,11 @@ export async function start_sandbox(
               `Path '${from}' listed in SANDBOX_MOUNTS must be absolute`,
             );
           }
+          if (isSensitiveHostPath(from)) {
+            throw new FatalSandboxError(
+              `Mounting sensitive host path '${from}' listed in SANDBOX_MOUNTS is strictly prohibited`,
+            );
+          }
           // check that from path exists on host
           if (!fs.existsSync(from)) {
             throw new FatalSandboxError(
@@ -431,6 +629,12 @@ export async function start_sandbox(
     if (config.allowedPaths) {
       for (const hostPath of config.allowedPaths) {
         if (hostPath && path.isAbsolute(hostPath) && fs.existsSync(hostPath)) {
+          if (isSensitiveHostPath(hostPath)) {
+            debugLogger.warn(
+              `Skipping sensitive path '${hostPath}' in config.allowedPaths`,
+            );
+            continue;
+          }
           const containerPath = getContainerPath(hostPath);
           debugLogger.log(
             `Config allowedPath: ${hostPath} -> ${containerPath} (ro)`,
@@ -711,8 +915,8 @@ export async function start_sandbox(
 
       // We still need userFlag for the simpler proxy container, which does not have this issue.
       userFlag = `--user ${uid}:${gid}`;
-      // When forcing a UID in the sandbox, $HOME can be reset to '/', so we copy $HOME as well.
-      args.push('--env', `HOME=${homedir()}`);
+      // When forcing a UID in the sandbox, $HOME can be reset to '/', so ensure $HOME is set to /home/node.
+      args.push('--env', 'HOME=/home/node');
     }
 
     // push container image name
@@ -768,9 +972,6 @@ export async function start_sandbox(
           // ignore
         }
       };
-      process.on('exit', stopProxy);
-      process.on('SIGINT', stopProxy);
-      process.on('SIGTERM', stopProxy);
 
       // commented out as it disrupts ink rendering
       // proxyProcess.stdout?.on('data', (data) => {
@@ -805,7 +1006,7 @@ export async function start_sandbox(
     });
 
     return await new Promise<number>((resolve, reject) => {
-      sandboxProcess.on('error', (err) => {
+      sandboxProcess?.on('error', (err) => {
         coreEvents.emitFeedback('error', 'Sandbox process error', err);
         reject(err);
       });
@@ -821,12 +1022,10 @@ export async function start_sandbox(
       });
     });
   } finally {
-    if (stopProxy) {
-      stopProxy();
-      process.off('exit', stopProxy);
-      process.off('SIGINT', stopProxy);
-      process.off('SIGTERM', stopProxy);
-    }
+    process.off('exit', cleanup);
+    process.off('SIGINT', sigintHandler);
+    process.off('SIGTERM', sigtermHandler);
+    cleanup();
     patcher.cleanup();
   }
 }
@@ -844,6 +1043,12 @@ async function start_lxc_sandbox(
 ): Promise<number> {
   const containerName = config.image || 'gemini-sandbox';
   const workdir = path.resolve(process.cwd());
+
+  if (isSensitiveHostPath(workdir)) {
+    throw new FatalSandboxError(
+      `Running sandbox from a sensitive host directory '${workdir}' is strictly prohibited`,
+    );
+  }
 
   debugLogger.log(
     `starting lxc sandbox (container: ${containerName}, workdir: ${workdir}) ...`,
@@ -948,6 +1153,12 @@ async function start_lxc_sandbox(
     if (config.allowedPaths) {
       for (const hostPath of config.allowedPaths) {
         if (hostPath && path.isAbsolute(hostPath) && fs.existsSync(hostPath)) {
+          if (isSensitiveHostPath(hostPath)) {
+            debugLogger.warn(
+              `Skipping sensitive path '${hostPath}' in config.allowedPaths for LXC`,
+            );
+            continue;
+          }
           const allowedDeviceName = `gemini-allowed-${randomBytes(4).toString(
             'hex',
           )}`;

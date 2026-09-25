@@ -54,6 +54,8 @@ export class ApprovalModeStrategy implements RoutingStrategy {
         config.getUseCustomToolModel(),
         config.getHasAccessToPreviewModel(),
       ]);
+    const useLatestFlash = config.hasLatestFlashGAAccess?.() ?? false;
+    const useLatestFlashLite = config.hasLatestFlashLiteGAAccess?.() ?? false;
 
     // 1. Planning Phase: If ApprovalMode === PLAN, explicitly route to the Pro model.
     if (approvalMode === ApprovalMode.PLAN) {
@@ -64,6 +66,8 @@ export class ApprovalModeStrategy implements RoutingStrategy {
         useCustomToolModel,
         hasAccessToPreview,
         config,
+        useLatestFlash,
+        useLatestFlashLite,
       );
       return {
         model: proModel,
@@ -82,6 +86,8 @@ export class ApprovalModeStrategy implements RoutingStrategy {
         useCustomToolModel,
         hasAccessToPreview,
         config,
+        useLatestFlash,
+        useLatestFlashLite,
       );
       return {
         model: flashModel,

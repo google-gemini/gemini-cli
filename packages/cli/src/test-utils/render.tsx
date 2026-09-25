@@ -706,13 +706,13 @@ export const renderWithProviders = async (
 
   const terminalWidth = width ?? baseState.terminalWidth;
 
-  if (!config) {
-    config = makeFakeConfig({
+  const finalConfig =
+    config ||
+    makeFakeConfig({
       useAlternateBuffer: settings.merged.ui?.useAlternateBuffer,
       showMemoryUsage: settings.merged.ui?.showMemoryUsage,
       accessibility: settings.merged.ui?.accessibility,
     });
-  }
 
   const mainAreaWidth = providedUiState?.mainAreaWidth ?? terminalWidth;
 
@@ -742,21 +742,23 @@ export const renderWithProviders = async (
 
   const wrapWithProviders = (comp: React.ReactElement) => (
     <AppContext.Provider value={appState}>
-      <ConfigContext.Provider value={config}>
+      <ConfigContext.Provider value={finalConfig}>
         <SettingsContext.Provider value={settings}>
           <QuotaContext.Provider value={quotaState}>
             <InputContext.Provider value={inputState}>
               <UIStateContext.Provider value={finalUiState}>
                 <VimModeProvider>
                   <ShellFocusContext.Provider value={shellFocus}>
-                    <SessionStatsProvider sessionId={config.getSessionId()}>
+                    <SessionStatsProvider
+                      sessionId={finalConfig.getSessionId()}
+                    >
                       <StreamingContext.Provider
                         value={finalUiState.streamingState}
                       >
                         <UIActionsContext.Provider value={finalUIActions}>
                           <OverflowProvider>
                             <ToolActionsProvider
-                              config={config}
+                              config={finalConfig}
                               toolCalls={allToolCalls}
                               isExpanded={
                                 toolActions?.isExpanded ??

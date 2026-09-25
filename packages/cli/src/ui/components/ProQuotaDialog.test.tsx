@@ -271,6 +271,40 @@ describe('ProQuotaDialog', () => {
         );
         unmount();
       });
+
+      it('should render keep trying, switch, and stop options even if isTerminalQuotaError is true when isCapacityExceeded is true', async () => {
+        const { unmount } = await render(
+          <ProQuotaDialog
+            failedModel="gemini-2.5-pro"
+            fallbackModel="gemini-2.5-flash"
+            message="capacity error"
+            isTerminalQuotaError={true}
+            isCapacityExceeded={true}
+            isModelNotFoundError={false}
+            onChoice={mockOnChoice}
+          />,
+        );
+
+        expect(RadioButtonSelect).toHaveBeenCalledWith(
+          expect.objectContaining({
+            items: [
+              {
+                label: 'Keep trying',
+                value: 'retry_once',
+                key: 'retry_once',
+              },
+              {
+                label: 'Switch to gemini-2.5-flash',
+                value: 'retry_always',
+                key: 'retry_always',
+              },
+              { label: 'Stop', value: 'retry_later', key: 'retry_later' },
+            ],
+          }),
+          undefined,
+        );
+        unmount();
+      });
     });
 
     describe('when it is a model not found error', () => {

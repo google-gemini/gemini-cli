@@ -20,6 +20,7 @@ import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
 } from './environmentSanitization.js';
+import { getSafeGitEnv } from '../utils/gitUtils.js';
 
 export const SHADOW_REPO_AUTHOR_NAME = 'Gemini CLI';
 export const SHADOW_REPO_AUTHOR_EMAIL = 'gemini-cli@google.com';
@@ -91,7 +92,7 @@ export class GitService {
 
   static async verifyGitAvailability(): Promise<boolean> {
     try {
-      await spawnAsync('git', ['--version']);
+      await spawnAsync('git', ['--version'], { env: getSafeGitEnv() });
       return true;
     } catch {
       return false;
@@ -102,11 +103,13 @@ export class GitService {
     const gitConfigPath = path.join(repoDir, '.gitconfig');
     const systemConfigPath = path.join(repoDir, '.gitconfig_system_empty');
     return {
-      ...sanitizeEnvironment(
-        process.env,
-        getSecureSanitizationConfig({
-          enableEnvironmentVariableRedaction: true,
-        }),
+      ...getSafeGitEnv(
+        sanitizeEnvironment(
+          process.env,
+          getSecureSanitizationConfig({
+            enableEnvironmentVariableRedaction: true,
+          }),
+        ),
       ),
       // Prevent git from using the user's global git config.
       GIT_CONFIG_GLOBAL: gitConfigPath,

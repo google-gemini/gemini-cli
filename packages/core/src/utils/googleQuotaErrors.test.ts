@@ -81,7 +81,7 @@ describe('classifyGoogleError', () => {
     }
   });
 
-  it('should return RetryableQuotaError with delay for 503 Service Unavailable with RetryInfo', () => {
+  it('should return TerminalQuotaError for MODEL_CAPACITY_EXHAUSTED even with RetryInfo headers', () => {
     const apiError: GoogleApiError = {
       code: 503,
       message:
@@ -103,8 +103,82 @@ describe('classifyGoogleError', () => {
     };
     vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
     const result = classifyGoogleError(new Error());
-    expect(result).toBeInstanceOf(RetryableQuotaError);
-    expect((result as RetryableQuotaError).retryDelayMs).toBe(9000);
+    expect(result).toBeInstanceOf(TerminalQuotaError);
+  });
+
+  it('should return TerminalQuotaError for MODEL_CAPACITY_EXHAUSTED when no retry delay is specified', () => {
+    const apiError: GoogleApiError = {
+      code: 429,
+      message:
+        'No capacity available for model gemini-3.1-pro-preview on the server',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'MODEL_CAPACITY_EXHAUSTED',
+          domain: 'cloudcode-pa.googleapis.com',
+          metadata: { model: 'gemini-3.1-pro-preview' },
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(TerminalQuotaError);
+  });
+
+  it('should return TerminalQuotaError for structured error with details when message contains capacity exhaustion keywords', () => {
+    const apiError: GoogleApiError = {
+      code: 429,
+      message: 'You have exhausted your capacity on this model.',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.Help',
+          links: [
+            { description: 'Learn more', url: 'https://support.google.com' },
+          ],
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(TerminalQuotaError);
+  });
+
+  it('should return TerminalQuotaError for MODEL_CAPACITY_EXHAUSTED even when the domain is not a Cloud Code domain (domain-agnostic)', () => {
+    const apiError: GoogleApiError = {
+      code: 429,
+      message:
+        'No capacity available for model gemini-3.1-pro-preview on the server',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'MODEL_CAPACITY_EXHAUSTED',
+          domain: 'other.googleapis.com',
+          metadata: { model: 'gemini-3.1-pro-preview' },
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(TerminalQuotaError);
+  });
+
+  it('should return TerminalQuotaError for MODEL_CAPACITY_EXCEEDED when no retry delay is specified', () => {
+    const apiError: GoogleApiError = {
+      code: 429,
+      message:
+        'No capacity available for model gemini-3.1-pro-preview on the server',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'MODEL_CAPACITY_EXCEEDED',
+          domain: 'cloudcode-pa.googleapis.com',
+          metadata: { model: 'gemini-3.1-pro-preview' },
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(TerminalQuotaError);
   });
 
   it('should return original error if code is not 429, 499 or 503', () => {
@@ -336,6 +410,28 @@ describe('classifyGoogleError', () => {
     const result = classifyGoogleError(new Error());
     expect(result).toBeInstanceOf(TerminalQuotaError);
     expect((result as TerminalQuotaError).retryDelayMs).toBe(600000);
+    expect((result as TerminalQuotaError).reason).toBe('RATE_LIMIT_EXCEEDED');
+  });
+
+  it('should return TerminalQuotaError for Cloud Code RATE_LIMIT_EXCEEDED without a specified server delay', () => {
+    const apiError: GoogleApiError = {
+      code: 429,
+      message: 'Rate limit exceeded',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'RATE_LIMIT_EXCEEDED',
+          domain: 'cloudcode-pa.googleapis.com',
+          metadata: {
+            uiMessage: 'true',
+            model: 'gemini-2.5-pro',
+          },
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(TerminalQuotaError);
     expect((result as TerminalQuotaError).reason).toBe('RATE_LIMIT_EXCEEDED');
   });
 
@@ -805,5 +901,124 @@ describe('classifyGoogleError', () => {
     vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
     const result = classifyGoogleError(new Error());
     expect(result).toBeInstanceOf(ValidationRequiredError);
+  });
+
+  it('should return TerminalQuotaError when limit is 0 even if message contains "Please retry in Xs"', () => {
+    const complexError = {
+      error: {
+        message:
+          '{"error": {"code": 429, "status": 429, "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/usage?tab=rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0\\nPlease retry in 59.906331105s.", "details": [{"detail": "??? to (unknown) : APP_ERROR(8) You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/usage?tab=rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0\\nPlease retry in 59.906331105s."}]}}',
+        code: 429,
+        status: 'Too Many Requests',
+      },
+    };
+    const rawError = new Error(JSON.stringify(complexError)) as Error & {
+      status?: number;
+    };
+    rawError.status = 429;
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(null);
+
+    const result = classifyGoogleError(rawError);
+
+    expect(result).toBeInstanceOf(TerminalQuotaError);
+  });
+
+  it('should return TerminalQuotaError when limit is 0 even if structured RetryInfo is present', () => {
+    const apiError: GoogleApiError = {
+      code: 429,
+      message: 'Quota exceeded for limit: 0',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.RetryInfo',
+          retryDelay: '59s',
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(
+      new Error('Quota exceeded for limit: 0'),
+    );
+    expect(result).toBeInstanceOf(TerminalQuotaError);
+  });
+
+  it('should return TerminalQuotaError when limit is 0 and message contains actual newlines', () => {
+    const apiError: GoogleApiError = {
+      code: 429,
+      message: 'Quota exceeded for metric: ...\nlimit: 0, model: gemini-3-pro',
+      details: [],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(
+      new Error(
+        'Quota exceeded for metric: ...\nlimit: 0, model: gemini-3-pro',
+      ),
+    );
+    expect(result).toBeInstanceOf(TerminalQuotaError);
+  });
+
+  it('should return TerminalQuotaError when limit is 0 followed by a period', () => {
+    const apiError: GoogleApiError = {
+      code: 429,
+      message: 'Quota exceeded for metric: ...\nlimit: 0. Please retry in 59s.',
+      details: [],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(
+      new Error(
+        'Quota exceeded for metric: ...\nlimit: 0. Please retry in 59s.',
+      ),
+    );
+    expect(result).toBeInstanceOf(TerminalQuotaError);
+  });
+
+  it('should return RetryableQuotaError when limit is fractional (e.g., 0.5)', () => {
+    const apiError: GoogleApiError = {
+      code: 429,
+      message:
+        'Quota exceeded for metric: ...\nlimit: 0.5. Please retry in 59s.',
+      details: [],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(
+      new Error(
+        'Quota exceeded for metric: ...\nlimit: 0.5. Please retry in 59s.',
+      ),
+    );
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+  });
+
+  it('should fall back to "Model not found" for 404 error with plain object', () => {
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(null);
+    const result = classifyGoogleError({ status: 404 });
+    expect(result).toBeInstanceOf(ModelNotFoundError);
+    expect((result as ModelNotFoundError).message).toBe('Model not found');
+  });
+
+  it('should parse custom 404 message from plain object correctly', () => {
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(null);
+    const result = classifyGoogleError({
+      status: 404,
+      message: 'Custom 404 message',
+    });
+    expect(result).toBeInstanceOf(ModelNotFoundError);
+    expect((result as ModelNotFoundError).message).toBe('Custom 404 message');
+  });
+
+  it('should classify plain object with limit: 0 message as TerminalQuotaError correctly', () => {
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(null);
+    const result = classifyGoogleError({
+      status: 429,
+      message: 'Quota exceeded, limit: 0',
+    });
+    expect(result).toBeInstanceOf(TerminalQuotaError);
+  });
+
+  it('should handle Error instances with undefined message gracefully', () => {
+    const malformedError = new Error();
+    delete (malformedError as { message?: string }).message;
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(null);
+
+    const result = classifyGoogleError(malformedError);
+    expect(result).toBe(malformedError); // Should return the original error without crashing
   });
 });
