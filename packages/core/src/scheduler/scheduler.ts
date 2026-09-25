@@ -706,6 +706,12 @@ export class Scheduler {
     let lastDetails: SerializableConfirmationDetails | undefined;
 
     if (decision === PolicyDecision.ASK_USER) {
+      const forcedDecision =
+        hookDecision === 'ask' ||
+        (policyDecision === PolicyDecision.ALLOW && hasTaintRisk)
+          ? 'ask_user'
+          : undefined;
+
       const result = await resolveConfirmation(toolCall, signal, {
         config: this.config,
         messageBus: this.messageBus,
@@ -715,7 +721,7 @@ export class Scheduler {
         schedulerId: this.schedulerId,
         onWaitingForConfirmation: this.onWaitingForConfirmation,
         systemMessage: hookSystemMessage,
-        forcedDecision: 'ask_user',
+        forcedDecision,
       });
       outcome = result.outcome;
       lastDetails = result.lastDetails;

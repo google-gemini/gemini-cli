@@ -975,6 +975,7 @@ describe('Scheduler (Orchestrator)', () => {
           messageBus: expect.anything(),
           state: mockStateManager,
           schedulerId: ROOT_SCHEDULER_ID,
+          forcedDecision: undefined,
         }),
       );
 
@@ -987,6 +988,44 @@ describe('Scheduler (Orchestrator)', () => {
         expect.anything(),
       );
 
+      expect(mockExecutor.execute).toHaveBeenCalled();
+    });
+
+    it('should pass forcedDecision: "ask_user" when hookDecision is ask', async () => {
+      vi.mocked(checkPolicy).mockResolvedValue({
+        decision: PolicyDecision.ALLOW,
+        rule: undefined,
+      });
+
+      const mockHookSystem = {
+        fireBeforeToolEvent: vi.fn().mockResolvedValue({
+          shouldStopExecution: () => false,
+          getBlockingError: () => undefined,
+          isAskDecision: () => true,
+          systemMessage: 'Hook prompt',
+        }),
+      };
+      mockConfig.getHookSystem = vi.fn().mockReturnValue(mockHookSystem);
+
+      vi.mocked(resolveConfirmation).mockResolvedValue({
+        outcome: ToolConfirmationOutcome.ProceedOnce,
+        lastDetails: undefined,
+      });
+
+      mockExecutor.execute.mockResolvedValue({
+        status: CoreToolCallStatus.Success,
+      } as unknown as SuccessfulToolCall);
+
+      await scheduler.schedule(req1, signal);
+
+      expect(resolveConfirmation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({
+          forcedDecision: 'ask_user',
+          systemMessage: 'Hook prompt',
+        }),
+      );
       expect(mockExecutor.execute).toHaveBeenCalled();
     });
 
