@@ -24,7 +24,7 @@
   "dependencies": {
     "@google/gemini-cli-core": "file:../core",
     "zod": "3.25.76",
-    "zod-to-json-schema": "3.25.1"
+    "zod-to-json-schema": "3.25.2"
   },
   "devDependencies": {
     "typescript": "5.8.3",
