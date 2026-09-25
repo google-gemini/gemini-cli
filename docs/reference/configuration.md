@@ -2556,6 +2556,15 @@ see [Telemetry](../cli/telemetry.md).
     `local`.
   - **`useCollector`** (boolean): Whether to use an external OTLP collector.
 
+#### `extensions`
+
+Settings for extensions.
+
+- **Properties:**
+  - **`disabled`** (array): List of disabled extensions.
+  - **`workspacesWithMigrationNudge`** (array): List of workspaces for which the
+    migration nudge has been shown.
+
 ### Example `settings.json`
 
 Here is an example of a `settings.json` file with the nested structure, new as
