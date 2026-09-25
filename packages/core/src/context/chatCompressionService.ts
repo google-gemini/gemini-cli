@@ -42,7 +42,225 @@ import { PreCompressTrigger } from '../hooks/types.js';
  * Default threshold for compression token count as a fraction of the model's
  * token limit. If the chat history exceeds this threshold, it will be compressed.
  */
-const DEFAULT_COMPRESSION_TOKEN_THRESHOLD = 0.5;
+export const DEFAULT_COMPRESSION_TOKEN_THRESHOLD = 0.5;
+
+/**
+ * Number of recent tool response turns that must be preserved at full fidelity.
+ */
+export const RECENT_TURNS_PROTECTED = 3;
+
+/**
+ * Tools that retrieve file content, documentation, or search results whose outputs
+ * are essential for multi-step reasoning and must be exempted from collapsing into snippets.
+ */
+export const RETRIEVAL_TOOL_NAMES_EXEMPT_FROM_COLLAPSE: ReadonlySet<string> =
+  new Set([
+    'read_file',
+    'read_many_files',
+    'get_internal_docs',
+    'read_mcp_resource',
+    'grep',
+    'rip_grep',
+    'glob',
+    'search_file_content',
+    'find_files',
+  ]);
+
+export function isExemptRetrievalTool(
+  toolName?: string,
+  exemptTools: ReadonlySet<string> = RETRIEVAL_TOOL_NAMES_EXEMPT_FROM_COLLAPSE,
+): boolean {
+  if (!toolName) {
+    return false;
+  }
+  const normalized = toolName.toLowerCase();
+  if (exemptTools.has(normalized)) {
+    return true;
+  }
+  return (
+    normalized.endsWith('read_file') ||
+    normalized.endsWith('read_files') ||
+    normalized.endsWith('read_many_files') ||
+    normalized.endsWith('read_resource')
+  );
+}
+
+export const COLLAPSED_FUNCTION_RESPONSE_MAX_BYTES = 2048; // 2 KB
+
+/**
+ * Computes the total byte size of text and payload content across all turns in history.
+ */
+export function calculateHistoryByteSize(history: readonly Content[]): number {
+  let bytes = 0;
+  for (const turn of history) {
+    if (turn.parts) {
+      for (const part of turn.parts) {
+        if (part.text) {
+          bytes += Buffer.byteLength(part.text, 'utf8');
+        }
+        if (part.functionResponse?.response) {
+          const resp = part.functionResponse.response;
+          if (typeof resp === 'string') {
+            bytes += Buffer.byteLength(resp, 'utf8');
+          } else if (typeof resp === 'object' && resp !== null) {
+            try {
+              bytes += Buffer.byteLength(JSON.stringify(resp), 'utf8');
+            } catch {
+              // ignore JSON errors
+            }
+          }
+        }
+        if (part.inlineData?.data) {
+          bytes += Buffer.byteLength(part.inlineData.data, 'utf8');
+        }
+      }
+    }
+  }
+  return bytes;
+}
+
+const defaultGraphemeSegmenter = new Intl.Segmenter(undefined, {
+  granularity: 'grapheme',
+});
+
+/**
+ * Collapses detailed logs in older functionResponse payloads from completed previous turns.
+ * The most recent N tool response turns (default 3) and retrieval tools (read_file, etc.)
+ * are preserved intact for immediate context fidelity and multi-step reasoning.
+ */
+export function collapseOlderFunctionResponses(
+  history: Content[],
+  maxBytesPerOldResponse: number = COLLAPSED_FUNCTION_RESPONSE_MAX_BYTES,
+  segmenter: Intl.Segmenter = defaultGraphemeSegmenter,
+  protectedTurns: number = RECENT_TURNS_PROTECTED,
+  exemptTools: ReadonlySet<string> = RETRIEVAL_TOOL_NAMES_EXEMPT_FROM_COLLAPSE,
+): Content[] {
+  // Find all indices of user messages that contain functionResponse
+  const toolIndices: number[] = [];
+  for (let i = 0; i < history.length; i++) {
+    if (
+      history[i].role === 'user' &&
+      history[i].parts?.some((p) => !!p.functionResponse)
+    ) {
+      toolIndices.push(i);
+    }
+  }
+
+  if (toolIndices.length <= protectedTurns) {
+    return history;
+  }
+
+  // The last N tool indices represent recent tool turns that must be protected.
+  // Only prior tool indices are older completed turns eligible for collapsing.
+  const cutoffToolIndex = toolIndices[toolIndices.length - protectedTurns];
+
+  const collapseString = (str: string): string => {
+    const totalBytes = Buffer.byteLength(str, 'utf8');
+    if (totalBytes <= maxBytesPerOldResponse) {
+      return str;
+    }
+
+    const previewBytes = maxBytesPerOldResponse;
+    let preview = '';
+    let currentBytes = 0;
+
+    for (const { segment } of segmenter.segment(str)) {
+      const segmentBytes = Buffer.byteLength(segment, 'utf8');
+      if (currentBytes + segmentBytes > previewBytes) {
+        break;
+      }
+      preview += segment;
+      currentBytes += segmentBytes;
+    }
+
+    const omittedBytes = totalBytes - currentBytes;
+    return `${preview}\n... [Tool output collapsed from previous turn: ${omittedBytes} bytes omitted to conserve memory] ...`;
+  };
+
+  const collapseValue = (val: unknown): unknown => {
+    if (typeof val === 'string') {
+      return collapseString(val);
+    }
+
+    if (Array.isArray(val)) {
+      let arrayModified = false;
+      const newVal = val.map((item) => {
+        const collapsed = collapseValue(item);
+        if (collapsed !== item) {
+          arrayModified = true;
+        }
+        return collapsed;
+      });
+      return arrayModified ? newVal : val;
+    }
+
+    if (typeof val === 'object' && val !== null) {
+      const proto: unknown = Object.getPrototypeOf(val);
+      if (proto !== Object.prototype && proto !== null) {
+        return val;
+      }
+
+      let objModified = false;
+      const copy: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(val)) {
+        const collapsed = collapseValue(v);
+        if (collapsed !== v) {
+          objModified = true;
+        }
+        copy[k] = collapsed;
+      }
+      return objModified ? copy : val;
+    }
+
+    return val;
+  };
+
+  let modified = false;
+  const newHistory = history.map((content, idx) => {
+    // Only process older tool response turns before the protected recent window
+    if (idx >= cutoffToolIndex || content.role !== 'user' || !content.parts) {
+      return content;
+    }
+
+    let partsModified = false;
+    const newParts = content.parts.map((part) => {
+      if (!part.functionResponse?.response) {
+        return part;
+      }
+
+      // Exempt retrieval and file reading tools from collapsing
+      if (isExemptRetrievalTool(part.functionResponse.name, exemptTools)) {
+        return part;
+      }
+
+      const resp: unknown = part.functionResponse.response;
+      const newResp = collapseValue(resp);
+
+      if (newResp !== resp) {
+        partsModified = true;
+        return {
+          ...part,
+          functionResponse: {
+            // eslint-disable-next-line @typescript-eslint/no-misused-spread
+            ...part.functionResponse,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            response: newResp as Record<string, unknown>,
+          },
+        };
+      }
+
+      return part;
+    });
+
+    if (partsModified) {
+      modified = true;
+      return { ...content, parts: newParts };
+    }
+    return content;
+  });
+
+  return modified ? newHistory : history;
+}
 
 /**
  * The fraction of the latest chat history to keep. A value of 0.3
@@ -274,14 +492,21 @@ export class ChatCompressionService {
     const trigger = force ? PreCompressTrigger.Manual : PreCompressTrigger.Auto;
     await config.getHookSystem()?.firePreCompressEvent(trigger);
 
-    const originalTokenCount = chat.getLastPromptTokenCount();
+    const lastPromptTokenCount = chat.getLastPromptTokenCount();
+    const originalTokenCount =
+      lastPromptTokenCount > 0
+        ? lastPromptTokenCount
+        : estimateTokenCountSync(curatedHistory.flatMap((c) => c.parts || []));
 
     // Don't compress if not forced and we are under the limit.
     if (!force) {
       const threshold =
         (await config.getCompressionThreshold()) ??
         DEFAULT_COMPRESSION_TOKEN_THRESHOLD;
-      if (originalTokenCount < threshold * tokenLimit(model)) {
+      const isOverModelThreshold =
+        originalTokenCount >= threshold * tokenLimit(model);
+
+      if (!isOverModelThreshold) {
         return {
           newHistory: null,
           info: {
@@ -479,6 +704,10 @@ export class ChatCompressionService {
         },
       };
     } else {
+      // Explicitly dereference old history slices so V8 GC can immediately reclaim memory
+      historyToCompressTruncated.length = 0;
+      originalHistoryToCompress.length = 0;
+
       return {
         newHistory: extraHistory,
         info: {
