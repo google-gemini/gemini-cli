@@ -883,7 +883,7 @@ describe('Scheduler (Orchestrator)', () => {
       expect(mockExecutor.execute).toHaveBeenCalled();
     });
 
-    it('should NOT escalate ALLOW to ASK_USER when invocation detects taint risk in non-interactive mode', async () => {
+    it('should escalate ALLOW to DENY when invocation detects taint risk in non-interactive mode', async () => {
       vi.mocked(checkPolicy).mockResolvedValue({
         decision: PolicyDecision.ALLOW,
         rule: undefined,
@@ -904,7 +904,14 @@ describe('Scheduler (Orchestrator)', () => {
       await scheduler.schedule(req1, signal);
 
       expect(resolveConfirmation).not.toHaveBeenCalled();
-      expect(mockExecutor.execute).toHaveBeenCalled();
+      expect(mockExecutor.execute).not.toHaveBeenCalled();
+      expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
+        'call-1',
+        CoreToolCallStatus.Error,
+        expect.objectContaining({
+          errorType: ToolErrorType.POLICY_VIOLATION,
+        }),
+      );
     });
 
     it('should auto-approve remaining identical tools in batch after ProceedAlways', async () => {

@@ -214,12 +214,9 @@ export async function readSecureFileBuffer(
       initialStats.ino !== undefined &&
       postStats.dev !== undefined &&
       postStats.ino !== undefined &&
-      (initialStats.dev !== postStats.dev ||
-        initialStats.ino !== postStats.ino)
+      (initialStats.dev !== postStats.dev || initialStats.ino !== postStats.ino)
     ) {
-      throw new Error(
-        `File device or inode changed during read: ${filePath}`,
-      );
+      throw new Error(`File device or inode changed during read: ${filePath}`);
     }
 
     return contentBuffer;

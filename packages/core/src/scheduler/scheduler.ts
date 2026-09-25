@@ -677,9 +677,10 @@ export class Scheduler {
       toolCall.invocation.hasTaintedOrBuildFileRisk();
 
     if (decision === PolicyDecision.ALLOW && hasTaintRisk) {
-      decision = (this.config.isInteractive?.() ?? true)
-        ? PolicyDecision.ASK_USER
-        : PolicyDecision.DENY;
+      decision =
+        (this.config.isInteractive?.() ?? true)
+          ? PolicyDecision.ASK_USER
+          : PolicyDecision.DENY;
     }
 
     if (decision === PolicyDecision.DENY) {
