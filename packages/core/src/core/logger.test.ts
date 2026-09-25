@@ -638,6 +638,43 @@ describe('Logger', () => {
       expect(result).toBe(false);
     });
 
+    it('should not delete files outside the checkpoint dir via a traversal tag', async () => {
+      const outsidePath = path.join(
+        path.dirname(TEST_GEMINI_DIR),
+        'logger-traversal-test.json',
+      );
+      const siblingPath = path.join(TEST_GEMINI_DIR, 'settings.json');
+      await fs.writeFile(outsidePath, '{}');
+      await fs.writeFile(siblingPath, '{}');
+
+      expect(
+        await logger.deleteCheckpoint('x/../../logger-traversal-test'),
+      ).toBe(false);
+      expect(await logger.deleteCheckpoint('x/../settings')).toBe(false);
+
+      expect(existsSync(outsidePath)).toBe(true);
+      expect(existsSync(siblingPath)).toBe(true);
+      await fs.rm(outsidePath, { force: true });
+      await fs.rm(siblingPath, { force: true });
+    });
+
+    it('should not load files outside the checkpoint dir via a traversal tag', async () => {
+      const outsidePath = path.join(
+        path.dirname(TEST_GEMINI_DIR),
+        'logger-traversal-test.json',
+      );
+      await fs.writeFile(
+        outsidePath,
+        JSON.stringify({ history: [{ role: 'user', parts: [{ text: 'x' }] }] }),
+      );
+
+      const result = await logger.loadCheckpoint(
+        'x/../../logger-traversal-test',
+      );
+      expect(result.history).toEqual([]);
+      await fs.rm(outsidePath, { force: true });
+    });
+
     it('should re-throw an error if file deletion fails for reasons other than not existing', async () => {
       // Simulate a different error (e.g., permission denied)
       vi.spyOn(fs, 'unlink').mockRejectedValueOnce(
