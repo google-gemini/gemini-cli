@@ -43,6 +43,7 @@ export const useFocus = (): {
     // Enable focus reporting
     stdout?.write(ENABLE_FOCUS_REPORTING);
     stdin?.on('data', handleData);
+    stdin?.resume?.();
 
     return () => {
       // Disable focus reporting on cleanup

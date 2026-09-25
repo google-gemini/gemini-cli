@@ -239,6 +239,9 @@ describe('useLoadingIndicator', () => {
 
     expect(result.current.currentLoadingPhrase).toContain('Trying to reach');
     expect(result.current.currentLoadingPhrase).toContain('Attempt 3/3');
+    expect(result.current.statusPhrase).toBe(
+      'Trying to reach gemini-pro (Attempt 3/3)',
+    );
   });
 
   it('should not show retry status phrase when idle', async () => {
@@ -255,6 +258,7 @@ describe('useLoadingIndicator', () => {
     );
 
     expect(result.current.currentLoadingPhrase).toBeUndefined();
+    expect(result.current.statusPhrase).toBeUndefined();
   });
 
   it('should hide low-verbosity retry status for early retry attempts', async () => {
