@@ -396,6 +396,26 @@ export function getDiffCommand(
 }
 
 /**
+ * Quotes an argument for safe invocation via cmd.exe on Windows.
+ * Wraps in double quotes and escapes special characters to prevent
+ * argument splitting and command injection.
+ */
+export function quoteCmdArg(arg: string): string {
+  if (!arg) {
+    return '""';
+  }
+  if (/^[a-zA-Z0-9\-_.:/\\]+$/.test(arg)) {
+    return arg;
+  }
+  const escaped = arg.replace(/"/g, '""').replace(/%/g, '^%');
+  const trailingBackslashes = escaped.match(/\\+$/);
+  if (trailingBackslashes) {
+    return `"${escaped}${trailingBackslashes[0]}"`;
+  }
+  return `"${escaped}"`;
+}
+
+/**
  * Opens a diff tool to compare two files.
  * Terminal-based editors by default blocks parent process until the editor exits.
  * GUI-based editors require args such as "--wait" to block parent process.
@@ -440,9 +460,14 @@ export async function openDiff(
   }
 
   return new Promise<void>((resolve, reject) => {
-    const childProcess = spawn(diffCommand.command, diffCommand.args, {
+    const isWindows = process.platform === 'win32';
+    const spawnArgs = isWindows
+      ? diffCommand.args.map(quoteCmdArg)
+      : diffCommand.args;
+
+    const childProcess = spawn(diffCommand.command, spawnArgs, {
       stdio: 'inherit',
-      shell: process.platform === 'win32',
+      shell: isWindows,
     });
 
     // Guard against both 'error' and 'close' firing for a single failure,
