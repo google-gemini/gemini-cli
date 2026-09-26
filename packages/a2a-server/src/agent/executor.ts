@@ -22,6 +22,7 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 
 import { logger } from '../utils/logger.js';
+import { redactSecrets } from '../utils/redaction.js';
 import {
   CoderAgentEvent,
   getPersistedState,
@@ -493,7 +494,7 @@ export class CoderAgentExecutor implements AgentExecutor {
           `[CoderAgentExecutor] Executing for taskId: ${taskId}, contextId: ${contextId}`,
         );
         logger.info(
-          `[CoderAgentExecutor] userMessage: ${JSON.stringify(userMessage)}`,
+          `[CoderAgentExecutor] userMessage: ${JSON.stringify(redactSecrets(userMessage))}`,
         );
         eventBus.on('event', (event: AgentExecutionEvent) =>
           logger.info('[EventBus event]: ', event),
