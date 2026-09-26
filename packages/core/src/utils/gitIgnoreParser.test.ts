@@ -92,6 +92,16 @@ describe('GitIgnoreParser', () => {
       expect(parser.isIgnored('file-in-subdir.txt', false)).toBe(false);
     });
 
+    it('should match nested directory patterns with only a trailing slash at any depth', async () => {
+      await createTestFile('pkg/.gitignore', 'build/');
+
+      expect(parser.isIgnored('pkg/build/out.js', false)).toBe(true);
+      expect(parser.isIgnored('pkg/deep/build/out.js', false)).toBe(true);
+      expect(parser.isIgnored('pkg/deep/build', true)).toBe(true);
+      expect(parser.isIgnored('pkg/deep/build', false)).toBe(false);
+      expect(parser.isIgnored('build/out.js', false)).toBe(false);
+    });
+
     it('should stop processing if an ancestor directory is ignored', async () => {
       await createTestFile(
         'ignored-at-root/.gitignore',
