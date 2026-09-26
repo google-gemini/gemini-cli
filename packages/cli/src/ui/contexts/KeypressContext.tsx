@@ -855,12 +855,16 @@ export function KeypressProvider({
   useEffect(() => {
     terminalCapabilityManager.enableSupportedModes();
 
+    if (!stdin) {
+      return;
+    }
+
     const wasRaw = stdin.isRaw;
     if (wasRaw === false) {
       setRawMode(true);
     }
 
-    process.stdin.setEncoding('utf8'); // Make data events emit strings
+    stdin.setEncoding?.('utf8'); // Make data events emit strings
 
     let processor = nonKeyboardEventFilter(broadcast);
     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
@@ -881,6 +885,7 @@ export function KeypressProvider({
     }
 
     stdin.on('data', dataListener);
+    stdin.resume?.();
     return () => {
       stdin.removeListener('data', dataListener);
       if (wasRaw === false) {

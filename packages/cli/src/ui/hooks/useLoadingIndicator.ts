@@ -94,6 +94,7 @@ export const useLoadingIndicator = ({
         ? retainedElapsedTime
         : elapsedTimeFromTimer,
     currentLoadingPhrase: retryPhrase || currentTip || currentWittyPhrase,
+    statusPhrase: retryPhrase ?? undefined,
     currentTip,
     currentWittyPhrase,
   };

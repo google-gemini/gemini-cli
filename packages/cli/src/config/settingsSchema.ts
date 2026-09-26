@@ -3524,7 +3524,24 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
               type: 'object',
               properties: {
                 useGemini3_1: { type: 'boolean' },
-                useGemini3_1FlashLite: { type: 'boolean' },
+                useLatestFlash: {
+                  type: 'boolean',
+                  description:
+                    'Whether the latest GA Flash model (Gemini 3.8 Flash) is launched and active.',
+                },
+                useLatestFlashLite: {
+                  type: 'boolean',
+                  description:
+                    'Whether the latest GA Flash Lite model (Gemini 3.5 Flash Lite) is launched and active.',
+                },
+                useGemini3_5Flash: {
+                  type: 'boolean',
+                  description: 'Deprecated alias for useLatestFlash.',
+                },
+                useGemini3_1FlashLite: {
+                  type: 'boolean',
+                  description: 'Deprecated alias for useLatestFlashLite.',
+                },
                 useCustomTools: { type: 'boolean' },
                 hasAccessToPreview: { type: 'boolean' },
                 requestedModels: {
@@ -3533,6 +3550,7 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
                 },
               },
             },
+
             target: { type: 'string' },
           },
         },
