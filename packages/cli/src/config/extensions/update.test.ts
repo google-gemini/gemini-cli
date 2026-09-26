@@ -18,12 +18,12 @@ import { ExtensionStorage } from './storage.js';
 import { type ExtensionManager, copyExtension } from '../extension-manager.js';
 import { checkForExtensionUpdate } from './github.js';
 import { loadInstallMetadata } from '../extension.js';
-import * as fs from 'node:fs';
 import {
   type GeminiCLIExtension,
   type ExtensionInstallMetadata,
   IntegrityDataStatus,
 } from '@google/gemini-cli-core';
+import { removeDirectoryWithRetry } from '../../utils/retry.js';
 
 vi.mock('./storage.js', () => ({
   ExtensionStorage: {
@@ -44,16 +44,9 @@ vi.mock('../extension.js', () => ({
   loadInstallMetadata: vi.fn(),
 }));
 
-vi.mock('node:fs', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs')>();
-  return {
-    ...actual,
-    promises: {
-      ...actual.promises,
-      rm: vi.fn(),
-    },
-  };
-});
+vi.mock('../../utils/retry.js', () => ({
+  removeDirectoryWithRetry: vi.fn(),
+}));
 
 describe('Extension Update Logic', () => {
   let mockExtensionManager: ExtensionManager;
@@ -190,10 +183,7 @@ describe('Extension Update Logic', () => {
         originalVersion: '1.0.0',
         updatedVersion: '1.1.0',
       });
-      expect(fs.promises.rm).toHaveBeenCalledWith('/tmp/mock-dir', {
-        recursive: true,
-        force: true,
-      });
+      expect(removeDirectoryWithRetry).toHaveBeenCalledWith('/tmp/mock-dir');
     });
 
     it('should migrate source if migratedTo is set and an update is available', async () => {
@@ -306,7 +296,7 @@ describe('Extension Update Logic', () => {
           state: ExtensionUpdateState.ERROR,
         },
       });
-      expect(fs.promises.rm).toHaveBeenCalled();
+      expect(removeDirectoryWithRetry).toHaveBeenCalledWith('/tmp/mock-dir');
     });
 
     describe('Integrity Verification', () => {
