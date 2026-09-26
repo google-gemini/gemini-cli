@@ -53,13 +53,16 @@ export function unescapeLiteralAt(text: string): string {
  * Regex source for the path/command part of an @ reference.
  * It uses strict ASCII whitespace delimiters to allow Unicode characters like NNBSP in filenames.
  *
- * 1. "(?:[^"]*)" matches a double-quoted string (for Windows paths with spaces).
- * 2. \\. matches any escaped character (e.g., \ ).
- * 3. [^ \t\n\r,;!?()\[\]{}.] matches any character that is NOT a delimiter and NOT a period.
- * 4. \.(?!$|[ \t\n\r]) matches a period ONLY if it is NOT followed by whitespace or end-of-string.
+ * Either:
+ * 1. "(?:[^"\n\r]*)" - a double-quoted string (for paths with spaces, e.g. on Windows) without internal newlines.
+ * 2. An unquoted path consisting of escaped characters or non-delimiter characters (excluding quotes).
+ * 3. \.(?!$|[ \t\n\r]) matches a period ONLY if it is NOT followed by whitespace or end-of-string.
+ *
+ * Notably, a quoted string cannot be extended by unquoted characters, and unquoted paths cannot contain unescaped quotes.
+ * This prevents catastrophic multi-line matches when code like `import { x } from "@scope/pkg";` is processed.
  */
 export const AT_COMMAND_PATH_REGEX_SOURCE =
-  '(?:(?:"(?:[^"]*)")|(?:\\\\.|[^ \\t\\n\\r,;!?()\\[\\]{}.]|\\.(?!$|[ \\t\\n\\r])))+';
+  '(?:(?:"[^"\\n\\r]*")|(?:\\\\.|[^ \\t\\n\\r,;!?()\\[\\]{}."\'`]|\\.(?!$|[ \\t\\n\\r]))+)';
 
 interface HandleAtCommandParams {
   query: string;
@@ -304,7 +307,19 @@ async function resolveFilePaths(
       // We also allow glob fallback for "unauthorized" results from resolveAtCommandPath,
       // as they might represent a relative path that matched an unauthorized file in one directory
       // but might have a valid match (via glob) in another.
-      if (config.getEnableRecursiveFileSearch() && globTool) {
+      // Guard against excessively long paths or newlines before invoking globTool to prevent
+      // exponential brace expansion / synchronous CPU hangs in minimatch (#29434).
+      const MAX_GLOB_SEARCH_PATH_LENGTH = 255;
+      const isPathSuitableForGlob =
+        pathName.length > 0 &&
+        pathName.length <= MAX_GLOB_SEARCH_PATH_LENGTH &&
+        !/[\r\n\0]/.test(pathName);
+
+      if (
+        config.getEnableRecursiveFileSearch() &&
+        globTool &&
+        isPathSuitableForGlob
+      ) {
         onDebugMessage(
           `Path ${pathName} not found directly, attempting glob search.`,
         );
