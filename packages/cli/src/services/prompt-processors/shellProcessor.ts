@@ -38,13 +38,38 @@ export class ConfirmationRequiredError extends Error {
  */
 export const SHELL_INJECTION_TIMEOUT_MS = 60_000;
 
+interface CommandAbortSignal {
+  signal: AbortSignal;
+  cleanup: () => void;
+}
+
 /**
  * Builds the signal a single injection is executed under: the caller's
  * cancellation (when there is one) combined with the per-command timeout.
+ * The returned cleanup must run when execution settles so short-lived commands
+ * do not leave a timer or listener attached to a long-lived caller signal.
  */
-function getCommandAbortSignal(caller?: AbortSignal): AbortSignal {
-  const timeoutSignal = AbortSignal.timeout(SHELL_INJECTION_TIMEOUT_MS);
-  return caller ? AbortSignal.any([timeoutSignal, caller]) : timeoutSignal;
+function getCommandAbortSignal(caller?: AbortSignal): CommandAbortSignal {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(
+    () => controller.abort(),
+    SHELL_INJECTION_TIMEOUT_MS,
+  );
+  const onCallerAbort = () => controller.abort();
+
+  if (caller?.aborted) {
+    controller.abort();
+  } else {
+    caller?.addEventListener('abort', onCallerAbort, { once: true });
+  }
+
+  return {
+    signal: controller.signal,
+    cleanup: () => {
+      clearTimeout(timeoutId);
+      caller?.removeEventListener('abort', onCallerAbort);
+    },
+  };
 }
 
 /**
@@ -184,16 +209,21 @@ export class ShellProcessor implements IPromptProcessor {
           defaultFg: activeTheme.colors.Foreground,
           defaultBg: activeTheme.colors.Background,
         };
-        const { result } = await ShellExecutionService.execute(
-          injection.resolvedCommand,
-          config.getTargetDir(),
-          () => {},
-          getCommandAbortSignal(context.signal),
-          config.getEnableInteractiveShell(),
-          shellExecutionConfig,
-        );
-
-        const executionResult = await result;
+        const commandAbort = getCommandAbortSignal(context.signal);
+        let executionResult;
+        try {
+          const { result } = await ShellExecutionService.execute(
+            injection.resolvedCommand,
+            config.getTargetDir(),
+            () => {},
+            commandAbort.signal,
+            config.getEnableInteractiveShell(),
+            shellExecutionConfig,
+          );
+          executionResult = await result;
+        } finally {
+          commandAbort.cleanup();
+        }
 
         // Handle Spawn Errors
         if (executionResult.error && !executionResult.aborted) {
