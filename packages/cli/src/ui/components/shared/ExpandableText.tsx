@@ -7,6 +7,7 @@
 import React from 'react';
 import { Text } from 'ink';
 import { theme } from '../../semantic-colors.js';
+import { cpLen, cpSlice, toCodePoints } from '../../utils/textUtils.js';
 
 export const MAX_WIDTH = 150;
 
@@ -19,6 +20,24 @@ export interface ExpandableTextProps {
   maxWidth?: number;
   maxLines?: number;
 }
+
+/**
+ * Converts a UTF-16 code-unit index (e.g. one produced by String.indexOf)
+ * into a code-point index, stepping back so the boundary never falls inside
+ * a surrogate pair.
+ */
+const toCodePointIndex = (str: string, utf16Index: number): number => {
+  const index =
+    utf16Index > 0 &&
+    utf16Index < str.length &&
+    str.charCodeAt(utf16Index - 1) >= 0xd800 &&
+    str.charCodeAt(utf16Index - 1) <= 0xdbff &&
+    str.charCodeAt(utf16Index) >= 0xdc00 &&
+    str.charCodeAt(utf16Index) <= 0xdfff
+      ? utf16Index - 1
+      : utf16Index;
+  return toCodePoints(str.slice(0, index)).length;
+};
 
 const _ExpandableText: React.FC<ExpandableTextProps> = ({
   label,
@@ -46,15 +65,15 @@ const _ExpandableText: React.FC<ExpandableTextProps> = ({
         let truncated = lines.slice(0, maxLines).join('\n');
         const hasMoreLines = lines.length > maxLines;
 
-        // 2. Truncate by characters (visual approximation) to prevent massive wrapping
-        if (truncated.length > maxWidth) {
-          truncated = truncated.slice(0, maxWidth) + '...';
+        // 2. Truncate by code points so a surrogate pair is never split
+        if (cpLen(truncated) > maxWidth) {
+          truncated = cpSlice(truncated, 0, maxWidth) + '...';
         } else if (hasMoreLines) {
           truncated += '...';
         }
         display = truncated;
-      } else if (label.length > maxWidth) {
-        display = label.slice(0, maxWidth) + '...';
+      } else if (cpLen(label) > maxWidth) {
+        display = cpSlice(label, 0, maxWidth) + '...';
       }
     }
 
@@ -65,52 +84,61 @@ const _ExpandableText: React.FC<ExpandableTextProps> = ({
     );
   }
 
-  const matchLength = userInput.length;
+  // All indexes below are code-point based so truncation never lands inside
+  // a surrogate pair (matchedIndex itself is a UTF-16 index from indexOf).
+  const totalCp = cpLen(label);
+  const matchStartCp = toCodePointIndex(label, matchedIndex);
+  const matchLengthCp = cpLen(userInput);
   let before = '';
   let match = '';
   let after = '';
 
   // Case 1: Show the full string if it's expanded or already fits
-  if (isExpanded || label.length <= maxWidth) {
-    before = label.slice(0, matchedIndex);
-    match = label.slice(matchedIndex, matchedIndex + matchLength);
-    after = label.slice(matchedIndex + matchLength);
+  if (isExpanded || totalCp <= maxWidth) {
+    before = cpSlice(label, 0, matchStartCp);
+    match = cpSlice(label, matchStartCp, matchStartCp + matchLengthCp);
+    after = cpSlice(label, matchStartCp + matchLengthCp);
   }
   // Case 2: The match itself is too long, so we only show a truncated portion of the match
-  else if (matchLength >= maxWidth) {
-    match = label.slice(matchedIndex, matchedIndex + maxWidth - 1) + '...';
+  else if (matchLengthCp >= maxWidth) {
+    match = cpSlice(label, matchStartCp, matchStartCp + maxWidth - 1) + '...';
   }
   // Case 3: Truncate the string to create a window around the match
   else {
-    const contextSpace = maxWidth - matchLength;
+    const contextSpace = maxWidth - matchLengthCp;
     const beforeSpace = Math.floor(contextSpace / 2);
     const afterSpace = Math.ceil(contextSpace / 2);
 
-    let start = matchedIndex - beforeSpace;
-    let end = matchedIndex + matchLength + afterSpace;
+    let start = matchStartCp - beforeSpace;
+    let end = matchStartCp + matchLengthCp + afterSpace;
 
     if (start < 0) {
       end += -start; // Slide window right
       start = 0;
     }
-    if (end > label.length) {
-      start -= end - label.length; // Slide window left
-      end = label.length;
+    if (end > totalCp) {
+      start -= end - totalCp; // Slide window left
+      end = totalCp;
     }
     start = Math.max(0, start);
 
-    const finalMatchIndex = matchedIndex - start;
-    const slicedLabel = label.slice(start, end);
+    const finalMatchIndex = matchStartCp - start;
+    const slicedLabel = cpSlice(label, start, end);
 
-    before = slicedLabel.slice(0, finalMatchIndex);
-    match = slicedLabel.slice(finalMatchIndex, finalMatchIndex + matchLength);
-    after = slicedLabel.slice(finalMatchIndex + matchLength);
+    before = cpSlice(slicedLabel, 0, finalMatchIndex);
+    match = cpSlice(
+      slicedLabel,
+      finalMatchIndex,
+      finalMatchIndex + matchLengthCp,
+    );
+    after = cpSlice(slicedLabel, finalMatchIndex + matchLengthCp);
 
     if (start > 0) {
-      before = before.length >= 3 ? '...' + before.slice(3) : '...';
+      before = cpLen(before) >= 3 ? '...' + cpSlice(before, 3) : '...';
     }
-    if (end < label.length) {
-      after = after.length >= 3 ? after.slice(0, -3) + '...' : '...';
+    if (end < totalCp) {
+      after =
+        cpLen(after) >= 3 ? cpSlice(after, 0, cpLen(after) - 3) + '...' : '...';
     }
   }
 

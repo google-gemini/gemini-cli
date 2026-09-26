@@ -9,7 +9,7 @@ import { theme } from '../semantic-colors.js';
 import { ExpandableText, MAX_WIDTH } from './shared/ExpandableText.js';
 import { CommandKind } from '../commands/types.js';
 import { Colors } from '../colors.js';
-import { sanitizeForDisplay } from '../utils/textUtils.js';
+import { sanitizeForDisplay, cpLen } from '../utils/textUtils.js';
 
 export interface Suggestion {
   label: string;
@@ -88,7 +88,7 @@ export function SuggestionsDisplay({
         const isActive = originalIndex === activeIndex;
         const isExpanded = originalIndex === expandedIndex;
         const textColor = isActive ? theme.ui.focus : theme.text.secondary;
-        const isLong = suggestion.value.length >= MAX_WIDTH;
+        const isLong = cpLen(suggestion.value) > MAX_WIDTH;
         const previousSectionTitle =
           suggestions[originalIndex - 1]?.sectionTitle;
         const shouldRenderSectionHeader =
