@@ -70,6 +70,9 @@ export const SubagentGroupDisplay: React.FC<SubagentGroupDisplayProps> = ({
         case SubagentState.COMPLETED:
           headerText = 'Agent Completed';
           break;
+        case SubagentState.INCOMPLETE:
+          headerText = 'Agent Incomplete';
+          break;
         case SubagentState.CANCELLED:
           headerText = 'Agent Cancelled';
           break;
@@ -210,6 +213,8 @@ export const SubagentGroupDisplay: React.FC<SubagentGroupDisplayProps> = ({
             } else {
               content = 'Completed successfully';
             }
+          } else if (progress.state === SubagentState.INCOMPLETE) {
+            content = `Budget exhausted (${progress.terminateReason ?? 'MAX_TURNS'})`;
           } else if (lastActivity) {
             // Match expanded view logic exactly:
             // Primary text: displayName || content
@@ -233,6 +238,8 @@ export const SubagentGroupDisplay: React.FC<SubagentGroupDisplayProps> = ({
                 return <Text color={theme.text.primary}>!</Text>;
               case SubagentState.COMPLETED:
                 return <Text color={theme.status.success}>✓</Text>;
+              case SubagentState.INCOMPLETE:
+                return <Text color={theme.status.warning}>⚠</Text>;
               case SubagentState.CANCELLED:
                 return <Text color={theme.status.warning}>ℹ</Text>;
               case SubagentState.ERROR:
