@@ -1878,7 +1878,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
       };
 
       let enteringConstrainHeightMode = false;
-      if (!constrainHeight) {
+      if (
+        !constrainHeight &&
+        (keyMatchers[Command.SHOW_MORE_LINES](key) ||
+          keyMatchers[Command.ESCAPE](key))
+      ) {
         enteringConstrainHeightMode = true;
         setConstrainHeight(true);
         if (keyMatchers[Command.SHOW_MORE_LINES](key)) {
