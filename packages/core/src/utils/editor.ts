@@ -401,6 +401,9 @@ export function getDiffCommand(
  * argument splitting and command injection.
  */
 export function quoteCmdArg(arg: string): string {
+  if (/[\r\n]/.test(arg)) {
+    throw new Error('Invalid argument: newlines are not allowed');
+  }
   if (!arg) {
     return '""';
   }

@@ -671,6 +671,18 @@ describe('editor utils', () => {
         '"C:\\dir with spaces\\\\"',
       );
     });
+
+    it('should throw an error if argument contains newline or carriage return characters', () => {
+      expect(() => quoteCmdArg('file\nname.txt')).toThrow(
+        'Invalid argument: newlines are not allowed',
+      );
+      expect(() => quoteCmdArg('file\rname.txt')).toThrow(
+        'Invalid argument: newlines are not allowed',
+      );
+      expect(() => quoteCmdArg('file\r\nname.txt')).toThrow(
+        'Invalid argument: newlines are not allowed',
+      );
+    });
   });
 
   describe('allowEditorTypeInSandbox', () => {
