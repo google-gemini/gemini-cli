@@ -14,6 +14,7 @@ import type { ToolRegistry } from '../tools/tool-registry.js';
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
 import type { ResourceRegistry } from '../resources/resource-registry.js';
 import type { EditorType } from '../utils/editor.js';
+import type { HoldDirective } from '../services/userDirectiveService.js';
 
 /**
  * Options for scheduling agent tools.
@@ -37,6 +38,11 @@ export interface AgentSchedulingOptions {
   getPreferredEditor?: () => EditorType | undefined;
   /** Optional function to be notified when the scheduler is waiting for user confirmation. */
   onWaitingForConfirmation?: (waiting: boolean) => void;
+  /**
+   * When set, the scheduler will block mutating tool calls and return an error
+   * to the model explaining the hold. Read-only tools remain available.
+   */
+  activeHoldDirective?: HoldDirective | null;
 }
 
 /**
@@ -62,6 +68,7 @@ export async function scheduleAgentTools(
     signal,
     getPreferredEditor,
     onWaitingForConfirmation,
+    activeHoldDirective,
   } = options;
 
   const schedulerContext = {
@@ -83,6 +90,7 @@ export async function scheduleAgentTools(
     subagent,
     parentCallId,
     onWaitingForConfirmation,
+    activeHoldDirective,
   });
 
   try {

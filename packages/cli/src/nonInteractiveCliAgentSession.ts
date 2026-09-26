@@ -39,6 +39,7 @@ import {
   geminiPartsToContentParts,
   displayContentToString,
   debugLogger,
+  detectHoldDirective,
   THINKING_ONLY_COMPRESS_SUGGESTION,
   MAX_TOKENS_EXCEEDED_SUGGESTION,
   SAFETY_BLOCKED_MESSAGE,
@@ -299,6 +300,20 @@ export async function runNonInteractive({
           role: 'user',
           content: input,
         });
+      }
+
+      // Detect user hold directives (e.g., "don't apply yet", "explain first")
+      // and configure the scheduler to block mutating tool calls.
+      const holdDirective = detectHoldDirective(input);
+      if (holdDirective) {
+        scheduler.setActiveHoldDirective(holdDirective);
+        debugLogger.log(
+          `[HoldDirective] Detected "${holdDirective.type}" directive ` +
+            `(matched: "${holdDirective.matchedPhrase}"). ` +
+            `Mutating tools will be blocked for this turn.`,
+        );
+      } else {
+        scheduler.setActiveHoldDirective(null);
       }
 
       // Create LegacyAgentSession — owns the agentic loop

@@ -53,6 +53,8 @@ import {
   type McpProgressPayload,
 } from '../utils/events.js';
 import { GeminiCliOperation } from '../telemetry/constants.js';
+import type { HoldDirective } from '../services/userDirectiveService.js';
+import { checkHoldDirectiveBatch } from './holdDirectiveGuard.js';
 
 interface SchedulerQueueItem {
   requests: ToolCallRequestInfo[];
@@ -69,6 +71,12 @@ export interface SchedulerOptions {
   subagent?: string;
   parentCallId?: string;
   onWaitingForConfirmation?: (waiting: boolean) => void;
+  /**
+   * When set, the scheduler will block mutating tool calls and return
+   * an error to the model explaining that the user has issued a hold directive.
+   * Read-only tools (grep, read_file, ls, etc.) remain available.
+   */
+  activeHoldDirective?: HoldDirective | null;
 }
 
 interface TaintRiskDetectable {
@@ -126,6 +134,7 @@ export class Scheduler {
   private readonly subagent?: string;
   private readonly parentCallId?: string;
   private readonly onWaitingForConfirmation?: (waiting: boolean) => void;
+  private activeHoldDirective: HoldDirective | null;
 
   private isProcessing = false;
   private isCancelling = false;
@@ -140,6 +149,7 @@ export class Scheduler {
     this.subagent = options.subagent;
     this.parentCallId = options.parentCallId;
     this.onWaitingForConfirmation = options.onWaitingForConfirmation;
+    this.activeHoldDirective = options.activeHoldDirective ?? null;
     this.state = new SchedulerStateManager(
       this.messageBus,
       this.schedulerId,
@@ -156,6 +166,15 @@ export class Scheduler {
   dispose(): void {
     coreEvents.off(CoreEvent.McpProgress, this.handleMcpProgress);
     this.disposeController.abort();
+  }
+
+  /**
+   * Updates the active hold directive at runtime.
+   * Called when a new user message is received to (re)evaluate
+   * whether the user wants the agent to hold off on mutations.
+   */
+  setActiveHoldDirective(directive: HoldDirective | null): void {
+    this.activeHoldDirective = directive;
   }
 
   private readonly handleMcpProgress = (payload: McpProgressPayload) => {
@@ -333,6 +352,16 @@ export class Scheduler {
     });
 
     try {
+      // --- Hold Directive Guard ---
+      // Check if any tool calls should be blocked due to an active user
+      // hold directive (e.g., "don't apply changes yet", "explain first").
+      // Blocked calls receive an immediate error response that instructs
+      // the model to present findings and wait for explicit authorization.
+      const holdBlockedCalls = checkHoldDirectiveBatch(
+        sortedRequests,
+        this.activeHoldDirective,
+      );
+
       const toolRegistry = this.context.toolRegistry;
       const newCalls: ToolCall[] = sortedRequests.map((request) => {
         const enrichedRequest: ToolCallRequestInfo = {
@@ -340,6 +369,28 @@ export class Scheduler {
           schedulerId: this.schedulerId,
           parentCallId: this.parentCallId,
         };
+
+        // If this call is blocked by the hold directive, return an
+        // immediate error without ever reaching the tool or policy layer.
+        const holdCheck = holdBlockedCalls.get(request.callId);
+        if (holdCheck?.blocked) {
+          return {
+            status: CoreToolCallStatus.Error,
+            request: enrichedRequest,
+            response: createErrorResponse(
+              enrichedRequest,
+              new Error(
+                holdCheck.errorMessage?.trim() ||
+                  'Tool call blocked by active user hold directive.',
+              ),
+              holdCheck.errorType,
+            ),
+            durationMs: 0,
+            schedulerId: this.schedulerId,
+            approvalMode: currentApprovalMode,
+          } as ErroredToolCall;
+        }
+
         const tool = toolRegistry.getTool(request.name);
 
         if (!tool) {
