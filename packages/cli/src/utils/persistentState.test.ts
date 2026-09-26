@@ -22,12 +22,29 @@ vi.mock('@google/gemini-cli-core', () => ({
 
 describe('PersistentState', () => {
   let persistentState: PersistentState;
+  let mockFileHandle: {
+    writeFile: ReturnType<typeof vi.fn>;
+    sync: ReturnType<typeof vi.fn>;
+    close: ReturnType<typeof vi.fn>;
+  };
   const mockDir = '/mock/dir';
   const mockFilePath = path.join(mockDir, 'state.json');
 
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(Storage.getGlobalGeminiDir).mockReturnValue(mockDir);
+    mockFileHandle = {
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      sync: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    vi.mocked(fs.promises.mkdir).mockResolvedValue(undefined);
+    vi.mocked(fs.promises.open).mockResolvedValue(
+      mockFileHandle as unknown as fs.promises.FileHandle,
+    );
+    vi.mocked(fs.promises.copyFile).mockResolvedValue(undefined);
+    vi.mocked(fs.promises.rename).mockResolvedValue(undefined);
+    vi.mocked(fs.promises.unlink).mockResolvedValue(undefined);
     persistentState = new PersistentState();
   });
 
@@ -47,16 +64,35 @@ describe('PersistentState', () => {
     expect(value).toBeUndefined();
   });
 
-  it('should save state to file', () => {
+  it('should save state through a temporary file and publish it atomically', async () => {
     vi.mocked(fs.existsSync).mockReturnValue(false);
-    persistentState.set('defaultBannerShownCount', { banner1: 1 });
+    await persistentState.set('defaultBannerShownCount', { banner1: 1 });
 
-    expect(fs.mkdirSync).toHaveBeenCalledWith(path.normalize(mockDir), {
+    expect(fs.promises.mkdir).toHaveBeenCalledWith(path.normalize(mockDir), {
       recursive: true,
     });
-    expect(fs.writeFileSync).toHaveBeenCalledWith(
-      mockFilePath,
+    expect(fs.promises.open).toHaveBeenCalledWith(
+      expect.stringMatching(/state\.json\..+\.tmp$/),
+      'wx',
+    );
+    expect(mockFileHandle.writeFile).toHaveBeenCalledWith(
       JSON.stringify({ defaultBannerShownCount: { banner1: 1 } }, null, 2),
+      'utf-8',
+    );
+    expect(mockFileHandle.sync).toHaveBeenCalled();
+    expect(mockFileHandle.close).toHaveBeenCalled();
+    expect(fs.promises.rename).toHaveBeenCalledWith(
+      expect.stringMatching(/state\.json\..+\.tmp$/),
+      mockFilePath,
+    );
+  });
+
+  it('should keep the previous state in a backup before replacing it', async () => {
+    await persistentState.set('defaultBannerShownCount', { banner1: 1 });
+
+    expect(fs.promises.copyFile).toHaveBeenCalledWith(
+      mockFilePath,
+      `${mockFilePath}.bak`,
     );
   });
 
@@ -71,13 +107,51 @@ describe('PersistentState', () => {
     expect(debugLogger.warn).toHaveBeenCalled();
   });
 
-  it('should handle save errors', () => {
-    vi.mocked(fs.existsSync).mockReturnValue(false);
-    vi.mocked(fs.writeFileSync).mockImplementation(() => {
-      throw new Error('Write error');
-    });
+  it('should persist a restored backup synchronously', () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockImplementation((filePath) =>
+      filePath === mockFilePath ? '{"broken":' : '{"tipsShown": 2}',
+    );
+    vi.mocked(fs.openSync).mockReturnValue(7);
+    vi.mocked(fs.writeSync).mockReturnValue(0);
 
-    persistentState.set('defaultBannerShownCount', { banner1: 1 });
+    const value = persistentState.get('defaultBannerShownCount');
+
+    expect(value).toBeUndefined();
+    expect(persistentState.get('tipsShown')).toBe(2);
+    expect(fs.renameSync).toHaveBeenCalledWith(
+      mockFilePath,
+      `${mockFilePath}.corrupt`,
+    );
+    expect(fs.openSync).toHaveBeenCalledWith(
+      expect.stringMatching(/state\.json\..+\.tmp$/),
+      'wx',
+    );
+    expect(fs.openSync).toHaveBeenCalledTimes(1);
+    expect(fs.writeSync).toHaveBeenCalledWith(
+      7,
+      JSON.stringify({ tipsShown: 2 }, null, 2),
+      null,
+      'utf-8',
+    );
+    expect(fs.fsyncSync).toHaveBeenCalledWith(7);
+    expect(fs.closeSync).toHaveBeenCalledWith(7);
+    expect(fs.renameSync).toHaveBeenNthCalledWith(
+      2,
+      expect.stringMatching(/state\.json\..+\.tmp$/),
+      mockFilePath,
+    );
+    expect(debugLogger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('corrupt'),
+      expect.any(Error),
+    );
+  });
+
+  it('should handle save errors', async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(false);
+    vi.mocked(fs.promises.open).mockRejectedValue(new Error('Write error'));
+
+    await persistentState.set('defaultBannerShownCount', { banner1: 1 });
     expect(debugLogger.warn).toHaveBeenCalled();
   });
 });

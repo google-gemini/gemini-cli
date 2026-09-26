@@ -28,7 +28,7 @@ export function useVisibilityToggle() {
   }, []);
 
   const persistFocusUiPreference = useCallback((isFullUiVisible: boolean) => {
-    persistentState.set(FOCUS_UI_ENABLED_STATE_KEY, !isFullUiVisible);
+    void persistentState.set(FOCUS_UI_ENABLED_STATE_KEY, !isFullUiVisible);
   }, []);
 
   const setCleanUiDetailsVisible = useCallback(
