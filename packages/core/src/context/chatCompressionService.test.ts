@@ -537,6 +537,139 @@ describe('ChatCompressionService', () => {
   });
 
   describe('Reverse Token Budget Truncation', () => {
+    it('should preserve message and part order without mutating the original history', async () => {
+      vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(600000);
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'first' }, { text: 'second' }] },
+        {
+          role: 'model',
+          parts: [
+            { text: 'before call' },
+            { functionCall: { name: 'grep', args: { pattern: 'test' } } },
+            { text: 'after call' },
+          ],
+        },
+        {
+          role: 'user',
+          parts: [
+            { text: 'before response' },
+            {
+              functionResponse: { name: 'grep', response: { output: 'match' } },
+            },
+            { text: 'after response' },
+          ],
+        },
+        { role: 'model', parts: [] },
+        { role: 'user' },
+      ];
+      const originalHistory = structuredClone(history);
+      vi.mocked(mockChat.getHistory).mockReturnValue(history);
+
+      const result = await service.compress(
+        mockChat,
+        mockPromptId,
+        false,
+        mockModel,
+        mockConfig,
+        true,
+      );
+
+      expect(result.info.compressionStatus).toBe(
+        CompressionStatus.CONTENT_TRUNCATED,
+      );
+      expect(result.newHistory).toEqual(
+        history.map((content) => ({ ...content, parts: content.parts ?? [] })),
+      );
+      expect(history).toEqual(originalHistory);
+    });
+
+    it.each([false, true])(
+      'should prioritize the newest response in a multi-part message when saving fails: %s',
+      async (saveFails) => {
+        vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(600000);
+        vi.spyOn(tokenCalculation, 'estimateTokenCountSync').mockImplementation(
+          (parts) =>
+            parts.reduce(
+              (total, part) =>
+                total + (part.text?.startsWith('large-') ? 30000 : 1),
+              0,
+            ),
+        );
+        const saveOutput = vi.spyOn(fileUtils, 'saveTruncatedToolOutput');
+        if (saveFails) {
+          saveOutput.mockRejectedValue(new Error('Disk full'));
+        } else {
+          saveOutput.mockResolvedValue({ outputFile: 'older-output.txt' });
+        }
+        vi.spyOn(fileUtils, 'formatTruncatedToolOutput').mockReturnValue(
+          'truncated older output',
+        );
+
+        const olderResponse: Part = {
+          functionResponse: {
+            name: 'older',
+            response: { output: 'large-older' },
+          },
+        };
+        const newerResponse: Part = {
+          functionResponse: {
+            name: 'newer',
+            response: { output: 'large-newer' },
+          },
+        };
+        const before: Part = { text: 'before' };
+        const between: Part = { text: 'between' };
+        const after: Part = { text: 'after' };
+        const history: Content[] = [
+          {
+            role: 'user',
+            parts: [before, olderResponse, between, newerResponse, after],
+          },
+        ];
+        const originalHistory = structuredClone(history);
+        vi.mocked(mockChat.getHistory).mockReturnValue(history);
+
+        const result = await service.compress(
+          mockChat,
+          mockPromptId,
+          false,
+          mockModel,
+          mockConfig,
+          true,
+        );
+
+        expect(result.info.compressionStatus).toBe(
+          CompressionStatus.CONTENT_TRUNCATED,
+        );
+        expect(saveOutput).toHaveBeenCalledExactlyOnceWith(
+          'large-older',
+          'older',
+          1,
+          testTempDir,
+        );
+        expect(result.newHistory).toEqual([
+          {
+            role: 'user',
+            parts: [
+              before,
+              saveFails
+                ? olderResponse
+                : {
+                    functionResponse: {
+                      name: 'older',
+                      response: { output: 'truncated older output' },
+                    },
+                  },
+              between,
+              newerResponse,
+              after,
+            ],
+          },
+        ]);
+        expect(history).toEqual(originalHistory);
+      },
+    );
+
     it('should truncate older function responses when budget is exceeded', async () => {
       vi.mocked(mockConfig.getCompressionThreshold).mockResolvedValue(0.5);
       vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(600000);
