@@ -2094,7 +2094,7 @@ describe('InputPrompt', () => {
   });
 
   describe('unfocused paste', () => {
-    it('should handle bracketed paste when not focused', async () => {
+    it('should ignore bracketed paste when not focused', async () => {
       props.focus = false;
       const { stdin, unmount } = await renderWithProviders(
         <TestInputPrompt {...props} />,
@@ -2103,14 +2103,9 @@ describe('InputPrompt', () => {
       await act(async () => {
         stdin.write('\x1B[200~pasted text\x1B[201~');
       });
-      await waitFor(() => {
-        expect(mockBuffer.handleInput).toHaveBeenCalledWith(
-          expect.objectContaining({
-            name: 'paste',
-            sequence: 'pasted text',
-          }),
-        );
-      });
+      await waitFor(() => {});
+
+      expect(mockBuffer.handleInput).not.toHaveBeenCalled();
       unmount();
     });
 

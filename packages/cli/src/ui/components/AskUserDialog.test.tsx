@@ -71,6 +71,14 @@ describe('AskUserDialog', () => {
       expectedSubmit: { '0': 'OAuth 2.0' },
     },
     {
+      name: 'Single Select with Spacebar',
+      questions: authQuestion,
+      actions: (stdin: { write: (data: string) => void }) => {
+        writeKey(stdin, ' ');
+      },
+      expectedSubmit: { '0': 'OAuth 2.0' },
+    },
+    {
       name: 'Multi-select',
       questions: [
         {
@@ -92,6 +100,31 @@ describe('AskUserDialog', () => {
         writeKey(stdin, '\x1b[B'); // Down to Other
         writeKey(stdin, '\x1b[B'); // Down to Done
         writeKey(stdin, '\r'); // Done
+      },
+      expectedSubmit: { '0': 'TypeScript, ESLint' },
+    },
+    {
+      name: 'Multi-select with Spacebar',
+      questions: [
+        {
+          question: 'Which features?',
+          header: 'Features',
+          type: QuestionType.CHOICE,
+          options: [
+            { label: 'TypeScript', description: '' },
+            { label: 'ESLint', description: '' },
+          ],
+          multiSelect: true,
+        },
+      ] as Question[],
+      actions: (stdin: { write: (data: string) => void }) => {
+        writeKey(stdin, ' '); // Toggle TS with Spacebar
+        writeKey(stdin, '\x1b[B'); // Down
+        writeKey(stdin, ' '); // Toggle ESLint with Spacebar
+        writeKey(stdin, '\x1b[B'); // Down to All of the above
+        writeKey(stdin, '\x1b[B'); // Down to Other
+        writeKey(stdin, '\x1b[B'); // Down to Done
+        writeKey(stdin, ' '); // Done with Spacebar
       },
       expectedSubmit: { '0': 'TypeScript, ESLint' },
     },
