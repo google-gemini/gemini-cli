@@ -463,6 +463,176 @@ describe('classifyGoogleError', () => {
     expect(result).toBeInstanceOf(TerminalQuotaError);
   });
 
+  it('should carry the server reset window for QUOTA_EXHAUSTED without RetryInfo', () => {
+    const resetTime = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString();
+    const apiError: GoogleApiError = {
+      code: 429,
+      message:
+        'Individual quota reached. Please upgrade your subscription to increase your limits.',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'QUOTA_EXHAUSTED',
+          domain: 'cloudcode-pa.googleapis.com',
+          metadata: {
+            uiMessage: 'true',
+            model: 'gemini-3.1-pro-preview',
+            quotaResetTimeStamp: resetTime,
+          },
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+
+    const result = classifyGoogleError(new Error());
+
+    expect(result).toBeInstanceOf(TerminalQuotaError);
+    const quotaError = result as TerminalQuotaError;
+    expect(quotaError.resetTime).toBe(resetTime);
+    expect(quotaError.isUserFacingMessage).toBe(true);
+    // A reset this far out is reported, not waited on.
+    expect(quotaError.retryDelayMs).toBeUndefined();
+  });
+
+  it('should derive a retry delay from a reset timestamp that is moments away', () => {
+    const resetTime = new Date(Date.now() + 60_000).toISOString();
+    const apiError: GoogleApiError = {
+      code: 429,
+      message: 'Rate limit exceeded',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'RATE_LIMIT_EXCEEDED',
+          domain: 'cloudcode-pa.googleapis.com',
+          metadata: { quotaResetTimeStamp: resetTime },
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+
+    const result = classifyGoogleError(new Error());
+
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+    const quotaError = result as RetryableQuotaError;
+    expect(quotaError.retryDelayMs).toBeGreaterThan(50_000);
+    expect(quotaError.retryDelayMs).toBeLessThanOrEqual(60_000);
+  });
+
+  it('should carry the reset window from a real Code Assist rejection', () => {
+    // Captured from a gcp-standard-tier account whose request buckets still
+    // reported 95.8-100% remaining (#29425).
+    const apiError: GoogleApiError = {
+      code: 429,
+      message:
+        'Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 9h22m20s.',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'QUOTA_EXHAUSTED',
+          domain: 'cloudcode-pa.googleapis.com',
+          metadata: {
+            quotaResetTimeStamp: '2026-09-20T21:03:14Z',
+            quotaResetDelay: '33740.910400305s',
+            uiMessage: 'true',
+            model: 'gemini-3.5-flash',
+          },
+        },
+        {
+          '@type': 'type.googleapis.com/google.rpc.RetryInfo',
+          retryDelay: '33740.910400305s',
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+
+    const result = classifyGoogleError(new Error());
+
+    expect(result).toBeInstanceOf(TerminalQuotaError);
+    const quotaError = result as TerminalQuotaError;
+    expect(quotaError.reason).toBe('QUOTA_EXHAUSTED');
+    expect(quotaError.resetTime).toBe('2026-09-20T21:03:14.000Z');
+    expect(quotaError.isUserFacingMessage).toBe(true);
+    // RetryInfo still supplies the delay when the server sends one.
+    expect(quotaError.retryDelayMs).toBeCloseTo(33_740_910.4, 0);
+  });
+
+  it('should not derive a retry delay from a reset timestamp in the past', () => {
+    const resetTime = new Date(Date.now() - 60_000).toISOString();
+    const apiError: GoogleApiError = {
+      code: 429,
+      message: 'Individual quota reached.',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'QUOTA_EXHAUSTED',
+          domain: 'cloudcode-pa.googleapis.com',
+          metadata: { quotaResetTimeStamp: resetTime },
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+
+    const result = classifyGoogleError(new Error());
+
+    expect(result).toBeInstanceOf(TerminalQuotaError);
+    const quotaError = result as TerminalQuotaError;
+    expect(quotaError.resetTime).toBe(resetTime);
+    expect(quotaError.retryDelayMs).toBeUndefined();
+    expect(quotaError.isUserFacingMessage).toBe(false);
+  });
+
+  it('should prefer RetryInfo over the quota reset metadata for the delay', () => {
+    const resetTime = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString();
+    const apiError: GoogleApiError = {
+      code: 429,
+      message: 'Rate limit exceeded',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'RATE_LIMIT_EXCEEDED',
+          domain: 'cloudcode-pa.googleapis.com',
+          metadata: {
+            quotaResetTimeStamp: resetTime,
+            quotaResetDelay: '120s',
+          },
+        },
+        {
+          '@type': 'type.googleapis.com/google.rpc.RetryInfo',
+          retryDelay: '30s',
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+
+    const result = classifyGoogleError(new Error());
+
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+    const quotaError = result as RetryableQuotaError;
+    expect(quotaError.retryDelayMs).toBe(30_000);
+    expect(quotaError.resetTime).toBe(resetTime);
+  });
+
+  it('should fall back to quotaResetDelay when RetryInfo is absent', () => {
+    const apiError: GoogleApiError = {
+      code: 429,
+      message: 'Rate limit exceeded',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'RATE_LIMIT_EXCEEDED',
+          domain: 'cloudcode-pa.googleapis.com',
+          metadata: { quotaResetDelay: '45s' },
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+
+    const result = classifyGoogleError(new Error());
+
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+    expect((result as RetryableQuotaError).retryDelayMs).toBe(45_000);
+  });
+
   it('should return TerminalQuotaError for INSUFFICIENT_G1_CREDITS_BALANCE without domain', () => {
     const apiError: GoogleApiError = {
       code: 429,
