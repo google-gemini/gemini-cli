@@ -426,7 +426,7 @@ async function truncateHistoryToBudget(
                 config.getTruncateToolOutputThreshold(),
               );
 
-              newParts.unshift({
+              newParts.push({
                 functionResponse: {
                   // eslint-disable-next-line @typescript-eslint/no-misused-spread
                   ...part.functionResponse,
@@ -441,26 +441,26 @@ async function truncateHistoryToBudget(
             } catch (error) {
               // Fallback: if truncation fails, keep the original part to avoid data loss in the chat.
               debugLogger.debug('Failed to truncate history to budget:', error);
-              newParts.unshift(part);
+              newParts.push(part);
               functionResponseTokenCounter += tokens;
             }
           } else {
             // Within budget: keep the full response.
             functionResponseTokenCounter += tokens;
-            newParts.unshift(part);
+            newParts.push(part);
           }
         } else {
           // Non-tool response part: always keep.
-          newParts.unshift(part);
+          newParts.push(part);
         }
       }
     }
 
-    // Reconstruct the message with processed (potentially truncated) parts.
-    truncatedHistory.unshift({ ...content, parts: newParts });
+    // Restore part order once, avoiding repeated front insertions.
+    truncatedHistory.push({ ...content, parts: newParts.reverse() });
   }
 
-  return truncatedHistory;
+  return truncatedHistory.reverse();
 }
 
 export class ChatCompressionService {
