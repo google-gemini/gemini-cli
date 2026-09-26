@@ -5,7 +5,11 @@
  */
 
 import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest';
-import { ConfirmationRequiredError, ShellProcessor } from './shellProcessor.js';
+import {
+  ConfirmationRequiredError,
+  SHELL_INJECTION_TIMEOUT_MS,
+  ShellProcessor,
+} from './shellProcessor.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import type { CommandContext } from '../../ui/commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
@@ -574,6 +578,138 @@ describe('ShellProcessor', () => {
           text: "partial output\n[Shell command 'long-running-command' aborted]",
         },
       ]);
+    });
+  });
+
+  describe('Command cancellation', () => {
+    /**
+     * A command that never exits on its own, whose result only settles once the
+     * signal it was executed with is aborted.
+     */
+    function mockHangingCommand(): () => AbortSignal | undefined {
+      let executedWith: AbortSignal | undefined;
+      mockShellExecute.mockImplementation(
+        (
+          _command: string,
+          _cwd: string,
+          _onOutput: unknown,
+          signal: AbortSignal,
+        ) => {
+          executedWith = signal;
+          return {
+            result: new Promise((resolve) => {
+              signal.addEventListener(
+                'abort',
+                () =>
+                  resolve({
+                    ...SUCCESS_RESULT,
+                    output: 'partial output',
+                    exitCode: null,
+                    aborted: true,
+                  }),
+                { once: true },
+              );
+            }),
+          };
+        },
+      );
+      return () => executedWith;
+    }
+
+    it('should forward the caller signal to shell execution', async () => {
+      const processor = new ShellProcessor('test-command');
+      const prompt: PromptPipelineContent = createPromptPipelineContent(
+        '!{long-running-command}',
+      );
+      const controller = new AbortController();
+      const executedWith = mockHangingCommand();
+
+      context.signal = controller.signal;
+      const processed = processor.process(prompt, context);
+
+      // The command is still running and the caller has not cancelled yet.
+      await vi.waitFor(() => expect(executedWith()).toBeDefined());
+      expect(executedWith()?.aborted).toBe(false);
+
+      controller.abort();
+
+      // Cancelling the caller must reach the subprocess.
+      expect(executedWith()?.aborted).toBe(true);
+      expect(await processed).toEqual([
+        {
+          text: "partial output\n[Shell command 'long-running-command' aborted]",
+        },
+      ]);
+    });
+
+    it('should abort a hung command once the injection timeout elapses', async () => {
+      vi.useFakeTimers();
+      try {
+        const processor = new ShellProcessor('test-command');
+        const prompt: PromptPipelineContent =
+          createPromptPipelineContent('!{hanging-command}');
+        const executedWith = mockHangingCommand();
+        const processed = processor.process(prompt, context);
+
+        await vi.advanceTimersByTimeAsync(0);
+        expect(executedWith()).toBeDefined();
+        expect(executedWith()?.aborted).toBe(false);
+
+        await vi.advanceTimersByTimeAsync(SHELL_INJECTION_TIMEOUT_MS);
+
+        expect(await processed).toEqual([
+          {
+            text: "partial output\n[Shell command 'hanging-command' aborted]",
+          },
+        ]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('should clean up the timeout and caller listener after execution', async () => {
+      vi.useFakeTimers();
+      try {
+        const processor = new ShellProcessor('test-command');
+        const prompt: PromptPipelineContent =
+          createPromptPipelineContent('!{list-command}');
+        const controller = new AbortController();
+        const addListenerSpy = vi.spyOn(controller.signal, 'addEventListener');
+        const removeListenerSpy = vi.spyOn(
+          controller.signal,
+          'removeEventListener',
+        );
+
+        context.signal = controller.signal;
+        const result = await processor.process(prompt, context);
+
+        expect(result).toEqual([{ text: 'default shell output' }]);
+        expect(addListenerSpy).toHaveBeenCalledWith(
+          'abort',
+          expect.any(Function),
+          { once: true },
+        );
+        expect(removeListenerSpy).toHaveBeenCalledWith(
+          'abort',
+          expect.any(Function),
+        );
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('should execute with a live signal when the caller provides none', async () => {
+      const processor = new ShellProcessor('test-command');
+      const prompt: PromptPipelineContent =
+        createPromptPipelineContent('!{list-command}');
+
+      const result = await processor.process(prompt, context);
+
+      expect(result).toEqual([{ text: 'default shell output' }]);
+      const signal = mockShellExecute.mock.calls[0][3] as AbortSignal;
+      expect(signal).toBeInstanceOf(AbortSignal);
+      expect(signal.aborted).toBe(false);
     });
   });
 
