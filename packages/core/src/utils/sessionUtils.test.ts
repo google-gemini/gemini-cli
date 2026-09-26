@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { describe, it, expect } from 'vitest';
+import { type Part } from '@google/genai';
 import { convertSessionToClientHistory } from './sessionUtils.js';
 import { type ConversationRecord } from '../services/chatRecordingService.js';
 import { CoreToolCallStatus } from '../scheduler/types.js';
@@ -184,6 +185,75 @@ describe('convertSessionToClientHistory', () => {
         ],
       },
     ]);
+  });
+
+  it('does not replay tool results already stored as durable user responses', () => {
+    const responsePart: Part = {
+      functionResponse: {
+        id: 'call123',
+        name: 'ls',
+        response: { output: 'file.txt' },
+      },
+    };
+    const messages: ConversationRecord['messages'] = [
+      {
+        id: 'msg1',
+        type: 'gemini',
+        timestamp: '2024-01-01T10:01:00Z',
+        content: 'Let me check.',
+        toolCalls: [
+          {
+            id: 'call123',
+            name: 'ls',
+            args: { dir: '.' },
+            status: CoreToolCallStatus.Success,
+            timestamp: '2024-01-01T10:01:05Z',
+            result: [responsePart],
+          },
+        ],
+      },
+      {
+        id: 'msg1_response',
+        type: 'user',
+        timestamp: '2024-01-01T10:01:06Z',
+        content: [responsePart],
+      },
+    ];
+
+    const history = convertSessionToClientHistory(messages);
+    const responses = history.flatMap((turn) =>
+      (turn.content.parts || []).filter((part) => part.functionResponse),
+    );
+
+    expect(responses).toEqual([responsePart]);
+  });
+
+  it('keeps only one response per call ID in already duplicated sessions', () => {
+    const responsePart: Part = {
+      functionResponse: {
+        id: 'call123',
+        name: 'ls',
+        response: { output: 'file.txt' },
+      },
+    };
+    const messages: ConversationRecord['messages'] = [
+      {
+        id: 'response-1',
+        type: 'user',
+        timestamp: '2024-01-01T10:01:06Z',
+        content: [responsePart],
+      },
+      {
+        id: 'response-2',
+        type: 'user',
+        timestamp: '2024-01-01T10:01:07Z',
+        content: [responsePart],
+      },
+    ];
+
+    const history = convertSessionToClientHistory(messages);
+    expect(history).toHaveLength(1);
+    expect(history[0].content.parts).toEqual([responsePart]);
   });
 
   it('should preserve multi-modal parts (inlineData)', () => {

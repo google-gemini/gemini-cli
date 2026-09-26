@@ -29,6 +29,7 @@ import { ExecutionLifecycleService } from './executionLifecycleService.js';
 import type { AnsiOutput, AnsiToken } from '../utils/terminalSerializer.js';
 
 // Hoisted Mocks
+const mockRealpathSync = vi.hoisted(() => vi.fn());
 const mockPtySpawn = vi.hoisted(() => vi.fn());
 const mockCpSpawn = vi.hoisted(() => vi.fn());
 const mockIsBinary = vi.hoisted(() => vi.fn());
@@ -72,12 +73,14 @@ vi.mock('node:fs', async (importOriginal) => {
       statSync: mockStatSync,
       fstatSync: mockFstatSync,
       closeSync: mockCloseSync,
+      realpathSync: mockRealpathSync,
     },
     mkdirSync: mockMkdirSync,
     createWriteStream: mockCreateWriteStream,
     statSync: mockStatSync,
     fstatSync: mockFstatSync,
     closeSync: mockCloseSync,
+    realpathSync: mockRealpathSync,
   };
 });
 vi.mock('../utils/shell-utils.js', async (importOriginal) => {
@@ -1536,6 +1539,7 @@ describe('ShellExecutionService', () => {
         rdev: targetRdev,
         isCharacterDevice: () => true,
       });
+      mockRealpathSync.mockReturnValue('/dev/ttys001');
       mockFstatSync.mockImplementation((fd: number) => {
         if (fd === 12) {
           return { rdev: targetRdev, isCharacterDevice: () => true };
@@ -1545,6 +1549,7 @@ describe('ShellExecutionService', () => {
 
       const result = closeOrphanSlaveFd(10, '/dev/ttys001');
       expect(result).toBe(12);
+
       expect(mockCloseSync).toHaveBeenCalledTimes(1);
       expect(mockCloseSync).toHaveBeenCalledWith(12);
     });

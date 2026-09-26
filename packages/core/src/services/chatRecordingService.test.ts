@@ -1417,7 +1417,7 @@ describe('ChatRecordingService', () => {
       });
     });
 
-    it('should preserve multi-modal sibling parts during sync', async () => {
+    it('should sync only the matching function response during sync', async () => {
       await chatRecordingService.initialize();
       const modelMsgId = chatRecordingService.recordMessage({
         type: 'gemini',
@@ -1483,12 +1483,10 @@ describe('ChatRecordingService', () => {
         type: 'gemini';
       };
       const result = lastMsg.toolCalls![0].result as Part[];
-      expect(result).toHaveLength(2);
+      expect(result).toHaveLength(1);
       expect(result[0].functionResponse!.response).toEqual({
         output: maskedSnippet,
       });
-      expect(result[1].inlineData).toBeDefined();
-      expect(result[1].inlineData!.mimeType).toBe('image/png');
     });
 
     it('should handle parts appearing BEFORE the functionResponse in a content block', async () => {
@@ -1546,9 +1544,78 @@ describe('ChatRecordingService', () => {
         type: 'gemini';
       };
       const result = lastMsg.toolCalls![0].result as Part[];
-      expect(result).toHaveLength(2);
-      expect(result[0].text).toBe('Prefix metadata or text');
-      expect(result[1].functionResponse!.id).toBe(callId);
+      expect(result).toEqual([
+        {
+          functionResponse: {
+            name: 'read_file',
+            id: callId,
+            response: { output: 'file content' },
+          },
+        },
+      ]);
+    });
+
+    it('keeps parallel tool results isolated to their matching call', async () => {
+      const modelMsgId = chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: '',
+        model: 'gemini-pro',
+      });
+      const calls = ['call-a', 'call-b'].map((id) => ({
+        id,
+        name: 'read_file',
+        args: { path: `${id}.txt` },
+        result: [],
+        status: CoreToolCallStatus.Success,
+        timestamp: new Date().toISOString(),
+      }));
+      chatRecordingService.recordToolCalls('gemini-pro', calls);
+
+      chatRecordingService.updateMessagesFromHistory([
+        { id: modelMsgId, content: { role: 'model', parts: [] } },
+        {
+          id: 'responses',
+          content: {
+            role: 'user',
+            parts: calls.map((call) => ({
+              functionResponse: {
+                id: call.id,
+                name: call.name,
+                response: { output: call.id },
+              },
+            })),
+          },
+        },
+      ]);
+
+      const conversation = (await loadConversationRecord(
+        chatRecordingService.getConversationFilePath()!,
+      )) as ConversationRecord;
+      const toolCalls = (
+        conversation.messages[0] as MessageRecord & {
+          type: 'gemini';
+        }
+      ).toolCalls!;
+      expect(toolCalls.map((call) => call.result)).toEqual([
+        [
+          {
+            functionResponse: {
+              id: 'call-a',
+              name: 'read_file',
+              response: { output: 'call-a' },
+            },
+          },
+        ],
+        [
+          {
+            functionResponse: {
+              id: 'call-b',
+              name: 'read_file',
+              response: { output: 'call-b' },
+            },
+          },
+        ],
+      ]);
     });
 
     it('should not write to disk when no tool calls match', async () => {
