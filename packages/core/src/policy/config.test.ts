@@ -150,7 +150,7 @@ describe('createPolicyEngineConfig', () => {
     expect(calledDirs).toContain(MOCK_DEFAULT_DIR);
   });
 
-  it('should NOT filter out insecure supplemental admin policy directories', async () => {
+  it('should filter out insecure supplemental admin policy directories', async () => {
     const adminPolicyDir = nodePath.resolve('/insecure/admin/policies');
     vi.mocked(isDirectorySecure).mockImplementation(async (path: string) => {
       if (nodePath.resolve(path) === adminPolicyDir) {
@@ -170,7 +170,7 @@ describe('createPolicyEngineConfig', () => {
     );
 
     const calledDirs = loadPoliciesSpy.mock.calls[0][0];
-    expect(calledDirs).toContain(adminPolicyDir);
+    expect(calledDirs).not.toContain(adminPolicyDir);
     expect(calledDirs).toContain(
       nodePath.resolve('/non/existent/system/policies'),
     );
@@ -178,6 +178,114 @@ describe('createPolicyEngineConfig', () => {
       nodePath.resolve('/non/existent/user/policies'),
     );
     expect(calledDirs).toContain(MOCK_DEFAULT_DIR);
+  });
+
+  it('should filter out insecure user policy directories', async () => {
+    const userPolicyDir = nodePath.resolve('/non/existent/user/policies');
+    vi.mocked(isDirectorySecure).mockImplementation(async (path: string) => {
+      if (nodePath.resolve(path) === userPolicyDir) {
+        return { secure: false, reason: 'Insecure directory' };
+      }
+      return { secure: true };
+    });
+
+    const loadPoliciesSpy = vi
+      .spyOn(tomlLoader, 'loadPoliciesFromToml')
+      .mockResolvedValue({ rules: [], checkers: [], errors: [] });
+
+    await createPolicyEngineConfig({}, ApprovalMode.DEFAULT, MOCK_DEFAULT_DIR);
+
+    const calledDirs = loadPoliciesSpy.mock.calls[0][0];
+    expect(calledDirs).not.toContain(userPolicyDir);
+    expect(calledDirs).toContain(
+      nodePath.resolve('/non/existent/system/policies'),
+    );
+    expect(calledDirs).toContain(MOCK_DEFAULT_DIR);
+  });
+
+  it('should filter out insecure workspace policy directories', async () => {
+    const workspacePolicyDir = nodePath.resolve('/insecure/workspace/policies');
+    vi.mocked(isDirectorySecure).mockImplementation(async (path: string) => {
+      if (nodePath.resolve(path) === workspacePolicyDir) {
+        return { secure: false, reason: 'Insecure directory' };
+      }
+      return { secure: true };
+    });
+
+    const loadPoliciesSpy = vi
+      .spyOn(tomlLoader, 'loadPoliciesFromToml')
+      .mockResolvedValue({ rules: [], checkers: [], errors: [] });
+
+    await createPolicyEngineConfig(
+      { workspacePoliciesDir: workspacePolicyDir },
+      ApprovalMode.DEFAULT,
+      MOCK_DEFAULT_DIR,
+    );
+
+    const calledDirs = loadPoliciesSpy.mock.calls[0][0];
+    expect(calledDirs).not.toContain(workspacePolicyDir);
+    expect(calledDirs).toContain(
+      nodePath.resolve('/non/existent/system/policies'),
+    );
+    expect(calledDirs).toContain(
+      nodePath.resolve('/non/existent/user/policies'),
+    );
+    expect(calledDirs).toContain(MOCK_DEFAULT_DIR);
+  });
+
+  it('should call isDirectorySecure with allowUserOwnership parameter based on tier', async () => {
+    const isDirectorySecureSpy = vi
+      .mocked(isDirectorySecure)
+      .mockResolvedValue({ secure: true });
+
+    vi.spyOn(tomlLoader, 'loadPoliciesFromToml').mockResolvedValue({
+      rules: [],
+      checkers: [],
+      errors: [],
+    });
+
+    const adminPolicyDir = nodePath.resolve('/some/admin/policies');
+    const userPolicyDir = nodePath.resolve('/non/existent/user/policies');
+    const workspacePolicyDir = nodePath.resolve('/some/workspace/policies');
+
+    await createPolicyEngineConfig(
+      {
+        adminPolicyPaths: [adminPolicyDir],
+        workspacePoliciesDir: workspacePolicyDir,
+      },
+      ApprovalMode.DEFAULT,
+      MOCK_DEFAULT_DIR,
+    );
+
+    // Get the calls made to isDirectorySecure
+    const calls = isDirectorySecureSpy.mock.calls;
+
+    // Helper to find a call for a specific directory
+    const findCallForPath = (target: string) =>
+      calls.find((call) => nodePath.resolve(call[0]) === target);
+
+    const systemCall = findCallForPath(
+      nodePath.resolve('/non/existent/system/policies'),
+    );
+    const adminCall = findCallForPath(adminPolicyDir);
+    const userCall = findCallForPath(userPolicyDir);
+    const workspaceCall = findCallForPath(workspacePolicyDir);
+    const defaultCall = findCallForPath(MOCK_DEFAULT_DIR);
+
+    expect(systemCall).toBeDefined();
+    expect(systemCall![1]).toEqual({ allowUserOwnership: false });
+
+    expect(adminCall).toBeDefined();
+    expect(adminCall![1]).toEqual({ allowUserOwnership: false });
+
+    expect(userCall).toBeDefined();
+    expect(userCall![1]).toEqual({ allowUserOwnership: true });
+
+    expect(workspaceCall).toBeDefined();
+    expect(workspaceCall![1]).toEqual({ allowUserOwnership: true });
+
+    expect(defaultCall).toBeDefined();
+    expect(defaultCall![1]).toEqual({ allowUserOwnership: true });
   });
 
   it('should return ASK_USER for write tools and ALLOW for read-only tools by default', async () => {
