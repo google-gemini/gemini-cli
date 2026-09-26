@@ -38,6 +38,33 @@ export class SdkAgentShell implements AgentShell {
     const cwd = options?.cwd || this.config.getWorkingDir();
     const abortController = new AbortController();
 
+    // Link caller-supplied signal if provided
+    let callerSignalCleanUp: (() => void) | undefined;
+    if (options?.signal) {
+      if (options.signal.aborted) {
+        abortController.abort(options.signal.reason);
+      } else {
+        const onAbort = () => abortController.abort(options.signal?.reason);
+        options.signal.addEventListener('abort', onAbort, { once: true });
+        callerSignalCleanUp = () =>
+          options.signal?.removeEventListener('abort', onAbort);
+      }
+    }
+
+    // Set up timeout if requested
+    let timeoutId: NodeJS.Timeout | undefined;
+    let didTimeout = false;
+    if (options?.timeoutSeconds && options.timeoutSeconds > 0) {
+      timeoutId = setTimeout(() => {
+        didTimeout = true;
+        abortController.abort(
+          new Error(
+            `Command timed out after ${options.timeoutSeconds} seconds.`,
+          ),
+        );
+      }, options.timeoutSeconds * 1000);
+    }
+
     // Use ShellTool to check policy
     const loopContext: AgentLoopContext = this.config;
     const shellTool = new ShellTool(this.config, loopContext.messageBus);
@@ -56,6 +83,8 @@ export class SdkAgentShell implements AgentShell {
         );
       }
     } catch (error) {
+      if (timeoutId) clearTimeout(timeoutId);
+      callerSignalCleanUp?.();
       return {
         output: '',
         stdout: '',
@@ -65,22 +94,71 @@ export class SdkAgentShell implements AgentShell {
       };
     }
 
-    const handle = await ShellExecutionService.execute(
-      command,
-      cwd,
-      () => {}, // No-op output event handler for now
-      abortController.signal,
-      false, // shouldUseNodePty: false for headless execution
-      this.config.getShellExecutionConfig(),
-    );
+    try {
+      const baseExecutionConfig = this.config.getShellExecutionConfig();
+      const executionConfig = options?.env
+        ? {
+            ...baseExecutionConfig,
+            env: {
+              ...(baseExecutionConfig.env ?? process.env),
+              ...options.env,
+            },
+            sanitizationConfig: {
+              ...baseExecutionConfig.sanitizationConfig,
+              allowedEnvironmentVariables: [
+                ...(baseExecutionConfig.sanitizationConfig
+                  ?.allowedEnvironmentVariables ?? []),
+                ...Object.keys(options.env),
+              ],
+            },
+          }
+        : baseExecutionConfig;
 
-    const result = await handle.result;
+      const validationError = this.config.validatePathAccess(cwd);
+      if (validationError) {
+        throw new Error(validationError);
+      }
 
-    return {
-      output: result.output,
-      stdout: result.output, // ShellExecutionService combines stdout/stderr usually
-      stderr: '', // ShellExecutionService currently combines, so stderr is empty or mixed
-      exitCode: result.exitCode,
-    };
+      const handle = await ShellExecutionService.execute(
+        command,
+        cwd,
+        () => {}, // No-op output event handler for now
+        abortController.signal,
+        false, // shouldUseNodePty: false for headless execution
+        executionConfig,
+      );
+
+      const result = await handle.result;
+
+      if (didTimeout) {
+        return {
+          output: result.output,
+          stdout: result.output,
+          stderr: '',
+          exitCode: result.exitCode ?? 1,
+          error: new Error(
+            `Command timed out after ${options?.timeoutSeconds} seconds.`,
+          ),
+        };
+      }
+
+      return {
+        output: result.output,
+        stdout: result.output, // ShellExecutionService combines stdout/stderr usually
+        stderr: '', // ShellExecutionService currently combines, so stderr is empty or mixed
+        exitCode: result.exitCode,
+      };
+    } catch (error) {
+      return {
+        output: '',
+        stdout: '',
+        stderr: '',
+        exitCode: 1,
+        error: error instanceof Error ? error : new Error(String(error)),
+      };
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+      callerSignalCleanUp?.();
+    }
   }
 }

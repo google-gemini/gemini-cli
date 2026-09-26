@@ -129,6 +129,11 @@ export interface AgentShellOptions {
    * Defaults to the agent's configured working directory.
    */
   cwd?: string;
+
+  /**
+   * An optional AbortSignal to cancel the command execution.
+   */
+  signal?: AbortSignal;
 }
 
 /**
