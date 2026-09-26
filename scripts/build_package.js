@@ -58,4 +58,21 @@ if (packageName === 'core') {
 
 // touch dist/.last_build
 writeFileSync(join(process.cwd(), 'dist', '.last_build'), '');
+
+// Validate that critical new modules compiled successfully (Issue #29264).
+// The interruptionSanitizer must be present for session context poisoning prevention.
+if (packageName === 'core') {
+  const sanitizerPath = join(
+    process.cwd(),
+    'dist',
+    'src',
+    'utils',
+    'interruptionSanitizer.js',
+  );
+  if (!existsSync(sanitizerPath)) {
+    console.warn(
+      'Warning: interruptionSanitizer.js not found in dist — session context poisoning prevention may be missing.',
+    );
+  }
+}
 process.exit(0);

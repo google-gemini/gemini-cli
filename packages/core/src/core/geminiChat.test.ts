@@ -19,6 +19,7 @@ import {
   InvalidStreamError,
   StreamEventType,
   SYNTHETIC_THOUGHT_SIGNATURE,
+  INTERRUPTED_RESPONSE_PLACEHOLDER,
   type StreamEvent,
   stripToolCallIdPrefixes,
   type HistoryTurn,
@@ -28,6 +29,10 @@ import {
   NO_RESPONSE_TEXT_NUDGE_MESSAGE,
   applyRetryNudge,
 } from './geminiChat.js';
+import {
+  BENIGN_INTERRUPTION_REPLACEMENT,
+  isInterruptionPlaceholder,
+} from '../utils/interruptionSanitizer.js';
 import {
   type CompletedToolCall,
   CoreToolCallStatus,
@@ -5074,6 +5079,133 @@ describe('GeminiChat', () => {
       ];
       const result = applyRetryNudge(contents, THINKING_ONLY_NUDGE_MESSAGE);
       expect(result).toEqual(contents);
+    });
+  });
+
+  describe('session context poisoning prevention (Issue #29264)', () => {
+    it('should sanitize INTERRUPTED_RESPONSE_PLACEHOLDER in curated history', () => {
+      const chat = new GeminiChat(mockConfig, '', [], []);
+      chat.setHistory([
+        { role: 'user', parts: [{ text: 'search the codebase' }] },
+        { role: 'model', parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }] },
+        { role: 'user', parts: [{ text: 'list files' }] },
+      ]);
+
+      const curated = chat.getHistory(true);
+      // The interrupted placeholder should be replaced with benign text
+      const modelTurn = curated.find((c) => c.role === 'model');
+      expect(modelTurn).toBeDefined();
+      expect(modelTurn!.parts![0].text).toBe(BENIGN_INTERRUPTION_REPLACEMENT);
+      expect(modelTurn!.parts![0].text).not.toBe(
+        INTERRUPTED_RESPONSE_PLACEHOLDER,
+      );
+    });
+
+    it('should preserve normal model turns while sanitizing interrupted ones', () => {
+      const chat = new GeminiChat(mockConfig, '', [], []);
+      chat.setHistory([
+        { role: 'user', parts: [{ text: 'prompt 1' }] },
+        { role: 'model', parts: [{ text: 'Normal answer' }] },
+        { role: 'user', parts: [{ text: 'prompt 2' }] },
+        { role: 'model', parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }] },
+        { role: 'user', parts: [{ text: 'prompt 3' }] },
+        { role: 'model', parts: [{ text: 'Another normal answer' }] },
+      ]);
+
+      const curated = chat.getHistory(true);
+      const modelTurns = curated.filter((c) => c.role === 'model');
+      expect(modelTurns).toHaveLength(3);
+      expect(modelTurns[0].parts![0].text).toBe('Normal answer');
+      expect(modelTurns[1].parts![0].text).toBe(
+        BENIGN_INTERRUPTION_REPLACEMENT,
+      );
+      expect(modelTurns[2].parts![0].text).toBe('Another normal answer');
+    });
+
+    it('should handle multiple consecutive interrupted turns without leaking', () => {
+      const chat = new GeminiChat(mockConfig, '', [], []);
+      chat.setHistory([
+        { role: 'user', parts: [{ text: 'prompt' }] },
+        { role: 'model', parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }] },
+        { role: 'user', parts: [{ text: 'retry prompt' }] },
+        { role: 'model', parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }] },
+        { role: 'user', parts: [{ text: 'final prompt' }] },
+      ]);
+
+      const curated = chat.getHistory(true);
+      const allText = JSON.stringify(curated);
+      expect(allText).not.toContain(INTERRUPTED_RESPONSE_PLACEHOLDER);
+    });
+
+    it('should not mutate comprehensive history when sanitizing curated', () => {
+      const chat = new GeminiChat(mockConfig, '', [], []);
+      chat.setHistory([
+        { role: 'user', parts: [{ text: 'prompt' }] },
+        { role: 'model', parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }] },
+      ]);
+
+      // Get curated (sanitized)
+      chat.getHistory(true);
+
+      // Comprehensive should still have the original placeholder
+      const comprehensive = chat.getHistory(false);
+      const modelTurn = comprehensive.find((c) => c.role === 'model');
+      expect(modelTurn!.parts![0].text).toBe(INTERRUPTED_RESPONSE_PLACEHOLDER);
+    });
+
+    it('should handle interrupted turn with mixed parts (thought + placeholder)', () => {
+      const chat = new GeminiChat(mockConfig, '', [], []);
+      chat.setHistory([
+        { role: 'user', parts: [{ text: 'do something' }] },
+        {
+          role: 'model',
+          parts: [
+            { text: 'Thinking about this...', thought: true },
+            { text: INTERRUPTED_RESPONSE_PLACEHOLDER },
+          ],
+        },
+      ]);
+
+      const curated = chat.getHistory(true);
+      const modelTurn = curated.find((c) => c.role === 'model');
+      expect(modelTurn).toBeDefined();
+
+      // The thought part stays, the poisoned part gets sanitized
+      const textParts = modelTurn!.parts!.filter(
+        (p) => typeof p.text === 'string' && !p.thought,
+      );
+      expect(textParts[0].text).toBe(BENIGN_INTERRUPTION_REPLACEMENT);
+    });
+
+    it('should ensure curated history never sends poisoned text to the API', () => {
+      const chat = new GeminiChat(mockConfig, '', [], []);
+      chat.setHistory([
+        { role: 'user', parts: [{ text: 'search for API handlers' }] },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'search',
+                response: { result: 'found 5 files' },
+              },
+            },
+          ],
+        },
+        { role: 'model', parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }] },
+        { role: 'user', parts: [{ text: 'list the files in the directory' }] },
+      ]);
+
+      const curated = chat.getHistory(true);
+
+      // Verify no poisoned text anywhere in the curated history
+      for (const turn of curated) {
+        for (const part of turn.parts || []) {
+          if (typeof part.text === 'string') {
+            expect(isInterruptionPlaceholder(part.text)).toBe(false);
+          }
+        }
+      }
     });
   });
 });

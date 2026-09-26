@@ -828,7 +828,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
       return {
         result:
-          finalResult || 'Agent execution was terminated before completion.',
+          finalResult?.trim() ||
+          'Agent execution was terminated before completion.',
         terminate_reason: terminateReason,
         turn_count: turnCounter,
         duration_ms: Date.now() - startTime,
