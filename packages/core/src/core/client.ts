@@ -13,6 +13,7 @@ import {
   type GenerateContentResponse,
 } from '@google/genai';
 import { partListUnionToString } from './geminiRequest.js';
+import { classifyTurn } from '../superfast/decision-gate.js';
 import {
   getDirectoryContextString,
   getInitialChatHistory,
@@ -921,6 +922,37 @@ export class GeminiClient {
     return turn;
   }
 
+  /**
+   * Superfast shadow pass. When the gate is enabled, ask the local System One
+   * model to classify the turn and log the recommendation. Deliberately
+   * fire-and-forget: the promise is not awaited and every failure is swallowed,
+   * so this can never add latency to, or break, the real turn. Acting on the
+   * route (skipping work) is a later phase once the model is validated.
+   */
+  private runSuperfastShadow(request: PartListUnion): void {
+    try {
+      const settings = this.config.getSuperfastSettings();
+      if (!settings.enabled) return;
+
+      const text = partListUnionToString(request);
+      if (!text || !text.trim()) return;
+
+      void classifyTurn(text, settings)
+        .then((decision) => {
+          if (decision) {
+            debugLogger.debug(
+              `superfast shadow route=${decision.route} latencyMs=${decision.latencyMs}`,
+            );
+          }
+        })
+        .catch(() => {
+          // Fail open: a gate error must never surface to the turn.
+        });
+    } catch {
+      // Fail open: the shadow pass must never break the real turn.
+    }
+  }
+
   async *sendMessageStream(
     request: PartListUnion,
     signal: AbortSignal,
@@ -929,6 +961,14 @@ export class GeminiClient {
     displayContent?: PartListUnion,
     stopHookActive: boolean = false,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
+    // Superfast decision gate (shadow mode). When enabled, classify this turn
+    // with the local System One model in the background. Fire-and-forget: it
+    // never blocks or alters the turn and fails open on any error, so with the
+    // feature off (the default) this is a no-op. Only the top-level user turn
+    // runs it; internal continuation recursions pass a decremented `turns`.
+    if (turns === MAX_TURNS) {
+      this.runSuperfastShadow(request);
+    }
     this.config.resetTurn();
 
     const hooksEnabled = this.config.getEnableHooks();

@@ -3025,6 +3025,60 @@ const SETTINGS_SCHEMA = {
       },
     },
   },
+  superfast: {
+    type: 'object',
+    label: 'Superfast (Decision Gate)',
+    category: 'Advanced',
+    requiresRestart: false,
+    default: {},
+    description:
+      'Optional System One decision gate. When enabled, a small local decision ' +
+      'model (Von) classifies each turn in a single forward pass so the harness ' +
+      'can skip expensive work on obvious requests. Off by default; fails open ' +
+      'to normal behaviour whenever the model is unsure or unavailable. Run ' +
+      '`gemini von-install` to set up the backend, then `/superfast on` to enable.',
+    showInDialog: false,
+    properties: {
+      enabled: {
+        type: 'boolean',
+        label: 'Enable Superfast',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Master switch for the Superfast decision gate. Off by default.',
+        showInDialog: false,
+      },
+      endpoint: {
+        type: 'string',
+        label: 'Decision Endpoint',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: 'http://localhost:8000/v1/systemone',
+        description: 'Full URL of the Jev-compatible /v1/systemone endpoint.',
+        showInDialog: false,
+      },
+      model: {
+        type: 'string',
+        label: 'Decision Model',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: 'von-1.2.0',
+        description: 'Model id sent to the decision endpoint.',
+        showInDialog: false,
+      },
+      timeoutMs: {
+        type: 'number',
+        label: 'Decision Timeout (ms)',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: 150,
+        description:
+          'Hard timeout for a single decision call. On timeout the gate fails open.',
+        showInDialog: false,
+      },
+    },
+  },
 } as const satisfies SettingsSchema;
 
 export type SettingsSchemaType = typeof SETTINGS_SCHEMA;
