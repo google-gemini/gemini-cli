@@ -35,6 +35,20 @@ import type {
 import type { SkillReference } from './skills.js';
 import type { GeminiCliAgent } from './agent.js';
 
+const PARSE_ERROR_KEY = '_parseError';
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function parseToolCallArgs(value: unknown): Record<string, unknown> {
+  const parsed: unknown = typeof value === 'string' ? JSON.parse(value) : value;
+  if (!isRecord(parsed)) {
+    throw new Error('Parsed JSON is not a valid arguments object');
+  }
+  return parsed;
+}
+
 /**
  * Represents an interactive conversation session with a Gemini CLI agent.
  *
@@ -225,6 +239,7 @@ export class GeminiCliSession {
     let request: Parameters<GeminiClient['sendMessageStream']>[0] = [
       { text: prompt },
     ];
+    const toolCallParseErrors = new WeakMap<object, string>();
 
     while (true) {
       if (typeof this.instructions === 'function') {
@@ -251,10 +266,24 @@ export class GeminiCliSession {
         yield event;
         if (event.type === GeminiEventType.ToolCallRequest) {
           const toolCall = event.value;
-          let args = toolCall.args;
-          if (typeof args === 'string') {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-            args = JSON.parse(args);
+          let args: Record<string, unknown>;
+          try {
+            args = parseToolCallArgs(toolCall.args);
+          } catch (e) {
+            const errorMessage = `Invalid JSON args: ${
+              e instanceof Error ? e.message : String(e)
+            }`;
+            const args: Record<string, unknown> = {
+              [PARSE_ERROR_KEY]: errorMessage,
+            };
+            toolCallParseErrors.set(args, errorMessage);
+            toolCallsToSchedule.push({
+              ...toolCall,
+              args,
+              isClientInitiated: false,
+              prompt_id: sessionId,
+            });
+            continue;
           }
           toolCallsToSchedule.push({
             ...toolCall,
@@ -287,10 +316,19 @@ export class GeminiCliSession {
       const originalGetTool = scopedRegistry.getTool.bind(scopedRegistry);
       scopedRegistry.getTool = (name: string) => {
         const tool = originalGetTool(name);
-        if (tool instanceof SdkTool) {
-          return tool.bindContext(context);
-        }
-        return tool;
+        if (!tool) return tool;
+
+        const boundTool =
+          tool instanceof SdkTool ? tool.bindContext(context) : tool;
+        const guardedTool = boundTool.clone();
+        guardedTool.build = (args: object) => {
+          const parseError = toolCallParseErrors.get(args);
+          if (parseError) {
+            throw new Error(parseError);
+          }
+          return boundTool.build(args);
+        };
+        return guardedTool;
       };
 
       const completedCalls = await scheduleAgentTools(
