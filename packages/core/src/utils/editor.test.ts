@@ -658,8 +658,8 @@ describe('editor utils', () => {
       expect(quoteCmdArg('file(1).txt')).toBe('"file(1).txt"');
     });
 
-    it('should escape percent signs to avoid cmd.exe variable expansion', () => {
-      expect(quoteCmdArg('file%TEMP%.txt')).toBe('"file^%TEMP^%.txt"');
+    it('should preserve percent signs without carets inside quotes', () => {
+      expect(quoteCmdArg('file%TEMP%.txt')).toBe('"file%TEMP%.txt"');
     });
 
     it('should escape internal double quotes', () => {

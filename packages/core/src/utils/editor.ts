@@ -410,7 +410,7 @@ export function quoteCmdArg(arg: string): string {
   if (/^[a-zA-Z0-9\-_.:/\\]+$/.test(arg)) {
     return arg;
   }
-  const escaped = arg.replace(/"/g, '""').replace(/%/g, '^%');
+  const escaped = arg.replace(/"/g, '""');
   const trailingBackslashes = escaped.match(/\\+$/);
   if (trailingBackslashes) {
     return `"${escaped}${trailingBackslashes[0]}"`;
