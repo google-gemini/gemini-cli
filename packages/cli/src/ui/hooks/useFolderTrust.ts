@@ -67,16 +67,9 @@ export const useFolderTrust = (
       }
     };
 
-    if (isHeadlessMode()) {
-      if (isMounted) {
-        setIsTrusted(trusted);
-        setIsFolderTrustDialogOpen(false);
-        onTrustChange(true);
-        showUntrustedMessage();
-      }
-    } else if (isMounted) {
+    if (isMounted) {
       setIsTrusted(trusted);
-      setIsFolderTrustDialogOpen(trusted === undefined);
+      setIsFolderTrustDialogOpen(!isHeadlessMode() && trusted === undefined);
       onTrustChange(trusted);
       showUntrustedMessage();
     }

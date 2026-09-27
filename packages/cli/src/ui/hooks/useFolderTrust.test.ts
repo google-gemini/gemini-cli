@@ -366,7 +366,7 @@ describe('useFolderTrust', () => {
   });
 
   describe('headless mode', () => {
-    it('should force trust and hide dialog in headless mode', async () => {
+    it('should propagate false to onTrustChange, hide dialog, and show warning when folder is untrusted', async () => {
       vi.mocked(isHeadlessMode).mockReturnValue(true);
       isWorkspaceTrustedSpy.mockReturnValue({
         isTrusted: false,
@@ -378,7 +378,8 @@ describe('useFolderTrust', () => {
       );
 
       expect(result.current.isFolderTrustDialogOpen).toBe(false);
-      expect(onTrustChange).toHaveBeenCalledWith(true);
+      expect(result.current.isTrusted).toBe(false);
+      expect(onTrustChange).toHaveBeenCalledWith(false);
       expect(addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
@@ -386,6 +387,40 @@ describe('useFolderTrust', () => {
         }),
         expect.any(Number),
       );
+    });
+
+    it('should propagate true to onTrustChange, hide dialog, and not show warning when folder is trusted', async () => {
+      vi.mocked(isHeadlessMode).mockReturnValue(true);
+      isWorkspaceTrustedSpy.mockReturnValue({
+        isTrusted: true,
+        source: 'file',
+      });
+
+      const { result } = await renderHook(() =>
+        useFolderTrust(mockSettings, onTrustChange, addItem),
+      );
+
+      expect(result.current.isFolderTrustDialogOpen).toBe(false);
+      expect(result.current.isTrusted).toBe(true);
+      expect(onTrustChange).toHaveBeenCalledWith(true);
+      expect(addItem).not.toHaveBeenCalled();
+    });
+
+    it('should propagate undefined to onTrustChange and hide dialog when folder trust is undefined', async () => {
+      vi.mocked(isHeadlessMode).mockReturnValue(true);
+      isWorkspaceTrustedSpy.mockReturnValue({
+        isTrusted: undefined,
+        source: undefined,
+      });
+
+      const { result } = await renderHook(() =>
+        useFolderTrust(mockSettings, onTrustChange, addItem),
+      );
+
+      expect(result.current.isFolderTrustDialogOpen).toBe(false);
+      expect(result.current.isTrusted).toBeUndefined();
+      expect(onTrustChange).toHaveBeenCalledWith(undefined);
+      expect(addItem).not.toHaveBeenCalled();
     });
   });
 });
