@@ -57,6 +57,7 @@ import {
 import { handleFallback } from '../fallback/handler.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { scrubHistory, scrubContents } from '../utils/historyHardening.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import {
   partListUnionToString,
   ensureStableToolIds,
@@ -1070,6 +1071,22 @@ export class GeminiChat {
 
       if (this.onModelChanged) {
         this.tools = await this.onModelChanged(modelToUse);
+      }
+
+      // Enforce Gemini API invariant: requests must not end with a model turn.
+      // If history ends with a model turn (e.g. after /rewind, aborted stream, or stripped user turn),
+      // append a continuation user turn so the API call succeeds without 400 Bad Request.
+      if (
+        contentsToUse.length > 0 &&
+        contentsToUse[contentsToUse.length - 1].role === 'model'
+      ) {
+        debugLogger.log(
+          'Final contents ends with model turn. Appending continuation user turn to satisfy Gemini API invariant.',
+        );
+        contentsToUse.push({
+          role: 'user',
+          parts: [{ text: 'Please continue.' }],
+        });
       }
 
       // Track final request parameters for AfterModel hooks
