@@ -11,7 +11,7 @@ import type { AuthType } from './contentGenerator.js';
 import type { Storage } from '../config/storage.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
-import { resolveToRealPath } from '../utils/paths.js';
+import { resolveToRealPath, isSubpath } from '../utils/paths.js';
 
 const LOG_FILE_NAME = 'logs.json';
 
@@ -302,22 +302,26 @@ export class Logger {
    * directory, so a traversal tag simply misses instead of reading or
    * deleting a file outside it.
    *
-   * The directory is resolved with resolveToRealPath so symlinked
-   * segments can't split the prefix, but the candidate stays lexical:
-   * the tag must be compared exactly as the fs calls will open it, and
-   * resolveToRealPath would decode %XX sequences inside it.
+   * The candidate stays lexical — the tag must be compared exactly as
+   * the fs calls will open it, and resolveToRealPath would decode %XX
+   * sequences inside it. It is matched against both the raw and the
+   * realpath'd directory (isSubpath handles the case-insensitive
+   * platforms), so setups where a segment of the directory is a symlink
+   * (e.g. /var -> /private/var on macOS) don't drop legit checkpoints.
    */
   private _isInsideCheckpointDir(candidatePath: string): boolean {
-    const checkpointDir = resolveToRealPath(this.geminiDir!);
     const resolvedCandidate = path.resolve(candidatePath);
-    // macOS and Windows filesystems are case-insensitive; compare the
-    // prefix without case so legitimate checkpoints aren't dropped.
-    const prefix = checkpointDir + path.sep;
-    const isCaseInsensitive =
-      process.platform === 'win32' || process.platform === 'darwin';
-    return isCaseInsensitive
-      ? resolvedCandidate.toLowerCase().startsWith(prefix.toLowerCase())
-      : resolvedCandidate.startsWith(prefix);
+    const rawDir = path.resolve(this.geminiDir!);
+    let realDir = rawDir;
+    try {
+      realDir = resolveToRealPath(this.geminiDir!);
+    } catch {
+      // Keep the raw directory as the fallback prefix.
+    }
+    return (
+      isSubpath(rawDir, resolvedCandidate) ||
+      isSubpath(realDir, resolvedCandidate)
+    );
   }
 
   private async _getCheckpointPath(tag: string): Promise<string> {
