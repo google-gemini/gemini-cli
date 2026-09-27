@@ -1083,10 +1083,14 @@ export class GeminiChat {
         debugLogger.log(
           'Final contents ends with model turn. Appending continuation user turn to satisfy Gemini API invariant.',
         );
-        contentsToUse.push({
+        const updatedContents = contentsToUse.map((item) =>
+          structuredClone(item),
+        );
+        updatedContents.push({
           role: 'user',
           parts: [{ text: 'Please continue.' }],
         });
+        contentsToUse = updatedContents;
       }
 
       // Track final request parameters for AfterModel hooks
