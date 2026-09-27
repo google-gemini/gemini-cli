@@ -676,6 +676,60 @@ describe('Logger', () => {
     });
   });
 
+  describe('legacy checkpoint path traversal (security)', () => {
+    const conversation: Content[] = [
+      { role: 'user', parts: [{ text: 'secret outside checkpoints dir' }] },
+    ];
+    // A file that lives next to the checkpoint directory, not inside it.
+    // A tag of "x/../../outside-target" makes the legacy raw path resolve
+    // to exactly this location.
+    const outsideFile = path.join(
+      path.dirname(TEST_GEMINI_DIR),
+      'outside-target.json',
+    );
+
+    beforeEach(async () => {
+      await fs.writeFile(outsideFile, JSON.stringify(conversation));
+    });
+
+    afterEach(async () => {
+      await fs.rm(outsideFile, { force: true });
+    });
+
+    it('should not delete a file outside the checkpoint directory via a traversal tag', async () => {
+      const result = await logger.deleteCheckpoint('x/../../outside-target');
+      expect(result).toBe(false);
+      expect(existsSync(outsideFile)).toBe(true);
+    });
+
+    it('should not return the contents of a file outside the checkpoint directory via a traversal tag', async () => {
+      const loaded = await logger.loadCheckpoint('x/../../outside-target');
+      expect(loaded).toEqual({ history: [] });
+      expect(existsSync(outsideFile)).toBe(true);
+    });
+
+    it('should report false for checkpointExists with a traversal tag', async () => {
+      await expect(
+        logger.checkpointExists('x/../../outside-target'),
+      ).resolves.toBe(false);
+    });
+
+    it('should still load and delete a flat legacy raw-path checkpoint', async () => {
+      const legacyPath = path.join(
+        TEST_GEMINI_DIR,
+        'checkpoint-legacy-raw.json',
+      );
+      await fs.writeFile(legacyPath, JSON.stringify(conversation));
+
+      await expect(logger.loadCheckpoint('legacy-raw')).resolves.toEqual({
+        history: conversation,
+      });
+      await expect(logger.checkpointExists('legacy-raw')).resolves.toBe(true);
+      await expect(logger.deleteCheckpoint('legacy-raw')).resolves.toBe(true);
+      expect(existsSync(legacyPath)).toBe(false);
+    });
+  });
+
   describe('checkpointExists', () => {
     const tag = 'exists-test';
     const encodedTag = 'exists-test';
