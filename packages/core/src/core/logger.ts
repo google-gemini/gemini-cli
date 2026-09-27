@@ -11,6 +11,7 @@ import type { AuthType } from './contentGenerator.js';
 import type { Storage } from '../config/storage.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
+import { resolveToRealPath } from '../utils/paths.js';
 
 const LOG_FILE_NAME = 'logs.json';
 
@@ -300,10 +301,23 @@ export class Logger {
    * allow the legacy path when it still resolves inside the checkpoint
    * directory, so a traversal tag simply misses instead of reading or
    * deleting a file outside it.
+   *
+   * The directory is resolved with resolveToRealPath so symlinked
+   * segments can't split the prefix, but the candidate stays lexical:
+   * the tag must be compared exactly as the fs calls will open it, and
+   * resolveToRealPath would decode %XX sequences inside it.
    */
   private _isInsideCheckpointDir(candidatePath: string): boolean {
-    const checkpointDir = path.resolve(this.geminiDir!);
-    return path.resolve(candidatePath).startsWith(checkpointDir + path.sep);
+    const checkpointDir = resolveToRealPath(this.geminiDir!);
+    const resolvedCandidate = path.resolve(candidatePath);
+    // macOS and Windows filesystems are case-insensitive; compare the
+    // prefix without case so legitimate checkpoints aren't dropped.
+    const prefix = checkpointDir + path.sep;
+    const isCaseInsensitive =
+      process.platform === 'win32' || process.platform === 'darwin';
+    return isCaseInsensitive
+      ? resolvedCandidate.toLowerCase().startsWith(prefix.toLowerCase())
+      : resolvedCandidate.startsWith(prefix);
   }
 
   private async _getCheckpointPath(tag: string): Promise<string> {
