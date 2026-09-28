@@ -318,8 +318,9 @@ function getOnboardTier(res: LoadCodeAssistResponse): GeminiUserTier {
     }
   }
 
-  if (res.allowedTiers && res.allowedTiers.length > 0) {
-    return res.allowedTiers[0];
+  const firstTier = res.allowedTiers?.[0];
+  if (firstTier) {
+    return firstTier;
   }
 
   return {

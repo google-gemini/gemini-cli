@@ -299,6 +299,7 @@ describe('setupUser', () => {
 
     it('should onboard using FREE when allowedTiers contains FREE without isDefault', async () => {
       vi.stubEnv('GOOGLE_CLOUD_PROJECT', '');
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT_ID', '');
       mockLoad.mockResolvedValue({
         allowedTiers: [{ ...mockFreeTier, isDefault: false }],
       });
