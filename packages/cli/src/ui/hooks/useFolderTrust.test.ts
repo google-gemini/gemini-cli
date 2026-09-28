@@ -539,5 +539,109 @@ describe('useFolderTrust', () => {
       expect(newOnTrustChange).toHaveBeenCalledWith(true);
       expect(initialOnTrustChange).not.toHaveBeenCalledWith(true);
     });
+
+    it('should not re-run discovery effect when unrelated settings change', async () => {
+      isWorkspaceTrustedSpy.mockReturnValue({
+        isTrusted: true,
+        source: 'file',
+      });
+
+      const onTrustChangeCb = vi.fn();
+      const addItemCb = vi.fn();
+
+      const initialSettings = {
+        merged: {
+          security: {
+            folderTrust: {
+              enabled: true,
+            },
+          },
+          ui: {
+            theme: 'default',
+          },
+        },
+        setValue: vi.fn(),
+      } as unknown as LoadedSettings;
+
+      const { rerender } = await renderHook(
+        ({ settings }) => useFolderTrust(settings, onTrustChangeCb, addItemCb),
+        {
+          initialProps: {
+            settings: initialSettings,
+          },
+        },
+      );
+
+      expect(onTrustChangeCb).toHaveBeenCalledTimes(1);
+
+      const updatedSettings = {
+        merged: {
+          security: {
+            folderTrust: {
+              enabled: true,
+            },
+          },
+          ui: {
+            theme: 'dark',
+          },
+        },
+        setValue: vi.fn(),
+      } as unknown as LoadedSettings;
+
+      rerender({
+        settings: updatedSettings,
+      });
+
+      expect(onTrustChangeCb).toHaveBeenCalledTimes(1);
+    });
+
+    it('should re-run discovery effect when folderTrust setting changes', async () => {
+      isWorkspaceTrustedSpy.mockReturnValue({
+        isTrusted: true,
+        source: 'file',
+      });
+
+      const onTrustChangeCb = vi.fn();
+      const addItemCb = vi.fn();
+
+      const initialSettings = {
+        merged: {
+          security: {
+            folderTrust: {
+              enabled: true,
+            },
+          },
+        },
+        setValue: vi.fn(),
+      } as unknown as LoadedSettings;
+
+      const { rerender } = await renderHook(
+        ({ settings }) => useFolderTrust(settings, onTrustChangeCb, addItemCb),
+        {
+          initialProps: {
+            settings: initialSettings,
+          },
+        },
+      );
+
+      expect(onTrustChangeCb).toHaveBeenCalledTimes(1);
+
+      const updatedSettings = {
+        merged: {
+          security: {
+            folderTrust: {
+              enabled: false,
+            },
+          },
+        },
+        setValue: vi.fn(),
+      } as unknown as LoadedSettings;
+
+      rerender({
+        settings: updatedSettings,
+      });
+
+      expect(onTrustChangeCb).toHaveBeenCalledTimes(2);
+    });
   });
 });

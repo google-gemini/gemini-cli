@@ -37,17 +37,19 @@ export const useFolderTrust = (
 
   const onTrustChangeRef = useRef(onTrustChange);
   const addItemRef = useRef(addItem);
+  const settingsRef = useRef(settings);
 
   useEffect(() => {
     onTrustChangeRef.current = onTrustChange;
     addItemRef.current = addItem;
-  }, [onTrustChange, addItem]);
+    settingsRef.current = settings;
+  }, [onTrustChange, addItem, settings]);
 
   const folderTrust = settings.merged.security.folderTrust.enabled ?? true;
 
   useEffect(() => {
     let isMounted = true;
-    const { isTrusted: trusted } = isWorkspaceTrusted(settings.merged);
+    const { isTrusted: trusted } = isWorkspaceTrusted(settingsRef.current.merged);
 
     if (trusted === undefined || trusted === false) {
       void FolderTrustDiscoveryService.discover(process.cwd())
@@ -85,7 +87,7 @@ export const useFolderTrust = (
     return () => {
       isMounted = false;
     };
-  }, [folderTrust, settings.merged]);
+  }, [folderTrust]);
 
   const handleFolderTrustSelect = useCallback(
     async (choice: FolderTrustChoice) => {
