@@ -51,14 +51,20 @@ export async function retryWithBackoff<T>(
   throw new Error('Unreachable');
 }
 
+export interface RemoveDirectoryOptions extends RetryOptions {
+  recursive?: boolean;
+  force?: boolean;
+}
+
 /**
  * Removes a directory or file with retries for common Windows locking errors.
  */
 export async function removeDirectoryWithRetry(
   path: string,
-  options: fs.RmOptions = { recursive: true, force: true },
-  retryOptions?: RetryOptions,
+  options: RemoveDirectoryOptions = {},
 ): Promise<void> {
+  const { recursive = true, force = true, ...retryOptions } = options;
+
   const isRetryableError = (error: unknown): boolean => {
     if (isNodeError(error)) {
       return (
@@ -70,13 +76,10 @@ export async function removeDirectoryWithRetry(
     return false;
   };
 
-  await retryWithBackoff(
-    () => fs.promises.rm(path, { recursive: true, force: true, ...options }),
-    {
-      maxRetries: 5,
-      initialDelay: 100,
-      shouldRetry: isRetryableError,
-      ...retryOptions,
-    },
-  );
+  await retryWithBackoff(() => fs.promises.rm(path, { recursive, force }), {
+    maxRetries: 5,
+    initialDelay: 100,
+    shouldRetry: isRetryableError,
+    ...retryOptions,
+  });
 }

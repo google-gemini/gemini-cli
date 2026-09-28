@@ -149,18 +149,27 @@ describe('retry utils', () => {
       expect(fs.promises.rm).toHaveBeenCalledTimes(1);
     });
 
-    it('should respect caller-supplied RmOptions while keeping defaults', async () => {
-      vi.mocked(fs.promises.rm).mockResolvedValue(undefined);
+    it('should respect caller-supplied options while keeping defaults', async () => {
+      const ebusyError = Object.assign(new Error('EBUSY'), { code: 'EBUSY' });
+      vi.mocked(fs.promises.rm)
+        .mockRejectedValueOnce(ebusyError)
+        .mockRejectedValueOnce(ebusyError);
 
-      await removeDirectoryWithRetry('/some/path', {
+      const promise = removeDirectoryWithRetry('/some/path', {
         recursive: false,
         maxRetries: 2,
+        initialDelay: 50,
       });
 
+      await Promise.all([
+        expect(promise).rejects.toThrow('EBUSY'),
+        vi.advanceTimersByTimeAsync(50),
+      ]);
+
+      expect(fs.promises.rm).toHaveBeenCalledTimes(2);
       expect(fs.promises.rm).toHaveBeenCalledWith('/some/path', {
         recursive: false,
         force: true,
-        maxRetries: 2,
       });
     });
   });
