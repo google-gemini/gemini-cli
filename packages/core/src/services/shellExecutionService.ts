@@ -11,6 +11,7 @@ import { TextDecoder } from 'node:util';
 import type { Writable } from 'node:stream';
 import os from 'node:os';
 import fs, { mkdirSync } from 'node:fs';
+import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import type { IPty } from '@lydell/node-pty';
 import {
@@ -142,6 +143,7 @@ export interface ShellExecutionConfig {
   originalCommand?: string;
   sessionId?: string;
   env?: Record<string, string | undefined>;
+  tempDir?: string;
 }
 
 /**
@@ -187,6 +189,7 @@ interface ActivePty {
   command: string;
   sessionId?: string;
   cancelRender?: () => void;
+  tempDir?: string;
 }
 
 interface ActiveChildProcess {
@@ -199,6 +202,7 @@ interface ActiveChildProcess {
   };
   command: string;
   sessionId?: string;
+  tempDir?: string;
 }
 
 const isAnsiOutputEqual = (
@@ -369,6 +373,7 @@ export type BackgroundProcess = {
 export type BackgroundProcessRecord = Omit<BackgroundProcess, 'pid'> & {
   startTime: number;
   endTime?: number;
+  tempDir?: string;
 };
 
 export class ShellExecutionService {
@@ -376,6 +381,7 @@ export class ShellExecutionService {
   private static activeChildProcesses = new Map<number, ActiveChildProcess>();
   private static backgroundLogPids = new Set<number>();
   private static backgroundLogStreams = new Map<number, fs.WriteStream>();
+  private static backgroundTempDirs = new Map<number, string>();
   private static backgroundProcessHistory = new Map<
     string, // sessionId
     Map<number, BackgroundProcessRecord>
@@ -417,6 +423,12 @@ export class ShellExecutionService {
   }
 
   private static async cleanupLogStream(pid: number): Promise<void> {
+    const tempDir = this.backgroundTempDirs.get(pid);
+    this.backgroundTempDirs.delete(pid);
+    const rmPromise = tempDir
+      ? fsPromises.rm(tempDir, { recursive: true, force: true }).catch(() => {})
+      : Promise.resolve();
+
     const stream = this.backgroundLogStreams.get(pid);
     if (stream) {
       await new Promise<void>((resolve) => {
@@ -426,6 +438,7 @@ export class ShellExecutionService {
     }
 
     this.backgroundLogPids.delete(pid);
+    await rmPromise;
   }
 
   /**
@@ -704,6 +717,7 @@ export class ShellExecutionService {
           state,
           command: shellExecutionConfig.originalCommand ?? commandToExecute,
           sessionId: shellExecutionConfig.sessionId,
+          tempDir: shellExecutionConfig.tempDir,
         });
       }
 
@@ -1246,6 +1260,7 @@ export class ShellExecutionService {
         command: shellExecutionConfig.originalCommand ?? commandToExecute,
         sessionId: shellExecutionConfig.sessionId,
         cancelRender,
+        tempDir: shellExecutionConfig.tempDir,
       });
 
       const result = ExecutionLifecycleService.attachExecution(assignedPid, {
@@ -1811,14 +1826,21 @@ export class ShellExecutionService {
    * This resolves the execution promise but keeps the PTY active.
    *
    * @param pid The process ID of the target PTY.
+   * @param sessionId Optional session ID for process history tracking.
+   * @param command Optional command string for display.
+   * @param tempDir Optional temporary directory path owned by this execution to clean up on exit.
    */
-  static background(pid: number, sessionId?: string, command?: string): void {
-    if (this.backgroundLogPids.has(pid)) {
-      return;
-    }
-
+  static background(
+    pid: number,
+    sessionId?: string,
+    command?: string,
+    tempDir?: string,
+  ): void {
     const activePty = this.activePtys.get(pid);
     const activeChild = this.activeChildProcesses.get(pid);
+
+    const resolvedTempDir =
+      tempDir ?? activePty?.tempDir ?? activeChild?.tempDir;
 
     const resolvedSessionId =
       sessionId ?? activePty?.sessionId ?? activeChild?.sessionId;
@@ -1832,20 +1854,27 @@ export class ShellExecutionService {
       throw new Error('Session ID is required for background operations');
     }
 
+    if (!activePty && !activeChild) {
+      if (resolvedTempDir) {
+        fsPromises
+          .rm(resolvedTempDir, { recursive: true, force: true })
+          .catch(() => {});
+      }
+      return;
+    }
+
+    if (resolvedTempDir) {
+      this.backgroundTempDirs.set(pid, resolvedTempDir);
+    }
+
+    if (this.backgroundLogPids.has(pid)) {
+      return;
+    }
+
     const MAX_BACKGROUND_PROCESS_HISTORY_SIZE = 100;
     const history =
       this.backgroundProcessHistory.get(resolvedSessionId) ??
-      new Map<
-        number,
-        {
-          command: string;
-          status: 'running' | 'exited';
-          exitCode?: number | null;
-          signal?: number | null;
-          startTime: number;
-          endTime?: number;
-        }
-      >();
+      new Map<number, BackgroundProcessRecord>();
 
     if (history.size >= MAX_BACKGROUND_PROCESS_HISTORY_SIZE) {
       const oldestPid = history.keys().next().value;
@@ -1858,6 +1887,7 @@ export class ShellExecutionService {
       command: resolvedCommand,
       status: 'running',
       startTime: Date.now(),
+      ...(resolvedTempDir ? { tempDir: resolvedTempDir } : {}),
     });
     this.backgroundProcessHistory.set(resolvedSessionId, history);
 
@@ -2045,8 +2075,16 @@ export class ShellExecutionService {
         // ignored
       }
     }
+    for (const tempDir of this.backgroundTempDirs.values()) {
+      try {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      } catch {
+        // ignored
+      }
+    }
     this.backgroundLogPids.clear();
     this.backgroundLogStreams.clear();
+    this.backgroundTempDirs.clear();
     this.backgroundProcessHistory.clear();
   }
 }
