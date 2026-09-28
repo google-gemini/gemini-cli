@@ -705,6 +705,11 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
   protected override validateToolParamValues(
     params: GrepToolParams,
   ): string | null {
+    const trimmedPattern = params.pattern.trim();
+    if (!trimmedPattern) {
+      return 'pattern cannot be empty or whitespace-only.';
+    }
+
     try {
       new RegExp(params.pattern);
     } catch (error) {

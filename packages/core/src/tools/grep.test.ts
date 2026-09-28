@@ -9,7 +9,10 @@ import { GrepTool, type GrepToolParams } from './grep.js';
 import type { ToolResult, GrepResult, ExecuteOptions } from './tools.js';
 import path from 'node:path';
 import { isSubpath, resolveToRealPath } from '../utils/paths.js';
-import fs from 'node:fs/promises';
+import fsp from 'node:fs/promises';
+import * as fsSync from 'node:fs';
+
+const fs = Object.assign(fsp, { mkdirSync: fsSync.mkdirSync });
 import os from 'node:os';
 import type { Config } from '../config/config.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
@@ -140,6 +143,17 @@ describe('GrepTool', () => {
       const params: GrepToolParams = { pattern: '[[' };
       expect(grepTool.validateToolParams(params)).toContain(
         'Invalid regular expression pattern',
+      );
+    });
+
+    it('should return error if pattern is empty or whitespace-only', () => {
+      const emptyParams: GrepToolParams = { pattern: '' };
+      expect(grepTool.validateToolParams(emptyParams)).toBe(
+        'pattern cannot be empty or whitespace-only.',
+      );
+      const whitespaceParams: GrepToolParams = { pattern: '   \t  ' };
+      expect(grepTool.validateToolParams(whitespaceParams)).toBe(
+        'pattern cannot be empty or whitespace-only.',
       );
     });
 
@@ -343,6 +357,7 @@ describe('GrepTool', () => {
     });
 
     it('should pass -e flag before pattern to system grep to handle leading hyphens safely', async () => {
+      vi.mocked(execStreaming).mockClear();
       vi.mocked(execStreaming).mockImplementationOnce(() =>
         createLineGenerator(['fileA.txt:1:-v flag']),
       );
@@ -360,8 +375,9 @@ describe('GrepTool', () => {
 
       await invocation.execute({ abortSignal });
 
+      expect(execStreaming).toHaveBeenCalledTimes(1);
       const calls = vi.mocked(execStreaming).mock.calls;
-      const lastCall = calls[calls.length - 1];
+      const lastCall = calls[0];
       expect(lastCall[0]).toBe('grep');
       const args = lastCall[1];
       const eIndex = args.indexOf('-e');
@@ -370,8 +386,9 @@ describe('GrepTool', () => {
     });
 
     it('should pass -e flag before pattern to git grep to handle leading hyphens safely', async () => {
-      await fs.mkdir(path.join(tempRootDir, '.git'), { recursive: true });
+      fs.mkdirSync(path.join(tempRootDir, '.git'), { recursive: true });
 
+      vi.mocked(execStreaming).mockClear();
       vi.mocked(execStreaming).mockImplementationOnce(() =>
         createLineGenerator(['fileA.txt:1:--flag option']),
       );
@@ -387,8 +404,9 @@ describe('GrepTool', () => {
 
       await invocation.execute({ abortSignal });
 
+      expect(execStreaming).toHaveBeenCalledTimes(1);
       const calls = vi.mocked(execStreaming).mock.calls;
-      const lastCall = calls[calls.length - 1];
+      const lastCall = calls[0];
       expect(lastCall[0]).toBe('git');
       const args = lastCall[1];
       const eIndex = args.indexOf('-e');
