@@ -342,6 +342,60 @@ describe('GrepTool', () => {
       );
     });
 
+    it('should pass -e flag before pattern to system grep to handle leading hyphens safely', async () => {
+      vi.mocked(execStreaming).mockImplementationOnce(() =>
+        createLineGenerator(['fileA.txt:1:-v flag']),
+      );
+
+      const params: GrepToolParams = { pattern: '-v' };
+      const invocation = grepTool.build(params) as unknown as {
+        isCommandAvailable: (command: string) => Promise<boolean>;
+        execute: (options: ExecuteOptions) => Promise<ToolResult>;
+      };
+      invocation.isCommandAvailable = vi.fn(async (command: string) => {
+        if (command === 'git') return false;
+        if (command === 'grep') return true;
+        return false;
+      });
+
+      await invocation.execute({ abortSignal });
+
+      const calls = vi.mocked(execStreaming).mock.calls;
+      const lastCall = calls[calls.length - 1];
+      expect(lastCall[0]).toBe('grep');
+      const args = lastCall[1];
+      const eIndex = args.indexOf('-e');
+      expect(eIndex).toBeGreaterThanOrEqual(0);
+      expect(args[eIndex + 1]).toBe('-v');
+    });
+
+    it('should pass -e flag before pattern to git grep to handle leading hyphens safely', async () => {
+      await fs.mkdir(path.join(tempRootDir, '.git'), { recursive: true });
+
+      vi.mocked(execStreaming).mockImplementationOnce(() =>
+        createLineGenerator(['fileA.txt:1:--flag option']),
+      );
+
+      const params: GrepToolParams = { pattern: '--flag' };
+      const invocation = grepTool.build(params) as unknown as {
+        isCommandAvailable: (command: string) => Promise<boolean>;
+        execute: (options: ExecuteOptions) => Promise<ToolResult>;
+      };
+      invocation.isCommandAvailable = vi.fn(
+        async (command: string) => command === 'git',
+      );
+
+      await invocation.execute({ abortSignal });
+
+      const calls = vi.mocked(execStreaming).mock.calls;
+      const lastCall = calls[calls.length - 1];
+      expect(lastCall[0]).toBe('git');
+      const args = lastCall[1];
+      const eIndex = args.indexOf('-e');
+      expect(eIndex).toBeGreaterThanOrEqual(0);
+      expect(args[eIndex + 1]).toBe('--flag');
+    });
+
     it('should throw an error if params are invalid', async () => {
       const params = { dir_path: '.' } as unknown as GrepToolParams; // Invalid: pattern missing
       expect(() => grepTool.build(params)).toThrow(

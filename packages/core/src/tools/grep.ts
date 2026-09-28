@@ -441,17 +441,11 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       if (gitAvailable) {
         strategyUsed = 'git grep';
-        const gitArgs = [
-          'grep',
-          '--untracked',
-          '-n',
-          '-E',
-          '--ignore-case',
-          pattern,
-        ];
+        const gitArgs = ['grep', '--untracked', '-n', '-E', '--ignore-case'];
         if (max_matches_per_file) {
           gitArgs.push('--max-count', max_matches_per_file.toString());
         }
+        gitArgs.push('-e', pattern);
         if (include_pattern) {
           gitArgs.push('--', include_pattern);
         }
@@ -525,7 +519,7 @@ class GrepToolInvocation extends BaseToolInvocation<
         if (include_pattern) {
           grepArgs.push(`--include=${include_pattern}`);
         }
-        grepArgs.push(pattern);
+        grepArgs.push('-e', pattern);
         grepArgs.push('.');
 
         const results: GrepMatch[] = [];
