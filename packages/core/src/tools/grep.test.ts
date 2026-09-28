@@ -9,10 +9,8 @@ import { GrepTool, type GrepToolParams } from './grep.js';
 import type { ToolResult, GrepResult, ExecuteOptions } from './tools.js';
 import path from 'node:path';
 import { isSubpath, resolveToRealPath } from '../utils/paths.js';
-import fsp from 'node:fs/promises';
-import * as fsSync from 'node:fs';
-
-const fs = Object.assign(fsp, { mkdirSync: fsSync.mkdirSync });
+import fs from 'node:fs/promises';
+import { mkdirSync } from 'node:fs';
 import os from 'node:os';
 import type { Config } from '../config/config.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
@@ -386,7 +384,7 @@ describe('GrepTool', () => {
     });
 
     it('should pass -e flag before pattern to git grep to handle leading hyphens safely', async () => {
-      fs.mkdirSync(path.join(tempRootDir, '.git'), { recursive: true });
+      mkdirSync(path.join(tempRootDir, '.git'), { recursive: true });
 
       vi.mocked(execStreaming).mockClear();
       vi.mocked(execStreaming).mockImplementationOnce(() =>
