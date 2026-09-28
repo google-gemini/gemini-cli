@@ -213,6 +213,49 @@ describe('ChatRecordingService', () => {
       expect(files[0]).toMatch(/^session-.*-test-ses\.jsonl$/);
     });
 
+    it('should not append to or poison an existing session file in the same UTC minute', async () => {
+      await chatRecordingService.initialize();
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'Reply with exactly: alpha',
+        model: 'gemini-pro',
+      });
+      chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: 'alpha',
+        model: 'gemini-pro',
+      });
+
+      const originalFilePath = chatRecordingService.getConversationFilePath()!;
+      expect(fs.existsSync(originalFilePath)).toBe(true);
+
+      // A second fresh initialization in the same UTC minute for the same sessionId
+      // (e.g. during eager config initialization before resumeChat) must not append a
+      // context-only checkpoint onto the existing session file.
+      const secondRecordingService = new ChatRecordingService(mockConfig);
+      await secondRecordingService.initialize();
+      secondRecordingService.updateMessagesFromHistory([
+        {
+          id: 'ctx-1',
+          content: {
+            role: 'user',
+            parts: [{ text: '<session_context>env</session_context>' }],
+          },
+        } as HistoryTurn,
+      ]);
+
+      const secondFilePath = secondRecordingService.getConversationFilePath()!;
+      expect(secondFilePath).not.toBe(originalFilePath);
+      expect(path.basename(secondFilePath)).toMatch(
+        /^session-.*-1-test-ses\.jsonl$/,
+      );
+
+      const reloadedOriginal = await loadConversationRecord(originalFilePath);
+      expect(reloadedOriginal).not.toBeNull();
+      expect(reloadedOriginal?.hasResumableContent).toBe(true);
+      expect(reloadedOriginal?.messages).toHaveLength(2);
+    });
+
     it('should include the conversation kind when specified', async () => {
       await chatRecordingService.initialize(undefined, 'subagent');
       chatRecordingService.recordMessage({
