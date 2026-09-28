@@ -145,7 +145,13 @@ export async function updateExtension(
     await copyExtension(tempDir, extension.path);
     throw e;
   } finally {
-    await removeDirectoryWithRetry(tempDir);
+    try {
+      await removeDirectoryWithRetry(tempDir);
+    } catch (cleanupError) {
+      debugLogger.warn(
+        `Failed to clean up temp directory ${tempDir}: ${getErrorMessage(cleanupError)}`,
+      );
+    }
   }
 }
 

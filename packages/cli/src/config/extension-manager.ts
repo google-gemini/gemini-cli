@@ -498,7 +498,13 @@ Would you like to attempt to install via "git clone" instead?`,
         }
       } finally {
         if (tempDir) {
-          await removeDirectoryWithRetry(tempDir);
+          try {
+            await removeDirectoryWithRetry(tempDir);
+          } catch (cleanupError) {
+            debugLogger.warn(
+              `Failed to clean up temp directory ${tempDir}: ${getErrorMessage(cleanupError)}`,
+            );
+          }
         }
       }
       return extension;

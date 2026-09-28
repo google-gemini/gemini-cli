@@ -333,6 +333,28 @@ describe('Extension Update Logic', () => {
       expect(fs.promises.rm).toHaveBeenCalled();
     });
 
+    it('should not mask primary update error if tempDir cleanup fails in finally', async () => {
+      vi.mocked(
+        mockExtensionManager.installOrUpdateExtension,
+      ).mockRejectedValueOnce(new Error('Install failed'));
+      const cleanupError = Object.assign(
+        new Error('EACCES: permission denied'),
+        {
+          code: 'EACCES',
+        },
+      );
+      vi.mocked(fs.promises.rm).mockRejectedValueOnce(cleanupError);
+
+      await expect(
+        updateExtension(
+          mockExtension,
+          mockExtensionManager,
+          ExtensionUpdateState.UPDATE_AVAILABLE,
+          mockDispatch,
+        ),
+      ).rejects.toThrow('Updated extension not found after installation');
+    });
+
     describe('Integrity Verification', () => {
       it('should fail update with security alert if integrity is invalid', async () => {
         vi.mocked(
