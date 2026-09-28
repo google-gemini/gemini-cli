@@ -310,4 +310,67 @@ describe('GeminiAgent Session Resume', () => {
       );
     });
   });
+
+  it('should resolve session before initializing config or fresh chat recording', async () => {
+    const callOrder: string[] = [];
+    const resolveSessionMock = vi.fn().mockImplementation(async () => {
+      callOrder.push('resolveSession');
+      return {
+        sessionData: {
+          sessionId: 'same-minute-session-id',
+          messages: [{ type: 'user', content: [{ text: 'Hello' }] }],
+        },
+        sessionPath: '/path/to/session.jsonl',
+      };
+    });
+
+    (SessionSelector as unknown as Mock).mockImplementation(() => ({
+      resolveSession: resolveSessionMock,
+    }));
+    mockConfig.initialize.mockImplementation(async () => {
+      callOrder.push('config.initialize');
+    });
+    vi.mocked(mockConfig.getGeminiClient().resumeChat).mockImplementation(
+      async () => {
+        callOrder.push('geminiClient.resumeChat');
+      },
+    );
+    (convertSessionToClientHistory as unknown as Mock).mockReturnValue([
+      { role: 'user', parts: [{ text: 'Hello' }] },
+    ]);
+
+    await agent.loadSession({
+      sessionId: 'same-minute-session-id',
+      cwd: '/tmp',
+      mcpServers: [],
+    });
+
+    expect(callOrder).toEqual([
+      'resolveSession',
+      'config.initialize',
+      'geminiClient.resumeChat',
+    ]);
+    expect(mockConfig.getGeminiClient().initialize).not.toHaveBeenCalled();
+  });
+
+  it('should not initialize config if session resolution fails', async () => {
+    (SessionSelector as unknown as Mock).mockImplementation(() => ({
+      resolveSession: vi
+        .fn()
+        .mockRejectedValue(
+          new Error('No previous sessions found for this project.'),
+        ),
+    }));
+
+    await expect(
+      agent.loadSession({
+        sessionId: 'missing-session-id',
+        cwd: '/tmp',
+        mcpServers: [],
+      }),
+    ).rejects.toThrow('No previous sessions found for this project.');
+
+    expect(mockConfig.initialize).not.toHaveBeenCalled();
+    expect(mockConfig.getGeminiClient().resumeChat).not.toHaveBeenCalled();
+  });
 });

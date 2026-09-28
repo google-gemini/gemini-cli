@@ -269,6 +269,19 @@ export class ShellToolInvocation extends BaseToolInvocation<
     return this.getContextualDetails().trim();
   }
 
+  hasTaintedOrBuildFileRisk(): boolean {
+    const command = stripShellWrapper(this.params.command);
+    const history = this.getHistory();
+    const untrustedContext = extractUntrustedContext(history);
+    const untrustedFlags = findUntrustedFlags(command, untrustedContext);
+    const modifiedBuildFiles = getModifiedBuildFiles(this.context.config);
+    const isBuildCmd = isBuildOrTestCommand(command);
+
+    return (
+      untrustedFlags.length > 0 || (isBuildCmd && modifiedBuildFiles.length > 0)
+    );
+  }
+
   override getPolicyUpdateOptions(
     outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
@@ -277,15 +290,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       outcome === ToolConfirmationOutcome.ProceedAlways
     ) {
       const command = stripShellWrapper(this.params.command);
-      const history = this.getHistory();
-      const untrustedContext = extractUntrustedContext(history);
-      const untrustedFlags = findUntrustedFlags(command, untrustedContext);
-      const modifiedBuildFiles = getModifiedBuildFiles(this.context.config);
-      const isBuildCmd = isBuildOrTestCommand(command);
-      if (
-        untrustedFlags.length > 0 ||
-        (isBuildCmd && modifiedBuildFiles.length > 0)
-      ) {
+      if (this.hasTaintedOrBuildFileRisk()) {
         return undefined;
       }
       const rootCommands = [...new Set(getCommandRoots(command))];
@@ -307,21 +312,14 @@ export class ShellToolInvocation extends BaseToolInvocation<
       return super.shouldConfirmExecute(abortSignal, forcedDecision);
     }
 
-    const command = stripShellWrapper(this.params.command);
-    const history = this.getHistory();
-    const untrustedContext = extractUntrustedContext(history);
-    const untrustedFlags = findUntrustedFlags(command, untrustedContext);
-    const modifiedBuildFiles = getModifiedBuildFiles(this.context.config);
-    const isBuildCmd = isBuildOrTestCommand(command);
-
-    if (
-      untrustedFlags.length > 0 ||
-      (isBuildCmd && modifiedBuildFiles.length > 0)
-    ) {
+    if (this.hasTaintedOrBuildFileRisk()) {
       return this.getConfirmationDetails(abortSignal);
     }
 
-    if (this.context.config.getApprovalMode() === ApprovalMode.YOLO) {
+    if (
+      this.context.config.getApprovalMode() === ApprovalMode.YOLO &&
+      forcedDecision !== 'ask_user'
+    ) {
       return super.shouldConfirmExecute(abortSignal, forcedDecision);
     }
 
