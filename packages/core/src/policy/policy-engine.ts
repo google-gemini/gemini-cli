@@ -337,9 +337,15 @@ export class PolicyEngine {
   private shouldDowngradeForRedirection(
     command: string,
     allowRedirection?: boolean,
+    rule?: PolicyRule,
   ): boolean {
     if (allowRedirection) return false;
     if (!hasRedirection(command)) return false;
+
+    // Require explicit allowRedirection when matching a command-prefix rule.
+    if (rule?.argsPattern && !allowRedirection) {
+      return true;
+    }
 
     // Do not downgrade (do not ask user) if in AUTO_EDIT or YOLO mode.
     // These modes trust the agent's actions (YOLO) or specific task (AUTO_EDIT).
@@ -511,7 +517,7 @@ export class PolicyEngine {
 
     // Check for redirection on the full command string.
     // Redirection always downgrades ALLOW to ASK_USER (it never upgrades).
-    if (this.shouldDowngradeForRedirection(command, allowRedirection)) {
+    if (this.shouldDowngradeForRedirection(command, allowRedirection, rule)) {
       if (aggregateDecision === PolicyDecision.ALLOW) {
         debugLogger.debug(
           `[PolicyEngine.check] Downgrading ALLOW to ASK_USER for redirected command: ${command}`,
@@ -577,7 +583,11 @@ export class PolicyEngine {
         // Downgrade if sub-command has redirection
         if (
           subResult.decision === PolicyDecision.ALLOW &&
-          this.shouldDowngradeForRedirection(subCmd, allowRedirection)
+          this.shouldDowngradeForRedirection(
+            subCmd,
+            subResult.rule?.allowRedirection ?? allowRedirection,
+            subResult.rule,
+          )
         ) {
           if (aggregateDecision === PolicyDecision.ALLOW) {
             aggregateDecision = PolicyDecision.ASK_USER;
@@ -906,6 +916,10 @@ export class PolicyEngine {
           }
         }
       }
+    }
+
+    if (this.nonInteractive && decision === PolicyDecision.ASK_USER) {
+      decision = PolicyDecision.DENY;
     }
 
     return {
