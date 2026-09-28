@@ -35,6 +35,14 @@ export const useFolderTrust = (
   const [isRestarting, setIsRestarting] = useState(false);
   const startupMessageSent = useRef(false);
 
+  const onTrustChangeRef = useRef(onTrustChange);
+  const addItemRef = useRef(addItem);
+
+  useEffect(() => {
+    onTrustChangeRef.current = onTrustChange;
+    addItemRef.current = addItem;
+  }, [onTrustChange, addItem]);
+
   const folderTrust = settings.merged.security.folderTrust.enabled ?? true;
 
   useEffect(() => {
@@ -56,7 +64,7 @@ export const useFolderTrust = (
 
     const showUntrustedMessage = () => {
       if (trusted === false && !startupMessageSent.current) {
-        addItem(
+        addItemRef.current(
           {
             type: MessageType.INFO,
             text: 'This folder is untrusted, project settings, hooks, MCPs, and GEMINI.md files will not be applied for this folder.\nUse the `/permissions` command to change the trust level.',
@@ -70,14 +78,14 @@ export const useFolderTrust = (
     if (isMounted) {
       setIsTrusted(trusted);
       setIsFolderTrustDialogOpen(!isHeadlessMode() && trusted === undefined);
-      onTrustChange(trusted);
+      onTrustChangeRef.current(trusted);
       showUntrustedMessage();
     }
 
     return () => {
       isMounted = false;
     };
-  }, [folderTrust, onTrustChange, settings.merged, addItem]);
+  }, [folderTrust, settings.merged]);
 
   const handleFolderTrustSelect = useCallback(
     async (choice: FolderTrustChoice) => {
@@ -111,7 +119,7 @@ export const useFolderTrust = (
         trustLevel === TrustLevel.TRUST_FOLDER ||
         trustLevel === TrustLevel.TRUST_PARENT;
 
-      onTrustChange(currentIsTrusted);
+      onTrustChangeRef.current(currentIsTrusted);
       setIsTrusted(currentIsTrusted);
 
       const wasTrusted = isTrusted ?? false;
@@ -123,7 +131,7 @@ export const useFolderTrust = (
         setIsFolderTrustDialogOpen(false);
       }
     },
-    [onTrustChange, isTrusted],
+    [isTrusted],
   );
 
   return {
