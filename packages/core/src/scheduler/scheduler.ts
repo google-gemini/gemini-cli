@@ -71,6 +71,22 @@ export interface SchedulerOptions {
   onWaitingForConfirmation?: (waiting: boolean) => void;
 }
 
+interface TaintRiskDetectable {
+  hasTaintedOrBuildFileRisk: () => boolean;
+}
+
+function isTaintRiskDetectable(
+  invocation: unknown,
+): invocation is TaintRiskDetectable {
+  return (
+    typeof invocation === 'object' &&
+    invocation !== null &&
+    'hasTaintedOrBuildFileRisk' in invocation &&
+    typeof (invocation as { hasTaintedOrBuildFileRisk?: unknown })
+      .hasTaintedOrBuildFileRisk === 'function'
+  );
+}
+
 const createErrorResponse = (
   request: ToolCallRequestInfo,
   error: Error,
@@ -656,6 +672,17 @@ export class Scheduler {
       decision = PolicyDecision.ASK_USER;
     }
 
+    const hasTaintRisk =
+      isTaintRiskDetectable(toolCall.invocation) &&
+      toolCall.invocation.hasTaintedOrBuildFileRisk();
+
+    if (decision === PolicyDecision.ALLOW && hasTaintRisk) {
+      decision =
+        (this.config.isInteractive?.() ?? true)
+          ? PolicyDecision.ASK_USER
+          : PolicyDecision.DENY;
+    }
+
     if (decision === PolicyDecision.DENY) {
       const { errorMessage, errorType } = getPolicyDenialError(
         this.config,
@@ -679,6 +706,12 @@ export class Scheduler {
     let lastDetails: SerializableConfirmationDetails | undefined;
 
     if (decision === PolicyDecision.ASK_USER) {
+      const forcedDecision =
+        hookDecision === 'ask' ||
+        (policyDecision === PolicyDecision.ALLOW && hasTaintRisk)
+          ? 'ask_user'
+          : undefined;
+
       const result = await resolveConfirmation(toolCall, signal, {
         config: this.config,
         messageBus: this.messageBus,
@@ -688,7 +721,7 @@ export class Scheduler {
         schedulerId: this.schedulerId,
         onWaitingForConfirmation: this.onWaitingForConfirmation,
         systemMessage: hookSystemMessage,
-        forcedDecision: hookDecision === 'ask' ? 'ask_user' : undefined,
+        forcedDecision,
       });
       outcome = result.outcome;
       lastDetails = result.lastDetails;

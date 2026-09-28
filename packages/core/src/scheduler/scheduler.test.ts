@@ -848,6 +848,72 @@ describe('Scheduler (Orchestrator)', () => {
       expect(mockExecutor.execute).toHaveBeenCalled();
     });
 
+    it('should escalate ALLOW to ASK_USER when invocation detects taint risk in interactive mode', async () => {
+      vi.mocked(checkPolicy).mockResolvedValue({
+        decision: PolicyDecision.ALLOW,
+        rule: undefined,
+      });
+
+      mockConfig.isInteractive = vi.fn().mockReturnValue(true);
+
+      const taintInvocation = {
+        ...mockInvocation,
+        hasTaintedOrBuildFileRisk: vi.fn().mockReturnValue(true),
+      };
+      mockTool.build = vi.fn().mockReturnValue(taintInvocation);
+
+      vi.mocked(resolveConfirmation).mockResolvedValue({
+        outcome: ToolConfirmationOutcome.ProceedOnce,
+        lastDetails: undefined,
+      });
+
+      mockExecutor.execute.mockResolvedValue({
+        status: CoreToolCallStatus.Success,
+      } as unknown as SuccessfulToolCall);
+
+      await scheduler.schedule(req1, signal);
+
+      expect(resolveConfirmation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({
+          forcedDecision: 'ask_user',
+        }),
+      );
+      expect(mockExecutor.execute).toHaveBeenCalled();
+    });
+
+    it('should escalate ALLOW to DENY when invocation detects taint risk in non-interactive mode', async () => {
+      vi.mocked(checkPolicy).mockResolvedValue({
+        decision: PolicyDecision.ALLOW,
+        rule: undefined,
+      });
+
+      mockConfig.isInteractive = vi.fn().mockReturnValue(false);
+
+      const taintInvocation = {
+        ...mockInvocation,
+        hasTaintedOrBuildFileRisk: vi.fn().mockReturnValue(true),
+      };
+      mockTool.build = vi.fn().mockReturnValue(taintInvocation);
+
+      mockExecutor.execute.mockResolvedValue({
+        status: CoreToolCallStatus.Success,
+      } as unknown as SuccessfulToolCall);
+
+      await scheduler.schedule(req1, signal);
+
+      expect(resolveConfirmation).not.toHaveBeenCalled();
+      expect(mockExecutor.execute).not.toHaveBeenCalled();
+      expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
+        'call-1',
+        CoreToolCallStatus.Error,
+        expect.objectContaining({
+          errorType: ToolErrorType.POLICY_VIOLATION,
+        }),
+      );
+    });
+
     it('should auto-approve remaining identical tools in batch after ProceedAlways', async () => {
       // First call requires confirmation, second is auto-approved (simulating policy update)
       vi.mocked(checkPolicy)
@@ -909,6 +975,7 @@ describe('Scheduler (Orchestrator)', () => {
           messageBus: expect.anything(),
           state: mockStateManager,
           schedulerId: ROOT_SCHEDULER_ID,
+          forcedDecision: undefined,
         }),
       );
 
@@ -921,6 +988,44 @@ describe('Scheduler (Orchestrator)', () => {
         expect.anything(),
       );
 
+      expect(mockExecutor.execute).toHaveBeenCalled();
+    });
+
+    it('should pass forcedDecision: "ask_user" when hookDecision is ask', async () => {
+      vi.mocked(checkPolicy).mockResolvedValue({
+        decision: PolicyDecision.ALLOW,
+        rule: undefined,
+      });
+
+      const mockHookSystem = {
+        fireBeforeToolEvent: vi.fn().mockResolvedValue({
+          shouldStopExecution: () => false,
+          getBlockingError: () => undefined,
+          isAskDecision: () => true,
+          systemMessage: 'Hook prompt',
+        }),
+      };
+      mockConfig.getHookSystem = vi.fn().mockReturnValue(mockHookSystem);
+
+      vi.mocked(resolveConfirmation).mockResolvedValue({
+        outcome: ToolConfirmationOutcome.ProceedOnce,
+        lastDetails: undefined,
+      });
+
+      mockExecutor.execute.mockResolvedValue({
+        status: CoreToolCallStatus.Success,
+      } as unknown as SuccessfulToolCall);
+
+      await scheduler.schedule(req1, signal);
+
+      expect(resolveConfirmation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({
+          forcedDecision: 'ask_user',
+          systemMessage: 'Hook prompt',
+        }),
+      );
       expect(mockExecutor.execute).toHaveBeenCalled();
     });
 

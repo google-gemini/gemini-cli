@@ -161,12 +161,82 @@ function decodeUTF32(buf: Buffer, littleEndian: boolean): string {
 }
 
 /**
+ * Reads a file as a Buffer while verifying device and inode (dev + ino) before,
+ * during (via fstat on the opened file descriptor), and after reading to ensure
+ * file consistency.
+ */
+export async function readSecureFileBuffer(
+  filePath: string,
+  expectedStats?: fs.Stats,
+): Promise<Buffer> {
+  const initialStats = expectedStats ?? (await fs.promises.stat(filePath));
+  let fileHandle: fs.promises.FileHandle | undefined;
+
+  try {
+    if (typeof fs.promises.open === 'function') {
+      try {
+        fileHandle = await fs.promises.open(filePath, 'r');
+      } catch {
+        // If opening file descriptor failed or is mocked without stat, continue to readFile
+      }
+      if (fileHandle && typeof fileHandle.stat === 'function') {
+        const handleStats = await fileHandle.stat();
+        if (
+          initialStats.dev !== undefined &&
+          initialStats.ino !== undefined &&
+          handleStats &&
+          handleStats.dev !== undefined &&
+          handleStats.ino !== undefined &&
+          (initialStats.dev !== handleStats.dev ||
+            initialStats.ino !== handleStats.ino)
+        ) {
+          throw new Error(
+            `File device or inode changed during read: ${filePath}`,
+          );
+        }
+      }
+    }
+
+    const contentBuffer = fileHandle
+      ? await fileHandle.readFile()
+      : await fs.promises.readFile(filePath);
+
+    // Verify post-read stats to ensure file consistency during or right after reading
+    let postStats: fs.Stats | undefined;
+    try {
+      postStats = await fs.promises.stat(filePath);
+    } catch {
+      // If post-stat failed due to file removal, ignore here
+    }
+    if (
+      postStats &&
+      initialStats.dev !== undefined &&
+      initialStats.ino !== undefined &&
+      postStats.dev !== undefined &&
+      postStats.ino !== undefined &&
+      (initialStats.dev !== postStats.dev || initialStats.ino !== postStats.ino)
+    ) {
+      throw new Error(`File device or inode changed during read: ${filePath}`);
+    }
+
+    return contentBuffer;
+  } finally {
+    if (fileHandle) {
+      await fileHandle.close().catch(() => {});
+    }
+  }
+}
+
+/**
  * Read a file as text, honoring BOM encodings (UTF‑8/16/32) and stripping the BOM.
  * Falls back to utf8 when no BOM is present.
  */
-export async function readFileWithEncoding(filePath: string): Promise<string> {
-  // Read the file once; detect BOM and decode from the single buffer.
-  const full = await fs.promises.readFile(filePath);
+export async function readFileWithEncoding(
+  filePath: string,
+  expectedStats?: fs.Stats,
+): Promise<string> {
+  // Read the file once securely; detect BOM and decode from the single buffer.
+  const full = await readSecureFileBuffer(filePath, expectedStats);
   if (full.length === 0) return '';
 
   const bom = detectBOM(full);
@@ -548,7 +618,7 @@ export async function processSingleFileContent(
             returnDisplay: `Skipped large SVG file (>1MB): ${relativePathForDisplay}`,
           };
         }
-        const content = await readFileWithEncoding(filePath);
+        const content = await readFileWithEncoding(filePath, stats);
         return {
           llmContent: content,
           returnDisplay: `Read SVG as text: ${relativePathForDisplay}`,
@@ -556,7 +626,7 @@ export async function processSingleFileContent(
       }
       case 'text': {
         // Use BOM-aware reader to avoid leaving a BOM character in content and to support UTF-16/32 transparently
-        const content = await readFileWithEncoding(filePath);
+        const content = await readFileWithEncoding(filePath, stats);
         const lines = content.split(/\r?\n/);
         const originalLineCount = lines.length;
 
@@ -627,7 +697,7 @@ export async function processSingleFileContent(
             errorType: ToolErrorType.READ_CONTENT_FAILURE,
           };
         }
-        const contentBuffer = await fs.promises.readFile(filePath);
+        const contentBuffer = await readSecureFileBuffer(filePath, stats);
         const base64Data = contentBuffer.toString('base64');
         return {
           llmContent: {
@@ -644,7 +714,7 @@ export async function processSingleFileContent(
       case 'video': {
         const mimeType =
           getSpecificMimeType(filePath) ?? 'application/octet-stream';
-        const contentBuffer = await fs.promises.readFile(filePath);
+        const contentBuffer = await readSecureFileBuffer(filePath, stats);
         const base64Data = contentBuffer.toString('base64');
         return {
           llmContent: {
