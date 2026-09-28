@@ -20,29 +20,6 @@ function isDangerousKey(key: string): boolean {
 
 let tempCounter = 0;
 
-function readFileWithRetry(filePath: string, retries = 3): string {
-  let attempt = 0;
-  while (attempt < retries) {
-    try {
-      return fs.readFileSync(filePath, 'utf-8');
-    } catch (err: unknown) {
-      if (
-        err &&
-        typeof err === 'object' &&
-        'code' in err &&
-        err.code === 'ENOENT'
-      ) {
-        throw err;
-      }
-      attempt++;
-      if (attempt >= retries) {
-        throw err;
-      }
-    }
-  }
-  return '';
-}
-
 function writeAtomicSync(filePath: string, content: string): void {
   const dir = path.dirname(filePath);
   if (!fs.existsSync(dir)) {
@@ -87,7 +64,7 @@ export function updateSettingsFilePreservingFormat(
 
   let parsed: Record<string, unknown>;
   try {
-    const originalContent = readFileWithRetry(filePath);
+    const originalContent = fs.readFileSync(filePath, 'utf-8');
     if (!originalContent.trim()) {
       parsed = {};
     } else {
