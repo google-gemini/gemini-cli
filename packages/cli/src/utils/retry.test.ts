@@ -148,5 +148,20 @@ describe('retry utils', () => {
       );
       expect(fs.promises.rm).toHaveBeenCalledTimes(1);
     });
+
+    it('should respect caller-supplied RmOptions while keeping defaults', async () => {
+      vi.mocked(fs.promises.rm).mockResolvedValue(undefined);
+
+      await removeDirectoryWithRetry('/some/path', {
+        recursive: false,
+        maxRetries: 2,
+      });
+
+      expect(fs.promises.rm).toHaveBeenCalledWith('/some/path', {
+        recursive: false,
+        force: true,
+        maxRetries: 2,
+      });
+    });
   });
 });

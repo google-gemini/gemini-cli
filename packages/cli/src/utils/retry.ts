@@ -71,7 +71,7 @@ export async function removeDirectoryWithRetry(
   };
 
   await retryWithBackoff(
-    () => fs.promises.rm(path, { ...options, recursive: true, force: true }),
+    () => fs.promises.rm(path, { recursive: true, force: true, ...options }),
     {
       maxRetries: 5,
       initialDelay: 100,

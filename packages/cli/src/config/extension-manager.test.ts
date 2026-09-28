@@ -34,6 +34,19 @@ const mockIntegrityManager = vi.hoisted(() => ({
   store: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    promises: {
+      ...actual.promises,
+      rm: vi.fn((...args: Parameters<typeof actual.promises.rm>) =>
+        actual.promises.rm(...args),
+      ),
+    },
+  };
+});
+
 vi.mock('os', async (importOriginal) => {
   const mockedOs = await importOriginal<typeof os>();
   return {
@@ -1029,35 +1042,21 @@ describe('ExtensionManager', () => {
         JSON.stringify({ name: extName, version: '1.1.0' }),
       );
 
-      const originalRm = fs.promises.rm.bind(fs.promises);
-      let callCount = 0;
-      const rmSpy = vi
-        .spyOn(fs.promises, 'rm')
-        .mockImplementation(async (targetPath, options) => {
-          callCount++;
-          if (callCount === 1) {
-            const err = Object.assign(
-              new Error(
-                `EBUSY: resource busy or locked, rmdir '${String(targetPath)}'`,
-              ),
-              { code: 'EBUSY' },
-            );
-            throw err;
-          }
-          return originalRm(targetPath, options);
-        });
+      const ebusyError = Object.assign(
+        new Error(`EBUSY: resource busy or locked, rmdir '${extDir}'`),
+        { code: 'EBUSY' },
+      );
+      vi.mocked(fs.promises.rm).mockRejectedValueOnce(ebusyError);
 
-      try {
-        const updated = await extensionManager.installOrUpdateExtension(
-          { type: 'local', source: newSourceDir },
-          { name: extName, version: '1.0.0' },
-        );
+      const updated = await extensionManager.installOrUpdateExtension(
+        { type: 'local', source: newSourceDir },
+        { name: extName, version: '1.0.0' },
+      );
 
-        expect(updated.version).toBe('1.1.0');
-        expect(rmSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
-      } finally {
-        rmSpy.mockRestore();
-      }
+      expect(updated.version).toBe('1.1.0');
+      expect(
+        vi.mocked(fs.promises.rm).mock.calls.length,
+      ).toBeGreaterThanOrEqual(2);
     });
   });
 });
