@@ -297,6 +297,59 @@ describe('setupUser', () => {
       });
     });
 
+    it('should onboard using FREE when allowedTiers contains FREE without isDefault', async () => {
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT', '');
+      mockLoad.mockResolvedValue({
+        allowedTiers: [{ ...mockFreeTier, isDefault: false }],
+      });
+      const userData = await setupUser({} as OAuth2Client, mockConfig);
+      expect(mockOnboardUser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tierId: UserTierId.FREE,
+          cloudaicompanionProject: undefined,
+        }),
+      );
+      expect(userData).toEqual({
+        projectId: 'server-project',
+        userTier: UserTierId.FREE,
+        userTierName: 'free',
+        hasOnboardedPreviously: false,
+      });
+    });
+
+    it('should use the FIRST allowed tier when multiple tiers exist and none has isDefault', async () => {
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'test-project');
+      const customTier = {
+        id: 'custom-tier',
+        name: 'custom',
+        isDefault: false,
+      };
+      mockLoad.mockResolvedValue({
+        allowedTiers: [customTier, { ...mockPaidTier, isDefault: false }],
+      });
+      const userData = await setupUser({} as OAuth2Client, mockConfig);
+      expect(mockOnboardUser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tierId: 'custom-tier',
+        }),
+      );
+      expect(userData.userTier).toBe('custom-tier');
+    });
+
+    it('should preserve LEGACY fallback when allowedTiers is empty or undefined', async () => {
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'test-project');
+      mockLoad.mockResolvedValue({
+        allowedTiers: [],
+      });
+      const userData = await setupUser({} as OAuth2Client, mockConfig);
+      expect(mockOnboardUser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tierId: UserTierId.LEGACY,
+        }),
+      );
+      expect(userData.userTier).toBe(UserTierId.LEGACY);
+    });
+
     it('should use GOOGLE_CLOUD_PROJECT when onboard response has no project ID', async () => {
       vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'test-project');
       mockLoad.mockResolvedValue({
