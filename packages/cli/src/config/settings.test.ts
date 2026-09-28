@@ -261,7 +261,7 @@ describe('Settings Loading and Merging', () => {
       },
     );
 
-    it('should unconditionally override selectedType when GEMINI_CLI_AUTH_OVERRIDE is present', () => {
+    it('should unconditionally override selectedType when GEMINI_CLI_AUTH_OVERRIDE is present and delete it from process.env', () => {
       (mockFsExistsSync as Mock).mockImplementation(
         (pathLike: fs.PathLike) =>
           path.normalize(pathLike.toString()) ===
@@ -295,6 +295,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged.security.auth.selectedType).toBe(
         AuthType.LOGIN_WITH_GOOGLE,
       );
+      expect(process.env['GEMINI_CLI_AUTH_OVERRIDE']).toBeUndefined();
     });
 
     it('should merge system, user and workspace settings, with system taking precedence over workspace, and workspace over user', () => {

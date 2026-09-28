@@ -416,29 +416,16 @@ export class TestRig {
 
   private _cleanDir(dir: string) {
     if (fs.existsSync(dir)) {
-      for (let i = 0; i < 10; i++) {
-        try {
-          fs.rmSync(dir, {
-            recursive: true,
-            force: true,
-            maxRetries: 5,
-            retryDelay: 50,
-          });
-          return;
-        } catch (err) {
-          if (i === 9) {
-            console.error(
-              `Failed to clean directory ${dir} after 10 attempts:`,
-              err,
-            );
-            throw err;
-          }
-          const delay = Math.min(50 * (i + 1), 500);
-          const start = Date.now();
-          while (Date.now() - start < delay) {
-            /* busy wait */
-          }
-        }
+      try {
+        fs.rmSync(dir, {
+          recursive: true,
+          force: true,
+          maxRetries: 10,
+          retryDelay: 50,
+        });
+      } catch (err) {
+        console.error(`Failed to clean directory ${dir} after retries:`, err);
+        throw err;
       }
     }
   }

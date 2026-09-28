@@ -1934,12 +1934,15 @@ describe('oauth2', () => {
 
     it('should immediately throw ENOENT without retrying', async () => {
       const nonExistent = path.join(tempDir, 'does-not-exist.json');
-      const getMaxRetries = vi.fn(() => 3);
+      let readAttempts = 0;
+      const originalReadFile = fs.promises.readFile;
+      vi.spyOn(fs.promises, 'readFile').mockImplementation(async (p, opts) => {
+        readAttempts++;
+        return originalReadFile(p, opts);
+      });
 
-      await expect(
-        readOAuthCredsWithRetry(nonExistent, getMaxRetries),
-      ).rejects.toThrow();
-      expect(getMaxRetries).toHaveBeenCalledTimes(1);
+      await expect(readOAuthCredsWithRetry(nonExistent, 3)).rejects.toThrow();
+      expect(readAttempts).toBe(1);
     });
 
     it('should retry on transient errors and succeed', async () => {
@@ -1966,27 +1969,16 @@ describe('oauth2', () => {
     it('should throw if max retries exceeded', async () => {
       const busyErr = new Error('Resource busy');
       (busyErr as unknown as { code: string }).code = 'EBUSY';
-      vi.spyOn(fs.promises, 'readFile').mockRejectedValue(busyErr);
+      let attempts = 0;
+      vi.spyOn(fs.promises, 'readFile').mockImplementation(async () => {
+        attempts++;
+        throw busyErr;
+      });
 
-      await expect(
-        readOAuthCredsWithRetry(tempFilePath, () => 3),
-      ).rejects.toThrow('Resource busy');
-    });
-
-    it('should dynamically re-evaluate getMaxRetries on each iteration', async () => {
-      const busyErr = new Error('Resource locked');
-      (busyErr as unknown as { code: string }).code = 'EPERM';
-      vi.spyOn(fs.promises, 'readFile').mockRejectedValue(busyErr);
-
-      const maxAttempts = 3;
-      const getMaxRetries = vi.fn(() => maxAttempts);
-
-      await expect(
-        readOAuthCredsWithRetry(tempFilePath, getMaxRetries),
-      ).rejects.toThrow('Resource locked');
-
-      // Loop checks condition at start of loop (attempt = 0, 1, 2) and after attempt increment (attempt = 1, 2, 3)
-      expect(getMaxRetries.mock.calls.length).toBeGreaterThanOrEqual(3);
+      await expect(readOAuthCredsWithRetry(tempFilePath, 3)).rejects.toThrow(
+        'Resource busy',
+      );
+      expect(attempts).toBe(3);
     });
   });
 });

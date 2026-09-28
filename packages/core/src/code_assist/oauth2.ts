@@ -692,10 +692,10 @@ export function getAvailablePort(): Promise<number> {
 
 export async function readOAuthCredsWithRetry(
   filePath: string,
-  getMaxRetries: () => number = () => 3,
+  maxRetries = 3,
 ): Promise<string> {
   let attempt = 0;
-  while (attempt < getMaxRetries()) {
+  while (attempt < maxRetries) {
     try {
       return await fs.readFile(filePath, 'utf-8');
     } catch (err: unknown) {
@@ -708,7 +708,7 @@ export async function readOAuthCredsWithRetry(
         throw err;
       }
       attempt++;
-      if (attempt >= getMaxRetries()) {
+      if (attempt >= maxRetries) {
         throw err;
       }
       await new Promise((resolve) => setTimeout(resolve, 25 * attempt));

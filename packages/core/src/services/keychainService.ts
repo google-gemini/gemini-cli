@@ -96,18 +96,15 @@ export class KeychainService {
     return (this.initializationPromise ??= this.initializeKeychain());
   }
 
-  private isHeadlessLinuxOrWsl(): boolean {
+  private isWsl(): boolean {
     if (os.platform() !== 'linux') {
       return false;
     }
-    const isWsl = !!(
+    return !!(
       process.env['WSL_DISTRO_NAME'] ||
       process.env['WSLENV'] ||
       process.env['WSL_INTEROP']
     );
-    const isHeadless =
-      !process.env['DISPLAY'] && !process.env['WAYLAND_DISPLAY'];
-    return isWsl || isHeadless;
   }
 
   // High-level orchestration of the loading and testing cycle.
@@ -117,9 +114,9 @@ export class KeychainService {
     // Try to get the native OS keychain unless file storage is requested.
     let nativeKeychain: Keychain | null = null;
     if (!forceFileStorage) {
-      if (this.isHeadlessLinuxOrWsl()) {
+      if (this.isWsl()) {
         debugLogger.debug(
-          'WSL / headless Linux environment detected; bypassing native keychain to prevent libsecret lockups.',
+          'WSL environment detected; bypassing native keychain to prevent libsecret lockups.',
         );
       } else {
         nativeKeychain = await this.getNativeKeychain();

@@ -38,11 +38,6 @@ function readFileWithRetry(filePath: string, retries = 3): string {
       if (attempt >= retries) {
         throw err;
       }
-      // Node.js main thread disallows Atomics.wait; use synchronous busy-wait for short delays
-      const end = Date.now() + 25 * attempt;
-      while (Date.now() < end) {
-        /* empty */
-      }
     }
   }
   return '';

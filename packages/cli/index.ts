@@ -76,6 +76,10 @@ async function run() {
         env: newEnv,
       });
 
+      // Clear one-time auth override from supervisor environment after passing to child
+      delete process.env['GEMINI_CLI_AUTH_OVERRIDE'];
+      delete newEnv['GEMINI_CLI_AUTH_OVERRIDE'];
+
       if (latestAdminSettings) {
         child.send({ type: 'admin-settings', settings: latestAdminSettings });
       }

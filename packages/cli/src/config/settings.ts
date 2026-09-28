@@ -906,6 +906,9 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
 
   // Support environment variable override from relaunch supervisor across exit code 199
   const envAuthOverride = process.env['GEMINI_CLI_AUTH_OVERRIDE'];
+  if (envAuthOverride) {
+    delete process.env['GEMINI_CLI_AUTH_OVERRIDE'];
+  }
   const authOverride =
     envAuthOverride &&
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
