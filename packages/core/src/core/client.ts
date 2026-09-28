@@ -340,6 +340,20 @@ export class GeminiClient {
     history: ReadonlyArray<Content | HistoryTurn>,
     resumedSessionData?: ResumedSessionData,
   ): Promise<void> {
+    if (resumedSessionData?.filePath) {
+      const previousRecordingService = this.chat?.getChatRecordingService?.();
+      if (
+        previousRecordingService &&
+        previousRecordingService.getConversationFilePath?.() !==
+          resumedSessionData.filePath
+      ) {
+        try {
+          await previousRecordingService.deleteCurrentSessionIfNotResumableAsync?.();
+        } catch {
+          // Best-effort cleanup of abandoned startup-only session file
+        }
+      }
+    }
     this.chat = await this.startChat(history, resumedSessionData);
     this.updateTelemetryTokenCount();
   }
