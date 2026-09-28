@@ -1551,6 +1551,90 @@ describe('ChatRecordingService', () => {
       expect(result[1].functionResponse!.id).toBe(callId);
     });
 
+    it('should only sync respective functionResponse for parallel tool calls without cross-contaminating results', async () => {
+      await chatRecordingService.initialize();
+      const modelMsgId = chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: '',
+        model: 'gemini-pro',
+      });
+
+      const callA = 'call-a';
+      const callB = 'call-b';
+
+      chatRecordingService.recordToolCalls('gemini-pro', [
+        {
+          id: callA,
+          name: 'tool_a',
+          args: {},
+          result: [],
+          status: CoreToolCallStatus.Success,
+          timestamp: new Date().toISOString(),
+        },
+        {
+          id: callB,
+          name: 'tool_b',
+          args: {},
+          result: [],
+          status: CoreToolCallStatus.Success,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+
+      const history: HistoryTurn[] = [
+        {
+          id: modelMsgId,
+          content: { role: 'model', parts: [] },
+        },
+        {
+          id: 'user-id',
+          content: {
+            role: 'user',
+            parts: [
+              {
+                functionResponse: {
+                  name: 'tool_a',
+                  id: callA,
+                  response: { output: 'result A' },
+                },
+              },
+              {
+                functionResponse: {
+                  name: 'tool_b',
+                  id: callB,
+                  response: { output: 'result B' },
+                },
+              },
+            ],
+          },
+        },
+      ];
+
+      chatRecordingService.updateMessagesFromHistory(history);
+
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+      const conversation = (await loadConversationRecord(
+        sessionFile,
+      )) as ConversationRecord;
+
+      const lastMsg = conversation.messages[0] as MessageRecord & {
+        type: 'gemini';
+      };
+      const tcA = lastMsg.toolCalls!.find((tc) => tc.id === callA);
+      const tcB = lastMsg.toolCalls!.find((tc) => tc.id === callB);
+
+      const resA = tcA!.result as Part[];
+      const resB = tcB!.result as Part[];
+
+      expect(resA).toHaveLength(1);
+      expect(resA[0].functionResponse!.id).toBe(callA);
+      expect(resA[0].functionResponse!.response).toEqual({ output: 'result A' });
+
+      expect(resB).toHaveLength(1);
+      expect(resB[0].functionResponse!.id).toBe(callB);
+      expect(resB[0].functionResponse!.response).toEqual({ output: 'result B' });
+    });
+
     it('should not write to disk when no tool calls match', async () => {
       chatRecordingService.recordMessage({
         type: 'gemini',
