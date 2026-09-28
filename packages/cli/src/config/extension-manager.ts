@@ -83,6 +83,7 @@ import {
 import type { EventEmitter } from 'node:stream';
 import { themeManager } from '../ui/themes/theme-manager.js';
 import { getFormattedSettingValue } from '../commands/extensions/utils.js';
+import { removeDirectoryWithRetry } from '../utils/retry.js';
 
 interface ExtensionManagerParams {
   enabledExtensionOverrides?: string[];
@@ -497,7 +498,7 @@ Would you like to attempt to install via "git clone" instead?`,
         }
       } finally {
         if (tempDir) {
-          await fs.promises.rm(tempDir, { recursive: true, force: true });
+          await removeDirectoryWithRetry(tempDir);
         }
       }
       return extension;
@@ -566,10 +567,7 @@ Would you like to attempt to install via "git clone" instead?`,
         : path.basename(extension.path),
     );
 
-    await fs.promises.rm(storage.getExtensionDir(), {
-      recursive: true,
-      force: true,
-    });
+    await removeDirectoryWithRetry(storage.getExtensionDir());
 
     // The rest of the cleanup below here is only for true uninstalls, not
     // uninstalls related to updates.

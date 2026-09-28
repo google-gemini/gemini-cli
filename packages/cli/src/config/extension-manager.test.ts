@@ -1004,4 +1004,60 @@ describe('ExtensionManager', () => {
       });
     });
   });
+
+  describe('Windows directory removal retry during update and uninstall', () => {
+    it('retries removing old extension directory on transient EBUSY during update', async () => {
+      const extName = 'google-workspace';
+      const extDir = path.join(userExtensionsDir, extName);
+      fs.mkdirSync(extDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(extDir, 'gemini-extension.json'),
+        JSON.stringify({ name: extName, version: '1.0.0' }),
+      );
+      fs.writeFileSync(
+        path.join(extDir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: extDir }),
+      );
+
+      await extensionManager.loadExtensions();
+
+      const newSourceDir = fs.mkdtempSync(
+        path.join(tempHomeDir, 'new-source-'),
+      );
+      fs.writeFileSync(
+        path.join(newSourceDir, 'gemini-extension.json'),
+        JSON.stringify({ name: extName, version: '1.1.0' }),
+      );
+
+      const originalRm = fs.promises.rm.bind(fs.promises);
+      let callCount = 0;
+      const rmSpy = vi
+        .spyOn(fs.promises, 'rm')
+        .mockImplementation(async (targetPath, options) => {
+          callCount++;
+          if (callCount === 1) {
+            const err = Object.assign(
+              new Error(
+                `EBUSY: resource busy or locked, rmdir '${String(targetPath)}'`,
+              ),
+              { code: 'EBUSY' },
+            );
+            throw err;
+          }
+          return originalRm(targetPath, options);
+        });
+
+      try {
+        const updated = await extensionManager.installOrUpdateExtension(
+          { type: 'local', source: newSourceDir },
+          { name: extName, version: '1.0.0' },
+        );
+
+        expect(updated.version).toBe('1.1.0');
+        expect(rmSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
+      } finally {
+        rmSpy.mockRestore();
+      }
+    });
+  });
 });
