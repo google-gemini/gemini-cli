@@ -121,8 +121,24 @@ class ReadFileToolInvocation extends BaseToolInvocation<
   }
 
   async execute(_options: ExecuteOptions): Promise<ToolResult> {
+    const sanitizedPath = resolveDefensiveToolPath(
+      this.params.file_path,
+      this.config.getTargetDir(),
+    );
+    let targetPathToRead = this.resolvedPath;
+    try {
+      targetPathToRead = resolveToRealPath(
+        path.resolve(this.config.getTargetDir(), sanitizedPath),
+      );
+    } catch {
+      targetPathToRead = path.resolve(
+        this.config.getTargetDir(),
+        sanitizedPath,
+      );
+    }
+
     const validationError = this.config.validatePathAccess(
-      this.resolvedPath,
+      targetPathToRead,
       'read',
     );
     if (validationError) {
@@ -137,7 +153,7 @@ class ReadFileToolInvocation extends BaseToolInvocation<
     }
 
     const result = await processSingleFileContent(
-      this.resolvedPath,
+      targetPathToRead,
       this.config.getTargetDir(),
       this.config.getFileSystemService(),
       this.params.start_line,
@@ -163,7 +179,9 @@ class ReadFileToolInvocation extends BaseToolInvocation<
       llmContent = `
 IMPORTANT: The file content has been truncated.
 Status: Showing lines ${start}-${end} of ${total} total lines.
-Action: To read more of the file, you can use the 'start_line' and 'end_line' parameters in a subsequent 'read_file' call. For example, to read the next section of the file, use start_line: ${end + 1}.
+Action: To read more of the file, you can use the 'start_line' and 'end_line' parameters in a subsequent 'read_file' call. For example, to read the next section of the file, use start_line: ${
+        end + 1
+      }.
 
 --- FILE CONTENT (truncated) ---
 ${result.llmContent}`;
@@ -175,9 +193,9 @@ ${result.llmContent}`;
       typeof result.llmContent === 'string'
         ? result.llmContent.split('\n').length
         : undefined;
-    const mimetype = getSpecificMimeType(this.resolvedPath);
+    const mimetype = getSpecificMimeType(targetPathToRead);
     const programming_language = getProgrammingLanguage({
-      file_path: this.resolvedPath,
+      file_path: targetPathToRead,
     });
     logFileOperation(
       this.config,
@@ -186,13 +204,13 @@ ${result.llmContent}`;
         FileOperation.READ,
         lines,
         mimetype,
-        path.extname(this.resolvedPath),
+        path.extname(targetPathToRead),
         programming_language,
       ),
     );
 
     // Discover JIT subdirectory context for the accessed file path
-    const jitContext = await discoverJitContext(this.config, this.resolvedPath);
+    const jitContext = await discoverJitContext(this.config, targetPathToRead);
     if (jitContext) {
       if (typeof llmContent === 'string') {
         llmContent = appendJitContext(llmContent, jitContext);
