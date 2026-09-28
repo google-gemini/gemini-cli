@@ -1495,9 +1495,50 @@ describe('Scheduler (Orchestrator)', () => {
         expect(scheduler.completedCalls).toEqual([]);
       });
 
-      it.each(['policy', 'confirmation'] as const)(
-        'should not execute tools when disposed during %s validation',
-        async (phase) => {
+      it('should preserve a sandbox error without requesting expansion after disposal', async () => {
+        const response: ToolCallResponseInfo = {
+          callId: req1.callId,
+          responseParts: [],
+          resultDisplay: 'Sandbox denied the command',
+          error: new Error(
+            JSON.stringify({
+              rootCommand: 'echo',
+              additionalPermissions: {},
+            }),
+          ),
+          errorType: ToolErrorType.SANDBOX_EXPANSION_REQUIRED,
+        };
+        vi.mocked(mockTool.build).mockReturnValue({
+          ...mockInvocation,
+          getDescription: () => 'Test tool',
+        } as unknown as AnyToolInvocation);
+        mockExecutor.execute.mockImplementationOnce(async ({ call }) => {
+          scheduler.dispose();
+          return { ...call, status: CoreToolCallStatus.Error, response };
+        });
+
+        const results = await scheduler.schedule([req1, req2], signal);
+
+        expect(resolveConfirmation).not.toHaveBeenCalled();
+        expect(mockExecutor.execute).toHaveBeenCalledTimes(1);
+        expect(
+          results.map((call) => [call.request.callId, call.status]),
+        ).toEqual([
+          ['call-1', CoreToolCallStatus.Error],
+          ['call-2', CoreToolCallStatus.Cancelled],
+        ]);
+        expect(results[0].response).toEqual(response);
+        expect(signal.aborted).toBe(false);
+        expect(scheduler.completedCalls).toEqual([]);
+      });
+
+      it.each([
+        ['policy', PolicyDecision.ALLOW],
+        ['policy', PolicyDecision.ASK_USER],
+        ['confirmation', PolicyDecision.ASK_USER],
+      ] as const)(
+        'should not execute tools when disposed during %s validation (%s)',
+        async (phase, decision) => {
           let release!: () => void;
           let entered!: () => void;
           const gate = new Promise<void>((resolve) => {
@@ -1510,7 +1551,7 @@ describe('Scheduler (Orchestrator)', () => {
             vi.mocked(checkPolicy).mockImplementationOnce(async () => {
               entered();
               await gate;
-              return { decision: PolicyDecision.ALLOW };
+              return { decision };
             });
           } else {
             vi.mocked(checkPolicy).mockResolvedValueOnce({
@@ -1529,6 +1570,9 @@ describe('Scheduler (Orchestrator)', () => {
 
           const results = await batch;
 
+          if (phase === 'policy') {
+            expect(resolveConfirmation).not.toHaveBeenCalled();
+          }
           expect(mockExecutor.execute).not.toHaveBeenCalled();
           expect(
             results.map((call) => [call.request.callId, call.status]),

@@ -695,6 +695,14 @@ export class Scheduler {
     let lastDetails: SerializableConfirmationDetails | undefined;
 
     if (decision === PolicyDecision.ASK_USER) {
+      if (this.disposeController.signal.aborted) {
+        this.state.updateStatus(
+          callId,
+          CoreToolCallStatus.Cancelled,
+          'Scheduler disposed',
+        );
+        return;
+      }
       const result = await resolveConfirmation(toolCall, signal, {
         config: this.config,
         messageBus: this.messageBus,
@@ -862,7 +870,7 @@ export class Scheduler {
       sandboxDetailsStr = result.response.error?.message || '';
     }
 
-    if (isSandboxError) {
+    if (isSandboxError && !this.disposeController.signal.aborted) {
       try {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const parsedError = JSON.parse(sandboxDetailsStr) as {
