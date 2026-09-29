@@ -674,15 +674,21 @@ export class McpClientManager {
       },
     );
 
-    await Promise.race([
-      Promise.all(disconnectionPromises),
-      new Promise<void>((resolve) =>
-        setTimeout(() => {
-          debugLogger.warn('MCP client manager stop timed out');
-          resolve();
-        }, timeoutMs),
-      ),
-    ]);
+    let stopTimeoutId: NodeJS.Timeout | undefined;
+    try {
+      await Promise.race([
+        Promise.all(disconnectionPromises),
+        new Promise<void>((resolve) => {
+          stopTimeoutId = setTimeout(() => {
+            debugLogger.warn('MCP client manager stop timed out');
+            resolve();
+          }, timeoutMs);
+          stopTimeoutId.unref();
+        }),
+      ]);
+    } finally {
+      if (stopTimeoutId) clearTimeout(stopTimeoutId);
+    }
     this.clients.clear();
   }
 

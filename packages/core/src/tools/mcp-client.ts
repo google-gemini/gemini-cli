@@ -184,11 +184,12 @@ export async function closeTransportSafely(
   const childProcess = stdioTransport?._process;
   const childPid = stdioTransport?.pid ?? childProcess?.pid ?? null;
 
+  let closeTimeoutId: NodeJS.Timeout | undefined;
   try {
     await Promise.race([
       Promise.resolve(transport.close()),
-      new Promise<void>((_, reject) =>
-        setTimeout(
+      new Promise<void>((_, reject) => {
+        closeTimeoutId = setTimeout(
           () =>
             reject(
               new Error(
@@ -196,11 +197,14 @@ export async function closeTransportSafely(
               ),
             ),
           timeoutMs,
-        ),
-      ),
+        );
+        closeTimeoutId.unref();
+      }),
     ]);
   } catch (error) {
     debugLogger.warn(`Warning closing transport for '${serverName}':`, error);
+  } finally {
+    if (closeTimeoutId) clearTimeout(closeTimeoutId);
   }
 
   if (childPid && typeof childPid === 'number') {
@@ -438,10 +442,18 @@ export class McpClient implements McpProgressReporter {
         await closeTransportSafely(transport, this.serverName, timeoutMs);
       }
       if (client) {
-        await Promise.race([
-          Promise.resolve(client.close()).catch(() => {}),
-          new Promise<void>((resolve) => setTimeout(resolve, 500)),
-        ]);
+        let clientTimeoutId: NodeJS.Timeout | undefined;
+        try {
+          await Promise.race([
+            Promise.resolve(client.close()).catch(() => {}),
+            new Promise<void>((resolve) => {
+              clientTimeoutId = setTimeout(resolve, 500);
+              clientTimeoutId.unref();
+            }),
+          ]);
+        } finally {
+          if (clientTimeoutId) clearTimeout(clientTimeoutId);
+        }
       }
     } catch (error) {
       debugLogger.warn(

@@ -132,6 +132,8 @@ async function run() {
 
         try {
           await runExitCleanup();
+        } catch {
+          // Ignore errors during final exit cleanup
         } finally {
           clearTimeout(cleanupTimeout);
           process.exit(0);

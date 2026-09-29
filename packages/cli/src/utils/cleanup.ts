@@ -79,56 +79,84 @@ export async function runExitCleanup() {
 
   runSyncCleanup();
   for (const fn of cleanupFunctions) {
+    let timeoutId: NodeJS.Timeout | undefined;
     try {
       await Promise.race([
         Promise.resolve(fn()),
-        new Promise<void>((_, reject) =>
-          setTimeout(() => reject(new Error('Cleanup step timed out')), 3000),
-        ),
+        new Promise<void>((_, reject) => {
+          timeoutId = setTimeout(
+            () => reject(new Error('Cleanup step timed out')),
+            3000,
+          );
+          timeoutId.unref();
+        }),
       ]);
     } catch {
       // Ignore errors during cleanup.
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
     }
   }
   cleanupFunctions.length = 0; // Clear the array
 
   // Close persistent browser sessions before disposing config
+  let browserTimeoutId: NodeJS.Timeout | undefined;
   try {
     await Promise.race([
       resetBrowserSession(),
-      new Promise<void>((_, reject) =>
-        setTimeout(() => reject(new Error('Browser cleanup timed out')), 2000),
-      ),
+      new Promise<void>((_, reject) => {
+        browserTimeoutId = setTimeout(
+          () => reject(new Error('Browser cleanup timed out')),
+          2000,
+        );
+        browserTimeoutId.unref();
+      }),
     ]);
   } catch {
     // Ignore errors during browser cleanup
+  } finally {
+    if (browserTimeoutId) clearTimeout(browserTimeoutId);
   }
 
   if (configForTelemetry) {
+    let disposeTimeoutId: NodeJS.Timeout | undefined;
     try {
       await Promise.race([
         configForTelemetry.dispose(),
-        new Promise<void>((_, reject) =>
-          setTimeout(() => reject(new Error('Config dispose timed out')), 5000),
-        ),
+        new Promise<void>((_, reject) => {
+          disposeTimeoutId = setTimeout(
+            () => reject(new Error('Config dispose timed out')),
+            5000,
+          );
+          disposeTimeoutId.unref();
+        }),
       ]);
     } catch {
       // Ignore errors during disposal
+    } finally {
+      if (disposeTimeoutId) clearTimeout(disposeTimeoutId);
     }
   }
 
   // IMPORTANT: Shutdown telemetry AFTER all other cleanup functions have run
   // This ensures SessionEnd hooks and other telemetry are properly flushed
   if (configForTelemetry && isTelemetrySdkInitialized()) {
+    let telemetryTimeoutId: NodeJS.Timeout | undefined;
     try {
       await Promise.race([
         shutdownTelemetry(configForTelemetry),
-        new Promise<void>((_, reject) =>
-          setTimeout(() => reject(new Error('Telemetry shutdown timed out')), 3000),
-        ),
+        new Promise<void>((_, reject) => {
+          telemetryTimeoutId = setTimeout(
+            () => reject(new Error('Telemetry shutdown timed out')),
+            3000,
+          );
+          telemetryTimeoutId.unref();
+        }),
       ]);
     } catch {
       // Ignore errors during telemetry shutdown
+    } finally {
+      if (telemetryTimeoutId) clearTimeout(telemetryTimeoutId);
     }
   }
 }
