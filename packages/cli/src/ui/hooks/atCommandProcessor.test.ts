@@ -1678,6 +1678,30 @@ describe('handleAtCommand', () => {
 
     expect(globSpy).not.toHaveBeenCalled();
   });
+
+  it('does not invoke recursive glob search on paths containing curly braces (#29434)', async () => {
+    const globSpy = vi.fn();
+    const mockGlobTool = {
+      buildAndExecute: globSpy,
+    };
+    vi.spyOn(mockConfig.getToolRegistry(), 'getTool').mockReturnValue(
+      mockGlobTool as never,
+    );
+
+    // Paths containing curly braces can cause catastrophic brace expansion in minimatch
+    const query = '@"foo{a,b}{c,d}"';
+
+    await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 708,
+      signal: abortController.signal,
+    });
+
+    expect(globSpy).not.toHaveBeenCalled();
+  });
 });
 
 describe('escapeAtSymbols', () => {

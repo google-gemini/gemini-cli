@@ -311,7 +311,7 @@ async function resolveFilePaths(
       const isPathSuitableForGlob =
         pathName.length > 0 &&
         pathName.length <= MAX_GLOB_SEARCH_PATH_LENGTH &&
-        !/[\r\n\0]/.test(pathName);
+        !/[\r\n\0{}]/.test(pathName);
 
       if (
         config.getEnableRecursiveFileSearch() &&
