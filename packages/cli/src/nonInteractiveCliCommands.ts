@@ -16,6 +16,7 @@ import { CommandService } from './services/CommandService.js';
 import { BuiltinCommandLoader } from './services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from './services/FileCommandLoader.js';
 import { McpPromptLoader } from './services/McpPromptLoader.js';
+import { SkillCommandLoader } from './services/SkillCommandLoader.js';
 import type { CommandContext } from './ui/commands/types.js';
 import { createNonInteractiveUI } from './ui/noninteractive/nonInteractiveUi.js';
 import type { LoadedSettings } from './config/settings.js';
@@ -43,6 +44,7 @@ export const handleSlashCommand = async (
   const commandService = await CommandService.create(
     [
       new BuiltinCommandLoader(config),
+      new SkillCommandLoader(config),
       new McpPromptLoader(config),
       new FileCommandLoader(config),
     ],
@@ -90,6 +92,13 @@ export const handleSlashCommand = async (
         switch (result.type) {
           case 'submit_prompt':
             return result.content;
+          case 'tool':
+            // Commands such as skill activation (`/skill-name`) resolve to a
+            // tool call. Non-interactive mode cannot schedule a UI tool call,
+            // so we forward the command's follow-up prompt to the model, which
+            // then invokes the tool (e.g. `activate_skill`) itself. If no
+            // follow-up prompt is provided there is nothing to send.
+            return result.postSubmitPrompt;
           case 'confirm_shell_commands':
             // This result indicates a command attempted to confirm shell commands.
             // However note that currently, ShellTool is excluded in non-interactive
