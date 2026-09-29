@@ -623,8 +623,7 @@ describe('ReadManyFilesTool', () => {
       // Text file summary.txt should be included
       expect(
         content.some(
-          (c) =>
-            typeof c === 'string' && c.includes('quarterly summary text'),
+          (c) => typeof c === 'string' && c.includes('quarterly summary text'),
         ),
       ).toBe(true);
 
