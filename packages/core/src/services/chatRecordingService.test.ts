@@ -2061,5 +2061,45 @@ describe('ChatRecordingService', () => {
       expect(metaLoaded!.firstUserMessage).toBe('First user prompt');
       expect(metaLoaded!.hasResumableContent).toBe(true);
     });
+
+    it('should reload previously evicted messages into the active trailing window when turns are removed in updateMessagesFromHistory', async () => {
+      await chatRecordingService.initialize();
+
+      const totalMessages = MAX_HISTORY_MESSAGES + 20; // 70 messages (first 20 evicted)
+      const history: HistoryTurn[] = [];
+
+      for (let i = 0; i < totalMessages; i++) {
+        const isUser = i % 2 === 0;
+        const text = `Message ${i}`;
+        const id = chatRecordingService.recordMessage({
+          type: isUser ? 'user' : 'gemini',
+          content: text,
+          model: 'gemini-pro',
+        });
+        history.push({
+          id,
+          content: { role: isUser ? 'user' : 'model', parts: [{ text }] },
+        });
+      }
+
+      chatRecordingService.updateMessagesFromHistory(history);
+
+      // First 20 messages (indices 0..19) are evicted from the in-memory window
+      // @ts-expect-error accessing private cachedConversation
+      const beforeRollback = chatRecordingService.cachedConversation.messages;
+      expect(beforeRollback).toHaveLength(MAX_HISTORY_MESSAGES);
+      expect(beforeRollback[0].id).toBe(history[20].id);
+
+      // Roll back the last 30 messages, leaving 40 messages (indices 0..39)
+      const truncatedHistory = history.slice(0, 40);
+      chatRecordingService.updateMessagesFromHistory(truncatedHistory);
+
+      // Previously evicted messages 0..19 must now be reloaded into cachedConversation.messages
+      // @ts-expect-error accessing private cachedConversation
+      const afterRollback = chatRecordingService.cachedConversation.messages;
+      expect(afterRollback).toHaveLength(40);
+      expect(afterRollback[0].id).toBe(history[0].id);
+      expect(afterRollback[39].id).toBe(history[39].id);
+    });
   });
 });

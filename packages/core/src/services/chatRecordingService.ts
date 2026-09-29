@@ -1473,8 +1473,6 @@ export class ChatRecordingService {
             this.toolCallMetaMap.delete(tcId);
           }
         }
-        this.cachedConversation.messages =
-          this.cachedConversation.messages.filter((m) => !removedSet.has(m.id));
       }
 
       const remainingOrder = this.messageOrder.filter((id) =>
@@ -1483,18 +1481,6 @@ export class ChatRecordingService {
       const orderChanged =
         remainingOrder.length !== historyIds.length ||
         remainingOrder.some((id, idx) => id !== historyIds[idx]);
-
-      if (orderChanged) {
-        const cachedById = new Map(
-          this.cachedConversation.messages.map((m) => [m.id, m]),
-        );
-        this.cachedConversation.messages = historyIds
-          .map((id) => cachedById.get(id))
-          .filter((m): m is MessageRecord => m !== undefined);
-      }
-
-      this.messageOrder = historyIds;
-      this.trimCachedMessages();
 
       const isPureTailRollback =
         removedIds.length > 0 &&
@@ -1527,6 +1513,47 @@ export class ChatRecordingService {
         this.appendRecord({ $patch: patchPayload });
         anyChange = true;
       }
+
+      let reloadedFromDisk = false;
+      if (
+        this.hasEvictedMessages &&
+        this.conversationFile &&
+        (removedIds.length > 0 || orderChanged)
+      ) {
+        const fullConversation = loadConversationRecordSync(
+          this.conversationFile,
+        );
+        if (fullConversation) {
+          const msgMap = new Map(
+            fullConversation.messages.map((m) => [m.id, m]),
+          );
+          this.cachedConversation.messages = historyIds
+            .map((id) => msgMap.get(id))
+            .filter((m): m is MessageRecord => m !== undefined);
+          reloadedFromDisk = true;
+        }
+      }
+
+      if (!reloadedFromDisk) {
+        if (removedIds.length > 0) {
+          const removedSet = new Set(removedIds);
+          this.cachedConversation.messages =
+            this.cachedConversation.messages.filter(
+              (m) => !removedSet.has(m.id),
+            );
+        }
+        if (orderChanged) {
+          const cachedById = new Map(
+            this.cachedConversation.messages.map((m) => [m.id, m]),
+          );
+          this.cachedConversation.messages = historyIds
+            .map((id) => cachedById.get(id))
+            .filter((m): m is MessageRecord => m !== undefined);
+        }
+      }
+
+      this.messageOrder = historyIds;
+      this.trimCachedMessages();
 
       if (anyChange) {
         this.updateMetadata({
