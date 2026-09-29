@@ -49,7 +49,9 @@ export const useFolderTrust = (
 
   useEffect(() => {
     let isMounted = true;
-    const { isTrusted: trusted } = isWorkspaceTrusted(settingsRef.current.merged);
+    const { isTrusted: trusted } = isWorkspaceTrusted(
+      settingsRef.current.merged,
+    );
 
     if (trusted === undefined || trusted === false) {
       void FolderTrustDiscoveryService.discover(process.cwd())
