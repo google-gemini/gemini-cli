@@ -47,21 +47,53 @@ describe('PersistentState', () => {
     expect(value).toBeUndefined();
   });
 
-  it('should save state to file', () => {
+  it('should save state atomically to file', () => {
+    const mockFd = 42;
     vi.mocked(fs.existsSync).mockReturnValue(false);
+    vi.mocked(fs.openSync).mockReturnValue(mockFd);
+
     persistentState.set('defaultBannerShownCount', { banner1: 1 });
 
     expect(fs.mkdirSync).toHaveBeenCalledWith(path.normalize(mockDir), {
       recursive: true,
     });
+    expect(fs.openSync).toHaveBeenCalledWith(
+      expect.stringMatching(/\.state\.json\..*\.tmp$/),
+      'w',
+      0o600,
+    );
     expect(fs.writeFileSync).toHaveBeenCalledWith(
-      mockFilePath,
+      mockFd,
       JSON.stringify({ defaultBannerShownCount: { banner1: 1 } }, null, 2),
+      'utf-8',
+    );
+    expect(fs.fsyncSync).toHaveBeenCalledWith(mockFd);
+    expect(fs.closeSync).toHaveBeenCalledWith(mockFd);
+    expect(fs.renameSync).toHaveBeenCalledWith(
+      expect.stringMatching(/\.state\.json\..*\.tmp$/),
+      mockFilePath,
     );
   });
 
-  it('should handle load errors and start fresh', () => {
-    vi.mocked(fs.existsSync).mockReturnValue(true);
+  it('should create a backup file when saving over an existing state file', () => {
+    const mockFd = 42;
+    vi.mocked(fs.existsSync).mockImplementation((p) => p === mockFilePath);
+    vi.mocked(fs.openSync).mockReturnValue(mockFd);
+
+    persistentState.set('defaultBannerShownCount', { banner1: 1 });
+
+    expect(fs.copyFileSync).toHaveBeenCalledWith(
+      mockFilePath,
+      `${mockFilePath}.bak`,
+    );
+    expect(fs.renameSync).toHaveBeenCalledWith(
+      expect.stringMatching(/\.state\.json\..*\.tmp$/),
+      mockFilePath,
+    );
+  });
+
+  it('should handle load errors, preserve corrupt file, and start fresh if no backup', () => {
+    vi.mocked(fs.existsSync).mockImplementation((p) => p === mockFilePath);
     vi.mocked(fs.readFileSync).mockImplementation(() => {
       throw new Error('Read error');
     });
@@ -69,15 +101,52 @@ describe('PersistentState', () => {
     const value = persistentState.get('defaultBannerShownCount');
     expect(value).toBeUndefined();
     expect(debugLogger.warn).toHaveBeenCalled();
+    expect(fs.renameSync).toHaveBeenCalledWith(
+      mockFilePath,
+      `${mockFilePath}.corrupt`,
+    );
   });
 
-  it('should handle save errors', () => {
-    vi.mocked(fs.existsSync).mockReturnValue(false);
-    vi.mocked(fs.writeFileSync).mockImplementation(() => {
-      throw new Error('Write error');
+  it('should recover state from backup if primary file fails to load', () => {
+    const backupData = { defaultBannerShownCount: { banner1: 5 } };
+    vi.mocked(fs.existsSync).mockImplementation(
+      (p) => p === mockFilePath || p === `${mockFilePath}.bak`,
+    );
+    vi.mocked(fs.readFileSync).mockImplementation((p) => {
+      if (p === mockFilePath) {
+        throw new Error('Corrupt state');
+      }
+      if (p === `${mockFilePath}.bak`) {
+        return JSON.stringify(backupData);
+      }
+      throw new Error('File not found');
     });
 
+    const value = persistentState.get('defaultBannerShownCount');
+    expect(value).toEqual(backupData.defaultBannerShownCount);
+    expect(debugLogger.warn).toHaveBeenCalledWith(
+      'Recovered persistent state from backup',
+    );
+  });
+
+  it('should handle save errors and clean up temporary file', () => {
+    const mockFd = 42;
+    vi.mocked(fs.openSync).mockReturnValue(mockFd);
+    vi.mocked(fs.renameSync).mockImplementation(() => {
+      throw new Error('Rename error');
+    });
+    vi.mocked(fs.existsSync).mockImplementation(
+      (p) => typeof p === 'string' && p.endsWith('.tmp'),
+    );
+
     persistentState.set('defaultBannerShownCount', { banner1: 1 });
-    expect(debugLogger.warn).toHaveBeenCalled();
+
+    expect(debugLogger.warn).toHaveBeenCalledWith(
+      'Failed to save persistent state:',
+      expect.any(Error),
+    );
+    expect(fs.unlinkSync).toHaveBeenCalledWith(
+      expect.stringMatching(/\.state\.json\..*\.tmp$/),
+    );
   });
 });
