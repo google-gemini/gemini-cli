@@ -145,7 +145,10 @@ export function isAssetExplicitlyRequested(
     }
 
     // Now verify the match is explicit (by extension or by name)
-    const cleanPattern = normalizedPattern.replace(/\/+$/, '');
+    let cleanPattern = normalizedPattern;
+    while (cleanPattern.endsWith('/') && cleanPattern.length > 0) {
+      cleanPattern = cleanPattern.slice(0, -1);
+    }
     const patternLeaf = path.posix.basename(cleanPattern);
     const patternExt = path.posix.extname(patternLeaf);
     const patternStem = path.posix.basename(patternLeaf, patternExt);
