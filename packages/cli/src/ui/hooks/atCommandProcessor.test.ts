@@ -1702,6 +1702,30 @@ describe('handleAtCommand', () => {
 
     expect(globSpy).not.toHaveBeenCalled();
   });
+
+  it('does not invoke recursive glob search on paths containing directory traversal sequences (#29434)', async () => {
+    const globSpy = vi.fn();
+    const mockGlobTool = {
+      buildAndExecute: globSpy,
+    };
+    vi.spyOn(mockConfig.getToolRegistry(), 'getTool').mockReturnValue(
+      mockGlobTool as never,
+    );
+
+    // Paths containing directory traversal sequences should never trigger glob fallback
+    const query = '@../sibling/nonexistent.txt';
+
+    await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 709,
+      signal: abortController.signal,
+    });
+
+    expect(globSpy).not.toHaveBeenCalled();
+  });
 });
 
 describe('escapeAtSymbols', () => {
