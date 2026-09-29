@@ -142,6 +142,24 @@ describe('parseInputForHighlighting', () => {
       { text: '@/my\u202Fpath/file.txt', type: 'file' },
     ]);
   });
+
+  it('should highlight a double-quoted file path with spaces', () => {
+    const text = 'Check @"C:\\Program Files\\my file.txt" now';
+    expect(parseInputForHighlighting(text, 0)).toEqual([
+      { text: 'Check ', type: 'default' },
+      { text: '@"C:\\Program Files\\my file.txt"', type: 'file' },
+      { text: ' now', type: 'default' },
+    ]);
+  });
+
+  it('should stop highlighting at the closing quote of "@scope/pkg" without swallowing subsequent quotes (#29434)', () => {
+    const text = 'import { a } from "@scope/pkg"; import { b } from "other";';
+    expect(parseInputForHighlighting(text, 0)).toEqual([
+      { text: 'import { a } from "', type: 'default' },
+      { text: '@scope/pkg', type: 'file' },
+      { text: '"; import { b } from "other";', type: 'default' },
+    ]);
+  });
 });
 
 describe('parseInputForHighlighting with Transformations', () => {

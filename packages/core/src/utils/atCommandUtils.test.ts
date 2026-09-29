@@ -431,6 +431,19 @@ describe('atCommandUtils', () => {
       // It should try to resolve /etc/passwd, identify it as unauthorized, and return that status.
       expect(result.status).toBe('unauthorized');
     });
+
+    it('should return invalid (not not_found) when extracted path candidate does not exist (#29434)', async () => {
+      const multiLineCodeFragment = [
+        'scope/pkg";',
+        'import { alpha1, beta1, gamma1 } from "~/modules/feature1/index"',
+      ].join('\n');
+
+      const result = await resolveAtCommandPath(
+        multiLineCodeFragment,
+        mockConfig as unknown as Config,
+      );
+      expect(result.status).toBe('invalid');
+    });
   });
 
   it('should include reason in debug message for unauthorized paths', async () => {

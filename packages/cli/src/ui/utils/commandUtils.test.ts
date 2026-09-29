@@ -201,6 +201,12 @@ describe('commandUtils', () => {
       // @file after a colon on the same line.
       expect(isAtCommand('Files:@src/a.py,@src/b.py')).toBe(true);
     });
+
+    it('should handle double-quoted @-references and reject unclosed quotes', () => {
+      expect(isAtCommand('@"C:\\path with spaces\\file.txt"')).toBe(true);
+      expect(isAtCommand('@"unclosed path')).toBe(false);
+      expect(isAtCommand('@"multi\nline"')).toBe(false);
+    });
   });
 
   describe('isSlashCommand', () => {

@@ -18,6 +18,7 @@ import {
   REFERENCE_CONTENT_END,
   CoreToolCallStatus,
   resolveAtCommandPath,
+  validatePath,
 } from '@google/gemini-cli-core';
 import { Buffer } from 'node:buffer';
 import type {
@@ -53,13 +54,13 @@ export function unescapeLiteralAt(text: string): string {
  * Regex source for the path/command part of an @ reference.
  * It uses strict ASCII whitespace delimiters to allow Unicode characters like NNBSP in filenames.
  *
- * 1. "(?:[^"]*)" matches a double-quoted string (for Windows paths with spaces).
+ * 1. "[^"\n\r]+" matches a single-line double-quoted path immediately after @ (for Windows paths with spaces).
  * 2. \\. matches any escaped character (e.g., \ ).
- * 3. [^ \t\n\r,;!?()\[\]{}.] matches any character that is NOT a delimiter and NOT a period.
+ * 3. [^ \t\n\r,;!?()\[\]{}."] matches any character that is NOT a delimiter, double quote, or period.
  * 4. \.(?!$|[ \t\n\r]) matches a period ONLY if it is NOT followed by whitespace or end-of-string.
  */
 export const AT_COMMAND_PATH_REGEX_SOURCE =
-  '(?:(?:"(?:[^"]*)")|(?:\\\\.|[^ \\t\\n\\r,;!?()\\[\\]{}.]|\\.(?!$|[ \\t\\n\\r])))+';
+  '(?:"[^"\\n\\r]+"|(?:\\\\.|[^ \\t\\n\\r,;!?()\\[\\]{}."]|\\.(?!$|[ \\t\\n\\r]))+)';
 
 interface HandleAtCommandParams {
   query: string;
@@ -304,7 +305,11 @@ async function resolveFilePaths(
       // We also allow glob fallback for "unauthorized" results from resolveAtCommandPath,
       // as they might represent a relative path that matched an unauthorized file in one directory
       // but might have a valid match (via glob) in another.
-      if (config.getEnableRecursiveFileSearch() && globTool) {
+      if (
+        config.getEnableRecursiveFileSearch() &&
+        globTool &&
+        validatePath(pathName).isValid
+      ) {
         onDebugMessage(
           `Path ${pathName} not found directly, attempting glob search.`,
         );
@@ -394,7 +399,12 @@ function constructInitialQuery(
       const resolved = replacementMap.get(part);
       content = resolved ? `@${resolved}` : part.content;
 
-      if (i > 0 && result.length > 0 && !result.endsWith(' ')) {
+      if (
+        i > 0 &&
+        commandParts[i - 1].type === 'atPath' &&
+        result.length > 0 &&
+        !result.endsWith(' ')
+      ) {
         result += ' ';
       }
     }

@@ -46,7 +46,17 @@ export async function resolveAtCommandPath(
         `Identified invalid path fragment, attempting to extract path: "${extractedPath}" from "${pathName}"`,
       );
       // Recurse once with the extracted path.
-      return resolveAtCommandPath(extractedPath, config, onDebugMessage);
+      const extractedResult = await resolveAtCommandPath(
+        extractedPath,
+        config,
+        onDebugMessage,
+      );
+      if (
+        extractedResult.status === 'resolved' ||
+        extractedResult.status === 'unauthorized'
+      ) {
+        return extractedResult;
+      }
     }
 
     onDebugMessage(

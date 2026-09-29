@@ -1539,6 +1539,9 @@ describe('handleAtCommand', () => {
   });
 
   it('should skip malformed paths (the original crash scenario)', async () => {
+    const globTool = mockConfig.getToolRegistry().getTool('glob')!;
+    const buildAndExecuteSpy = vi.spyOn(globTool, 'buildAndExecute');
+
     // We use a quoted path so the parser treats the whole thing as one @path token
     const malformedPath =
       '"FAIL tests/int/my.test.ts ... AssertionError: expected true to be false"';
@@ -1553,8 +1556,9 @@ describe('handleAtCommand', () => {
       signal: abortController.signal,
     });
 
-    // Malformed path should be skipped and original query part preserved as text
+    // Malformed path should be skipped without falling back to glob search
     expect(result.processedQuery).toEqual([{ text: query }]);
+    expect(buildAndExecuteSpy).not.toHaveBeenCalled();
     expect(mockOnDebugMessage).toHaveBeenCalledWith(
       expect.stringContaining(
         'Identified invalid path fragment, attempting to extract path',
@@ -1589,6 +1593,89 @@ describe('handleAtCommand', () => {
         'Identified invalid path fragment, attempting to extract path',
       ),
     );
+  });
+
+  it('should not swallow subsequent lines or pass multi-line source code to glob when input contains "@scope/pkg" (#29434)', async () => {
+    const globTool = mockConfig.getToolRegistry().getTool('glob')!;
+    const buildAndExecuteSpy = vi.spyOn(globTool, 'buildAndExecute');
+
+    const lines = ['import { useThing } from "@scope/pkg";'];
+    for (let i = 1; i <= 60; i++) {
+      lines.push(
+        `import { alpha${i}, beta${i}, gamma${i} } from "~/modules/feature${i}/index";`,
+      );
+    }
+    lines.push('', 'Summarize the content above in one sentence.');
+    const query = lines.join('\n');
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 704,
+      signal: abortController.signal,
+    });
+
+    expect(result.processedQuery).toEqual([{ text: query }]);
+    expect(buildAndExecuteSpy).toHaveBeenCalledExactlyOnceWith(
+      {
+        pattern: '**/*scope/pkg*',
+        path: testRootDir,
+      },
+      abortController.signal,
+    );
+  });
+
+  it('should resolve a valid @file reference that appears after "@scope/pkg" and other quoted strings (#29434)', async () => {
+    const fileContent = 'export const realValue = 42;';
+    const filePath = await createTestFile(
+      path.join(testRootDir, 'src', 'real.ts'),
+      fileContent,
+    );
+    const relativePath = getRelativePath(filePath);
+
+    const query = [
+      'import { useThing } from "@scope/pkg";',
+      'import { other } from "~/modules/other";',
+      `Please compare with @${relativePath}`,
+    ].join('\n');
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 705,
+      signal: abortController.signal,
+    });
+
+    expect(result.processedQuery).toEqual([
+      { text: query },
+      { text: '\n--- Content from referenced files ---' },
+      { text: `\nContent from @${relativePath}:\n` },
+      { text: fileContent },
+      { text: '\n--- End of content ---' },
+    ]);
+  });
+
+  it('should ignore unclosed double quotes after @ without swallowing subsequent text', async () => {
+    const globTool = mockConfig.getToolRegistry().getTool('glob')!;
+    const buildAndExecuteSpy = vi.spyOn(globTool, 'buildAndExecute');
+
+    const query = 'Check @"unclosed path\nand more text with "quotes" here';
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 706,
+      signal: abortController.signal,
+    });
+
+    expect(result.processedQuery).toEqual([{ text: query }]);
+    expect(buildAndExecuteSpy).not.toHaveBeenCalled();
   });
 });
 
