@@ -1726,6 +1726,52 @@ describe('handleAtCommand', () => {
 
     expect(globSpy).not.toHaveBeenCalled();
   });
+
+  it('does not invoke recursive glob search on absolute paths that do not exist (#29434)', async () => {
+    const globSpy = vi.fn();
+    const mockGlobTool = {
+      buildAndExecute: globSpy,
+    };
+    vi.spyOn(mockConfig.getToolRegistry(), 'getTool').mockReturnValue(
+      mockGlobTool as never,
+    );
+
+    const query = '@/usr/bin/nonexistent-binary-path-xyz';
+
+    await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 710,
+      signal: abortController.signal,
+    });
+
+    expect(globSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not invoke recursive glob search on paths containing glob wildcards (#29434)', async () => {
+    const globSpy = vi.fn();
+    const mockGlobTool = {
+      buildAndExecute: globSpy,
+    };
+    vi.spyOn(mockConfig.getToolRegistry(), 'getTool').mockReturnValue(
+      mockGlobTool as never,
+    );
+
+    const query = '@"test*wildcard?.txt"';
+
+    await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 711,
+      signal: abortController.signal,
+    });
+
+    expect(globSpy).not.toHaveBeenCalled();
+  });
 });
 
 describe('escapeAtSymbols', () => {
