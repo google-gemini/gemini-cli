@@ -459,6 +459,143 @@ describe('Session', () => {
     expect(confirmationDetails.onConfirm).toHaveBeenCalled();
   });
 
+  it('should emit tool_call session update with status pending before requesting permission', async () => {
+    const confirmationDetails = {
+      type: 'info',
+      onConfirm: vi.fn(),
+    };
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(confirmationDetails),
+      execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
+    });
+
+    mockConnection.requestPermission.mockResolvedValue({
+      outcome: {
+        outcome: 'selected',
+        optionId: 'proceed_once',
+      },
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: GeminiEventType.ToolCallRequest,
+        value: {
+          callId: 'call-1',
+          name: 'test_tool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-1',
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: GeminiEventType.Content,
+        value: '',
+      },
+    ]);
+
+    mockSendMessageStream
+      .mockReturnValueOnce(stream1)
+      .mockReturnValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    // Check that we sent a sessionUpdate notification for tool_call with status: pending
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'tool_call',
+          toolCallId: 'call-1',
+          status: 'pending',
+          title: 'Test Tool',
+        }),
+      }),
+    );
+  });
+
+  it('should emit tool_call_update with status failed when tool permission is denied', async () => {
+    const confirmationDetails = {
+      type: 'info',
+      onConfirm: vi.fn(),
+    };
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(confirmationDetails),
+      execute: vi.fn(),
+    });
+
+    mockConnection.requestPermission.mockResolvedValue({
+      outcome: {
+        outcome: 'cancelled',
+      },
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: GeminiEventType.ToolCallRequest,
+        value: {
+          callId: 'call-1',
+          name: 'test_tool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-1',
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: GeminiEventType.Content,
+        value: '',
+      },
+    ]);
+
+    mockSendMessageStream
+      .mockReturnValueOnce(stream1)
+      .mockReturnValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    // Check that we sent a sessionUpdate notification for tool_call with status: pending
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'tool_call',
+          toolCallId: 'call-1',
+          status: 'pending',
+        }),
+      }),
+    );
+
+    // Check that we also sent a sessionUpdate notification for tool_call_update with status: failed
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'tool_call_update',
+          toolCallId: 'call-1',
+          status: 'failed',
+          content: expect.arrayContaining([
+            expect.objectContaining({
+              type: 'content',
+              content: expect.objectContaining({
+                text: expect.stringContaining('was canceled by the user'),
+              }),
+            }),
+          ]),
+        }),
+      }),
+    );
+  });
+
   it('should handle @path resolution', async () => {
     (path.resolve as unknown as Mock).mockReturnValue('/tmp/file.txt');
     (fs.stat as unknown as Mock).mockResolvedValue({

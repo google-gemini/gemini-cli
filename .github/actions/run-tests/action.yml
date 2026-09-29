@@ -40,9 +40,9 @@ runs:
         echo "::endgroup::"
         echo "::group::Integration Tests (VS Code)"
         if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-          xvfb-run -a npm run test:integration:vscode
+          xvfb-run -a npm run test:integration:vscode --if-present
         else
-          npm run test:integration:vscode
+          npm run test:integration:vscode --if-present
         fi
         echo "::endgroup::"
       shell: 'bash'

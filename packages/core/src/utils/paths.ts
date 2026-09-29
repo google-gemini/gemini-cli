@@ -679,9 +679,16 @@ export function trimTrailingSpacesAndDots(str: string): string {
 }
 
 const GIT_SFN_REGEX = /^(git|gi[0-9a-f]{4})~\d+$/;
-const ENV_SFN_REGEX = /^(env|en[0-9a-f]{4})~\d+$/;
+const ENV_SFN_REGEX = /^(env|en[0-9a-f]{4})~\d+(\..+)?$/i;
 const NODE_MODULES_SFN_REGEX = /^(node_m|no[0-9a-f]{4})~\d+$/;
 const GHA_CREDS_SFN_REGEX = /^(gha-cr|gh[0-9a-f]{4})~\d+\.jso(n)?$/;
+
+const SAFE_ENV_TEMPLATES = new Set([
+  '.env.example',
+  '.env.sample',
+  '.env.template',
+  '.env.dist',
+]);
 
 /**
  * Checks if a path string contains any blocked segments (.git, .env, node_modules, gha-creds-*.json)
@@ -694,9 +701,12 @@ export function hasBlockedPathSegment(p: string): boolean {
     const clean = trimTrailingSpacesAndDots(
       segment.split(':')[0],
     ).toLowerCase();
+    const isEnvFile =
+      clean === '.env' ||
+      (clean.startsWith('.env.') && !SAFE_ENV_TEMPLATES.has(clean));
     if (
       clean === '.git' ||
-      clean === '.env' ||
+      isEnvFile ||
       clean === 'node_modules' ||
       GIT_SFN_REGEX.test(clean) ||
       ENV_SFN_REGEX.test(clean) ||

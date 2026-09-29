@@ -100,7 +100,9 @@ export interface ModelResolution {
 export interface ResolutionContext {
   useGemini3_1?: boolean;
   useGemini3_1FlashLite?: boolean;
+  useLatestFlashLite?: boolean;
   useGemini3_5Flash?: boolean;
+  useLatestFlash?: boolean;
   useCustomTools?: boolean;
   hasAccessToPreview?: boolean;
   hasAccessToProModel?: boolean;
@@ -111,10 +113,12 @@ export interface ResolutionContext {
 export interface ResolutionCondition {
   useGemini3_1?: boolean;
   useGemini3_1FlashLite?: boolean;
+  useLatestFlashLite?: boolean;
   useGemini3_5Flash?: boolean;
+  useLatestFlash?: boolean;
   useCustomTools?: boolean;
   hasAccessToPreview?: boolean;
-  /** Matches if the current model is in this list. */
+  hasAccessToProModel?: boolean;
   requestedModels?: string[];
 }
 
@@ -160,7 +164,7 @@ export class ModelConfigService {
     const definitions = this.config.modelDefinitions ?? {};
     const shouldShowPreviewModels = context.hasAccessToPreview ?? false;
     const useGemini31 = context.useGemini3_1 ?? false;
-    const useGemini3_5Flash = context.useGemini3_5Flash ?? false;
+    const useLatestFlash = context.useLatestFlash ?? false;
 
     const mainOptions = Object.entries(definitions)
       .filter(([_, m]) => {
@@ -175,7 +179,7 @@ export class ModelConfigService {
           description = getAutoModelDescription(
             shouldShowPreviewModels,
             useGemini31,
-            useGemini3_5Flash,
+            useLatestFlash,
           );
         } else if (id === 'auto-gemini-3' && useGemini31) {
           description = description.replace('gemini-3-pro', 'gemini-3.1-pro');
@@ -255,14 +259,28 @@ export class ModelConfigService {
       switch (key) {
         case 'useGemini3_1':
           return value === context.useGemini3_1;
-        case 'useGemini3_1FlashLite':
-          return value === context.useGemini3_1FlashLite;
-        case 'useGemini3_5Flash':
-          return value === context.useGemini3_5Flash;
+        case 'useLatestFlashLite':
+        case 'useGemini3_1FlashLite': {
+          const actualValue =
+            key === 'useLatestFlashLite'
+              ? (context.useLatestFlashLite ?? context.useGemini3_1FlashLite)
+              : (context.useGemini3_1FlashLite ?? context.useLatestFlashLite);
+          return value === actualValue;
+        }
+        case 'useLatestFlash':
+        case 'useGemini3_5Flash': {
+          const actualValue =
+            key === 'useLatestFlash'
+              ? (context.useLatestFlash ?? context.useGemini3_5Flash)
+              : (context.useGemini3_5Flash ?? context.useLatestFlash);
+          return value === actualValue;
+        }
         case 'useCustomTools':
           return value === context.useCustomTools;
         case 'hasAccessToPreview':
           return value === context.hasAccessToPreview;
+        case 'hasAccessToProModel':
+          return value === context.hasAccessToProModel;
         case 'requestedModels':
           return (
             Array.isArray(value) &&
