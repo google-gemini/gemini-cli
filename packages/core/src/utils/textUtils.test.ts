@@ -125,6 +125,16 @@ describe('truncateString', () => {
     expect(truncateString(str, 2, '')).toBe('a');
   });
 
+  it('should preserve newlines when truncating multi-line text', () => {
+    // Line terminators are single-code-unit grapheme clusters and must be kept.
+    // Dropping them silently corrupts line-oriented content (shell output, logs).
+    expect(truncateString('aa\nbb\ncc', 4, '')).toBe('aa\nb');
+    expect(truncateString('aa\nbb\ncc', 5, '')).toBe('aa\nbb');
+    expect(truncateString('line one\nline two', 9, '')).toBe('line one\n');
+    expect(truncateString('a\r\nb', 3, '')).toBe('a\r\n');
+    expect(truncateString('a b', 2, '')).toBe('a ');
+  });
+
   it('should handle multi-code-point grapheme clusters like combining marks', () => {
     // FORCE Decomposed form (NFD) to ensure 'e' + 'accent' are separate code units
     // This ensures the test behaves the same on Linux and Mac.
