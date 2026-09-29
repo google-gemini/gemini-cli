@@ -39,7 +39,11 @@ describe('PersistentState Recovery & Atomic Persist', () => {
       tipsShown: 8,
       startupWarningCounts: { 'home-directory': 2 },
     };
-    fs.writeFileSync(backupFilePath, JSON.stringify(backupData, null, 2), 'utf-8');
+    fs.writeFileSync(
+      backupFilePath,
+      JSON.stringify(backupData, null, 2),
+      'utf-8',
+    );
 
     // Simulate truncated file from interrupted/crash write
     fs.writeFileSync(
@@ -74,7 +78,11 @@ describe('PersistentState Recovery & Atomic Persist', () => {
       terminalSetupPromptShown: true,
       defaultBannerShownCount: { 'banner-v1': 3 },
     };
-    fs.writeFileSync(backupFilePath, JSON.stringify(backupData, null, 2), 'utf-8');
+    fs.writeFileSync(
+      backupFilePath,
+      JSON.stringify(backupData, null, 2),
+      'utf-8',
+    );
     fs.writeFileSync(stateFilePath, '{\n  "corrupt', 'utf-8');
 
     const persistentState = new PersistentState();
