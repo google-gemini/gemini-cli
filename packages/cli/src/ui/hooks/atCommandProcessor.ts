@@ -313,7 +313,7 @@ async function resolveFilePaths(
         pathName.length <= MAX_GLOB_SEARCH_PATH_LENGTH &&
         !path.isAbsolute(pathName) &&
         !pathName.includes('..') &&
-        !/[\r\n\t\0{}*?\[\]]/.test(pathName);
+        !/[\r\n\t\0{}*?[\]]/.test(pathName);
 
       if (
         config.getEnableRecursiveFileSearch() &&
