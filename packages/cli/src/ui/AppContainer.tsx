@@ -981,6 +981,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
           try {
             await runExitCleanup();
+          } catch {
+            // Ignore errors during final exit cleanup
           } finally {
             clearTimeout(forceExitTimer);
             process.exit(0);

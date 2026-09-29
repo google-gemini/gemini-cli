@@ -667,7 +667,7 @@ export class McpClientManager {
         } catch (error) {
           this.emitDiagnostic(
             'error',
-            `Error stopping client '${name}':`,
+            `Error stopping client '${client.getServerName()}':`,
             error,
           );
         }
