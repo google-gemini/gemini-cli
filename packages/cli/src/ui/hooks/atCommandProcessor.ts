@@ -307,13 +307,13 @@ async function resolveFilePaths(
       // We also allow glob fallback for "unauthorized" results from resolveAtCommandPath,
       // as they might represent a relative path that matched an unauthorized file in one directory
       // but might have a valid match (via glob) in another.
-      // Guard against excessively long paths or newlines before invoking globTool to prevent
-      // exponential brace expansion / synchronous CPU hangs in minimatch (#29434).
+      // Guard against excessively long paths, newlines, or glob metacharacters before invoking globTool
+      // to prevent exponential brace expansion / synchronous CPU hangs in minimatch (#29434).
       const MAX_GLOB_SEARCH_PATH_LENGTH = 255;
       const isPathSuitableForGlob =
         pathName.length > 0 &&
         pathName.length <= MAX_GLOB_SEARCH_PATH_LENGTH &&
-        !/[\r\n\0]/.test(pathName);
+        !/[\r\n\0*?{}[\]]/.test(pathName);
 
       if (
         config.getEnableRecursiveFileSearch() &&
