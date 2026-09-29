@@ -110,6 +110,10 @@ vi.mock('./utils/sandbox.js', () => ({
   start_sandbox: vi.fn(() => Promise.resolve()),
 }));
 
+vi.mock('./utils/ensureHostFolderTrust.js', () => ({
+  ensureHostFolderTrust: vi.fn(() => Promise.resolve()),
+}));
+
 vi.mock('./utils/relaunch.js', () => ({
   relaunchAppInChildProcess: vi.fn(),
   relaunchOnExitCode: vi.fn(),

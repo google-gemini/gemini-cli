@@ -44,6 +44,10 @@ import {
   sanitizeSettingsForSandbox,
 } from './sandboxUtils.js';
 import { BUILTIN_SEATBELT_PROFILE_CONTENTS } from './sandboxBuiltinProfiles.js';
+import {
+  applyTrustRequestFromSandbox,
+  getTrustEnvForSandbox,
+} from './sandboxTrust.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -854,6 +858,12 @@ export async function start_sandbox(
     // set SANDBOX as container name
     args.push('--env', `SANDBOX=${containerName}`);
 
+    const folderTrustEnabled = cliConfig?.getFolderTrust() ?? false;
+    const trustEnv = getTrustEnvForSandbox(workdir, folderTrustEnabled);
+    if (trustEnv !== undefined) {
+      args.push('--env', `GEMINI_CLI_TRUST_WORKSPACE=${trustEnv}`);
+    }
+
     // for podman only, use empty --authfile to skip unnecessary auth refresh overhead
     if (command === 'podman') {
       const emptyAuthFilePath = path.join(os.tmpdir(), 'empty_auth.json');
@@ -1018,7 +1028,21 @@ export async function start_sandbox(
             `Sandbox process exited with code: ${code}, signal: ${signal}`,
           );
         }
-        resolve(code ?? 1);
+
+        const tmpDir = sandboxTmpDir;
+        const finish = () => resolve(code ?? 1);
+        if (!tmpDir) {
+          finish();
+          return;
+        }
+        void applyTrustRequestFromSandbox(tmpDir, workdir)
+          .catch((err) => {
+            debugLogger.error(
+              'Failed to apply trust request from sandbox:',
+              err,
+            );
+          })
+          .finally(finish);
       });
     });
   } finally {

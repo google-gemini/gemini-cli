@@ -40,16 +40,63 @@ interface FolderTrustDialogProps {
   onSelect: (choice: FolderTrustChoice) => void;
   isRestarting?: boolean;
   discoveryResults?: FolderDiscoveryResults | null;
+  terminalHeight?: number;
+  terminalWidth?: number;
+  constrainHeight?: boolean;
 }
 
-export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
+export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = (props) => {
+  if (
+    props.terminalHeight !== undefined &&
+    props.terminalWidth !== undefined &&
+    props.constrainHeight !== undefined
+  ) {
+    return (
+      <FolderTrustDialogView
+        {...props}
+        terminalHeight={props.terminalHeight}
+        terminalWidth={props.terminalWidth}
+        constrainHeight={props.constrainHeight}
+        isAlternateBuffer={false}
+      />
+    );
+  }
+  return <FolderTrustDialogWithAppContext {...props} />;
+};
+
+const FolderTrustDialogWithAppContext: React.FC<FolderTrustDialogProps> = (
+  props,
+) => {
+  const { terminalHeight, terminalWidth, constrainHeight } = useUIState();
+  const isAlternateBuffer = useAlternateBuffer();
+  return (
+    <FolderTrustDialogView
+      {...props}
+      terminalHeight={terminalHeight}
+      terminalWidth={terminalWidth}
+      constrainHeight={constrainHeight}
+      isAlternateBuffer={isAlternateBuffer}
+    />
+  );
+};
+
+const FolderTrustDialogView: React.FC<
+  FolderTrustDialogProps & {
+    terminalHeight: number;
+    terminalWidth: number;
+    constrainHeight: boolean;
+    isAlternateBuffer: boolean;
+  }
+> = ({
   onSelect,
   isRestarting,
   discoveryResults,
+  terminalHeight,
+  terminalWidth,
+  constrainHeight,
+  isAlternateBuffer,
 }) => {
   const [exiting, setExiting] = useState(false);
-  const { terminalHeight, terminalWidth, constrainHeight } = useUIState();
-  const isAlternateBuffer = useAlternateBuffer();
 
   const isExpanded = !constrainHeight;
 

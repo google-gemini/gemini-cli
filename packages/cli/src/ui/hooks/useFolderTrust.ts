@@ -76,8 +76,9 @@ export const useFolderTrust = (
       }
     } else if (isMounted) {
       setIsTrusted(trusted);
-      setIsFolderTrustDialogOpen(trusted === undefined);
-      onTrustChange(trusted);
+      const inSandbox = !!process.env['SANDBOX'];
+      setIsFolderTrustDialogOpen(trusted === undefined && !inSandbox);
+      onTrustChange(inSandbox && trusted === undefined ? false : trusted);
       showUntrustedMessage();
     }
 

@@ -67,6 +67,8 @@ describe('useFolderTrust', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
+    // Host-side default: an empty SANDBOX env must not hide the dialog.
+    vi.stubEnv('SANDBOX', '');
 
     // Default to interactive mode for tests
     Object.defineProperty(process.stdout, 'isTTY', {
@@ -107,6 +109,7 @@ describe('useFolderTrust', () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
     Object.defineProperty(process.stdout, 'isTTY', {
       value: originalStdoutIsTTY,
       configurable: true,
@@ -363,6 +366,38 @@ describe('useFolderTrust', () => {
       'Failed to save trust settings. Exiting Gemini CLI.',
     );
     expect(mockedExit).toHaveBeenCalledWith(ExitCodes.FATAL_CONFIG_ERROR);
+  });
+
+  describe('sandbox mode', () => {
+    it('should not open the dialog when SANDBOX is set and trust is undecided', async () => {
+      vi.stubEnv('SANDBOX', 'docker');
+      isWorkspaceTrustedSpy.mockReturnValue({
+        isTrusted: undefined,
+        source: undefined,
+      });
+
+      const { result } = await renderHook(() =>
+        useFolderTrust(mockSettings, onTrustChange, addItem),
+      );
+
+      expect(result.current.isFolderTrustDialogOpen).toBe(false);
+      expect(onTrustChange).toHaveBeenCalledWith(false);
+    });
+
+    it('should still report trusted folders when SANDBOX is set', async () => {
+      vi.stubEnv('SANDBOX', 'docker');
+      isWorkspaceTrustedSpy.mockReturnValue({
+        isTrusted: true,
+        source: 'file',
+      });
+
+      const { result } = await renderHook(() =>
+        useFolderTrust(mockSettings, onTrustChange, addItem),
+      );
+
+      expect(result.current.isFolderTrustDialogOpen).toBe(false);
+      expect(onTrustChange).toHaveBeenCalledWith(true);
+    });
   });
 
   describe('headless mode', () => {

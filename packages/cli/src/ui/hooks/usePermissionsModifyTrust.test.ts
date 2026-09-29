@@ -28,18 +28,26 @@ const mockedCwd = vi.hoisted(() => vi.fn().mockReturnValue('/mock/cwd'));
 const mockedLoadTrustedFolders = vi.hoisted(() => vi.fn());
 const mockedIsWorkspaceTrusted = vi.hoisted(() => vi.fn());
 const mockedUseSettings = vi.hoisted(() => vi.fn());
+const mockedPersistHostTrust = vi.hoisted(() => vi.fn());
+const mockedWriteTrustRequest = vi.hoisted(() => vi.fn());
+const mockedEnv = vi.hoisted(() => ({}) as Record<string, string | undefined>);
 
 // Mock modules
 vi.mock('node:process', () => {
   const mockProcess = {
     cwd: mockedCwd,
-    env: {},
+    env: mockedEnv,
   };
   return {
     ...mockProcess,
     default: mockProcess,
   };
 });
+
+vi.mock('../../utils/sandboxTrust.js', () => ({
+  persistHostTrust: mockedPersistHostTrust,
+  writeTrustRequest: mockedWriteTrustRequest,
+}));
 
 vi.mock('node:path', async (importOriginal) => {
   const actual = await importOriginal();
@@ -71,6 +79,13 @@ describe('usePermissionsModifyTrust', () => {
   beforeEach(() => {
     mockAddItem = vi.fn();
     mockOnExit = vi.fn();
+    for (const key of Object.keys(mockedEnv)) {
+      delete mockedEnv[key];
+    }
+    mockedPersistHostTrust.mockReset();
+    mockedWriteTrustRequest.mockReset();
+    mockedPersistHostTrust.mockResolvedValue(undefined);
+    mockedWriteTrustRequest.mockResolvedValue(undefined);
 
     mockedCwd.mockReturnValue('/test/dir');
     mockedUseSettings.mockReturnValue({
@@ -151,9 +166,10 @@ describe('usePermissionsModifyTrust', () => {
         setValue: mockSetValue,
       } as unknown as LoadedTrustedFolders);
 
-      mockedIsWorkspaceTrusted
-        .mockReturnValueOnce({ isTrusted: false, source: 'file' })
-        .mockReturnValueOnce({ isTrusted: true, source: 'file' });
+      mockedIsWorkspaceTrusted.mockReturnValue({
+        isTrusted: false,
+        source: 'file',
+      });
 
       const { result } = await renderHook(() =>
         usePermissionsModifyTrust(mockOnExit, mockAddItem, mockedCwd()),
@@ -164,7 +180,7 @@ describe('usePermissionsModifyTrust', () => {
       });
 
       expect(result.current.needsRestart).toBe(true);
-      expect(mockSetValue).not.toHaveBeenCalled();
+      expect(mockedPersistHostTrust).not.toHaveBeenCalled();
     });
 
     it('should save immediately if trust does not change', async () => {
@@ -188,7 +204,7 @@ describe('usePermissionsModifyTrust', () => {
       });
 
       expect(result.current.needsRestart).toBe(false);
-      expect(mockSetValue).toHaveBeenCalledWith(
+      expect(mockedPersistHostTrust).toHaveBeenCalledWith(
         '/test/dir',
         TrustLevel.TRUST_PARENT,
       );
@@ -202,9 +218,10 @@ describe('usePermissionsModifyTrust', () => {
         setValue: mockSetValue,
       } as unknown as LoadedTrustedFolders);
 
-      mockedIsWorkspaceTrusted
-        .mockReturnValueOnce({ isTrusted: false, source: 'file' })
-        .mockReturnValueOnce({ isTrusted: true, source: 'file' });
+      mockedIsWorkspaceTrusted.mockReturnValue({
+        isTrusted: false,
+        source: 'file',
+      });
 
       const { result } = await renderHook(() =>
         usePermissionsModifyTrust(mockOnExit, mockAddItem, mockedCwd()),
@@ -220,7 +237,7 @@ describe('usePermissionsModifyTrust', () => {
         await result.current.commitTrustLevelChange();
       });
 
-      expect(mockSetValue).toHaveBeenCalledWith(
+      expect(mockedPersistHostTrust).toHaveBeenCalledWith(
         '/test/dir',
         TrustLevel.TRUST_FOLDER,
       );
@@ -321,7 +338,7 @@ describe('usePermissionsModifyTrust', () => {
       });
 
       expect(result.current.needsRestart).toBe(false);
-      expect(mockSetValue).toHaveBeenCalledWith(
+      expect(mockedPersistHostTrust).toHaveBeenCalledWith(
         otherDirectory,
         TrustLevel.TRUST_FOLDER,
       );
@@ -350,13 +367,10 @@ describe('usePermissionsModifyTrust', () => {
     });
   });
 
-  it('should emit feedback when setValue throws in updateTrustLevel', async () => {
-    const mockSetValue = vi.fn().mockImplementation(() => {
-      throw new Error('test error');
-    });
+  it('should emit feedback when persistHostTrust throws in updateTrustLevel', async () => {
+    mockedPersistHostTrust.mockRejectedValue(new Error('test error'));
     mockedLoadTrustedFolders.mockReturnValue({
       user: { config: {} },
-      setValue: mockSetValue,
     } as unknown as LoadedTrustedFolders);
 
     mockedIsWorkspaceTrusted.mockReturnValue({
@@ -381,18 +395,16 @@ describe('usePermissionsModifyTrust', () => {
     expect(mockOnExit).toHaveBeenCalled();
   });
 
-  it('should emit feedback when setValue throws in commitTrustLevelChange', async () => {
-    const mockSetValue = vi.fn().mockImplementation(() => {
-      throw new Error('test error');
-    });
+  it('should emit feedback when persistHostTrust throws in commitTrustLevelChange', async () => {
+    mockedPersistHostTrust.mockRejectedValue(new Error('test error'));
     mockedLoadTrustedFolders.mockReturnValue({
       user: { config: {} },
-      setValue: mockSetValue,
     } as unknown as LoadedTrustedFolders);
 
-    mockedIsWorkspaceTrusted
-      .mockReturnValueOnce({ isTrusted: false, source: 'file' })
-      .mockReturnValueOnce({ isTrusted: true, source: 'file' });
+    mockedIsWorkspaceTrusted.mockReturnValue({
+      isTrusted: false,
+      source: 'file',
+    });
 
     const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
 
@@ -414,5 +426,87 @@ describe('usePermissionsModifyTrust', () => {
       'Failed to save trust settings. Your changes may not persist.',
     );
     expect(result.current.needsRestart).toBe(false);
+  });
+
+  describe('when running inside a sandbox', () => {
+    beforeEach(() => {
+      mockedEnv['SANDBOX'] = 'docker';
+      mockedLoadTrustedFolders.mockReturnValue({
+        user: { config: {} },
+      } as unknown as LoadedTrustedFolders);
+    });
+
+    it('writes a trust request instead of persisting on the host', async () => {
+      mockedIsWorkspaceTrusted.mockReturnValue({
+        isTrusted: true,
+        source: 'file',
+      });
+
+      const { result } = await renderHook(() =>
+        usePermissionsModifyTrust(mockOnExit, mockAddItem, mockedCwd()),
+      );
+
+      await act(async () => {
+        await result.current.updateTrustLevel(TrustLevel.TRUST_PARENT);
+      });
+
+      expect(mockedWriteTrustRequest).toHaveBeenCalledWith(
+        '/test/dir',
+        TrustLevel.TRUST_PARENT,
+      );
+      expect(mockedPersistHostTrust).not.toHaveBeenCalled();
+      expect(mockOnExit).toHaveBeenCalled();
+    });
+
+    it('uses GEMINI_CLI_TRUST_WORKSPACE for wasTrusted', async () => {
+      mockedEnv['GEMINI_CLI_TRUST_WORKSPACE'] = 'true';
+      mockedIsWorkspaceTrusted.mockReturnValue({
+        isTrusted: false,
+        source: 'file',
+      });
+
+      const { result } = await renderHook(() =>
+        usePermissionsModifyTrust(mockOnExit, mockAddItem, mockedCwd()),
+      );
+
+      await act(async () => {
+        await result.current.updateTrustLevel(TrustLevel.TRUST_FOLDER);
+      });
+
+      expect(result.current.needsRestart).toBe(false);
+      expect(mockedWriteTrustRequest).toHaveBeenCalledWith(
+        '/test/dir',
+        TrustLevel.TRUST_FOLDER,
+      );
+    });
+
+    it('requires a restart when GEMINI_CLI_TRUST_WORKSPACE disagrees with the new level', async () => {
+      mockedEnv['GEMINI_CLI_TRUST_WORKSPACE'] = 'false';
+      mockedIsWorkspaceTrusted.mockReturnValue({
+        isTrusted: false,
+        source: 'file',
+      });
+
+      const { result } = await renderHook(() =>
+        usePermissionsModifyTrust(mockOnExit, mockAddItem, mockedCwd()),
+      );
+
+      await act(async () => {
+        await result.current.updateTrustLevel(TrustLevel.TRUST_FOLDER);
+      });
+
+      expect(result.current.needsRestart).toBe(true);
+      expect(mockedWriteTrustRequest).not.toHaveBeenCalled();
+
+      await act(async () => {
+        await result.current.commitTrustLevelChange();
+      });
+
+      expect(mockedWriteTrustRequest).toHaveBeenCalledWith(
+        '/test/dir',
+        TrustLevel.TRUST_FOLDER,
+      );
+      expect(mockedPersistHostTrust).not.toHaveBeenCalled();
+    });
   });
 });
