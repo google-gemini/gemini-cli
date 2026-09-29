@@ -1590,6 +1590,90 @@ describe('handleAtCommand', () => {
       ),
     );
   });
+
+  // Regression for #29434: code with @ inside quotes should not swallow subsequent quoted strings across lines
+  it('does not greedily consume code across quotes when @ is inside quotes (#29434)', async () => {
+    const query =
+      'import { x } from "@scope/pkg";\nconst a = "foo";\nconsole.log("hello");';
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 704,
+      signal: abortController.signal,
+    });
+
+    // The query does not refer to an existing file, so it should not trigger runaway globs and should return the query parts
+    expect(result.processedQuery).not.toBeNull();
+    // Should not throw or hang
+    expect(result.error).toBeUndefined();
+  });
+
+  it('does not invoke recursive glob search on paths exceeding MAX_GLOB_SEARCH_PATH_LENGTH (#29434)', async () => {
+    const globSpy = vi.fn();
+    const mockGlobTool = {
+      buildAndExecute: globSpy,
+    };
+    vi.spyOn(mockConfig.getToolRegistry(), 'getTool').mockReturnValue(
+      mockGlobTool as never,
+    );
+
+    const excessivelyLongNonexistent = 'a'.repeat(300);
+    const query = `@${excessivelyLongNonexistent}`;
+
+    await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 705,
+      signal: abortController.signal,
+    });
+
+    // Glob search should be skipped for excessively long path names
+    expect(globSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not invoke recursive glob search on paths containing glob metacharacters (#29434)', async () => {
+    const globSpy = vi.fn();
+    const mockGlobTool = {
+      buildAndExecute: globSpy,
+    };
+    vi.spyOn(mockConfig.getToolRegistry(), 'getTool').mockReturnValue(
+      mockGlobTool as never,
+    );
+
+    // Unquoted path containing *
+    const unquotedQuery = '@foo*bar';
+    await handleAtCommand({
+      query: unquotedQuery,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 706,
+      signal: abortController.signal,
+    });
+    expect(globSpy).not.toHaveBeenCalled();
+
+    // Quoted paths containing glob metacharacters *, ?, {, }, [, ]
+    for (const char of ['*', '?', '{', '}', '[', ']']) {
+      globSpy.mockClear();
+      const query = `@"foo${char}bar"`;
+
+      await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 707,
+        signal: abortController.signal,
+      });
+
+      expect(globSpy).not.toHaveBeenCalled();
+    }
+  });
 });
 
 describe('escapeAtSymbols', () => {
