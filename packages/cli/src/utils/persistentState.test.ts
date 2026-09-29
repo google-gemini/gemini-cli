@@ -158,6 +158,7 @@ describe('PersistentState', () => {
     expect(debugLogger.warn).toHaveBeenCalledWith(
       'Recovered persistent state from backup',
     );
+    expect(fs.copyFileSync).not.toHaveBeenCalled();
   });
 
   it('should handle save errors and clean up temporary file', () => {

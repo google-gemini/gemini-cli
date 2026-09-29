@@ -80,7 +80,7 @@ export class PersistentState {
         if (isPersistentStateData(bakParsed)) {
           debugLogger.warn('Recovered persistent state from backup');
           this.cache = bakParsed;
-          this.save();
+          this.save(true);
           return this.cache;
         }
       } catch (bakError) {
@@ -95,7 +95,7 @@ export class PersistentState {
     return this.cache;
   }
 
-  private save() {
+  private save(skipBackup = false) {
     if (!this.cache) return;
     const filePath = this.getPath();
     const dir = path.dirname(filePath);
@@ -123,7 +123,7 @@ export class PersistentState {
       }
 
       const backupPath = `${filePath}.bak`;
-      if (fs.existsSync(filePath)) {
+      if (!skipBackup && fs.existsSync(filePath)) {
         try {
           fs.copyFileSync(filePath, backupPath);
         } catch (err) {
