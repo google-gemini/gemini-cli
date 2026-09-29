@@ -58,10 +58,17 @@ export class PersistentState {
         debugLogger.warn('Failed to load persistent state:', error);
         try {
           if (fs.existsSync(filePath)) {
+            if (fs.existsSync(corruptPath)) {
+              fs.unlinkSync(corruptPath);
+            }
             fs.renameSync(filePath, corruptPath);
           }
         } catch {
-          // Ignore failure to preserve corrupt file
+          try {
+            fs.unlinkSync(filePath);
+          } catch {
+            // Ignore failure to remove corrupt file
+          }
         }
       }
     }

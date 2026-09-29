@@ -96,4 +96,30 @@ describe('PersistentState Recovery & Atomic Persist', () => {
       tipsShown: 1,
     });
   });
+
+  it('handles pre-existing .corrupt file when preserving a newly corrupted state.json', () => {
+    // Pre-existing .corrupt file from a previous event
+    fs.writeFileSync(corruptFilePath, 'old-corrupt-data', 'utf-8');
+
+    const backupData = {
+      tipsShown: 7,
+      terminalSetupPromptShown: true,
+    };
+    fs.writeFileSync(
+      backupFilePath,
+      JSON.stringify(backupData, null, 2),
+      'utf-8',
+    );
+
+    // Newly corrupted state.json
+    fs.writeFileSync(stateFilePath, '{"tipsShown": 8, "invalid', 'utf-8');
+
+    const persistentState = new PersistentState();
+    const tips = persistentState.get('tipsShown');
+
+    expect(tips).toBe(7);
+    expect(fs.readFileSync(corruptFilePath, 'utf-8')).toBe(
+      '{"tipsShown": 8, "invalid',
+    );
+  });
 });

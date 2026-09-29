@@ -107,6 +107,37 @@ describe('PersistentState', () => {
     );
   });
 
+  it('should unlink existing corrupt file before renaming on load error', () => {
+    vi.mocked(fs.existsSync).mockImplementation(
+      (p) => p === mockFilePath || p === `${mockFilePath}.corrupt`,
+    );
+    vi.mocked(fs.readFileSync).mockImplementation(() => {
+      throw new Error('Read error');
+    });
+
+    const value = persistentState.get('defaultBannerShownCount');
+    expect(value).toBeUndefined();
+    expect(fs.unlinkSync).toHaveBeenCalledWith(`${mockFilePath}.corrupt`);
+    expect(fs.renameSync).toHaveBeenCalledWith(
+      mockFilePath,
+      `${mockFilePath}.corrupt`,
+    );
+  });
+
+  it('should unlink corrupt file if rename fails', () => {
+    vi.mocked(fs.existsSync).mockImplementation((p) => p === mockFilePath);
+    vi.mocked(fs.readFileSync).mockImplementation(() => {
+      throw new Error('Read error');
+    });
+    vi.mocked(fs.renameSync).mockImplementation(() => {
+      throw new Error('Rename error');
+    });
+
+    const value = persistentState.get('defaultBannerShownCount');
+    expect(value).toBeUndefined();
+    expect(fs.unlinkSync).toHaveBeenCalledWith(mockFilePath);
+  });
+
   it('should recover state from backup if primary file fails to load', () => {
     const backupData = { defaultBannerShownCount: { banner1: 5 } };
     vi.mocked(fs.existsSync).mockImplementation(
