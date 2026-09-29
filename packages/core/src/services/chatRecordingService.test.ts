@@ -2101,5 +2101,47 @@ describe('ChatRecordingService', () => {
       expect(afterRollback[0].id).toBe(history[0].id);
       expect(afterRollback[39].id).toBe(history[39].id);
     });
+
+    it('should detect in-place mutations to Part objects and modifications at index >= 1 in updateMessagesFromHistory', async () => {
+      await chatRecordingService.initialize();
+
+      const parts: Part[] = [
+        { text: 'Initial first part' },
+        { text: 'Part 2' },
+      ];
+      const msgId = chatRecordingService.recordMessage({
+        type: 'user',
+        content: parts,
+        model: 'gemini-pro',
+      });
+
+      const history: HistoryTurn[] = [
+        {
+          id: msgId,
+          content: { role: 'user', parts },
+        },
+      ];
+
+      // Mutate parts[0].text in place (same array reference, same parts[0] reference)
+      parts[0].text = 'Mutated first part in place';
+      chatRecordingService.updateMessagesFromHistory(history);
+
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+      const afterFirstMutation = await loadConversationRecord(sessionFile);
+      expect(afterFirstMutation!.messages[0].content).toEqual([
+        { text: 'Mutated first part in place' },
+        { text: 'Part 2' },
+      ]);
+
+      // Modify parts[1] (index >= 1) in place while keeping array and parts[0] unchanged
+      parts[1] = { text: 'Updated second part at index 1' };
+      chatRecordingService.updateMessagesFromHistory(history);
+
+      const afterSecondMutation = await loadConversationRecord(sessionFile);
+      expect(afterSecondMutation!.messages[0].content).toEqual([
+        { text: 'Mutated first part in place' },
+        { text: 'Updated second part at index 1' },
+      ]);
+    });
   });
 });

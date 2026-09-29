@@ -107,11 +107,11 @@ function isTextPart(part: unknown): part is { text: string } {
   return isStringProperty(part, 'text');
 }
 
+function isRecordObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 interface ContentFingerprint {
-  ref?: WeakRef<object>;
-  partsLength: number;
-  firstPartRef?: WeakRef<object>;
-  firstPartPrimitive?: unknown;
   digest: string;
 }
 
@@ -129,105 +129,102 @@ interface ToolCallMeta {
 }
 
 function computeContentDigest(value: PartListUnion | null | undefined): string {
-  const serialized = JSON.stringify(value ?? []);
-  if (serialized.length <= 128) {
-    return serialized;
-  }
-  let h1 = 0xdeadbeef ^ serialized.length;
-  let h2 = 0x41c6ce57 ^ serialized.length;
-  for (let i = 0; i < serialized.length; i++) {
-    const ch = serialized.charCodeAt(i);
-    h1 = Math.imul(h1 ^ ch, 2654435761);
-    h2 = Math.imul(h2 ^ ch, 1597334677);
-  }
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  let totalLen = 0;
+
+  const mix = (code: number): void => {
+    h1 = Math.imul(h1 ^ code, 2654435761);
+    h2 = Math.imul(h2 ^ code, 1597334677);
+    totalLen++;
+  };
+
+  const mixString = (str: string): void => {
+    const len = str.length;
+    mix(len);
+    totalLen += len;
+    if (len <= 256) {
+      for (let i = 0; i < len; i++) {
+        const ch = str.charCodeAt(i);
+        h1 = Math.imul(h1 ^ ch, 2654435761);
+        h2 = Math.imul(h2 ^ ch, 1597334677);
+      }
+    } else {
+      for (let i = 0; i < 64; i++) {
+        const ch = str.charCodeAt(i);
+        h1 = Math.imul(h1 ^ ch, 2654435761);
+        h2 = Math.imul(h2 ^ ch, 1597334677);
+      }
+      const step = Math.max(1, Math.floor((len - 128) / 128));
+      for (let i = 64; i < len - 64; i += step) {
+        const ch = str.charCodeAt(i);
+        h1 = Math.imul(h1 ^ ch, 2654435761);
+        h2 = Math.imul(h2 ^ ch, 1597334677);
+      }
+      for (let i = len - 64; i < len; i++) {
+        const ch = str.charCodeAt(i);
+        h1 = Math.imul(h1 ^ ch, 2654435761);
+        h2 = Math.imul(h2 ^ ch, 1597334677);
+      }
+    }
+  };
+
+  const visit = (val: unknown): void => {
+    if (val === null || val === undefined) {
+      mix(0);
+      return;
+    }
+    if (typeof val === 'string') {
+      mix(1);
+      mixString(val);
+    } else if (typeof val === 'number') {
+      mix(2);
+      mixString(String(val));
+    } else if (typeof val === 'boolean') {
+      mix(3);
+      mix(val ? 1 : 0);
+    } else if (Array.isArray(val)) {
+      mix(4);
+      mix(val.length);
+      for (let i = 0; i < val.length; i++) {
+        visit(val[i]);
+      }
+    } else if (isRecordObject(val)) {
+      mix(5);
+      const keys = Object.keys(val);
+      mix(keys.length);
+      for (let i = 0; i < keys.length; i++) {
+        const k = keys[i];
+        mixString(k);
+        visit(val[k]);
+      }
+    }
+  };
+
+  visit(value ?? []);
+
   h1 =
     Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^
     Math.imul(h2 ^ (h2 >>> 13), 3266489909);
   h2 =
     Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^
     Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-  return `${serialized.length}:${h1 >>> 0}:${h2 >>> 0}:${serialized.slice(0, 32)}:${serialized.slice(-32)}`;
-}
-
-function assignReferenceTracking(
-  target: {
-    ref?: WeakRef<object>;
-    partsLength: number;
-    firstPartRef?: WeakRef<object>;
-    firstPartPrimitive?: unknown;
-  },
-  value: PartListUnion | null | undefined,
-): void {
-  if (value !== null && typeof value === 'object') {
-    target.ref = new WeakRef(value);
-    if (Array.isArray(value)) {
-      target.partsLength = value.length;
-      if (value.length > 0) {
-        const first = value[0];
-        if (first !== null && typeof first === 'object') {
-          target.firstPartRef = new WeakRef(first);
-          target.firstPartPrimitive = undefined;
-        } else {
-          target.firstPartRef = undefined;
-          target.firstPartPrimitive = first;
-        }
-      } else {
-        target.firstPartRef = undefined;
-        target.firstPartPrimitive = undefined;
-      }
-    } else {
-      target.partsLength = -1;
-      target.firstPartRef = undefined;
-      target.firstPartPrimitive = undefined;
-    }
-  } else {
-    target.ref = undefined;
-    target.partsLength = -1;
-    target.firstPartRef = undefined;
-    target.firstPartPrimitive = value;
-  }
+  return `${totalLen}:${h1 >>> 0}:${h2 >>> 0}`;
 }
 
 function createFingerprint(
   value: PartListUnion | null | undefined,
 ): ContentFingerprint {
-  const fp: ContentFingerprint = {
-    partsLength: -1,
+  return {
     digest: computeContentDigest(value),
   };
-  assignReferenceTracking(fp, value);
-  return fp;
 }
 
 function updateFingerprintIfChanged(
   fp: ContentFingerprint,
   nextValue: PartListUnion | null | undefined,
 ): boolean {
-  if (nextValue !== null && typeof nextValue === 'object') {
-    const currentRef = fp.ref?.deref();
-    if (currentRef === nextValue) {
-      if (Array.isArray(nextValue)) {
-        if (fp.partsLength === nextValue.length) {
-          if (nextValue.length === 0) {
-            return false;
-          }
-          const first = nextValue[0];
-          if (first !== null && typeof first === 'object') {
-            if (fp.firstPartRef?.deref() === first) {
-              return false;
-            }
-          } else if (fp.firstPartPrimitive === first) {
-            return false;
-          }
-        }
-      } else {
-        return false;
-      }
-    }
-  }
-
   const nextDigest = computeContentDigest(nextValue);
-  assignReferenceTracking(fp, nextValue);
   if (nextDigest === fp.digest) {
     return false;
   }
