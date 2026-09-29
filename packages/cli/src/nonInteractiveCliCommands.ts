@@ -97,7 +97,13 @@ export const handleSlashCommand = async (
             // tool call. Non-interactive mode cannot schedule a UI tool call,
             // so we forward the command's follow-up prompt to the model, which
             // then invokes the tool (e.g. `activate_skill`) itself. If no
-            // follow-up prompt is provided there is nothing to send.
+            // follow-up prompt is provided there is nothing we can forward, so
+            // we fail loudly rather than silently doing nothing.
+            if (!result.postSubmitPrompt) {
+              throw new FatalInputError(
+                'Exiting due to a tool action without a follow-up prompt, which is not supported in non-interactive mode.',
+              );
+            }
             return result.postSubmitPrompt;
           case 'confirm_shell_commands':
             // This result indicates a command attempted to confirm shell commands.

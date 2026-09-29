@@ -111,7 +111,7 @@ describe('handleSlashCommand (non-interactive)', () => {
     expect(result).toBe('Use the skill my-skill');
   });
 
-  it('returns undefined for a tool action without a postSubmitPrompt', async () => {
+  it('throws for a tool action without a postSubmitPrompt', async () => {
     mockCommands([
       {
         name: 'bare-tool',
@@ -125,13 +125,14 @@ describe('handleSlashCommand (non-interactive)', () => {
       },
     ]);
 
-    const result = await handleSlashCommand(
-      '/bare-tool',
-      abortController,
-      mockConfig,
-      mockSettings,
-    );
-    expect(result).toBeUndefined();
+    await expect(
+      handleSlashCommand(
+        '/bare-tool',
+        abortController,
+        mockConfig,
+        mockSettings,
+      ),
+    ).rejects.toThrow(FatalInputError);
   });
 
   it('throws for a confirm_shell_commands action', async () => {
