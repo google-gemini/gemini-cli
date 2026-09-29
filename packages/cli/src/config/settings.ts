@@ -49,6 +49,7 @@ export {
 };
 
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
+import { getNestedValue } from '../utils/settingsUtils.js';
 import { customDeepMerge } from '../utils/deepMerge.js';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
 import {
@@ -235,6 +236,60 @@ function setNestedProperty(
     }
   }
   current[lastKey] = value;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function deleteNestedProperty(
+  obj: Record<string, unknown>,
+  keyPath: string,
+): void {
+  const keys = keyPath.split('.');
+  const lastKey = keys.pop();
+
+  if (!lastKey) {
+    return;
+  }
+
+  let current: Record<string, unknown> = obj;
+
+  for (const key of keys) {
+    const next = current[key];
+
+    if (!isRecord(next)) {
+      return;
+    }
+
+    current = next;
+  }
+
+  delete current[lastKey];
+}
+
+function preserveOriginalValues(
+  migratedValue: unknown,
+  originalValue: unknown,
+  migratedPaths: string[],
+): unknown {
+  if (!isRecord(migratedValue) || !isRecord(originalValue)) {
+    return migratedValue;
+  }
+
+  const persistedValue = structuredClone(originalValue);
+
+  for (const migratedPath of migratedPaths) {
+    const value = getNestedValue(migratedValue, migratedPath.split('.'));
+
+    if (value === undefined) {
+      deleteNestedProperty(persistedValue, migratedPath);
+    } else {
+      setNestedProperty(persistedValue, migratedPath, structuredClone(value));
+    }
+  }
+
+  return persistedValue;
 }
 
 export function getDefaultsFromSchema(
@@ -476,6 +531,44 @@ export class LoadedSettings {
         key,
         structuredClone(valueToSet),
       );
+      saveSettings(settingsFile);
+    }
+
+    this._merged = this.computeMergedSettings();
+    this._snapshot = this.computeSnapshot();
+    coreEvents.emitSettingsChanged();
+  }
+
+  setMigratedValue(
+    scope: LoadableSettingScope,
+    key: string,
+    value: unknown,
+    migratedPaths: string[],
+  ): void {
+    const settingsFile = this.forScope(scope);
+
+    const valueToSet =
+      typeof value === 'object' && value !== null
+        ? structuredClone(value)
+        : value;
+
+    // Runtime gets the fully expanded/migrated value.
+    setNestedProperty(settingsFile.settings, key, valueToSet);
+
+    if (this.isPersistable(settingsFile)) {
+      const originalValue = getNestedValue(
+        settingsFile.originalSettings,
+        key.split('.'),
+      );
+
+      const persistedValue = preserveOriginalValues(
+        valueToSet,
+        originalValue,
+        migratedPaths,
+      );
+
+      setNestedProperty(settingsFile.originalSettings, key, persistedValue);
+
       saveSettings(settingsFile);
     }
 
@@ -1101,7 +1194,12 @@ export function migrateDeprecatedSettings(
         ) || modified;
 
       if (modified) {
-        loadedSettings.setValue(scope, 'general', newGeneral);
+        loadedSettings.setMigratedValue(scope, 'general', newGeneral, [
+          'disableAutoUpdate',
+          'enableAutoUpdate',
+          'disableUpdateNag',
+          'enableAutoUpdateNotification',
+        ]);
         if (!settingsFile.readOnly) {
           anyModified = true;
         }
@@ -1129,7 +1227,10 @@ export function migrateDeprecatedSettings(
           )
         ) {
           newUi['accessibility'] = newAccessibility;
-          loadedSettings.setValue(scope, 'ui', newUi);
+          loadedSettings.setMigratedValue(scope, 'ui', newUi, [
+            'accessibility.disableLoadingPhrases',
+            'accessibility.enableLoadingPhrases',
+          ]);
           if (!settingsFile.readOnly) {
             anyModified = true;
           }
@@ -1143,7 +1244,10 @@ export function migrateDeprecatedSettings(
         ) {
           if (!enableLP) {
             newUi['loadingPhrases'] = 'off';
-            loadedSettings.setValue(scope, 'ui', newUi);
+            loadedSettings.setMigratedValue(scope, 'ui', newUi, [
+              'accessibility.enableLoadingPhrases',
+              'loadingPhrases',
+            ]);
             if (!settingsFile.readOnly) {
               anyModified = true;
             }
@@ -1176,7 +1280,10 @@ export function migrateDeprecatedSettings(
           )
         ) {
           newContext['fileFiltering'] = newFileFiltering;
-          loadedSettings.setValue(scope, 'context', newContext);
+          loadedSettings.setMigratedValue(scope, 'context', newContext, [
+            'fileFiltering.disableFuzzySearch',
+            'fileFiltering.enableFuzzySearch',
+          ]);
           if (!settingsFile.readOnly) {
             anyModified = true;
           }
@@ -1197,7 +1304,9 @@ export function migrateDeprecatedSettings(
         // Only set defaultApprovalMode if it's not already set
         if (newGeneral['defaultApprovalMode'] === undefined) {
           newGeneral['defaultApprovalMode'] = toolsSettings['approvalMode'];
-          loadedSettings.setValue(scope, 'general', newGeneral);
+          loadedSettings.setMigratedValue(scope, 'general', newGeneral, [
+            'defaultApprovalMode',
+          ]);
           if (!settingsFile.readOnly) {
             anyModified = true;
           }
@@ -1206,7 +1315,9 @@ export function migrateDeprecatedSettings(
         if (removeDeprecated) {
           const newTools = { ...toolsSettings };
           delete newTools['approvalMode'];
-          loadedSettings.setValue(scope, 'tools', newTools);
+          loadedSettings.setMigratedValue(scope, 'tools', newTools, [
+            'approvalMode',
+          ]);
           if (!settingsFile.readOnly) {
             anyModified = true;
           }
@@ -1406,21 +1517,31 @@ function migrateExperimentalSettings(
       if (newPlan['enabled'] === undefined) {
         newPlan['enabled'] = planValue;
         newGeneral['plan'] = newPlan;
-        loadedSettings.setValue(scope, 'general', newGeneral);
+        loadedSettings.setMigratedValue(scope, 'general', newGeneral, [
+          'plan.enabled',
+        ]);
         modified = true;
       }
     });
 
     if (modified) {
       agentsSettings['overrides'] = agentsOverrides;
-      loadedSettings.setValue(scope, 'agents', agentsSettings);
+      loadedSettings.setMigratedValue(scope, 'agents', agentsSettings, [
+        'overrides.codebase_investigator',
+        'overrides.cli_help',
+      ]);
 
       if (removeDeprecated) {
         const newExperimental = { ...experimentalSettings };
         delete newExperimental['codebaseInvestigatorSettings'];
         delete newExperimental['cliHelpAgentSettings'];
         delete newExperimental['plan'];
-        loadedSettings.setValue(scope, 'experimental', newExperimental);
+        loadedSettings.setMigratedValue(
+          scope,
+          'experimental',
+          newExperimental,
+          ['codebaseInvestigatorSettings', 'cliHelpAgentSettings', 'plan'],
+        );
       }
       return true;
     }

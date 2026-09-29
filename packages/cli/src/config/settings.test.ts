@@ -2340,16 +2340,59 @@ describe('Settings Loading and Merging', () => {
         },
       );
 
-      const setValueSpy = vi.spyOn(LoadedSettings.prototype, 'setValue');
+      const setMigratedValueSpy = vi.spyOn(
+        LoadedSettings.prototype,
+        'setMigratedValue',
+      );
       const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
 
       migrateDeprecatedSettings(loadedSettings, true);
 
       // Should set new value to false (inverted from true)
-      expect(setValueSpy).toHaveBeenCalledWith(
+      expect(setMigratedValueSpy).toHaveBeenCalledWith(
         SettingScope.User,
         'general',
         expect.objectContaining({ enableAutoUpdate: false }),
+        expect.any(Array),
+      );
+    });
+
+    it('should preserve environment variable placeholders during migration', () => {
+      vi.stubEnv('TEST_AUTO_THEME', 'true');
+
+      const placeholder = '${TEST_AUTO_THEME:-false}';
+
+      const userSettingsContent = {
+        ui: {
+          autoThemeSwitching: placeholder,
+          accessibility: {
+            disableLoadingPhrases: true,
+          },
+        },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (normalizePath(p) === normalizePath(USER_SETTINGS_PATH)) {
+            return JSON.stringify(userSettingsContent);
+          }
+          return '{}';
+        },
+      );
+
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      const userFile = loadedSettings.forScope(SettingScope.User);
+
+      expect(userFile.settings.ui?.autoThemeSwitching).toBe(true);
+
+      expect(
+        (userFile.settings.ui?.accessibility as Record<string, unknown>)?.[
+          'enableLoadingPhrases'
+        ],
+      ).toBe(false);
+
+      expect(userFile.originalSettings.ui?.autoThemeSwitching).toBe(
+        placeholder,
       );
     });
 
@@ -2368,22 +2411,27 @@ describe('Settings Loading and Merging', () => {
         },
       );
 
-      const setValueSpy = vi.spyOn(LoadedSettings.prototype, 'setValue');
+      const setMigratedValueSpy = vi.spyOn(
+        LoadedSettings.prototype,
+        'setMigratedValue',
+      );
       const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
 
       migrateDeprecatedSettings(loadedSettings, true);
 
-      expect(setValueSpy).toHaveBeenCalledWith(
+      expect(setMigratedValueSpy).toHaveBeenCalledWith(
         SettingScope.User,
         'general',
         expect.objectContaining({ defaultApprovalMode: 'plan' }),
+        expect.any(Array),
       );
 
       // Verify removal
-      expect(setValueSpy).toHaveBeenCalledWith(
+      expect(setMigratedValueSpy).toHaveBeenCalledWith(
         SettingScope.User,
-        'tools',
-        expect.not.objectContaining({ approvalMode: 'plan' }),
+        'general',
+        expect.objectContaining({ defaultApprovalMode: 'plan' }),
+        expect.any(Array),
       );
     });
 
@@ -2413,34 +2461,40 @@ describe('Settings Loading and Merging', () => {
         },
       );
 
-      const setValueSpy = vi.spyOn(LoadedSettings.prototype, 'setValue');
+      const setMigratedValueSpy = vi.spyOn(
+        LoadedSettings.prototype,
+        'setMigratedValue',
+      );
       const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
 
       migrateDeprecatedSettings(loadedSettings, true);
 
       // Check that general settings were migrated with inverted values
-      expect(setValueSpy).toHaveBeenCalledWith(
+      expect(setMigratedValueSpy).toHaveBeenCalledWith(
         SettingScope.User,
         'general',
         expect.objectContaining({ enableAutoUpdate: true }),
+        expect.any(Array),
       );
-      expect(setValueSpy).toHaveBeenCalledWith(
+      expect(setMigratedValueSpy).toHaveBeenCalledWith(
         SettingScope.User,
         'general',
         expect.objectContaining({ enableAutoUpdateNotification: false }),
+        expect.any(Array),
       );
 
       // Check context.fileFiltering was migrated
-      expect(setValueSpy).toHaveBeenCalledWith(
+      expect(setMigratedValueSpy).toHaveBeenCalledWith(
         SettingScope.User,
         'context',
         expect.objectContaining({
           fileFiltering: expect.objectContaining({ enableFuzzySearch: true }),
         }),
+        expect.any(Array),
       );
 
       // Check ui.accessibility was migrated
-      expect(setValueSpy).toHaveBeenCalledWith(
+      expect(setMigratedValueSpy).toHaveBeenCalledWith(
         SettingScope.User,
         'ui',
         expect.objectContaining({
@@ -2448,15 +2502,17 @@ describe('Settings Loading and Merging', () => {
             enableLoadingPhrases: false,
           }),
         }),
+        expect.any(Array),
       );
 
       // Check that enableLoadingPhrases: false was further migrated to loadingPhrases: 'off'
-      expect(setValueSpy).toHaveBeenCalledWith(
+      expect(setMigratedValueSpy).toHaveBeenCalledWith(
         SettingScope.User,
         'ui',
         expect.objectContaining({
           loadingPhrases: 'off',
         }),
+        expect.any(Array),
       );
     });
 
@@ -2470,16 +2526,20 @@ describe('Settings Loading and Merging', () => {
       };
 
       const loadedSettings = createMockSettings(userSettingsContent);
-      const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
+      const setMigratedValueSpy = vi.spyOn(
+        LoadedSettings.prototype,
+        'setMigratedValue',
+      );
 
       migrateDeprecatedSettings(loadedSettings);
 
-      expect(setValueSpy).toHaveBeenCalledWith(
+      expect(setMigratedValueSpy).toHaveBeenCalledWith(
         SettingScope.User,
         'ui',
         expect.objectContaining({
           loadingPhrases: 'off',
         }),
+        expect.any(Array),
       );
     });
 
@@ -2545,20 +2605,33 @@ describe('Settings Loading and Merging', () => {
       };
 
       const loadedSettings = createMockSettings(userSettingsContent);
-      const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
+      const setMigratedValueSpy = vi.spyOn(
+        LoadedSettings.prototype,
+        'setMigratedValue',
+      );
 
       // Default is now removeDeprecated = true
       migrateDeprecatedSettings(loadedSettings);
 
       // Should remove disableAutoUpdate and trust enableAutoUpdate: true
-      expect(setValueSpy).toHaveBeenCalledWith(SettingScope.User, 'general', {
-        enableAutoUpdate: true,
-      });
+      expect(setMigratedValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'general',
+        {
+          enableAutoUpdate: true,
+        },
+        expect.any(Array),
+      );
 
       // Should remove disableFuzzySearch and trust enableFuzzySearch: false
-      expect(setValueSpy).toHaveBeenCalledWith(SettingScope.User, 'context', {
-        fileFiltering: { enableFuzzySearch: false },
-      });
+      expect(setMigratedValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'context',
+        {
+          fileFiltering: { enableFuzzySearch: false },
+        },
+        expect.any(Array),
+      );
     });
 
     it('should preserve deprecated settings when removeDeprecated is explicitly false', () => {
