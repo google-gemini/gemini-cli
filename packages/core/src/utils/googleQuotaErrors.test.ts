@@ -106,6 +106,26 @@ describe('classifyGoogleError', () => {
     expect(result).toBeInstanceOf(TerminalQuotaError);
   });
 
+  it('should return TerminalQuotaError for a monthly spending cap with empty details', () => {
+    const message =
+      'Your project has exceeded its monthly spending cap. Please go to AI Studio at https://ai.studio/spend to manage your project spend cap. Learn more at https://ai.google.dev/gemini-api/docs/billing#project-spend-caps. ';
+    const apiError: GoogleApiError = {
+      code: 429,
+      message,
+      details: [],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+
+    const result = classifyGoogleError(new Error(message));
+
+    expect(result).toBeInstanceOf(TerminalQuotaError);
+    expect(result).not.toBeInstanceOf(RetryableQuotaError);
+    if (result instanceof TerminalQuotaError) {
+      expect(result.message).toBe(message);
+      expect(result.status).toBe(429);
+    }
+  });
+
   it('should return TerminalQuotaError for MODEL_CAPACITY_EXHAUSTED when no retry delay is specified', () => {
     const apiError: GoogleApiError = {
       code: 429,
