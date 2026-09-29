@@ -92,6 +92,14 @@ describe('sandboxUtils', () => {
         'my-image-v1',
       );
     });
+
+    it('should handle registry path with a port', () => {
+      expect(parseImageName('localhost:5000/my-image:v1')).toBe('my-image-v1');
+    });
+
+    it('should never produce a name containing a path separator', () => {
+      expect(parseImageName('localhost:5000/ns/my-image')).not.toContain('/');
+    });
   });
 
   describe('ports', () => {
