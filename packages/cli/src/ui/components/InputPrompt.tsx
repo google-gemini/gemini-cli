@@ -1429,6 +1429,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const getGhostTextLines = useCallback(() => {
     if (
+      inputWidth <= 0 ||
       !completion.promptCompletion.text ||
       !buffer.text ||
       !completion.promptCompletion.text.startsWith(buffer.text)
@@ -1514,6 +1515,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 part += char;
                 partWidth += charWidth;
                 splitIndex = i + 1;
+              }
+              if (splitIndex === 0) {
+                part = wordCP[0];
+                splitIndex = 1;
               }
               additionalLines.push(part);
               wordToProcess = cpSlice(wordToProcess, splitIndex);

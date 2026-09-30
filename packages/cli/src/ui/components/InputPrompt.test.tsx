@@ -5421,6 +5421,61 @@ describe('InputPrompt', () => {
       unmount();
     });
   });
+
+  describe('ghost text wrapping edge cases', () => {
+    it('does not hang when wrapping wide characters with inputWidth = 1', async () => {
+      props.inputWidth = 1;
+      props.suggestionsWidth = 1;
+      mockBuffer.setText('a');
+
+      mockedUseCommandCompletion.mockReturnValue({
+        ...mockCommandCompletion,
+        promptCompletion: {
+          text: 'a' + '好'.repeat(5),
+          accept: vi.fn(),
+          clear: vi.fn(),
+          isLoading: false,
+          isActive: true,
+          markSelected: vi.fn(),
+        },
+      });
+
+      const { lastFrame, unmount } = await renderWithProviders(
+        <TestInputPrompt {...props} />,
+        { uiActions },
+      );
+
+      await waitFor(() => {
+        expect(clean(lastFrame())).toContain('a');
+      });
+      unmount();
+    });
+
+    it('does not hang when inputWidth is 0 and ghost text is active', async () => {
+      props.inputWidth = 0;
+      props.suggestionsWidth = 0;
+      mockBuffer.setText('@app.js');
+
+      mockedUseCommandCompletion.mockReturnValue({
+        ...mockCommandCompletion,
+        promptCompletion: {
+          text: '@app.js:10-20',
+          accept: vi.fn(),
+          clear: vi.fn(),
+          isLoading: false,
+          isActive: true,
+          markSelected: vi.fn(),
+        },
+      });
+
+      const { unmount } = await renderWithProviders(
+        <TestInputPrompt {...props} />,
+        { uiActions },
+      );
+
+      unmount();
+    });
+  });
 });
 
 function clean(str: string | undefined): string {
