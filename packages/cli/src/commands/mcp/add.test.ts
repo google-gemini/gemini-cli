@@ -332,15 +332,19 @@ describe('mcp add command', () => {
             throw new Error('process.exit called');
           }) as (code?: number | string | null) => never);
 
-        await expect(
-          parser.parseAsync(`add ${serverName} ${command}`),
-        ).rejects.toThrow('process.exit called');
+        try {
+          await expect(
+            parser.parseAsync(`add ${serverName} ${command}`),
+          ).rejects.toThrow('process.exit called');
 
-        expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
-          'Error: Please use --scope user to edit settings in the home directory.',
-        );
-        expect(mockProcessExit).toHaveBeenCalledWith(1);
-        expect(mockSetValue).not.toHaveBeenCalled();
+          expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
+            'Error: Please use --scope user to edit settings in the home directory.',
+          );
+          expect(mockProcessExit).toHaveBeenCalledWith(1);
+          expect(mockSetValue).not.toHaveBeenCalled();
+        } finally {
+          mockProcessExit.mockRestore();
+        }
       });
     });
 
@@ -471,15 +475,19 @@ describe('mcp add command', () => {
           throw new Error('process.exit called');
         }) as (code?: number | string | null) => never);
 
-      await expect(
-        parser.parseAsync(`add ${serverName} ${command}`),
-      ).rejects.toThrow('process.exit called');
+      try {
+        await expect(
+          parser.parseAsync(`add ${serverName} ${command}`),
+        ).rejects.toThrow('process.exit called');
 
-      expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
-        'Error: Cannot modify settings in an untrusted workspace. To enable this, verify the source of the repository and set GEMINI_CLI_TRUST_WORKSPACE=true or move your configuration to the global settings file.',
-      );
-      expect(mockProcessExit).toHaveBeenCalledWith(1);
-      expect(mockSetValue).not.toHaveBeenCalled();
+        expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
+          'Error: Cannot modify settings in an untrusted workspace. To enable this, verify the source of the repository and set GEMINI_CLI_TRUST_WORKSPACE=true or move your configuration to the global settings file.',
+        );
+        expect(mockProcessExit).toHaveBeenCalledWith(1);
+        expect(mockSetValue).not.toHaveBeenCalled();
+      } finally {
+        mockProcessExit.mockRestore();
+      }
     });
 
     it('should allow adding to user scope when --scope=user is specified', async () => {
