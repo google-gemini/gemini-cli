@@ -79,16 +79,19 @@ describe('StandardFileSystemService atomicity', () => {
     await expect(fsp.readFile(filePath, 'utf-8')).resolves.toBe('hello');
   });
 
-  it('preserves the permissions of an existing file', async () => {
-    const filePath = path.join(dir, 'secret.txt');
-    await fsp.writeFile(filePath, 'before', { mode: 0o600 });
-    await fsp.chmod(filePath, 0o600);
+  it.skipIf(process.platform === 'win32')(
+    'preserves the permissions of an existing file',
+    async () => {
+      const filePath = path.join(dir, 'secret.txt');
+      await fsp.writeFile(filePath, 'before', { mode: 0o600 });
+      await fsp.chmod(filePath, 0o600);
 
-    await service.writeTextFile(filePath, 'after');
+      await service.writeTextFile(filePath, 'after');
 
-    const stats = await fsp.stat(filePath);
-    expect(stats.mode & 0o777).toBe(0o600);
-  });
+      const stats = await fsp.stat(filePath);
+      expect(stats.mode & 0o777).toBe(0o600);
+    },
+  );
 
   it('leaves no temporary files behind on success', async () => {
     const filePath = path.join(dir, 'clean.txt');

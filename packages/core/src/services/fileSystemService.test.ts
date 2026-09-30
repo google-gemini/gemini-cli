@@ -6,12 +6,19 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs/promises';
+import path from 'node:path';
 import { StandardFileSystemService } from './fileSystemService.js';
 
 vi.mock('fs/promises');
 
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 describe('StandardFileSystemService', () => {
   let fileSystem: StandardFileSystemService;
+  const targetFile = path.resolve('/test/file.txt');
+  const tmpPattern = new RegExp(`^${escapeRegex(targetFile)}\\..*\\.tmp$`);
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -27,9 +34,9 @@ describe('StandardFileSystemService', () => {
       const testContent = 'Hello, World!';
       vi.mocked(fs.readFile).mockResolvedValue(testContent);
 
-      const result = await fileSystem.readTextFile('/test/file.txt');
+      const result = await fileSystem.readTextFile(targetFile);
 
-      expect(fs.readFile).toHaveBeenCalledWith('/test/file.txt', 'utf-8');
+      expect(fs.readFile).toHaveBeenCalledWith(targetFile, 'utf-8');
       expect(result).toBe(testContent);
     });
 
@@ -37,7 +44,7 @@ describe('StandardFileSystemService', () => {
       const error = new Error('ENOENT: File not found');
       vi.mocked(fs.readFile).mockRejectedValue(error);
 
-      await expect(fileSystem.readTextFile('/test/file.txt')).rejects.toThrow(
+      await expect(fileSystem.readTextFile(targetFile)).rejects.toThrow(
         'ENOENT: File not found',
       );
     });
@@ -49,14 +56,24 @@ describe('StandardFileSystemService', () => {
       vi.mocked(fs.rename).mockResolvedValue();
       vi.mocked(fs.stat).mockRejectedValue(new Error('ENOENT'));
 
-      await fileSystem.writeTextFile('/test/file.txt', 'Hello, World!');
+      await fileSystem.writeTextFile(targetFile, 'Hello, World!');
 
       const [tmpPath, content, options] = vi.mocked(fs.writeFile).mock
         .calls[0] as [string, string, { encoding: string }];
       expect(content).toBe('Hello, World!');
       expect(options.encoding).toBe('utf-8');
-      expect(tmpPath).toMatch(/^\/test\/file\.txt\..*\.tmp$/);
-      expect(fs.rename).toHaveBeenCalledWith(tmpPath, '/test/file.txt');
+      expect(tmpPath).toMatch(tmpPattern);
+      expect(fs.rename).toHaveBeenCalledWith(tmpPath, targetFile);
+    });
+
+    it('should match temp file patterns with Windows-style backslash paths', () => {
+      const winTarget = 'C:\\test\\folder\\file.txt';
+      const winTmpPattern = new RegExp(
+        `^${escapeRegex(winTarget)}\\..*\\.tmp$`,
+      );
+      const sampleWinTmp =
+        'C:\\test\\folder\\file.txt.12345678-1234-1234-1234-123456789abc.tmp';
+      expect(sampleWinTmp).toMatch(winTmpPattern);
     });
 
     it('should create the temp file with the destination permissions', async () => {
@@ -67,7 +84,8 @@ describe('StandardFileSystemService', () => {
         mode: 0o600,
       } as unknown as Awaited<ReturnType<typeof fs.stat>>);
 
-      await fileSystem.writeTextFile('/test/secret.txt', 'Hello, World!');
+      const secretFile = path.resolve('/test/secret.txt');
+      await fileSystem.writeTextFile(secretFile, 'Hello, World!');
 
       // Creating the temp file already restricted means the content is never
       // briefly readable through a wider default mode.
@@ -90,7 +108,7 @@ describe('StandardFileSystemService', () => {
       );
 
       await expect(
-        fileSystem.writeTextFile('/test/file.txt', 'Hello, World!'),
+        fileSystem.writeTextFile(targetFile, 'Hello, World!'),
       ).resolves.toBeUndefined();
 
       expect(fs.rename).toHaveBeenCalled();
@@ -102,12 +120,12 @@ describe('StandardFileSystemService', () => {
       vi.mocked(fs.rm).mockResolvedValue();
 
       await expect(
-        fileSystem.writeTextFile('/test/file.txt', 'Hello, World!'),
+        fileSystem.writeTextFile(targetFile, 'Hello, World!'),
       ).rejects.toThrow('ENOSPC');
 
       expect(fs.rename).not.toHaveBeenCalled();
       const [removed] = vi.mocked(fs.rm).mock.calls[0] as [string];
-      expect(removed).toMatch(/^\/test\/file\.txt\..*\.tmp$/);
+      expect(removed).toMatch(tmpPattern);
     });
 
     it('should retry rename when encountering EACCES', async () => {
@@ -121,7 +139,7 @@ describe('StandardFileSystemService', () => {
         .mockResolvedValueOnce();
 
       await expect(
-        fileSystem.writeTextFile('/test/file.txt', 'Hello, World!'),
+        fileSystem.writeTextFile(targetFile, 'Hello, World!'),
       ).resolves.toBeUndefined();
 
       expect(fs.rename).toHaveBeenCalledTimes(2);
