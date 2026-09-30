@@ -1366,17 +1366,17 @@ export class ChatRecordingService {
             existingMeta.contentFp,
             turnParts,
           );
-          const cachedIdx = this.cachedConversation.messages.findIndex(
-            (m) => m.id === turn.id,
-          );
-          if (cachedIdx !== -1) {
-            this.cachedConversation.messages[cachedIdx] = {
-              ...this.cachedConversation.messages[cachedIdx],
-              content: turnParts,
-            };
-          }
           if (contentChanged) {
             anyChange = true;
+            const cachedIdx = this.cachedConversation.messages.findIndex(
+              (m) => m.id === turn.id,
+            );
+            if (cachedIdx !== -1) {
+              this.cachedConversation.messages[cachedIdx] = {
+                ...this.cachedConversation.messages[cachedIdx],
+                content: turnParts,
+              };
+            }
             const patch = getOrCreatePatch(turn.id);
             patch.content = turnParts;
             const contentStr = partListUnionToString(turnParts).trim();
