@@ -104,7 +104,11 @@ export class AcpSessionManager {
     }
 
     if (!isAuthenticated) {
-      await config?.dispose?.();
+      try {
+        await config?.dispose?.();
+      } catch (disposeError) {
+        debugLogger.error(`Error disposing config: ${disposeError}`);
+      }
       throw new acp.RequestError(
         -32000,
         authErrorMessage || 'Authentication required.',
@@ -249,7 +253,11 @@ export class AcpSessionManager {
       return response;
     } catch (error) {
       if (config) {
-        await config.dispose?.();
+        try {
+          await config.dispose?.();
+        } catch (disposeError) {
+          debugLogger.error(`Error disposing config: ${disposeError}`);
+        }
       }
       throw error;
     }
@@ -286,7 +294,11 @@ export class AcpSessionManager {
       );
     } catch (e) {
       debugLogger.error(`Authentication failed: ${e}`);
-      await config?.dispose?.();
+      try {
+        await config?.dispose?.();
+      } catch (disposeError) {
+        debugLogger.error(`Error disposing config: ${disposeError}`);
+      }
       throw acp.RequestError.authRequired();
     }
 
@@ -303,7 +315,11 @@ export class AcpSessionManager {
         config.setFileSystemService(acpFileSystemService);
       }
     } catch (e) {
-      await config?.dispose?.();
+      try {
+        await config?.dispose?.();
+      } catch (disposeError) {
+        debugLogger.error(`Error disposing config: ${disposeError}`);
+      }
       throw e;
     }
 

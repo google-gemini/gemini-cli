@@ -561,7 +561,11 @@ export class SessionSelector {
     const { filePath, sessionData } = matches[0];
     const firstUserMsg = extractFirstUserMessage(sessionData.messages);
     const messageCount = sessionData.messages.length;
-    const displayInfo = `Session ${sessionData.sessionId}: ${firstUserMsg} (${messageCount} messages, ${formatRelativeTime(sessionData.lastUpdated)})`;
+    const timestamp =
+      sessionData.lastUpdated ??
+      sessionData.startTime ??
+      new Date().toISOString();
+    const displayInfo = `Session ${sessionData.sessionId}: ${firstUserMsg} (${messageCount} messages, ${formatRelativeTime(timestamp)})`;
 
     return {
       sessionPath: filePath,
