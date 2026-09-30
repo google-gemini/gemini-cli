@@ -193,6 +193,7 @@ export class Session {
       this.handleApprovalModeChanged,
     );
     this.disposeController.abort();
+    void this.context.config?.dispose?.();
   }
 
   async cancelPendingPrompt(): Promise<void> {

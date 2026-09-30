@@ -15,13 +15,18 @@ import {
   type Mocked,
 } from 'vitest';
 import { AcpSessionManager } from './acpSessionManager.js';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import * as os from 'node:os';
 import type * as acp from '@agentclientprotocol/sdk';
 import {
   AuthType,
   type Config,
+  CoreEvent,
+  coreEvents,
   GEMINI_MODEL_ALIAS_AUTO,
   type MessageBus,
-  type Storage,
+  Storage,
 } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../config/settings.js';
 import { loadCliConfig, type CliArgs } from '../config/config.js';
@@ -56,6 +61,7 @@ describe('AcpSessionManager', () => {
     mockConfig = {
       refreshAuth: vi.fn(),
       initialize: vi.fn(),
+      dispose: vi.fn(),
       waitForMcpInit: vi.fn(),
       getFileSystemService: vi.fn(),
       setFileSystemService: vi.fn(),
@@ -64,6 +70,8 @@ describe('AcpSessionManager', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getGeminiClient: vi.fn().mockReturnValue({
         startChat: vi.fn().mockResolvedValue({}),
+        resumeChat: vi.fn().mockResolvedValue(undefined),
+        getChat: vi.fn().mockReturnValue({}),
       }),
       getMessageBus: vi.fn().mockReturnValue({
         publish: vi.fn(),
@@ -378,5 +386,112 @@ describe('AcpSessionManager', () => {
     );
 
     expect(startAutoMemoryIfEnabledMock).toHaveBeenCalledWith(mockConfig);
+  });
+
+  it('should successfully load an ACP session created by newSession without resumable content filters', async () => {
+    const testDir = await fs.mkdtemp(path.join(os.tmpdir(), 'acp-load-test-'));
+    const sessionId = 'test-session-uuid-123';
+    const storage = new Storage(testDir, sessionId);
+    await storage.initialize();
+    const chatsDir = path.join(storage.getProjectTempDir(), 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    // Initial header written by ChatRecordingService on newSession (hasResumableContent is false)
+    const initialRecord = {
+      sessionId,
+      projectHash: 'test-hash',
+      startTime: new Date().toISOString(),
+      lastUpdated: new Date().toISOString(),
+      kind: 'main',
+      messages: [],
+    };
+    await fs.writeFile(
+      path.join(chatsDir, `session-2026-09-30-${sessionId.slice(0, 8)}.jsonl`),
+      JSON.stringify(initialRecord) + '\n',
+    );
+
+    const response = await manager.loadSession(
+      {
+        sessionId,
+        cwd: testDir,
+        mcpServers: [],
+      },
+      {},
+    );
+
+    expect(response).toBeDefined();
+    expect(response.modes).toBeDefined();
+    expect(response.models).toBeDefined();
+    expect(mockConfig.getGeminiClient().resumeChat).toHaveBeenCalledWith(
+      [],
+      expect.objectContaining({
+        conversation: expect.objectContaining({ sessionId }),
+      }),
+    );
+  });
+
+  it('should successfully load an ACP session with conversational content', async () => {
+    const testDir = await fs.mkdtemp(path.join(os.tmpdir(), 'acp-load-chat-'));
+    const sessionId = 'test-session-with-chat';
+    const storage = new Storage(testDir, sessionId);
+    await storage.initialize();
+    const chatsDir = path.join(storage.getProjectTempDir(), 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const sessionRecord = {
+      sessionId,
+      projectHash: 'test-hash',
+      startTime: new Date().toISOString(),
+      lastUpdated: new Date().toISOString(),
+      kind: 'main',
+      messages: [
+        { type: 'user', content: 'hello' },
+        { type: 'gemini', content: 'world' },
+      ],
+    };
+    await fs.writeFile(
+      path.join(chatsDir, `session-2026-09-30-${sessionId.slice(0, 8)}.jsonl`),
+      JSON.stringify(sessionRecord) + '\n',
+    );
+
+    const response = await manager.loadSession(
+      {
+        sessionId,
+        cwd: testDir,
+        mcpServers: [],
+      },
+      {},
+    );
+
+    expect(response).toBeDefined();
+    expect(mockConfig.getGeminiClient().resumeChat).toHaveBeenCalled();
+  });
+
+  it('should reject loading an invalid session identifier without leaking event listeners', async () => {
+    const testDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'acp-load-invalid-'),
+    );
+    const initialListenerCount = coreEvents.listenerCount(
+      CoreEvent.ModelChanged,
+    );
+
+    // Call loadSession with an invalid/non-existent session ID 15 times
+    for (let i = 0; i < 15; i++) {
+      await expect(
+        manager.loadSession(
+          {
+            sessionId: `non-existent-id-${i}`,
+            cwd: testDir,
+            mcpServers: [],
+          },
+          {},
+        ),
+      ).rejects.toThrow('Invalid session identifier');
+    }
+
+    // Verify no listeners were leaked
+    expect(coreEvents.listenerCount(CoreEvent.ModelChanged)).toBe(
+      initialListenerCount,
+    );
   });
 });

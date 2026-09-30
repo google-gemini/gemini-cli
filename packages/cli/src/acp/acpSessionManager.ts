@@ -12,6 +12,7 @@ import {
   startupProfiler,
   convertSessionToClientHistory,
   createPolicyUpdater,
+  Storage,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { randomUUID } from 'node:crypto';
@@ -103,6 +104,7 @@ export class AcpSessionManager {
     }
 
     if (!isAuthenticated) {
+      await config?.dispose?.();
       throw new acp.RequestError(
         -32000,
         authErrorMessage || 'Authentication required.',
@@ -167,71 +169,82 @@ export class AcpSessionManager {
     { sessionId, cwd, mcpServers }: acp.LoadSessionRequest,
     authDetails: AuthDetails,
   ): Promise<acp.LoadSessionResponse> {
-    const config = await this.prepareSessionConfig(
+    const storage = new Storage(cwd, sessionId);
+    await storage.initialize();
+    const sessionSelector = new SessionSelector(storage);
+
+    const { sessionData, sessionPath } = await sessionSelector.resolveSession(
       sessionId,
-      cwd,
-      mcpServers,
-      authDetails,
+      { allowEmpty: true },
     );
 
-    await config.storage?.initialize?.();
-    const sessionSelector = new SessionSelector(config.storage);
+    let config: Config | undefined;
+    try {
+      config = await this.prepareSessionConfig(
+        sessionId,
+        cwd,
+        mcpServers,
+        authDetails,
+      );
 
-    const { sessionData, sessionPath } =
-      await sessionSelector.resolveSession(sessionId);
+      await config.initialize();
+      startupProfiler.flush(config);
+      startAutoMemoryIfEnabled(config);
 
-    await config.initialize();
-    startupProfiler.flush(config);
-    startAutoMemoryIfEnabled(config);
+      const clientHistory = convertSessionToClientHistory(sessionData.messages);
 
-    const clientHistory = convertSessionToClientHistory(sessionData.messages);
+      const geminiClient = config.getGeminiClient();
+      await geminiClient.resumeChat(clientHistory, {
+        conversation: sessionData,
+        filePath: sessionPath,
+      });
 
-    const geminiClient = config.getGeminiClient();
-    await geminiClient.resumeChat(clientHistory, {
-      conversation: sessionData,
-      filePath: sessionPath,
-    });
+      const session = new Session(
+        sessionId,
+        geminiClient.getChat(),
+        config,
+        this.connection,
+        this.settings,
+      );
 
-    const session = new Session(
-      sessionId,
-      geminiClient.getChat(),
-      config,
-      this.connection,
-      this.settings,
-    );
+      const existingSession = this.sessions.get(sessionId);
+      if (existingSession) {
+        existingSession.dispose();
+      }
 
-    const existingSession = this.sessions.get(sessionId);
-    if (existingSession) {
-      existingSession.dispose();
-    }
+      this.sessions.set(sessionId, session);
 
-    this.sessions.set(sessionId, session);
-
-    // Stream history back to client
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    session.streamHistory(sessionData.messages);
-
-    setTimeout(() => {
+      // Stream history back to client
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      session.sendAvailableCommands();
-    }, 0);
+      session.streamHistory(sessionData.messages);
 
-    const { availableModels, currentModelId } = buildAvailableModels(
-      config,
-      this.settings,
-    );
+      setTimeout(() => {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        session.sendAvailableCommands();
+      }, 0);
 
-    const response = {
-      modes: {
-        availableModes: buildAvailableModes(config.isPlanEnabled()),
-        currentModeId: config.getApprovalMode(),
-      },
-      models: {
-        availableModels,
-        currentModelId,
-      },
-    };
-    return response;
+      const { availableModels, currentModelId } = buildAvailableModels(
+        config,
+        this.settings,
+      );
+
+      const response = {
+        modes: {
+          availableModes: buildAvailableModes(config.isPlanEnabled()),
+          currentModeId: config.getApprovalMode(),
+        },
+        models: {
+          availableModels,
+          currentModelId,
+        },
+      };
+      return response;
+    } catch (error) {
+      if (config) {
+        await config.dispose?.();
+      }
+      throw error;
+    }
   }
 
   private async prepareSessionConfig(
@@ -265,6 +278,7 @@ export class AcpSessionManager {
       );
     } catch (e) {
       debugLogger.error(`Authentication failed: ${e}`);
+      await config?.dispose?.();
       throw acp.RequestError.authRequired();
     }
 
