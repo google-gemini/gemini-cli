@@ -249,6 +249,66 @@ describe('Session', () => {
     expect(result).toMatchObject({ stopReason: 'end_turn' });
   });
 
+  it('should include standard ACP token usage in PromptResponse.usage and emit usage_update', async () => {
+    async function* mockStreamWithUsage(): AsyncGenerator<ServerGeminiStreamEvent> {
+      yield {
+        type: GeminiEventType.Content,
+        value: 'Hello',
+      };
+      yield {
+        type: GeminiEventType.Finished,
+        value: {
+          reason: FinishReason.STOP,
+          usageMetadata: {
+            promptTokenCount: 120,
+            candidatesTokenCount: 45,
+            cachedContentTokenCount: 80,
+            thoughtsTokenCount: 15,
+          },
+        },
+      };
+    }
+    mockSendMessageStream.mockReturnValue(mockStreamWithUsage());
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Hi' }],
+    });
+
+    expect(result.usage).toEqual({
+      inputTokens: 120,
+      outputTokens: 45,
+      cachedReadTokens: 80,
+      thoughtTokens: 15,
+      totalTokens: 165,
+    });
+    expect(result._meta).toEqual({
+      quota: {
+        token_count: {
+          input_tokens: 120,
+          output_tokens: 45,
+        },
+        model_usage: [
+          {
+            model: 'gemini-pro',
+            token_count: {
+              input_tokens: 120,
+              output_tokens: 45,
+            },
+          },
+        ],
+      },
+    });
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      update: {
+        sessionUpdate: 'usage_update',
+        used: 165,
+        size: expect.any(Number),
+      },
+    });
+  });
+
   it('should pass current session information directly onto geminiClient.sendMessageStream', async () => {
     const stream = createMockStream([
       {
@@ -368,7 +428,20 @@ describe('Session', () => {
       prompt: [{ type: 'text', text: '/memory view' }],
     });
 
-    expect(result).toMatchObject({ stopReason: 'end_turn' });
+    expect(result).toMatchObject({
+      stopReason: 'end_turn',
+      usage: {
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+      },
+      _meta: {
+        quota: {
+          token_count: { input_tokens: 0, output_tokens: 0 },
+          model_usage: [],
+        },
+      },
+    });
     expect(handleCommandSpy).toHaveBeenCalledWith(
       '/memory view',
       expect.any(Object),
@@ -405,7 +478,22 @@ describe('Session', () => {
     });
 
     expect(mockToolRegistry.getTool).toHaveBeenCalledWith('test_tool');
-    expect(result).toMatchObject({ stopReason: 'end_turn' });
+    expect(result).toMatchObject({
+      stopReason: 'end_turn',
+      usage: {
+        inputTokens: 10,
+        outputTokens: 20,
+        totalTokens: 30,
+      },
+      _meta: {
+        quota: {
+          token_count: {
+            input_tokens: 10,
+            output_tokens: 20,
+          },
+        },
+      },
+    });
   });
 
   it('should handle tool call permission request', async () => {
