@@ -408,6 +408,8 @@ export class ChatRecordingService {
   private queuedThoughts: Array<ThoughtSummary & { timestamp: string }> = [];
   private queuedTokens: TokensSummary | null = null;
   private context: AgentLoopContext;
+  private isResumedSession = false;
+  private initializationPromise: Promise<void> | null = null;
 
   constructor(context: AgentLoopContext) {
     this.context = context;
@@ -415,7 +417,24 @@ export class ChatRecordingService {
     this.projectHash = getProjectHash(context.config.getProjectRoot());
   }
 
+  getIsResumedSession(): boolean {
+    return this.isResumedSession;
+  }
+
+  setIsResumedSession(isResumed: boolean): void {
+    this.isResumedSession = isResumed;
+  }
+
   async initialize(
+    resumedSessionData?: ResumedSessionData,
+    kind?: 'main' | 'subagent',
+  ): Promise<void> {
+    this.isResumedSession = Boolean(resumedSessionData);
+    this.initializationPromise = this.doInitialize(resumedSessionData, kind);
+    return this.initializationPromise;
+  }
+
+  private async doInitialize(
     resumedSessionData?: ResumedSessionData,
     kind?: 'main' | 'subagent',
   ): Promise<void> {
@@ -527,20 +546,40 @@ export class ChatRecordingService {
               ]
             : undefined;
 
-        const initialMetadata = {
-          sessionId: this.sessionId,
-          projectHash: this.projectHash,
-          startTime: new Date().toISOString(),
-          lastUpdated: new Date().toISOString(),
-          kind: this.kind,
-          directories,
-        };
+        let fileAlreadyExisted = false;
+        if (fs.existsSync(this.conversationFile)) {
+          fileAlreadyExisted = true;
+          const loadedRecord = await loadConversationRecord(
+            this.conversationFile,
+          );
+          if (loadedRecord) {
+            this.cachedConversation = loadedRecord;
+            this.projectHash = this.cachedConversation.projectHash;
+            if (
+              loadedRecord.hasResumableContent ||
+              hasResumableConversationContent(loadedRecord.messages)
+            ) {
+              this.isResumedSession = true;
+            }
+          }
+        }
 
-        this.appendRecord(initialMetadata);
-        this.cachedConversation = {
-          ...initialMetadata,
-          messages: [],
-        };
+        if (!fileAlreadyExisted || !this.cachedConversation) {
+          const initialMetadata = {
+            sessionId: this.sessionId,
+            projectHash: this.projectHash,
+            startTime: new Date().toISOString(),
+            lastUpdated: new Date().toISOString(),
+            kind: this.kind,
+            directories,
+          };
+
+          this.appendRecord(initialMetadata);
+          this.cachedConversation = {
+            ...initialMetadata,
+            messages: [],
+          };
+        }
       }
 
       this.queuedThoughts = [];
@@ -913,12 +952,43 @@ export class ChatRecordingService {
    * session with a real user prompt, model response, or tool activity.
    */
   async deleteCurrentSessionIfNotResumableAsync(): Promise<void> {
-    if (!this.conversationFile || !this.cachedConversation) {
+    if (this.initializationPromise) {
+      try {
+        await this.initializationPromise;
+      } catch {
+        // Ignore initialization error during exit cleanup
+      }
+    }
+
+    if (this.isResumedSession) {
       return;
     }
 
-    if (hasResumableConversationContent(this.cachedConversation.messages)) {
+    if (!this.conversationFile) {
       return;
+    }
+
+    if (
+      this.cachedConversation &&
+      hasResumableConversationContent(this.cachedConversation.messages)
+    ) {
+      return;
+    }
+
+    // Check file content on disk in case in-memory cache was uninitialized or incomplete
+    if (fs.existsSync(this.conversationFile)) {
+      try {
+        const fileRecord = await loadConversationRecord(this.conversationFile);
+        if (
+          fileRecord &&
+          (fileRecord.hasResumableContent ||
+            hasResumableConversationContent(fileRecord.messages))
+        ) {
+          return;
+        }
+      } catch {
+        // Ignore read errors and proceed
+      }
     }
 
     await this.deleteCurrentSessionAsync();

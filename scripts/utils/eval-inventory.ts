@@ -47,7 +47,7 @@ export async function collectInventory(
       throw new Error(`evals path exists but is not a directory: ${evalsDir}`);
     }
   } catch (err: unknown) {
-    if (isNodeError(err) && err.code === 'ENOENT') {
+    if (isNodeError(err) && (err.code === 'ENOENT' || err.code === 'EACCES')) {
       throw new Error(
         `evals directory not found under repo root: ${evalsDir}\n` +
           `Make sure --root points to the repository root.`,
