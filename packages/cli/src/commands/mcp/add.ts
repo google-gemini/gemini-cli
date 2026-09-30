@@ -57,7 +57,8 @@ async function addMcpServer(
 
   if (
     settingsScope === SettingScope.Workspace &&
-    (settings.forScope(settingsScope).readOnly || settings.isTrusted === false)
+    ((settings.forScope(settingsScope).readOnly ?? false) ||
+      settings.isTrusted === false)
   ) {
     debugLogger.error(`Error: ${UNTRUSTED_WORKSPACE_SETTINGS_ERROR}`);
     process.exit(1);
