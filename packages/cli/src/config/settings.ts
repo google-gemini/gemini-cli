@@ -466,7 +466,7 @@ export class LoadedSettings {
     const settingsFile = this.forScope(scope);
 
     if (scope === SettingScope.Workspace && !this.isPersistable(settingsFile)) {
-      if (settingsFile.path === '') {
+      if (settingsFile.path === '' || settingsFile.path === this.user.path) {
         throw new Error(
           'Cannot modify workspace settings in the home directory. Please use user scope instead.',
         );
