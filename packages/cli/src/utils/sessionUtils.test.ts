@@ -947,6 +947,44 @@ describe('SessionSelector', () => {
         SessionError,
       );
     });
+
+    it('should continue to resolve via index rather than resolveSessionById when passing numeric index with allowEmpty: true', async () => {
+      const sessionId = randomUUID();
+      const chatsDir = path.join(tmpDir, 'chats');
+      await fs.mkdir(chatsDir, { recursive: true });
+
+      const session = {
+        sessionId,
+        projectHash: 'test-hash',
+        startTime: '2024-01-01T10:00:00.000Z',
+        lastUpdated: '2024-01-01T10:00:00.000Z',
+        messages: [
+          {
+            type: 'user',
+            content: 'test message',
+            id: 'msg1',
+            timestamp: '2024-01-01T10:00:00.000Z',
+          },
+        ],
+      };
+
+      await fs.writeFile(
+        path.join(
+          chatsDir,
+          `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.jsonl`,
+        ),
+        JSON.stringify(session) + '\n',
+      );
+
+      const sessionSelector = new SessionSelector(storage);
+
+      const result = await sessionSelector.resolveSession('1', {
+        allowEmpty: true,
+      });
+
+      expect(result.sessionData.sessionId).toBe(sessionId);
+      expect(result.sessionData.messages[0].content).toBe('test message');
+    });
   });
 });
 

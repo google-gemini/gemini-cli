@@ -18,7 +18,7 @@ import { AcpSessionManager } from './acpSessionManager.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import type * as acp from '@agentclientprotocol/sdk';
+import * as acp from '@agentclientprotocol/sdk';
 import {
   AuthType,
   type Config,
@@ -493,5 +493,51 @@ describe('AcpSessionManager', () => {
     expect(coreEvents.listenerCount(CoreEvent.ModelChanged)).toBe(
       initialListenerCount,
     );
+  });
+
+  it('should reject loading a session identifier containing path traversal without performing file operations', async () => {
+    const testDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'acp-load-traversal-'),
+    );
+
+    await expect(
+      manager.loadSession(
+        {
+          sessionId: '../../evil',
+          cwd: testDir,
+          mcpServers: [],
+        },
+        {},
+      ),
+    ).rejects.toSatisfy((error) => {
+      expect(error).toBeInstanceOf(acp.RequestError);
+      expect((error as acp.RequestError).code).toBe(-32602);
+      expect((error as acp.RequestError).message).toBe(
+        'Invalid session identifier format.',
+      );
+      return true;
+    });
+
+    await expect(
+      manager.loadSession(
+        {
+          sessionId: 'path/with/slash',
+          cwd: testDir,
+          mcpServers: [],
+        },
+        {},
+      ),
+    ).rejects.toThrow('Invalid session identifier format.');
+
+    await expect(
+      manager.loadSession(
+        {
+          sessionId: 'path\\with\\backslash',
+          cwd: testDir,
+          mcpServers: [],
+        },
+        {},
+      ),
+    ).rejects.toThrow('Invalid session identifier format.');
   });
 });

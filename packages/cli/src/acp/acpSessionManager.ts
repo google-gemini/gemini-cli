@@ -169,6 +169,14 @@ export class AcpSessionManager {
     { sessionId, cwd, mcpServers }: acp.LoadSessionRequest,
     authDetails: AuthDetails,
   ): Promise<acp.LoadSessionResponse> {
+    if (
+      sessionId.includes('..') ||
+      sessionId.includes('/') ||
+      sessionId.includes('\\')
+    ) {
+      throw new acp.RequestError(-32602, 'Invalid session identifier format.');
+    }
+
     const storage = new Storage(cwd, sessionId);
     await storage.initialize();
     const sessionSelector = new SessionSelector(storage);
@@ -283,15 +291,20 @@ export class AcpSessionManager {
     }
 
     // 3. Set the ACP FileSystemService (if supported) before config initialization
-    if (this.clientCapabilities?.fs) {
-      const acpFileSystemService = new AcpFileSystemService(
-        this.connection,
-        sessionId,
-        this.clientCapabilities.fs,
-        config.getFileSystemService(),
-        cwd,
-      );
-      config.setFileSystemService(acpFileSystemService);
+    try {
+      if (this.clientCapabilities?.fs) {
+        const acpFileSystemService = new AcpFileSystemService(
+          this.connection,
+          sessionId,
+          this.clientCapabilities.fs,
+          config.getFileSystemService(),
+          cwd,
+        );
+        config.setFileSystemService(acpFileSystemService);
+      }
+    } catch (e) {
+      await config?.dispose?.();
+      throw e;
     }
 
     return config;

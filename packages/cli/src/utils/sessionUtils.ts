@@ -583,7 +583,8 @@ export class SessionSelector {
   ): Promise<SessionSelectionResult> {
     const trimmedResumeArg = resumeArg.trim();
 
-    if (options?.allowEmpty && trimmedResumeArg !== RESUME_LATEST) {
+    const isIndex = /^\d+$/.test(trimmedResumeArg);
+    if (options?.allowEmpty && trimmedResumeArg !== RESUME_LATEST && !isIndex) {
       return this.resolveSessionById(trimmedResumeArg);
     }
 

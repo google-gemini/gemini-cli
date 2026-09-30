@@ -193,7 +193,9 @@ export class Session {
       this.handleApprovalModeChanged,
     );
     this.disposeController.abort();
-    void this.context.config?.dispose?.();
+    void this.context.config?.dispose?.().catch((err) => {
+      debugLogger.error(`Error disposing config: ${err}`);
+    });
   }
 
   async cancelPendingPrompt(): Promise<void> {
