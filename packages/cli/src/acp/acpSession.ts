@@ -39,6 +39,7 @@ import {
   type ToolConfirmationRequest,
   resolveAtCommandPath,
   type ResolvedAtCommandPath,
+  tokenLimit,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import type { Part, FunctionCall } from '@google/genai';
@@ -352,6 +353,11 @@ export class Session {
       if (handled) {
         return {
           stopReason: 'end_turn',
+          usage: {
+            inputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 0,
+          },
           _meta: {
             quota: {
               token_count: { input_tokens: 0, output_tokens: 0 },
@@ -364,7 +370,39 @@ export class Session {
 
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
+    let totalCachedTokens = 0;
+    let totalThoughtTokens = 0;
     const modelUsageMap = new Map<string, { input: number; output: number }>();
+
+    const buildPromptResponse = (
+      stopReason: acp.StopReason,
+    ): acp.PromptResponse => ({
+      stopReason,
+      usage: {
+        inputTokens: totalInputTokens,
+        outputTokens: totalOutputTokens,
+        cachedReadTokens: totalCachedTokens || undefined,
+        thoughtTokens: totalThoughtTokens || undefined,
+        totalTokens: totalInputTokens + totalOutputTokens,
+      },
+      _meta: {
+        quota: {
+          token_count: {
+            input_tokens: totalInputTokens,
+            output_tokens: totalOutputTokens,
+          },
+          model_usage: Array.from(modelUsageMap.entries()).map(
+            ([modelName, counts]) => ({
+              model: modelName,
+              token_count: {
+                input_tokens: counts.input,
+                output_tokens: counts.output,
+              },
+            }),
+          ),
+        },
+      },
+    });
 
     let currentParts: Part[] = parts;
     let turnCount = 0;
@@ -373,26 +411,7 @@ export class Session {
     while (true) {
       turnCount++;
       if (maxTurns >= 0 && turnCount > maxTurns) {
-        return {
-          stopReason: 'max_turn_requests',
-          _meta: {
-            quota: {
-              token_count: {
-                input_tokens: totalInputTokens,
-                output_tokens: totalOutputTokens,
-              },
-              model_usage: Array.from(modelUsageMap.entries()).map(
-                ([modelName, counts]) => ({
-                  model: modelName,
-                  token_count: {
-                    input_tokens: counts.input,
-                    output_tokens: counts.output,
-                  },
-                }),
-              ),
-            },
-          },
-        };
+        return buildPromptResponse('max_turn_requests');
       }
 
       if (pendingSend.signal.aborted) {
@@ -404,6 +423,8 @@ export class Session {
       let turnModelId = this.context.config.getModel();
       let turnInputTokens = 0;
       let turnOutputTokens = 0;
+      let turnCachedTokens = 0;
+      let turnThoughtTokens = 0;
 
       try {
         const responseStream = this.context.geminiClient.sendMessageStream(
@@ -450,6 +471,18 @@ export class Session {
                 turnInputTokens = usage.promptTokenCount ?? turnInputTokens;
                 turnOutputTokens =
                   usage.candidatesTokenCount ?? turnOutputTokens;
+                turnCachedTokens =
+                  usage.cachedContentTokenCount ?? turnCachedTokens;
+                turnThoughtTokens =
+                  usage.thoughtsTokenCount ?? turnThoughtTokens;
+
+                await this.sendUpdate({
+                  sessionUpdate: 'usage_update',
+                  used: turnInputTokens + turnOutputTokens,
+                  size: tokenLimit(
+                    turnModelId || this.context.config.getModel(),
+                  ),
+                });
               }
               break;
             }
@@ -522,26 +555,7 @@ export class Session {
         ) {
           // The stream ended with an empty response or malformed tool call.
           // Treat this as a graceful end to the model's turn rather than a crash.
-          return {
-            stopReason: 'end_turn',
-            _meta: {
-              quota: {
-                token_count: {
-                  input_tokens: totalInputTokens,
-                  output_tokens: totalOutputTokens,
-                },
-                model_usage: Array.from(modelUsageMap.entries()).map(
-                  ([modelName, counts]) => ({
-                    model: modelName,
-                    token_count: {
-                      input_tokens: counts.input,
-                      output_tokens: counts.output,
-                    },
-                  }),
-                ),
-              },
-            },
-          };
+          return buildPromptResponse('end_turn');
         }
 
         throw new acp.RequestError(
@@ -552,6 +566,8 @@ export class Session {
 
       totalInputTokens += turnInputTokens;
       totalOutputTokens += turnOutputTokens;
+      totalCachedTokens += turnCachedTokens;
+      totalThoughtTokens += turnThoughtTokens;
 
       if (turnInputTokens > 0 || turnOutputTokens > 0) {
         const existing = modelUsageMap.get(turnModelId) ?? {
@@ -564,26 +580,7 @@ export class Session {
       }
 
       if (stopReason !== 'end_turn') {
-        return {
-          stopReason,
-          _meta: {
-            quota: {
-              token_count: {
-                input_tokens: totalInputTokens,
-                output_tokens: totalOutputTokens,
-              },
-              model_usage: Array.from(modelUsageMap.entries()).map(
-                ([modelName, counts]) => ({
-                  model: modelName,
-                  token_count: {
-                    input_tokens: counts.input,
-                    output_tokens: counts.output,
-                  },
-                }),
-              ),
-            },
-          },
-        };
+        return buildPromptResponse(stopReason);
       }
 
       if (toolCallRequests.length === 0) {
@@ -605,28 +602,7 @@ export class Session {
       currentParts = toolResponseParts;
     }
 
-    const modelUsageArray = Array.from(modelUsageMap.entries()).map(
-      ([modelName, counts]) => ({
-        model: modelName,
-        token_count: {
-          input_tokens: counts.input,
-          output_tokens: counts.output,
-        },
-      }),
-    );
-
-    return {
-      stopReason: 'end_turn',
-      _meta: {
-        quota: {
-          token_count: {
-            input_tokens: totalInputTokens,
-            output_tokens: totalOutputTokens,
-          },
-          model_usage: modelUsageArray,
-        },
-      },
-    };
+    return buildPromptResponse('end_turn');
   }
 
   private async handleCommand(

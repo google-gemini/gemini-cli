@@ -1590,6 +1590,188 @@ describe('handleAtCommand', () => {
       ),
     );
   });
+
+  // Regression tests for #29434: code with @ inside quotes should not trigger runaway glob searches or hangs
+  it('does not greedily consume code across quotes when @ is inside quotes (#29434)', async () => {
+    const query =
+      'import { x } from "@scope/pkg";\nconst a = "foo";\nconsole.log("hello");';
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 704,
+      signal: abortController.signal,
+    });
+
+    // The query should be processed without hanging or throwing
+    expect(result.processedQuery).not.toBeNull();
+    expect(result.error).toBeUndefined();
+  });
+
+  it('does not hang when input contains @scope/pkg followed by many imports (#29434)', async () => {
+    let query = 'import { useThing } from "@scope/pkg";\n';
+    for (let i = 1; i <= 60; i++) {
+      query += `import { alpha${i}, beta${i}, gamma${i} } from "~/modules/feature${i}/index";\n`;
+    }
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 705,
+      signal: abortController.signal,
+    });
+
+    expect(result.processedQuery).not.toBeNull();
+    expect(result.error).toBeUndefined();
+  });
+
+  it('does not invoke recursive glob search on paths exceeding MAX_GLOB_SEARCH_PATH_LENGTH (#29434)', async () => {
+    const globSpy = vi.fn();
+    const mockGlobTool = {
+      buildAndExecute: globSpy,
+    };
+    vi.spyOn(mockConfig.getToolRegistry(), 'getTool').mockReturnValue(
+      mockGlobTool as never,
+    );
+
+    // Path with individual components < 255 but total length > 255
+    const excessivelyLongNonexistent = 'sub/'.repeat(65) + 'file.ts';
+    const query = `@${excessivelyLongNonexistent}`;
+
+    await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 706,
+      signal: abortController.signal,
+    });
+
+    // Glob search should be skipped for excessively long path names
+    expect(globSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not invoke recursive glob search on paths containing newlines (#29434)', async () => {
+    const globSpy = vi.fn();
+    const mockGlobTool = {
+      buildAndExecute: globSpy,
+    };
+    vi.spyOn(mockConfig.getToolRegistry(), 'getTool').mockReturnValue(
+      mockGlobTool as never,
+    );
+
+    // Path containing newline characters should never trigger glob fallback
+    const query = '@"invalid\npath"';
+
+    await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 707,
+      signal: abortController.signal,
+    });
+
+    expect(globSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not invoke recursive glob search on paths containing curly braces (#29434)', async () => {
+    const globSpy = vi.fn();
+    const mockGlobTool = {
+      buildAndExecute: globSpy,
+    };
+    vi.spyOn(mockConfig.getToolRegistry(), 'getTool').mockReturnValue(
+      mockGlobTool as never,
+    );
+
+    // Paths containing curly braces can cause catastrophic brace expansion in minimatch
+    const query = '@"foo{a,b}{c,d}"';
+
+    await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 708,
+      signal: abortController.signal,
+    });
+
+    expect(globSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not invoke recursive glob search on paths containing directory traversal sequences (#29434)', async () => {
+    const globSpy = vi.fn();
+    const mockGlobTool = {
+      buildAndExecute: globSpy,
+    };
+    vi.spyOn(mockConfig.getToolRegistry(), 'getTool').mockReturnValue(
+      mockGlobTool as never,
+    );
+
+    // Paths containing directory traversal sequences should never trigger glob fallback
+    const query = '@../sibling/nonexistent.txt';
+
+    await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 709,
+      signal: abortController.signal,
+    });
+
+    expect(globSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not invoke recursive glob search on absolute paths that do not exist (#29434)', async () => {
+    const globSpy = vi.fn();
+    const mockGlobTool = {
+      buildAndExecute: globSpy,
+    };
+    vi.spyOn(mockConfig.getToolRegistry(), 'getTool').mockReturnValue(
+      mockGlobTool as never,
+    );
+
+    const query = '@/usr/bin/nonexistent-binary-path-xyz';
+
+    await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 710,
+      signal: abortController.signal,
+    });
+
+    expect(globSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not invoke recursive glob search on paths containing glob wildcards (#29434)', async () => {
+    const globSpy = vi.fn();
+    const mockGlobTool = {
+      buildAndExecute: globSpy,
+    };
+    vi.spyOn(mockConfig.getToolRegistry(), 'getTool').mockReturnValue(
+      mockGlobTool as never,
+    );
+
+    const query = '@"test*wildcard?.txt"';
+
+    await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 711,
+      signal: abortController.signal,
+    });
+
+    expect(globSpy).not.toHaveBeenCalled();
+  });
 });
 
 describe('escapeAtSymbols', () => {

@@ -266,12 +266,12 @@ export async function loadConfig(
   const getEnvLocal = (key: string) => envVars[key];
 
   const folderTrust =
-    settings.folderTrust === true ||
+    settings.security?.folderTrust?.enabled === true ||
     getEnvLocal('GEMINI_FOLDER_TRUST') === 'true';
 
   let checkpointing = getEnvLocal('CHECKPOINTING')
     ? getEnvLocal('CHECKPOINTING') === 'true'
-    : settings.checkpointing?.enabled;
+    : settings.general?.checkpointing?.enabled;
 
   if (checkpointing) {
     if (!(await GitService.verifyGitAvailability())) {
@@ -322,6 +322,10 @@ export async function loadConfig(
       telemetry: undefined,
     };
   }
+
+  if (settings.logging?.level) {
+    logger.level = settings.logging.level;
+  }
   const safeMcpServers = settings.mcpServers;
 
   const policySettings: PolicySettings = {
@@ -342,6 +346,8 @@ export async function loadConfig(
     true,
   );
 
+  const resolvedFileFiltering = settings.context?.fileFiltering;
+
   const configParams: ConfigParameters = {
     sessionId: taskId,
     clientName: 'a2a-server',
@@ -356,7 +362,7 @@ export async function loadConfig(
     coreTools: settings.tools?.core || undefined,
     excludeTools: settings.tools?.exclude || undefined,
     allowedTools: settings.tools?.allowed || undefined,
-    showMemoryUsage: settings.showMemoryUsage || false,
+    showMemoryUsage: settings.ui?.showMemoryUsage || false,
     approvalMode,
     policyEngineConfig,
     mcpServers: safeMcpServers,
@@ -372,12 +378,12 @@ export async function loadConfig(
     },
     // Git-aware file filtering settings
     fileFiltering: {
-      respectGitIgnore: settings.fileFiltering?.respectGitIgnore,
-      respectGeminiIgnore: settings.fileFiltering?.respectGeminiIgnore,
+      respectGitIgnore: resolvedFileFiltering?.respectGitIgnore,
+      respectGeminiIgnore: resolvedFileFiltering?.respectGeminiIgnore,
       enableRecursiveFileSearch:
-        settings.fileFiltering?.enableRecursiveFileSearch,
+        resolvedFileFiltering?.enableRecursiveFileSearch,
       customIgnoreFilePaths: [
-        ...(settings.fileFiltering?.customIgnoreFilePaths || []),
+        ...(resolvedFileFiltering?.customIgnoreFilePaths || []),
         ...(getEnvLocal('CUSTOM_IGNORE_FILE_PATHS')
           ? getEnvLocal('CUSTOM_IGNORE_FILE_PATHS').split(path.delimiter)
           : []),
@@ -451,14 +457,15 @@ export function setIsTrusted(
     return agentSettings.isTrusted;
   }
   const cliTrustEnv = getEnv('GEMINI_CLI_TRUST_WORKSPACE');
-  if (cliTrustEnv !== undefined) {
+  if (cliTrustEnv !== undefined && cliTrustEnv !== '') {
     return cliTrustEnv === 'true';
   }
   if (workspaceRoot) {
     const initialSettings = loadSettings(workspaceRoot, false);
     const { isTrusted } = checkPathTrust({
       path: workspaceRoot,
-      isFolderTrustEnabled: initialSettings.folderTrust ?? true,
+      isFolderTrustEnabled:
+        initialSettings.security?.folderTrust?.enabled ?? true,
       isHeadless: isHeadlessMode(),
     });
     return isTrusted ?? false;
