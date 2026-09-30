@@ -45,6 +45,19 @@ export class FileDiscoveryService {
   };
   private projectRoot: string;
   private _realProjectRoot?: string;
+  private symlinkCache: Map<string, boolean> = new Map();
+  private realPathCache: Map<string, string> = new Map();
+
+  clearCache(): void {
+    this.symlinkCache.clear();
+    this.realPathCache.clear();
+    if (this.gitIgnoreFilter instanceof GitIgnoreParser) {
+      this.gitIgnoreFilter.clearCache();
+    }
+    if (this.combinedIgnoreFilter instanceof GitIgnoreParser) {
+      this.combinedIgnoreFilter.clearCache();
+    }
+  }
 
   private get realProjectRoot(): string {
     if (!this._realProjectRoot) {
@@ -279,15 +292,28 @@ export class FileDiscoveryService {
         ? filePath
         : path.resolve(this.projectRoot, filePath);
 
-      const isSymlink =
-        options.isSymbolicLink ??
-        fs
-          .lstatSync(absolutePath, { throwIfNoEntry: false })
-          ?.isSymbolicLink() ??
-        false;
+      let isSymlink: boolean;
+      if (options.isSymbolicLink !== undefined) {
+        isSymlink = options.isSymbolicLink;
+      } else {
+        const cached = this.symlinkCache.get(absolutePath);
+        if (cached !== undefined) {
+          isSymlink = cached;
+        } else {
+          isSymlink =
+            fs
+              .lstatSync(absolutePath, { throwIfNoEntry: false })
+              ?.isSymbolicLink() ?? false;
+          this.symlinkCache.set(absolutePath, isSymlink);
+        }
+      }
 
       if (isSymlink) {
-        const realPath = resolveToRealPath(absolutePath);
+        let realPath = this.realPathCache.get(absolutePath);
+        if (!realPath) {
+          realPath = resolveToRealPath(absolutePath);
+          this.realPathCache.set(absolutePath, realPath);
+        }
         if (!isSubpath(this.realProjectRoot, realPath)) {
           return true;
         }

@@ -10,23 +10,37 @@ import ignorePkg, { type Ignore } from 'ignore';
 // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
 const ignore = ((ignorePkg as unknown as { default?: () => Ignore }).default ??
   ignorePkg) as () => Ignore;
-import { getNormalizedRelativePath } from './ignorePathUtils.js';
+import {
+  getNormalizedRelativePath,
+  expandWildcardDirectoryPatterns,
+} from './ignorePathUtils.js';
 
 export interface GitIgnoreFilter {
   isIgnored(filePath: string, isDirectory: boolean): boolean;
 }
 
+interface DirIgnoreState {
+  isIgnored: boolean;
+  ig: Ignore;
+  combinedIg: Ignore;
+}
+
 export class GitIgnoreParser implements GitIgnoreFilter {
   private projectRoot: string;
-  private cache: Map<string, Ignore> = new Map();
-  private globalPatterns: Ignore | undefined;
+  private dirStateCache: Map<string, DirIgnoreState> = new Map();
+  private gitignoreFileCache: Map<string, string[]> = new Map();
+  private globalPatterns: string[] | undefined;
   private processedExtraPatterns: Ignore;
+  private hasExtraPatterns: boolean;
 
   constructor(
     projectRoot: string,
     private readonly extraPatterns?: string[],
   ) {
     this.projectRoot = path.resolve(projectRoot);
+    this.hasExtraPatterns = Boolean(
+      this.extraPatterns && this.extraPatterns.length > 0,
+    );
     this.processedExtraPatterns = ignore();
     if (this.extraPatterns) {
       // extraPatterns are assumed to be from project root (like .geminiignore)
@@ -36,12 +50,18 @@ export class GitIgnoreParser implements GitIgnoreFilter {
     }
   }
 
-  private loadPatternsForFile(patternsFilePath: string): Ignore {
+  clearCache(): void {
+    this.dirStateCache.clear();
+    this.gitignoreFileCache.clear();
+    this.globalPatterns = undefined;
+  }
+
+  private loadPatternsForFile(patternsFilePath: string): string[] {
     let content: string;
     try {
       content = fs.readFileSync(patternsFilePath, 'utf-8');
     } catch {
-      return ignore();
+      return [];
     }
 
     const isExcludeFile = patternsFilePath.endsWith(
@@ -56,14 +76,15 @@ export class GitIgnoreParser implements GitIgnoreFilter {
           .join(path.posix.sep);
 
     const rawPatterns = content.split(/\r\n|\n|\r/);
-    return ignore().add(this.processPatterns(rawPatterns, relativeBaseDir));
+    return this.processPatterns(rawPatterns, relativeBaseDir);
   }
 
   private processPatterns(
     rawPatterns: string[],
     relativeBaseDir: string,
   ): string[] {
-    return rawPatterns
+    const expandedPatterns = expandWildcardDirectoryPatterns(rawPatterns);
+    return expandedPatterns
       .map((p) => p.trimStart())
       .filter((p) => p !== '' && !p.startsWith('#'))
       .map((p) => {
@@ -119,6 +140,104 @@ export class GitIgnoreParser implements GitIgnoreFilter {
       .filter((p) => p !== '');
   }
 
+  private getPatternsForDir(dir: string): string[] {
+    let patterns = this.gitignoreFileCache.get(dir);
+    if (patterns === undefined) {
+      const gitignorePath = path.join(dir, '.gitignore');
+      patterns = fs.existsSync(gitignorePath)
+        ? this.loadPatternsForFile(gitignorePath)
+        : [];
+      this.gitignoreFileCache.set(dir, patterns);
+    }
+    return patterns;
+  }
+
+  private getGlobalPatterns(): string[] {
+    if (this.globalPatterns === undefined) {
+      const excludeFile = path.join(
+        this.projectRoot,
+        '.git',
+        'info',
+        'exclude',
+      );
+      this.globalPatterns = fs.existsSync(excludeFile)
+        ? this.loadPatternsForFile(excludeFile)
+        : [];
+    }
+    return this.globalPatterns;
+  }
+
+  private getRelDirState(relDir: string): DirIgnoreState {
+    let state = this.dirStateCache.get(relDir);
+    if (state !== undefined) {
+      return state;
+    }
+
+    if (relDir === '') {
+      const ig = ignore().add('.git'); // Always ignore .git
+      const globals = this.getGlobalPatterns();
+      if (globals.length > 0) {
+        ig.add(globals);
+      }
+      const rootPatterns = this.getPatternsForDir(this.projectRoot);
+      if (rootPatterns.length > 0) {
+        ig.add(rootPatterns);
+      }
+      const combinedIg = this.hasExtraPatterns
+        ? ignore().add(ig).add(this.processedExtraPatterns)
+        : ig;
+      state = { isIgnored: false, ig, combinedIg };
+      this.dirStateCache.set('', state);
+      return state;
+    }
+
+    const lastSlash = relDir.lastIndexOf('/');
+    const parentRelDir = lastSlash === -1 ? '' : relDir.slice(0, lastSlash);
+    const parentState = this.getRelDirState(parentRelDir);
+    if (parentState.isIgnored) {
+      // Optimization: If a parent directory is ignored, its descendants are ignored automatically
+      state = {
+        isIgnored: true,
+        ig: parentState.ig,
+        combinedIg: parentState.combinedIg,
+      };
+      this.dirStateCache.set(relDir, state);
+      return state;
+    }
+
+    const dirWithSlash = relDir + '/';
+    if (parentState.combinedIg.ignores(dirWithSlash)) {
+      state = {
+        isIgnored: true,
+        ig: parentState.ig,
+        combinedIg: parentState.combinedIg,
+      };
+      this.dirStateCache.set(relDir, state);
+      return state;
+    }
+
+    const absDir = path.join(this.projectRoot, relDir);
+    const dirPatterns = this.getPatternsForDir(absDir);
+    if (dirPatterns.length === 0) {
+      // Re-use parent's Ignore instance directly to avoid unnecessary allocations
+      state = {
+        isIgnored: false,
+        ig: parentState.ig,
+        combinedIg: parentState.combinedIg,
+      };
+      this.dirStateCache.set(relDir, state);
+      return state;
+    }
+
+    const ig = ignore().add(parentState.ig).add(dirPatterns);
+    const combinedIg = this.hasExtraPatterns
+      ? ignore().add(ig).add(this.processedExtraPatterns)
+      : ig;
+    state = { isIgnored: false, ig, combinedIg };
+    this.dirStateCache.set(relDir, state);
+    return state;
+  }
+
   isIgnored(filePath: string, isDirectory: boolean): boolean {
     const normalizedPath = getNormalizedRelativePath(
       this.projectRoot,
@@ -135,63 +254,26 @@ export class GitIgnoreParser implements GitIgnoreFilter {
     }
 
     try {
-      const ig = ignore().add('.git'); // Always ignore .git
-
-      // Load global patterns from .git/info/exclude
-      if (this.globalPatterns === undefined) {
-        const excludeFile = path.join(
-          this.projectRoot,
-          '.git',
-          'info',
-          'exclude',
-        );
-        this.globalPatterns = fs.existsSync(excludeFile)
-          ? this.loadPatternsForFile(excludeFile)
-          : ignore();
-      }
-      ig.add(this.globalPatterns);
-
-      // Git checks directories hierarchically. If a parent directory is ignored,
-      // its children are ignored automatically, and we can stop processing.
-      const pathParts = normalizedPath.split('/');
-      let currentAbsDir = this.projectRoot;
-      const dirsToVisit = [this.projectRoot];
-
-      for (let i = 0; i < pathParts.length - 1; i++) {
-        currentAbsDir = path.join(currentAbsDir, pathParts[i]);
-        dirsToVisit.push(currentAbsDir);
+      let relDir: string;
+      if (isDirectory) {
+        relDir = normalizedPath.endsWith('/')
+          ? normalizedPath.slice(0, -1)
+          : normalizedPath;
+      } else {
+        const lastSlash = normalizedPath.lastIndexOf('/');
+        relDir = lastSlash === -1 ? '' : normalizedPath.slice(0, lastSlash);
       }
 
-      for (const dir of dirsToVisit) {
-        const relativeDir = path.relative(this.projectRoot, dir);
-        if (relativeDir) {
-          // Check if this parent directory is already ignored by patterns found so far
-          const parentDirRelative = getNormalizedRelativePath(
-            this.projectRoot,
-            dir,
-            true,
-          );
-          const currentIg = ignore().add(ig).add(this.processedExtraPatterns);
-          if (parentDirRelative && currentIg.ignores(parentDirRelative)) {
-            // Optimization: Stop once an ancestor is ignored
-            break;
-          }
-        }
-
-        // Load and add patterns from .gitignore in the current directory
-        let patterns = this.cache.get(dir);
-        if (patterns === undefined) {
-          const gitignorePath = path.join(dir, '.gitignore');
-          patterns = fs.existsSync(gitignorePath)
-            ? this.loadPatternsForFile(gitignorePath)
-            : ignore();
-          this.cache.set(dir, patterns);
-        }
-        ig.add(patterns);
+      const dirState = this.getRelDirState(relDir);
+      if (dirState.isIgnored) {
+        return true;
       }
 
-      // Extra patterns (like .geminiignore) have final precedence
-      return ig.add(this.processedExtraPatterns).ignores(normalizedPath);
+      if (isDirectory) {
+        return false;
+      }
+
+      return dirState.combinedIg.ignores(normalizedPath);
     } catch {
       return false;
     }
