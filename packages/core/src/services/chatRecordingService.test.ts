@@ -2134,13 +2134,25 @@ describe('ChatRecordingService', () => {
       ]);
 
       // Modify parts[1] (index >= 1) in place while keeping array and parts[0] unchanged
-      parts[1] = { text: 'Updated second part at index 1' };
+      const longPrefix = 'A'.repeat(500);
+      const longSuffix = 'Z'.repeat(500);
+      parts[1] = { text: `${longPrefix}0${longSuffix}` };
       chatRecordingService.updateMessagesFromHistory(history);
 
       const afterSecondMutation = await loadConversationRecord(sessionFile);
       expect(afterSecondMutation!.messages[0].content).toEqual([
         { text: 'Mutated first part in place' },
-        { text: 'Updated second part at index 1' },
+        { text: `${longPrefix}0${longSuffix}` },
+      ]);
+
+      // Modify a single character in the middle of the >1000-char string (same length, prefix, and suffix)
+      parts[1].text = `${longPrefix}1${longSuffix}`;
+      chatRecordingService.updateMessagesFromHistory(history);
+
+      const afterMiddleCharMutation = await loadConversationRecord(sessionFile);
+      expect(afterMiddleCharMutation!.messages[0].content).toEqual([
+        { text: 'Mutated first part in place' },
+        { text: `${longPrefix}1${longSuffix}` },
       ]);
     });
   });

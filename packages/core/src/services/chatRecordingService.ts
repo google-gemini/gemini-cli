@@ -143,29 +143,10 @@ function computeContentDigest(value: PartListUnion | null | undefined): string {
     const len = str.length;
     mix(len);
     totalLen += len;
-    if (len <= 256) {
-      for (let i = 0; i < len; i++) {
-        const ch = str.charCodeAt(i);
-        h1 = Math.imul(h1 ^ ch, 2654435761);
-        h2 = Math.imul(h2 ^ ch, 1597334677);
-      }
-    } else {
-      for (let i = 0; i < 64; i++) {
-        const ch = str.charCodeAt(i);
-        h1 = Math.imul(h1 ^ ch, 2654435761);
-        h2 = Math.imul(h2 ^ ch, 1597334677);
-      }
-      const step = Math.max(1, Math.floor((len - 128) / 128));
-      for (let i = 64; i < len - 64; i += step) {
-        const ch = str.charCodeAt(i);
-        h1 = Math.imul(h1 ^ ch, 2654435761);
-        h2 = Math.imul(h2 ^ ch, 1597334677);
-      }
-      for (let i = len - 64; i < len; i++) {
-        const ch = str.charCodeAt(i);
-        h1 = Math.imul(h1 ^ ch, 2654435761);
-        h2 = Math.imul(h2 ^ ch, 1597334677);
-      }
+    for (let i = 0; i < len; i++) {
+      const ch = str.charCodeAt(i);
+      h1 = Math.imul(h1 ^ ch, 2654435761);
+      h2 = Math.imul(h2 ^ ch, 1597334677);
     }
   };
 
