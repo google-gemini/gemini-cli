@@ -2229,6 +2229,30 @@ describe('Settings Loading and Merging', () => {
       }).toThrow(/Cannot modify settings in an untrusted workspace/);
       expect(updateSettingsFilePreservingFormat).not.toHaveBeenCalled();
     });
+
+    it('should throw a home directory error when setValue is called on workspace scope in the home directory', () => {
+      const isWorkspaceHomeDirSpy = vi
+        .spyOn(Storage.prototype, 'isWorkspaceHomeDir')
+        .mockReturnValue(true);
+
+      try {
+        const settings = loadSettings(path.resolve('/mock/home/user'));
+
+        expect(settings.workspace.path).toBe('');
+        expect(settings.workspace.readOnly).toBe(true);
+
+        expect(() => {
+          settings.setValue(SettingScope.Workspace, 'mcpServers', {
+            newsrv: { command: 'echo' },
+          });
+        }).toThrow(
+          'Cannot modify workspace settings in the home directory. Please use user scope instead.',
+        );
+        expect(updateSettingsFilePreservingFormat).not.toHaveBeenCalled();
+      } finally {
+        isWorkspaceHomeDirSpy.mockRestore();
+      }
+    });
   });
 
   describe('loadEnvironment', () => {

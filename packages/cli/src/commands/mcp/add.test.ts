@@ -317,6 +317,31 @@ describe('mcp add command', () => {
         );
         expect(debugLoggerErrorSpy).not.toHaveBeenCalled();
       });
+
+      it('should show home directory error when workspace.path is empty string and readOnly is true', async () => {
+        mockedLoadSettings.mockReturnValue({
+          forScope: () => ({ settings: {}, readOnly: true }),
+          setValue: mockSetValue,
+          workspace: { path: '', readOnly: true },
+          user: { path: '/home/user/.gemini/settings.json', readOnly: false },
+        });
+
+        const mockProcessExit = vi
+          .spyOn(process, 'exit')
+          .mockImplementation((() => {
+            throw new Error('process.exit called');
+          }) as (code?: number | string | null) => never);
+
+        await expect(
+          parser.parseAsync(`add ${serverName} ${command}`),
+        ).rejects.toThrow('process.exit called');
+
+        expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
+          'Error: Please use --scope user to edit settings in the home directory.',
+        );
+        expect(mockProcessExit).toHaveBeenCalledWith(1);
+        expect(mockSetValue).not.toHaveBeenCalled();
+      });
     });
 
     describe('when in a subdirectory of home (not a project)', () => {

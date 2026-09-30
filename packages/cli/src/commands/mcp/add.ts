@@ -43,25 +43,27 @@ async function addMcpServer(
   } = options;
 
   const settings = loadSettings(process.cwd());
-  const inHome = settings.workspace.path === settings.user.path;
-
-  if (scope === 'project' && inHome) {
-    debugLogger.error(
-      'Error: Please use --scope user to edit settings in the home directory.',
-    );
-    process.exit(1);
-  }
 
   const settingsScope =
     scope === 'user' ? SettingScope.User : SettingScope.Workspace;
 
-  if (
-    settingsScope === SettingScope.Workspace &&
-    ((settings.forScope(settingsScope).readOnly ?? false) ||
-      settings.isTrusted === false)
-  ) {
-    debugLogger.error(`Error: ${UNTRUSTED_WORKSPACE_SETTINGS_ERROR}`);
-    process.exit(1);
+  if (settingsScope === SettingScope.Workspace) {
+    const inHome =
+      settings.workspace.path === '' ||
+      settings.workspace.path === settings.user.path;
+    if (inHome) {
+      debugLogger.error(
+        'Error: Please use --scope user to edit settings in the home directory.',
+      );
+      process.exit(1);
+    }
+    if (
+      (settings.forScope(settingsScope).readOnly ?? false) ||
+      settings.isTrusted === false
+    ) {
+      debugLogger.error(`Error: ${UNTRUSTED_WORKSPACE_SETTINGS_ERROR}`);
+      process.exit(1);
+    }
   }
 
   let newServer: Partial<MCPServerConfig> = {};
