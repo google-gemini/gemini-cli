@@ -593,4 +593,23 @@ describe('AcpSessionManager', () => {
     expect(secondSession).toBeDefined();
     expect(secondSession).not.toBe(firstSession);
   });
+
+  it('should dispose config when newSession initialization fails', async () => {
+    mockConfig.getContentGeneratorConfig = vi.fn().mockReturnValue({
+      apiKey: 'test-key',
+    });
+    mockConfig.initialize = vi.fn().mockRejectedValue(new Error('Init failed'));
+
+    await expect(
+      manager.newSession(
+        {
+          cwd: '/tmp',
+          mcpServers: [],
+        },
+        {},
+      ),
+    ).rejects.toThrow('Init failed');
+
+    expect(mockConfig.dispose).toHaveBeenCalled();
+  });
 });

@@ -188,15 +188,19 @@ export class Session {
     }
   };
 
-  dispose(): void {
+  async dispose(): Promise<void> {
     coreEvents.off(
       CoreEvent.ApprovalModeChanged,
       this.handleApprovalModeChanged,
     );
     this.disposeController.abort();
-    void this.context.config?.dispose?.()?.catch((err) => {
-      debugLogger.error(`Error disposing config: ${err}`);
-    });
+    if (this.context.config?.dispose) {
+      try {
+        await this.context.config.dispose();
+      } catch (err) {
+        debugLogger.error(`Error disposing config: ${err}`);
+      }
+    }
   }
 
   async cancelPendingPrompt(): Promise<void> {

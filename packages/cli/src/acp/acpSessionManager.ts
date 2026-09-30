@@ -51,7 +51,7 @@ export class AcpSessionManager {
 
   dispose(): void {
     for (const session of this.sessions.values()) {
-      session.dispose();
+      void session.dispose();
     }
     this.sessions.clear();
   }
@@ -115,58 +115,71 @@ export class AcpSessionManager {
       );
     }
 
-    if (this.clientCapabilities?.fs) {
-      const acpFileSystemService = new AcpFileSystemService(
-        this.connection,
+    try {
+      if (this.clientCapabilities?.fs) {
+        const acpFileSystemService = new AcpFileSystemService(
+          this.connection,
+          sessionId,
+          this.clientCapabilities.fs,
+          config.getFileSystemService(),
+          cwd,
+        );
+        config.setFileSystemService(acpFileSystemService);
+      }
+
+      await config.initialize();
+      startupProfiler.flush(config);
+      startAutoMemoryIfEnabled(config);
+
+      const geminiClient = config.getGeminiClient();
+
+      const chat = geminiClient.isInitialized?.()
+        ? geminiClient.getChat()
+        : await geminiClient.startChat();
+
+      const session = new Session(
         sessionId,
-        this.clientCapabilities.fs,
-        config.getFileSystemService(),
-        cwd,
+        chat,
+        config,
+        this.connection,
+        this.settings,
       );
-      config.setFileSystemService(acpFileSystemService);
+      this.sessions.set(sessionId, session);
+
+      setTimeout(() => {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        session.sendAvailableCommands();
+      }, 0);
+
+      const { availableModels, currentModelId } = buildAvailableModels(
+        config,
+        loadedSettings,
+      );
+
+      const response = {
+        sessionId,
+        modes: {
+          availableModes: buildAvailableModes(config.isPlanEnabled()),
+          currentModeId: config.getApprovalMode(),
+        },
+        models: {
+          availableModels,
+          currentModelId,
+        },
+      };
+      return response;
+    } catch (error) {
+      if (config) {
+        try {
+          await config.dispose?.();
+        } catch (disposeError) {
+          debugLogger.error(
+            `Error disposing config in newSession: ${disposeError}`,
+          );
+        }
+      }
+      throw error;
     }
-
-    await config.initialize();
-    startupProfiler.flush(config);
-    startAutoMemoryIfEnabled(config);
-
-    const geminiClient = config.getGeminiClient();
-
-    const chat = geminiClient.isInitialized?.()
-      ? geminiClient.getChat()
-      : await geminiClient.startChat();
-
-    const session = new Session(
-      sessionId,
-      chat,
-      config,
-      this.connection,
-      this.settings,
-    );
-    this.sessions.set(sessionId, session);
-
-    setTimeout(() => {
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      session.sendAvailableCommands();
-    }, 0);
-
-    const { availableModels, currentModelId } = buildAvailableModels(
-      config,
-      loadedSettings,
-    );
-
-    const response = {
-      sessionId,
-      modes: {
-        availableModes: buildAvailableModes(config.isPlanEnabled()),
-        currentModeId: config.getApprovalMode(),
-      },
-      models: {
-        availableModels,
-        currentModelId,
-      },
-    };
-    return response;
   }
 
   async loadSession(
@@ -192,7 +205,7 @@ export class AcpSessionManager {
 
     const existingSession = this.sessions.get(sessionId);
     if (existingSession) {
-      existingSession.dispose();
+      await existingSession.dispose();
       this.sessions.delete(sessionId);
     }
 
