@@ -177,7 +177,7 @@ export class AcpSessionManager {
       throw new acp.RequestError(-32602, 'Invalid session identifier format.');
     }
 
-    const storage = new Storage(cwd, sessionId);
+    const storage = new Storage(cwd);
     await storage.initialize();
     const sessionSelector = new SessionSelector(storage);
 

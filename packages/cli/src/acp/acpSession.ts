@@ -194,7 +194,7 @@ export class Session {
       this.handleApprovalModeChanged,
     );
     this.disposeController.abort();
-    void this.context.config?.dispose?.().catch((err) => {
+    void this.context.config?.dispose?.()?.catch((err) => {
       debugLogger.error(`Error disposing config: ${err}`);
     });
   }
