@@ -540,4 +540,57 @@ describe('AcpSessionManager', () => {
       ),
     ).rejects.toThrow('Invalid session identifier format.');
   });
+
+  it('should dispose an existing session before initializing new config when reloading a session', async () => {
+    const testDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'acp-reload-test-'),
+    );
+    const sessionId = 'test-session-reload-123';
+    const storage = new Storage(testDir, sessionId);
+    await storage.initialize();
+    const chatsDir = path.join(storage.getProjectTempDir(), 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const sessionRecord = {
+      sessionId,
+      projectHash: 'test-hash',
+      startTime: new Date().toISOString(),
+      lastUpdated: new Date().toISOString(),
+      kind: 'main',
+      messages: [{ type: 'user', content: 'hello' }],
+    };
+    await fs.writeFile(
+      path.join(chatsDir, `session-2026-09-30-${sessionId.slice(0, 8)}.jsonl`),
+      JSON.stringify(sessionRecord) + '\n',
+    );
+
+    // First load
+    await manager.loadSession(
+      {
+        sessionId,
+        cwd: testDir,
+        mcpServers: [],
+      },
+      {},
+    );
+
+    const firstSession = manager.getSession(sessionId);
+    expect(firstSession).toBeDefined();
+    const disposeSpy = vi.spyOn(firstSession!, 'dispose');
+
+    // Second load with the same sessionId
+    await manager.loadSession(
+      {
+        sessionId,
+        cwd: testDir,
+        mcpServers: [],
+      },
+      {},
+    );
+
+    expect(disposeSpy).toHaveBeenCalledTimes(1);
+    const secondSession = manager.getSession(sessionId);
+    expect(secondSession).toBeDefined();
+    expect(secondSession).not.toBe(firstSession);
+  });
 });

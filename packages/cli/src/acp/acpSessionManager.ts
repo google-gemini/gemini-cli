@@ -190,6 +190,12 @@ export class AcpSessionManager {
       { allowEmpty: true },
     );
 
+    const existingSession = this.sessions.get(sessionId);
+    if (existingSession) {
+      existingSession.dispose();
+      this.sessions.delete(sessionId);
+    }
+
     let config: Config | undefined;
     try {
       config = await this.prepareSessionConfig(
@@ -218,11 +224,6 @@ export class AcpSessionManager {
         this.connection,
         this.settings,
       );
-
-      const existingSession = this.sessions.get(sessionId);
-      if (existingSession) {
-        existingSession.dispose();
-      }
 
       this.sessions.set(sessionId, session);
 
