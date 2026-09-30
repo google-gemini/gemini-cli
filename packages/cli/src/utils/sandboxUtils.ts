@@ -366,7 +366,7 @@ export function parseImageName(image: string): string {
   const hasTag = lastColon > lastSlash;
   const fullName = hasTag ? image.slice(0, lastColon) : image;
   const tag = hasTag ? image.slice(lastColon + 1) : '';
-  const name = fullName.split('/').at(-1) ?? 'unknown-image';
+  const name = fullName.split('/').at(-1) || 'unknown-image';
   return tag ? `${name}-${tag}` : name;
 }
 

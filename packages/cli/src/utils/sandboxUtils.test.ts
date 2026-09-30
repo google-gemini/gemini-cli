@@ -87,6 +87,14 @@ describe('sandboxUtils', () => {
       expect(parseImageName('my-image')).toBe('my-image');
     });
 
+    it('should use a fallback for an empty image reference', () => {
+      expect(parseImageName('')).toBe('unknown-image');
+    });
+
+    it('should use a fallback when the image reference ends with a slash', () => {
+      expect(parseImageName('namespace/')).toBe('unknown-image');
+    });
+
     it('should handle registry path', () => {
       expect(parseImageName('gcr.io/my-project/my-image:v1')).toBe(
         'my-image-v1',
