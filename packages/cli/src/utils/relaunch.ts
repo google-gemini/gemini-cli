@@ -61,15 +61,26 @@ export async function relaunchAppInChildProcess(
       env: newEnv,
     });
 
+    // Clear one-time auth override from supervisor environment after passing to child
+    delete process.env['GEMINI_CLI_AUTH_OVERRIDE'];
+    delete newEnv['GEMINI_CLI_AUTH_OVERRIDE'];
+
     if (latestAdminSettings) {
       child.send({ type: 'admin-settings', settings: latestAdminSettings });
     }
 
-    child.on('message', (msg: { type?: string; settings?: unknown }) => {
-      if (msg.type === 'admin-settings-update' && msg.settings) {
-        latestAdminSettings = msg.settings as AdminControlsSettings;
-      }
-    });
+    child.on(
+      'message',
+      (msg: { type?: string; settings?: unknown; authType?: string }) => {
+        if (msg.type === 'admin-settings-update' && msg.settings) {
+          latestAdminSettings = msg.settings as AdminControlsSettings;
+        }
+        if (msg.type === 'auth-selected-type' && msg.authType) {
+          process.env['GEMINI_CLI_AUTH_OVERRIDE'] = msg.authType;
+          newEnv['GEMINI_CLI_AUTH_OVERRIDE'] = msg.authType;
+        }
+      },
+    );
 
     return new Promise<number>((resolve, reject) => {
       child.on('error', reject);

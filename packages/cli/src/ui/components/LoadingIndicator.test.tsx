@@ -316,6 +316,43 @@ describe('<LoadingIndicator />', () => {
     unmount();
   });
 
+  it('should prioritize statusPhrase over thought.subject', async () => {
+    const props = {
+      thought: {
+        subject: 'Thinking...',
+        description: 'A description',
+      },
+      statusPhrase: 'Trying to reach gemini-2.5-flash (Attempt 1/5)',
+      elapsedTime: 5,
+    };
+    const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
+      <LoadingIndicator {...props} />,
+      StreamingState.Responding,
+    );
+    await waitUntilReady();
+    const output = lastFrame();
+    expect(output).toContain('Trying to reach gemini-2.5-flash (Attempt 1/5)');
+    expect(output).not.toContain('Thinking...');
+    unmount();
+  });
+
+  it('should prioritize statusPhrase over currentLoadingPhrase', async () => {
+    const props = {
+      statusPhrase: 'Trying to reach gemini-2.5-flash (Attempt 2/5)',
+      currentLoadingPhrase: 'Tip: Use /clear to reset history',
+      elapsedTime: 5,
+    };
+    const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
+      <LoadingIndicator {...props} />,
+      StreamingState.Responding,
+    );
+    await waitUntilReady();
+    const output = lastFrame();
+    expect(output).toContain('Trying to reach gemini-2.5-flash (Attempt 2/5)');
+    expect(output).not.toContain('Tip: Use /clear to reset history');
+    unmount();
+  });
+
   it('should not display thought indicator for non-thought loading phrases', async () => {
     const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
       <LoadingIndicator
