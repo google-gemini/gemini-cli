@@ -172,7 +172,7 @@ function computeContentDigest(value: PartListUnion | null | undefined): string {
       }
     } else if (isRecordObject(val)) {
       mix(5);
-      const keys = Object.keys(val);
+      const keys = Object.keys(val).sort();
       mix(keys.length);
       for (let i = 0; i < keys.length; i++) {
         const k = keys[i];
@@ -678,6 +678,8 @@ export class ChatRecordingService {
   private messageMetaMap = new Map<string, MessageMeta>();
   private toolCallMetaMap = new Map<string, ToolCallMeta>();
   private hasEvictedMessages = false;
+  private fullConversationCache: WeakRef<ConversationRecord> | null = null;
+  private isCacheDirty = true;
 
   constructor(context: AgentLoopContext) {
     this.context = context;
@@ -889,6 +891,8 @@ export class ChatRecordingService {
 
   private appendRecord(record: unknown): void {
     if (!this.conversationFile) return;
+    this.isCacheDirty = true;
+    this.fullConversationCache = null;
     try {
       const line = JSON.stringify(record) + '\n';
       fs.mkdirSync(path.dirname(this.conversationFile), { recursive: true });
@@ -910,6 +914,8 @@ export class ChatRecordingService {
    */
   private rewriteConversationFile(conversation: ConversationRecord): void {
     if (!this.conversationFile) return;
+    this.isCacheDirty = true;
+    this.fullConversationCache = null;
 
     // Normalize legacy `.json` paths to the `.jsonl` format we write.
     if (this.conversationFile.endsWith('.json')) {
@@ -1203,12 +1209,21 @@ export class ChatRecordingService {
     if (!this.hasEvictedMessages) {
       return this.cachedConversation;
     }
+    const cachedFull = !this.isCacheDirty
+      ? this.fullConversationCache?.deref()
+      : undefined;
+    if (cachedFull) {
+      return cachedFull;
+    }
     const loaded = loadConversationRecordSync(this.conversationFile);
     if (loaded) {
-      return {
+      const fullRecord: ConversationRecord = {
         ...this.cachedConversation,
         messages: loaded.messages,
       };
+      this.fullConversationCache = new WeakRef(fullRecord);
+      this.isCacheDirty = false;
+      return fullRecord;
     }
     return this.cachedConversation;
   }
