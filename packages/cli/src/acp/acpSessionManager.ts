@@ -126,7 +126,9 @@ export class AcpSessionManager {
 
     const geminiClient = config.getGeminiClient();
 
-    const chat = await geminiClient.startChat();
+    const chat = geminiClient.isInitialized?.()
+      ? geminiClient.getChat()
+      : await geminiClient.startChat();
 
     const session = new Session(
       sessionId,
@@ -165,22 +167,26 @@ export class AcpSessionManager {
     { sessionId, cwd, mcpServers }: acp.LoadSessionRequest,
     authDetails: AuthDetails,
   ): Promise<acp.LoadSessionResponse> {
-    const config = await this.initializeSessionConfig(
+    const config = await this.prepareSessionConfig(
       sessionId,
       cwd,
       mcpServers,
       authDetails,
     );
 
+    await config.storage?.initialize?.();
     const sessionSelector = new SessionSelector(config.storage);
 
     const { sessionData, sessionPath } =
       await sessionSelector.resolveSession(sessionId);
 
+    await config.initialize();
+    startupProfiler.flush(config);
+    startAutoMemoryIfEnabled(config);
+
     const clientHistory = convertSessionToClientHistory(sessionData.messages);
 
     const geminiClient = config.getGeminiClient();
-    await geminiClient.initialize();
     await geminiClient.resumeChat(clientHistory, {
       conversation: sessionData,
       filePath: sessionPath,
@@ -228,7 +234,7 @@ export class AcpSessionManager {
     return response;
   }
 
-  private async initializeSessionConfig(
+  private async prepareSessionConfig(
     sessionId: string,
     cwd: string,
     mcpServers: acp.McpServer[],
@@ -273,12 +279,6 @@ export class AcpSessionManager {
       );
       config.setFileSystemService(acpFileSystemService);
     }
-
-    // 4. Now that we are authenticated, it is safe to initialize the config
-    // which starts the MCP servers and other heavy resources.
-    await config.initialize();
-    startupProfiler.flush(config);
-    startAutoMemoryIfEnabled(config);
 
     return config;
   }

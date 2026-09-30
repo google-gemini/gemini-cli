@@ -211,15 +211,31 @@ export const MainContent = () => {
           : availableTerminalHeight
         : undefined;
 
+    // In alternate buffer mode, we bypass partitioning the height because the list is
+    // scrollable and virtualized, allowing each item to use the full budget.
+    // Otherwise, we partition the budget among pending items to fit them on screen.
     const perPendingItemHeight =
       rawPendingBudget !== undefined
-        ? Math.max(Math.floor(rawPendingBudget / pendingCount), 4)
+        ? isAlternateBufferOrTerminalBuffer
+          ? rawPendingBudget
+          : shouldPartitionHeight
+            ? Math.max(Math.floor(rawPendingBudget / pendingCount), 1)
+            : Math.max(Math.floor(rawPendingBudget / pendingCount), 4)
         : undefined;
 
+    // Calculate confirmationQueueBudget by subtracting the actual allocated pending height
+    // (perPendingItemHeight * pendingCount) from availableTerminalHeight to prevent terminal overflows.
+    // We enforce a minimum height of 1 when partitioning to prevent overflows on small terminals.
     const confirmationQueueBudget =
       availableTerminalHeight !== undefined
         ? shouldPartitionHeight
-          ? Math.max(availableTerminalHeight - (rawPendingBudget ?? 0), 6)
+          ? Math.max(
+              availableTerminalHeight -
+                (perPendingItemHeight !== undefined
+                  ? perPendingItemHeight * pendingCount
+                  : 0),
+              1,
+            )
           : availableTerminalHeight
         : undefined;
 

@@ -1881,7 +1881,26 @@ Logging in with Google... Restarting Gemini CLI to continue.
       if (
         !constrainHeight &&
         (keyMatchers[Command.SHOW_MORE_LINES](key) ||
-          keyMatchers[Command.ESCAPE](key))
+          (keyMatchers[Command.ESCAPE](key) &&
+            !isSettingsDialogOpen &&
+            !isThemeDialogOpen &&
+            !isModelDialogOpen &&
+            !isVoiceModelDialogOpen &&
+            !isAgentConfigDialogOpen &&
+            !isPermissionsDialogOpen &&
+            !isEditorDialogOpen &&
+            !showPrivacyNotice &&
+            !isSessionBrowserOpen &&
+            !isFolderTrustDialogOpen &&
+            !isPolicyUpdateDialogOpen &&
+            !commandConfirmationRequest &&
+            !authConsentRequest &&
+            !permissionConfirmationRequest &&
+            !loopDetectionConfirmationRequest &&
+            !proQuotaRequest &&
+            !validationRequest &&
+            !overageMenuRequest &&
+            !emptyWalletRequest))
       ) {
         enteringConstrainHeightMode = true;
         setConstrainHeight(true);
@@ -1891,6 +1910,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         if (!isAlternateBuffer) {
           refreshStatic();
         }
+        return true;
       }
 
       if (keyMatchers[Command.SHOW_ERROR_DETAILS](key)) {
@@ -2047,6 +2067,25 @@ Logging in with Google... Restarting Gemini CLI to continue.
       startRecording,
       stopRecording,
       mouseMode,
+      isSettingsDialogOpen,
+      isThemeDialogOpen,
+      isModelDialogOpen,
+      isVoiceModelDialogOpen,
+      isAgentConfigDialogOpen,
+      isPermissionsDialogOpen,
+      isEditorDialogOpen,
+      showPrivacyNotice,
+      isSessionBrowserOpen,
+      isFolderTrustDialogOpen,
+      isPolicyUpdateDialogOpen,
+      commandConfirmationRequest,
+      authConsentRequest,
+      permissionConfirmationRequest,
+      loopDetectionConfirmationRequest,
+      proQuotaRequest,
+      validationRequest,
+      overageMenuRequest,
+      emptyWalletRequest,
     ],
   );
 
