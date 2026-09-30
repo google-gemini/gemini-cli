@@ -6,7 +6,11 @@
 
 // File for 'gemini mcp add' command
 import type { CommandModule } from 'yargs';
-import { loadSettings, SettingScope } from '../../config/settings.js';
+import {
+  loadSettings,
+  SettingScope,
+  UNTRUSTED_WORKSPACE_SETTINGS_ERROR,
+} from '../../config/settings.js';
 import { debugLogger, type MCPServerConfig } from '@google/gemini-cli-core';
 import { exitCli } from '../utils.js';
 
@@ -50,6 +54,14 @@ async function addMcpServer(
 
   const settingsScope =
     scope === 'user' ? SettingScope.User : SettingScope.Workspace;
+
+  if (
+    settingsScope === SettingScope.Workspace &&
+    (settings.forScope(settingsScope).readOnly || settings.isTrusted === false)
+  ) {
+    debugLogger.error(`Error: ${UNTRUSTED_WORKSPACE_SETTINGS_ERROR}`);
+    process.exit(1);
+  }
 
   let newServer: Partial<MCPServerConfig> = {};
 

@@ -2142,6 +2142,93 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged.tools?.sandbox).toBe(false); // User setting
       expect(settings.merged.context?.fileName).toBe('USER.md'); // User setting
     });
+
+    it('should mark workspace scope as readOnly and block setValue when workspace is not trusted', () => {
+      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
+        isTrusted: false,
+        source: 'file',
+      });
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const workspaceSettingsContent = {
+        ui: { theme: 'dark' },
+        mcpServers: {
+          existing: { command: 'node', args: ['server.js'] },
+        },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (normalizePath(p) === normalizePath(MOCK_WORKSPACE_SETTINGS_PATH))
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.workspace.readOnly).toBe(true);
+      expect(settings.forScope(SettingScope.Workspace).readOnly).toBe(true);
+
+      expect(() => {
+        settings.setValue(SettingScope.Workspace, 'mcpServers', {
+          newsrv: { command: 'echo' },
+        });
+      }).toThrow(/Cannot modify settings in an untrusted workspace/);
+
+      expect(updateSettingsFilePreservingFormat).not.toHaveBeenCalled();
+    });
+
+    it('should restore workspace writability when setTrusted(true) is called and re-block when setTrusted(false) is called', () => {
+      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
+        isTrusted: false,
+        source: 'file',
+      });
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const workspaceSettingsContent = {
+        ui: { theme: 'dark' },
+        mcpServers: {
+          existing: { command: 'node', args: ['server.js'] },
+        },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (normalizePath(p) === normalizePath(MOCK_WORKSPACE_SETTINGS_PATH))
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.workspace.readOnly).toBe(true);
+
+      settings.setTrusted(true);
+      expect(settings.workspace.readOnly).toBe(false);
+      expect(settings.workspace.settings).toEqual(workspaceSettingsContent);
+
+      settings.setValue(SettingScope.Workspace, 'mcpServers', {
+        ...workspaceSettingsContent.mcpServers,
+        newsrv: { command: 'echo' },
+      });
+      expect(updateSettingsFilePreservingFormat).toHaveBeenCalledWith(
+        MOCK_WORKSPACE_SETTINGS_PATH,
+        expect.objectContaining({
+          ui: { theme: 'dark' },
+          mcpServers: {
+            existing: { command: 'node', args: ['server.js'] },
+            newsrv: { command: 'echo' },
+          },
+        }),
+      );
+
+      vi.mocked(updateSettingsFilePreservingFormat).mockClear();
+      settings.setTrusted(false);
+      expect(settings.workspace.readOnly).toBe(true);
+      expect(() => {
+        settings.setValue(SettingScope.Workspace, 'ui.theme', 'light');
+      }).toThrow(/Cannot modify settings in an untrusted workspace/);
+      expect(updateSettingsFilePreservingFormat).not.toHaveBeenCalled();
+    });
   });
 
   describe('loadEnvironment', () => {

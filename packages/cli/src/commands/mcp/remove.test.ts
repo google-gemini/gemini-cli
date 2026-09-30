@@ -258,5 +258,48 @@ describe('mcp remove command', () => {
 
       debugLogSpy.mockRestore();
     });
+
+    it('should abort with an error and not modify settings.json when workspace is untrusted', async () => {
+      const trustedFolders = await import('../../config/trustedFolders.js');
+      vi.mocked(trustedFolders.isWorkspaceTrusted).mockReturnValueOnce({
+        isTrusted: false,
+        source: 'file',
+      });
+
+      const originalContent = `{
+        "ui": {
+          "theme": "dark"
+        },
+        "mcpServers": {
+          "server1": {
+            "command": "node",
+            "args": ["s1.js"]
+          }
+        }
+      }`;
+      fs.writeFileSync(settingsPath, originalContent, 'utf-8');
+
+      const debugErrorSpy = vi
+        .spyOn(debugLogger, 'error')
+        .mockImplementation(() => {});
+      const mockProcessExit = vi
+        .spyOn(process, 'exit')
+        .mockImplementation((() => {
+          throw new Error('process.exit called');
+        }) as (code?: number | string | null) => never);
+
+      await expect(parser.parseAsync('remove server1')).rejects.toThrow(
+        'process.exit called',
+      );
+
+      expect(debugErrorSpy).toHaveBeenCalledWith(
+        'Error: Cannot modify settings in an untrusted workspace. To enable this, verify the source of the repository and set GEMINI_CLI_TRUST_WORKSPACE=true or move your configuration to the global settings file.',
+      );
+      expect(mockProcessExit).toHaveBeenCalledWith(1);
+      expect(fs.readFileSync(settingsPath, 'utf-8')).toBe(originalContent);
+
+      debugErrorSpy.mockRestore();
+      mockProcessExit.mockRestore();
+    });
   });
 });
