@@ -9,6 +9,7 @@ import { createMockSettings } from '../../test-utils/settings.js';
 import { makeFakeConfig, CoreToolCallStatus } from '@google/gemini-cli-core';
 import { waitFor } from '../../test-utils/async.js';
 import { MainContent } from './MainContent.js';
+import { Composer } from './Composer.js';
 import { getToolGroupBorderAppearance } from '../utils/borderStyles.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Box, Text } from 'ink';
@@ -1043,6 +1044,72 @@ describe('MainContent', () => {
         config: makeFakeConfig({ useAlternateBuffer: true }),
         settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
       });
+
+      expect(scrollableListMocks.getScrollState).toHaveBeenCalled();
+      expect(scrollableListMocks.scrollToEnd).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('preserves scroll position when rendered alongside Composer during a pending tool confirmation', async () => {
+      vi.mocked(useAlternateBuffer).mockReturnValue(true);
+      scrollableListMocks.getScrollState.mockReturnValue({
+        scrollTop: 30,
+        scrollHeight: 100,
+        innerHeight: 20,
+      });
+
+      const confirmingTool = {
+        tool: {
+          callId: 'call-composer-scrolled-up',
+          name: SHELL_COMMAND_NAME,
+          description: 'echo test',
+          status: CoreToolCallStatus.AwaitingApproval,
+          resultDisplay: undefined,
+          confirmationDetails: {
+            type: 'exec' as const,
+            title: 'Confirm Shell',
+            command: 'echo test',
+            rootCommand: 'echo',
+            rootCommands: ['echo'],
+          },
+        },
+        index: 1,
+        total: 1,
+      };
+      vi.mocked(useConfirmingTool).mockReturnValue(
+        confirmingTool as unknown as ConfirmingToolState,
+      );
+
+      const uiStateWithPendingTool = {
+        ...defaultMockUiState,
+        activeHooks: [],
+        sessionStats: {
+          sessionId: 'test-session',
+          sessionStartTime: new Date(),
+          metrics: {} as never,
+          lastPromptTokenCount: 0,
+          promptCount: 0,
+        },
+        pendingHistoryItems: [
+          {
+            type: 'tool_group' as const,
+            id: -1,
+            tools: [confirmingTool.tool],
+          },
+        ],
+      };
+
+      const { unmount } = await renderWithProviders(
+        <>
+          <MainContent />
+          <Composer />
+        </>,
+        {
+          uiState: uiStateWithPendingTool as Partial<UIState>,
+          config: makeFakeConfig({ useAlternateBuffer: true }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+        },
+      );
 
       expect(scrollableListMocks.getScrollState).toHaveBeenCalled();
       expect(scrollableListMocks.scrollToEnd).not.toHaveBeenCalled();

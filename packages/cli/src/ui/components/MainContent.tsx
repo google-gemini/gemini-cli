@@ -191,13 +191,11 @@ export const MainContent = () => {
     const hasConfirmationQueue = Boolean(
       showConfirmationQueue && confirmingTool,
     );
-    const visiblePendingCount = pendingHistoryItems.filter(
-      (item) =>
-        item.type !== 'tool_group' ||
-        item.tools.some(
-          (t) => t.status !== CoreToolCallStatus.AwaitingApproval,
-        ),
-    ).length;
+    const isVisiblePendingItem = (item: (typeof pendingHistoryItems)[number]) =>
+      item.type !== 'tool_group' ||
+      item.tools.some((t) => t.status !== CoreToolCallStatus.AwaitingApproval);
+    const visiblePendingCount =
+      pendingHistoryItems.filter(isVisiblePendingItem).length;
     const shouldPartitionHeight =
       !isAlternateBufferOrTerminalBuffer &&
       hasConfirmationQueue &&
@@ -213,35 +211,51 @@ export const MainContent = () => {
 
     // In alternate buffer mode, we bypass partitioning the height because the list is
     // scrollable and virtualized, allowing each item to use the full budget.
-    // Otherwise, we partition the budget among pending items to fit them on screen.
-    const perPendingItemHeight =
+    // Otherwise, we distribute the height budget among pending items using the
+    // Largest Remainder Method so all available space is utilized without overflowing.
+    const basePendingItemHeight =
       rawPendingBudget !== undefined
-        ? isAlternateBufferOrTerminalBuffer
-          ? rawPendingBudget
-          : shouldPartitionHeight
-            ? Math.max(Math.floor(rawPendingBudget / pendingCount), 1)
-            : Math.max(Math.floor(rawPendingBudget / pendingCount), 4)
+        ? Math.floor(rawPendingBudget / pendingCount)
         : undefined;
+    const pendingHeightRemainder =
+      rawPendingBudget !== undefined ? rawPendingBudget % pendingCount : 0;
+    const perPendingItemHeights =
+      rawPendingBudget !== undefined && basePendingItemHeight !== undefined
+        ? Array.from({ length: pendingCount }, (_, index) =>
+            isAlternateBufferOrTerminalBuffer
+              ? rawPendingBudget
+              : Math.max(
+                  basePendingItemHeight +
+                    (index < pendingHeightRemainder ? 1 : 0),
+                  1,
+                ),
+          )
+        : undefined;
+    const totalAllocatedPendingHeight =
+      perPendingItemHeights !== undefined
+        ? perPendingItemHeights.reduce((sum, height) => sum + height, 0)
+        : 0;
 
     // Calculate confirmationQueueBudget by subtracting the actual allocated pending height
-    // (perPendingItemHeight * pendingCount) from availableTerminalHeight to prevent terminal overflows.
+    // from availableTerminalHeight to prevent terminal overflows.
     // We enforce a minimum height of 1 when partitioning to prevent overflows on small terminals.
     const confirmationQueueBudget =
       availableTerminalHeight !== undefined
         ? shouldPartitionHeight
-          ? Math.max(
-              availableTerminalHeight -
-                (perPendingItemHeight !== undefined
-                  ? perPendingItemHeight * pendingCount
-                  : 0),
-              1,
-            )
+          ? Math.max(availableTerminalHeight - totalAllocatedPendingHeight, 1)
           : availableTerminalHeight
         : undefined;
+
+    let visiblePendingIndex = 0;
 
     return (
       <Box flexDirection="column" key="pending-items-group">
         {pendingHistoryItems.map((item, i) => {
+          const isVisible = isVisiblePendingItem(item);
+          const itemHeightIndex = isVisible
+            ? visiblePendingIndex++
+            : Math.min(visiblePendingIndex, pendingCount - 1);
+          const perPendingItemHeight = perPendingItemHeights?.[itemHeightIndex];
           const prevType =
             i === 0
               ? uiState.history.at(-1)?.type
