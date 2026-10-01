@@ -425,6 +425,16 @@ describe('resolveModel', () => {
       expect(model).toBe(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL);
     });
 
+    it.each([[GEMINI_MODEL_ALIAS_AUTO], [GEMINI_MODEL_ALIAS_PRO]])(
+      'should still follow the Gemini 3.1 rollout for the %s alias',
+      (alias) => {
+        expect(resolveModel(alias, true)).toBe(PREVIEW_GEMINI_3_1_MODEL);
+        expect(resolveModel(alias, true, true)).toBe(
+          PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+        );
+      },
+    );
+
     it('should return the Default Pro model when auto-gemini-2.5 is requested', () => {
       const model = resolveModel(DEFAULT_GEMINI_MODEL_AUTO);
       expect(model).toBe(DEFAULT_GEMINI_MODEL);
@@ -449,6 +459,27 @@ describe('resolveModel', () => {
         DEFAULT_GEMINI_FLASH_LITE_MODEL,
       );
     });
+
+    it.each([undefined, dynamicConfig])(
+      'should preserve the explicit Pro preview model when Gemini 3.1 rollout is enabled',
+      (config) => {
+        expect(
+          resolveModel(PREVIEW_GEMINI_MODEL, true, false, true, config),
+        ).toBe(PREVIEW_GEMINI_MODEL);
+        expect(
+          resolveModel(PREVIEW_GEMINI_MODEL, true, true, true, config),
+        ).toBe(PREVIEW_GEMINI_MODEL);
+      },
+    );
+
+    it.each([undefined, dynamicConfig])(
+      'should keep preview access fallback for the explicit Pro preview model',
+      (config) => {
+        expect(
+          resolveModel(PREVIEW_GEMINI_MODEL, true, false, false, config),
+        ).toBe(DEFAULT_GEMINI_MODEL);
+      },
+    );
 
     it('should return a custom model name when requested', () => {
       const customModel = 'custom-model-v1';

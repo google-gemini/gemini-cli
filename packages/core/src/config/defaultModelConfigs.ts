@@ -543,14 +543,6 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       default: 'gemini-3-pro-preview',
       contexts: [
         { condition: { hasAccessToPreview: false }, target: 'gemini-2.5-pro' },
-        {
-          condition: { useGemini3_1: true, useCustomTools: true },
-          target: 'gemini-3.1-pro-preview-customtools',
-        },
-        {
-          condition: { useGemini3_1: true },
-          target: 'gemini-3.1-pro-preview',
-        },
       ],
     },
     auto: {
@@ -669,6 +661,13 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
           target: 'gemini-2.5-pro',
         },
         {
+          // An explicit Pro preview model ID pins that version: only aliases
+          // follow the Gemini 3.1 rollout below. The preview-access downgrade
+          // above still applies.
+          condition: { requestedModels: ['gemini-3-pro-preview'] },
+          target: 'gemini-3-pro-preview',
+        },
+        {
           condition: { useGemini3_1: true, useCustomTools: true },
           target: 'gemini-3.1-pro-preview-customtools',
         },
@@ -682,7 +681,9 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
   modelChains: {
     preview: [
       {
-        model: 'gemini-3-pro-preview',
+        // This chain selects the current Pro rollout target. Use the alias
+        // rather than an explicit versioned model ID, which users can pin.
+        model: 'pro',
         actions: {
           terminal: 'prompt',
           transient: 'prompt',
@@ -716,7 +717,9 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     ],
     'auto-preview': [
       {
-        model: 'gemini-3-pro-preview',
+        // This chain selects the current Pro rollout target. Use the alias
+        // rather than an explicit versioned model ID, which users can pin.
+        model: 'pro',
         maxAttempts: 3,
         actions: {
           terminal: 'prompt',
