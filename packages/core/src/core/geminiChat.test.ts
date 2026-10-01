@@ -4760,6 +4760,36 @@ describe('GeminiChat', () => {
       expect(stripped[0].parts![0].functionCall!.id).toBe('call_123');
       expect(stripped[1].parts![0].functionResponse!.id).toBe('call_123');
     });
+
+    it('should keep multimodal parts on a function response when stripping the prefix', () => {
+      const imagePart = {
+        inlineData: { mimeType: 'image/png', data: 'iVBORw0KGgo=' },
+      };
+      const contents: Content[] = [
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                id: 'read_file__call_123',
+                name: 'read_file',
+                response: { output: 'Binary content provided (1 item(s)).' },
+                parts: [imagePart],
+              },
+            },
+          ],
+        },
+      ];
+
+      const stripped = stripToolCallIdPrefixes(contents);
+      const fr = stripped[0].parts![0].functionResponse!;
+      expect(fr.id).toBe('call_123');
+      expect(fr.name).toBe('read_file');
+      expect(fr.response).toEqual({
+        output: 'Binary content provided (1 item(s)).',
+      });
+      expect(fr.parts).toEqual([imagePart]);
+    });
   });
 
   describe('coalesceConsecutiveRoles', () => {
