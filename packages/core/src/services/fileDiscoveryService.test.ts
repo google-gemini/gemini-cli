@@ -245,6 +245,21 @@ describe('FileDiscoveryService', () => {
       ).toBe(true);
     });
 
+    it('should return true for wildcard directory patterns (e.g. dir/**)', async () => {
+      await createTestFile('.gitignore', 'build/**\ntemp/**');
+      const service = new FileDiscoveryService(projectRoot);
+
+      expect(
+        service.shouldIgnoreDirectory(path.join(projectRoot, 'build')),
+      ).toBe(true);
+      expect(
+        service.shouldIgnoreDirectory(path.join(projectRoot, 'temp')),
+      ).toBe(true);
+      expect(
+        service.shouldIgnoreFile(path.join(projectRoot, 'build/output.js')),
+      ).toBe(true);
+    });
+
     it('should return false for non-git-ignored files', () => {
       const service = new FileDiscoveryService(projectRoot);
 
@@ -590,6 +605,21 @@ describe('FileDiscoveryService', () => {
 
       expect(ignoredPaths.sort()).toEqual(
         [path.join(projectRoot, '.git'), ignoredDir].sort(),
+      );
+    });
+
+    it('should optimize by not traversing into wildcard ignored directories (e.g. dir/**)', async () => {
+      await createTestFile('.gitignore', 'node_modules/**\nbuild/**');
+      const nodeModulesDir = path.join(projectRoot, 'node_modules');
+      await fs.mkdir(nodeModulesDir);
+      await createTestFile('node_modules/dummy.txt');
+
+      const service = new FileDiscoveryService(projectRoot);
+      expect(service.shouldIgnoreDirectory(nodeModulesDir)).toBe(true);
+
+      const ignoredPaths = await service.getIgnoredPaths();
+      expect(ignoredPaths.sort()).toEqual(
+        [path.join(projectRoot, '.git'), nodeModulesDir].sort(),
       );
     });
 
