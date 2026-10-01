@@ -302,5 +302,123 @@ describe('CheckerRunner', () => {
         'Safety checker "python-checker" exited with code 1',
       );
     });
+
+    it('should spawn external checkers with a minimal env allowlist', async () => {
+      const previousApiKey = process.env['GEMINI_API_KEY'];
+      process.env['GEMINI_API_KEY'] = 'secret-test-value';
+      vi.spyOn(mockContextBuilder, 'config', 'get').mockReturnValue({
+        env: { CUSTOM_VAR: 'yes' },
+        getWorkingDir: vi.fn().mockReturnValue('/mock/cwd'),
+      } as unknown as Config);
+
+      const mockCheckerPath = '/mock/dist/python-checker';
+      vi.mocked(mockRegistry.resolveExternal).mockReturnValue(mockCheckerPath);
+      vi.mocked(mockContextBuilder.buildFullContext).mockReturnValue({
+        environment: { cwd: '/tmp', workspaces: [] },
+      });
+
+      const mockChildProcess = {
+        stdin: { write: vi.fn(), end: vi.fn() },
+        stdout: { on: vi.fn() },
+        stderr: { on: vi.fn() },
+        on: vi.fn().mockImplementation((event, callback) => {
+          if (event === 'close') {
+            setTimeout(() => callback(0), 0);
+          }
+        }),
+        kill: vi.fn(),
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(spawn).mockReturnValue(mockChildProcess as any);
+
+      try {
+        await runner.runChecker(mockToolCall, mockExternalConfig);
+      } finally {
+        if (previousApiKey === undefined) {
+          delete process.env['GEMINI_API_KEY'];
+        } else {
+          process.env['GEMINI_API_KEY'] = previousApiKey;
+        }
+      }
+
+      const spawnOptions = vi.mocked(spawn).mock.calls[0][2] as Record<
+        string,
+        unknown
+      >;
+      const spawnEnv = spawnOptions['env'] as Record<string, string>;
+      expect(spawnEnv['GEMINI_API_KEY']).toBeUndefined();
+      expect(spawnEnv['PATH']).toBeDefined();
+      expect(spawnEnv['CUSTOM_VAR']).toBe('yes');
+    });
+
+    it('should deny and kill a checker whose stdout exceeds the output cap', async () => {
+      const mockCheckerPath = '/mock/dist/python-checker';
+      vi.mocked(mockRegistry.resolveExternal).mockReturnValue(mockCheckerPath);
+      vi.mocked(mockContextBuilder.buildFullContext).mockReturnValue({
+        environment: { cwd: '/tmp', workspaces: [] },
+      });
+
+      const oversized = Buffer.alloc(256 * 1024 + 1, 'a');
+      const mockChildProcess = {
+        stdin: { write: vi.fn(), end: vi.fn() },
+        stdout: {
+          on: vi.fn().mockImplementation((event, callback) => {
+            if (event === 'data') {
+              callback(oversized);
+            }
+          }),
+        },
+        stderr: { on: vi.fn() },
+        on: vi.fn().mockImplementation((event, callback) => {
+          if (event === 'close') {
+            setTimeout(() => callback(0), 0);
+          }
+        }),
+        kill: vi.fn(),
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(spawn).mockReturnValue(mockChildProcess as any);
+
+      const result = await runner.runChecker(mockToolCall, mockExternalConfig);
+
+      expect(result.decision).toBe(SafetyCheckDecision.DENY);
+      expect(result.reason).toContain('stdout exceeded');
+      expect(mockChildProcess.kill).toHaveBeenCalledWith('SIGTERM');
+    });
+
+    it('should deny and kill a checker whose stderr exceeds the output cap', async () => {
+      const mockCheckerPath = '/mock/dist/python-checker';
+      vi.mocked(mockRegistry.resolveExternal).mockReturnValue(mockCheckerPath);
+      vi.mocked(mockContextBuilder.buildFullContext).mockReturnValue({
+        environment: { cwd: '/tmp', workspaces: [] },
+      });
+
+      const oversized = Buffer.alloc(256 * 1024 + 1, 'a');
+      const mockChildProcess = {
+        stdin: { write: vi.fn(), end: vi.fn() },
+        stdout: { on: vi.fn() },
+        stderr: {
+          on: vi.fn().mockImplementation((event, callback) => {
+            if (event === 'data') {
+              callback(oversized);
+            }
+          }),
+        },
+        on: vi.fn().mockImplementation((event, callback) => {
+          if (event === 'close') {
+            setTimeout(() => callback(0), 0);
+          }
+        }),
+        kill: vi.fn(),
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(spawn).mockReturnValue(mockChildProcess as any);
+
+      const result = await runner.runChecker(mockToolCall, mockExternalConfig);
+
+      expect(result.decision).toBe(SafetyCheckDecision.DENY);
+      expect(result.reason).toContain('stderr exceeded');
+      expect(mockChildProcess.kill).toHaveBeenCalledWith('SIGTERM');
+    });
   });
 });
