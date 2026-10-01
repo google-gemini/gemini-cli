@@ -554,17 +554,22 @@ export class SessionSelector {
         const t = new Date(dateStr).getTime();
         return isNaN(t) ? 0 : t;
       };
-      const timeA = getTime(a.sessionData.lastUpdated?.trim() || a.sessionData.startTime);
-      const timeB = getTime(b.sessionData.lastUpdated?.trim() || b.sessionData.startTime);
+      const timeA = getTime(
+        a.sessionData.lastUpdated?.trim() || a.sessionData.startTime,
+      );
+      const timeB = getTime(
+        b.sessionData.lastUpdated?.trim() || b.sessionData.startTime,
+      );
       return timeB - timeA;
     });
 
     const { filePath, sessionData } = matches[0];
-    const firstUserMsg = extractFirstUserMessage(sessionData.messages);
-    const messageCount = sessionData.messages.length;
+    const messages = sessionData.messages ?? [];
+    const firstUserMsg = extractFirstUserMessage(messages);
+    const messageCount = messages.length;
     const timestamp =
-      sessionData.lastUpdated ??
-      sessionData.startTime ??
+      sessionData.lastUpdated?.trim() ||
+      sessionData.startTime?.trim() ||
       new Date().toISOString();
     const displayInfo = `Session ${sessionData.sessionId}: ${firstUserMsg} (${messageCount} messages, ${formatRelativeTime(timestamp)})`;
 

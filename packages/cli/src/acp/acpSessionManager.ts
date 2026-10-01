@@ -199,11 +199,7 @@ export class AcpSessionManager {
     { sessionId, cwd, mcpServers }: acp.LoadSessionRequest,
     authDetails: AuthDetails,
   ): Promise<acp.LoadSessionResponse> {
-    if (
-      sessionId.includes('..') ||
-      sessionId.includes('/') ||
-      sessionId.includes('\\')
-    ) {
+    if (!/^[a-zA-Z0-9-_]+$/.test(sessionId)) {
       throw new acp.RequestError(-32602, 'Invalid session identifier format.');
     }
 
@@ -236,7 +232,8 @@ export class AcpSessionManager {
       startupProfiler.flush(config);
       startAutoMemoryIfEnabled(config);
 
-      const clientHistory = convertSessionToClientHistory(sessionData.messages);
+      const messages = sessionData.messages ?? [];
+      const clientHistory = convertSessionToClientHistory(messages);
 
       const geminiClient = config.getGeminiClient();
       await geminiClient.resumeChat(clientHistory, {
@@ -271,7 +268,7 @@ export class AcpSessionManager {
       };
 
       // Stream history back to client
-      session.streamHistory(sessionData.messages).catch((err) => {
+      session.streamHistory(messages).catch((err) => {
         debugLogger.error(`Error streaming history: ${err}`);
       });
 
