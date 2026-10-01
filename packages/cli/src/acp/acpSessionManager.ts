@@ -148,12 +148,6 @@ export class AcpSessionManager {
       );
       this.sessions.set(sessionId, session);
 
-      setTimeout(() => {
-        session?.sendAvailableCommands().catch((err) => {
-          debugLogger.error(`Error sending available commands: ${err}`);
-        });
-      }, 0);
-
       const { availableModels, currentModelId } = buildAvailableModels(
         config,
         loadedSettings,
@@ -170,6 +164,13 @@ export class AcpSessionManager {
           currentModelId,
         },
       };
+
+      setTimeout(() => {
+        session?.sendAvailableCommands().catch((err) => {
+          debugLogger.error(`Error sending available commands: ${err}`);
+        });
+      }, 0);
+
       return response;
     } catch (error) {
       if (session) {
@@ -253,17 +254,6 @@ export class AcpSessionManager {
 
       this.sessions.set(sessionId, session);
 
-      // Stream history back to client
-      session.streamHistory(sessionData.messages).catch((err) => {
-        debugLogger.error(`Error streaming history: ${err}`);
-      });
-
-      setTimeout(() => {
-        session?.sendAvailableCommands().catch((err) => {
-          debugLogger.error(`Error sending available commands: ${err}`);
-        });
-      }, 0);
-
       const { availableModels, currentModelId } = buildAvailableModels(
         config,
         this.settings,
@@ -279,6 +269,18 @@ export class AcpSessionManager {
           currentModelId,
         },
       };
+
+      // Stream history back to client
+      session.streamHistory(sessionData.messages).catch((err) => {
+        debugLogger.error(`Error streaming history: ${err}`);
+      });
+
+      setTimeout(() => {
+        session?.sendAvailableCommands().catch((err) => {
+          debugLogger.error(`Error sending available commands: ${err}`);
+        });
+      }, 0);
+
       return response;
     } catch (error) {
       if (session) {
