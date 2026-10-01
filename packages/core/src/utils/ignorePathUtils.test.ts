@@ -6,7 +6,10 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import * as path from 'node:path';
-import { getNormalizedRelativePath } from './ignorePathUtils.js';
+import {
+  getNormalizedRelativePath,
+  expandWildcardDirectoryPatterns,
+} from './ignorePathUtils.js';
 
 vi.mock('node:path', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:path')>();
@@ -125,5 +128,68 @@ describe('ignorePathUtils', () => {
     expect(
       getNormalizedRelativePath('C:\\project', 'D:\\outside', false),
     ).toBeNull();
+  });
+
+  describe('expandWildcardDirectoryPatterns', () => {
+    it('should expand basic wildcard directory patterns', () => {
+      expect(expandWildcardDirectoryPatterns(['node_modules/**'])).toEqual([
+        'node_modules/**',
+        'node_modules/',
+      ]);
+      expect(expandWildcardDirectoryPatterns(['dist/**', 'build/**'])).toEqual([
+        'dist/**',
+        'dist/',
+        'build/**',
+        'build/',
+      ]);
+    });
+
+    it('should preserve leading slash for anchored patterns', () => {
+      expect(expandWildcardDirectoryPatterns(['/dist/**'])).toEqual([
+        '/dist/**',
+        '/dist/',
+      ]);
+    });
+
+    it('should not expand patterns with exact directory negations (!dir)', () => {
+      expect(expandWildcardDirectoryPatterns(['dir/**', '!dir'])).toEqual([
+        'dir/**',
+        '!dir',
+      ]);
+      expect(expandWildcardDirectoryPatterns(['/dir/**', '!/dir'])).toEqual([
+        '/dir/**',
+        '!/dir',
+      ]);
+    });
+
+    it('should not expand patterns with nested child negations (!dir/keep.txt)', () => {
+      expect(
+        expandWildcardDirectoryPatterns(['dir/**', '!dir/keep.txt']),
+      ).toEqual(['dir/**', '!dir/keep.txt']);
+    });
+
+    it('should not expand wildcard parent patterns (e.g. packages/*/**)', () => {
+      expect(
+        expandWildcardDirectoryPatterns([
+          'packages/*/**',
+          '!packages/foo/keep.txt',
+        ]),
+      ).toEqual(['packages/*/**', '!packages/foo/keep.txt']);
+      expect(expandWildcardDirectoryPatterns(['**/**'])).toEqual(['**/**']);
+    });
+
+    it('should not expand root wildcard pattern (/**)', () => {
+      expect(expandWildcardDirectoryPatterns(['/**'])).toEqual(['/**']);
+    });
+
+    it('should ignore comments and negated patterns', () => {
+      expect(
+        expandWildcardDirectoryPatterns([
+          '# a comment /**',
+          '!foo/**',
+          'normal/file.txt',
+        ]),
+      ).toEqual(['# a comment /**', '!foo/**', 'normal/file.txt']);
+    });
   });
 });

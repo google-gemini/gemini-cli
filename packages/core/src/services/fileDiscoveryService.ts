@@ -19,6 +19,10 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import fs from 'node:fs';
 import * as path from 'node:path';
+import { LRUCache } from 'mnemonist';
+
+const MAX_SYMLINK_CACHE_SIZE = 20_000;
+const MAX_REALPATH_CACHE_SIZE = 20_000;
 
 export interface FilterFilesOptions {
   respectGitIgnore?: boolean;
@@ -45,8 +49,12 @@ export class FileDiscoveryService {
   };
   private projectRoot: string;
   private _realProjectRoot?: string;
-  private symlinkCache: Map<string, boolean> = new Map();
-  private realPathCache: Map<string, string> = new Map();
+  private symlinkCache: LRUCache<string, boolean> = new LRUCache(
+    MAX_SYMLINK_CACHE_SIZE,
+  );
+  private realPathCache: LRUCache<string, string> = new LRUCache(
+    MAX_REALPATH_CACHE_SIZE,
+  );
 
   clearCache(): void {
     this.symlinkCache.clear();
@@ -295,6 +303,7 @@ export class FileDiscoveryService {
       let isSymlink: boolean;
       if (options.isSymbolicLink !== undefined) {
         isSymlink = options.isSymbolicLink;
+        this.symlinkCache.set(absolutePath, isSymlink);
       } else {
         const cached = this.symlinkCache.get(absolutePath);
         if (cached !== undefined) {
