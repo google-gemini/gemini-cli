@@ -120,6 +120,7 @@ export function isAssetExplicitlyRequested(
   includePatterns: string[],
   filePath: string,
   relativePathForDisplay: string,
+  workspaceDirs: readonly string[] = [],
 ): boolean {
   const fileExtension = path.extname(filePath);
   const fileName = path.basename(filePath);
@@ -138,7 +139,14 @@ export function isAssetExplicitlyRequested(
     const matchesPath =
       fileMatcher(normalizedRelativePath) || fileMatcher(normalizedFilePath);
     const matchesFileName =
-      !normalizedPattern.includes('/') && fileMatcher(fileName);
+      !normalizedPattern.includes('/') &&
+      (workspaceDirs.length > 0
+        ? workspaceDirs.some((dir) => {
+            const normalizedDir = dir.replace(/\\/g, '/');
+            const fileDir = path.dirname(normalizedFilePath);
+            return fileDir === normalizedDir && fileMatcher(fileName);
+          })
+        : !normalizedRelativePath.includes('/') && fileMatcher(fileName));
 
     if (!matchesPath && !matchesFileName) {
       return false;
@@ -372,6 +380,7 @@ ${finalExclusionPatternsForDescription
               include,
               filePath,
               relativePathForDisplay,
+              this.config.getWorkspaceContext().getDirectories(),
             );
 
             if (!requestedExplicitly) {

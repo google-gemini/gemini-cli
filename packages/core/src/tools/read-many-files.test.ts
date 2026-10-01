@@ -1262,6 +1262,26 @@ Content of file[1]
       ).toBe(false);
       expect(
         isAssetExplicitlyRequested(
+          ['*.png'],
+          '/root/subdir/image.png',
+          'subdir/image.png',
+        ),
+      ).toBe(false);
+      expect(
+        isAssetExplicitlyRequested(
+          ['*.png'],
+          '/root/subdir/image.png',
+          'subdir/image.png',
+          ['/root'],
+        ),
+      ).toBe(false);
+      expect(
+        isAssetExplicitlyRequested(['*.png'], '/root/image.png', 'image.png', [
+          '/root',
+        ]),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
           ['*.{png,jpg}'],
           '/root/photo.jpg',
           'photo.jpg',
