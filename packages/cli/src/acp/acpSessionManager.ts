@@ -150,7 +150,7 @@ export class AcpSessionManager {
 
       setTimeout(() => {
         session?.sendAvailableCommands().catch((err) => {
-          debugLogger.error('Error sending available commands: ' + err);
+          debugLogger.error(`Error sending available commands: ${err}`);
         });
       }, 0);
 
@@ -254,12 +254,14 @@ export class AcpSessionManager {
       this.sessions.set(sessionId, session);
 
       // Stream history back to client
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      session.streamHistory(sessionData.messages);
+      session.streamHistory(sessionData.messages).catch((err) => {
+        debugLogger.error(`Error streaming history: ${err}`);
+      });
 
       setTimeout(() => {
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        session?.sendAvailableCommands();
+        session?.sendAvailableCommands().catch((err) => {
+          debugLogger.error(`Error sending available commands: ${err}`);
+        });
       }, 0);
 
       const { availableModels, currentModelId } = buildAvailableModels(
