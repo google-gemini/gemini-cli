@@ -548,15 +548,16 @@ export class SessionSelector {
     }
 
     // If duplicate records exist, choose the most recently updated one
-    matches.sort(
-      (a, b) =>
-        new Date(
-          b.sessionData.lastUpdated || b.sessionData.startTime || 0,
-        ).getTime() -
-        new Date(
-          a.sessionData.lastUpdated || a.sessionData.startTime || 0,
-        ).getTime(),
-    );
+    matches.sort((a, b) => {
+      const getTime = (dateStr: string | undefined) => {
+        if (!dateStr) return 0;
+        const t = new Date(dateStr).getTime();
+        return isNaN(t) ? 0 : t;
+      };
+      const timeA = getTime(a.sessionData.lastUpdated?.trim() || a.sessionData.startTime);
+      const timeB = getTime(b.sessionData.lastUpdated?.trim() || b.sessionData.startTime);
+      return timeB - timeA;
+    });
 
     const { filePath, sessionData } = matches[0];
     const firstUserMsg = extractFirstUserMessage(sessionData.messages);
