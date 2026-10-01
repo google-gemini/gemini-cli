@@ -452,6 +452,63 @@ describe('GlobTool', () => {
       expect(result.llmContent).toContain('gemini-ignored_test.txt');
     }, 30000);
   });
+
+  describe('pattern containment (security)', () => {
+    // A file that lives OUTSIDE the tool's root directory.
+    let secretDir: string;
+    let secretFile: string;
+
+    beforeEach(async () => {
+      const rawSecretDir = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'glob-tool-secret-'),
+      );
+      secretDir = await fs.realpath(rawSecretDir);
+      secretFile = path.join(secretDir, 'secret.txt');
+      await fs.writeFile(secretFile, 'outside content');
+    });
+
+    afterEach(async () => {
+      await fs.rm(secretDir, { recursive: true, force: true });
+    });
+
+    it('should reject an absolute pattern with an invalid-params error', async () => {
+      const params: GlobToolParams = { pattern: secretFile };
+      const invocation = globTool.build(params);
+      const result = await invocation.execute({ abortSignal });
+      expect(result.error?.type).toBe(ToolErrorType.INVALID_TOOL_PARAMS);
+      expect(result.llmContent).not.toContain('outside content');
+    }, 30000);
+
+    it('should drop matches from a brace alternative containing an absolute path', async () => {
+      const params: GlobToolParams = {
+        pattern: `{${secretFile},fileA.txt}`,
+      };
+      const invocation = globTool.build(params);
+      const result = await invocation.execute({ abortSignal });
+      // Only the in-workspace alternative may survive; the success message
+      // echoes the caller's pattern, so assert on the match count/path.
+      expect(result.llmContent).toContain('Found 1 file(s)');
+      expect(result.llmContent).toContain(path.join(tempRootDir, 'fileA.txt'));
+    }, 30000);
+
+    it('should drop matches from a backslash-escaped traversal pattern', async () => {
+      // On POSIX, glob treats "\\" as an escape, so "..\/" reaches a path
+      // segment-wise outside the search directory.
+      const escaped = `..\\/${path.basename(secretDir)}\\/secret.txt`;
+      const params: GlobToolParams = { pattern: escaped };
+      const invocation = globTool.build(params);
+      const result = await invocation.execute({ abortSignal });
+      expect(result.llmContent).not.toContain(secretFile);
+      expect(result.llmContent).not.toContain('outside content');
+    }, 30000);
+
+    it('should not leak outside paths via a Windows drive-root pattern', async () => {
+      const params: GlobToolParams = { pattern: 'C:\\\\Windows\\\\*.txt' };
+      const invocation = globTool.build(params);
+      const result = await invocation.execute({ abortSignal });
+      expect(result.error?.type).toBe(ToolErrorType.INVALID_TOOL_PARAMS);
+    }, 30000);
+  });
 });
 
 describe('sortFileEntries', () => {
