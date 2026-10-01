@@ -4389,6 +4389,55 @@ describe('InputPrompt', () => {
       expect(cursorLineCall![0].terminalCursorPosition).toBe(0);
       unmount();
     });
+
+    it('should report cursor position 0 when input is empty and placeholder is empty', async () => {
+      mockBuffer.text = '';
+      mockBuffer.lines = [''];
+      mockBuffer.allVisualLines = [''];
+      mockBuffer.viewportVisualLines = [''];
+      mockBuffer.visualToLogicalMap = [[0, 0]];
+      mockBuffer.visualCursor = [0, 0];
+      mockBuffer.visualScrollRow = 0;
+
+      const { unmount } = await renderWithProviders(
+        <TestInputPrompt {...props} placeholder="" />,
+        { uiActions },
+      );
+
+      const textCalls = vi.mocked(Text).mock.calls;
+      const cursorLineCall = [...textCalls]
+        .reverse()
+        .find((call) => call[0].terminalCursorFocus === true);
+
+      expect(cursorLineCall).toBeDefined();
+      expect(cursorLineCall![0].terminalCursorPosition).toBe(0);
+      unmount();
+    });
+
+    it('should report correct cursor position for CJK characters', async () => {
+      const text = '中文测试';
+      mockBuffer.setText(text);
+      mockBuffer.visualCursor = [0, 2]; // Cursor after '中文'
+      mockBuffer.visualScrollRow = 0;
+
+      const { stdout, unmount } = await renderWithProviders(
+        <TestInputPrompt {...props} />,
+        { uiActions },
+      );
+
+      await waitFor(() => {
+        expect(stdout.lastFrame()).toContain('中文测试');
+      });
+
+      const textCalls = vi.mocked(Text).mock.calls;
+      const cursorLineCall = [...textCalls]
+        .reverse()
+        .find((call) => call[0].terminalCursorFocus === true);
+
+      expect(cursorLineCall).toBeDefined();
+      expect(cursorLineCall![0].terminalCursorPosition).toBe(2);
+      unmount();
+    });
   });
 
   describe('image path transformation snapshots', () => {
