@@ -5,7 +5,10 @@
  */
 
 import { render, renderWithProviders } from '../../../test-utils/render.js';
-import { OverflowProvider } from '../../contexts/OverflowContext.js';
+import {
+  OverflowProvider,
+  useOverflowState,
+} from '../../contexts/OverflowContext.js';
 import { MaxSizedBox } from './MaxSizedBox.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { Box, Text } from 'ink';
@@ -314,6 +317,55 @@ describe('<MaxSizedBox />', () => {
       /^\.\.\. last \d+ lines? hidden \(Ctrl\+O to show\) \.\.\.$/,
     );
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
+  });
+
+  it('retains overflowing ID when maxHeight becomes undefined on expansion', async () => {
+    let capturedOverflowIds: ReadonlySet<string> | undefined;
+    function OverflowReader() {
+      const state = useOverflowState();
+      capturedOverflowIds = state?.overflowingIds;
+      return null;
+    }
+
+    const { rerender, waitUntilReady, unmount } = await render(
+      <OverflowProvider>
+        <MaxSizedBox maxWidth={80} maxHeight={2}>
+          <Box flexDirection="column">
+            <Text>Line 1</Text>
+            <Text>Line 2</Text>
+            <Text>Line 3</Text>
+          </Box>
+        </MaxSizedBox>
+        <OverflowReader />
+      </OverflowProvider>,
+    );
+
+    await act(async () => {
+      vi.runAllTimers();
+    });
+    await waitUntilReady();
+    expect(capturedOverflowIds?.size).toBe(1);
+
+    // Expand by setting maxHeight to undefined
+    rerender(
+      <OverflowProvider>
+        <MaxSizedBox maxWidth={80} maxHeight={undefined}>
+          <Box flexDirection="column">
+            <Text>Line 1</Text>
+            <Text>Line 2</Text>
+            <Text>Line 3</Text>
+          </Box>
+        </MaxSizedBox>
+        <OverflowReader />
+      </OverflowProvider>,
+    );
+
+    await act(async () => {
+      vi.runAllTimers();
+    });
+    await waitUntilReady();
+    expect(capturedOverflowIds?.size).toBe(1);
     unmount();
   });
 });
