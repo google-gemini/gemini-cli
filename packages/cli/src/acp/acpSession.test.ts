@@ -1366,4 +1366,18 @@ describe('Session', () => {
       );
     });
   });
+
+  describe('dispose', () => {
+    it('should safely dispose without throwing when config.dispose is undefined', async () => {
+      delete (mockConfig as { dispose?: unknown }).dispose;
+      await expect(session.dispose()).resolves.toBeUndefined();
+    });
+
+    it('should catch rejection when config.dispose rejects', async () => {
+      mockConfig.dispose = vi
+        .fn()
+        .mockRejectedValue(new Error('Disposal failed'));
+      await expect(session.dispose()).resolves.toBeUndefined();
+    });
+  });
 });
