@@ -96,14 +96,32 @@ export class KeychainService {
     return (this.initializationPromise ??= this.initializeKeychain());
   }
 
+  private isWsl(): boolean {
+    if (os.platform() !== 'linux') {
+      return false;
+    }
+    return !!(
+      process.env['WSL_DISTRO_NAME'] ||
+      process.env['WSLENV'] ||
+      process.env['WSL_INTEROP']
+    );
+  }
+
   // High-level orchestration of the loading and testing cycle.
   private async initializeKeychain(): Promise<Keychain | null> {
     const forceFileStorage = process.env[FORCE_FILE_STORAGE_ENV_VAR] === 'true';
 
     // Try to get the native OS keychain unless file storage is requested.
-    const nativeKeychain = forceFileStorage
-      ? null
-      : await this.getNativeKeychain();
+    let nativeKeychain: Keychain | null = null;
+    if (!forceFileStorage) {
+      if (this.isWsl()) {
+        debugLogger.debug(
+          'WSL environment detected; bypassing native keychain to prevent libsecret lockups.',
+        );
+      } else {
+        nativeKeychain = await this.getNativeKeychain();
+      }
+    }
 
     coreEvents.emitTelemetryKeychainAvailability(
       new KeychainAvailabilityEvent(nativeKeychain !== null),

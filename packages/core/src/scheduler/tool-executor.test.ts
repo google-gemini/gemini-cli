@@ -16,11 +16,12 @@ import { MockTool } from '../test-utils/mock-tool.js';
 import { CoreToolCallStatus, type ScheduledToolCall } from './types.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
-import type { CallableTool } from '@google/genai';
+import type { CallableTool, Part } from '@google/genai';
 import * as fileUtils from '../utils/fileUtils.js';
 import * as coreToolHookTriggers from '../core/coreToolHookTriggers.js';
 import { ShellToolInvocation } from '../tools/shell.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import { MAX_STORED_TOOL_OUTPUT_BYTES } from '../utils/constants.js';
 import {
   GeminiCliOperation,
   GEN_AI_TOOL_CALL_ID,
@@ -813,5 +814,189 @@ describe('ToolExecutor', () => {
       expect(response['output']).toBe('TruncatedContent...');
       expect(result.response.outputFile).toBe('/tmp/truncated_output.txt');
     }
+  });
+
+  describe('Tool Output Bounding and Truncation', () => {
+    it('should truncate a single Part object when text exceeds MAX_STORED_TOOL_OUTPUT_BYTES', async () => {
+      const mockTool = new MockTool({
+        name: 'partTool',
+        description: 'Returns single Part',
+      });
+      const invocation = mockTool.build({});
+      const largeText = 'A'.repeat(80 * 1024); // 80 KB
+      const singlePart: Part = { text: largeText };
+
+      vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockResolvedValue({
+        llmContent: singlePart,
+        returnDisplay: 'Large part output',
+      } as ToolResult);
+
+      const scheduledCall: ScheduledToolCall = {
+        status: CoreToolCallStatus.Scheduled,
+        request: {
+          callId: 'call-part-single',
+          name: 'partTool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-part-single',
+        },
+        tool: mockTool,
+        invocation: invocation as unknown as AnyToolInvocation,
+        startTime: Date.now(),
+      };
+
+      const result = await executor.execute({
+        call: scheduledCall,
+        signal: new AbortController().signal,
+        onUpdateToolCall: vi.fn(),
+      });
+
+      expect(result.status).toBe(CoreToolCallStatus.Success);
+      if (result.status === CoreToolCallStatus.Success) {
+        const response = result.response.responseParts[0]?.functionResponse
+          ?.response as Record<string, unknown>;
+        expect(response).toBeDefined();
+        const output = response['output'] as string;
+        expect(output).toContain('[Tool output truncated to conserve memory');
+        expect(output).toContain('/tmp/truncated_output.txt');
+        expect(fileUtils.saveTruncatedToolOutput).toHaveBeenCalledWith(
+          largeText,
+          'partTool',
+          'call-part-single',
+          expect.any(String),
+          expect.any(String),
+        );
+        expect(Buffer.byteLength(output, 'utf8')).toBeLessThanOrEqual(
+          MAX_STORED_TOOL_OUTPUT_BYTES,
+        );
+      }
+    });
+
+    it('should truncate an array of Part objects exceeding MAX_STORED_TOOL_OUTPUT_BYTES', async () => {
+      const mockTool = new MockTool({
+        name: 'multiPartTool',
+        description: 'Returns array of Parts',
+      });
+      const invocation = mockTool.build({});
+      const normalText = 'Normal part content';
+      const largeText = 'B'.repeat(70 * 1024); // 70 KB
+      const parts: Part[] = [
+        { text: normalText },
+        { text: largeText },
+        { inlineData: { mimeType: 'image/png', data: 'fake_base64_data' } },
+      ];
+
+      vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockResolvedValue({
+        llmContent: parts,
+        returnDisplay: 'Multi-part output',
+      } as ToolResult);
+
+      const scheduledCall: ScheduledToolCall = {
+        status: CoreToolCallStatus.Scheduled,
+        request: {
+          callId: 'call-part-array',
+          name: 'multiPartTool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-part-array',
+        },
+        tool: mockTool,
+        invocation: invocation as unknown as AnyToolInvocation,
+        startTime: Date.now(),
+      };
+
+      const result = await executor.execute({
+        call: scheduledCall,
+        signal: new AbortController().signal,
+        onUpdateToolCall: vi.fn(),
+      });
+
+      expect(result.status).toBe(CoreToolCallStatus.Success);
+      if (result.status === CoreToolCallStatus.Success) {
+        const response = result.response.responseParts[0]?.functionResponse
+          ?.response as Record<string, unknown>;
+        expect(response).toBeDefined();
+        const output = response['output'] as string;
+        expect(output).toContain(normalText);
+        expect(output).toContain('[Tool output truncated to conserve memory');
+        expect(output).toContain('/tmp/truncated_output.txt');
+        expect(fileUtils.saveTruncatedToolOutput).toHaveBeenCalledWith(
+          largeText,
+          'multiPartTool',
+          'call-part-array',
+          expect.any(String),
+          expect.any(String),
+        );
+        // Verify inlineData part was preserved in responseParts
+        expect(
+          result.response.responseParts.some((p) => p.inlineData !== undefined),
+        ).toBe(true);
+      }
+    });
+
+    it('should truncate strings containing multi-byte graphemes without splitting or corrupting characters', async () => {
+      const mockTool = new MockTool({
+        name: 'graphemeTool',
+        description: 'Returns multi-byte graphemes',
+      });
+      const invocation = mockTool.build({});
+
+      // 👩‍👩‍👦‍👦 (family emoji) consists of 7 Unicode code points with ZWJ sequences (25 UTF-8 bytes).
+      // 'caffè' contains accented character è (2 UTF-8 bytes).
+      const emoji = '👩‍👩‍👦‍👦';
+      const accented = 'caffè';
+      const repeatedGraphemes = `${emoji} ${accented} `.repeat(3000); // ~96 KB
+
+      vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockResolvedValue({
+        llmContent: repeatedGraphemes,
+        returnDisplay: 'Grapheme output',
+      } as ToolResult);
+
+      const scheduledCall: ScheduledToolCall = {
+        status: CoreToolCallStatus.Scheduled,
+        request: {
+          callId: 'call-graphemes',
+          name: 'graphemeTool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-graphemes',
+        },
+        tool: mockTool,
+        invocation: invocation as unknown as AnyToolInvocation,
+        startTime: Date.now(),
+      };
+
+      const result = await executor.execute({
+        call: scheduledCall,
+        signal: new AbortController().signal,
+        onUpdateToolCall: vi.fn(),
+      });
+
+      expect(result.status).toBe(CoreToolCallStatus.Success);
+      if (result.status === CoreToolCallStatus.Success) {
+        const response = result.response.responseParts[0]?.functionResponse
+          ?.response as Record<string, unknown>;
+        expect(response).toBeDefined();
+        const output = response['output'] as string;
+
+        expect(output).toContain('[Tool output truncated to conserve memory');
+        expect(output).toContain('/tmp/truncated_output.txt');
+        expect(fileUtils.saveTruncatedToolOutput).toHaveBeenCalledWith(
+          repeatedGraphemes,
+          'graphemeTool',
+          'call-graphemes',
+          expect.any(String),
+          expect.any(String),
+        );
+        expect(Buffer.byteLength(output, 'utf8')).toBeLessThanOrEqual(
+          MAX_STORED_TOOL_OUTPUT_BYTES,
+        );
+
+        // Verify that UTF-8 integrity is preserved (no malformed characters or replacement characters)
+        expect(output.includes('\uFFFD')).toBe(false);
+        // Valid round-trip UTF-8 encoding
+        expect(Buffer.from(output, 'utf8').toString('utf8')).toBe(output);
+      }
+    });
   });
 });

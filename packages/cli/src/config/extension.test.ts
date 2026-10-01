@@ -251,23 +251,20 @@ describe('extension tests', () => {
       expect(extensions[0].name).toBe('test-extension');
     });
 
-    it('should skip the extension if a context file path is outside the extension directory and log an error', async () => {
-      const consoleSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
+    it('should skip loading the context file if a context file path is outside the extension directory and log a warning', async () => {
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       createExtension({
         extensionsDir: userExtensionsDir,
-        name: 'traversal-extension',
+        name: 'boundary-extension',
         version: '1.0.0',
         contextFileName: '../secret.txt',
       });
 
       const extensions = await extensionManager.loadExtensions();
-      expect(extensions).toHaveLength(0);
+      expect(extensions).toHaveLength(1);
+      expect(extensions[0].contextFiles).toHaveLength(0);
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining(
-          'traversal-extension: Invalid context file path: "../secret.txt"',
-        ),
+        expect.stringContaining('Invalid contextFileName: "../secret.txt"'),
       );
       consoleSpy.mockRestore();
     });
@@ -1545,7 +1542,11 @@ name = "yolo-checker"
         `Installing extension "my-local-extension".
 This extension will run the following MCP servers:
   * test-server (local): node dobadthing \\u001b[12D\\u001b[K server.js
+    Description: a local mcp server
+    Config signature: 2e78d87d1e8ad2180a3b7c7cadf540ccd376375312fa9d94371b1b4ea486d992
   * test-server-2 (remote): https://google.com
+    Description: a remote mcp server
+    Config signature: 08fe6539fb2663eceb2f28aeca2ee49ced91a937780986616f989b496f7c8e83
 
 ${INSTALL_WARNING_MESSAGE}`,
       );

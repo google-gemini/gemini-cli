@@ -249,6 +249,66 @@ describe('Session', () => {
     expect(result).toMatchObject({ stopReason: 'end_turn' });
   });
 
+  it('should include standard ACP token usage in PromptResponse.usage and emit usage_update', async () => {
+    async function* mockStreamWithUsage(): AsyncGenerator<ServerGeminiStreamEvent> {
+      yield {
+        type: GeminiEventType.Content,
+        value: 'Hello',
+      };
+      yield {
+        type: GeminiEventType.Finished,
+        value: {
+          reason: FinishReason.STOP,
+          usageMetadata: {
+            promptTokenCount: 120,
+            candidatesTokenCount: 45,
+            cachedContentTokenCount: 80,
+            thoughtsTokenCount: 15,
+          },
+        },
+      };
+    }
+    mockSendMessageStream.mockReturnValue(mockStreamWithUsage());
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Hi' }],
+    });
+
+    expect(result.usage).toEqual({
+      inputTokens: 120,
+      outputTokens: 45,
+      cachedReadTokens: 80,
+      thoughtTokens: 15,
+      totalTokens: 165,
+    });
+    expect(result._meta).toEqual({
+      quota: {
+        token_count: {
+          input_tokens: 120,
+          output_tokens: 45,
+        },
+        model_usage: [
+          {
+            model: 'gemini-pro',
+            token_count: {
+              input_tokens: 120,
+              output_tokens: 45,
+            },
+          },
+        ],
+      },
+    });
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      update: {
+        sessionUpdate: 'usage_update',
+        used: 165,
+        size: expect.any(Number),
+      },
+    });
+  });
+
   it('should pass current session information directly onto geminiClient.sendMessageStream', async () => {
     const stream = createMockStream([
       {
@@ -368,7 +428,20 @@ describe('Session', () => {
       prompt: [{ type: 'text', text: '/memory view' }],
     });
 
-    expect(result).toMatchObject({ stopReason: 'end_turn' });
+    expect(result).toMatchObject({
+      stopReason: 'end_turn',
+      usage: {
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+      },
+      _meta: {
+        quota: {
+          token_count: { input_tokens: 0, output_tokens: 0 },
+          model_usage: [],
+        },
+      },
+    });
     expect(handleCommandSpy).toHaveBeenCalledWith(
       '/memory view',
       expect.any(Object),
@@ -405,7 +478,22 @@ describe('Session', () => {
     });
 
     expect(mockToolRegistry.getTool).toHaveBeenCalledWith('test_tool');
-    expect(result).toMatchObject({ stopReason: 'end_turn' });
+    expect(result).toMatchObject({
+      stopReason: 'end_turn',
+      usage: {
+        inputTokens: 10,
+        outputTokens: 20,
+        totalTokens: 30,
+      },
+      _meta: {
+        quota: {
+          token_count: {
+            input_tokens: 10,
+            output_tokens: 20,
+          },
+        },
+      },
+    });
   });
 
   it('should handle tool call permission request', async () => {
@@ -457,6 +545,143 @@ describe('Session', () => {
 
     expect(mockConnection.requestPermission).toHaveBeenCalled();
     expect(confirmationDetails.onConfirm).toHaveBeenCalled();
+  });
+
+  it('should emit tool_call session update with status pending before requesting permission', async () => {
+    const confirmationDetails = {
+      type: 'info',
+      onConfirm: vi.fn(),
+    };
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(confirmationDetails),
+      execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
+    });
+
+    mockConnection.requestPermission.mockResolvedValue({
+      outcome: {
+        outcome: 'selected',
+        optionId: 'proceed_once',
+      },
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: GeminiEventType.ToolCallRequest,
+        value: {
+          callId: 'call-1',
+          name: 'test_tool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-1',
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: GeminiEventType.Content,
+        value: '',
+      },
+    ]);
+
+    mockSendMessageStream
+      .mockReturnValueOnce(stream1)
+      .mockReturnValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    // Check that we sent a sessionUpdate notification for tool_call with status: pending
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'tool_call',
+          toolCallId: 'call-1',
+          status: 'pending',
+          title: 'Test Tool',
+        }),
+      }),
+    );
+  });
+
+  it('should emit tool_call_update with status failed when tool permission is denied', async () => {
+    const confirmationDetails = {
+      type: 'info',
+      onConfirm: vi.fn(),
+    };
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(confirmationDetails),
+      execute: vi.fn(),
+    });
+
+    mockConnection.requestPermission.mockResolvedValue({
+      outcome: {
+        outcome: 'cancelled',
+      },
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: GeminiEventType.ToolCallRequest,
+        value: {
+          callId: 'call-1',
+          name: 'test_tool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-1',
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: GeminiEventType.Content,
+        value: '',
+      },
+    ]);
+
+    mockSendMessageStream
+      .mockReturnValueOnce(stream1)
+      .mockReturnValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    // Check that we sent a sessionUpdate notification for tool_call with status: pending
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'tool_call',
+          toolCallId: 'call-1',
+          status: 'pending',
+        }),
+      }),
+    );
+
+    // Check that we also sent a sessionUpdate notification for tool_call_update with status: failed
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'tool_call_update',
+          toolCallId: 'call-1',
+          status: 'failed',
+          content: expect.arrayContaining([
+            expect.objectContaining({
+              type: 'content',
+              content: expect.objectContaining({
+                text: expect.stringContaining('was canceled by the user'),
+              }),
+            }),
+          ]),
+        }),
+      }),
+    );
   });
 
   it('should handle @path resolution', async () => {
@@ -697,6 +922,76 @@ describe('Session', () => {
               content: { type: 'text', text: 'Test Explanation' },
             },
           ]),
+        }),
+      }),
+    );
+  });
+
+  it('should include both diff and explanation in request_permission content for edit tools', async () => {
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'edit_file(file_path: test.ts)',
+      getDisplayTitle: () => 'edit_file(file_path: test.ts)',
+      getExplanation: () => 'Updating configuration value',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue({
+        type: 'edit',
+        filePath: 'test.ts',
+        originalContent: 'old',
+        newContent: 'new',
+        onConfirm: vi.fn(),
+      }),
+      execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
+    });
+
+    mockConnection.requestPermission.mockResolvedValue({
+      outcome: {
+        outcome: 'selected',
+        optionId: 'proceed_once',
+      },
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: GeminiEventType.ToolCallRequest,
+        value: {
+          callId: 'call-edit-1',
+          name: 'test_tool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-1',
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: GeminiEventType.Content,
+        value: '',
+      },
+    ]);
+
+    mockSendMessageStream
+      .mockReturnValueOnce(stream1)
+      .mockReturnValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Edit file' }],
+    });
+
+    expect(mockConnection.requestPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolCall: expect.objectContaining({
+          title: 'edit_file(file_path: test.ts)',
+          content: [
+            expect.objectContaining({
+              type: 'diff',
+              path: 'test.ts',
+            }),
+            {
+              type: 'content',
+              content: { type: 'text', text: 'Updating configuration value' },
+            },
+          ],
         }),
       }),
     );
@@ -1069,6 +1364,20 @@ describe('Session', () => {
           requiresUserConfirmation: false,
         }),
       );
+    });
+  });
+
+  describe('dispose', () => {
+    it('should safely dispose without throwing when config.dispose is undefined', async () => {
+      delete (mockConfig as { dispose?: unknown }).dispose;
+      await expect(session.dispose()).resolves.toBeUndefined();
+    });
+
+    it('should catch rejection when config.dispose rejects', async () => {
+      mockConfig.dispose = vi
+        .fn()
+        .mockRejectedValue(new Error('Disposal failed'));
+      await expect(session.dispose()).resolves.toBeUndefined();
     });
   });
 });

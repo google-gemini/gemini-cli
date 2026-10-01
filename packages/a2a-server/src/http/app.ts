@@ -204,7 +204,8 @@ export async function createApp() {
     const initialSettings = loadSettings(workspaceRoot, false);
     const { isTrusted } = checkPathTrust({
       path: workspaceRoot,
-      isFolderTrustEnabled: initialSettings.folderTrust ?? true,
+      isFolderTrustEnabled:
+        initialSettings.security?.folderTrust?.enabled ?? true,
       isHeadless: isHeadlessMode(),
     });
 
@@ -360,6 +361,7 @@ export async function createApp() {
           error:
             'Listing all task metadata is only supported when using InMemoryTaskStore.',
         });
+        return;
       }
       try {
         const wrappers = agentExecutor.getAllTasks();

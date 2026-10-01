@@ -154,6 +154,7 @@ export interface UIState {
   cleanUiDetailsVisible: boolean;
   elapsedTime: number;
   currentLoadingPhrase: string | undefined;
+  statusPhrase?: string | undefined;
   currentTip: string | undefined;
   currentWittyPhrase: string | undefined;
   historyRemountKey: number;

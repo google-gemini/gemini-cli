@@ -34,6 +34,7 @@ import {
   resolveToRealPath,
 } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
+import { withPathLock } from '../utils/pathMutex.js';
 import { correctPath } from '../utils/pathCorrector.js';
 import type { Config } from '../config/config.js';
 import { CoreToolCallStatus } from '../scheduler/types.js';
@@ -61,6 +62,8 @@ import { resolveToolDeclaration } from './definitions/resolver.js';
 import { detectOmissionPlaceholders } from './omissionPlaceholderDetector.js';
 import { discoverJitContext, appendJitContext } from './jit-context.js';
 import { resolveAndValidatePlanPath } from '../utils/planUtils.js';
+import { isBuildFile } from '../utils/buildFileUtils.js';
+import { recordModifiedBuildFile } from '../utils/untrustedContextTracker.js';
 
 const ENABLE_FUZZY_MATCH_RECOVERY = true;
 const FUZZY_MATCH_THRESHOLD = 0.1; // Allow up to 10% weighted difference
@@ -852,6 +855,7 @@ class EditToolInvocation
       fileDiff,
       originalContent: editData.currentContent,
       newContent: editData.newContent,
+      isBuildFile: isBuildFile(this.resolvedPath),
       onConfirm: async (_outcome: ToolConfirmationOutcome) => {
         // Mode transitions (e.g. AUTO_EDIT) and policy updates are now
         // handled centrally by the scheduler.
@@ -911,6 +915,43 @@ class EditToolInvocation
       };
     }
 
+    // Serialize the whole read-modify-write against other writers of this
+    // path. Two edits scheduled in parallel (common with sub-agents) would
+    // otherwise both read the original content, and whichever wrote second
+    // would silently discard the other's edit while still reporting success.
+    let lockKey = path.resolve(this.config.getTargetDir(), this.resolvedPath);
+    try {
+      lockKey = resolveToRealPath(lockKey);
+    } catch {
+      try {
+        const dir = path.dirname(lockKey);
+        const base = path.basename(lockKey);
+        lockKey = path.join(resolveToRealPath(dir), base);
+      } catch {
+        // Keep unresolved lockKey
+      }
+    }
+    try {
+      return await withPathLock(lockKey, () => this.applyEdit(signal), signal);
+    } catch (err) {
+      if (err instanceof Error && err.message === 'Aborted') {
+        throw new Error('Edit aborted');
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Computes and applies the edit.
+   *
+   * Must be called while holding the path lock for `this.resolvedPath`, so
+   * that the read in `calculateEdit` and the subsequent write cannot be
+   * interleaved with another writer of the same file.
+   */
+  private async applyEdit(signal: AbortSignal): Promise<ToolResult> {
+    if (signal.aborted) {
+      throw new Error('Edit aborted');
+    }
     let editData: CalculatedEdit;
     try {
       editData = await this.calculateEdit(this.params, signal);
@@ -955,6 +996,10 @@ class EditToolInvocation
       await this.config
         .getFileSystemService()
         .writeTextFile(this.resolvedPath, finalContent);
+
+      if (isBuildFile(this.resolvedPath)) {
+        recordModifiedBuildFile(this.resolvedPath, this.config);
+      }
 
       let displayResult: ToolResultDisplay;
       if (editData.isNewFile) {
@@ -1011,6 +1056,7 @@ class EditToolInvocation
           newContent: editData.newContent,
           diffStat,
           isNewFile: editData.isNewFile,
+          isBuildFile: isBuildFile(this.resolvedPath),
         };
       }
 

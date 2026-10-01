@@ -108,6 +108,7 @@ export type SerializableConfirmationDetails =
       newContent: string;
       isModifying?: boolean;
       diffStat?: DiffStat;
+      isBuildFile?: boolean;
     }
   | {
       type: 'exec';
@@ -117,6 +118,8 @@ export type SerializableConfirmationDetails =
       rootCommand: string;
       rootCommands: string[];
       commands?: string[];
+      untrustedFlags?: string[];
+      modifiedBuildFiles?: string[];
     }
   | {
       type: 'mcp';

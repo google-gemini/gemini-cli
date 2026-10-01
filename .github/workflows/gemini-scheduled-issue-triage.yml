@@ -169,7 +169,7 @@ jobs:
       - name: 'Run Standard Triage Analysis'
         if: |-
           steps.get_issue_from_event.outputs.has_issues == 'true' || steps.find_issues.outputs.has_standard_issues == 'true'
-        uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
+        uses: 'google-github-actions/run-gemini-cli@f77273f4c914e4bf38440cf36a0369cb64a37489' # ratchet:google-github-actions/run-gemini-cli@v0
         id: 'gemini_standard_issue_analysis'
         env:
           GITHUB_TOKEN: '' # Do not pass any auth token here since this runs on untrusted inputs
@@ -194,7 +194,6 @@ jobs:
               "maxSessionTurns": 25,
               "tools": {
                 "core": [
-                  "run_shell_command(echo)",
                   "read_file"
                 ]
               },
@@ -212,7 +211,7 @@ jobs:
 
             ## Steps
 
-            1. You are only able to use the echo and read_file commands. Review the available labels in the environment variable: "${AVAILABLE_LABELS}".
+            1. You are only able to use the read_file command. Review the available labels in the environment variable: "${AVAILABLE_LABELS}".
             2. Use the read_file tool to read the file "standard_issues_to_triage.json" which contains the JSON array of issues to triage (including their current labels).
             3. Review the issue title, body, current labels, and any comments provided in the JSON file.
             4. Identify the most relevant labels from the existing labels, specifically focusing on area/*, kind/*, and priority/*.
@@ -294,7 +293,7 @@ jobs:
       - name: 'Run Effort Triage Analysis'
         if: |-
           steps.find_issues.outputs.has_effort_issues == 'true'
-        uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
+        uses: 'google-github-actions/run-gemini-cli@f77273f4c914e4bf38440cf36a0369cb64a37489' # ratchet:google-github-actions/run-gemini-cli@v0
         id: 'gemini_effort_issue_analysis'
         env:
           GITHUB_TOKEN: '' # Do not pass any auth token here since this runs on untrusted inputs
@@ -319,7 +318,6 @@ jobs:
               "maxSessionTurns": 30,
               "tools": {
                 "core": [
-                  "run_shell_command(echo)",
                   "grep_search",
                   "glob",
                   "read_file"

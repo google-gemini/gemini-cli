@@ -13,6 +13,7 @@ import { theme as semanticTheme } from '../../semantic-colors.js';
 import type { Theme } from '../../themes/theme.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
 import { getFileExtension } from '../../utils/fileUtils.js';
+import { safeRepeat } from '../../utils/borderStyles.js';
 
 export interface DiffLine {
   type: 'add' | 'del' | 'context' | 'hunk' | 'other';
@@ -91,6 +92,7 @@ interface DiffRendererProps {
   theme?: Theme;
   disableColor?: boolean;
   paddingX?: number;
+  disableTruncation?: boolean;
 }
 
 const DEFAULT_TAB_WIDTH = 4; // Spaces per tab for normalization
@@ -104,8 +106,10 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
   theme,
   disableColor = false,
   paddingX = 0,
+  disableTruncation = false,
 }) => {
   const settings = useSettings();
+  const safeTerminalWidth = Math.max(0, Math.floor(terminalWidth || 0));
 
   const screenReaderEnabled = useIsScreenReaderEnabled();
 
@@ -156,12 +160,15 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
       return colorizeCode({
         code: addedContent,
         language,
-        availableHeight: availableTerminalHeight,
-        maxWidth: terminalWidth,
+        availableHeight: disableTruncation
+          ? undefined
+          : availableTerminalHeight,
+        maxWidth: safeTerminalWidth,
         theme,
         settings,
         disableColor,
         paddingX,
+        disableTruncation,
       });
     } else {
       const key = filename ? `diff-box-${filename}` : undefined;
@@ -169,15 +176,15 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
       return (
         <MaxSizedBox
           paddingX={paddingX}
-          maxHeight={availableTerminalHeight}
-          maxWidth={terminalWidth}
+          maxHeight={disableTruncation ? undefined : availableTerminalHeight}
+          maxWidth={safeTerminalWidth}
           key={key}
         >
           {renderDiffLines({
             parsedLines,
             filename,
             tabWidth,
-            terminalWidth,
+            terminalWidth: safeTerminalWidth,
             disableColor,
           })}
         </MaxSizedBox>
@@ -190,12 +197,13 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
     isNewFileResult,
     filename,
     availableTerminalHeight,
-    terminalWidth,
+    safeTerminalWidth,
     theme,
     settings,
     tabWidth,
     disableColor,
     paddingX,
+    disableTruncation,
   ]);
 
   return renderedOutput;
@@ -228,10 +236,13 @@ export const renderDiffLines = ({
   terminalWidth,
   disableColor = false,
 }: RenderDiffLinesOptions): React.ReactNode[] => {
+  const safeTabWidth = Math.max(0, Math.floor(tabWidth || 0));
+  const safeTerminalWidth = Math.max(0, Math.floor(terminalWidth || 0));
+
   // 1. Normalize whitespace (replace tabs with spaces) *before* further processing
   const normalizedLines = parsedLines.map((line) => ({
     ...line,
-    content: line.content.replace(/\t/g, ' '.repeat(tabWidth)),
+    content: line.content.replace(/\t/g, safeRepeat(' ', safeTabWidth)),
   }));
 
   // Filter out non-displayable lines (hunks, potentially 'other') using the normalized list
@@ -301,7 +312,7 @@ export const renderDiffLines = ({
               borderLeft={false}
               borderRight={false}
               borderBottom={false}
-              width={terminalWidth}
+              width={safeTerminalWidth}
               borderColor={semanticTheme.text.secondary}
             ></Box>
           </Box>,

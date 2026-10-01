@@ -18,6 +18,7 @@ import { INTERACTIVE_SHELL_WAITING_PHRASE } from '../hooks/usePhraseCycler.js';
 
 interface LoadingIndicatorProps {
   currentLoadingPhrase?: string;
+  statusPhrase?: string;
   wittyPhrase?: string;
   showWit?: boolean;
   showTips?: boolean;
@@ -35,6 +36,7 @@ interface LoadingIndicatorProps {
 
 export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   currentLoadingPhrase,
+  statusPhrase,
   wittyPhrase,
   showWit = false,
   elapsedTime,
@@ -54,22 +56,24 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   if (
     streamingState === StreamingState.Idle &&
     !currentLoadingPhrase &&
+    !statusPhrase &&
     !thought
   ) {
     return null;
   }
 
-  // Prioritize the interactive shell waiting phrase over the thought subject
-  // because it conveys an actionable state for the user (waiting for input).
+  // Prioritize active operational status (e.g. retries) or interactive shell waiting
+  // over thought subject, while keeping cosmetic tips/witty phrases subordinate to thoughts.
   const primaryText =
-    currentLoadingPhrase === INTERACTIVE_SHELL_WAITING_PHRASE
+    statusPhrase ??
+    (currentLoadingPhrase === INTERACTIVE_SHELL_WAITING_PHRASE
       ? currentLoadingPhrase
       : thought?.subject
         ? (thoughtLabel ?? thought.subject)
         : currentLoadingPhrase ||
           (streamingState === StreamingState.Responding
             ? 'Thinking...'
-            : undefined);
+            : undefined));
 
   const cancelAndTimerContent =
     showCancelAndTimer && streamingState === StreamingState.Responding
