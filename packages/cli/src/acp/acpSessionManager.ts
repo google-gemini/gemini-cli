@@ -149,8 +149,9 @@ export class AcpSessionManager {
       this.sessions.set(sessionId, session);
 
       setTimeout(() => {
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        session?.sendAvailableCommands();
+        session?.sendAvailableCommands().catch((err) => {
+          debugLogger.error('Error sending available commands: ' + err);
+        });
       }, 0);
 
       const { availableModels, currentModelId } = buildAvailableModels(
