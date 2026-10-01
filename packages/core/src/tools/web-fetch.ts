@@ -845,11 +845,29 @@ ${toFetch.join('\n')}
         });
 
         insertions.sort((a, b) => b.index - a.index);
-        const responseChars = responseText.split('');
-        insertions.forEach((insertion) => {
-          responseChars.splice(insertion.index, 0, insertion.marker);
-        });
-        responseText = responseChars.join('');
+
+        // Use TextEncoder/TextDecoder since segment indices are UTF-8 byte positions
+        const encoder = new TextEncoder();
+        const responseBytes = encoder.encode(responseText);
+        const parts: Uint8Array[] = [];
+        let lastIndex = responseBytes.length;
+        for (const ins of insertions) {
+          const pos = Math.min(ins.index, lastIndex);
+          parts.unshift(responseBytes.subarray(pos, lastIndex));
+          parts.unshift(encoder.encode(ins.marker));
+          lastIndex = pos;
+        }
+        parts.unshift(responseBytes.subarray(0, lastIndex));
+
+        // Concatenate all parts into a single buffer
+        const totalLength = parts.reduce((sum, part) => sum + part.length, 0);
+        const finalBytes = new Uint8Array(totalLength);
+        let offset = 0;
+        for (const part of parts) {
+          finalBytes.set(part, offset);
+          offset += part.length;
+        }
+        responseText = new TextDecoder().decode(finalBytes);
       }
 
       // 2. Append Source List
