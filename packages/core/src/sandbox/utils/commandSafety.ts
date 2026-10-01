@@ -553,35 +553,7 @@ function isSafeToCallWithExec(
   }
 
   if (cmd === 'git') {
-    if (gitHasConfigOverrideGlobalOption(args)) {
-      return false;
-    }
-
-    const { idx, subcommand } = findGitSubcommand(args, [
-      'status',
-      'log',
-      'diff',
-      'show',
-      'branch',
-    ]);
-    if (!subcommand) {
-      return false;
-    }
-
-    const subcommandArgs = args.slice(idx + 1);
-
-    if (['status', 'log', 'diff', 'show'].includes(subcommand)) {
-      return gitSubcommandArgsAreReadOnly(subcommandArgs);
-    }
-
-    if (subcommand === 'branch') {
-      return (
-        gitSubcommandArgsAreReadOnly(subcommandArgs) &&
-        gitBranchIsReadOnly(subcommandArgs)
-      );
-    }
-
-    return false;
+    return isReadOnlyGitCommand(args);
   }
 
   if (cmd === 'sed') {
@@ -600,6 +572,48 @@ function isSafeToCallWithExec(
   }
 
   return false;
+}
+
+/**
+ * Checks whether a git invocation is a known read-only operation: an allowed
+ * subcommand (`status`, `log`, `diff`, `show`, `branch`) with no config
+ * overrides and no flags that write files or execute programs.
+ *
+ * @param args - The full git command arguments, starting with `git`.
+ * @returns true if the command is safe to run without confirmation.
+ */
+export function isReadOnlyGitCommand(args: string[]): boolean {
+  if (gitHasConfigOverrideGlobalOption(args)) {
+    return false;
+  }
+
+  const { idx, subcommand } = findGitSubcommand(args, [
+    'status',
+    'log',
+    'diff',
+    'show',
+    'branch',
+  ]);
+  if (!subcommand) {
+    return false;
+  }
+
+  // Global options placed before the subcommand can redirect git to an
+  // attacker-controlled exec path, repository, or working tree.
+  if (gitHasDangerousGlobalOption(args.slice(1, idx))) {
+    return false;
+  }
+
+  const subcommandArgs = args.slice(idx + 1);
+
+  if (['status', 'log', 'diff', 'show'].includes(subcommand)) {
+    return gitSubcommandArgsAreReadOnly(subcommandArgs);
+  }
+
+  return (
+    gitSubcommandArgsAreReadOnly(subcommandArgs) &&
+    gitBranchIsReadOnly(subcommandArgs)
+  );
 }
 
 /**
@@ -683,6 +697,27 @@ function gitHasConfigOverrideGlobalOption(args: string[]): boolean {
 }
 
 /**
+ * Checks git's global options (those before the subcommand) for ones that
+ * change where git loads helpers, repository data, or the working tree from:
+ * `--exec-path`, `--git-dir`, `--work-tree`, and `-C`.
+ *
+ * @param globalArgs - The arguments between `git` and the subcommand.
+ * @returns true if a dangerous global option is present.
+ */
+function gitHasDangerousGlobalOption(globalArgs: string[]): boolean {
+  return globalArgs.some(
+    (arg) =>
+      arg === '--exec-path' ||
+      arg.startsWith('--exec-path=') ||
+      arg === '--git-dir' ||
+      arg.startsWith('--git-dir=') ||
+      arg === '--work-tree' ||
+      arg.startsWith('--work-tree=') ||
+      arg.startsWith('-C'),
+  );
+}
+
+/**
  * Validates that the arguments for safe git subcommands (like `status`, `log`,
  * `diff`, `show`) do not contain flags that could cause mutations or execute
  * arbitrary commands (e.g., `--output`, `--exec`).
@@ -691,20 +726,28 @@ function gitHasConfigOverrideGlobalOption(args: string[]): boolean {
  * @returns true if the arguments only represent read-only operations.
  */
 function gitSubcommandArgsAreReadOnly(args: string[]): boolean {
-  const unsafeFlags = new Set([
+  const unsafeFlags = [
     '--output',
     '--ext-diff',
     '--textconv',
     '--exec',
     '--paginate',
-  ]);
+  ];
 
-  return !args.some(
-    (arg) =>
-      unsafeFlags.has(arg) ||
-      arg.startsWith('--output=') ||
-      arg.startsWith('--exec='),
-  );
+  // Git accepts any unambiguous prefix of a long option (e.g. `--out=file`),
+  // so treat any prefix of an unsafe flag as unsafe too.
+  return !args.some((arg) => {
+    if (!arg.startsWith('--')) {
+      return false;
+    }
+    const name = arg.split('=', 1)[0];
+    // `--text` is an exact, safe diff option that merely prefixes `--textconv`.
+    return (
+      name !== '--text' &&
+      name.length >= 3 &&
+      unsafeFlags.some((flag) => flag.startsWith(name))
+    );
+  });
 }
 
 /**
