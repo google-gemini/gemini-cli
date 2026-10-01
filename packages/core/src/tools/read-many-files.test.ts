@@ -17,7 +17,9 @@ import { mockControl } from '../__mocks__/fs/promises.js';
 import {
   ReadManyFilesTool,
   isAssetExplicitlyRequested,
+  type AssetRequestCache,
 } from './read-many-files.js';
+import { LRUCache } from 'mnemonist';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import path from 'node:path';
 import { isSubpath, resolveToRealPath } from '../utils/paths.js';
@@ -1337,6 +1339,36 @@ Content of file[1]
       ).toBe(true);
       expect(
         isAssetExplicitlyRequested(['logo.*'], '/root/logo.png', 'logo.png'),
+      ).toBe(true);
+    });
+
+    it('should use provided LRUCache to cache compiled matchers and scans', () => {
+      const cache: AssetRequestCache = new LRUCache(100);
+      expect(
+        isAssetExplicitlyRequested(
+          ['assets/*.{png,jpg}', 'logo.*'],
+          '/root/assets/logo.png',
+          'assets/logo.png',
+          ['/root'],
+          cache,
+        ),
+      ).toBe(true);
+
+      // Verify that cache was populated with compiled matcher and scan
+      expect(cache.size).toBeGreaterThan(0);
+      expect(cache.has('assets/*.{png,jpg}')).toBe(true);
+      expect(cache.has('scan:.{png,jpg}')).toBe(true);
+      expect(cache.has('matcher:.{png,jpg}')).toBe(true);
+
+      // Second run should use cached values
+      expect(
+        isAssetExplicitlyRequested(
+          ['assets/*.{png,jpg}', 'logo.*'],
+          '/root/assets/other.png',
+          'assets/other.png',
+          ['/root'],
+          cache,
+        ),
       ).toBe(true);
     });
   });

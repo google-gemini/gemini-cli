@@ -21,6 +21,7 @@ import * as fsPromises from 'node:fs/promises';
 import * as path from 'node:path';
 import { glob, escape } from 'glob';
 import picomatch from 'picomatch';
+import { LRUCache } from 'mnemonist';
 import { buildParamArgsPattern } from '../policy/utils.js';
 import {
   detectFileType,
@@ -112,6 +113,22 @@ type FileProcessingResult =
     };
 
 /**
+ * Cache type for storing compiled picomatch matchers and scan results.
+ */
+export type AssetRequestCache = LRUCache<
+  string,
+  picomatch.Matcher | ReturnType<typeof picomatch.scan>
+>;
+
+function isMatcher(val: unknown): val is picomatch.Matcher {
+  return typeof val === 'function';
+}
+
+function isScanInfo(val: unknown): val is ReturnType<typeof picomatch.scan> {
+  return typeof val === 'object' && val !== null && 'isGlob' in val;
+}
+
+/**
  * Determines whether an asset file (image, PDF, audio, video) was explicitly requested
  * by name or extension in the include patterns, rather than implicitly matched
  * by a broad glob pattern (e.g. generic wildcard or directory patterns).
@@ -121,6 +138,7 @@ export function isAssetExplicitlyRequested(
   filePath: string,
   relativePathForDisplay: string,
   workspaceDirs: readonly string[] = [],
+  cache?: AssetRequestCache,
 ): boolean {
   const fileExtension = path.extname(filePath);
   const fileName = path.basename(filePath);
@@ -132,10 +150,16 @@ export function isAssetExplicitlyRequested(
     if (!normalizedPattern) return false;
 
     // Check if pattern matches this file (by relative path, full path, or by filename if pattern has no slashes)
-    const fileMatcher = picomatch(normalizedPattern, {
-      nocase: true,
-      dot: true,
-    });
+    const cachedMatcher = cache?.get(normalizedPattern);
+    const fileMatcher = isMatcher(cachedMatcher)
+      ? cachedMatcher
+      : picomatch(normalizedPattern, {
+          nocase: true,
+          dot: true,
+        });
+    if (!cachedMatcher && cache) {
+      cache.set(normalizedPattern, fileMatcher);
+    }
     const matchesPath =
       fileMatcher(normalizedRelativePath) || fileMatcher(normalizedFilePath);
     const matchesFileName =
@@ -165,13 +189,28 @@ export function isAssetExplicitlyRequested(
     // Pattern leaf has a non-wildcard extension (e.g., '*.png', '**/*.png', 'assets/*.PNG', '*.{png,jpg}')
     // and that extension pattern matches the file's extension case-insensitively.
     if (patternExt && !patternExt.includes('*') && !patternExt.includes('?')) {
-      const extScan = picomatch.scan(patternExt);
+      const cachedScan = cache?.get(`scan:${patternExt}`);
+      const extScan = isScanInfo(cachedScan)
+        ? cachedScan
+        : picomatch.scan(patternExt);
+      if (!cachedScan && cache) {
+        cache.set(`scan:${patternExt}`, extScan);
+      }
       if (!extScan.isGlob) {
         if (patternExt.toLowerCase() === fileExtension.toLowerCase()) {
           return true;
         }
-      } else if (picomatch(patternExt, { nocase: true })(fileExtension)) {
-        return true;
+      } else {
+        const cachedExtMatcher = cache?.get(`matcher:${patternExt}`);
+        const extMatcher = isMatcher(cachedExtMatcher)
+          ? cachedExtMatcher
+          : picomatch(patternExt, { nocase: true });
+        if (!cachedExtMatcher && cache) {
+          cache.set(`matcher:${patternExt}`, extMatcher);
+        }
+        if (extMatcher(fileExtension)) {
+          return true;
+        }
       }
     }
 
@@ -179,8 +218,14 @@ export function isAssetExplicitlyRequested(
     // Pattern leaf specifies a non-wildcard filename/stem (e.g., 'logo.png', 'myExactImage.png', 'report-final.pdf', 'logo.*')
     // i.e. patternStem is not empty, not '*' or '**', and contains no glob characters.
     if (patternStem && patternStem !== '*' && patternStem !== '**') {
-      const scan = picomatch.scan(patternStem);
-      if (!scan.isGlob) {
+      const cachedStemScan = cache?.get(`scan:${patternStem}`);
+      const stemScan = isScanInfo(cachedStemScan)
+        ? cachedStemScan
+        : picomatch.scan(patternStem);
+      if (!cachedStemScan && cache) {
+        cache.set(`scan:${patternStem}`, stemScan);
+      }
+      if (!stemScan.isGlob) {
         return true;
       }
     }
@@ -205,6 +250,8 @@ class ReadManyFilesToolInvocation extends BaseToolInvocation<
   ReadManyFilesParams,
   ToolResult
 > {
+  private readonly assetRequestCache: AssetRequestCache = new LRUCache(1000);
+
   constructor(
     private readonly config: Config,
     params: ReadManyFilesParams,
@@ -383,6 +430,7 @@ ${finalExclusionPatternsForDescription
               filePath,
               relativePathForDisplay,
               this.config.getWorkspaceContext().getDirectories(),
+              this.assetRequestCache,
             );
 
             if (!requestedExplicitly) {
