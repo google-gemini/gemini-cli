@@ -11,6 +11,7 @@ import type { AuthType } from './contentGenerator.js';
 import type { Storage } from '../config/storage.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
+import { resolveToRealPath, isSubpath } from '../utils/paths.js';
 
 const LOG_FILE_NAME = 'logs.json';
 
@@ -294,6 +295,35 @@ export class Logger {
     return path.join(this.geminiDir, `checkpoint-${encodedTag}.json`);
   }
 
+  /**
+   * The tag in a legacy raw path comes straight from user input (chat
+   * command args), and path.join() normalizes ".." segments away. Only
+   * allow the legacy path when it still resolves inside the checkpoint
+   * directory, so a traversal tag simply misses instead of reading or
+   * deleting a file outside it.
+   *
+   * The candidate stays lexical — the tag must be compared exactly as
+   * the fs calls will open it, and resolveToRealPath would decode %XX
+   * sequences inside it. It is matched against both the raw and the
+   * realpath'd directory (isSubpath handles the case-insensitive
+   * platforms), so setups where a segment of the directory is a symlink
+   * (e.g. /var -> /private/var on macOS) don't drop legit checkpoints.
+   */
+  private _isInsideCheckpointDir(candidatePath: string): boolean {
+    const resolvedCandidate = path.resolve(candidatePath);
+    const rawDir = path.resolve(this.geminiDir!);
+    let realDir = rawDir;
+    try {
+      realDir = resolveToRealPath(this.geminiDir!);
+    } catch {
+      // Keep the raw directory as the fallback prefix.
+    }
+    return (
+      isSubpath(rawDir, resolvedCandidate) ||
+      isSubpath(realDir, resolvedCandidate)
+    );
+  }
+
   private async _getCheckpointPath(tag: string): Promise<string> {
     // 1. Check for the new encoded path first.
     const newPath = this._checkpointPath(tag);
@@ -311,6 +341,10 @@ export class Logger {
 
     // 2. Fallback for backward compatibility: check for the old raw path.
     const oldPath = path.join(this.geminiDir!, `checkpoint-${tag}.json`);
+    if (!this._isInsideCheckpointDir(oldPath)) {
+      // The tag escapes the checkpoint directory; never touch it.
+      return newPath;
+    }
     try {
       await fs.access(oldPath);
       return oldPath; // Found it, use the old path.
@@ -420,7 +454,12 @@ export class Logger {
 
     // 2. Attempt to delete the old raw path for backward compatibility.
     const oldPath = path.join(this.geminiDir, `checkpoint-${tag}.json`);
-    if (newPath !== oldPath) {
+    if (
+      newPath !== oldPath &&
+      // The tag is untrusted user input; never touch a legacy path that
+      // resolves outside the checkpoint directory.
+      this._isInsideCheckpointDir(oldPath)
+    ) {
       try {
         await fs.unlink(oldPath);
         deletedSomething = true;
