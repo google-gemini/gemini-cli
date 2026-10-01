@@ -50,8 +50,14 @@ export class AcpSessionManager {
   }
 
   async dispose(): Promise<void> {
-    const disposePromises = Array.from(this.sessions.values()).map((session) =>
-      session.dispose(),
+    const disposePromises = Array.from(this.sessions.entries()).map(
+      async ([sessionId, session]) => {
+        try {
+          await session.dispose();
+        } catch (err) {
+          debugLogger.error(`Error disposing session ${sessionId}: ${err}`);
+        }
+      },
     );
     await Promise.all(disposePromises);
     this.sessions.clear();
@@ -214,8 +220,15 @@ export class AcpSessionManager {
 
     const existingSession = this.sessions.get(sessionId);
     if (existingSession) {
-      await existingSession.dispose();
-      this.sessions.delete(sessionId);
+      try {
+        await existingSession.dispose();
+      } catch (err) {
+        debugLogger.error(
+          `Error disposing existing session ${sessionId}: ${err}`,
+        );
+      } finally {
+        this.sessions.delete(sessionId);
+      }
     }
 
     let config: Config | undefined;
