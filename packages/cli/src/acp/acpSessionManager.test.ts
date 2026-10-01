@@ -612,4 +612,88 @@ describe('AcpSessionManager', () => {
 
     expect(mockConfig.dispose).toHaveBeenCalled();
   });
+
+  it('should await session disposals and clear sessions on dispose', async () => {
+    mockConfig.getContentGeneratorConfig = vi.fn().mockReturnValue({
+      apiKey: 'test-key',
+    });
+    const response = await manager.newSession(
+      {
+        cwd: '/tmp',
+        mcpServers: [],
+      },
+      {},
+    );
+
+    const session = manager.getSession(response.sessionId);
+    expect(session).toBeDefined();
+    const disposeSpy = vi.spyOn(session!, 'dispose');
+
+    await manager.dispose();
+
+    expect(disposeSpy).toHaveBeenCalledTimes(1);
+    expect(manager.getSession(response.sessionId)).toBeUndefined();
+  });
+
+  it('should dispose session and remove from manager when newSession fails after session instantiation', async () => {
+    mockConfig.getContentGeneratorConfig = vi.fn().mockReturnValue({
+      apiKey: 'test-key',
+    });
+    mockConfig.getModel = vi.fn().mockImplementation(() => {
+      throw new Error('Post-session failure');
+    });
+
+    await expect(
+      manager.newSession(
+        {
+          cwd: '/tmp',
+          mcpServers: [],
+        },
+        {},
+      ),
+    ).rejects.toThrow('Post-session failure');
+
+    expect(mockConfig.dispose).toHaveBeenCalled();
+    expect(manager.getSession('test-session-id')).toBeUndefined();
+  });
+
+  it('should dispose session and remove from manager when loadSession fails after session instantiation', async () => {
+    const testDir = await fs.mkdtemp(path.join(os.tmpdir(), 'gemini-test-'));
+    const sessionId = '11111111-2222-3333-4444-555555555555';
+    const storage = new Storage(testDir);
+    await storage.initialize();
+    const chatsDir = path.join(storage.getProjectTempDir(), 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const sessionRecord = {
+      sessionId,
+      projectHash: 'test-hash',
+      startTime: new Date().toISOString(),
+      lastUpdated: new Date().toISOString(),
+      kind: 'main',
+      messages: [{ type: 'user', content: 'hello' }],
+    };
+    await fs.writeFile(
+      path.join(chatsDir, `session-2026-09-30-${sessionId.slice(0, 8)}.jsonl`),
+      JSON.stringify(sessionRecord) + '\n',
+    );
+
+    mockConfig.getModel = vi.fn().mockImplementation(() => {
+      throw new Error('Post-session load failure');
+    });
+
+    await expect(
+      manager.loadSession(
+        {
+          sessionId,
+          cwd: testDir,
+          mcpServers: [],
+        },
+        {},
+      ),
+    ).rejects.toThrow('Post-session load failure');
+
+    expect(mockConfig.dispose).toHaveBeenCalled();
+    expect(manager.getSession(sessionId)).toBeUndefined();
+  });
 });

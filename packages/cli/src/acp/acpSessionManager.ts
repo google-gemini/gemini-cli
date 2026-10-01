@@ -49,10 +49,11 @@ export class AcpSessionManager {
     return this.sessions.get(sessionId);
   }
 
-  dispose(): void {
-    for (const session of this.sessions.values()) {
-      void session.dispose();
-    }
+  async dispose(): Promise<void> {
+    const disposePromises = Array.from(this.sessions.values()).map((session) =>
+      session.dispose(),
+    );
+    await Promise.all(disposePromises);
     this.sessions.clear();
   }
 
@@ -115,6 +116,7 @@ export class AcpSessionManager {
       );
     }
 
+    let session: Session | undefined;
     try {
       if (this.clientCapabilities?.fs) {
         const acpFileSystemService = new AcpFileSystemService(
@@ -137,7 +139,7 @@ export class AcpSessionManager {
         ? geminiClient.getChat()
         : await geminiClient.startChat();
 
-      const session = new Session(
+      session = new Session(
         sessionId,
         chat,
         config,
@@ -148,7 +150,7 @@ export class AcpSessionManager {
 
       setTimeout(() => {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        session.sendAvailableCommands();
+        session?.sendAvailableCommands();
       }, 0);
 
       const { availableModels, currentModelId } = buildAvailableModels(
@@ -169,7 +171,16 @@ export class AcpSessionManager {
       };
       return response;
     } catch (error) {
-      if (config) {
+      if (session) {
+        this.sessions.delete(sessionId);
+        try {
+          await session.dispose();
+        } catch (disposeError) {
+          debugLogger.error(
+            `Error disposing session in newSession: ${disposeError}`,
+          );
+        }
+      } else if (config) {
         try {
           await config.dispose?.();
         } catch (disposeError) {
@@ -210,6 +221,7 @@ export class AcpSessionManager {
     }
 
     let config: Config | undefined;
+    let session: Session | undefined;
     try {
       config = await this.prepareSessionConfig(
         sessionId,
@@ -230,7 +242,7 @@ export class AcpSessionManager {
         filePath: sessionPath,
       });
 
-      const session = new Session(
+      session = new Session(
         sessionId,
         geminiClient.getChat(),
         config,
@@ -246,7 +258,7 @@ export class AcpSessionManager {
 
       setTimeout(() => {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        session.sendAvailableCommands();
+        session?.sendAvailableCommands();
       }, 0);
 
       const { availableModels, currentModelId } = buildAvailableModels(
@@ -266,7 +278,16 @@ export class AcpSessionManager {
       };
       return response;
     } catch (error) {
-      if (config) {
+      if (session) {
+        this.sessions.delete(sessionId);
+        try {
+          await session.dispose();
+        } catch (disposeError) {
+          debugLogger.error(
+            `Error disposing session in loadSession: ${disposeError}`,
+          );
+        }
+      } else if (config) {
         try {
           await config.dispose?.();
         } catch (disposeError) {
