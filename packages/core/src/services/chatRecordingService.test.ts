@@ -199,6 +199,11 @@ describe('ChatRecordingService', () => {
 
       expect(hasResumableConversationContent(messages)).toBe(true);
     });
+
+    it('should return false when messages is undefined or empty', () => {
+      expect(hasResumableConversationContent(undefined)).toBe(false);
+      expect(hasResumableConversationContent([])).toBe(false);
+    });
   });
 
   describe('initialize', () => {
@@ -1236,6 +1241,42 @@ describe('ChatRecordingService', () => {
       await chatRecordingService.deleteCurrentSessionIfNotResumableAsync();
 
       expect(fs.existsSync(collisionFile)).toBe(true);
+    });
+
+    it('should handle malformed records with undefined messages without throwing', async () => {
+      const chatsDir = path.join(testTempDir, 'chats');
+      fs.mkdirSync(chatsDir, { recursive: true });
+      const sessionFile = path.join(chatsDir, 'session-malformed.jsonl');
+      // Write metadata only without messages array
+      fs.writeFileSync(
+        sessionFile,
+        JSON.stringify({
+          sessionId: 'malformed-session',
+          projectHash: 'test-project-hash',
+          startTime: new Date().toISOString(),
+          lastUpdated: new Date().toISOString(),
+        }) + '\n',
+      );
+
+      (
+        chatRecordingService as unknown as {
+          conversationFile: string;
+          cachedConversation: { messages?: MessageRecord[] };
+          isResumedSession: boolean;
+        }
+      ).conversationFile = sessionFile;
+      (
+        chatRecordingService as unknown as {
+          cachedConversation: { messages?: MessageRecord[] };
+        }
+      ).cachedConversation = {};
+      (
+        chatRecordingService as unknown as { isResumedSession: boolean }
+      ).isResumedSession = false;
+
+      await expect(
+        chatRecordingService.deleteCurrentSessionIfNotResumableAsync(),
+      ).resolves.not.toThrow();
     });
   });
 

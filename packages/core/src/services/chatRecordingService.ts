@@ -125,9 +125,11 @@ export function isResumableMessageRecord(message: MessageRecord): boolean {
 }
 
 export function hasResumableConversationContent(
-  messages: readonly MessageRecord[],
+  messages?: readonly MessageRecord[],
 ): boolean {
-  return messages.some((message) => isResumableMessageRecord(message));
+  return (
+    messages?.some((message) => isResumableMessageRecord(message)) ?? false
+  );
 }
 
 export async function loadConversationRecord(
@@ -557,7 +559,7 @@ export class ChatRecordingService {
             this.projectHash = this.cachedConversation.projectHash;
             if (
               loadedRecord.hasResumableContent ||
-              hasResumableConversationContent(loadedRecord.messages)
+              hasResumableConversationContent(loadedRecord.messages ?? [])
             ) {
               this.isResumedSession = true;
             }
@@ -970,7 +972,7 @@ export class ChatRecordingService {
 
     if (
       this.cachedConversation &&
-      hasResumableConversationContent(this.cachedConversation.messages)
+      hasResumableConversationContent(this.cachedConversation.messages ?? [])
     ) {
       return;
     }
@@ -982,7 +984,7 @@ export class ChatRecordingService {
         if (
           fileRecord &&
           (fileRecord.hasResumableContent ||
-            hasResumableConversationContent(fileRecord.messages))
+            hasResumableConversationContent(fileRecord.messages ?? []))
         ) {
           return;
         }
