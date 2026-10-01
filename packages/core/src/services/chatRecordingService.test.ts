@@ -43,6 +43,7 @@ import {
   hasResumableConversationContent,
   isResumableMessageRecord,
   loadConversationRecord,
+  MAX_HISTORY_MESSAGES,
   type ConversationRecord,
   type ToolCallRecord,
   type MessageRecord,
@@ -1682,6 +1683,477 @@ describe('ChatRecordingService', () => {
       expect(record2!.messages).toHaveLength(2);
       expect(record2!.messages[0].id).toBe(summaryId);
       expect(record2!.messages[1].id).toBe('h2');
+    });
+  });
+
+  describe('append-only delta patching and memory bounding', () => {
+    it('should append atomic delta patches instead of $set: { messages } when updating tool results or turns', async () => {
+      await chatRecordingService.initialize();
+
+      const userMsgId = chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'Run tool',
+        model: 'gemini-pro',
+      });
+      const modelMsgId = chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: 'Running tool...',
+        model: 'gemini-pro',
+      });
+
+      const callId = 'tool-call-delta-1';
+      chatRecordingService.recordToolCalls('gemini-pro', [
+        {
+          id: callId,
+          name: 'read_file',
+          args: { path: 'large.txt' },
+          result: [{ text: 'x'.repeat(10000) }],
+          status: CoreToolCallStatus.Success,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+
+      const maskedOutput = '<tool_output_masked>masked</tool_output_masked>';
+      const history: HistoryTurn[] = [
+        {
+          id: userMsgId,
+          content: { role: 'user', parts: [{ text: 'Run tool' }] },
+        },
+        {
+          id: modelMsgId,
+          content: {
+            role: 'model',
+            parts: [
+              {
+                functionCall: {
+                  id: callId,
+                  name: 'read_file',
+                  args: { path: 'large.txt' },
+                },
+              },
+            ],
+          },
+        },
+        {
+          id: 'tool-resp-turn-1',
+          content: {
+            role: 'user',
+            parts: [
+              {
+                functionResponse: {
+                  id: callId,
+                  name: 'read_file',
+                  response: { output: maskedOutput },
+                },
+              },
+            ],
+          },
+        },
+      ];
+
+      chatRecordingService.updateMessagesFromHistory(history);
+
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+      const rawLines = fs
+        .readFileSync(sessionFile, 'utf8')
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line));
+
+      // Verify NO line contains { $set: { messages: [...] } }
+      for (const record of rawLines) {
+        if (record && typeof record === 'object' && '$set' in record) {
+          expect(record.$set).not.toHaveProperty('messages');
+        }
+      }
+
+      const loaded = await loadConversationRecord(sessionFile);
+      expect(loaded).not.toBeNull();
+      const loadedGemini = loaded!.messages.find((m) => m.id === modelMsgId);
+      expect(loadedGemini?.type).toBe('gemini');
+      if (loadedGemini?.type === 'gemini') {
+        expect(loadedGemini.toolCalls?.[0].result).toEqual([
+          {
+            functionResponse: {
+              id: callId,
+              name: 'read_file',
+              response: { output: maskedOutput },
+            },
+          },
+        ]);
+      }
+    });
+
+    it('should scale file size linearly O(n) and bound in-memory cached messages over 100+ turns with large tool outputs', async () => {
+      await chatRecordingService.initialize();
+
+      const totalTurns = 100;
+      const payloadSize = 50 * 1024; // 50 KB per turn
+      const largePayload = 'A'.repeat(payloadSize);
+      const history: HistoryTurn[] = [];
+      let firstTurnUserMsgId = '';
+
+      for (let i = 0; i < totalTurns; i++) {
+        const userId = chatRecordingService.recordMessage({
+          type: 'user',
+          content: `User prompt ${i}`,
+          model: 'gemini-pro',
+        });
+        if (i === 0) {
+          firstTurnUserMsgId = userId;
+        }
+        const modelId = chatRecordingService.recordMessage({
+          type: 'gemini',
+          content: `Model response ${i}`,
+          model: 'gemini-pro',
+        });
+        const callId = `call-${i}`;
+        const toolResultParts: Part[] = [
+          {
+            functionResponse: {
+              id: callId,
+              name: 'read_file',
+              response: { output: largePayload },
+            },
+          },
+        ];
+        chatRecordingService.recordToolCalls('gemini-pro', [
+          {
+            id: callId,
+            name: 'read_file',
+            args: { index: i },
+            result: toolResultParts,
+            status: CoreToolCallStatus.Success,
+            timestamp: new Date().toISOString(),
+          },
+        ]);
+
+        history.push(
+          {
+            id: userId,
+            content: { role: 'user', parts: [{ text: `User prompt ${i}` }] },
+          },
+          {
+            id: modelId,
+            content: {
+              role: 'model',
+              parts: [{ text: `Model response ${i}` }],
+            },
+          },
+        );
+
+        // Sync every turn as GeminiChat does
+        chatRecordingService.updateMessagesFromHistory(history);
+      }
+
+      // 1. In-memory cache must be bounded to MAX_HISTORY_MESSAGES
+      // @ts-expect-error accessing private cachedConversation for memory bound verification
+      const inMemoryMessages = chatRecordingService.cachedConversation.messages;
+      expect(inMemoryMessages.length).toBeLessThanOrEqual(MAX_HISTORY_MESSAGES);
+
+      // 2. Disk file size must scale linearly O(n), not quadratically O(n^2).
+      // 100 turns * ~50KB = ~5MB linear vs ~250MB+ quadratic.
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+      const stats = fs.statSync(sessionFile);
+      const maxLinearBytes = totalTurns * payloadSize * 3; // generous 3x linear bound (~15MB)
+      expect(stats.size).toBeLessThan(maxLinearBytes);
+
+      // 3. Full conversation reconstruction via loadConversationRecord and getConversation()
+      const loaded = await loadConversationRecord(sessionFile);
+      expect(loaded!.messages).toHaveLength(totalTurns * 2);
+
+      const fullConv = chatRecordingService.getConversation();
+      expect(fullConv!.messages).toHaveLength(totalTurns * 2);
+
+      // 4. Rewind to the very first message (which was evicted from the in-memory window)
+      const rewound = chatRecordingService.rewindTo(firstTurnUserMsgId);
+      expect(rewound!.messages).toHaveLength(0);
+    });
+
+    it('should patch tool results for messages evicted from the in-memory window and reconstruct accurately on resume', async () => {
+      await chatRecordingService.initialize();
+
+      const totalTurns = 35; // 70 messages (> MAX_HISTORY_MESSAGES = 50)
+      const history: HistoryTurn[] = [];
+      let firstModelMsgId = '';
+      const firstCallId = 'evicted-call-0';
+
+      for (let i = 0; i < totalTurns; i++) {
+        const userParts: Part[] = [{ text: `User turn ${i}` }];
+        const userId = chatRecordingService.recordMessage({
+          type: 'user',
+          content: userParts,
+          model: 'gemini-pro',
+        });
+
+        const modelParts: Part[] = [{ text: `Model turn ${i}` }];
+        const modelId = chatRecordingService.recordMessage({
+          type: 'gemini',
+          content: modelParts,
+          model: 'gemini-pro',
+        });
+
+        if (i === 0) {
+          firstModelMsgId = modelId;
+          chatRecordingService.recordToolCalls('gemini-pro', [
+            {
+              id: firstCallId,
+              name: 'run_shell_command',
+              args: { command: 'ls' },
+              result: [{ text: 'unmasked-initial-output' }],
+              status: CoreToolCallStatus.Success,
+              timestamp: new Date().toISOString(),
+            },
+          ]);
+        }
+
+        history.push(
+          { id: userId, content: { role: 'user', parts: userParts } },
+          { id: modelId, content: { role: 'model', parts: modelParts } },
+        );
+      }
+
+      chatRecordingService.updateMessagesFromHistory(history);
+
+      // Verify firstModelMsgId was evicted from the in-memory window
+      // @ts-expect-error accessing private cachedConversation
+      const cachedIds = chatRecordingService.cachedConversation.messages.map(
+        (m: MessageRecord) => m.id,
+      );
+      expect(cachedIds).not.toContain(firstModelMsgId);
+
+      // Now mask the tool result of the evicted first turn
+      const maskedParts: Part[] = [
+        {
+          functionResponse: {
+            id: firstCallId,
+            name: 'run_shell_command',
+            response: {
+              output: '<tool_output_masked>evicted</tool_output_masked>',
+            },
+          },
+        },
+      ];
+      history.push({
+        id: 'tool-mask-turn',
+        content: { role: 'user', parts: maskedParts },
+      });
+
+      chatRecordingService.updateMessagesFromHistory(history);
+
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+      const loaded = await loadConversationRecord(sessionFile);
+      expect(loaded).not.toBeNull();
+      const firstModelMsg = loaded!.messages.find(
+        (m) => m.id === firstModelMsgId,
+      );
+      expect(firstModelMsg?.type).toBe('gemini');
+      if (firstModelMsg?.type === 'gemini') {
+        expect(firstModelMsg.toolCalls?.[0].result).toEqual(maskedParts);
+      }
+
+      // Resume a new ChatRecordingService instance from this session file
+      const resumedService = new ChatRecordingService(mockConfig);
+      await resumedService.initialize({
+        filePath: sessionFile,
+        conversation: loaded!,
+      });
+
+      // Resumed service should also bound its in-memory messages to MAX_HISTORY_MESSAGES
+      // @ts-expect-error accessing private cachedConversation
+      const resumedInMemory = resumedService.cachedConversation.messages;
+      expect(resumedInMemory.length).toBeLessThanOrEqual(MAX_HISTORY_MESSAGES);
+      expect(resumedService.getConversation()?.messages.length).toBe(
+        totalTurns * 2 + 1,
+      );
+
+      // Rewind to a mid-history message that was evicted from memory
+      const targetMsgId = history[10].id;
+      const rewound = resumedService.rewindTo(targetMsgId);
+      expect(rewound?.messages).toHaveLength(10);
+      expect(rewound?.messages[9].id).toBe(history[9].id);
+    });
+
+    it('should support legacy $set: { messages } checkpoints alongside new $patch and $rewindTo records in loadConversationRecord', async () => {
+      const chatsDir = path.join(testTempDir, 'chats');
+      fs.mkdirSync(chatsDir, { recursive: true });
+      const sessionFile = path.join(chatsDir, 'mixed-format.jsonl');
+
+      const lines = [
+        JSON.stringify({
+          sessionId: 'mixed-session',
+          projectHash: 'test-project-hash',
+          startTime: '2026-01-01T00:00:00.000Z',
+          lastUpdated: '2026-01-01T00:00:00.000Z',
+        }),
+        // Legacy $set: { messages } checkpoint
+        JSON.stringify({
+          $set: {
+            messages: [
+              {
+                id: 'm1',
+                type: 'user',
+                timestamp: '2026-01-01T00:01:00.000Z',
+                content: 'First user prompt',
+              },
+              {
+                id: 'm2',
+                type: 'gemini',
+                timestamp: '2026-01-01T00:02:00.000Z',
+                content: 'Initial model response',
+                toolCalls: [
+                  {
+                    id: 'tc-1',
+                    name: 'read_file',
+                    args: {},
+                    result: 'raw-output',
+                    status: CoreToolCallStatus.Success,
+                    timestamp: '2026-01-01T00:02:00.000Z',
+                  },
+                ],
+              },
+            ],
+          },
+        }),
+        // Incremental message append
+        JSON.stringify({
+          id: 'm3',
+          type: 'user',
+          timestamp: '2026-01-01T00:03:00.000Z',
+          content: 'Second user prompt',
+        }),
+        // Delta $patch updating m2's content and toolCall result
+        JSON.stringify({
+          $patch: {
+            updates: [
+              {
+                id: 'm2',
+                content: [{ text: 'Updated model response' }],
+                toolCalls: [
+                  { id: 'tc-1', result: [{ text: 'masked-output' }] },
+                ],
+              },
+            ],
+          },
+        }),
+      ];
+
+      fs.writeFileSync(sessionFile, lines.join('\n') + '\n');
+
+      const fullLoaded = await loadConversationRecord(sessionFile);
+      expect(fullLoaded).not.toBeNull();
+      expect(fullLoaded!.messages).toHaveLength(3);
+      expect(fullLoaded!.messages[1].content).toEqual([
+        { text: 'Updated model response' },
+      ]);
+      if (fullLoaded!.messages[1].type === 'gemini') {
+        expect(fullLoaded!.messages[1].toolCalls?.[0].result).toEqual([
+          { text: 'masked-output' },
+        ]);
+      }
+
+      const metaLoaded = await loadConversationRecord(sessionFile, {
+        metadataOnly: true,
+      });
+      expect(metaLoaded).not.toBeNull();
+      expect(metaLoaded!.messageCount).toBe(3);
+      expect(metaLoaded!.userMessageCount).toBe(2);
+      expect(metaLoaded!.firstUserMessage).toBe('First user prompt');
+      expect(metaLoaded!.hasResumableContent).toBe(true);
+    });
+
+    it('should reload previously evicted messages into the active trailing window when turns are removed in updateMessagesFromHistory', async () => {
+      await chatRecordingService.initialize();
+
+      const totalMessages = MAX_HISTORY_MESSAGES + 20; // 70 messages (first 20 evicted)
+      const history: HistoryTurn[] = [];
+
+      for (let i = 0; i < totalMessages; i++) {
+        const isUser = i % 2 === 0;
+        const text = `Message ${i}`;
+        const id = chatRecordingService.recordMessage({
+          type: isUser ? 'user' : 'gemini',
+          content: text,
+          model: 'gemini-pro',
+        });
+        history.push({
+          id,
+          content: { role: isUser ? 'user' : 'model', parts: [{ text }] },
+        });
+      }
+
+      chatRecordingService.updateMessagesFromHistory(history);
+
+      // First 20 messages (indices 0..19) are evicted from the in-memory window
+      // @ts-expect-error accessing private cachedConversation
+      const beforeRollback = chatRecordingService.cachedConversation.messages;
+      expect(beforeRollback).toHaveLength(MAX_HISTORY_MESSAGES);
+      expect(beforeRollback[0].id).toBe(history[20].id);
+
+      // Roll back the last 30 messages, leaving 40 messages (indices 0..39)
+      const truncatedHistory = history.slice(0, 40);
+      chatRecordingService.updateMessagesFromHistory(truncatedHistory);
+
+      // Previously evicted messages 0..19 must now be reloaded into cachedConversation.messages
+      // @ts-expect-error accessing private cachedConversation
+      const afterRollback = chatRecordingService.cachedConversation.messages;
+      expect(afterRollback).toHaveLength(40);
+      expect(afterRollback[0].id).toBe(history[0].id);
+      expect(afterRollback[39].id).toBe(history[39].id);
+    });
+
+    it('should detect in-place mutations to Part objects and modifications at index >= 1 in updateMessagesFromHistory', async () => {
+      await chatRecordingService.initialize();
+
+      const parts: Part[] = [
+        { text: 'Initial first part' },
+        { text: 'Part 2' },
+      ];
+      const msgId = chatRecordingService.recordMessage({
+        type: 'user',
+        content: parts,
+        model: 'gemini-pro',
+      });
+
+      const history: HistoryTurn[] = [
+        {
+          id: msgId,
+          content: { role: 'user', parts },
+        },
+      ];
+
+      // Mutate parts[0].text in place (same array reference, same parts[0] reference)
+      parts[0].text = 'Mutated first part in place';
+      chatRecordingService.updateMessagesFromHistory(history);
+
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+      const afterFirstMutation = await loadConversationRecord(sessionFile);
+      expect(afterFirstMutation!.messages[0].content).toEqual([
+        { text: 'Mutated first part in place' },
+        { text: 'Part 2' },
+      ]);
+
+      // Modify parts[1] (index >= 1) in place while keeping array and parts[0] unchanged
+      const longPrefix = 'A'.repeat(500);
+      const longSuffix = 'Z'.repeat(500);
+      parts[1] = { text: `${longPrefix}0${longSuffix}` };
+      chatRecordingService.updateMessagesFromHistory(history);
+
+      const afterSecondMutation = await loadConversationRecord(sessionFile);
+      expect(afterSecondMutation!.messages[0].content).toEqual([
+        { text: 'Mutated first part in place' },
+        { text: `${longPrefix}0${longSuffix}` },
+      ]);
+
+      // Modify a single character in the middle of the >1000-char string (same length, prefix, and suffix)
+      parts[1].text = `${longPrefix}1${longSuffix}`;
+      chatRecordingService.updateMessagesFromHistory(history);
+
+      const afterMiddleCharMutation = await loadConversationRecord(sessionFile);
+      expect(afterMiddleCharMutation!.messages[0].content).toEqual([
+        { text: 'Mutated first part in place' },
+        { text: `${longPrefix}1${longSuffix}` },
+      ]);
     });
   });
 });
