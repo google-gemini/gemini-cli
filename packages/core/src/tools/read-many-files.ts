@@ -143,7 +143,7 @@ export function isAssetExplicitlyRequested(
       (workspaceDirs.length > 0
         ? workspaceDirs.some((dir) => {
             const normalizedDir = dir.replace(/\\/g, '/');
-            const fileDir = path.dirname(normalizedFilePath);
+            const fileDir = path.posix.dirname(normalizedFilePath);
             return fileDir === normalizedDir && fileMatcher(fileName);
           })
         : !normalizedRelativePath.includes('/') && fileMatcher(fileName));
@@ -164,13 +164,15 @@ export function isAssetExplicitlyRequested(
     // 1. Explicit by extension:
     // Pattern leaf has a non-wildcard extension (e.g., '*.png', '**/*.png', 'assets/*.PNG', '*.{png,jpg}')
     // and that extension pattern matches the file's extension case-insensitively.
-    if (
-      patternExt &&
-      !patternExt.includes('*') &&
-      !patternExt.includes('?') &&
-      picomatch(patternExt, { nocase: true })(fileExtension)
-    ) {
-      return true;
+    if (patternExt && !patternExt.includes('*') && !patternExt.includes('?')) {
+      const extScan = picomatch.scan(patternExt);
+      if (!extScan.isGlob) {
+        if (patternExt.toLowerCase() === fileExtension.toLowerCase()) {
+          return true;
+        }
+      } else if (picomatch(patternExt, { nocase: true })(fileExtension)) {
+        return true;
+      }
     }
 
     // 2. Explicit by name:
