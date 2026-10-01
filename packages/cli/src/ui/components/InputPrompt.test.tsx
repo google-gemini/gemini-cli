@@ -244,6 +244,20 @@ describe('InputPrompt', () => {
     return null;
   };
 
+  const GlobalQuitHandler = ({ onQuit }: { onQuit: () => void }) => {
+    useKeypress(
+      (key) => {
+        if (key.ctrl && key.name === 'c') {
+          onQuit();
+          return true;
+        }
+        return false;
+      },
+      { isActive: true, priority: false },
+    );
+    return null;
+  };
+
   const mockedUseShellHistory = vi.mocked(useShellHistory);
   const mockedUseCommandCompletion = vi.mocked(useCommandCompletion);
   const mockedUseInputHistory = vi.mocked(useInputHistory);
@@ -2876,6 +2890,30 @@ describe('InputPrompt', () => {
         expect(onGlobalEscape).toHaveBeenCalledTimes(1);
       });
       expect(props.setShellModeActive).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should allow Ctrl+C to reach global cancellation handler when responding even if buffer has text', async () => {
+      props.shellModeActive = false;
+      props.streamingState = StreamingState.Responding;
+      props.buffer.text = 'some text typed during generation';
+      const onGlobalQuit = vi.fn();
+
+      const { stdin, unmount } = await renderWithProviders(
+        <>
+          <GlobalQuitHandler onQuit={onGlobalQuit} />
+          <TestInputPrompt {...props} />
+        </>,
+      );
+
+      await act(async () => {
+        stdin.write('\x03');
+        vi.advanceTimersByTime(100);
+      });
+
+      await waitFor(() => {
+        expect(onGlobalQuit).toHaveBeenCalledTimes(1);
+      });
       unmount();
     });
 

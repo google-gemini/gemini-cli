@@ -1345,6 +1345,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return false;
       }
 
+      // If we're generating and user presses Ctrl+C (QUIT), do not swallow it as
+      // CLEAR_INPUT in the text buffer; let it propagate to cancel ongoing operations.
+      if (isGenerating && keyMatchers[Command.QUIT](key)) {
+        return false;
+      }
+
       // Fall back to the text buffer's default input handling for all other keys
       const handled = buffer.handleInput(key);
 
