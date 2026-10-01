@@ -65,4 +65,56 @@ describe('stdio utils', () => {
 
     cleanup();
   });
+
+  it('shows cursor on Windows when Ink positions the IME cursor and hides it when unfocused', async () => {
+    const originalPlatform = process.platform;
+    Object.defineProperty(process, 'platform', {
+      value: 'win32',
+      configurable: true,
+    });
+
+    try {
+      vi.resetModules();
+      const writeSpy = vi
+        .spyOn(process.stdout, 'write')
+        .mockImplementation(() => true);
+      const { createWorkingStdio: createWinWorkingStdio } = await import(
+        './stdio.js'
+      );
+      const { stdout } = createWinWorkingStdio();
+
+      // Plain writes should not be modified when cursor has not been shown for IME
+      stdout.write('plain output');
+      expect(writeSpy).toHaveBeenLastCalledWith('plain output');
+
+      // Frame ending with Ink's positionImeCursor (\x1b[2A\x1b[5G) should append \x1b[?25h
+      stdout.write('prompt line\nfooter line\n\x1b[2A\x1b[5G');
+      expect(writeSpy).toHaveBeenLastCalledWith(
+        'prompt line\nfooter line\n\x1b[2A\x1b[5G\x1b[?25h',
+      );
+
+      // Subsequent frame without cursor positioning should append \x1b[?25l to hide cursor
+      stdout.write('streaming output\nfooter line\n');
+      expect(writeSpy).toHaveBeenLastCalledWith(
+        'streaming output\nfooter line\n\x1b[?25l',
+      );
+
+      // Synchronized output frame with cursor positioning should insert \x1b[?25h before \x1b[?2026l
+      stdout.write('\x1b[?2026hframe content\x1b[10;4H\x1b[?2026l');
+      expect(writeSpy).toHaveBeenLastCalledWith(
+        '\x1b[?2026hframe content\x1b[10;4H\x1b[?25h\x1b[?2026l',
+      );
+
+      // Synchronized output frame without cursor positioning should insert \x1b[?25l before \x1b[?2026l
+      stdout.write('\x1b[?2026hstreaming content\x1b[?2026l');
+      expect(writeSpy).toHaveBeenLastCalledWith(
+        '\x1b[?2026hstreaming content\x1b[?25l\x1b[?2026l',
+      );
+    } finally {
+      Object.defineProperty(process, 'platform', {
+        value: originalPlatform,
+        configurable: true,
+      });
+    }
+  });
 });
