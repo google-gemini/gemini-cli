@@ -723,7 +723,10 @@ export class ChatRecordingService {
           this.conversationFile,
         );
         if (loadedRecord) {
-          this.cachedConversation = loadedRecord;
+          this.cachedConversation = {
+            ...loadedRecord,
+            messages: loadedRecord.messages ?? [],
+          };
           this.projectHash = this.cachedConversation.projectHash;
 
           if (this.conversationFile.endsWith('.json')) {
@@ -835,11 +838,14 @@ export class ChatRecordingService {
             this.conversationFile,
           );
           if (loadedRecord) {
-            this.cachedConversation = loadedRecord;
+            this.cachedConversation = {
+              ...loadedRecord,
+              messages: loadedRecord.messages ?? [],
+            };
             this.projectHash = this.cachedConversation.projectHash;
             if (
               loadedRecord.hasResumableContent ||
-              hasResumableConversationContent(loadedRecord.messages ?? [])
+              hasResumableConversationContent(this.cachedConversation.messages)
             ) {
               this.isResumedSession = true;
             }
@@ -911,20 +917,21 @@ export class ChatRecordingService {
     this.hasEvictedMessages = msgs.length < this.messageOrder.length;
   }
 
-  private rebuildIndexAndWindow(messages: readonly MessageRecord[]): void {
+  private rebuildIndexAndWindow(messages?: readonly MessageRecord[]): void {
+    const safeMessages = messages ?? [];
     this.messageOrder = [];
     this.messageMetaMap.clear();
     this.toolCallMetaMap.clear();
 
-    for (const msg of messages) {
+    for (const msg of safeMessages) {
       this.indexMessage(msg);
     }
 
     if (this.cachedConversation) {
       this.cachedConversation.messages =
-        messages.length > MAX_HISTORY_MESSAGES
-          ? messages.slice(-MAX_HISTORY_MESSAGES)
-          : [...messages];
+        safeMessages.length > MAX_HISTORY_MESSAGES
+          ? safeMessages.slice(-MAX_HISTORY_MESSAGES)
+          : [...safeMessages];
       this.hasEvictedMessages =
         this.cachedConversation.messages.length < this.messageOrder.length;
     } else {

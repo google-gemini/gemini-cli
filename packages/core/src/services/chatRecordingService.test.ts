@@ -362,6 +362,35 @@ describe('ChatRecordingService', () => {
       expect(conversation.sessionId).toBe('old-session-id');
     });
 
+    it('should safely handle resumed session files with undefined messages and initialize array', async () => {
+      const chatsDir = path.join(testTempDir, 'chats');
+      fs.mkdirSync(chatsDir, { recursive: true });
+      const sessionFile = path.join(chatsDir, 'session-undefined-msgs.jsonl');
+      fs.writeFileSync(
+        sessionFile,
+        JSON.stringify({
+          sessionId: 'undefined-msgs-id',
+          projectHash: 'test-project-hash',
+          startTime: new Date().toISOString(),
+          lastUpdated: new Date().toISOString(),
+        }) + '\n',
+      );
+
+      await expect(
+        chatRecordingService.initialize({
+          filePath: sessionFile,
+          conversation: {
+            sessionId: 'undefined-msgs-id',
+            projectHash: 'test-project-hash',
+          } as ConversationRecord,
+        }),
+      ).resolves.not.toThrow();
+
+      const conv = chatRecordingService.getConversation();
+      expect(conv).not.toBeNull();
+      expect(conv?.messages).toEqual([]);
+    });
+
     it('should fall back to the in-memory conversation when the file cannot be reloaded', async () => {
       // Regression test for the `/compress` "Failed to load resumed session
       // data from file" bug: when resuming with a filePath that cannot be
