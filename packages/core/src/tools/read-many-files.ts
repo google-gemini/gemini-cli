@@ -154,6 +154,14 @@ export function isAssetExplicitlyRequested(
   const fileExtension = path.posix.extname(normalizedFilePath);
   const fileName = path.posix.basename(normalizedFilePath);
 
+  const resolvedWorkspaceDirs = workspaceDirs.map((dir) =>
+    resolveToRealPathSafe(dir),
+  );
+  const resolvedFileDir =
+    workspaceDirs.length > 0
+      ? resolveToRealPathSafe(path.dirname(normalizedFilePath))
+      : '';
+
   return includePatterns.some((pattern) => {
     const normalizedPattern = pattern.replace(/\\/g, '/').trim();
     if (!normalizedPattern) return false;
@@ -174,14 +182,11 @@ export function isAssetExplicitlyRequested(
       fileMatcher(normalizedRelativePath) || fileMatcher(normalizedFilePath);
     const matchesFileName =
       !normalizedPattern.includes('/') &&
-      (workspaceDirs.length > 0
-        ? workspaceDirs.some((dir) => {
-            const resolvedDir = resolveToRealPathSafe(dir);
-            const resolvedFileDir = resolveToRealPathSafe(
-              path.dirname(normalizedFilePath),
-            );
-            return resolvedFileDir === resolvedDir && fileMatcher(fileName);
-          })
+      (resolvedWorkspaceDirs.length > 0
+        ? resolvedWorkspaceDirs.some(
+            (resolvedDir) =>
+              resolvedFileDir === resolvedDir && fileMatcher(fileName),
+          )
         : !normalizedRelativePath.includes('/') && fileMatcher(fileName));
 
     if (!matchesPath && !matchesFileName) {
