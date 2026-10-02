@@ -664,13 +664,28 @@ export function supportsMultimodalFunctionResponse(
   model: string,
   config?: ModelCapabilityContext,
 ): boolean {
+  const hasAccessToPreview = config?.getHasAccessToPreviewModel?.() ?? true;
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
+    const resolved = resolveModel(
+      model,
+      false,
+      false,
+      hasAccessToPreview,
+      config,
+    );
     return (
-      config.modelConfigService.getModelDefinition(model)?.features
+      config.modelConfigService.getModelDefinition(resolved)?.features
         ?.multimodalToolUse === true
     );
   }
-  return model.startsWith('gemini-3-');
+  const resolved = resolveModel(
+    model,
+    false,
+    false,
+    hasAccessToPreview,
+    config,
+  );
+  return /^gemini-3(\.|-|$)/.test(resolved);
 }
 
 /**

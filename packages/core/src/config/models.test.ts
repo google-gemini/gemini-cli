@@ -393,18 +393,70 @@ describe('getDisplayString', () => {
 });
 
 describe('supportsMultimodalFunctionResponse', () => {
-  it('should return true for gemini-3 model', () => {
+  it('should return true for gemini-3 models and aliases', () => {
     expect(supportsMultimodalFunctionResponse('gemini-3-pro')).toBe(true);
+    expect(supportsMultimodalFunctionResponse('gemini-3-flash-preview')).toBe(
+      true,
+    );
+    expect(supportsMultimodalFunctionResponse('gemini-3.5-flash')).toBe(true);
+    expect(supportsMultimodalFunctionResponse('gemini-3.8-flash')).toBe(true);
+    expect(supportsMultimodalFunctionResponse('gemini-3.1-pro-preview')).toBe(
+      true,
+    );
+    expect(supportsMultimodalFunctionResponse('gemini-3.1-flash-lite')).toBe(
+      true,
+    );
+    expect(supportsMultimodalFunctionResponse(GEMINI_MODEL_ALIAS_AUTO)).toBe(
+      true,
+    );
+    expect(supportsMultimodalFunctionResponse(GEMINI_MODEL_ALIAS_PRO)).toBe(
+      true,
+    );
+    expect(supportsMultimodalFunctionResponse(GEMINI_MODEL_ALIAS_FLASH)).toBe(
+      true,
+    );
   });
 
   it('should return false for gemini-2 models', () => {
     expect(supportsMultimodalFunctionResponse('gemini-2.5-pro')).toBe(false);
     expect(supportsMultimodalFunctionResponse('gemini-2.5-flash')).toBe(false);
+    expect(supportsMultimodalFunctionResponse('gemini-2.5-flash-lite')).toBe(
+      false,
+    );
   });
 
   it('should return false for other models', () => {
+    expect(supportsMultimodalFunctionResponse('gemma-4-31b-it')).toBe(false);
     expect(supportsMultimodalFunctionResponse('some-other-model')).toBe(false);
     expect(supportsMultimodalFunctionResponse('')).toBe(false);
+  });
+
+  it('should respect preview access when resolving aliases', () => {
+    const noPreviewConfig = {
+      getHasAccessToPreviewModel: () => false,
+      getExperimentalDynamicModelConfiguration: () => false,
+      modelConfigService,
+    } as unknown as Config;
+
+    expect(
+      supportsMultimodalFunctionResponse(
+        GEMINI_MODEL_ALIAS_PRO,
+        noPreviewConfig,
+      ),
+    ).toBe(false);
+
+    const hasPreviewConfig = {
+      getHasAccessToPreviewModel: () => true,
+      getExperimentalDynamicModelConfiguration: () => false,
+      modelConfigService,
+    } as unknown as Config;
+
+    expect(
+      supportsMultimodalFunctionResponse(
+        GEMINI_MODEL_ALIAS_PRO,
+        hasPreviewConfig,
+      ),
+    ).toBe(true);
   });
 });
 

@@ -27,6 +27,7 @@ import {
 import {
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL,
+  GEMINI_MODEL_ALIAS_AUTO,
 } from '../config/models.js';
 
 const mockTextPart = (text: string): Part => ({ text });
@@ -235,11 +236,40 @@ describe('generateContentResponseUtilities', () => {
       const llmContent: Part = {
         inlineData: { mimeType: 'image/png', data: 'base64...' },
       };
+      for (const model of [
+        PREVIEW_GEMINI_MODEL,
+        'gemini-3.8-flash',
+        'gemini-3.5-flash',
+        GEMINI_MODEL_ALIAS_AUTO,
+      ]) {
+        const result = convertToFunctionResponse(
+          toolName,
+          callId,
+          llmContent,
+          model,
+        );
+        expect(result).toEqual([
+          {
+            functionResponse: {
+              name: toolName,
+              id: callId,
+              response: { output: 'Binary content provided (1 item(s)).' },
+              parts: [llmContent],
+            },
+          },
+        ]);
+      }
+    });
+
+    it('should handle llmContent with inlineData for non-Gemini 3 models (should be siblings)', () => {
+      const llmContent: Part = {
+        inlineData: { mimeType: 'image/png', data: 'base64...' },
+      };
       const result = convertToFunctionResponse(
         toolName,
         callId,
         llmContent,
-        PREVIEW_GEMINI_MODEL,
+        DEFAULT_GEMINI_MODEL,
       );
       expect(result).toEqual([
         {
@@ -247,9 +277,9 @@ describe('generateContentResponseUtilities', () => {
             name: toolName,
             id: callId,
             response: { output: 'Binary content provided (1 item(s)).' },
-            parts: [llmContent],
           },
         },
+        llmContent,
       ]);
     });
 
