@@ -1786,6 +1786,43 @@ Logging in with Google... Restarting Gemini CLI to continue.
     [handleSlashCommand, settings],
   );
 
+  const isAwaitingLoginRestart = authState === AuthState.AwaitingLoginRestart;
+  const loginRestartMessage =
+    settings.merged.security.auth.selectedType === AuthType.USE_VERTEX_AI
+      ? 'Authenticating to Vertex AI in Cloud Shell requires a restart to apply project settings.'
+      : undefined;
+
+  const dialogsVisible =
+    shouldShowIdePrompt ||
+    isFolderTrustDialogOpen ||
+    isPolicyUpdateDialogOpen ||
+    adminSettingsChanged ||
+    !!commandConfirmationRequest ||
+    !!authConsentRequest ||
+    !!permissionConfirmationRequest ||
+    !!customDialog ||
+    confirmUpdateExtensionRequests.length > 0 ||
+    !!loopDetectionConfirmationRequest ||
+    isThemeDialogOpen ||
+    isSettingsDialogOpen ||
+    isModelDialogOpen ||
+    isVoiceModelDialogOpen ||
+    isAgentConfigDialogOpen ||
+    isPermissionsDialogOpen ||
+    isAuthenticating ||
+    isAuthDialogOpen ||
+    isEditorDialogOpen ||
+    showPrivacyNotice ||
+    showIdeRestartPrompt ||
+    !!proQuotaRequest ||
+    !!validationRequest ||
+    !!overageMenuRequest ||
+    !!emptyWalletRequest ||
+    isSessionBrowserOpen ||
+    authState === AuthState.AwaitingApiKeyInput ||
+    isAwaitingLoginRestart ||
+    !!newAgents;
+
   const handleGlobalKeypress = useCallback(
     (key: Key): boolean => {
       // Debug log keystrokes if enabled
@@ -1877,9 +1914,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
         }
       };
 
-      let enteringConstrainHeightMode = false;
-      if (!constrainHeight) {
-        enteringConstrainHeightMode = true;
+      if (
+        !constrainHeight &&
+        (keyMatchers[Command.SHOW_MORE_LINES](key) ||
+          (keyMatchers[Command.ESCAPE](key) && !dialogsVisible))
+      ) {
         setConstrainHeight(true);
         if (keyMatchers[Command.SHOW_MORE_LINES](key)) {
           toggleLastTurnTools();
@@ -1887,6 +1926,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         if (!isAlternateBuffer) {
           refreshStatic();
         }
+        return true;
       }
 
       if (keyMatchers[Command.SHOW_ERROR_DETAILS](key)) {
@@ -1925,10 +1965,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleSlashCommand('/ide status');
         return true;
-      } else if (
-        keyMatchers[Command.SHOW_MORE_LINES](key) &&
-        !enteringConstrainHeightMode
-      ) {
+      } else if (keyMatchers[Command.SHOW_MORE_LINES](key)) {
         setConstrainHeight(false);
         toggleLastTurnTools();
         refreshStatic();
@@ -2043,6 +2080,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       startRecording,
       stopRecording,
       mouseMode,
+      dialogsVisible,
     ],
   );
 
@@ -2170,43 +2208,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }, [historyManager]);
 
   const nightly = props.version.includes('nightly');
-
-  const isAwaitingLoginRestart = authState === AuthState.AwaitingLoginRestart;
-  const loginRestartMessage =
-    settings.merged.security.auth.selectedType === AuthType.USE_VERTEX_AI
-      ? 'Authenticating to Vertex AI in Cloud Shell requires a restart to apply project settings.'
-      : undefined;
-
-  const dialogsVisible =
-    shouldShowIdePrompt ||
-    isFolderTrustDialogOpen ||
-    isPolicyUpdateDialogOpen ||
-    adminSettingsChanged ||
-    !!commandConfirmationRequest ||
-    !!authConsentRequest ||
-    !!permissionConfirmationRequest ||
-    !!customDialog ||
-    confirmUpdateExtensionRequests.length > 0 ||
-    !!loopDetectionConfirmationRequest ||
-    isThemeDialogOpen ||
-    isSettingsDialogOpen ||
-    isModelDialogOpen ||
-    isVoiceModelDialogOpen ||
-    isAgentConfigDialogOpen ||
-    isPermissionsDialogOpen ||
-    isAuthenticating ||
-    isAuthDialogOpen ||
-    isEditorDialogOpen ||
-    showPrivacyNotice ||
-    showIdeRestartPrompt ||
-    !!proQuotaRequest ||
-    !!validationRequest ||
-    !!overageMenuRequest ||
-    !!emptyWalletRequest ||
-    isSessionBrowserOpen ||
-    authState === AuthState.AwaitingApiKeyInput ||
-    isAwaitingLoginRestart ||
-    !!newAgents;
 
   const hasPendingToolConfirmation = useMemo(
     () => isToolAwaitingConfirmation(pendingHistoryItems),
