@@ -22,6 +22,7 @@ export interface OAuthCredentials {
   serverName: string;
   token: OAuthToken;
   clientId?: string;
+  clientSecret?: string;
   tokenUrl?: string;
   mcpServerUrl?: string;
   updatedAt: number;

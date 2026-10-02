@@ -559,6 +559,7 @@ ${authUrl}
         config.clientId,
         config.tokenUrl,
         mcpServerUrl,
+        config.clientSecret,
       );
       debugLogger.debug('✓ Authentication successful! Token saved.');
 
@@ -621,6 +622,7 @@ ${authUrl}
     // persisted during dynamic client registration when the static config
     // does not provide one.
     const clientId = config.clientId ?? credentials.clientId;
+    const clientSecret = config.clientSecret ?? credentials.clientSecret;
     if (token.refreshToken && clientId && credentials.tokenUrl) {
       try {
         debugLogger.log(
@@ -628,7 +630,7 @@ ${authUrl}
         );
 
         const newTokenResponse = await this.refreshAccessToken(
-          { ...config, clientId },
+          { ...config, clientId, clientSecret },
           token.refreshToken,
           credentials.tokenUrl,
           credentials.mcpServerUrl,
@@ -652,6 +654,7 @@ ${authUrl}
           clientId,
           credentials.tokenUrl,
           credentials.mcpServerUrl,
+          clientSecret,
         );
 
         return newToken.accessToken;
@@ -685,10 +688,11 @@ ${authUrl}
 
     if (this.tokenStorage.isTokenExpired(current)) {
       const clientId = config.clientId ?? credentials.clientId;
+      const clientSecret = config.clientSecret ?? credentials.clientSecret;
       if (current.refreshToken && clientId && credentials.tokenUrl) {
         try {
           const newTokenResponse = await this.refreshAccessToken(
-            { ...config, clientId },
+            { ...config, clientId, clientSecret },
             current.refreshToken,
             credentials.tokenUrl,
             credentials.mcpServerUrl,
@@ -713,6 +717,7 @@ ${authUrl}
             clientId,
             credentials.tokenUrl,
             credentials.mcpServerUrl,
+            clientSecret,
           );
 
           current = refreshed;

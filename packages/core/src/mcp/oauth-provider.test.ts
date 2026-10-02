@@ -283,6 +283,7 @@ describe('MCPOAuthProvider', () => {
         'test-client-id',
         'https://auth.example.com/token',
         undefined,
+        'test-client-secret',
       );
     });
 
@@ -1569,6 +1570,7 @@ describe('MCPOAuthProvider', () => {
         'test-client-id',
         'https://auth.example.com/token',
         undefined,
+        'test-client-secret',
       );
     });
 
@@ -1612,6 +1614,54 @@ describe('MCPOAuthProvider', () => {
         'registered-client-id',
         'https://auth.example.com/token',
         undefined,
+        'test-client-secret',
+      );
+      expect(tokenStorage.deleteCredentials).not.toHaveBeenCalled();
+    });
+
+    it('should refresh with the stored client secret when config has none', async () => {
+      const expiredCredentials = {
+        serverName: 'test-server',
+        token: { ...mockToken, expiresAt: Date.now() - 3600000 },
+        clientId: 'registered-client-id',
+        clientSecret: 'stored-client-secret',
+        tokenUrl: 'https://auth.example.com/token',
+        updatedAt: Date.now(),
+      };
+
+      const tokenStorage = new MCPOAuthTokenStorage();
+      vi.mocked(tokenStorage.getCredentials).mockResolvedValue(
+        expiredCredentials,
+      );
+      vi.mocked(tokenStorage.isTokenExpired).mockReturnValue(true);
+
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockTokenResponse),
+          json: mockTokenResponse,
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      const result = await authProvider.getValidToken('test-server', {
+        ...mockConfig,
+        clientId: undefined,
+        clientSecret: undefined,
+      });
+
+      expect(result).toBe('access_token_123');
+      expect(mockFetch.mock.calls[0][1].body).toContain(
+        'client_secret=stored-client-secret',
+      );
+      expect(tokenStorage.saveToken).toHaveBeenCalledWith(
+        'test-server',
+        expect.objectContaining({ accessToken: 'access_token_123' }),
+        'registered-client-id',
+        'https://auth.example.com/token',
+        undefined,
+        'stored-client-secret',
       );
       expect(tokenStorage.deleteCredentials).not.toHaveBeenCalled();
     });
@@ -1742,6 +1792,7 @@ describe('MCPOAuthProvider', () => {
         expect.objectContaining({ accessToken: 'access_token_123' }),
         'registered-client-id',
         'https://auth.example.com/token',
+        undefined,
         undefined,
       );
       expect(tokenStorage.deleteCredentials).not.toHaveBeenCalled();
