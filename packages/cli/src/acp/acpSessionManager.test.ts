@@ -15,13 +15,18 @@ import {
   type Mocked,
 } from 'vitest';
 import { AcpSessionManager } from './acpSessionManager.js';
-import type * as acp from '@agentclientprotocol/sdk';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import * as os from 'node:os';
+import * as acp from '@agentclientprotocol/sdk';
 import {
   AuthType,
   type Config,
+  CoreEvent,
+  coreEvents,
   GEMINI_MODEL_ALIAS_AUTO,
   type MessageBus,
-  type Storage,
+  Storage,
 } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../config/settings.js';
 import { loadCliConfig, type CliArgs } from '../config/config.js';
@@ -56,6 +61,7 @@ describe('AcpSessionManager', () => {
     mockConfig = {
       refreshAuth: vi.fn(),
       initialize: vi.fn(),
+      dispose: vi.fn(),
       waitForMcpInit: vi.fn(),
       getFileSystemService: vi.fn(),
       setFileSystemService: vi.fn(),
@@ -64,6 +70,8 @@ describe('AcpSessionManager', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getGeminiClient: vi.fn().mockReturnValue({
         startChat: vi.fn().mockResolvedValue({}),
+        resumeChat: vi.fn().mockResolvedValue(undefined),
+        getChat: vi.fn().mockReturnValue({}),
       }),
       getMessageBus: vi.fn().mockReturnValue({
         publish: vi.fn(),
@@ -378,5 +386,314 @@ describe('AcpSessionManager', () => {
     );
 
     expect(startAutoMemoryIfEnabledMock).toHaveBeenCalledWith(mockConfig);
+  });
+
+  it('should successfully load an ACP session created by newSession without resumable content filters', async () => {
+    const testDir = await fs.mkdtemp(path.join(os.tmpdir(), 'acp-load-test-'));
+    const sessionId = 'test-session-uuid-123';
+    const storage = new Storage(testDir, sessionId);
+    await storage.initialize();
+    const chatsDir = path.join(storage.getProjectTempDir(), 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    // Initial header written by ChatRecordingService on newSession (hasResumableContent is false)
+    const initialRecord = {
+      sessionId,
+      projectHash: 'test-hash',
+      startTime: new Date().toISOString(),
+      lastUpdated: new Date().toISOString(),
+      kind: 'main',
+      messages: [],
+    };
+    await fs.writeFile(
+      path.join(chatsDir, `session-2026-09-30-${sessionId.slice(0, 8)}.jsonl`),
+      JSON.stringify(initialRecord) + '\n',
+    );
+
+    const response = await manager.loadSession(
+      {
+        sessionId,
+        cwd: testDir,
+        mcpServers: [],
+      },
+      {},
+    );
+
+    expect(response).toBeDefined();
+    expect(response.modes).toBeDefined();
+    expect(response.models).toBeDefined();
+    expect(mockConfig.getGeminiClient().resumeChat).toHaveBeenCalledWith(
+      [],
+      expect.objectContaining({
+        conversation: expect.objectContaining({ sessionId }),
+      }),
+    );
+  });
+
+  it('should successfully load an ACP session with conversational content', async () => {
+    const testDir = await fs.mkdtemp(path.join(os.tmpdir(), 'acp-load-chat-'));
+    const sessionId = 'test-session-with-chat';
+    const storage = new Storage(testDir, sessionId);
+    await storage.initialize();
+    const chatsDir = path.join(storage.getProjectTempDir(), 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const sessionRecord = {
+      sessionId,
+      projectHash: 'test-hash',
+      startTime: new Date().toISOString(),
+      lastUpdated: new Date().toISOString(),
+      kind: 'main',
+      messages: [
+        { type: 'user', content: 'hello' },
+        { type: 'gemini', content: 'world' },
+      ],
+    };
+    await fs.writeFile(
+      path.join(chatsDir, `session-2026-09-30-${sessionId.slice(0, 8)}.jsonl`),
+      JSON.stringify(sessionRecord) + '\n',
+    );
+
+    const response = await manager.loadSession(
+      {
+        sessionId,
+        cwd: testDir,
+        mcpServers: [],
+      },
+      {},
+    );
+
+    expect(response).toBeDefined();
+    expect(mockConfig.getGeminiClient().resumeChat).toHaveBeenCalled();
+  });
+
+  it('should reject loading an invalid session identifier without leaking event listeners', async () => {
+    const testDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'acp-load-invalid-'),
+    );
+    const initialListenerCount = coreEvents.listenerCount(
+      CoreEvent.ModelChanged,
+    );
+
+    // Call loadSession with an invalid/non-existent session ID 15 times
+    for (let i = 0; i < 15; i++) {
+      await expect(
+        manager.loadSession(
+          {
+            sessionId: `non-existent-id-${i}`,
+            cwd: testDir,
+            mcpServers: [],
+          },
+          {},
+        ),
+      ).rejects.toThrow('Invalid session identifier');
+    }
+
+    // Verify no listeners were leaked
+    expect(coreEvents.listenerCount(CoreEvent.ModelChanged)).toBe(
+      initialListenerCount,
+    );
+  });
+
+  it('should reject loading a session identifier containing path traversal without performing file operations', async () => {
+    const testDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'acp-load-traversal-'),
+    );
+
+    await expect(
+      manager.loadSession(
+        {
+          sessionId: '../../evil',
+          cwd: testDir,
+          mcpServers: [],
+        },
+        {},
+      ),
+    ).rejects.toSatisfy((error) => {
+      expect(error).toBeInstanceOf(acp.RequestError);
+      expect((error as acp.RequestError).code).toBe(-32602);
+      expect((error as acp.RequestError).message).toBe(
+        'Invalid session identifier format.',
+      );
+      return true;
+    });
+
+    await expect(
+      manager.loadSession(
+        {
+          sessionId: 'path/with/slash',
+          cwd: testDir,
+          mcpServers: [],
+        },
+        {},
+      ),
+    ).rejects.toThrow('Invalid session identifier format.');
+
+    await expect(
+      manager.loadSession(
+        {
+          sessionId: 'path\\with\\backslash',
+          cwd: testDir,
+          mcpServers: [],
+        },
+        {},
+      ),
+    ).rejects.toThrow('Invalid session identifier format.');
+  });
+
+  it('should dispose an existing session before initializing new config when reloading a session', async () => {
+    const testDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'acp-reload-test-'),
+    );
+    const sessionId = 'test-session-reload-123';
+    const storage = new Storage(testDir, sessionId);
+    await storage.initialize();
+    const chatsDir = path.join(storage.getProjectTempDir(), 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const sessionRecord = {
+      sessionId,
+      projectHash: 'test-hash',
+      startTime: new Date().toISOString(),
+      lastUpdated: new Date().toISOString(),
+      kind: 'main',
+      messages: [{ type: 'user', content: 'hello' }],
+    };
+    await fs.writeFile(
+      path.join(chatsDir, `session-2026-09-30-${sessionId.slice(0, 8)}.jsonl`),
+      JSON.stringify(sessionRecord) + '\n',
+    );
+
+    // First load
+    await manager.loadSession(
+      {
+        sessionId,
+        cwd: testDir,
+        mcpServers: [],
+      },
+      {},
+    );
+
+    const firstSession = manager.getSession(sessionId);
+    expect(firstSession).toBeDefined();
+    const disposeSpy = vi.spyOn(firstSession!, 'dispose');
+
+    // Second load with the same sessionId
+    await manager.loadSession(
+      {
+        sessionId,
+        cwd: testDir,
+        mcpServers: [],
+      },
+      {},
+    );
+
+    expect(disposeSpy).toHaveBeenCalledTimes(1);
+    const secondSession = manager.getSession(sessionId);
+    expect(secondSession).toBeDefined();
+    expect(secondSession).not.toBe(firstSession);
+  });
+
+  it('should dispose config when newSession initialization fails', async () => {
+    mockConfig.getContentGeneratorConfig = vi.fn().mockReturnValue({
+      apiKey: 'test-key',
+    });
+    mockConfig.initialize = vi.fn().mockRejectedValue(new Error('Init failed'));
+
+    await expect(
+      manager.newSession(
+        {
+          cwd: '/tmp',
+          mcpServers: [],
+        },
+        {},
+      ),
+    ).rejects.toThrow('Init failed');
+
+    expect(mockConfig.dispose).toHaveBeenCalled();
+  });
+
+  it('should await session disposals and clear sessions on dispose', async () => {
+    mockConfig.getContentGeneratorConfig = vi.fn().mockReturnValue({
+      apiKey: 'test-key',
+    });
+    const response = await manager.newSession(
+      {
+        cwd: '/tmp',
+        mcpServers: [],
+      },
+      {},
+    );
+
+    const session = manager.getSession(response.sessionId);
+    expect(session).toBeDefined();
+    const disposeSpy = vi.spyOn(session!, 'dispose');
+
+    await manager.dispose();
+
+    expect(disposeSpy).toHaveBeenCalledTimes(1);
+    expect(manager.getSession(response.sessionId)).toBeUndefined();
+  });
+
+  it('should dispose session and remove from manager when newSession fails after session instantiation', async () => {
+    mockConfig.getContentGeneratorConfig = vi.fn().mockReturnValue({
+      apiKey: 'test-key',
+    });
+    mockConfig.getModel = vi.fn().mockImplementation(() => {
+      throw new Error('Post-session failure');
+    });
+
+    await expect(
+      manager.newSession(
+        {
+          cwd: '/tmp',
+          mcpServers: [],
+        },
+        {},
+      ),
+    ).rejects.toThrow('Post-session failure');
+
+    expect(mockConfig.dispose).toHaveBeenCalled();
+    expect(manager.getSession('test-session-id')).toBeUndefined();
+  });
+
+  it('should dispose session and remove from manager when loadSession fails after session instantiation', async () => {
+    const testDir = await fs.mkdtemp(path.join(os.tmpdir(), 'gemini-test-'));
+    const sessionId = '11111111-2222-3333-4444-555555555555';
+    const storage = new Storage(testDir);
+    await storage.initialize();
+    const chatsDir = path.join(storage.getProjectTempDir(), 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const sessionRecord = {
+      sessionId,
+      projectHash: 'test-hash',
+      startTime: new Date().toISOString(),
+      lastUpdated: new Date().toISOString(),
+      kind: 'main',
+      messages: [{ type: 'user', content: 'hello' }],
+    };
+    await fs.writeFile(
+      path.join(chatsDir, `session-2026-09-30-${sessionId.slice(0, 8)}.jsonl`),
+      JSON.stringify(sessionRecord) + '\n',
+    );
+
+    mockConfig.getModel = vi.fn().mockImplementation(() => {
+      throw new Error('Post-session load failure');
+    });
+
+    await expect(
+      manager.loadSession(
+        {
+          sessionId,
+          cwd: testDir,
+          mcpServers: [],
+        },
+        {},
+      ),
+    ).rejects.toThrow('Post-session load failure');
+
+    expect(mockConfig.dispose).toHaveBeenCalled();
+    expect(manager.getSession(sessionId)).toBeUndefined();
   });
 });

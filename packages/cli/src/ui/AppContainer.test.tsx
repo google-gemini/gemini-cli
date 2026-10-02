@@ -3545,6 +3545,47 @@ describe('AppContainer State Management', () => {
 
       unmount();
     });
+
+    it('does not collapse unconstrained height on navigation keys, but collapses on Escape', async () => {
+      const { stdin, unmount } = await act(async () => renderAppContainer());
+      await waitFor(() => expect(capturedOverflowActions).toBeTruthy());
+
+      expect(capturedUIState.constrainHeight).toBe(true);
+
+      // Expand via Ctrl+O
+      act(() => {
+        stdin.write('\x0f');
+      });
+      expect(capturedUIState.constrainHeight).toBe(false);
+
+      mocks.mockStdout.write.mockClear();
+
+      // Simulate PageUp and Up Arrow navigation keys
+      act(() => {
+        stdin.write('\x1b[5~');
+        stdin.write('\x1b[A');
+      });
+
+      // Should remain expanded and not clear terminal
+      expect(capturedUIState.constrainHeight).toBe(false);
+      expect(mocks.mockStdout.write).not.toHaveBeenCalledWith(
+        ansiEscapes.clearTerminal,
+      );
+
+      // Simulate Escape key to exit expanded view
+      act(() => {
+        stdin.write('\x1b');
+      });
+      act(() => {
+        vi.advanceTimersByTime(100);
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState.constrainHeight).toBe(true);
+      });
+
+      unmount();
+    });
   });
 
   describe('Permission Handling', () => {

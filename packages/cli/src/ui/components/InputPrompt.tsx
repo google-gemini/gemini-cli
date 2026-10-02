@@ -684,6 +684,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleInput = useCallback(
     (key: Key) => {
+      if (!focus) {
+        return false;
+      }
+
       if (handleVoiceInput(key)) return true;
 
       // Determine if this keypress is a history navigation command
@@ -731,14 +735,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         if (key.name !== 'tab') {
           setForceShowShellSuggestions(false);
         }
-      }
-
-      // TODO(jacobr): this special case is likely not needed anymore.
-      // We should probably stop supporting paste if the InputPrompt is not
-      // focused.
-      /// We want to handle paste even when not focused to support drag and drop.
-      if (!focus && key.name !== 'paste') {
-        return false;
       }
 
       // Handle escape to close shortcuts panel first, before letting it bubble
@@ -1345,6 +1341,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return false;
       }
 
+      // If we're generating and user presses Ctrl+C (QUIT), do not swallow it as
+      // CLEAR_INPUT in the text buffer; let it propagate to cancel ongoing operations.
+      if (isGenerating && keyMatchers[Command.QUIT](key)) {
+        return false;
+      }
+
       // Fall back to the text buffer's default input handling for all other keys
       const handled = buffer.handleInput(key);
 
@@ -1420,7 +1422,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     ],
   );
   useKeypress(handleInput, {
-    isActive: !isEmbeddedShellFocused && !copyModeEnabled,
+    isActive: focus && !isEmbeddedShellFocused && !copyModeEnabled,
     priority: true,
   });
 
@@ -1429,6 +1431,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const getGhostTextLines = useCallback(() => {
     if (
+      inputWidth <= 0 ||
       !completion.promptCompletion.text ||
       !buffer.text ||
       !completion.promptCompletion.text.startsWith(buffer.text)
@@ -1514,6 +1517,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 part += char;
                 partWidth += charWidth;
                 splitIndex = i + 1;
+              }
+              if (splitIndex === 0) {
+                part = wordCP[0];
+                splitIndex = 1;
               }
               additionalLines.push(part);
               wordToProcess = cpSlice(wordToProcess, splitIndex);
@@ -1845,24 +1852,20 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             )}{' '}
           </Text>
           <Box flexGrow={1} flexDirection="column" ref={innerBoxRef}>
-            {buffer.text.length === 0 ? (
-              effectivePlaceholder ? (
-                showCursor ? (
-                  <Text
-                    terminalCursorFocus={showCursor}
-                    terminalCursorPosition={0}
-                  >
-                    {chalk.inverse(effectivePlaceholder.slice(0, 1))}
-                    <Text color={theme.text.secondary}>
-                      {effectivePlaceholder.slice(1)}
-                    </Text>
-                  </Text>
-                ) : (
+            {buffer.text.length === 0 && effectivePlaceholder ? (
+              showCursor ? (
+                <Text
+                  terminalCursorFocus={showCursor}
+                  terminalCursorPosition={0}
+                >
+                  {chalk.inverse(cpSlice(effectivePlaceholder, 0, 1))}
                   <Text color={theme.text.secondary}>
-                    {effectivePlaceholder}
+                    {cpSlice(effectivePlaceholder, 1)}
                   </Text>
-                )
-              ) : null
+                </Text>
+              ) : (
+                <Text color={theme.text.secondary}>{effectivePlaceholder}</Text>
+              )
             ) : (
               <Box
                 flexDirection="column"

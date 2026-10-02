@@ -690,7 +690,12 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
         keyMatchers[Command.MOVE_RIGHT](key) ||
         keyMatchers[Command.RETURN](key) ||
         keyMatchers[Command.ESCAPE](key) ||
-        keyMatchers[Command.QUIT](key)
+        keyMatchers[Command.QUIT](key) ||
+        ((key.name === 'space' || key.sequence === ' ') &&
+          !key.ctrl &&
+          !key.alt &&
+          !key.shift &&
+          !key.cmd)
       ) {
         return false;
       }
@@ -916,6 +921,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
         onSelect={handleSelect}
         onHighlight={handleHighlight}
         focusKey={isCustomOptionFocused ? 'other' : undefined}
+        priority={!isCustomOptionFocused}
         maxItemsToShow={maxItemsToShow}
         showScrollArrows={true}
         renderItem={(item, context) => {

@@ -18,6 +18,7 @@ import {
   REFERENCE_CONTENT_END,
   CoreToolCallStatus,
   resolveAtCommandPath,
+  stripLineNumberSuffix,
 } from '@google/gemini-cli-core';
 import { Buffer } from 'node:buffer';
 import type {
@@ -196,8 +197,18 @@ export async function checkPermissions(
         path.resolve(config.getTargetDir(), pathName),
       );
     } catch {
-      // skip if resolveToRealPath errors out
-      continue;
+      const strippedPath = stripLineNumberSuffix(pathName);
+      if (!strippedPath) {
+        continue;
+      }
+      try {
+        resolvedPathName = resolveToRealPath(
+          path.resolve(config.getTargetDir(), strippedPath),
+        );
+      } catch {
+        // skip if resolveToRealPath errors out
+        continue;
+      }
     }
 
     if (config.validatePathAccess(resolvedPathName, 'read')) {
@@ -246,18 +257,29 @@ async function resolveFilePaths(
       continue;
     }
 
+    const basePathName = stripLineNumberSuffix(pathName) ?? pathName;
     const gitIgnored =
       respectFileIgnore.respectGitIgnore &&
-      fileDiscovery.shouldIgnoreFile(pathName, {
+      (fileDiscovery.shouldIgnoreFile(pathName, {
         respectGitIgnore: true,
         respectGeminiIgnore: false,
-      });
+      }) ||
+        (basePathName !== pathName &&
+          fileDiscovery.shouldIgnoreFile(basePathName, {
+            respectGitIgnore: true,
+            respectGeminiIgnore: false,
+          })));
     const geminiIgnored =
       respectFileIgnore.respectGeminiIgnore &&
-      fileDiscovery.shouldIgnoreFile(pathName, {
+      (fileDiscovery.shouldIgnoreFile(pathName, {
         respectGitIgnore: false,
         respectGeminiIgnore: true,
-      });
+      }) ||
+        (basePathName !== pathName &&
+          fileDiscovery.shouldIgnoreFile(basePathName, {
+            respectGitIgnore: false,
+            respectGeminiIgnore: true,
+          })));
 
     if (gitIgnored || geminiIgnored) {
       const reason =
@@ -328,7 +350,7 @@ async function resolveFilePaths(
           try {
             const globResult = await globTool.buildAndExecute(
               {
-                pattern: `**/*${pathName}*`,
+                pattern: `**/*${basePathName}*`,
                 path: dir,
               },
               signal,
@@ -361,12 +383,12 @@ async function resolveFilePaths(
                 break;
               } else {
                 onDebugMessage(
-                  `Glob search for '**/*${pathName}*' did not return a usable path. Path ${pathName} will be skipped.`,
+                  `Glob search for '**/*${basePathName}*' did not return a usable path. Path ${pathName} will be skipped.`,
                 );
               }
             } else {
               onDebugMessage(
-                `Glob search for '**/*${pathName}*' found no files or an error. Path ${pathName} will be skipped.`,
+                `Glob search for '**/*${basePathName}*' found no files or an error. Path ${pathName} will be skipped.`,
               );
             }
           } catch (globError) {

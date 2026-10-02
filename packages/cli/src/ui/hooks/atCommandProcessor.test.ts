@@ -1772,6 +1772,40 @@ describe('handleAtCommand', () => {
 
     expect(globSpy).not.toHaveBeenCalled();
   });
+
+  it.each([
+    '@src/app.js:10',
+    '@src/app.js:10-20',
+    '@src/app.js:10:5',
+    '@src/app.js#L10',
+    '@src/app.js#L10-L25',
+    '@src/app.js#L10-#L25',
+  ])(
+    'should resolve file references with line numbers or ranges (%s) without falling back to glob',
+    async (atRef) => {
+      const fileContent = 'const x = 42;';
+      await createTestFile(
+        path.join(testRootDir, 'src', 'app.js'),
+        fileContent,
+      );
+
+      const result = await handleAtCommand({
+        query: `Explain ${atRef}`,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 712,
+        signal: abortController.signal,
+      });
+
+      expect(result.processedQuery).toContainEqual(
+        expect.objectContaining({ text: fileContent }),
+      );
+      expect(mockOnDebugMessage).not.toHaveBeenCalledWith(
+        expect.stringContaining('not found directly, attempting glob search.'),
+      );
+    },
+  );
 });
 
 describe('escapeAtSymbols', () => {

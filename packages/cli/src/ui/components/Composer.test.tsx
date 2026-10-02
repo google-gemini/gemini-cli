@@ -24,7 +24,11 @@ import {
 } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
 import { StreamingState } from '../types.js';
-import { TransientMessageType } from '../../utils/events.js';
+import {
+  appEvents,
+  AppEvent,
+  TransientMessageType,
+} from '../../utils/events.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import type { SessionMetrics } from '../contexts/SessionContext.js';
 import type { TextBuffer } from './shared/text-buffer.js';
@@ -47,6 +51,7 @@ vi.mock('../hooks/useTerminalSize.js', () => ({
 const composerTestControls = vi.hoisted(() => ({
   suggestionsVisible: false,
   isAlternateBuffer: false,
+  lastInputPromptFocus: undefined as boolean | undefined,
 }));
 
 // Mock child components
@@ -100,11 +105,14 @@ vi.mock('./DetailedMessagesDisplay.js', () => ({
 vi.mock('./InputPrompt.js', () => ({
   InputPrompt: ({
     placeholder,
+    focus,
     onSuggestionsVisibilityChange,
   }: {
     placeholder?: string;
+    focus?: boolean;
     onSuggestionsVisibilityChange?: (visible: boolean) => void;
   }) => {
+    composerTestControls.lastInputPromptFocus = focus;
     useEffect(() => {
       onSuggestionsVisibilityChange?.(composerTestControls.suggestionsVisible);
     }, [onSuggestionsVisibilityChange]);
@@ -485,6 +493,49 @@ describe('Composer', () => {
       expect(output).toBe('');
     });
 
+    it('does not emit AppEvent.ScrollToBottom when a tool confirmation is pending', async () => {
+      const emitSpy = vi.spyOn(appEvents, 'emit');
+      const uiState = createMockUIState({
+        streamingState: StreamingState.Responding,
+        pendingHistoryItems: [
+          {
+            type: 'tool_group',
+            tools: [
+              {
+                callId: 'call-scroll-1',
+                name: 'edit',
+                description: 'edit file',
+                status: CoreToolCallStatus.AwaitingApproval,
+                resultDisplay: undefined,
+                confirmationDetails: undefined,
+              },
+            ],
+          },
+        ],
+      });
+
+      const { unmount } = await renderComposer(uiState);
+
+      expect(emitSpy).not.toHaveBeenCalledWith(AppEvent.ScrollToBottom);
+      unmount();
+    });
+
+    it('emits AppEvent.ScrollToBottom when a non-tool action is required', async () => {
+      const emitSpy = vi.spyOn(appEvents, 'emit');
+      const uiState = createMockUIState({
+        customDialog: (
+          <Box>
+            <Text>Action Dialog</Text>
+          </Box>
+        ),
+      });
+
+      const { unmount } = await renderComposer(uiState);
+
+      expect(emitSpy).toHaveBeenCalledWith(AppEvent.ScrollToBottom);
+      unmount();
+    });
+
     it('renders LoadingIndicator when embedded shell is focused but background shell is visible', async () => {
       const uiState = createMockUIState({
         streamingState: StreamingState.Responding,
@@ -633,6 +684,26 @@ describe('Composer', () => {
       const { lastFrame } = await renderComposer(uiState);
 
       expect(lastFrame()).toContain('InputPrompt');
+      expect(composerTestControls.lastInputPromptFocus).toBe(true);
+    });
+
+    it('unfocuses InputPrompt when an action is required and collapseDrawerDuringApproval is false', async () => {
+      const uiState = createMockUIState({
+        isInputActive: true,
+        customDialog: (
+          <Box>
+            <Text>Test Dialog</Text>
+          </Box>
+        ),
+      });
+      const settings = createMockSettings({
+        ui: { collapseDrawerDuringApproval: false },
+      });
+
+      const { lastFrame } = await renderComposer(uiState, settings);
+
+      expect(lastFrame()).toContain('InputPrompt');
+      expect(composerTestControls.lastInputPromptFocus).toBe(false);
     });
 
     it('does not render InputPrompt when input is inactive', async () => {
