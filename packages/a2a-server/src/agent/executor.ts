@@ -236,10 +236,35 @@ export class CoderAgentExecutor implements AgentExecutor {
     agentSettingsInput?: AgentSettings,
     eventBus?: ExecutionEventBus,
   ): Promise<TaskWrapper> {
-    const agentSettings: AgentSettings = agentSettingsInput || {
+    const rawAgentSettings: AgentSettings = agentSettingsInput || {
       kind: CoderAgentEvent.StateAgentSettingsEvent,
       workspacePath: process.cwd(),
     };
+    // Never derive workspace trust from caller-supplied agentSettings. A task
+    // created from a request must not be able to mark its own workspace trusted
+    // (which would re-enable workspace mcpServers/tools and .env loading, i.e.
+    // command execution). Mirror execute() and reconstruct(), which already force
+    // isTrusted:false and validate the workspace path. createTask was the one
+    // entry point that still forwarded the request's isTrusted flag, leaving the
+    // trust check bypassable via POST /tasks (incomplete hardening from #28470).
+    let agentSettings: AgentSettings;
+    try {
+      agentSettings = {
+        ...rawAgentSettings,
+        workspacePath: validateWorkspacePath(rawAgentSettings.workspacePath),
+        isTrusted: false,
+      };
+    } catch (error) {
+      logger.error(
+        `[CoderAgentExecutor] Invalid workspace path during task creation for task ${taskId}:`,
+        error,
+      );
+      if (eventBus) {
+        void pushTaskStateFailed(error, eventBus, taskId, contextId);
+      }
+      throw error; // Re-throw to be caught by caller
+    }
+
     return this.runInIsolatedEnv(
       agentSettings,
       async (isTrusted, workspaceRoot) => {
