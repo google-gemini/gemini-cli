@@ -155,7 +155,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           setShellModeActive={uiActions.setShellModeActive}
           approvalMode={uiState.showApprovalModeIndicator}
           onEscapePromptChange={uiActions.onEscapePromptChange}
-          focus={isFocused}
+          focus={isFocused && !hasPendingActionRequired}
           vimHandleInput={uiActions.vimHandleInput}
           vimEnabled={vimEnabled}
           vimMode={vimMode}
