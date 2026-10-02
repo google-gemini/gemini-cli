@@ -361,7 +361,7 @@ export function modelStringToModelConfigAlias(model: string): string {
  * This ensures that compression effectively reduces context size even when recent turns
  * contain massive tool outputs (like large grep results or logs).
  */
-async function truncateHistoryToBudget(
+export async function truncateHistoryToBudget(
   history: readonly Content[],
   config: Config,
 ): Promise<Content[]> {
@@ -426,7 +426,7 @@ async function truncateHistoryToBudget(
                 config.getTruncateToolOutputThreshold(),
               );
 
-              newParts.unshift({
+              newParts.push({
                 functionResponse: {
                   // eslint-disable-next-line @typescript-eslint/no-misused-spread
                   ...part.functionResponse,
@@ -441,24 +441,33 @@ async function truncateHistoryToBudget(
             } catch (error) {
               // Fallback: if truncation fails, keep the original part to avoid data loss in the chat.
               debugLogger.debug('Failed to truncate history to budget:', error);
-              newParts.unshift(part);
+              newParts.push(part);
               functionResponseTokenCounter += tokens;
             }
           } else {
             // Within budget: keep the full response.
             functionResponseTokenCounter += tokens;
-            newParts.unshift(part);
+            newParts.push(part);
           }
         } else {
           // Non-tool response part: always keep.
-          newParts.unshift(part);
+          newParts.push(part);
         }
       }
+      // Parts were appended newest-first (matching the backwards traversal
+      // above); reverse once to restore chronological order instead of
+      // repeated O(n) front-insertion via unshift.
+      newParts.reverse();
     }
 
     // Reconstruct the message with processed (potentially truncated) parts.
-    truncatedHistory.unshift({ ...content, parts: newParts });
+    truncatedHistory.push({ ...content, parts: newParts });
   }
+
+  // Messages were appended newest-first (matching the backwards traversal
+  // above); reverse once to restore chronological order instead of repeated
+  // O(n) front-insertion via unshift.
+  truncatedHistory.reverse();
 
   return truncatedHistory;
 }
