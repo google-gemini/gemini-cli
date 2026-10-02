@@ -112,6 +112,7 @@ export function convertSessionToClientHistory(
 ): HistoryTurn[] {
   const clientHistory: HistoryTurn[] = [];
   const seenFunctionResponseIds = new Set<string>();
+  const pendingPartsToAppend = new Map<string, Part[]>();
 
   for (let i = 0; i < messages.length; i++) {
     const msg = messages[i];
@@ -120,23 +121,28 @@ export function convertSessionToClientHistory(
     }
 
     if (msg.type === 'user') {
-      const contentString = partListUnionToString(msg.content);
-      const trimmedContent = contentString.trim();
-      if (isIgnoredUserContent(trimmedContent)) {
-        continue;
+      const extraParts = pendingPartsToAppend.get(msg.id) || [];
+      if (extraParts.length === 0) {
+        const contentString = partListUnionToString(msg.content);
+        const trimmedContent = contentString.trim();
+        if (isIgnoredUserContent(trimmedContent)) {
+          continue;
+        }
       }
 
-      const parts = ensurePartArray(msg.content).filter((part) => {
-        const respId = part.functionResponse?.id;
-        if (!respId) {
+      const parts = [...ensurePartArray(msg.content), ...extraParts].filter(
+        (part) => {
+          const respId = part.functionResponse?.id;
+          if (!respId) {
+            return true;
+          }
+          if (seenFunctionResponseIds.has(respId)) {
+            return false;
+          }
+          seenFunctionResponseIds.add(respId);
           return true;
-        }
-        if (seenFunctionResponseIds.has(respId)) {
-          return false;
-        }
-        seenFunctionResponseIds.add(respId);
-        return true;
-      });
+        },
+      );
 
       if (parts.length === 0) {
         continue;
@@ -205,6 +211,7 @@ export function convertSessionToClientHistory(
         if (msg.toolCalls && msg.toolCalls.length > 0) {
           const recordedResponseIds = new Set<string>();
           let hasUntrackedFunctionResponse = false;
+          let targetUserMsgId: string | undefined;
           for (let j = i + 1; j < messages.length; j++) {
             const nextMsg = messages[j];
             if (nextMsg.type === 'gemini') {
@@ -213,6 +220,7 @@ export function convertSessionToClientHistory(
             if (nextMsg.type === 'user' && nextMsg.content) {
               for (const part of ensurePartArray(nextMsg.content)) {
                 if (part.functionResponse) {
+                  targetUserMsgId ??= nextMsg.id;
                   if (part.functionResponse.id) {
                     recordedResponseIds.add(part.functionResponse.id);
                   } else {
@@ -252,26 +260,39 @@ export function convertSessionToClientHistory(
             }
           }
 
-          const dedupedResponseParts = functionResponseParts.filter((part) => {
-            const respId = part.functionResponse?.id;
-            if (!respId) {
-              return true;
-            }
-            if (seenFunctionResponseIds.has(respId)) {
-              return false;
-            }
-            seenFunctionResponseIds.add(respId);
-            return true;
-          });
+          if (functionResponseParts.length > 0) {
+            if (targetUserMsgId) {
+              const existingPending =
+                pendingPartsToAppend.get(targetUserMsgId) || [];
+              pendingPartsToAppend.set(targetUserMsgId, [
+                ...existingPending,
+                ...functionResponseParts,
+              ]);
+            } else {
+              const dedupedResponseParts = functionResponseParts.filter(
+                (part) => {
+                  const respId = part.functionResponse?.id;
+                  if (!respId) {
+                    return true;
+                  }
+                  if (seenFunctionResponseIds.has(respId)) {
+                    return false;
+                  }
+                  seenFunctionResponseIds.add(respId);
+                  return true;
+                },
+              );
 
-          if (dedupedResponseParts.length > 0) {
-            clientHistory.push({
-              id: `${msg.id}_response`,
-              content: {
-                role: 'user',
-                parts: dedupedResponseParts,
-              },
-            });
+              if (dedupedResponseParts.length > 0) {
+                clientHistory.push({
+                  id: `${msg.id}_response`,
+                  content: {
+                    role: 'user',
+                    parts: dedupedResponseParts,
+                  },
+                });
+              }
+            }
           }
         }
       }

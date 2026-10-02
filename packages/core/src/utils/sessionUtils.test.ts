@@ -464,6 +464,115 @@ describe('convertSessionToClientHistory', () => {
     ]);
   });
 
+  it('should merge synthesized missing tool responses into the subsequent user turn without creating consecutive user turns', () => {
+    const respA = {
+      functionResponse: {
+        id: 'callA',
+        name: 'read_file',
+        response: { output: 'contents A' },
+      },
+    };
+    const respB = {
+      functionResponse: {
+        id: 'callB',
+        name: 'read_file',
+        response: { output: 'contents B' },
+      },
+    };
+
+    const messages: ConversationRecord['messages'] = [
+      {
+        id: 'msg1',
+        type: 'user',
+        timestamp: '2024-01-01T10:00:00Z',
+        content: 'Read both files',
+      },
+      {
+        id: 'msg2',
+        type: 'gemini',
+        timestamp: '2024-01-01T10:01:00Z',
+        content: [
+          {
+            functionCall: {
+              id: 'callA',
+              name: 'read_file',
+              args: { path: 'a.txt' },
+            },
+          },
+          {
+            functionCall: {
+              id: 'callB',
+              name: 'read_file',
+              args: { path: 'b.txt' },
+            },
+          },
+        ],
+        toolCalls: [
+          {
+            id: 'callA',
+            name: 'read_file',
+            args: { path: 'a.txt' },
+            status: CoreToolCallStatus.Success,
+            timestamp: '2024-01-01T10:01:05Z',
+            result: [respA],
+          },
+          {
+            id: 'callB',
+            name: 'read_file',
+            args: { path: 'b.txt' },
+            status: CoreToolCallStatus.Success,
+            timestamp: '2024-01-01T10:01:05Z',
+            result: [respB],
+          },
+        ],
+      },
+      {
+        id: 'msg3',
+        type: 'user',
+        timestamp: '2024-01-01T10:01:06Z',
+        content: [respA],
+      },
+    ];
+
+    const history = convertSessionToClientHistory(messages);
+
+    expect(history).toEqual([
+      {
+        id: 'msg1',
+        content: { role: 'user', parts: [{ text: 'Read both files' }] },
+      },
+      {
+        id: 'msg2',
+        content: {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                id: 'callA',
+                name: 'read_file',
+                args: { path: 'a.txt' },
+              },
+            },
+            {
+              functionCall: {
+                id: 'callB',
+                name: 'read_file',
+                args: { path: 'b.txt' },
+              },
+            },
+          ],
+        },
+      },
+      {
+        id: 'msg3',
+        content: {
+          role: 'user',
+          parts: [respA, respB],
+        },
+      },
+    ]);
+  });
+
   it('should preserve multi-modal parts (inlineData)', () => {
     const messages: ConversationRecord['messages'] = [
       {
