@@ -278,6 +278,71 @@ describe('SessionSelector', () => {
     expect(result.sessionData.messages[0].content).toBe('Latest session');
   });
 
+  it('should resolve latest session by most recent activity, not start time', async () => {
+    const sessionId1 = randomUUID();
+    const sessionId2 = randomUUID();
+
+    // Create test session files
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    // Older session that was used most recently (the one the user just left).
+    const session1 = {
+      sessionId: sessionId1,
+      projectHash: 'test-hash',
+      startTime: '2024-01-01T10:00:00.000Z',
+      lastUpdated: '2024-01-01T12:00:00.000Z',
+      messages: [
+        {
+          type: 'user',
+          content: 'Main session I just used',
+          id: 'msg1',
+          timestamp: '2024-01-01T12:00:00.000Z',
+        },
+      ],
+    };
+
+    // Newer-started session that has been stale since morning.
+    const session2 = {
+      sessionId: sessionId2,
+      projectHash: 'test-hash',
+      startTime: '2024-01-01T11:00:00.000Z',
+      lastUpdated: '2024-01-01T11:30:00.000Z',
+      messages: [
+        {
+          type: 'user',
+          content: 'Stale spike session',
+          id: 'msg2',
+          timestamp: '2024-01-01T11:00:00.000Z',
+        },
+      ],
+    };
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId1.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(session1, null, 2),
+    );
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T11-00-${sessionId2.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(session2, null, 2),
+    );
+
+    const sessionSelector = new SessionSelector(storage);
+
+    const result = await sessionSelector.resolveSession('latest');
+    expect(result.sessionData.sessionId).toBe(sessionId1);
+    expect(result.sessionData.messages[0].content).toBe(
+      'Main session I just used',
+    );
+  });
+
   it('should resolve session by UUID with whitespace (trimming)', async () => {
     const sessionId = randomUUID();
 
