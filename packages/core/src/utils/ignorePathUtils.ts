@@ -69,3 +69,52 @@ export function getNormalizedRelativePath(
 
   return normalized;
 }
+
+/**
+ * Expands wildcard directory patterns (e.g. 'dir/**') to also include the directory itself ('dir/'),
+ * unless there are negative patterns matching or under that directory.
+ * This allows directory subtree pruning to identify the directory as ignored.
+ */
+export function expandWildcardDirectoryPatterns(
+  rawPatterns: string[],
+): string[] {
+  const negations = new Set<string>();
+  for (const p of rawPatterns) {
+    const trimmed = p.trimStart();
+    if (trimmed.startsWith('!')) {
+      negations.add(trimmed.slice(1).replace(/^\//, ''));
+    }
+  }
+
+  const expanded: string[] = [];
+  for (const p of rawPatterns) {
+    expanded.push(p);
+    const trimmed = p.trim();
+    if (
+      !trimmed.startsWith('!') &&
+      !trimmed.startsWith('#') &&
+      trimmed.endsWith('/**')
+    ) {
+      const withoutGlob = trimmed.slice(0, -3).replace(/^\//, '');
+      // Only expand concrete directory prefixes (skip empty or wildcard-containing paths like '/**' or 'packages/*/**')
+      if (
+        withoutGlob !== '' &&
+        !withoutGlob.includes('*') &&
+        !withoutGlob.includes('?')
+      ) {
+        let hasNegation = false;
+        for (const neg of negations) {
+          if (neg === withoutGlob || neg.startsWith(withoutGlob + '/')) {
+            hasNegation = true;
+            break;
+          }
+        }
+        if (!hasNegation) {
+          // Convert 'dir/**' -> 'dir/' (preserving leading slash if present)
+          expanded.push(trimmed.slice(0, -3) + '/');
+        }
+      }
+    }
+  }
+  return expanded;
+}

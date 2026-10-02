@@ -19,6 +19,10 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import fs from 'node:fs';
 import * as path from 'node:path';
+import { LRUCache } from 'mnemonist';
+
+const MAX_SYMLINK_CACHE_SIZE = 20_000;
+const MAX_REALPATH_CACHE_SIZE = 20_000;
 
 export interface FilterFilesOptions {
   respectGitIgnore?: boolean;
@@ -45,6 +49,23 @@ export class FileDiscoveryService {
   };
   private projectRoot: string;
   private _realProjectRoot?: string;
+  private symlinkCache: LRUCache<string, boolean> = new LRUCache(
+    MAX_SYMLINK_CACHE_SIZE,
+  );
+  private realPathCache: LRUCache<string, string> = new LRUCache(
+    MAX_REALPATH_CACHE_SIZE,
+  );
+
+  clearCache(): void {
+    this.symlinkCache.clear();
+    this.realPathCache.clear();
+    if (this.gitIgnoreFilter instanceof GitIgnoreParser) {
+      this.gitIgnoreFilter.clearCache();
+    }
+    if (this.combinedIgnoreFilter instanceof GitIgnoreParser) {
+      this.combinedIgnoreFilter.clearCache();
+    }
+  }
 
   private get realProjectRoot(): string {
     if (!this._realProjectRoot) {
@@ -279,15 +300,29 @@ export class FileDiscoveryService {
         ? filePath
         : path.resolve(this.projectRoot, filePath);
 
-      const isSymlink =
-        options.isSymbolicLink ??
-        fs
-          .lstatSync(absolutePath, { throwIfNoEntry: false })
-          ?.isSymbolicLink() ??
-        false;
+      let isSymlink: boolean;
+      if (options.isSymbolicLink !== undefined) {
+        isSymlink = options.isSymbolicLink;
+        this.symlinkCache.set(absolutePath, isSymlink);
+      } else {
+        const cached = this.symlinkCache.get(absolutePath);
+        if (cached !== undefined) {
+          isSymlink = cached;
+        } else {
+          isSymlink =
+            fs
+              .lstatSync(absolutePath, { throwIfNoEntry: false })
+              ?.isSymbolicLink() ?? false;
+          this.symlinkCache.set(absolutePath, isSymlink);
+        }
+      }
 
       if (isSymlink) {
-        const realPath = resolveToRealPath(absolutePath);
+        let realPath = this.realPathCache.get(absolutePath);
+        if (!realPath) {
+          realPath = resolveToRealPath(absolutePath);
+          this.realPathCache.set(absolutePath, realPath);
+        }
         if (!isSubpath(this.realProjectRoot, realPath)) {
           return true;
         }
