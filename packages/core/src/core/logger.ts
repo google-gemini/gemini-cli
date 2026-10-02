@@ -294,6 +294,26 @@ export class Logger {
     return path.join(this.geminiDir, `checkpoint-${encodedTag}.json`);
   }
 
+  /**
+   * Returns the legacy (raw tag) checkpoint path, or undefined if the tag would
+   * resolve to anything other than a flat `checkpoint-<tag>.json` file directly
+   * inside the gemini directory (e.g. tags containing path separators or `..`).
+   */
+  private _legacyCheckpointPath(tag: string): string | undefined {
+    if (!this.geminiDir) {
+      return undefined;
+    }
+    const fileName = `checkpoint-${tag}.json`;
+    const legacyPath = path.join(this.geminiDir, fileName);
+    if (
+      path.basename(legacyPath) !== fileName ||
+      path.dirname(legacyPath) !== path.dirname(path.join(this.geminiDir, 'x'))
+    ) {
+      return undefined;
+    }
+    return legacyPath;
+  }
+
   private async _getCheckpointPath(tag: string): Promise<string> {
     // 1. Check for the new encoded path first.
     const newPath = this._checkpointPath(tag);
@@ -310,15 +330,17 @@ export class Logger {
     }
 
     // 2. Fallback for backward compatibility: check for the old raw path.
-    const oldPath = path.join(this.geminiDir!, `checkpoint-${tag}.json`);
-    try {
-      await fs.access(oldPath);
-      return oldPath; // Found it, use the old path.
-    } catch (error) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const nodeError = error as NodeJS.ErrnoException;
-      if (nodeError.code !== 'ENOENT') {
-        throw error; // A real error occurred, rethrow it.
+    const oldPath = this._legacyCheckpointPath(tag);
+    if (oldPath) {
+      try {
+        await fs.access(oldPath);
+        return oldPath; // Found it, use the old path.
+      } catch (error) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const nodeError = error as NodeJS.ErrnoException;
+        if (nodeError.code !== 'ENOENT') {
+          throw error; // A real error occurred, rethrow it.
+        }
       }
     }
 
@@ -419,8 +441,8 @@ export class Logger {
     }
 
     // 2. Attempt to delete the old raw path for backward compatibility.
-    const oldPath = path.join(this.geminiDir, `checkpoint-${tag}.json`);
-    if (newPath !== oldPath) {
+    const oldPath = this._legacyCheckpointPath(tag);
+    if (oldPath && newPath !== oldPath) {
       try {
         await fs.unlink(oldPath);
         deletedSomething = true;
