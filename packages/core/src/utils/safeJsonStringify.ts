@@ -5,7 +5,7 @@
  */
 
 /**
- * Safely stringifies an object to JSON, handling circular references by replacing them with [Circular].
+ * Safely stringifies an object to JSON, replacing active-path circular references with [Circular].
  *
  * @param obj - The object to stringify
  * @param space - Optional space parameter for formatting (defaults to no formatting)
@@ -17,17 +17,24 @@ export function safeJsonStringify(
   obj: unknown,
   space?: string | number,
 ): string {
-  const seen = new WeakSet();
+  const ancestors: object[] = [];
   return JSON.stringify(
     obj,
-    (key, value) => {
-      if (typeof value === 'object' && value !== null) {
-        if (seen.has(value)) {
-          return '[Circular]';
-        }
-        seen.add(value);
+    function (this: object, _key: string, value: unknown) {
+      if (typeof value !== 'object' || value === null) {
+        return value;
       }
-      return value as unknown;
+
+      while (ancestors.length > 0 && ancestors[ancestors.length - 1] !== this) {
+        ancestors.pop();
+      }
+
+      if (ancestors.includes(value)) {
+        return '[Circular]';
+      }
+
+      ancestors.push(value);
+      return value;
     },
     space,
   );
