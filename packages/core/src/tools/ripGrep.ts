@@ -351,6 +351,10 @@ class GrepToolInvocation extends BaseToolInvocation<
       return {
         llmContent: `Error during grep search operation: ${errorMessage}`,
         returnDisplay: `Error: ${errorMessage}`,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.GREP_EXECUTION_ERROR,
+        },
       };
     }
   }
