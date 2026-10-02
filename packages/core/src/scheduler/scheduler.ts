@@ -156,6 +156,10 @@ export class Scheduler {
   dispose(): void {
     coreEvents.off(CoreEvent.McpProgress, this.handleMcpProgress);
     this.disposeController.abort();
+
+    for (const request of this.requestQueue.splice(0)) {
+      request.reject(new Error('Scheduler disposed'));
+    }
   }
 
   private readonly handleMcpProgress = (payload: McpProgressPayload) => {
@@ -220,6 +224,10 @@ export class Scheduler {
         sessionId: this.context.config.getSessionId(),
       },
       async ({ metadata: spanMetadata }) => {
+        if (this.disposeController.signal.aborted) {
+          throw new Error('Scheduler disposed');
+        }
+
         const requests = Array.isArray(request) ? request : [request];
 
         spanMetadata.input = requests;
@@ -454,7 +462,11 @@ export class Scheduler {
    * @returns true if the loop should continue, false if it should terminate.
    */
   private async _processNextItem(signal: AbortSignal): Promise<boolean> {
-    if (signal.aborted || this.isCancelling) {
+    if (
+      signal.aborted ||
+      this.isCancelling ||
+      this.disposeController.signal.aborted
+    ) {
       // Finalize active calls that are terminal
       const activeCalls = this.state.allActiveCalls;
       for (const call of activeCalls) {
@@ -463,7 +475,11 @@ export class Scheduler {
         }
       }
 
-      this.state.cancelAllQueued('Operation cancelled');
+      this.state.cancelAllQueued(
+        this.disposeController.signal.aborted
+          ? 'Scheduler disposed'
+          : 'Operation cancelled',
+      );
       return false;
     }
 
@@ -706,6 +722,14 @@ export class Scheduler {
     let lastDetails: SerializableConfirmationDetails | undefined;
 
     if (decision === PolicyDecision.ASK_USER) {
+      if (this.disposeController.signal.aborted) {
+        this.state.updateStatus(
+          callId,
+          CoreToolCallStatus.Cancelled,
+          'Scheduler disposed',
+        );
+        return;
+      }
       const forcedDecision =
         hookDecision === 'ask' ||
         (policyDecision === PolicyDecision.ALLOW && hasTaintRisk)
@@ -765,11 +789,13 @@ export class Scheduler {
     signal: AbortSignal,
   ): Promise<boolean> {
     const callId = toolCall.request.callId;
-    if (signal.aborted) {
+    if (signal.aborted || this.disposeController.signal.aborted) {
       this.state.updateStatus(
         callId,
         CoreToolCallStatus.Cancelled,
-        'Operation cancelled',
+        this.disposeController.signal.aborted
+          ? 'Scheduler disposed'
+          : 'Operation cancelled',
       );
       return false;
     }
@@ -877,7 +903,7 @@ export class Scheduler {
       sandboxDetailsStr = result.response.error?.message || '';
     }
 
-    if (isSandboxError) {
+    if (isSandboxError && !this.disposeController.signal.aborted) {
       try {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const parsedError = JSON.parse(sandboxDetailsStr) as {
