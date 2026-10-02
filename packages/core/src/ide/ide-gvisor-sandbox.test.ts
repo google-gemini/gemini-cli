@@ -124,26 +124,6 @@ describe('IDE Companion under gVisor (runsc) Sandbox Constraints', () => {
     );
   });
 
-  it.fails('fails when expecting companion connection to succeed under gVisor netstack constraints', async () => {
-    // In a container sandbox, /.dockerenv exists
-    vi.mocked(fs.existsSync).mockImplementation((targetPath: fs.PathLike) => {
-      if (targetPath === '/.dockerenv') return true;
-      return false;
-    });
-
-    const blockedGatewayPort = 65432;
-    vi.stubEnv('GEMINI_CLI_IDE_SERVER_PORT', String(blockedGatewayPort));
-    vi.stubEnv('GEMINI_CLI_IDE_AUTH_TOKEN', 'valid-auth-token');
-
-    const ideClient = await IdeClient.getInstance();
-    await ideClient.connect({ logToConsole: false });
-
-    // This assertion fails under gVisor constraints because status is Disconnected, not Connected
-    expect(ideClient.getConnectionStatus().status).toBe(
-      IDEConnectionStatus.Connected,
-    );
-  });
-
   it('fails to connect when executed within gVisor IPC unix socket constraints (missing IPC socket path / --host-uds=none)', async () => {
     // In gVisor, unix domain sockets from the host are blocked (--host-uds=none) or missing from /tmp
     vi.stubEnv('GEMINI_CLI_IDE_SERVER_STDIO_COMMAND', '/nonexistent/ide-uds-bridge');

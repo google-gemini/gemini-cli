@@ -575,4 +575,21 @@ describe('IDEServer HTTP endpoints', () => {
     );
     expect(response.statusCode).toBe(400);
   });
+
+  it('should allow requests with mixed-case Host header', async () => {
+    const response = await request(
+      port,
+      {
+        path: '/mcp',
+        method: 'POST',
+        headers: {
+          Host: `Host.Docker.Internal:${port}`,
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer test-auth-token',
+        },
+      },
+      JSON.stringify({ jsonrpc: '2.0', method: 'initialize' }),
+    );
+    expect(response.statusCode).toBe(400);
+  });
 });
