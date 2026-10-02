@@ -17,17 +17,24 @@ export function safeJsonStringify(
   obj: unknown,
   space?: string | number,
 ): string {
-  const seen = new WeakSet();
+  // Ancestor stack: only references on the current depth-first path are
+  // circular. Shared (non-circular) references reached from a sibling are
+  // safe to serialize again. The replacer's `this` is the object holding the
+  // current key, which lets us unwind completed subtrees.
+  const stack: object[] = [];
   return JSON.stringify(
     obj,
-    (key, value) => {
+    function (this: unknown, _key: string, value: unknown) {
       if (typeof value === 'object' && value !== null) {
-        if (seen.has(value)) {
+        while (stack.length > 0 && stack[stack.length - 1] !== this) {
+          stack.pop();
+        }
+        if (stack.includes(value)) {
           return '[Circular]';
         }
-        seen.add(value);
+        stack.push(value);
       }
-      return value as unknown;
+      return value;
     },
     space,
   );
