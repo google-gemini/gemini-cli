@@ -151,6 +151,60 @@ describe('WebSearchTool', () => {
       expect(result.returnDisplay).toBe('Error performing web search.');
     });
 
+    it('should return a WEB_SEARCH_FAILED error when the search times out', async () => {
+      const params: WebSearchToolParams = { query: 'hanging query' };
+      (mockGeminiClient.generateContent as Mock).mockImplementation(
+        (_params, _content, signal: AbortSignal) =>
+          new Promise((_resolve, reject) => {
+            signal.addEventListener(
+              'abort',
+              () => reject(signal.reason ?? new Error('AbortError')),
+              { once: true },
+            );
+          }),
+      );
+
+      vi.useFakeTimers();
+      try {
+        const invocation = tool.build(params);
+        const resultPromise = invocation.execute({ abortSignal });
+        await vi.advanceTimersByTimeAsync(30_000);
+        const result = await resultPromise;
+
+        expect(result.error?.type).toBe(ToolErrorType.WEB_SEARCH_FAILED);
+        expect(result.llmContent).toContain('timed out after 30000ms');
+        expect(result.returnDisplay).toBe('Web search timed out.');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('should still report cancellation when aborted before the timeout', async () => {
+      const params: WebSearchToolParams = { query: 'cancelled query' };
+      (mockGeminiClient.generateContent as Mock).mockImplementation(
+        (_params, _content, signal: AbortSignal) =>
+          new Promise((_resolve, reject) => {
+            signal.addEventListener(
+              'abort',
+              () => reject(signal.reason ?? new Error('AbortError')),
+              { once: true },
+            );
+          }),
+      );
+
+      const externalController = new AbortController();
+      const invocation = tool.build(params);
+      const resultPromise = invocation.execute({
+        abortSignal: externalController.signal,
+      });
+      externalController.abort();
+      const result = await resultPromise;
+
+      expect(result.error).toBeUndefined();
+      expect(result.llmContent).toBe('Web search was cancelled.');
+      expect(result.returnDisplay).toBe('Search cancelled.');
+    });
+
     it('should correctly format results with sources and citations wrapped in untrusted_context', async () => {
       const params: WebSearchToolParams = { query: 'grounding query' };
       (mockGeminiClient.generateContent as Mock).mockResolvedValue({
