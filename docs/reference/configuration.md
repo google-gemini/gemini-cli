@@ -2482,6 +2482,29 @@ their corresponding top-level category object in your `settings.json` file.
 - **`admin.skills.enabled`** (boolean):
   - **Description:** If false, disallows agent skills from being used.
   - **Default:** `true`
+
+#### `superfast`
+
+- **`superfast.enabled`** (boolean):
+
+  - **Description:** Master switch for the Superfast decision gate. Off by
+    default.
+  - **Default:** `false`
+
+- **`superfast.endpoint`** (string):
+
+  - **Description:** Full URL of the Jev-compatible /v1/systemone endpoint.
+  - **Default:** `"http://localhost:8000/v1/systemone"`
+
+- **`superfast.model`** (string):
+
+  - **Description:** Model id sent to the decision endpoint.
+  - **Default:** `"von-1.2.0"`
+
+- **`superfast.timeoutMs`** (number):
+  - **Description:** Hard timeout for a single decision call. On timeout the
+    gate fails open.
+  - **Default:** `150`
   <!-- SETTINGS-AUTOGEN:END -->
 
 #### `mcpServers`

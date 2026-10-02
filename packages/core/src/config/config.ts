@@ -179,6 +179,11 @@ import { setGlobalProxy, updateGlobalFetchTimeouts } from '../utils/fetch.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { ragLogger } from '../utils/ragLogger.js';
+import {
+  resolveGateSettings,
+  type DecisionGateSettings,
+  type SuperfastSettingsInput,
+} from '../superfast/decision-gate.js';
 import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
 import type { AgentDefinition } from '../agents/types.js';
@@ -736,6 +741,12 @@ export interface ConfigParameters {
   tracker?: boolean;
   planSettings?: PlanSettings;
   worktreeSettings?: WorktreeSettings;
+  /**
+   * Optional Superfast System One decision gate. Off by default; when enabled
+   * a small local decision model classifies each turn in a single forward
+   * pass. Fails open to normal behaviour whenever it is unsure or absent.
+   */
+  superfast?: SuperfastSettingsInput;
   modelSteering?: boolean;
   onModelChange?: (model: string) => void;
   mcpEnabled?: boolean;
@@ -789,6 +800,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly debugMode: boolean;
   private readonly question: string | undefined;
   private readonly worktreeSettings: WorktreeSettings | undefined;
+  private readonly superfastSettings: DecisionGateSettings;
   readonly enableConseca: boolean;
 
   private readonly coreTools: string[] | undefined;
@@ -1030,6 +1042,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.debugMode = params.debugMode;
     this.question = params.question;
     this.worktreeSettings = params.worktreeSettings;
+    this.superfastSettings = resolveGateSettings(params.superfast);
 
     this._sandboxPolicyManager = new SandboxPolicyManager();
     const initialApprovalMode =
@@ -1825,6 +1838,15 @@ export class Config implements McpContext, AgentLoopContext {
 
   getWorktreeSettings(): WorktreeSettings | undefined {
     return this.worktreeSettings;
+  }
+
+  /**
+   * Resolved Superfast decision-gate settings (merged with defaults). Off
+   * unless `superfast.enabled` is set. The gate fails open whenever it is
+   * unsure or the backend is absent.
+   */
+  getSuperfastSettings(): DecisionGateSettings {
+    return this.superfastSettings;
   }
 
   getClientName(): string | undefined {
