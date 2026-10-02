@@ -82,6 +82,7 @@ export const handleSlashCommand = async (
           name: commandToExecute.name,
           args,
         },
+        signal: abortController.signal,
       };
 
       const result = await commandToExecute.action(commandContext, args);

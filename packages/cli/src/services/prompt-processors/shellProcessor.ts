@@ -32,6 +32,47 @@ export class ConfirmationRequiredError extends Error {
 }
 
 /**
+ * Ceiling for a single `!{...}` injection. A command that never exits would
+ * otherwise hold the prompt pipeline open with no way out, since the pipeline
+ * has no per-command budget of its own.
+ */
+export const SHELL_INJECTION_TIMEOUT_MS = 60_000;
+
+interface CommandAbortSignal {
+  signal: AbortSignal;
+  cleanup: () => void;
+}
+
+/**
+ * Builds the signal a single injection is executed under: the caller's
+ * cancellation (when there is one) combined with the per-command timeout.
+ * The returned cleanup must run when execution settles so short-lived commands
+ * do not leave a timer or listener attached to a long-lived caller signal.
+ */
+function getCommandAbortSignal(caller?: AbortSignal): CommandAbortSignal {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(
+    () => controller.abort(),
+    SHELL_INJECTION_TIMEOUT_MS,
+  );
+  const onCallerAbort = () => controller.abort();
+
+  if (caller?.aborted) {
+    controller.abort();
+  } else {
+    caller?.addEventListener('abort', onCallerAbort, { once: true });
+  }
+
+  return {
+    signal: controller.signal,
+    cleanup: () => {
+      clearTimeout(timeoutId);
+      caller?.removeEventListener('abort', onCallerAbort);
+    },
+  };
+}
+
+/**
  * Represents a single detected shell injection site in the prompt,
  * after resolution of arguments. Extends the base Injection interface.
  */
@@ -168,16 +209,21 @@ export class ShellProcessor implements IPromptProcessor {
           defaultFg: activeTheme.colors.Foreground,
           defaultBg: activeTheme.colors.Background,
         };
-        const { result } = await ShellExecutionService.execute(
-          injection.resolvedCommand,
-          config.getTargetDir(),
-          () => {},
-          new AbortController().signal,
-          config.getEnableInteractiveShell(),
-          shellExecutionConfig,
-        );
-
-        const executionResult = await result;
+        const commandAbort = getCommandAbortSignal(context.signal);
+        let executionResult;
+        try {
+          const { result } = await ShellExecutionService.execute(
+            injection.resolvedCommand,
+            config.getTargetDir(),
+            () => {},
+            commandAbort.signal,
+            config.getEnableInteractiveShell(),
+            shellExecutionConfig,
+          );
+          executionResult = await result;
+        } finally {
+          commandAbort.cleanup();
+        }
 
         // Handle Spawn Errors
         if (executionResult.error && !executionResult.aborted) {

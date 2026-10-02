@@ -100,6 +100,13 @@ export interface CommandContext {
     /** A transient list of shell commands the user has approved for this session. */
     sessionShellAllowlist: Set<string>;
   };
+  /**
+   * Cancellation for the work this command triggers (for example the caller's
+   * abort controller in non-interactive mode). Processors and actions that
+   * start long-running work should honour it so a cancelled invocation does not
+   * keep running.
+   */
+  signal?: AbortSignal;
   // Flag to indicate if an overwrite has been confirmed
   overwriteConfirmed?: boolean;
 }
