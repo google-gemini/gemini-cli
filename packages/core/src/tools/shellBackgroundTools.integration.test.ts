@@ -10,6 +10,7 @@ import {
   ListBackgroundProcessesTool,
   ReadBackgroundOutputTool,
 } from './shellBackgroundTools.js';
+import type { ToolResult } from './tools.js';
 import { ShellTool } from './shell.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { NoopSandboxManager } from '../services/sandboxManager.js';
@@ -54,7 +55,7 @@ describe('Background Tools Integration', () => {
     const scriptPath = path.join(tempRootDir, 'log.js');
     fs.writeFileSync(
       scriptPath,
-      "setInterval(() => console.log('Log line'), 100);",
+      "console.log('Log line'); console.log('Log line'); console.log('Log line'); setInterval(() => console.log('Log line'), 100);",
     );
 
     // Using 'node' directly avoids cross-platform shell quoting issues with absolute paths.
@@ -101,21 +102,29 @@ describe('Background Tools Integration', () => {
       `[PID ${pid}] RUNNING: \`node continuous_log\``,
     );
 
-    // 4. Give it time to write output to interval
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    // 4. Poll until the background process writes output (resilient on slow CI VMs)
+    let readResult: ToolResult | undefined;
+    for (let attempt = 0; attempt < 50; attempt++) {
+      const readInvocation = readTool.build({ pid, lines: 2 });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (readInvocation as any).context = {
+        config: { getSessionId: () => 'default' },
+      };
+      readResult = await readInvocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
-    // 5. Model decides to read logs
-    const readInvocation = readTool.build({ pid, lines: 2 });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (readInvocation as any).context = {
-      config: { getSessionId: () => 'default' },
-    };
-    const readResult = await readInvocation.execute({
-      abortSignal: new AbortController().signal,
-    });
+      if (
+        typeof readResult.llmContent === 'string' &&
+        readResult.llmContent.includes('Log line')
+      ) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
 
-    expect(readResult.llmContent).toContain('Showing last');
-    expect(readResult.llmContent).toContain('Log line');
+    expect(readResult?.llmContent).toContain('Showing last');
+    expect(readResult?.llmContent).toContain('Log line');
 
     // Cleanup
     await ShellExecutionService.kill(pid);
