@@ -23,18 +23,87 @@ enum GoogleApiType {
 }
 
 /**
+ * Quota reset details the Cloud Code API reports in `ErrorInfo.metadata`.
+ *
+ * The generation endpoint knows exactly which limit was hit and when it
+ * clears, even when `retrieveUserQuota` reports the remaining buckets as
+ * healthy, so this is often the only reset window the user can be shown.
+ */
+export interface QuotaResetInfo {
+  /** Absolute reset instant, ISO 8601 (`quotaResetTimeStamp`). */
+  resetTime?: string;
+  /** Time until reset in seconds, from `quotaResetDelay` or `resetTime`. */
+  delaySeconds?: number;
+  /** `uiMessage`: the server intends its message to be shown verbatim. */
+  isUserFacingMessage: boolean;
+}
+
+/**
+ * Extracts the quota reset window the server reported alongside a quota error.
+ *
+ * `resetTime` is a fact about when the limit clears and is always reported.
+ * `delaySeconds` is how long it would be reasonable to wait, so it is taken
+ * from the server's own `quotaResetDelay` instruction, and only derived from
+ * `quotaResetTimeStamp` when that window is short enough to sit through. A
+ * reset hours away is shown to the user, never slept on.
+ */
+function extractQuotaResetInfo(errorInfo: ErrorInfo): QuotaResetInfo {
+  const metadata = errorInfo.metadata;
+  const isUserFacingMessage = metadata?.['uiMessage'] === 'true';
+  if (!metadata) {
+    return { isUserFacingMessage };
+  }
+
+  const timestamp = metadata['quotaResetTimeStamp'];
+  const resetDate = timestamp ? new Date(timestamp) : null;
+  const resetTime =
+    resetDate && !isNaN(resetDate.getTime())
+      ? resetDate.toISOString()
+      : undefined;
+
+  let delaySeconds: number | undefined;
+  const resetDelay = metadata['quotaResetDelay'];
+  if (resetDelay) {
+    const parsed = parseDurationInSeconds(resetDelay);
+    if (parsed !== null && parsed > 0) {
+      delaySeconds = parsed;
+    }
+  }
+  if (delaySeconds === undefined && resetDate) {
+    const remainingSeconds = (resetDate.getTime() - Date.now()) / 1000;
+    if (
+      remainingSeconds > 0 &&
+      remainingSeconds <= MAX_RETRYABLE_DELAY_SECONDS
+    ) {
+      delaySeconds = remainingSeconds;
+    }
+  }
+
+  return { resetTime, delaySeconds, isUserFacingMessage };
+}
+
+/**
  * A non-retryable error indicating a hard quota limit has been reached (e.g., daily limit).
  */
 export class TerminalQuotaError extends Error {
   retryDelayMs?: number;
   reason?: string;
   status?: number;
+  /**
+   * Absolute instant the quota resets, as reported by the server
+   * (`quotaResetTimeStamp`). Preferred over `retryDelayMs` when present, since
+   * it stays correct no matter how long the error sits before it is rendered.
+   */
+  resetTime?: string;
+  /** The server marked `message` as safe to show to the user verbatim. */
+  isUserFacingMessage: boolean;
 
   constructor(
     message: string,
     override readonly cause?: GoogleApiError,
     retryDelaySeconds?: number,
     reason?: string,
+    quotaReset?: QuotaResetInfo,
   ) {
     super(message);
     this.name = 'TerminalQuotaError';
@@ -43,6 +112,8 @@ export class TerminalQuotaError extends Error {
       ? retryDelaySeconds * 1000
       : undefined;
     this.reason = reason;
+    this.resetTime = quotaReset?.resetTime;
+    this.isUserFacingMessage = quotaReset?.isUserFacingMessage ?? false;
   }
 
   get isInsufficientCredits(): boolean {
@@ -56,11 +127,16 @@ export class TerminalQuotaError extends Error {
 export class RetryableQuotaError extends Error {
   retryDelayMs?: number;
   status?: number;
+  /** See {@link TerminalQuotaError.resetTime}. */
+  resetTime?: string;
+  /** The server marked `message` as safe to show to the user verbatim. */
+  isUserFacingMessage: boolean;
 
   constructor(
     message: string,
     override readonly cause?: GoogleApiError,
     retryDelaySeconds?: number,
+    quotaReset?: QuotaResetInfo,
   ) {
     super(message);
     this.name = 'RetryableQuotaError';
@@ -68,6 +144,8 @@ export class RetryableQuotaError extends Error {
     this.retryDelayMs = retryDelaySeconds
       ? retryDelaySeconds * 1000
       : undefined;
+    this.resetTime = quotaReset?.resetTime;
+    this.isUserFacingMessage = quotaReset?.isUserFacingMessage ?? false;
   }
 }
 
@@ -323,6 +401,8 @@ export function classifyGoogleError(error: unknown): unknown {
     (d): d is RetryInfo => d['@type'] === GoogleApiType.RETRY_INFO,
   );
 
+  const quotaReset = errorInfo ? extractQuotaResetInfo(errorInfo) : undefined;
+
   // 1. Check for long-term limits in QuotaFailure or ErrorInfo
   if (quotaFailure) {
     for (const violation of quotaFailure.violations) {
@@ -331,6 +411,9 @@ export function classifyGoogleError(error: unknown): unknown {
         return new TerminalQuotaError(
           `You have exhausted your daily quota on this model.`,
           googleApiError,
+          quotaReset?.delaySeconds,
+          undefined,
+          quotaReset,
         );
       }
     }
@@ -344,6 +427,12 @@ export function classifyGoogleError(error: unknown): unknown {
     }
   }
 
+  // RetryInfo wins when present; otherwise fall back to the reset window the
+  // quota metadata reports, which is frequently the only one the server sends.
+  if (delaySeconds === undefined) {
+    delaySeconds = quotaReset?.delaySeconds;
+  }
+
   if (errorInfo) {
     // Always treat capacity exhaustion as terminal error to trigger immediate model fallback
     if (
@@ -355,6 +444,7 @@ export function classifyGoogleError(error: unknown): unknown {
         googleApiError,
         delaySeconds,
         errorInfo.reason,
+        quotaReset,
       );
     }
 
@@ -365,6 +455,7 @@ export function classifyGoogleError(error: unknown): unknown {
         googleApiError,
         delaySeconds,
         errorInfo.reason,
+        quotaReset,
       );
     }
 
@@ -378,6 +469,7 @@ export function classifyGoogleError(error: unknown): unknown {
               googleApiError,
               undefined,
               errorInfo.reason,
+              quotaReset,
             );
           }
           const effectiveDelay = delaySeconds;
@@ -387,12 +479,14 @@ export function classifyGoogleError(error: unknown): unknown {
               googleApiError,
               effectiveDelay,
               errorInfo.reason,
+              quotaReset,
             );
           }
           return new RetryableQuotaError(
             googleApiError.message,
             googleApiError,
             effectiveDelay,
+            quotaReset,
           );
         }
         if (errorInfo.reason === 'QUOTA_EXHAUSTED') {
@@ -401,6 +495,7 @@ export function classifyGoogleError(error: unknown): unknown {
             googleApiError,
             delaySeconds,
             errorInfo.reason,
+            quotaReset,
           );
         }
       }
@@ -414,12 +509,15 @@ export function classifyGoogleError(error: unknown): unknown {
         `${googleApiError.message}\nSuggested retry after ${retryInfo.retryDelay}.`,
         googleApiError,
         delaySeconds,
+        undefined,
+        quotaReset,
       );
     }
     return new RetryableQuotaError(
       `${googleApiError.message}\nSuggested retry after ${retryInfo.retryDelay}.`,
       googleApiError,
       delaySeconds,
+      quotaReset,
     );
   }
 
@@ -454,12 +552,23 @@ export function classifyGoogleError(error: unknown): unknown {
       errorMessage,
     )
   ) {
-    return new TerminalQuotaError(errorMessage, googleApiError);
+    return new TerminalQuotaError(
+      errorMessage,
+      googleApiError,
+      undefined,
+      undefined,
+      quotaReset,
+    );
   }
 
   // If we reached this point, the status is 429, 499, or 503 and we have details,
   // but no specific violation was matched. We return a generic retryable error.
-  return new RetryableQuotaError(errorMessage, googleApiError);
+  return new RetryableQuotaError(
+    errorMessage,
+    googleApiError,
+    undefined,
+    quotaReset,
+  );
 }
 
 function extractErrorMessage(error: unknown): string {

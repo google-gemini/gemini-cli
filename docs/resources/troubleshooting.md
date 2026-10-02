@@ -134,6 +134,21 @@ topics on:
     `advanced.excludedEnvVars` setting in your `settings.json` to exclude fewer
     variables.
 
+- **Error: "Usage limit reached" while `/stats model` still shows remaining
+  quota**
+
+  - **Issue:** Requests fail with `RESOURCE_EXHAUSTED` (HTTP 429) even though
+    the model usage bars report most of your quota as unused.
+  - **Cause:** The usage bars show the per-model buckets returned by the quota
+    service. A request is rejected as soon as _any_ limit that applies to you is
+    spent, including limits that service does not report, such as an individual
+    or subscription-wide cap.
+  - **Solution:** Read the limit and reset window from the error message itself:
+    Gemini CLI shows the explanation and the reset time the server reports with
+    the rejection. If the message points at a subscription cap, switching models
+    with `/model` hits the same cap, so wait for the stated reset, use `/auth`
+    to switch to an API key, or upgrade your subscription.
+
 - **Warning: `npm WARN deprecated node-domexception@1.0.0` or
   `npm WARN deprecated glob` during install/update**
   - **Issue:** When installing or updating Gemini CLI globally via
