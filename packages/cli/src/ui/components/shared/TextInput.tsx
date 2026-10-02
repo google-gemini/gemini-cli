@@ -66,7 +66,7 @@ export function TextInput({
         return true;
       }
 
-      const handled = handleInput(key);
+      const handled = handleInput?.(key) ?? false;
       return handled;
     },
     [handleInput, onCancel, onSubmit, text, buffer.pastedContent, keyMatchers],
