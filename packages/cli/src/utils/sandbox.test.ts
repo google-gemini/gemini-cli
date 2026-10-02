@@ -630,6 +630,7 @@ describe('sandbox', () => {
       vi.stubEnv('GEMINI_CLI_IDE_SERVER_STDIO_COMMAND', '/usr/bin/ide-bridge');
       vi.stubEnv('GEMINI_CLI_IDE_SERVER_STDIO_ARGS', '["--flag"]');
       vi.stubEnv('TERM_PROGRAM', 'vscode');
+      vi.stubEnv('GEMINI_SANDBOX', 'runsc');
 
       const config: SandboxConfig = createMockSandboxConfig({
         command: 'docker',
@@ -680,6 +681,8 @@ describe('sandbox', () => {
           'GEMINI_CLI_IDE_SERVER_STDIO_ARGS=["--flag"]',
           '--env',
           'TERM_PROGRAM=vscode',
+          '--env',
+          'GEMINI_SANDBOX=runsc',
         ]),
         expect.objectContaining({ stdio: 'inherit' }),
       );
