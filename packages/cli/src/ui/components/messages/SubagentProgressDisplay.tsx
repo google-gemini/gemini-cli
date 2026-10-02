@@ -69,6 +69,9 @@ export const SubagentProgressDisplay: React.FC<
   } else if (progress.state === SubagentState.ERROR) {
     headerText = `Subagent ${progress.agentName} failed.`;
     headerColor = theme.status.error;
+  } else if (progress.state === SubagentState.INCOMPLETE) {
+    headerText = `Subagent ${progress.agentName} did not complete (${progress.terminateReason ?? 'budget exhausted'}).`;
+    headerColor = theme.status.warning;
   } else if (progress.state === SubagentState.COMPLETED) {
     headerText = `Subagent ${progress.agentName} completed.`;
     headerColor = theme.status.success;
@@ -173,7 +176,10 @@ export const SubagentProgressDisplay: React.FC<
           )}
           <MarkdownDisplay
             text={safeJsonToMarkdown(progress.result)}
-            isPending={progress.state !== SubagentState.COMPLETED}
+            isPending={
+              progress.state === SubagentState.RUNNING ||
+              progress.state === undefined
+            }
             terminalWidth={terminalWidth}
           />
         </Box>
