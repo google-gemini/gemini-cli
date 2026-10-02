@@ -1774,8 +1774,10 @@ export function stripToolCallIdPrefixes(contents: Content[]): Content[] {
           const name = fr.name?.trim() || 'generic_tool';
           if (fr.id && fr.id.startsWith(`${name}__`)) {
             newPart.functionResponse = {
-              name: fr.name,
-              response: fr.response,
+              // Keep every other field, e.g. `parts`, which carries multimodal
+              // tool output such as an image read by read_file.
+              // eslint-disable-next-line @typescript-eslint/no-misused-spread
+              ...fr,
               id: fr.id.substring(name.length + 2),
             };
           }
