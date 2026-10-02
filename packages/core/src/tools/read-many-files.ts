@@ -22,6 +22,7 @@ import * as path from 'node:path';
 import { glob, escape } from 'glob';
 import picomatch from 'picomatch';
 import { LRUCache } from 'mnemonist';
+import { resolveToRealPath } from '../utils/paths.js';
 import { buildParamArgsPattern } from '../policy/utils.js';
 import {
   detectFileType,
@@ -128,6 +129,14 @@ function isScanInfo(val: unknown): val is ReturnType<typeof picomatch.scan> {
   return typeof val === 'object' && val !== null && 'isGlob' in val;
 }
 
+function resolveToRealPathSafe(p: string): string {
+  try {
+    return resolveToRealPath(p).replace(/\\/g, '/');
+  } catch {
+    return path.resolve(p).replace(/\\/g, '/');
+  }
+}
+
 /**
  * Determines whether an asset file (image, PDF, audio, video) was explicitly requested
  * by name or extension in the include patterns, rather than implicitly matched
@@ -167,9 +176,11 @@ export function isAssetExplicitlyRequested(
       !normalizedPattern.includes('/') &&
       (workspaceDirs.length > 0
         ? workspaceDirs.some((dir) => {
-            const normalizedDir = dir.replace(/\\/g, '/');
-            const fileDir = path.posix.dirname(normalizedFilePath);
-            return fileDir === normalizedDir && fileMatcher(fileName);
+            const resolvedDir = resolveToRealPathSafe(dir);
+            const resolvedFileDir = resolveToRealPathSafe(
+              path.dirname(normalizedFilePath),
+            );
+            return resolvedFileDir === resolvedDir && fileMatcher(fileName);
           })
         : !normalizedRelativePath.includes('/') && fileMatcher(fileName));
 
