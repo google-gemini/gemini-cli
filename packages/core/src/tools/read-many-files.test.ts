@@ -1340,6 +1340,13 @@ Content of file[1]
       expect(
         isAssetExplicitlyRequested(['logo.*'], '/root/logo.png', 'logo.png'),
       ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['assets/logo.png'],
+          'C:\\root\\assets\\logo.png',
+          'assets\\logo.png',
+        ),
+      ).toBe(true);
     });
 
     it('should use provided LRUCache to cache compiled matchers and scans', () => {

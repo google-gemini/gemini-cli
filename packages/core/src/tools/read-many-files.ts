@@ -140,10 +140,10 @@ export function isAssetExplicitlyRequested(
   workspaceDirs: readonly string[] = [],
   cache?: AssetRequestCache,
 ): boolean {
-  const fileExtension = path.extname(filePath);
-  const fileName = path.basename(filePath);
   const normalizedRelativePath = relativePathForDisplay.replace(/\\/g, '/');
   const normalizedFilePath = filePath.replace(/\\/g, '/');
+  const fileExtension = path.posix.extname(normalizedFilePath);
+  const fileName = path.posix.basename(normalizedFilePath);
 
   return includePatterns.some((pattern) => {
     const normalizedPattern = pattern.replace(/\\/g, '/').trim();
