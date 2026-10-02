@@ -1545,4 +1545,38 @@ describe('KeypressContext', () => {
       },
     );
   });
+
+  describe('SGR mouse sequence handling', () => {
+    it('should not trap subsequent keypresses when an incomplete SGR sequence times out', async () => {
+      const { keyHandler } = await setupKeypressTest();
+
+      // Send incomplete SGR sequence
+      act(() => stdin.write('\x1b[<0;10;'));
+
+      // Timeout expires
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(ESC_TIMEOUT);
+      });
+
+      // Subsequent Ctrl+C should be received cleanly
+      act(() => stdin.write('\x03'));
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'c',
+          ctrl: true,
+        }),
+      );
+    });
+
+    it('should filter out complete SGR mouse events from regular keypress handler', async () => {
+      const { keyHandler } = await setupKeypressTest();
+
+      // Complete SGR mouse press event
+      act(() => stdin.write('\x1b[<0;10;20M'));
+
+      // Filtered out by nonKeyboardEventFilter
+      expect(keyHandler).not.toHaveBeenCalled();
+    });
+  });
 });
