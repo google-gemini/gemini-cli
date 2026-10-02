@@ -794,7 +794,10 @@ export async function start_sandbox(
     for (const envVar of [
       'GEMINI_CLI_IDE_SERVER_PORT',
       'GEMINI_CLI_IDE_WORKSPACE_PATH',
+      'GEMINI_CLI_IDE_SERVER_STDIO_COMMAND',
+      'GEMINI_CLI_IDE_SERVER_STDIO_ARGS',
       'TERM_PROGRAM',
+      'GEMINI_SANDBOX',
     ]) {
       if (process.env[envVar]) {
         args.push('--env', `${envVar}=${process.env[envVar]}`);

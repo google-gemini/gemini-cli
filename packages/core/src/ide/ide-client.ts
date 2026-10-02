@@ -194,9 +194,17 @@ export class IdeClient {
       }
     }
 
+    const isGvisor =
+      process.env['SANDBOX']?.includes('runsc') ||
+      process.env['GEMINI_SANDBOX'] === 'runsc';
+    const ideName = this.currentIde?.displayName ?? 'IDE';
+    const failureDetails = isGvisor
+      ? `Failed to connect to IDE companion extension in ${ideName}: gVisor (runsc) sandboxing enforces strict network isolation which prevents host loopback communication.`
+      : `Failed to connect to IDE companion extension in ${ideName}. Please ensure the extension is running. To install the extension, run /ide install.`;
+
     this.setState(
       IDEConnectionStatus.Disconnected,
-      `Failed to connect to IDE companion extension in ${this.currentIde.displayName}. Please ensure the extension is running. To install the extension, run /ide install.`,
+      failureDetails,
       logError,
     );
   }
