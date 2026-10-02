@@ -623,6 +623,68 @@ describe('sandbox', () => {
       );
     });
 
+    it('should pass through all IDE environment variables into container args', async () => {
+      vi.stubEnv('GEMINI_CLI_IDE_SERVER_PORT', '9999');
+      vi.stubEnv('GEMINI_CLI_IDE_WORKSPACE_PATH', '/test/workspace');
+      vi.stubEnv('GEMINI_CLI_IDE_AUTH_TOKEN', 'secret-auth-token');
+      vi.stubEnv('GEMINI_CLI_IDE_SERVER_STDIO_COMMAND', '/usr/bin/ide-bridge');
+      vi.stubEnv('GEMINI_CLI_IDE_SERVER_STDIO_ARGS', '["--flag"]');
+      vi.stubEnv('TERM_PROGRAM', 'vscode');
+
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+      await expect(
+        start_sandbox(config, [], undefined, ['arg1']),
+      ).resolves.toBe(0);
+
+      expect(spawn).toHaveBeenNthCalledWith(
+        2,
+        'docker',
+        expect.arrayContaining([
+          '--env',
+          'GEMINI_CLI_IDE_SERVER_PORT=9999',
+          '--env',
+          'GEMINI_CLI_IDE_WORKSPACE_PATH=/test/workspace',
+          '--env',
+          'GEMINI_CLI_IDE_AUTH_TOKEN=secret-auth-token',
+          '--env',
+          'GEMINI_CLI_IDE_SERVER_STDIO_COMMAND=/usr/bin/ide-bridge',
+          '--env',
+          'GEMINI_CLI_IDE_SERVER_STDIO_ARGS=["--flag"]',
+          '--env',
+          'TERM_PROGRAM=vscode',
+        ]),
+        expect.objectContaining({ stdio: 'inherit' }),
+      );
+    });
+
     it('should not attempt to create a temporary settings directory when homedir is empty', async () => {
       mockedHomedir.mockReturnValue('');
       vi.mocked(os.tmpdir).mockReturnValue('/mock/tmp');
