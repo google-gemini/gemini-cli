@@ -794,7 +794,6 @@ export async function start_sandbox(
     for (const envVar of [
       'GEMINI_CLI_IDE_SERVER_PORT',
       'GEMINI_CLI_IDE_WORKSPACE_PATH',
-      'GEMINI_CLI_IDE_AUTH_TOKEN',
       'GEMINI_CLI_IDE_SERVER_STDIO_COMMAND',
       'GEMINI_CLI_IDE_SERVER_STDIO_ARGS',
       'TERM_PROGRAM',

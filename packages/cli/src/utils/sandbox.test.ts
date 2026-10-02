@@ -626,7 +626,6 @@ describe('sandbox', () => {
     it('should pass through all IDE environment variables into container args', async () => {
       vi.stubEnv('GEMINI_CLI_IDE_SERVER_PORT', '9999');
       vi.stubEnv('GEMINI_CLI_IDE_WORKSPACE_PATH', '/test/workspace');
-      vi.stubEnv('GEMINI_CLI_IDE_AUTH_TOKEN', 'secret-auth-token');
       vi.stubEnv('GEMINI_CLI_IDE_SERVER_STDIO_COMMAND', '/usr/bin/ide-bridge');
       vi.stubEnv('GEMINI_CLI_IDE_SERVER_STDIO_ARGS', '["--flag"]');
       vi.stubEnv('TERM_PROGRAM', 'vscode');
@@ -673,8 +672,6 @@ describe('sandbox', () => {
           'GEMINI_CLI_IDE_SERVER_PORT=9999',
           '--env',
           'GEMINI_CLI_IDE_WORKSPACE_PATH=/test/workspace',
-          '--env',
-          'GEMINI_CLI_IDE_AUTH_TOKEN=secret-auth-token',
           '--env',
           'GEMINI_CLI_IDE_SERVER_STDIO_COMMAND=/usr/bin/ide-bridge',
           '--env',
