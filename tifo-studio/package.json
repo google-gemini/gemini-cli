@@ -1,0 +1,14 @@
+{
+  "name": "tifo-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local web studio for making Tifo Football-style animated tactics videos",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "Apache-2.0"
+}
