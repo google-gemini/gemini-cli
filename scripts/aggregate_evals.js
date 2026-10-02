@@ -242,9 +242,21 @@ function generateMarkdown(currentStatsByModel, history) {
 const currentReports = findReports(artifactsDir);
 if (currentReports.length === 0) {
   console.log('No reports found.');
-  // We don't exit here because we might still want to see history if available,
-  // but practically if current has no reports, something is wrong.
-  // Sticking to original behavior roughly, but maybe we can continue.
+  // The scheduled nightly runs the full suite, so zero reports means every
+  // matrix leg failed before writing one (e.g. an expired API key); failing
+  // the summary job keeps the nightly from reading as green. Filtered manual
+  // runs can legitimately match nothing, so they only get a warning.
+  if (process.env.GITHUB_EVENT_NAME === 'schedule') {
+    console.error(
+      '::error::The nightly eval run produced no reports; every matrix leg likely failed.',
+    );
+    process.exit(1);
+  }
+  if (process.env.CI) {
+    console.log(
+      '::warning::No eval reports found for this (possibly filtered) run.',
+    );
+  }
   process.exit(0);
 }
 
