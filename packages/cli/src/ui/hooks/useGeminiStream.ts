@@ -1739,7 +1739,7 @@ export const useGeminiStream = (
               return;
             }
 
-            if (geminiClient) {
+            if (geminiClient && !options?.isContinuation) {
               historyLengthAfterUserPromptRef.current =
                 geminiClient.getHistory().length;
             }

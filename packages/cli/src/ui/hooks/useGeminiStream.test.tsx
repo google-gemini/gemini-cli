@@ -1167,6 +1167,131 @@ describe('useGeminiStream', () => {
     });
   });
 
+  it('should keep the rollback anchor at the original user prompt when a continuation turn is cancelled', async () => {
+    const cancelledToolCalls: TrackedToolCall[] = [
+      {
+        request: {
+          callId: '2',
+          name: 'testTool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-4',
+        },
+        status: CoreToolCallStatus.Cancelled,
+        response: {
+          callId: '2',
+          responseParts: [{ text: CoreToolCallStatus.Cancelled }],
+          errorType: undefined,
+        },
+        responseSubmittedToGemini: false,
+        tool: {
+          displayName: 'mock tool',
+        },
+        invocation: {
+          getDescription: () => `Mock description`,
+        },
+      } as any,
+    ];
+    const client = new MockedGeminiClientClass(mockConfig);
+    client.setHistory([{ role: 'user', parts: [{ text: 'User prompt' }] }]);
+
+    let capturedOnComplete:
+      | ((completedTools: TrackedToolCall[]) => Promise<void>)
+      | null = null;
+
+    mockUseToolScheduler.mockImplementation((onComplete) => {
+      capturedOnComplete = onComplete;
+      return [
+        [],
+        mockScheduleToolCalls,
+        mockMarkToolsAsSubmitted,
+        vi.fn(),
+        mockCancelAllToolCalls,
+        0,
+      ];
+    });
+
+    const { result } = await renderHookWithProviders(() =>
+      useGeminiStream(
+        client,
+        [],
+        mockAddItem,
+        mockConfig,
+        mockLoadedSettings,
+        mockOnDebugMessage,
+        mockHandleSlashCommand,
+        false,
+        () => 'vscode' as EditorType,
+        () => {},
+        () => Promise.resolve(),
+        false,
+        () => {},
+        () => {},
+        () => {},
+        80,
+        24,
+      ),
+    );
+
+    // The initial user prompt anchors the rollback index at length 1.
+    await act(async () => {
+      await result.current.submitQuery('User prompt');
+    });
+
+    // A first tool round completes and its response is submitted back to the
+    // model as a continuation turn. The continuation must not move the anchor.
+    const firstRoundResponse: Part[] = [
+      {
+        functionResponse: {
+          name: 'testTool',
+          id: '1',
+          response: { output: 'first result' },
+        },
+      },
+    ];
+    client.setHistory([
+      { role: 'user', parts: [{ text: 'User prompt' }] },
+      {
+        role: 'model',
+        parts: [{ functionCall: { name: 'testTool', args: {} } }],
+      },
+      { role: 'user', parts: firstRoundResponse },
+    ]);
+    await act(async () => {
+      await result.current.submitQuery(firstRoundResponse, {
+        isContinuation: true,
+      });
+    });
+
+    // The model requests a second tool call within the same chain.
+    client.setHistory([
+      ...client.getHistory(),
+      {
+        role: 'model',
+        parts: [{ functionCall: { name: 'testTool', args: {} } }],
+      },
+    ]);
+
+    // The second tool call is cancelled.
+    await act(async () => {
+      if (capturedOnComplete) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        await capturedOnComplete(cancelledToolCalls);
+      }
+    });
+
+    await waitFor(() => {
+      expect(mockMarkToolsAsSubmitted).toHaveBeenCalledWith(['2']);
+      expect(client.addHistory).not.toHaveBeenCalled();
+      // The whole cancelled exchange is removed back to the original user
+      // prompt instead of stopping at the intermediate continuation point,
+      // which would leave the history ending on a model turn.
+      expect(client.getHistory()).toEqual([
+        { role: 'user', parts: [{ text: 'User prompt' }] },
+      ]);
+    });
+  });
+
   it('should record tool responses in history when the model was switched due to a quota error', async () => {
     // Regression test: returning early on a quota-triggered model switch
     // without recording the responses leaves the already-recorded

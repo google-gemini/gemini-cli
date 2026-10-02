@@ -70,6 +70,7 @@ import {
 } from '../availability/policyHelpers.js';
 import { coreEvents } from '../utils/events.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -559,6 +560,7 @@ export class GeminiChat {
         const lastTurn = history[history.length - 1];
         if (
           !lastTurn ||
+          lastTurn.content.role !== 'user' ||
           partListUnionToString(lastTurn.content.parts || []) !==
             userMessageContent
         ) {
@@ -630,6 +632,7 @@ export class GeminiChat {
         const lastTurn = history[history.length - 1];
         if (
           !lastTurn ||
+          lastTurn.content.role !== 'user' ||
           partListUnionToString(lastTurn.content.parts || []) !==
             partListUnionToString(userContent.parts || [])
         ) {
@@ -1079,10 +1082,70 @@ export class GeminiChat {
 
       const finalContents = stripToolCallIdPrefixes(contentsToUse);
 
+      let contentsToDispatch = finalContents;
+      const lastContentTurn =
+        contentsToDispatch.length > 0
+          ? contentsToDispatch[contentsToDispatch.length - 1]
+          : null;
+
+      if (
+        !lastContentTurn ||
+        lastContentTurn.role !== 'user' ||
+        !lastContentTurn.parts?.length
+      ) {
+        debugLogger.warn(
+          'Final contents do not end with a valid user turn. Normalizing contents to satisfy Gemini API invariant.',
+        );
+        const cloned: Content[] = contentsToDispatch.map((item) =>
+          structuredClone(item),
+        );
+        const lastTurn = cloned.length > 0 ? cloned[cloned.length - 1] : null;
+        if (lastTurn && lastTurn.role === 'model') {
+          const hasFunctionCall = lastTurn.parts?.some(
+            (p) => p && p.functionCall,
+          );
+          if (hasFunctionCall) {
+            const missingResponses: Part[] = [];
+            for (const part of lastTurn.parts || []) {
+              if (part && part.functionCall) {
+                missingResponses.push({
+                  functionResponse: {
+                    name: part.functionCall.name?.trim() || 'generic_tool',
+                    id: part.functionCall.id,
+                    response: {
+                      error: 'Response was lost or interrupted.',
+                    },
+                  },
+                });
+              }
+            }
+            cloned.push({
+              role: 'user',
+              parts: missingResponses,
+            });
+          } else {
+            cloned.push({
+              role: 'user',
+              parts: [{ text: 'Please continue.' }],
+            });
+          }
+        } else if (!lastTurn) {
+          cloned.push({
+            role: 'user',
+            parts: [{ text: 'Please continue.' }],
+          });
+        } else if (lastTurn.role === 'user' && !lastTurn.parts?.length) {
+          lastTurn.parts = [{ text: 'Please continue.' }];
+        }
+        contentsToDispatch = cloned;
+      }
+
+      lastContentsToUse = contentsToDispatch;
+
       return this.context.config.getContentGenerator().generateContentStream(
         {
           model: modelToUse,
-          contents: finalContents,
+          contents: contentsToDispatch,
           config,
         },
         prompt_id,
@@ -1754,60 +1817,67 @@ export function isInvalidArgumentError(errorMessage: string): boolean {
 }
 
 export function stripToolCallIdPrefixes(contents: Content[]): Content[] {
-  return contents.map((content) => {
-    const parts = (content.parts || [])
-      .map((part) => {
-        const newPart = { ...part };
-        if (newPart.functionCall) {
-          const fc = newPart.functionCall;
-          const name = fc.name?.trim() || 'generic_tool';
-          if (fc.id && fc.id.startsWith(`${name}__`)) {
-            newPart.functionCall = {
-              name: fc.name,
-              args: fc.args,
-              id: fc.id.substring(name.length + 2),
-            };
+  return contents
+    .map((content) => {
+      const parts = (content.parts || [])
+        .map((part) => {
+          const newPart = { ...part };
+          if (newPart.functionCall) {
+            const fc = newPart.functionCall;
+            const name = fc.name?.trim() || 'generic_tool';
+            if (fc.id && fc.id.startsWith(`${name}__`)) {
+              newPart.functionCall = {
+                name: fc.name,
+                args: fc.args,
+                id: fc.id.substring(name.length + 2),
+              };
+            }
           }
-        }
-        if (newPart.functionResponse) {
-          const fr = newPart.functionResponse;
-          const name = fr.name?.trim() || 'generic_tool';
-          if (fr.id && fr.id.startsWith(`${name}__`)) {
-            newPart.functionResponse = {
-              name: fr.name,
-              response: fr.response,
-              id: fr.id.substring(name.length + 2),
-            };
+          if (newPart.functionResponse) {
+            const fr = newPart.functionResponse;
+            const name = fr.name?.trim() || 'generic_tool';
+            if (fr.id && fr.id.startsWith(`${name}__`)) {
+              newPart.functionResponse = {
+                name: fr.name,
+                response: fr.response,
+                id: fr.id.substring(name.length + 2),
+                ...(fr.parts ? { parts: fr.parts } : {}),
+              };
+            }
           }
-        }
 
-        // If there's an empty text key alongside other active properties, remove the empty text key
-        // so it doesn't trigger "contains empty parts" validation errors on the Gemini API.
-        const hasOtherKeys = Object.keys(newPart).some(
-          (key) => key !== 'text' && key !== 'thought' && key !== 'callIndex',
-        );
-        if (newPart.text !== undefined && newPart.text === '' && hasOtherKeys) {
-          delete newPart.text;
-        }
+          // If there's an empty text key alongside other active properties, remove the empty text key
+          // so it doesn't trigger "contains empty parts" validation errors on the Gemini API.
+          const hasOtherKeys = Object.keys(newPart).some(
+            (key) => key !== 'text' && key !== 'thought' && key !== 'callIndex',
+          );
+          if (
+            newPart.text !== undefined &&
+            newPart.text === '' &&
+            hasOtherKeys
+          ) {
+            delete newPart.text;
+          }
 
-        return newPart;
-      })
-      .filter((part) => {
-        // Filter out truly empty parts that have only text: '' and no payload
-        const hasOtherKeys = Object.keys(part).some(
-          (key) => key !== 'text' && key !== 'thought' && key !== 'callIndex',
-        );
-        if (part.text !== undefined && part.text === '' && !hasOtherKeys) {
-          return false;
-        }
-        return true;
-      });
+          return newPart;
+        })
+        .filter((part) => {
+          // Filter out truly empty parts that have only text: '' and no payload
+          const hasOtherKeys = Object.keys(part).some(
+            (key) => key !== 'text' && key !== 'thought' && key !== 'callIndex',
+          );
+          if (part.text !== undefined && part.text === '' && !hasOtherKeys) {
+            return false;
+          }
+          return true;
+        });
 
-    return {
-      ...content,
-      parts,
-    };
-  });
+      return {
+        ...content,
+        parts,
+      };
+    })
+    .filter((content) => !content.parts || content.parts.length > 0);
 }
 
 export function coalesceConsecutiveRoles(
