@@ -18,6 +18,7 @@ and parameters.
 | `gemini update`                    | Update to latest version           | `gemini update`                                              |
 | `gemini extensions`                | Manage extensions                  | See [Extensions Management](#extensions-management)          |
 | `gemini mcp`                       | Configure MCP servers              | See [MCP Server Management](#mcp-server-management)          |
+| `gemini models list`               | List available models              | `gemini models list -o json`                                 |
 
 ### Positional arguments
 
