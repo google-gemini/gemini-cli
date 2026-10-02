@@ -555,11 +555,12 @@ describe('oauth-flow', () => {
       expect(response.state).toBe('my-state');
     });
 
-    it('should reject callback when expectedIssuer is configured but iss parameter is omitted (downgrade prevention)', async () => {
+    it('should reject callback when expectedIssuer is configured and requireIssInResponse is true but iss parameter is omitted (downgrade prevention)', async () => {
       const server = startCallbackServer(
         'my-state',
         undefined,
         'https://secure-idp.example.com',
+        true, // AS advertises authorization_response_iss_parameter_supported
       );
       const port = await server.port;
 
@@ -582,6 +583,46 @@ describe('oauth-flow', () => {
       );
       // Ensure sensitive internal issuer details are not exposed in the error message
       expect(error.message).not.toContain('https://secure-idp.example.com');
+    });
+
+    it('should allow callback when expectedIssuer is configured but requireIssInResponse is false and iss parameter is omitted (RFC 9207 §2.4 / MCP spec)', async () => {
+      const server = startCallbackServer(
+        'my-state',
+        undefined,
+        'https://supabase-auth.example.com',
+        false,
+      );
+      const port = await server.port;
+
+      const res = await realFetch(
+        `http://localhost:${port}${REDIRECT_PATH}?code=auth-code-456&state=my-state`,
+      );
+      expect(res.status).toBe(200);
+
+      const response = await server.response;
+      expect(response.code).toBe('auth-code-456');
+      expect(response.state).toBe('my-state');
+      expect(response.iss).toBeUndefined();
+    });
+
+    it('should allow callback when expectedIssuer is configured but requireIssInResponse is undefined and iss parameter is omitted', async () => {
+      const server = startCallbackServer(
+        'my-state',
+        undefined,
+        'https://supabase-auth.example.com',
+        undefined,
+      );
+      const port = await server.port;
+
+      const res = await realFetch(
+        `http://localhost:${port}${REDIRECT_PATH}?code=auth-code-789&state=my-state`,
+      );
+      expect(res.status).toBe(200);
+
+      const response = await server.response;
+      expect(response.code).toBe('auth-code-789');
+      expect(response.state).toBe('my-state');
+      expect(response.iss).toBeUndefined();
     });
 
     it('should allow callback when no expectedIssuer is configured and iss parameter is omitted', async () => {

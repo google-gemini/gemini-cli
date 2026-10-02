@@ -341,6 +341,7 @@ describe('OAuthUtils', () => {
         tokenUrl: 'https://auth.example.com/token',
         scopes: ['read', 'write'],
       });
+      expect(config.authorizationResponseIssParameterSupported).toBeUndefined();
     });
 
     it('should handle empty scopes', () => {
@@ -366,6 +367,31 @@ describe('OAuthUtils', () => {
       const config = OAuthUtils.metadataToOAuthConfig(metadata);
 
       expect(config.issuer).toBe('https://auth.example.com');
+    });
+
+    it('should propagate authorization_response_iss_parameter_supported from metadata', () => {
+      const metadata: OAuthAuthorizationServerMetadata = {
+        issuer: 'https://auth.example.com',
+        authorization_endpoint: 'https://auth.example.com/authorize',
+        token_endpoint: 'https://auth.example.com/token',
+        authorization_response_iss_parameter_supported: true,
+      };
+
+      const config = OAuthUtils.metadataToOAuthConfig(metadata);
+
+      expect(config.authorizationResponseIssParameterSupported).toBe(true);
+    });
+
+    it('should leave authorizationResponseIssParameterSupported undefined when not in metadata', () => {
+      const metadata: OAuthAuthorizationServerMetadata = {
+        issuer: 'https://auth.example.com',
+        authorization_endpoint: 'https://auth.example.com/authorize',
+        token_endpoint: 'https://auth.example.com/token',
+      };
+
+      const config = OAuthUtils.metadataToOAuthConfig(metadata);
+
+      expect(config.authorizationResponseIssParameterSupported).toBeUndefined();
     });
   });
 

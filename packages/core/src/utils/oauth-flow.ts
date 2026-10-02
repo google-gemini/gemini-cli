@@ -193,6 +193,7 @@ export function startCallbackServer(
   expectedState: string,
   port?: number,
   expectedIssuer?: string,
+  requireIssInResponse?: boolean,
 ): {
   port: Promise<number>;
   response: Promise<OAuthAuthorizationResponse>;
@@ -265,14 +266,17 @@ export function startCallbackServer(
             }
 
             // RFC 9207 Authorization Server Issuer Identification check
-            if (expectedIssuer) {
-              // Fail-closed: if an issuer was expected, the response MUST include it
-              if (!iss) {
-                debugLogger.error(
-                  'OAuth callback rejected: Missing required "iss" parameter when an expected issuer is configured. Possible IdP mix-up attack (RFC 9207).',
-                );
-                res.writeHead(400, { 'Content-Type': 'text/html' });
-                res.end(`
+            // Per RFC 9207 §2.4 and MCP spec (2026-07-28), reject a missing
+            // "iss" only when the AS advertises
+            // authorization_response_iss_parameter_supported: true.
+            // When "iss" IS present, always validate it against the expected
+            // issuer to prevent IdP mix-up attacks.
+            if (expectedIssuer && !iss && requireIssInResponse) {
+              debugLogger.error(
+                'OAuth callback rejected: Missing required "iss" parameter. The authorization server advertises authorization_response_iss_parameter_supported. Possible IdP mix-up attack (RFC 9207).',
+              );
+              res.writeHead(400, { 'Content-Type': 'text/html' });
+              res.end(`
                 <html>
                   <body>
                     <h1>Authentication Failed</h1>
@@ -281,21 +285,21 @@ export function startCallbackServer(
                   </body>
                 </html>
               `);
-                server.close();
-                reject(
-                  new Error(
-                    'Missing "iss" parameter in authorization response per RFC 9207',
-                  ),
-                );
-                return;
-              }
+              server.close();
+              reject(
+                new Error(
+                  'Missing "iss" parameter in authorization response per RFC 9207',
+                ),
+              );
+              return;
+            }
 
-              if (!areIssuersEqual(iss, expectedIssuer)) {
-                debugLogger.error(
-                  'OAuth callback rejected: Issuer mismatch between authorization response and expected authorization server. Possible IdP mix-up attack (RFC 9207).',
-                );
-                res.writeHead(400, { 'Content-Type': 'text/html' });
-                res.end(`
+            if (expectedIssuer && iss && !areIssuersEqual(iss, expectedIssuer)) {
+              debugLogger.error(
+                'OAuth callback rejected: Issuer mismatch between authorization response and expected authorization server. Possible IdP mix-up attack (RFC 9207).',
+              );
+              res.writeHead(400, { 'Content-Type': 'text/html' });
+              res.end(`
                 <html>
                   <body>
                     <h1>Authentication Failed</h1>
@@ -304,16 +308,22 @@ export function startCallbackServer(
                   </body>
                 </html>
               `);
-                server.close();
-                reject(
-                  new Error(
-                    'Issuer mismatch in authorization response - possible OAuth mix-up attack',
-                  ),
-                );
-                return;
-              }
+              server.close();
+              reject(
+                new Error(
+                  'Issuer mismatch in authorization response - possible OAuth mix-up attack',
+                ),
+              );
+              return;
+            }
+
+            if (expectedIssuer && iss) {
               debugLogger.debug(
                 '✓ OAuth callback issuer validated successfully.',
+              );
+            } else if (expectedIssuer && !iss) {
+              debugLogger.debug(
+                'OAuth callback: "iss" parameter absent but authorization_response_iss_parameter_supported is not advertised. Proceeding per MCP spec.',
               );
             } else if (iss) {
               debugLogger.debug(
