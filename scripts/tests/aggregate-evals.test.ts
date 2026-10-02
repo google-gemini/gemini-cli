@@ -8,9 +8,12 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-const SCRIPT = path.resolve(import.meta.dirname, '../aggregate_evals.js');
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const SCRIPT = path.resolve(__dirname, '../aggregate_evals.js');
 
 /**
  * Runs the aggregator against a directory that contains no report.json files,
