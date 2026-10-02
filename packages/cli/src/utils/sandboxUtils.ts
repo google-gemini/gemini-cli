@@ -360,8 +360,13 @@ export async function shouldUseCurrentUserInSandbox(): Promise<boolean> {
 }
 
 export function parseImageName(image: string): string {
-  const [fullName, tag] = image.split(':');
-  const name = fullName.split('/').at(-1) ?? 'unknown-image';
+  // A colon before the last slash is a registry port, not a tag separator.
+  const lastSlash = image.lastIndexOf('/');
+  const lastColon = image.lastIndexOf(':');
+  const hasTag = lastColon > lastSlash;
+  const fullName = hasTag ? image.slice(0, lastColon) : image;
+  const tag = hasTag ? image.slice(lastColon + 1) : '';
+  const name = fullName.split('/').at(-1) || 'unknown-image';
   return tag ? `${name}-${tag}` : name;
 }
 

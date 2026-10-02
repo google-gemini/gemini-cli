@@ -87,10 +87,26 @@ describe('sandboxUtils', () => {
       expect(parseImageName('my-image')).toBe('my-image');
     });
 
+    it('should use a fallback for an empty image reference', () => {
+      expect(parseImageName('')).toBe('unknown-image');
+    });
+
+    it('should use a fallback when the image reference ends with a slash', () => {
+      expect(parseImageName('namespace/')).toBe('unknown-image');
+    });
+
     it('should handle registry path', () => {
       expect(parseImageName('gcr.io/my-project/my-image:v1')).toBe(
         'my-image-v1',
       );
+    });
+
+    it('should handle registry path with a port', () => {
+      expect(parseImageName('localhost:5000/my-image:v1')).toBe('my-image-v1');
+    });
+
+    it('should never produce a name containing a path separator', () => {
+      expect(parseImageName('localhost:5000/ns/my-image')).not.toContain('/');
     });
   });
 
