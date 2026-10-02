@@ -619,9 +619,9 @@ const SETTINGS_SCHEMA = {
         label: 'Escape Pasted @ Symbols',
         category: 'UI',
         requiresRestart: false,
-        default: false,
+        default: true,
         description:
-          'When enabled, @ symbols in pasted text are escaped to prevent unintended @path expansion.',
+          'When enabled, @ symbols in pasted text are escaped to prevent unintended @path expansion. Type @path manually to include a file.',
         showInDialog: true,
       },
       showShortcutsHint: {
