@@ -550,7 +550,7 @@ async function readLocalFiles(
   display?: IndividualToolCallDisplay;
   error?: string;
 }> {
-  const filesToRead = resolvedFiles.filter((rf) => !rf.isDirectory);
+  const filesToRead = resolvedFiles.filter((rf) => !(rf.isDirectory ?? false));
   if (filesToRead.length === 0) {
     return { parts: [] };
   }
