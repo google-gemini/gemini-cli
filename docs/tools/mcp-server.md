@@ -326,17 +326,25 @@ This feature will not work in:
 
 <!-- prettier-ignore -->
 > [!IMPORTANT]
-> To protect against OAuth Identity Provider (IdP) mix-up attacks, Gemini CLI
-> validates the `iss` (issuer) parameter per
-> [RFC 9207](https://www.rfc-editor.org/rfc/rfc9207). When an expected issuer is
-> discovered or configured, authorization servers **must** return the `iss`
-> parameter in the callback redirect matching the issuer URL. Responses missing
-> `iss` or with mismatched issuers are rejected with HTTP 400.
+> Gemini CLI validates the `iss` (issuer) parameter in OAuth authorization
+> responses per [RFC 9207](https://www.rfc-editor.org/rfc/rfc9207) and the MCP
+> specification:
+>
+> - Whenever the `iss` parameter is present in the callback redirect and an
+>   expected `issuer` is discovered or configured, `iss` **must** match the
+>   expected issuer URL.
+> - When the authorization server metadata sets
+>   `authorization_response_iss_parameter_supported: true`, the callback
+>   redirect **must** include the `iss` parameter.
+> - When `authorization_response_iss_parameter_supported` is omitted or `false`
+>   (for example, providers that do not declare RFC 9207 support), callbacks
+>   without `iss` are accepted.
 
 ##### Expected authorization callback example
 
-When the authorization server redirects the user back to Gemini CLI, the
-redirect URI must include the `iss` parameter:
+When the authorization server declares
+`authorization_response_iss_parameter_supported: true`, the redirect URI must
+include the `iss` parameter:
 
 ```http
 HTTP/1.1 302 Found
@@ -344,10 +352,12 @@ Location: http://localhost:<port>/oauth/callback?code=AUTH_CODE&state=STATE&iss=
 ```
 
 - **Valid response (accepted):** `iss` matches the configured or discovered
-  issuer (`https://auth.example.com`).
-- **Missing `iss` (rejected):**
-  `http://localhost:<port>/oauth/callback?code=AUTH_CODE&state=STATE` (fails
-  with HTTP 400: `Missing issuer parameter in response`).
+  issuer (`https://auth.example.com`), or `iss` is omitted when
+  `authorization_response_iss_parameter_supported` is not `true`.
+- **Missing `iss` when required (rejected):**
+  `http://localhost:<port>/oauth/callback?code=AUTH_CODE&state=STATE` when
+  `authorization_response_iss_parameter_supported` is `true` (fails with HTTP
+  400: `Missing issuer parameter in response`).
 - **Mismatched `iss` (rejected):** `iss` points to a different domain or
   includes userinfo (fails with HTTP 400: `Issuer mismatch`).
 

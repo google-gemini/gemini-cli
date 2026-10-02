@@ -555,11 +555,12 @@ describe('oauth-flow', () => {
       expect(response.state).toBe('my-state');
     });
 
-    it('should reject callback when expectedIssuer is configured but iss parameter is omitted (downgrade prevention)', async () => {
+    it('should reject callback when expectedIssuer is configured, requireIssInResponse is true, and iss parameter is omitted', async () => {
       const server = startCallbackServer(
         'my-state',
         undefined,
         'https://secure-idp.example.com',
+        true,
       );
       const port = await server.port;
 
@@ -582,6 +583,26 @@ describe('oauth-flow', () => {
       );
       // Ensure sensitive internal issuer details are not exposed in the error message
       expect(error.message).not.toContain('https://secure-idp.example.com');
+    });
+
+    it('should allow callback when expectedIssuer is configured, requireIssInResponse is omitted or false, and iss parameter is omitted', async () => {
+      const server = startCallbackServer(
+        'my-state',
+        undefined,
+        'https://secure-idp.example.com',
+        false,
+      );
+      const port = await server.port;
+
+      const res = await realFetch(
+        `http://localhost:${port}${REDIRECT_PATH}?code=auth-code-123&state=my-state`,
+      );
+      expect(res.status).toBe(200);
+
+      const response = await server.response;
+      expect(response.code).toBe('auth-code-123');
+      expect(response.state).toBe('my-state');
+      expect(response.iss).toBeUndefined();
     });
 
     it('should allow callback when no expectedIssuer is configured and iss parameter is omitted', async () => {
