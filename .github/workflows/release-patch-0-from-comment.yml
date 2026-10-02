@@ -3,7 +3,6 @@ name: 'Release: Patch (0) from Comment'
 on:
   issue_comment:
     types: ['created']
-
 jobs:
   slash-command:
     runs-on: 'ubuntu-latest'
@@ -28,14 +27,29 @@ jobs:
           commands: 'patch'
           permission: 'write'
           issue-type: 'pull-request'
-
+      - name: 'Verify commenter has write permission'
+        if: "startsWith(github.event.comment.body, '/patch')"
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          ACTOR: '${{ github.actor }}'
+          REPO: '${{ github.repository }}'
+        run: |
+          PERM=$(gh api \
+            "repos/${REPO}/collaborators/${ACTOR}/permission" \
+            --jq '.permission' 2>/dev/null || echo "none")
+          echo "Commenter '${ACTOR}' permission: $PERM"
+          if [[ "$PERM" != "write" && "$PERM" != "maintain" && "$PERM" != "admin" ]]; then
+            echo "ERROR: Commenter does not have write access (got: $PERM). Blocking workflow."
+            exit 1
+          fi
       - name: 'Get PR Status'
         id: 'pr_status'
         if: "startsWith(github.event.comment.body, '/patch')"
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          PR_NUMBER: '${{ github.event.issue.number }}'
         run: |
-          gh pr view "${{ github.event.issue.number }}" --json mergeCommit,state > pr_status.json
+          gh pr view "${PR_NUMBER}" --json mergeCommit,state > pr_status.json
           echo "MERGE_COMMIT_SHA=$(jq -r .mergeCommit.oid pr_status.json)" >> "$GITHUB_OUTPUT"
           echo "STATE=$(jq -r .state pr_status.json)" >> "$GITHUB_OUTPUT"
 
@@ -45,6 +59,8 @@ jobs:
         uses: 'actions/github-script@00f12e3e20659f42342b1c0226afda7f7c042325'
         env:
           COMMENT_BODY: '${{ github.event.comment.body }}'
+          MERGE_COMMIT_SHA: '${{ steps.pr_status.outputs.MERGE_COMMIT_SHA }}'
+          ORIGINAL_PR: '${{ github.event.issue.number }}'
         with:
           github-token: '${{ secrets.GITHUB_TOKEN }}'
           script: |
@@ -88,9 +104,9 @@ jobs:
                 workflow_id: 'release-patch-1-create-pr.yml',
                 ref: 'main',
                 inputs: {
-                  commit: '${{ steps.pr_status.outputs.MERGE_COMMIT_SHA }}',
+                  commit: process.env.MERGE_COMMIT_SHA,
                   channel: channel,
-                  original_pr: '${{ github.event.issue.number }}',
+                  original_pr: process.env.ORIGINAL_PR,
                   environment: 'prod'
                 }
               });
