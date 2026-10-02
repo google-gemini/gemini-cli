@@ -367,6 +367,32 @@ describe('OAuthUtils', () => {
 
       expect(config.issuer).toBe('https://auth.example.com');
     });
+
+    it('should map authorization_response_iss_parameter_supported from metadata', () => {
+      const metadataSupported: OAuthAuthorizationServerMetadata = {
+        issuer: 'https://auth.example.com',
+        authorization_endpoint: 'https://auth.example.com/oauth/authorize',
+        token_endpoint: 'https://auth.example.com/token',
+        authorization_response_iss_parameter_supported: true,
+      };
+
+      expect(
+        OAuthUtils.metadataToOAuthConfig(metadataSupported)
+          .authorizationResponseIssParameterSupported,
+      ).toBe(true);
+
+      const metadataUnsupported: OAuthAuthorizationServerMetadata = {
+        issuer: 'https://auth.example.com',
+        authorization_endpoint: 'https://auth.example.com/oauth/authorize',
+        token_endpoint: 'https://auth.example.com/token',
+        authorization_response_iss_parameter_supported: false,
+      };
+
+      expect(
+        OAuthUtils.metadataToOAuthConfig(metadataUnsupported)
+          .authorizationResponseIssParameterSupported,
+      ).toBe(false);
+    });
   });
 
   describe('parseWWWAuthenticateHeader', () => {

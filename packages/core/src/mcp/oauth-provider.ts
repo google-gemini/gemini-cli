@@ -53,6 +53,7 @@ export interface MCPOAuthConfig {
   redirectUri?: string;
   tokenParamName?: string; // For SSE connections, specifies the query parameter name for the token
   registrationUrl?: string;
+  authorizationResponseIssParameterSupported?: boolean;
 }
 
 /**
@@ -344,6 +345,9 @@ export class MCPOAuthProvider {
                 issuer: discoveredConfig.issuer,
                 tokenUrl: discoveredConfig.tokenUrl,
                 scopes: config.scopes || discoveredConfig.scopes || [],
+                authorizationResponseIssParameterSupported:
+                  config.authorizationResponseIssParameterSupported ??
+                  discoveredConfig.authorizationResponseIssParameterSupported,
                 // Preserve existing client credentials
                 clientId: config.clientId,
                 clientSecret: config.clientSecret,
@@ -378,6 +382,9 @@ export class MCPOAuthProvider {
             issuer: discoveredConfig.issuer,
             scopes: config.scopes || discoveredConfig.scopes || [],
             registrationUrl: discoveredConfig.registrationUrl,
+            authorizationResponseIssParameterSupported:
+              config.authorizationResponseIssParameterSupported ??
+              discoveredConfig.authorizationResponseIssParameterSupported,
             // Preserve existing client credentials
             clientId: config.clientId,
             clientSecret: config.clientSecret,
@@ -405,6 +412,7 @@ export class MCPOAuthProvider {
       pkceParams.state,
       preferredPort,
       config.issuer,
+      config.authorizationResponseIssParameterSupported,
     );
 
     // Wait for server to start and get the allocated port

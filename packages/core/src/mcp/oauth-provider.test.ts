@@ -385,6 +385,84 @@ describe('MCPOAuthProvider', () => {
       );
     });
 
+    it('should require iss in callback only when discovered metadata sets authorization_response_iss_parameter_supported to true', async () => {
+      const configWithoutAuth: MCPOAuthConfig = {
+        enabled: true,
+        clientId: 'test-client-id',
+      };
+
+      const mockResourceMetadata = {
+        resource: 'https://api.example.com/',
+        authorization_servers: ['https://discovered.auth.com'],
+      };
+
+      const mockAuthServerMetadataRequireIss = {
+        issuer: 'https://discovered.auth.com',
+        authorization_endpoint: 'https://discovered.auth.com/authorize',
+        token_endpoint: 'https://discovered.auth.com/token',
+        scopes_supported: ['read', 'write'],
+        authorization_response_iss_parameter_supported: true,
+      };
+
+      mockFetch
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            status: 200,
+          }),
+        )
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            text: JSON.stringify(mockResourceMetadata),
+            json: mockResourceMetadata,
+          }),
+        )
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            text: JSON.stringify(mockAuthServerMetadataRequireIss),
+            json: mockAuthServerMetadataRequireIss,
+          }),
+        );
+
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+          };
+          const mockRes = {
+            writeHead: vi.fn(),
+            end: vi.fn(),
+          };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+
+      const authProvider = new MCPOAuthProvider();
+      await expect(
+        authProvider.authenticate(
+          'test-server',
+          configWithoutAuth,
+          'https://api.example.com',
+        ),
+      ).rejects.toThrow(
+        'Missing "iss" parameter in authorization response per RFC 9207',
+      );
+    });
+
     it('should perform dynamic client registration when no client ID is provided but registration URL is provided', async () => {
       const configWithoutClient: MCPOAuthConfig = {
         ...mockConfig,
