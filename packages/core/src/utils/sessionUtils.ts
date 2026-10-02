@@ -123,6 +123,9 @@ export function convertSessionToClientHistory(
     if (msg.type === 'user') {
       const extraParts = pendingPartsToAppend.get(msg.id) || [];
       if (extraParts.length === 0) {
+        if (!msg.content) {
+          continue;
+        }
         const contentString = partListUnionToString(msg.content);
         const trimmedContent = contentString.trim();
         if (isIgnoredUserContent(trimmedContent)) {
@@ -130,19 +133,20 @@ export function convertSessionToClientHistory(
         }
       }
 
-      const parts = [...ensurePartArray(msg.content), ...extraParts].filter(
-        (part) => {
-          const respId = part.functionResponse?.id;
-          if (!respId) {
-            return true;
-          }
-          if (seenFunctionResponseIds.has(respId)) {
-            return false;
-          }
-          seenFunctionResponseIds.add(respId);
+      const parts = [
+        ...(msg.content ? ensurePartArray(msg.content) : []),
+        ...extraParts,
+      ].filter((part) => {
+        const respId = part?.functionResponse?.id;
+        if (!respId) {
           return true;
-        },
-      );
+        }
+        if (seenFunctionResponseIds.has(respId)) {
+          return false;
+        }
+        seenFunctionResponseIds.add(respId);
+        return true;
+      });
 
       if (parts.length === 0) {
         continue;
@@ -219,7 +223,7 @@ export function convertSessionToClientHistory(
             }
             if (nextMsg.type === 'user' && nextMsg.content) {
               for (const part of ensurePartArray(nextMsg.content)) {
-                if (part.functionResponse) {
+                if (part?.functionResponse) {
                   targetUserMsgId ??= nextMsg.id;
                   if (part.functionResponse.id) {
                     recordedResponseIds.add(part.functionResponse.id);
@@ -271,7 +275,7 @@ export function convertSessionToClientHistory(
             } else {
               const dedupedResponseParts = functionResponseParts.filter(
                 (part) => {
-                  const respId = part.functionResponse?.id;
+                  const respId = part?.functionResponse?.id;
                   if (!respId) {
                     return true;
                   }

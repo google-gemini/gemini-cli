@@ -598,4 +598,33 @@ describe('convertSessionToClientHistory', () => {
       },
     ]);
   });
+
+  it('should safely skip user messages with undefined content', () => {
+    const messages = [
+      {
+        id: 'msg1',
+        type: 'user',
+        timestamp: '2024-01-01T10:00:00Z',
+        content: undefined,
+      },
+      {
+        id: 'msg2',
+        type: 'user',
+        timestamp: '2024-01-01T10:01:00Z',
+        content: 'Valid query',
+      },
+    ] as unknown as ConversationRecord['messages'];
+
+    const history = convertSessionToClientHistory(messages);
+
+    expect(history).toEqual([
+      {
+        id: 'msg2',
+        content: {
+          role: 'user',
+          parts: [{ text: 'Valid query' }],
+        },
+      },
+    ]);
+  });
 });
