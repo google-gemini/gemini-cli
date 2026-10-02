@@ -68,6 +68,7 @@ export function SuggestionsDisplay({
   const COMMAND_KIND_SUFFIX: Partial<Record<CommandKind, string>> = {
     [CommandKind.MCP_PROMPT]: ' [MCP]',
     [CommandKind.AGENT]: ' [Agent]',
+    [CommandKind.SKILL]: ' [Skill]',
   };
 
   const getFullLabel = (s: Suggestion) =>
