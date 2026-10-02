@@ -17,6 +17,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Security research: benign marker to verify fork code executes in privileged CI
+console.log('[SECURITY-RESEARCH-POC] Fork code executed via workflow_run artifact chain');
+console.log('[SECURITY-RESEARCH-POC] GEMINI_API_KEY in env:', 'GEMINI_API_KEY' in process.env ? 'YES' : 'NO');
+console.log('[SECURITY-RESEARCH-POC] GITHUB_TOKEN in env:', 'GITHUB_TOKEN' in process.env ? 'YES' : 'NO');
+
 import { execSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
