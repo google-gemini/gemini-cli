@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as http from 'node:http';
-import * as fs from 'node:fs';
+import type * as fs from 'node:fs';
 import { IdeClient, IDEConnectionStatus } from './ide-client.js';
 import { getIdeServerHost } from './ide-connection-utils.js';
 import { getIdeProcessInfo } from './process-utils.js';
@@ -15,7 +15,15 @@ vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
   return {
     ...actual,
-    existsSync: vi.fn(actual.existsSync),
+    existsSync: vi.fn((targetPath: fs.PathLike) => {
+      if (
+        targetPath === '/.dockerenv' &&
+        process.env['GEMINI_SANDBOX'] === 'runsc'
+      ) {
+        return true;
+      }
+      return actual.existsSync(targetPath);
+    }),
     promises: {
       ...actual.promises,
       // In sandbox container, host /tmp/gemini/ide discovery directory does not exist
@@ -95,11 +103,7 @@ describe('IDE Companion under gVisor (runsc) Sandbox Constraints', () => {
   });
 
   it('fails to connect when executed within gVisor netstack constraints (blocked host-gateway port / loopback isolation)', async () => {
-    // In a container sandbox, /.dockerenv exists and GEMINI_SANDBOX is runsc
-    vi.mocked(fs.existsSync).mockImplementation((targetPath: fs.PathLike) => {
-      if (targetPath === '/.dockerenv') return true;
-      return false;
-    });
+    // In a container sandbox, /.dockerenv existence is simulated via the module-level fs mock when GEMINI_SANDBOX is runsc
     vi.stubEnv('GEMINI_SANDBOX', 'runsc');
 
     // IdeServerHost resolves to host.docker.internal in a container
