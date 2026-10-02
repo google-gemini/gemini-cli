@@ -20,6 +20,9 @@ import { getErrorMessage } from '../utils/errors.js';
 import * as fsPromises from 'node:fs/promises';
 import * as path from 'node:path';
 import { glob, escape } from 'glob';
+import picomatch from 'picomatch';
+import { LRUCache } from 'mnemonist';
+import { resolveToRealPath } from '../utils/paths.js';
 import { buildParamArgsPattern } from '../policy/utils.js';
 import {
   detectFileType,
@@ -111,6 +114,144 @@ type FileProcessingResult =
     };
 
 /**
+ * Cache type for storing compiled picomatch matchers and scan results.
+ */
+export type AssetRequestCache = LRUCache<
+  string,
+  picomatch.Matcher | ReturnType<typeof picomatch.scan>
+>;
+
+function isMatcher(val: unknown): val is picomatch.Matcher {
+  return typeof val === 'function';
+}
+
+function isScanInfo(val: unknown): val is ReturnType<typeof picomatch.scan> {
+  return typeof val === 'object' && val !== null && 'isGlob' in val;
+}
+
+function resolveToRealPathSafe(p: string): string {
+  try {
+    return resolveToRealPath(p).replace(/\\/g, '/');
+  } catch {
+    return path.resolve(p).replace(/\\/g, '/');
+  }
+}
+
+/**
+ * Determines whether an asset file (image, PDF, audio, video) was explicitly requested
+ * by name or extension in the include patterns, rather than implicitly matched
+ * by a broad glob pattern (e.g. generic wildcard or directory patterns).
+ */
+export function isAssetExplicitlyRequested(
+  includePatterns: string[],
+  filePath: string,
+  relativePathForDisplay: string,
+  workspaceDirs: readonly string[] = [],
+  cache?: AssetRequestCache,
+): boolean {
+  const normalizedRelativePath = relativePathForDisplay.replace(/\\/g, '/');
+  const normalizedFilePath = filePath.replace(/\\/g, '/');
+  const fileExtension = path.posix.extname(normalizedFilePath);
+  const fileName = path.posix.basename(normalizedFilePath);
+
+  const resolvedWorkspaceDirs = workspaceDirs.map((dir) =>
+    resolveToRealPathSafe(dir),
+  );
+  const resolvedFileDir =
+    workspaceDirs.length > 0
+      ? resolveToRealPathSafe(path.dirname(normalizedFilePath))
+      : '';
+
+  return includePatterns.some((pattern) => {
+    const normalizedPattern = pattern.replace(/\\/g, '/').trim();
+    if (!normalizedPattern) return false;
+
+    // Check if pattern matches this file (by relative path, full path, or by filename if pattern has no slashes)
+    const patternKey = `pattern:${normalizedPattern}`;
+    const cachedMatcher = cache?.get(patternKey);
+    const fileMatcher = isMatcher(cachedMatcher)
+      ? cachedMatcher
+      : picomatch(normalizedPattern, {
+          nocase: true,
+          dot: true,
+        });
+    if (!cachedMatcher && cache) {
+      cache.set(patternKey, fileMatcher);
+    }
+    const matchesPath =
+      fileMatcher(normalizedRelativePath) || fileMatcher(normalizedFilePath);
+    const matchesFileName =
+      !normalizedPattern.includes('/') &&
+      (resolvedWorkspaceDirs.length > 0
+        ? resolvedWorkspaceDirs.some(
+            (resolvedDir) =>
+              resolvedFileDir === resolvedDir && fileMatcher(fileName),
+          )
+        : !normalizedRelativePath.includes('/') && fileMatcher(fileName));
+
+    if (!matchesPath && !matchesFileName) {
+      return false;
+    }
+
+    // Now verify the match is explicit (by extension or by name)
+    let cleanPattern = normalizedPattern;
+    while (cleanPattern.endsWith('/') && cleanPattern.length > 0) {
+      cleanPattern = cleanPattern.slice(0, -1);
+    }
+    const patternLeaf = path.posix.basename(cleanPattern);
+    const patternExt = path.posix.extname(patternLeaf);
+    const patternStem = path.posix.basename(patternLeaf, patternExt);
+
+    // 1. Explicit by extension:
+    // Pattern leaf has a non-wildcard extension (e.g., '*.png', '**/*.png', 'assets/*.PNG', '*.{png,jpg}')
+    // and that extension pattern matches the file's extension case-insensitively.
+    if (patternExt && !patternExt.includes('*') && !patternExt.includes('?')) {
+      const cachedScan = cache?.get(`scan:${patternExt}`);
+      const extScan = isScanInfo(cachedScan)
+        ? cachedScan
+        : picomatch.scan(patternExt);
+      if (!cachedScan && cache) {
+        cache.set(`scan:${patternExt}`, extScan);
+      }
+      if (!extScan.isGlob) {
+        if (patternExt.toLowerCase() === fileExtension.toLowerCase()) {
+          return true;
+        }
+      } else {
+        const cachedExtMatcher = cache?.get(`matcher:${patternExt}`);
+        const extMatcher = isMatcher(cachedExtMatcher)
+          ? cachedExtMatcher
+          : picomatch(patternExt, { nocase: true });
+        if (!cachedExtMatcher && cache) {
+          cache.set(`matcher:${patternExt}`, extMatcher);
+        }
+        if (extMatcher(fileExtension)) {
+          return true;
+        }
+      }
+    }
+
+    // 2. Explicit by name:
+    // Pattern leaf specifies a non-wildcard filename/stem (e.g., 'logo.png', 'myExactImage.png', 'report-final.pdf', 'logo.*')
+    // i.e. patternStem is not empty, not '*' or '**', and contains no glob characters.
+    if (patternStem && patternStem !== '*' && patternStem !== '**') {
+      const cachedStemScan = cache?.get(`scan:${patternStem}`);
+      const stemScan = isScanInfo(cachedStemScan)
+        ? cachedStemScan
+        : picomatch.scan(patternStem);
+      if (!cachedStemScan && cache) {
+        cache.set(`scan:${patternStem}`, stemScan);
+      }
+      if (!stemScan.isGlob) {
+        return true;
+      }
+    }
+
+    return false;
+  });
+}
+
+/**
  * Creates the default exclusion patterns including dynamic patterns.
  * This combines the shared patterns with dynamic patterns like GEMINI.md.
  * TODO(adh): Consider making this configurable or extendable through a command line argument.
@@ -126,6 +267,8 @@ class ReadManyFilesToolInvocation extends BaseToolInvocation<
   ReadManyFilesParams,
   ToolResult
 > {
+  private readonly assetRequestCache: AssetRequestCache = new LRUCache(1000);
+
   constructor(
     private readonly config: Config,
     params: ReadManyFilesParams,
@@ -296,17 +439,15 @@ ${finalExclusionPatternsForDescription
           if (
             fileType === 'image' ||
             fileType === 'pdf' ||
-            fileType === 'audio'
+            fileType === 'audio' ||
+            fileType === 'video'
           ) {
-            const fileExtension = path.extname(filePath).toLowerCase();
-            const fileNameWithoutExtension = path.basename(
+            const requestedExplicitly = isAssetExplicitlyRequested(
+              include,
               filePath,
-              fileExtension,
-            );
-            const requestedExplicitly = include.some(
-              (pattern: string) =>
-                pattern.toLowerCase().includes(fileExtension) ||
-                pattern.includes(fileNameWithoutExtension),
+              relativePathForDisplay,
+              this.config.getWorkspaceContext().getDirectories(),
+              this.assetRequestCache,
             );
 
             if (!requestedExplicitly) {
@@ -315,7 +456,7 @@ ${finalExclusionPatternsForDescription
                 filePath,
                 relativePathForDisplay,
                 reason:
-                  'asset file (image/pdf/audio) was not explicitly requested by name or extension',
+                  'asset file (image/pdf/audio/video) was not explicitly requested by name or extension',
               };
             }
           }
