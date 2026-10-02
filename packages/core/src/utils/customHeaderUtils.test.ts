@@ -88,4 +88,28 @@ describe('parseCustomHeaders', () => {
       Authorization: 'Bearer abc',
     });
   });
+
+  it('should not split a JSON value on commas inside the value', () => {
+    const input = 'x-portkey-metadata: {"_user":"alice","env":"prod"}';
+    expect(parseCustomHeaders(input)).toEqual({
+      'x-portkey-metadata': '{"_user":"alice","env":"prod"}',
+    });
+  });
+
+  it('should not split a Link header listing multiple URLs', () => {
+    const input =
+      'Link: <https://a.example>; rel="a", <https://b.example>; rel="b"';
+    expect(parseCustomHeaders(input)).toEqual({
+      Link: '<https://a.example>; rel="a", <https://b.example>; rel="b"',
+    });
+  });
+
+  it('should still split on a comma followed by a valid header name', () => {
+    const input =
+      'x-portkey-metadata: {"_user":"alice","env":"prod"}, Authorization: Bearer abc';
+    expect(parseCustomHeaders(input)).toEqual({
+      'x-portkey-metadata': '{"_user":"alice","env":"prod"}',
+      Authorization: 'Bearer abc',
+    });
+  });
 });
