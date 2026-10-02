@@ -225,6 +225,7 @@ interface ResolvedFile {
   pathSpec: string;
   displayLabel: string;
   absolutePath?: string;
+  isDirectory?: boolean;
 }
 
 interface IgnoredFile {
@@ -300,15 +301,15 @@ async function resolveFilePaths(
     if (result.status === 'resolved') {
       const { absolutePath, relativePath, stats } = result.resolved;
       if (stats.isDirectory()) {
-        const pathSpec = path.join(relativePath, '**');
         resolvedFiles.push({
           part,
-          pathSpec,
+          pathSpec: relativePath,
           displayLabel: path.isAbsolute(pathName) ? relativePath : pathName,
           absolutePath,
+          isDirectory: true,
         });
         onDebugMessage(
-          `Path ${pathName} resolved to directory, using glob: ${pathSpec}`,
+          `Path ${pathName} resolved to directory: ${absolutePath}, using relative path: ${relativePath}`,
         );
       } else {
         resolvedFiles.push({
@@ -549,7 +550,8 @@ async function readLocalFiles(
   display?: IndividualToolCallDisplay;
   error?: string;
 }> {
-  if (resolvedFiles.length === 0) {
+  const filesToRead = resolvedFiles.filter((rf) => !(rf.isDirectory ?? false));
+  if (filesToRead.length === 0) {
     return { parts: [] };
   }
 
@@ -558,7 +560,7 @@ async function readLocalFiles(
     config.getMessageBus(),
   );
 
-  const pathSpecsToRead = resolvedFiles.map((rf) => {
+  const pathSpecsToRead = filesToRead.map((rf) => {
     if (rf.absolutePath) {
       return rf.pathSpec.endsWith('**')
         ? path.join(rf.absolutePath, '**')
@@ -566,7 +568,7 @@ async function readLocalFiles(
     }
     return rf.pathSpec;
   });
-  const fileLabelsForDisplay = resolvedFiles.map((rf) => rf.displayLabel);
+  const fileLabelsForDisplay = filesToRead.map((rf) => rf.displayLabel);
   const respectFileIgnore = config.getFileFilteringOptions();
 
   const toolArgs = {
@@ -604,7 +606,7 @@ async function readLocalFiles(
             const fileActualContent = match[2].trim();
 
             // Find the display label for this path
-            const resolvedFile = resolvedFiles.find(
+            const resolvedFile = filesToRead.find(
               (rf) =>
                 rf.absolutePath === filePathSpecInContent ||
                 rf.pathSpec === filePathSpecInContent,
