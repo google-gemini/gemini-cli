@@ -1356,7 +1356,7 @@ Content of file[1]
 
       // Verify that cache was populated with compiled matcher and scan
       expect(cache.size).toBeGreaterThan(0);
-      expect(cache.has('assets/*.{png,jpg}')).toBe(true);
+      expect(cache.has('pattern:assets/*.{png,jpg}')).toBe(true);
       expect(cache.has('scan:.{png,jpg}')).toBe(true);
       expect(cache.has('matcher:.{png,jpg}')).toBe(true);
 

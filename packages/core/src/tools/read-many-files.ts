@@ -150,7 +150,8 @@ export function isAssetExplicitlyRequested(
     if (!normalizedPattern) return false;
 
     // Check if pattern matches this file (by relative path, full path, or by filename if pattern has no slashes)
-    const cachedMatcher = cache?.get(normalizedPattern);
+    const patternKey = `pattern:${normalizedPattern}`;
+    const cachedMatcher = cache?.get(patternKey);
     const fileMatcher = isMatcher(cachedMatcher)
       ? cachedMatcher
       : picomatch(normalizedPattern, {
@@ -158,7 +159,7 @@ export function isAssetExplicitlyRequested(
           dot: true,
         });
     if (!cachedMatcher && cache) {
-      cache.set(normalizedPattern, fileMatcher);
+      cache.set(patternKey, fileMatcher);
     }
     const matchesPath =
       fileMatcher(normalizedRelativePath) || fileMatcher(normalizedFilePath);
