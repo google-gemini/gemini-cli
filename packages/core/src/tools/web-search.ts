@@ -18,6 +18,7 @@ import {
 import { ToolErrorType } from './tool-error.js';
 
 import { getErrorMessage, isAbortError } from '../utils/errors.js';
+import { createTimeoutAbortHandle } from '../utils/abort.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { WEB_SEARCH_DEFINITION } from './definitions/coreTools.js';
@@ -100,26 +101,17 @@ class WebSearchToolInvocation extends BaseToolInvocation<
 
     // Abort the underlying request after a timeout so that a search whose
     // request never settles fails with a structured tool error instead of
-    // hanging the agent loop indefinitely. External aborts (user pressing
-    // Esc) are forwarded onto the same controller.
-    const timeoutController = new AbortController();
-    let timedOut = false;
-    const timer = setTimeout(() => {
-      timedOut = true;
-      timeoutController.abort();
-    }, WEB_SEARCH_TIMEOUT_MS);
-    const onExternalAbort = () => timeoutController.abort(signal.reason);
-    if (signal.aborted) {
-      onExternalAbort();
-    } else {
-      signal.addEventListener('abort', onExternalAbort, { once: true });
-    }
+    // hanging the agent loop indefinitely.
+    const timeoutHandle = createTimeoutAbortHandle(
+      signal,
+      WEB_SEARCH_TIMEOUT_MS,
+    );
 
     try {
       const response = await geminiClient.generateContent(
         { model: 'web-search' },
         [{ role: 'user', parts: [{ text: this.params.query }] }],
-        timeoutController.signal,
+        timeoutHandle.signal,
         LlmRole.UTILITY_TOOL,
       );
 
@@ -203,7 +195,7 @@ class WebSearchToolInvocation extends BaseToolInvocation<
         sources,
       };
     } catch (error: unknown) {
-      if (timedOut) {
+      if (timeoutHandle.didTimeout()) {
         const errorMessage = `Web search for query "${this.params.query}" timed out after ${WEB_SEARCH_TIMEOUT_MS}ms.`;
         debugLogger.warn(errorMessage, error);
         return {
@@ -234,8 +226,7 @@ class WebSearchToolInvocation extends BaseToolInvocation<
         },
       };
     } finally {
-      clearTimeout(timer);
-      signal.removeEventListener('abort', onExternalAbort);
+      timeoutHandle.dispose();
     }
   }
 }
