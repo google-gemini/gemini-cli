@@ -309,6 +309,23 @@ describe('AgentRegistry', () => {
       expect(registry.getDefinition('cli_help')).toBeDefined();
     });
 
+    it('should register CLI help agent with get_cli_reference tool', async () => {
+      const config = makeMockedConfig();
+      const registry = new TestableAgentRegistry(config);
+
+      await registry.initialize();
+
+      const def = registry.getDefinition('cli_help');
+      expect(def).toBeDefined();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const tools = (def as any)?.toolConfig?.tools ?? [];
+      const hasCliRef = tools.some(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (t: any) => typeof t !== 'string' && t.name === 'get_cli_reference',
+      );
+      expect(hasCliRef).toBe(true);
+    });
+
     it('should NOT register CLI help agent if disabled', async () => {
       const config = makeMockedConfig({
         agents: {
