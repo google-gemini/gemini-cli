@@ -1044,53 +1044,97 @@ describe('normalizePath', () => {
 });
 
 describe('tildeifyPath', () => {
-  const originalHome = process.env['GEMINI_CLI_HOME'];
-
-  beforeEach(() => {
-    process.env['GEMINI_CLI_HOME'] = '/Users/al';
-  });
-
   afterEach(() => {
-    if (originalHome === undefined) {
-      delete process.env['GEMINI_CLI_HOME'];
-    } else {
-      process.env['GEMINI_CLI_HOME'] = originalHome;
-    }
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
   });
 
-  it('tildeifies the home directory', () => {
-    expect(tildeifyPath('/Users/al')).toBe('~');
+  describe('on POSIX', () => {
+    beforeEach(() => {
+      mockPlatform('linux');
+      vi.stubEnv('GEMINI_CLI_HOME', '/Users/al');
+    });
+
+    it('should replace the exact home directory with a tilde', () => {
+      expect(tildeifyPath('/Users/al')).toBe('~');
+    });
+
+    it('should replace the home directory prefix for a descendant', () => {
+      expect(tildeifyPath('/Users/al/Documents/app')).toBe(
+        '~/Documents/app',
+      );
+    });
+
+    it('should preserve a descendant trailing slash when home has one', () => {
+      vi.stubEnv('GEMINI_CLI_HOME', '/Users/al/');
+      expect(tildeifyPath('/Users/al/Documents/app/')).toBe(
+        '~/Documents/app/',
+      );
+    });
+
+    it('should normalize duplicate slashes and relative segments', () => {
+      expect(tildeifyPath('/Users//al/Documents/app')).toBe(
+        '~/Documents/app',
+      );
+      expect(tildeifyPath('/Users/al/../al/Documents/./app')).toBe(
+        '~/Documents/app',
+      );
+    });
+
+    it('should not replace a sibling directory with the same prefix', () => {
+      expect(tildeifyPath('/Users/albert/Documents/app')).toBe(
+        '/Users/albert/Documents/app',
+      );
+    });
+
+    it('should not replace a relative path', () => {
+      expect(tildeifyPath('Documents/app')).toBe('Documents/app');
+    });
   });
 
-  it('tildeifies paths inside the home directory', () => {
-    expect(tildeifyPath('/Users/al/project/file.ts')).toBe('~/project/file.ts');
-  });
+  describe('on Windows', () => {
+    beforeEach(() => {
+      mockPlatform('win32');
+      vi.stubEnv('GEMINI_CLI_HOME', 'C:\\Users\\Al');
+    });
 
-  it('does not tildeify sibling directories with the same prefix', () => {
-    expect(tildeifyPath('/Users/albert/project')).toBe('/Users/albert/project');
-  });
-});
+    it('should replace the exact home directory with a tilde', () => {
+      expect(tildeifyPath('C:\\Users\\Al')).toBe('~');
+    });
 
-describe.skipIf(process.platform !== 'win32')('tildeifyPath on Windows', () => {
-  beforeEach(() => {
-    process.env['GEMINI_CLI_HOME'] = 'C:\\Users\\Al';
-  });
+    it('should replace the exact home directory with forward slashes', () => {
+      expect(tildeifyPath('C:/Users/Al')).toBe('~');
+    });
 
-  afterEach(() => {
-    delete process.env['GEMINI_CLI_HOME'];
-  });
+    it('should replace the home directory prefix with native separators', () => {
+      expect(tildeifyPath('C:\\Users\\Al\\Documents\\app')).toBe(
+        '~\\Documents\\app',
+      );
+    });
 
-  it('tildeifies a Windows child path', () => {
-    expect(tildeifyPath('C:\\Users\\Al\\project')).toBe('~\\project');
-  });
+    it('should replace the home directory prefix with forward slashes', () => {
+      expect(tildeifyPath('C:/Users/Al/Documents/app')).toBe(
+        '~/Documents/app',
+      );
+    });
 
-  it('does not tildeify a sibling Windows directory with the same prefix', () => {
-    expect(tildeifyPath('C:\\Users\\Albert\\project')).toBe(
-      'C:\\Users\\Albert\\project',
-    );
-  });
+    it('should normalize duplicate separators and relative segments', () => {
+      expect(tildeifyPath('C:\\Users\\\\Al\\Documents\\.\\app')).toBe(
+        '~\\Documents\\app',
+      );
+      expect(tildeifyPath('C:/Users/Al/Documents/../Documents/app')).toBe(
+        '~/Documents/app',
+      );
+    });
 
-  it('handles Windows paths using forward slashes', () => {
-    expect(tildeifyPath('C:/Users/Al/project')).toBe('~/project');
+    it('should not replace a sibling directory with the same prefix', () => {
+      expect(tildeifyPath('C:\\Users\\Albert\\Documents\\app')).toBe(
+        'C:\\Users\\Albert\\Documents\\app',
+      );
+    });
+
+    it('should not replace a relative path', () => {
+      expect(tildeifyPath('Documents\\app')).toBe('Documents\\app');
+    });
   });
 });
