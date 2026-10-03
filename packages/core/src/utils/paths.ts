@@ -39,12 +39,34 @@ export function tmpdir(): string {
  * @param path - The path to tildeify.
  * @returns The tildeified path.
  */
-export function tildeifyPath(path: string): string {
+export function tildeifyPath(filePath: string): string {
   const homeDir = homedir();
-  if (path.startsWith(homeDir)) {
-    return path.replace(homeDir, '~');
+
+  if (filePath === homeDir) {
+    return '~';
   }
-  return path;
+
+  const homeWithSeparator = homeDir.endsWith(path.sep)
+    ? homeDir
+    : `${homeDir}${path.sep}`;
+
+  if (filePath.startsWith(homeWithSeparator)) {
+    return '~' + filePath.slice(homeDir.length);
+  }
+
+  if (process.platform === 'win32') {
+    const forwardSlashHome = homeDir.replaceAll(path.win32.sep, '/');
+    const forwardSlashHomeWithSeparator = forwardSlashHome.endsWith('/')
+      ? forwardSlashHome
+      : `${forwardSlashHome}/`;
+    const normalizedFilePath = filePath.replaceAll(path.win32.sep, '/');
+
+    if (normalizedFilePath.startsWith(forwardSlashHomeWithSeparator)) {
+      return '~' + filePath.slice(homeDir.length);
+    }
+  }
+
+  return filePath;
 }
 
 /**
