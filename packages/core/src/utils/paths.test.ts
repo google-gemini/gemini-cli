@@ -23,6 +23,7 @@ import {
   resolveDefensiveToolPath,
   hasBlockedPathSegment,
   stripExtendedLengthPrefix,
+  tildeifyPath,
 } from './paths.js';
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -1039,5 +1040,57 @@ describe('normalizePath', () => {
       expect(hasBlockedPathSegment('gha-cr~1.jso')).toBe(true);
       expect(hasBlockedPathSegment('gh1a2b~1.jso')).toBe(true);
     });
+  });
+});
+
+describe('tildeifyPath', () => {
+  const originalHome = process.env['GEMINI_CLI_HOME'];
+
+  beforeEach(() => {
+    process.env['GEMINI_CLI_HOME'] = '/Users/al';
+  });
+
+  afterEach(() => {
+    if (originalHome === undefined) {
+      delete process.env['GEMINI_CLI_HOME'];
+    } else {
+      process.env['GEMINI_CLI_HOME'] = originalHome;
+    }
+  });
+
+  it('tildeifies the home directory', () => {
+    expect(tildeifyPath('/Users/al')).toBe('~');
+  });
+
+  it('tildeifies paths inside the home directory', () => {
+    expect(tildeifyPath('/Users/al/project/file.ts')).toBe('~/project/file.ts');
+  });
+
+  it('does not tildeify sibling directories with the same prefix', () => {
+    expect(tildeifyPath('/Users/albert/project')).toBe('/Users/albert/project');
+  });
+});
+
+describe.skipIf(process.platform !== 'win32')('tildeifyPath on Windows', () => {
+  beforeEach(() => {
+    process.env['GEMINI_CLI_HOME'] = 'C:\\Users\\Al';
+  });
+
+  afterEach(() => {
+    delete process.env['GEMINI_CLI_HOME'];
+  });
+
+  it('tildeifies a Windows child path', () => {
+    expect(tildeifyPath('C:\\Users\\Al\\project')).toBe('~\\project');
+  });
+
+  it('does not tildeify a sibling Windows directory with the same prefix', () => {
+    expect(tildeifyPath('C:\\Users\\Albert\\project')).toBe(
+      'C:\\Users\\Albert\\project',
+    );
+  });
+
+  it('handles Windows paths using forward slashes', () => {
+    expect(tildeifyPath('C:/Users/Al/project')).toBe('~/project');
   });
 });
