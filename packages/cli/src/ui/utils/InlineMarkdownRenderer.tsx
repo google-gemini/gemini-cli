@@ -18,8 +18,8 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({
   text: rawText,
   defaultColor,
 }) => {
-  const text = stripUnsafeCharacters(rawText);
-  const ansiText = parseMarkdownToANSI(text, defaultColor);
+  const sanitizedText = stripUnsafeCharacters(rawText);
+  const ansiText = parseMarkdownToANSI(sanitizedText, defaultColor);
 
   return <Text>{ansiText}</Text>;
 };

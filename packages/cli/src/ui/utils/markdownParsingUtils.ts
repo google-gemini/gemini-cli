@@ -236,7 +236,16 @@ export const parseMarkdownToANSI = (
           ),
         );
       } else if (fullMatch.match(/^https?:\/\//)) {
-        styledPart = ansiColorize(fullMatch, theme.text.link);
+        const colored = ansiColorize(fullMatch, theme.text.link);
+        // Wrap in an OSC 8 terminal hyperlink so the full URL remains the
+        // clickable target even when the terminal visually word-wraps the text.
+        // OSC 8 is an escape sequence: only emit it when chalk is outputting
+        // ANSI codes. chalk.level === 0 when NO_COLOR is set, stdout is
+        // non-TTY, or FORCE_COLOR/TERM=dumb suppresses output.
+        styledPart =
+          chalk.level > 0
+            ? `\x1b]8;;${fullMatch}\x1b\\${colored}\x1b]8;;\x1b\\`
+            : colored;
       }
     } catch (e) {
       debugLogger.warn('Error parsing inline markdown part:', fullMatch, e);
