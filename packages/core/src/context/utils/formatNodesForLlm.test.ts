@@ -9,6 +9,50 @@ import { formatNodesForLlm } from './formatNodesForLlm.js';
 import { NodeType, type ConcreteNode } from '../graph/types.js';
 
 describe('formatNodesForLlm', () => {
+  it('should preserve first-seen turn numbering with repeated and empty turn IDs', () => {
+    const nodes: ConcreteNode[] = [
+      { turnId: 'older', text: 'first' },
+      { turnId: 'newer', text: 'second' },
+      { turnId: 'older', text: 'third' },
+      { turnId: '', text: 'untracked' },
+    ].map(({ turnId, text }, index) => ({
+      id: String(index),
+      turnId,
+      type: NodeType.USER_PROMPT,
+      timestamp: index,
+      role: 'user',
+      payload: { text },
+    }));
+    const originalNodes = structuredClone(nodes);
+
+    expect(formatNodesForLlm(nodes)).toBe(
+      '[Turn -1] [USER] [USER_PROMPT]: first\n' +
+        '[Turn 0] [USER] [USER_PROMPT]: second\n' +
+        '[Turn -1] [USER] [USER_PROMPT]: third\n' +
+        '[USER] [USER_PROMPT]: untracked\n',
+    );
+    expect(nodes).toEqual(originalNodes);
+  });
+
+  it('should omit turn markers when all turn IDs are empty', () => {
+    const nodes: ConcreteNode[] = [
+      {
+        id: 'untracked',
+        turnId: '',
+        type: NodeType.USER_PROMPT,
+        timestamp: 100,
+        role: 'user',
+        payload: { text: 'message' },
+      },
+    ];
+
+    expect(formatNodesForLlm(nodes)).toBe('[USER] [USER_PROMPT]: message\n');
+  });
+
+  it('should return an empty transcript for an empty history', () => {
+    expect(formatNodesForLlm([])).toBe('');
+  });
+
   it('should format standard user and model text messages with relative turns', () => {
     const nodes: ConcreteNode[] = [
       {
