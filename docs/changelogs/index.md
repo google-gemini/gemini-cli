@@ -18,6 +18,26 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.62.0 - 2026-09-29
+
+- **Gemini 3.8 Flash & 3.5 Flash Lite Support:** Added support for Gemini 3.8
+  Flash and Gemini 3.5 Flash Lite models, expanding model options and routing
+  capabilities ([#29443](https://github.com/google-gemini/gemini-cli/pull/29443)
+  by @DavidAPierce).
+- **MCP Tool Call Formatting:** Formatted MCP tool call titles as structured
+  signatures and segregated explanations, while emitting tool call updates
+  before requesting permission in ACP mode
+  ([#29341](https://github.com/google-gemini/gemini-cli/pull/29341) by
+  @jvargassanchez-dot,
+  [#29439](https://github.com/google-gemini/gemini-cli/pull/29439) by
+  @urielefrenvirtusa).
+- **PTY & Process Lifecycle Hardening:** Synchronized ConPTY process exit
+  lifecycles, hardened PTY output finalization, and improved file descriptor
+  cleanup ([#29379](https://github.com/google-gemini/gemini-cli/pull/29379) by
+  @jvargassanchez-dot,
+  [#29340](https://github.com/google-gemini/gemini-cli/pull/29340) by
+  @jesussamuel-byte).
+
 ## Announcements: v0.61.0 - 2026-09-23
 
 - **Core Security Hardening:** Prevented indirect prompt injection
