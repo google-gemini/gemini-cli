@@ -215,6 +215,7 @@ function classifyValidationRequiredError(
  *   - If the error has a retry delay, it's a `RetryableQuotaError`.
  *   - If the error indicates a per-minute limit, it's a `RetryableQuotaError`.
  *   - If the error message contains the phrase "Please retry in X[s|ms]", it's a `RetryableQuotaError`.
+ *   - A project spending cap (monthly or otherwise) is a `TerminalQuotaError`, even when `details` is empty.
  * - 503 errors are classified as `RetryableQuotaError`.
  *
  * @param error The error to classify.
@@ -260,6 +261,20 @@ export function classifyGoogleError(error: unknown): unknown {
   ) {
     const cause = googleApiError ?? {
       code: status ?? 429,
+      message: errorMessage,
+      details: [],
+    };
+    return new TerminalQuotaError(errorMessage, cause);
+  }
+
+  // A spending cap is an account limit, not transient capacity. Empty `details`
+  // used to fall through to RetryableQuotaError and loop as "high demand".
+  if (
+    (status === 400 || status === 429 || status === 499) &&
+    isSpendingCapMessage(errorMessage)
+  ) {
+    const cause = googleApiError ?? {
+      code: status,
       message: errorMessage,
       details: [],
     };
@@ -460,6 +475,11 @@ export function classifyGoogleError(error: unknown): unknown {
   // If we reached this point, the status is 429, 499, or 503 and we have details,
   // but no specific violation was matched. We return a generic retryable error.
   return new RetryableQuotaError(errorMessage, googleApiError);
+}
+
+/** True when the API text is a project spending cap, not a short rate limit. */
+export function isSpendingCapMessage(message: string): boolean {
+  return /spending cap|spend cap/i.test(message);
 }
 
 function extractErrorMessage(error: unknown): string {

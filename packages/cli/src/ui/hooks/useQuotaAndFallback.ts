@@ -13,6 +13,7 @@ import {
   type ValidationIntent,
   TerminalQuotaError,
   ModelNotFoundError,
+  isSpendingCapMessage,
   UserTierId,
   VALID_GEMINI_MODELS,
   isProModel,
@@ -156,6 +157,9 @@ export function useQuotaAndFallback({
             `/model to switch models.`,
           ].filter(Boolean);
           message = messageLines.join('\n');
+        } else if (isSpendingCapMessage(error.message)) {
+          // Keep the API text. A generic usage-limit line hides the spend cap.
+          message = error.message;
         } else {
           const messageLines = [
             `Usage limit reached for ${usageLimitReachedModel}.`,
