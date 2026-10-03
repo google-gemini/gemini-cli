@@ -1049,6 +1049,72 @@ describe('LocalAgentExecutor', () => {
   });
 
   describe('run (Execution Loop and Logic)', () => {
+    it('should preserve all tool response parts in function call order', async () => {
+      const readFileTool = new MockTool({ name: READ_FILE_TOOL_NAME });
+      const executor = await LocalAgentExecutor.create(
+        createTestDefinition([readFileTool]),
+        mockConfig,
+        onActivity,
+      );
+      const functionCalls = [
+        {
+          name: READ_FILE_TOOL_NAME,
+          args: { absolute_path: '/tmp/first.png' },
+          id: 'image1',
+        },
+        {
+          name: READ_FILE_TOOL_NAME,
+          args: { absolute_path: '/tmp/second.png' },
+          id: 'image2',
+        },
+      ];
+      const responses = functionCalls.map((call) => ({
+        status: 'success',
+        request: {
+          callId: call.id,
+          name: call.name,
+          args: call.args,
+          prompt_id: 'test-prompt',
+        },
+        response: {
+          resultDisplay: 'Read image file',
+          responseParts: [
+            {
+              functionResponse: {
+                name: call.name,
+                id: call.id,
+                response: { output: 'Read image file' },
+              },
+            },
+            {
+              inlineData: {
+                mimeType: 'image/png',
+                data: Buffer.from(call.id).toString('base64'),
+              },
+            },
+          ],
+        },
+      }));
+
+      mockModelResponse(functionCalls);
+      // The scheduler may finish calls in a different order from the model.
+      mockScheduleAgentTools.mockResolvedValueOnce([...responses].reverse());
+      mockModelResponse([
+        {
+          name: COMPLETE_TASK_TOOL_NAME,
+          args: { finalResult: 'Inspected both images' },
+          id: 'complete',
+        },
+      ]);
+
+      const output = await executor.run({ goal: 'Inspect images' }, signal);
+
+      expect(getMockMessageParams(1).message).toEqual(
+        responses.flatMap((call) => call.response.responseParts),
+      );
+      expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
+    });
+
     it('should log AgentFinish with error if run throws', async () => {
       const definition = createTestDefinition();
       // Make the definition invalid to cause an error during run
