@@ -79,36 +79,84 @@ export async function runExitCleanup() {
 
   runSyncCleanup();
   for (const fn of cleanupFunctions) {
+    let timeoutId: NodeJS.Timeout | undefined;
     try {
-      await fn();
+      await Promise.race([
+        Promise.resolve(fn()),
+        new Promise<void>((_, reject) => {
+          timeoutId = setTimeout(
+            () => reject(new Error('Cleanup step timed out')),
+            3000,
+          );
+          timeoutId.unref();
+        }),
+      ]);
     } catch {
       // Ignore errors during cleanup.
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
     }
   }
   cleanupFunctions.length = 0; // Clear the array
 
   // Close persistent browser sessions before disposing config
+  let browserTimeoutId: NodeJS.Timeout | undefined;
   try {
-    await resetBrowserSession();
+    await Promise.race([
+      resetBrowserSession(),
+      new Promise<void>((_, reject) => {
+        browserTimeoutId = setTimeout(
+          () => reject(new Error('Browser cleanup timed out')),
+          2000,
+        );
+        browserTimeoutId.unref();
+      }),
+    ]);
   } catch {
     // Ignore errors during browser cleanup
+  } finally {
+    if (browserTimeoutId) clearTimeout(browserTimeoutId);
   }
 
   if (configForTelemetry) {
+    let disposeTimeoutId: NodeJS.Timeout | undefined;
     try {
-      await configForTelemetry.dispose();
+      await Promise.race([
+        configForTelemetry.dispose(),
+        new Promise<void>((_, reject) => {
+          disposeTimeoutId = setTimeout(
+            () => reject(new Error('Config dispose timed out')),
+            5000,
+          );
+          disposeTimeoutId.unref();
+        }),
+      ]);
     } catch {
       // Ignore errors during disposal
+    } finally {
+      if (disposeTimeoutId) clearTimeout(disposeTimeoutId);
     }
   }
 
   // IMPORTANT: Shutdown telemetry AFTER all other cleanup functions have run
   // This ensures SessionEnd hooks and other telemetry are properly flushed
   if (configForTelemetry && isTelemetrySdkInitialized()) {
+    let telemetryTimeoutId: NodeJS.Timeout | undefined;
     try {
-      await shutdownTelemetry(configForTelemetry);
+      await Promise.race([
+        shutdownTelemetry(configForTelemetry),
+        new Promise<void>((_, reject) => {
+          telemetryTimeoutId = setTimeout(
+            () => reject(new Error('Telemetry shutdown timed out')),
+            3000,
+          );
+          telemetryTimeoutId.unref();
+        }),
+      ]);
     } catch {
       // Ignore errors during telemetry shutdown
+    } finally {
+      if (telemetryTimeoutId) clearTimeout(telemetryTimeoutId);
     }
   }
 }
@@ -123,6 +171,13 @@ async function drainStdin() {
     .on('data', () => {});
   // Give it a moment to flush the OS buffer.
   await new Promise((resolve) => setTimeout(resolve, 50));
+  try {
+    process.stdin.pause();
+    process.stdin.removeAllListeners('data');
+    process.stdin.unref();
+  } catch {
+    // Ignore errors pausing stdin.
+  }
 }
 
 /**
@@ -130,16 +185,35 @@ async function drainStdin() {
  * Guards against concurrent shutdown from signals (SIGHUP, SIGTERM, SIGINT)
  * and TTY loss detection racing each other.
  *
+ * If a second SIGINT is received while shutting down, immediately force-exits
+ * to prevent zombie processes.
+ *
  * @see https://github.com/google-gemini/gemini-cli/issues/15874
+ * @see https://github.com/google-gemini/gemini-cli/issues/29424
  */
-async function gracefulShutdown(_reason: string) {
+async function gracefulShutdown(reason: string) {
   if (isShuttingDown) {
+    if (reason === 'SIGINT') {
+      // User pressed Ctrl+C again while waiting for shutdown: force exit immediately
+      process.exit(130);
+    }
     return;
   }
   isShuttingDown = true;
 
-  await runExitCleanup();
-  process.exit(ExitCodes.SUCCESS);
+  // Set a watchdog timer to guarantee process exit even if cleanup hangs
+  const forceExitTimeout = setTimeout(() => {
+    process.stderr.write(`Shutdown timed out after ${reason}, forcing exit...\n`);
+    process.exit(ExitCodes.SUCCESS);
+  }, 5000);
+  forceExitTimeout.unref();
+
+  try {
+    await runExitCleanup();
+  } finally {
+    clearTimeout(forceExitTimeout);
+    process.exit(ExitCodes.SUCCESS);
+  }
 }
 
 export function setupSignalHandlers() {

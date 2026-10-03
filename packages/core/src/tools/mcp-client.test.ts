@@ -36,6 +36,7 @@ import {
   hasNetworkTransport,
   isEnabled,
   McpClient,
+  closeTransportSafely,
   populateMcpServerCommand,
   discoverPrompts,
   type McpContext,
@@ -1254,6 +1255,71 @@ describe('mcp-client', () => {
       expect(resourceRegistry.removeResourcesByServer).toHaveBeenCalledWith(
         'test-server',
       );
+    });
+
+    it('should initialize and retain transport on connect, and close it on disconnect', async () => {
+      const mockedClient = {
+        connect: vi.fn().mockImplementation(function (this: any, t: any) {
+          this.transport = t;
+          return Promise.resolve();
+        }),
+        close: vi.fn().mockResolvedValue(undefined),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+        setNotificationHandler: vi.fn(),
+        getServerCapabilities: vi.fn().mockReturnValue({}),
+      };
+      vi.mocked(ClientLib.Client).mockReturnValue(
+        mockedClient as unknown as ClientLib.Client,
+      );
+
+      const client = new McpClient(
+        'test-server',
+        { command: 'test-command' },
+        workspaceContext,
+        MOCK_CONTEXT,
+        false,
+        '0.0.1',
+      );
+
+      await client.connect();
+      const transport = client.getTransport();
+      expect(transport).toBeDefined();
+      const closeSpy = vi.spyOn(transport!, 'close');
+
+      await client.disconnect();
+      expect(closeSpy).toHaveBeenCalled();
+      expect(mockedClient.close).toHaveBeenCalled();
+    });
+
+    it('closeTransportSafely should aggressively terminate lingering child processes with SIGKILL', async () => {
+      const mockProcess = {
+        pid: 99999,
+        stdin: { destroy: vi.fn() },
+        stdout: { destroy: vi.fn() },
+        stderr: { destroy: vi.fn() },
+        kill: vi.fn(),
+        unref: vi.fn(),
+      };
+      const mockStdioTransport = {
+        pid: 99999,
+        _process: mockProcess,
+        close: vi.fn().mockResolvedValue(undefined),
+      };
+
+      const killSpy = vi
+        .spyOn(process, 'kill')
+        .mockImplementation((_pid, _signal) => true as any);
+
+      await closeTransportSafely(mockStdioTransport as any, 'test-server', 50);
+
+      expect(mockStdioTransport.close).toHaveBeenCalled();
+      expect(mockProcess.stdin.destroy).toHaveBeenCalled();
+      expect(killSpy).toHaveBeenCalledWith(99999, 'SIGTERM');
+      expect(killSpy).toHaveBeenCalledWith(99999, 'SIGKILL');
+      expect(mockProcess.unref).toHaveBeenCalled();
+
+      killSpy.mockRestore();
     });
   });
 
@@ -2973,6 +3039,14 @@ describe('connectToMcpServer with OAuth', () => {
       tokenStorage: mockTokenStorage,
     } as unknown as MCPOAuthProvider;
     vi.mocked(MCPOAuthProvider).mockReturnValue(mockAuthProvider);
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        status: 401,
+        headers: new Headers(),
+      }),
+    );
   });
 
   afterEach(async () => {

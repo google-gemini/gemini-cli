@@ -659,7 +659,7 @@ export class McpClientManager {
    * Stops all running local MCP servers and closes all client connections.
    * This is the cleanup method to be called on application exit.
    */
-  async stop(): Promise<void> {
+  async stop(timeoutMs: number = 5000): Promise<void> {
     const disconnectionPromises = Array.from(this.clients.entries()).map(
       async ([name, client]) => {
         try {
@@ -667,14 +667,28 @@ export class McpClientManager {
         } catch (error) {
           this.emitDiagnostic(
             'error',
-            `Error stopping client '${name}':`,
+            `Error stopping client '${client.getServerName()}':`,
             error,
           );
         }
       },
     );
 
-    await Promise.all(disconnectionPromises);
+    let stopTimeoutId: NodeJS.Timeout | undefined;
+    try {
+      await Promise.race([
+        Promise.all(disconnectionPromises),
+        new Promise<void>((resolve) => {
+          stopTimeoutId = setTimeout(() => {
+            debugLogger.warn('MCP client manager stop timed out');
+            resolve();
+          }, timeoutMs);
+          stopTimeoutId.unref();
+        }),
+      ]);
+    } finally {
+      if (stopTimeoutId) clearTimeout(stopTimeoutId);
+    }
     this.clients.clear();
   }
 
