@@ -104,6 +104,57 @@ describe('IdeClient', () => {
     vi.restoreAllMocks();
   });
 
+  describe('getInstance', () => {
+    beforeEach(() => {
+      // Reset the cached singleton so getInstance re-races the timeout.
+      (
+        IdeClient as unknown as { instancePromise: Promise<IdeClient> | null }
+      ).instancePromise = null;
+    });
+    afterEach(() => {
+      // Clear the cached promise so downstream tests' outer beforeEach
+      // rebuilds the singleton with the default getIdeProcessInfo mock.
+      (
+        IdeClient as unknown as { instancePromise: Promise<IdeClient> | null }
+      ).instancePromise = null;
+      vi.mocked(getIdeProcessInfo).mockResolvedValue({
+        pid: 12345,
+        command: 'test-ide',
+      });
+      vi.mocked(detectIde).mockReturnValue(IDE_DEFINITIONS.vscode);
+    });
+
+    it('falls back to a no-IDE client when getIdeProcessInfo hangs (#21477)', async () => {
+      // Fake timers are scoped to this test only (try/finally) so the MCP
+      // client/connect tests below are not affected by the mocked clock.
+      vi.useFakeTimers();
+      try {
+        // Simulate the process-tree traversal never resolving (a bare-terminal
+        // hang). getInstance must not block forever - it races against a
+        // timeout and resolves with a client that has no IDE process info.
+        vi.mocked(getIdeProcessInfo).mockReturnValue(
+          new Promise<{ pid: number; command: string }>(() => {
+            // never resolves
+          }),
+        );
+        // No IDE detected when the process info is absent - detectIde is
+        // called with undefined process info, so currentIde is undefined
+        // (not null).
+        vi.mocked(detectIde).mockReturnValue(undefined);
+
+        const clientPromise = IdeClient.getInstance();
+        // Advance past the IDE_PROCESS_INFO_TIMEOUT_MS deadline.
+        await vi.advanceTimersByTimeAsync(3_000);
+        const client = await clientPromise;
+
+        expect(client.ideProcessInfo).toBeUndefined();
+        expect(client.currentIde).toBeUndefined();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   describe('connect', () => {
     it('should connect using HTTP when port is provided in config file', async () => {
       const config = { port: '8080' };
