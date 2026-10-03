@@ -114,11 +114,12 @@ export function createStateSnapshotProcessor(
             };
 
             // Remove the consumed nodes and insert the snapshot at the earliest index
+            const consumedIdSet = new Set(consumedIds);
             const returnedNodes = targets.filter(
-              (t) => !consumedIds.includes(t.id),
+              (t) => !consumedIdSet.has(t.id),
             );
             const firstRemovedIdx = targets.findIndex((t) =>
-              consumedIds.includes(t.id),
+              consumedIdSet.has(t.id),
             );
 
             if (firstRemovedIdx !== -1) {
@@ -214,11 +215,10 @@ export function createStateSnapshotProcessor(
           abstractsIds: [...consumedIds],
         };
 
-        const returnedNodes = targets.filter(
-          (t) => !consumedIds.includes(t.id),
-        );
+        const consumedIdSet = new Set(consumedIds);
+        const returnedNodes = targets.filter((t) => !consumedIdSet.has(t.id));
         const firstRemovedIdx = targets.findIndex((t) =>
-          consumedIds.includes(t.id),
+          consumedIdSet.has(t.id),
         );
 
         if (firstRemovedIdx !== -1) {
