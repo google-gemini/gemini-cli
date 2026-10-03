@@ -376,6 +376,12 @@ export class LoadedSettings {
       ...workspace,
       settings: {},
       originalSettings: {},
+      // This copy keeps the real path but has had its contents emptied, so it
+      // must never be written back: saveSettings persists originalSettings,
+      // and applyKeyDiff is sync-by-omission, so writing {} deletes every key
+      // the file actually holds. Same mechanism loadSettings already uses to
+      // keep the workspace unwritable when it is the home directory.
+      readOnly: true,
     };
   }
 
@@ -477,6 +483,16 @@ export class LoadedSettings {
         structuredClone(valueToSet),
       );
       saveSettings(settingsFile);
+    } else if (scope === SettingScope.Workspace) {
+      // Nothing reached disk. Say so: callers such as `gemini mcp add` report
+      // success straight after this returns, and an untrusted folder is the
+      // default state, so staying quiet reads as "saved" when it was not.
+      coreEvents.emitFeedback(
+        'warning',
+        this.isTrusted
+          ? 'Workspace settings were not saved: this workspace has no writable settings file.'
+          : 'Workspace settings were not saved because this folder is not trusted. Trust the folder, or pass the user scope instead.',
+      );
     }
 
     this._merged = this.computeMergedSettings();
