@@ -6,6 +6,10 @@
 
 import * as Diff from 'diff';
 
+function normalizeNewlines(content: string): string {
+  return content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
 /**
  * Generates a snippet of the diff between two strings, including a few lines of context around the changes.
  */
@@ -18,8 +22,15 @@ export function getDiffContextSnippet(
     return newContent;
   }
 
-  const changes = Diff.diffLines(originalContent, newContent);
-  const newLines = newContent.split(/\r?\n/);
+  const normalizedOriginal = normalizeNewlines(originalContent);
+  const normalizedNew = normalizeNewlines(newContent);
+
+  if (normalizedOriginal === normalizedNew) {
+    return newContent;
+  }
+
+  const changes = Diff.diffLines(normalizedOriginal, normalizedNew);
+  const newLines = normalizedNew.split('\n');
   const ranges: Array<{ start: number; end: number }> = [];
   let newLineIdx = 0;
 
