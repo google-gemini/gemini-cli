@@ -77,6 +77,40 @@ real-world usage while remaining small and maintainable.
   paths vs. more tests that are more unit-test like. These are evals, so the
   value is in testing how the agent works in a semi-realistic scenario.
 
+## Drafting Evals from Session Logs
+
+`eval:from-log` can use one plain-text turn from a local Gemini CLI session as
+the starting point for a behavioral eval. It creates a deliberately incomplete,
+fail-closed draft; it does not turn a log into a finished regression eval.
+
+```bash
+# Inspect eligible turns first.
+npm run eval:from-log -- --log /path/to/session.jsonl \
+  --workspace /path/to/original/workspace --list-turns
+
+# Preview a draft. Nothing is written by default.
+npm run eval:from-log -- --log /path/to/session.jsonl \
+  --workspace /path/to/original/workspace \
+  --message-id <user-message-id> --name "expected behavior" \
+  --expect-tool read_many_files --fixture src/example.ts
+```
+
+Pass the workspace in which the session was recorded. It is used to redact
+machine-specific paths, interpret displayed fixture candidates, and verify the
+provenance of any fixture files selected for the draft.
+
+The contributor must choose the expected and/or forbidden tools. Observed tool
+calls are evidence only, and fixture contents are copied only from explicitly
+selected files in the original workspace. The helper never reconstructs files
+from tool results, calls an LLM, runs an eval, or uploads a session log.
+
+The generated draft includes a runtime guard. Review and refine the complete
+output, confirm that the pre-fix behavior fails at the intended assertion rather
+than the guard, then remove the guard and verify the eval before and after the
+fix. See
+[Drafting an Eval from a Session Log](../docs/behavioral-evals.md#drafting-an-eval-from-a-session-log)
+for the complete workflow, safety limits, and command reference.
+
 ## Creating an Evaluation
 
 Evaluations are located in the `evals` directory. Each evaluation is a Vitest
