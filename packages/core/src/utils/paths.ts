@@ -40,33 +40,45 @@ export function tmpdir(): string {
  * @returns The tildeified path.
  */
 export function tildeifyPath(filePath: string): string {
-  const homeDir = homedir();
+  const pathModule = process.platform === 'win32' ? path.win32 : path.posix;
+  if (!pathModule.isAbsolute(filePath)) {
+    return filePath;
+  }
 
-  if (filePath === homeDir) {
+  let homeDir = homedir();
+  const homeRoot = pathModule.parse(homeDir).root;
+  while (
+    homeDir.length > homeRoot.length &&
+    (homeDir.endsWith('/') || homeDir.endsWith('\\'))
+  ) {
+    homeDir = homeDir.slice(0, -1);
+  }
+
+  const relativePath = pathModule.relative(homeDir, filePath);
+  const isWithinHome =
+    relativePath === '' ||
+    (relativePath !== '..' &&
+      !relativePath.startsWith(`..${pathModule.sep}`) &&
+      !pathModule.isAbsolute(relativePath));
+
+  if (!isWithinHome) {
+    return filePath;
+  }
+
+  if (relativePath === '') {
     return '~';
   }
 
-  const homeWithSeparator = homeDir.endsWith(path.sep)
-    ? homeDir
-    : `${homeDir}${path.sep}`;
+  const separator =
+    process.platform === 'win32' && !filePath.includes('/') ? '\\' : '/';
+  const formattedRelativePath =
+    process.platform === 'win32'
+      ? relativePath.replaceAll(pathModule.sep, separator)
+      : relativePath;
+  const trailingSeparator =
+    filePath.endsWith('/') || filePath.endsWith('\\') ? separator : '';
 
-  if (filePath.startsWith(homeWithSeparator)) {
-    return '~' + filePath.slice(homeDir.length);
-  }
-
-  if (process.platform === 'win32') {
-    const forwardSlashHome = homeDir.replaceAll(path.win32.sep, '/');
-    const forwardSlashHomeWithSeparator = forwardSlashHome.endsWith('/')
-      ? forwardSlashHome
-      : `${forwardSlashHome}/`;
-    const normalizedFilePath = filePath.replaceAll(path.win32.sep, '/');
-
-    if (normalizedFilePath.startsWith(forwardSlashHomeWithSeparator)) {
-      return '~' + filePath.slice(homeDir.length);
-    }
-  }
-
-  return filePath;
+  return `~${separator}${formattedRelativePath}${trailingSeparator}`;
 }
 
 /**
