@@ -12,6 +12,7 @@ import {
   createPathSecurityCache,
   SecurityValidator,
   normalizeSecurityPath,
+  getWindowsPowerShellPath,
 } from './security.js';
 import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
@@ -408,7 +409,7 @@ describe('isDirectorySecure', () => {
       delete process.env['systemroot'];
       delete process.env['windir'];
       delete process.env['WINDIR'];
-      process.env['SystemRoot'] = 'D:\\CustomWindows';
+      process.env['SystemRoot'] = 'D:\\Windows';
       vi.mocked(fs.stat).mockResolvedValue({
         isDirectory: () => true,
       } as unknown as Stats);
@@ -419,7 +420,42 @@ describe('isDirectorySecure', () => {
 
       await isDirectorySecure('C:\\Some\\Path');
       expect(vi.mocked(spawnAsync).mock.calls[0]?.[0]).toBe(
-        'D:\\CustomWindows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+        'D:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+      );
+    } finally {
+      for (const [key, val] of Object.entries(envBackup)) {
+        if (val !== undefined) {
+          process.env[key] = val;
+        } else {
+          delete process.env[key];
+        }
+      }
+    }
+  });
+
+  it('falls back to C:\\Windows when SystemRoot is C:\\Temp or path traversal C:\\Windows\\..\\Evil', () => {
+    vi.spyOn(os, 'platform').mockReturnValue('win32');
+    const envBackup = {
+      SystemRoot: process.env['SystemRoot'],
+      systemroot: process.env['systemroot'],
+      windir: process.env['windir'],
+      WINDIR: process.env['WINDIR'],
+    };
+    try {
+      delete process.env['systemroot'];
+      delete process.env['windir'];
+      delete process.env['WINDIR'];
+
+      // C:\Temp should fail regex /^[a-zA-Z]:\\Windows\\?$/i and fall back to C:\Windows
+      process.env['SystemRoot'] = 'C:\\Temp';
+      expect(getWindowsPowerShellPath()).toBe(
+        'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+      );
+
+      // C:\Windows\..\Evil should fail validation and fall back to C:\Windows
+      process.env['SystemRoot'] = 'C:\\Windows\\..\\Evil';
+      expect(getWindowsPowerShellPath()).toBe(
+        'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
       );
     } finally {
       for (const [key, val] of Object.entries(envBackup)) {
