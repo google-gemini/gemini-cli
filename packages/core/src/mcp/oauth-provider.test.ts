@@ -2174,6 +2174,163 @@ describe('MCPOAuthProvider', () => {
         'discovered-scope-1 discovered-scope-2',
       );
     });
+
+    it('should propagate authorizationResponseIssParameterSupported from standard discovery and enforce missing iss', async () => {
+      mockOpenBrowserSecurely.mockResolvedValue(undefined);
+
+      const configWithoutEndpoints: MCPOAuthConfig = {
+        ...mockConfig,
+        clientId: 'test-client-id',
+        clientSecret: 'test-client-secret',
+      };
+      delete configWithoutEndpoints.authorizationUrl;
+      delete configWithoutEndpoints.tokenUrl;
+
+      const mockResourceMetadata = {
+        resource: 'https://api.example.com/',
+        authorization_servers: ['https://discovered.auth.com'],
+      };
+
+      const mockAuthServerMetadata = {
+        issuer: 'https://discovered.auth.com',
+        authorization_endpoint: 'https://discovered.auth.com/authorize',
+        token_endpoint: 'https://discovered.auth.com/token',
+        authorization_response_iss_parameter_supported: true,
+      };
+
+      mockFetch
+        .mockResolvedValueOnce(createMockResponse({ ok: true, status: 200 }))
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            text: JSON.stringify(mockResourceMetadata),
+            json: mockResourceMetadata,
+          }),
+        )
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            text: JSON.stringify(mockAuthServerMetadata),
+            json: mockAuthServerMetadata,
+          }),
+        );
+
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=auth_code&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+          };
+          const mockRes = { writeHead: vi.fn(), end: vi.fn() };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+
+      const authProvider = new MCPOAuthProvider();
+      await expect(
+        authProvider.authenticate(
+          'test-server',
+          configWithoutEndpoints,
+          'https://api.example.com',
+        ),
+      ).rejects.toThrow(
+        'Missing "iss" parameter in authorization response per RFC 9207',
+      );
+    });
+
+    it('should propagate authorizationResponseIssParameterSupported from WWW-Authenticate discovery and enforce missing iss', async () => {
+      mockOpenBrowserSecurely.mockResolvedValue(undefined);
+
+      const configWithoutEndpoints: MCPOAuthConfig = {
+        ...mockConfig,
+        clientId: 'test-client-id',
+        clientSecret: 'test-client-secret',
+      };
+      delete configWithoutEndpoints.authorizationUrl;
+      delete configWithoutEndpoints.tokenUrl;
+
+      const mockResourceMetadata = {
+        resource: 'https://api.example.com/',
+        authorization_servers: ['https://discovered.auth.com'],
+      };
+
+      const mockAuthServerMetadata = {
+        issuer: 'https://discovered.auth.com',
+        authorization_endpoint: 'https://discovered.auth.com/authorize',
+        token_endpoint: 'https://discovered.auth.com/token',
+        authorization_response_iss_parameter_supported: true,
+      };
+
+      mockFetch
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: false,
+            status: 401,
+            headers: new Headers({
+              'www-authenticate':
+                'Bearer realm="https://api.example.com", resource_metadata="https://api.example.com/.well-known/oauth-protected-resource"',
+            }),
+          }),
+        )
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            text: JSON.stringify(mockResourceMetadata),
+            json: mockResourceMetadata,
+          }),
+        )
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            text: JSON.stringify(mockAuthServerMetadata),
+            json: mockAuthServerMetadata,
+          }),
+        );
+
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=auth_code&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+          };
+          const mockRes = { writeHead: vi.fn(), end: vi.fn() };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+
+      const authProvider = new MCPOAuthProvider();
+      await expect(
+        authProvider.authenticate(
+          'test-server',
+          configWithoutEndpoints,
+          'https://api.example.com',
+        ),
+      ).rejects.toThrow(
+        'Missing "iss" parameter in authorization response per RFC 9207',
+      );
+    });
   });
 
   describe('issuer discovery conformance', () => {
