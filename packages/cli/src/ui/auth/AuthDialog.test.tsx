@@ -17,7 +17,7 @@ import {
 } from 'vitest';
 import { AuthDialog } from './AuthDialog.js';
 import { AuthType, type Config, debugLogger } from '@google/gemini-cli-core';
-import type { LoadedSettings } from '../../config/settings.js';
+import { SettingScope, type LoadedSettings } from '../../config/settings.js';
 import { AuthState } from '../types.js';
 import { RadioButtonSelect } from '../components/shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
@@ -395,7 +395,45 @@ describe('AuthDialog', () => {
       expect(props.onAuthError).toHaveBeenCalledWith(
         'Failed to clear cached credentials: Disk I/O failure',
       );
-      expect(props.settings.setValue).toHaveBeenCalled();
+      expect(props.settings.setValue).not.toHaveBeenCalled();
+      errorSpy.mockRestore();
+      unmount();
+    });
+
+    it('allows switching to non-Google auth methods even if clearCachedCredentialFile fails to prevent lockouts', async () => {
+      mockedValidateAuthMethod.mockResolvedValue(null);
+      props.settings.merged.security.auth.selectedType =
+        AuthType.LOGIN_WITH_GOOGLE;
+
+      const { clearCachedCredentialFile } = await import(
+        '@google/gemini-cli-core'
+      );
+      const testError = new Error('Disk I/O failure');
+      vi.mocked(clearCachedCredentialFile).mockRejectedValueOnce(testError);
+      const errorSpy = vi
+        .spyOn(debugLogger, 'error')
+        .mockImplementation(() => {});
+
+      const { unmount } = await renderWithProviders(<AuthDialog {...props} />);
+      const { onSelect: handleAuthSelect } =
+        mockedRadioButtonSelect.mock.calls[0][0];
+
+      await expect(
+        handleAuthSelect(AuthType.USE_GEMINI),
+      ).resolves.not.toThrow();
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Failed to clear cached credentials:',
+        testError,
+      );
+      expect(props.onAuthError).toHaveBeenCalledWith(
+        'Failed to clear cached credentials: Disk I/O failure',
+      );
+      expect(props.settings.setValue).toHaveBeenCalledWith(
+        SettingScope.User,
+        'security.auth.selectedType',
+        AuthType.USE_GEMINI,
+      );
       errorSpy.mockRestore();
       unmount();
     });

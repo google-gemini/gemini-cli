@@ -145,6 +145,9 @@ export function AuthDialog({
               'Failed to clear cached credentials: ' +
                 (error instanceof Error ? error.message : String(error)),
             );
+            if (authType === AuthType.LOGIN_WITH_GOOGLE) {
+              return;
+            }
           }
         }
 
