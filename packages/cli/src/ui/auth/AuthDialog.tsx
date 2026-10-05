@@ -145,7 +145,6 @@ export function AuthDialog({
               'Failed to clear cached credentials: ' +
                 (error instanceof Error ? error.message : String(error)),
             );
-            return;
           }
         }
 

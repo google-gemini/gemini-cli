@@ -395,7 +395,7 @@ describe('AuthDialog', () => {
       expect(props.onAuthError).toHaveBeenCalledWith(
         'Failed to clear cached credentials: Disk I/O failure',
       );
-      expect(props.settings.setValue).not.toHaveBeenCalled();
+      expect(props.settings.setValue).toHaveBeenCalled();
       errorSpy.mockRestore();
       unmount();
     });
