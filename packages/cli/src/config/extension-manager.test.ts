@@ -34,6 +34,19 @@ const mockIntegrityManager = vi.hoisted(() => ({
   store: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    promises: {
+      ...actual.promises,
+      rm: vi.fn((...args: Parameters<typeof actual.promises.rm>) =>
+        actual.promises.rm(...args),
+      ),
+    },
+  };
+});
+
 vi.mock('os', async (importOriginal) => {
   const mockedOs = await importOriginal<typeof os>();
   return {
@@ -1002,6 +1015,48 @@ describe('ExtensionManager', () => {
           expect(result.isValid).toBe(true);
         }
       });
+    });
+  });
+
+  describe('Windows directory removal retry during update and uninstall', () => {
+    it('retries removing old extension directory on transient EBUSY during update', async () => {
+      const extName = 'google-workspace';
+      const extDir = path.join(userExtensionsDir, extName);
+      fs.mkdirSync(extDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(extDir, 'gemini-extension.json'),
+        JSON.stringify({ name: extName, version: '1.0.0' }),
+      );
+      fs.writeFileSync(
+        path.join(extDir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: extDir }),
+      );
+
+      await extensionManager.loadExtensions();
+
+      const newSourceDir = fs.mkdtempSync(
+        path.join(tempHomeDir, 'new-source-'),
+      );
+      fs.writeFileSync(
+        path.join(newSourceDir, 'gemini-extension.json'),
+        JSON.stringify({ name: extName, version: '1.1.0' }),
+      );
+
+      const ebusyError = Object.assign(
+        new Error(`EBUSY: resource busy or locked, rmdir '${extDir}'`),
+        { code: 'EBUSY' },
+      );
+      vi.mocked(fs.promises.rm).mockRejectedValueOnce(ebusyError);
+
+      const updated = await extensionManager.installOrUpdateExtension(
+        { type: 'local', source: newSourceDir },
+        { name: extName, version: '1.0.0' },
+      );
+
+      expect(updated.version).toBe('1.1.0');
+      expect(
+        vi.mocked(fs.promises.rm).mock.calls.length,
+      ).toBeGreaterThanOrEqual(2);
     });
   });
 });
