@@ -333,24 +333,34 @@ describe('telemetry/config helpers', () => {
       });
     });
 
-    it('throws FatalConfigError on invalid otlpHeaders in env or argv', async () => {
+    it('throws FatalConfigError on invalid otlpHeaders without leaking raw secret values', async () => {
       await expect(
         resolveTelemetrySettings({
-          env: { GEMINI_TELEMETRY_OTLP_HEADERS: 'invalid-headers' },
+          env: {
+            GEMINI_TELEMETRY_OTLP_HEADERS: '{"Authorization":"secret-token-1"',
+          },
         }),
-      ).rejects.toThrow(/Invalid telemetry OTLP headers/i);
+      ).rejects.toThrow(
+        'Invalid telemetry OTLP headers in GEMINI_TELEMETRY_OTLP_HEADERS. Expected JSON object or key=value pairs',
+      );
 
       await expect(
         resolveTelemetrySettings({
-          env: { OTEL_EXPORTER_OTLP_HEADERS: '{bad json}' },
+          env: {
+            OTEL_EXPORTER_OTLP_HEADERS: '{"Authorization":"secret-token-2"',
+          },
         }),
-      ).rejects.toThrow(/Invalid telemetry OTLP headers/i);
+      ).rejects.toThrow(
+        'Invalid telemetry OTLP headers in OTEL_EXPORTER_OTLP_HEADERS. Expected JSON object or key=value pairs',
+      );
 
       await expect(
         resolveTelemetrySettings({
-          argv: { telemetryOtlpHeaders: 'invalid-headers' },
+          argv: { telemetryOtlpHeaders: '{"Authorization":"secret-token-3"' },
         }),
-      ).rejects.toThrow(/Invalid telemetry OTLP headers/i);
+      ).rejects.toThrow(
+        'Invalid telemetry OTLP headers in argv. Expected JSON object or key=value pairs',
+      );
 
       await expect(
         resolveTelemetrySettings({
@@ -360,7 +370,23 @@ describe('telemetry/config helpers', () => {
 
       await expect(
         resolveTelemetrySettings({
+          settings: {
+            otlpHeaders: null as unknown as Record<string, string>,
+          },
+        }),
+      ).rejects.toThrow(/Invalid telemetry OTLP headers in settings/i);
+
+      await expect(
+        resolveTelemetrySettings({
           argv: { telemetryOtlpHeaders: { 'x-key': 'bad\r\nvalue' } },
+        }),
+      ).rejects.toThrow(/Invalid telemetry OTLP headers in argv/i);
+
+      await expect(
+        resolveTelemetrySettings({
+          argv: {
+            telemetryOtlpHeaders: ['a=b'] as unknown as Record<string, string>,
+          },
         }),
       ).rejects.toThrow(/Invalid telemetry OTLP headers in argv/i);
     });
