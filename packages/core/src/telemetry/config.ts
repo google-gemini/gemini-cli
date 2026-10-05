@@ -39,8 +39,128 @@ export interface TelemetryArgOverrides {
   telemetryTarget?: string | TelemetryTarget;
   telemetryOtlpEndpoint?: string;
   telemetryOtlpProtocol?: string;
+  telemetryOtlpHeaders?: string | Record<string, string>;
   telemetryLogPrompts?: boolean;
   telemetryOutfile?: string;
+}
+
+const HEADER_NAME_REGEX = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+
+function isValidHeaderName(name: string): boolean {
+  return HEADER_NAME_REGEX.test(name);
+}
+
+function isValidHeaderValue(value: string): boolean {
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    if ((code < 0x20 && code !== 0x09) || code === 0x7f) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function stripQuotes(value: string): string {
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    return value.slice(1, -1);
+  }
+  return value;
+}
+
+/**
+ * Parse OTLP headers from a string.
+ * Supports JSON object format (e.g., '{"Authorization":"Bearer token"}') or
+ * key=value pairs separated by commas or semicolons (e.g., 'Authorization=Bearer token,x-api-key=abc123').
+ */
+export function parseOtlpHeaders(
+  value: string | undefined,
+): Record<string, string> | undefined {
+  if (!value || value.trim() === '') return undefined;
+
+  const trimmed = value.trim();
+
+  // If the string starts with '{', treat it strictly as JSON and do not fall through to key=value parsing.
+  if (trimmed.startsWith('{')) {
+    try {
+      const parsed: unknown = JSON.parse(trimmed);
+      if (
+        typeof parsed === 'object' &&
+        parsed !== null &&
+        !Array.isArray(parsed)
+      ) {
+        const headers: Record<string, string> = {};
+        for (const [k, v] of Object.entries(parsed)) {
+          const trimmedKey = k.trim();
+          if (
+            typeof v !== 'string' ||
+            !isValidHeaderName(trimmedKey) ||
+            !isValidHeaderValue(v)
+          ) {
+            return undefined;
+          }
+          headers[trimmedKey] = v;
+        }
+        return Object.keys(headers).length > 0 ? headers : undefined;
+      }
+      return undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  // Reject other JSON literals like arrays
+  if (trimmed.startsWith('[')) {
+    return undefined;
+  }
+
+  // Parse as key=value pairs separated by commas or semicolons
+  const headers: Record<string, string> = {};
+  const pairs = trimmed.split(/[,;]/);
+  for (const pair of pairs) {
+    const trimmedPair = pair.trim();
+    if (!trimmedPair) continue;
+    const eqIndex = trimmedPair.indexOf('=');
+    if (eqIndex === -1) continue;
+    const key = trimmedPair.slice(0, eqIndex).trim();
+    const val = stripQuotes(trimmedPair.slice(eqIndex + 1).trim());
+    if (key && isValidHeaderName(key) && isValidHeaderValue(val)) {
+      headers[key] = val;
+    }
+  }
+
+  return Object.keys(headers).length > 0 ? headers : undefined;
+}
+
+/**
+ * Merge header objects from lowest to highest precedence, deduplicating keys case-insensitively.
+ */
+function mergeHeaders(
+  ...sources: Array<Record<string, string> | undefined>
+): Record<string, string> | undefined {
+  const definedSources = sources.filter(
+    (s): s is Record<string, string> => s !== undefined,
+  );
+  if (definedSources.length === 0) {
+    return undefined;
+  }
+
+  const merged: Record<string, string> = {};
+  const lowerKeyMap = new Map<string, string>();
+  for (const source of definedSources) {
+    for (const [key, value] of Object.entries(source)) {
+      const lowerKey = key.toLowerCase();
+      const existingKey = lowerKeyMap.get(lowerKey);
+      if (existingKey !== undefined && existingKey !== key) {
+        delete merged[existingKey];
+      }
+      merged[key] = value;
+      lowerKeyMap.set(lowerKey, key);
+    }
+  }
+  return merged;
 }
 
 /**
@@ -112,12 +232,60 @@ export async function resolveTelemetrySettings(options: {
     parseBooleanEnvFlag(env['GEMINI_TELEMETRY_USE_COLLECTOR']) ??
     settings.useCollector;
 
+  // Resolve OTLP headers: merge settings (lowest), OTEL_EXPORTER_OTLP_HEADERS,
+  // GEMINI_TELEMETRY_OTLP_HEADERS, and argv (highest).
+  const rawOtelEnvHeaders = env['OTEL_EXPORTER_OTLP_HEADERS'];
+  let otelEnvHeaders: Record<string, string> | undefined;
+  if (rawOtelEnvHeaders !== undefined && rawOtelEnvHeaders.trim() !== '') {
+    otelEnvHeaders = parseOtlpHeaders(rawOtelEnvHeaders);
+    if (otelEnvHeaders === undefined) {
+      throw new FatalConfigError(
+        `Invalid telemetry OTLP headers: ${rawOtelEnvHeaders}. Expected JSON object or key=value pairs`,
+      );
+    }
+  }
+
+  const rawGeminiEnvHeaders = env['GEMINI_TELEMETRY_OTLP_HEADERS'];
+  let geminiEnvHeaders: Record<string, string> | undefined;
+  if (rawGeminiEnvHeaders !== undefined && rawGeminiEnvHeaders.trim() !== '') {
+    geminiEnvHeaders = parseOtlpHeaders(rawGeminiEnvHeaders);
+    if (geminiEnvHeaders === undefined) {
+      throw new FatalConfigError(
+        `Invalid telemetry OTLP headers: ${rawGeminiEnvHeaders}. Expected JSON object or key=value pairs`,
+      );
+    }
+  }
+
+  let argvHeaders: Record<string, string> | undefined;
+  if (argv.telemetryOtlpHeaders !== undefined) {
+    if (typeof argv.telemetryOtlpHeaders === 'string') {
+      if (argv.telemetryOtlpHeaders.trim() !== '') {
+        argvHeaders = parseOtlpHeaders(argv.telemetryOtlpHeaders);
+        if (argvHeaders === undefined) {
+          throw new FatalConfigError(
+            `Invalid telemetry OTLP headers: ${argv.telemetryOtlpHeaders}. Expected JSON object or key=value pairs`,
+          );
+        }
+      }
+    } else {
+      argvHeaders = argv.telemetryOtlpHeaders;
+    }
+  }
+
+  const otlpHeaders = mergeHeaders(
+    settings.otlpHeaders,
+    otelEnvHeaders,
+    geminiEnvHeaders,
+    argvHeaders,
+  );
+
   return {
     enabled,
     traces,
     target,
     otlpEndpoint,
     otlpProtocol,
+    otlpHeaders,
     logPrompts,
     outfile,
     useCollector,
