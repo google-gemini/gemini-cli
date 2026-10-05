@@ -903,37 +903,32 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged.telemetry?.enabled).toBe(false);
     });
 
-    it('should load telemetry.otlpHeaders and resolve environment variables', () => {
-      vi.stubEnv('TEST_OTLP_TOKEN', 'secret-token-value');
-      try {
-        (mockFsExistsSync as Mock).mockImplementation(
-          (p: fs.PathLike) =>
-            normalizePath(p) === normalizePath(USER_SETTINGS_PATH),
-        );
-        const userSettingsContent = {
-          telemetry: {
-            enabled: true,
-            otlpHeaders: {
-              Authorization: 'Bearer ${TEST_OTLP_TOKEN}',
-              'x-custom': 'static-val',
-            },
+    it('should load telemetry.otlpHeaders from settings', () => {
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) =>
+          normalizePath(p) === normalizePath(USER_SETTINGS_PATH),
+      );
+      const userSettingsContent = {
+        telemetry: {
+          enabled: true,
+          otlpHeaders: {
+            Authorization: 'Bearer test-token-value',
+            'x-custom': 'static-val',
           },
-        };
-        (fs.readFileSync as Mock).mockImplementation(
-          (p: fs.PathOrFileDescriptor) => {
-            if (normalizePath(p) === normalizePath(USER_SETTINGS_PATH))
-              return JSON.stringify(userSettingsContent);
-            return '{}';
-          },
-        );
-        const settings = loadSettings(MOCK_WORKSPACE_DIR);
-        expect(settings.merged.telemetry?.otlpHeaders).toEqual({
-          Authorization: 'Bearer secret-token-value',
-          'x-custom': 'static-val',
-        });
-      } finally {
-        vi.unstubAllEnvs();
-      }
+        },
+      };
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (normalizePath(p) === normalizePath(USER_SETTINGS_PATH))
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.telemetry?.otlpHeaders).toEqual({
+        Authorization: 'Bearer test-token-value',
+        'x-custom': 'static-val',
+      });
     });
 
     it('should have telemetry as undefined if not in any settings file', () => {

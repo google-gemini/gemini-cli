@@ -351,6 +351,18 @@ describe('telemetry/config helpers', () => {
           argv: { telemetryOtlpHeaders: 'invalid-headers' },
         }),
       ).rejects.toThrow(/Invalid telemetry OTLP headers/i);
+
+      await expect(
+        resolveTelemetrySettings({
+          settings: { otlpHeaders: { 'bad name': 'value' } },
+        }),
+      ).rejects.toThrow(/Invalid telemetry OTLP headers in settings/i);
+
+      await expect(
+        resolveTelemetrySettings({
+          argv: { telemetryOtlpHeaders: { 'x-key': 'bad\r\nvalue' } },
+        }),
+      ).rejects.toThrow(/Invalid telemetry OTLP headers in argv/i);
     });
   });
 });

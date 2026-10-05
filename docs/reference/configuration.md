@@ -2551,8 +2551,7 @@ see [Telemetry](../cli/telemetry.md).
   - **`otlpProtocol`** (string): The protocol for the OTLP Exporter (`grpc` or
     `http`).
   - **`otlpHeaders`** (object): Custom headers to send with OTLP Exporter
-    requests (supports environment variable references like `$VAR_NAME` or
-    `${VAR_NAME}`).
+    requests.
   - **`logPrompts`** (boolean): Whether or not to include the content of user
     prompts in the logs.
   - **`outfile`** (string): The file to write telemetry to when `target` is

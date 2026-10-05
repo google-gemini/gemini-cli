@@ -70,6 +70,56 @@ function stripQuotes(value: string): string {
   return value;
 }
 
+const ALLOWED_TELEMETRY_ENV_KEYS = new Set([
+  'GEMINI_TELEMETRY_ENABLED',
+  'GEMINI_TELEMETRY_TRACES_ENABLED',
+  'GEMINI_TELEMETRY_TARGET',
+  'GEMINI_TELEMETRY_OTLP_ENDPOINT',
+  'OTEL_EXPORTER_OTLP_ENDPOINT',
+  'GEMINI_TELEMETRY_OTLP_PROTOCOL',
+  'GEMINI_TELEMETRY_OTLP_HEADERS',
+  'OTEL_EXPORTER_OTLP_HEADERS',
+  'GEMINI_TELEMETRY_LOG_PROMPTS',
+  'GEMINI_TELEMETRY_OUTFILE',
+  'GEMINI_TELEMETRY_USE_COLLECTOR',
+  'GEMINI_TELEMETRY_USE_CLI_AUTH',
+]);
+
+function setHeaderCaseInsensitive(
+  headers: Record<string, string>,
+  lowerKeyMap: Map<string, string>,
+  key: string,
+  value: string,
+): void {
+  const lowerKey = key.toLowerCase();
+  const existingKey = lowerKeyMap.get(lowerKey);
+  if (existingKey !== undefined && existingKey !== key) {
+    delete headers[existingKey];
+  }
+  headers[key] = value;
+  lowerKeyMap.set(lowerKey, key);
+}
+
+function validateHeadersObject(
+  headers: object,
+): Record<string, string> | undefined {
+  const validated: Record<string, string> = {};
+  const lowerKeyMap = new Map<string, string>();
+  for (const [k, v] of Object.entries(headers)) {
+    const trimmedKey = k.trim();
+    if (
+      typeof v !== 'string' ||
+      !trimmedKey ||
+      !isValidHeaderName(trimmedKey) ||
+      !isValidHeaderValue(v)
+    ) {
+      return undefined;
+    }
+    setHeaderCaseInsensitive(validated, lowerKeyMap, trimmedKey, v);
+  }
+  return validated;
+}
+
 /**
  * Parse OTLP headers from a string.
  * Supports JSON object format (e.g., '{"Authorization":"Bearer token"}') or
@@ -91,19 +141,11 @@ export function parseOtlpHeaders(
         parsed !== null &&
         !Array.isArray(parsed)
       ) {
-        const headers: Record<string, string> = {};
-        for (const [k, v] of Object.entries(parsed)) {
-          const trimmedKey = k.trim();
-          if (
-            typeof v !== 'string' ||
-            !isValidHeaderName(trimmedKey) ||
-            !isValidHeaderValue(v)
-          ) {
-            return undefined;
-          }
-          headers[trimmedKey] = v;
+        const validated = validateHeadersObject(parsed);
+        if (!validated || Object.keys(validated).length === 0) {
+          return undefined;
         }
-        return Object.keys(headers).length > 0 ? headers : undefined;
+        return validated;
       }
       return undefined;
     } catch {
@@ -118,6 +160,7 @@ export function parseOtlpHeaders(
 
   // Parse as key=value pairs separated by commas
   const headers: Record<string, string> = {};
+  const lowerKeyMap = new Map<string, string>();
   const pairs = trimmed.split(',');
   for (const pair of pairs) {
     const trimmedPair = pair.trim();
@@ -127,7 +170,7 @@ export function parseOtlpHeaders(
     const key = trimmedPair.slice(0, eqIndex).trim();
     const val = stripQuotes(trimmedPair.slice(eqIndex + 1).trim());
     if (key && isValidHeaderName(key) && isValidHeaderValue(val)) {
-      headers[key] = val;
+      setHeaderCaseInsensitive(headers, lowerKeyMap, key, val);
     }
   }
 
@@ -151,13 +194,7 @@ function mergeHeaders(
   const lowerKeyMap = new Map<string, string>();
   for (const source of definedSources) {
     for (const [key, value] of Object.entries(source)) {
-      const lowerKey = key.toLowerCase();
-      const existingKey = lowerKeyMap.get(lowerKey);
-      if (existingKey !== undefined && existingKey !== key) {
-        delete merged[existingKey];
-      }
-      merged[key] = value;
-      lowerKeyMap.set(lowerKey, key);
+      setHeaderCaseInsensitive(merged, lowerKeyMap, key, value);
     }
   }
   return merged;
@@ -172,21 +209,25 @@ export async function resolveTelemetrySettings(options: {
   settings?: TelemetrySettings;
 }): Promise<TelemetrySettings> {
   const argv = options.argv ?? {};
-  const env = options.env ?? {};
+  const sanitizedEnv = Object.fromEntries(
+    Object.entries(options.env ?? {}).filter(([key]) =>
+      ALLOWED_TELEMETRY_ENV_KEYS.has(key),
+    ),
+  );
   const settings = options.settings ?? {};
 
   const enabled =
     argv.telemetry ??
-    parseBooleanEnvFlag(env['GEMINI_TELEMETRY_ENABLED']) ??
+    parseBooleanEnvFlag(sanitizedEnv['GEMINI_TELEMETRY_ENABLED']) ??
     settings.enabled;
 
   const traces =
-    parseBooleanEnvFlag(env['GEMINI_TELEMETRY_TRACES_ENABLED']) ??
+    parseBooleanEnvFlag(sanitizedEnv['GEMINI_TELEMETRY_TRACES_ENABLED']) ??
     settings.traces;
 
   const rawTarget =
     argv.telemetryTarget ??
-    env['GEMINI_TELEMETRY_TARGET'] ??
+    sanitizedEnv['GEMINI_TELEMETRY_TARGET'] ??
     (settings.target as string | TelemetryTarget | undefined);
   const target = parseTelemetryTargetValue(rawTarget);
   if (rawTarget !== undefined && target === undefined) {
@@ -199,13 +240,13 @@ export async function resolveTelemetrySettings(options: {
 
   const otlpEndpoint =
     argv.telemetryOtlpEndpoint ??
-    env['GEMINI_TELEMETRY_OTLP_ENDPOINT'] ??
-    env['OTEL_EXPORTER_OTLP_ENDPOINT'] ??
+    sanitizedEnv['GEMINI_TELEMETRY_OTLP_ENDPOINT'] ??
+    sanitizedEnv['OTEL_EXPORTER_OTLP_ENDPOINT'] ??
     settings.otlpEndpoint;
 
   const rawProtocol =
     argv.telemetryOtlpProtocol ??
-    env['GEMINI_TELEMETRY_OTLP_PROTOCOL'] ??
+    sanitizedEnv['GEMINI_TELEMETRY_OTLP_PROTOCOL'] ??
     settings.otlpProtocol;
   const otlpProtocol = (['grpc', 'http'] as const).find(
     (p) => p === rawProtocol,
@@ -220,21 +261,31 @@ export async function resolveTelemetrySettings(options: {
 
   const logPrompts =
     argv.telemetryLogPrompts ??
-    parseBooleanEnvFlag(env['GEMINI_TELEMETRY_LOG_PROMPTS']) ??
+    parseBooleanEnvFlag(sanitizedEnv['GEMINI_TELEMETRY_LOG_PROMPTS']) ??
     settings.logPrompts;
 
   const outfile =
     argv.telemetryOutfile ??
-    env['GEMINI_TELEMETRY_OUTFILE'] ??
+    sanitizedEnv['GEMINI_TELEMETRY_OUTFILE'] ??
     settings.outfile;
 
   const useCollector =
-    parseBooleanEnvFlag(env['GEMINI_TELEMETRY_USE_COLLECTOR']) ??
+    parseBooleanEnvFlag(sanitizedEnv['GEMINI_TELEMETRY_USE_COLLECTOR']) ??
     settings.useCollector;
 
   // Resolve OTLP headers: merge settings (lowest), OTEL_EXPORTER_OTLP_HEADERS,
   // GEMINI_TELEMETRY_OTLP_HEADERS, and argv (highest).
-  const rawOtelEnvHeaders = env['OTEL_EXPORTER_OTLP_HEADERS'];
+  let settingsHeaders: Record<string, string> | undefined;
+  if (settings.otlpHeaders !== undefined) {
+    settingsHeaders = validateHeadersObject(settings.otlpHeaders);
+    if (settingsHeaders === undefined) {
+      throw new FatalConfigError(
+        'Invalid telemetry OTLP headers in settings: header names and values must be valid HTTP header tokens.',
+      );
+    }
+  }
+
+  const rawOtelEnvHeaders = sanitizedEnv['OTEL_EXPORTER_OTLP_HEADERS'];
   let otelEnvHeaders: Record<string, string> | undefined;
   if (rawOtelEnvHeaders !== undefined && rawOtelEnvHeaders.trim() !== '') {
     otelEnvHeaders = parseOtlpHeaders(rawOtelEnvHeaders);
@@ -245,7 +296,7 @@ export async function resolveTelemetrySettings(options: {
     }
   }
 
-  const rawGeminiEnvHeaders = env['GEMINI_TELEMETRY_OTLP_HEADERS'];
+  const rawGeminiEnvHeaders = sanitizedEnv['GEMINI_TELEMETRY_OTLP_HEADERS'];
   let geminiEnvHeaders: Record<string, string> | undefined;
   if (rawGeminiEnvHeaders !== undefined && rawGeminiEnvHeaders.trim() !== '') {
     geminiEnvHeaders = parseOtlpHeaders(rawGeminiEnvHeaders);
@@ -268,12 +319,17 @@ export async function resolveTelemetrySettings(options: {
         }
       }
     } else {
-      argvHeaders = argv.telemetryOtlpHeaders;
+      argvHeaders = validateHeadersObject(argv.telemetryOtlpHeaders);
+      if (argvHeaders === undefined) {
+        throw new FatalConfigError(
+          'Invalid telemetry OTLP headers in argv: header names and values must be valid HTTP header tokens.',
+        );
+      }
     }
   }
 
   const otlpHeaders = mergeHeaders(
-    settings.otlpHeaders,
+    settingsHeaders,
     otelEnvHeaders,
     geminiEnvHeaders,
     argvHeaders,
@@ -290,7 +346,7 @@ export async function resolveTelemetrySettings(options: {
     outfile,
     useCollector,
     useCliAuth:
-      parseBooleanEnvFlag(env['GEMINI_TELEMETRY_USE_CLI_AUTH']) ??
+      parseBooleanEnvFlag(sanitizedEnv['GEMINI_TELEMETRY_USE_CLI_AUTH']) ??
       settings.useCliAuth,
   };
 }
