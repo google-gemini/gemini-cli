@@ -131,10 +131,15 @@ describe('telemetry/config helpers', () => {
       expect(parseOtlpHeaders('=value_without_key')).toBeUndefined();
     });
 
-    it('rejects header names with invalid RFC 7230 characters', () => {
+    it('rejects header names with invalid RFC 7230 characters or prototype-polluting keys', () => {
       expect(parseOtlpHeaders('bad name=value')).toBeUndefined();
       expect(parseOtlpHeaders('{"bad name": "value"}')).toBeUndefined();
       expect(parseOtlpHeaders('bad:name=value')).toBeUndefined();
+      expect(parseOtlpHeaders('__proto__=polluted')).toBeUndefined();
+      expect(parseOtlpHeaders('constructor=polluted')).toBeUndefined();
+      expect(parseOtlpHeaders('prototype=polluted')).toBeUndefined();
+      expect(parseOtlpHeaders('{"__proto__": "polluted"}')).toBeUndefined();
+      expect(parseOtlpHeaders('{"constructor": "polluted"}')).toBeUndefined();
     });
 
     it('rejects header values with control characters (CRLF injection)', () => {

@@ -47,7 +47,13 @@ export interface TelemetryArgOverrides {
 const HEADER_NAME_REGEX = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
 
 function isValidHeaderName(name: string): boolean {
-  return HEADER_NAME_REGEX.test(name);
+  const lower = name.toLowerCase();
+  return (
+    HEADER_NAME_REGEX.test(name) &&
+    lower !== '__proto__' &&
+    lower !== 'constructor' &&
+    lower !== 'prototype'
+  );
 }
 
 function isValidHeaderValue(value: string): boolean {
