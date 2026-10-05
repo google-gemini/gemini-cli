@@ -73,7 +73,7 @@ function stripQuotes(value: string): string {
 /**
  * Parse OTLP headers from a string.
  * Supports JSON object format (e.g., '{"Authorization":"Bearer token"}') or
- * key=value pairs separated by commas or semicolons (e.g., 'Authorization=Bearer token,x-api-key=abc123').
+ * key=value pairs separated by commas (e.g., 'Authorization=Bearer token,x-api-key=abc123').
  */
 export function parseOtlpHeaders(
   value: string | undefined,
@@ -116,9 +116,9 @@ export function parseOtlpHeaders(
     return undefined;
   }
 
-  // Parse as key=value pairs separated by commas or semicolons
+  // Parse as key=value pairs separated by commas
   const headers: Record<string, string> = {};
-  const pairs = trimmed.split(/[,;]/);
+  const pairs = trimmed.split(',');
   for (const pair of pairs) {
     const trimmedPair = pair.trim();
     if (!trimmedPair) continue;

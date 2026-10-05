@@ -904,7 +904,7 @@ describe('Settings Loading and Merging', () => {
     });
 
     it('should load telemetry.otlpHeaders and resolve environment variables', () => {
-      process.env['TEST_OTLP_TOKEN'] = 'secret-token-value';
+      vi.stubEnv('TEST_OTLP_TOKEN', 'secret-token-value');
       try {
         (mockFsExistsSync as Mock).mockImplementation(
           (p: fs.PathLike) =>
@@ -932,7 +932,7 @@ describe('Settings Loading and Merging', () => {
           'x-custom': 'static-val',
         });
       } finally {
-        delete process.env['TEST_OTLP_TOKEN'];
+        vi.unstubAllEnvs();
       }
     });
 

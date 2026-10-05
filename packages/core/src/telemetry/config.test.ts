@@ -91,12 +91,14 @@ describe('telemetry/config helpers', () => {
       });
     });
 
-    it('parses semicolon-separated key=value pairs', () => {
+    it('preserves semicolons inside header values in key=value format', () => {
       expect(
-        parseOtlpHeaders('Authorization=Bearer token123;x-api-key=abc'),
+        parseOtlpHeaders(
+          'Authorization=Bearer token123;tenant=abc,x-api-key=xyz',
+        ),
       ).toEqual({
-        Authorization: 'Bearer token123',
-        'x-api-key': 'abc',
+        Authorization: 'Bearer token123;tenant=abc',
+        'x-api-key': 'xyz',
       });
     });
 

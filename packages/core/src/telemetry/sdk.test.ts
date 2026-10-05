@@ -191,6 +191,34 @@ describe('Telemetry SDK', () => {
     }
   });
 
+  it('should skip invalid gRPC metadata keys and log a warning without crashing', async () => {
+    const customHeaders = {
+      bad$key: 'invalid-for-grpc',
+      'x-valid-key': 'valid-value',
+    };
+    vi.spyOn(mockConfig, 'getTelemetryOtlpProtocol').mockReturnValue('grpc');
+    vi.spyOn(mockConfig, 'getTelemetryOtlpEndpoint').mockReturnValue(
+      'http://localhost:4317',
+    );
+    vi.spyOn(mockConfig, 'getTelemetryOtlpHeaders').mockReturnValue(
+      customHeaders,
+    );
+
+    await initializeTelemetry(mockConfig);
+
+    expect(debugLogger.warn).toHaveBeenCalledWith(
+      expect.stringContaining(
+        '[Telemetry] Skipping invalid gRPC metadata key "bad$key":',
+      ),
+      expect.any(Error),
+    );
+    const callArg = vi.mocked(OTLPTraceExporter).mock.calls[0]?.[0] as {
+      metadata?: Metadata;
+    };
+    expect(callArg?.metadata).toBeInstanceOf(Metadata);
+    expect(callArg?.metadata?.get('x-valid-key')).toEqual(['valid-value']);
+  });
+
   it('should parse gRPC endpoint correctly', async () => {
     vi.spyOn(mockConfig, 'getTelemetryOtlpEndpoint').mockReturnValue(
       'https://my-collector.com',

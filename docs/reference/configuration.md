@@ -2771,7 +2771,7 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - Overrides the `telemetry.otlpProtocol` setting.
 - **`GEMINI_TELEMETRY_OTLP_HEADERS`**:
   - Sets custom headers for OTLP exporter requests (as a JSON object string or
-    comma/semicolon-separated `key=value` pairs; also falls back to
+    comma-separated `key=value` pairs; also falls back to
     `OTEL_EXPORTER_OTLP_HEADERS`).
   - Merges with and overrides headers in the `telemetry.otlpHeaders` setting.
 - **`GEMINI_TELEMETRY_LOG_PROMPTS`**:

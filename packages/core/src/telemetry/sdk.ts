@@ -309,9 +309,21 @@ export async function initializeTelemetry(
       // grpc
       let metadata: Metadata | undefined;
       if (hasHeaders) {
-        metadata = new Metadata();
+        const candidateMetadata = new Metadata();
+        let validCount = 0;
         for (const [key, value] of Object.entries(otlpHeaders)) {
-          metadata.set(key, value);
+          try {
+            candidateMetadata.set(key, value);
+            validCount++;
+          } catch (error) {
+            debugLogger.warn(
+              `[Telemetry] Skipping invalid gRPC metadata key "${key}":`,
+              error,
+            );
+          }
+        }
+        if (validCount > 0) {
+          metadata = candidateMetadata;
         }
       }
       spanExporter = new OTLPTraceExporter({
