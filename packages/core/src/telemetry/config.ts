@@ -167,8 +167,14 @@ export function parseOtlpHeaders(
     if (!trimmedPair) continue;
     const eqIndex = trimmedPair.indexOf('=');
     if (eqIndex === -1) continue;
-    const key = trimmedPair.slice(0, eqIndex).trim();
-    const val = stripQuotes(trimmedPair.slice(eqIndex + 1).trim());
+    let key = trimmedPair.slice(0, eqIndex).trim();
+    let val = stripQuotes(trimmedPair.slice(eqIndex + 1).trim());
+    try {
+      key = decodeURIComponent(key);
+      val = decodeURIComponent(val);
+    } catch {
+      // Fallback to undecoded values if decoding fails
+    }
     if (key && isValidHeaderName(key) && isValidHeaderValue(val)) {
       setHeaderCaseInsensitive(headers, lowerKeyMap, key, val);
     }
@@ -215,6 +221,16 @@ export async function resolveTelemetrySettings(options: {
     ),
   );
   const settings = options.settings ?? {};
+
+  const createInvalidHeadersError = (source: string) =>
+    new FatalConfigError(
+      `Invalid telemetry OTLP headers in ${source}. Expected JSON object or key=value pairs`,
+    );
+
+  const createInvalidHeaderTokensError = (source: string) =>
+    new FatalConfigError(
+      `Invalid telemetry OTLP headers in ${source}: header names and values must be valid HTTP header tokens.`,
+    );
 
   const enabled =
     argv.telemetry ??
@@ -279,9 +295,7 @@ export async function resolveTelemetrySettings(options: {
   if (settings.otlpHeaders !== undefined) {
     settingsHeaders = validateHeadersObject(settings.otlpHeaders);
     if (settingsHeaders === undefined) {
-      throw new FatalConfigError(
-        'Invalid telemetry OTLP headers in settings: header names and values must be valid HTTP header tokens.',
-      );
+      throw createInvalidHeaderTokensError('settings');
     }
   }
 
@@ -290,9 +304,7 @@ export async function resolveTelemetrySettings(options: {
   if (rawOtelEnvHeaders !== undefined && rawOtelEnvHeaders.trim() !== '') {
     otelEnvHeaders = parseOtlpHeaders(rawOtelEnvHeaders);
     if (otelEnvHeaders === undefined) {
-      throw new FatalConfigError(
-        'Invalid telemetry OTLP headers in OTEL_EXPORTER_OTLP_HEADERS. Expected JSON object or key=value pairs',
-      );
+      throw createInvalidHeadersError('OTEL_EXPORTER_OTLP_HEADERS');
     }
   }
 
@@ -301,9 +313,7 @@ export async function resolveTelemetrySettings(options: {
   if (rawGeminiEnvHeaders !== undefined && rawGeminiEnvHeaders.trim() !== '') {
     geminiEnvHeaders = parseOtlpHeaders(rawGeminiEnvHeaders);
     if (geminiEnvHeaders === undefined) {
-      throw new FatalConfigError(
-        'Invalid telemetry OTLP headers in GEMINI_TELEMETRY_OTLP_HEADERS. Expected JSON object or key=value pairs',
-      );
+      throw createInvalidHeadersError('GEMINI_TELEMETRY_OTLP_HEADERS');
     }
   }
 
@@ -313,17 +323,13 @@ export async function resolveTelemetrySettings(options: {
       if (argv.telemetryOtlpHeaders.trim() !== '') {
         argvHeaders = parseOtlpHeaders(argv.telemetryOtlpHeaders);
         if (argvHeaders === undefined) {
-          throw new FatalConfigError(
-            'Invalid telemetry OTLP headers in argv. Expected JSON object or key=value pairs',
-          );
+          throw createInvalidHeadersError('argv');
         }
       }
     } else {
       argvHeaders = validateHeadersObject(argv.telemetryOtlpHeaders);
       if (argvHeaders === undefined) {
-        throw new FatalConfigError(
-          'Invalid telemetry OTLP headers in argv: header names and values must be valid HTTP header tokens.',
-        );
+        throw createInvalidHeaderTokensError('argv');
       }
     }
   }

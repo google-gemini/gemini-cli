@@ -139,7 +139,20 @@ describe('telemetry/config helpers', () => {
 
     it('rejects header values with control characters (CRLF injection)', () => {
       expect(parseOtlpHeaders('x-key=val\r\nInjected: true')).toBeUndefined();
+      expect(parseOtlpHeaders('x-key=val%0D%0AInjected: true')).toBeUndefined();
       expect(parseOtlpHeaders('{"x-key": "val\\u0000bad"}')).toBeUndefined();
+    });
+
+    it('percent-decodes keys and values in key=value format and falls back on malformed encoding', () => {
+      expect(
+        parseOtlpHeaders(
+          'Authorization=Bearer%20token%2C123,x-custom%2Dkey=a%3Db,x-raw=100%unencoded',
+        ),
+      ).toEqual({
+        Authorization: 'Bearer token,123',
+        'x-custom-key': 'a=b',
+        'x-raw': '100%unencoded',
+      });
     });
 
     it('skips invalid pairs in key=value format and keeps valid ones', () => {
