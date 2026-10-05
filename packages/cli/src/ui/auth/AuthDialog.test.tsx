@@ -346,6 +346,26 @@ describe('AuthDialog', () => {
       unmount();
     });
 
+    it('clears cached credentials when re-selecting LOGIN_WITH_GOOGLE to prevent staying stuck in cached account', async () => {
+      mockedValidateAuthMethod.mockResolvedValue(null);
+      // Simulate that user is currently signed in with Google (e.g. cached free-tier account from previous test run)
+      props.settings.merged.security.auth.selectedType =
+        AuthType.LOGIN_WITH_GOOGLE;
+
+      const { unmount } = await renderWithProviders(<AuthDialog {...props} />);
+      const { onSelect: handleAuthSelect } =
+        mockedRadioButtonSelect.mock.calls[0][0];
+
+      // User selects "Sign in with Google" again expecting to authenticate/switch accounts
+      await handleAuthSelect(AuthType.LOGIN_WITH_GOOGLE);
+
+      const { clearCachedCredentialFile } = await import(
+        '@google/gemini-cli-core'
+      );
+      expect(clearCachedCredentialFile).toHaveBeenCalled();
+      unmount();
+    });
+
     it('exits process for Sign in with Google when browser is suppressed', async () => {
       vi.useFakeTimers();
       const exitSpy = vi

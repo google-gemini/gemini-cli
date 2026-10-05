@@ -132,7 +132,11 @@ export function AuthDialog({
         }
 
         const currentAuthType = settings.merged.security?.auth?.selectedType;
-        if (currentAuthType && currentAuthType !== authType) {
+        if (
+          currentAuthType &&
+          (currentAuthType !== authType ||
+            authType === AuthType.LOGIN_WITH_GOOGLE)
+        ) {
           await clearCachedCredentialFile();
         }
 
