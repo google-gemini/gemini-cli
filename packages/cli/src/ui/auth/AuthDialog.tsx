@@ -137,7 +137,11 @@ export function AuthDialog({
           (currentAuthType !== authType ||
             authType === AuthType.LOGIN_WITH_GOOGLE)
         ) {
-          await clearCachedCredentialFile();
+          try {
+            await clearCachedCredentialFile();
+          } catch (error) {
+            debugLogger.error('Failed to clear cached credentials:', error);
+          }
         }
 
         settings.setValue(scope, 'security.auth.selectedType', authType);

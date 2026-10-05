@@ -366,6 +366,36 @@ describe('AuthDialog', () => {
       unmount();
     });
 
+    it('handles errors when clearCachedCredentialFile fails gracefully and logs via debugLogger', async () => {
+      mockedValidateAuthMethod.mockResolvedValue(null);
+      props.settings.merged.security.auth.selectedType =
+        AuthType.LOGIN_WITH_GOOGLE;
+
+      const { clearCachedCredentialFile } = await import(
+        '@google/gemini-cli-core'
+      );
+      const testError = new Error('Disk I/O failure');
+      vi.mocked(clearCachedCredentialFile).mockRejectedValueOnce(testError);
+      const errorSpy = vi
+        .spyOn(debugLogger, 'error')
+        .mockImplementation(() => {});
+
+      const { unmount } = await renderWithProviders(<AuthDialog {...props} />);
+      const { onSelect: handleAuthSelect } =
+        mockedRadioButtonSelect.mock.calls[0][0];
+
+      await expect(
+        handleAuthSelect(AuthType.LOGIN_WITH_GOOGLE),
+      ).resolves.not.toThrow();
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Failed to clear cached credentials:',
+        testError,
+      );
+      errorSpy.mockRestore();
+      unmount();
+    });
+
     it('exits process for Sign in with Google when browser is suppressed', async () => {
       vi.useFakeTimers();
       const exitSpy = vi
