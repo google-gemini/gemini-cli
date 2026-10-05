@@ -141,6 +141,11 @@ export function AuthDialog({
             await clearCachedCredentialFile();
           } catch (error) {
             debugLogger.error('Failed to clear cached credentials:', error);
+            onAuthError(
+              'Failed to clear cached credentials: ' +
+                (error instanceof Error ? error.message : String(error)),
+            );
+            return;
           }
         }
 
@@ -169,7 +174,7 @@ export function AuthDialog({
       }
       setAuthState(AuthState.Unauthenticated);
     },
-    [settings, config, setAuthState, exiting, setAuthContext],
+    [settings, config, setAuthState, exiting, setAuthContext, onAuthError],
   );
 
   const handleAuthSelect = async (authMethod: AuthType) => {
