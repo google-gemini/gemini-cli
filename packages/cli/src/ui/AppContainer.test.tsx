@@ -250,6 +250,7 @@ import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import * as useKeypressModule from './hooks/useKeypress.js';
 import { useSuspend } from './hooks/useSuspend.js';
+import { useTerminalSize } from './hooks/useTerminalSize.js';
 import {
   writeToStdout,
   enableMouseEvents,
@@ -334,6 +335,7 @@ describe('AppContainer State Management', () => {
   const mockedUseTerminalTheme = useTerminalTheme as Mock;
   const mockedUseShellInactivityStatus = useShellInactivityStatus as Mock;
   const mockedUseFocusState = useFocus as Mock;
+  const mockedUseTerminalSize = useTerminalSize as Mock;
 
   const DEFAULT_GEMINI_STREAM_MOCK = {
     streamingState: 'idle',
@@ -465,6 +467,10 @@ describe('AppContainer State Management', () => {
     });
     mockedUseSuspend.mockReturnValue({
       handleSuspend: vi.fn(),
+    });
+    mockedUseTerminalSize.mockReturnValue({
+      columns: 80,
+      rows: 24,
     });
     mockedUseHookDisplayState.mockReturnValue([]);
     mockedUseTerminalTheme.mockReturnValue(undefined);
@@ -3230,6 +3236,82 @@ describe('AppContainer State Management', () => {
 
       expect(clearTerminalCalls).toHaveLength(0);
       unmount();
+    });
+
+    it('debounces refreshStatic when terminal width changes in default inline mode, and ignores height-only changes', async () => {
+      vi.useFakeTimers();
+      try {
+        vi.spyOn(mockConfig, 'getUseTerminalBuffer').mockReturnValue(false);
+        vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(false);
+
+        const { rerender, unmount } = await act(async () =>
+          renderAppContainer(),
+        );
+        expect(capturedUIState).toBeTruthy();
+
+        const initialRemountKey = capturedUIState.historyRemountKey;
+        mocks.mockStdout.write.mockClear();
+
+        // Initial mount should not trigger refreshStatic after 100ms
+        act(() => {
+          vi.advanceTimersByTime(100);
+        });
+        expect(mocks.mockStdout.write).not.toHaveBeenCalledWith(
+          ansiEscapes.clearTerminal,
+        );
+        expect(capturedUIState.historyRemountKey).toBe(initialRemountKey);
+
+        // Simulate height-only resize (e.g. mobile virtual keyboard toggle)
+        mockedUseTerminalSize.mockReturnValue({ columns: 80, rows: 16 });
+        await act(async () => {
+          rerender(getAppContainer());
+        });
+        act(() => {
+          vi.advanceTimersByTime(100);
+        });
+        expect(mocks.mockStdout.write).not.toHaveBeenCalledWith(
+          ansiEscapes.clearTerminal,
+        );
+        expect(capturedUIState.historyRemountKey).toBe(initialRemountKey);
+
+        // Simulate rapid consecutive horizontal resizes (columns: 80 -> 70 -> 60)
+        mockedUseTerminalSize.mockReturnValue({ columns: 70, rows: 16 });
+        await act(async () => {
+          rerender(getAppContainer());
+        });
+        act(() => {
+          vi.advanceTimersByTime(60);
+        });
+        expect(mocks.mockStdout.write).not.toHaveBeenCalledWith(
+          ansiEscapes.clearTerminal,
+        );
+
+        // Second resize before 100ms elapses should reset the debounce timer
+        mockedUseTerminalSize.mockReturnValue({ columns: 60, rows: 16 });
+        await act(async () => {
+          rerender(getAppContainer());
+        });
+        act(() => {
+          vi.advanceTimersByTime(60);
+        });
+        expect(mocks.mockStdout.write).not.toHaveBeenCalledWith(
+          ansiEscapes.clearTerminal,
+        );
+        expect(capturedUIState.historyRemountKey).toBe(initialRemountKey);
+
+        // Remaining 40ms completes the 100ms debounce from the last width change
+        act(() => {
+          vi.advanceTimersByTime(40);
+        });
+        expect(mocks.mockStdout.write).toHaveBeenCalledWith(
+          ansiEscapes.clearTerminal,
+        );
+        expect(capturedUIState.historyRemountKey).toBe(initialRemountKey + 1);
+
+        unmount();
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

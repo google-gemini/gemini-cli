@@ -1688,6 +1688,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     needsRestart: ideNeedsRestart,
     restartReason: ideTrustRestartReason,
   } = useIdeTrustListener();
+  const isInitialMount = useRef(true);
+
   useIncludeDirsTrust(config, isTrustedFolder, historyManager, setCustomDialog);
 
   const tabFocusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1749,6 +1751,21 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setShowIdeRestartPrompt(true);
     }
   }, [ideNeedsRestart]);
+
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    const handler = setTimeout(() => {
+      refreshStatic();
+    }, 100);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [terminalWidth, refreshStatic]);
 
   useEffect(() => {
     const unsubscribe = ideContextStore.subscribe(setIdeContextState);
