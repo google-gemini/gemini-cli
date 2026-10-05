@@ -1976,6 +1976,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         toggleLastTurnTools();
         if (
           !isAlternateBuffer &&
+          !config.getUseTerminalBuffer() &&
           getLastTurnToolCallIds(historyManager.history, []).length > 0
         ) {
           refreshStatic();
