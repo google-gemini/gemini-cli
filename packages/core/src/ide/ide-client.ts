@@ -27,6 +27,7 @@ import {
   getIdeServerHost,
   getPortFromEnv,
   getStdioConfigFromEnv,
+  isGvisorSandbox,
   validateWorkspacePath,
   createProxyAwareFetch,
   type StdioConfig,
@@ -145,9 +146,7 @@ export class IdeClient {
       connectionConfig?.workspacePath ??
       process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
 
-    const isGvisor =
-      Boolean(process.env['SANDBOX']?.toLowerCase().includes('runsc')) ||
-      process.env['GEMINI_SANDBOX']?.toLowerCase().trim() === 'runsc';
+    const isGvisor = isGvisorSandbox();
     const ideName = this.currentIde.displayName;
     const gvisorFailureDetails = `Failed to connect to IDE companion extension in ${ideName}: gVisor (runsc) sandboxing enforces strict network isolation which prevents host loopback communication.`;
 

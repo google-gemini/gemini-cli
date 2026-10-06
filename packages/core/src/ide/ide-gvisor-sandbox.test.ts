@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as http from 'node:http';
 import type * as fs from 'node:fs';
 import { IdeClient, IDEConnectionStatus } from './ide-client.js';
-import { getIdeServerHost } from './ide-connection-utils.js';
+import { getIdeServerHost, isGvisorSandbox } from './ide-connection-utils.js';
 import { getIdeProcessInfo } from './process-utils.js';
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -115,6 +115,7 @@ describe('Issue #21331: IDE Companion connection under gVisor (runsc) sandbox', 
 
     // Inside the container, getIdeServerHost() maps to host.docker.internal
     expect(getIdeServerHost()).toBe('host.docker.internal');
+    expect(isGvisorSandbox()).toBe(true);
 
     const ideClient = await IdeClient.getInstance();
     await ideClient.connect({ logToConsole: false });
@@ -134,6 +135,8 @@ describe('Issue #21331: IDE Companion connection under gVisor (runsc) sandbox', 
     vi.stubEnv('SANDBOX', 'gemini-cli-sandbox-runsc-a1b2c3');
     vi.stubEnv('GEMINI_CLI_IDE_SERVER_PORT', String(serverPort));
     vi.stubEnv('GEMINI_CLI_IDE_AUTH_TOKEN', 'valid-auth-token');
+
+    expect(isGvisorSandbox()).toBe(true);
 
     const ideClient = await IdeClient.getInstance();
     await ideClient.connect({ logToConsole: false });
@@ -198,6 +201,8 @@ describe('Issue #21331: IDE Companion connection under gVisor (runsc) sandbox', 
     vi.stubEnv('GEMINI_SANDBOX', 'docker');
     vi.stubEnv('GEMINI_CLI_IDE_SERVER_PORT', String(serverPort));
     vi.stubEnv('GEMINI_CLI_IDE_AUTH_TOKEN', 'valid-auth-token');
+
+    expect(isGvisorSandbox()).toBe(false);
 
     const ideClient = await IdeClient.getInstance();
     await ideClient.connect({ logToConsole: false });

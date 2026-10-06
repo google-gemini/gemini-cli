@@ -1717,7 +1717,6 @@ describe('sandbox', () => {
         process.env['TEST_LXC_LIST_OUTPUT'] = LXC_RUNNING;
         vi.stubEnv('GEMINI_CLI_IDE_SERVER_PORT', '12345');
         vi.stubEnv('GEMINI_CLI_IDE_WORKSPACE_PATH', '/workspace');
-        vi.stubEnv('GEMINI_CLI_IDE_AUTH_TOKEN', 'secret-token');
         vi.stubEnv('GEMINI_CLI_IDE_SERVER_STDIO_COMMAND', 'node');
         vi.stubEnv('GEMINI_CLI_IDE_SERVER_STDIO_ARGS', '["server.js"]');
         vi.stubEnv('TERM_PROGRAM', 'vscode');
@@ -1753,8 +1752,6 @@ describe('sandbox', () => {
             'GEMINI_CLI_IDE_SERVER_PORT=12345',
             '--env',
             'GEMINI_CLI_IDE_WORKSPACE_PATH=/workspace',
-            '--env',
-            'GEMINI_CLI_IDE_AUTH_TOKEN=secret-token',
             '--env',
             'GEMINI_CLI_IDE_SERVER_STDIO_COMMAND=node',
             '--env',
@@ -1850,10 +1847,9 @@ describe('sandbox', () => {
         expect.arrayContaining(['images', '-q', 'gemini-cli-sandbox']),
       );
 
-      // Verify docker run includes --runtime=runsc, GEMINI_SANDBOX=runsc, and IDE env vars
-      expect(spawn).toHaveBeenNthCalledWith(
-        2,
-        'docker',
+      // Verify docker run includes --runtime=runsc, GEMINI_SANDBOX=runsc, and safe IDE env vars (excluding GEMINI_CLI_IDE_AUTH_TOKEN)
+      const dockerRunArgs = vi.mocked(spawn).mock.calls[1][1] as string[];
+      expect(dockerRunArgs).toEqual(
         expect.arrayContaining([
           'run',
           '--runtime=runsc',
@@ -1864,15 +1860,15 @@ describe('sandbox', () => {
           '--env',
           'GEMINI_CLI_IDE_WORKSPACE_PATH=/workspace/project',
           '--env',
-          'GEMINI_CLI_IDE_AUTH_TOKEN=ide-auth-token-123',
-          '--env',
           'GEMINI_CLI_IDE_SERVER_STDIO_COMMAND=ide-mcp-cmd',
           '--env',
           'GEMINI_CLI_IDE_SERVER_STDIO_ARGS=["--stdio"]',
           '--env',
           'TERM_PROGRAM=vscode',
         ]),
-        expect.objectContaining({ stdio: 'inherit' }),
+      );
+      expect(dockerRunArgs).not.toContain(
+        'GEMINI_CLI_IDE_AUTH_TOKEN=ide-auth-token-123',
       );
     });
   });

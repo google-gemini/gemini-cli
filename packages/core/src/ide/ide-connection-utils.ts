@@ -395,6 +395,13 @@ export function getIdeServerHost() {
   return host;
 }
 
+export function isGvisorSandbox(): boolean {
+  return (
+    Boolean(process.env['SANDBOX']?.toLowerCase().includes('runsc')) ||
+    process.env['GEMINI_SANDBOX']?.toLowerCase().trim() === 'runsc'
+  );
+}
+
 function isInContainer() {
   return fs.existsSync('/.dockerenv') || fs.existsSync('/run/.containerenv');
 }
