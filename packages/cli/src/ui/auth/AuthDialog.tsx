@@ -162,8 +162,8 @@ export function AuthDialog({
     if (error) {
       onAuthError(error);
     } else {
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      onSelect(authMethod, SettingScope.User);
+      onAuthError(null);
+      await onSelect(authMethod, SettingScope.User);
     }
   };
 

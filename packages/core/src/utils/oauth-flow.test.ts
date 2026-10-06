@@ -466,6 +466,21 @@ describe('oauth-flow', () => {
         vi.useRealTimers();
       }
     });
+
+    it('should close the server and reject response when cancel is called', async () => {
+      const server = startCallbackServer('cancel-state');
+      await server.port;
+
+      const responseResult = server.response.then(
+        () => new Error('Expected rejection'),
+        (e: Error) => e,
+      );
+
+      server.cancel?.(new Error('Cancelled by caller'));
+
+      const error = await responseResult;
+      expect(error.message).toBe('Cancelled by caller');
+    });
   });
 
   describe('exchangeCodeForToken', () => {

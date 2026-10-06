@@ -399,6 +399,26 @@ describe('OAuth2AuthProvider', () => {
         /requires authorization_url and token_url/,
       );
     });
+
+    it('should deduplicate concurrent interactive auth requests', async () => {
+      const provider = new OAuth2AuthProvider(createConfig(), 'test-agent');
+      const storage = getTokenStorage();
+      storage.getCredentials.mockResolvedValue(null);
+
+      await provider.initialize();
+
+      const [headers1, headers2, headers3] = await Promise.all([
+        provider.headers(),
+        provider.headers(),
+        provider.headers(),
+      ]);
+
+      expect(headers1).toEqual({ Authorization: 'Bearer new-access-token' });
+      expect(headers2).toEqual({ Authorization: 'Bearer new-access-token' });
+      expect(headers3).toEqual({ Authorization: 'Bearer new-access-token' });
+      expect(vi.mocked(startCallbackServer)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(exchangeCodeForToken)).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('shouldRetryWithHeaders', () => {
@@ -479,6 +499,22 @@ describe('OAuth2AuthProvider', () => {
       await provider.shouldRetryWithHeaders({}, res200); // resets
 
       // Should be able to retry again.
+      const result = await provider.shouldRetryWithHeaders({}, res401);
+      expect(result).toBeDefined();
+    });
+
+    it('should reset retry count when cached token is used on subsequent headers() call', async () => {
+      const provider = new OAuth2AuthProvider(createConfig(), 'test-agent');
+      const res401 = new Response(null, { status: 401 });
+
+      // Consume both retries
+      await provider.shouldRetryWithHeaders({}, res401);
+      await provider.shouldRetryWithHeaders({}, res401);
+
+      // A subsequent normal request uses the valid cached token, resetting the retry counter
+      await provider.headers();
+
+      // A later 401 should be allowed to retry again
       const result = await provider.shouldRetryWithHeaders({}, res401);
       expect(result).toBeDefined();
     });
