@@ -19,6 +19,7 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { useRewind } from '../hooks/useRewind.js';
 import { RewindConfirmation, RewindOutcome } from './RewindConfirmation.js';
 import { stripReferenceContent } from '../utils/formatters.js';
+import { isToolResponseMessage } from '../utils/rewindFileOps.js';
 import { Command } from '../key/keyMatchers.js';
 import { CliSpinner } from './CliSpinner.js';
 import { ExpandableText } from './shared/ExpandableText.js';
@@ -72,19 +73,7 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
     () =>
       conversation.messages.filter((msg) => {
         if (msg.type !== 'user') return false;
-        const content = msg.content;
-        const parts = Array.isArray(content)
-          ? content
-          : content !== undefined && content !== null
-            ? [content]
-            : [];
-        const isToolResponse =
-          parts.length > 0 &&
-          parts.some(
-            (p) =>
-              typeof p === 'object' && p !== null && 'functionResponse' in p,
-          );
-        return !isToolResponse;
+        return !isToolResponseMessage(msg);
       }),
     [conversation.messages],
   );

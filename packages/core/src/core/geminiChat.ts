@@ -887,6 +887,7 @@ export class GeminiChat {
     if (hadEmptyTrailingModelTurn) {
       const lastTurn = turns[turns.length - 1];
       lastTurn.content.parts = [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }];
+      this.chatRecordingService.updateMessagesFromHistory(turns);
     } else {
       this.agentHistory.push({
         id: randomUUID(),
@@ -1207,6 +1208,7 @@ export class GeminiChat {
           const lastHistoryTurn = historyTurns[historyTurns.length - 1];
           if (lastHistoryTurn && lastHistoryTurn.content.role === 'user') {
             lastHistoryTurn.content.parts = [{ text: 'Please continue.' }];
+            this.chatRecordingService.updateMessagesFromHistory(historyTurns);
           }
         }
         contentsToDispatch = cloned;
