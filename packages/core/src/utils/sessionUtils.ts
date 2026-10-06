@@ -106,6 +106,17 @@ export function isIgnoredUserContent(trimmedContent: string): boolean {
 
 /**
  * Converts session/conversation data into Gemini client history formats.
+ *
+ * When a model (`gemini`) turn contains `toolCalls`, this function performs a
+ * forward scan up to the next model turn to check whether subsequent `user`
+ * messages already record `functionResponse` parts for those tool calls:
+ * - Tool calls already covered by a subsequent `user` turn are not re-synthesized.
+ * - Any remaining tool calls with a `result` are either queued in
+ *   `pendingPartsToAppend` to be merged into the existing `user` tool-response
+ *   turn in that round, or synthesized into a fallback `${msg.id}_response`
+ *   turn for legacy recordings that lack a recorded `user` response turn.
+ * - Within each tool exchange round, `seenFunctionResponseIds` deduplicates
+ *   `functionResponse` parts by ID so previously inflated recordings recover cleanly.
  */
 export function convertSessionToClientHistory(
   messages: ConversationRecord['messages'],
@@ -122,6 +133,7 @@ export function convertSessionToClientHistory(
 
     if (msg.type === 'user') {
       const extraParts = pendingPartsToAppend.get(msg.id) || [];
+      pendingPartsToAppend.delete(msg.id);
       if (extraParts.length === 0) {
         if (!msg.content) {
           continue;
