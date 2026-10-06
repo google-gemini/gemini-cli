@@ -605,7 +605,7 @@ describe('oauth-flow', () => {
       expect(response.iss).toBeUndefined();
     });
 
-    it('should allow callback when expectedIssuer is configured but requireIssInResponse is undefined and iss parameter is omitted', async () => {
+    it('should reject callback when expectedIssuer is configured and requireIssInResponse is undefined but iss parameter is omitted (secure by default)', async () => {
       const server = startCallbackServer(
         'my-state',
         undefined,
@@ -614,15 +614,23 @@ describe('oauth-flow', () => {
       );
       const port = await server.port;
 
+      const responseResult = server.response.then(
+        () => new Error('Expected rejection'),
+        (e: Error) => e,
+      );
+
       const res = await realFetch(
         `http://localhost:${port}${REDIRECT_PATH}?code=auth-code-789&state=my-state`,
-      );
-      expect(res.status).toBe(200);
+      ).catch(() => {});
 
-      const response = await server.response;
-      expect(response.code).toBe('auth-code-789');
-      expect(response.state).toBe('my-state');
-      expect(response.iss).toBeUndefined();
+      if (res) {
+        expect(res.status).toBe(400);
+      }
+
+      const error = await responseResult;
+      expect(error.message).toContain(
+        'Missing "iss" parameter in authorization response per RFC 9207',
+      );
     });
 
     it('should allow callback when no expectedIssuer is configured and iss parameter is omitted', async () => {

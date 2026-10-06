@@ -412,7 +412,7 @@ export class MCPOAuthProvider {
       pkceParams.state,
       preferredPort,
       config.issuer,
-      config.authorizationResponseIssParameterSupported,
+      config.authorizationResponseIssParameterSupported ?? false,
     );
 
     // Wait for server to start and get the allocated port

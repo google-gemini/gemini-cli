@@ -266,12 +266,13 @@ export function startCallbackServer(
             }
 
             // RFC 9207 Authorization Server Issuer Identification check
-            // Per RFC 9207 §2.4 and MCP spec (2026-07-28), reject a missing
-            // "iss" only when the AS advertises
-            // authorization_response_iss_parameter_supported: true.
+            // Per RFC 9207 §2.4, reject a missing "iss" when expectedIssuer is
+            // configured unless explicitly opted out via requireIssInResponse: false.
+            // Defaults to true when undefined to maintain a secure-by-default posture.
             // When "iss" IS present, always validate it against the expected
             // issuer to prevent IdP mix-up attacks.
-            if (expectedIssuer && !iss && requireIssInResponse) {
+            const enforceIss = requireIssInResponse ?? true;
+            if (expectedIssuer && !iss && enforceIss) {
               debugLogger.error(
                 'OAuth callback rejected: Missing required "iss" parameter. The authorization server advertises authorization_response_iss_parameter_supported. Possible IdP mix-up attack (RFC 9207).',
               );
