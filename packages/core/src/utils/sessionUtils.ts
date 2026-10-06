@@ -139,12 +139,14 @@ export function convertSessionToClientHistory(
         continue;
       }
 
-      let parts = ensurePartArray(msg.content);
-      const hasFunctionResponses = parts.some((p) => p && !!p.functionResponse);
+      let parts = ensurePartArray(msg.content).filter(
+        (p): p is Part => p != null,
+      );
+      const hasFunctionResponses = parts.some((p) => !!p.functionResponse);
       if (hasFunctionResponses) {
         // Prevent duplicate functionResponse turns if session was previously checkpointed with duplicates
         parts = parts.filter((p) => {
-          if (p && p.functionResponse?.id) {
+          if (p.functionResponse?.id) {
             if (seenFunctionResponseIds.has(p.functionResponse.id)) {
               return false;
             }
@@ -240,18 +242,20 @@ export function convertSessionToClientHistory(
                 };
               } else if (Array.isArray(toolCall.result)) {
                 // Only include parts for this tool call and avoid duplicate function responses
-                const parts = ensurePartArray(toolCall.result).filter((p) => {
-                  if (p && p.functionResponse?.id) {
-                    if (toolCall.id && p.functionResponse.id !== toolCall.id) {
-                      return false;
+                const parts = ensurePartArray(toolCall.result)
+                  .filter((p): p is Part => p != null)
+                  .filter((p) => {
+                    if (p.functionResponse?.id) {
+                      if (toolCall.id && p.functionResponse.id !== toolCall.id) {
+                        return false;
+                      }
+                      if (seenFunctionResponseIds.has(p.functionResponse.id)) {
+                        return false;
+                      }
+                      seenFunctionResponseIds.add(p.functionResponse.id);
                     }
-                    if (seenFunctionResponseIds.has(p.functionResponse.id)) {
-                      return false;
-                    }
-                    seenFunctionResponseIds.add(p.functionResponse.id);
-                  }
-                  return true;
-                });
+                    return true;
+                  });
                 functionResponseParts.push(...parts);
                 continue;
               } else {

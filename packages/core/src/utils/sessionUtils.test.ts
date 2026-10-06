@@ -405,6 +405,39 @@ describe('convertSessionToClientHistory', () => {
       expect(() => convertSessionToClientHistory(messages)).not.toThrow();
       const history = convertSessionToClientHistory(messages);
       expect(history).toHaveLength(1);
+      expect(history[0].content.parts).toHaveLength(1);
+      expect(history[0].content.parts![0].functionResponse?.id).toBe('call_1');
+    });
+
+    it('should filter out null or undefined parts from legacy toolCall.result arrays', () => {
+      const messages: ConversationRecord['messages'] = [
+        {
+          id: 'model_call_legacy',
+          type: 'gemini',
+          timestamp: '2024-01-01T10:01:00Z',
+          content: '',
+          toolCalls: [
+            {
+              id: 'call_legacy_1',
+              name: 'tool_1',
+              args: {},
+              status: CoreToolCallStatus.Success,
+              timestamp: '2024-01-01T10:01:05Z',
+              result: [
+                null as unknown as Part,
+                { functionResponse: { id: 'call_legacy_1', name: 'tool_1', response: { output: 'legacy_ok' } } },
+                undefined as unknown as Part,
+              ],
+            },
+          ],
+        },
+      ];
+
+      const history = convertSessionToClientHistory(messages);
+      const toolTurn = history.find((h) => h.id === 'model_call_legacy_response');
+      expect(toolTurn).toBeDefined();
+      expect(toolTurn!.content.parts).toHaveLength(1);
+      expect(toolTurn!.content.parts![0].functionResponse?.id).toBe('call_legacy_1');
     });
   });
 });
