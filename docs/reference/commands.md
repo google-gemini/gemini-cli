@@ -532,8 +532,9 @@ your prompt to Gemini. These commands include git-aware filtering.
     - `What is this file about? @README.md`
   - **Details:**
     - If a path to a single file is provided, the content of that file is read.
-    - If a path to a directory is provided, the command attempts to read the
-      content of files within that directory and any subdirectories.
+    - If a path to a directory is provided, the directory path is resolved and
+      passed to the model so it can inspect or list the directory using its
+      tools without eagerly reading every nested file into the prompt.
     - Spaces in paths should be escaped with a backslash (for example,
       `@My\ Documents/file.txt`).
     - The command uses the `read_many_files` tool internally. The content is

@@ -270,6 +270,27 @@ describe('handleAtCommand', () => {
     );
   });
 
+  it('should normalize an absolute path to the workspace root directory to @.', async () => {
+    const query = `List files in @${testRootDir}`;
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 1261,
+      signal: abortController.signal,
+    });
+
+    expect(result).toEqual({
+      processedQuery: [{ text: 'List files in @.' }],
+    });
+    expect(mockAddItem).not.toHaveBeenCalled();
+    expect(mockOnDebugMessage).toHaveBeenCalledWith(
+      `Path ${testRootDir} resolved to directory: ${testRootDir}, using relative path: .`,
+    );
+  });
+
   it('should not eagerly read file contents when asking to list files in @<directory>', async () => {
     await createTestFile(
       path.join(testRootDir, 'Documents', 'internal', 'dev-link.sh'),
@@ -341,6 +362,15 @@ describe('handleAtCommand', () => {
         { text: '\n--- End of content ---' },
       ],
     });
+    expect(mockAddItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'tool_group',
+        tools: [
+          expect.objectContaining({ status: CoreToolCallStatus.Success }),
+        ],
+      }),
+      1271,
+    );
   });
 
   it('should handle query with text before and after @command', async () => {
