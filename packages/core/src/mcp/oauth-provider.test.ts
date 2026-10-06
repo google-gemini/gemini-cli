@@ -89,6 +89,7 @@ const createMockResponse = (options: {
   ok: boolean;
   status?: number;
   contentType?: string;
+  headers?: Headers | Record<string, string>;
   text?: string | (() => Promise<string>);
   json?: unknown | (() => Promise<unknown>);
 }) => {
@@ -104,6 +105,13 @@ const createMockResponse = (options: {
     ok: options.ok,
     headers: {
       get: (name: string) => {
+        if (options.headers) {
+          if (typeof (options.headers as Headers).get === 'function') {
+            return (options.headers as Headers).get(name);
+          }
+          const rec = options.headers as Record<string, string>;
+          return rec[name] || rec[name.toLowerCase()] || null;
+        }
         if (name.toLowerCase() === 'content-type') {
           return options.contentType || null;
         }
@@ -2330,6 +2338,175 @@ describe('MCPOAuthProvider', () => {
       ).rejects.toThrow(
         'Missing "iss" parameter in authorization response per RFC 9207',
       );
+    });
+
+    it('should respect user-defined authorizationResponseIssParameterSupported: false override during standard discovery', async () => {
+      mockOpenBrowserSecurely.mockResolvedValue(undefined);
+
+      const configWithoutEndpoints: MCPOAuthConfig = {
+        ...mockConfig,
+        clientId: 'test-client-id',
+        clientSecret: 'test-client-secret',
+        authorizationResponseIssParameterSupported: false,
+      };
+      delete configWithoutEndpoints.authorizationUrl;
+      delete configWithoutEndpoints.tokenUrl;
+
+      const mockResourceMetadata = {
+        resource: 'https://api.example.com/',
+        authorization_servers: ['https://discovered.auth.com'],
+      };
+
+      const mockAuthServerMetadata = {
+        issuer: 'https://discovered.auth.com',
+        authorization_endpoint: 'https://discovered.auth.com/authorize',
+        token_endpoint: 'https://discovered.auth.com/token',
+        authorization_response_iss_parameter_supported: true,
+      };
+
+      mockFetch
+        .mockResolvedValueOnce(createMockResponse({ ok: true, status: 200 }))
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            text: JSON.stringify(mockResourceMetadata),
+            json: mockResourceMetadata,
+          }),
+        )
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            text: JSON.stringify(mockAuthServerMetadata),
+            json: mockAuthServerMetadata,
+          }),
+        )
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            text: JSON.stringify(mockTokenResponse),
+            json: mockTokenResponse,
+          }),
+        );
+
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=auth_code&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+          };
+          const mockRes = { writeHead: vi.fn(), end: vi.fn() };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+
+      const authProvider = new MCPOAuthProvider();
+      const result = await authProvider.authenticate(
+        'test-server',
+        configWithoutEndpoints,
+        'https://api.example.com',
+      );
+      expect(result.accessToken).toBe('access_token_123');
+    });
+
+    it('should respect user-defined authorizationResponseIssParameterSupported: false override during WWW-Authenticate discovery', async () => {
+      mockOpenBrowserSecurely.mockResolvedValue(undefined);
+
+      const configWithoutEndpoints: MCPOAuthConfig = {
+        ...mockConfig,
+        clientId: 'test-client-id',
+        clientSecret: 'test-client-secret',
+        authorizationResponseIssParameterSupported: false,
+      };
+      delete configWithoutEndpoints.authorizationUrl;
+      delete configWithoutEndpoints.tokenUrl;
+
+      const mockResourceMetadata = {
+        resource: 'https://api.example.com/',
+        authorization_servers: ['https://discovered.auth.com'],
+      };
+
+      const mockAuthServerMetadata = {
+        issuer: 'https://discovered.auth.com',
+        authorization_endpoint: 'https://discovered.auth.com/authorize',
+        token_endpoint: 'https://discovered.auth.com/token',
+        authorization_response_iss_parameter_supported: true,
+      };
+
+      mockFetch
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: false,
+            status: 401,
+            headers: new Headers({
+              'www-authenticate':
+                'Bearer realm="https://api.example.com", resource_metadata="https://api.example.com/.well-known/oauth-protected-resource"',
+            }),
+          }),
+        )
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            text: JSON.stringify(mockResourceMetadata),
+            json: mockResourceMetadata,
+          }),
+        )
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            text: JSON.stringify(mockAuthServerMetadata),
+            json: mockAuthServerMetadata,
+          }),
+        )
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            text: JSON.stringify(mockTokenResponse),
+            json: mockTokenResponse,
+          }),
+        );
+
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=auth_code&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+          };
+          const mockRes = { writeHead: vi.fn(), end: vi.fn() };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+
+      const authProvider = new MCPOAuthProvider();
+      const result = await authProvider.authenticate(
+        'test-server',
+        configWithoutEndpoints,
+        'https://api.example.com',
+      );
+      expect(result.accessToken).toBe('access_token_123');
     });
   });
 

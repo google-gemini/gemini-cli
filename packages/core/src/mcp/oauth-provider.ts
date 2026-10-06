@@ -346,6 +346,7 @@ export class MCPOAuthProvider {
                 tokenUrl: discoveredConfig.tokenUrl,
                 scopes: config.scopes || discoveredConfig.scopes || [],
                 authorizationResponseIssParameterSupported:
+                  config.authorizationResponseIssParameterSupported ??
                   discoveredConfig.authorizationResponseIssParameterSupported,
                 // Preserve existing client credentials
                 clientId: config.clientId,
@@ -382,6 +383,7 @@ export class MCPOAuthProvider {
             scopes: config.scopes || discoveredConfig.scopes || [],
             registrationUrl: discoveredConfig.registrationUrl,
             authorizationResponseIssParameterSupported:
+              config.authorizationResponseIssParameterSupported ??
               discoveredConfig.authorizationResponseIssParameterSupported,
             // Preserve existing client credentials
             clientId: config.clientId,
