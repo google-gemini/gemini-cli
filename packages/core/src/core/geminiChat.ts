@@ -512,12 +512,12 @@ export class GeminiChat {
     let userContent = createUserContent(message);
     const isOriginalFunctionResponse = isFunctionResponse(userContent);
 
-    // A turn can end leaving history on an unanswered tool response: a stream
-    // error after the response was committed, or a cancelled tool call. Close
-    // it before recording a genuinely new user message, otherwise the two user
-    // turns are coalesced into one and the model continues the trailing text
-    // instead of answering it.
+    // If history ended on an unanswered model tool call or an unanswered tool response
+    // (e.g. cancelled tool call, interrupted stream, or user follow-up prompt), close it
+    // before recording a genuinely new user message so proper tool call pairing and
+    // role alternation are maintained.
     if (!isOriginalFunctionResponse) {
+      this.closeUnansweredToolCallsTurn(userContent);
       this.closeUnansweredToolResponseTurn();
     }
 
@@ -828,25 +828,74 @@ export class GeminiChat {
   }
 
   /**
+   * Synthesizes matching functionResponse parts into userContent when history
+   * ends with an unclosed model functionCall, so the subsequent user prompt
+   * preserves proper tool call pairing and role alternation.
+   */
+  private closeUnansweredToolCallsTurn(userContent: Content): void {
+    const turns = this.agentHistory.get();
+    const last = turns[turns.length - 1];
+    if (
+      last?.content.role !== 'model' ||
+      !last.content.parts?.some((part) => !!part.functionCall)
+    ) {
+      return;
+    }
+    const missingResponses: Part[] = [];
+    for (const part of last.content.parts || []) {
+      if (part && part.functionCall) {
+        missingResponses.push({
+          functionResponse: {
+            name: part.functionCall.name?.trim() || 'generic_tool',
+            id: part.functionCall.id,
+            response: {
+              error: 'Response was lost or interrupted.',
+            },
+          },
+        });
+      }
+    }
+    if (missingResponses.length > 0) {
+      const remainingParts = (userContent.parts || []).filter(
+        (p) => !(p.text !== undefined && p.text === ''),
+      );
+      userContent.parts = [...missingResponses, ...remainingParts];
+    }
+  }
+
+  /**
    * Appends a closing model turn when history ends with an unanswered tool
    * response, so the next user message stays a turn of its own.
    */
   private closeUnansweredToolResponseTurn(): void {
     const turns = this.agentHistory.get();
-    const last = turns[turns.length - 1];
+    let targetTurn = turns[turns.length - 1];
+    let hadEmptyTrailingModelTurn = false;
     if (
-      last?.content.role !== 'user' ||
-      !last.content.parts?.some((part) => !!part.functionResponse)
+      targetTurn?.content.role === 'model' &&
+      (!targetTurn.content.parts || targetTurn.content.parts.length === 0)
+    ) {
+      hadEmptyTrailingModelTurn = true;
+      targetTurn = turns[turns.length - 2];
+    }
+    if (
+      targetTurn?.content.role !== 'user' ||
+      !targetTurn.content.parts?.some((part) => !!part.functionResponse)
     ) {
       return;
     }
-    this.agentHistory.push({
-      id: randomUUID(),
-      content: {
-        role: 'model',
-        parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
-      },
-    });
+    if (hadEmptyTrailingModelTurn) {
+      const lastTurn = turns[turns.length - 1];
+      lastTurn.content.parts = [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }];
+    } else {
+      this.agentHistory.push({
+        id: randomUUID(),
+        content: {
+          role: 'model',
+          parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+        },
+      });
+    }
   }
 
   private extractBinaryInjections(
@@ -1119,28 +1168,49 @@ export class GeminiChat {
                 });
               }
             }
-            cloned.push({
+            const normalizedUserTurn: Content = {
               role: 'user',
               parts: missingResponses,
-            });
+            };
+            cloned.push(normalizedUserTurn);
+            const id = this.chatRecordingService.recordSyntheticMessage(
+              'user',
+              missingResponses,
+            );
+            this.agentHistory.push({ id, content: normalizedUserTurn });
           } else {
-            cloned.push({
+            const normalizedUserTurn: Content = {
               role: 'user',
               parts: [{ text: 'Please continue.' }],
-            });
+            };
+            cloned.push(normalizedUserTurn);
+            const id = this.chatRecordingService.recordSyntheticMessage(
+              'user',
+              normalizedUserTurn.parts!,
+            );
+            this.agentHistory.push({ id, content: normalizedUserTurn });
           }
         } else if (!lastTurn) {
-          cloned.push({
+          const normalizedUserTurn: Content = {
             role: 'user',
             parts: [{ text: 'Please continue.' }],
-          });
+          };
+          cloned.push(normalizedUserTurn);
+          const id = this.chatRecordingService.recordSyntheticMessage(
+            'user',
+            normalizedUserTurn.parts!,
+          );
+          this.agentHistory.push({ id, content: normalizedUserTurn });
         } else if (lastTurn.role === 'user' && !lastTurn.parts?.length) {
           lastTurn.parts = [{ text: 'Please continue.' }];
+          const historyTurns = this.agentHistory.get();
+          const lastHistoryTurn = historyTurns[historyTurns.length - 1];
+          if (lastHistoryTurn && lastHistoryTurn.content.role === 'user') {
+            lastHistoryTurn.content.parts = [{ text: 'Please continue.' }];
+          }
         }
         contentsToDispatch = cloned;
       }
-
-      lastContentsToUse = contentsToDispatch;
 
       return this.context.config.getContentGenerator().generateContentStream(
         {
@@ -1817,7 +1887,7 @@ export function isInvalidArgumentError(errorMessage: string): boolean {
 }
 
 export function stripToolCallIdPrefixes(contents: Content[]): Content[] {
-  return contents
+  const stripped = contents
     .map((content) => {
       const parts = (content.parts || [])
         .map((part) => {
@@ -1878,6 +1948,28 @@ export function stripToolCallIdPrefixes(contents: Content[]): Content[] {
       };
     })
     .filter((content) => !content.parts || content.parts.length > 0);
+
+  return coalesceConsecutiveContents(stripped);
+}
+
+export function coalesceConsecutiveContents(contents: Content[]): Content[] {
+  const result: Content[] = [];
+  for (const item of contents) {
+    const lastIdx = result.length - 1;
+    const last = result[lastIdx];
+    if (last && last.role === item.role) {
+      const hasParts = last.parts || item.parts;
+      result[lastIdx] = {
+        ...last,
+        parts: hasParts
+          ? [...(last.parts || []), ...(item.parts || [])]
+          : undefined,
+      };
+    } else {
+      result.push({ ...item });
+    }
+  }
+  return result;
 }
 
 export function coalesceConsecutiveRoles(

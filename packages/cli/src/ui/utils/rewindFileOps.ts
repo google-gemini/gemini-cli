@@ -30,6 +30,25 @@ export interface FileChangeStats {
 }
 
 /**
+ * Determines whether a user message record is a synthetic tool response.
+ */
+export function isToolResponseMessage(msg: MessageRecord): boolean {
+  if (msg.type !== 'user') return false;
+  const content = msg.content;
+  const parts = Array.isArray(content)
+    ? content
+    : content !== undefined && content !== null
+      ? [content]
+      : [];
+  return (
+    parts.length > 0 &&
+    parts.some(
+      (p) => typeof p === 'object' && p !== null && 'functionResponse' in p,
+    )
+  );
+}
+
+/**
  * Calculates file change statistics for a single turn.
  * A turn is defined as the sequence of messages starting after the given user message
  * and continuing until the next user message or the end of the conversation.
@@ -53,7 +72,12 @@ export function calculateTurnStats(
   // Look ahead until the next user message (single turn)
   for (let i = msgIndex + 1; i < conversation.messages.length; i++) {
     const msg = conversation.messages[i];
-    if (msg.type === 'user') break; // Stop at next user message
+    if (msg.type === 'user') {
+      if (isToolResponseMessage(msg)) {
+        continue;
+      }
+      break; // Stop at next user message
+    }
 
     if (msg.type === 'gemini' && msg.toolCalls) {
       for (const toolCall of msg.toolCalls) {

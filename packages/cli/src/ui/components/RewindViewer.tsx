@@ -80,7 +80,7 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
             : [];
         const isToolResponse =
           parts.length > 0 &&
-          parts.every(
+          parts.some(
             (p) =>
               typeof p === 'object' && p !== null && 'functionResponse' in p,
           );

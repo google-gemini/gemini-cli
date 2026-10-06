@@ -5401,5 +5401,96 @@ describe('GeminiChat', () => {
         },
       ]);
     });
+
+    it('should synthesize matching functionResponse before follow-up user text prompt when preceding turn has unclosed functionCall', async () => {
+      chat.setHistory([
+        { role: 'user', parts: [{ text: 'Please read the file' }] },
+        {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                id: 'call_read',
+                name: 'read_file',
+                args: { path: 'foo.ts' },
+              },
+            },
+          ],
+        },
+      ]);
+
+      let capturedContents: Content[] | undefined;
+      vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
+        async (params) => {
+          capturedContents = params.contents as Content[];
+          return (async function* (): AsyncGenerator<GenerateContentResponse> {
+            yield {
+              candidates: [
+                {
+                  content: {
+                    role: 'model',
+                    parts: [{ text: 'Understood, doing something else.' }],
+                  },
+                  finishReason: 'STOP' as unknown as undefined,
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })();
+        },
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-2.5-pro' },
+        [{ text: 'Nevermind, do something else.' }],
+        'prompt-followup',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      for await (const _ of stream) {
+        // consume
+      }
+
+      expect(capturedContents).toBeDefined();
+      const lastTurn = capturedContents![capturedContents!.length - 1];
+      expect(lastTurn.role).toBe('user');
+      expect(lastTurn.parts).toEqual([
+        {
+          functionResponse: {
+            name: 'read_file',
+            id: 'call_read',
+            response: {
+              error: 'Response was lost or interrupted.',
+            },
+          },
+        },
+        { text: 'Nevermind, do something else.' },
+      ]);
+    });
+
+    it('should re-coalesce adjacent turns of same role when interior empty user turn is stripped', () => {
+      const input: Content[] = [
+        {
+          role: 'model',
+          parts: [{ text: 'Step 1 output' }],
+        },
+        {
+          role: 'user',
+          parts: [{ text: '' }],
+        },
+        {
+          role: 'model',
+          parts: [{ text: 'Step 2 output' }],
+        },
+      ];
+
+      const stripped = stripToolCallIdPrefixes(input);
+      expect(stripped.length).toBe(1);
+      expect(stripped[0].role).toBe('model');
+      expect(stripped[0].parts).toEqual([
+        { text: 'Step 1 output' },
+        { text: 'Step 2 output' },
+      ]);
+    });
   });
 });
