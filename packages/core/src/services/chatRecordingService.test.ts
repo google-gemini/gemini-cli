@@ -1636,6 +1636,55 @@ describe('ChatRecordingService', () => {
       expect(resB[0].functionResponse!.response).toEqual({ output: 'result B' });
     });
 
+    it('should defensively handle null or undefined parts in history without throwing', async () => {
+      await chatRecordingService.initialize();
+      const modelMsgId = chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: '',
+        model: 'gemini-pro',
+      });
+
+      const callId = 'call-null-test';
+      chatRecordingService.recordToolCalls('gemini-pro', [
+        {
+          id: callId,
+          name: 'tool_test',
+          args: {},
+          result: [],
+          status: CoreToolCallStatus.Success,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+
+      const history = [
+        {
+          id: modelMsgId,
+          content: { role: 'model', parts: [] },
+        },
+        {
+          id: 'user-id',
+          content: {
+            role: 'user',
+            parts: [
+              null as unknown as Part,
+              undefined as unknown as Part,
+              {
+                functionResponse: {
+                  name: 'tool_test',
+                  id: callId,
+                  response: { output: 'ok' },
+                },
+              },
+            ],
+          },
+        },
+      ] as unknown as HistoryTurn[];
+
+      expect(() =>
+        chatRecordingService.updateMessagesFromHistory(history),
+      ).not.toThrow();
+    });
+
     it('should not write to disk when no tool calls match', async () => {
       chatRecordingService.recordMessage({
         type: 'gemini',

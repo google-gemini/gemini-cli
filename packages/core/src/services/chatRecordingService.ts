@@ -1411,7 +1411,7 @@ export class ChatRecordingService {
         if (turn.content.role !== 'user') continue;
         const turnParts = turn.content.parts || [];
         for (const part of turnParts) {
-          if (part.functionResponse) {
+          if (part?.functionResponse) {
             const callId = part.functionResponse.id;
             if (!callId) continue;
             const tcMeta = this.toolCallMetaMap.get(callId);
@@ -1419,7 +1419,8 @@ export class ChatRecordingService {
               // Sync parts belonging to this callId while preserving sibling non-functionResponse parts
               // (e.g. multi-modal inlineData), but excluding function responses of other parallel calls.
               const relevantParts = turnParts.filter(
-                (p) => !p.functionResponse || p.functionResponse.id === callId,
+                (p) =>
+                  p && (!p.functionResponse || p.functionResponse.id === callId),
               );
               if (updateFingerprintIfChanged(tcMeta.resultFp, relevantParts)) {
                 anyChange = true;

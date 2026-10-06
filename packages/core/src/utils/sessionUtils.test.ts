@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { describe, it, expect } from 'vitest';
+import { type Part } from '@google/genai';
 import { convertSessionToClientHistory } from './sessionUtils.js';
 import { type ConversationRecord } from '../services/chatRecordingService.js';
 import { CoreToolCallStatus } from '../scheduler/types.js';
@@ -384,6 +385,26 @@ describe('convertSessionToClientHistory', () => {
           h.content.parts?.some((p) => !!p.functionResponse),
       );
       expect(respTurns).toHaveLength(1);
+    });
+
+    it('should defensively handle null or undefined parts without throwing TypeError', () => {
+      const messages = [
+        {
+          id: 'user_with_null_parts',
+          type: 'user',
+          timestamp: '2024-01-01T10:00:00Z',
+          content: [
+            null as unknown as Part,
+            undefined as unknown as Part,
+            { functionResponse: { id: 'call_1', name: 'tool_1', response: { output: 'ok' } } },
+            null as unknown as Part,
+          ],
+        },
+      ] as unknown as ConversationRecord['messages'];
+
+      expect(() => convertSessionToClientHistory(messages)).not.toThrow();
+      const history = convertSessionToClientHistory(messages);
+      expect(history).toHaveLength(1);
     });
   });
 });

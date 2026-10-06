@@ -118,7 +118,7 @@ export function convertSessionToClientHistory(
   for (const msg of messages) {
     if (msg.type === 'user' && msg.content) {
       for (const part of ensurePartArray(msg.content)) {
-        if (part.functionResponse?.id) {
+        if (part?.functionResponse?.id) {
           answeredToolCallIds.add(part.functionResponse.id);
         }
       }
@@ -140,11 +140,11 @@ export function convertSessionToClientHistory(
       }
 
       let parts = ensurePartArray(msg.content);
-      const hasFunctionResponses = parts.some((p) => !!p.functionResponse);
+      const hasFunctionResponses = parts.some((p) => p && !!p.functionResponse);
       if (hasFunctionResponses) {
         // Prevent duplicate functionResponse turns if session was previously checkpointed with duplicates
         parts = parts.filter((p) => {
-          if (p.functionResponse?.id) {
+          if (p && p.functionResponse?.id) {
             if (seenFunctionResponseIds.has(p.functionResponse.id)) {
               return false;
             }
@@ -241,7 +241,7 @@ export function convertSessionToClientHistory(
               } else if (Array.isArray(toolCall.result)) {
                 // Only include parts for this tool call and avoid duplicate function responses
                 const parts = ensurePartArray(toolCall.result).filter((p) => {
-                  if (p.functionResponse?.id) {
+                  if (p && p.functionResponse?.id) {
                     if (toolCall.id && p.functionResponse.id !== toolCall.id) {
                       return false;
                     }
@@ -258,7 +258,7 @@ export function convertSessionToClientHistory(
                 responseData = toolCall.result;
               }
 
-              if (responseData.functionResponse?.id) {
+              if (responseData?.functionResponse?.id) {
                 if (seenFunctionResponseIds.has(responseData.functionResponse.id)) {
                   continue;
                 }
