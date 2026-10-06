@@ -164,6 +164,9 @@ export class IDEServer {
         const allowedHosts = [
           `localhost:${this.port}`,
           `127.0.0.1:${this.port}`,
+          // Used by the CLI when running inside a container sandbox
+          // (docker, podman, runsc). See getIdeServerHost in core.
+          `host.docker.internal:${this.port}`,
         ];
         if (!allowedHosts.includes(host)) {
           return res.status(403).json({ error: 'Invalid Host header' });

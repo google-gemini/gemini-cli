@@ -541,4 +541,40 @@ describe('IDEServer HTTP endpoints', () => {
     // but it's not a host error, which is what we are testing.
     expect(response.statusCode).toBe(400);
   });
+
+  it('should allow requests from a container sandbox via host.docker.internal', async () => {
+    const response = await request(
+      port,
+      {
+        path: '/mcp',
+        method: 'POST',
+        headers: {
+          Host: `host.docker.internal:${port}`,
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer test-auth-token',
+        },
+      },
+      JSON.stringify({ jsonrpc: '2.0', method: 'initialize' }),
+    );
+    // 400 rather than 403: the host check passed and the request reached the
+    // MCP handler, which rejects the incomplete initialize payload.
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('should deny host.docker.internal with a mismatched port', async () => {
+    const response = await request(
+      port,
+      {
+        path: '/mcp',
+        method: 'POST',
+        headers: {
+          Host: `host.docker.internal:${Number(port) + 1}`,
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer test-auth-token',
+        },
+      },
+      JSON.stringify({ jsonrpc: '2.0', method: 'initialize' }),
+    );
+    expect(response.statusCode).toBe(403);
+  });
 });

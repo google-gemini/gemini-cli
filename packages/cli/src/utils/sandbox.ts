@@ -790,10 +790,13 @@ export async function start_sandbox(
       args.push('--env', `COLORTERM=${process.env['COLORTERM']}`);
     }
 
-    // Pass through IDE mode environment variables
+    // Pass through IDE mode environment variables. The auth token is required
+    // because the IDE connection file in the host's temp directory is not
+    // visible inside the sandbox.
     for (const envVar of [
       'GEMINI_CLI_IDE_SERVER_PORT',
       'GEMINI_CLI_IDE_WORKSPACE_PATH',
+      'GEMINI_CLI_IDE_AUTH_TOKEN',
       'TERM_PROGRAM',
     ]) {
       if (process.env[envVar]) {
@@ -1209,6 +1212,7 @@ async function start_lxc_sandbox(
       GEMINI_CLI_IDE_SERVER_PORT: process.env['GEMINI_CLI_IDE_SERVER_PORT'],
       GEMINI_CLI_IDE_WORKSPACE_PATH:
         process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'],
+      GEMINI_CLI_IDE_AUTH_TOKEN: process.env['GEMINI_CLI_IDE_AUTH_TOKEN'],
       TERM_PROGRAM: process.env['TERM_PROGRAM'],
     };
     for (const [key, value] of Object.entries(envVarsToForward)) {

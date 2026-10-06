@@ -623,6 +623,62 @@ describe('sandbox', () => {
       );
     });
 
+    it('should forward IDE connection environment variables into the container', async () => {
+      vi.stubEnv('GEMINI_CLI_IDE_SERVER_PORT', '12345');
+      vi.stubEnv('GEMINI_CLI_IDE_WORKSPACE_PATH', '/test/project');
+      vi.stubEnv('GEMINI_CLI_IDE_AUTH_TOKEN', 'test-ide-token');
+
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+      await expect(
+        start_sandbox(config, [], undefined, ['arg1']),
+      ).resolves.toBe(0);
+
+      const dockerCall = vi.mocked(spawn).mock.calls.find((call) => {
+        const args = call[1] as string[];
+        return args && args.includes('run');
+      });
+      expect(dockerCall).toBeDefined();
+      const dockerArgs = dockerCall![1] as string[];
+      expect(dockerArgs).toEqual(
+        expect.arrayContaining([
+          '--env',
+          'GEMINI_CLI_IDE_SERVER_PORT=12345',
+          '--env',
+          'GEMINI_CLI_IDE_WORKSPACE_PATH=/test/project',
+          '--env',
+          'GEMINI_CLI_IDE_AUTH_TOKEN=test-ide-token',
+        ]),
+      );
+    });
+
     it('should not attempt to create a temporary settings directory when homedir is empty', async () => {
       mockedHomedir.mockReturnValue('');
       vi.mocked(os.tmpdir).mockReturnValue('/mock/tmp');
