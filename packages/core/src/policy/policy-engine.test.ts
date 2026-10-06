@@ -2271,7 +2271,7 @@ describe('PolicyEngine', () => {
     });
 
     it('should downgrade to ASK_USER in YOLO mode if shell command parsing fails and command has redirection', async () => {
-      const { splitCommands } = await import('../utils/shell-utils.js');
+      const { parseCommandDetails } = await import('../utils/shell-utils.js');
       const rules: PolicyRule[] = [
         {
           toolName: '*',
@@ -2287,7 +2287,10 @@ describe('PolicyEngine', () => {
       });
 
       // Simulate parsing failure for a command with redirection
-      vi.mocked(splitCommands).mockReturnValueOnce([]);
+      vi.mocked(parseCommandDetails).mockReturnValueOnce({
+        details: [],
+        hasError: true,
+      });
 
       const result = await engine.check(
         {
@@ -2301,7 +2304,7 @@ describe('PolicyEngine', () => {
     });
 
     it('should return DENY in nonInteractive YOLO mode if shell command parsing fails and command has redirection', async () => {
-      const { splitCommands } = await import('../utils/shell-utils.js');
+      const { parseCommandDetails } = await import('../utils/shell-utils.js');
       const rules: PolicyRule[] = [
         {
           toolName: '*',
@@ -2318,7 +2321,10 @@ describe('PolicyEngine', () => {
       });
 
       // Simulate parsing failure for a command with redirection
-      vi.mocked(splitCommands).mockReturnValueOnce([]);
+      vi.mocked(parseCommandDetails).mockReturnValueOnce({
+        details: [],
+        hasError: true,
+      });
 
       const result = await engine.check(
         {
@@ -2332,7 +2338,7 @@ describe('PolicyEngine', () => {
     });
 
     it('should return ALLOW in YOLO mode if shell command parsing fails with redirection but allowRedirection is true', async () => {
-      const { splitCommands } = await import('../utils/shell-utils.js');
+      const { parseCommandDetails } = await import('../utils/shell-utils.js');
       const rules: PolicyRule[] = [
         {
           toolName: 'run_shell_command',
@@ -2347,7 +2353,10 @@ describe('PolicyEngine', () => {
         approvalMode: ApprovalMode.YOLO,
       });
 
-      vi.mocked(splitCommands).mockReturnValueOnce([]);
+      vi.mocked(parseCommandDetails).mockReturnValueOnce({
+        details: [],
+        hasError: true,
+      });
 
       const result = await engine.check(
         {
@@ -2361,7 +2370,7 @@ describe('PolicyEngine', () => {
     });
 
     it('should downgrade in AUTO_EDIT mode if shell command parsing fails and command has redirection', async () => {
-      const { splitCommands } = await import('../utils/shell-utils.js');
+      const { parseCommandDetails } = await import('../utils/shell-utils.js');
       const rules: PolicyRule[] = [
         {
           toolName: 'run_shell_command',
@@ -2375,7 +2384,10 @@ describe('PolicyEngine', () => {
         approvalMode: ApprovalMode.AUTO_EDIT,
       });
 
-      vi.mocked(splitCommands).mockReturnValueOnce([]);
+      vi.mocked(parseCommandDetails).mockReturnValueOnce({
+        details: [],
+        hasError: true,
+      });
 
       const result = await engine.check(
         {
