@@ -107,6 +107,7 @@ export class OAuth2AuthProvider extends BaseA2AAuthProvider {
     }
 
     const token = await this.pendingAuthPromise;
+    this.authRetryCount = 0;
     return { Authorization: `Bearer ${token.accessToken}` };
   }
 
@@ -167,7 +168,8 @@ export class OAuth2AuthProvider extends BaseA2AAuthProvider {
     if (this.authRetryCount >= BaseA2AAuthProvider.MAX_AUTH_RETRIES) {
       return undefined;
     }
-    this.authRetryCount++;
+    const nextRetryCount = this.authRetryCount + 1;
+    this.authRetryCount = nextRetryCount;
 
     debugLogger.debug(
       '[OAuth2AuthProvider] Auth failure, clearing token and re-authenticating',
@@ -175,7 +177,9 @@ export class OAuth2AuthProvider extends BaseA2AAuthProvider {
     this.cachedToken = null;
     await this.tokenStorage.deleteCredentials(this.agentName);
 
-    return this.headers();
+    const headers = await this.headers();
+    this.authRetryCount = nextRetryCount;
+    return headers;
   }
 
   // ---------------------------------------------------------------------------

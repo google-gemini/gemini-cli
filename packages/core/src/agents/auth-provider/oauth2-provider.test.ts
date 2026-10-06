@@ -518,6 +518,26 @@ describe('OAuth2AuthProvider', () => {
       const result = await provider.shouldRetryWithHeaders({}, res401);
       expect(result).toBeDefined();
     });
+
+    it('should reset retry count when a new token is acquired on subsequent headers() call', async () => {
+      const provider = new OAuth2AuthProvider(createConfig(), 'test-agent');
+      const storage = getTokenStorage();
+      const res401 = new Response(null, { status: 401 });
+
+      // Consume both retries
+      await provider.shouldRetryWithHeaders({}, res401);
+      await provider.shouldRetryWithHeaders({}, res401);
+
+      // Simulate token expiring before the next normal request
+      storage.isTokenExpired.mockReturnValueOnce(true);
+
+      // Acquiring a fresh token via headers() resets the retry counter
+      await provider.headers();
+
+      // A later 401 should be allowed to retry again
+      const result = await provider.shouldRetryWithHeaders({}, res401);
+      expect(result).toBeDefined();
+    });
   });
 
   describe('token persistence', () => {

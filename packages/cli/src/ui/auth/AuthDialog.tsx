@@ -163,7 +163,11 @@ export function AuthDialog({
       onAuthError(error);
     } else {
       onAuthError(null);
-      await onSelect(authMethod, SettingScope.User);
+      try {
+        await onSelect(authMethod, SettingScope.User);
+      } catch (e) {
+        onAuthError(e instanceof Error ? e.message : String(e));
+      }
     }
   };
 
