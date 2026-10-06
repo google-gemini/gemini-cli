@@ -153,6 +153,151 @@ type McpContentBlock =
   | McpResourceBlock
   | McpResourceLinkBlock;
 
+const CONVERSATIONAL_PARAM_KEYS = new Set([
+  'description',
+  'explanation',
+  'reason',
+  'thought',
+]);
+
+function formatParamValue(value: unknown): string {
+  if (value === null || value === undefined) {
+    return String(value);
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    typeof value === 'bigint'
+  ) {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(formatParamValue).join(', ')}]`;
+  }
+  if (typeof value === 'object') {
+    const entries = Object.entries(value)
+      .filter(([, v]) => v !== undefined)
+      .map(([k, v]) => `${k}: ${formatParamValue(v)}`);
+    return `(${entries.join(', ')})`;
+  }
+  return String(value);
+}
+
+/**
+ * Formats tool parameters into a human-readable function signature or raw command,
+ * excluding conversational/explanatory parameters and avoiding raw JSON braces.
+ */
+export function formatToolDescription(
+  toolName: string,
+  fallbackDisplayName: string | undefined,
+  params: Record<string, unknown>,
+): string {
+  const functionalEntries = Object.entries(params).filter(
+    ([key, val]) =>
+      !CONVERSATIONAL_PARAM_KEYS.has(key.toLowerCase()) && val !== undefined,
+  );
+
+  const command = params['command'];
+  if (
+    typeof command === 'string' &&
+    functionalEntries.length === 1 &&
+    functionalEntries[0]?.[0] === 'command'
+  ) {
+    return command;
+  }
+
+  if (functionalEntries.length === 0) {
+    return fallbackDisplayName || toolName;
+  }
+
+  const formattedArgs = functionalEntries
+    .map(([key, val]) => `${key}: ${formatParamValue(val)}`)
+    .join(', ');
+
+  return `${toolName}(${formattedArgs})`;
+}
+
+/**
+ * Formats a clean title for UI/ACP display. If a `command` parameter is present,
+ * returns strictly the raw executable command so IDE clients can syntax-highlight it.
+ * Otherwise, returns the formatted function signature.
+ */
+export function formatToolDisplayTitle(
+  toolName: string,
+  fallbackDisplayName: string | undefined,
+  params: Record<string, unknown>,
+): string {
+  const command = params['command'];
+  if (typeof command === 'string' && command.trim().length > 0) {
+    return command;
+  }
+  return formatToolDescription(toolName, fallbackDisplayName, params);
+}
+
+/**
+ * Extracts conversational/explanatory text (and non-command contextual parameters
+ * when a command is present) so explanations travel in ACP content blocks.
+ */
+export function extractToolExplanation(
+  params: Record<string, unknown>,
+): string {
+  const MAX_EXPLANATION_LENGTH = 500;
+  const parts: string[] = [];
+
+  const command = params['command'];
+  const hasCommand = typeof command === 'string' && command.trim().length > 0;
+
+  if (hasCommand) {
+    const contextEntries = Object.entries(params).filter(
+      ([key, val]) =>
+        key !== 'command' &&
+        !CONVERSATIONAL_PARAM_KEYS.has(key.toLowerCase()) &&
+        val !== undefined,
+    );
+    if (contextEntries.length > 0) {
+      const formattedContext = contextEntries
+        .map(([key, val]) => `${key}: ${formatParamValue(val)}`)
+        .join(', ');
+      if (formattedContext.length > MAX_EXPLANATION_LENGTH) {
+        const keys = Object.keys(params);
+        const displayedKeys = keys.slice(0, 5);
+        const keysDesc =
+          displayedKeys.length > 0
+            ? ` with parameters: ${displayedKeys.join(', ')}${
+                keys.length > 5 ? ', ...' : ''
+              }`
+            : '';
+        parts.push(`[Payload omitted due to length${keysDesc}]`);
+      } else {
+        parts.push(`[${formattedContext}]`);
+      }
+    }
+  }
+
+  for (const [key, val] of Object.entries(params)) {
+    if (
+      CONVERSATIONAL_PARAM_KEYS.has(key.toLowerCase()) &&
+      typeof val === 'string' &&
+      val.trim().length > 0
+    ) {
+      parts.push(val.trim());
+    }
+  }
+
+  if (parts.length === 0) {
+    return '';
+  }
+
+  const combined = parts.join(' ');
+  if (combined.length > MAX_EXPLANATION_LENGTH) {
+    return `${combined.slice(0, MAX_EXPLANATION_LENGTH)}...`;
+  }
+  return combined;
+}
+
 export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
   ToolParams,
   ToolResult
@@ -333,36 +478,23 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
   }
 
   getDescription(): string {
-    return safeJsonStringify(this.params);
+    return formatToolDescription(
+      this.serverToolName,
+      this.displayName,
+      this.params,
+    );
   }
 
   override getDisplayTitle(): string {
-    // If it's a known terminal execute tool provided by JetBrains or similar,
-    // and a command argument is present, return just the command.
-    const command = this.params['command'];
-    if (typeof command === 'string') {
-      return command;
-    }
-
-    // Otherwise fallback to the display name or server tool name
-    return this.displayName || this.serverToolName;
+    return formatToolDisplayTitle(
+      this.serverToolName,
+      this.displayName,
+      this.params,
+    );
   }
 
   override getExplanation(): string {
-    const MAX_EXPLANATION_LENGTH = 500;
-    const stringified = safeJsonStringify(this.params);
-    if (stringified.length > MAX_EXPLANATION_LENGTH) {
-      const keys = Object.keys(this.params);
-      const displayedKeys = keys.slice(0, 5);
-      const keysDesc =
-        displayedKeys.length > 0
-          ? ` with parameters: ${displayedKeys.join(', ')}${
-              keys.length > 5 ? ', ...' : ''
-            }`
-          : '';
-      return `[Payload omitted due to length${keysDesc}]`;
-    }
-    return stringified;
+    return extractToolExplanation(this.params);
   }
 }
 

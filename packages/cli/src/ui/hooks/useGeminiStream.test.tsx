@@ -55,6 +55,7 @@ import {
   getPlanModeExitMessage,
   UPDATE_TOPIC_TOOL_NAME,
   TRUE_EMPTY_RESPONSE_MESSAGE,
+  DEFAULT_GEMINI_FLASH_MODEL,
 } from '@google/gemini-cli-core';
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -2645,7 +2646,7 @@ describe('useGeminiStream', () => {
           mockAuthType,
           undefined,
           'gemini-2.5-pro',
-          'gemini-2.5-flash',
+          DEFAULT_GEMINI_FLASH_MODEL,
         );
       });
     });
@@ -3882,7 +3883,7 @@ describe('useGeminiStream', () => {
         expect.any(String),
         undefined,
         'gemini-2.5-pro',
-        'gemini-2.5-flash',
+        DEFAULT_GEMINI_FLASH_MODEL,
       );
     });
 

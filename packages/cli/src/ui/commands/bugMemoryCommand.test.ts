@@ -118,4 +118,22 @@ describe('bugMemoryCommand', () => {
     expect(addItemCalls[0][0].type).toBe(MessageType.ERROR);
     expect(addItemCalls[0][0].text).toContain('temp directory');
   });
+
+  it('wraps Windows snapshot paths in backticks to prevent Markdown backslash escaping', async () => {
+    const windowsTempDir = 'C:\\Users\\ASUS\\.gemini\\tmp\\aicode';
+    const context = makeContextWithTempDir(windowsTempDir);
+    vi.mocked(captureHeapSnapshot).mockResolvedValueOnce(undefined);
+
+    if (!bugMemoryCommand.action) throw new Error('Action missing');
+    await bugMemoryCommand.action(context, '');
+
+    const expectedPath = path.join(
+      windowsTempDir,
+      `bug-memory-${new Date('2024-01-01T00:00:00Z').getTime()}.heapsnapshot`,
+    );
+
+    const addItemCalls = vi.mocked(context.ui.addItem).mock.calls;
+    expect(addItemCalls[0][0].text).toContain(`\`${expectedPath}\``);
+    expect(addItemCalls[1][0].text).toContain(`\`${expectedPath}\``);
+  });
 });

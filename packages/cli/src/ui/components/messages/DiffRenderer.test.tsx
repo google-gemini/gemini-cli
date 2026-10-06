@@ -393,6 +393,68 @@ fileDiff Index: Dockerfile
         await waitFor(() => expect(lastFrame()).toContain('RUN npm run build'));
         expect(lastFrame()).toMatchSnapshot();
       });
+
+      it('should disable truncation and render all diff lines without hidden lines indicator when disableTruncation is true', async () => {
+        const longDiff = `
+diff --git a/test.txt b/test.txt
+--- a/test.txt
++++ b/test.txt
+@@ -1,10 +1,10 @@
+-old line 1
+-old line 2
+-old line 3
+-old line 4
+-old line 5
++new line 1
++new line 2
++new line 3
++new line 4
++new line 5
+`;
+        const { lastFrame } = await renderWithProviders(
+          <OverflowProvider>
+            <DiffRenderer
+              diffContent={longDiff}
+              filename="test.txt"
+              availableTerminalHeight={3}
+              disableTruncation={true}
+              terminalWidth={80}
+            />
+          </OverflowProvider>,
+        );
+        await waitFor(() => {
+          expect(lastFrame()).toContain('new line 1');
+          expect(lastFrame()).toContain('new line 5');
+          expect(lastFrame()).not.toContain('hidden');
+        });
+      });
+
+      it('handles negative, zero, and very small terminal widths without throwing RangeError', async () => {
+        const diffWithHunks = `
+diff --git a/test.txt b/test.txt
+--- a/test.txt
++++ b/test.txt
+@@ -1,2 +1,2 @@
+-line 1
++line 1 modified
+@@ -10,2 +10,2 @@
+-line 10
++line 10 modified
+`;
+        for (const terminalWidth of [-5, -1, 0, 1, 2, 4]) {
+          const { lastFrame, unmount } = await renderWithProviders(
+            <OverflowProvider>
+              <DiffRenderer
+                diffContent={diffWithHunks}
+                filename="test.txt"
+                terminalWidth={terminalWidth}
+              />
+            </OverflowProvider>,
+          );
+          expect(lastFrame()).toBeDefined();
+          unmount();
+        }
+      });
     },
   );
 });

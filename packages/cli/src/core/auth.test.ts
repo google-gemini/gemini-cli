@@ -127,7 +127,7 @@ describe('auth', () => {
     );
     expect(result).toEqual({
       authError:
-        'This account requires setting the GOOGLE_CLOUD_PROJECT or GOOGLE_CLOUD_PROJECT_ID env var. See https://goo.gle/gemini-cli-auth-docs#workspace-gca',
+        'This account requires setting the GOOGLE_CLOUD_PROJECT or GOOGLE_CLOUD_PROJECT_ID env var. See https://geminicli.com/docs/get-started/authentication/#set-gcp',
       accountSuspensionInfo: null,
     });
     expect(result.authError).not.toContain('Failed to login');

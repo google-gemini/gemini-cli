@@ -803,6 +803,226 @@ describe('SessionSelector', () => {
       },
     );
   });
+
+  describe('resolveSessionById', () => {
+    it('should resolve session with no messages / no resumable content', async () => {
+      const sessionId = randomUUID();
+      const chatsDir = path.join(tmpDir, 'chats');
+      await fs.mkdir(chatsDir, { recursive: true });
+
+      const session = {
+        sessionId,
+        projectHash: 'test-hash',
+        startTime: '2024-01-01T10:00:00.000Z',
+        lastUpdated: '2024-01-01T10:00:00.000Z',
+        kind: 'main',
+        messages: [],
+      };
+
+      await fs.writeFile(
+        path.join(
+          chatsDir,
+          `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.jsonl`,
+        ),
+        JSON.stringify(session) + '\n',
+      );
+
+      const sessionSelector = new SessionSelector(storage);
+      const result = await sessionSelector.resolveSessionById(sessionId);
+
+      expect(result.sessionData.sessionId).toBe(sessionId);
+      expect(result.sessionData.messages).toEqual([]);
+      expect(result.displayInfo).toContain('Empty conversation');
+    });
+
+    it('should resolve session with messages', async () => {
+      const sessionId = randomUUID();
+      const chatsDir = path.join(tmpDir, 'chats');
+      await fs.mkdir(chatsDir, { recursive: true });
+
+      const session = {
+        sessionId,
+        projectHash: 'test-hash',
+        startTime: '2024-01-01T10:00:00.000Z',
+        lastUpdated: '2024-01-01T10:30:00.000Z',
+        kind: 'main',
+        messages: [
+          {
+            type: 'user',
+            content: 'Hello ACP',
+            id: 'msg1',
+            timestamp: '2024-01-01T10:00:00.000Z',
+          },
+        ],
+      };
+
+      await fs.writeFile(
+        path.join(
+          chatsDir,
+          `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.jsonl`,
+        ),
+        JSON.stringify(session) + '\n',
+      );
+
+      const sessionSelector = new SessionSelector(storage);
+      const result = await sessionSelector.resolveSessionById(sessionId);
+
+      expect(result.sessionData.sessionId).toBe(sessionId);
+      expect(result.sessionData.messages).toHaveLength(1);
+    });
+
+    it('should format displayInfo using startTime fallback when lastUpdated is missing', async () => {
+      const sessionId = randomUUID();
+      const chatsDir = path.join(tmpDir, 'chats');
+      await fs.mkdir(chatsDir, { recursive: true });
+
+      const session = {
+        sessionId,
+        projectHash: 'test-hash',
+        startTime: '2024-01-01T10:00:00.000Z',
+        messages: [
+          {
+            type: 'user',
+            content: 'Hello without lastUpdated',
+            id: 'msg1',
+            timestamp: '2024-01-01T10:00:00.000Z',
+          },
+        ],
+      };
+
+      await fs.writeFile(
+        path.join(
+          chatsDir,
+          `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.jsonl`,
+        ),
+        JSON.stringify(session) + '\n',
+      );
+
+      const sessionSelector = new SessionSelector(storage);
+      const result = await sessionSelector.resolveSessionById(sessionId);
+
+      expect(result.sessionData.sessionId).toBe(sessionId);
+      expect(result.displayInfo).toContain(
+        `Session ${sessionId}: Hello without lastUpdated`,
+      );
+      expect(result.displayInfo).not.toContain('Invalid Date');
+    });
+
+    it('should throw INVALID_SESSION_IDENTIFIER if session does not exist on disk', async () => {
+      const nonExistentId = randomUUID();
+      const sessionSelector = new SessionSelector(storage);
+
+      await expect(
+        sessionSelector.resolveSessionById(nonExistentId),
+      ).rejects.toSatisfy((error) => {
+        expect(error).toBeInstanceOf(SessionError);
+        expect((error as SessionError).code).toBe('INVALID_SESSION_IDENTIFIER');
+        return true;
+      });
+    });
+
+    it('should not resolve subagent sessions via resolveSessionById', async () => {
+      const subagentId = randomUUID();
+      const chatsDir = path.join(tmpDir, 'chats');
+      await fs.mkdir(chatsDir, { recursive: true });
+
+      const session = {
+        sessionId: subagentId,
+        projectHash: 'test-hash',
+        startTime: '2024-01-01T10:00:00.000Z',
+        lastUpdated: '2024-01-01T10:00:00.000Z',
+        kind: 'subagent',
+        messages: [],
+      };
+
+      await fs.writeFile(
+        path.join(
+          chatsDir,
+          `${SESSION_FILE_PREFIX}2024-01-01T10-00-${subagentId.slice(0, 8)}.jsonl`,
+        ),
+        JSON.stringify(session) + '\n',
+      );
+
+      const sessionSelector = new SessionSelector(storage);
+      await expect(
+        sessionSelector.resolveSessionById(subagentId),
+      ).rejects.toThrow(SessionError);
+    });
+
+    it('should allow resolving empty session via resolveSession with allowEmpty: true', async () => {
+      const sessionId = randomUUID();
+      const chatsDir = path.join(tmpDir, 'chats');
+      await fs.mkdir(chatsDir, { recursive: true });
+
+      const session = {
+        sessionId,
+        projectHash: 'test-hash',
+        startTime: '2024-01-01T10:00:00.000Z',
+        lastUpdated: '2024-01-01T10:00:00.000Z',
+        kind: 'main',
+        messages: [],
+      };
+
+      await fs.writeFile(
+        path.join(
+          chatsDir,
+          `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.jsonl`,
+        ),
+        JSON.stringify(session) + '\n',
+      );
+
+      const sessionSelector = new SessionSelector(storage);
+
+      // With allowEmpty: true, it succeeds
+      const result = await sessionSelector.resolveSession(sessionId, {
+        allowEmpty: true,
+      });
+      expect(result.sessionData.sessionId).toBe(sessionId);
+
+      // Without allowEmpty, it rejects (preserving human terminal CLI semantics)
+      await expect(sessionSelector.resolveSession(sessionId)).rejects.toThrow(
+        SessionError,
+      );
+    });
+
+    it('should continue to resolve via index rather than resolveSessionById when passing numeric index with allowEmpty: true', async () => {
+      const sessionId = randomUUID();
+      const chatsDir = path.join(tmpDir, 'chats');
+      await fs.mkdir(chatsDir, { recursive: true });
+
+      const session = {
+        sessionId,
+        projectHash: 'test-hash',
+        startTime: '2024-01-01T10:00:00.000Z',
+        lastUpdated: '2024-01-01T10:00:00.000Z',
+        messages: [
+          {
+            type: 'user',
+            content: 'test message',
+            id: 'msg1',
+            timestamp: '2024-01-01T10:00:00.000Z',
+          },
+        ],
+      };
+
+      await fs.writeFile(
+        path.join(
+          chatsDir,
+          `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.jsonl`,
+        ),
+        JSON.stringify(session) + '\n',
+      );
+
+      const sessionSelector = new SessionSelector(storage);
+
+      const result = await sessionSelector.resolveSession('1', {
+        allowEmpty: true,
+      });
+
+      expect(result.sessionData.sessionId).toBe(sessionId);
+      expect(result.sessionData.messages[0].content).toBe('test message');
+    });
+  });
 });
 
 describe('extractFirstUserMessage', () => {

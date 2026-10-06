@@ -4,7 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  afterAll,
+  beforeEach,
+  afterEach,
+  vi,
+} from 'vitest';
 import request from 'supertest';
 import type express from 'express';
 import * as fs from 'node:fs';
@@ -17,12 +26,27 @@ import { createApp, updateCoderAgentCardUrl } from './app.js';
 import type { TaskMetadata } from '../types.js';
 import { createMockConfig } from '../utils/testing_utils.js';
 import { debugLogger, type Config } from '@google/gemini-cli-core';
+import { logger } from '../utils/logger.js';
 
 // Mock the logger to avoid polluting test output
 // Comment out to help debug
 vi.mock('../utils/logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
+
+vi.mock('../persistence/gcs.js', () => {
+  class MockGCSTaskStore {
+    load = vi.fn();
+    save = vi.fn();
+  }
+  class MockNoOpTaskStore {
+    constructor(public store: unknown) {}
+  }
+  return {
+    GCSTaskStore: MockGCSTaskStore,
+    NoOpTaskStore: MockNoOpTaskStore,
+  };
+});
 
 // Mock Task.create to avoid its complex setup
 vi.mock('../agent/task.js', () => {
@@ -158,5 +182,64 @@ describe('Agent Server Endpoints', () => {
     expect(response.status).toBe(200);
     expect(response.body.name).toBe('Gemini SDLC Agent');
     expect(response.body.url).toBe(`http://localhost:${port}/`);
+  });
+
+  describe('GET /tasks/metadata with non-InMemoryTaskStore', () => {
+    let nonInMemoryApp: express.Express;
+    let nonInMemoryServer: Server;
+    let nonInMemoryWorkspace: string;
+    let originalCwd: string;
+
+    beforeEach(async () => {
+      originalCwd = process.cwd();
+      nonInMemoryWorkspace = fs.mkdtempSync(
+        path.join(os.tmpdir(), 'gemini-agent-gcs-test-'),
+      );
+      vi.stubEnv('CODER_AGENT_WORKSPACE_PATH', nonInMemoryWorkspace);
+      vi.stubEnv('GCS_BUCKET_NAME', 'test-bucket');
+      nonInMemoryApp = await createApp();
+      await new Promise<void>((resolve) => {
+        nonInMemoryServer = nonInMemoryApp.listen(0, () => {
+          resolve();
+        });
+      });
+    });
+
+    afterEach(async () => {
+      vi.unstubAllEnvs();
+      if (nonInMemoryServer) {
+        await new Promise<void>((resolve, reject) => {
+          nonInMemoryServer.close((err) => {
+            if (err) return reject(err);
+            resolve();
+          });
+        });
+      }
+      if (originalCwd) {
+        process.chdir(originalCwd);
+      }
+      if (nonInMemoryWorkspace) {
+        try {
+          fs.rmSync(nonInMemoryWorkspace, { recursive: true, force: true });
+        } catch (e) {
+          debugLogger.warn(
+            `Could not remove temp dir '${nonInMemoryWorkspace}':`,
+            e,
+          );
+        }
+      }
+    });
+
+    it('should return 501 and not fall through to send a second response', async () => {
+      vi.mocked(logger.error).mockClear();
+      const response = await request(nonInMemoryApp).get('/tasks/metadata');
+      expect(response.status).toBe(501);
+      expect(response.body).toEqual({
+        error:
+          'Listing all task metadata is only supported when using InMemoryTaskStore.',
+      });
+      // Without return, the handler falls through and triggers ERR_HTTP_HEADERS_SENT
+      expect(logger.error).not.toHaveBeenCalled();
+    });
   });
 });

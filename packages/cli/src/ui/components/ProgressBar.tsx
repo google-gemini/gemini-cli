@@ -19,9 +19,16 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   width,
   warningThreshold = 80,
 }) => {
-  const safeValue = Math.min(Math.max(value, 0), 100);
-  const activeChars = Math.ceil((safeValue / 100) * width);
-  const inactiveChars = width - activeChars;
+  const safeWidth = Math.max(0, Math.floor(width || 0));
+  const safeValue = Math.min(
+    Math.max(Number.isFinite(value) ? value : 0, 0),
+    100,
+  );
+  const activeChars = Math.min(
+    safeWidth,
+    Math.max(0, Math.ceil((safeValue / 100) * safeWidth)),
+  );
+  const inactiveChars = Math.max(0, safeWidth - activeChars);
 
   let color = theme.status.success;
   if (safeValue >= 100) {

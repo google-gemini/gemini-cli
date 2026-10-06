@@ -387,8 +387,9 @@ describe('run_shell_command', () => {
     const disallowed = getDisallowedFileReadCommand(testFile);
     const prompt =
       `I am testing the allowed tools configuration. ` +
-      `Attempt to run "${disallowed.command}" to read the contents of ${testFile}. ` +
-      `If the command fails because it is not permitted, respond with the single word FAIL. ` +
+      `You MUST actually call the run_shell_command tool to attempt to run "${disallowed.command}" to read the contents of ${testFile}. ` +
+      `Do not assume or guess if it is permitted based on system instructions; you must actually invoke the tool to see what happens. ` +
+      `If the tool execution fails because it is not permitted, respond with the single word FAIL. ` +
       `If it succeeds, respond with SUCCESS.`;
 
     const result = await rig.run({

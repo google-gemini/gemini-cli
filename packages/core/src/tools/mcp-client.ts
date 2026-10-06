@@ -84,6 +84,7 @@ import { validateMcpPolicyToolNames } from '../policy/toml-loader.js';
 import {
   sanitizeEnvironment,
   type EnvironmentSanitizationConfig,
+  isDangerousExecutionEnvironmentVariable,
 } from '../services/environmentSanitization.js';
 import { expandEnvVars } from '../utils/envExpansion.js';
 
@@ -950,6 +951,9 @@ async function handleAutomaticOAuth(
       issuer: oauthConfig.issuer,
       tokenUrl: oauthConfig.tokenUrl,
       scopes: oauthConfig.scopes || [],
+      authorizationResponseIssParameterSupported:
+        mcpServerConfig.oauth?.authorizationResponseIssParameterSupported ??
+        oauthConfig.authorizationResponseIssParameterSupported,
     };
 
     // Perform OAuth authentication
@@ -2112,6 +2116,10 @@ export async function connectToMcpServer(
               issuer: oauthConfig.issuer,
               tokenUrl: oauthConfig.tokenUrl,
               scopes: oauthConfig.scopes || [],
+              authorizationResponseIssParameterSupported:
+                mcpServerConfig.oauth
+                  ?.authorizationResponseIssParameterSupported ??
+                oauthConfig.authorizationResponseIssParameterSupported,
             };
 
             // Perform OAuth authentication
@@ -2360,7 +2368,16 @@ export async function createTransport(
     // Expand and merge explicit environment variables from the MCP configuration.
     if (mcpServerConfig.env) {
       for (const [key, value] of Object.entries(mcpServerConfig.env)) {
-        finalEnv[key] = expandEnvVars(value, expansionEnv);
+        if (value === undefined) {
+          continue;
+        }
+        if (isDangerousExecutionEnvironmentVariable(key)) {
+          debugLogger.warn(
+            `Blocked dangerous environment variable override for MCP server '${mcpServerName}': ${key}`,
+          );
+          continue;
+        }
+        finalEnv[key] = expandEnvVars(value, sanitizedEnv);
       }
     }
 
@@ -2414,7 +2431,13 @@ function getExtensionEnvironment(
   const env: Record<string, string> = {};
   if (extension?.resolvedSettings) {
     for (const setting of extension.resolvedSettings) {
-      if (setting.value !== undefined) {
+      if (setting.value !== undefined && typeof setting.envVar === 'string') {
+        if (isDangerousExecutionEnvironmentVariable(setting.envVar)) {
+          debugLogger.warn(
+            `Blocked restricted environment variable override in extension settings: ${setting.envVar}`,
+          );
+          continue;
+        }
         env[setting.envVar] = setting.value;
       }
     }
