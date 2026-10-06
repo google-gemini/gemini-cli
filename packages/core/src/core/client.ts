@@ -304,8 +304,12 @@ export class GeminiClient {
   /**
    * Removes the trailing model turn when it only holds unanswered function
    * calls. See {@link GeminiChat.discardTrailingUnansweredToolCallTurn}.
+   * Returns false without side effects when the chat is not initialized.
    */
   discardTrailingUnansweredToolCallTurn(): boolean {
+    if (!this.isInitialized()) {
+      return false;
+    }
     const removed = this.getChat().discardTrailingUnansweredToolCallTurn();
     if (removed) {
       this.updateTelemetryTokenCount();
