@@ -71,10 +71,9 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
 
   const interactions = useMemo(
     () =>
-      conversation.messages.filter((msg) => {
-        if (msg.type !== 'user') return false;
-        return !isToolResponseMessage(msg);
-      }),
+      conversation.messages.filter(
+        (msg) => msg.type === 'user' && !isToolResponseMessage(msg),
+      ),
     [conversation.messages],
   );
 

@@ -28,6 +28,10 @@ import {
   THINKING_ONLY_NUDGE_MESSAGE,
   NO_RESPONSE_TEXT_NUDGE_MESSAGE,
   applyRetryNudge,
+  coalesceConsecutiveContents,
+  ensureTerminalUserTurn,
+  CONTINUE_PROMPT_TEXT,
+  INTERRUPTED_TOOL_RESPONSE_ERROR,
 } from './geminiChat.js';
 import {
   type CompletedToolCall,
@@ -5387,19 +5391,25 @@ describe('GeminiChat', () => {
       }
 
       expect(capturedContents).toBeDefined();
-      const lastTurn = capturedContents![capturedContents!.length - 1];
-      expect(lastTurn.role).toBe('user');
-      expect(lastTurn.parts).toEqual([
-        {
-          functionResponse: {
-            name: 'generic_tool',
-            id: 'call_fallback',
-            response: {
-              error: 'Response was lost or interrupted.',
+      expect(capturedContents![2]).toEqual({
+        role: 'user',
+        parts: [
+          {
+            functionResponse: {
+              name: 'generic_tool',
+              id: 'call_fallback',
+              response: {
+                error: INTERRUPTED_TOOL_RESPONSE_ERROR,
+              },
             },
           },
-        },
-      ]);
+        ],
+      });
+      const lastTurn = capturedContents![capturedContents!.length - 1];
+      expect(lastTurn).toEqual({
+        role: 'user',
+        parts: [{ text: CONTINUE_PROMPT_TEXT }],
+      });
     });
 
     it('should synthesize matching functionResponse before follow-up user text prompt when preceding turn has unclosed functionCall', async () => {
@@ -5439,6 +5449,15 @@ describe('GeminiChat', () => {
         },
       );
 
+      const recordMessageSpy = vi.spyOn(
+        chat.getChatRecordingService(),
+        'recordMessage',
+      );
+      const recordSyntheticMessageSpy = vi.spyOn(
+        chat.getChatRecordingService(),
+        'recordSyntheticMessage',
+      );
+
       const stream = await chat.sendMessageStream(
         { model: 'gemini-2.5-pro' },
         [{ text: 'Nevermind, do something else.' }],
@@ -5452,20 +5471,59 @@ describe('GeminiChat', () => {
       }
 
       expect(capturedContents).toBeDefined();
-      const lastTurn = capturedContents![capturedContents!.length - 1];
-      expect(lastTurn.role).toBe('user');
-      expect(lastTurn.parts).toEqual([
+      expect(capturedContents).toEqual([
+        { role: 'user', parts: [{ text: 'Please read the file' }] },
+        {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                id: 'call_read',
+                name: 'read_file',
+                args: { path: 'foo.ts' },
+              },
+            },
+          ],
+        },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'read_file',
+                id: 'call_read',
+                response: { error: INTERRUPTED_TOOL_RESPONSE_ERROR },
+              },
+            },
+          ],
+        },
+        {
+          role: 'model',
+          parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+        },
+        {
+          role: 'user',
+          parts: [{ text: 'Nevermind, do something else.' }],
+        },
+      ]);
+
+      // The synthetic response and the user's prompt are recorded as separate
+      // messages; the prompt is not mixed with functionResponse parts.
+      expect(recordSyntheticMessageSpy).toHaveBeenCalledWith('user', [
         {
           functionResponse: {
             name: 'read_file',
             id: 'call_read',
-            response: {
-              error: 'Response was lost or interrupted.',
-            },
+            response: { error: INTERRUPTED_TOOL_RESPONSE_ERROR },
           },
         },
-        { text: 'Nevermind, do something else.' },
       ]);
+      expect(recordMessageSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'user',
+          content: [{ text: 'Nevermind, do something else.' }],
+        }),
+      );
     });
 
     it('should re-coalesce adjacent turns of same role when interior empty user turn is stripped', () => {
@@ -5491,6 +5549,368 @@ describe('GeminiChat', () => {
         { text: 'Step 1 output' },
         { text: 'Step 2 output' },
       ]);
+    });
+
+    it('should not add synthetic turns to history or the session log across retries', async () => {
+      const recordSyntheticMessageSpy = vi.spyOn(
+        chat.getChatRecordingService(),
+        'recordSyntheticMessage',
+      );
+      const apiHistoryOverride: Content[] = [
+        { role: 'user', parts: [{ text: 'Initial question' }] },
+        { role: 'model', parts: [{ text: 'Initial answer' }] },
+      ];
+
+      const capturedContents: Content[][] = [];
+      vi.mocked(mockContentGenerator.generateContentStream)
+        // Attempt 1: thought-only response triggers a mid-stream retry.
+        .mockImplementationOnce(async (params) => {
+          capturedContents.push(params.contents as Content[]);
+          return (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: {
+                    role: 'model',
+                    parts: [{ thought: true, text: 'thinking' }],
+                  },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })();
+        })
+        // Attempt 2: valid response.
+        .mockImplementationOnce(async (params) => {
+          capturedContents.push(params.contents as Content[]);
+          return (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: { role: 'model', parts: [{ text: 'Answer' }] },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })();
+        });
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-2.0-flash' },
+        'Follow-up question',
+        'prompt-retry-normalization',
+        new AbortController().signal,
+        LlmRole.MAIN,
+        undefined,
+        apiHistoryOverride,
+      );
+      for await (const _ of stream) {
+        // consume
+      }
+
+      expect(capturedContents).toHaveLength(2);
+      expect(capturedContents[0].at(-1)).toEqual({
+        role: 'user',
+        parts: [{ text: CONTINUE_PROMPT_TEXT }],
+      });
+      expect(recordSyntheticMessageSpy).not.toHaveBeenCalled();
+      expect(chat.getHistory()).toEqual([
+        { role: 'user', parts: [{ text: 'Follow-up question' }] },
+        { role: 'model', parts: [{ text: 'Answer' }] },
+      ]);
+      expect(apiHistoryOverride).toHaveLength(2);
+    });
+
+    it('should populate a trailing empty model turn after a tool response in place', async () => {
+      chat.setHistory([
+        { id: 'u1', content: { role: 'user', parts: [{ text: 'Search' }] } },
+        {
+          id: 'm1',
+          content: {
+            role: 'model',
+            parts: [{ functionCall: { id: 'c1', name: 'grep', args: {} } }],
+          },
+        },
+        {
+          id: 'u2',
+          content: {
+            role: 'user',
+            parts: [
+              {
+                functionResponse: {
+                  id: 'c1',
+                  name: 'grep',
+                  response: { output: 'ok' },
+                },
+              },
+            ],
+          },
+        },
+        { id: 'm2', content: { role: 'model', parts: [] } },
+      ]);
+      const updateSpy = vi.spyOn(
+        chat.getChatRecordingService(),
+        'updateMessagesFromHistory',
+      );
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: { role: 'model', parts: [{ text: 'Done' }] },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-2.0-flash' },
+        'Next prompt',
+        'prompt-empty-model-turn',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of stream) {
+        // consume
+      }
+
+      const turns = chat.getHistoryTurns();
+      expect(turns.map((t) => t.id).slice(0, 4)).toEqual([
+        'u1',
+        'm1',
+        'u2',
+        'm2',
+      ]);
+      expect(turns[3].content.parts).toEqual([
+        { text: INTERRUPTED_RESPONSE_PLACEHOLDER },
+      ]);
+      expect(turns[4].content).toEqual({
+        role: 'user',
+        parts: [{ text: 'Next prompt' }],
+      });
+      expect(updateSpy).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: 'm2',
+            content: {
+              role: 'model',
+              parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+            },
+          }),
+        ]),
+      );
+    });
+
+    it('should replace an empty trailing user turn once and keep history in sync', async () => {
+      chat.setHistory([
+        { role: 'user', parts: [{ text: 'Hi' }] },
+        { role: 'model', parts: [{ text: 'Hello' }] },
+      ]);
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: { role: 'model', parts: [{ text: 'Continuing' }] },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-2.0-flash' },
+        [{ text: '' }],
+        'prompt-empty-user-turn',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of stream) {
+        // consume
+      }
+
+      expect(chat.getHistory()).toEqual([
+        { role: 'user', parts: [{ text: 'Hi' }] },
+        { role: 'model', parts: [{ text: 'Hello' }] },
+        { role: 'user', parts: [{ text: CONTINUE_PROMPT_TEXT }] },
+        { role: 'model', parts: [{ text: 'Continuing' }] },
+      ]);
+    });
+  });
+
+  describe('ensureTerminalUserTurn', () => {
+    it('returns the same array when the last turn is a user turn with content', () => {
+      const contents: Content[] = [
+        { role: 'model', parts: [{ text: 'a' }] },
+        { role: 'user', parts: [{ text: 'b' }] },
+      ];
+      expect(ensureTerminalUserTurn(contents)).toBe(contents);
+    });
+
+    it('replaces the parts of a trailing user turn without content', () => {
+      const contents: Content[] = [
+        { role: 'model', parts: [{ text: 'a' }] },
+        { role: 'user', parts: [{ text: '' }] },
+      ];
+      const snapshot = structuredClone(contents);
+      expect(ensureTerminalUserTurn(contents)).toEqual([
+        { role: 'model', parts: [{ text: 'a' }] },
+        { role: 'user', parts: [{ text: CONTINUE_PROMPT_TEXT }] },
+      ]);
+      expect(contents).toEqual(snapshot);
+    });
+
+    it('appends matching responses after a trailing model function call turn', () => {
+      const contents: Content[] = [
+        { role: 'user', parts: [{ text: 'go' }] },
+        {
+          role: 'model',
+          parts: [
+            { text: 'Running tools' },
+            { functionCall: { id: 'read_file__1', name: 'read_file' } },
+            { functionCall: { id: '2', name: ' ' } },
+          ],
+        },
+      ];
+      expect(ensureTerminalUserTurn(contents).at(-1)).toEqual({
+        role: 'user',
+        parts: [
+          {
+            functionResponse: {
+              name: 'read_file',
+              id: 'read_file__1',
+              response: { error: INTERRUPTED_TOOL_RESPONSE_ERROR },
+            },
+          },
+          {
+            functionResponse: {
+              name: 'generic_tool',
+              id: '2',
+              response: { error: INTERRUPTED_TOOL_RESPONSE_ERROR },
+            },
+          },
+        ],
+      });
+      expect(contents).toHaveLength(2);
+    });
+
+    it('appends a continuation prompt after a trailing model text turn or for empty contents', () => {
+      expect(
+        ensureTerminalUserTurn([{ role: 'model', parts: [{ text: 'a' }] }]),
+      ).toEqual([
+        { role: 'model', parts: [{ text: 'a' }] },
+        { role: 'user', parts: [{ text: CONTINUE_PROMPT_TEXT }] },
+      ]);
+      expect(ensureTerminalUserTurn([])).toEqual([
+        { role: 'user', parts: [{ text: CONTINUE_PROMPT_TEXT }] },
+      ]);
+    });
+  });
+
+  describe('discardTrailingUnansweredToolCallTurn', () => {
+    it('removes only the trailing model function call turn and keeps turn ids', () => {
+      chat.setHistory([
+        { id: 'u1', content: { role: 'user', parts: [{ text: 'go' }] } },
+        {
+          id: 'm1',
+          content: {
+            role: 'model',
+            parts: [{ functionCall: { id: 'c1', name: 'a', args: {} } }],
+          },
+        },
+        {
+          id: 'u2',
+          content: {
+            role: 'user',
+            parts: [
+              { functionResponse: { id: 'c1', name: 'a', response: {} } },
+            ],
+          },
+        },
+        {
+          id: 'm2',
+          content: {
+            role: 'model',
+            parts: [{ functionCall: { id: 'c2', name: 'b', args: {} } }],
+          },
+        },
+      ]);
+
+      expect(chat.discardTrailingUnansweredToolCallTurn()).toBe(true);
+      expect(chat.getHistoryTurns().map((t) => t.id)).toEqual([
+        'u1',
+        'm1',
+        'u2',
+      ]);
+    });
+
+    it('does nothing when the last turn is not a model function call turn', () => {
+      chat.setHistory([
+        { id: 'u1', content: { role: 'user', parts: [{ text: 'go' }] } },
+        { id: 'm1', content: { role: 'model', parts: [{ text: 'done' }] } },
+      ]);
+
+      expect(chat.discardTrailingUnansweredToolCallTurn()).toBe(false);
+      expect(chat.getHistoryTurns().map((t) => t.id)).toEqual(['u1', 'm1']);
+    });
+  });
+
+  describe('stripToolCallIdPrefixes field preservation', () => {
+    it('keeps every functionCall and functionResponse field when stripping prefixes', () => {
+      const result = stripToolCallIdPrefixes([
+        {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                id: 'tool__1',
+                name: 'tool',
+                args: { a: 1 },
+                willContinue: true,
+              } as Part['functionCall'],
+            },
+          ],
+        },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                id: 'tool__1',
+                name: 'tool',
+                response: { ok: true },
+                willContinue: true,
+              },
+            },
+          ],
+        },
+      ]);
+
+      expect(result[0].parts![0].functionCall).toEqual({
+        id: '1',
+        name: 'tool',
+        args: { a: 1 },
+        willContinue: true,
+      });
+      expect(result[1].parts![0].functionResponse).toEqual({
+        id: '1',
+        name: 'tool',
+        response: { ok: true },
+        willContinue: true,
+      });
+    });
+  });
+
+  describe('coalesceConsecutiveContents', () => {
+    it('does not merge adjacent contents without a role', () => {
+      const contents: Content[] = [
+        { parts: [{ text: 'a' }] },
+        { parts: [{ text: 'b' }] },
+      ];
+      expect(coalesceConsecutiveContents(contents)).toEqual(contents);
     });
   });
 });

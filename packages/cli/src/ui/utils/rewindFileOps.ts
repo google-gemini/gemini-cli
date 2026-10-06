@@ -29,21 +29,34 @@ export interface FileChangeStats {
   details?: FileChangeDetail[];
 }
 
+function isPartWithKey(part: unknown, key: string): boolean {
+  return typeof part === 'object' && part !== null && key in part;
+}
+
 /**
  * Determines whether a user message record is a synthetic tool response.
+ *
+ * A tool response holds at least one `functionResponse` part, and every part
+ * is either a `functionResponse` or binary data emitted alongside tool output
+ * (`inlineData` / `fileData`). Any user-authored text (e.g. a prompt or a
+ * steering hint sent with the responses) keeps the message a real user turn.
  */
 export function isToolResponseMessage(msg: MessageRecord): boolean {
-  if (msg.type !== 'user') return false;
-  const content = msg.content;
-  const parts = Array.isArray(content)
-    ? content
-    : content !== undefined && content !== null
-      ? [content]
-      : [];
+  if (
+    msg.type !== 'user' ||
+    !Array.isArray(msg.content) ||
+    msg.content.length === 0
+  ) {
+    return false;
+  }
+  const parts: unknown[] = msg.content;
   return (
-    parts.length > 0 &&
-    parts.some(
-      (p) => typeof p === 'object' && p !== null && 'functionResponse' in p,
+    parts.some((p) => isPartWithKey(p, 'functionResponse')) &&
+    parts.every(
+      (p) =>
+        isPartWithKey(p, 'functionResponse') ||
+        isPartWithKey(p, 'inlineData') ||
+        isPartWithKey(p, 'fileData'),
     )
   );
 }
@@ -72,10 +85,7 @@ export function calculateTurnStats(
   // Look ahead until the next user message (single turn)
   for (let i = msgIndex + 1; i < conversation.messages.length; i++) {
     const msg = conversation.messages[i];
-    if (msg.type === 'user') {
-      if (isToolResponseMessage(msg)) {
-        continue;
-      }
+    if (msg.type === 'user' && !isToolResponseMessage(msg)) {
       break; // Stop at next user message
     }
 

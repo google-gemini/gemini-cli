@@ -118,6 +118,19 @@ export const INTERRUPTED_RESPONSE_PLACEHOLDER =
   '[The previous response was interrupted before it completed.]';
 
 /**
+ * Error payload used for synthesized function responses that close a model
+ * function call whose real response never arrived.
+ */
+export const INTERRUPTED_TOOL_RESPONSE_ERROR =
+  'Response was lost or interrupted.';
+
+/**
+ * Text used for a synthesized user turn when the request would otherwise not
+ * end with a user turn that carries content.
+ */
+export const CONTINUE_PROMPT_TEXT = 'Please continue.';
+
+/**
  * Internal interface for parts that carry the magic 'callIndex' property
  * used during model response consolidation.
  */
@@ -514,10 +527,11 @@ export class GeminiChat {
 
     // If history ended on an unanswered model tool call or an unanswered tool response
     // (e.g. cancelled tool call, interrupted stream, or user follow-up prompt), close it
-    // before recording a genuinely new user message so proper tool call pairing and
-    // role alternation are maintained.
+    // with dedicated synthetic turns before recording a genuinely new user message, so
+    // tool call pairing and role alternation are maintained and the user's prompt stays
+    // a turn of its own.
     if (!isOriginalFunctionResponse) {
-      this.closeUnansweredToolCallsTurn(userContent);
+      this.closeUnansweredToolCallsTurn();
       this.closeUnansweredToolResponseTurn();
     }
 
@@ -640,6 +654,10 @@ export class GeminiChat {
         }
       }
     }
+
+    // Durable history repair runs once per send, outside the retry loop, so
+    // retried attempts never append duplicate synthetic turns.
+    this.replaceEmptyTrailingUserTurn();
 
     const requestHistory = this.getHistoryTurns(true);
 
@@ -828,39 +846,55 @@ export class GeminiChat {
   }
 
   /**
-   * Synthesizes matching functionResponse parts into userContent when history
-   * ends with an unclosed model functionCall, so the subsequent user prompt
-   * preserves proper tool call pairing and role alternation.
+   * Appends a dedicated synthetic user turn with matching functionResponse
+   * parts when history ends with an unclosed model functionCall. The
+   * subsequent user prompt is then recorded as a clean turn of its own (after
+   * `closeUnansweredToolResponseTurn` adds the closing model turn).
    */
-  private closeUnansweredToolCallsTurn(userContent: Content): void {
+  private closeUnansweredToolCallsTurn(): void {
     const turns = this.agentHistory.get();
     const last = turns[turns.length - 1];
-    if (
-      last?.content.role !== 'model' ||
-      !last.content.parts?.some((part) => !!part.functionCall)
-    ) {
+    if (last?.content.role !== 'model') {
       return;
     }
-    const missingResponses: Part[] = [];
-    for (const part of last.content.parts || []) {
-      if (part && part.functionCall) {
-        missingResponses.push({
-          functionResponse: {
-            name: part.functionCall.name?.trim() || 'generic_tool',
-            id: part.functionCall.id,
-            response: {
-              error: 'Response was lost or interrupted.',
-            },
-          },
-        });
-      }
+    const missingResponses = buildInterruptedToolResponseParts(
+      last.content.parts ?? [],
+    );
+    if (missingResponses.length === 0) {
+      return;
     }
-    if (missingResponses.length > 0) {
-      const remainingParts = (userContent.parts || []).filter(
-        (p) => !(p.text !== undefined && p.text === ''),
-      );
-      userContent.parts = [...missingResponses, ...remainingParts];
+    const id = this.chatRecordingService.recordSyntheticMessage(
+      'user',
+      missingResponses,
+    );
+    this.agentHistory.push({
+      id,
+      content: { role: 'user', parts: missingResponses },
+    });
+  }
+
+  /**
+   * Replaces the parts of a trailing user turn that carries no content (e.g.
+   * only empty text parts) with a continuation prompt, keeping the in-memory
+   * history and the session log in sync. Runs once per send so that the
+   * persisted history never keeps an empty user turn between model turns.
+   */
+  private replaceEmptyTrailingUserTurn(): void {
+    const turns = this.agentHistory.get();
+    const last = turns[turns.length - 1];
+    if (last?.content.role !== 'user' || hasNonEmptyParts(last.content)) {
+      return;
     }
+    this.agentHistory.set([
+      ...turns.slice(0, -1),
+      {
+        id: last.id,
+        content: { ...last.content, parts: [{ text: CONTINUE_PROMPT_TEXT }] },
+      },
+    ]);
+    this.chatRecordingService.updateMessagesFromHistory(
+      this.agentHistory.get(),
+    );
   }
 
   /**
@@ -1125,99 +1159,28 @@ export class GeminiChat {
         this.tools = await this.onModelChanged(modelToUse);
       }
 
-      // Track final request parameters for AfterModel hooks
-      lastModelToUse = modelToUse;
-      lastConfig = config;
-      lastContentsToUse = contentsToUse;
-
-      const finalContents = stripToolCallIdPrefixes(contentsToUse);
-
-      let contentsToDispatch = finalContents;
-      const lastContentTurn =
-        contentsToDispatch.length > 0
-          ? contentsToDispatch[contentsToDispatch.length - 1]
-          : null;
-
-      if (
-        !lastContentTurn ||
-        lastContentTurn.role !== 'user' ||
-        !lastContentTurn.parts?.length
-      ) {
+      // Normalize the outbound payload so it always ends with a user turn that
+      // carries content. This is a pure transformation: retries, per-call
+      // history overrides and hook-modified contents never leak into the
+      // persistent history or the session log.
+      const normalizedContents = ensureTerminalUserTurn(contentsToUse);
+      if (normalizedContents !== contentsToUse) {
         debugLogger.warn(
           'Final contents do not end with a valid user turn. Normalizing contents to satisfy Gemini API invariant.',
         );
-        const cloned: Content[] = contentsToDispatch.map((item) =>
-          structuredClone(item),
-        );
-        const lastTurn = cloned.length > 0 ? cloned[cloned.length - 1] : null;
-        if (lastTurn && lastTurn.role === 'model') {
-          const hasFunctionCall = lastTurn.parts?.some(
-            (p) => p && p.functionCall,
-          );
-          if (hasFunctionCall) {
-            const missingResponses: Part[] = [];
-            for (const part of lastTurn.parts || []) {
-              if (part && part.functionCall) {
-                missingResponses.push({
-                  functionResponse: {
-                    name: part.functionCall.name?.trim() || 'generic_tool',
-                    id: part.functionCall.id,
-                    response: {
-                      error: 'Response was lost or interrupted.',
-                    },
-                  },
-                });
-              }
-            }
-            const normalizedUserTurn: Content = {
-              role: 'user',
-              parts: missingResponses,
-            };
-            cloned.push(normalizedUserTurn);
-            const id = this.chatRecordingService.recordSyntheticMessage(
-              'user',
-              missingResponses,
-            );
-            this.agentHistory.push({ id, content: normalizedUserTurn });
-          } else {
-            const normalizedUserTurn: Content = {
-              role: 'user',
-              parts: [{ text: 'Please continue.' }],
-            };
-            cloned.push(normalizedUserTurn);
-            const id = this.chatRecordingService.recordSyntheticMessage(
-              'user',
-              normalizedUserTurn.parts!,
-            );
-            this.agentHistory.push({ id, content: normalizedUserTurn });
-          }
-        } else if (!lastTurn) {
-          const normalizedUserTurn: Content = {
-            role: 'user',
-            parts: [{ text: 'Please continue.' }],
-          };
-          cloned.push(normalizedUserTurn);
-          const id = this.chatRecordingService.recordSyntheticMessage(
-            'user',
-            normalizedUserTurn.parts!,
-          );
-          this.agentHistory.push({ id, content: normalizedUserTurn });
-        } else if (lastTurn.role === 'user' && !lastTurn.parts?.length) {
-          lastTurn.parts = [{ text: 'Please continue.' }];
-          const historyTurns = this.agentHistory.get();
-          const lastHistoryTurn = historyTurns[historyTurns.length - 1];
-          if (lastHistoryTurn && lastHistoryTurn.content.role === 'user') {
-            lastHistoryTurn.content.parts = [{ text: 'Please continue.' }];
-            this.chatRecordingService.updateMessagesFromHistory(historyTurns);
-          }
-        }
-        contentsToDispatch = cloned;
       }
+
+      // Track final request parameters for AfterModel hooks
+      lastModelToUse = modelToUse;
+      lastConfig = config;
+      lastContentsToUse = normalizedContents;
+
+      const finalContents = stripToolCallIdPrefixes(normalizedContents);
 
       return this.context.config.getContentGenerator().generateContentStream(
         {
           model: modelToUse,
-          contents: contentsToDispatch,
+          contents: finalContents,
           config,
         },
         prompt_id,
@@ -1350,6 +1313,33 @@ export class GeminiChat {
     }
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     ensureStableToolIds(this.agentHistory.get() as HistoryTurn[]);
+  }
+
+  /**
+   * Removes the trailing model turn when it holds function calls that were
+   * never answered (e.g. every call in the batch was declined). Earlier
+   * completed tool rounds and the originating user prompt are kept, and the
+   * durable IDs of the remaining turns are preserved.
+   *
+   * @returns true when a turn was removed.
+   */
+  discardTrailingUnansweredToolCallTurn(): boolean {
+    const turns = this.agentHistory.get();
+    const last = turns[turns.length - 1];
+    if (
+      last?.content.role !== 'model' ||
+      !last.content.parts?.some((part) => !!part.functionCall)
+    ) {
+      return false;
+    }
+    this.agentHistory.rollback(turns.length - 1);
+    this.lastPromptTokenCount = estimateTokenCountSync(
+      this.agentHistory.flatMap((c) => c.content.parts || []),
+    );
+    this.chatRecordingService.updateMessagesFromHistory(
+      this.agentHistory.get(),
+    );
+    return true;
   }
 
   setHistory(history: ReadonlyArray<Content | HistoryTurn>): void {
@@ -1888,6 +1878,73 @@ export function isInvalidArgumentError(errorMessage: string): boolean {
   return errorMessage.includes('Request contains an invalid argument');
 }
 
+/**
+ * Returns true for a part that only holds an empty `text` value (optionally
+ * alongside bookkeeping keys) and no other payload.
+ */
+function isEmptyTextPart(part: Part): boolean {
+  if (part.text !== '') {
+    return false;
+  }
+  return !Object.keys(part).some(
+    (key) => key !== 'text' && key !== 'thought' && key !== 'callIndex',
+  );
+}
+
+/**
+ * Returns true when the content has at least one part that survives
+ * `stripToolCallIdPrefixes` (i.e. it is not an empty text part).
+ */
+function hasNonEmptyParts(content: Content): boolean {
+  return (content.parts ?? []).some((part) => !isEmptyTextPart(part));
+}
+
+/**
+ * Builds functionResponse parts that close every functionCall in `parts`
+ * whose real response was lost or interrupted.
+ */
+export function buildInterruptedToolResponseParts(
+  parts: readonly Part[],
+): Part[] {
+  return parts
+    .filter((part) => !!part?.functionCall)
+    .map((part) => ({
+      functionResponse: {
+        name: part.functionCall!.name?.trim() || 'generic_tool',
+        id: part.functionCall!.id,
+        response: { error: INTERRUPTED_TOOL_RESPONSE_ERROR },
+      },
+    }));
+}
+
+/**
+ * Ensures the request contents end with a user turn that carries content, as
+ * required by the Gemini API. Pure: returns the same array when no change is
+ * needed, otherwise a new array; the input is never mutated.
+ *
+ * - A trailing user turn without content gets a continuation prompt.
+ * - A trailing model turn with function calls gets matching responses.
+ * - Any other trailing turn (or no turn at all) gets a continuation prompt.
+ */
+export function ensureTerminalUserTurn(contents: Content[]): Content[] {
+  const last = contents.at(-1);
+  if (last?.role === 'user' && hasNonEmptyParts(last)) {
+    return contents;
+  }
+  if (last?.role === 'user') {
+    return [
+      ...contents.slice(0, -1),
+      { ...last, parts: [{ text: CONTINUE_PROMPT_TEXT }] },
+    ];
+  }
+  const missingResponses = buildInterruptedToolResponseParts(last?.parts ?? []);
+  const parts =
+    missingResponses.length > 0
+      ? missingResponses
+      : [{ text: CONTINUE_PROMPT_TEXT }];
+  return [...contents, { role: 'user', parts }];
+}
+
 export function stripToolCallIdPrefixes(contents: Content[]): Content[] {
   const stripped = contents
     .map((content) => {
@@ -1899,8 +1956,7 @@ export function stripToolCallIdPrefixes(contents: Content[]): Content[] {
             const name = fc.name?.trim() || 'generic_tool';
             if (fc.id && fc.id.startsWith(`${name}__`)) {
               newPart.functionCall = {
-                name: fc.name,
-                args: fc.args,
+                ...fc,
                 id: fc.id.substring(name.length + 2),
               };
             }
@@ -1910,10 +1966,10 @@ export function stripToolCallIdPrefixes(contents: Content[]): Content[] {
             const name = fr.name?.trim() || 'generic_tool';
             if (fr.id && fr.id.startsWith(`${name}__`)) {
               newPart.functionResponse = {
-                name: fr.name,
-                response: fr.response,
+                // History parts are plain JSON objects, not class instances.
+                // eslint-disable-next-line @typescript-eslint/no-misused-spread
+                ...fr,
                 id: fr.id.substring(name.length + 2),
-                ...(fr.parts ? { parts: fr.parts } : {}),
               };
             }
           }
@@ -1933,23 +1989,15 @@ export function stripToolCallIdPrefixes(contents: Content[]): Content[] {
 
           return newPart;
         })
-        .filter((part) => {
-          // Filter out truly empty parts that have only text: '' and no payload
-          const hasOtherKeys = Object.keys(part).some(
-            (key) => key !== 'text' && key !== 'thought' && key !== 'callIndex',
-          );
-          if (part.text !== undefined && part.text === '' && !hasOtherKeys) {
-            return false;
-          }
-          return true;
-        });
+        // Filter out truly empty parts that have only text: '' and no payload
+        .filter((part) => !isEmptyTextPart(part));
 
       return {
         ...content,
         parts,
       };
     })
-    .filter((content) => !content.parts || content.parts.length > 0);
+    .filter((content) => content.parts.length > 0);
 
   return coalesceConsecutiveContents(stripped);
 }
@@ -1959,7 +2007,7 @@ export function coalesceConsecutiveContents(contents: Content[]): Content[] {
   for (const item of contents) {
     const lastIdx = result.length - 1;
     const last = result[lastIdx];
-    if (last && last.role === item.role) {
+    if (last && last.role && last.role === item.role) {
       const hasParts = last.parts || item.parts;
       result[lastIdx] = {
         ...last,
