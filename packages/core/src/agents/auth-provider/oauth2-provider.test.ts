@@ -538,6 +538,45 @@ describe('OAuth2AuthProvider', () => {
       const result = await provider.shouldRetryWithHeaders({}, res401);
       expect(result).toBeDefined();
     });
+
+    it('should not increment retry count or delete credentials again when concurrent requests fail with the same stale token', async () => {
+      const provider = new OAuth2AuthProvider(createConfig(), 'test-agent');
+      const storage = getTokenStorage();
+
+      storage.getCredentials.mockResolvedValue({
+        serverName: 'test-agent',
+        token: { accessToken: 'stale-token', tokenType: 'Bearer' },
+        updatedAt: Date.now(),
+      });
+      storage.isTokenExpired.mockReturnValue(false);
+
+      await provider.initialize();
+
+      const staleReq = {
+        headers: { Authorization: 'Bearer stale-token' },
+      };
+      const res401 = new Response(null, { status: 401 });
+
+      // Three concurrent requests that all used 'stale-token' fail with 401
+      const [retry1, retry2, retry3] = await Promise.all([
+        provider.shouldRetryWithHeaders(staleReq, res401),
+        provider.shouldRetryWithHeaders(staleReq, res401),
+        provider.shouldRetryWithHeaders(staleReq, res401),
+      ]);
+
+      expect(retry1).toEqual({ Authorization: 'Bearer new-access-token' });
+      expect(retry2).toEqual({ Authorization: 'Bearer new-access-token' });
+      expect(retry3).toEqual({ Authorization: 'Bearer new-access-token' });
+      expect(storage.deleteCredentials).toHaveBeenCalledTimes(1);
+
+      // Because the 3 concurrent failures were for the same stale token, only 1 retry
+      // was consumed, so another subsequent 401 with the new token can still retry.
+      const nextRetry = await provider.shouldRetryWithHeaders(
+        { headers: { Authorization: 'Bearer new-access-token' } },
+        res401,
+      );
+      expect(nextRetry).toBeDefined();
+    });
   });
 
   describe('token persistence', () => {

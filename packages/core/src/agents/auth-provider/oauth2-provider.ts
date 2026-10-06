@@ -154,10 +154,17 @@ export class OAuth2AuthProvider extends BaseA2AAuthProvider {
   }
 
   /**
+   * Return the maximum number of consecutive authentication retries allowed.
+   */
+  protected getMaxAuthRetries(): number {
+    return BaseA2AAuthProvider.MAX_AUTH_RETRIES;
+  }
+
+  /**
    * On 401/403, clear the cached token and re-authenticate (up to MAX_AUTH_RETRIES).
    */
   override async shouldRetryWithHeaders(
-    _req: RequestInit,
+    req: RequestInit,
     res: Response,
   ): Promise<HttpHeaders | undefined> {
     if (res.status !== 401 && res.status !== 403) {
@@ -165,7 +172,27 @@ export class OAuth2AuthProvider extends BaseA2AAuthProvider {
       return undefined;
     }
 
-    if (this.authRetryCount >= BaseA2AAuthProvider.MAX_AUTH_RETRIES) {
+    const reqHeaders = new Headers(req.headers);
+    const reqToken = reqHeaders.get('Authorization')?.split(' ')[1];
+
+    // If the token used in the request is already different from our current cached token
+    // (or if the cached token has already been cleared), another concurrent request has
+    // already initiated the re-authentication flow. We can safely retry with the new
+    // token without incrementing the retry count or clearing credentials again.
+    if (
+      reqToken &&
+      (!this.cachedToken || reqToken !== this.cachedToken.accessToken)
+    ) {
+      debugLogger.debug(
+        '[OAuth2AuthProvider] Token already cleared or updated by another request, retrying with new token',
+      );
+      const retryCount = this.authRetryCount;
+      const headers = await this.headers();
+      this.authRetryCount = Math.max(this.authRetryCount, retryCount);
+      return headers;
+    }
+
+    if (this.authRetryCount >= this.getMaxAuthRetries()) {
       return undefined;
     }
     const nextRetryCount = this.authRetryCount + 1;
