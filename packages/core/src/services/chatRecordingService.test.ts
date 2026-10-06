@@ -40,6 +40,7 @@ vi.mock('node:fs', async (importOriginal) => {
 
 import {
   ChatRecordingService,
+  SESSION_FILE_PREFIX,
   hasResumableConversationContent,
   isResumableMessageRecord,
   loadConversationRecord,
@@ -75,23 +76,13 @@ describe('ChatRecordingService', () => {
   let mockConfig: Config;
   let testTempDir: string;
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-  beforeEach(async () => {
-    testTempDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'chat-recording-test-'),
-    );
-
-    mockConfig = {
-      get config() {
-        return this;
-      },
+  function createTestMockConfig(promptId: string = 'test-session-id'): Config {
+    const configObj = {
       toolRegistry: {
         getTool: vi.fn(),
       },
-      promptId: 'test-session-id',
-      getSessionId: vi.fn().mockReturnValue('test-session-id'),
+      promptId,
+      getSessionId: vi.fn().mockReturnValue(promptId),
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue(testTempDir),
@@ -108,14 +99,27 @@ describe('ChatRecordingService', () => {
           isOutputMarkdown: false,
         }),
       }),
-    } as unknown as Config;
+    };
 
-    // Ensure mockConfig.config points to itself for AgentLoopContext parity
-    Object.defineProperty(mockConfig, 'config', {
+    // Ensure configObj.config points to itself for AgentLoopContext parity
+    Object.defineProperty(configObj, 'config', {
       get() {
-        return mockConfig;
+        return configObj;
       },
     });
+
+    return configObj as unknown as Config;
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+  beforeEach(async () => {
+    testTempDir = await fs.promises.mkdtemp(
+      path.join(os.tmpdir(), 'chat-recording-test-'),
+    );
+
+    mockConfig = createTestMockConfig('test-session-id');
 
     vi.mocked(getProjectHash).mockReturnValue('test-project-hash');
     chatRecordingService = new ChatRecordingService(mockConfig);
@@ -195,6 +199,11 @@ describe('ChatRecordingService', () => {
       ] as MessageRecord[];
 
       expect(hasResumableConversationContent(messages)).toBe(true);
+    });
+
+    it('should return false when messages is undefined or empty', () => {
+      expect(hasResumableConversationContent(undefined)).toBe(false);
+      expect(hasResumableConversationContent([])).toBe(false);
     });
   });
 
@@ -351,6 +360,35 @@ describe('ChatRecordingService', () => {
         sessionFile,
       )) as ConversationRecord;
       expect(conversation.sessionId).toBe('old-session-id');
+    });
+
+    it('should safely handle resumed session files with undefined messages and initialize array', async () => {
+      const chatsDir = path.join(testTempDir, 'chats');
+      fs.mkdirSync(chatsDir, { recursive: true });
+      const sessionFile = path.join(chatsDir, 'session-undefined-msgs.jsonl');
+      fs.writeFileSync(
+        sessionFile,
+        JSON.stringify({
+          sessionId: 'undefined-msgs-id',
+          projectHash: 'test-project-hash',
+          startTime: new Date().toISOString(),
+          lastUpdated: new Date().toISOString(),
+        }) + '\n',
+      );
+
+      await expect(
+        chatRecordingService.initialize({
+          filePath: sessionFile,
+          conversation: {
+            sessionId: 'undefined-msgs-id',
+            projectHash: 'test-project-hash',
+          } as ConversationRecord,
+        }),
+      ).resolves.not.toThrow();
+
+      const conv = chatRecordingService.getConversation();
+      expect(conv).not.toBeNull();
+      expect(conv?.messages).toEqual([]);
     });
 
     it('should fall back to the in-memory conversation when the file cannot be reloaded', async () => {
@@ -1113,6 +1151,204 @@ describe('ChatRecordingService', () => {
       await chatRecordingService.deleteCurrentSessionIfNotResumableAsync();
 
       expect(fs.existsSync(conversationFile!)).toBe(true);
+    });
+
+    it('should not delete a resumed session even if messages are empty', async () => {
+      const chatsDir = path.join(testTempDir, 'chats');
+      fs.mkdirSync(chatsDir, { recursive: true });
+      const sessionFile = path.join(chatsDir, 'session-resume-test.jsonl');
+      const initialData = {
+        sessionId: 'resumed-empty-session',
+        projectHash: 'test-project-hash',
+        startTime: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
+      };
+      fs.writeFileSync(sessionFile, JSON.stringify(initialData) + '\n');
+
+      await chatRecordingService.initialize({
+        filePath: sessionFile,
+        conversation: {
+          sessionId: 'resumed-empty-session',
+          projectHash: 'test-project-hash',
+          startTime: initialData.startTime,
+          lastUpdated: initialData.lastUpdated,
+          messages: [],
+        },
+      });
+
+      expect(chatRecordingService.getIsResumedSession()).toBe(true);
+
+      await chatRecordingService.deleteCurrentSessionIfNotResumableAsync();
+
+      expect(fs.existsSync(sessionFile)).toBe(true);
+    });
+
+    it('should wait for async initialization before deciding whether to delete (race condition)', async () => {
+      const chatsDir = path.join(testTempDir, 'chats');
+      fs.mkdirSync(chatsDir, { recursive: true });
+      const sessionFile = path.join(chatsDir, 'session-race-test.jsonl');
+      const initialData = {
+        sessionId: 'resumed-race-session',
+        projectHash: 'test-project-hash',
+        startTime: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
+      };
+      const msg = {
+        id: 'msg-1',
+        type: 'user',
+        content: 'Hello prior conversation',
+        timestamp: new Date().toISOString(),
+      };
+      fs.writeFileSync(
+        sessionFile,
+        JSON.stringify(initialData) + '\n' + JSON.stringify(msg) + '\n',
+      );
+
+      // Start initialization without awaiting it immediately
+      const initPromise = chatRecordingService.initialize({
+        filePath: sessionFile,
+        conversation: {
+          sessionId: 'resumed-race-session',
+          projectHash: 'test-project-hash',
+          startTime: initialData.startTime,
+          lastUpdated: initialData.lastUpdated,
+          messages: [msg as MessageRecord],
+        },
+      });
+
+      // Fire cleanup concurrently (simulates fast exit before init settles)
+      await chatRecordingService.deleteCurrentSessionIfNotResumableAsync();
+      await initPromise;
+
+      expect(fs.existsSync(sessionFile)).toBe(true);
+    });
+
+    it('should not delete session file if the file on disk has resumable content even if in-memory cache is empty', async () => {
+      const chatsDir = path.join(testTempDir, 'chats');
+      fs.mkdirSync(chatsDir, { recursive: true });
+      const sessionFile = path.join(chatsDir, 'session-disk-check.jsonl');
+      const initialData = {
+        sessionId: 'session-disk-id',
+        projectHash: 'test-project-hash',
+        startTime: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
+      };
+      const msg = {
+        id: 'msg-1',
+        type: 'user',
+        content: 'Preserved content from disk',
+        timestamp: new Date().toISOString(),
+      };
+      fs.writeFileSync(
+        sessionFile,
+        JSON.stringify(initialData) + '\n' + JSON.stringify(msg) + '\n',
+      );
+
+      // Directly configure chatRecordingService to point to this file but with empty cache
+      await chatRecordingService.initialize();
+      // Overwrite private properties to simulate empty in-memory state on an existing file
+      (
+        chatRecordingService as unknown as { conversationFile: string }
+      ).conversationFile = sessionFile;
+      (
+        chatRecordingService as unknown as {
+          cachedConversation: { messages: MessageRecord[] };
+        }
+      ).cachedConversation = {
+        messages: [],
+      };
+      (
+        chatRecordingService as unknown as { isResumedSession: boolean }
+      ).isResumedSession = false;
+
+      await chatRecordingService.deleteCurrentSessionIfNotResumableAsync();
+
+      expect(fs.existsSync(sessionFile)).toBe(true);
+    });
+
+    it('should detect and preserve existing session files during same-minute collision', async () => {
+      const chatsDir = path.join(testTempDir, 'chats');
+      fs.mkdirSync(chatsDir, { recursive: true });
+
+      const timestamp = new Date()
+        .toISOString()
+        .slice(0, 16)
+        .replace(/:/g, '-');
+      const collisionSessionId = 'collision-session-uuid';
+      const expectedFilename = `${SESSION_FILE_PREFIX}${timestamp}-${collisionSessionId.slice(
+        0,
+        8,
+      )}.jsonl`;
+      const collisionFile = path.join(chatsDir, expectedFilename);
+
+      const initialData = {
+        sessionId: collisionSessionId,
+        projectHash: 'test-project-hash',
+        startTime: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
+      };
+      const msg = {
+        id: 'msg-existing',
+        type: 'user',
+        content: 'Message created earlier in the same minute',
+        timestamp: new Date().toISOString(),
+      };
+      fs.writeFileSync(
+        collisionFile,
+        JSON.stringify(initialData) + '\n' + JSON.stringify(msg) + '\n',
+      );
+
+      // Configure collisionConfig promptId to match the collision session ID
+      const collisionConfig = createTestMockConfig(collisionSessionId);
+      chatRecordingService = new ChatRecordingService(collisionConfig);
+
+      // Initialize as a new session (no resumedSessionData)
+      await chatRecordingService.initialize();
+
+      expect(chatRecordingService.getConversationFilePath()).not.toBe(
+        collisionFile,
+      );
+
+      // Calling deleteCurrentSessionIfNotResumableAsync must NOT delete the collided session file
+      await chatRecordingService.deleteCurrentSessionIfNotResumableAsync();
+
+      expect(fs.existsSync(collisionFile)).toBe(true);
+    });
+
+    it('should handle malformed records with undefined messages without throwing', async () => {
+      const chatsDir = path.join(testTempDir, 'chats');
+      fs.mkdirSync(chatsDir, { recursive: true });
+      const sessionFile = path.join(chatsDir, 'session-malformed.jsonl');
+      // Write metadata only without messages array
+      fs.writeFileSync(
+        sessionFile,
+        JSON.stringify({
+          sessionId: 'malformed-session',
+          projectHash: 'test-project-hash',
+          startTime: new Date().toISOString(),
+          lastUpdated: new Date().toISOString(),
+        }) + '\n',
+      );
+
+      (
+        chatRecordingService as unknown as {
+          conversationFile: string;
+          cachedConversation: { messages?: MessageRecord[] };
+          isResumedSession: boolean;
+        }
+      ).conversationFile = sessionFile;
+      (
+        chatRecordingService as unknown as {
+          cachedConversation: { messages?: MessageRecord[] };
+        }
+      ).cachedConversation = {};
+      (
+        chatRecordingService as unknown as { isResumedSession: boolean }
+      ).isResumedSession = false;
+
+      await expect(
+        chatRecordingService.deleteCurrentSessionIfNotResumableAsync(),
+      ).resolves.not.toThrow();
     });
   });
 
