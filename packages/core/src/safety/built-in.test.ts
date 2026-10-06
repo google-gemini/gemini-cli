@@ -249,6 +249,8 @@ describe('AllowedPathChecker', () => {
         path.join(mockCwd, 'GIT~1', 'config'),
         path.join(mockCwd, 'env~1'),
         path.join(mockCwd, 'ENV~1'),
+        path.join(mockCwd, 'ENV~1.LOC'),
+        path.join(mockCwd, 'env~1.loc'),
         path.join(mockCwd, 'node_m~1', 'package', 'index.js'),
         path.join(mockCwd, 'NODE_M~1', 'package', 'index.js'),
         // NTFS Collision-Based SFNs (e.g. first two characters followed by 4-digit hex hash and ~number)
@@ -256,6 +258,7 @@ describe('AllowedPathChecker', () => {
         path.join(mockCwd, 'GI3F4E~2', 'config'),
         path.join(mockCwd, 'en9c8d~1'),
         path.join(mockCwd, 'EN2A1B~3'),
+        path.join(mockCwd, 'en1a2b~1.pro'),
         path.join(mockCwd, 'no5c6d~1', 'package', 'index.js'),
         path.join(mockCwd, 'NO7A8B~2', 'package', 'index.js'),
       ];
@@ -276,6 +279,8 @@ describe('AllowedPathChecker', () => {
         path.join(mockCwd, '.env'),
         path.join(mockCwd, '.Env'),
         path.join(mockCwd, '.ENV'),
+        path.join(mockCwd, '.env.local'),
+        path.join(mockCwd, '.env.production'),
         path.join(mockCwd, 'node_modules', 'package', 'index.js'),
         path.join(mockCwd, 'NODE_MODULES', 'package', 'index.js'),
         // Windows trailing character bypasses
@@ -295,6 +300,62 @@ describe('AllowedPathChecker', () => {
         const result = await checker.check(input);
         expect(result.decision).toBe(SafetyCheckDecision.DENY);
         expect(result.reason).toContain('Access to sensitive path');
+      }
+    });
+
+    it('should allow safe environment templates like .env.example, .env.sample, .env.template, and .env.dist', async () => {
+      const templatePaths = [
+        path.join(mockCwd, '.env.example'),
+        path.join(mockCwd, '.env.sample'),
+        path.join(mockCwd, '.env.template'),
+        path.join(mockCwd, '.env.dist'),
+        path.join(mockCwd, 'subdir', '.env.example'),
+      ];
+
+      for (const p of templatePaths) {
+        const input = createInput({ path: p });
+        const result = await checker.check(input);
+        expect(result.decision).toBe(SafetyCheckDecision.ALLOW);
+      }
+    });
+
+    it('should require ASK_USER for .gemini configuration files inside workspace, but deny them if outside, including NTFS ADS bypasses and SFNs', async () => {
+      const geminiPaths = [
+        path.join(mockCwd, '.gemini', 'settings.json'),
+        path.join(mockCwd, '.gemini', 'custom.toml'),
+        path.join(mockCwd, '.gemini', 'config.yaml'),
+        // Windows trailing character bypasses
+        path.join(mockCwd, '.gemini ', 'settings.json'),
+        path.join(mockCwd, '.gemini.', 'settings.json'),
+        // NTFS Alternate Data Stream bypasses
+        path.join(mockCwd, '.gemini::$DATA', 'settings.json'),
+        // SFN formats (standard and collision-based)
+        path.join(mockCwd, 'gemini~1', 'settings.json'),
+        path.join(mockCwd, 'GEMINI~1', 'settings.json'),
+        path.join(mockCwd, 'ge12ab~1', 'settings.json'),
+        path.join(mockCwd, 'GE3F4E~2', 'settings.json'),
+      ];
+
+      for (const p of geminiPaths) {
+        const input = createInput({ path: p });
+        const result = await checker.check(input);
+        expect(result.decision).toBe(SafetyCheckDecision.ASK_USER);
+        expect(result.reason).toContain(
+          'Modifying .gemini configuration files requires explicit user confirmation',
+        );
+      }
+
+      // Verify that paths outside the workspace containing .gemini are strictly denied
+      const outsideGeminiPaths = [
+        path.join(testRootDir, 'outside', '.gemini', 'settings.json'),
+        path.join(testRootDir, 'outside', '.GEMINI', 'settings.json'),
+      ];
+
+      for (const p of outsideGeminiPaths) {
+        const input = createInput({ path: p });
+        const result = await checker.check(input);
+        expect(result.decision).toBe(SafetyCheckDecision.DENY);
+        expect(result.reason).toContain('outside of the allowed workspace');
       }
     });
 

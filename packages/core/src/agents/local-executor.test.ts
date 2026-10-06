@@ -128,15 +128,26 @@ import { getModelConfigAlias, type AgentRegistry } from './registry.js';
 import type { ModelRouterService } from '../routing/modelRouterService.js';
 
 let mockChatHistory: Content[] = [];
-const mockSetHistory = vi.fn((newHistory: Content[]) => {
-  mockChatHistory = newHistory;
-});
+const mockSetHistory = vi.fn(
+  (newHistory: Array<Content | { content?: Content }>) => {
+    mockChatHistory = newHistory.map((h) =>
+      'content' in h && h.content ? h.content : (h as Content),
+    );
+  },
+);
 
-vi.mock('../context/chatCompressionService.js', () => ({
-  ChatCompressionService: vi.fn().mockImplementation(() => ({
-    compress: mockCompress,
-  })),
-}));
+vi.mock('../context/chatCompressionService.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import('../context/chatCompressionService.js')
+    >();
+  return {
+    ...actual,
+    ChatCompressionService: vi.fn().mockImplementation(() => ({
+      compress: mockCompress,
+    })),
+  };
+});
 
 vi.mock('../core/geminiChat.js', () => ({
   StreamEventType: {

@@ -44,12 +44,30 @@ jobs:
     timeout-minutes: 20
     runs-on: 'ubuntu-latest'
     outputs:
-      duplicate_issues_csv: '${{ env.DUPLICATE_ISSUES_CSV }}'
+      duplicate_issues_csv: '${{ steps.parse_duplicates.outputs.duplicate_issues_csv }}'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
         with:
           persist-credentials: false
+
+      - name: 'Fetch Issue Details'
+        id: 'get_issue_data'
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        env:
+          ISSUE_NUMBER: '${{ github.event.issue.number || github.event.inputs.issue_number }}'
+        with:
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+          script: |
+            const issueNumber = Number(process.env.ISSUE_NUMBER);
+            const { data: issue } = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+            });
+            core.setOutput('title', issue.title);
+            core.setOutput('body', issue.body || '');
+            core.setOutput('issue_number', issueNumber);
 
       - name: 'Log in to GitHub Container Registry'
         uses: 'docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1' # ratchet:docker/login-action@v3
@@ -59,13 +77,13 @@ jobs:
           password: '${{ secrets.GITHUB_TOKEN }}'
 
       - name: 'Find Duplicate Issues'
-        uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
+        uses: 'google-github-actions/run-gemini-cli@f77273f4c914e4bf38440cf36a0369cb64a37489' # ratchet:google-github-actions/run-gemini-cli@v0
         id: 'gemini_issue_deduplication'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-          ISSUE_TITLE: '${{ github.event.issue.title }}'
-          ISSUE_BODY: '${{ github.event.issue.body }}'
-          ISSUE_NUMBER: '${{ github.event.issue.number }}'
+          ISSUE_TITLE: '${{ steps.get_issue_data.outputs.title }}'
+          ISSUE_BODY: '${{ steps.get_issue_data.outputs.body }}'
+          ISSUE_NUMBER: '${{ steps.get_issue_data.outputs.issue_number }}'
           REPOSITORY: '${{ github.repository }}'
           FIRESTORE_PROJECT: '${{ vars.FIRESTORE_PROJECT }}'
           GEMINI_CLI_TRUST_WORKSPACE: 'true'
@@ -110,10 +128,7 @@ jobs:
               },
               "maxSessionTurns": 25,
               "tools": {
-                "core": [
-                  "run_shell_command(echo)",
-                  "run_shell_command(gh issue view)"
-                ]
+                "core": []
               },
               "telemetry": {
                 "enabled": true,
@@ -124,33 +139,63 @@ jobs:
             ## Role
             You are an issue de-duplication assistant. Your goal is to find
             duplicate issues for a given issue.
+
+            Original Issue #${{ steps.get_issue_data.outputs.issue_number }}:
+            <issue_title>
+            ${{ steps.get_issue_data.outputs.title }}
+            </issue_title>
+            <issue_body>
+            ${{ steps.get_issue_data.outputs.body }}
+            </issue_body>
+
             ## Steps
             1.  **Find Potential Duplicates:**
-                - The repository is ${{ github.repository }} and the issue number is ${{ github.event.issue.number }}.
+                - The repository is ${{ github.repository }} and the issue number is ${{ steps.get_issue_data.outputs.issue_number }}.
                 - Use the `duplicates` tool with the `repo` and `issue_number` to find potential duplicates for the current issue. Do not use the `threshold` parameter.
                 - If no duplicates are found, you are done.
                 - Print the JSON output from the `duplicates` tool to the logs.
             2.  **Refine Duplicates List (if necessary):**
-                - If the `duplicates` tool returns between 1 and 14 results, you must refine the list.
-                - For each potential duplicate issue, run `gh issue view <issue-number> --json title,body,comments` to fetch its content.
-                - Also fetch the content of the original issue: `gh issue view "${ISSUE_NUMBER}" --json title,body,comments`.
-                - Carefully analyze the content (title, body, comments) of the original issue and all potential duplicates.
-                - It is very important if the comments on either issue mention that they are not duplicates of each other, to treat them as not duplicates.
-                - Based on your analysis, create a final list containing only the issues you are highly confident are actual duplicates.
-                - If your final list is empty, you are done.
-                - Print to the logs if you omitted any potential duplicates based on your analysis.
-                - If the `duplicates` tool returned 15+ results, use the top 15 matches (based on descending similarity score value) to perform this step.
+                - Carefully analyze the potential duplicates returned by the `duplicates` tool against the original issue details provided above.
+                - Based on your analysis, determine which issues you are highly confident are actual duplicates.
+                - If there are no actual duplicates, you are done.
             3.  **Output final duplicates list as CSV:**
-                - Convert the list of appropriate duplicate issue numbers into a comma-separated list (CSV). If there are no appropriate duplicates, use the empty string.
-                - Use the "echo" shell command to append the CSV of issue numbers into the filepath referenced by the environment variable "${GITHUB_ENV}":
-                  echo "DUPLICATE_ISSUES_CSV=[DUPLICATE_ISSUES_AS_CSV]" >> "${GITHUB_ENV}"
+                - Output only the comma-separated list of duplicate issue numbers (e.g. 123, 456). If there are no duplicates, output an empty response.
+
             ## Guidelines
-            - Only use the `duplicates` and `run_shell_command` tools.
-            - The `run_shell_command` tool can be used with `gh issue view`.
-            - Do not download or read media files like images, videos, or links. The `--json` flag for `gh issue view` will prevent this.
-            - Do not modify the issue content or status.
+            - Only use the `duplicates` tool.
+            - Do not attempt to run shell commands or modify any issues.
             - Do not add comments or labels.
-            - Reference all shell variables as "${VAR}" (with quotes and braces).
+
+      - name: 'Parse Duplicate Issues Output'
+        id: 'parse_duplicates'
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        env:
+          GEMINI_OUTPUT: '${{ steps.gemini_issue_deduplication.outputs.summary }}'
+          ORIGINAL_ISSUE_NUMBER: '${{ steps.get_issue_data.outputs.issue_number }}'
+        with:
+          script: |
+            const output = (process.env.GEMINI_OUTPUT || '').trim();
+            core.info(`Raw output from Gemini: ${output}`);
+
+            let csv = '';
+            // Try to find a line matching comma-separated numbers (e.g., "123, 456" or "#123, #456")
+            const lines = output.split('\n').map(l => l.trim()).filter(Boolean);
+            const csvLine = lines.find(l => /^#?\d+(\s*,\s*#?\d+)*$/.test(l));
+            if (csvLine) {
+              csv = csvLine.replace(/#/g, '').split(',').map(s => s.trim()).filter(Boolean).join(',');
+            } else {
+              // Fallback: only match explicit issue numbers (e.g., #123)
+              const matches = output.match(/#(\d+)\b/g);
+              if (matches) {
+                const original = String(process.env.ORIGINAL_ISSUE_NUMBER);
+                const duplicates = Array.from(new Set(matches.map(m => m.replace('#', ''))))
+                  .filter(num => num !== original && num !== '0');
+                csv = duplicates.join(',');
+              }
+            }
+
+            core.info(`Parsed duplicate issues CSV: ${csv}`);
+            core.setOutput('duplicate_issues_csv', csv);
 
   add-comment-and-label:
     needs: 'find-duplicates'
