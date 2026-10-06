@@ -337,24 +337,10 @@ export class PolicyEngine {
   private shouldDowngradeForRedirection(
     command: string,
     allowRedirection?: boolean,
-    rule?: PolicyRule,
+    _rule?: PolicyRule,
   ): boolean {
     if (allowRedirection) return false;
     if (!hasRedirection(command)) return false;
-
-    // Require explicit allowRedirection when matching a command-prefix rule.
-    if (rule?.argsPattern && !allowRedirection) {
-      return true;
-    }
-
-    // Do not downgrade (do not ask user) if in AUTO_EDIT or YOLO mode.
-    // These modes trust the agent's actions (YOLO) or specific task (AUTO_EDIT).
-    if (
-      this.approvalMode === ApprovalMode.AUTO_EDIT ||
-      this.approvalMode === ApprovalMode.YOLO
-    ) {
-      return false;
-    }
 
     return true;
   }
@@ -471,6 +457,16 @@ export class PolicyEngine {
       // If the matched rule says DENY, we should respect it immediately even if parsing fails.
       if (ruleDecision === PolicyDecision.DENY) {
         return { decision: PolicyDecision.DENY, rule };
+      }
+
+      if (this.shouldDowngradeForRedirection(command, allowRedirection, rule)) {
+        debugLogger.debug(
+          `[PolicyEngine.check] Command parsing failed and redirection detected, falling back to ${this.defaultDecision}: ${command}`,
+        );
+        return {
+          decision: this.defaultDecision,
+          rule: undefined,
+        };
       }
 
       if (this.approvalMode === ApprovalMode.YOLO) {
@@ -744,41 +740,40 @@ export class PolicyEngine {
 
     // Default if no rule matched
     if (decision === undefined) {
-      if (this.approvalMode === ApprovalMode.YOLO) {
-        debugLogger.debug(
-          `[PolicyEngine.check] NO MATCH in YOLO mode - using ALLOW`,
-        );
-        decision = PolicyDecision.ALLOW;
-      } else {
-        debugLogger.debug(
-          `[PolicyEngine.check] NO MATCH - using default decision: ${this.defaultDecision}`,
-        );
-        if (toolName && SHELL_TOOL_NAMES.includes(toolName)) {
-          let heuristicDecision = this.defaultDecision;
-          if (!skipHeuristics && command) {
-            heuristicDecision = await this.applyShellHeuristics(
-              command,
-              heuristicDecision,
-              shellDirPath,
-            );
-          }
+      const defaultDec =
+        this.approvalMode === ApprovalMode.YOLO
+          ? PolicyDecision.ALLOW
+          : this.defaultDecision;
 
-          const shellResult = await this.checkShellCommand(
-            toolName,
+      debugLogger.debug(
+        `[PolicyEngine.check] NO MATCH${this.approvalMode === ApprovalMode.YOLO ? ' in YOLO mode' : ''} - using ${defaultDec}`,
+      );
+
+      if (toolName && SHELL_TOOL_NAMES.includes(toolName)) {
+        let heuristicDecision = defaultDec;
+        if (!skipHeuristics && command) {
+          heuristicDecision = await this.applyShellHeuristics(
             command,
             heuristicDecision,
-            serverName,
             shellDirPath,
-            false,
-            undefined,
-            toolAnnotations,
-            subagent,
           );
-          decision = shellResult.decision;
-          matchedRule = shellResult.rule;
-        } else {
-          decision = this.defaultDecision;
         }
+
+        const shellResult = await this.checkShellCommand(
+          toolName,
+          command,
+          heuristicDecision,
+          serverName,
+          shellDirPath,
+          false,
+          undefined,
+          toolAnnotations,
+          subagent,
+        );
+        decision = shellResult.decision;
+        matchedRule = shellResult.rule;
+      } else {
+        decision = defaultDec;
       }
     }
 
