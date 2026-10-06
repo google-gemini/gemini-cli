@@ -1714,7 +1714,7 @@ describe('sandbox', () => {
       });
 
       it('should pass through IDE mode environment variables to lxc exec', async () => {
-        process.env['TEST_LXC_LIST_OUTPUT'] = LXC_RUNNING;
+        vi.stubEnv('TEST_LXC_LIST_OUTPUT', LXC_RUNNING);
         vi.stubEnv('GEMINI_CLI_IDE_SERVER_PORT', '12345');
         vi.stubEnv('GEMINI_CLI_IDE_WORKSPACE_PATH', '/workspace');
         vi.stubEnv('GEMINI_CLI_IDE_SERVER_STDIO_COMMAND', 'node');
