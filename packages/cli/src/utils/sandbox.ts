@@ -794,11 +794,20 @@ export async function start_sandbox(
     for (const envVar of [
       'GEMINI_CLI_IDE_SERVER_PORT',
       'GEMINI_CLI_IDE_WORKSPACE_PATH',
+      'GEMINI_CLI_IDE_AUTH_TOKEN',
+      'GEMINI_CLI_IDE_SERVER_STDIO_COMMAND',
+      'GEMINI_CLI_IDE_SERVER_STDIO_ARGS',
       'TERM_PROGRAM',
     ]) {
       if (process.env[envVar]) {
         args.push('--env', `${envVar}=${process.env[envVar]}`);
       }
+    }
+
+    const geminiSandboxEnv =
+      config.command === 'runsc' ? 'runsc' : process.env['GEMINI_SANDBOX'];
+    if (geminiSandboxEnv) {
+      args.push('--env', `GEMINI_SANDBOX=${geminiSandboxEnv}`);
     }
 
     // copy VIRTUAL_ENV if under working directory
@@ -1209,6 +1218,11 @@ async function start_lxc_sandbox(
       GEMINI_CLI_IDE_SERVER_PORT: process.env['GEMINI_CLI_IDE_SERVER_PORT'],
       GEMINI_CLI_IDE_WORKSPACE_PATH:
         process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'],
+      GEMINI_CLI_IDE_AUTH_TOKEN: process.env['GEMINI_CLI_IDE_AUTH_TOKEN'],
+      GEMINI_CLI_IDE_SERVER_STDIO_COMMAND:
+        process.env['GEMINI_CLI_IDE_SERVER_STDIO_COMMAND'],
+      GEMINI_CLI_IDE_SERVER_STDIO_ARGS:
+        process.env['GEMINI_CLI_IDE_SERVER_STDIO_ARGS'],
       TERM_PROGRAM: process.env['TERM_PROGRAM'],
     };
     for (const [key, value] of Object.entries(envVarsToForward)) {

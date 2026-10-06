@@ -164,8 +164,10 @@ export class IDEServer {
         const allowedHosts = [
           `localhost:${this.port}`,
           `127.0.0.1:${this.port}`,
+          `host.docker.internal:${this.port}`,
+          `host.containers.internal:${this.port}`,
         ];
-        if (!allowedHosts.includes(host)) {
+        if (!allowedHosts.includes(host.toLowerCase())) {
           return res.status(403).json({ error: 'Invalid Host header' });
         }
         next();

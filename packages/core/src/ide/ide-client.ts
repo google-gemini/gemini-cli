@@ -145,13 +145,23 @@ export class IdeClient {
       connectionConfig?.workspacePath ??
       process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
 
+    const isGvisor =
+      Boolean(process.env['SANDBOX']?.toLowerCase().includes('runsc')) ||
+      process.env['GEMINI_SANDBOX']?.toLowerCase().trim() === 'runsc';
+    const ideName = this.currentIde.displayName;
+    const gvisorFailureDetails = `Failed to connect to IDE companion extension in ${ideName}: gVisor (runsc) sandboxing enforces strict network isolation which prevents host loopback communication.`;
+
     const { isValid, error } = validateWorkspacePath(
       workspacePath,
       process.cwd(),
     );
 
     if (!isValid) {
-      this.setState(IDEConnectionStatus.Disconnected, error, logError);
+      this.setState(
+        IDEConnectionStatus.Disconnected,
+        workspacePath === undefined && isGvisor ? gvisorFailureDetails : error,
+        logError,
+      );
       return;
     }
 
@@ -194,11 +204,11 @@ export class IdeClient {
       }
     }
 
-    this.setState(
-      IDEConnectionStatus.Disconnected,
-      `Failed to connect to IDE companion extension in ${this.currentIde.displayName}. Please ensure the extension is running. To install the extension, run /ide install.`,
-      logError,
-    );
+    const failureDetails = isGvisor
+      ? gvisorFailureDetails
+      : `Failed to connect to IDE companion extension in ${ideName}. Please ensure the extension is running. To install the extension, run /ide install.`;
+
+    this.setState(IDEConnectionStatus.Disconnected, failureDetails, logError);
   }
 
   /**

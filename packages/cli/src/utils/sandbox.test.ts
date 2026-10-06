@@ -1713,6 +1713,59 @@ describe('sandbox', () => {
         );
       });
 
+      it('should pass through IDE mode environment variables to lxc exec', async () => {
+        process.env['TEST_LXC_LIST_OUTPUT'] = LXC_RUNNING;
+        vi.stubEnv('GEMINI_CLI_IDE_SERVER_PORT', '12345');
+        vi.stubEnv('GEMINI_CLI_IDE_WORKSPACE_PATH', '/workspace');
+        vi.stubEnv('GEMINI_CLI_IDE_AUTH_TOKEN', 'secret-token');
+        vi.stubEnv('GEMINI_CLI_IDE_SERVER_STDIO_COMMAND', 'node');
+        vi.stubEnv('GEMINI_CLI_IDE_SERVER_STDIO_ARGS', '["server.js"]');
+        vi.stubEnv('TERM_PROGRAM', 'vscode');
+
+        const config: SandboxConfig = createMockSandboxConfig({
+          command: 'lxc',
+          image: 'gemini-sandbox',
+        });
+
+        const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+          typeof spawn
+        >;
+        mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+          if (event === 'close') {
+            setTimeout(() => cb(0), 10);
+          }
+          return mockSpawnProcess;
+        });
+
+        vi.mocked(spawn).mockImplementation((cmd) => {
+          if (cmd === 'lxc') {
+            return mockSpawnProcess;
+          }
+          return new EventEmitter() as unknown as ReturnType<typeof spawn>;
+        });
+
+        await expect(start_sandbox(config)).resolves.toBe(0);
+
+        expect(spawn).toHaveBeenCalledWith(
+          'lxc',
+          expect.arrayContaining([
+            '--env',
+            'GEMINI_CLI_IDE_SERVER_PORT=12345',
+            '--env',
+            'GEMINI_CLI_IDE_WORKSPACE_PATH=/workspace',
+            '--env',
+            'GEMINI_CLI_IDE_AUTH_TOKEN=secret-token',
+            '--env',
+            'GEMINI_CLI_IDE_SERVER_STDIO_COMMAND=node',
+            '--env',
+            'GEMINI_CLI_IDE_SERVER_STDIO_ARGS=["server.js"]',
+            '--env',
+            'TERM_PROGRAM=vscode',
+          ]),
+          expect.objectContaining({ stdio: 'inherit' }),
+        );
+      });
+
       it('should throw FatalSandboxError if lxc list fails', async () => {
         process.env['TEST_LXC_LIST_OUTPUT'] = 'throw';
         const config: SandboxConfig = createMockSandboxConfig({
@@ -1748,8 +1801,15 @@ describe('sandbox', () => {
   });
 
   describe('gVisor (runsc)', () => {
-    it('should use docker with --runtime=runsc on Linux', async () => {
+    it('should use docker with --runtime=runsc on Linux and forward GEMINI_SANDBOX=runsc and IDE env vars', async () => {
       vi.mocked(os.platform).mockReturnValue('linux');
+      vi.stubEnv('GEMINI_CLI_IDE_SERVER_PORT', '54321');
+      vi.stubEnv('GEMINI_CLI_IDE_WORKSPACE_PATH', '/workspace/project');
+      vi.stubEnv('GEMINI_CLI_IDE_AUTH_TOKEN', 'ide-auth-token-123');
+      vi.stubEnv('GEMINI_CLI_IDE_SERVER_STDIO_COMMAND', 'ide-mcp-cmd');
+      vi.stubEnv('GEMINI_CLI_IDE_SERVER_STDIO_ARGS', '["--stdio"]');
+      vi.stubEnv('TERM_PROGRAM', 'vscode');
+
       const config: SandboxConfig = createMockSandboxConfig({
         command: 'runsc',
         image: 'gemini-cli-sandbox',
@@ -1790,11 +1850,28 @@ describe('sandbox', () => {
         expect.arrayContaining(['images', '-q', 'gemini-cli-sandbox']),
       );
 
-      // Verify docker run includes --runtime=runsc
+      // Verify docker run includes --runtime=runsc, GEMINI_SANDBOX=runsc, and IDE env vars
       expect(spawn).toHaveBeenNthCalledWith(
         2,
         'docker',
-        expect.arrayContaining(['run', '--runtime=runsc']),
+        expect.arrayContaining([
+          'run',
+          '--runtime=runsc',
+          '--env',
+          'GEMINI_SANDBOX=runsc',
+          '--env',
+          'GEMINI_CLI_IDE_SERVER_PORT=54321',
+          '--env',
+          'GEMINI_CLI_IDE_WORKSPACE_PATH=/workspace/project',
+          '--env',
+          'GEMINI_CLI_IDE_AUTH_TOKEN=ide-auth-token-123',
+          '--env',
+          'GEMINI_CLI_IDE_SERVER_STDIO_COMMAND=ide-mcp-cmd',
+          '--env',
+          'GEMINI_CLI_IDE_SERVER_STDIO_ARGS=["--stdio"]',
+          '--env',
+          'TERM_PROGRAM=vscode',
+        ]),
         expect.objectContaining({ stdio: 'inherit' }),
       );
     });
