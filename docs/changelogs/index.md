@@ -18,6 +18,20 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.63.0 - 2026-10-06
+
+- **Autonomous Plan Execution:** Enabled autonomous plan execution in
+  non-interactive mode to support unattended agent workflows
+  ([#29539](https://github.com/google-gemini/gemini-cli/pull/29539) by
+  @urielefrenvirtusa).
+- **Core Stability and Memory Lifecycle:** Bounded tool output sizes and
+  optimized memory management in long-running agent loops while preventing
+  infinite authentication loops across headless and supervisor environments
+  ([#29451](https://github.com/google-gemini/gemini-cli/pull/29451) by
+  @diegogodinezr,
+  [#29448](https://github.com/google-gemini/gemini-cli/pull/29448) by
+  @villahernandez-coder).
+
 ## Announcements: v0.61.0 - 2026-09-23
 
 - **Core Security Hardening:** Prevented indirect prompt injection
