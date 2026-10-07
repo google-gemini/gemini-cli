@@ -27,23 +27,18 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 });
 
 describe('getGitHubToken', () => {
-  const originalToken = process.env['GITHUB_TOKEN'];
-
   afterEach(() => {
-    if (originalToken) {
-      process.env['GITHUB_TOKEN'] = originalToken;
-    } else {
-      delete process.env['GITHUB_TOKEN'];
-    }
+    vi.unstubAllEnvs();
   });
 
   it('should return the token if GITHUB_TOKEN is set', () => {
-    process.env['GITHUB_TOKEN'] = 'test-token';
+    vi.stubEnv('GITHUB_TOKEN', 'test-token');
     expect(getGitHubToken()).toBe('test-token');
   });
 
   it('should return undefined if GITHUB_TOKEN is not set', () => {
-    delete process.env['GITHUB_TOKEN'];
+    // Must be truly unset: an empty string would be returned as-is.
+    vi.stubEnv('GITHUB_TOKEN', undefined);
     expect(getGitHubToken()).toBeUndefined();
   });
 });
@@ -157,6 +152,56 @@ describe('fetchJson', () => {
     );
     expect(getMock).toHaveBeenCalledTimes(1);
   });
+
+  it.each([
+    {
+      event: 'error',
+      trigger: (req: ClientRequest) =>
+        req.emit('error', new Error('socket hang up')),
+      expectedDestroyCalls: 0,
+    },
+    {
+      event: 'timeout',
+      trigger: (req: ClientRequest) => req.emit('timeout'),
+      // The original socket is still released; only its rejection is suppressed.
+      expectedDestroyCalls: 1,
+    },
+  ])(
+    'should ignore a late $event of the original request once a redirect has started',
+    async ({ trigger, expectedDestroyCalls }) => {
+      const destroyMock = vi.fn();
+      const originalReq = Object.assign(new EventEmitter(), {
+        destroy: destroyMock,
+      }) as unknown as ClientRequest;
+      getMock.mockImplementationOnce((_url, _options, callback) => {
+        const res = new EventEmitter() as IncomingMessage;
+        res.statusCode = 302;
+        res.headers = { location: 'https://example.com/final' };
+        res.resume = vi.fn();
+        queueMicrotask(() => {
+          (callback as (res: IncomingMessage) => void)(res);
+        });
+        return originalReq;
+      });
+      getMock.mockImplementationOnce((_url, _options, callback) => {
+        // The redirect request is now in flight while the original one fails.
+        trigger(originalReq);
+        queueMicrotask(() => {
+          const res = new EventEmitter() as IncomingMessage;
+          res.statusCode = 200;
+          (callback as (res: IncomingMessage) => void)(res);
+          res.emit('data', Buffer.from('{"redirected": true}'));
+          res.emit('end');
+        });
+        return new EventEmitter() as ClientRequest;
+      });
+
+      await expect(fetchJson('https://example.com/redirect')).resolves.toEqual({
+        redirected: true,
+      });
+      expect(destroyMock).toHaveBeenCalledTimes(expectedDestroyCalls);
+    },
+  );
 
   it('should reject on non-200/30x status code and drain the response', async () => {
     const resumeMock = vi.fn();
@@ -328,18 +373,12 @@ describe('fetchJson', () => {
   });
 
   describe('with GITHUB_TOKEN', () => {
-    const originalToken = process.env['GITHUB_TOKEN'];
-
     beforeEach(() => {
-      process.env['GITHUB_TOKEN'] = 'my-secret-token';
+      vi.stubEnv('GITHUB_TOKEN', 'my-secret-token');
     });
 
     afterEach(() => {
-      if (originalToken) {
-        process.env['GITHUB_TOKEN'] = originalToken;
-      } else {
-        delete process.env['GITHUB_TOKEN'];
-      }
+      vi.unstubAllEnvs();
     });
 
     it('should include Authorization header if token is present for github.com domains', async () => {
@@ -398,16 +437,12 @@ describe('fetchJson', () => {
   });
 
   describe('without GITHUB_TOKEN', () => {
-    const originalToken = process.env['GITHUB_TOKEN'];
-
     beforeEach(() => {
-      delete process.env['GITHUB_TOKEN'];
+      vi.stubEnv('GITHUB_TOKEN', '');
     });
 
     afterEach(() => {
-      if (originalToken) {
-        process.env['GITHUB_TOKEN'] = originalToken;
-      }
+      vi.unstubAllEnvs();
     });
 
     it('should not include Authorization header if token is not present', async () => {

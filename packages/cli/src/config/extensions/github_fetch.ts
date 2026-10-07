@@ -45,6 +45,10 @@ export async function fetchJson<T>(
     // 'aborted', then 'error', then 'close'). Settle the promise exactly once
     // and skip building errors for any event that arrives afterwards.
     let settled = false;
+    // Set once a redirect has been handed off to a nested fetchJson call. The
+    // original request and response then only drain, and their failures must
+    // not settle this promise, which now tracks the redirect target instead.
+    let isRedirecting = false;
     const succeed = (value: T): void => {
       if (!settled) {
         settled = true;
@@ -57,30 +61,32 @@ export async function fetchJson<T>(
         reject(createReason());
       }
     };
+    // Failure path for the original request and response: a no-op once a
+    // redirect is in flight, because the redirect then settles the promise.
+    const failUnlessRedirecting = (createReason: () => unknown): void => {
+      if (!isRedirecting) {
+        fail(createReason);
+      }
+    };
 
     const req = https.get(url, { headers, timeout: 30000 }, (res) => {
-      let isRedirecting = false;
-      res.on('error', (error) => {
-        if (!isRedirecting) {
-          fail(
-            () =>
-              new Error(
-                `Response error while fetching ${url} (status ${res.statusCode}): ${getErrorMessage(error)}`,
-                { cause: error },
-              ),
-          );
-        }
-      });
-      res.on('aborted', () => {
-        if (!isRedirecting) {
-          fail(
-            () =>
-              new Error(
-                `Response aborted while fetching ${url} (status ${res.statusCode})`,
-              ),
-          );
-        }
-      });
+      res.on('error', (error) =>
+        failUnlessRedirecting(
+          () =>
+            new Error(
+              `Response error while fetching ${url} (status ${res.statusCode}): ${getErrorMessage(error)}`,
+              { cause: error },
+            ),
+        ),
+      );
+      res.on('aborted', () =>
+        failUnlessRedirecting(
+          () =>
+            new Error(
+              `Response aborted while fetching ${url} (status ${res.statusCode})`,
+            ),
+        ),
+      );
 
       if (res.statusCode === 302 || res.statusCode === 301) {
         if (redirectCount >= 10) {
@@ -157,9 +163,11 @@ export async function fetchJson<T>(
         );
       });
     });
-    req.on('error', (error) => fail(() => error));
+    req.on('error', (error) => failUnlessRedirecting(() => error));
     req.on('timeout', () => {
-      fail(() => new Error('Request timed out after 30000ms'));
+      failUnlessRedirecting(() => new Error('Request timed out after 30000ms'));
+      // Always release the original socket. A redirect in flight runs on its
+      // own request, so destroying this one does not affect it.
       req.destroy();
     });
   });
