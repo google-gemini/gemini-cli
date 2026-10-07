@@ -1601,6 +1601,41 @@ describe('PolicyEngine', () => {
       expect(result.decision).toBe(PolicyDecision.ALLOW);
     });
 
+    it('should upgrade catch-all ASK_USER to ALLOW for compound commands/loops when all decomposed sub-commands match explicit ALLOW rules', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"git status"/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"ls"/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+        {
+          // Catch-all ASK_USER for shell
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ASK_USER,
+          priority: 10,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'git status && ls' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
     it('should NOT upgrade Git commands to ALLOW in untrusted workspace', async () => {
       const isTrustedMock = vi.fn().mockReturnValue(false);
       const engine = new PolicyEngine({

@@ -517,7 +517,12 @@ export class PolicyEngine {
 
     // Check for redirection on the full command string.
     // Redirection always downgrades ALLOW to ASK_USER (it never upgrades).
-    if (this.shouldDowngradeForRedirection(command, allowRedirection, rule)) {
+    const hasTopLevelRedirectionDowngrade = this.shouldDowngradeForRedirection(
+      command,
+      allowRedirection,
+      rule,
+    );
+    if (hasTopLevelRedirectionDowngrade) {
       if (aggregateDecision === PolicyDecision.ALLOW) {
         debugLogger.debug(
           `[PolicyEngine.check] Downgrading ALLOW to ASK_USER for redirected command: ${command}`,
@@ -526,6 +531,10 @@ export class PolicyEngine {
         responsibleRule = undefined; // Inherent policy
       }
     }
+
+    let evaluatedSubCommands = 0;
+    let allSubCommandsExplicitlyAllowed = true;
+    let lastAllowedSubRule: PolicyRule | undefined;
 
     for (const detail of subCommands) {
       if (REDIRECTION_NAMES.has(detail.name)) {
@@ -540,6 +549,7 @@ export class PolicyEngine {
       // Recursive check for shell wrappers (bash -c, etc.)
       const stripped = stripShellWrapper(subCmd);
       if (stripped !== subCmd) {
+        evaluatedSubCommands++;
         const wrapperResult = await this.check(
           { name: toolName, args: { command: stripped, dir_path } },
           serverName,
@@ -551,16 +561,22 @@ export class PolicyEngine {
         if (wrapperResult.decision === PolicyDecision.DENY)
           return wrapperResult;
         if (wrapperResult.decision === PolicyDecision.ASK_USER) {
+          allSubCommandsExplicitlyAllowed = false;
           if (aggregateDecision === PolicyDecision.ALLOW) {
             responsibleRule = wrapperResult.rule;
           } else {
             responsibleRule ??= wrapperResult.rule;
           }
           aggregateDecision = PolicyDecision.ASK_USER;
+        } else if (wrapperResult.rule?.decision === PolicyDecision.ALLOW) {
+          lastAllowedSubRule = wrapperResult.rule;
+        } else {
+          allSubCommandsExplicitlyAllowed = false;
         }
       }
 
       if (!isAtomic) {
+        evaluatedSubCommands++;
         const subResult = await this.check(
           { name: toolName, args: { command: subCmd, dir_path } },
           serverName,
@@ -572,6 +588,7 @@ export class PolicyEngine {
         if (subResult.decision === PolicyDecision.DENY) return subResult;
 
         if (subResult.decision === PolicyDecision.ASK_USER) {
+          allSubCommandsExplicitlyAllowed = false;
           if (aggregateDecision === PolicyDecision.ALLOW) {
             responsibleRule = subResult.rule;
           } else {
@@ -589,12 +606,36 @@ export class PolicyEngine {
             subResult.rule,
           )
         ) {
+          allSubCommandsExplicitlyAllowed = false;
           if (aggregateDecision === PolicyDecision.ALLOW) {
             aggregateDecision = PolicyDecision.ASK_USER;
             responsibleRule = undefined;
           }
+        } else if (
+          subResult.decision === PolicyDecision.ALLOW &&
+          subResult.rule?.decision === PolicyDecision.ALLOW
+        ) {
+          lastAllowedSubRule = subResult.rule;
+        } else {
+          allSubCommandsExplicitlyAllowed = false;
         }
+      } else if (stripped === subCmd) {
+        allSubCommandsExplicitlyAllowed = false;
       }
+    }
+
+    // If the top-level compound command (e.g. a `for` loop or subshell) fell through
+    // to a catch-all ASK_USER rule without an argsPattern, but every decomposed
+    // sub-command explicitly matched an ALLOW rule without redirection, upgrade to ALLOW.
+    if (
+      aggregateDecision === PolicyDecision.ASK_USER &&
+      !rule?.argsPattern &&
+      !hasTopLevelRedirectionDowngrade &&
+      evaluatedSubCommands > 0 &&
+      allSubCommandsExplicitlyAllowed
+    ) {
+      aggregateDecision = PolicyDecision.ALLOW;
+      responsibleRule = lastAllowedSubRule;
     }
 
     return {
