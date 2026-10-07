@@ -406,7 +406,9 @@ export function startCallbackServer(
 
       const onAbort = () => {
         clearCallbackTimeout();
-        server.close();
+        if (server.listening) {
+          server.close();
+        }
         reject(abortController.signal.reason);
       };
       abortController.signal.addEventListener('abort', onAbort, { once: true });
