@@ -7,10 +7,19 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import * as https from 'node:https';
 import { EventEmitter } from 'node:events';
+import { validateUrlDestination } from '@google/gemini-cli-core';
 import { fetchJson, getGitHubToken } from './github_fetch.js';
 import type { ClientRequest, IncomingMessage } from 'node:http';
 
 vi.mock('node:https');
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    validateUrlDestination: vi.fn(),
+  };
+});
 
 describe('getGitHubToken', () => {
   const originalToken = process.env['GITHUB_TOKEN'];
@@ -36,6 +45,11 @@ describe('getGitHubToken', () => {
 
 describe('fetchJson', () => {
   const getMock = vi.mocked(https.get);
+  const validateUrlDestinationMock = vi.mocked(validateUrlDestination);
+
+  beforeEach(() => {
+    validateUrlDestinationMock.mockResolvedValue(true);
+  });
 
   afterEach(() => {
     vi.resetAllMocks();
@@ -106,6 +120,38 @@ describe('fetchJson', () => {
     ).resolves.toEqual({ permanent: true });
   });
 
+  it('should reject when URL destination validation fails (SSRF protection)', async () => {
+    validateUrlDestinationMock.mockResolvedValueOnce(false);
+
+    await expect(
+      fetchJson('http://169.254.169.254/latest/meta-data/'),
+    ).rejects.toThrow(
+      'Access to blocked or private host http://169.254.169.254/latest/meta-data/ is not allowed.',
+    );
+    expect(getMock).not.toHaveBeenCalled();
+  });
+
+  it('should reject when redirect destination fails SSRF validation', async () => {
+    validateUrlDestinationMock
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+
+    getMock.mockImplementationOnce((_url, _options, callback) => {
+      const res = new EventEmitter() as IncomingMessage;
+      res.statusCode = 302;
+      res.headers = { location: 'http://127.0.0.1:8080/internal' };
+      res.resume = vi.fn();
+      (callback as (res: IncomingMessage) => void)(res);
+      res.emit('end');
+      return new EventEmitter() as ClientRequest;
+    });
+
+    await expect(fetchJson('https://example.com/redirect')).rejects.toThrow(
+      'Access to blocked or private host http://127.0.0.1:8080/internal is not allowed.',
+    );
+    expect(getMock).toHaveBeenCalledTimes(1);
+  });
+
   it('should reject on non-200/30x status code and drain the response', async () => {
     const resumeMock = vi.fn();
     getMock.mockImplementationOnce((_url, _options, callback) => {
@@ -127,13 +173,38 @@ describe('fetchJson', () => {
     const error = new Error('Network error');
     getMock.mockImplementationOnce(() => {
       const req = new EventEmitter() as ClientRequest;
-      req.emit('error', error);
+      queueMicrotask(() => {
+        req.emit('error', error);
+      });
       return req;
     });
 
     await expect(fetchJson('https://example.com/error')).rejects.toThrow(
       'Network error',
     );
+  });
+
+  it('should destroy request and reject on request timeout', async () => {
+    const destroyMock = vi.fn();
+    getMock.mockImplementationOnce((_url, options) => {
+      expect(options).toEqual(
+        expect.objectContaining({
+          timeout: 30000,
+        }),
+      );
+      const req = Object.assign(new EventEmitter(), {
+        destroy: destroyMock,
+      }) as unknown as ClientRequest;
+      queueMicrotask(() => {
+        req.emit('timeout');
+      });
+      return req;
+    });
+
+    await expect(fetchJson('https://example.com/slow')).rejects.toThrow(
+      'Request timed out after 30000ms',
+    );
+    expect(destroyMock).toHaveBeenCalledOnce();
   });
 
   it('should reject with contextual error on malformed JSON', async () => {
@@ -235,7 +306,7 @@ describe('fetchJson', () => {
       }
     });
 
-    it('should include Authorization header if token is present', async () => {
+    it('should include Authorization header if token is present for github.com domains', async () => {
       getMock.mockImplementationOnce((_url, options, callback) => {
         expect(options.headers).toEqual({
           'User-Agent': 'gemini-cli',
@@ -250,6 +321,42 @@ describe('fetchJson', () => {
       });
       await expect(fetchJson('https://api.github.com/user')).resolves.toEqual({
         foo: 'bar',
+      });
+    });
+
+    it('should strip Authorization header when redirecting to a non-GitHub domain', async () => {
+      getMock.mockImplementationOnce((_url, options, callback) => {
+        expect(options.headers).toEqual({
+          'User-Agent': 'gemini-cli',
+          Authorization: 'token my-secret-token',
+        });
+        const res = new EventEmitter() as IncomingMessage;
+        res.statusCode = 302;
+        res.headers = {
+          location: 'https://external-bucket.s3.amazonaws.com/data.json',
+        };
+        res.resume = vi.fn();
+        (callback as (res: IncomingMessage) => void)(res);
+        res.emit('end');
+        return new EventEmitter() as ClientRequest;
+      });
+
+      getMock.mockImplementationOnce((_url, options, callback) => {
+        expect(options.headers).toEqual({
+          'User-Agent': 'gemini-cli',
+        });
+        const res = new EventEmitter() as IncomingMessage;
+        res.statusCode = 200;
+        (callback as (res: IncomingMessage) => void)(res);
+        res.emit('data', Buffer.from('{"redirected": true}'));
+        res.emit('end');
+        return new EventEmitter() as ClientRequest;
+      });
+
+      await expect(
+        fetchJson('https://api.github.com/repos/owner/repo/releases/latest'),
+      ).resolves.toEqual({
+        redirected: true,
       });
     });
   });
