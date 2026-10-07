@@ -1763,8 +1763,7 @@ export function stripToolCallIdPrefixes(contents: Content[]): Content[] {
           const name = fc.name?.trim() || 'generic_tool';
           if (fc.id && fc.id.startsWith(`${name}__`)) {
             newPart.functionCall = {
-              name: fc.name,
-              args: fc.args,
+              ...fc,
               id: fc.id.substring(name.length + 2),
             };
           }
@@ -1774,8 +1773,8 @@ export function stripToolCallIdPrefixes(contents: Content[]): Content[] {
           const name = fr.name?.trim() || 'generic_tool';
           if (fr.id && fr.id.startsWith(`${name}__`)) {
             newPart.functionResponse = {
-              name: fr.name,
-              response: fr.response,
+              // eslint-disable-next-line @typescript-eslint/no-misused-spread
+              ...fr,
               id: fr.id.substring(name.length + 2),
             };
           }
