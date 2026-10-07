@@ -495,9 +495,13 @@ export class CoderAgentExecutor implements AgentExecutor {
         logger.info(
           `[CoderAgentExecutor] userMessage: ${JSON.stringify(userMessage)}`,
         );
-        eventBus.on('event', (event: AgentExecutionEvent) =>
-          logger.info('[EventBus event]: ', event),
-        );
+        let cleanupSocketListeners: (() => void) | undefined;
+        eventBus.on('event', (event: AgentExecutionEvent) => {
+          logger.info('[EventBus event]: ', event);
+          if ('final' in event && event.final) {
+            cleanupSocketListeners?.();
+          }
+        });
 
         const store = requestStorage.getStore();
         if (!store) {
@@ -530,13 +534,16 @@ export class CoderAgentExecutor implements AgentExecutor {
               }
               socket.removeListener('end', onSocketEnd);
             };
+            const removeEndListener = () =>
+              socket.removeListener('end', onSocketEnd);
             socket.on('end', onSocketEnd);
-            socket.once('close', () =>
-              socket.removeListener('end', onSocketEnd),
-            );
-            abortSignal.addEventListener('abort', () =>
-              socket.removeListener('end', onSocketEnd),
-            );
+            socket.once('close', removeEndListener);
+            abortSignal.addEventListener('abort', removeEndListener);
+            cleanupSocketListeners = () => {
+              socket.removeListener('end', onSocketEnd);
+              socket.removeListener('close', removeEndListener);
+              abortSignal.removeEventListener('abort', removeEndListener);
+            };
             logger.info(
               `[CoderAgentExecutor] Socket close handler set up for task ${taskId}.`,
             );
@@ -713,6 +720,7 @@ export class CoderAgentExecutor implements AgentExecutor {
         } finally {
           this.explicitlyCanceledTasks.delete(abortController);
           if (!proceedToMainLoop) {
+            cleanupSocketListeners?.();
             const controllers = this.activeAbortControllers.get(taskId);
             if (controllers) {
               controllers.delete(abortController);
@@ -885,6 +893,7 @@ export class CoderAgentExecutor implements AgentExecutor {
             }
           }
         } finally {
+          cleanupSocketListeners?.();
           if (isPrimaryExecution) {
             const controllers = this.activeAbortControllers.get(taskId);
             if (controllers) {

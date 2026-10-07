@@ -419,6 +419,235 @@ describe('E2E Tests', () => {
     expect(events.length).toBe(8);
   });
 
+  it('should continue to the next sequential edit tool call when the first is rejected', async () => {
+    const coreMod = await import('@google/gemini-cli-core');
+    const originalGetMessageBus = config?.getMessageBus;
+
+    sendMessageStreamSpy.mockImplementationOnce(async function* () {
+      yield* [
+        {
+          type: GeminiEventType.ToolCallRequest,
+          value: {
+            callId: 'write-call-1',
+            name: 'write_file',
+            args: { file_path: '/tmp/file1.txt', content: 'one' },
+          },
+        },
+        {
+          type: GeminiEventType.ToolCallRequest,
+          value: {
+            callId: 'write-call-2',
+            name: 'write_file',
+            args: { file_path: '/tmp/file2.txt', content: 'two' },
+          },
+        },
+      ];
+    });
+    sendMessageStreamSpy.mockImplementation(async function* () {
+      yield* [{ type: 'content', value: 'Completed batch.' }];
+    });
+
+    const mockWriteTool = new MockTool({
+      name: 'write_file',
+      displayName: 'Write File',
+      shouldConfirmExecute: vi.fn(
+        async () =>
+          ({
+            type: 'edit',
+            title: 'Confirm write_file',
+            fileName: 'file.txt',
+            fileDiff: 'diff',
+            filePath: '/tmp/file.txt',
+            originalContent: '',
+            newContent: 'content',
+          }) as unknown as ToolCallConfirmationDetails,
+      ),
+      execute: vi.fn().mockResolvedValue({
+        llmContent: 'File written successfully.',
+        returnDisplay: 'File written successfully.',
+      }),
+    });
+
+    getToolRegistrySpy.mockReturnValue({
+      getAllTools: vi.fn().mockReturnValue([mockWriteTool]),
+      getToolsByServer: vi.fn().mockReturnValue([]),
+      getAllToolNames: vi.fn().mockReturnValue(['write_file']),
+      getTool: vi.fn().mockImplementation((name: string) => {
+        if (name === 'write_file') return mockWriteTool;
+        return undefined;
+      }),
+    });
+
+    const configMod = await import('../config/config.js');
+    vi.mocked(configMod.loadConfig).mockImplementationOnce(async () => {
+      const mockConfig = createMockConfig({
+        getToolRegistry: getToolRegistrySpy,
+        getApprovalMode: getApprovalModeSpy,
+        getShellExecutionConfig: getShellExecutionConfigSpy,
+        getExtensions: getExtensionsSpy,
+      }) as Config;
+      const realBus = new coreMod.MessageBus(mockConfig.getPolicyEngine());
+      mockConfig.getMessageBus = vi.fn().mockReturnValue(realBus);
+      config = mockConfig;
+      return config;
+    });
+
+    const agent = request.agent(app);
+
+    // 1. Initial prompt schedules write-call-1 and write-call-2.
+    // write-call-1 transitions to awaiting_approval while write-call-2 stays queued.
+    const res1 = await agent
+      .post('/')
+      .send(
+        createStreamMessageRequest('create two files', 'a2a-seq-edit-msg-1'),
+      )
+      .set('Content-Type', 'application/json')
+      .expect(200);
+
+    const events1 = streamToSSEEvents(res1.text);
+    assertTaskCreationAndWorkingStatus(events1);
+    assertUniqueFinalEventIsLast(events1);
+
+    const taskId = (events1[0].result as { id: string }).id;
+
+    // Verify write-call-1 is awaiting_approval in stream 1
+    const awaitingCall1 = events1.find((e) => {
+      const update = e.result as TaskStatusUpdateEvent;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const part = update.status?.message?.parts?.[0] as any;
+      return (
+        part?.data?.request?.callId === 'write-call-1' &&
+        part?.data?.status === 'awaiting_approval'
+      );
+    });
+    expect(awaitingCall1).toBeDefined();
+
+    // 2. Reject write-call-1 (outcome: 'cancel')
+    const res2 = await agent
+      .post('/')
+      .send({
+        jsonrpc: '2.0',
+        id: '2',
+        method: 'message/stream',
+        params: {
+          message: {
+            kind: 'message',
+            role: 'user',
+            taskId,
+            parts: [
+              {
+                kind: 'data',
+                data: {
+                  callId: 'write-call-1',
+                  outcome: 'cancel',
+                },
+              },
+            ],
+            messageId: 'a2a-seq-edit-msg-2',
+          },
+          metadata: {
+            coderAgent: {
+              kind: 'agent-settings',
+              workspacePath: '/tmp',
+            },
+          },
+        },
+      })
+      .set('Content-Type', 'application/json')
+      .expect(200);
+
+    const events2 = streamToSSEEvents(res2.text);
+    assertUniqueFinalEventIsLast(events2);
+
+    // Verify write-call-1 was cancelled, and write-call-2 was NOT auto-cancelled,
+    // instead transitioning to awaiting_approval!
+    const cancelledCall1 = events2.find((e) => {
+      const update = e.result as TaskStatusUpdateEvent;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const part = update.status?.message?.parts?.[0] as any;
+      return (
+        part?.data?.request?.callId === 'write-call-1' &&
+        part?.data?.status === 'cancelled'
+      );
+    });
+    expect(cancelledCall1).toBeDefined();
+
+    const cancelledCall2 = events2.find((e) => {
+      const update = e.result as TaskStatusUpdateEvent;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const part = update.status?.message?.parts?.[0] as any;
+      return (
+        part?.data?.request?.callId === 'write-call-2' &&
+        part?.data?.status === 'cancelled'
+      );
+    });
+    expect(cancelledCall2).toBeUndefined();
+
+    const awaitingCall2 = events2.find((e) => {
+      const update = e.result as TaskStatusUpdateEvent;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const part = update.status?.message?.parts?.[0] as any;
+      return (
+        part?.data?.request?.callId === 'write-call-2' &&
+        part?.data?.status === 'awaiting_approval'
+      );
+    });
+    expect(awaitingCall2).toBeDefined();
+
+    // 3. Approve write-call-2 (outcome: 'proceed_once')
+    const res3 = await agent
+      .post('/')
+      .send({
+        jsonrpc: '2.0',
+        id: '3',
+        method: 'message/stream',
+        params: {
+          message: {
+            kind: 'message',
+            role: 'user',
+            taskId,
+            parts: [
+              {
+                kind: 'data',
+                data: {
+                  callId: 'write-call-2',
+                  outcome: 'proceed_once',
+                },
+              },
+            ],
+            messageId: 'a2a-seq-edit-msg-3',
+          },
+          metadata: {
+            coderAgent: {
+              kind: 'agent-settings',
+              workspacePath: '/tmp',
+            },
+          },
+        },
+      })
+      .set('Content-Type', 'application/json')
+      .expect(200);
+
+    const events3 = streamToSSEEvents(res3.text);
+    assertUniqueFinalEventIsLast(events3);
+
+    const successCall2 = events3.find((e) => {
+      const update = e.result as TaskStatusUpdateEvent;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const part = update.status?.message?.parts?.[0] as any;
+      return (
+        part?.data?.request?.callId === 'write-call-2' &&
+        part?.data?.status === 'success'
+      );
+    });
+    expect(successCall2).toBeDefined();
+    expect(mockWriteTool.execute).toHaveBeenCalledTimes(1);
+
+    if (originalGetMessageBus && config) {
+      config.getMessageBus = originalGetMessageBus;
+    }
+  });
+
   it('should handle multiple tool calls sequentially in YOLO mode', async () => {
     // Set YOLO mode to auto-approve tools and test sequential execution.
     getApprovalModeSpy.mockReturnValue(ApprovalMode.YOLO);

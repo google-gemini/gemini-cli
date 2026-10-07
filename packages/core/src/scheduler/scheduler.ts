@@ -69,6 +69,7 @@ export interface SchedulerOptions {
   subagent?: string;
   parentCallId?: string;
   onWaitingForConfirmation?: (waiting: boolean) => void;
+  cancelAllQueuedOnCancel?: boolean;
 }
 
 interface TaintRiskDetectable {
@@ -126,6 +127,7 @@ export class Scheduler {
   private readonly subagent?: string;
   private readonly parentCallId?: string;
   private readonly onWaitingForConfirmation?: (waiting: boolean) => void;
+  private readonly cancelAllQueuedOnCancel: boolean;
 
   private isProcessing = false;
   private isCancelling = false;
@@ -140,6 +142,7 @@ export class Scheduler {
     this.subagent = options.subagent;
     this.parentCallId = options.parentCallId;
     this.onWaitingForConfirmation = options.onWaitingForConfirmation;
+    this.cancelAllQueuedOnCancel = options.cancelAllQueuedOnCancel ?? true;
     this.state = new SchedulerStateManager(
       this.messageBus,
       this.schedulerId,
@@ -741,14 +744,16 @@ export class Scheduler {
       );
     }
 
-    // Handle cancellation (cascades to entire batch)
+    // Handle cancellation (cascades to entire batch by default unless disabled)
     if (outcome === ToolConfirmationOutcome.Cancel) {
       this.state.updateStatus(
         callId,
         CoreToolCallStatus.Cancelled,
         'User denied execution.',
       );
-      this.state.cancelAllQueued('User cancelled operation');
+      if (this.cancelAllQueuedOnCancel) {
+        this.state.cancelAllQueued('User cancelled operation');
+      }
       return; // Skip execution
     }
 
