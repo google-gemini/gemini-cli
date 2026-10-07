@@ -456,7 +456,11 @@ export function persistSandboxState(
 ): void {
   try {
     fs.mkdirSync(sandboxStateDir, { recursive: true, mode: 0o700 });
-    fs.chmodSync(sandboxStateDir, 0o700);
+    try {
+      fs.chmodSync(sandboxStateDir, 0o700);
+    } catch {
+      // Ignore permission errors on non-POSIX filesystems.
+    }
   } catch (err) {
     debugLogger.warn(
       `Failed to prepare persistent sandbox state directory: ${err instanceof Error ? err.message : String(err)}`,

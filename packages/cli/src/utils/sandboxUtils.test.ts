@@ -113,8 +113,8 @@ describe('sandboxUtils', () => {
     beforeEach(() => {
       vi.mocked(os.platform).mockReturnValue('linux');
       vi.mocked(fs.existsSync).mockReturnValue(false);
-      delete process.env['PATH'];
-      delete process.env['PYTHONPATH'];
+      vi.stubEnv('PATH', '');
+      vi.stubEnv('PYTHONPATH', '');
     });
 
     it('should generate default entrypoint', () => {
@@ -758,8 +758,6 @@ describe('sandboxUtils', () => {
       const fakeIsolatedDir = '/tmp/gemini-sandbox-settings-xyz';
 
       vi.mocked(fs.existsSync).mockReturnValue(false);
-      delete process.env['PATH'];
-      delete process.env['PYTHONPATH'];
       vi.mocked(fs.mkdtempSync).mockReturnValue(fakeIsolatedDir);
 
       const result = prepareIsolatedSettingsDir(fakeHostSettingsDir);
