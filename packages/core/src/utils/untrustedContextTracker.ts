@@ -398,7 +398,8 @@ export function findUntrustedFlags(
         SAFE_SHORT_FLAGS.has(rawFlagName) || SAFE_LONG_FLAGS.has(flagToCheck);
       const isHighRiskFlag =
         HIGH_RISK_VALUE_FLAGS.has(rawFlagName) ||
-        (rawFlagName.startsWith('--') && HIGH_RISK_VALUE_FLAGS.has(flagToCheck));
+        (rawFlagName.startsWith('--') &&
+          HIGH_RISK_VALUE_FLAGS.has(flagToCheck));
 
       // Check 1A: Full flag or flag name exists in untrusted tokens (unless it is a known safe flag)
       if (
