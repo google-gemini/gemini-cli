@@ -4760,6 +4760,63 @@ describe('GeminiChat', () => {
       expect(stripped[0].parts![0].functionCall!.id).toBe('call_123');
       expect(stripped[1].parts![0].functionResponse!.id).toBe('call_123');
     });
+
+    it('should preserve all additional fields including parts and metadata when stripping prefixes', () => {
+      const contents: Content[] = [
+        {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                id: 'read_file__call_123',
+                name: 'read_file',
+                args: { file_path: 'image.png' },
+                partialArgs: '{"file_path":',
+              } as unknown as NonNullable<Content['parts']>[0]['functionCall'],
+            },
+          ],
+        },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                id: 'read_file__call_123',
+                name: 'read_file',
+                response: { output: 'Binary content provided (1 item(s)).' },
+                parts: [
+                  {
+                    inlineData: {
+                      mimeType: 'image/png',
+                      data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+                    },
+                  },
+                ],
+              } as unknown as NonNullable<
+                Content['parts']
+              >[0]['functionResponse'],
+            },
+          ],
+        },
+      ];
+
+      const stripped = stripToolCallIdPrefixes(contents);
+      expect(stripped[0].parts![0].functionCall!.id).toBe('call_123');
+      expect(
+        (stripped[0].parts![0].functionCall as Record<string, unknown>)[
+          'partialArgs'
+        ],
+      ).toBe('{"file_path":');
+      expect(stripped[1].parts![0].functionResponse!.id).toBe('call_123');
+      expect(stripped[1].parts![0].functionResponse!.parts).toEqual([
+        {
+          inlineData: {
+            mimeType: 'image/png',
+            data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+          },
+        },
+      ]);
+    });
   });
 
   describe('coalesceConsecutiveRoles', () => {
