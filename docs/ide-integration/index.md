@@ -220,11 +220,10 @@ If you are using Gemini CLI within a sandbox, be aware of the following:
   IDE server on `host.docker.internal`. No special configuration is usually
   required, but you may need to ensure your Docker networking setup allows
   connections from the container to the host.
-- **In a gVisor (`runsc`) sandbox:** The IDE companion integration is not
-  supported when running with `GEMINI_SANDBOX=runsc` because gVisor's isolated
-  user-space network stack blocks host loopback communication. Use
-  `GEMINI_SANDBOX=docker` if you require IDE companion integration with
-  container sandboxing.
+- **In a gVisor (`runsc`) sandbox:** IDE integration is not available when you
+  run Gemini CLI with `GEMINI_SANDBOX=runsc`. gVisor's isolated user-space
+  network stack can't reach the IDE companion server on the host loopback
+  interface. To use IDE integration, run Gemini CLI without the `runsc` sandbox.
 
 ## Troubleshooting
 
@@ -246,14 +245,14 @@ If you are using Gemini CLI within a sandbox, be aware of the following:
         environment.
 
 - **Message:**
-  `🔴 Disconnected: Failed to connect to IDE companion extension in [IDE Name]: gVisor (runsc) sandboxing enforces strict network isolation which prevents host loopback communication.`
+  `🔴 Disconnected: Failed to connect to IDE companion extension in [IDE Name]: gVisor (runsc) sandboxing isolates the container network stack, so the IDE companion server on the host is unreachable. To use IDE integration, run Gemini CLI without the runsc sandbox.`
 
-  - **Cause:** You are running Gemini CLI with gVisor (`runsc`) sandboxing
-    enabled, which isolates container network traffic from the host loopback
-    interface used by the IDE companion server.
-  - **Solution:** Switch to standard Docker sandboxing (`GEMINI_SANDBOX=docker`)
-    or run Gemini CLI outside the `runsc` container when using IDE companion
-    features.
+  - **Cause:** You are running Gemini CLI with gVisor (`runsc`) sandboxing.
+    gVisor isolates the container's network traffic from the host loopback
+    interface that the IDE companion server listens on, so the connection can't
+    succeed.
+  - **Solution:** Run Gemini CLI without the `runsc` sandbox when you need IDE
+    integration.
 
 - **Message:**
   `🔴 Disconnected: IDE connection error. The connection was lost unexpectedly. Please try reconnecting by running /ide enable`

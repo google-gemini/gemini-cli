@@ -148,7 +148,7 @@ export class IdeClient {
 
     const isGvisor = isGvisorSandbox();
     const ideName = this.currentIde.displayName;
-    const gvisorFailureDetails = `Failed to connect to IDE companion extension in ${ideName}: gVisor (runsc) sandboxing enforces strict network isolation which prevents host loopback communication.`;
+    const gvisorFailureDetails = `Failed to connect to IDE companion extension in ${ideName}: gVisor (runsc) sandboxing isolates the container network stack, so the IDE companion server on the host is unreachable. To use IDE integration, run Gemini CLI without the runsc sandbox.`;
 
     const { isValid, error } = validateWorkspacePath(
       workspacePath,
@@ -156,6 +156,9 @@ export class IdeClient {
     );
 
     if (!isValid) {
+      // An unknown workspace path normally means the extension is not
+      // installed, so the generic error suggests `/ide install`. Under gVisor
+      // that advice cannot help: the companion is unreachable either way.
       this.setState(
         IDEConnectionStatus.Disconnected,
         workspacePath === undefined && isGvisor ? gvisorFailureDetails : error,

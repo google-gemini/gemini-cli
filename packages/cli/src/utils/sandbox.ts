@@ -794,8 +794,6 @@ export async function start_sandbox(
     for (const envVar of [
       'GEMINI_CLI_IDE_SERVER_PORT',
       'GEMINI_CLI_IDE_WORKSPACE_PATH',
-      'GEMINI_CLI_IDE_SERVER_STDIO_COMMAND',
-      'GEMINI_CLI_IDE_SERVER_STDIO_ARGS',
       'TERM_PROGRAM',
     ]) {
       if (process.env[envVar]) {
@@ -803,10 +801,11 @@ export async function start_sandbox(
       }
     }
 
-    const geminiSandboxEnv =
-      config.command === 'runsc' ? 'runsc' : process.env['GEMINI_SANDBOX'];
-    if (geminiSandboxEnv) {
-      args.push('--env', `GEMINI_SANDBOX=${geminiSandboxEnv}`);
+    // gVisor's isolated network stack cannot reach the IDE companion server on
+    // the host loopback interface. Tell the CLI inside the container which
+    // runtime launched it so it can explain IDE connection failures.
+    if (config.command === 'runsc') {
+      args.push('--env', 'GEMINI_SANDBOX=runsc');
     }
 
     // copy VIRTUAL_ENV if under working directory
@@ -1217,10 +1216,6 @@ async function start_lxc_sandbox(
       GEMINI_CLI_IDE_SERVER_PORT: process.env['GEMINI_CLI_IDE_SERVER_PORT'],
       GEMINI_CLI_IDE_WORKSPACE_PATH:
         process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'],
-      GEMINI_CLI_IDE_SERVER_STDIO_COMMAND:
-        process.env['GEMINI_CLI_IDE_SERVER_STDIO_COMMAND'],
-      GEMINI_CLI_IDE_SERVER_STDIO_ARGS:
-        process.env['GEMINI_CLI_IDE_SERVER_STDIO_ARGS'],
       TERM_PROGRAM: process.env['TERM_PROGRAM'],
     };
     for (const [key, value] of Object.entries(envVarsToForward)) {

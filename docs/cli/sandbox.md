@@ -223,10 +223,10 @@ To set up runsc:
 **Limitations**:
 
 - Linux only (gVisor is not available on macOS or Windows).
-- [IDE integration](../ide-integration/index.md) is not supported when using
-  `runsc` because gVisor's isolated network stack blocks communication with the
-  IDE companion server on the host loopback interface. Use `docker` sandboxing
-  if you need IDE companion integration inside a container.
+- [IDE integration](../ide-integration/index.md) is not available inside a
+  `runsc` sandbox: gVisor's isolated network stack can't reach the IDE companion
+  server on the host loopback interface. To use IDE integration, run Gemini CLI
+  without the `runsc` sandbox.
 
 ### 5. LXC/LXD (Linux only, experimental)
 

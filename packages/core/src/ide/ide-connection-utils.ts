@@ -395,11 +395,16 @@ export function getIdeServerHost() {
   return host;
 }
 
+/**
+ * Returns true when the CLI runs inside a gVisor (runsc) sandbox container.
+ *
+ * The sandbox launcher forwards `GEMINI_SANDBOX=runsc` into the container
+ * (see `start_sandbox` in `packages/cli/src/utils/sandbox.ts`). gVisor's
+ * isolated network stack cannot reach the IDE companion server on the host
+ * loopback interface, so IDE connection attempts always fail there.
+ */
 export function isGvisorSandbox(): boolean {
-  return (
-    Boolean(process.env['SANDBOX']?.toLowerCase().includes('runsc')) ||
-    process.env['GEMINI_SANDBOX']?.toLowerCase().trim() === 'runsc'
-  );
+  return process.env['GEMINI_SANDBOX']?.toLowerCase().trim() === 'runsc';
 }
 
 function isInContainer() {

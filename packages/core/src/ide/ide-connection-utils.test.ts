@@ -18,6 +18,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import {
   getConnectionConfigFromFile,
+  isGvisorSandbox,
   validateWorkspacePath,
   getIdeServerHost,
 } from './ide-connection-utils.js';
@@ -884,6 +885,33 @@ describe('ide-connection-utils', () => {
       expect(EnvHttpProxyAgent).toHaveBeenCalledWith({
         noProxy: ideServerHost,
       });
+    });
+  });
+
+  describe('isGvisorSandbox', () => {
+    it.each([
+      ['runsc', true],
+      ['RUNSC', true],
+      ['  runsc\n', true],
+      ['docker', false],
+      ['podman', false],
+      ['sandbox-exec', false],
+      ['true', false],
+      ['', false],
+    ])('returns %s for GEMINI_SANDBOX=%j', (value, expected) => {
+      vi.stubEnv('GEMINI_SANDBOX', value);
+      expect(isGvisorSandbox()).toBe(expected);
+    });
+
+    it('returns false when GEMINI_SANDBOX is not set', () => {
+      vi.stubEnv('GEMINI_SANDBOX', undefined);
+      expect(isGvisorSandbox()).toBe(false);
+    });
+
+    it('ignores the SANDBOX container name', () => {
+      vi.stubEnv('GEMINI_SANDBOX', undefined);
+      vi.stubEnv('SANDBOX', 'gemini-cli-sandbox-runsc-0123456789ab');
+      expect(isGvisorSandbox()).toBe(false);
     });
   });
 });

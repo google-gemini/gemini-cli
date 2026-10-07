@@ -1713,56 +1713,6 @@ describe('sandbox', () => {
         );
       });
 
-      it('should pass through IDE mode environment variables to lxc exec', async () => {
-        vi.stubEnv('TEST_LXC_LIST_OUTPUT', LXC_RUNNING);
-        vi.stubEnv('GEMINI_CLI_IDE_SERVER_PORT', '12345');
-        vi.stubEnv('GEMINI_CLI_IDE_WORKSPACE_PATH', '/workspace');
-        vi.stubEnv('GEMINI_CLI_IDE_SERVER_STDIO_COMMAND', 'node');
-        vi.stubEnv('GEMINI_CLI_IDE_SERVER_STDIO_ARGS', '["server.js"]');
-        vi.stubEnv('TERM_PROGRAM', 'vscode');
-
-        const config: SandboxConfig = createMockSandboxConfig({
-          command: 'lxc',
-          image: 'gemini-sandbox',
-        });
-
-        const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
-          typeof spawn
-        >;
-        mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
-          if (event === 'close') {
-            setTimeout(() => cb(0), 10);
-          }
-          return mockSpawnProcess;
-        });
-
-        vi.mocked(spawn).mockImplementation((cmd) => {
-          if (cmd === 'lxc') {
-            return mockSpawnProcess;
-          }
-          return new EventEmitter() as unknown as ReturnType<typeof spawn>;
-        });
-
-        await expect(start_sandbox(config)).resolves.toBe(0);
-
-        expect(spawn).toHaveBeenCalledWith(
-          'lxc',
-          expect.arrayContaining([
-            '--env',
-            'GEMINI_CLI_IDE_SERVER_PORT=12345',
-            '--env',
-            'GEMINI_CLI_IDE_WORKSPACE_PATH=/workspace',
-            '--env',
-            'GEMINI_CLI_IDE_SERVER_STDIO_COMMAND=node',
-            '--env',
-            'GEMINI_CLI_IDE_SERVER_STDIO_ARGS=["server.js"]',
-            '--env',
-            'TERM_PROGRAM=vscode',
-          ]),
-          expect.objectContaining({ stdio: 'inherit' }),
-        );
-      });
-
       it('should throw FatalSandboxError if lxc list fails', async () => {
         process.env['TEST_LXC_LIST_OUTPUT'] = 'throw';
         const config: SandboxConfig = createMockSandboxConfig({
@@ -1798,21 +1748,10 @@ describe('sandbox', () => {
   });
 
   describe('gVisor (runsc)', () => {
-    it('should use docker with --runtime=runsc on Linux and forward GEMINI_SANDBOX=runsc and IDE env vars', async () => {
-      vi.mocked(os.platform).mockReturnValue('linux');
-      vi.stubEnv('GEMINI_CLI_IDE_SERVER_PORT', '54321');
-      vi.stubEnv('GEMINI_CLI_IDE_WORKSPACE_PATH', '/workspace/project');
-      vi.stubEnv('GEMINI_CLI_IDE_AUTH_TOKEN', 'ide-auth-token-123');
-      vi.stubEnv('GEMINI_CLI_IDE_SERVER_STDIO_COMMAND', 'ide-mcp-cmd');
-      vi.stubEnv('GEMINI_CLI_IDE_SERVER_STDIO_ARGS', '["--stdio"]');
-      vi.stubEnv('TERM_PROGRAM', 'vscode');
-
-      const config: SandboxConfig = createMockSandboxConfig({
-        command: 'runsc',
-        image: 'gemini-cli-sandbox',
-      });
-
-      // Mock image check
+    /** Mocks the image check and `docker run`, then returns the run args. */
+    async function captureDockerRunArgs(
+      config: SandboxConfig,
+    ): Promise<string[]> {
       interface MockProcessWithStdout extends EventEmitter {
         stdout: EventEmitter;
       }
@@ -1826,7 +1765,6 @@ describe('sandbox', () => {
         return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
       });
 
-      // Mock docker run
       const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
         typeof spawn
       >;
@@ -1840,35 +1778,89 @@ describe('sandbox', () => {
 
       await start_sandbox(config, [], undefined, ['arg1']);
 
-      // Verify docker (not runsc) is called for image check
       expect(spawn).toHaveBeenNthCalledWith(
         1,
         'docker',
-        expect.arrayContaining(['images', '-q', 'gemini-cli-sandbox']),
+        expect.arrayContaining(['images', '-q', config.image]),
+      );
+      expect(vi.mocked(spawn).mock.calls[1][0]).toBe('docker');
+      return vi.mocked(spawn).mock.calls[1][1] as string[];
+    }
+
+    /** Extracts the `KEY=VALUE` entries passed via `--env`. */
+    const envEntries = (args: string[]): string[] =>
+      args.flatMap((arg, i) => (args[i - 1] === '--env' ? [arg] : []));
+
+    beforeEach(() => {
+      vi.mocked(os.platform).mockReturnValue('linux');
+      vi.stubEnv('GEMINI_CLI_IDE_SERVER_PORT', '54321');
+      vi.stubEnv('GEMINI_CLI_IDE_WORKSPACE_PATH', '/workspace/project');
+      vi.stubEnv('GEMINI_CLI_IDE_AUTH_TOKEN', 'ide-auth-token-123');
+      vi.stubEnv('GEMINI_CLI_IDE_SERVER_STDIO_COMMAND', 'ide-mcp-cmd');
+      vi.stubEnv('TERM_PROGRAM', 'vscode');
+    });
+
+    it('should use docker with --runtime=runsc on Linux and mark the container with GEMINI_SANDBOX=runsc', async () => {
+      const dockerRunArgs = await captureDockerRunArgs(
+        createMockSandboxConfig({
+          command: 'runsc',
+          image: 'gemini-cli-sandbox',
+        }),
       );
 
-      // Verify docker run includes --runtime=runsc, GEMINI_SANDBOX=runsc, and safe IDE env vars (excluding GEMINI_CLI_IDE_AUTH_TOKEN)
-      const dockerRunArgs = vi.mocked(spawn).mock.calls[1][1] as string[];
       expect(dockerRunArgs).toEqual(
+        expect.arrayContaining(['run', '--runtime=runsc']),
+      );
+      expect(envEntries(dockerRunArgs)).toEqual(
         expect.arrayContaining([
-          'run',
-          '--runtime=runsc',
-          '--env',
           'GEMINI_SANDBOX=runsc',
-          '--env',
           'GEMINI_CLI_IDE_SERVER_PORT=54321',
-          '--env',
           'GEMINI_CLI_IDE_WORKSPACE_PATH=/workspace/project',
-          '--env',
-          'GEMINI_CLI_IDE_SERVER_STDIO_COMMAND=ide-mcp-cmd',
-          '--env',
-          'GEMINI_CLI_IDE_SERVER_STDIO_ARGS=["--stdio"]',
-          '--env',
           'TERM_PROGRAM=vscode',
         ]),
       );
-      expect(dockerRunArgs).not.toContain(
-        'GEMINI_CLI_IDE_AUTH_TOKEN=ide-auth-token-123',
+    });
+
+    it('should never forward the IDE auth token or stdio command into the runsc container', async () => {
+      const dockerRunArgs = await captureDockerRunArgs(
+        createMockSandboxConfig({
+          command: 'runsc',
+          image: 'gemini-cli-sandbox',
+        }),
+      );
+
+      const forwardedKeys = envEntries(dockerRunArgs).map(
+        (entry) => entry.split('=')[0],
+      );
+      expect(forwardedKeys).not.toContain('GEMINI_CLI_IDE_AUTH_TOKEN');
+      expect(forwardedKeys).not.toContain(
+        'GEMINI_CLI_IDE_SERVER_STDIO_COMMAND',
+      );
+      expect(forwardedKeys).not.toContain('GEMINI_CLI_IDE_SERVER_STDIO_ARGS');
+    });
+
+    it('should not set GEMINI_SANDBOX for a plain docker sandbox', async () => {
+      vi.stubEnv('GEMINI_SANDBOX', 'docker');
+
+      const dockerRunArgs = await captureDockerRunArgs(
+        createMockSandboxConfig({
+          command: 'docker',
+          image: 'gemini-cli-sandbox',
+        }),
+      );
+
+      expect(dockerRunArgs).not.toContain('--runtime=runsc');
+      expect(
+        envEntries(dockerRunArgs).some((entry) =>
+          entry.startsWith('GEMINI_SANDBOX='),
+        ),
+      ).toBe(false);
+      expect(envEntries(dockerRunArgs)).toEqual(
+        expect.arrayContaining([
+          'GEMINI_CLI_IDE_SERVER_PORT=54321',
+          'GEMINI_CLI_IDE_WORKSPACE_PATH=/workspace/project',
+          'TERM_PROGRAM=vscode',
+        ]),
       );
     });
   });

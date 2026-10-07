@@ -26,6 +26,7 @@ import {
   getConnectionConfigFromFile,
   getStdioConfigFromEnv,
   getPortFromEnv,
+  isGvisorSandbox,
   validateWorkspacePath,
   getIdeServerHost,
 } from './ide-connection-utils.js';
@@ -233,6 +234,134 @@ describe('IdeClient', () => {
       expect(ideClient.getConnectionStatus().details).toContain(
         'Failed to connect',
       );
+    });
+
+    describe('inside a gVisor (runsc) sandbox', () => {
+      const GVISOR_MESSAGE =
+        'Failed to connect to IDE companion extension in VS Code: gVisor (runsc) sandboxing isolates the container network stack, so the IDE companion server on the host is unreachable. To use IDE integration, run Gemini CLI without the runsc sandbox.';
+      const GENERIC_MESSAGE =
+        'Failed to connect to IDE companion extension in VS Code. Please ensure the extension is running. To install the extension, run /ide install.';
+
+      beforeEach(() => {
+        vi.mocked(isGvisorSandbox).mockReturnValue(true);
+        vi.mocked(getConnectionConfigFromFile).mockResolvedValue(undefined);
+        vi.mocked(validateWorkspacePath).mockReturnValue({ isValid: true });
+      });
+
+      afterEach(() => {
+        vi.mocked(isGvisorSandbox).mockReset();
+      });
+
+      it('should explain the gVisor network isolation when the HTTP connection fails', async () => {
+        vi.mocked(getPortFromEnv).mockReturnValue('9090');
+        mockClient.connect.mockRejectedValue(new Error('ECONNREFUSED'));
+
+        const ideClient = await IdeClient.getInstance();
+        await ideClient.connect();
+
+        // The connection is still attempted; only the diagnostic changes.
+        expect(StreamableHTTPClientTransport).toHaveBeenCalledWith(
+          new URL('http://127.0.0.1:9090/mcp'),
+          expect.any(Object),
+        );
+        expect(ideClient.getConnectionStatus()).toEqual({
+          status: IDEConnectionStatus.Disconnected,
+          details: GVISOR_MESSAGE,
+        });
+      });
+
+      it('should explain the gVisor network isolation when the stdio connection fails', async () => {
+        vi.mocked(getStdioConfigFromEnv).mockReturnValue({
+          command: 'env-cmd',
+          args: ['--bar'],
+        });
+        mockClient.connect.mockRejectedValue(new Error('ENOENT'));
+
+        const ideClient = await IdeClient.getInstance();
+        await ideClient.connect();
+
+        expect(StdioClientTransport).toHaveBeenCalled();
+        expect(ideClient.getConnectionStatus()).toEqual({
+          status: IDEConnectionStatus.Disconnected,
+          details: GVISOR_MESSAGE,
+        });
+      });
+
+      it('should explain the gVisor network isolation when no connection config is found', async () => {
+        const ideClient = await IdeClient.getInstance();
+        await ideClient.connect();
+
+        expect(StreamableHTTPClientTransport).not.toHaveBeenCalled();
+        expect(StdioClientTransport).not.toHaveBeenCalled();
+        expect(ideClient.getConnectionStatus()).toEqual({
+          status: IDEConnectionStatus.Disconnected,
+          details: GVISOR_MESSAGE,
+        });
+      });
+
+      it('should explain the gVisor network isolation instead of suggesting /ide install when the workspace path is unknown', async () => {
+        vi.stubEnv('GEMINI_CLI_IDE_WORKSPACE_PATH', undefined);
+        vi.mocked(validateWorkspacePath).mockReturnValue({
+          isValid: false,
+          error: GENERIC_MESSAGE,
+        });
+
+        const ideClient = await IdeClient.getInstance();
+        await ideClient.connect();
+
+        expect(validateWorkspacePath).toHaveBeenCalledWith(
+          undefined,
+          '/test/workspace/sub-dir',
+        );
+        expect(StreamableHTTPClientTransport).not.toHaveBeenCalled();
+        expect(ideClient.getConnectionStatus()).toEqual({
+          status: IDEConnectionStatus.Disconnected,
+          details: GVISOR_MESSAGE,
+        });
+      });
+
+      it('should preserve workspace validation errors when the workspace path is known', async () => {
+        const mismatchError =
+          'Directory mismatch. Gemini CLI is running in a different location than the open workspace in the IDE.';
+        vi.mocked(validateWorkspacePath).mockReturnValue({
+          isValid: false,
+          error: mismatchError,
+        });
+
+        const ideClient = await IdeClient.getInstance();
+        await ideClient.connect();
+
+        expect(ideClient.getConnectionStatus()).toEqual({
+          status: IDEConnectionStatus.Disconnected,
+          details: mismatchError,
+        });
+      });
+
+      it('should still connect when the companion is reachable', async () => {
+        vi.mocked(getPortFromEnv).mockReturnValue('9090');
+
+        const ideClient = await IdeClient.getInstance();
+        await ideClient.connect();
+
+        expect(mockClient.connect).toHaveBeenCalledWith(mockHttpTransport);
+        expect(ideClient.getConnectionStatus().status).toBe(
+          IDEConnectionStatus.Connected,
+        );
+      });
+
+      it('should keep the generic message when not running under gVisor', async () => {
+        vi.mocked(isGvisorSandbox).mockReturnValue(false);
+        vi.mocked(getPortFromEnv).mockReturnValue('9090');
+        mockClient.connect.mockRejectedValue(new Error('ECONNREFUSED'));
+
+        const ideClient = await IdeClient.getInstance();
+        await ideClient.connect();
+
+        expect(ideClient.getConnectionStatus()).toEqual({
+          status: IDEConnectionStatus.Disconnected,
+          details: GENERIC_MESSAGE,
+        });
+      });
     });
   });
 

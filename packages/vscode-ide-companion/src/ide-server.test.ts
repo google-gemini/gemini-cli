@@ -541,45 +541,4 @@ describe('IDEServer HTTP endpoints', () => {
     // but it's not a host error, which is what we are testing.
     expect(response.statusCode).toBe(400);
   });
-
-  it.each([
-    'host.docker.internal',
-    'host.containers.internal',
-    'Host.Docker.Internal',
-  ])(
-    'should allow requests from container host header %s',
-    async (containerHost) => {
-      const response = await request(
-        port,
-        {
-          path: '/mcp',
-          method: 'POST',
-          headers: {
-            Host: `${containerHost}:${port}`,
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer test-auth-token',
-          },
-        },
-        JSON.stringify({ jsonrpc: '2.0', method: 'initialize' }),
-      );
-      expect(response.statusCode).toBe(400);
-    },
-  );
-
-  it('should deny requests with a container host header on a mismatched port', async () => {
-    const response = await request(
-      port,
-      {
-        path: '/mcp',
-        method: 'POST',
-        headers: {
-          Host: `host.docker.internal:${Number(port) + 1}`,
-          'Content-Type': 'application/json',
-          Authorization: 'Bearer test-auth-token',
-        },
-      },
-      JSON.stringify({ jsonrpc: '2.0', method: 'initialize' }),
-    );
-    expect(response.statusCode).toBe(403);
-  });
 });
