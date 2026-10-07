@@ -241,7 +241,8 @@ export class IDEServer {
                   this.log(
                     `Session ${sessionId} missed ${missedPings} pings. Closing connection and cleaning up interval.`,
                   );
-                  clearInterval(keepAlive);
+                  // `onclose` clears the interval and evicts the session.
+                  void transport.close();
                 }
               });
           }, 60000); // 60 sec
@@ -404,28 +405,44 @@ export class IDEServer {
   }
 
   async stop(): Promise<void> {
-    if (this.server) {
-      await new Promise<void>((resolve, reject) => {
-        this.server!.close((err?: Error) => {
-          if (err) {
-            this.log(`Error shutting down IDE server: ${err.message}`);
-            return reject(err);
-          }
-          this.log(`IDE server shut down`);
-          resolve();
-        });
-      });
-      this.server = undefined;
-    }
+    // Detach synchronously so concurrent or repeated stop() calls are no-ops
+    // rather than closing the same listener twice.
+    const server = this.server;
+    this.server = undefined;
+    const transports = Object.values(this.transports);
+    this.transports = {};
 
-    if (this.context) {
-      this.context.environmentVariableCollection.clear();
-    }
-    if (this.portFile) {
-      try {
-        await fs.unlink(this.portFile);
-      } catch {
-        // Ignore errors if the file doesn't exist.
+    // Close every MCP session first. This ends their long-lived SSE
+    // responses and fires `onclose`, which clears the keep-alive interval.
+    await Promise.allSettled(transports.map((transport) => transport.close()));
+
+    try {
+      if (server) {
+        await new Promise<void>((resolve, reject) => {
+          server.close((err?: Error) => {
+            if (err) {
+              this.log(`Error shutting down IDE server: ${err.message}`);
+              return reject(err);
+            }
+            this.log(`IDE server shut down`);
+            resolve();
+          });
+          // `close()` only stops accepting new connections and waits for
+          // existing ones to drain. Drop any remaining sockets so the callback
+          // above fires promptly instead of hanging on an idle keep-alive.
+          server.closeAllConnections();
+        });
+      }
+    } finally {
+      if (this.context) {
+        this.context.environmentVariableCollection.clear();
+      }
+      if (this.portFile) {
+        try {
+          await fs.unlink(this.portFile);
+        } catch {
+          // Ignore errors if the file doesn't exist.
+        }
       }
     }
   }
