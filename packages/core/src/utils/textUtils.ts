@@ -96,6 +96,10 @@ export function detectLineEnding(content: string): '\r\n' | '\n' {
   return content.includes('\r\n') ? '\r\n' : '\n';
 }
 
+const graphemeSegmenter = new Intl.Segmenter(undefined, {
+  granularity: 'grapheme',
+});
+
 /**
  * Truncates a string to a maximum length, appending a suffix if truncated.
  * @param str The string to truncate.
@@ -112,21 +116,11 @@ export function truncateString(
     return str;
   }
 
-  // This regex matches a "Grapheme Cluster" manually:
-  // 1. A surrogate pair OR a single character...
-  // 2. Followed by any number of "Combining Marks" (\p{M})
-  // 'u' flag is required for Unicode property escapes
-  // 's' (dotAll) flag ensures '.' matches line terminators (\n, \r, \u2028, \u2029)
-  // so they are preserved and counted toward the length budget
-  const graphemeRegex = /(?:[\uD800-\uDBFF][\uDC00-\uDFFF]|.)\p{M}*/gsu;
-
   let truncatedStr = '';
-  let match: RegExpExecArray | null;
 
-  while ((match = graphemeRegex.exec(str)) !== null) {
-    const segment = match[0];
-
-    // If adding the whole cluster (base char + accent) exceeds maxLength, stop.
+  for (const { segment } of graphemeSegmenter.segment(str)) {
+    // If adding the whole grapheme cluster (e.g. CRLF, surrogate pair, ZWJ sequence,
+    // or base char + combining marks) exceeds maxLength, stop.
     if (truncatedStr.length + segment.length > maxLength) {
       break;
     }

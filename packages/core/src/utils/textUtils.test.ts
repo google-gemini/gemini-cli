@@ -147,9 +147,16 @@ describe('truncateString', () => {
   it('should preserve line terminators and count them toward maxLength', () => {
     expect(truncateString('aa\nbb\ncc', 4, '')).toBe('aa\nb');
     expect(truncateString('a\nb\nc', 3, '')).toBe('a\nb');
-    expect(truncateString('x\r\ny', 2, '')).toBe('x\r');
+    expect(truncateString('x\r\ny', 2, '')).toBe('x');
     expect(truncateString('x\r\ny', 3, '')).toBe('x\r\n');
     expect(truncateString('a\u2028b\u2029c', 3, '')).toBe('a\u2028b');
+  });
+
+  it('should not split ZWJ emoji grapheme clusters', () => {
+    const familyEmoji = '👨‍👩‍👧‍👦'; // length 11
+    const str = 'a' + familyEmoji + 'b'; // length 13
+    expect(truncateString(str, 5, '')).toBe('a');
+    expect(truncateString(str, 12, '')).toBe('a' + familyEmoji);
   });
 });
 
