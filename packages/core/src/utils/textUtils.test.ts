@@ -143,6 +143,14 @@ describe('truncateString', () => {
     // Truncating combinedChar (len 2) at maxLength 2: fits perfectly.
     expect(truncateString(combinedChar, 2, '')).toBe(combinedChar);
   });
+
+  it('should preserve line terminators and count them toward maxLength', () => {
+    expect(truncateString('aa\nbb\ncc', 4, '')).toBe('aa\nb');
+    expect(truncateString('a\nb\nc', 3, '')).toBe('a\nb');
+    expect(truncateString('x\r\ny', 2, '')).toBe('x\r');
+    expect(truncateString('x\r\ny', 3, '')).toBe('x\r\n');
+    expect(truncateString('a\u2028b\u2029c', 3, '')).toBe('a\u2028b');
+  });
 });
 
 describe('safeTemplateReplace', () => {

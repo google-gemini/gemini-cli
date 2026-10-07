@@ -116,7 +116,9 @@ export function truncateString(
   // 1. A surrogate pair OR a single character...
   // 2. Followed by any number of "Combining Marks" (\p{M})
   // 'u' flag is required for Unicode property escapes
-  const graphemeRegex = /(?:[\uD800-\uDBFF][\uDC00-\uDFFF]|.)\p{M}*/gu;
+  // 's' (dotAll) flag ensures '.' matches line terminators (\n, \r, \u2028, \u2029)
+  // so they are preserved and counted toward the length budget
+  const graphemeRegex = /(?:[\uD800-\uDBFF][\uDC00-\uDFFF]|.)\p{M}*/gsu;
 
   let truncatedStr = '';
   let match: RegExpExecArray | null;
