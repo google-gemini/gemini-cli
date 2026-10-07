@@ -1636,6 +1636,52 @@ describe('PolicyEngine', () => {
       expect(result.decision).toBe(PolicyDecision.ALLOW);
     });
 
+    it('should upgrade catch-all ASK_USER to ALLOW for for-loops when all inner commands match ALLOW rules', async () => {
+      vi.mocked(parseCommandDetails).mockReturnValueOnce({
+        details: [
+          { name: 'echo', text: 'echo "$repo"', startIndex: 10 },
+          { name: 'git', text: 'git -C "$repo" log', startIndex: 30 },
+        ],
+        hasError: false,
+      });
+
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"echo/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"git/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+        {
+          // Catch-all ASK_USER for shell
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ASK_USER,
+          priority: 10,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: {
+            command:
+              'for repo in a b; do echo "$repo"; git -C "$repo" log; done',
+          },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
     it('should NOT upgrade Git commands to ALLOW in untrusted workspace', async () => {
       const isTrustedMock = vi.fn().mockReturnValue(false);
       const engine = new PolicyEngine({

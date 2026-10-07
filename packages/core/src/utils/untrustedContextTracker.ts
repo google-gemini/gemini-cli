@@ -278,7 +278,7 @@ export function extractUntrustedContext(
           // Strip internal ShellTool execution metadata wrapper lines so empty/normal
           // shell executions do not pollute untrustedTokens with wrapper labels.
           const contentWithoutShellMetadata = normalizedContent
-            .replace(/^Output:\s*(\(empty\))?\s*/i, '')
+            .replace(/^\s*Output:\s*(\(empty\))?\s*/i, '')
             .replace(
               /\n(?:Exit Code|Signal|Background PIDs|Process Group PGID):.*$/gim,
               '',
@@ -398,7 +398,7 @@ export function findUntrustedFlags(
         SAFE_SHORT_FLAGS.has(rawFlagName) || SAFE_LONG_FLAGS.has(flagToCheck);
       const isHighRiskFlag =
         HIGH_RISK_VALUE_FLAGS.has(rawFlagName) ||
-        HIGH_RISK_VALUE_FLAGS.has(flagToCheck);
+        (rawFlagName.startsWith('--') && HIGH_RISK_VALUE_FLAGS.has(flagToCheck));
 
       // Check 1A: Full flag or flag name exists in untrusted tokens (unless it is a known safe flag)
       if (
@@ -428,6 +428,7 @@ export function findUntrustedFlags(
           (isHighRiskFlag ||
             (!isSafeFlag && isHighRiskPatternToken(rawValToCheck)));
         const isHighRiskValSubstring =
+          (!isSafeFlag || isHighRiskFlag) &&
           isHighRiskPatternToken(rawValToCheck) &&
           untrustedContext.untrustedTexts.some((text) =>
             text.toLowerCase().includes(valToCheck.replace(/\\/g, '/')),

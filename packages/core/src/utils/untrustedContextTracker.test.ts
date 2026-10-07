@@ -228,6 +228,34 @@ describe('untrustedContextTracker', () => {
   git -C "$repo" log --all --grep="11541" --oneline
 done`;
       expect(findUntrustedFlags(command, untrustedContext)).toEqual([]);
+
+      // Test literal directory after -C (not a variable) when the directory was in untrustedTokens
+      expect(
+        findUntrustedFlags(
+          'git -C swse-operations-cloud log --oneline',
+          untrustedContext,
+        ),
+      ).toEqual([]);
+
+      // Test safe flag --grep taking a URL pattern from untrusted context
+      const urlContext = {
+        untrustedTexts: [
+          'Error report: see https://example.com/api/v1/auth failure',
+        ],
+        untrustedTokens: new Set([
+          'error',
+          'report',
+          'see',
+          'https://example.com/api/v1/auth',
+          'failure',
+        ]),
+      };
+      expect(
+        findUntrustedFlags(
+          'git log --grep="https://example.com/api/v1/auth"',
+          urlContext,
+        ),
+      ).toEqual([]);
     });
 
     it('should not falsely flag safe POSIX flags (e.g. ls -ld, ls -la, grep -rn) or relative workspace files (#29650)', () => {
