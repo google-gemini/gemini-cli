@@ -568,8 +568,10 @@ export class PolicyEngine {
             responsibleRule ??= wrapperResult.rule;
           }
           aggregateDecision = PolicyDecision.ASK_USER;
-        } else if (wrapperResult.rule?.decision === PolicyDecision.ALLOW) {
-          lastAllowedSubRule = wrapperResult.rule;
+        } else if (wrapperResult.decision === PolicyDecision.ALLOW) {
+          if (wrapperResult.rule?.decision === PolicyDecision.ALLOW) {
+            lastAllowedSubRule = wrapperResult.rule;
+          }
         } else {
           allSubCommandsExplicitlyAllowed = false;
         }
@@ -611,11 +613,10 @@ export class PolicyEngine {
             aggregateDecision = PolicyDecision.ASK_USER;
             responsibleRule = undefined;
           }
-        } else if (
-          subResult.decision === PolicyDecision.ALLOW &&
-          subResult.rule?.decision === PolicyDecision.ALLOW
-        ) {
-          lastAllowedSubRule = subResult.rule;
+        } else if (subResult.decision === PolicyDecision.ALLOW) {
+          if (subResult.rule?.decision === PolicyDecision.ALLOW) {
+            lastAllowedSubRule = subResult.rule;
+          }
         } else {
           allSubCommandsExplicitlyAllowed = false;
         }

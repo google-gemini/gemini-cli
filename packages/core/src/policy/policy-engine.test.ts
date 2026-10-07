@@ -1682,6 +1682,68 @@ describe('PolicyEngine', () => {
       expect(result.decision).toBe(PolicyDecision.ALLOW);
     });
 
+    it('should upgrade catch-all ASK_USER to ALLOW for compound commands when sub-commands are allowed even if subResult.rule is undefined', async () => {
+      vi.mocked(parseCommandDetails).mockReturnValueOnce({
+        details: [
+          { name: 'ls', text: 'ls', startIndex: 0 },
+          { name: 'pwd', text: 'pwd', startIndex: 6 },
+        ],
+        hasError: false,
+      });
+
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"ls"/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+        {
+          // Catch-all ASK_USER for shell
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ASK_USER,
+          priority: 10,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+      const originalCheck = engine.check.bind(engine);
+      vi.spyOn(engine, 'check').mockImplementation(
+        async (
+          toolCall,
+          serverName,
+          toolAnnotations,
+          subagent,
+          skipHeuristics,
+        ) => {
+          if (
+            toolCall.name === 'run_shell_command' &&
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (toolCall.args as any)?.command === 'pwd'
+          ) {
+            return { decision: PolicyDecision.ALLOW, rule: undefined };
+          }
+          return originalCheck(
+            toolCall,
+            serverName,
+            toolAnnotations,
+            subagent,
+            skipHeuristics,
+          );
+        },
+      );
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'ls && pwd' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
     it('should NOT upgrade Git commands to ALLOW in untrusted workspace', async () => {
       const isTrustedMock = vi.fn().mockReturnValue(false);
       const engine = new PolicyEngine({
