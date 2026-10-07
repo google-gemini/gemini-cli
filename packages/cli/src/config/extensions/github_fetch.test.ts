@@ -7,7 +7,10 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import * as https from 'node:https';
 import { EventEmitter } from 'node:events';
-import { validateUrlDestination } from '@google/gemini-cli-core';
+import {
+  getErrorMessage,
+  validateUrlDestination,
+} from '@google/gemini-cli-core';
 import { fetchJson, getGitHubToken } from './github_fetch.js';
 import type { ClientRequest, IncomingMessage } from 'node:http';
 
@@ -18,6 +21,8 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     validateUrlDestination: vi.fn(),
+    // Pass-through spy: lets tests assert that no extra errors are built.
+    getErrorMessage: vi.fn(actual.getErrorMessage),
   };
 });
 
@@ -46,6 +51,7 @@ describe('getGitHubToken', () => {
 describe('fetchJson', () => {
   const getMock = vi.mocked(https.get);
   const validateUrlDestinationMock = vi.mocked(validateUrlDestination);
+  const getErrorMessageMock = vi.mocked(getErrorMessage);
 
   beforeEach(() => {
     validateUrlDestinationMock.mockResolvedValue(true);
@@ -197,6 +203,8 @@ describe('fetchJson', () => {
       }) as unknown as ClientRequest;
       queueMicrotask(() => {
         req.emit('timeout');
+        // Destroying a real request makes Node emit a follow-up error.
+        req.emit('error', new Error('socket hang up'));
       });
       return req;
     });
@@ -232,6 +240,8 @@ describe('fetchJson', () => {
       queueMicrotask(() => {
         (callback as (res: IncomingMessage) => void)(res);
         res.emit('error', streamError);
+        // Node emits 'close' after 'error'; it must not reject a second time.
+        res.emit('close');
       });
       return new EventEmitter() as ClientRequest;
     });
@@ -257,6 +267,30 @@ describe('fetchJson', () => {
     );
   });
 
+  it('should settle once when the response emits aborted, error and close in sequence', async () => {
+    const resetError = Object.assign(new Error('aborted'), {
+      code: 'ECONNRESET',
+    });
+    getMock.mockImplementationOnce((_url, _options, callback) => {
+      const res = new EventEmitter() as IncomingMessage;
+      res.statusCode = 200;
+      queueMicrotask(() => {
+        (callback as (res: IncomingMessage) => void)(res);
+        // A connection reset mid-response emits all three, in this order.
+        res.emit('aborted');
+        res.emit('error', resetError);
+        res.emit('close');
+      });
+      return new EventEmitter() as ClientRequest;
+    });
+
+    await expect(fetchJson('https://example.com/reset')).rejects.toThrow(
+      'Response aborted while fetching https://example.com/reset (status 200)',
+    );
+    // The follow-up events must not build (and discard) further errors.
+    expect(getErrorMessageMock).not.toHaveBeenCalled();
+  });
+
   it('should reject when response ends prematurely (res.complete === false)', async () => {
     getMock.mockImplementationOnce((_url, _options, callback) => {
       const res = new EventEmitter() as IncomingMessage;
@@ -266,6 +300,8 @@ describe('fetchJson', () => {
         (callback as (res: IncomingMessage) => void)(res);
         res.emit('data', Buffer.from('{"partial":'));
         res.emit('end');
+        // Node emits 'close' after 'end'; it must not reject a second time.
+        res.emit('close');
       });
       return new EventEmitter() as ClientRequest;
     });
