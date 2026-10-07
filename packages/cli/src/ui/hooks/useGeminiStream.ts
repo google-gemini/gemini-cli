@@ -258,7 +258,6 @@ export const useGeminiStream = (
   const abortControllerRef = useRef<AbortController | null>(null);
   const turnCancelledRef = useRef(false);
   const activeQueryIdRef = useRef<string | null>(null);
-  const historyLengthAfterUserPromptRef = useRef<number | undefined>(undefined);
   const previousApprovalModeRef = useRef<ApprovalMode>(
     config.getApprovalMode(),
   );
@@ -1739,11 +1738,6 @@ export const useGeminiStream = (
               return;
             }
 
-            if (geminiClient) {
-              historyLengthAfterUserPromptRef.current =
-                geminiClient.getHistory().length;
-            }
-
             if (!options?.isContinuation) {
               if (typeof queryToSend === 'string') {
                 // logging the text prompts only for now
@@ -2127,17 +2121,10 @@ export const useGeminiStream = (
         }
         setIsResponding(false);
 
-        if (
-          geminiClient &&
-          historyLengthAfterUserPromptRef.current !== undefined
-        ) {
-          const targetLength = historyLengthAfterUserPromptRef.current;
-          if (geminiClient.getHistory().length > targetLength) {
-            geminiClient.setHistory(
-              geminiClient.getHistory().slice(0, targetLength),
-            );
-          }
-        }
+        // Only roll back the unanswered model function call turn for this
+        // cancelled batch. The originating user prompt and any tool rounds
+        // that already completed (and may have changed files) stay in history.
+        geminiClient?.discardTrailingUnansweredToolCallTurn();
 
         const callIdsToMarkAsSubmitted = geminiTools.map(
           (toolCall) => toolCall.request.callId,
