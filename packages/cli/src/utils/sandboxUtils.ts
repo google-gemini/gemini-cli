@@ -30,8 +30,42 @@ export const BUILTIN_SEATBELT_PROFILES = [
   'strict-proxied',
 ];
 
+/**
+ * State created by Gemini CLI inside a container that may safely persist
+ * between sandbox invocations. This state is kept separate from the user's
+ * normal ~/.gemini data so the sandbox never receives host credentials.
+ */
+export const SANDBOX_PERSISTED_STATE_ENTRIES = [
+  'oauth_creds.json',
+  'google_accounts.json',
+  'gemini-credentials.json',
+  'mcp-oauth-tokens.json',
+  'a2a-oauth-tokens.json',
+  'trustedFolders.json',
+  'history',
+  'tmp',
+] as const;
+
+const SANDBOX_AUTH_SETTINGS_FILENAME = 'auth-settings.json';
+
+interface SandboxAuthSettings {
+  selectedType?: string;
+  useExternal?: boolean;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isSandboxAuthSettings(value: unknown): value is SandboxAuthSettings {
+  if (!isRecord(value)) return false;
+
+  const selectedType = value['selectedType'];
+  const useExternal = value['useExternal'];
+  return (
+    (selectedType === undefined || typeof selectedType === 'string') &&
+    (useExternal === undefined || typeof useExternal === 'boolean')
+  );
 }
 
 /**
@@ -265,6 +299,173 @@ export function sanitizeSettingsForSandbox(
   delete sanitized['googleApiKey'];
 
   return sanitized;
+}
+
+function copySandboxStateEntries(
+  sourceDir: string,
+  destinationDir: string,
+  removeMissing: boolean,
+): void {
+  for (const entry of SANDBOX_PERSISTED_STATE_ENTRIES) {
+    const source = path.join(sourceDir, entry);
+    const destination = path.join(destinationDir, entry);
+
+    try {
+      if (!fs.existsSync(source)) {
+        if (removeMissing && fs.existsSync(destination)) {
+          fs.rmSync(destination, { recursive: true, force: true });
+        }
+        continue;
+      }
+
+      if (fs.existsSync(destination)) {
+        fs.rmSync(destination, { recursive: true, force: true });
+      }
+      fs.cpSync(source, destination, { recursive: true, force: true });
+    } catch (err) {
+      debugLogger.warn(
+        `Failed to persist sandbox state entry '${entry}': ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+}
+
+function getSandboxAuthSettings(
+  settings: Record<string, unknown>,
+): SandboxAuthSettings | undefined {
+  const security = settings['security'];
+  if (!isRecord(security)) return undefined;
+
+  const auth = security['auth'];
+  if (!isSandboxAuthSettings(auth)) return undefined;
+
+  const persistedAuth: SandboxAuthSettings = {};
+  if (auth.selectedType !== undefined) {
+    persistedAuth.selectedType = auth.selectedType;
+  }
+  if (auth.useExternal !== undefined) {
+    persistedAuth.useExternal = auth.useExternal;
+  }
+
+  return Object.keys(persistedAuth).length > 0 ? persistedAuth : undefined;
+}
+
+function persistSandboxAuthSettings(
+  sandboxSettingsDir: string,
+  sandboxStateDir: string,
+): void {
+  const settingsFile = path.join(sandboxSettingsDir, 'settings.json');
+  const authSettingsFile = path.join(
+    sandboxStateDir,
+    SANDBOX_AUTH_SETTINGS_FILENAME,
+  );
+
+  if (!fs.existsSync(settingsFile)) return;
+
+  try {
+    const parsed = JSON.parse(fs.readFileSync(settingsFile, 'utf8')) as unknown;
+    if (!isRecord(parsed)) return;
+
+    const authSettings = getSandboxAuthSettings(parsed);
+    if (!authSettings) {
+      if (fs.existsSync(authSettingsFile)) {
+        fs.rmSync(authSettingsFile, { force: true });
+      }
+      return;
+    }
+
+    fs.writeFileSync(authSettingsFile, JSON.stringify(authSettings, null, 2), {
+      mode: 0o600,
+    });
+  } catch (err) {
+    debugLogger.warn(
+      `Failed to persist sandbox authentication settings: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
+function restoreSandboxAuthSettings(
+  sandboxStateDir: string,
+  sandboxSettingsDir: string,
+): void {
+  const authSettingsFile = path.join(
+    sandboxStateDir,
+    SANDBOX_AUTH_SETTINGS_FILENAME,
+  );
+  const settingsFile = path.join(sandboxSettingsDir, 'settings.json');
+
+  if (!fs.existsSync(authSettingsFile) || !fs.existsSync(settingsFile)) return;
+
+  try {
+    const persistedAuth = JSON.parse(
+      fs.readFileSync(authSettingsFile, 'utf8'),
+    ) as unknown;
+    const parsedSettings = JSON.parse(
+      fs.readFileSync(settingsFile, 'utf8'),
+    ) as unknown;
+    if (!isSandboxAuthSettings(persistedAuth) || !isRecord(parsedSettings)) {
+      return;
+    }
+
+    const security = isRecord(parsedSettings['security'])
+      ? { ...parsedSettings['security'] }
+      : {};
+    const auth = isRecord(security['auth']) ? { ...security['auth'] } : {};
+
+    if (persistedAuth.selectedType !== undefined) {
+      auth['selectedType'] = persistedAuth.selectedType;
+    }
+    if (persistedAuth.useExternal !== undefined) {
+      auth['useExternal'] = persistedAuth.useExternal;
+    }
+
+    security['auth'] = auth;
+    parsedSettings['security'] = security;
+    fs.writeFileSync(settingsFile, JSON.stringify(parsedSettings, null, 2), {
+      mode: 0o600,
+    });
+  } catch (err) {
+    debugLogger.warn(
+      `Failed to restore sandbox authentication settings: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
+/**
+ * Restores state created by an earlier sandbox invocation into the ephemeral
+ * settings directory used by the next container.
+ */
+export function restoreSandboxState(
+  sandboxStateDir: string,
+  sandboxSettingsDir: string,
+): void {
+  if (!fs.existsSync(sandboxStateDir)) return;
+
+  copySandboxStateEntries(sandboxStateDir, sandboxSettingsDir, false);
+  restoreSandboxAuthSettings(sandboxStateDir, sandboxSettingsDir);
+}
+
+/**
+ * Saves only explicitly approved sandbox-owned state before the ephemeral
+ * settings directory is removed. Host ~/.gemini credentials are never read or
+ * copied into this directory.
+ */
+export function persistSandboxState(
+  sandboxSettingsDir: string,
+  sandboxStateDir: string,
+): void {
+  try {
+    fs.mkdirSync(sandboxStateDir, { recursive: true, mode: 0o700 });
+    fs.chmodSync(sandboxStateDir, 0o700);
+  } catch (err) {
+    debugLogger.warn(
+      `Failed to prepare persistent sandbox state directory: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return;
+  }
+
+  copySandboxStateEntries(sandboxSettingsDir, sandboxStateDir, true);
+  persistSandboxAuthSettings(sandboxSettingsDir, sandboxStateDir);
 }
 
 /**
