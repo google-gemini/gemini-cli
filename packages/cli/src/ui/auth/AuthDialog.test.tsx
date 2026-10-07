@@ -379,6 +379,7 @@ describe('AuthDialog', () => {
 
     it('catches errors thrown during onSelect and forwards them to onAuthError', async () => {
       mockedValidateAuthMethod.mockResolvedValue(null);
+      props.settings.merged.security.auth.selectedType = AuthType.USE_GEMINI;
       vi.mocked(clearCachedCredentialFile).mockRejectedValueOnce(
         new Error('Failed to clear credentials'),
       );
