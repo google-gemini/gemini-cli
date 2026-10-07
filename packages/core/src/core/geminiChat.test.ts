@@ -2305,6 +2305,65 @@ describe('GeminiChat', () => {
       );
     });
 
+    it('should append a continuation user turn if contents ends with a model turn before calling generateContentStream', async () => {
+      const response = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                parts: [{ text: 'response' }],
+                role: 'model',
+              },
+              finishReason: 'STOP',
+              index: 0,
+              safetyRatings: [],
+            },
+          ],
+          text: () => 'response',
+        } as unknown as GenerateContentResponse;
+      })();
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        response,
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'test-model' },
+        'hello',
+        'prompt-id-model-end',
+        new AbortController().signal,
+        LlmRole.MAIN,
+        undefined,
+        [
+          { role: 'user', parts: [{ text: 'first' }] },
+          { role: 'model', parts: [{ text: 'interrupted model response' }] },
+        ],
+      );
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: 'first' }],
+            },
+            {
+              role: 'model',
+              parts: [{ text: 'interrupted model response' }],
+            },
+            {
+              role: 'user',
+              parts: [{ text: 'Please continue.' }],
+            },
+          ],
+        }),
+        'prompt-id-model-end',
+        LlmRole.MAIN,
+      );
+    });
+
     it('should send an explicit versioned Flash model unchanged when Gemini 3.5 Flash GA is enabled', async () => {
       vi.mocked(mockConfig.hasLatestFlashGAAccess).mockReturnValue(true);
       vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
