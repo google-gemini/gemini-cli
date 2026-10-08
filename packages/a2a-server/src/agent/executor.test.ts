@@ -667,4 +667,42 @@ describe('CoderAgentExecutor', () => {
       '/tmp',
     );
   });
+
+  it('should clean up already-registered socket listeners if a subsequent listener registration throws synchronously', async () => {
+    const taskId = 'test-partial-socket-registration-cleanup';
+    const contextId = 'test-context';
+
+    const mockSocket = new EventEmitter();
+    vi.spyOn(mockSocket, 'once').mockImplementation(() => {
+      throw new Error('Simulated socket.once registration failure');
+    });
+
+    (requestStorage.getStore as Mock).mockReturnValue({
+      req: { socket: mockSocket },
+    });
+
+    const requestContext = {
+      userMessage: {
+        messageId: 'msg-socket-err',
+        taskId,
+        contextId,
+        parts: [{ kind: 'text', text: 'hello' }],
+        metadata: {
+          coderAgent: {
+            kind: 'agent-settings',
+            workspacePath: '/tmp',
+          },
+        },
+      },
+    } as unknown as RequestContext;
+
+    await expect(
+      executor.execute(requestContext, mockEventBus),
+    ).rejects.toThrow('Simulated socket.once registration failure');
+
+    expect(mockSocket.listenerCount('end')).toBe(0);
+    expect(
+      (mockEventBus as unknown as EventEmitter).listenerCount('event'),
+    ).toBe(0);
+  });
 });

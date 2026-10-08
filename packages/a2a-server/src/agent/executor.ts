@@ -547,15 +547,15 @@ export class CoderAgentExecutor implements AgentExecutor {
             };
             const removeEndListener = () =>
               socket.removeListener('end', onSocketEnd);
-            socket.on('end', onSocketEnd);
-            socket.once('close', removeEndListener);
-            abortSignal.addEventListener('abort', removeEndListener);
             cleanupSocketListeners = () => {
               socket.removeListener('end', onSocketEnd);
               socket.removeListener('close', removeEndListener);
               abortSignal.removeEventListener('abort', removeEndListener);
               eventBus.off('event', onEvent);
             };
+            socket.on('end', onSocketEnd);
+            socket.once('close', removeEndListener);
+            abortSignal.addEventListener('abort', removeEndListener);
             logger.info(
               `[CoderAgentExecutor] Socket close handler set up for task ${taskId}.`,
             );

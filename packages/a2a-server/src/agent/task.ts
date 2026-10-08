@@ -35,7 +35,7 @@ import {
   type AnsiToken,
   isSubagentProgress,
   EDIT_TOOL_NAMES,
-  UPDATE_TOPIC_TOOL_NAME,
+  isParallelizable,
   processRestorableToolCalls,
   MessageBusType,
   type ToolCallsUpdateMessage,
@@ -453,20 +453,6 @@ export class Task {
     this.scheduler.dispose();
   }
 
-  private _isParallelizable(request: ToolCallRequestInfo): boolean {
-    if (
-      request.name === UPDATE_TOPIC_TOOL_NAME ||
-      EDIT_TOOL_NAMES.has(request.name)
-    ) {
-      return false;
-    }
-    const wait = request.args?.['wait_for_previous'];
-    if (typeof wait === 'boolean') {
-      return !wait;
-    }
-    return true;
-  }
-
   private handleEventDrivenToolCallsUpdate(
     event: ToolCallsUpdateMessage,
   ): void {
@@ -490,8 +476,8 @@ export class Task {
       const callId = tc.request.callId;
       if (index === 0) {
         this.queuedToolCalls.delete(callId);
-        activeWaveOpen = this._isParallelizable(tc.request);
-      } else if (activeWaveOpen && this._isParallelizable(tc.request)) {
+        activeWaveOpen = isParallelizable(tc.request);
+      } else if (activeWaveOpen && isParallelizable(tc.request)) {
         this.queuedToolCalls.delete(callId);
       } else {
         activeWaveOpen = false;

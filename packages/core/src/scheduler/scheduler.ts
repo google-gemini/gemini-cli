@@ -26,16 +26,13 @@ import {
   type ScheduledToolCall,
 } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
-import {
-  UPDATE_TOPIC_TOOL_NAME,
-  EDIT_TOOL_NAMES,
-} from '../tools/tool-names.js';
+import { UPDATE_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
 import { PolicyDecision, type ApprovalMode } from '../policy/types.js';
 import {
   ToolConfirmationOutcome,
   type AnyDeclarativeTool,
 } from '../tools/tools.js';
-import { getToolSuggestion } from '../utils/tool-utils.js';
+import { getToolSuggestion, isParallelizable } from '../utils/tool-utils.js';
 import { runInDevTraceSpan } from '../telemetry/trace.js';
 import { logToolCall } from '../telemetry/loggers.js';
 import { ToolCallEvent } from '../telemetry/types.js';
@@ -489,10 +486,10 @@ export class Scheduler {
       }
 
       // If the first tool is parallelizable, batch all contiguous parallelizable tools.
-      if (this._isParallelizable(next.request)) {
+      if (isParallelizable(next.request)) {
         while (this.state.queueLength > 0) {
           const peeked = this.state.peekQueue();
-          if (peeked && this._isParallelizable(peeked.request)) {
+          if (peeked && isParallelizable(peeked.request)) {
             this.state.dequeue();
           } else {
             break;
@@ -575,25 +572,6 @@ export class Scheduler {
     // If we are here, we have active calls (likely Validating or Scheduled) but none progressed.
     // This is a stuck state.
     return false;
-  }
-
-  private _isParallelizable(request: ToolCallRequestInfo): boolean {
-    // update_topic tool is forced as sequential call
-    if (
-      request.name === UPDATE_TOPIC_TOOL_NAME ||
-      EDIT_TOOL_NAMES.has(request.name)
-    ) {
-      return false;
-    }
-    if (request.args) {
-      const wait = request.args['wait_for_previous'];
-      if (typeof wait === 'boolean') {
-        return !wait;
-      }
-    }
-
-    // Default to parallel if the flag is omitted.
-    return true;
   }
 
   private async _processValidatingCall(
