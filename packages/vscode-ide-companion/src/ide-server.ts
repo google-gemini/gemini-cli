@@ -128,6 +128,11 @@ export class IDEServer {
   private transports: { [sessionId: string]: StreamableHTTPServerTransport } =
     {};
   private openFilesManager: OpenFilesManager | undefined;
+  private status: 'idle' | 'stopping' | 'stopped' = 'idle';
+  private stopPromise: Promise<void> | undefined;
+  /** Bumped by every start(); lets a late-finishing shutdown recognise that a
+   *  newer server now owns the status, env vars and port file. */
+  private generation = 0;
   diffManager: DiffManager;
 
   constructor(log: (message: string) => void, diffManager: DiffManager) {
@@ -137,6 +142,10 @@ export class IDEServer {
 
   start(context: vscode.ExtensionContext): Promise<void> {
     return new Promise((resolve) => {
+      // A restart after stop() must be stoppable again, and any shutdown still
+      // in flight must not touch this server's state when it finishes.
+      this.status = 'idle';
+      this.generation++;
       this.context = context;
       this.authToken = randomUUID();
       const sessionsWithInitialNotification = new Set<string>();
@@ -242,6 +251,14 @@ export class IDEServer {
                     `Session ${sessionId} missed ${missedPings} pings. Closing connection and cleaning up interval.`,
                   );
                   clearInterval(keepAlive);
+                  // `onclose` evicts the session from `this.transports`.
+                  transport.close().catch((error: unknown) => {
+                    const message =
+                      error instanceof Error ? error.message : String(error);
+                    this.log(
+                      `Failed to close transport for session ${sessionId}: ${message}`,
+                    );
+                  });
                 }
               });
           }, 60000); // 60 sec
@@ -404,28 +421,70 @@ export class IDEServer {
   }
 
   async stop(): Promise<void> {
-    if (this.server) {
-      await new Promise<void>((resolve, reject) => {
-        this.server!.close((err?: Error) => {
-          if (err) {
-            this.log(`Error shutting down IDE server: ${err.message}`);
-            return reject(err);
+    switch (this.status) {
+      case 'stopping':
+        // Join the in-flight shutdown so a concurrent caller resolves only
+        // once the listener, sockets and port file are actually gone.
+        return this.stopPromise;
+      case 'stopped':
+        return;
+      default: {
+        this.status = 'stopping';
+        const generation = this.generation;
+        this.stopPromise = this.shutdown(generation).finally(() => {
+          // A start() issued meanwhile owns the state now; leave it alone.
+          if (this.generation === generation) {
+            this.status = 'stopped';
           }
-          this.log(`IDE server shut down`);
-          resolve();
         });
-      });
-      this.server = undefined;
+        return this.stopPromise;
+      }
     }
+  }
 
-    if (this.context) {
-      this.context.environmentVariableCollection.clear();
-    }
-    if (this.portFile) {
-      try {
-        await fs.unlink(this.portFile);
-      } catch {
-        // Ignore errors if the file doesn't exist.
+  private async shutdown(generation: number): Promise<void> {
+    // Detach synchronously so a stop() issued after this one completes is a
+    // no-op rather than closing the same listener twice, and so a start()
+    // issued meanwhile cannot have its port file removed by this shutdown.
+    const server = this.server;
+    this.server = undefined;
+    const transports = Object.values(this.transports);
+    this.transports = {};
+    const portFile = this.portFile;
+    this.portFile = undefined;
+
+    // Close every MCP session first. This ends their long-lived SSE
+    // responses and fires `onclose`, which clears the keep-alive interval.
+    await Promise.allSettled(transports.map((transport) => transport.close()));
+
+    try {
+      if (server) {
+        await new Promise<void>((resolve, reject) => {
+          server.close((err?: Error) => {
+            if (err) {
+              this.log(`Error shutting down IDE server: ${err.message}`);
+              return reject(err);
+            }
+            this.log(`IDE server shut down`);
+            resolve();
+          });
+          // `close()` only stops accepting new connections and waits for
+          // existing ones to drain. Drop any remaining sockets so the callback
+          // above fires promptly instead of hanging on an idle keep-alive.
+          server.closeAllConnections();
+        });
+      }
+    } finally {
+      // Only clear the env vars if no newer start() has written its own.
+      if (this.generation === generation && this.context) {
+        this.context.environmentVariableCollection.clear();
+      }
+      if (portFile) {
+        try {
+          await fs.unlink(portFile);
+        } catch {
+          // Ignore errors if the file doesn't exist.
+        }
       }
     }
   }
