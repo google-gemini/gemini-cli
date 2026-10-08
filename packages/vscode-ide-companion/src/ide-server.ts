@@ -130,6 +130,9 @@ export class IDEServer {
   private openFilesManager: OpenFilesManager | undefined;
   private status: 'idle' | 'stopping' | 'stopped' = 'idle';
   private stopPromise: Promise<void> | undefined;
+  /** Bumped by every start(); lets a late-finishing shutdown recognise that a
+   *  newer server now owns the status, env vars and port file. */
+  private generation = 0;
   diffManager: DiffManager;
 
   constructor(log: (message: string) => void, diffManager: DiffManager) {
@@ -139,8 +142,10 @@ export class IDEServer {
 
   start(context: vscode.ExtensionContext): Promise<void> {
     return new Promise((resolve) => {
-      // A restart after stop() must be stoppable again.
+      // A restart after stop() must be stoppable again, and any shutdown still
+      // in flight must not touch this server's state when it finishes.
       this.status = 'idle';
+      this.generation++;
       this.context = context;
       this.authToken = randomUUID();
       const sessionsWithInitialNotification = new Set<string>();
@@ -423,25 +428,30 @@ export class IDEServer {
         return this.stopPromise;
       case 'stopped':
         return;
-      default:
+      default: {
         this.status = 'stopping';
-        this.stopPromise = this.shutdown().finally(() => {
-          // `start()` may have reset the status meanwhile; don't clobber it.
-          if (this.status === 'stopping') {
+        const generation = this.generation;
+        this.stopPromise = this.shutdown(generation).finally(() => {
+          // A start() issued meanwhile owns the state now; leave it alone.
+          if (this.generation === generation) {
             this.status = 'stopped';
           }
         });
         return this.stopPromise;
+      }
     }
   }
 
-  private async shutdown(): Promise<void> {
+  private async shutdown(generation: number): Promise<void> {
     // Detach synchronously so a stop() issued after this one completes is a
-    // no-op rather than closing the same listener twice.
+    // no-op rather than closing the same listener twice, and so a start()
+    // issued meanwhile cannot have its port file removed by this shutdown.
     const server = this.server;
     this.server = undefined;
     const transports = Object.values(this.transports);
     this.transports = {};
+    const portFile = this.portFile;
+    this.portFile = undefined;
 
     // Close every MCP session first. This ends their long-lived SSE
     // responses and fires `onclose`, which clears the keep-alive interval.
@@ -465,12 +475,13 @@ export class IDEServer {
         });
       }
     } finally {
-      if (this.context) {
+      // Only clear the env vars if no newer start() has written its own.
+      if (this.generation === generation && this.context) {
         this.context.environmentVariableCollection.clear();
       }
-      if (this.portFile) {
+      if (portFile) {
         try {
-          await fs.unlink(this.portFile);
+          await fs.unlink(portFile);
         } catch {
           // Ignore errors if the file doesn't exist.
         }

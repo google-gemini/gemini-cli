@@ -371,6 +371,42 @@ describe('IDEServer', () => {
         ),
       ]);
 
+    const getServer = () =>
+      (ideServer as unknown as { server: http.Server }).server;
+
+    /** Holds `server.close()` until the returned function is called. */
+    const gateServerClose = (server: http.Server) => {
+      const realClose = server.close.bind(server);
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      vi.spyOn(server, 'close').mockImplementation((cb) => {
+        void gate.then(() => realClose(cb));
+        return server;
+      });
+      return release;
+    };
+
+    const latestPort = () =>
+      vi
+        .mocked(mockContext.environmentVariableCollection.replace)
+        .mock.calls.filter(([k]) => k === 'GEMINI_CLI_IDE_SERVER_PORT')
+        .at(-1)?.[1] as string;
+
+    const portFileFor = (p: string) =>
+      path.join(
+        '/tmp',
+        'gemini',
+        'ide',
+        `gemini-ide-server-${process.ppid}-${p}.json`,
+      );
+
+    const shutdownLogCount = () =>
+      vi
+        .mocked(mockLog)
+        .mock.calls.filter(([m]) => m === 'IDE server shut down').length;
+
     let port: string;
     let clients: Client[];
 
@@ -454,36 +490,19 @@ describe('IDEServer', () => {
       await ideServer.stop();
 
       await ideServer.start(mockContext);
-      const newPort = vi
-        .mocked(mockContext.environmentVariableCollection.replace)
-        .mock.calls.filter(([k]) => k === 'GEMINI_CLI_IDE_SERVER_PORT')
-        .at(-1)?.[1] as string;
-      clients.push(await connectMcpClient(newPort));
+      clients.push(await connectMcpClient(latestPort()));
       expect(Object.keys(getTransports())).toHaveLength(1);
 
       const outcome = await withDeadline(ideServer.stop(), 2_000);
 
       expect(outcome).toBe('resolved');
       expect(Object.keys(getTransports())).toHaveLength(0);
-      expect(
-        vi
-          .mocked(mockLog)
-          .mock.calls.filter(([m]) => m === 'IDE server shut down'),
-      ).toHaveLength(2);
+      expect(shutdownLogCount()).toBe(2);
     });
 
     it('should make concurrent stop() calls await the same in-flight shutdown', async () => {
       clients.push(await connectMcpClient(port));
-      const server = (ideServer as unknown as { server: http.Server }).server;
-      const realClose = server.close.bind(server);
-      let releaseClose!: () => void;
-      const closeGate = new Promise<void>((resolve) => {
-        releaseClose = resolve;
-      });
-      vi.spyOn(server, 'close').mockImplementation((cb) => {
-        void closeGate.then(() => realClose(cb));
-        return server;
-      });
+      const releaseClose = gateServerClose(getServer());
 
       const first = ideServer.stop();
       const second = ideServer.stop();
@@ -503,14 +522,65 @@ describe('IDEServer', () => {
       expect(
         mockContext.environmentVariableCollection.clear,
       ).toHaveBeenCalledTimes(1);
-      expect(
-        vi
-          .mocked(mockLog)
-          .mock.calls.filter(([m]) => m === 'IDE server shut down'),
-      ).toHaveLength(1);
+      expect(shutdownLogCount()).toBe(1);
       expect(mockLog).not.toHaveBeenCalledWith(
         expect.stringContaining('Error shutting down IDE server'),
       );
+    });
+
+    it('should not let a late-finishing stop() clobber a restarted server', async () => {
+      vi.mocked(fs.unlink).mockClear();
+      clients.push(await connectMcpClient(port));
+      const releaseOldClose = gateServerClose(getServer());
+      const oldStop = ideServer.stop();
+
+      // Restart while the old shutdown is still draining.
+      await ideServer.start(mockContext);
+      const newPort = latestPort();
+      expect(newPort).not.toBe(port);
+      clients.push(await connectMcpClient(newPort));
+
+      releaseOldClose();
+      await oldStop;
+
+      // The old shutdown removed only its own port file and left the new
+      // server's env vars alone.
+      expect(fs.unlink).toHaveBeenCalledWith(portFileFor(port));
+      expect(fs.unlink).not.toHaveBeenCalledWith(portFileFor(newPort));
+      expect(
+        mockContext.environmentVariableCollection.clear,
+      ).not.toHaveBeenCalled();
+
+      // ...and the new server is still fully stoppable.
+      expect(await withDeadline(ideServer.stop(), 2_000)).toBe('resolved');
+      expect(shutdownLogCount()).toBe(2);
+      expect(fs.unlink).toHaveBeenCalledWith(portFileFor(newPort));
+      expect(
+        mockContext.environmentVariableCollection.clear,
+      ).toHaveBeenCalledTimes(1);
+    });
+
+    it('should keep a second shutdown joinable when the first finishes later', async () => {
+      clients.push(await connectMcpClient(port));
+      const releaseOldClose = gateServerClose(getServer());
+      const oldStop = ideServer.stop();
+
+      await ideServer.start(mockContext);
+      clients.push(await connectMcpClient(latestPort()));
+      const releaseNewClose = gateServerClose(getServer());
+      const newStop = ideServer.stop();
+
+      // First shutdown completes while the second is still in flight.
+      releaseOldClose();
+      await oldStop;
+
+      // The server must still report "stopping": a further stop() joins the
+      // second shutdown instead of returning instantly as "stopped".
+      expect(await withDeadline(ideServer.stop(), 50)).toBe('timed-out');
+
+      releaseNewClose();
+      await expect(newStop).resolves.toBeUndefined();
+      expect(shutdownLogCount()).toBe(2);
     });
 
     it('should still clean up when the HTTP server fails to close', async () => {
