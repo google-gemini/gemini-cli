@@ -18,6 +18,7 @@ import {
   AuthType,
   clearCachedCredentialFile,
   type Config,
+  debugLogger,
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { AuthState } from '../types.js';
@@ -129,7 +130,11 @@ export function AuthDialog({
         } else {
           setAuthContext({});
         }
-        await clearCachedCredentialFile();
+
+        const currentAuthType = settings.merged.security?.auth?.selectedType;
+        if (currentAuthType && currentAuthType !== authType) {
+          await clearCachedCredentialFile();
+        }
 
         settings.setValue(scope, 'security.auth.selectedType', authType);
         if (
@@ -137,7 +142,12 @@ export function AuthDialog({
           config.isBrowserLaunchSuppressed()
         ) {
           setExiting(true);
-          setTimeout(relaunchApp, 100);
+          setTimeout(() => {
+            void relaunchApp({ overrideAuthType: authType }).catch((err) => {
+              debugLogger.error('Failed to trigger supervisor relaunch:', err);
+              process.exit(1);
+            });
+          }, 100);
           return;
         }
 
@@ -162,8 +172,12 @@ export function AuthDialog({
     if (error) {
       onAuthError(error);
     } else {
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      onSelect(authMethod, SettingScope.User);
+      onAuthError(null);
+      try {
+        await onSelect(authMethod, SettingScope.User);
+      } catch (e) {
+        onAuthError(e instanceof Error ? e.message : String(e));
+      }
     }
   };
 

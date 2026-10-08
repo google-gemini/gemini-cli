@@ -18,6 +18,7 @@ import {
   REFERENCE_CONTENT_END,
   CoreToolCallStatus,
   resolveAtCommandPath,
+  stripLineNumberSuffix,
 } from '@google/gemini-cli-core';
 import { Buffer } from 'node:buffer';
 import type {
@@ -53,13 +54,16 @@ export function unescapeLiteralAt(text: string): string {
  * Regex source for the path/command part of an @ reference.
  * It uses strict ASCII whitespace delimiters to allow Unicode characters like NNBSP in filenames.
  *
- * 1. "(?:[^"]*)" matches a double-quoted string (for Windows paths with spaces).
- * 2. \\. matches any escaped character (e.g., \ ).
- * 3. [^ \t\n\r,;!?()\[\]{}.] matches any character that is NOT a delimiter and NOT a period.
- * 4. \.(?!$|[ \t\n\r]) matches a period ONLY if it is NOT followed by whitespace or end-of-string.
+ * Either:
+ * 1. "(?:[^"\n\r]*)" - a double-quoted string (for paths with spaces, e.g. on Windows) without internal newlines.
+ * 2. An unquoted path consisting of escaped characters or non-delimiter characters (excluding quotes).
+ * 3. \.(?!$|[ \t\n\r]) matches a period ONLY if it is NOT followed by whitespace or end-of-string.
+ *
+ * Notably, a quoted string cannot be extended by unquoted characters, and unquoted paths cannot contain unescaped quotes.
+ * This prevents catastrophic multi-line matches when code like `import { x } from "@scope/pkg";` is processed (#29434).
  */
 export const AT_COMMAND_PATH_REGEX_SOURCE =
-  '(?:(?:"(?:[^"]*)")|(?:\\\\.|[^ \\t\\n\\r,;!?()\\[\\]{}.]|\\.(?!$|[ \\t\\n\\r])))+';
+  '(?:(?:"[^"\\n\\r]*")|(?:\\\\.|[^ \\t\\n\\r,;!?()\\[\\]{}."\'`]|\\.(?!$|[ \\t\\n\\r]))+)';
 
 interface HandleAtCommandParams {
   query: string;
@@ -193,8 +197,18 @@ export async function checkPermissions(
         path.resolve(config.getTargetDir(), pathName),
       );
     } catch {
-      // skip if resolveToRealPath errors out
-      continue;
+      const strippedPath = stripLineNumberSuffix(pathName);
+      if (!strippedPath) {
+        continue;
+      }
+      try {
+        resolvedPathName = resolveToRealPath(
+          path.resolve(config.getTargetDir(), strippedPath),
+        );
+      } catch {
+        // skip if resolveToRealPath errors out
+        continue;
+      }
     }
 
     if (config.validatePathAccess(resolvedPathName, 'read')) {
@@ -243,18 +257,29 @@ async function resolveFilePaths(
       continue;
     }
 
+    const basePathName = stripLineNumberSuffix(pathName) ?? pathName;
     const gitIgnored =
       respectFileIgnore.respectGitIgnore &&
-      fileDiscovery.shouldIgnoreFile(pathName, {
+      (fileDiscovery.shouldIgnoreFile(pathName, {
         respectGitIgnore: true,
         respectGeminiIgnore: false,
-      });
+      }) ||
+        (basePathName !== pathName &&
+          fileDiscovery.shouldIgnoreFile(basePathName, {
+            respectGitIgnore: true,
+            respectGeminiIgnore: false,
+          })));
     const geminiIgnored =
       respectFileIgnore.respectGeminiIgnore &&
-      fileDiscovery.shouldIgnoreFile(pathName, {
+      (fileDiscovery.shouldIgnoreFile(pathName, {
         respectGitIgnore: false,
         respectGeminiIgnore: true,
-      });
+      }) ||
+        (basePathName !== pathName &&
+          fileDiscovery.shouldIgnoreFile(basePathName, {
+            respectGitIgnore: false,
+            respectGeminiIgnore: true,
+          })));
 
     if (gitIgnored || geminiIgnored) {
       const reason =
@@ -304,7 +329,19 @@ async function resolveFilePaths(
       // We also allow glob fallback for "unauthorized" results from resolveAtCommandPath,
       // as they might represent a relative path that matched an unauthorized file in one directory
       // but might have a valid match (via glob) in another.
-      if (config.getEnableRecursiveFileSearch() && globTool) {
+      const MAX_GLOB_SEARCH_PATH_LENGTH = 255;
+      const isPathSuitableForGlob =
+        pathName.length > 0 &&
+        pathName.length <= MAX_GLOB_SEARCH_PATH_LENGTH &&
+        !path.isAbsolute(pathName) &&
+        !pathName.includes('..') &&
+        !/[\r\n\t\0{}*?[\]]/.test(pathName);
+
+      if (
+        config.getEnableRecursiveFileSearch() &&
+        globTool &&
+        isPathSuitableForGlob
+      ) {
         onDebugMessage(
           `Path ${pathName} not found directly, attempting glob search.`,
         );
@@ -313,7 +350,7 @@ async function resolveFilePaths(
           try {
             const globResult = await globTool.buildAndExecute(
               {
-                pattern: `**/*${pathName}*`,
+                pattern: `**/*${basePathName}*`,
                 path: dir,
               },
               signal,
@@ -346,12 +383,12 @@ async function resolveFilePaths(
                 break;
               } else {
                 onDebugMessage(
-                  `Glob search for '**/*${pathName}*' did not return a usable path. Path ${pathName} will be skipped.`,
+                  `Glob search for '**/*${basePathName}*' did not return a usable path. Path ${pathName} will be skipped.`,
                 );
               }
             } else {
               onDebugMessage(
-                `Glob search for '**/*${pathName}*' found no files or an error. Path ${pathName} will be skipped.`,
+                `Glob search for '**/*${basePathName}*' found no files or an error. Path ${pathName} will be skipped.`,
               );
             }
           } catch (globError) {

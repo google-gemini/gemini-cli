@@ -66,7 +66,7 @@ export function TextInput({
         return true;
       }
 
-      const handled = handleInput(key);
+      const handled = handleInput?.(key) ?? false;
       return handled;
     },
     [handleInput, onCancel, onSubmit, text, buffer.pastedContent, keyMatchers],
@@ -81,8 +81,8 @@ export function TextInput({
       <Box ref={containerRef}>
         {focus ? (
           <Text terminalCursorFocus={focus} terminalCursorPosition={0}>
-            {chalk.inverse(placeholder[0] || ' ')}
-            <Text color={theme.text.secondary}>{placeholder.slice(1)}</Text>
+            {chalk.inverse(cpSlice(placeholder, 0, 1) || ' ')}
+            <Text color={theme.text.secondary}>{cpSlice(placeholder, 1)}</Text>
           </Text>
         ) : (
           <Text color={theme.text.secondary}>{placeholder}</Text>

@@ -312,6 +312,9 @@ export interface LoadedSettingsSnapshot {
   merged: MergedSettings;
 }
 
+export const UNTRUSTED_WORKSPACE_SETTINGS_ERROR =
+  'Cannot modify settings in an untrusted workspace. To enable this, verify the source of the repository and set GEMINI_CLI_TRUST_WORKSPACE=true or move your configuration to the global settings file.';
+
 export class LoadedSettings {
   constructor(
     system: SettingsFile,
@@ -376,6 +379,7 @@ export class LoadedSettings {
       ...workspace,
       settings: {},
       originalSettings: {},
+      readOnly: true,
     };
   }
 
@@ -460,6 +464,15 @@ export class LoadedSettings {
 
   setValue(scope: LoadableSettingScope, key: string, value: unknown): void {
     const settingsFile = this.forScope(scope);
+
+    if (scope === SettingScope.Workspace && !this.isPersistable(settingsFile)) {
+      if (settingsFile.path === '' || settingsFile.path === this.user.path) {
+        throw new Error(
+          'Cannot modify workspace settings in the home directory. Please use user scope instead.',
+        );
+      }
+      throw new Error(UNTRUSTED_WORKSPACE_SETTINGS_ERROR);
+    }
 
     // Clone value to prevent reference sharing
     const valueToSet =
@@ -903,6 +916,35 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
   systemDefaultSettings = systemDefaultsResult.settings;
   userSettings = userResult.settings;
   workspaceSettings = workspaceResult.settings;
+
+  // Support environment variable override from relaunch supervisor across exit code 199
+  const envAuthOverride = process.env['GEMINI_CLI_AUTH_OVERRIDE'];
+  if (envAuthOverride) {
+    delete process.env['GEMINI_CLI_AUTH_OVERRIDE'];
+  }
+  const authOverride =
+    envAuthOverride &&
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    Object.values(AuthType).includes(envAuthOverride as AuthType)
+      ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        (envAuthOverride as AuthType)
+      : undefined;
+  if (authOverride) {
+    if (!userSettings.security) {
+      userSettings.security = {};
+    }
+    if (!userSettings.security.auth) {
+      userSettings.security.auth = {};
+    }
+    userSettings.security.auth.selectedType = authOverride;
+    if (!userOriginalSettings.security) {
+      userOriginalSettings.security = {};
+    }
+    if (!userOriginalSettings.security.auth) {
+      userOriginalSettings.security.auth = {};
+    }
+    userOriginalSettings.security.auth.selectedType = authOverride;
+  }
 
   // Support legacy theme names
   if (userSettings.ui?.theme === 'VS') {
