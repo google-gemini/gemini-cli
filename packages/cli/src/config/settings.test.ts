@@ -1478,6 +1478,7 @@ describe('Settings Loading and Merging', () => {
       expect((settings.merged as TestSettings)['apiKey']).toBe(
         'resolved_from_dot_env',
       );
+      delete process.env['TEST_VAR_FROM_DOT_ENV'];
     });
 
     it('should resolve environment variables in workspace settings', () => {
@@ -3817,6 +3818,7 @@ MALICIOUS_VAR=allowed-because-trusted
         loadSettings(MOCK_WORKSPACE_DIR);
 
         expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe('my-vertex-project');
+        delete process.env['MOCK_AUTH_TYPE'];
       });
     });
 
