@@ -628,4 +628,43 @@ describe('CoderAgentExecutor', () => {
       (syncEventBus as unknown as EventEmitter).listenerCount('event'),
     ).toBe(0);
   });
+
+  it('should sanitize client-supplied isTrusted to undefined in execute and reconstruct so setIsTrusted evaluates server environment', async () => {
+    const { setIsTrusted } = await import('../config/config.js');
+    vi.mocked(setIsTrusted).mockReturnValue(true);
+
+    const taskId = 'test-sanitize-is-trusted';
+    const contextId = 'test-context';
+
+    const mockSocket = new EventEmitter();
+    (requestStorage.getStore as Mock).mockReturnValue({
+      req: { socket: mockSocket },
+    });
+
+    const requestContext = {
+      userMessage: {
+        messageId: 'msg-trust',
+        taskId,
+        contextId,
+        parts: [{ kind: 'confirmation', callId: '1', outcome: 'proceed' }],
+        metadata: {
+          coderAgent: {
+            kind: 'agent-settings',
+            workspacePath: '/tmp',
+            isTrusted: true,
+          },
+        },
+      },
+    } as unknown as RequestContext;
+
+    await executor.execute(requestContext, mockEventBus);
+
+    expect(setIsTrusted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspacePath: '/tmp',
+        isTrusted: undefined,
+      }),
+      '/tmp',
+    );
+  });
 });

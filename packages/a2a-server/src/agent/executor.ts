@@ -183,7 +183,9 @@ export class CoderAgentExecutor implements AgentExecutor {
         workspacePath: validateWorkspacePath(
           persistedState._agentSettings?.workspacePath,
         ),
-        isTrusted: false,
+        // Strip client/persisted isTrusted so setIsTrusted() evaluates
+        // server-side trust (GEMINI_CLI_TRUST_WORKSPACE / GEMINI_FOLDER_TRUST / checkPathTrust).
+        isTrusted: undefined,
       };
     } catch (error) {
       logger.error(
@@ -463,7 +465,8 @@ export class CoderAgentExecutor implements AgentExecutor {
           workspacePath: validateWorkspacePath(
             persistedState?._agentSettings?.workspacePath,
           ),
-          isTrusted: false,
+          // Strip persisted isTrusted so setIsTrusted() evaluates server-side trust.
+          isTrusted: undefined,
         };
       } else {
         const rawAgentSettings = getAgentSettingsFromMetadata(
@@ -473,7 +476,8 @@ export class CoderAgentExecutor implements AgentExecutor {
           kind: CoderAgentEvent.StateAgentSettingsEvent,
           ...(rawAgentSettings || {}),
           workspacePath: validateWorkspacePath(rawAgentSettings?.workspacePath),
-          isTrusted: false,
+          // Strip client-supplied isTrusted so setIsTrusted() evaluates server-side trust.
+          isTrusted: undefined,
         };
       }
     } catch (error) {
