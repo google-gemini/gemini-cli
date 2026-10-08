@@ -63,4 +63,20 @@ describe('getDiffContextSnippet', () => {
 
     expect(snippet).toBe('...\n4\n6\n...');
   });
+
+  it('should not treat CRLF vs LF as a full-file change', () => {
+    const original = '1\r\n2\r\n3\r\n4\r\n5\r\n6\r\n7\r\n8\r\n9\r\n10';
+    const modified = '1\n2\n3\n4\n5\nadded\n6\n7\n8\n9\n10';
+    const snippet = getDiffContextSnippet(original, modified, 1);
+
+    expect(snippet).toBe('...\n5\nadded\n6\n...');
+  });
+
+  it('should snippet a CRLF file edited with CRLF', () => {
+    const original = '1\r\n2\r\n3\r\n4\r\n5\r\n6\r\n7\r\n8\r\n9\r\n10';
+    const modified = '1\r\n2\r\n3\r\n4\r\n5\r\nadded\r\n6\r\n7\r\n8\r\n9\r\n10';
+    const snippet = getDiffContextSnippet(original, modified, 1);
+
+    expect(snippet).toBe('...\n5\nadded\n6\n...');
+  });
 });
