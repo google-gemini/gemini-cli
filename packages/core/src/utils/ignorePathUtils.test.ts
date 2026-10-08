@@ -238,6 +238,23 @@ describe('ignorePathUtils', () => {
       ).toEqual(['build/**', '/build/']);
     });
 
+    it('should ignore empty negation patterns (!, !   ) and still expand directory patterns', () => {
+      expect(expandWildcardDirectoryPatterns(['build/**', '!'])).toEqual([
+        'build/**',
+        '/build/',
+        '!',
+      ]);
+      expect(expandWildcardDirectoryPatterns(['build/**', '!   '])).toEqual([
+        'build/**',
+        '/build/',
+        '!   ',
+      ]);
+      expect(expandWildcardDirectoryPatterns(['build/**'], ['!'])).toEqual([
+        'build/**',
+        '/build/',
+      ]);
+    });
+
     it('should ignore comments and negated patterns', () => {
       expect(
         expandWildcardDirectoryPatterns([

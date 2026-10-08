@@ -137,7 +137,10 @@ export function expandWildcardDirectoryPatterns(
   for (const p of allPatternSources) {
     const trimmed = p.trim();
     if (trimmed.startsWith('!')) {
-      negations.add(trimmed.slice(1).trim());
+      const neg = trimmed.slice(1).trim();
+      if (neg !== '') {
+        negations.add(neg);
+      }
     }
   }
 

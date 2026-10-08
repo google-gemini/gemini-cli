@@ -59,8 +59,7 @@ export class FileDiscoveryService {
   clearCache(): void {
     this.symlinkCache.clear();
     this.realPathCache.clear();
-    this.gitIgnoreFilter?.clearCache?.();
-    this.combinedIgnoreFilter?.clearCache?.();
+    this.initFilters();
   }
 
   private get realProjectRoot(): string {
@@ -77,8 +76,14 @@ export class FileDiscoveryService {
   constructor(projectRoot: string, options?: FilterFilesOptions) {
     this.projectRoot = path.resolve(projectRoot);
     this.applyFilterFilesOptions(options);
+    this.initFilters();
+  }
+
+  private initFilters(): void {
     if (isGitRepository(this.projectRoot)) {
       this.gitIgnoreFilter = new GitIgnoreParser(this.projectRoot);
+    } else {
+      this.gitIgnoreFilter = null;
     }
     this.geminiIgnoreFilter = new IgnoreFileParser(
       this.projectRoot,
@@ -89,28 +94,28 @@ export class FileDiscoveryService {
         this.projectRoot,
         this.defaultFilterFileOptions.customIgnoreFilePaths,
       );
+    } else {
+      this.customIgnoreFilter = null;
     }
 
+    const geminiPatterns = this.geminiIgnoreFilter.getPatterns();
+    const customPatterns = this.customIgnoreFilter
+      ? this.customIgnoreFilter.getPatterns()
+      : [];
+    const extraPatterns = [...geminiPatterns, ...customPatterns];
+
     if (this.gitIgnoreFilter) {
-      const geminiPatterns = this.geminiIgnoreFilter.getPatterns();
-      const customPatterns = this.customIgnoreFilter
-        ? this.customIgnoreFilter.getPatterns()
-        : [];
       // Create combined parser: .gitignore + .geminiignore + custom ignore
       this.combinedIgnoreFilter = new GitIgnoreParser(
         this.projectRoot,
         // customPatterns should go the last to ensure overwriting of geminiPatterns
-        [...geminiPatterns, ...customPatterns],
+        extraPatterns,
       );
     } else {
       // Create combined parser when not git repo
-      const geminiPatterns = this.geminiIgnoreFilter.getPatterns();
-      const customPatterns = this.customIgnoreFilter
-        ? this.customIgnoreFilter.getPatterns()
-        : [];
       this.combinedIgnoreFilter = new IgnoreFileParser(
         this.projectRoot,
-        [...geminiPatterns, ...customPatterns],
+        extraPatterns,
         true,
       );
     }

@@ -788,6 +788,40 @@ describe('FileDiscoveryService', () => {
       expect(lstatSpy).toHaveBeenCalled();
     });
 
+    it('should reload .geminiignore and custom ignore files when clearCache() is called', async () => {
+      await fs.mkdir(path.join(projectRoot, '.git'));
+      await createTestFile(GEMINI_IGNORE_FILE_NAME, 'gemini-temp/');
+      const customIgnoreName = 'my-custom.ignore';
+      await createTestFile(customIgnoreName, 'custom-temp/');
+
+      const service = new FileDiscoveryService(projectRoot, {
+        customIgnoreFilePaths: [customIgnoreName],
+      });
+
+      expect(service.shouldIgnoreFile('gemini-temp/file.txt')).toBe(true);
+      expect(service.shouldIgnoreFile('gemini-new/file.txt')).toBe(false);
+      expect(service.shouldIgnoreFile('custom-temp/file.txt')).toBe(true);
+      expect(service.shouldIgnoreFile('custom-new/file.txt')).toBe(false);
+
+      // Modify .geminiignore and custom ignore file on disk
+      await createTestFile(GEMINI_IGNORE_FILE_NAME, 'gemini-new/');
+      await createTestFile(customIgnoreName, 'custom-new/');
+
+      // Before clearCache, old in-memory rules are used
+      expect(service.shouldIgnoreFile('gemini-temp/file.txt')).toBe(true);
+      expect(service.shouldIgnoreFile('gemini-new/file.txt')).toBe(false);
+      expect(service.shouldIgnoreFile('custom-temp/file.txt')).toBe(true);
+      expect(service.shouldIgnoreFile('custom-new/file.txt')).toBe(false);
+
+      // After clearCache, new rules from disk are reloaded
+      service.clearCache();
+
+      expect(service.shouldIgnoreFile('gemini-temp/file.txt')).toBe(false);
+      expect(service.shouldIgnoreFile('gemini-new/file.txt')).toBe(true);
+      expect(service.shouldIgnoreFile('custom-temp/file.txt')).toBe(false);
+      expect(service.shouldIgnoreFile('custom-new/file.txt')).toBe(true);
+    });
+
     it('should not cache false for non-existent paths, preventing negative existence caching hazards', async () => {
       const service = new FileDiscoveryService(projectRoot);
 
