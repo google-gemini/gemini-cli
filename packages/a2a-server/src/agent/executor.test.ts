@@ -235,6 +235,9 @@ describe('CoderAgentExecutor', () => {
       ).executingTasks.has(taskId),
     ).toBe(false);
     expect(wrapper?.task.dispose).toHaveBeenCalled();
+    expect(
+      (mockEventBus as unknown as EventEmitter).listenerCount('event'),
+    ).toBe(0);
   });
 
   it('should evict task from cache when it reaches terminal state', async () => {

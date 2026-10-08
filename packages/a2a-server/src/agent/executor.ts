@@ -495,13 +495,17 @@ export class CoderAgentExecutor implements AgentExecutor {
         logger.info(
           `[CoderAgentExecutor] userMessage: ${JSON.stringify(userMessage)}`,
         );
-        let cleanupSocketListeners: (() => void) | undefined;
-        eventBus.on('event', (event: AgentExecutionEvent) => {
+        const onEvent = (event: AgentExecutionEvent) => {
           logger.info('[EventBus event]: ', event);
           if ('final' in event && event.final) {
             cleanupSocketListeners?.();
           }
-        });
+        };
+        eventBus.on('event', onEvent);
+
+        let cleanupSocketListeners = () => {
+          eventBus.off('event', onEvent);
+        };
 
         const store = requestStorage.getStore();
         if (!store) {
@@ -543,6 +547,7 @@ export class CoderAgentExecutor implements AgentExecutor {
               socket.removeListener('end', onSocketEnd);
               socket.removeListener('close', removeEndListener);
               abortSignal.removeEventListener('abort', removeEndListener);
+              eventBus.off('event', onEvent);
             };
             logger.info(
               `[CoderAgentExecutor] Socket close handler set up for task ${taskId}.`,
