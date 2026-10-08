@@ -449,13 +449,37 @@ describe('IDEServer', () => {
       ).toHaveLength(1);
     });
 
-    it('should tolerate concurrent stop() calls', async () => {
+    it('should make concurrent stop() calls await the same in-flight shutdown', async () => {
       clients.push(await connectMcpClient(port));
+      const server = (ideServer as unknown as { server: http.Server }).server;
+      const realClose = server.close.bind(server);
+      let releaseClose!: () => void;
+      const closeGate = new Promise<void>((resolve) => {
+        releaseClose = resolve;
+      });
+      vi.spyOn(server, 'close').mockImplementation((cb) => {
+        void closeGate.then(() => realClose(cb));
+        return server;
+      });
 
-      await expect(
-        Promise.all([ideServer.stop(), ideServer.stop()]),
-      ).resolves.toEqual([undefined, undefined]);
+      const first = ideServer.stop();
+      const second = ideServer.stop();
 
+      // The second caller must not resolve while the listener is still
+      // closing and cleanup (env collection, port file) has not run yet.
+      expect(await withDeadline(second, 50)).toBe('timed-out');
+      expect(
+        mockContext.environmentVariableCollection.clear,
+      ).not.toHaveBeenCalled();
+
+      releaseClose();
+      await expect(Promise.all([first, second])).resolves.toEqual([
+        undefined,
+        undefined,
+      ]);
+      expect(
+        mockContext.environmentVariableCollection.clear,
+      ).toHaveBeenCalledTimes(1);
       expect(
         vi
           .mocked(mockLog)
@@ -542,6 +566,29 @@ describe('IDEServer', () => {
         expect(transport.send).toHaveBeenCalledTimes(5);
         expect(closeSpy).not.toHaveBeenCalled();
         expect(getTransports()[sessionId]).toBe(transport);
+      });
+
+      it('should log and stop pinging if closing the evicted session fails', async () => {
+        clients.push(await connectMcpClient(port));
+        const [sessionId] = Object.keys(getTransports());
+        const transport = getTransports()[sessionId];
+        vi.spyOn(transport, 'send').mockRejectedValue(new Error('EPIPE'));
+        const closeSpy = vi
+          .spyOn(transport, 'close')
+          .mockRejectedValue(new Error('close failed'));
+
+        await vi.advanceTimersByTimeAsync(KEEP_ALIVE_MS * 3);
+
+        expect(closeSpy).toHaveBeenCalledTimes(1);
+        expect(mockLog).toHaveBeenCalledWith(
+          `Failed to close transport for session ${sessionId}: close failed`,
+        );
+
+        // The interval must not keep retrying a transport that cannot close.
+        const sendCalls = vi.mocked(transport.send).mock.calls.length;
+        await vi.advanceTimersByTimeAsync(KEEP_ALIVE_MS * 2);
+        expect(transport.send).toHaveBeenCalledTimes(sendCalls);
+        expect(closeSpy).toHaveBeenCalledTimes(1);
       });
     });
   });

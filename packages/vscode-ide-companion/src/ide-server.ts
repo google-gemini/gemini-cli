@@ -128,6 +128,7 @@ export class IDEServer {
   private transports: { [sessionId: string]: StreamableHTTPServerTransport } =
     {};
   private openFilesManager: OpenFilesManager | undefined;
+  private stopping: Promise<void> | undefined;
   diffManager: DiffManager;
 
   constructor(log: (message: string) => void, diffManager: DiffManager) {
@@ -241,8 +242,15 @@ export class IDEServer {
                   this.log(
                     `Session ${sessionId} missed ${missedPings} pings. Closing connection and cleaning up interval.`,
                   );
-                  // `onclose` clears the interval and evicts the session.
-                  void transport.close();
+                  clearInterval(keepAlive);
+                  // `onclose` evicts the session from `this.transports`.
+                  transport.close().catch((error: unknown) => {
+                    const message =
+                      error instanceof Error ? error.message : String(error);
+                    this.log(
+                      `Failed to close transport for session ${sessionId}: ${message}`,
+                    );
+                  });
                 }
               });
           }, 60000); // 60 sec
@@ -405,8 +413,19 @@ export class IDEServer {
   }
 
   async stop(): Promise<void> {
-    // Detach synchronously so concurrent or repeated stop() calls are no-ops
-    // rather than closing the same listener twice.
+    // Share the in-flight shutdown so a concurrent caller resolves only once
+    // the listener, sockets and port file are actually gone — not instantly.
+    if (!this.stopping) {
+      this.stopping = this.shutdown().finally(() => {
+        this.stopping = undefined;
+      });
+    }
+    return this.stopping;
+  }
+
+  private async shutdown(): Promise<void> {
+    // Detach synchronously so a stop() issued after this one completes is a
+    // no-op rather than closing the same listener twice.
     const server = this.server;
     this.server = undefined;
     const transports = Object.values(this.transports);
