@@ -495,15 +495,19 @@ export class CoderAgentExecutor implements AgentExecutor {
         logger.info(
           `[CoderAgentExecutor] userMessage: ${JSON.stringify(userMessage)}`,
         );
+        let cleanupSocketListeners: () => void;
+
         const onEvent = (event: AgentExecutionEvent) => {
           logger.info('[EventBus event]: ', event);
           if ('final' in event && event.final) {
             cleanupSocketListeners();
           }
         };
-        let cleanupSocketListeners = () => {
+
+        cleanupSocketListeners = () => {
           eventBus.off('event', onEvent);
         };
+
         eventBus.on('event', onEvent);
 
         const store = requestStorage.getStore();
