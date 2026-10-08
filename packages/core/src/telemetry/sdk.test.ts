@@ -17,6 +17,7 @@ import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-grpc';
 import { OTLPTraceExporter as OTLPTraceExporterHttp } from '@opentelemetry/exporter-trace-otlp-http';
 import { OTLPLogExporter as OTLPLogExporterHttp } from '@opentelemetry/exporter-logs-otlp-http';
 import { OTLPMetricExporter as OTLPMetricExporterHttp } from '@opentelemetry/exporter-metrics-otlp-http';
+import { Metadata } from '@grpc/grpc-js';
 import { ConsoleSpanExporter } from '@opentelemetry/sdk-trace-node';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { GoogleAuth, type JWTInput } from 'google-auth-library';
@@ -68,6 +69,7 @@ describe('Telemetry SDK', () => {
       getTelemetryEnabled: () => true,
       getTelemetryOtlpEndpoint: () => 'http://localhost:4317',
       getTelemetryOtlpProtocol: () => 'grpc',
+      getTelemetryOtlpHeaders: () => ({}),
       getTelemetryTarget: () => 'local',
       getTelemetryUseCollector: () => false,
       getTelemetryOutfile: () => undefined,
@@ -122,6 +124,99 @@ describe('Telemetry SDK', () => {
       url: 'http://localhost:4318/v1/metrics',
     });
     expect(NodeSDK.prototype.start).toHaveBeenCalled();
+  });
+
+  it('should pass custom headers to HTTP exporters when otlpHeaders is configured', async () => {
+    const customHeaders = {
+      Authorization: 'Bearer secret-token',
+      'x-api-key': 'my-api-key',
+    };
+    vi.spyOn(mockConfig, 'getTelemetryOtlpProtocol').mockReturnValue('http');
+    vi.spyOn(mockConfig, 'getTelemetryOtlpEndpoint').mockReturnValue(
+      'http://localhost:4318',
+    );
+    vi.spyOn(mockConfig, 'getTelemetryOtlpHeaders').mockReturnValue(
+      customHeaders,
+    );
+
+    await initializeTelemetry(mockConfig);
+
+    expect(OTLPTraceExporterHttp).toHaveBeenCalledWith({
+      url: 'http://localhost:4318/v1/traces',
+      headers: customHeaders,
+    });
+    expect(OTLPLogExporterHttp).toHaveBeenCalledWith({
+      url: 'http://localhost:4318/v1/logs',
+      headers: customHeaders,
+    });
+    expect(OTLPMetricExporterHttp).toHaveBeenCalledWith({
+      url: 'http://localhost:4318/v1/metrics',
+      headers: customHeaders,
+    });
+  });
+
+  it('should pass custom metadata to gRPC exporters when otlpHeaders is configured', async () => {
+    const customHeaders = {
+      Authorization: 'Bearer secret-token',
+      'x-api-key': 'my-api-key',
+    };
+    vi.spyOn(mockConfig, 'getTelemetryOtlpProtocol').mockReturnValue('grpc');
+    vi.spyOn(mockConfig, 'getTelemetryOtlpEndpoint').mockReturnValue(
+      'http://localhost:4317',
+    );
+    vi.spyOn(mockConfig, 'getTelemetryOtlpHeaders').mockReturnValue(
+      customHeaders,
+    );
+
+    await initializeTelemetry(mockConfig);
+
+    for (const ExporterMock of [
+      OTLPTraceExporter,
+      OTLPLogExporter,
+      OTLPMetricExporter,
+    ]) {
+      expect(ExporterMock).toHaveBeenCalledTimes(1);
+      const callArg = vi.mocked(ExporterMock).mock.calls[0]?.[0] as {
+        url?: string;
+        compression?: string;
+        metadata?: Metadata;
+      };
+      expect(callArg?.url).toBe('http://localhost:4317');
+      expect(callArg?.compression).toBe('gzip');
+      expect(callArg?.metadata).toBeInstanceOf(Metadata);
+      expect(callArg?.metadata?.get('authorization')).toEqual([
+        'Bearer secret-token',
+      ]);
+      expect(callArg?.metadata?.get('x-api-key')).toEqual(['my-api-key']);
+    }
+  });
+
+  it('should skip invalid gRPC metadata keys and log a warning without crashing', async () => {
+    const customHeaders = {
+      bad$key: 'invalid-for-grpc',
+      'x-valid-key': 'valid-value',
+    };
+    vi.spyOn(mockConfig, 'getTelemetryOtlpProtocol').mockReturnValue('grpc');
+    vi.spyOn(mockConfig, 'getTelemetryOtlpEndpoint').mockReturnValue(
+      'http://localhost:4317',
+    );
+    vi.spyOn(mockConfig, 'getTelemetryOtlpHeaders').mockReturnValue(
+      customHeaders,
+    );
+
+    await initializeTelemetry(mockConfig);
+
+    expect(debugLogger.warn).toHaveBeenCalledWith(
+      expect.stringContaining(
+        '[Telemetry] Skipping invalid gRPC metadata key "bad$key":',
+      ),
+      expect.any(Error),
+    );
+    const callArg = vi.mocked(OTLPTraceExporter).mock.calls[0]?.[0] as {
+      metadata?: Metadata;
+    };
+    expect(callArg?.metadata).toBeInstanceOf(Metadata);
+    expect(callArg?.metadata?.get('x-valid-key')).toEqual(['valid-value']);
   });
 
   it('should parse gRPC endpoint correctly', async () => {
