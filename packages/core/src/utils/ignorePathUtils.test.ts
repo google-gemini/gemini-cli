@@ -6,6 +6,9 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import * as path from 'node:path';
+import ignorePkg, { type Ignore } from 'ignore';
+const ignore = ((ignorePkg as unknown as { default?: () => Ignore }).default ??
+  ignorePkg) as () => Ignore;
 import {
   getNormalizedRelativePath,
   expandWildcardDirectoryPatterns,
@@ -134,14 +137,24 @@ describe('ignorePathUtils', () => {
     it('should expand basic wildcard directory patterns', () => {
       expect(expandWildcardDirectoryPatterns(['node_modules/**'])).toEqual([
         'node_modules/**',
-        'node_modules/',
+        '/node_modules/',
       ]);
       expect(expandWildcardDirectoryPatterns(['dist/**', 'build/**'])).toEqual([
         'dist/**',
-        'dist/',
+        '/dist/',
         'build/**',
-        'build/',
+        '/build/',
       ]);
+    });
+
+    it('should expand single-segment patterns as anchored so they do not match nested directories', () => {
+      const patterns = expandWildcardDirectoryPatterns(['build/**']);
+      expect(patterns).toEqual(['build/**', '/build/']);
+      const ig = ignore().add(patterns);
+      expect(ig.ignores('build/')).toBe(true);
+      expect(ig.ignores('build/output.js')).toBe(true);
+      expect(ig.ignores('src/build/')).toBe(false);
+      expect(ig.ignores('src/build/index.ts')).toBe(false);
     });
 
     it('should preserve leading slash for anchored patterns', () => {
@@ -180,6 +193,49 @@ describe('ignorePathUtils', () => {
 
     it('should not expand root wildcard pattern (/**)', () => {
       expect(expandWildcardDirectoryPatterns(['/**'])).toEqual(['/**']);
+    });
+
+    it('should not expand patterns with unanchored negations (!*.keep, !keep.txt)', () => {
+      expect(expandWildcardDirectoryPatterns(['build/**', '!*.keep'])).toEqual([
+        'build/**',
+        '!*.keep',
+      ]);
+      expect(
+        expandWildcardDirectoryPatterns(['build/**', '!keep.txt']),
+      ).toEqual(['build/**', '!keep.txt']);
+      expect(
+        expandWildcardDirectoryPatterns(['build/**', '!keep.txt   ']),
+      ).toEqual(['build/**', '!keep.txt   ']);
+    });
+
+    it('should not expand patterns with wildcard negations (!**/keep.txt, !packages/*/keep.txt)', () => {
+      expect(
+        expandWildcardDirectoryPatterns(['build/**', '!**/keep.txt']),
+      ).toEqual(['build/**', '!**/keep.txt']);
+      expect(
+        expandWildcardDirectoryPatterns([
+          'packages/foo/**',
+          '!packages/*/keep.txt',
+        ]),
+      ).toEqual(['packages/foo/**', '!packages/*/keep.txt']);
+    });
+
+    it('should expand directory pattern when wildcard negation is in a disjoint directory', () => {
+      expect(
+        expandWildcardDirectoryPatterns(['build/**', '!packages/*/keep.txt']),
+      ).toEqual(['build/**', '/build/', '!packages/*/keep.txt']);
+    });
+
+    it('should support extraRawPatterns parameter for cross-file negations', () => {
+      expect(
+        expandWildcardDirectoryPatterns(['build/**'], ['!build/important.js']),
+      ).toEqual(['build/**']);
+      expect(
+        expandWildcardDirectoryPatterns(['build/**'], ['!*.keep']),
+      ).toEqual(['build/**']);
+      expect(
+        expandWildcardDirectoryPatterns(['build/**'], ['!docs/readme.md']),
+      ).toEqual(['build/**', '/build/']);
     });
 
     it('should ignore comments and negated patterns', () => {

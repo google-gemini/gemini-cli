@@ -59,12 +59,8 @@ export class FileDiscoveryService {
   clearCache(): void {
     this.symlinkCache.clear();
     this.realPathCache.clear();
-    if (this.gitIgnoreFilter instanceof GitIgnoreParser) {
-      this.gitIgnoreFilter.clearCache();
-    }
-    if (this.combinedIgnoreFilter instanceof GitIgnoreParser) {
-      this.combinedIgnoreFilter.clearCache();
-    }
+    this.gitIgnoreFilter?.clearCache?.();
+    this.combinedIgnoreFilter?.clearCache?.();
   }
 
   private get realProjectRoot(): string {
@@ -309,11 +305,13 @@ export class FileDiscoveryService {
         if (cached !== undefined) {
           isSymlink = cached;
         } else {
-          isSymlink =
-            fs
-              .lstatSync(absolutePath, { throwIfNoEntry: false })
-              ?.isSymbolicLink() ?? false;
-          this.symlinkCache.set(absolutePath, isSymlink);
+          const stat = fs.lstatSync(absolutePath, { throwIfNoEntry: false });
+          if (stat !== undefined) {
+            isSymlink = stat.isSymbolicLink();
+            this.symlinkCache.set(absolutePath, isSymlink);
+          } else {
+            isSymlink = false;
+          }
         }
       }
 

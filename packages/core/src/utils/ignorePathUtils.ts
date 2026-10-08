@@ -70,6 +70,56 @@ export function getNormalizedRelativePath(
   return normalized;
 }
 
+function canNegationMatchInsideDir(
+  dir: string,
+  negations: Set<string>,
+): boolean {
+  const dirPrefix = dir + '/';
+
+  for (const neg of negations) {
+    const isAnchored = neg.startsWith('/');
+    const cleanNeg = isAnchored ? neg.slice(1) : neg;
+
+    // 1. Exact match with directory (e.g. !dir, !dir/, !/dir, !/dir/)
+    if (cleanNeg === dir || cleanNeg === dirPrefix) {
+      return true;
+    }
+
+    // 2. Concrete path inside the directory (e.g. !dir/keep.txt or !/dir/keep.txt)
+    if (cleanNeg.startsWith(dirPrefix)) {
+      return true;
+    }
+
+    // 3. Unanchored negation: no slash before its final character (e.g. !*.keep, !keep.txt, !dir/)
+    const slashIndex = cleanNeg.indexOf('/');
+    const isUnanchored =
+      !isAnchored && (slashIndex === -1 || slashIndex === cleanNeg.length - 1);
+    if (isUnanchored) {
+      return true;
+    }
+
+    // 4. Wildcard pattern (*, ?, [)
+    const firstWildcard = cleanNeg.search(/[*?[]/);
+    if (firstWildcard !== -1) {
+      const slashBeforeWildcard = cleanNeg.lastIndexOf('/', firstWildcard);
+      if (slashBeforeWildcard === -1) {
+        // No slash before wildcard (e.g. *.keep, **/keep.txt): can match anywhere
+        return true;
+      }
+      // Fixed prefix before wildcard (e.g. 'packages/' in 'packages/*/keep.txt')
+      const prefixBeforeWildcard = cleanNeg.slice(0, slashBeforeWildcard + 1);
+      if (
+        dirPrefix.startsWith(prefixBeforeWildcard) ||
+        prefixBeforeWildcard.startsWith(dirPrefix)
+      ) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 /**
  * Expands wildcard directory patterns (e.g. 'dir/**') to also include the directory itself ('dir/'),
  * unless there are negative patterns matching or under that directory.
@@ -77,12 +127,17 @@ export function getNormalizedRelativePath(
  */
 export function expandWildcardDirectoryPatterns(
   rawPatterns: string[],
+  extraRawPatterns?: string[],
 ): string[] {
   const negations = new Set<string>();
-  for (const p of rawPatterns) {
-    const trimmed = p.trimStart();
+  const allPatternSources = extraRawPatterns
+    ? [...rawPatterns, ...extraRawPatterns]
+    : rawPatterns;
+
+  for (const p of allPatternSources) {
+    const trimmed = p.trim();
     if (trimmed.startsWith('!')) {
-      negations.add(trimmed.slice(1).replace(/^\//, ''));
+      negations.add(trimmed.slice(1).trim());
     }
   }
 
@@ -90,30 +145,27 @@ export function expandWildcardDirectoryPatterns(
   for (const p of rawPatterns) {
     expanded.push(p);
     const trimmed = p.trim();
+
+    if (trimmed.startsWith('!') || trimmed.startsWith('#')) {
+      continue;
+    }
+    if (!trimmed.endsWith('/**')) {
+      continue;
+    }
+
+    const withoutGlob = trimmed.slice(0, -3).replace(/^\//, '');
+    // Only expand concrete directory prefixes (skip empty or wildcard-containing paths like '/**' or 'packages/*/**')
     if (
-      !trimmed.startsWith('!') &&
-      !trimmed.startsWith('#') &&
-      trimmed.endsWith('/**')
+      withoutGlob === '' ||
+      withoutGlob.includes('*') ||
+      withoutGlob.includes('?')
     ) {
-      const withoutGlob = trimmed.slice(0, -3).replace(/^\//, '');
-      // Only expand concrete directory prefixes (skip empty or wildcard-containing paths like '/**' or 'packages/*/**')
-      if (
-        withoutGlob !== '' &&
-        !withoutGlob.includes('*') &&
-        !withoutGlob.includes('?')
-      ) {
-        let hasNegation = false;
-        for (const neg of negations) {
-          if (neg === withoutGlob || neg.startsWith(withoutGlob + '/')) {
-            hasNegation = true;
-            break;
-          }
-        }
-        if (!hasNegation) {
-          // Convert 'dir/**' -> 'dir/' (preserving leading slash if present)
-          expanded.push(trimmed.slice(0, -3) + '/');
-        }
-      }
+      continue;
+    }
+
+    if (!canNegationMatchInsideDir(withoutGlob, negations)) {
+      // Convert 'dir/**' or '/dir/**' -> '/dir/' so single-segment patterns stay anchored
+      expanded.push(`/${withoutGlob}/`);
     }
   }
   return expanded;

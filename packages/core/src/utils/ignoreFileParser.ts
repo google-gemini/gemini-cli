@@ -21,6 +21,7 @@ export interface IgnoreFileFilter {
   getPatterns(): string[];
   getIgnoreFilePaths(): string[];
   hasPatterns(): boolean;
+  clearCache?(): void;
 }
 
 /**
@@ -57,8 +58,8 @@ export class IgnoreFileParser implements IgnoreFileFilter {
     for (const fileName of [...this.fileNames].reverse()) {
       const patterns = this.parseIgnoreFile(fileName);
       this.patterns.push(...patterns);
-      this.ig.add(expandWildcardDirectoryPatterns(patterns));
     }
+    this.ig.add(expandWildcardDirectoryPatterns(this.patterns));
   }
 
   private parseIgnoreFile(fileName: string): string[] {

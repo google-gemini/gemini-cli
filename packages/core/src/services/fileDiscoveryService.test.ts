@@ -6,6 +6,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'node:fs/promises';
+import nodeFs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { FileDiscoveryService } from './fileDiscoveryService.js';
@@ -26,12 +27,18 @@ describe('FileDiscoveryService', () => {
     testRootDir = await fs.mkdtemp(
       path.join(os.tmpdir(), 'file-discovery-test-'),
     );
+    try {
+      testRootDir = await fs.realpath(testRootDir);
+    } catch {
+      // Fallback
+    }
     projectRoot = path.join(testRootDir, 'project');
     await fs.mkdir(projectRoot, { recursive: true });
   });
 
   afterEach(async () => {
     await fs.rm(testRootDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
   });
 
   describe('initialization', () => {
@@ -260,6 +267,21 @@ describe('FileDiscoveryService', () => {
       ).toBe(true);
     });
 
+    it('should not falsely ignore nested directories for root wildcard patterns (e.g. build/** should not ignore src/build)', async () => {
+      await createTestFile('.gitignore', 'build/**');
+      const service = new FileDiscoveryService(projectRoot);
+
+      expect(
+        service.shouldIgnoreDirectory(path.join(projectRoot, 'build')),
+      ).toBe(true);
+      expect(
+        service.shouldIgnoreDirectory(path.join(projectRoot, 'src/build')),
+      ).toBe(false);
+      expect(
+        service.shouldIgnoreFile(path.join(projectRoot, 'src/build/index.ts')),
+      ).toBe(false);
+    });
+
     it('should return false for non-git-ignored files', () => {
       const service = new FileDiscoveryService(projectRoot);
 
@@ -345,6 +367,26 @@ describe('FileDiscoveryService', () => {
 
       const filtered = service.filterFiles(files);
       expect(filtered).toEqual(files);
+    });
+
+    it('should allow .geminiignore to un-ignore files inside wildcard directories in .gitignore (e.g. build/** and !build/important.js)', async () => {
+      await createTestFile('.gitignore', 'build/**');
+      await createTestFile(GEMINI_IGNORE_FILE_NAME, '!build/important.js');
+
+      const service = new FileDiscoveryService(projectRoot);
+      const files = [
+        path.join(projectRoot, 'build/output.js'),
+        path.join(projectRoot, 'build/important.js'),
+      ];
+
+      const filtered = service.filterFiles(files);
+      expect(filtered).toEqual([path.join(projectRoot, 'build/important.js')]);
+      expect(
+        service.shouldIgnoreFile(path.join(projectRoot, 'build/important.js')),
+      ).toBe(false);
+      expect(
+        service.shouldIgnoreFile(path.join(projectRoot, 'build/output.js')),
+      ).toBe(true);
     });
 
     it('should extend ignore rules in .geminiignore', async () => {
@@ -670,6 +712,102 @@ describe('FileDiscoveryService', () => {
       expect(onlyGit).not.toContain(
         path.join(projectRoot, 'ignored-by-gemini.txt'),
       );
+    });
+  });
+
+  describe('caching and clearCache', () => {
+    it('should hit symlinkCache on repeated queries without calling lstatSync again', async () => {
+      await createTestFile('test.txt', 'hello');
+      const service = new FileDiscoveryService(projectRoot);
+
+      // First query populates symlinkCache
+      service.shouldIgnoreFile('test.txt');
+
+      const lstatSpy = vi.spyOn(nodeFs, 'lstatSync');
+      service.shouldIgnoreFile('test.txt');
+
+      expect(lstatSpy).not.toHaveBeenCalled();
+    });
+
+    it('should populate symlinkCache when isSymbolicLink option is provided', async () => {
+      await createTestFile('manual.txt', 'hello');
+      const service = new FileDiscoveryService(projectRoot);
+
+      // Query with explicit isSymbolicLink option
+      service.shouldIgnoreFile('manual.txt', { isSymbolicLink: false });
+
+      const lstatSpy = vi.spyOn(nodeFs, 'lstatSync');
+      // Subsequent query without options should hit symlinkCache
+      service.shouldIgnoreFile('manual.txt');
+
+      expect(lstatSpy).not.toHaveBeenCalled();
+    });
+
+    it('should hit realPathCache on repeated queries for symlinks', async () => {
+      const target = await createTestFile('target.txt', 'content');
+      const linkPath = path.join(projectRoot, 'link.txt');
+      await fs.symlink(target, linkPath);
+
+      const service = new FileDiscoveryService(projectRoot);
+      // First call resolves real path and populates realPathCache
+      service.shouldIgnoreFile('link.txt');
+
+      const realpathSpy = vi.spyOn(nodeFs, 'realpathSync');
+      service.shouldIgnoreFile('link.txt');
+
+      expect(realpathSpy).not.toHaveBeenCalled();
+    });
+
+    it('should clear caches and invalidate git ignore rules on clearCache()', async () => {
+      await fs.mkdir(path.join(projectRoot, '.git'));
+      await createTestFile('.gitignore', '*.tmp');
+      await createTestFile('cached.txt', 'content');
+
+      const service = new FileDiscoveryService(projectRoot);
+      expect(service.shouldIgnoreFile('test.tmp')).toBe(true);
+      expect(service.shouldIgnoreFile('test.log')).toBe(false);
+      service.shouldIgnoreFile('cached.txt');
+
+      // Update .gitignore on disk
+      await createTestFile('.gitignore', '*.log');
+
+      // Before clearCache, cached gitignore rules and symlinkCache are used
+      expect(service.shouldIgnoreFile('test.tmp')).toBe(true);
+      expect(service.shouldIgnoreFile('test.log')).toBe(false);
+
+      // Call clearCache()
+      service.clearCache();
+
+      // Git ignore rules are reloaded
+      expect(service.shouldIgnoreFile('test.tmp')).toBe(false);
+      expect(service.shouldIgnoreFile('test.log')).toBe(true);
+
+      // symlinkCache is cleared, requiring fresh lstatSync
+      const lstatSpy = vi.spyOn(nodeFs, 'lstatSync');
+      service.shouldIgnoreFile('cached.txt');
+      expect(lstatSpy).toHaveBeenCalled();
+    });
+
+    it('should not cache false for non-existent paths, preventing negative existence caching hazards', async () => {
+      const service = new FileDiscoveryService(projectRoot);
+
+      // Check a path that does not exist on disk yet
+      const linkRelPath = 'deferred_symlink.txt';
+      expect(service.shouldIgnoreFile(linkRelPath)).toBe(false);
+
+      // Now create an outside file and create a symlink to it
+      const outsideDir = path.join(testRootDir, 'outside');
+      await fs.mkdir(outsideDir, { recursive: true });
+      const outsideFile = path.join(outsideDir, 'outside.txt');
+      await fs.writeFile(outsideFile, 'secret outside data');
+
+      const linkAbsPath = path.join(projectRoot, linkRelPath);
+      await fs.symlink(outsideFile, linkAbsPath);
+
+      // Query again WITHOUT calling clearCache()
+      // Because false was not cached when the path did not exist,
+      // it correctly queries lstat, discovers the symlink escaping project root, and ignores it
+      expect(service.shouldIgnoreFile(linkRelPath)).toBe(true);
     });
   });
 });

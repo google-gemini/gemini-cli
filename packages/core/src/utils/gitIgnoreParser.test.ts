@@ -143,4 +143,45 @@ describe('GitIgnoreParser', () => {
       expect(parser.isIgnored('temp/anything.js', false)).toBe(true);
     });
   });
+
+  describe('Caching and clearCache', () => {
+    beforeEach(async () => {
+      await setupGitRepo();
+    });
+
+    it('should clear internal caches and reload updated ignore rules', async () => {
+      await createTestFile('.gitignore', '*.log');
+      expect(parser.isIgnored('app.log', false)).toBe(true);
+      expect(parser.isIgnored('app.txt', false)).toBe(false);
+
+      // Update .gitignore on disk
+      await createTestFile('.gitignore', '*.txt');
+
+      // Before clearCache, cached state is used
+      expect(parser.isIgnored('new.log', false)).toBe(true);
+      expect(parser.isIgnored('new.txt', false)).toBe(false);
+
+      // After clearCache, new rules on disk are loaded
+      parser.clearCache();
+      expect(parser.isIgnored('new.log', false)).toBe(false);
+      expect(parser.isIgnored('new.txt', false)).toBe(true);
+    });
+
+    it('should invalidate global exclude file cache when clearCache is called', async () => {
+      const excludePath = path.join('.git', 'info', 'exclude');
+      await createTestFile(excludePath, '*.bak');
+      expect(parser.isIgnored('test.bak', false)).toBe(true);
+      expect(parser.isIgnored('test.tmp', false)).toBe(false);
+
+      await createTestFile(excludePath, '*.tmp');
+
+      // Before clearCache, cached globals are retained
+      expect(parser.isIgnored('file.bak', false)).toBe(true);
+      expect(parser.isIgnored('file.tmp', false)).toBe(false);
+
+      parser.clearCache();
+      expect(parser.isIgnored('file.bak', false)).toBe(false);
+      expect(parser.isIgnored('file.tmp', false)).toBe(true);
+    });
+  });
 });

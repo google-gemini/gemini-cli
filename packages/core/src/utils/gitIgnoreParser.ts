@@ -17,6 +17,7 @@ import {
 
 export interface GitIgnoreFilter {
   isIgnored(filePath: string, isDirectory: boolean): boolean;
+  clearCache?(): void;
 }
 
 interface DirIgnoreState {
@@ -83,7 +84,10 @@ export class GitIgnoreParser implements GitIgnoreFilter {
     rawPatterns: string[],
     relativeBaseDir: string,
   ): string[] {
-    const expandedPatterns = expandWildcardDirectoryPatterns(rawPatterns);
+    const expandedPatterns = expandWildcardDirectoryPatterns(
+      rawPatterns,
+      this.extraPatterns,
+    );
     return expandedPatterns
       .map((p) => p.trimStart())
       .filter((p) => p !== '' && !p.startsWith('#'))
@@ -167,12 +171,13 @@ export class GitIgnoreParser implements GitIgnoreFilter {
     return this.globalPatterns;
   }
 
-  private getRelDirState(relDir: string): DirIgnoreState {
-    let state = this.dirStateCache.get(relDir);
-    if (state !== undefined) {
-      return state;
-    }
+  private createCombinedIgnore(ig: Ignore): Ignore {
+    return this.hasExtraPatterns
+      ? ignore().add(ig).add(this.processedExtraPatterns)
+      : ig;
+  }
 
+  private computeRelDirState(relDir: string): DirIgnoreState {
     if (relDir === '') {
       const ig = ignore().add('.git'); // Always ignore .git
       const globals = this.getGlobalPatterns();
@@ -183,58 +188,50 @@ export class GitIgnoreParser implements GitIgnoreFilter {
       if (rootPatterns.length > 0) {
         ig.add(rootPatterns);
       }
-      const combinedIg = this.hasExtraPatterns
-        ? ignore().add(ig).add(this.processedExtraPatterns)
-        : ig;
-      state = { isIgnored: false, ig, combinedIg };
-      this.dirStateCache.set('', state);
-      return state;
+      return {
+        isIgnored: false,
+        ig,
+        combinedIg: this.createCombinedIgnore(ig),
+      };
     }
 
     const lastSlash = relDir.lastIndexOf('/');
     const parentRelDir = lastSlash === -1 ? '' : relDir.slice(0, lastSlash);
     const parentState = this.getRelDirState(parentRelDir);
-    if (parentState.isIgnored) {
-      // Optimization: If a parent directory is ignored, its descendants are ignored automatically
-      state = {
-        isIgnored: true,
-        ig: parentState.ig,
-        combinedIg: parentState.combinedIg,
-      };
-      this.dirStateCache.set(relDir, state);
-      return state;
-    }
 
-    const dirWithSlash = relDir + '/';
-    if (parentState.combinedIg.ignores(dirWithSlash)) {
-      state = {
+    if (parentState.isIgnored || parentState.combinedIg.ignores(`${relDir}/`)) {
+      return {
         isIgnored: true,
         ig: parentState.ig,
         combinedIg: parentState.combinedIg,
       };
-      this.dirStateCache.set(relDir, state);
-      return state;
     }
 
     const absDir = path.join(this.projectRoot, relDir);
     const dirPatterns = this.getPatternsForDir(absDir);
     if (dirPatterns.length === 0) {
       // Re-use parent's Ignore instance directly to avoid unnecessary allocations
-      state = {
+      return {
         isIgnored: false,
         ig: parentState.ig,
         combinedIg: parentState.combinedIg,
       };
-      this.dirStateCache.set(relDir, state);
-      return state;
     }
 
     const ig = ignore().add(parentState.ig).add(dirPatterns);
-    const combinedIg = this.hasExtraPatterns
-      ? ignore().add(ig).add(this.processedExtraPatterns)
-      : ig;
-    state = { isIgnored: false, ig, combinedIg };
-    this.dirStateCache.set(relDir, state);
+    return {
+      isIgnored: false,
+      ig,
+      combinedIg: this.createCombinedIgnore(ig),
+    };
+  }
+
+  private getRelDirState(relDir: string): DirIgnoreState {
+    let state = this.dirStateCache.get(relDir);
+    if (state === undefined) {
+      state = this.computeRelDirState(relDir);
+      this.dirStateCache.set(relDir, state);
+    }
     return state;
   }
 
