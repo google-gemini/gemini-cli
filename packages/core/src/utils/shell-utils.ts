@@ -840,6 +840,45 @@ export function getCommandRoots(command: string): string[] {
 }
 
 /**
+ * Checks whether a POSIX shell CLI token represents the command execution termination flag.
+ * Supports standalone -c or +c, as well as valid short-flag chains where the final flag is 'c'
+ * (e.g. -xc, -ec, -exic, -lc, +xc).
+ * Ensures intermediate flags are valid POSIX single-character option letters that do not take arguments
+ * (specifically excluding 'o' and 'O', which require an option argument in POSIX shells).
+ */
+function isPosixTerminationFlag(token: string): boolean {
+  if (token.length < 2) {
+    return false;
+  }
+  const first = token[0];
+  if (first !== '-' && first !== '+') {
+    return false;
+  }
+  // Reject long options like --exec or --rc
+  if (token[1] === '-') {
+    return false;
+  }
+  // Must end with 'c'
+  if (token[token.length - 1] !== 'c') {
+    return false;
+  }
+  // Standalone -c or +c
+  if (token.length === 2) {
+    return true;
+  }
+  // For chained flags (e.g. -xc, -exic, -lc), verify all intermediate characters
+  // are valid short-flag letters that do not take arguments (excluding 'o' and 'O').
+  for (let i = 1; i < token.length - 1; i++) {
+    const ch = token[i];
+    const isLetter = (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z');
+    if (!isLetter || ch === 'o' || ch === 'O') {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
  * Checks whether a PowerShell CLI token represents the command execution termination flag (-Command, -c, or -CommandWithArgs).
  * Matches valid PowerShell abbreviations starting with 'c' or 'co' for -Command, or -cwa / -commandwithargs.
  */
@@ -1007,13 +1046,21 @@ export function stripShellWrapper(command: string): string {
     // Check for termination flag at current position if not expecting an argument
     if (!expectsFlagArg) {
       if (isPosix) {
+        let peekPos = pos;
+        while (peekPos < len && !/\s/.test(command[peekPos])) {
+          peekPos++;
+        }
+        let candidate = command.substring(pos, peekPos);
         if (
-          command[pos] === '-' &&
-          command[pos + 1] === 'c' &&
-          (pos + 2 === len || /\s/.test(command[pos + 2]))
+          candidate.length >= 2 &&
+          ((candidate.startsWith('"') && candidate.endsWith('"')) ||
+            (candidate.startsWith("'") && candidate.endsWith("'")))
         ) {
+          candidate = candidate.slice(1, -1);
+        }
+        if (isPosixTerminationFlag(candidate)) {
           foundTerminationFlag = true;
-          pos += 2;
+          pos = peekPos;
           break;
         }
       } else if (isCmd) {

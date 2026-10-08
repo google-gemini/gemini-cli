@@ -666,6 +666,167 @@ describe('stripShellWrapper', () => {
         expect(detectCommandSubstitution(stripped)).toBe(false);
       });
     });
+
+    describe('POSIX chained short flags ending in -c', () => {
+      it('should strip bash -xc and detect command substitution', () => {
+        const input = "bash -xc 'echo $(whoami)'";
+        const stripped = stripShellWrapper(input);
+        expect(stripped).toEqual('echo $(whoami)');
+        expect(detectCommandSubstitution(stripped)).toBe(true);
+      });
+
+      it('should strip bash -ec and detect command substitution', () => {
+        const input = "bash -ec 'echo $(whoami)'";
+        const stripped = stripShellWrapper(input);
+        expect(stripped).toEqual('echo $(whoami)');
+        expect(detectCommandSubstitution(stripped)).toBe(true);
+      });
+
+      it('should strip bash -exic and detect command substitution', () => {
+        const input = "bash -exic 'echo $(whoami)'";
+        const stripped = stripShellWrapper(input);
+        expect(stripped).toEqual('echo $(whoami)');
+        expect(detectCommandSubstitution(stripped)).toBe(true);
+      });
+
+      it('should strip sh -lc and detect command substitution', () => {
+        const input = "sh -lc 'echo $(whoami)'";
+        const stripped = stripShellWrapper(input);
+        expect(stripped).toEqual('echo $(whoami)');
+        expect(detectCommandSubstitution(stripped)).toBe(true);
+      });
+
+      it('should strip bash +c and detect command substitution', () => {
+        const input = "bash +c 'echo $(whoami)'";
+        const stripped = stripShellWrapper(input);
+        expect(stripped).toEqual('echo $(whoami)');
+        expect(detectCommandSubstitution(stripped)).toBe(true);
+      });
+
+      it('should strip bash +xc and detect command substitution', () => {
+        const input = "bash +xc 'echo $(whoami)'";
+        const stripped = stripShellWrapper(input);
+        expect(stripped).toEqual('echo $(whoami)');
+        expect(detectCommandSubstitution(stripped)).toBe(true);
+      });
+
+      it('should strip zsh -xc and detect command substitution', () => {
+        const input = "zsh -xc 'echo $(whoami)'";
+        const stripped = stripShellWrapper(input);
+        expect(stripped).toEqual('echo $(whoami)');
+        expect(detectCommandSubstitution(stripped)).toBe(true);
+      });
+
+      it('should detect backtick command substitution with chained short flags', () => {
+        const input = "bash -xc 'echo `whoami`'";
+        const stripped = stripShellWrapper(input);
+        expect(stripped).toEqual('echo `whoami`');
+        expect(detectCommandSubstitution(stripped)).toBe(true);
+      });
+
+      it('should detect process substitution <() with chained short flags', () => {
+        const input = "bash -xc 'cat <(whoami)'";
+        const stripped = stripShellWrapper(input);
+        expect(stripped).toEqual('cat <(whoami)');
+        expect(detectCommandSubstitution(stripped)).toBe(true);
+      });
+
+      it('should not detect command substitution for safe commands with chained short flags', () => {
+        const input = "bash -xc 'echo safe_command'";
+        const stripped = stripShellWrapper(input);
+        expect(stripped).toEqual('echo safe_command');
+        expect(detectCommandSubstitution(stripped)).toBe(false);
+      });
+
+      it('should strip when non-terminating chained flags are followed by standalone -c', () => {
+        const input = "bash -xe -c 'echo $(whoami)'";
+        const stripped = stripShellWrapper(input);
+        expect(stripped).toEqual('echo $(whoami)');
+        expect(detectCommandSubstitution(stripped)).toBe(true);
+      });
+
+      it('should strip when intermediate flags with arguments precede chained -xc', () => {
+        const input = "bash -o pipefail -xc 'echo $(whoami)'";
+        const stripped = stripShellWrapper(input);
+        expect(stripped).toEqual('echo $(whoami)');
+        expect(detectCommandSubstitution(stripped)).toBe(true);
+      });
+
+      it('should strip when intermediate flags with escaped arguments precede chained -xc', () => {
+        const input = "bash --rcfile my\\ dir/rc -xc 'echo $(whoami)'";
+        const stripped = stripShellWrapper(input);
+        expect(stripped).toEqual('echo $(whoami)');
+        expect(detectCommandSubstitution(stripped)).toBe(true);
+      });
+    });
+
+    describe('POSIX chained flags negative tests (must not be treated as termination flag)', () => {
+      it('should not strip long options ending in c (e.g. --exec)', () => {
+        const input = "bash --exec 'echo $(whoami)'";
+        expect(stripShellWrapper(input)).toEqual(input);
+      });
+
+      it('should not strip long options ending in c (e.g. --rc)', () => {
+        const input = "bash --rc 'echo $(whoami)'";
+        expect(stripShellWrapper(input)).toEqual(input);
+      });
+
+      it('should not strip long options ending in c (e.g. --sync)', () => {
+        const input = "bash --sync 'echo $(whoami)'";
+        expect(stripShellWrapper(input)).toEqual(input);
+      });
+
+      it('should not strip non-flag file tokens ending in c (e.g. file.c)', () => {
+        const input = "bash file.c 'echo $(whoami)'";
+        expect(stripShellWrapper(input)).toEqual(input);
+      });
+
+      it('should not strip flags with file extensions ending in c (e.g. -file.c)', () => {
+        const input = "bash -file.c 'echo $(whoami)'";
+        expect(stripShellWrapper(input)).toEqual(input);
+      });
+
+      it('should not strip flags where c is the argument to -o (e.g. -oc)', () => {
+        const input = "bash -oc 'echo $(whoami)'";
+        expect(stripShellWrapper(input)).toEqual(input);
+      });
+
+      it('should not strip flags where c is the argument to -o in a chain (e.g. -xoc)', () => {
+        const input = "bash -xoc 'echo $(whoami)'";
+        expect(stripShellWrapper(input)).toEqual(input);
+      });
+
+      it('should not strip flags where c is the argument to -O (e.g. -Oc)', () => {
+        const input = "bash -Oc 'echo $(whoami)'";
+        expect(stripShellWrapper(input)).toEqual(input);
+      });
+
+      it('should not strip flags where c is not the final character (e.g. -ce)', () => {
+        const input = "bash -ce 'echo $(whoami)'";
+        expect(stripShellWrapper(input)).toEqual(input);
+      });
+
+      it('should not strip flags with non-letter characters (e.g. -1c, -c-, -c/c)', () => {
+        expect(stripShellWrapper("bash -1c 'echo $(whoami)'")).toEqual(
+          "bash -1c 'echo $(whoami)'",
+        );
+        expect(stripShellWrapper("bash -c- 'echo $(whoami)'")).toEqual(
+          "bash -c- 'echo $(whoami)'",
+        );
+        expect(stripShellWrapper("bash -c/c 'echo $(whoami)'")).toEqual(
+          "bash -c/c 'echo $(whoami)'",
+        );
+      });
+
+      it('should not strip bare hyphen or double-hyphen without c', () => {
+        expect(stripShellWrapper("bash - 'echo $(whoami)'")).toEqual(
+          "bash - 'echo $(whoami)'",
+        );
+        expect(stripShellWrapper("bash -- 'echo $(whoami)'")).toEqual(
+          "bash -- 'echo $(whoami)'",
+        );
+      });
+    });
   });
 });
 
