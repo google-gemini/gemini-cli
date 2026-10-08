@@ -739,9 +739,10 @@ export function loadEnvironment(
 
   // 2. Now that process.env is fully populated, expand the selected auth type
   const rawAuthType = settings.security?.auth?.selectedType;
-  const selectedAuthType = rawAuthType
-    ? resolveEnvVarsInString(rawAuthType)
-    : undefined;
+  const selectedAuthType =
+    typeof rawAuthType === 'string'
+      ? resolveEnvVarsInString(rawAuthType)
+      : undefined;
 
   // 3. Cloud Shell environment variable handling (using the fully expanded auth type)
   if (process.env['CLOUD_SHELL'] === 'true') {
