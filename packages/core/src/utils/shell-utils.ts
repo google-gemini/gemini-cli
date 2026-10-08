@@ -840,6 +840,124 @@ export function getCommandRoots(command: string): string[] {
 }
 
 /**
+ * Checks whether a PowerShell CLI token represents the command execution termination flag (-Command, -c, or -CommandWithArgs).
+ * Matches valid PowerShell abbreviations starting with 'c' or 'co' for -Command, or -cwa / -commandwithargs.
+ */
+function isPowerShellTerminationFlag(token: string): boolean {
+  if (!token.startsWith('-') && !token.startsWith('/')) {
+    return false;
+  }
+  const name = token.replace(/^[-/]+/, '').toLowerCase();
+  return (
+    name === 'c' ||
+    (name.startsWith('co') && 'command'.startsWith(name)) ||
+    name === 'cwa' ||
+    (name.startsWith('commandwithargs') && 'commandwithargs'.startsWith(name))
+  );
+}
+
+/**
+ * Checks whether a PowerShell CLI parameter expects an argument (e.g. -ExecutionPolicy Bypass, -WindowStyle Hidden).
+ * Correctly accounts for valid PowerShell abbreviations and / prefixes.
+ */
+function isPowerShellArgTakingFlag(token: string): boolean {
+  if (!token.startsWith('-') && !token.startsWith('/')) {
+    return false;
+  }
+  const name = token.replace(/^[-/]+/, '').toLowerCase();
+
+  // ExecutionPolicy: -ep, -ex, -exec, ..., -executionpolicy
+  if (
+    name === 'ep' ||
+    (name.startsWith('ex') && 'executionpolicy'.startsWith(name))
+  ) {
+    return true;
+  }
+
+  // WindowStyle (-w, -wi, -win, ...) and WorkingDirectory (-wd, -wo, -work, ...)
+  // Note: All PowerShell parameters starting with 'w' take an argument.
+  if (
+    name === 'w' ||
+    name === 'wd' ||
+    (name.startsWith('wi') && 'windowstyle'.startsWith(name)) ||
+    (name.startsWith('wo') && 'workingdirectory'.startsWith(name))
+  ) {
+    return true;
+  }
+
+  // Version: -v, -ve, -ver, ..., -version (in powershell.exe takes version argument)
+  if (name.length >= 1 && 'version'.startsWith(name)) {
+    return true;
+  }
+
+  // ConfigurationName & ConfigurationFile: -config, -conf, ..., -configurationname, -configurationfile
+  if (
+    name === 'config' ||
+    (name.startsWith('conf') &&
+      ('configurationname'.startsWith(name) ||
+        'configurationfile'.startsWith(name)))
+  ) {
+    return true;
+  }
+
+  // CustomPipeName: -cu, -cust, ..., -custompipename
+  if (name.startsWith('cu') && 'custompipename'.startsWith(name)) {
+    return true;
+  }
+
+  // OutputFormat: -o, -of, -out, ..., -outputformat
+  if (
+    name === 'o' ||
+    name === 'of' ||
+    (name.startsWith('out') && 'outputformat'.startsWith(name))
+  ) {
+    return true;
+  }
+
+  // InputFormat: -if, -inp, ..., -inputformat (Note: 1-char -i is -Interactive, a switch!)
+  if (
+    name === 'if' ||
+    (name.startsWith('inp') && 'inputformat'.startsWith(name))
+  ) {
+    return true;
+  }
+
+  // EncodedCommand & EncodedArguments: -e, -ec, -enc, ..., -encodedcommand
+  if (
+    name === 'e' ||
+    name === 'ec' ||
+    (name.startsWith('enc') &&
+      ('encodedcommand'.startsWith(name) ||
+        'encodedarguments'.startsWith(name)))
+  ) {
+    return true;
+  }
+
+  // SettingsFile: -settings, -set, ..., -settingsfile (Note: 1-char -s is ambiguous with -Sta / -SSHServerMode)
+  if (
+    name === 'settings' ||
+    (name.startsWith('set') && 'settingsfile'.startsWith(name))
+  ) {
+    return true;
+  }
+
+  // PSConsoleFile: -psc, -pscon, ..., -psconsolefile (in powershell.exe)
+  if (
+    name === 'psc' ||
+    (name.startsWith('pscon') && 'psconsolefile'.startsWith(name))
+  ) {
+    return true;
+  }
+
+  // File: -f, -file (if encountered in shell wrapper)
+  if (name === 'f' || name === 'file') {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Strips outer shell invocation wrappers (e.g., bash -c, sh -c, cmd.exe /c, powershell -Command),
  * including intermediate option flags (e.g., -e, -x, -o pipefail, -ExecutionPolicy Bypass).
  *
@@ -886,62 +1004,72 @@ export function stripShellWrapper(command: string): string {
     skipWhitespace();
     if (pos >= len) break;
 
-    // Check for termination flag at current position
-    if (isPosix) {
-      if (
-        command[pos] === '-' &&
-        command[pos + 1] === 'c' &&
-        (pos + 2 === len || /\s/.test(command[pos + 2]))
-      ) {
-        foundTerminationFlag = true;
-        pos += 2;
-        break;
-      }
-    } else if (isCmd) {
-      if (
-        command[pos] === '/' &&
-        command[pos + 1]?.toLowerCase() === 'c' &&
-        (pos + 2 === len || /\s/.test(command[pos + 2]))
-      ) {
-        foundTerminationFlag = true;
-        pos += 2;
-        break;
-      }
-    } else if (isPowerShell) {
-      const remaining = command.slice(pos);
-      const commandMatch = remaining.match(/^(?:[-/](?:command|c))\b/i);
-      if (commandMatch) {
-        foundTerminationFlag = true;
-        pos += commandMatch[0].length;
-        break;
+    // Check for termination flag at current position if not expecting an argument
+    if (!expectsFlagArg) {
+      if (isPosix) {
+        if (
+          command[pos] === '-' &&
+          command[pos + 1] === 'c' &&
+          (pos + 2 === len || /\s/.test(command[pos + 2]))
+        ) {
+          foundTerminationFlag = true;
+          pos += 2;
+          break;
+        }
+      } else if (isCmd) {
+        if (
+          command[pos] === '/' &&
+          command[pos + 1]?.toLowerCase() === 'c' &&
+          (pos + 2 === len || /\s/.test(command[pos + 2]))
+        ) {
+          foundTerminationFlag = true;
+          pos += 2;
+          break;
+        }
+      } else if (isPowerShell) {
+        let peekPos = pos;
+        while (peekPos < len && !/\s/.test(command[peekPos])) {
+          peekPos++;
+        }
+        const candidate = command.substring(pos, peekPos);
+        if (isPowerShellTerminationFlag(candidate)) {
+          foundTerminationFlag = true;
+          pos = peekPos;
+          break;
+        }
       }
     }
 
-    // Read the next token
+    // Read the next token (accounting for quotes and POSIX backslash escapes)
     const tokenStart = pos;
-    let token = '';
-
-    if (command[pos] === '"' || command[pos] === "'") {
-      const quoteChar = command[pos];
-      pos++;
-      while (pos < len && command[pos] !== quoteChar) {
-        if (command[pos] === '\\' && pos + 1 < len) {
+    while (pos < len) {
+      if (isPosix && command[pos] === '\\') {
+        if (pos + 1 < len) {
           pos += 2;
         } else {
           pos++;
         }
-      }
-      if (pos < len && command[pos] === quoteChar) {
+      } else if (command[pos] === '"' || command[pos] === "'") {
+        const quoteChar = command[pos];
+        pos++;
+        while (pos < len && command[pos] !== quoteChar) {
+          if (quoteChar === '"' && command[pos] === '\\' && pos + 1 < len) {
+            pos += 2;
+          } else {
+            pos++;
+          }
+        }
+        if (pos < len && command[pos] === quoteChar) {
+          pos++;
+        }
+      } else if (/\s/.test(command[pos])) {
+        break;
+      } else {
         pos++;
       }
-      token = command.substring(tokenStart, pos);
-    } else {
-      while (pos < len && !/\s/.test(command[pos])) {
-        pos++;
-      }
-      token = command.substring(tokenStart, pos);
     }
 
+    const token = command.substring(tokenStart, pos);
     if (!token) break;
 
     if (expectsFlagArg) {
@@ -971,18 +1099,7 @@ export function stripShellWrapper(command: string): string {
         expectsFlagArg = true;
       }
     } else if (isPowerShell) {
-      if (
-        lowerToken === '-executionpolicy' ||
-        lowerToken === '/executionpolicy' ||
-        lowerToken === '-configurationname' ||
-        lowerToken === '/configurationname' ||
-        lowerToken === '-custompipename' ||
-        lowerToken === '/custompipename' ||
-        lowerToken === '-outputformat' ||
-        lowerToken === '/outputformat' ||
-        lowerToken === '-inputformat' ||
-        lowerToken === '/inputformat'
-      ) {
+      if (isPowerShellArgTakingFlag(token)) {
         expectsFlagArg = true;
       }
     }

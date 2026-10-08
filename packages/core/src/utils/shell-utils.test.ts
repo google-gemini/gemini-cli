@@ -469,6 +469,203 @@ describe('stripShellWrapper', () => {
       expect(stripped).toEqual('echo safe');
       expect(elapsed).toBeLessThan(1000);
     });
+
+    describe('PowerShell parameter abbreviations and slash forms', () => {
+      it('should strip powershell with abbreviated -ep Bypass flag and detect command substitution', () => {
+        mockPlatform.mockReturnValue('win32');
+        const input = "powershell -ep Bypass -Command 'Get-Process $(whoami)'";
+        const stripped = stripShellWrapper(input);
+        expect(stripped).toEqual('Get-Process $(whoami)');
+        expect(detectCommandSubstitution(stripped)).toBe(true);
+      });
+
+      it('should strip powershell with /ep slash flag form', () => {
+        const input = "powershell /ep Bypass /Command 'Get-Process'";
+        expect(stripShellWrapper(input)).toEqual('Get-Process');
+      });
+
+      it('should strip powershell with -Version flag and -c termination', () => {
+        const input = "powershell -Version 5.1 -c 'Get-Process'";
+        expect(stripShellWrapper(input)).toEqual('Get-Process');
+      });
+
+      it('should strip powershell with /Version slash flag', () => {
+        const input = "powershell /Version 5.1 /c 'Get-Process'";
+        expect(stripShellWrapper(input)).toEqual('Get-Process');
+      });
+
+      it('should strip powershell with -WindowStyle Hidden flag', () => {
+        const input = "powershell -WindowStyle Hidden -Command 'Get-Process'";
+        expect(stripShellWrapper(input)).toEqual('Get-Process');
+      });
+
+      it('should strip powershell with -w abbreviated window style flag', () => {
+        const input = "powershell -w Hidden -c 'Get-Process'";
+        expect(stripShellWrapper(input)).toEqual('Get-Process');
+      });
+
+      it('should strip powershell with /w and /ExecutionPolicy combinations', () => {
+        const input =
+          "powershell /w Hidden /ExecutionPolicy Bypass /Command 'Get-Process'";
+        expect(stripShellWrapper(input)).toEqual('Get-Process');
+      });
+
+      it('should strip powershell with -exec Bypass and /exec Bypass', () => {
+        expect(
+          stripShellWrapper("powershell -exec Bypass -c 'Get-Process'"),
+        ).toEqual('Get-Process');
+        expect(
+          stripShellWrapper("powershell /exec Bypass /c 'Get-Process'"),
+        ).toEqual('Get-Process');
+      });
+
+      it('should strip powershell with -wd and -WorkingDirectory flag', () => {
+        expect(
+          stripShellWrapper("powershell -wd 'C:\\work' -c 'Get-Process'"),
+        ).toEqual('Get-Process');
+        expect(
+          stripShellWrapper("powershell /wd 'C:\\work' /c 'Get-Process'"),
+        ).toEqual('Get-Process');
+        expect(
+          stripShellWrapper(
+            "powershell -WorkingDirectory 'C:\\work' -Command 'Get-Process'",
+          ),
+        ).toEqual('Get-Process');
+      });
+
+      it('should strip powershell with -o and -OutputFormat XML flag', () => {
+        expect(stripShellWrapper("powershell -o XML -c 'Get-Process'")).toEqual(
+          'Get-Process',
+        );
+        expect(stripShellWrapper("pwsh /o XML /c 'Get-Process'")).toEqual(
+          'Get-Process',
+        );
+        expect(
+          stripShellWrapper("powershell -OutputFormat XML -c 'Get-Process'"),
+        ).toEqual('Get-Process');
+      });
+
+      it('should strip powershell with -if and -InputFormat Text flag', () => {
+        expect(
+          stripShellWrapper("powershell -if Text -c 'Get-Process'"),
+        ).toEqual('Get-Process');
+        expect(
+          stripShellWrapper("powershell /if Text /c 'Get-Process'"),
+        ).toEqual('Get-Process');
+        expect(
+          stripShellWrapper("powershell -InputFormat Text -c 'Get-Process'"),
+        ).toEqual('Get-Process');
+      });
+
+      it('should not treat -i as taking an argument since it is the -Interactive switch', () => {
+        expect(stripShellWrapper("pwsh -i -c 'Get-Process'")).toEqual(
+          'Get-Process',
+        );
+        expect(stripShellWrapper("powershell /i /c 'Get-Process'")).toEqual(
+          'Get-Process',
+        );
+      });
+
+      it('should strip powershell with -config and -ConfigurationName flag', () => {
+        expect(
+          stripShellWrapper("pwsh -config AdminRoles -c 'Get-Process'"),
+        ).toEqual('Get-Process');
+        expect(
+          stripShellWrapper(
+            "pwsh -ConfigurationName AdminRoles -Command 'Get-Process'",
+          ),
+        ).toEqual('Get-Process');
+      });
+
+      it('should strip powershell with -co termination abbreviation', () => {
+        expect(stripShellWrapper("powershell -co 'Get-Process'")).toEqual(
+          'Get-Process',
+        );
+        expect(stripShellWrapper("powershell /co 'Get-Process'")).toEqual(
+          'Get-Process',
+        );
+      });
+
+      it('should strip pwsh with -cwa termination flag', () => {
+        expect(stripShellWrapper("pwsh -cwa 'Get-Process'")).toEqual(
+          'Get-Process',
+        );
+      });
+
+      it('should fail closed (leave unstripped) when an ambiguous non-flag token appears', () => {
+        const input = "powershell -invalidFlag nonFlagValue -c 'Get-Process'";
+        expect(stripShellWrapper(input)).toEqual(input);
+      });
+
+      it('should strip pwsh with multiple abbreviated flags and detect command substitution', () => {
+        mockPlatform.mockReturnValue('win32');
+        const input = "pwsh -ep Bypass -w Hidden -c 'Get-Process $(whoami)'";
+        const stripped = stripShellWrapper(input);
+        expect(stripped).toEqual('Get-Process $(whoami)');
+        expect(detectCommandSubstitution(stripped)).toBe(true);
+      });
+    });
+
+    describe('POSIX backslash-escaped characters in flag arguments', () => {
+      it('should handle backslash-escaped space in --rcfile argument and detect $()', () => {
+        const input = "bash --rcfile my\\ dir/rc -c 'echo $(whoami)'";
+        const stripped = stripShellWrapper(input);
+        expect(stripped).toEqual('echo $(whoami)');
+        expect(detectCommandSubstitution(stripped)).toBe(true);
+      });
+
+      it('should handle backslash-escaped space in --rcfile argument and detect backticks', () => {
+        const input = "bash --rcfile my\\ dir/rc -c 'echo `whoami`'";
+        const stripped = stripShellWrapper(input);
+        expect(stripped).toEqual('echo `whoami`');
+        expect(detectCommandSubstitution(stripped)).toBe(true);
+      });
+
+      it('should handle backslash-escaped space in --rcfile argument and detect <() process substitution', () => {
+        const input = "bash --rcfile my\\ dir/rc -c 'cat <(whoami)'";
+        const stripped = stripShellWrapper(input);
+        expect(stripped).toEqual('cat <(whoami)');
+        expect(detectCommandSubstitution(stripped)).toBe(true);
+      });
+
+      it('should handle multiple consecutive escaped spaces', () => {
+        const input = "bash --rcfile my\\ \\ \\ dir/rc -c 'echo $(whoami)'";
+        const stripped = stripShellWrapper(input);
+        expect(stripped).toEqual('echo $(whoami)');
+        expect(detectCommandSubstitution(stripped)).toBe(true);
+      });
+
+      it('should handle escaped backslashes in flag arguments', () => {
+        const input =
+          "bash --rcfile dir\\\\with\\\\slashes/rc -c 'echo $(whoami)'";
+        const stripped = stripShellWrapper(input);
+        expect(stripped).toEqual('echo $(whoami)');
+        expect(detectCommandSubstitution(stripped)).toBe(true);
+      });
+
+      it('should handle escaped special characters in flag arguments', () => {
+        const input =
+          "bash --rcfile dir\\$dollar\\ and\\ spaces/rc -c 'echo $(whoami)'";
+        const stripped = stripShellWrapper(input);
+        expect(stripped).toEqual('echo $(whoami)');
+        expect(detectCommandSubstitution(stripped)).toBe(true);
+      });
+
+      it('should handle combinations of intermediate flags with escaped arguments', () => {
+        const input =
+          "bash -o pipefail --rcfile my\\ dir/rc -c 'echo $(whoami)'";
+        const stripped = stripShellWrapper(input);
+        expect(stripped).toEqual('echo $(whoami)');
+        expect(detectCommandSubstitution(stripped)).toBe(true);
+      });
+
+      it('should correctly mark safe commands with escaped flag arguments as safe', () => {
+        const input = "bash --rcfile my\\ dir/rc -c 'echo safe_command'";
+        const stripped = stripShellWrapper(input);
+        expect(stripped).toEqual('echo safe_command');
+        expect(detectCommandSubstitution(stripped)).toBe(false);
+      });
+    });
   });
 });
 
