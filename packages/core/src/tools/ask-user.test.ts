@@ -650,6 +650,40 @@ describe('AskUserTool', () => {
             '    → Orphaned answer',
         );
       });
+
+      it('should fall back to a positional label when the header is whitespace-only', async () => {
+        const result = await answerAndExecute(
+          [
+            {
+              question: 'Proceed?',
+              header: '   ',
+              type: QuestionType.YESNO,
+            },
+          ],
+          { '0': 'Yes' },
+        );
+
+        expect(result.returnDisplay).toBe(
+          '**User answered:**\n  Q0: Proceed?\n    → Yes',
+        );
+      });
+
+      it('should not crash when an answer value is not a string at runtime', async () => {
+        const result = await answerAndExecute(
+          [
+            {
+              question: 'Proceed?',
+              header: 'Confirm',
+              type: QuestionType.YESNO,
+            },
+          ],
+          { '0': undefined as unknown as string },
+        );
+
+        expect(result.returnDisplay).toBe(
+          '**User answered:**\n  Confirm: Proceed?\n    → ',
+        );
+      });
     });
 
     it('should display message when user submits without answering', async () => {

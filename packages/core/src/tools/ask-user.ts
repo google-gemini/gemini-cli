@@ -219,15 +219,16 @@ export class AskUserInvocation extends BaseToolInvocation<
       ? `**User answered:**\n${answerEntries
           .map(([index, answer]) => {
             const question = this.params.questions[parseInt(index, 10)];
-            const questionText = question
-              ? `${question.header}: ${question.question}`
-              : `Q${index}`;
+            const header = question?.header?.trim() || `Q${index}`;
+            const questionText = question?.question
+              ? `${header}: ${question.question}`
+              : header;
             const questionIndent = '  ';
             const answerPrefix = '    → ';
             const answerIndent = ' '.repeat(answerPrefix.length);
 
             const questionLines = questionText.split('\n');
-            const answerLines = answer.split('\n');
+            const answerLines = (answer ?? '').split('\n');
             return (
               questionIndent +
               questionLines.join('\n' + questionIndent) +
