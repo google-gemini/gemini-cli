@@ -556,7 +556,7 @@ export class PolicyEngine {
           serverName,
           toolAnnotations,
           subagent,
-          false,
+          true,
         );
 
         if (wrapperResult.decision === PolicyDecision.DENY)
@@ -569,10 +569,12 @@ export class PolicyEngine {
             responsibleRule ??= wrapperResult.rule;
           }
           aggregateDecision = PolicyDecision.ASK_USER;
-        } else if (wrapperResult.decision === PolicyDecision.ALLOW) {
-          if (wrapperResult.rule?.decision === PolicyDecision.ALLOW) {
-            lastAllowedSubRule = wrapperResult.rule;
-          }
+        } else if (
+          wrapperResult.decision === PolicyDecision.ALLOW &&
+          wrapperResult.rule?.decision === PolicyDecision.ALLOW &&
+          Boolean(wrapperResult.rule?.argsPattern)
+        ) {
+          lastAllowedSubRule = wrapperResult.rule;
         } else {
           allSubCommandsExplicitlyAllowed = false;
         }
@@ -585,7 +587,7 @@ export class PolicyEngine {
           serverName,
           toolAnnotations,
           subagent,
-          false,
+          true,
         );
 
         if (subResult.decision === PolicyDecision.DENY) return subResult;
@@ -614,10 +616,12 @@ export class PolicyEngine {
             aggregateDecision = PolicyDecision.ASK_USER;
             responsibleRule = undefined;
           }
-        } else if (subResult.decision === PolicyDecision.ALLOW) {
-          if (subResult.rule?.decision === PolicyDecision.ALLOW) {
-            lastAllowedSubRule = subResult.rule;
-          }
+        } else if (
+          subResult.decision === PolicyDecision.ALLOW &&
+          subResult.rule?.decision === PolicyDecision.ALLOW &&
+          Boolean(subResult.rule?.argsPattern)
+        ) {
+          lastAllowedSubRule = subResult.rule;
         } else {
           allSubCommandsExplicitlyAllowed = false;
         }
@@ -626,14 +630,37 @@ export class PolicyEngine {
       }
     }
 
+    const workspace =
+      typeof this.sandboxManager.getWorkspace === 'function'
+        ? this.sandboxManager.getWorkspace()
+        : process.cwd();
+    const effectiveCwd = dir_path
+      ? path.resolve(workspace, dir_path)
+      : workspace;
+    const isOutsideWorkspace =
+      effectiveCwd !== workspace &&
+      !isSubpath(workspace, effectiveCwd) &&
+      this.approvalMode !== ApprovalMode.YOLO;
+    const parsedObjArgs = shellParse(command);
+    const parsedArgs = parsedObjArgs.map(extractStringFromParseEntry);
+    const isUntrustedGit =
+      containsGitCommand(parsedArgs) && !this.isTrustedFolder();
+    const isDangerous =
+      this.approvalMode !== ApprovalMode.YOLO &&
+      this.sandboxManager.isDangerousCommand(parsedArgs, effectiveCwd);
+
     // If the top-level compound command (e.g. a `for` loop or subshell) fell through
     // to a catch-all ASK_USER rule without an argsPattern, but every decomposed
-    // sub-command explicitly matched an ALLOW rule without redirection, upgrade to ALLOW.
+    // sub-command explicitly matched an ALLOW rule with an argsPattern without redirection,
+    // and neither workspace boundary nor trust constraints are violated, upgrade to ALLOW.
     if (
       aggregateDecision === PolicyDecision.ASK_USER &&
       !rule?.argsPattern &&
       !hasTopLevelRedirectionDowngrade &&
       !hasTopLevelHeuristicDowngrade &&
+      !isOutsideWorkspace &&
+      !isUntrustedGit &&
+      !isDangerous &&
       evaluatedSubCommands > 0 &&
       allSubCommandsExplicitlyAllowed
     ) {

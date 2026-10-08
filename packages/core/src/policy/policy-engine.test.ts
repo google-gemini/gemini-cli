@@ -1682,7 +1682,7 @@ describe('PolicyEngine', () => {
       expect(result.decision).toBe(PolicyDecision.ALLOW);
     });
 
-    it('should upgrade catch-all ASK_USER to ALLOW for compound commands when sub-commands are allowed even if subResult.rule is undefined', async () => {
+    it('should NOT upgrade compound command when a sub-command lacks an explicit argsPattern ALLOW rule', async () => {
       vi.mocked(parseCommandDetails).mockReturnValueOnce({
         details: [
           { name: 'ls', text: 'ls', startIndex: 0 },
@@ -1730,7 +1730,7 @@ describe('PolicyEngine', () => {
         undefined,
       );
 
-      expect(result.decision).toBe(PolicyDecision.ALLOW);
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
     });
 
     it('should NOT upgrade compound command to ALLOW when dir_path escapes workspace', async () => {
