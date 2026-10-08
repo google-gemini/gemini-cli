@@ -460,6 +460,15 @@ describe('stripShellWrapper', () => {
         'pwsh -NoProfile -ExecutionPolicy Bypass -Command "Get-ChildItem"';
       expect(stripShellWrapper(input)).toEqual('Get-ChildItem');
     });
+
+    it('should safely and rapidly process repetitive flags without backtracking (ReDoS defense)', () => {
+      const redosPayload = 'bash ' + '-a '.repeat(5000) + '-c "echo safe"';
+      const t0 = Date.now();
+      const stripped = stripShellWrapper(redosPayload);
+      const elapsed = Date.now() - t0;
+      expect(stripped).toEqual('echo safe');
+      expect(elapsed).toBeLessThan(1000);
+    });
   });
 });
 

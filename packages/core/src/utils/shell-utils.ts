@@ -839,39 +839,186 @@ export function getCommandRoots(command: string): string[] {
     .filter(Boolean);
 }
 
+/**
+ * Strips outer shell invocation wrappers (e.g., bash -c, sh -c, cmd.exe /c, powershell -Command),
+ * including intermediate option flags (e.g., -e, -x, -o pipefail, -ExecutionPolicy Bypass).
+ *
+ * Uses an iterative token scanner rather than complex nested-quantifier regexes to eliminate
+ * any risk of Regular Expression Denial of Service (ReDoS).
+ */
 export function stripShellWrapper(command: string): string {
-  const pattern =
-    /^\s*(?:(?:(?:\S+\/)?(?:sh|bash|zsh))(?:\s+(?!-c\b)(?:-[a-zA-Z0-9_-]+|--[a-zA-Z0-9_-]+|\+[a-zA-Z0-9_-]+)(?:\s+(?:'[^']*'|"[^"]*"|[^-\s]\S*))?)*\s+-c|cmd(?:\.exe)?(?:\s+(?!\/c\b)\/[a-zA-Z0-9:]+)*\s+\/c|(?:powershell|pwsh)(?:\.exe)?(?:\s+(?!(?:-Command|-c)\b)(?:-[a-zA-Z0-9_-]+|--[a-zA-Z0-9_-]+)(?:\s+(?:'[^']*'|"[^"]*"|[^-\s]\S*))?)*\s+(?:-Command|-c))\s+/i;
-  const match = command.match(pattern);
-  if (match) {
-    let newCommand = command.substring(match[0].length).trim();
-    if (
-      newCommand.length >= 2 &&
-      ((newCommand.startsWith('"') && newCommand.endsWith('"')) ||
-        (newCommand.startsWith("'") && newCommand.endsWith("'")))
-    ) {
-      const isPosixShell =
-        /^\s*(?:\S+\/)?(?:sh|bash|zsh)\b/i.test(match[0]) &&
-        match[0].trim().endsWith('-c');
-      if (isPosixShell && newCommand.startsWith('"')) {
-        try {
-          const parsed = parse(newCommand, (key) => '$' + key);
-          const firstEntry = parsed[0];
-          if (parsed.length === 1 && typeof firstEntry === 'string') {
-            newCommand = firstEntry;
-          } else {
-            newCommand = newCommand.substring(1, newCommand.length - 1);
-          }
-        } catch {
-          newCommand = newCommand.substring(1, newCommand.length - 1);
-        }
-      } else {
-        newCommand = newCommand.substring(1, newCommand.length - 1);
+  // 1. Identify the shell binary prefix safely with no nested quantifiers
+  const prefixMatch = command.match(
+    /^\s*(?:(?:\S+[/\\])?(sh|bash|zsh|cmd(?:\.exe)?|powershell(?:\.exe)?|pwsh(?:\.exe)?))\b/i,
+  );
+  if (!prefixMatch) {
+    return command.trim();
+  }
+
+  const rawBinary = prefixMatch[1].toLowerCase();
+  const baseBinary = rawBinary.endsWith('.exe')
+    ? rawBinary.slice(0, -4)
+    : rawBinary;
+  const isPosix =
+    baseBinary === 'sh' || baseBinary === 'bash' || baseBinary === 'zsh';
+  const isCmd = baseBinary === 'cmd';
+  const isPowerShell = baseBinary === 'powershell' || baseBinary === 'pwsh';
+
+  let pos = prefixMatch[0].length;
+  const len = command.length;
+
+  const skipWhitespace = () => {
+    while (pos < len && /\s/.test(command[pos])) {
+      pos++;
+    }
+  };
+
+  skipWhitespace();
+  if (pos >= len) {
+    return command.trim();
+  }
+
+  // 2. Iteratively scan intermediate option flags until the termination flag (-c, /c, -Command)
+  let foundTerminationFlag = false;
+  let expectsFlagArg = false;
+
+  while (pos < len) {
+    skipWhitespace();
+    if (pos >= len) break;
+
+    // Check for termination flag at current position
+    if (isPosix) {
+      if (
+        command[pos] === '-' &&
+        command[pos + 1] === 'c' &&
+        (pos + 2 === len || /\s/.test(command[pos + 2]))
+      ) {
+        foundTerminationFlag = true;
+        pos += 2;
+        break;
+      }
+    } else if (isCmd) {
+      if (
+        command[pos] === '/' &&
+        command[pos + 1]?.toLowerCase() === 'c' &&
+        (pos + 2 === len || /\s/.test(command[pos + 2]))
+      ) {
+        foundTerminationFlag = true;
+        pos += 2;
+        break;
+      }
+    } else if (isPowerShell) {
+      const remaining = command.slice(pos);
+      const commandMatch = remaining.match(/^(?:[-/](?:command|c))\b/i);
+      if (commandMatch) {
+        foundTerminationFlag = true;
+        pos += commandMatch[0].length;
+        break;
       }
     }
-    return newCommand;
+
+    // Read the next token
+    const tokenStart = pos;
+    let token = '';
+
+    if (command[pos] === '"' || command[pos] === "'") {
+      const quoteChar = command[pos];
+      pos++;
+      while (pos < len && command[pos] !== quoteChar) {
+        if (command[pos] === '\\' && pos + 1 < len) {
+          pos += 2;
+        } else {
+          pos++;
+        }
+      }
+      if (pos < len && command[pos] === quoteChar) {
+        pos++;
+      }
+      token = command.substring(tokenStart, pos);
+    } else {
+      while (pos < len && !/\s/.test(command[pos])) {
+        pos++;
+      }
+      token = command.substring(tokenStart, pos);
+    }
+
+    if (!token) break;
+
+    if (expectsFlagArg) {
+      expectsFlagArg = false;
+      continue;
+    }
+
+    const isFlag =
+      (isPosix && (token.startsWith('-') || token.startsWith('+'))) ||
+      (isCmd && token.startsWith('/')) ||
+      (isPowerShell && (token.startsWith('-') || token.startsWith('/')));
+
+    if (!isFlag) {
+      return command.trim();
+    }
+
+    const lowerToken = token.toLowerCase();
+    if (isPosix) {
+      if (
+        lowerToken === '-o' ||
+        lowerToken === '+o' ||
+        lowerToken === '-O' ||
+        lowerToken.endsWith('o') ||
+        lowerToken === '--rcfile' ||
+        lowerToken === '--init-file'
+      ) {
+        expectsFlagArg = true;
+      }
+    } else if (isPowerShell) {
+      if (
+        lowerToken === '-executionpolicy' ||
+        lowerToken === '/executionpolicy' ||
+        lowerToken === '-configurationname' ||
+        lowerToken === '/configurationname' ||
+        lowerToken === '-custompipename' ||
+        lowerToken === '/custompipename' ||
+        lowerToken === '-outputformat' ||
+        lowerToken === '/outputformat' ||
+        lowerToken === '-inputformat' ||
+        lowerToken === '/inputformat'
+      ) {
+        expectsFlagArg = true;
+      }
+    }
   }
-  return command.trim();
+
+  if (!foundTerminationFlag) {
+    return command.trim();
+  }
+
+  // 3. Extract the inner command payload
+  let newCommand = command.substring(pos).trim();
+
+  // 4. Robust unquoting and POSIX safe-parsing
+  if (
+    newCommand.length >= 2 &&
+    ((newCommand.startsWith('"') && newCommand.endsWith('"')) ||
+      (newCommand.startsWith("'") && newCommand.endsWith("'")))
+  ) {
+    if (isPosix && newCommand.startsWith('"')) {
+      try {
+        const parsed = parse(newCommand, (key) => '$' + key);
+        const firstEntry = parsed[0];
+        if (parsed.length === 1 && typeof firstEntry === 'string') {
+          newCommand = firstEntry;
+        } else {
+          newCommand = newCommand.substring(1, newCommand.length - 1);
+        }
+      } catch {
+        newCommand = newCommand.substring(1, newCommand.length - 1);
+      }
+    } else {
+      newCommand = newCommand.substring(1, newCommand.length - 1);
+    }
+  }
+
+  return newCommand;
 }
 
 /**
