@@ -2043,7 +2043,9 @@ describe('GeminiChat', () => {
         expect(mockLogContentRetry).toHaveBeenCalledTimes(1);
         controller.abort();
 
-        await expect(consumed).rejects.toThrow(InvalidStreamError);
+        // The backoff is cut short with the standard AbortError, so callers
+        // see a cancellation rather than a stream failure.
+        await expect(consumed).rejects.toThrow('Aborted');
         expect(
           mockContentGenerator.generateContentStream,
         ).toHaveBeenCalledTimes(1);

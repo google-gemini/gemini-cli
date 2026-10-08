@@ -768,13 +768,9 @@ export class GeminiChat {
                   error: errorType,
                   model,
                 });
-                try {
-                  await delay(delayMs, signal);
-                } catch {
-                  // Aborted during the backoff: surface the original error
-                  // without logging a retry failure, as the entry check does.
-                  throw error;
-                }
+                // Abort-aware: rejects with an AbortError if the user cancels
+                // during the backoff instead of sleeping the full delay.
+                await delay(delayMs, signal);
                 continue;
               }
             }
