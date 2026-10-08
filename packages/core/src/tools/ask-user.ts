@@ -212,16 +212,29 @@ export class AskUserInvocation extends BaseToolInvocation<
       },
     };
 
+    // The UI hides the tool description once the dialog closes, so this
+    // display is the only record of the question the user answered. Keep the
+    // full question text (not just the short header chip) for context.
     const returnDisplay = hasAnswers
       ? `**User answered:**\n${answerEntries
           .map(([index, answer]) => {
             const question = this.params.questions[parseInt(index, 10)];
-            const category = question?.header ?? `Q${index}`;
-            const prefix = `  ${category} → `;
-            const indent = ' '.repeat(prefix.length);
+            const questionText = question
+              ? `${question.header}: ${question.question}`
+              : `Q${index}`;
+            const questionIndent = '  ';
+            const answerPrefix = '    → ';
+            const answerIndent = ' '.repeat(answerPrefix.length);
 
-            const lines = answer.split('\n');
-            return prefix + lines.join('\n' + indent);
+            const questionLines = questionText.split('\n');
+            const answerLines = answer.split('\n');
+            return (
+              questionIndent +
+              questionLines.join('\n' + questionIndent) +
+              '\n' +
+              answerPrefix +
+              answerLines.join('\n' + answerIndent)
+            );
           })
           .join('\n')}`
       : 'User submitted without answering questions.';
