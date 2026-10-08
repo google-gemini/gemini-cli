@@ -621,7 +621,7 @@ const USER_GCP_PROJECT = '_GEMINI_USER_GCP_PROJECT';
 export function setUpCloudShellEnvironment(
   envFilePath: string | null,
   isTrusted: boolean,
-  isSandboxed: boolean,
+  _isSandboxed: boolean,
   selectedAuthType?: string,
 ): void {
   // Special handling for GOOGLE_CLOUD_PROJECT in Cloud Shell:
@@ -655,7 +655,7 @@ export function setUpCloudShellEnvironment(
     if (parsedEnv['GOOGLE_CLOUD_PROJECT']) {
       // .env file takes precedence in Cloud Shell
       value = parsedEnv['GOOGLE_CLOUD_PROJECT'];
-      if (!isTrusted && isSandboxed) {
+      if (!isTrusted) {
         value = sanitizeEnvVar(value);
       }
     }
