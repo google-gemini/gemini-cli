@@ -128,7 +128,8 @@ export class IDEServer {
   private transports: { [sessionId: string]: StreamableHTTPServerTransport } =
     {};
   private openFilesManager: OpenFilesManager | undefined;
-  private stopping: Promise<void> | undefined;
+  private status: 'idle' | 'stopping' | 'stopped' = 'idle';
+  private stopPromise: Promise<void> | undefined;
   diffManager: DiffManager;
 
   constructor(log: (message: string) => void, diffManager: DiffManager) {
@@ -138,6 +139,8 @@ export class IDEServer {
 
   start(context: vscode.ExtensionContext): Promise<void> {
     return new Promise((resolve) => {
+      // A restart after stop() must be stoppable again.
+      this.status = 'idle';
       this.context = context;
       this.authToken = randomUUID();
       const sessionsWithInitialNotification = new Set<string>();
@@ -413,14 +416,23 @@ export class IDEServer {
   }
 
   async stop(): Promise<void> {
-    // Share the in-flight shutdown so a concurrent caller resolves only once
-    // the listener, sockets and port file are actually gone — not instantly.
-    if (!this.stopping) {
-      this.stopping = this.shutdown().finally(() => {
-        this.stopping = undefined;
-      });
+    switch (this.status) {
+      case 'stopping':
+        // Join the in-flight shutdown so a concurrent caller resolves only
+        // once the listener, sockets and port file are actually gone.
+        return this.stopPromise;
+      case 'stopped':
+        return;
+      default:
+        this.status = 'stopping';
+        this.stopPromise = this.shutdown().finally(() => {
+          // `start()` may have reset the status meanwhile; don't clobber it.
+          if (this.status === 'stopping') {
+            this.status = 'stopped';
+          }
+        });
+        return this.stopPromise;
     }
-    return this.stopping;
   }
 
   private async shutdown(): Promise<void> {

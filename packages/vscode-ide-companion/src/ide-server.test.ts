@@ -449,6 +449,29 @@ describe('IDEServer', () => {
       ).toHaveLength(1);
     });
 
+    it('should be stoppable again after a restart', async () => {
+      clients.push(await connectMcpClient(port));
+      await ideServer.stop();
+
+      await ideServer.start(mockContext);
+      const newPort = vi
+        .mocked(mockContext.environmentVariableCollection.replace)
+        .mock.calls.filter(([k]) => k === 'GEMINI_CLI_IDE_SERVER_PORT')
+        .at(-1)?.[1] as string;
+      clients.push(await connectMcpClient(newPort));
+      expect(Object.keys(getTransports())).toHaveLength(1);
+
+      const outcome = await withDeadline(ideServer.stop(), 2_000);
+
+      expect(outcome).toBe('resolved');
+      expect(Object.keys(getTransports())).toHaveLength(0);
+      expect(
+        vi
+          .mocked(mockLog)
+          .mock.calls.filter(([m]) => m === 'IDE server shut down'),
+      ).toHaveLength(2);
+    });
+
     it('should make concurrent stop() calls await the same in-flight shutdown', async () => {
       clients.push(await connectMcpClient(port));
       const server = (ideServer as unknown as { server: http.Server }).server;
