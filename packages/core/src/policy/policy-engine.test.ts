@@ -1691,6 +1691,17 @@ describe('PolicyEngine', () => {
         hasError: false,
       });
 
+      const mockSandboxManager = {
+        enabled: true,
+        prepareCommand: vi.fn(),
+        isDangerousCommand: vi.fn().mockReturnValue(false),
+        isKnownSafeCommand: vi
+          .fn()
+          .mockImplementation((args) => args[0] === 'ls' || args[0] === 'pwd'),
+        parseDenials: vi.fn().mockReturnValue(undefined),
+        getWorkspace: vi.fn().mockReturnValue('/safe/path'),
+      } as unknown as SandboxManager;
+
       const rules: PolicyRule[] = [
         {
           toolName: 'run_shell_command',
@@ -1706,32 +1717,10 @@ describe('PolicyEngine', () => {
         },
       ];
 
-      engine = new PolicyEngine({ rules });
-      const originalCheck = engine.check.bind(engine);
-      vi.spyOn(engine, 'check').mockImplementation(
-        async (
-          toolCall,
-          serverName,
-          toolAnnotations,
-          subagent,
-          skipHeuristics,
-        ) => {
-          if (
-            toolCall.name === 'run_shell_command' &&
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (toolCall.args as any)?.command === 'pwd'
-          ) {
-            return { decision: PolicyDecision.ALLOW, rule: undefined };
-          }
-          return originalCheck(
-            toolCall,
-            serverName,
-            toolAnnotations,
-            subagent,
-            skipHeuristics,
-          );
-        },
-      );
+      engine = new PolicyEngine({
+        rules,
+        sandboxManager: mockSandboxManager,
+      });
 
       const result = await engine.check(
         {
@@ -1742,6 +1731,106 @@ describe('PolicyEngine', () => {
       );
 
       expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should NOT upgrade compound command to ALLOW when dir_path escapes workspace', async () => {
+      const mockSandboxManager = {
+        enabled: true,
+        prepareCommand: vi.fn(),
+        isDangerousCommand: vi.fn().mockReturnValue(false),
+        isKnownSafeCommand: vi.fn().mockReturnValue(true),
+        parseDenials: vi.fn().mockReturnValue(undefined),
+        getWorkspace: vi.fn().mockReturnValue('/safe/path'),
+      } as unknown as SandboxManager;
+
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ALLOW,
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        sandboxManager: mockSandboxManager,
+      });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'pwd && ls', dir_path: '/outside/path' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should NOT upgrade compound command to ALLOW when Git is invoked in untrusted workspace', async () => {
+      const isTrustedMock = vi.fn().mockReturnValue(false);
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ALLOW,
+        },
+      ];
+
+      const engine = new PolicyEngine({
+        rules,
+        isTrustedFolder: isTrustedMock,
+      });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo "hello" && git status' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should NOT upgrade compound command to ALLOW when a sub-command is dangerous', async () => {
+      const mockSandboxManager = {
+        enabled: true,
+        prepareCommand: vi.fn(),
+        isDangerousCommand: vi
+          .fn()
+          .mockImplementation((args) => args[0] === 'rm'),
+        isKnownSafeCommand: vi.fn().mockReturnValue(false),
+        parseDenials: vi.fn().mockReturnValue(undefined),
+        getWorkspace: vi.fn().mockReturnValue('/safe/path'),
+      } as unknown as SandboxManager;
+
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"echo/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ASK_USER,
+          priority: 10,
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        sandboxManager: mockSandboxManager,
+      });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo hello && rm -rf /' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
     });
 
     it('should NOT upgrade Git commands to ALLOW in untrusted workspace', async () => {

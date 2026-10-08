@@ -88,6 +88,7 @@ const SAFE_SHORT_FLAGS: ReadonlySet<string> = new Set([
   '-C',
   '-d',
   '-D',
+  '-E',
   '-F',
   '-g',
   '-G',
@@ -214,6 +215,8 @@ const HIGH_RISK_VALUE_FLAGS: ReadonlySet<string> = new Set([
 
 const FILE_MODE_STRING_REGEX = /^[dcbpsl-][rwxstST-]{9}[+@.]?$/i;
 const BARE_DASHES_REGEX = /^--+$/;
+const BARE_SHELL_VARIABLE_REGEX =
+  /^\$(?:[a-zA-Z_][a-zA-Z0-9_]*|\{[a-zA-Z_][a-zA-Z0-9_]*\})$/;
 
 function isHighRiskPatternToken(token: string): boolean {
   return (
@@ -225,6 +228,16 @@ function isHighRiskPatternToken(token: string): boolean {
     token.startsWith('../') ||
     /^[a-zA-Z]:[\\/]/.test(token) ||
     /\.(sh|bash|zsh|ps1|bat|cmd|exe)$/i.test(token)
+  );
+}
+
+function hasUntrustedSubstring(
+  untrustedContext: UntrustedContextData,
+  value: string,
+): boolean {
+  const normalized = value.toLowerCase().replace(/\\/g, '/');
+  return untrustedContext.untrustedTexts.some((text) =>
+    text.toLowerCase().includes(normalized),
   );
 }
 
@@ -291,22 +304,33 @@ export function extractUntrustedContext(
             .filter((t) => t.length > 1) // Ignore single-character words/punctuation
             .filter((t) => !BARE_DASHES_REGEX.test(t))
             .filter((t) => !FILE_MODE_STRING_REGEX.test(t))
-            .filter((t) => !BENIGN_SUBCOMMAND_TOKENS.has(t.toLowerCase()));
+            .filter((t) => !BENIGN_SUBCOMMAND_TOKENS.has(t.toLowerCase()))
+            .filter((t) => !SAFE_SHORT_FLAGS.has(t))
+            .filter((t) => !SAFE_LONG_FLAGS.has(t.toLowerCase()));
 
           for (const token of tokens) {
-            const lowerToken = token.toLowerCase();
-            untrustedTokens.add(lowerToken);
+            const isShortFlag =
+              token.startsWith('-') && !token.startsWith('--');
+            const tokenToStore = isShortFlag ? token : token.toLowerCase();
+            untrustedTokens.add(tokenToStore);
 
             // Split on equals to handle key-value pairs (e.g., --run_under=/tmp/payload.sh)
-            if (lowerToken.includes('=')) {
-              const eqParts = lowerToken.split('=');
+            if (token.includes('=')) {
+              const eqParts = token.split('=');
               for (const eqPart of eqParts) {
                 const trimmedPart = eqPart.trim();
                 if (
                   trimmedPart.length > 1 &&
-                  !BARE_DASHES_REGEX.test(trimmedPart)
+                  !BARE_DASHES_REGEX.test(trimmedPart) &&
+                  !SAFE_SHORT_FLAGS.has(trimmedPart) &&
+                  !SAFE_LONG_FLAGS.has(trimmedPart.toLowerCase())
                 ) {
-                  untrustedTokens.add(trimmedPart);
+                  const isPartShortFlag =
+                    trimmedPart.startsWith('-') &&
+                    !trimmedPart.startsWith('--');
+                  untrustedTokens.add(
+                    isPartShortFlag ? trimmedPart : trimmedPart.toLowerCase(),
+                  );
                 }
               }
             }
@@ -401,25 +425,21 @@ export function findUntrustedFlags(
         (rawFlagName.startsWith('--') &&
           HIGH_RISK_VALUE_FLAGS.has(flagToCheck));
 
+      const isShortFlag =
+        rawFlagName.startsWith('-') && !rawFlagName.startsWith('--');
+      const tokenToLookup = isShortFlag ? rawFlagName : lowerToken;
+      const flagToLookup = isShortFlag ? rawFlagName : flagToCheck;
+
       // Check 1A: Full flag or flag name exists in untrusted tokens (unless it is a known safe flag)
       if (
         !isSafeFlag &&
-        (untrustedContext.untrustedTokens.has(lowerToken) ||
-          untrustedContext.untrustedTokens.has(flagToCheck))
+        (untrustedContext.untrustedTokens.has(tokenToLookup) ||
+          untrustedContext.untrustedTokens.has(flagToLookup))
       ) {
         detected.add(token);
-        if (!token.includes('=') && isHighRiskFlag) {
-          const nextToken = rawTokens[i + 1];
-          if (
-            nextToken &&
-            !nextToken.startsWith('-') &&
-            !nextToken.startsWith('$') &&
-            untrustedContext.untrustedTokens.has(nextToken.toLowerCase())
-          ) {
-            detected.add(nextToken);
-          }
+        if (token.includes('=') || !isHighRiskFlag) {
+          continue;
         }
-        continue;
       }
 
       // Check 1B: Attached '=value'
@@ -431,9 +451,7 @@ export function findUntrustedFlags(
         const isHighRiskValSubstring =
           (!isSafeFlag || isHighRiskFlag) &&
           isHighRiskPatternToken(rawValToCheck) &&
-          untrustedContext.untrustedTexts.some((text) =>
-            text.toLowerCase().includes(valToCheck.replace(/\\/g, '/')),
-          );
+          hasUntrustedSubstring(untrustedContext, valToCheck);
         if (isValUntrusted || isHighRiskValSubstring) {
           detected.add(token);
           continue;
@@ -446,15 +464,11 @@ export function findUntrustedFlags(
         if (
           nextToken &&
           !nextToken.startsWith('-') &&
-          !nextToken.startsWith('$') &&
+          !BARE_SHELL_VARIABLE_REGEX.test(nextToken) &&
           !BENIGN_SUBCOMMAND_TOKENS.has(nextToken.toLowerCase()) &&
           (untrustedContext.untrustedTokens.has(nextToken.toLowerCase()) ||
             (isHighRiskPatternToken(nextToken) &&
-              untrustedContext.untrustedTexts.some((text) =>
-                text
-                  .toLowerCase()
-                  .includes(nextToken.toLowerCase().replace(/\\/g, '/')),
-              )))
+              hasUntrustedSubstring(untrustedContext, nextToken)))
         ) {
           detected.add(token);
           detected.add(nextToken);
@@ -463,7 +477,7 @@ export function findUntrustedFlags(
     } else {
       // Check 2: Non-flag arguments. Flag high-risk values (e.g. URLs, absolute paths,
       // relative script executions) sourced from untrusted context.
-      if (token.length <= 1 || token.startsWith('$')) {
+      if (token.length <= 1 || BARE_SHELL_VARIABLE_REGEX.test(token)) {
         continue;
       }
 
@@ -473,12 +487,8 @@ export function findUntrustedFlags(
           continue;
         }
 
-        const normalizedLowerToken = lowerToken.replace(/\\/g, '/');
-        for (const text of untrustedContext.untrustedTexts) {
-          if (text.toLowerCase().includes(normalizedLowerToken)) {
-            detected.add(token);
-            break;
-          }
+        if (hasUntrustedSubstring(untrustedContext, lowerToken)) {
+          detected.add(token);
         }
       }
     }

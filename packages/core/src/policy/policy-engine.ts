@@ -454,6 +454,7 @@ export class PolicyEngine {
     rule?: PolicyRule,
     toolAnnotations?: Record<string, unknown>,
     subagent?: string,
+    hasTopLevelHeuristicDowngrade = false,
   ): Promise<CheckResult> {
     if (!command) {
       return {
@@ -555,7 +556,7 @@ export class PolicyEngine {
           serverName,
           toolAnnotations,
           subagent,
-          true,
+          false,
         );
 
         if (wrapperResult.decision === PolicyDecision.DENY)
@@ -584,7 +585,7 @@ export class PolicyEngine {
           serverName,
           toolAnnotations,
           subagent,
-          true,
+          false,
         );
 
         if (subResult.decision === PolicyDecision.DENY) return subResult;
@@ -632,6 +633,7 @@ export class PolicyEngine {
       aggregateDecision === PolicyDecision.ASK_USER &&
       !rule?.argsPattern &&
       !hasTopLevelRedirectionDowngrade &&
+      !hasTopLevelHeuristicDowngrade &&
       evaluatedSubCommands > 0 &&
       allSubCommandsExplicitlyAllowed
     ) {
@@ -747,6 +749,7 @@ export class PolicyEngine {
         );
 
         let ruleDecision = rule.decision;
+        let hasTopLevelHeuristicDowngrade = false;
         if (
           !skipHeuristics &&
           isShellCommand &&
@@ -754,11 +757,18 @@ export class PolicyEngine {
           !('commandPrefix' in rule) &&
           !rule.argsPattern
         ) {
+          const prevDecision = ruleDecision;
           ruleDecision = await this.applyShellHeuristics(
             command,
             ruleDecision,
             shellDirPath,
           );
+          if (
+            prevDecision === PolicyDecision.ALLOW &&
+            ruleDecision === PolicyDecision.ASK_USER
+          ) {
+            hasTopLevelHeuristicDowngrade = true;
+          }
         }
 
         if (isShellCommand && toolName) {
@@ -772,6 +782,7 @@ export class PolicyEngine {
             rule,
             toolAnnotations,
             subagent,
+            hasTopLevelHeuristicDowngrade,
           );
           decision = shellResult.decision;
           matchedRule = shellResult.rule;
@@ -797,12 +808,20 @@ export class PolicyEngine {
         );
         if (toolName && SHELL_TOOL_NAMES.includes(toolName)) {
           let heuristicDecision = this.defaultDecision;
+          let hasTopLevelHeuristicDowngrade = false;
           if (!skipHeuristics && command) {
+            const prevDecision = heuristicDecision;
             heuristicDecision = await this.applyShellHeuristics(
               command,
               heuristicDecision,
               shellDirPath,
             );
+            if (
+              prevDecision === PolicyDecision.ALLOW &&
+              heuristicDecision === PolicyDecision.ASK_USER
+            ) {
+              hasTopLevelHeuristicDowngrade = true;
+            }
           }
 
           const shellResult = await this.checkShellCommand(
@@ -815,6 +834,7 @@ export class PolicyEngine {
             undefined,
             toolAnnotations,
             subagent,
+            hasTopLevelHeuristicDowngrade,
           );
           decision = shellResult.decision;
           matchedRule = shellResult.rule;
