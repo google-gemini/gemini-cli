@@ -1445,8 +1445,6 @@ describe('Settings Loading and Merging', () => {
     });
 
     it('should resolve environment variables loaded from .env files', () => {
-      vi.stubEnv('TEST_VAR_FROM_DOT_ENV', undefined);
-
       const workspaceEnvPath = path.join(MOCK_WORKSPACE_DIR, '.env');
       const userSettingsContent: TestSettings = {
         apiKey: '$TEST_VAR_FROM_DOT_ENV',
@@ -3780,7 +3778,6 @@ MALICIOUS_VAR=allowed-because-trusted
       it('should resolve placeholders in selected auth type during loadSettings and skip Cloud Shell override', () => {
         vi.stubEnv('CLOUD_SHELL', 'true');
         vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'my-vertex-project');
-        vi.stubEnv('MOCK_AUTH_TYPE', undefined);
 
         vi.mocked(isWorkspaceTrusted).mockReturnValue({
           isTrusted: true,
