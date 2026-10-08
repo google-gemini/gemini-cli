@@ -383,6 +383,23 @@ describe('AuthDialog', () => {
       unmount();
     });
 
+    it('does not clear cached credentials when switching between non-Google auth methods', async () => {
+      mockedValidateAuthMethod.mockResolvedValue(null);
+      props.settings.merged.security.auth.selectedType = AuthType.USE_GEMINI;
+
+      const { unmount } = await renderWithProviders(<AuthDialog {...props} />);
+      const { onSelect: handleAuthSelect } =
+        mockedRadioButtonSelect.mock.calls[0][0];
+
+      await handleAuthSelect(AuthType.USE_VERTEX_AI);
+
+      const { clearCachedCredentialFile } = await import(
+        '@google/gemini-cli-core'
+      );
+      expect(clearCachedCredentialFile).not.toHaveBeenCalled();
+      unmount();
+    });
+
     it('handles errors when clearCachedCredentialFile fails gracefully and logs via debugLogger', async () => {
       mockedValidateAuthMethod.mockResolvedValue(null);
       props.settings.merged.security.auth.selectedType =
