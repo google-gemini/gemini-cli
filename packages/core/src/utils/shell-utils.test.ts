@@ -21,6 +21,7 @@ import {
   parseCommandDetails,
   splitCommands,
   stripShellWrapper,
+  detectCommandSubstitution,
   normalizeCommand,
   hasRedirection,
   resolveExecutable,
@@ -397,6 +398,68 @@ describe('stripShellWrapper', () => {
     const multiLine = 'bash -c "hg commit -m \\"title\n\nbody\\""';
     const expected = 'hg commit -m "title\n\nbody"';
     expect(stripShellWrapper(multiLine)).toEqual(expected);
+  });
+
+  describe('Security Regression: stripShellWrapper with intermediate flags', () => {
+    it('should strip bash -e -c and detect command substitution', () => {
+      const input = "bash -e -c 'echo $(whoami)'";
+      const stripped = stripShellWrapper(input);
+      expect(stripped).toEqual('echo $(whoami)');
+      expect(detectCommandSubstitution(stripped)).toBe(true);
+    });
+
+    it('should strip bash -o pipefail -c and detect command substitution', () => {
+      const input = "bash -o pipefail -c 'echo $(whoami)'";
+      const stripped = stripShellWrapper(input);
+      expect(stripped).toEqual('echo $(whoami)');
+      expect(detectCommandSubstitution(stripped)).toBe(true);
+    });
+
+    it('should strip sh -l -c and detect command substitution', () => {
+      const input = "sh -l -c 'echo $(whoami)'";
+      const stripped = stripShellWrapper(input);
+      expect(stripped).toEqual('echo $(whoami)');
+      expect(detectCommandSubstitution(stripped)).toBe(true);
+    });
+
+    it('should strip bash -x -e -c and detect command substitution', () => {
+      const input = "bash -x -e -c 'echo $(whoami)'";
+      const stripped = stripShellWrapper(input);
+      expect(stripped).toEqual('echo $(whoami)');
+      expect(detectCommandSubstitution(stripped)).toBe(true);
+    });
+
+    it('should strip powershell -ExecutionPolicy Bypass -Command', () => {
+      const input = "powershell -ExecutionPolicy Bypass -Command 'Get-Process'";
+      expect(stripShellWrapper(input)).toEqual('Get-Process');
+    });
+
+    it('should strip powershell with intermediate flags and detect command substitution on Windows', () => {
+      mockPlatform.mockReturnValue('win32');
+      const input =
+        "powershell -ExecutionPolicy Bypass -Command 'Get-Process $(whoami)'";
+      const stripped = stripShellWrapper(input);
+      expect(stripped).toEqual('Get-Process $(whoami)');
+      expect(detectCommandSubstitution(stripped)).toBe(true);
+    });
+
+    it('should not detect command substitution when stripped command is safe', () => {
+      const input = "bash -e -c 'echo safe_command'";
+      const stripped = stripShellWrapper(input);
+      expect(stripped).toEqual('echo safe_command');
+      expect(detectCommandSubstitution(stripped)).toBe(false);
+    });
+
+    it('should strip cmd.exe with intermediate flags such as /d /s /c', () => {
+      const input = 'cmd.exe /d /s /c "dir"';
+      expect(stripShellWrapper(input)).toEqual('dir');
+    });
+
+    it('should strip pwsh with intermediate flags', () => {
+      const input =
+        'pwsh -NoProfile -ExecutionPolicy Bypass -Command "Get-ChildItem"';
+      expect(stripShellWrapper(input)).toEqual('Get-ChildItem');
+    });
   });
 });
 

@@ -841,7 +841,7 @@ export function getCommandRoots(command: string): string[] {
 
 export function stripShellWrapper(command: string): string {
   const pattern =
-    /^\s*(?:(?:(?:\S+\/)?(?:sh|bash|zsh))\s+-c|cmd\.exe\s+\/c|powershell(?:\.exe)?\s+(?:-NoProfile\s+)?-Command|pwsh(?:\.exe)?\s+(?:-NoProfile\s+)?-Command)\s+/i;
+    /^\s*(?:(?:(?:\S+\/)?(?:sh|bash|zsh))(?:\s+(?!-c\b)(?:-[a-zA-Z0-9_-]+|--[a-zA-Z0-9_-]+|\+[a-zA-Z0-9_-]+)(?:\s+(?:'[^']*'|"[^"]*"|[^-\s]\S*))?)*\s+-c|cmd(?:\.exe)?(?:\s+(?!\/c\b)\/[a-zA-Z0-9:]+)*\s+\/c|(?:powershell|pwsh)(?:\.exe)?(?:\s+(?!(?:-Command|-c)\b)(?:-[a-zA-Z0-9_-]+|--[a-zA-Z0-9_-]+)(?:\s+(?:'[^']*'|"[^"]*"|[^-\s]\S*))?)*\s+(?:-Command|-c))\s+/i;
   const match = command.match(pattern);
   if (match) {
     let newCommand = command.substring(match[0].length).trim();
@@ -850,7 +850,9 @@ export function stripShellWrapper(command: string): string {
       ((newCommand.startsWith('"') && newCommand.endsWith('"')) ||
         (newCommand.startsWith("'") && newCommand.endsWith("'")))
     ) {
-      const isPosixShell = match[0].trim().endsWith('-c');
+      const isPosixShell =
+        /^\s*(?:\S+\/)?(?:sh|bash|zsh)\b/i.test(match[0]) &&
+        match[0].trim().endsWith('-c');
       if (isPosixShell && newCommand.startsWith('"')) {
         try {
           const parsed = parse(newCommand, (key) => '$' + key);
