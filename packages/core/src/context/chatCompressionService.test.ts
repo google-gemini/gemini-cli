@@ -10,6 +10,7 @@ import {
   findCompressSplitPoint,
   modelStringToModelConfigAlias,
   collapseOlderFunctionResponses,
+  truncateHistoryToBudget,
   RECENT_TURNS_PROTECTED,
 } from './chatCompressionService.js';
 import type { Content, GenerateContentResponse, Part } from '@google/genai';
@@ -600,6 +601,25 @@ describe('ChatCompressionService', () => {
       const files = fs.readdirSync(toolOutputDir);
       expect(files.length).toBeGreaterThan(0);
       expect(files[0]).toMatch(/grep_.*\.txt/);
+    });
+
+    it('preserves message and multi-part ordering when reconstructing the truncated history', async () => {
+      // No functionResponse parts here, so nothing gets truncated: this
+      // isolates the array-reconstruction logic (push+reverse) from the
+      // budget-truncation logic, which is covered by the other tests in
+      // this block.
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'm1' }] },
+        {
+          role: 'model',
+          parts: [{ text: 'm2p1' }, { text: 'm2p2' }, { text: 'm2p3' }],
+        },
+        { role: 'user', parts: [{ text: 'm3' }] },
+      ];
+
+      const result = await truncateHistoryToBudget(history, mockConfig);
+
+      expect(result).toEqual(history);
     });
 
     it('should correctly handle massive single-line strings inside JSON by using multi-line Elephant Line logic', async () => {
