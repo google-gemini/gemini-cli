@@ -587,4 +587,45 @@ describe('CoderAgentExecutor', () => {
     mockSocket2.emit('end');
     await secondaryPromise;
   });
+
+  it('should safely handle synchronous final event emission during eventBus.on registration without TDZ error', async () => {
+    const taskId = 'test-sync-event-bus';
+    const contextId = 'test-context';
+
+    const mockSocket = new EventEmitter();
+    (requestStorage.getStore as Mock).mockReturnValue({
+      req: { socket: mockSocket },
+    });
+
+    const syncEventBus = new EventEmitter() as unknown as ExecutionEventBus;
+    syncEventBus.publish = vi.fn();
+    syncEventBus.finished = vi.fn();
+    const originalOn = syncEventBus.on.bind(syncEventBus);
+    vi.spyOn(syncEventBus, 'on').mockImplementation((event, listener) => {
+      const res = originalOn(event, listener);
+      if (event === 'event') {
+        listener({ kind: 'status-update', final: true } as never);
+      }
+      return res;
+    });
+
+    const requestContext = {
+      userMessage: {
+        messageId: 'msg-sync',
+        taskId,
+        contextId,
+        parts: [{ kind: 'confirmation', callId: '1', outcome: 'proceed' }],
+        metadata: {
+          coderAgent: { kind: 'agent-settings', workspacePath: '/tmp' },
+        },
+      },
+    } as unknown as RequestContext;
+
+    await expect(
+      executor.execute(requestContext, syncEventBus),
+    ).resolves.toBeUndefined();
+    expect(
+      (syncEventBus as unknown as EventEmitter).listenerCount('event'),
+    ).toBe(0);
+  });
 });

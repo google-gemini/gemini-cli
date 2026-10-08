@@ -498,14 +498,13 @@ export class CoderAgentExecutor implements AgentExecutor {
         const onEvent = (event: AgentExecutionEvent) => {
           logger.info('[EventBus event]: ', event);
           if ('final' in event && event.final) {
-            cleanupSocketListeners?.();
+            cleanupSocketListeners();
           }
         };
-        eventBus.on('event', onEvent);
-
         let cleanupSocketListeners = () => {
           eventBus.off('event', onEvent);
         };
+        eventBus.on('event', onEvent);
 
         const store = requestStorage.getStore();
         if (!store) {
