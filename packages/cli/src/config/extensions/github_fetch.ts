@@ -5,8 +5,10 @@
  */
 
 import * as https from 'node:https';
+import type { LookupFunction } from 'node:net';
 import {
   getErrorMessage,
+  safeLookup,
   validateUrlDestination,
 } from '@google/gemini-cli-core';
 
@@ -14,6 +16,26 @@ export function getGitHubToken(): string | undefined {
   // An empty value counts as unset, so callers never see a blank token.
   return process.env['GITHUB_TOKEN'] || undefined;
 }
+
+/**
+ * DNS lookup for the HTTPS client. `validateUrlDestination` resolves the host
+ * once before the request, but the client resolves it again when it connects,
+ * and a host can answer differently the second time. Checking inside the
+ * client's own lookup validates the addresses the socket will actually use.
+ * Hosts given as IP literals skip the lookup and rely on the earlier check.
+ *
+ * Node's `LookupFunction` type allows `family` to be 'IPv4' | 'IPv6', which
+ * `safeLookup` does not accept, so only a numeric family is forwarded.
+ */
+const lookupPublicAddress: LookupFunction = (hostname, options, callback) =>
+  safeLookup(
+    hostname,
+    {
+      all: options.all,
+      family: typeof options.family === 'number' ? options.family : undefined,
+    },
+    callback,
+  );
 
 export async function fetchJson<T>(
   url: string,
@@ -70,7 +92,12 @@ export async function fetchJson<T>(
       }
     };
 
-    const req = https.get(url, { headers, timeout: 30000 }, (res) => {
+    const requestOptions = {
+      headers,
+      lookup: lookupPublicAddress,
+      timeout: 30000,
+    };
+    const req = https.get(url, requestOptions, (res) => {
       res.on('error', (error) =>
         failUnlessRedirecting(
           () =>

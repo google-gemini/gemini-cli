@@ -7,8 +7,10 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import * as https from 'node:https';
 import { EventEmitter } from 'node:events';
+import { promisify } from 'node:util';
 import {
   getErrorMessage,
+  PrivateIpError,
   validateUrlDestination,
 } from '@google/gemini-cli-core';
 import { fetchJson, getGitHubToken } from './github_fetch.js';
@@ -152,6 +154,34 @@ describe('fetchJson', () => {
       'Access to blocked or private host http://127.0.0.1:8080/internal is not allowed.',
     );
     expect(getMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('should connect through a lookup that refuses private addresses', async () => {
+    getMock.mockImplementationOnce((_url, _options, callback) => {
+      const res = new EventEmitter() as IncomingMessage;
+      res.statusCode = 200;
+      (callback as (res: IncomingMessage) => void)(res);
+      res.emit('data', Buffer.from('{}'));
+      res.emit('end');
+      return new EventEmitter() as ClientRequest;
+    });
+    await fetchJson('https://example.com/data.json');
+
+    const { lookup } = getMock.mock.calls[0][1];
+    if (!lookup) {
+      throw new Error('https.get was called without a lookup');
+    }
+    const resolveHost = promisify(lookup);
+
+    // validateUrlDestination is mocked to pass, so a host that resolves to a
+    // private address when the client connects is only stopped by this lookup.
+    // Literal addresses stand in for hostnames, which keeps DNS out of the test.
+    await expect(resolveHost('10.0.0.5', {})).rejects.toThrow(PrivateIpError);
+    await expect(resolveHost('localhost', {})).rejects.toThrow(PrivateIpError);
+    await expect(resolveHost('8.8.8.8', {})).resolves.toBe('8.8.8.8');
+    await expect(resolveHost('8.8.8.8', { all: true })).resolves.toEqual([
+      { address: '8.8.8.8', family: 4 },
+    ]);
   });
 
   it.each([
