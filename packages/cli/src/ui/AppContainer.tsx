@@ -335,6 +335,8 @@ export const AppContainer = (props: AppContainerProps) => {
   const overflowingIdsSize = overflowState?.overflowingIds.size ?? 0;
   const hasOverflowState = overflowingIdsSize > 0 || !constrainHeight;
 
+  const prevOverflowingIdsSizeRef = useRef(0);
+
   /**
    * Manages the visibility and x-second timer for the expansion hint.
    *
@@ -347,9 +349,13 @@ export const AppContainer = (props: AppContainerProps) => {
    * to avoid noise, but the user can still trigger it manually with Ctrl+O.
    */
   useEffect(() => {
-    if (hasOverflowState) {
+    if (
+      overflowingIdsSize > prevOverflowingIdsSizeRef.current &&
+      hasOverflowState
+    ) {
       triggerExpandHint(true);
     }
+    prevOverflowingIdsSizeRef.current = overflowingIdsSize;
   }, [hasOverflowState, overflowingIdsSize, triggerExpandHint]);
 
   const [defaultBannerText, setDefaultBannerText] = useState('');
@@ -743,6 +749,10 @@ export const AppContainer = (props: AppContainerProps) => {
     }
   }, [authState, authContext, setAuthState]);
 
+  const handleShowAuthSelection = useCallback(() => {
+    setAuthState(AuthState.Updating);
+  }, [setAuthState]);
+
   const {
     proQuotaRequest,
     handleProQuotaChoice,
@@ -760,7 +770,7 @@ export const AppContainer = (props: AppContainerProps) => {
     paidTier,
     settings,
     setModelSwitchedFromQuotaError,
-    onShowAuthSelection: () => setAuthState(AuthState.Updating),
+    onShowAuthSelection: handleShowAuthSelection,
     errorVerbosity: settings.merged.ui.errorVerbosity,
   });
 
@@ -1968,7 +1978,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
       } else if (keyMatchers[Command.SHOW_MORE_LINES](key)) {
         setConstrainHeight(false);
         toggleLastTurnTools();
-        refreshStatic();
+        if (
+          !isAlternateBuffer &&
+          !config.getUseTerminalBuffer() &&
+          getLastTurnToolCallIds(historyManager.history, []).length > 0
+        ) {
+          refreshStatic();
+        }
         return true;
       } else if (
         (keyMatchers[Command.FOCUS_SHELL_INPUT](key) ||
@@ -2276,6 +2292,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     customWittyPhrases: settings.merged.ui.customWittyPhrases,
     errorVerbosity: settings.merged.ui.errorVerbosity,
     maxLength,
+    pauseUpdates:
+      !constrainHeight && !isAlternateBuffer && !config.getUseTerminalBuffer(),
   });
 
   const allowPlanMode =
