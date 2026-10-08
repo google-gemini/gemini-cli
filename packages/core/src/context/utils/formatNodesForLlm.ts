@@ -47,6 +47,7 @@ export function formatNodesForLlm(
   const uniqueTurns = Array.from(
     new Set(nodes.map((n) => n.turnId).filter(Boolean)),
   );
+  const turnIndices = new Map(uniqueTurns.map((turnId, idx) => [turnId, idx]));
 
   for (const node of nodes) {
     const payload = node.payload;
@@ -78,8 +79,8 @@ export function formatNodesForLlm(
     // Calculate relative turn index (e.g., -2, -1, 0)
     let turnMarker = '';
     if (node.turnId) {
-      const idx = uniqueTurns.indexOf(node.turnId);
-      if (idx !== -1) {
+      const idx = turnIndices.get(node.turnId);
+      if (idx !== undefined) {
         const relativeIdx = idx - (uniqueTurns.length - 1);
         turnMarker = `[Turn ${relativeIdx}] `;
       }
