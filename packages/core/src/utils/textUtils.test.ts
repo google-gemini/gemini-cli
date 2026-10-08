@@ -106,6 +106,11 @@ describe('truncateString', () => {
     expect(truncateString('', 5)).toBe('');
   });
 
+  it('should return only suffix when maxLength is 0 or negative', () => {
+    expect(truncateString('abc', 0, '...')).toBe('...');
+    expect(truncateString('abc', -1, '...')).toBe('...');
+  });
+
   it('should not slice surrogate pairs', () => {
     const emoji = '😭'; // \uD83D\uDE2D, length 2
     const str = 'a' + emoji; // length 3

@@ -116,18 +116,14 @@ export function truncateString(
     return str;
   }
 
-  let truncatedStr = '';
-
-  for (const { segment } of graphemeSegmenter.segment(str)) {
-    // If adding the whole grapheme cluster (e.g. CRLF, surrogate pair, ZWJ sequence,
-    // or base char + combining marks) exceeds maxLength, stop.
-    if (truncatedStr.length + segment.length > maxLength) {
-      break;
-    }
-
-    truncatedStr += segment;
-    if (truncatedStr.length >= maxLength) break;
+  if (maxLength <= 0) {
+    return suffix;
   }
+
+  // Find the grapheme cluster containing code-unit index `maxLength`.
+  // Its start `index` is the largest grapheme cluster boundary <= maxLength.
+  const boundary = graphemeSegmenter.segment(str).containing(maxLength);
+  let truncatedStr = str.slice(0, boundary ? boundary.index : maxLength);
 
   // Final safety check for dangling high surrogates
   if (truncatedStr.length > 0) {
