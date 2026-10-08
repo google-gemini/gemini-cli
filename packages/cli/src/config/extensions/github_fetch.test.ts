@@ -37,8 +37,9 @@ describe('getGitHubToken', () => {
   });
 
   it('should return undefined if GITHUB_TOKEN is not set', () => {
-    // Must be truly unset: an empty string would be returned as-is.
-    vi.stubEnv('GITHUB_TOKEN', undefined);
+    // An empty string is how vi.stubEnv "unsets" a variable (see GEMINI.md);
+    // getGitHubToken treats an empty value as unset.
+    vi.stubEnv('GITHUB_TOKEN', '');
     expect(getGitHubToken()).toBeUndefined();
   });
 });

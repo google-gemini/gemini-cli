@@ -11,7 +11,8 @@ import {
 } from '@google/gemini-cli-core';
 
 export function getGitHubToken(): string | undefined {
-  return process.env['GITHUB_TOKEN'];
+  // An empty value counts as unset, so callers never see a blank token.
+  return process.env['GITHUB_TOKEN'] || undefined;
 }
 
 export async function fetchJson<T>(
