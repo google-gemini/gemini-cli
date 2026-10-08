@@ -37,6 +37,9 @@ const lookupPublicAddress: LookupFunction = (hostname, options, callback) =>
     callback,
   );
 
+// Status codes that tell the client to repeat the GET at the Location URL.
+const REDIRECT_STATUS_CODES = new Set([301, 302, 303, 307, 308]);
+
 export async function fetchJson<T>(
   url: string,
   redirectCount: number = 0,
@@ -116,7 +119,7 @@ export async function fetchJson<T>(
         ),
       );
 
-      if (res.statusCode === 302 || res.statusCode === 301) {
+      if (res.statusCode && REDIRECT_STATUS_CODES.has(res.statusCode)) {
         if (redirectCount >= 10) {
           res.resume?.();
           return fail(() => new Error('Too many redirects'));

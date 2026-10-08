@@ -74,55 +74,33 @@ describe('fetchJson', () => {
     });
   });
 
-  it('should handle redirects (301 and 302)', async () => {
-    // Test 302
-    getMock.mockImplementationOnce((_url, _options, callback) => {
-      const res = new EventEmitter() as IncomingMessage;
-      res.statusCode = 302;
-      res.headers = { location: 'https://example.com/final' };
-      res.resume = vi.fn();
-      (callback as (res: IncomingMessage) => void)(res);
-      res.emit('end');
-      return new EventEmitter() as ClientRequest;
-    });
-    getMock.mockImplementationOnce((url, _options, callback) => {
-      expect(url).toBe('https://example.com/final');
-      const res = new EventEmitter() as IncomingMessage;
-      res.statusCode = 200;
-      (callback as (res: IncomingMessage) => void)(res);
-      res.emit('data', Buffer.from('{"success": true}'));
-      res.emit('end');
-      return new EventEmitter() as ClientRequest;
-    });
+  it.each([301, 302, 303, 307, 308])(
+    'should follow a %i redirect',
+    async (statusCode) => {
+      getMock.mockImplementationOnce((_url, _options, callback) => {
+        const res = new EventEmitter() as IncomingMessage;
+        res.statusCode = statusCode;
+        res.headers = { location: 'https://example.com/final' };
+        res.resume = vi.fn();
+        (callback as (res: IncomingMessage) => void)(res);
+        res.emit('end');
+        return new EventEmitter() as ClientRequest;
+      });
+      getMock.mockImplementationOnce((url, _options, callback) => {
+        expect(url).toBe('https://example.com/final');
+        const res = new EventEmitter() as IncomingMessage;
+        res.statusCode = 200;
+        (callback as (res: IncomingMessage) => void)(res);
+        res.emit('data', Buffer.from('{"success": true}'));
+        res.emit('end');
+        return new EventEmitter() as ClientRequest;
+      });
 
-    await expect(fetchJson('https://example.com/redirect')).resolves.toEqual({
-      success: true,
-    });
-
-    // Test 301
-    getMock.mockImplementationOnce((_url, _options, callback) => {
-      const res = new EventEmitter() as IncomingMessage;
-      res.statusCode = 301;
-      res.headers = { location: 'https://example.com/final-permanent' };
-      res.resume = vi.fn();
-      (callback as (res: IncomingMessage) => void)(res);
-      res.emit('end');
-      return new EventEmitter() as ClientRequest;
-    });
-    getMock.mockImplementationOnce((url, _options, callback) => {
-      expect(url).toBe('https://example.com/final-permanent');
-      const res = new EventEmitter() as IncomingMessage;
-      res.statusCode = 200;
-      (callback as (res: IncomingMessage) => void)(res);
-      res.emit('data', Buffer.from('{"permanent": true}'));
-      res.emit('end');
-      return new EventEmitter() as ClientRequest;
-    });
-
-    await expect(
-      fetchJson('https://example.com/redirect-perm'),
-    ).resolves.toEqual({ permanent: true });
-  });
+      await expect(fetchJson('https://example.com/redirect')).resolves.toEqual({
+        success: true,
+      });
+    },
+  );
 
   it('should reject when URL destination validation fails (SSRF protection)', async () => {
     validateUrlDestinationMock.mockResolvedValueOnce(false);
