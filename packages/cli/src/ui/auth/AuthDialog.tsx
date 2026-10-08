@@ -133,9 +133,8 @@ export function AuthDialog({
 
         const currentAuthType = settings.merged.security?.auth?.selectedType;
         if (
-          currentAuthType &&
-          (currentAuthType !== authType ||
-            authType === AuthType.LOGIN_WITH_GOOGLE)
+          authType === AuthType.LOGIN_WITH_GOOGLE ||
+          (currentAuthType && currentAuthType !== authType)
         ) {
           try {
             await clearCachedCredentialFile();
@@ -187,8 +186,12 @@ export function AuthDialog({
     if (error) {
       onAuthError(error);
     } else {
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      onSelect(authMethod, SettingScope.User);
+      onAuthError(null);
+      try {
+        await onSelect(authMethod, SettingScope.User);
+      } catch (e) {
+        onAuthError(e instanceof Error ? e.message : String(e));
+      }
     }
   };
 

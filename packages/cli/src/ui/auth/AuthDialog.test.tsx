@@ -366,6 +366,23 @@ describe('AuthDialog', () => {
       unmount();
     });
 
+    it('clears cached credentials when selecting LOGIN_WITH_GOOGLE even if selectedType is undefined', async () => {
+      mockedValidateAuthMethod.mockResolvedValue(null);
+      props.settings.merged.security.auth.selectedType = undefined;
+
+      const { unmount } = await renderWithProviders(<AuthDialog {...props} />);
+      const { onSelect: handleAuthSelect } =
+        mockedRadioButtonSelect.mock.calls[0][0];
+
+      await handleAuthSelect(AuthType.LOGIN_WITH_GOOGLE);
+
+      const { clearCachedCredentialFile } = await import(
+        '@google/gemini-cli-core'
+      );
+      expect(clearCachedCredentialFile).toHaveBeenCalled();
+      unmount();
+    });
+
     it('handles errors when clearCachedCredentialFile fails gracefully and logs via debugLogger', async () => {
       mockedValidateAuthMethod.mockResolvedValue(null);
       props.settings.merged.security.auth.selectedType =
@@ -461,6 +478,24 @@ describe('AuthDialog', () => {
       exitSpy.mockRestore();
       logSpy.mockRestore();
       vi.useRealTimers();
+      unmount();
+    });
+
+    it('catches errors thrown during onSelect and forwards them to onAuthError', async () => {
+      mockedValidateAuthMethod.mockResolvedValue(null);
+      vi.mocked(props.settings.setValue).mockImplementationOnce(() => {
+        throw new Error('Failed to update settings');
+      });
+
+      const { unmount } = await renderWithProviders(<AuthDialog {...props} />);
+      const { onSelect: handleAuthSelect } =
+        mockedRadioButtonSelect.mock.calls[0][0];
+      await handleAuthSelect(AuthType.USE_GEMINI);
+
+      expect(props.onAuthError).toHaveBeenCalledWith(null);
+      expect(props.onAuthError).toHaveBeenCalledWith(
+        'Failed to update settings',
+      );
       unmount();
     });
   });
