@@ -53,6 +53,7 @@ export interface MCPOAuthConfig {
   redirectUri?: string;
   tokenParamName?: string; // For SSE connections, specifies the query parameter name for the token
   registrationUrl?: string;
+  authorizationResponseIssParameterSupported?: boolean;
 }
 
 /**
@@ -344,6 +345,9 @@ export class MCPOAuthProvider {
                 issuer: discoveredConfig.issuer,
                 tokenUrl: discoveredConfig.tokenUrl,
                 scopes: config.scopes || discoveredConfig.scopes || [],
+                authorizationResponseIssParameterSupported:
+                  config.authorizationResponseIssParameterSupported ??
+                  discoveredConfig.authorizationResponseIssParameterSupported,
                 // Preserve existing client credentials
                 clientId: config.clientId,
                 clientSecret: config.clientSecret,
@@ -378,6 +382,9 @@ export class MCPOAuthProvider {
             issuer: discoveredConfig.issuer,
             scopes: config.scopes || discoveredConfig.scopes || [],
             registrationUrl: discoveredConfig.registrationUrl,
+            authorizationResponseIssParameterSupported:
+              config.authorizationResponseIssParameterSupported ??
+              discoveredConfig.authorizationResponseIssParameterSupported,
             // Preserve existing client credentials
             clientId: config.clientId,
             clientSecret: config.clientSecret,
@@ -401,10 +408,17 @@ export class MCPOAuthProvider {
     debugLogger.debug(
       `Starting callback server for "${serverName}" (expected issuer: ${config.issuer || 'none'})...`,
     );
+    // RFC 9207: discovered metadata (or an explicit user setting) provides an
+    // explicit boolean. When the issuer was configured explicitly without
+    // discovery metadata, the "iss" parameter remains required by default.
+    const requireIssInResponse =
+      config.authorizationResponseIssParameterSupported ??
+      Boolean(config.issuer);
     const callbackServer = startCallbackServer(
       pkceParams.state,
       preferredPort,
       config.issuer,
+      requireIssInResponse,
     );
 
     // Wait for server to start and get the allocated port

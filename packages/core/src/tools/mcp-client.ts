@@ -951,6 +951,9 @@ async function handleAutomaticOAuth(
       issuer: oauthConfig.issuer,
       tokenUrl: oauthConfig.tokenUrl,
       scopes: oauthConfig.scopes || [],
+      authorizationResponseIssParameterSupported:
+        mcpServerConfig.oauth?.authorizationResponseIssParameterSupported ??
+        oauthConfig.authorizationResponseIssParameterSupported,
     };
 
     // Perform OAuth authentication
@@ -2114,6 +2117,10 @@ export async function connectToMcpServer(
               issuer: oauthConfig.issuer,
               tokenUrl: oauthConfig.tokenUrl,
               scopes: oauthConfig.scopes || [],
+              authorizationResponseIssParameterSupported:
+                mcpServerConfig.oauth
+                  ?.authorizationResponseIssParameterSupported ??
+                oauthConfig.authorizationResponseIssParameterSupported,
             };
 
             // Perform OAuth authentication

@@ -3545,6 +3545,182 @@ describe('AppContainer State Management', () => {
 
       unmount();
     });
+
+    it('does not collapse unconstrained height on navigation keys, but collapses on Escape', async () => {
+      const { stdin, unmount } = await act(async () => renderAppContainer());
+      await waitFor(() => expect(capturedOverflowActions).toBeTruthy());
+
+      expect(capturedUIState.constrainHeight).toBe(true);
+
+      // Expand via Ctrl+O
+      act(() => {
+        stdin.write('\x0f');
+      });
+      expect(capturedUIState.constrainHeight).toBe(false);
+
+      mocks.mockStdout.write.mockClear();
+
+      // Simulate PageUp and Up Arrow navigation keys
+      act(() => {
+        stdin.write('\x1b[5~');
+        stdin.write('\x1b[A');
+      });
+
+      // Should remain expanded and not clear terminal
+      expect(capturedUIState.constrainHeight).toBe(false);
+      expect(mocks.mockStdout.write).not.toHaveBeenCalledWith(
+        ansiEscapes.clearTerminal,
+      );
+
+      // Simulate Escape key to exit expanded view
+      act(() => {
+        stdin.write('\x1b');
+      });
+      act(() => {
+        vi.advanceTimersByTime(100);
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState.constrainHeight).toBe(true);
+      });
+
+      unmount();
+    });
+
+    it('does not reset the hint timer when an overflowing ID is removed while others remain', async () => {
+      const { unmount } = await act(async () => renderAppContainer());
+      await waitFor(() => expect(capturedOverflowActions).toBeTruthy());
+
+      act(() => {
+        capturedOverflowActions.addOverflowingId('test-id-1');
+        capturedOverflowActions.addOverflowingId('test-id-2');
+      });
+
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState.showIsExpandableHint).toBe(true);
+      });
+
+      // Advance half the duration
+      act(() => {
+        vi.advanceTimersByTime(EXPAND_HINT_DURATION_MS / 2);
+      });
+      expect(capturedUIState.showIsExpandableHint).toBe(true);
+
+      // Removing one overflowing ID should NOT reset the hint timer
+      act(() => {
+        capturedOverflowActions.removeOverflowingId('test-id-2');
+      });
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+
+      // Advance the remaining half of the original timer
+      act(() => {
+        vi.advanceTimersByTime(EXPAND_HINT_DURATION_MS / 2 - 1);
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState.showIsExpandableHint).toBe(false);
+      });
+
+      unmount();
+    });
+
+    it('does not clear terminal when expanding with Ctrl+O if there are no last-turn tool calls in history', async () => {
+      const { stdin, unmount } = await act(async () => renderAppContainer());
+
+      mocks.mockStdout.write.mockClear();
+
+      // Expand with Ctrl+O when history has no last-turn tool calls
+      act(() => {
+        stdin.write('\x0f');
+      });
+
+      expect(capturedUIState.constrainHeight).toBe(false);
+      expect(mocks.mockStdout.write).not.toHaveBeenCalledWith(
+        ansiEscapes.clearTerminal,
+      );
+
+      // Collapse with Ctrl+O should still refresh static and clear terminal
+      act(() => {
+        stdin.write('\x0f');
+      });
+
+      expect(capturedUIState.constrainHeight).toBe(true);
+      expect(mocks.mockStdout.write).toHaveBeenCalledWith(
+        ansiEscapes.clearTerminal,
+      );
+
+      unmount();
+    });
+
+    it('clears terminal when expanding with Ctrl+O if there are last-turn tool calls in history', async () => {
+      (useHistory as Mock).mockReturnValue({
+        history: [
+          { id: 1, type: 'user', text: 'run something' },
+          {
+            id: 2,
+            type: 'tool_group',
+            tools: [
+              {
+                callId: 'call-1',
+                name: 'test_tool',
+                description: 'desc',
+                status: CoreToolCallStatus.Success,
+                resultDisplay: 'result',
+                confirmationDetails: undefined,
+              },
+            ],
+          },
+        ],
+        addItem: vi.fn(),
+        updateItem: vi.fn(),
+        clearItems: vi.fn(),
+        loadHistory: vi.fn(),
+      });
+
+      const { stdin, unmount } = await act(async () => renderAppContainer());
+
+      mocks.mockStdout.write.mockClear();
+
+      act(() => {
+        stdin.write('\x0f');
+      });
+
+      expect(capturedUIState.constrainHeight).toBe(false);
+      expect(mocks.mockStdout.write).toHaveBeenCalledWith(
+        ansiEscapes.clearTerminal,
+      );
+
+      unmount();
+    });
+
+    it('passes pauseUpdates=true to useLoadingIndicator when expanded in standard mode', async () => {
+      const { stdin, unmount } = await act(async () => renderAppContainer());
+
+      expect(useLoadingIndicator).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          pauseUpdates: false,
+        }),
+      );
+
+      act(() => {
+        stdin.write('\x0f');
+      });
+
+      expect(capturedUIState.constrainHeight).toBe(false);
+      expect(useLoadingIndicator).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          pauseUpdates: true,
+        }),
+      );
+
+      unmount();
+    });
   });
 
   describe('Permission Handling', () => {

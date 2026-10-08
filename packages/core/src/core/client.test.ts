@@ -351,6 +351,51 @@ describe('Gemini Client (client.ts)', () => {
     });
   });
 
+  describe('discardTrailingUnansweredToolCallTurn', () => {
+    it('should return false without throwing when the chat is not initialized', () => {
+      const uninitializedClient = new GeminiClient(
+        mockConfig as unknown as AgentLoopContext,
+      );
+
+      expect(uninitializedClient.isInitialized()).toBe(false);
+      expect(() =>
+        uninitializedClient.discardTrailingUnansweredToolCallTurn(),
+      ).not.toThrow();
+      expect(uninitializedClient.discardTrailingUnansweredToolCallTurn()).toBe(
+        false,
+      );
+    });
+
+    it('should delegate to the chat and update telemetry when a turn is removed', () => {
+      const mockChat = {
+        discardTrailingUnansweredToolCallTurn: vi.fn().mockReturnValue(true),
+        getLastPromptTokenCount: vi.fn().mockReturnValue(0),
+        setTools: vi.fn(),
+      } as unknown as GeminiChat;
+      client['chat'] = mockChat;
+      vi.mocked(uiTelemetryService.setLastPromptTokenCount).mockClear();
+
+      expect(client.discardTrailingUnansweredToolCallTurn()).toBe(true);
+      expect(
+        mockChat.discardTrailingUnansweredToolCallTurn,
+      ).toHaveBeenCalledTimes(1);
+      expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalled();
+    });
+
+    it('should not update telemetry when no turn is removed', () => {
+      const mockChat = {
+        discardTrailingUnansweredToolCallTurn: vi.fn().mockReturnValue(false),
+        getLastPromptTokenCount: vi.fn().mockReturnValue(0),
+        setTools: vi.fn(),
+      } as unknown as GeminiChat;
+      client['chat'] = mockChat;
+      vi.mocked(uiTelemetryService.setLastPromptTokenCount).mockClear();
+
+      expect(client.discardTrailingUnansweredToolCallTurn()).toBe(false);
+      expect(uiTelemetryService.setLastPromptTokenCount).not.toHaveBeenCalled();
+    });
+  });
+
   describe('resumeChat', () => {
     it('should update telemetry token count when a chat is resumed', async () => {
       const history: Content[] = [
