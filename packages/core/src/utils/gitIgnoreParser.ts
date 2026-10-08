@@ -148,9 +148,7 @@ export class GitIgnoreParser implements GitIgnoreFilter {
     let patterns = this.gitignoreFileCache.get(dir);
     if (patterns === undefined) {
       const gitignorePath = path.join(dir, '.gitignore');
-      patterns = fs.existsSync(gitignorePath)
-        ? this.loadPatternsForFile(gitignorePath)
-        : [];
+      patterns = this.loadPatternsForFile(gitignorePath);
       this.gitignoreFileCache.set(dir, patterns);
     }
     return patterns;
@@ -164,9 +162,7 @@ export class GitIgnoreParser implements GitIgnoreFilter {
         'info',
         'exclude',
       );
-      this.globalPatterns = fs.existsSync(excludeFile)
-        ? this.loadPatternsForFile(excludeFile)
-        : [];
+      this.globalPatterns = this.loadPatternsForFile(excludeFile);
     }
     return this.globalPatterns;
   }
