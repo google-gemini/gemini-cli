@@ -295,7 +295,9 @@ export async function retryWithBackoff<T>(
 
   let attempt = 0;
   let capacityAttempts = 0;
+  let validationAttempts = 0;
   const MAX_SILENT_CAPACITY_ATTEMPTS = 3;
+  const MAX_VALIDATION_ATTEMPTS = 3;
   let currentDelay = initialDelayMs;
   const throwIfAborted = () => {
     if (signal?.aborted) {
@@ -421,11 +423,15 @@ export async function retryWithBackoff<T>(
 
       // Handle ValidationRequiredError - user needs to verify before proceeding
       if (classifiedError instanceof ValidationRequiredError) {
-        if (onValidationRequired) {
+        if (
+          onValidationRequired &&
+          validationAttempts < MAX_VALIDATION_ATTEMPTS
+        ) {
+          validationAttempts++;
           try {
             const intent = await onValidationRequired(classifiedError);
             if (intent === 'verify') {
-              // User verified, retry the request
+              // User verified, retry the request (bounded by MAX_VALIDATION_ATTEMPTS)
               attempt = 0;
               currentDelay = initialDelayMs;
               continue;

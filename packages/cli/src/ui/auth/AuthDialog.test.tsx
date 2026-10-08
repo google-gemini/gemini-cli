@@ -16,7 +16,12 @@ import {
   type Mock,
 } from 'vitest';
 import { AuthDialog } from './AuthDialog.js';
-import { AuthType, type Config, debugLogger } from '@google/gemini-cli-core';
+import {
+  AuthType,
+  clearCachedCredentialFile,
+  type Config,
+  debugLogger,
+} from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../../config/settings.js';
 import { AuthState } from '../types.js';
 import { RadioButtonSelect } from '../components/shared/RadioButtonSelect.js';
@@ -369,6 +374,25 @@ describe('AuthDialog', () => {
       exitSpy.mockRestore();
       logSpy.mockRestore();
       vi.useRealTimers();
+      unmount();
+    });
+
+    it('catches errors thrown during onSelect and forwards them to onAuthError', async () => {
+      mockedValidateAuthMethod.mockResolvedValue(null);
+      props.settings.merged.security.auth.selectedType = AuthType.USE_GEMINI;
+      vi.mocked(clearCachedCredentialFile).mockRejectedValueOnce(
+        new Error('Failed to clear credentials'),
+      );
+
+      const { unmount } = await renderWithProviders(<AuthDialog {...props} />);
+      const { onSelect: handleAuthSelect } =
+        mockedRadioButtonSelect.mock.calls[0][0];
+      await handleAuthSelect(AuthType.LOGIN_WITH_GOOGLE);
+
+      expect(props.onAuthError).toHaveBeenCalledWith(null);
+      expect(props.onAuthError).toHaveBeenCalledWith(
+        'Failed to clear credentials',
+      );
       unmount();
     });
   });
