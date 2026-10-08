@@ -12,8 +12,149 @@ import {
 } from '../testing/contextTestUtils.js';
 import { NodeType } from '../graph/types.js';
 import type { InboxSnapshotImpl } from '../pipeline/inbox.js';
+import { deriveStableId } from '../../utils/cryptoUtils.js';
 
 describe('StateSnapshotProcessor', () => {
+  it('should preserve consumed ID order and duplicates when splicing a snapshot', async () => {
+    const env = createMockEnvironment();
+    const processor = createStateSnapshotProcessor('snapshot', env, {
+      target: 'incremental',
+    });
+    const targets = ['left', 'node-A', 'middle', 'node-B', 'right'].map((id) =>
+      createDummyNode(id, NodeType.USER_PROMPT, 50, {}, id),
+    );
+    const originalTargets = structuredClone(targets);
+    const consumedIds = ['node-B', 'node-A', 'node-B'];
+    const processArgs = createMockProcessArgs(
+      targets,
+      [],
+      [
+        {
+          id: 'proposal',
+          topic: 'PROPOSED_SNAPSHOT',
+          timestamp: 100,
+          payload: {
+            consumedIds,
+            newText: 'snapshot',
+            type: 'point-in-time',
+            timestamp: 100,
+          },
+        },
+      ],
+    );
+
+    const result = await processor.process(processArgs);
+
+    expect(result.map((node) => node.id)).toEqual([
+      'left',
+      deriveStableId(consumedIds),
+      'middle',
+      'right',
+    ]);
+    expect(result[1].abstractsIds).toEqual(['node-B', 'node-A', 'node-B']);
+    expect(consumedIds).toEqual(['node-B', 'node-A', 'node-B']);
+    expect(targets).toEqual(originalTargets);
+    expect(env.llmClient.generateJson).not.toHaveBeenCalled();
+    expect(
+      (processArgs.inbox as InboxSnapshotImpl).getConsumedIds().has('proposal'),
+    ).toBe(true);
+  });
+
+  it('should keep all targets when a valid inbox snapshot consumes no IDs', async () => {
+    const env = createMockEnvironment();
+    const processor = createStateSnapshotProcessor('snapshot', env, {
+      target: 'incremental',
+    });
+    const targets = [
+      createDummyNode('turn', NodeType.USER_PROMPT, 50, {}, 'node-A'),
+    ];
+    const processArgs = createMockProcessArgs(
+      targets,
+      [],
+      [
+        {
+          id: 'proposal',
+          topic: 'PROPOSED_SNAPSHOT',
+          timestamp: 100,
+          payload: {
+            consumedIds: [],
+            newText: 'snapshot',
+            type: 'point-in-time',
+            timestamp: 100,
+          },
+        },
+      ],
+    );
+
+    const result = await processor.process(processArgs);
+
+    expect(result).toHaveLength(2);
+    expect(result[0].id).toBe(deriveStableId([]));
+    expect(result[0].abstractsIds).toEqual([]);
+    expect(result[1]).toBe(targets[0]);
+    expect(targets).toHaveLength(1);
+  });
+
+  it.each([true, false])(
+    'should splice a synchronous snapshot with the baseline inside the summary window: %s',
+    async (baselineInside) => {
+      const env = createMockEnvironment();
+      const nodeA = createDummyNode(
+        'turn-A',
+        NodeType.USER_PROMPT,
+        50,
+        {},
+        'node-A',
+      );
+      const nodeB = createDummyNode(
+        'turn-A',
+        NodeType.AGENT_THOUGHT,
+        60,
+        {},
+        'node-B',
+      );
+      const retained = createDummyNode(
+        'turn-B',
+        NodeType.USER_PROMPT,
+        50,
+        {},
+        'retained',
+      );
+      const baseline = createDummyNode(
+        'earlier-turn',
+        NodeType.SNAPSHOT,
+        10,
+        { payload: { text: '{"facts":["previous state"]}' } },
+        'baseline',
+      );
+      const targets = baselineInside
+        ? [nodeA, baseline, nodeB, retained]
+        : [nodeA, nodeB, retained, baseline];
+      const originalTargets = structuredClone(targets);
+      const processor = createStateSnapshotProcessor('snapshot', env, {
+        target: 'freeNTokens',
+        freeTokensTarget:
+          env.tokenCalculator.getTokenCost(nodeA) +
+          env.tokenCalculator.getTokenCost(nodeB) +
+          (baselineInside ? env.tokenCalculator.getTokenCost(baseline) : 0),
+      });
+
+      const result = await processor.process(createMockProcessArgs(targets));
+
+      const consumedIds = baselineInside
+        ? ['node-A', 'node-B', 'baseline']
+        : ['node-A', 'node-B'];
+      expect(result).toHaveLength(baselineInside ? 2 : 3);
+      expect(result[0].type).toBe(NodeType.SNAPSHOT);
+      expect(result[0].id).toBe(deriveStableId(consumedIds));
+      expect(result[0].abstractsIds).toEqual(consumedIds);
+      expect(result.slice(1)).toEqual(
+        baselineInside ? [retained] : [retained, baseline],
+      );
+      expect(targets).toEqual(originalTargets);
+    },
+  );
+
   it('should ignore if budget is satisfied', async () => {
     const env = createMockEnvironment();
     const processor = createStateSnapshotProcessor(
