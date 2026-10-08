@@ -2166,7 +2166,7 @@ describe('PolicyEngine', () => {
       expect(result.decision).toBe(PolicyDecision.ALLOW);
     });
 
-    it('should NOT downgrade to ASK_USER for redirected commands in YOLO mode even without sandbox', async () => {
+    it('should downgrade to ASK_USER for redirected commands in YOLO mode unless allowRedirection is set', async () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'run_shell_command',
@@ -2187,7 +2187,217 @@ describe('PolicyEngine', () => {
         undefined,
       );
 
+      expect(decision).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should allow redirected commands in YOLO mode when allowRedirection is explicitly true', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ALLOW,
+          priority: 10,
+          allowRedirection: true,
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.YOLO,
+        sandboxManager: new NoopSandboxManager(),
+      });
+
+      const command = 'npm test 2>&1 | tail -80';
+      const { decision } = await engine.check(
+        { name: 'run_shell_command', args: { command } },
+        undefined,
+      );
+
       expect(decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should downgrade redirected shell command in YOLO mode with no rules configured', async () => {
+      engine = new PolicyEngine({
+        approvalMode: ApprovalMode.YOLO,
+        sandboxManager: new NoopSandboxManager(),
+      });
+
+      const command = 'echo x > /outside/ws';
+      const result = await engine.check(
+        { name: 'run_shell_command', args: { command } },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should return DENY for redirected shell command in non-interactive YOLO mode with no rules', async () => {
+      engine = new PolicyEngine({
+        approvalMode: ApprovalMode.YOLO,
+        nonInteractive: true,
+        sandboxManager: new NoopSandboxManager(),
+      });
+
+      const command = 'echo x > /outside/ws';
+      const result = await engine.check(
+        { name: 'run_shell_command', args: { command } },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.DENY);
+    });
+
+    it('should downgrade redirected shell command in AUTO_EDIT mode even without argsPattern', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ALLOW,
+          priority: 10,
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.AUTO_EDIT,
+        sandboxManager: new NoopSandboxManager(),
+      });
+
+      const command = 'echo hello > file.txt';
+      const result = await engine.check(
+        { name: 'run_shell_command', args: { command } },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should downgrade to ASK_USER in YOLO mode if shell command parsing fails and command has redirection', async () => {
+      const { parseCommandDetails } = await import('../utils/shell-utils.js');
+      const rules: PolicyRule[] = [
+        {
+          toolName: '*',
+          decision: PolicyDecision.ALLOW,
+          priority: 999,
+          modes: [ApprovalMode.YOLO],
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.YOLO,
+      });
+
+      // Simulate parsing failure for a command with redirection
+      vi.mocked(parseCommandDetails).mockReturnValueOnce({
+        details: [],
+        hasError: true,
+      });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo x > /outside/ws' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should return DENY in nonInteractive YOLO mode if shell command parsing fails and command has redirection', async () => {
+      const { parseCommandDetails } = await import('../utils/shell-utils.js');
+      const rules: PolicyRule[] = [
+        {
+          toolName: '*',
+          decision: PolicyDecision.ALLOW,
+          priority: 999,
+          modes: [ApprovalMode.YOLO],
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.YOLO,
+        nonInteractive: true,
+      });
+
+      // Simulate parsing failure for a command with redirection
+      vi.mocked(parseCommandDetails).mockReturnValueOnce({
+        details: [],
+        hasError: true,
+      });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo x > /outside/ws' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.DENY);
+    });
+
+    it('should return ALLOW in YOLO mode if shell command parsing fails with redirection but allowRedirection is true', async () => {
+      const { parseCommandDetails } = await import('../utils/shell-utils.js');
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ALLOW,
+          priority: 999,
+          allowRedirection: true,
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.YOLO,
+      });
+
+      vi.mocked(parseCommandDetails).mockReturnValueOnce({
+        details: [],
+        hasError: true,
+      });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo x > /outside/ws' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should downgrade in AUTO_EDIT mode if shell command parsing fails and command has redirection', async () => {
+      const { parseCommandDetails } = await import('../utils/shell-utils.js');
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.AUTO_EDIT,
+      });
+
+      vi.mocked(parseCommandDetails).mockReturnValueOnce({
+        details: [],
+        hasError: true,
+      });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo x > /outside/ws' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
     });
 
     it('should return ALLOW in YOLO mode even if shell command parsing fails', async () => {

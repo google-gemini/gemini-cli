@@ -288,6 +288,11 @@ describe('hasRedirection', () => {
     mockPlatform.mockReturnValue('linux');
     expect(hasRedirection('echo "a > b"')).toBe(false);
   });
+
+  it('should detect redirection even when bash command has syntax errors', () => {
+    mockPlatform.mockReturnValue('linux');
+    expect(hasRedirection('echo hello > /tmp/bad (((')).toBe(true);
+  });
 });
 
 describeWindowsOnly('PowerShell integration', () => {

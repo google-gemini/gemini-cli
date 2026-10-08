@@ -788,6 +788,9 @@ export function hasRedirection(command: string): boolean {
         if (child) stack.push(child);
       }
     }
+    if (tree.rootNode.hasError) {
+      return fallbackCheck();
+    }
     return false;
   }
 
