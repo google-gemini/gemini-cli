@@ -23,6 +23,7 @@ import { MAX_GEMINI_MESSAGE_LINES } from '../constants.js';
 import { useConfirmingTool } from '../hooks/useConfirmingTool.js';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
 import { appEvents, AppEvent } from '../../utils/events.js';
+import type { HistoryItem } from '../types.js';
 
 const MemoizedHistoryItemDisplay = memo(HistoryItemDisplay);
 const MemoizedAppHeader = memo(AppHeader);
@@ -52,6 +53,30 @@ const ToolConfirmationQueueWithBudget = ({
     </UIStateContext.Provider>
   );
 };
+
+const STATIC_HISTORY_ITEM_TYPES: ReadonlySet<HistoryItem['type']> = new Set([
+  'user',
+  'user_shell',
+  'gemini',
+  'gemini_content',
+  'info',
+  'warning',
+  'error',
+  'hint',
+  'thinking',
+  'about',
+  'help',
+  'stats',
+  'model_stats',
+  'tool_stats',
+  'model',
+  'quit',
+  'extensions_list',
+  'tools_list',
+  'skills_list',
+  'agents_list',
+  'chat_list',
+]);
 
 // Limit Gemini messages to a very high number of lines to mitigate performance
 // issues in the worst case if we somehow get an enormous response from Gemini.
@@ -339,19 +364,35 @@ export const MainContent = () => {
 
   const keyExtractor = useCallback(
     (item: (typeof virtualizedData)[number], _index: number) => {
-      if (item.type === 'header') return 'header';
-      if (item.type === 'history') return item.item.id.toString();
+      if (item.type === 'header') {
+        return `header-${showHeaderDetails}-${uiState.bannerVisible}-${uiState.bannerData?.defaultText ?? ''}-${uiState.bannerData?.warningText ?? ''}-${uiState.historyRemountKey}`;
+      }
+      if (item.type === 'history') {
+        return `${item.item.id}-${uiState.renderMarkdown}-${uiState.historyRemountKey}`;
+      }
       return 'pending';
     },
-    [],
+    [
+      showHeaderDetails,
+      uiState.bannerVisible,
+      uiState.bannerData?.defaultText,
+      uiState.bannerData?.warningText,
+      uiState.renderMarkdown,
+      uiState.historyRemountKey,
+    ],
   );
 
-  // TODO(jacobr): we should return true for all messages that are not
-  // interactive. Gemini messages and Tool results that are not scrollable,
-  // collapsible, or clickable should also be tagged as static in the future.
   const isStaticItem = useCallback(
-    (item: (typeof virtualizedData)[number]) => item.type === 'header',
-    [],
+    (item: (typeof virtualizedData)[number]) => {
+      if (item.type === 'header') {
+        return !uiState.updateInfo?.isUpdating;
+      }
+      if (item.type === 'history') {
+        return STATIC_HISTORY_ITEM_TYPES.has(item.item.type);
+      }
+      return false;
+    },
+    [uiState.updateInfo?.isUpdating],
   );
 
   const scrollableList = useMemo(() => {

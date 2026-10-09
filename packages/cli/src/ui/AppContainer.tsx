@@ -652,6 +652,8 @@ export const AppContainer = (props: AppContainerProps) => {
   const refreshStatic = useCallback(() => {
     if (!isAlternateBuffer && !config.getUseTerminalBuffer()) {
       stdout.write(ansiEscapes.clearTerminal);
+    }
+    if (!isAlternateBuffer) {
       setHistoryRemountKey((prev) => prev + 1);
     }
   }, [setHistoryRemountKey, isAlternateBuffer, stdout, config]);
@@ -1769,7 +1771,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
   useEffect(() => {
     const openDebugConsole = () => {
       setShowErrorDetails(true);
-      setConstrainHeight(false);
     };
     appEvents.on(AppEvent.OpenDebugConsole, openDebugConsole);
 

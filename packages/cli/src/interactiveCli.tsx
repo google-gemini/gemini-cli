@@ -164,7 +164,7 @@ export async function startInteractiveUI(
         config.getUseRenderProcess() && config.getUseTerminalBuffer(),
       incrementalRendering:
         settings.merged.ui.incrementalRendering !== false &&
-        useAlternateBuffer &&
+        (useAlternateBuffer || config.getUseTerminalBuffer()) &&
         !isShpool,
       debugRainbow: settings.merged.ui.debugRainbow === true,
     },
