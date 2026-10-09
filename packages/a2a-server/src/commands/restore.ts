@@ -69,8 +69,7 @@ export class RestoreCommand implements Command {
         throw error;
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const toolCallData = JSON.parse(data);
+      const toolCallData: unknown = JSON.parse(data);
       const ToolCallDataSchema = getToolCallDataSchema();
       const parseResult = ToolCallDataSchema.safeParse(toolCallData);
 
