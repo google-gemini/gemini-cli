@@ -225,6 +225,7 @@ interface ResolvedFile {
   pathSpec: string;
   displayLabel: string;
   absolutePath?: string;
+  isDirectory?: boolean;
 }
 
 interface IgnoredFile {
@@ -299,28 +300,20 @@ async function resolveFilePaths(
 
     if (result.status === 'resolved') {
       const { absolutePath, relativePath, stats } = result.resolved;
-      if (stats.isDirectory()) {
-        const pathSpec = path.join(relativePath, '**');
-        resolvedFiles.push({
-          part,
-          pathSpec,
-          displayLabel: path.isAbsolute(pathName) ? relativePath : pathName,
-          absolutePath,
-        });
-        onDebugMessage(
-          `Path ${pathName} resolved to directory, using glob: ${pathSpec}`,
-        );
-      } else {
-        resolvedFiles.push({
-          part,
-          pathSpec: relativePath,
-          displayLabel: path.isAbsolute(pathName) ? relativePath : pathName,
-          absolutePath,
-        });
-        onDebugMessage(
-          `Path ${pathName} resolved to file: ${absolutePath}, using relative path: ${relativePath}`,
-        );
-      }
+      const isDirectory = stats.isDirectory();
+      const normalizedRelativePath = relativePath || '.';
+      resolvedFiles.push({
+        part,
+        pathSpec: normalizedRelativePath,
+        displayLabel: path.isAbsolute(pathName)
+          ? normalizedRelativePath
+          : pathName,
+        absolutePath,
+        isDirectory,
+      });
+      onDebugMessage(
+        `Path ${pathName} resolved to ${isDirectory ? 'directory' : 'file'}: ${absolutePath}, using relative path: ${normalizedRelativePath}`,
+      );
     } else if (
       result.status === 'not_found' ||
       result.status === 'unauthorized'
@@ -549,7 +542,8 @@ async function readLocalFiles(
   display?: IndividualToolCallDisplay;
   error?: string;
 }> {
-  if (resolvedFiles.length === 0) {
+  const filesToRead = resolvedFiles.filter((rf) => !(rf.isDirectory ?? false));
+  if (filesToRead.length === 0) {
     return { parts: [] };
   }
 
@@ -558,15 +552,10 @@ async function readLocalFiles(
     config.getMessageBus(),
   );
 
-  const pathSpecsToRead = resolvedFiles.map((rf) => {
-    if (rf.absolutePath) {
-      return rf.pathSpec.endsWith('**')
-        ? path.join(rf.absolutePath, '**')
-        : rf.absolutePath;
-    }
-    return rf.pathSpec;
-  });
-  const fileLabelsForDisplay = resolvedFiles.map((rf) => rf.displayLabel);
+  const pathSpecsToRead = filesToRead.map(
+    (rf) => rf.absolutePath ?? rf.pathSpec,
+  );
+  const fileLabelsForDisplay = filesToRead.map((rf) => rf.displayLabel);
   const respectFileIgnore = config.getFileFilteringOptions();
 
   const toolArgs = {
@@ -604,7 +593,7 @@ async function readLocalFiles(
             const fileActualContent = match[2].trim();
 
             // Find the display label for this path
-            const resolvedFile = resolvedFiles.find(
+            const resolvedFile = filesToRead.find(
               (rf) =>
                 rf.absolutePath === filePathSpecInContent ||
                 rf.pathSpec === filePathSpecInContent,
@@ -698,7 +687,8 @@ function reportIgnoredFiles(
 
 /**
  * Processes user input containing one or more '@<path>' commands.
- * - Workspace paths are read via the 'read_many_files' tool.
+ * - Workspace file paths are read via the 'read_many_files' tool.
+ * - Workspace directory paths are resolved to relative paths in the query without eagerly reading their contents.
  * - MCP resource URIs are read via each server's `resources/read`.
  * The user query is updated with inline content blocks so the LLM receives the
  * referenced context directly.
