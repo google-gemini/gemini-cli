@@ -63,6 +63,27 @@ describe('auth', () => {
     );
   });
 
+  it('should remove trailing period from Antigravity URL in auth error', async () => {
+    const error = new Error(
+      'This client is no longer supported for Gemini Code Assist for individuals. To continue using Gemini, please migrate to the Antigravity suite of products: https://antigravity.google.',
+    );
+    vi.mocked(mockConfig.refreshAuth).mockRejectedValue(error);
+    const result = await performInitialAuth(
+      mockConfig,
+      AuthType.LOGIN_WITH_GOOGLE,
+    );
+    expect(result).toEqual({
+      authError:
+        'Failed to sign in. Message: This client is no longer supported for Gemini Code Assist for individuals. To continue using Gemini, please migrate to the Antigravity suite of products: https://antigravity.google',
+      accountSuspensionInfo: null,
+    });
+    expect(result.authError).toContain('https://antigravity.google');
+    expect(result.authError).not.toContain('https://antigravity.google.');
+    expect(mockConfig.refreshAuth).toHaveBeenCalledWith(
+      AuthType.LOGIN_WITH_GOOGLE,
+    );
+  });
+
   it('should return null if refreshAuth throws ValidationRequiredError', async () => {
     vi.mocked(mockConfig.refreshAuth).mockRejectedValue(
       new ValidationRequiredError('Validation required'),
