@@ -226,6 +226,16 @@ const RESIZE_DEBOUNCE_MS = 100;
 const RESIZE_CORK_SAFETY_TIMEOUT_MS = 1000;
 
 /**
+ * Internal representation of a single buffered write entry in Node.js's `_writableState.buffered` queue.
+ * Used to calculate the exact byte length of discarded corked writes and invoke their completion callbacks.
+ */
+interface WritableBufferEntry {
+  chunk?: string | Buffer | Uint8Array;
+  encoding?: BufferEncoding;
+  callback?: (err?: Error | null) => void;
+}
+
+/**
  * Internal representation of Node.js Writable stream state.
  * This is used to access and discard stale buffered writes during rapid terminal resizes.
  * Since Node.js does not expose a public API to clear or discard corked/buffered writes,
@@ -235,7 +245,7 @@ const RESIZE_CORK_SAFETY_TIMEOUT_MS = 1000;
 interface WritableBufferState {
   corked?: number;
   length?: number;
-  buffered?: Array<{ callback?: (err?: Error | null) => void }>;
+  buffered?: WritableBufferEntry[];
   bufferedIndex?: number;
   allBuffers?: boolean;
   allNoop?: boolean;
@@ -258,12 +268,30 @@ function discardCorkedStdoutBuffer(stream: NodeJS.WriteStream): void {
   try {
     const state = (stream as ResizableWriteStream)._writableState;
     if (state && (state.corked ?? 0) > 0 && Array.isArray(state.buffered)) {
-      const entries = state.buffered.slice(state.bufferedIndex ?? 0);
+      const startIndex = state.bufferedIndex ?? 0;
+      const entries = state.buffered.slice(startIndex);
+
+      let discardedLength = 0;
+      for (const entry of entries) {
+        if (entry?.chunk) {
+          if (typeof entry.chunk === 'string') {
+            discardedLength += Buffer.byteLength(
+              entry.chunk,
+              entry.encoding ?? 'utf8',
+            );
+          } else if (
+            'length' in entry.chunk &&
+            typeof entry.chunk.length === 'number'
+          ) {
+            discardedLength += entry.chunk.length;
+          }
+        }
+      }
+
       state.buffered.length = 0;
-      state.length = 0;
+      state.length = Math.max(0, (state.length ?? 0) - discardedLength);
       if ('allBuffers' in state) state.allBuffers = true;
       if ('allNoop' in state) state.allNoop = true;
-      if ('writelen' in state) state.writelen = 0;
       if ('bufferedIndex' in state) state.bufferedIndex = 0;
 
       for (const entry of entries) {

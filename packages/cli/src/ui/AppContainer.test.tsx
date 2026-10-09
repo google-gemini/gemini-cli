@@ -3326,7 +3326,12 @@ describe('AppContainer State Management', () => {
         _writableState?: {
           corked: number;
           length: number;
-          buffered: Array<{ callback?: (err?: Error | null) => void }>;
+          writelen?: number;
+          buffered: Array<{
+            chunk?: string | Buffer | Uint8Array;
+            encoding?: string;
+            callback?: (err?: Error | null) => void;
+          }>;
           bufferedIndex: number;
         };
       };
@@ -3336,7 +3341,12 @@ describe('AppContainer State Management', () => {
       const writableState = {
         corked: 0,
         length: 0,
-        buffered: [] as Array<{ callback?: (err?: Error | null) => void }>,
+        writelen: 0,
+        buffered: [] as Array<{
+          chunk?: string | Buffer | Uint8Array;
+          encoding?: string;
+          callback?: (err?: Error | null) => void;
+        }>,
         bufferedIndex: 0,
       };
 
@@ -3376,8 +3386,15 @@ describe('AppContainer State Management', () => {
         expect(writableState.corked).toBe(1);
 
         // Simulate intermediate buffered frame written while corked during resize drag
-        writableState.buffered.push({ callback: bufferedCallback });
-        writableState.length = 42;
+        // alongside an active in-flight write (writelen = 10)
+        const discardedChunk = 'intermediate frame';
+        writableState.buffered.push({
+          chunk: discardedChunk,
+          encoding: 'utf8',
+          callback: bufferedCallback,
+        });
+        writableState.writelen = 10;
+        writableState.length = 10 + Buffer.byteLength(discardedChunk, 'utf8');
 
         mockedUseTerminalSize.mockReturnValue({ columns: 60, rows: 24 });
         await act(async () => {
@@ -3410,10 +3427,12 @@ describe('AppContainer State Management', () => {
           vi.advanceTimersByTime(100);
         });
 
-        // Intermediate buffered frame should have been discarded before clearTerminal
+        // Intermediate buffered frame should have been discarded before clearTerminal,
+        // subtracting only the discarded chunk bytes and preserving in-flight writelen
         expect(bufferedCallback).toHaveBeenCalledWith(null);
         expect(writableState.buffered).toHaveLength(0);
-        expect(writableState.length).toBe(0);
+        expect(writableState.length).toBe(10);
+        expect(writableState.writelen).toBe(10);
 
         // clearTerminal should be wrapped in DEC Synchronized Output (\x1b[?2026h ... \x1b[?2026l) and uncorked in useLayoutEffect
         expect(mocks.mockStdout.write).toHaveBeenNthCalledWith(
