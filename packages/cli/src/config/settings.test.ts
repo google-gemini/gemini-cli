@@ -83,7 +83,6 @@ import {
   GEMINI_DIR,
   Storage,
   AuthType,
-  type MCPServerConfig,
 } from '@google/gemini-cli-core';
 import * as core from '@google/gemini-cli-core';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
@@ -601,8 +600,8 @@ describe('Settings Loading and Merging', () => {
       expect(settings.errors[0].message).toContain(
         'Expected number, received string',
       );
-      // Should fall back to the expanded string value
-      expect(settings.merged.model.maxSessionTurns).toBe('not-a-number');
+      // Invalid expanded values are ignored so defaults still apply.
+      expect(settings.merged.model.maxSessionTurns).toBe(-1);
     });
 
     it('should preserve environment variable placeholders on save', () => {
@@ -3118,10 +3117,10 @@ describe('Settings Loading and Merging', () => {
 
     it('should un-nest MCP configuration from remote settings', () => {
       const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
-      const mcpServers: Record<string, MCPServerConfig> = {
+      const mcpServers = {
         'admin-server': {
           url: 'http://admin-mcp.com',
-          type: 'sse',
+          type: 'sse' as const,
           trust: true,
         },
       };
