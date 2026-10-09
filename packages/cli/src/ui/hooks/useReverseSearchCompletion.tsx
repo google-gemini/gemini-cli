@@ -30,6 +30,10 @@ export interface UseReverseSearchCompletionReturn {
   resetCompletionState: () => void;
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export function useReverseSearchCompletion(
   buffer: TextBuffer,
   history: readonly string[],
@@ -71,11 +75,12 @@ export function useReverseSearchCompletion(
   const searchHistory = useCallback(
     (query: string, items: readonly string[]) => {
       const out: Suggestion[] = [];
+      const regex = new RegExp(escapeRegExp(query), 'i');
       for (let i = 0; i < items.length; i++) {
         const cmd = items[i];
-        const idx = cmd.toLowerCase().indexOf(query);
-        if (idx !== -1) {
-          out.push({ label: cmd, value: cmd, matchedIndex: idx });
+        const match = regex.exec(cmd);
+        if (match) {
+          out.push({ label: cmd, value: cmd, matchedIndex: match.index });
         }
       }
       return out;
