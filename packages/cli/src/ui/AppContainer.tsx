@@ -225,6 +225,13 @@ const EXIT_SYNCHRONIZED_OUTPUT = '\x1b[?2026l';
 const RESIZE_DEBOUNCE_MS = 100;
 const RESIZE_CORK_SAFETY_TIMEOUT_MS = 1000;
 
+/**
+ * Internal representation of Node.js Writable stream state.
+ * This is used to access and discard stale buffered writes during rapid terminal resizes.
+ * Since Node.js does not expose a public API to clear or discard corked/buffered writes,
+ * accessing the internal `_writableState` is necessary to prevent terminal output lag
+ * and rendering glitches during resize events.
+ */
 interface WritableBufferState {
   corked?: number;
   length?: number;
@@ -235,10 +242,20 @@ interface WritableBufferState {
   writelen?: number;
 }
 
+/**
+ * Local interface for resizable terminal streams.
+ * Node.js WriteStream uses the internal `_refreshSize` method to update its `columns` and `rows`
+ * properties when a resize occurs, and stores corked buffer state on `_writableState`. Since there
+ * is no public API to force-refresh the stream's dimensions immediately or discard corked writes,
+ * we define this local interface to ensure layout and buffer calculations use up-to-date state.
+ */
+interface ResizableWriteStream extends NodeJS.WriteStream {
+  _writableState?: WritableBufferState;
+  _refreshSize?: () => void;
+}
+
 function discardCorkedStdoutBuffer(stream: NodeJS.WriteStream): void {
-  const state = (
-    stream as NodeJS.WriteStream & { _writableState?: WritableBufferState }
-  )._writableState;
+  const state = (stream as ResizableWriteStream)._writableState;
   if (state && (state.corked ?? 0) > 0 && Array.isArray(state.buffered)) {
     for (const entry of state.buffered) {
       if (typeof entry.callback === 'function') {
@@ -255,9 +272,7 @@ function discardCorkedStdoutBuffer(stream: NodeJS.WriteStream): void {
 }
 
 function refreshStdoutSize(stream: NodeJS.WriteStream): void {
-  const resizableStream = stream as NodeJS.WriteStream & {
-    _refreshSize?: () => void;
-  };
+  const resizableStream = stream as ResizableWriteStream;
   if (typeof resizableStream._refreshSize === 'function') {
     resizableStream._refreshSize();
   }
@@ -1949,6 +1964,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
       return;
     }
 
+    if (isAlternateBuffer || config.getUseTerminalBuffer()) {
+      clearResizeDebounceTimer();
+      return;
+    }
+
     clearResizeDebounceTimer();
     resizeDebounceTimerRef.current = setTimeout(() => {
       refreshStatic();
@@ -1957,7 +1977,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
     return () => {
       clearResizeDebounceTimer();
     };
-  }, [terminalWidth, refreshStatic, clearResizeDebounceTimer]);
+  }, [
+    terminalWidth,
+    refreshStatic,
+    clearResizeDebounceTimer,
+    isAlternateBuffer,
+    config,
+  ]);
 
   useEffect(() => {
     const unsubscribe = ideContextStore.subscribe(setIdeContextState);
