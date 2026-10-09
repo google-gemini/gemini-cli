@@ -22,6 +22,7 @@ import {
   shortenPath,
   makeRelative,
   resolveToRealPath,
+  isSubpath,
 } from '../utils/paths.js';
 import { type Config } from '../config/config.js';
 import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/constants.js';
@@ -97,6 +98,14 @@ export interface GlobToolParams {
    * Whether to respect .geminiignore patterns (optional, defaults to true)
    */
   respect_gemini_ignore?: boolean;
+}
+
+/**
+ * Detects patterns that would resolve glob outside the search directory
+ * outright: POSIX absolute paths and Windows drive/UNC roots.
+ */
+function isAbsolutePattern(pattern: string): boolean {
+  return path.isAbsolute(pattern) || /^[a-zA-Z]:[\\/]/.test(pattern);
 }
 
 class GlobToolInvocation extends BaseToolInvocation<
@@ -181,6 +190,23 @@ class GlobToolInvocation extends BaseToolInvocation<
       // Get centralized file discovery service
       const fileDiscovery = this.config.getFileService();
 
+      // A pattern is matched against each search directory. Absolute
+      // patterns (POSIX or Windows-style) bypass the directory entirely,
+      // so reject them up front for a clear error; backslash escapes and
+      // brace alternatives can still smuggle roots past this check, which
+      // the per-match containment filter below catches.
+      if (isAbsolutePattern(this.params.pattern)) {
+        const errMsg = `Pattern must be relative to the search directory (absolute paths are not allowed): ${this.params.pattern}`;
+        return {
+          llmContent: errMsg,
+          returnDisplay: 'Invalid glob pattern.',
+          error: {
+            message: errMsg,
+            type: ToolErrorType.INVALID_TOOL_PARAMS,
+          },
+        };
+      }
+
       // Collect entries from all search directories
       const allEntries: GlobPath[] = [];
       for (const searchDir of searchDirectories) {
@@ -202,7 +228,22 @@ class GlobToolInvocation extends BaseToolInvocation<
           signal,
         })) as GlobPath[];
 
-        allEntries.push(...entries);
+        // The search directory itself was validated above; a crafted
+        // pattern (absolute paths via braces, backslash-escaped "..")
+        // could still resolve matches outside it, so keep only matches
+        // that stay inside.
+        const containedEntries = entries.filter((entry) =>
+          isSubpath(searchDir, path.resolve(entry.fullpath())),
+        );
+        if (containedEntries.length !== entries.length) {
+          debugLogger.warn(
+            `Glob pattern "${this.params.pattern}" matched ${
+              entries.length - containedEntries.length
+            } path(s) outside ${searchDir}; they were dropped.`,
+          );
+        }
+
+        allEntries.push(...containedEntries);
       }
 
       let realTargetDir = this.config.getTargetDir();
