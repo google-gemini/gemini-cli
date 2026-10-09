@@ -267,6 +267,29 @@ describe('BrowserAgentInvocation', () => {
       expect(removeInputBlocker).toHaveBeenCalled();
     });
 
+    it('should throw plain cancellation messages after emitting cancelled progress', async () => {
+      mockExecutor.run.mockRejectedValue(
+        new Error('The user aborted a request.'),
+      );
+
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+
+      const updateOutput = vi.fn();
+      await expect(
+        invocation.execute(new AbortController().signal, updateOutput),
+      ).rejects.toThrow('The user aborted a request.');
+
+      const lastCall = updateOutput.mock.calls[
+        updateOutput.mock.calls.length - 1
+      ]?.[0] as SubagentProgress;
+      expect(lastCall.state).toBe('cancelled');
+      expect(cleanupBrowserAgent).toHaveBeenCalled();
+    });
+
     // ─── Structured SubagentProgress emission tests ───────────────────────
 
     /**
