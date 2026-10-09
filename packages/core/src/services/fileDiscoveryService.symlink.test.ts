@@ -6,12 +6,41 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
+import * as fsSync from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { FileDiscoveryService } from './fileDiscoveryService.js';
 import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
 
-describe('FileDiscoveryService - Symlink Ignore Handling', () => {
+function canCreateSymlinks(): boolean {
+  if (os.platform() !== 'win32') {
+    return true;
+  }
+  let uniqueTempDir: string | undefined;
+  try {
+    uniqueTempDir = fsSync.mkdtempSync(path.join(os.tmpdir(), 'symlink-test-'));
+    const testTarget = path.join(uniqueTempDir, 'symlink-test-target');
+    const testLink = path.join(uniqueTempDir, 'symlink-test-link');
+    fsSync.writeFileSync(testTarget, '');
+    fsSync.symlinkSync(testTarget, testLink);
+    return true;
+  } catch {
+    return false;
+  } finally {
+    if (uniqueTempDir) {
+      try {
+        fsSync.rmSync(uniqueTempDir, { recursive: true, force: true });
+      } catch {
+        // Ignore cleanup error
+      }
+    }
+  }
+}
+
+const hasSymlinkPrivilege = canCreateSymlinks();
+const describeSymlink = hasSymlinkPrivilege ? describe : describe.skip;
+
+describeSymlink('FileDiscoveryService - Symlink Ignore Handling', () => {
   let testRootDir: string;
   let projectRoot: string;
 
