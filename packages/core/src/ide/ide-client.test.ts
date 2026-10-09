@@ -413,6 +413,33 @@ describe('IdeClient', () => {
         ).diffResponses.has('/non-existent.txt'),
       ).toBe(false);
     });
+
+    it('should still resolve resolver if closeDiff throws an error', async () => {
+      const ideClient = await IdeClient.getInstance();
+      vi.spyOn(
+        ideClient as unknown as {
+          closeDiff: () => Promise<string | undefined>;
+        },
+        'closeDiff',
+      ).mockRejectedValue(new Error('Connection lost'));
+
+      const diffPromise = ideClient.openDiff('/test.txt', 'new content');
+      await new Promise((resolve) => setImmediate(resolve));
+
+      await ideClient.resolveDiffFromCli('/test.txt', 'accepted');
+
+      const result = await diffPromise;
+
+      expect(result).toEqual({
+        status: 'accepted',
+        content: undefined,
+      });
+      expect(
+        (
+          ideClient as unknown as { diffResponses: Map<string, unknown> }
+        ).diffResponses.has('/test.txt'),
+      ).toBe(false);
+    });
   });
 
   describe('closeDiff', () => {
