@@ -23,6 +23,7 @@ import {
   resolveDefensiveToolPath,
   hasBlockedPathSegment,
   stripExtendedLengthPrefix,
+  tildeifyPath,
 } from './paths.js';
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -1038,6 +1039,102 @@ describe('normalizePath', () => {
       expect(hasBlockedPathSegment('gh1a2b~1.json')).toBe(true);
       expect(hasBlockedPathSegment('gha-cr~1.jso')).toBe(true);
       expect(hasBlockedPathSegment('gh1a2b~1.jso')).toBe(true);
+    });
+  });
+});
+
+describe('tildeifyPath', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  describe('on POSIX', () => {
+    beforeEach(() => {
+      mockPlatform('linux');
+      vi.stubEnv('GEMINI_CLI_HOME', '/Users/al');
+    });
+
+    it('should replace the exact home directory with a tilde', () => {
+      expect(tildeifyPath('/Users/al')).toBe('~');
+    });
+
+    it('should replace the home directory prefix for a descendant', () => {
+      expect(tildeifyPath('/Users/al/Documents/app')).toBe(
+        '~/Documents/app',
+      );
+    });
+
+    it('should preserve a descendant trailing slash when home has one', () => {
+      vi.stubEnv('GEMINI_CLI_HOME', '/Users/al/');
+      expect(tildeifyPath('/Users/al/Documents/app/')).toBe(
+        '~/Documents/app/',
+      );
+    });
+
+    it('should normalize duplicate slashes and relative segments', () => {
+      expect(tildeifyPath('/Users//al/Documents/app')).toBe(
+        '~/Documents/app',
+      );
+      expect(tildeifyPath('/Users/al/../al/Documents/./app')).toBe(
+        '~/Documents/app',
+      );
+    });
+
+    it('should not replace a sibling directory with the same prefix', () => {
+      expect(tildeifyPath('/Users/albert/Documents/app')).toBe(
+        '/Users/albert/Documents/app',
+      );
+    });
+
+    it('should not replace a relative path', () => {
+      expect(tildeifyPath('Documents/app')).toBe('Documents/app');
+    });
+  });
+
+  describe('on Windows', () => {
+    beforeEach(() => {
+      mockPlatform('win32');
+      vi.stubEnv('GEMINI_CLI_HOME', 'C:\\Users\\Al');
+    });
+
+    it('should replace the exact home directory with a tilde', () => {
+      expect(tildeifyPath('C:\\Users\\Al')).toBe('~');
+    });
+
+    it('should replace the exact home directory with forward slashes', () => {
+      expect(tildeifyPath('C:/Users/Al')).toBe('~');
+    });
+
+    it('should replace the home directory prefix with native separators', () => {
+      expect(tildeifyPath('C:\\Users\\Al\\Documents\\app')).toBe(
+        '~\\Documents\\app',
+      );
+    });
+
+    it('should replace the home directory prefix with forward slashes', () => {
+      expect(tildeifyPath('C:/Users/Al/Documents/app')).toBe(
+        '~/Documents/app',
+      );
+    });
+
+    it('should normalize duplicate separators and relative segments', () => {
+      expect(tildeifyPath('C:\\Users\\\\Al\\Documents\\.\\app')).toBe(
+        '~\\Documents\\app',
+      );
+      expect(tildeifyPath('C:/Users/Al/Documents/../Documents/app')).toBe(
+        '~/Documents/app',
+      );
+    });
+
+    it('should not replace a sibling directory with the same prefix', () => {
+      expect(tildeifyPath('C:\\Users\\Albert\\Documents\\app')).toBe(
+        'C:\\Users\\Albert\\Documents\\app',
+      );
+    });
+
+    it('should not replace a relative path', () => {
+      expect(tildeifyPath('Documents\\app')).toBe('Documents\\app');
     });
   });
 });
