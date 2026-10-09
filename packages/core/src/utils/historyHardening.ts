@@ -485,6 +485,12 @@ export function scrubPart(part: Part): Part {
     if (part.functionResponse.id) {
       scrubbedResp['id'] = part.functionResponse.id;
     }
+    if (
+      'parts' in part.functionResponse &&
+      Array.isArray(part.functionResponse.parts)
+    ) {
+      scrubbedResp['parts'] = part.functionResponse.parts.map(scrubPart);
+    }
     scrubbed['functionResponse'] = scrubbedResp;
   }
   if ('fileData' in part) {

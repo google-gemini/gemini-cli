@@ -555,7 +555,37 @@ describe('oauth-flow', () => {
       expect(response.state).toBe('my-state');
     });
 
-    it('should reject callback when expectedIssuer is configured but iss parameter is omitted (downgrade prevention)', async () => {
+    it('should reject callback when expectedIssuer is configured, requireIssInResponse is true, and iss parameter is omitted', async () => {
+      const server = startCallbackServer(
+        'my-state',
+        undefined,
+        'https://secure-idp.example.com',
+        true,
+      );
+      const port = await server.port;
+
+      const responseResult = server.response.then(
+        () => new Error('Expected rejection'),
+        (e: Error) => e,
+      );
+
+      const res = await realFetch(
+        `http://localhost:${port}${REDIRECT_PATH}?code=auth-code-123&state=my-state`,
+      ).catch(() => {});
+
+      if (res) {
+        expect(res.status).toBe(400);
+      }
+
+      const error = await responseResult;
+      expect(error.message).toContain(
+        'Missing "iss" parameter in authorization response per RFC 9207',
+      );
+      // Ensure sensitive internal issuer details are not exposed in the error message
+      expect(error.message).not.toContain('https://secure-idp.example.com');
+    });
+
+    it('should reject callback when expectedIssuer is configured, requireIssInResponse is omitted (defaults to required), and iss parameter is omitted', async () => {
       const server = startCallbackServer(
         'my-state',
         undefined,
@@ -580,8 +610,54 @@ describe('oauth-flow', () => {
       expect(error.message).toContain(
         'Missing "iss" parameter in authorization response per RFC 9207',
       );
-      // Ensure sensitive internal issuer details are not exposed in the error message
-      expect(error.message).not.toContain('https://secure-idp.example.com');
+    });
+
+    it('should allow callback when expectedIssuer is configured, requireIssInResponse is false, and iss parameter is omitted', async () => {
+      const server = startCallbackServer(
+        'my-state',
+        undefined,
+        'https://secure-idp.example.com',
+        false,
+      );
+      const port = await server.port;
+
+      const res = await realFetch(
+        `http://localhost:${port}${REDIRECT_PATH}?code=auth-code-123&state=my-state`,
+      );
+      expect(res.status).toBe(200);
+
+      const response = await server.response;
+      expect(response.code).toBe('auth-code-123');
+      expect(response.state).toBe('my-state');
+      expect(response.iss).toBeUndefined();
+    });
+
+    it('should reject callback when requireIssInResponse is false but the provided iss does not match expectedIssuer', async () => {
+      const server = startCallbackServer(
+        'my-state',
+        undefined,
+        'https://secure-idp.example.com',
+        false,
+      );
+      const port = await server.port;
+
+      const responseResult = server.response.then(
+        () => new Error('Expected rejection'),
+        (e: Error) => e,
+      );
+
+      const res = await realFetch(
+        `http://localhost:${port}${REDIRECT_PATH}?code=auth-code-123&state=my-state&iss=https://other-idp.example.com`,
+      ).catch(() => {});
+
+      if (res) {
+        expect(res.status).toBe(400);
+      }
+
+      const error = await responseResult;
+      expect(error.message).toContain(
+        'Issuer mismatch in authorization response',
+      );
     });
 
     it('should allow callback when no expectedIssuer is configured and iss parameter is omitted', async () => {
