@@ -39,6 +39,7 @@ import { hasCycleInSchema } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
 import type { CompletedToolCall } from '../scheduler/types.js';
 import { isAbortError } from '../utils/errors.js';
+import { delay } from '../utils/delay.js';
 import {
   logContentRetry,
   logContentRetryFailure,
@@ -749,7 +750,7 @@ export class GeminiChat {
               ? error.type
               : getRetryErrorType(error);
 
-            if (isRetryableContentError || (isRetryable && !signal.aborted)) {
+            if (!signal.aborted && (isRetryable || isRetryableContentError)) {
               // The issue requests exactly 3 retries (4 attempts) for API errors during stream iteration.
               // Regardless of the global maxAttempts (e.g. 10), we only want to retry these mid-stream API errors
               // up to 3 times before finally throwing the error to the user.
@@ -788,7 +789,9 @@ export class GeminiChat {
                   error: errorType,
                   model,
                 });
-                await new Promise((res) => setTimeout(res, delayMs));
+                // Abort-aware: rejects with an AbortError if the user cancels
+                // during the backoff instead of sleeping the full delay.
+                await delay(delayMs, signal);
                 continue;
               }
             }

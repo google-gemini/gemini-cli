@@ -1960,6 +1960,106 @@ describe('GeminiChat', () => {
       expect(mockLogContentRetryFailure).toHaveBeenCalledTimes(1);
     });
 
+    it('should not retry a content error once the request has been aborted', async () => {
+      const controller = new AbortController();
+      vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
+        async () =>
+          (async function* () {
+            // The user cancels while the (invalid) stream is still in flight.
+            controller.abort();
+            yield {
+              candidates: [
+                {
+                  content: {
+                    role: 'model',
+                    parts: [{ thought: true, text: 'thinking...' }],
+                  },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-2.0-flash' },
+        'test message',
+        'prompt-id-1',
+        controller.signal,
+        LlmRole.MAIN,
+      );
+
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            // consume stream
+          }
+        })(),
+      ).rejects.toThrow(InvalidStreamError);
+
+      // No retry slot, retry telemetry, or extra API call after cancellation.
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
+        1,
+      );
+      expect(mockLogContentRetry).not.toHaveBeenCalled();
+      expect(mockLogContentRetryFailure).not.toHaveBeenCalled();
+    });
+
+    it('should abandon the retry backoff as soon as the request is aborted', async () => {
+      // The suite stubs setTimeout to fire immediately; this test needs a
+      // real (fake) clock to observe the backoff being cut short.
+      vi.mocked(globalThis.setTimeout).mockRestore();
+      vi.useFakeTimers();
+      try {
+        const controller = new AbortController();
+        vi.mocked(
+          mockContentGenerator.generateContentStream,
+        ).mockImplementation(async () =>
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: {
+                    role: 'model',
+                    parts: [{ thought: true, text: 'thinking...' }],
+                  },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+        );
+
+        const stream = await chat.sendMessageStream(
+          { model: 'gemini-2.0-flash' },
+          'test message',
+          'prompt-id-1',
+          controller.signal,
+          LlmRole.MAIN,
+        );
+        const consumed = (async () => {
+          for await (const _ of stream) {
+            // consume stream
+          }
+        })();
+
+        // Let the first attempt fail and enter the backoff, then cancel.
+        await vi.advanceTimersByTimeAsync(10);
+        expect(mockLogContentRetry).toHaveBeenCalledTimes(1);
+        controller.abort();
+
+        // The backoff is cut short with the standard AbortError, so callers
+        // see a cancellation rather than a stream failure.
+        await expect(consumed).rejects.toThrow('Aborted');
+        expect(
+          mockContentGenerator.generateContentStream,
+        ).toHaveBeenCalledTimes(1);
+        expect(mockLogContentRetryFailure).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('should succeed when there is finish reason and response text', async () => {
       // Setup: Stream with both finish reason and text content
       const validStream = (async function* () {
