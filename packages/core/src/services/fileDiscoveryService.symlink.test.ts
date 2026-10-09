@@ -16,27 +16,24 @@ function canCreateSymlinks(): boolean {
   if (os.platform() !== 'win32') {
     return true;
   }
-  const tempDir = os.tmpdir();
-  const testTarget = path.join(tempDir, `symlink-test-target-${Date.now()}`);
-  const testLink = path.join(tempDir, `symlink-test-link-${Date.now()}`);
+  let uniqueTempDir: string | undefined;
   try {
+    uniqueTempDir = fsSync.mkdtempSync(path.join(os.tmpdir(), 'symlink-test-'));
+    const testTarget = path.join(uniqueTempDir, 'symlink-test-target');
+    const testLink = path.join(uniqueTempDir, 'symlink-test-link');
     fsSync.writeFileSync(testTarget, '');
     fsSync.symlinkSync(testTarget, testLink);
-    fsSync.unlinkSync(testLink);
-    fsSync.unlinkSync(testTarget);
     return true;
   } catch {
-    try {
-      if (fsSync.existsSync(testLink)) {
-        fsSync.unlinkSync(testLink);
-      }
-      if (fsSync.existsSync(testTarget)) {
-        fsSync.unlinkSync(testTarget);
-      }
-    } catch {
-      // Ignore cleanup error
-    }
     return false;
+  } finally {
+    if (uniqueTempDir) {
+      try {
+        fsSync.rmSync(uniqueTempDir, { recursive: true, force: true });
+      } catch {
+        // Ignore cleanup error
+      }
+    }
   }
 }
 
