@@ -1,6 +1,6 @@
-# Preview release: v0.64.0-preview.0
+# Preview release: v0.64.0-preview.1
 
-Released: October 6, 2026
+Released: October 9, 2026
 
 Our preview release includes the latest, new, and experimental features. This
 release may not be as stable as our [latest weekly release](latest.md).
@@ -28,6 +28,10 @@ npm install -g @google/gemini-cli@preview
 
 ## What's Changed
 
+- fix(patch): cherry-pick 2ce1a69 to release/v0.64.0-preview.0-pr-29672 to patch
+  version v0.64.0-preview.0 and create version 0.64.0-preview.1 by
+  @gemini-cli-robot in
+  [#29696](https://github.com/google-gemini/gemini-cli/pull/29696)
 - refactor(a2a-server): implement V1 to V2 settings migration logic by
   @jvargassanchez-dot in
   [#29450](https://github.com/google-gemini/gemini-cli/pull/29450)
@@ -76,4 +80,4 @@ npm install -g @google/gemini-cli@preview
   [#29502](https://github.com/google-gemini/gemini-cli/pull/29502)
 
 **Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.63.0-preview.0...v0.64.0-preview.0
+https://github.com/google-gemini/gemini-cli/compare/v0.63.0-preview.0...v0.64.0-preview.1
