@@ -54,9 +54,19 @@ export interface CheckerRunnerConfig {
 
 /**
  * Service for executing safety checker processes.
+ *
+ * External checkers are third-party binaries run locally: they get a
+ * minimal environment (no CLI secrets such as API keys) and their output
+ * is size-capped so a buggy or malicious checker cannot exhaust memory.
  */
 export class CheckerRunner {
   private static readonly DEFAULT_TIMEOUT = 5000; // 5 seconds
+
+  /**
+   * Maximum stdout/stderr bytes collected from an external checker before
+   * it is killed and the tool call is denied.
+   */
+  private static readonly MAX_OUTPUT_BYTES = 256 * 1024;
 
   private readonly registry: CheckerRegistry;
   private readonly contextBuilder: ContextBuilder;
@@ -158,6 +168,22 @@ export class CheckerRunner {
   }
 
   /**
+   * Minimal environment for external checkers: PATH (and SYSTEMROOT on
+   * Windows) only, so secrets from the CLI process env are not handed to
+   * third-party binaries. Explicit config.env entries win on top.
+   */
+  private buildCheckerEnv(): NodeJS.ProcessEnv {
+    const env: NodeJS.ProcessEnv = {};
+    if (process.env['PATH'] !== undefined) {
+      env['PATH'] = process.env['PATH'];
+    }
+    if (process.env['SYSTEMROOT'] !== undefined) {
+      env['SYSTEMROOT'] = process.env['SYSTEMROOT'];
+    }
+    return { ...env, ...this.contextBuilder.config.env };
+  }
+
+  /**
    * Executes an external checker process and handles its lifecycle.
    */
   private executeCheckerProcess(
@@ -169,15 +195,45 @@ export class CheckerRunner {
       const child = spawn(checkerPath, [], {
         stdio: ['pipe', 'pipe', 'pipe'],
         cwd: this.contextBuilder.config.getWorkingDir(),
-        env: { ...process.env, ...this.contextBuilder.config.env },
+        env: this.buildCheckerEnv(),
       });
 
       let stdout = '';
       let stderr = '';
+      let stdoutBytes = 0;
+      let stderrBytes = 0;
+      let capped = false;
       let timeoutHandle: NodeJS.Timeout | null = null;
       let killed = false;
 
       let exited = false;
+
+      const capOutput = (
+        streamName: 'stdout' | 'stderr',
+        incomingBytes: number,
+      ): boolean => {
+        if (capped) {
+          return true;
+        }
+        const total = streamName === 'stdout' ? stdoutBytes : stderrBytes;
+        if (total + incomingBytes <= CheckerRunner.MAX_OUTPUT_BYTES) {
+          return false;
+        }
+        capped = true;
+        killed = true;
+        child.kill('SIGTERM');
+        resolve({
+          decision: SafetyCheckDecision.DENY,
+          reason: `Safety checker "${checkerName}" ${streamName} exceeded the ${CheckerRunner.MAX_OUTPUT_BYTES} byte output limit`,
+        });
+        // Fallback: if process doesn't exit after 5s, force kill
+        setTimeout(() => {
+          if (!exited) {
+            child.kill('SIGKILL');
+          }
+        }, 5000).unref();
+        return true;
+      };
 
       // Set up timeout
       timeoutHandle = setTimeout(() => {
@@ -199,12 +255,20 @@ export class CheckerRunner {
       // Collect output
       if (child.stdout) {
         child.stdout.on('data', (data: Buffer) => {
+          if (capOutput('stdout', data.length)) {
+            return;
+          }
+          stdoutBytes += data.length;
           stdout += data.toString();
         });
       }
 
       if (child.stderr) {
         child.stderr.on('data', (data: Buffer) => {
+          if (capOutput('stderr', data.length)) {
+            return;
+          }
+          stderrBytes += data.length;
           stderr += data.toString();
         });
       }
