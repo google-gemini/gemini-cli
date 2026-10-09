@@ -777,9 +777,6 @@ export const AppContainer = (props: AppContainerProps) => {
     corkStdout,
   ]);
 
-  const refreshStaticRef = useRef(refreshStatic);
-  refreshStaticRef.current = refreshStatic;
-
   useLayoutEffect(() => {
     if (isRefreshingStaticRef.current) {
       isRefreshingStaticRef.current = false;
@@ -1916,15 +1913,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
       ) {
         lastStdoutColumnsRef.current = currentColumns;
         corkStdout();
-        clearResizeDebounceTimer();
         clearResizeCorkSafetyTimer();
         resizeCorkSafetyTimerRef.current = setTimeout(() => {
           discardCorkedStdoutBuffer(stdout);
           uncorkStdout();
         }, RESIZE_CORK_SAFETY_TIMEOUT_MS);
-        resizeDebounceTimerRef.current = setTimeout(() => {
-          refreshStaticRef.current();
-        }, RESIZE_DEBOUNCE_MS);
       }
     };
 
