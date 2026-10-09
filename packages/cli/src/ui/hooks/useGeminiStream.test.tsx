@@ -92,6 +92,19 @@ const MockedGeminiClientClass = vi.hoisted(() =>
     this.setHistory = vi.fn().mockImplementation((newHistory: any[]) => {
       mockHistory = [...newHistory];
     });
+    this.discardTrailingUnansweredToolCallTurn = vi
+      .fn()
+      .mockImplementation(() => {
+        const last = mockHistory[mockHistory.length - 1];
+        if (
+          last?.role !== 'model' ||
+          !last.parts?.some((part: any) => !!part.functionCall)
+        ) {
+          return false;
+        }
+        mockHistory = mockHistory.slice(0, -1);
+        return true;
+      });
     this.generateContent = vi.fn().mockResolvedValue({
       candidates: [
         { content: { parts: [{ text: 'Got it. Focusing on tests only.' }] } },
@@ -1132,7 +1145,7 @@ describe('useGeminiStream', () => {
       ),
     );
 
-    // Call submitQuery to populate the user turn and set historyLengthAfterUserPromptRef
+    // Call submitQuery to populate the user turn
     await act(async () => {
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
       result.current.submitQuery('User prompt');
@@ -1165,6 +1178,161 @@ describe('useGeminiStream', () => {
       // Ensure we do NOT call back to the API a second time (only the initial user turn was sent)
       expect(mockSendMessageStream).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it('should keep the user prompt and completed tool rounds when a later tool batch is declined', async () => {
+    const cancelledToolCalls: TrackedToolCall[] = [
+      {
+        request: {
+          callId: '2',
+          name: 'testTool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-4',
+        },
+        status: CoreToolCallStatus.Cancelled,
+        response: {
+          callId: '2',
+          responseParts: [{ text: CoreToolCallStatus.Cancelled }],
+          errorType: undefined,
+        },
+        responseSubmittedToGemini: false,
+        tool: {
+          displayName: 'mock tool',
+        },
+        invocation: {
+          getDescription: () => `Mock description`,
+        },
+      } as any,
+    ];
+    const client = new MockedGeminiClientClass(mockConfig);
+    const priorTurn = [
+      { role: 'user', parts: [{ text: 'Earlier prompt' }] },
+      { role: 'model', parts: [{ text: 'Earlier answer' }] },
+    ];
+    client.setHistory(priorTurn);
+    // Model the real sendMessageStream contract: the user turn is recorded in
+    // the client history when the request is sent, not before submitQuery.
+    mockSendMessageStream.mockImplementation((query: PartListUnion) => {
+      const parts = (Array.isArray(query) ? query : [query]).map((part) =>
+        typeof part === 'string' ? { text: part } : part,
+      );
+      client.setHistory([...client.getHistory(), { role: 'user', parts }]);
+      return (async function* () {
+        yield { type: ServerGeminiEventType.Content, value: 'Working on it' };
+      })();
+    });
+
+    let capturedOnComplete:
+      | ((completedTools: TrackedToolCall[]) => Promise<void>)
+      | null = null;
+
+    mockUseToolScheduler.mockImplementation((onComplete) => {
+      capturedOnComplete = onComplete;
+      return [
+        [],
+        mockScheduleToolCalls,
+        mockMarkToolsAsSubmitted,
+        vi.fn(),
+        mockCancelAllToolCalls,
+        0,
+      ];
+    });
+
+    const { result } = await renderHookWithProviders(() =>
+      useGeminiStream(
+        client,
+        [],
+        mockAddItem,
+        mockConfig,
+        mockLoadedSettings,
+        mockOnDebugMessage,
+        mockHandleSlashCommand,
+        false,
+        () => 'vscode' as EditorType,
+        () => {},
+        () => Promise.resolve(),
+        false,
+        () => {},
+        () => {},
+        () => {},
+        80,
+        24,
+      ),
+    );
+
+    // Turn 1 starts: sendMessageStream records the user prompt.
+    await act(async () => {
+      await result.current.submitQuery('User prompt');
+    });
+
+    // The model answers with a first tool call, which completes and is sent
+    // back to the model as a continuation turn.
+    const firstRoundResponse: Part[] = [
+      {
+        functionResponse: {
+          name: 'testTool',
+          id: '1',
+          response: { output: 'first result' },
+        },
+      },
+    ];
+    client.setHistory([
+      ...client.getHistory(),
+      {
+        role: 'model',
+        parts: [{ functionCall: { name: 'testTool', id: '1', args: {} } }],
+      },
+    ]);
+    await act(async () => {
+      await result.current.submitQuery(firstRoundResponse, {
+        isContinuation: true,
+      });
+    });
+
+    // The model requests a second tool call within the same chain.
+    client.setHistory([
+      ...client.getHistory(),
+      {
+        role: 'model',
+        parts: [{ functionCall: { name: 'testTool', id: '2', args: {} } }],
+      },
+    ]);
+    vi.mocked(client.setHistory).mockClear();
+
+    // The second tool call is declined.
+    await act(async () => {
+      if (capturedOnComplete) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        await capturedOnComplete(cancelledToolCalls);
+      }
+    });
+
+    try {
+      await waitFor(() => {
+        expect(mockMarkToolsAsSubmitted).toHaveBeenCalledWith(['2']);
+        expect(client.addHistory).not.toHaveBeenCalled();
+        // Only the trailing unanswered call is removed, without re-setting
+        // the whole history (which would re-record every turn).
+        expect(
+          client.discardTrailingUnansweredToolCallTurn,
+        ).toHaveBeenCalledTimes(1);
+        expect(client.setHistory).not.toHaveBeenCalled();
+        // The previous turn, the user prompt and the completed first round
+        // are preserved.
+        expect(client.getHistory()).toEqual([
+          ...priorTurn,
+          { role: 'user', parts: [{ text: 'User prompt' }] },
+          {
+            role: 'model',
+            parts: [{ functionCall: { name: 'testTool', id: '1', args: {} } }],
+          },
+          { role: 'user', parts: firstRoundResponse },
+        ]);
+      });
+    } finally {
+      mockSendMessageStream.mockImplementation(() => (async function* () {})());
+    }
   });
 
   it('should record tool responses in history when the model was switched due to a quota error', async () => {
@@ -1597,7 +1765,7 @@ describe('useGeminiStream', () => {
       ),
     );
 
-    // Call submitQuery to populate the user turn and set historyLengthAfterUserPromptRef
+    // Call submitQuery to populate the user turn
     await act(async () => {
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
       result.current.submitQuery('User prompt');
