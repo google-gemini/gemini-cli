@@ -709,7 +709,6 @@ export const AppContainer = (props: AppContainerProps) => {
     stdout.columns ?? process.stdout.columns ?? terminalWidth,
   );
   const lastRefreshedColumnsRef = useRef<number>(terminalWidth);
-  const lastRenderedHistoryRemountKeyRef = useRef<number>(historyRemountKey);
   const terminalWidthRef = useRef<number>(terminalWidth);
   terminalWidthRef.current = terminalWidth;
 
@@ -751,12 +750,14 @@ export const AppContainer = (props: AppContainerProps) => {
         return;
       }
       clearResizeCorkSafetyTimer();
+      lastRefreshedColumnsRef.current = terminalWidth;
       if (typeof stdout.cork === 'function') {
         corkStdout();
+        discardCorkedStdoutBuffer(stdout);
         isRefreshingStaticRef.current = true;
-      } else {
-        stdout.write(ansiEscapes.clearTerminal);
+        stdout.write(ENTER_SYNCHRONIZED_OUTPUT);
       }
+      stdout.write(ansiEscapes.clearTerminal);
       setHistoryRemountKey((prev) => prev + 1);
     }
   }, [
@@ -772,22 +773,6 @@ export const AppContainer = (props: AppContainerProps) => {
 
   const refreshStaticRef = useRef(refreshStatic);
   refreshStaticRef.current = refreshStatic;
-
-  if (!isAlternateBuffer && !config.getUseTerminalBuffer()) {
-    if (terminalWidth !== lastRefreshedColumnsRef.current) {
-      corkStdout();
-    }
-    if (historyRemountKey !== lastRenderedHistoryRemountKeyRef.current) {
-      lastRenderedHistoryRemountKeyRef.current = historyRemountKey;
-      lastRefreshedColumnsRef.current = terminalWidth;
-      if (isRefreshingStaticRef.current && typeof stdout.cork === 'function') {
-        corkStdout();
-        discardCorkedStdoutBuffer(stdout);
-        stdout.write(ENTER_SYNCHRONIZED_OUTPUT);
-        stdout.write(ansiEscapes.clearTerminal);
-      }
-    }
-  }
 
   useLayoutEffect(() => {
     if (isRefreshingStaticRef.current) {
