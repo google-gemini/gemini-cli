@@ -1843,7 +1843,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     needsRestart: ideNeedsRestart,
     restartReason: ideTrustRestartReason,
   } = useIdeTrustListener();
-  const isInitialMount = useRef(true);
+  const prevWidthRef = useRef<number>(terminalWidth);
 
   useIncludeDirsTrust(config, isTrustedFolder, historyManager, setCustomDialog);
 
@@ -1959,10 +1959,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
   ]);
 
   useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
+    if (prevWidthRef.current === terminalWidth) {
       return;
     }
+    prevWidthRef.current = terminalWidth;
 
     if (isAlternateBuffer || config.getUseTerminalBuffer()) {
       clearResizeDebounceTimer();
