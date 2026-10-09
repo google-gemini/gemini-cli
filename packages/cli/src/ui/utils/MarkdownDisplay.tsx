@@ -12,6 +12,7 @@ import { TableRenderer } from './TableRenderer.js';
 import { RenderInline } from './InlineMarkdownRenderer.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+import { MaxSizedBox } from '../components/shared/MaxSizedBox.js';
 
 interface MarkdownDisplayProps {
   text: string;
@@ -308,6 +309,25 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
         rows={tableRows}
         terminalWidth={terminalWidth}
       />,
+    );
+  }
+
+  // When not in alternate buffer mode a pending message that is taller than the
+  // terminal forces Ink to clear and redraw the whole screen on every update.
+  // Cap the height so streaming text keeps the frame shorter than the terminal.
+  if (
+    !isAlternateBuffer &&
+    isPending &&
+    availableTerminalHeight !== undefined
+  ) {
+    return (
+      <MaxSizedBox
+        maxHeight={availableTerminalHeight}
+        maxWidth={terminalWidth}
+        overflowDirection="top"
+      >
+        {contentBlocks}
+      </MaxSizedBox>
     );
   }
 

@@ -87,6 +87,45 @@ describe('<MarkdownDisplay />', () => {
       unmount();
     });
 
+    it('caps the height of pending plain text to the available height', async () => {
+      const text = Array.from(
+        { length: 30 },
+        (_, i) => `${i + 1}. tip ${i + 1}`,
+      ).join(eol);
+      const { lastFrame, unmount } = await renderWithProviders(
+        <MarkdownDisplay
+          {...baseProps}
+          text={text}
+          isPending={true}
+          availableTerminalHeight={10}
+        />,
+      );
+      const frame = lastFrame() ?? '';
+      expect(frame.trimEnd().split('\n').length).toBeLessThanOrEqual(10);
+      expect(frame).toContain('tip 30');
+      expect(frame).not.toContain('tip 1\n');
+      expect(frame).toContain('lines hidden');
+      unmount();
+    });
+
+    it('does not cap the height of completed plain text', async () => {
+      const text = Array.from(
+        { length: 30 },
+        (_, i) => `${i + 1}. tip ${i + 1}`,
+      ).join(eol);
+      const { lastFrame, unmount } = await renderWithProviders(
+        <MarkdownDisplay
+          {...baseProps}
+          text={text}
+          isPending={false}
+          availableTerminalHeight={10}
+        />,
+      );
+      expect(lastFrame()).toContain('tip 1');
+      expect(lastFrame()).toContain('tip 30');
+      unmount();
+    });
+
     it('renders unordered lists with different markers', async () => {
       const text = `
 - item A
