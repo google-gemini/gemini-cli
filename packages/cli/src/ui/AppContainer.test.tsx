@@ -221,6 +221,8 @@ vi.mock('../utils/handleAutoUpdate.js');
 vi.mock('./utils/ConsolePatcher.js');
 vi.mock('../utils/cleanup.js');
 
+import { appEvents, AppEvent } from '../utils/events.js';
+
 import { useHistory } from './hooks/useHistoryManager.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
 import { useAuthCommand } from './auth/useAuth.js';
@@ -3229,6 +3231,28 @@ describe('AppContainer State Management', () => {
       );
 
       expect(clearTerminalCalls).toHaveLength(0);
+      unmount();
+    });
+
+    it('keeps constrainHeight true when OpenDebugConsole event is triggered', async () => {
+      const { unmount } = await act(async () => renderAppContainer());
+      expect(capturedUIState).toBeTruthy();
+      expect(capturedUIState.showErrorDetails).toBe(false);
+      expect(capturedUIState.constrainHeight).toBe(true);
+
+      const openDebugConsoleHandler = vi
+        .mocked(appEvents.on)
+        .mock.calls.find(
+          (call: unknown[]) => call[0] === AppEvent.OpenDebugConsole,
+        )?.[1] as (() => void) | undefined;
+      expect(openDebugConsoleHandler).toBeDefined();
+
+      act(() => {
+        openDebugConsoleHandler!();
+      });
+
+      expect(capturedUIState.showErrorDetails).toBe(true);
+      expect(capturedUIState.constrainHeight).toBe(true);
       unmount();
     });
   });

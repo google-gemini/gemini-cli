@@ -95,20 +95,23 @@ vi.mock('./AppHeader.js', () => ({
   ),
 }));
 
+const mockScrollableList = vi.fn();
+
 vi.mock('./shared/ScrollableList.js', async () => {
   const { forwardRef, useImperativeHandle } =
     await vi.importActual<typeof import('react')>('react');
   const ScrollableList = forwardRef(
     (
-      {
-        data,
-        renderItem,
-      }: {
+      props: {
         data: unknown[];
         renderItem: (props: { item: unknown }) => JSX.Element;
+        isStaticItem?: (item: unknown) => boolean;
+        renderStatic?: boolean;
       },
       ref,
     ) => {
+      mockScrollableList(props);
+      const { data, renderItem } = props;
       useImperativeHandle(ref, () => ({
         scrollToEnd: scrollableListMocks.scrollToEnd,
         getScrollState: scrollableListMocks.getScrollState,
@@ -956,7 +959,6 @@ describe('MainContent', () => {
       },
     );
   });
-
   describe('Scroll position preservation and dynamic height partitioning', () => {
     beforeEach(() => {
       scrollableListMocks.scrollToEnd.mockClear();
@@ -1190,5 +1192,77 @@ describe('MainContent', () => {
       expect(renderedLines).toBeLessThanOrEqual(uiState.terminalHeight);
       unmount();
     });
+  });
+
+  it('marks header and non-interactive history items as static in terminalBuffer mode', async () => {
+    vi.mocked(useAlternateBuffer).mockReturnValue(true);
+    mockScrollableList.mockClear();
+
+    const { unmount } = await renderWithProviders(<MainContent />, {
+      uiState: defaultMockUiState as Partial<UIState>,
+      config: makeFakeConfig({
+        useAlternateBuffer: false,
+        useTerminalBuffer: true,
+      }),
+      settings: createMockSettings({
+        ui: { useAlternateBuffer: false, terminalBuffer: true },
+      }),
+    });
+
+    expect(mockScrollableList).toHaveBeenCalled();
+    const lastCallProps =
+      mockScrollableList.mock.calls[
+        mockScrollableList.mock.calls.length - 1
+      ][0];
+    expect(lastCallProps.renderStatic).toBe(true);
+    const isStaticItem = lastCallProps.isStaticItem as (
+      item: unknown,
+    ) => boolean;
+    expect(isStaticItem).toBeTypeOf('function');
+
+    expect(isStaticItem({ type: 'header' })).toBe(true);
+    expect(
+      isStaticItem({
+        type: 'history',
+        item: { id: 1, type: 'user', text: 'Hello' },
+      }),
+    ).toBe(true);
+    expect(
+      isStaticItem({
+        type: 'history',
+        item: { id: 2, type: 'gemini', text: 'Response' },
+      }),
+    ).toBe(true);
+    expect(
+      isStaticItem({
+        type: 'history',
+        item: { id: 3, type: 'gemini_content', text: 'Chunk' },
+      }),
+    ).toBe(true);
+    expect(
+      isStaticItem({
+        type: 'history',
+        item: {
+          id: 4,
+          type: 'thinking',
+          thought: { subject: 'S', description: 'D' },
+        },
+      }),
+    ).toBe(true);
+    expect(
+      isStaticItem({
+        type: 'history',
+        item: { id: 5, type: 'tool_group', tools: [] },
+      }),
+    ).toBe(false);
+    expect(
+      isStaticItem({
+        type: 'history',
+        item: { id: 6, type: 'compression', compression: { isPending: false } },
+      }),
+    ).toBe(false);
+    expect(isStaticItem({ type: 'pending' })).toBe(false);
+
+    unmount();
   });
 });
