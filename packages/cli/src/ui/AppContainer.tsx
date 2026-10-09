@@ -258,17 +258,19 @@ function discardCorkedStdoutBuffer(stream: NodeJS.WriteStream): void {
   try {
     const state = (stream as ResizableWriteStream)._writableState;
     if (state && (state.corked ?? 0) > 0 && Array.isArray(state.buffered)) {
-      for (const entry of state.buffered) {
-        if (entry && typeof entry.callback === 'function') {
-          entry.callback(null);
-        }
-      }
+      const entries = state.buffered.slice(state.bufferedIndex ?? 0);
       state.buffered.length = 0;
       state.length = 0;
       if ('allBuffers' in state) state.allBuffers = true;
       if ('allNoop' in state) state.allNoop = true;
       if ('writelen' in state) state.writelen = 0;
       if ('bufferedIndex' in state) state.bufferedIndex = 0;
+
+      for (const entry of entries) {
+        if (entry && typeof entry.callback === 'function') {
+          entry.callback(null);
+        }
+      }
     }
   } catch (error) {
     debugLogger.warn('Failed to discard corked stdout buffer safely:', error);
@@ -750,10 +752,16 @@ export const AppContainer = (props: AppContainerProps) => {
       clearResizeDebounceTimer();
       refreshStdoutSize(stdout);
       if (
+        typeof stdout.prependListener === 'function' &&
         stdout.columns !== undefined &&
         stdout.columns !== terminalWidthRef.current
       ) {
         corkStdout();
+        clearResizeCorkSafetyTimer();
+        resizeCorkSafetyTimerRef.current = setTimeout(() => {
+          discardCorkedStdoutBuffer(stdout);
+          uncorkStdout();
+        }, RESIZE_CORK_SAFETY_TIMEOUT_MS);
         return;
       }
       clearResizeCorkSafetyTimer();
@@ -775,6 +783,7 @@ export const AppContainer = (props: AppContainerProps) => {
     clearResizeDebounceTimer,
     clearResizeCorkSafetyTimer,
     corkStdout,
+    uncorkStdout,
   ]);
 
   useLayoutEffect(() => {
