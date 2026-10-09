@@ -255,19 +255,23 @@ interface ResizableWriteStream extends NodeJS.WriteStream {
 }
 
 function discardCorkedStdoutBuffer(stream: NodeJS.WriteStream): void {
-  const state = (stream as ResizableWriteStream)._writableState;
-  if (state && (state.corked ?? 0) > 0 && Array.isArray(state.buffered)) {
-    for (const entry of state.buffered) {
-      if (typeof entry.callback === 'function') {
-        entry.callback(null);
+  try {
+    const state = (stream as ResizableWriteStream)._writableState;
+    if (state && (state.corked ?? 0) > 0 && Array.isArray(state.buffered)) {
+      for (const entry of state.buffered) {
+        if (entry && typeof entry.callback === 'function') {
+          entry.callback(null);
+        }
       }
+      state.buffered.length = 0;
+      state.length = 0;
+      if ('allBuffers' in state) state.allBuffers = true;
+      if ('allNoop' in state) state.allNoop = true;
+      if ('writelen' in state) state.writelen = 0;
+      if ('bufferedIndex' in state) state.bufferedIndex = 0;
     }
-    state.buffered.length = 0;
-    state.length = 0;
-    if ('allBuffers' in state) state.allBuffers = true;
-    if ('allNoop' in state) state.allNoop = true;
-    if ('writelen' in state) state.writelen = 0;
-    if ('bufferedIndex' in state) state.bufferedIndex = 0;
+  } catch (error) {
+    debugLogger.warn('Failed to discard corked stdout buffer safely:', error);
   }
 }
 
@@ -785,6 +789,7 @@ export const AppContainer = (props: AppContainerProps) => {
         stdout.columns !== lastRefreshedColumnsRef.current
       ) {
         discardCorkedStdoutBuffer(stdout);
+        uncorkStdout();
         return;
       }
       stdout.write(EXIT_SYNCHRONIZED_OUTPUT);
@@ -1917,11 +1922,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
           discardCorkedStdoutBuffer(stdout);
           uncorkStdout();
         }, RESIZE_CORK_SAFETY_TIMEOUT_MS);
-        if (currentColumns === terminalWidthRef.current) {
-          resizeDebounceTimerRef.current = setTimeout(() => {
-            refreshStaticRef.current();
-          }, RESIZE_DEBOUNCE_MS);
-        }
+        resizeDebounceTimerRef.current = setTimeout(() => {
+          refreshStaticRef.current();
+        }, RESIZE_DEBOUNCE_MS);
       }
     };
 
