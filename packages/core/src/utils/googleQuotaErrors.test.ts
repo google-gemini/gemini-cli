@@ -435,6 +435,101 @@ describe('classifyGoogleError', () => {
     expect((result as TerminalQuotaError).reason).toBe('RATE_LIMIT_EXCEEDED');
   });
 
+  it('should return RetryableQuotaError for Cloud Code RATE_LIMIT_EXCEEDED with a zero retry delay', () => {
+    const apiError: GoogleApiError = {
+      code: 429,
+      message: 'Rate limit exceeded',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'RATE_LIMIT_EXCEEDED',
+          domain: 'cloudcode-pa.googleapis.com',
+          metadata: {
+            uiMessage: 'true',
+            model: 'gemini-2.5-pro',
+          },
+        },
+        {
+          '@type': 'type.googleapis.com/google.rpc.RetryInfo',
+          retryDelay: '0s',
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+  });
+
+  it('should return RetryableQuotaError for Cloud Code RATE_LIMIT_EXCEEDED with a zero millisecond retry delay', () => {
+    const apiError: GoogleApiError = {
+      code: 429,
+      message: 'Rate limit exceeded',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'RATE_LIMIT_EXCEEDED',
+          domain: 'cloudcode-pa.googleapis.com',
+          metadata: {
+            uiMessage: 'true',
+            model: 'gemini-2.5-pro',
+          },
+        },
+        {
+          '@type': 'type.googleapis.com/google.rpc.RetryInfo',
+          retryDelay: '0ms',
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+  });
+
+  it('should return TerminalQuotaError for Cloud Code RATE_LIMIT_EXCEEDED with an unparsable retry delay', () => {
+    const apiError: GoogleApiError = {
+      code: 429,
+      message: 'Rate limit exceeded',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'RATE_LIMIT_EXCEEDED',
+          domain: 'cloudcode-pa.googleapis.com',
+          metadata: {
+            uiMessage: 'true',
+            model: 'gemini-2.5-pro',
+          },
+        },
+        {
+          '@type': 'type.googleapis.com/google.rpc.RetryInfo',
+          retryDelay: 'not-a-duration',
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(TerminalQuotaError);
+    expect((result as TerminalQuotaError).reason).toBe('RATE_LIMIT_EXCEEDED');
+  });
+
+  it('should return RetryableQuotaError for a zero retry delay in RetryInfo', () => {
+    const apiError: GoogleApiError = {
+      code: 429,
+      message: 'Too many requests',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.RetryInfo',
+          retryDelay: '0s',
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+    expect((result as RetryableQuotaError).message).toBe(
+      'Too many requests\nSuggested retry after 0s.',
+    );
+  });
+
   it('should return TerminalQuotaError for Cloud Code QUOTA_EXHAUSTED', () => {
     const apiError: GoogleApiError = {
       code: 429,
