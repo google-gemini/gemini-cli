@@ -161,7 +161,8 @@ export function expandWildcardDirectoryPatterns(
     if (
       withoutGlob === '' ||
       withoutGlob.includes('*') ||
-      withoutGlob.includes('?')
+      withoutGlob.includes('?') ||
+      withoutGlob.includes('[')
     ) {
       continue;
     }

@@ -191,6 +191,15 @@ describe('ignorePathUtils', () => {
       expect(expandWildcardDirectoryPatterns(['**/**'])).toEqual(['**/**']);
     });
 
+    it('should not expand wildcard patterns with character classes (e.g. dir[0-9]/**)', () => {
+      expect(
+        expandWildcardDirectoryPatterns(['dir[0-9]/**', '!dir5/keep.txt']),
+      ).toEqual(['dir[0-9]/**', '!dir5/keep.txt']);
+      expect(expandWildcardDirectoryPatterns(['dir[a-z]/**'])).toEqual([
+        'dir[a-z]/**',
+      ]);
+    });
+
     it('should not expand root wildcard pattern (/**)', () => {
       expect(expandWildcardDirectoryPatterns(['/**'])).toEqual(['/**']);
     });
