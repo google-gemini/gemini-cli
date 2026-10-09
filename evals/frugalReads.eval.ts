@@ -107,8 +107,10 @@ describe('Frugal reads eval', () => {
         'Agent read more of the file than expected',
       ).toBeLessThan(1000);
 
-      // Check that we read around the error lines
-      const errorLines = [500, 510, 520];
+      // Check that we read around the error lines. The generated file is
+      // 1-indexed, so the `var` lines at loop indices 500/510/520 are lines
+      // 501/511/521 (which is also what eslint reports).
+      const errorLines = [501, 511, 521];
       for (const line of errorLines) {
         const covered = readRanges.some(
           (range) => line >= range.start_line && line <= range.end_line,
