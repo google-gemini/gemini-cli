@@ -60,6 +60,57 @@ describe('safeJsonStringify', () => {
     expect(result).toBe('[{"id":1,"parent":"[Circular]"}]');
   });
 
+  it('should preserve shared (non-circular) references instead of emitting [Circular]', () => {
+    // Regression test for #29406: OpenTelemetry metrics share the same
+    // `endTime` object reference across records; a global "seen" set wrongly
+    // replaced the second occurrence with [Circular].
+    const sharedEndTime = { seconds: 1758900000, nanos: 0 };
+    const telemetry = {
+      resourceName: 'resource1',
+      scopeMetrics: [
+        {
+          scope: { name: 'scopeA' },
+          metrics: [
+            { name: 'metricA', endTime: sharedEndTime },
+            { name: 'metricB', endTime: sharedEndTime },
+          ],
+        },
+      ],
+    };
+
+    const result = safeJsonStringify(telemetry);
+    expect(result).toContain('"name":"metricA"');
+    expect(result).toContain('"name":"metricB"');
+    expect(result).toContain('"seconds":1758900000');
+    // Both occurrences of the shared endTime must be serialized, not [Circular].
+    expect(result.match(/1758900000/g)).toHaveLength(2);
+    expect(result).not.toContain('[Circular]');
+  });
+
+  it('should preserve shared histogram bound arrays (explicit bucket boundaries)', () => {
+    // Regression test for #29406: explicit histogram bounds share one array
+    // reference between lower and upper bounds.
+    const bounds = [0, 5, 10, 25, 50, 75, 100];
+    const histogram = {
+      dataPoints: [{ lowerBounds: bounds, upperBounds: bounds, count: 42 }],
+    };
+
+    const result = safeJsonStringify(histogram);
+    expect(
+      result.match(/"0,5,10,25,50,75,100"|0,5,10,25,50,75,100/g),
+    ).toHaveLength(2);
+    expect(result).not.toContain('[Circular]');
+  });
+
+  it('should still detect true circularity when a shared object is also its own descendant', () => {
+    const shared = { marker: 'shared' };
+    const root: Record<string, unknown> = { a: shared, b: shared };
+    shared.self = root; // now genuinely circular through the shared object
+
+    const result = safeJsonStringify(root);
+    expect(result).toContain('[Circular]');
+  });
+
   it('should handle null and undefined values', () => {
     expect(safeJsonStringify(null)).toBe('null');
     expect(safeJsonStringify(undefined)).toBe(undefined);
