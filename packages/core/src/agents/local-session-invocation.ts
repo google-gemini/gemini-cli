@@ -23,6 +23,8 @@ import {
   SUBAGENT_CANCELLED_ERROR_MESSAGE,
   isToolActivityError,
   SubagentState,
+  isSuccessfulTermination,
+  getSubagentStateFromTermination,
 } from './types.js';
 import { randomUUID } from 'node:crypto';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -336,11 +338,15 @@ export class LocalSessionInvocation extends BaseToolInvocation<
         throw cancelError;
       }
 
+      const progressState = getSubagentStateFromTermination(
+        output.terminate_reason,
+      );
+
       const progress: SubagentProgress = {
         isSubagentProgress: true,
         agentName: this.definition.name,
         recentActivity: [...recentActivity],
-        state: SubagentState.COMPLETED,
+        state: progressState,
         result: output.result,
         terminateReason: output.terminate_reason,
       };
@@ -349,7 +355,10 @@ export class LocalSessionInvocation extends BaseToolInvocation<
         updateOutput(progress);
       }
 
-      const resultContent = `Subagent '${this.definition.name}' finished.
+      const wasSuccessful = isSuccessfulTermination(output.terminate_reason);
+      const statusLabel = wasSuccessful ? 'finished' : 'did not complete';
+
+      const resultContent = `Subagent '${this.definition.name}' ${statusLabel}.
 Termination Reason: ${output.terminate_reason}
 Result:
 ${output.result}`;
