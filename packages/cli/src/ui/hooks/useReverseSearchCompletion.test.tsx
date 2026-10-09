@@ -262,5 +262,65 @@ describe('useReverseSearchCompletion', () => {
       expect(result.current.suggestions).toEqual([]);
       expect(result.current.showSuggestions).toBe(false);
     });
+
+    it('computes matchedIndex accurately when command contains length-expanding Unicode characters', async () => {
+      const history = ['echo \u0130 abc'];
+      const { result } = await renderHookWithProviders(() =>
+        useReverseSearchCompletion(useTextBufferForTest('abc'), history, true),
+      );
+
+      expect(result.current.suggestions).toEqual([
+        {
+          label: 'echo \u0130 abc',
+          value: 'echo \u0130 abc',
+          matchedIndex: 7,
+        },
+      ]);
+    });
+
+    it('escapes special regex characters in queries without throwing syntax errors', async () => {
+      const history = ['git log [a-z]', 'echo foo*', 'grep (unclosed['];
+
+      const { result: bracketResult } = await renderHookWithProviders(() =>
+        useReverseSearchCompletion(
+          useTextBufferForTest('git log [a-z]'),
+          history,
+          true,
+        ),
+      );
+      expect(bracketResult.current.suggestions).toEqual([
+        {
+          label: 'git log [a-z]',
+          value: 'git log [a-z]',
+          matchedIndex: 0,
+        },
+      ]);
+
+      const { result: starResult } = await renderHookWithProviders(() =>
+        useReverseSearchCompletion(useTextBufferForTest('foo*'), history, true),
+      );
+      expect(starResult.current.suggestions).toEqual([
+        {
+          label: 'echo foo*',
+          value: 'echo foo*',
+          matchedIndex: 5,
+        },
+      ]);
+
+      const { result: unclosedResult } = await renderHookWithProviders(() =>
+        useReverseSearchCompletion(
+          useTextBufferForTest('(unclosed['),
+          history,
+          true,
+        ),
+      );
+      expect(unclosedResult.current.suggestions).toEqual([
+        {
+          label: 'grep (unclosed[',
+          value: 'grep (unclosed[',
+          matchedIndex: 5,
+        },
+      ]);
+    });
   });
 });
