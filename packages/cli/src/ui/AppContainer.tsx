@@ -745,12 +745,15 @@ export const AppContainer = (props: AppContainerProps) => {
     if (!isAlternateBuffer && !config.getUseTerminalBuffer()) {
       clearResizeDebounceTimer();
       refreshStdoutSize(stdout);
-      if (stdout.columns !== undefined && stdout.columns !== terminalWidth) {
+      if (
+        stdout.columns !== undefined &&
+        stdout.columns !== terminalWidthRef.current
+      ) {
         corkStdout();
         return;
       }
       clearResizeCorkSafetyTimer();
-      lastRefreshedColumnsRef.current = terminalWidth;
+      lastRefreshedColumnsRef.current = terminalWidthRef.current;
       if (typeof stdout.cork === 'function') {
         corkStdout();
         discardCorkedStdoutBuffer(stdout);
@@ -765,7 +768,6 @@ export const AppContainer = (props: AppContainerProps) => {
     isAlternateBuffer,
     stdout,
     config,
-    terminalWidth,
     clearResizeDebounceTimer,
     clearResizeCorkSafetyTimer,
     corkStdout,
