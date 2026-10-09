@@ -460,6 +460,13 @@ export function setIsTrusted(
   if (cliTrustEnv !== undefined && cliTrustEnv !== '') {
     return cliTrustEnv === 'true';
   }
+  // GEMINI_FOLDER_TRUST is set by the Gemini Code Assist (GCA) IDE extension
+  // (AgentProcess.ts) to propagate the IDE's workspace trust state
+  // (vscode.workspace.isTrusted). Do not remove this check without updating GCA.
+  const folderTrustEnv = getEnv('GEMINI_FOLDER_TRUST');
+  if (folderTrustEnv !== undefined && folderTrustEnv !== '') {
+    return folderTrustEnv === 'true';
+  }
   if (workspaceRoot) {
     const initialSettings = loadSettings(workspaceRoot, false);
     const { isTrusted } = checkPathTrust({

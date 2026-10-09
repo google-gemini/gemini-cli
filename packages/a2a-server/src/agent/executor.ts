@@ -183,7 +183,9 @@ export class CoderAgentExecutor implements AgentExecutor {
         workspacePath: validateWorkspacePath(
           persistedState._agentSettings?.workspacePath,
         ),
-        isTrusted: false,
+        // Strip client/persisted isTrusted so setIsTrusted() evaluates
+        // server-side trust (GEMINI_CLI_TRUST_WORKSPACE / GEMINI_FOLDER_TRUST / checkPathTrust).
+        isTrusted: undefined,
       };
     } catch (error) {
       logger.error(
@@ -463,7 +465,8 @@ export class CoderAgentExecutor implements AgentExecutor {
           workspacePath: validateWorkspacePath(
             persistedState?._agentSettings?.workspacePath,
           ),
-          isTrusted: false,
+          // Strip persisted isTrusted so setIsTrusted() evaluates server-side trust.
+          isTrusted: undefined,
         };
       } else {
         const rawAgentSettings = getAgentSettingsFromMetadata(
@@ -473,7 +476,8 @@ export class CoderAgentExecutor implements AgentExecutor {
           kind: CoderAgentEvent.StateAgentSettingsEvent,
           ...(rawAgentSettings || {}),
           workspacePath: validateWorkspacePath(rawAgentSettings?.workspacePath),
-          isTrusted: false,
+          // Strip client-supplied isTrusted so setIsTrusted() evaluates server-side trust.
+          isTrusted: undefined,
         };
       }
     } catch (error) {
@@ -495,9 +499,20 @@ export class CoderAgentExecutor implements AgentExecutor {
         logger.info(
           `[CoderAgentExecutor] userMessage: ${JSON.stringify(userMessage)}`,
         );
-        eventBus.on('event', (event: AgentExecutionEvent) =>
-          logger.info('[EventBus event]: ', event),
-        );
+        let cleanupSocketListeners: () => void;
+
+        const onEvent = (event: AgentExecutionEvent) => {
+          logger.info('[EventBus event]: ', event);
+          if ('final' in event && event.final) {
+            cleanupSocketListeners();
+          }
+        };
+
+        cleanupSocketListeners = () => {
+          eventBus.off('event', onEvent);
+        };
+
+        eventBus.on('event', onEvent);
 
         const store = requestStorage.getStore();
         if (!store) {
@@ -530,13 +545,17 @@ export class CoderAgentExecutor implements AgentExecutor {
               }
               socket.removeListener('end', onSocketEnd);
             };
+            const removeEndListener = () =>
+              socket.removeListener('end', onSocketEnd);
+            cleanupSocketListeners = () => {
+              socket.removeListener('end', onSocketEnd);
+              socket.removeListener('close', removeEndListener);
+              abortSignal.removeEventListener('abort', removeEndListener);
+              eventBus.off('event', onEvent);
+            };
             socket.on('end', onSocketEnd);
-            socket.once('close', () =>
-              socket.removeListener('end', onSocketEnd),
-            );
-            abortSignal.addEventListener('abort', () =>
-              socket.removeListener('end', onSocketEnd),
-            );
+            socket.once('close', removeEndListener);
+            abortSignal.addEventListener('abort', removeEndListener);
             logger.info(
               `[CoderAgentExecutor] Socket close handler set up for task ${taskId}.`,
             );
@@ -713,6 +732,7 @@ export class CoderAgentExecutor implements AgentExecutor {
         } finally {
           this.explicitlyCanceledTasks.delete(abortController);
           if (!proceedToMainLoop) {
+            cleanupSocketListeners?.();
             const controllers = this.activeAbortControllers.get(taskId);
             if (controllers) {
               controllers.delete(abortController);
@@ -885,6 +905,7 @@ export class CoderAgentExecutor implements AgentExecutor {
             }
           }
         } finally {
+          cleanupSocketListeners?.();
           if (isPrimaryExecution) {
             const controllers = this.activeAbortControllers.get(taskId);
             if (controllers) {
