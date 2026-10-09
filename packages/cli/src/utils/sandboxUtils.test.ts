@@ -21,6 +21,9 @@ import {
   isCredentialOrSensitivePath,
   prepareIsolatedSettingsDir,
   SENSITIVE_SETTINGS_FILENAMES,
+  SANDBOX_PERSISTED_STATE_ENTRIES,
+  persistSandboxState,
+  restoreSandboxState,
 } from './sandboxUtils.js';
 
 vi.mock('node:os');
@@ -110,6 +113,8 @@ describe('sandboxUtils', () => {
     beforeEach(() => {
       vi.mocked(os.platform).mockReturnValue('linux');
       vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.stubEnv('PATH', '');
+      vi.stubEnv('PYTHONPATH', '');
     });
 
     it('should generate default entrypoint', () => {
@@ -760,6 +765,142 @@ describe('sandboxUtils', () => {
       expect(fs.chmodSync).toHaveBeenCalledWith(fakeIsolatedDir, 0o700);
       expect(result).toBe(fakeIsolatedDir);
       expect(fs.cpSync).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('sandbox state persistence', () => {
+    const sandboxSettingsDir = '/tmp/gemini-sandbox-xyz';
+    const sandboxStateDir = '/home/user/.gemini/sandbox';
+
+    it('should persist only explicitly approved sandbox state', () => {
+      vi.mocked(fs.existsSync).mockImplementation((target) => {
+        const value = String(target);
+        return (
+          value === path.join(sandboxSettingsDir, 'oauth_creds.json') ||
+          value === path.join(sandboxSettingsDir, 'trustedFolders.json') ||
+          value === path.join(sandboxSettingsDir, 'tmp') ||
+          value === path.join(sandboxSettingsDir, 'settings.json')
+        );
+      });
+      vi.mocked(fs.readFileSync).mockReturnValue(
+        JSON.stringify({
+          security: {
+            auth: {
+              selectedType: 'oauth-personal',
+              useExternal: true,
+              enforcedType: 'should-not-persist',
+            },
+          },
+          hooks: { BeforeAgent: [{ command: 'unsafe' }] },
+        }),
+      );
+
+      persistSandboxState(sandboxSettingsDir, sandboxStateDir);
+
+      expect(fs.mkdirSync).toHaveBeenCalledWith(sandboxStateDir, {
+        recursive: true,
+        mode: 0o700,
+      });
+      expect(fs.chmodSync).toHaveBeenCalledWith(sandboxStateDir, 0o700);
+      expect(fs.cpSync).toHaveBeenCalledWith(
+        path.join(sandboxSettingsDir, 'oauth_creds.json'),
+        path.join(sandboxStateDir, 'oauth_creds.json'),
+        { recursive: true, force: true },
+      );
+      expect(fs.cpSync).toHaveBeenCalledWith(
+        path.join(sandboxSettingsDir, 'trustedFolders.json'),
+        path.join(sandboxStateDir, 'trustedFolders.json'),
+        { recursive: true, force: true },
+      );
+      expect(fs.cpSync).toHaveBeenCalledWith(
+        path.join(sandboxSettingsDir, 'tmp'),
+        path.join(sandboxStateDir, 'tmp'),
+        { recursive: true, force: true },
+      );
+      expect(fs.cpSync).not.toHaveBeenCalledWith(
+        path.join(sandboxSettingsDir, 'settings.json'),
+        expect.anything(),
+        expect.anything(),
+      );
+
+      const authSettingsWrite = vi
+        .mocked(fs.writeFileSync)
+        .mock.calls.find(
+          ([target]) =>
+            String(target) === path.join(sandboxStateDir, 'auth-settings.json'),
+        );
+      expect(authSettingsWrite).toBeDefined();
+      expect(JSON.parse(String(authSettingsWrite?.[1]))).toEqual({
+        selectedType: 'oauth-personal',
+        useExternal: true,
+      });
+    });
+
+    it('should restore persisted state and merge only authentication settings', () => {
+      vi.mocked(fs.existsSync).mockImplementation((target) => {
+        const value = String(target);
+        return (
+          value === sandboxStateDir ||
+          value === path.join(sandboxStateDir, 'oauth_creds.json') ||
+          value === path.join(sandboxStateDir, 'trustedFolders.json') ||
+          value === path.join(sandboxStateDir, 'tmp') ||
+          value === path.join(sandboxStateDir, 'auth-settings.json') ||
+          value === path.join(sandboxSettingsDir, 'settings.json')
+        );
+      });
+      vi.mocked(fs.readFileSync).mockImplementation((target) => {
+        if (String(target).endsWith('auth-settings.json')) {
+          return JSON.stringify({
+            selectedType: 'oauth-personal',
+            useExternal: true,
+            hooks: 'ignored',
+          });
+        }
+        return JSON.stringify({
+          theme: 'dark',
+          security: { auth: { enforcedType: 'oauth-personal' } },
+        });
+      });
+
+      restoreSandboxState(sandboxStateDir, sandboxSettingsDir);
+
+      for (const entry of ['oauth_creds.json', 'trustedFolders.json', 'tmp']) {
+        expect(fs.cpSync).toHaveBeenCalledWith(
+          path.join(sandboxStateDir, entry),
+          path.join(sandboxSettingsDir, entry),
+          { recursive: true, force: true },
+        );
+      }
+
+      const settingsWrite = vi
+        .mocked(fs.writeFileSync)
+        .mock.calls.find(
+          ([target]) =>
+            String(target) === path.join(sandboxSettingsDir, 'settings.json'),
+        );
+      expect(settingsWrite).toBeDefined();
+      expect(JSON.parse(String(settingsWrite?.[1]))).toEqual({
+        theme: 'dark',
+        security: {
+          auth: {
+            enforcedType: 'oauth-personal',
+            selectedType: 'oauth-personal',
+            useExternal: true,
+          },
+        },
+      });
+    });
+
+    it('should include authentication, trust, and session paths in the allowlist', () => {
+      expect(SANDBOX_PERSISTED_STATE_ENTRIES).toEqual(
+        expect.arrayContaining([
+          'oauth_creds.json',
+          'google_accounts.json',
+          'trustedFolders.json',
+          'history',
+          'tmp',
+        ]),
+      );
     });
   });
 });
