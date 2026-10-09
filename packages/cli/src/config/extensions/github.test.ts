@@ -133,6 +133,8 @@ describe('github.ts', () => {
     it.each([
       ['https://github.com/owner/repo', 'owner', 'repo'],
       ['https://github.com/owner/repo.git', 'owner', 'repo'],
+      ['https://github.com/owner/blog.github.io', 'owner', 'blog.github.io'],
+      ['owner/my.git.repo', 'owner', 'my.git.repo'],
       ['git@github.com:owner/repo.git', 'owner', 'repo'],
       ['owner/repo', 'owner', 'repo'],
     ])('should parse %s to %s/%s', (url, owner, repo) => {
