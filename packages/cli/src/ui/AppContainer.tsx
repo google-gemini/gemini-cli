@@ -220,6 +220,49 @@ const SHELL_WIDTH_FRACTION = 0.89;
  */
 const SHELL_HEIGHT_PADDING = 10;
 
+const ENTER_SYNCHRONIZED_OUTPUT = '\x1b[?2026h';
+const EXIT_SYNCHRONIZED_OUTPUT = '\x1b[?2026l';
+const RESIZE_DEBOUNCE_MS = 100;
+const RESIZE_CORK_SAFETY_TIMEOUT_MS = 1000;
+
+interface WritableBufferState {
+  corked?: number;
+  length?: number;
+  buffered?: Array<{ callback?: (err?: Error | null) => void }>;
+  bufferedIndex?: number;
+  allBuffers?: boolean;
+  allNoop?: boolean;
+  writelen?: number;
+}
+
+function discardCorkedStdoutBuffer(stream: NodeJS.WriteStream): void {
+  const state = (
+    stream as NodeJS.WriteStream & { _writableState?: WritableBufferState }
+  )._writableState;
+  if (state && (state.corked ?? 0) > 0 && Array.isArray(state.buffered)) {
+    for (const entry of state.buffered) {
+      if (typeof entry.callback === 'function') {
+        entry.callback(null);
+      }
+    }
+    state.buffered.length = 0;
+    state.length = 0;
+    if ('allBuffers' in state) state.allBuffers = true;
+    if ('allNoop' in state) state.allNoop = true;
+    if ('writelen' in state) state.writelen = 0;
+    if ('bufferedIndex' in state) state.bufferedIndex = 0;
+  }
+}
+
+function refreshStdoutSize(stream: NodeJS.WriteStream): void {
+  const resizableStream = stream as NodeJS.WriteStream & {
+    _refreshSize?: () => void;
+  };
+  if (typeof resizableStream._refreshSize === 'function') {
+    resizableStream._refreshSize();
+  }
+}
+
 export const AppContainer = (props: AppContainerProps) => {
   const isHelpDismissKey = useIsHelpDismissKey();
   const keyMatchers = useKeyMatchers();
@@ -643,12 +686,109 @@ export const AppContainer = (props: AppContainerProps) => {
     addItem: historyManager.addItem,
   });
 
+  const isStdoutCorkedRef = useRef(false);
+  const isRefreshingStaticRef = useRef(false);
+  const resizeCorkSafetyTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const resizeDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastStdoutColumnsRef = useRef<number>(
+    stdout.columns ?? process.stdout.columns ?? terminalWidth,
+  );
+  const lastRefreshedColumnsRef = useRef<number>(terminalWidth);
+  const lastRenderedHistoryRemountKeyRef = useRef<number>(historyRemountKey);
+  const terminalWidthRef = useRef<number>(terminalWidth);
+  terminalWidthRef.current = terminalWidth;
+
+  const clearResizeCorkSafetyTimer = useCallback(() => {
+    if (resizeCorkSafetyTimerRef.current) {
+      clearTimeout(resizeCorkSafetyTimerRef.current);
+      resizeCorkSafetyTimerRef.current = null;
+    }
+  }, []);
+
+  const clearResizeDebounceTimer = useCallback(() => {
+    if (resizeDebounceTimerRef.current) {
+      clearTimeout(resizeDebounceTimerRef.current);
+      resizeDebounceTimerRef.current = null;
+    }
+  }, []);
+
+  const corkStdout = useCallback(() => {
+    if (!isStdoutCorkedRef.current && typeof stdout.cork === 'function') {
+      stdout.cork();
+      isStdoutCorkedRef.current = true;
+    }
+  }, [stdout]);
+
+  const uncorkStdout = useCallback(() => {
+    clearResizeCorkSafetyTimer();
+    if (isStdoutCorkedRef.current && typeof stdout.uncork === 'function') {
+      isStdoutCorkedRef.current = false;
+      stdout.uncork();
+    }
+  }, [stdout, clearResizeCorkSafetyTimer]);
+
   const refreshStatic = useCallback(() => {
     if (!isAlternateBuffer && !config.getUseTerminalBuffer()) {
-      stdout.write(ansiEscapes.clearTerminal);
+      clearResizeDebounceTimer();
+      refreshStdoutSize(stdout);
+      if (stdout.columns !== undefined && stdout.columns !== terminalWidth) {
+        corkStdout();
+        return;
+      }
+      clearResizeCorkSafetyTimer();
+      if (typeof stdout.cork === 'function') {
+        corkStdout();
+        isRefreshingStaticRef.current = true;
+      } else {
+        stdout.write(ansiEscapes.clearTerminal);
+      }
       setHistoryRemountKey((prev) => prev + 1);
     }
-  }, [setHistoryRemountKey, isAlternateBuffer, stdout, config]);
+  }, [
+    setHistoryRemountKey,
+    isAlternateBuffer,
+    stdout,
+    config,
+    terminalWidth,
+    clearResizeDebounceTimer,
+    clearResizeCorkSafetyTimer,
+    corkStdout,
+  ]);
+
+  const refreshStaticRef = useRef(refreshStatic);
+  refreshStaticRef.current = refreshStatic;
+
+  if (!isAlternateBuffer && !config.getUseTerminalBuffer()) {
+    if (terminalWidth !== lastRefreshedColumnsRef.current) {
+      corkStdout();
+    }
+    if (historyRemountKey !== lastRenderedHistoryRemountKeyRef.current) {
+      lastRenderedHistoryRemountKeyRef.current = historyRemountKey;
+      lastRefreshedColumnsRef.current = terminalWidth;
+      if (isRefreshingStaticRef.current && typeof stdout.cork === 'function') {
+        corkStdout();
+        discardCorkedStdoutBuffer(stdout);
+        stdout.write(ENTER_SYNCHRONIZED_OUTPUT);
+        stdout.write(ansiEscapes.clearTerminal);
+      }
+    }
+  }
+
+  useLayoutEffect(() => {
+    if (isRefreshingStaticRef.current) {
+      isRefreshingStaticRef.current = false;
+      refreshStdoutSize(stdout);
+      if (
+        stdout.columns !== undefined &&
+        stdout.columns !== lastRefreshedColumnsRef.current
+      ) {
+        discardCorkedStdoutBuffer(stdout);
+        return;
+      }
+      stdout.write(EXIT_SYNCHRONIZED_OUTPUT);
+      uncorkStdout();
+    }
+  }, [historyRemountKey, stdout, uncorkStdout]);
 
   const shouldUseAlternateScreen = shouldEnterAlternateScreen(
     isAlternateBuffer,
@@ -1753,19 +1893,71 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }, [ideNeedsRestart]);
 
   useEffect(() => {
+    if (
+      isAlternateBuffer ||
+      config.getUseTerminalBuffer() ||
+      typeof stdout.prependListener !== 'function'
+    ) {
+      return;
+    }
+
+    const handleResizeStart = () => {
+      const currentColumns = stdout.columns ?? process.stdout.columns;
+      if (
+        currentColumns !== undefined &&
+        currentColumns !== lastStdoutColumnsRef.current
+      ) {
+        lastStdoutColumnsRef.current = currentColumns;
+        corkStdout();
+        clearResizeDebounceTimer();
+        clearResizeCorkSafetyTimer();
+        resizeCorkSafetyTimerRef.current = setTimeout(() => {
+          discardCorkedStdoutBuffer(stdout);
+          uncorkStdout();
+        }, RESIZE_CORK_SAFETY_TIMEOUT_MS);
+        if (currentColumns === terminalWidthRef.current) {
+          resizeDebounceTimerRef.current = setTimeout(() => {
+            refreshStaticRef.current();
+          }, RESIZE_DEBOUNCE_MS);
+        }
+      }
+    };
+
+    stdout.prependListener('resize', handleResizeStart);
+    return () => {
+      stdout.off('resize', handleResizeStart);
+      clearResizeDebounceTimer();
+      if (isRefreshingStaticRef.current) {
+        isRefreshingStaticRef.current = false;
+        stdout.write(EXIT_SYNCHRONIZED_OUTPUT);
+      }
+      uncorkStdout();
+    };
+  }, [
+    stdout,
+    isAlternateBuffer,
+    config,
+    corkStdout,
+    uncorkStdout,
+    clearResizeDebounceTimer,
+    clearResizeCorkSafetyTimer,
+  ]);
+
+  useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
       return;
     }
 
-    const handler = setTimeout(() => {
+    clearResizeDebounceTimer();
+    resizeDebounceTimerRef.current = setTimeout(() => {
       refreshStatic();
-    }, 100);
+    }, RESIZE_DEBOUNCE_MS);
 
     return () => {
-      clearTimeout(handler);
+      clearResizeDebounceTimer();
     };
-  }, [terminalWidth, refreshStatic]);
+  }, [terminalWidth, refreshStatic, clearResizeDebounceTimer]);
 
   useEffect(() => {
     const unsubscribe = ideContextStore.subscribe(setIdeContextState);
