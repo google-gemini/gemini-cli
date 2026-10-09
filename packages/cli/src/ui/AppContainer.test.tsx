@@ -250,6 +250,7 @@ import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import * as useKeypressModule from './hooks/useKeypress.js';
 import { useSuspend } from './hooks/useSuspend.js';
+import { useTerminalSize } from './hooks/useTerminalSize.js';
 import {
   writeToStdout,
   enableMouseEvents,
@@ -334,6 +335,7 @@ describe('AppContainer State Management', () => {
   const mockedUseTerminalTheme = useTerminalTheme as Mock;
   const mockedUseShellInactivityStatus = useShellInactivityStatus as Mock;
   const mockedUseFocusState = useFocus as Mock;
+  const mockedUseTerminalSize = useTerminalSize as Mock;
 
   const DEFAULT_GEMINI_STREAM_MOCK = {
     streamingState: 'idle',
@@ -465,6 +467,10 @@ describe('AppContainer State Management', () => {
     });
     mockedUseSuspend.mockReturnValue({
       handleSuspend: vi.fn(),
+    });
+    mockedUseTerminalSize.mockReturnValue({
+      columns: 80,
+      rows: 24,
     });
     mockedUseHookDisplayState.mockReturnValue([]);
     mockedUseTerminalTheme.mockReturnValue(undefined);
@@ -3230,6 +3236,230 @@ describe('AppContainer State Management', () => {
 
       expect(clearTerminalCalls).toHaveLength(0);
       unmount();
+    });
+
+    it('debounces refreshStatic when terminal width changes in default inline mode, and ignores height-only changes', async () => {
+      vi.useFakeTimers();
+      try {
+        vi.spyOn(mockConfig, 'getUseTerminalBuffer').mockReturnValue(false);
+        vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(false);
+
+        const { rerender, unmount } = await act(async () =>
+          renderAppContainer(),
+        );
+        expect(capturedUIState).toBeTruthy();
+
+        const initialRemountKey = capturedUIState.historyRemountKey;
+        mocks.mockStdout.write.mockClear();
+
+        // Initial mount should not trigger refreshStatic after 100ms
+        act(() => {
+          vi.advanceTimersByTime(100);
+        });
+        expect(mocks.mockStdout.write).not.toHaveBeenCalledWith(
+          ansiEscapes.clearTerminal,
+        );
+        expect(capturedUIState.historyRemountKey).toBe(initialRemountKey);
+
+        // Simulate height-only resize (e.g. mobile virtual keyboard toggle)
+        mockedUseTerminalSize.mockReturnValue({ columns: 80, rows: 16 });
+        await act(async () => {
+          rerender(getAppContainer());
+        });
+        act(() => {
+          vi.advanceTimersByTime(100);
+        });
+        expect(mocks.mockStdout.write).not.toHaveBeenCalledWith(
+          ansiEscapes.clearTerminal,
+        );
+        expect(capturedUIState.historyRemountKey).toBe(initialRemountKey);
+
+        // Simulate rapid consecutive horizontal resizes (columns: 80 -> 70 -> 60)
+        mockedUseTerminalSize.mockReturnValue({ columns: 70, rows: 16 });
+        await act(async () => {
+          rerender(getAppContainer());
+        });
+        act(() => {
+          vi.advanceTimersByTime(60);
+        });
+        expect(mocks.mockStdout.write).not.toHaveBeenCalledWith(
+          ansiEscapes.clearTerminal,
+        );
+
+        // Second resize before 100ms elapses should reset the debounce timer
+        mockedUseTerminalSize.mockReturnValue({ columns: 60, rows: 16 });
+        await act(async () => {
+          rerender(getAppContainer());
+        });
+        act(() => {
+          vi.advanceTimersByTime(60);
+        });
+        expect(mocks.mockStdout.write).not.toHaveBeenCalledWith(
+          ansiEscapes.clearTerminal,
+        );
+        expect(capturedUIState.historyRemountKey).toBe(initialRemountKey);
+
+        // Remaining 40ms completes the 100ms debounce from the last width change
+        act(() => {
+          vi.advanceTimersByTime(40);
+        });
+        expect(mocks.mockStdout.write).toHaveBeenCalledWith(
+          ansiEscapes.clearTerminal,
+        );
+        expect(capturedUIState.historyRemountKey).toBe(initialRemountKey + 1);
+
+        unmount();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('corks stdout during horizontal resize, discards intermediate buffered writes, and wraps refreshStatic in synchronized output', async () => {
+      vi.useFakeTimers();
+      const mockStdoutWithCork = mocks.mockStdout as {
+        write: Mock;
+        columns?: number;
+        cork?: Mock;
+        uncork?: Mock;
+        prependListener?: Mock;
+        off?: Mock;
+        _writableState?: {
+          corked: number;
+          length: number;
+          writelen?: number;
+          buffered: Array<{
+            chunk?: string | Buffer | Uint8Array;
+            encoding?: string;
+            callback?: (err?: Error | null) => void;
+          }>;
+          bufferedIndex: number;
+        };
+      };
+
+      let resizeListener: (() => void) | undefined;
+      const bufferedCallback = vi.fn();
+      const writableState = {
+        corked: 0,
+        length: 0,
+        writelen: 0,
+        buffered: [] as Array<{
+          chunk?: string | Buffer | Uint8Array;
+          encoding?: string;
+          callback?: (err?: Error | null) => void;
+        }>,
+        bufferedIndex: 0,
+      };
+
+      mockStdoutWithCork.columns = 80;
+      mockStdoutWithCork._writableState = writableState;
+      mockStdoutWithCork.cork = vi.fn(() => {
+        writableState.corked += 1;
+      });
+      mockStdoutWithCork.uncork = vi.fn(() => {
+        writableState.corked = Math.max(0, writableState.corked - 1);
+      });
+      mockStdoutWithCork.prependListener = vi.fn(
+        (event: string, cb: () => void) => {
+          if (event === 'resize') {
+            resizeListener = cb;
+          }
+        },
+      );
+      mockStdoutWithCork.off = vi.fn();
+
+      try {
+        vi.spyOn(mockConfig, 'getUseTerminalBuffer').mockReturnValue(false);
+        vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(false);
+
+        const { rerender, unmount } = await act(async () =>
+          renderAppContainer(),
+        );
+        expect(resizeListener).toBeTypeOf('function');
+        mocks.mockStdout.write.mockClear();
+        mockStdoutWithCork.cork.mockClear();
+        mockStdoutWithCork.uncork.mockClear();
+
+        // Simulate horizontal resize event before Ink.resized runs
+        mockStdoutWithCork.columns = 60;
+        resizeListener!();
+        expect(mockStdoutWithCork.cork).toHaveBeenCalledTimes(1);
+        expect(writableState.corked).toBe(1);
+
+        // Simulate intermediate buffered frame written while corked during resize drag
+        // alongside an active in-flight write (writelen = 10)
+        const discardedChunk = 'intermediate frame';
+        writableState.buffered.push({
+          chunk: discardedChunk,
+          encoding: 'utf8',
+          callback: bufferedCallback,
+        });
+        writableState.writelen = 10;
+        writableState.length = 10 + Buffer.byteLength(discardedChunk, 'utf8');
+
+        mockedUseTerminalSize.mockReturnValue({ columns: 60, rows: 24 });
+        await act(async () => {
+          rerender(getAppContainer());
+        });
+
+        // Advance 80ms (timer for 60 cols has 20ms left), then emit a new raw
+        // stdout resize event (columns = 50) BEFORE React commits the new size.
+        act(() => {
+          vi.advanceTimersByTime(80);
+        });
+        mockStdoutWithCork.columns = 50;
+        resizeListener!();
+
+        // Advancing past the original 100ms mark (20ms more) must NOT flush or
+        // uncork stdout for the stale 60-col width.
+        act(() => {
+          vi.advanceTimersByTime(30);
+        });
+        expect(mocks.mockStdout.write).not.toHaveBeenCalled();
+        expect(mockStdoutWithCork.uncork).not.toHaveBeenCalled();
+        expect(writableState.corked).toBe(1);
+
+        // Now React commits the 50-col width and settles for 100ms
+        mockedUseTerminalSize.mockReturnValue({ columns: 50, rows: 24 });
+        await act(async () => {
+          rerender(getAppContainer());
+        });
+        act(() => {
+          vi.advanceTimersByTime(100);
+        });
+
+        // Intermediate buffered frame should have been discarded before clearTerminal,
+        // subtracting only the discarded chunk bytes and preserving in-flight writelen
+        expect(bufferedCallback).toHaveBeenCalledWith(null);
+        expect(writableState.buffered).toHaveLength(0);
+        expect(writableState.length).toBe(10);
+        expect(writableState.writelen).toBe(10);
+
+        // clearTerminal should be wrapped in DEC Synchronized Output (\x1b[?2026h ... \x1b[?2026l) and uncorked in useLayoutEffect
+        expect(mocks.mockStdout.write).toHaveBeenNthCalledWith(
+          1,
+          '\x1b[?2026h',
+        );
+        expect(mocks.mockStdout.write).toHaveBeenNthCalledWith(
+          2,
+          ansiEscapes.clearTerminal,
+        );
+        expect(mocks.mockStdout.write).toHaveBeenNthCalledWith(
+          3,
+          '\x1b[?2026l',
+        );
+        expect(mockStdoutWithCork.uncork).toHaveBeenCalledTimes(1);
+        expect(writableState.corked).toBe(0);
+
+        unmount();
+      } finally {
+        delete mockStdoutWithCork.columns;
+        delete mockStdoutWithCork.cork;
+        delete mockStdoutWithCork.uncork;
+        delete mockStdoutWithCork.prependListener;
+        delete mockStdoutWithCork.off;
+        delete mockStdoutWithCork._writableState;
+        vi.useRealTimers();
+      }
     });
   });
 
