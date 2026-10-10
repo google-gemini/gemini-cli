@@ -611,7 +611,7 @@ export class ShellExecutionService {
       ['credential.helper', ''],
       ['core.fsmonitor', ''],
       ['core.hooksPath', ''],
-      ['core.sshCommand', ''],
+      ['core.sshCommand', 'ssh'],
       ['core.pager', 'cat'],
       ['core.editor', ''],
       ['sequence.editor', ''],
