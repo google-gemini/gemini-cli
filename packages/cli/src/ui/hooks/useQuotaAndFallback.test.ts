@@ -342,6 +342,38 @@ describe('useQuotaAndFallback', () => {
       );
     });
 
+    it('should show the API spending-cap message instead of high demand', async () => {
+      const { result } = await renderHook(() =>
+        useQuotaAndFallback({
+          config: mockConfig,
+          historyManager: mockHistoryManager,
+          userTier: UserTierId.FREE,
+          setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          onShowAuthSelection: mockOnShowAuthSelection,
+          paidTier: null,
+          settings: mockSettings,
+          errorVerbosity: 'low',
+        }),
+      );
+
+      const handler = setFallbackHandlerSpy.mock
+        .calls[0][0] as FallbackModelHandler;
+      const message =
+        'Your project has exceeded its monthly spending cap. Please go to AI Studio to manage your project spend cap.';
+      const error = new TerminalQuotaError(message, mockGoogleApiError);
+
+      act(() => {
+        void handler('gemini-2.5-flash', 'gemini-2.5-flash-lite', error);
+      });
+
+      expect(result.current.proQuotaRequest).not.toBeNull();
+      expect(result.current.proQuotaRequest?.message).toBe(message);
+      expect(result.current.proQuotaRequest?.message).not.toContain(
+        'high demand',
+      );
+      expect(result.current.proQuotaRequest?.isCapacityExceeded).toBe(false);
+    });
+
     describe('Interactive Fallback', () => {
       it('should set an interactive request for a terminal quota error', async () => {
         const { result } = await renderHook(() =>
