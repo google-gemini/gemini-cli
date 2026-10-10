@@ -91,6 +91,10 @@ describe('formatters', () => {
       expect(formatDuration(59999)).toBe('1m');
     });
 
+    it('should promote rounded minutes to hours', () => {
+      expect(formatDuration(3599999)).toBe('1h');
+    });
+
     it('should format an exact number of minutes', () => {
       expect(formatDuration(120000)).toBe('2m');
     });
