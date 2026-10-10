@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>How Tifo Videos Are Made</title>
+  <style>@font-face{font-family:Oswald;font-weight:500;src:url(fonts/Oswald-Medium.ttf)}@font-face{font-family:Oswald;font-weight:700;src:url(fonts/Oswald-Bold.ttf)}</style>
+  <style>
+    :root { --bg: #efe8d6; --ink: #1d2621; --muted: #5d665f; --accent: #c8412f; --card: #f8f3e6; --line: #d6ccb2; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.65 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+    main { max-width: 860px; margin: 0 auto; padding: 48px 16px 80px; }
+    h1, h2, h3 { font-family: Oswald, Impact, sans-serif; text-transform: uppercase; letter-spacing: .5px; line-height: 1.15; }
+    h1 { font-size: 46px; margin: 0 0 8px; }
+    h1 span { color: var(--accent); }
+    h2 { font-size: 26px; margin: 48px 0 12px; border-top: 3px solid var(--ink); padding-top: 14px; }
+    h3 { font-size: 18px; margin: 22px 0 6px; }
+    .lead { font-size: 19px; color: var(--muted); }
+    .step { background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--accent); padding: 14px 18px; margin: 14px 0; border-radius: 6px; }
+    .step b.n { font-family: Oswald, sans-serif; color: var(--accent); font-size: 20px; margin-right: 8px; }
+    .tool { font-size: 14px; color: var(--muted); margin-top: 6px; }
+    .tool b { color: var(--ink); }
+    table { width: 100%; border-collapse: collapse; font-size: 15px; background: var(--card); }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { font-family: Oswald, sans-serif; text-transform: uppercase; font-weight: 500; }
+    code { background: #e2d9c2; padding: 1px 5px; border-radius: 4px; font-size: 14px; }
+    pre { background: #1d2621; color: #efe8d6; padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 14px; }
+    .swatches { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+    .swatches span { width: 70px; height: 46px; border-radius: 4px; display: flex; align-items: end; padding: 3px 5px; font-size: 11px; color: #fff; }
+    a { color: var(--accent); }
+    .back { display: inline-block; margin-bottom: 24px; font-weight: 600; }
+  </style>
+</head>
+<body>
+<main>
+  <a class="back" href="index.html">← Back to the studio</a>
+  <h1>How <span>Tifo-style</span> videos are made</h1>
+  <p class="lead">Tifo Football (now part of The Athletic) makes 6–15 minute explainers that mix a calm, authoritative voiceover with flat, textured illustrations and animated tactics boards. Here is the production pipeline behind that look, and how each step maps onto this studio.</p>
+
+  <h2>1. What makes the look</h2>
+  <ul>
+    <li><b>Flat, limited palette</b> — muted grass greens, cream pitch lines, 2–3 strong accent colours (team colours + a highlight yellow). No gradients or 3D.</li>
+    <li><b>Texture</b> — a fine paper/film grain over everything and a soft vignette so it feels printed, not digital.</li>
+    <li><b>Tactics board</b> — a top-down pitch with players as numbered discs, dashed pass lines, solid run arrows that <i>draw themselves on</i>, shaded zones for space, lines linking a back four.</li>
+    <li><b>Camera moves</b> — slow zooms and pans across the board to follow the ball, instead of cuts.</li>
+    <li><b>Illustration cards</b> — hand-drawn caricatures of players/managers and scenes, with slow push-ins and parallax.</li>
+    <li><b>Bold condensed type</b> — uppercase condensed fonts (Oswald / Bebas-like) for titles and labels.</li>
+    <li><b>Voice first</b> — every visual beat is timed to the narration. The script drives everything.</li>
+  </ul>
+  <div class="swatches">
+    <span style="background:#417a4b">grass</span><span style="background:#3b7245">stripe</span><span style="background:#ece6d3;color:#333">lines</span>
+    <span style="background:#d64545">home</span><span style="background:#2f6fb5">away</span><span style="background:#f2c14e;color:#333">highlight</span><span style="background:#e8dfc8;color:#333">paper</span>
+  </div>
+
+  <h2>2. The production pipeline</h2>
+  <div class="step"><b class="n">01</b><b>Research &amp; script.</b> A writer researches the topic (match footage, data from FBref/Opta/StatsBomb, interviews) and writes a 1,000–2,000 word script. Each paragraph is roughly one visual idea.
+    <div class="tool">In the studio: <b>Script → Scenes</b> splits your script into one scene per paragraph, and can voice every scene straight away.</div></div>
+  <div class="step"><b class="n">02</b><b>Voiceover.</b> The script is recorded first, cleanly, in a quiet room. The recording locks the timing of the whole video.
+    <div class="tool">In the studio: <b>🤖 Generate voice</b> uses a free local neural voice (British Piper narrators) and fits each scene to it. Or <b>● Record mic</b> (the animation plays while you talk), or <b>Upload audio</b>, for example from Audacity or ElevenLabs.</div></div>
+  <div class="step"><b class="n">03</b><b>Storyboard / animatic.</b> Rough frames for each line of the script: which players, which arrows, where the camera goes.
+    <div class="tool">In the studio: rough out each scene with <b>Insert XI</b> and a few arrows, then refine.</div></div>
+  <div class="step"><b class="n">04</b><b>Illustration.</b> Illustrators draw player caricatures, crowds, stadiums and title cards in Adobe Illustrator/Photoshop (or Procreate), with layered textures.
+    <div class="tool">In the studio: a <b>Card</b> scene (title, chapter, quote or lower-third layout) with your illustration. The <b>Illustrated</b> filter turns photos into flat, outlined poster art, and a transparent foreground PNG gets parallax depth. <b>Portraits</b> can go on player discs. Free drawing tools: Krita, Inkscape, Photopea.</div></div>
+  <div class="step"><b class="n">05</b><b>Animation.</b> Everything is assembled in Adobe After Effects: player discs keyframed across the board, arrows revealed with <i>Trim Paths</i>, zones scaling in, camera moves, texture overlays.
+    <div class="tool">In the studio: move the playhead and drag players to create eased keyframes. Arrows draw themselves on. <b>Cover shadows</b>, <b>spotlights</b>, <b>team shapes</b>, <b>trails</b> and <b>distance lines</b> are one click each. The camera zooms, <b>tilts into 3D</b> and rotates between keyframes, like Tifo's angled pitch shots. <b>Charts</b> animate stats, and <b>wipe</b> or crossfade transitions join the scenes.</div></div>
+  <div class="step"><b class="n">06</b><b>Sound design &amp; music.</b> A subtle music bed under the voice, plus whooshes and crowd sounds.
+    <div class="tool">In the studio: automatic <b>sound effects</b> (whooshes on transitions and camera moves, ticks when graphics appear) and <b>background music</b> with a fade-out, both in <b>Project &amp; Teams</b>. Free music: YouTube Audio Library, Pixabay Music.</div></div>
+  <div class="step"><b class="n">07</b><b>Export &amp; publish.</b> 1080p H.264 upload, with subtitles and a bold thumbnail.
+    <div class="tool">In the studio: <b>Export Video</b> gives a frame-accurate MP4 at 1080p, 1440p or 4K, at 30 or 60 fps. <b>📷 Snapshot</b> makes the thumbnail and <b>Subtitles .srt</b> the captions.</div></div>
+
+  <h2>3. Recipe for one tactical beat</h2>
+  <p>Script line: <i>“The moment the ball goes to the full-back, the winger presses and the striker curves his run to cut off the pass inside.”</i></p>
+  <table>
+    <tr><th>Words</th><th>What to animate</th><th>How</th></tr>
+    <tr><td>“The moment the ball goes…”</td><td>Dashed pass arrow draws on, ball follows</td><td>Pass tool; set <b>Appears</b> to the time you say “ball”. Keyframe the ball at the start and end of the pass.</td></tr>
+    <tr><td>“…the winger presses…”</td><td>Winger runs at the full-back, yellow run arrow</td><td>Playhead to the start → <b>◆ Key</b> the winger; playhead to the end → drag him. Add a Run arrow.</td></tr>
+    <tr><td>“…curves his run…”</td><td>Curved arrow, striker moves</td><td>Drag the arrow's middle handle to bend it.</td></tr>
+    <tr><td>(pause)</td><td>Zoom in and tilt, shade the trap area</td><td>🎥 Camera: drag a frame around the area, then set <b>Tilt</b> to about 40°. Add an Area zone and a “THE TRAP” label.</td></tr>
+    <tr><td>“…cut off the pass inside.”</td><td>Show the blocked lane</td><td>◣ Shadow tool: click the striker. His cover shadow points away from the ball automatically.</td></tr>
+    <tr><td>“Watch the full-back…”</td><td>Focus on one player</td><td>◉ Spotlight tool: click the player. Everything else darkens, and the circle follows him.</td></tr>
+  </table>
+
+  <h2>4. Tips for the Tifo feel</h2>
+  <ul>
+    <li><b>One idea per scene.</b> Remove everything that isn't being talked about (use <b>Disappears</b>).</li>
+    <li><b>Hold, then move.</b> Let the viewer read the setup for a second before anything moves — press ◆ Key at the moment movement should start.</li>
+    <li><b>Use “Continue ▸”</b> so the next scene starts exactly where the last ended; it looks like one continuous board.</li>
+    <li><b>Zoom sparingly</b> — 1.5×–2.5× on the action, then back out to show the shape.</li>
+    <li><b>Highlight the protagonist</b> with the pulse ring, and give key players name tags.</li>
+    <li><b>Stick to 2 team colours + 1 highlight colour.</b></li>
+    <li><b>Intercut illustration cards</b> between tactical scenes for pacing (manager portrait, stadium, a quote).</li>
+  </ul>
+
+  <h2>5. Converting &amp; finishing</h2>
+  <p>If your browser exported WebM, convert to MP4 for editors/YouTube with <a href="https://ffmpeg.org">ffmpeg</a>:</p>
+  <pre>ffmpeg -i video.webm -c:v libx264 -crf 18 -preset slow -c:a aac -b:a 192k video.mp4</pre>
+  <p>Want more polish? Export individual scenes and finish in a free editor like DaVinci Resolve, Kdenlive or CapCut: add sound effects, crowd noise, and footage clips (only use footage you have the rights to).</p>
+</main>
+</body>
+</html>
