@@ -512,6 +512,58 @@ describe('WebFetchTool', () => {
       );
     });
 
+    it('should fall back when the primary fetch times out', async () => {
+      vi.spyOn(fetchUtils, 'isPrivateIp').mockResolvedValue(false);
+
+      // The primary LLM fetch never settles until its timeout aborts it;
+      // the fallback LLM call resolves normally.
+      let generateContentCalls = 0;
+      mockGenerateContent.mockImplementation(
+        (_params, _content, signal?: AbortSignal) => {
+          generateContentCalls++;
+          if (generateContentCalls === 1) {
+            return new Promise((_resolve, reject) => {
+              signal?.addEventListener(
+                'abort',
+                () => reject(signal.reason ?? new Error('AbortError')),
+                { once: true },
+              );
+            });
+          }
+          return Promise.resolve({
+            candidates: [
+              { content: { parts: [{ text: 'fallback processed response' }] } },
+            ],
+          });
+        },
+      );
+
+      mockFetch('https://url1.com/', {
+        text: () => Promise.resolve('content 1'),
+      });
+
+      vi.useFakeTimers();
+      try {
+        const tool = new WebFetchTool(mockConfig, bus);
+        const params = { prompt: 'fetch https://url1.com' };
+        const invocation = tool.build(params);
+        const resultPromise = invocation.execute({
+          abortSignal: new AbortController().signal,
+        });
+        await vi.advanceTimersByTimeAsync(30_000);
+        const result = await resultPromise;
+
+        expect(result.llmContent).toBe(
+          '<untrusted_context>\nfallback processed response\n</untrusted_context>',
+        );
+        expect(result.returnDisplay).toContain(
+          'URL(s) processed using fallback fetch',
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('should NOT include private URLs in fallback', async () => {
       vi.mocked(fetchUtils.isPrivateIp).mockImplementation((url) =>
         Promise.resolve(url === 'https://private.com/'),

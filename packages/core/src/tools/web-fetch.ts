@@ -18,6 +18,7 @@ import {
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
+import { createTimeoutAbortHandle } from '../utils/abort.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
 import { truncateString, wrapUntrusted } from '../utils/textUtils.js';
@@ -39,6 +40,12 @@ import { LRUCache } from 'mnemonist';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 const URL_FETCH_TIMEOUT_MS = 10000;
+/**
+ * Upper bound for the primary LLM-mediated fetch. Without it, a request that
+ * never settles would leave the agent loop hanging until the user cancels;
+ * a timed-out primary fetch falls back to the direct URL fetch path.
+ */
+const PRIMARY_FETCH_TIMEOUT_MS = 30000;
 const MAX_CONTENT_LENGTH = 250000;
 const MAX_EXPERIMENTAL_FETCH_SIZE = 10 * 1024 * 1024; // 10MB
 const USER_AGENT =
@@ -791,6 +798,14 @@ Response: ${rawResponseText}`;
       };
     }
 
+    // Abort the primary LLM-mediated fetch after a timeout so that a
+    // request which never settles falls back to the direct URL fetch path
+    // instead of hanging the agent loop indefinitely.
+    const timeoutHandle = createTimeoutAbortHandle(
+      signal,
+      PRIMARY_FETCH_TIMEOUT_MS,
+    );
+
     try {
       const geminiClient = this.context.geminiClient;
       const sanitizedPrompt = `Follow the user's instructions to process the authorized URLs.
@@ -806,7 +821,7 @@ ${toFetch.join('\n')}
       const response = await geminiClient.generateContent(
         { model: 'web-fetch' },
         [{ role: 'user', parts: [{ text: sanitizedPrompt }] }],
-        signal,
+        timeoutHandle.signal,
         LlmRole.UTILITY_TOOL,
       );
 
@@ -887,8 +902,12 @@ ${toFetch.join('\n')}
         this.context.config,
         new WebFetchFallbackAttemptEvent('primary_failed'),
       );
-      // Simple All-or-Nothing Fallback
-      return this.executeFallback(toFetch, signal);
+      // Simple All-or-Nothing Fallback. The original signal is used so that
+      // an external cancellation still stops the fallback, while a timeout
+      // of the primary fetch does not.
+      return await this.executeFallback(toFetch, signal);
+    } finally {
+      timeoutHandle.dispose();
     }
   }
 }

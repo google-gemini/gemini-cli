@@ -18,6 +18,7 @@ import {
 import { ToolErrorType } from './tool-error.js';
 
 import { getErrorMessage, isAbortError } from '../utils/errors.js';
+import { createTimeoutAbortHandle } from '../utils/abort.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { WEB_SEARCH_DEFINITION } from './definitions/coreTools.js';
@@ -45,8 +46,15 @@ interface GroundingSupportSegment {
 interface GroundingSupportItem {
   segment?: GroundingSupportSegment;
   groundingChunkIndices?: number[];
-  confidenceScores?: number[]; // Optional as per example
+  confidenceScores?: number[]; // Optional as per the example
 }
+
+/**
+ * Upper bound for a single web search request. Without it, a search whose
+ * underlying request never settles would leave the agent loop hanging in
+ * "Thinking..." until the user cancels manually.
+ */
+const WEB_SEARCH_TIMEOUT_MS = 30_000;
 
 /**
  * Parameters for the WebSearchTool.
@@ -91,11 +99,19 @@ class WebSearchToolInvocation extends BaseToolInvocation<
   }: ExecuteOptions): Promise<WebSearchToolResult> {
     const geminiClient = this.context.geminiClient;
 
+    // Abort the underlying request after a timeout so that a search whose
+    // request never settles fails with a structured tool error instead of
+    // hanging the agent loop indefinitely.
+    const timeoutHandle = createTimeoutAbortHandle(
+      signal,
+      WEB_SEARCH_TIMEOUT_MS,
+    );
+
     try {
       const response = await geminiClient.generateContent(
         { model: 'web-search' },
         [{ role: 'user', parts: [{ text: this.params.query }] }],
-        signal,
+        timeoutHandle.signal,
         LlmRole.UTILITY_TOOL,
       );
 
@@ -179,6 +195,18 @@ class WebSearchToolInvocation extends BaseToolInvocation<
         sources,
       };
     } catch (error: unknown) {
+      if (timeoutHandle.didTimeout()) {
+        const errorMessage = `Web search for query "${this.params.query}" timed out after ${WEB_SEARCH_TIMEOUT_MS}ms.`;
+        debugLogger.warn(errorMessage, error);
+        return {
+          llmContent: `Error: ${errorMessage}`,
+          returnDisplay: `Web search timed out.`,
+          error: {
+            message: errorMessage,
+            type: ToolErrorType.WEB_SEARCH_FAILED,
+          },
+        };
+      }
       if (isAbortError(error)) {
         return {
           llmContent: 'Web search was cancelled.',
@@ -197,6 +225,8 @@ class WebSearchToolInvocation extends BaseToolInvocation<
           type: ToolErrorType.WEB_SEARCH_FAILED,
         },
       };
+    } finally {
+      timeoutHandle.dispose();
     }
   }
 }
