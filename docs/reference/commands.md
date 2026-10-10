@@ -449,6 +449,10 @@ Slash commands provide meta-level control over the CLI itself.
   - **`tools`**:
     - **Description:** Show tool-specific usage statistics.
 
+Duration metrics are rounded to their displayed precision. When rounding
+reaches the next unit boundary, the duration is displayed using that unit (for
+example, `1.0s` instead of `1000ms`, or `1m` instead of `60.0s`).
+
 ### `/terminal-setup`
 
 - **Description:** Configure terminal keybindings for multiline input (VS Code,

@@ -68,6 +68,11 @@ describe('formatters', () => {
       expect(formatDuration(500)).toBe('500ms');
     });
 
+    it('should promote rounded milliseconds to seconds', () => {
+      expect(formatDuration(999.4)).toBe('999ms');
+      expect(formatDuration(999.5)).toBe('1.0s');
+    });
+
     it('should format a duration of 0', () => {
       expect(formatDuration(0)).toBe('0s');
     });
@@ -78,6 +83,12 @@ describe('formatters', () => {
 
     it('should format a duration in seconds with one decimal place', () => {
       expect(formatDuration(12345)).toBe('12.3s');
+    });
+
+    it('should promote rounded seconds to minutes', () => {
+      expect(formatDuration(59949)).toBe('59.9s');
+      expect(formatDuration(59950)).toBe('1m');
+      expect(formatDuration(59999)).toBe('1m');
     });
 
     it('should format an exact number of minutes', () => {
