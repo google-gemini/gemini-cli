@@ -43,7 +43,11 @@ jobs:
 
   download_repo_name:
     runs-on: 'gemini-cli-ubuntu-16-core'
-    if: "github.repository == 'google-gemini/gemini-cli' && (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run')"
+    if: >-
+      github.repository == 'google-gemini/gemini-cli' && (
+        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+      )
     outputs:
       repo_name: '${{ steps.output-repo-name.outputs.repo_name }}'
       head_sha: '${{ steps.output-repo-name.outputs.head_sha }}'
@@ -101,7 +105,7 @@ jobs:
         name: 'Set dynamic repository and SHA'
         env:
           REPO: '${{ needs.download_repo_name.outputs.repo_name || github.repository }}'
-          SHA: '${{ needs.download_repo_name.outputs.head_sha || github.event.inputs.head_sha || github.event.workflow_run.head_sha || github.sha }}'
+          SHA: '${{ needs.download_repo_name.outputs.head_sha || github.event.inputs.head_sha || github.sha }}'
         shell: 'bash'
         run: |
           echo "REPO=$REPO" >> "$GITHUB_OUTPUT"
