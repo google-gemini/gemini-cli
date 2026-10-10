@@ -499,6 +499,21 @@ export function buildAuthorizationUrl(
   params.forEach((value, key) => {
     url.searchParams.append(key, value);
   });
+
+  // Google OAuth authorization endpoints require access_type=offline and prompt=consent
+  // to return a refresh token during code exchange.
+  if (
+    url.hostname === 'accounts.google.com' ||
+    url.hostname.endsWith('.google.com')
+  ) {
+    if (!url.searchParams.has('access_type')) {
+      url.searchParams.set('access_type', 'offline');
+    }
+    if (!url.searchParams.has('prompt')) {
+      url.searchParams.set('prompt', 'consent');
+    }
+  }
+
   return url.toString();
 }
 

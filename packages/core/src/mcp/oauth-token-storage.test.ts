@@ -224,6 +224,44 @@ describe('MCPOAuthTokenStorage', () => {
         expect(savedData[0].token.refreshToken).toBe('old-refresh-token'); // successfully merged
       });
 
+      it('should save token with clientSecret and preserve it on subsequent updates', async () => {
+        vi.mocked(fs.readFile).mockRejectedValue({ code: 'ENOENT' });
+        vi.mocked(fs.mkdir).mockResolvedValue(undefined);
+        vi.mocked(fs.writeFile).mockResolvedValue(undefined);
+
+        await tokenStorage.saveToken(
+          'test-server',
+          mockToken,
+          'client-id',
+          'https://token.url',
+          undefined,
+          'test-client-secret',
+        );
+
+        let writeCall = vi.mocked(fs.writeFile).mock.calls[0];
+        let savedData = JSON.parse(
+          writeCall[1] as string,
+        ) as OAuthCredentials[];
+        expect(savedData[0].clientSecret).toBe('test-client-secret');
+
+        // Subsequent save without passing clientSecret should preserve the existing clientSecret
+        vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify(savedData));
+        const updatedToken: OAuthToken = {
+          ...mockToken,
+          accessToken: 'updated_token',
+        };
+        await tokenStorage.saveToken(
+          'test-server',
+          updatedToken,
+          'client-id',
+          'https://token.url',
+        );
+
+        writeCall = vi.mocked(fs.writeFile).mock.calls[1];
+        savedData = JSON.parse(writeCall[1] as string) as OAuthCredentials[];
+        expect(savedData[0].clientSecret).toBe('test-client-secret');
+      });
+
       it('should handle write errors gracefully', async () => {
         vi.mocked(fs.readFile).mockRejectedValue({ code: 'ENOENT' });
         vi.mocked(fs.mkdir).mockResolvedValue(undefined);

@@ -489,6 +489,29 @@ describe('oauth-flow', () => {
       const parsed = new URL(url);
       expect(parsed.searchParams.get('redirect_uri')).toBe('not-a-valid-url');
     });
+
+    it('should include access_type=offline and prompt=consent for Google authorization endpoints', () => {
+      const googleConfig: OAuthFlowConfig = {
+        ...baseConfig,
+        authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+      };
+      const url = buildAuthorizationUrl(googleConfig, basePkceParams, 3000);
+      const parsed = new URL(url);
+      expect(parsed.searchParams.get('access_type')).toBe('offline');
+      expect(parsed.searchParams.get('prompt')).toBe('consent');
+    });
+
+    it('should not override custom access_type or prompt if already present in Google authorizationUrl', () => {
+      const googleConfig: OAuthFlowConfig = {
+        ...baseConfig,
+        authorizationUrl:
+          'https://accounts.google.com/o/oauth2/v2/auth?access_type=online&prompt=select_account',
+      };
+      const url = buildAuthorizationUrl(googleConfig, basePkceParams, 3000);
+      const parsed = new URL(url);
+      expect(parsed.searchParams.get('access_type')).toBe('online');
+      expect(parsed.searchParams.get('prompt')).toBe('select_account');
+    });
   });
 
   describe('startCallbackServer', () => {

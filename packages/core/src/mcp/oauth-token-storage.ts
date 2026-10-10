@@ -141,6 +141,7 @@ export class MCPOAuthTokenStorage implements TokenStorage {
     clientId?: string,
     tokenUrl?: string,
     mcpServerUrl?: string,
+    clientSecret?: string,
   ): Promise<void> {
     await this.ensureConfigDir();
 
@@ -157,6 +158,7 @@ export class MCPOAuthTokenStorage implements TokenStorage {
       serverName,
       token: mergedToken,
       clientId,
+      clientSecret: clientSecret || existing?.clientSecret,
       tokenUrl,
       mcpServerUrl,
       updatedAt: Date.now(),
