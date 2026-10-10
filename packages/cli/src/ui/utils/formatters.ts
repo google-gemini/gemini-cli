@@ -31,16 +31,18 @@ export const formatDuration = (milliseconds: number): string => {
     return '0s';
   }
 
-  if (milliseconds < 1000) {
-    return `${Math.round(milliseconds)}ms`;
+  const roundedMs = Math.round(milliseconds);
+  if (roundedMs < 1000) {
+    return `${roundedMs}ms`;
   }
 
-  const totalSeconds = milliseconds / 1000;
+  const tenthsOfSecond = Math.round(milliseconds / 100);
 
-  if (totalSeconds < 60) {
-    return `${totalSeconds.toFixed(1)}s`;
+  if (tenthsOfSecond < 600) {
+    return `${(tenthsOfSecond / 10).toFixed(1)}s`;
   }
 
+  const totalSeconds = Math.round(milliseconds / 1000);
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = Math.floor(totalSeconds % 60);
