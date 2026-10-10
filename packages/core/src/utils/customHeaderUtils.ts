@@ -16,8 +16,10 @@ export function parseCustomHeaders(
   }
 
   // Split the string on commas that are followed by a header key (key:),
-  // but ignore commas that are part of a header value (including values with colons or commas)
-  for (const entry of envValue.split(/,(?=\s*[^,:]+:)/)) {
+  // but ignore commas that are part of a header value (including values with colons or commas).
+  // The lookahead requires an RFC 9110 token before the colon so that values
+  // containing sequences like `,"name":` (JSON) or `, <url>` (Link) are not split.
+  for (const entry of envValue.split(/,(?=\s*[\w!#$%&'*+.^`|~-]+\s*:)/)) {
     const trimmedEntry = entry.trim();
     if (!trimmedEntry) {
       continue;
