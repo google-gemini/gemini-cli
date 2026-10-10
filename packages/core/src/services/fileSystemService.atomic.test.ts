@@ -113,4 +113,48 @@ describe('StandardFileSystemService atomicity', () => {
     const lstat = await fsp.lstat(symlinkPath);
     expect(lstat.isSymbolicLink()).toBe(true);
   });
+
+  // Windows limits the whole path (about 260 characters), so a 255-byte name
+  // fails there for a different reason than the one under test.
+  describe.skipIf(process.platform === 'win32')('long file names', () => {
+    // A name of 215-255 bytes is legal, but the temp name is 41 bytes longer
+    // and used to overflow NAME_MAX, failing with ENAMETOOLONG.
+    it.each([214, 215, 254, 255])(
+      'writes an ASCII name of %i bytes',
+      async (nameBytes) => {
+        const name = 'a'.repeat(nameBytes);
+        expect(Buffer.byteLength(name)).toBe(nameBytes);
+        const filePath = path.join(dir, name);
+
+        await service.writeTextFile(filePath, 'hello');
+
+        expect(await fsp.readFile(filePath, 'utf-8')).toBe('hello');
+        // No temp file is left behind.
+        expect(await fsp.readdir(dir)).toEqual([name]);
+      },
+    );
+
+    it('writes a long multi-byte name without splitting a character', async () => {
+      // 80 characters x 3 bytes + '.txt' = 244 bytes, over the 214-byte budget.
+      const name = 'あ'.repeat(80) + '.txt';
+      expect(Buffer.byteLength(name)).toBe(244);
+      const filePath = path.join(dir, name);
+
+      await service.writeTextFile(filePath, 'hello');
+
+      expect(await fsp.readFile(filePath, 'utf-8')).toBe('hello');
+      expect(await fsp.readdir(dir)).toEqual([name]);
+    });
+
+    it('overwrites an existing file with a long name', async () => {
+      const name = 'b'.repeat(250) + '.txt';
+      const filePath = path.join(dir, name);
+      await fsp.writeFile(filePath, 'old', 'utf-8');
+
+      await service.writeTextFile(filePath, 'new');
+
+      expect(await fsp.readFile(filePath, 'utf-8')).toBe('new');
+      expect(await fsp.readdir(dir)).toEqual([name]);
+    });
+  });
 });
