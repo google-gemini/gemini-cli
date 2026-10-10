@@ -11,6 +11,7 @@ import {
   resolveRipgrepPath,
 } from './ripGrep.js';
 import type { GrepResult } from './tools.js';
+import { ToolErrorType } from './tool-error.js';
 import path from 'node:path';
 import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import fs from 'node:fs/promises';
@@ -459,6 +460,7 @@ describe('RipGrepTool', () => {
       expect((result.returnDisplay as GrepResult).summary).toBe(
         'No matches found',
       );
+      expect(result.error).toBeUndefined();
     });
 
     it('should throw error for invalid regex pattern during build', async () => {
@@ -468,7 +470,7 @@ describe('RipGrepTool', () => {
       );
     });
 
-    it('should ignore invalid regex error from ripgrep when it is not a user error', async () => {
+    it('should return a GREP_EXECUTION_ERROR if ripgrep exits with an error', async () => {
       mockSpawn.mockImplementation(
         createMockSpawn({
           outputData: '',
@@ -487,6 +489,10 @@ describe('RipGrepTool', () => {
       expect(result.returnDisplay).toContain(
         'Error: Process exited with code 2',
       );
+      expect(result.error).toEqual({
+        message: expect.stringContaining('Process exited with code 2'),
+        type: ToolErrorType.GREP_EXECUTION_ERROR,
+      });
     });
 
     it('should handle massive output by terminating early without crashing (Regression)', async () => {
@@ -684,7 +690,7 @@ describe('RipGrepTool', () => {
       );
     });
 
-    it('should throw an error if ripgrep is not available', async () => {
+    it('should return a GREP_EXECUTION_ERROR if ripgrep is not available', async () => {
       vi.mocked(mockConfig.getRipgrepPath).mockResolvedValue(null);
 
       const params: RipGrepToolParams = { pattern: 'world' };
@@ -692,6 +698,10 @@ describe('RipGrepTool', () => {
 
       const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toContain('Cannot find bundled ripgrep binary');
+      expect(result.error).toEqual({
+        message: 'Cannot find bundled ripgrep binary.',
+        type: ToolErrorType.GREP_EXECUTION_ERROR,
+      });
 
       // restore the mock for subsequent tests
       vi.mocked(mockConfig.getRipgrepPath).mockResolvedValue('/mock/rg');
