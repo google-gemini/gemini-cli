@@ -313,11 +313,15 @@ describe('activate', () => {
       expect(context.subscriptions).toContain(findCommandDisposable(id));
     }
 
-    const folderDisposable = vi.mocked(
-      vscode.workspace.onDidChangeWorkspaceFolders,
-    ).mock.results[0]?.value;
-    const trustDisposable = vi.mocked(vscode.workspace.onDidGrantWorkspaceTrust)
-      .mock.results[0]?.value;
+    // Use the latest registration rather than results[0]: Vitest does not
+    // clear mock call history between tests by default, so results[0] could
+    // belong to an earlier test if other tests also call activate().
+    const folderDisposable = vi
+      .mocked(vscode.workspace.onDidChangeWorkspaceFolders)
+      .mock.results.at(-1)?.value;
+    const trustDisposable = vi
+      .mocked(vscode.workspace.onDidGrantWorkspaceTrust)
+      .mock.results.at(-1)?.value;
     expect(context.subscriptions).toContain(folderDisposable);
     expect(context.subscriptions).toContain(trustDisposable);
 
