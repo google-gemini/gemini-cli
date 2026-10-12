@@ -236,16 +236,6 @@ interface WritableBufferEntry {
 }
 
 /**
- * Internal representation of a single buffered write entry in Node.js's `_writableState.buffered` queue.
- * Used to calculate the exact byte length of discarded corked writes and invoke their completion callbacks.
- */
-interface WritableBufferEntry {
-  chunk?: string | Buffer | Uint8Array;
-  encoding?: BufferEncoding;
-  callback?: (err?: Error | null) => void;
-}
-
-/**
  * Internal representation of Node.js Writable stream state.
  * This is used to access and discard stale buffered writes during rapid terminal resizes.
  * Since Node.js does not expose a public API to clear or discard corked/buffered writes,
@@ -832,6 +822,7 @@ export const AppContainer = (props: AppContainerProps) => {
         stdout.columns !== lastRefreshedColumnsRef.current
       ) {
         discardCorkedStdoutBuffer(stdout);
+        stdout.write(EXIT_SYNCHRONIZED_OUTPUT);
         uncorkStdout();
         return;
       }
