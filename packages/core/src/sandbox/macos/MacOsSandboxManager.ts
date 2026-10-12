@@ -23,6 +23,7 @@ import {
 } from '../../services/environmentSanitization.js';
 import { buildSeatbeltProfile } from './seatbeltArgsBuilder.js';
 import {
+  IGNORED_COMMAND_ROOTS,
   initializeShellParsers,
   getCommandRoots,
   stripShellWrapper,
@@ -139,7 +140,7 @@ export class MacOsSandboxManager implements SandboxManager {
     const fullCmd = [command, ...args].join(' ');
     const stripped = stripShellWrapper(fullCmd);
     const roots = getCommandRoots(stripped).filter(
-      (r) => r !== 'shopt' && r !== 'set',
+      (r) => !IGNORED_COMMAND_ROOTS.has(r),
     );
     const isGitCommand = roots.includes('git');
 

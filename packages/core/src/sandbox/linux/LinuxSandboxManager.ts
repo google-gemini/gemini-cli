@@ -40,6 +40,7 @@ import { isErrnoException } from '../utils/fsUtils.js';
 import { handleReadWriteCommands } from '../utils/sandboxReadWriteUtils.js';
 import { buildBwrapArgs } from './bwrapArgsBuilder.js';
 import {
+  IGNORED_COMMAND_ROOTS,
   getCommandRoots,
   initializeShellParsers,
   stripShellWrapper,
@@ -228,7 +229,7 @@ export class LinuxSandboxManager implements SandboxManager {
     const fullCmd = [command, ...args].join(' ');
     const stripped = stripShellWrapper(fullCmd);
     const roots = getCommandRoots(stripped).filter(
-      (r) => r !== 'shopt' && r !== 'set',
+      (r) => !IGNORED_COMMAND_ROOTS.has(r),
     );
     const commandName = roots.length > 0 ? roots[0] : join(command);
     const isGitCommand = roots.includes('git');

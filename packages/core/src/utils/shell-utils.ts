@@ -15,8 +15,14 @@ import {
 } from 'node:child_process';
 
 /**
+ * Shell builtin commands that may be injected by wrappers or guards
+ * and should be ignored when determining the primary command name.
+ */
+export const IGNORED_COMMAND_ROOTS = new Set(['shopt', 'set', 'trap']);
+
+/**
  * Extracts the primary command name from a potentially wrapped shell command.
- * Strips shell wrappers and handles shopt/set/etc.
+ * Strips shell wrappers and handles shopt/set/trap/etc.
  *
  * @param command - The full command string.
  * @param args - The arguments for the command.
@@ -30,7 +36,7 @@ export async function getCommandName(
   const fullCmd = [command, ...args].join(' ');
   const stripped = stripShellWrapper(fullCmd);
   const roots = getCommandRoots(stripped).filter(
-    (r) => r !== 'shopt' && r !== 'set',
+    (r) => !IGNORED_COMMAND_ROOTS.has(r),
   );
   if (roots.length > 0) {
     return roots[0];
