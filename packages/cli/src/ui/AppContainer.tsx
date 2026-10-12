@@ -653,7 +653,7 @@ export const AppContainer = (props: AppContainerProps) => {
     if (!isAlternateBuffer && !config.getUseTerminalBuffer()) {
       stdout.write(ansiEscapes.clearTerminal);
     }
-    if (!isAlternateBuffer) {
+    if (!isAlternateBuffer || config.getUseTerminalBuffer()) {
       setHistoryRemountKey((prev) => prev + 1);
     }
   }, [setHistoryRemountKey, isAlternateBuffer, stdout, config]);

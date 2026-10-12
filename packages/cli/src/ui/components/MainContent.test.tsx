@@ -1263,6 +1263,56 @@ describe('MainContent', () => {
     ).toBe(false);
     expect(isStaticItem({ type: 'pending' })).toBe(false);
 
+    const keyExtractor = lastCallProps.keyExtractor as (
+      item: unknown,
+      index: number,
+    ) => string;
+    expect(keyExtractor({ type: 'header' }, 0)).toContain('undefined');
+
+    unmount();
+  });
+
+  it('marks header as non-static and updates header key when updateInfo.isUpdating is true', async () => {
+    vi.mocked(useAlternateBuffer).mockReturnValue(true);
+    mockScrollableList.mockClear();
+
+    const { unmount } = await renderWithProviders(<MainContent />, {
+      uiState: {
+        ...defaultMockUiState,
+        updateInfo: {
+          isUpdating: true,
+          message: 'Updating...',
+          update: {
+            latest: '2.0.0',
+            current: '1.0.0',
+            name: '@google/gemini-cli',
+          },
+        },
+      } as Partial<UIState>,
+      config: makeFakeConfig({
+        useAlternateBuffer: false,
+        useTerminalBuffer: true,
+      }),
+      settings: createMockSettings({
+        ui: { useAlternateBuffer: false, terminalBuffer: true },
+      }),
+    });
+
+    const lastCallProps =
+      mockScrollableList.mock.calls[
+        mockScrollableList.mock.calls.length - 1
+      ][0];
+    const isStaticItem = lastCallProps.isStaticItem as (
+      item: unknown,
+    ) => boolean;
+    const keyExtractor = lastCallProps.keyExtractor as (
+      item: unknown,
+      index: number,
+    ) => string;
+
+    expect(isStaticItem({ type: 'header' })).toBe(false);
+    expect(keyExtractor({ type: 'header' }, 0)).toContain('-true-');
+
     unmount();
   });
 });

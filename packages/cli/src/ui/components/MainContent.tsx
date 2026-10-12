@@ -365,7 +365,7 @@ export const MainContent = () => {
   const keyExtractor = useCallback(
     (item: (typeof virtualizedData)[number], _index: number) => {
       if (item.type === 'header') {
-        return `header-${showHeaderDetails}-${uiState.bannerVisible}-${uiState.bannerData?.defaultText ?? ''}-${uiState.bannerData?.warningText ?? ''}-${uiState.historyRemountKey}`;
+        return `header-${showHeaderDetails}-${uiState.bannerVisible}-${uiState.bannerData?.defaultText ?? ''}-${uiState.bannerData?.warningText ?? ''}-${uiState.updateInfo?.isUpdating}-${uiState.historyRemountKey}`;
       }
       if (item.type === 'history') {
         return `${item.item.id}-${uiState.renderMarkdown}-${uiState.historyRemountKey}`;
@@ -379,6 +379,7 @@ export const MainContent = () => {
       uiState.bannerData?.warningText,
       uiState.renderMarkdown,
       uiState.historyRemountKey,
+      uiState.updateInfo?.isUpdating,
     ],
   );
 
