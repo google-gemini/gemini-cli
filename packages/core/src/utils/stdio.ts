@@ -159,40 +159,6 @@ export function wrapWithSynchronizedOutput(chunk: string): string {
 }
 
 /**
- * Wraps a writable stdout stream so that frame writes are bracketed with
- * terminal synchronized output escape sequences.
- */
-export function createSynchronizedStdout(
-  stdout: typeof process.stdout,
-): typeof process.stdout {
-  const synchronizedWrite = (
-    ...args: Parameters<typeof process.stdout.write>
-  ): boolean => {
-    const [chunk] = args;
-    if (typeof chunk === 'string') {
-      args[0] = wrapWithSynchronizedOutput(chunk);
-    }
-    return stdout.write(...args);
-  };
-
-  return new Proxy(stdout, {
-    get(target, prop) {
-      if (prop === 'write') {
-        return synchronizedWrite;
-      }
-      if (isKey(prop, target)) {
-        const value = target[prop];
-        if (typeof value === 'function') {
-          return value.bind(target);
-        }
-        return value;
-      }
-      return undefined;
-    },
-  });
-}
-
-/**
  * Creates proxies for process.stdout and process.stderr that use the real write methods
  * (writeToStdout and writeToStderr) bypassing any monkey patching.
  * This is used to write to the real output even when stdio is patched.

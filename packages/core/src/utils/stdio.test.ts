@@ -127,15 +127,13 @@ describe('stdio utils', () => {
       .mockImplementation(() => true);
     const {
       createWorkingStdio: createSyncStdio,
-      createSynchronizedStdout,
       ENTER_SYNCHRONIZED_OUTPUT_SEQ,
       EXIT_SYNCHRONIZED_OUTPUT_SEQ,
     } = await import('./stdio.js');
 
-    const { stdout: rawStdout } = createSyncStdio({
+    const { stdout } = createSyncStdio({
       synchronizedOutput: true,
     });
-    const stdout = createSynchronizedStdout(rawStdout);
 
     stdout.write('spinner frame 1');
     expect(writeSpy).toHaveBeenLastCalledWith(
@@ -156,15 +154,13 @@ describe('stdio utils', () => {
       .mockImplementation(() => true);
     const {
       createWorkingStdio: createSyncStdio,
-      createSynchronizedStdout,
       TMUX_ENTER_SYNCHRONIZED_OUTPUT_SEQ,
       TMUX_EXIT_SYNCHRONIZED_OUTPUT_SEQ,
     } = await import('./stdio.js');
 
-    const { stdout: rawStdout } = createSyncStdio({
+    const { stdout } = createSyncStdio({
       synchronizedOutput: true,
     });
-    const stdout = createSynchronizedStdout(rawStdout);
 
     stdout.write('spinner frame in tmux');
     expect(writeSpy).toHaveBeenLastCalledWith(

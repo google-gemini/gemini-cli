@@ -19,7 +19,6 @@ import {
   type Config,
   type ResumedSessionData,
   coreEvents,
-  createSynchronizedStdout,
   createWorkingStdio,
   disableMouseEvents,
   enableMouseEvents,
@@ -95,10 +94,9 @@ export async function startInteractiveUI(
   });
   consolePatcher.patch();
 
-  const { stdout: rawInkStdout, stderr: inkStderr } = createWorkingStdio({
+  const { stdout: inkStdout, stderr: inkStderr } = createWorkingStdio({
     synchronizedOutput: true,
   });
-  const inkStdout = createSynchronizedStdout(rawInkStdout);
 
   const isShpool = !!process.env['SHPOOL_SESSION_NAME'];
 
