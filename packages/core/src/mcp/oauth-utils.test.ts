@@ -277,6 +277,7 @@ describe('OAuthUtils', () => {
         issuer: 'https://auth.example.com',
         tokenUrl: 'https://auth.example.com/token',
         scopes: ['read', 'write'],
+        authorizationResponseIssParameterSupported: false,
       });
     });
 
@@ -320,6 +321,7 @@ describe('OAuthUtils', () => {
         issuer: 'https://auth.example.com',
         tokenUrl: 'https://auth.example.com/token',
         scopes: ['read', 'write'],
+        authorizationResponseIssParameterSupported: false,
       });
     });
   });
@@ -340,6 +342,7 @@ describe('OAuthUtils', () => {
         issuer: 'https://auth.example.com',
         tokenUrl: 'https://auth.example.com/token',
         scopes: ['read', 'write'],
+        authorizationResponseIssParameterSupported: false,
       });
     });
 
@@ -367,6 +370,51 @@ describe('OAuthUtils', () => {
 
       expect(config.issuer).toBe('https://auth.example.com');
     });
+
+    it('should map authorization_response_iss_parameter_supported from metadata', () => {
+      const baseMetadata: OAuthAuthorizationServerMetadata = {
+        issuer: 'https://auth.example.com',
+        authorization_endpoint: 'https://auth.example.com/oauth/authorize',
+        token_endpoint: 'https://auth.example.com/token',
+      };
+
+      expect(
+        OAuthUtils.metadataToOAuthConfig({
+          ...baseMetadata,
+          authorization_response_iss_parameter_supported: true,
+        }).authorizationResponseIssParameterSupported,
+      ).toBe(true);
+
+      expect(
+        OAuthUtils.metadataToOAuthConfig({
+          ...baseMetadata,
+          authorization_response_iss_parameter_supported: false,
+        }).authorizationResponseIssParameterSupported,
+      ).toBe(false);
+
+      // RFC 9207 Section 3: defaults to false when omitted from metadata
+      expect(
+        OAuthUtils.metadataToOAuthConfig(baseMetadata)
+          .authorizationResponseIssParameterSupported,
+      ).toBe(false);
+    });
+
+    it.each([['false'], ['true'], ['0'], ['1'], [1], [null]])(
+      'should treat non-boolean authorization_response_iss_parameter_supported value %j as false',
+      (value) => {
+        const metadata = {
+          issuer: 'https://auth.example.com',
+          authorization_endpoint: 'https://auth.example.com/oauth/authorize',
+          token_endpoint: 'https://auth.example.com/token',
+          authorization_response_iss_parameter_supported: value,
+        } as unknown as OAuthAuthorizationServerMetadata;
+
+        expect(
+          OAuthUtils.metadataToOAuthConfig(metadata)
+            .authorizationResponseIssParameterSupported,
+        ).toBe(false);
+      },
+    );
   });
 
   describe('parseWWWAuthenticateHeader', () => {
@@ -421,6 +469,7 @@ describe('OAuthUtils', () => {
         issuer: 'https://auth.example.com',
         tokenUrl: 'https://auth.example.com/token',
         scopes: ['read', 'write'],
+        authorizationResponseIssParameterSupported: false,
       });
     });
   });

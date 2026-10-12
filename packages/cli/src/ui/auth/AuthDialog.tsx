@@ -132,8 +132,22 @@ export function AuthDialog({
         }
 
         const currentAuthType = settings.merged.security?.auth?.selectedType;
-        if (currentAuthType && currentAuthType !== authType) {
-          await clearCachedCredentialFile();
+        if (
+          authType === AuthType.LOGIN_WITH_GOOGLE ||
+          currentAuthType === AuthType.LOGIN_WITH_GOOGLE
+        ) {
+          try {
+            await clearCachedCredentialFile();
+          } catch (error) {
+            debugLogger.error('Failed to clear cached credentials:', error);
+            onAuthError(
+              'Failed to clear cached credentials: ' +
+                (error instanceof Error ? error.message : String(error)),
+            );
+            if (authType === AuthType.LOGIN_WITH_GOOGLE) {
+              return;
+            }
+          }
         }
 
         settings.setValue(scope, 'security.auth.selectedType', authType);
@@ -161,7 +175,7 @@ export function AuthDialog({
       }
       setAuthState(AuthState.Unauthenticated);
     },
-    [settings, config, setAuthState, exiting, setAuthContext],
+    [settings, config, setAuthState, exiting, setAuthContext, onAuthError],
   );
 
   const handleAuthSelect = async (authMethod: AuthType) => {
@@ -172,8 +186,12 @@ export function AuthDialog({
     if (error) {
       onAuthError(error);
     } else {
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      onSelect(authMethod, SettingScope.User);
+      onAuthError(null);
+      try {
+        await onSelect(authMethod, SettingScope.User);
+      } catch (e) {
+        onAuthError(e instanceof Error ? e.message : String(e));
+      }
     }
   };
 

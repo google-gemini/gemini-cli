@@ -238,9 +238,11 @@ export function isResumableMessageRecord(message: MessageRecord): boolean {
 }
 
 export function hasResumableConversationContent(
-  messages: readonly MessageRecord[],
+  messages?: readonly MessageRecord[],
 ): boolean {
-  return messages.some((message) => isResumableMessageRecord(message));
+  return (
+    messages?.some((message) => isResumableMessageRecord(message)) ?? false
+  );
 }
 
 type LoadedConversationResult = ConversationRecord & {
@@ -674,6 +676,8 @@ export class ChatRecordingService {
   private queuedThoughts: Array<ThoughtSummary & { timestamp: string }> = [];
   private queuedTokens: TokensSummary | null = null;
   private context: AgentLoopContext;
+  private isResumedSession = false;
+  private initializationPromise: Promise<void> | null = null;
   private messageOrder: string[] = [];
   private messageMetaMap = new Map<string, MessageMeta>();
   private toolCallMetaMap = new Map<string, ToolCallMeta>();
@@ -687,7 +691,24 @@ export class ChatRecordingService {
     this.projectHash = getProjectHash(context.config.getProjectRoot());
   }
 
+  getIsResumedSession(): boolean {
+    return this.isResumedSession;
+  }
+
+  setIsResumedSession(isResumed: boolean): void {
+    this.isResumedSession = isResumed;
+  }
+
   async initialize(
+    resumedSessionData?: ResumedSessionData,
+    kind?: 'main' | 'subagent',
+  ): Promise<void> {
+    this.isResumedSession = Boolean(resumedSessionData);
+    this.initializationPromise = this.doInitialize(resumedSessionData, kind);
+    return this.initializationPromise;
+  }
+
+  private async doInitialize(
     resumedSessionData?: ResumedSessionData,
     kind?: 'main' | 'subagent',
   ): Promise<void> {
@@ -702,7 +723,10 @@ export class ChatRecordingService {
           this.conversationFile,
         );
         if (loadedRecord) {
-          this.cachedConversation = loadedRecord;
+          this.cachedConversation = {
+            ...loadedRecord,
+            messages: loadedRecord.messages ?? [],
+          };
           this.projectHash = this.cachedConversation.projectHash;
 
           if (this.conversationFile.endsWith('.json')) {
@@ -807,21 +831,46 @@ export class ChatRecordingService {
               ]
             : undefined;
 
-        const initialMetadata = {
-          sessionId: this.sessionId,
-          projectHash: this.projectHash,
-          startTime: new Date().toISOString(),
-          lastUpdated: new Date().toISOString(),
-          kind: this.kind,
-          directories,
-        };
+        let fileAlreadyExisted = false;
+        if (fs.existsSync(this.conversationFile)) {
+          fileAlreadyExisted = true;
+          const loadedRecord = await loadConversationRecord(
+            this.conversationFile,
+          );
+          if (loadedRecord) {
+            this.cachedConversation = {
+              ...loadedRecord,
+              messages: loadedRecord.messages ?? [],
+            };
+            this.projectHash = this.cachedConversation.projectHash;
+            if (
+              loadedRecord.hasResumableContent ||
+              hasResumableConversationContent(this.cachedConversation.messages)
+            ) {
+              this.isResumedSession = true;
+            }
+          }
+        }
 
-        this.appendRecord(initialMetadata);
-        this.cachedConversation = {
-          ...initialMetadata,
-          messages: [],
-        };
-        this.rebuildIndexAndWindow([]);
+        if (!fileAlreadyExisted || !this.cachedConversation) {
+          const initialMetadata = {
+            sessionId: this.sessionId,
+            projectHash: this.projectHash,
+            startTime: new Date().toISOString(),
+            lastUpdated: new Date().toISOString(),
+            kind: this.kind,
+            directories,
+          };
+
+          this.appendRecord(initialMetadata);
+          this.cachedConversation = {
+            ...initialMetadata,
+            messages: [],
+          };
+          this.rebuildIndexAndWindow([]);
+        } else {
+          this.rebuildIndexAndWindow(this.cachedConversation.messages);
+        }
       }
 
       this.queuedThoughts = [];
@@ -868,20 +917,21 @@ export class ChatRecordingService {
     this.hasEvictedMessages = msgs.length < this.messageOrder.length;
   }
 
-  private rebuildIndexAndWindow(messages: readonly MessageRecord[]): void {
+  private rebuildIndexAndWindow(messages?: readonly MessageRecord[]): void {
+    const safeMessages = messages ?? [];
     this.messageOrder = [];
     this.messageMetaMap.clear();
     this.toolCallMetaMap.clear();
 
-    for (const msg of messages) {
+    for (const msg of safeMessages) {
       this.indexMessage(msg);
     }
 
     if (this.cachedConversation) {
       this.cachedConversation.messages =
-        messages.length > MAX_HISTORY_MESSAGES
-          ? messages.slice(-MAX_HISTORY_MESSAGES)
-          : [...messages];
+        safeMessages.length > MAX_HISTORY_MESSAGES
+          ? safeMessages.slice(-MAX_HISTORY_MESSAGES)
+          : [...safeMessages];
       this.hasEvictedMessages =
         this.cachedConversation.messages.length < this.messageOrder.length;
     } else {
@@ -1275,15 +1325,46 @@ export class ChatRecordingService {
    * session with a real user prompt, model response, or tool activity.
    */
   async deleteCurrentSessionIfNotResumableAsync(): Promise<void> {
-    if (!this.conversationFile || !this.cachedConversation) {
+    if (this.initializationPromise) {
+      try {
+        await this.initializationPromise;
+      } catch {
+        // Ignore initialization error during exit cleanup
+      }
+    }
+
+    if (this.isResumedSession) {
+      return;
+    }
+
+    if (!this.conversationFile) {
       return;
     }
 
     if (
-      hasResumableConversationContent(this.cachedConversation.messages) ||
+      (this.cachedConversation &&
+        hasResumableConversationContent(
+          this.cachedConversation.messages ?? [],
+        )) ||
       Array.from(this.messageMetaMap.values()).some((m) => m.isResumable)
     ) {
       return;
+    }
+
+    // Check file content on disk in case in-memory cache was uninitialized or incomplete
+    if (fs.existsSync(this.conversationFile)) {
+      try {
+        const fileRecord = await loadConversationRecord(this.conversationFile);
+        if (
+          fileRecord &&
+          (fileRecord.hasResumableContent ||
+            hasResumableConversationContent(fileRecord.messages ?? []))
+        ) {
+          return;
+        }
+      } catch {
+        // Ignore read errors and proceed
+      }
     }
 
     await this.deleteCurrentSessionAsync();

@@ -187,15 +187,18 @@ export function areIssuersEqual(issuerA: string, issuerB: string): boolean {
  * @param expectedState The state parameter to validate
  * @param port Optional preferred port to listen on
  * @param expectedIssuer Optional expected authorization server issuer for RFC 9207 validation
+ * @param requireIssInResponse Whether the "iss" parameter must be present when expectedIssuer is provided (RFC 9207). Defaults to true when omitted; pass false when the authorization server metadata does not advertise authorization_response_iss_parameter_supported
  * @returns Object containing the port (available immediately) and a promise for the auth response
  */
 export function startCallbackServer(
   expectedState: string,
   port?: number,
   expectedIssuer?: string,
+  requireIssInResponse?: boolean,
 ): {
   port: Promise<number>;
   response: Promise<OAuthAuthorizationResponse>;
+  cancel?: (reason?: Error) => void;
 } {
   let portResolve: (port: number) => void;
   let portReject: (error: Error) => void;
@@ -205,6 +208,14 @@ export function startCallbackServer(
   });
 
   let timeoutId: NodeJS.Timeout | undefined;
+  const abortController = new AbortController();
+
+  const clearCallbackTimeout = () => {
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId);
+      timeoutId = undefined;
+    }
+  };
 
   const responsePromise = new Promise<OAuthAuthorizationResponse>(
     (resolve, reject) => {
@@ -239,6 +250,7 @@ export function startCallbackServer(
                 </body>
               </html>
             `);
+              clearCallbackTimeout();
               server.close();
               reject(new Error(`OAuth error: ${error}`));
               return;
@@ -259,6 +271,7 @@ export function startCallbackServer(
               );
               res.writeHead(400);
               res.end('Invalid state parameter');
+              clearCallbackTimeout();
               server.close();
               reject(new Error('State mismatch - possible CSRF attack'));
               return;
@@ -266,10 +279,12 @@ export function startCallbackServer(
 
             // RFC 9207 Authorization Server Issuer Identification check
             if (expectedIssuer) {
-              // Fail-closed: if an issuer was expected, the response MUST include it
-              if (!iss) {
+              // "iss" is required unless the caller explicitly indicates the
+              // authorization server does not provide it in the response.
+              const requireIss = requireIssInResponse ?? true;
+              if (requireIss && !iss) {
                 debugLogger.error(
-                  'OAuth callback rejected: Missing required "iss" parameter when an expected issuer is configured. Possible IdP mix-up attack (RFC 9207).',
+                  'OAuth callback rejected: Missing required "iss" parameter for the expected authorization server (RFC 9207).',
                 );
                 res.writeHead(400, { 'Content-Type': 'text/html' });
                 res.end(`
@@ -290,7 +305,7 @@ export function startCallbackServer(
                 return;
               }
 
-              if (!areIssuersEqual(iss, expectedIssuer)) {
+              if (iss && !areIssuersEqual(iss, expectedIssuer)) {
                 debugLogger.error(
                   'OAuth callback rejected: Issuer mismatch between authorization response and expected authorization server. Possible IdP mix-up attack (RFC 9207).',
                 );
@@ -312,9 +327,11 @@ export function startCallbackServer(
                 );
                 return;
               }
-              debugLogger.debug(
-                '✓ OAuth callback issuer validated successfully.',
-              );
+              if (iss) {
+                debugLogger.debug(
+                  '✓ OAuth callback issuer validated successfully.',
+                );
+              }
             } else if (iss) {
               debugLogger.debug(
                 'OAuth callback received "iss" parameter (no expected issuer was configured).',
@@ -333,9 +350,11 @@ export function startCallbackServer(
             </html>
           `);
 
+            clearCallbackTimeout();
             server.close();
             resolve({ code, state, iss });
           } catch (error) {
+            clearCallbackTimeout();
             server.close();
             reject(error);
           }
@@ -343,6 +362,7 @@ export function startCallbackServer(
       );
 
       server.on('error', (error) => {
+        clearCallbackTimeout();
         portReject(error);
         reject(error);
       });
@@ -376,7 +396,6 @@ export function startCallbackServer(
         portResolve(serverPort); // Resolve port promise immediately
       });
 
-      const abortController = new AbortController();
       timeoutId = setTimeout(
         () => {
           abortController.abort(new Error('OAuth callback timeout'));
@@ -386,12 +405,16 @@ export function startCallbackServer(
       timeoutId.unref();
 
       const onAbort = () => {
-        server.close();
+        clearCallbackTimeout();
+        if (server.listening) {
+          server.close();
+        }
         reject(abortController.signal.reason);
       };
       abortController.signal.addEventListener('abort', onAbort, { once: true });
 
       server.on('close', () => {
+        clearCallbackTimeout();
         abortController.signal.removeEventListener('abort', onAbort);
       });
     },
@@ -400,6 +423,11 @@ export function startCallbackServer(
   return {
     port: portPromise,
     response: responsePromise,
+    cancel: (reason?: Error) => {
+      if (!abortController.signal.aborted) {
+        abortController.abort(reason ?? new Error('OAuth callback cancelled'));
+      }
+    },
   };
 }
 

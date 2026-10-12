@@ -1840,4 +1840,54 @@ describe('startInteractiveUI', () => {
     }
     writeSpy.mockRestore();
   });
+
+  it('should not delete session on exit when resumedSessionData is provided', async () => {
+    const mockDeleteIfNotResumable = vi.fn().mockResolvedValue(undefined);
+    const mockChatRecordingService = {
+      deleteCurrentSessionIfNotResumableAsync: mockDeleteIfNotResumable,
+    };
+    const mockGeminiClient = {
+      getChatRecordingService: vi
+        .fn()
+        .mockReturnValue(mockChatRecordingService),
+    };
+    const mockConfigWithClient = {
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
+      ...mockConfig,
+      getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
+    } as unknown as Config;
+
+    const mockResumedData: ResumedSessionData = {
+      filePath: '/path/to/session.jsonl',
+      conversation: {
+        sessionId: 'resumed-session-id',
+        projectHash: 'hash',
+        startTime: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
+        messages: [],
+      },
+    };
+
+    const { registerCleanup } = await import('./utils/cleanup.js');
+    const registerCleanupMock = vi.mocked(registerCleanup);
+    registerCleanupMock.mockClear();
+
+    await startTestInteractiveUI(
+      mockConfigWithClient,
+      mockSettings,
+      mockStartupWarnings,
+      mockWorkspaceRoot,
+      mockResumedData,
+      mockInitializationResult,
+    );
+
+    for (const call of registerCleanupMock.mock.calls) {
+      const fn = call[0];
+      if (typeof fn === 'function') {
+        await fn();
+      }
+    }
+
+    expect(mockDeleteIfNotResumable).not.toHaveBeenCalled();
+  });
 });

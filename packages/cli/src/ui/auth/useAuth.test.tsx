@@ -331,5 +331,21 @@ describe('useAuth', () => {
       expect(result.current.authError).not.toContain('Failed to login');
       expect(result.current.authState).toBe(AuthState.Updating);
     });
+
+    it('should transition to Updating without setting authError on ChangeAuthRequestedError or ValidationCancelledError', async () => {
+      const { ChangeAuthRequestedError } = await import(
+        '@google/gemini-cli-core'
+      );
+      const { result } = await renderHook(() =>
+        useAuthCommand(createSettings(AuthType.LOGIN_WITH_GOOGLE), mockConfig),
+      );
+
+      await act(async () => {
+        deferredRefreshAuth.reject(new ChangeAuthRequestedError());
+      });
+
+      expect(result.current.authError).toBeNull();
+      expect(result.current.authState).toBe(AuthState.Updating);
+    });
   });
 });
