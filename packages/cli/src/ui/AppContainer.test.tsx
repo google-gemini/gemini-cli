@@ -2246,6 +2246,33 @@ describe('AppContainer State Management', () => {
         unmount();
       });
 
+      it('should safely handle rejected cancelOngoingRequest promise and still quit on rapid double press', async () => {
+        let rejectCancel!: (err: Error) => void;
+        const cancelPromise = new Promise<void>((_, reject) => {
+          rejectCancel = reject;
+        });
+        mockCancelOngoingRequest.mockReturnValue(cancelPromise);
+
+        await setupKeypressTest();
+
+        pressKey('\x03', 2); // Rapid double Ctrl+C
+
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+
+        await act(async () => {
+          rejectCancel(new Error('Cancel failed'));
+          await cancelPromise.catch(() => {});
+        });
+
+        expect(mockHandleSlashCommand).toHaveBeenCalledWith(
+          '/quit',
+          undefined,
+          undefined,
+          false,
+        );
+        unmount();
+      });
+
       it('should reset press count after a timeout', async () => {
         await setupKeypressTest();
 

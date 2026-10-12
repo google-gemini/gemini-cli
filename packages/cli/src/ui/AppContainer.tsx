@@ -960,6 +960,28 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const cancelPromiseRef = useRef<Promise<void> | null>(null);
 
+  const awaitCancelPromise = useCallback(async () => {
+    if (!cancelPromiseRef.current) {
+      return;
+    }
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        cancelPromiseRef.current,
+        new Promise<void>((resolve) => {
+          timeoutId = setTimeout(resolve, 1000);
+        }),
+      ]);
+    } catch (error) {
+      debugLogger.warn(`Error awaiting cancellation: ${error}`);
+    } finally {
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+      }
+      cancelPromiseRef.current = null;
+    }
+  }, []);
+
   const slashCommandActions = useMemo(
     () => ({
       openAuthDialog: () => setAuthState(AuthState.Updating),
@@ -976,22 +998,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         closeThemeDialog();
         setQuittingMessages(messages);
         setTimeout(async () => {
-          if (cancelPromiseRef.current) {
-            let timeoutId: ReturnType<typeof setTimeout> | undefined;
-            try {
-              await Promise.race([
-                cancelPromiseRef.current,
-                new Promise<void>((resolve) => {
-                  timeoutId = setTimeout(resolve, 1000);
-                }),
-              ]);
-            } finally {
-              if (timeoutId !== undefined) {
-                clearTimeout(timeoutId);
-              }
-              cancelPromiseRef.current = null;
-            }
-          }
+          await awaitCancelPromise();
           await runExitCleanup();
           process.exit(0);
         }, 100);
@@ -1027,6 +1034,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       openVoiceModelDialog,
       openAgentConfigDialog,
       setQuittingMessages,
+      awaitCancelPromise,
       setDebugMessage,
       setShowPrivacyNotice,
       setCorgiMode,
@@ -1663,25 +1671,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
       }
       if (count > 1) {
         if (cancelPromiseRef.current) {
-          let timeoutId: ReturnType<typeof setTimeout> | undefined;
-          try {
-            await Promise.race([
-              cancelPromiseRef.current,
-              new Promise<void>((resolve) => {
-                timeoutId = setTimeout(resolve, 1000);
-              }),
-            ]);
-          } finally {
-            if (timeoutId !== undefined) {
-              clearTimeout(timeoutId);
-            }
-            cancelPromiseRef.current = null;
-          }
+          await awaitCancelPromise();
         }
         await handleSlashCommand('/quit', undefined, undefined, false);
       }
     },
-    [config, handleSlashCommand],
+    [config, handleSlashCommand, awaitCancelPromise],
   );
 
   const { pressCount: ctrlCPressCount, handlePress: handleCtrlCPress } =
