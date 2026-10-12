@@ -43,8 +43,7 @@ Our development is guided by the following principles:
 
 ## How the Roadmap Works
 
-Our roadmap is managed directly through GitHub Issues. See our entry point
-Roadmap Issue [here](https://github.com/google-gemini/gemini-cli/issues/4191).
+Our roadmap is managed directly through GitHub Issues.
 This approach allows for transparency and gives you a direct way to learn more
 or get involved with any specific initiative. All our roadmap items will be
 tagged as Type:`Feature` and Label:`maintainer` for features we are actively
