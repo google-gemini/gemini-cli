@@ -14,6 +14,7 @@ import stripAnsi from 'strip-ansi';
 import { type ActiveHook } from '../types.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
+import { useInputState } from '../contexts/InputContext.js';
 import { theme } from '../semantic-colors.js';
 import { GENERIC_WORKING_LABEL } from '../textConstants.js';
 import { INTERACTIVE_SHELL_WAITING_PHRASE } from '../hooks/usePhraseCycler.js';
@@ -162,8 +163,6 @@ export const StatusNode: React.FC<StatusNodeProps> = React.memo(
   },
 );
 StatusNode.displayName = 'StatusNode';
-
-import { useInputState } from '../contexts/InputContext.js';
 
 export const StatusRow: React.FC<StatusRowProps> = React.memo(
   ({
