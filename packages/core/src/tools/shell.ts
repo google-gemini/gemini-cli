@@ -53,6 +53,7 @@ import {
   findUntrustedFlags,
   isBuildOrTestCommand,
   getModifiedBuildFiles,
+  resetModifiedBuildFiles,
 } from '../utils/untrustedContextTracker.js';
 import { getShellDefinition } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
@@ -511,8 +512,17 @@ export class ShellToolInvocation extends BaseToolInvocation<
         isBuildCmd && modifiedBuildFiles.length > 0
           ? modifiedBuildFiles
           : undefined,
-      onConfirm: async (_outcome: ToolConfirmationOutcome) => {
+      onConfirm: async (outcome: ToolConfirmationOutcome) => {
         // Policy updates are now handled centrally by the scheduler
+        if (
+          outcome === ToolConfirmationOutcome.ProceedOnce ||
+          outcome === ToolConfirmationOutcome.ProceedAlways ||
+          outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave
+        ) {
+          if (isBuildCmd && modifiedBuildFiles.length > 0) {
+            resetModifiedBuildFiles(this.context.config);
+          }
+        }
       },
     };
     return confirmationDetails;
