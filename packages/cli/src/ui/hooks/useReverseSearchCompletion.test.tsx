@@ -278,6 +278,25 @@ describe('useReverseSearchCompletion', () => {
       ]);
     });
 
+    it('matches length-expanding Unicode characters when queried directly', async () => {
+      const history = ['echo \u0130 abc'];
+      const { result } = await renderHookWithProviders(() =>
+        useReverseSearchCompletion(
+          useTextBufferForTest('\u0130'),
+          history,
+          true,
+        ),
+      );
+
+      expect(result.current.suggestions).toEqual([
+        {
+          label: 'echo \u0130 abc',
+          value: 'echo \u0130 abc',
+          matchedIndex: 5,
+        },
+      ]);
+    });
+
     it('escapes special regex characters in queries without throwing syntax errors', async () => {
       const history = ['git log [a-z]', 'echo foo*', 'grep (unclosed['];
 

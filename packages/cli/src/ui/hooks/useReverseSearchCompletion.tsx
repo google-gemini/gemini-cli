@@ -75,7 +75,7 @@ export function useReverseSearchCompletion(
   const searchHistory = useCallback(
     (query: string, items: readonly string[]) => {
       const out: Suggestion[] = [];
-      const regex = new RegExp(escapeRegExp(query), 'i');
+      const regex = new RegExp(escapeRegExp(query), 'iu');
       for (let i = 0; i < items.length; i++) {
         const cmd = items[i];
         const match = regex.exec(cmd);
@@ -97,17 +97,17 @@ export function useReverseSearchCompletion(
         matchedIndex: -1,
       }));
 
-    const query = debouncedQuery.toLowerCase();
+    const lowerQuery = debouncedQuery.toLowerCase();
     const canUseCache =
       prevQueryRef.current &&
-      query.startsWith(prevQueryRef.current) &&
+      lowerQuery.startsWith(prevQueryRef.current) &&
       prevMatchesRef.current.length > 0;
 
     const source = canUseCache
       ? prevMatchesRef.current.map((m) => m.value)
       : history;
 
-    return searchHistory(query, source);
+    return searchHistory(debouncedQuery, source);
   }, [debouncedQuery, history, reverseSearchActive, searchHistory]);
 
   useEffect(() => {
