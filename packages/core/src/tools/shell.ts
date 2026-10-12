@@ -456,7 +456,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
     }
 
     const rootCommands = [...new Set(getCommandRoots(command))];
-    const rootCommand = rootCommands[0] || 'shell';
+    const filteredRoots = rootCommands.filter(
+      (r) => !IGNORED_COMMAND_ROOTS.has(r),
+    );
+    const rootCommand = filteredRoots[0] || rootCommands[0] || 'shell';
 
     const history = this.getHistory();
     const untrustedContext = extractUntrustedContext(history);
