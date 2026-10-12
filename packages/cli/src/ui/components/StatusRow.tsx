@@ -249,9 +249,15 @@ export const StatusRow: React.FC<StatusRowProps> = React.memo(
       return undefined;
     })();
 
+    const hasStatus =
+      showLoadingIndicator ||
+      uiState.activeHooks.length > 0 ||
+      Boolean(statusPhrase);
+    const effectiveStatusWidth = hasStatus ? statusWidth : 0;
+
     // Collision detection using measured widths
     const willCollideTip =
-      statusWidth + tipWidth + LAYOUT.COLLISION_GAP > terminalWidth;
+      effectiveStatusWidth + tipWidth + LAYOUT.COLLISION_GAP > terminalWidth;
 
     const showTipLine = Boolean(
       !hasPendingActionRequired &&
