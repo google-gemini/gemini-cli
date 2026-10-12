@@ -16,13 +16,8 @@ import {
   type Mock,
 } from 'vitest';
 import { AuthDialog } from './AuthDialog.js';
-import {
-  AuthType,
-  clearCachedCredentialFile,
-  type Config,
-  debugLogger,
-} from '@google/gemini-cli-core';
-import type { LoadedSettings } from '../../config/settings.js';
+import { AuthType, type Config, debugLogger } from '@google/gemini-cli-core';
+import { SettingScope, type LoadedSettings } from '../../config/settings.js';
 import { AuthState } from '../types.js';
 import { RadioButtonSelect } from '../components/shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
@@ -351,6 +346,132 @@ describe('AuthDialog', () => {
       unmount();
     });
 
+    it('clears cached credentials when re-selecting LOGIN_WITH_GOOGLE to prevent staying stuck in cached account', async () => {
+      mockedValidateAuthMethod.mockResolvedValue(null);
+      // Simulate that user is currently signed in with Google (e.g. cached free-tier account from previous test run)
+      props.settings.merged.security.auth.selectedType =
+        AuthType.LOGIN_WITH_GOOGLE;
+
+      const { unmount } = await renderWithProviders(<AuthDialog {...props} />);
+      const { onSelect: handleAuthSelect } =
+        mockedRadioButtonSelect.mock.calls[0][0];
+
+      // User selects "Sign in with Google" again expecting to authenticate/switch accounts
+      await handleAuthSelect(AuthType.LOGIN_WITH_GOOGLE);
+
+      const { clearCachedCredentialFile } = await import(
+        '@google/gemini-cli-core'
+      );
+      expect(clearCachedCredentialFile).toHaveBeenCalled();
+      unmount();
+    });
+
+    it('clears cached credentials when selecting LOGIN_WITH_GOOGLE even if selectedType is undefined', async () => {
+      mockedValidateAuthMethod.mockResolvedValue(null);
+      props.settings.merged.security.auth.selectedType = undefined;
+
+      const { unmount } = await renderWithProviders(<AuthDialog {...props} />);
+      const { onSelect: handleAuthSelect } =
+        mockedRadioButtonSelect.mock.calls[0][0];
+
+      await handleAuthSelect(AuthType.LOGIN_WITH_GOOGLE);
+
+      const { clearCachedCredentialFile } = await import(
+        '@google/gemini-cli-core'
+      );
+      expect(clearCachedCredentialFile).toHaveBeenCalled();
+      unmount();
+    });
+
+    it('does not clear cached credentials when switching between non-Google auth methods', async () => {
+      mockedValidateAuthMethod.mockResolvedValue(null);
+      props.settings.merged.security.auth.selectedType = AuthType.USE_GEMINI;
+
+      const { unmount } = await renderWithProviders(<AuthDialog {...props} />);
+      const { onSelect: handleAuthSelect } =
+        mockedRadioButtonSelect.mock.calls[0][0];
+
+      await handleAuthSelect(AuthType.USE_VERTEX_AI);
+
+      const { clearCachedCredentialFile } = await import(
+        '@google/gemini-cli-core'
+      );
+      expect(clearCachedCredentialFile).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('handles errors when clearCachedCredentialFile fails gracefully and logs via debugLogger', async () => {
+      mockedValidateAuthMethod.mockResolvedValue(null);
+      props.settings.merged.security.auth.selectedType =
+        AuthType.LOGIN_WITH_GOOGLE;
+
+      const { clearCachedCredentialFile } = await import(
+        '@google/gemini-cli-core'
+      );
+      const testError = new Error('Disk I/O failure');
+      vi.mocked(clearCachedCredentialFile).mockRejectedValueOnce(testError);
+      const errorSpy = vi
+        .spyOn(debugLogger, 'error')
+        .mockImplementation(() => {});
+
+      const { unmount } = await renderWithProviders(<AuthDialog {...props} />);
+      const { onSelect: handleAuthSelect } =
+        mockedRadioButtonSelect.mock.calls[0][0];
+
+      await expect(
+        handleAuthSelect(AuthType.LOGIN_WITH_GOOGLE),
+      ).resolves.not.toThrow();
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Failed to clear cached credentials:',
+        testError,
+      );
+      expect(props.onAuthError).toHaveBeenCalledWith(
+        'Failed to clear cached credentials: Disk I/O failure',
+      );
+      expect(props.settings.setValue).not.toHaveBeenCalled();
+      errorSpy.mockRestore();
+      unmount();
+    });
+
+    it('allows switching to non-Google auth methods even if clearCachedCredentialFile fails to prevent lockouts', async () => {
+      mockedValidateAuthMethod.mockResolvedValue(null);
+      props.settings.merged.security.auth.selectedType =
+        AuthType.LOGIN_WITH_GOOGLE;
+
+      const { clearCachedCredentialFile } = await import(
+        '@google/gemini-cli-core'
+      );
+      const testError = new Error('Disk I/O failure');
+      vi.mocked(clearCachedCredentialFile).mockRejectedValueOnce(testError);
+      const errorSpy = vi
+        .spyOn(debugLogger, 'error')
+        .mockImplementation(() => {});
+
+      const { unmount } = await renderWithProviders(<AuthDialog {...props} />);
+      const { onSelect: handleAuthSelect } =
+        mockedRadioButtonSelect.mock.calls[0][0];
+
+      await expect(
+        handleAuthSelect(AuthType.USE_GEMINI),
+      ).resolves.not.toThrow();
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Failed to clear cached credentials:',
+        testError,
+      );
+      expect(props.onAuthError).toHaveBeenCalledWith(
+        'Failed to clear cached credentials: Disk I/O failure',
+      );
+      expect(props.settings.setValue).toHaveBeenCalledWith(
+        SettingScope.User,
+        'security.auth.selectedType',
+        AuthType.USE_GEMINI,
+      );
+      errorSpy.mockRestore();
+      unmount();
+    });
+
     it('exits process for Sign in with Google when browser is suppressed', async () => {
       vi.useFakeTimers();
       const exitSpy = vi
@@ -379,19 +500,18 @@ describe('AuthDialog', () => {
 
     it('catches errors thrown during onSelect and forwards them to onAuthError', async () => {
       mockedValidateAuthMethod.mockResolvedValue(null);
-      props.settings.merged.security.auth.selectedType = AuthType.USE_GEMINI;
-      vi.mocked(clearCachedCredentialFile).mockRejectedValueOnce(
-        new Error('Failed to clear credentials'),
-      );
+      vi.mocked(props.settings.setValue).mockImplementationOnce(() => {
+        throw new Error('Failed to update settings');
+      });
 
       const { unmount } = await renderWithProviders(<AuthDialog {...props} />);
       const { onSelect: handleAuthSelect } =
         mockedRadioButtonSelect.mock.calls[0][0];
-      await handleAuthSelect(AuthType.LOGIN_WITH_GOOGLE);
+      await handleAuthSelect(AuthType.USE_GEMINI);
 
       expect(props.onAuthError).toHaveBeenCalledWith(null);
       expect(props.onAuthError).toHaveBeenCalledWith(
-        'Failed to clear credentials',
+        'Failed to update settings',
       );
       unmount();
     });

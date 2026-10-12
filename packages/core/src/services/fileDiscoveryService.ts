@@ -19,6 +19,10 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import fs from 'node:fs';
 import * as path from 'node:path';
+import { LRUCache } from 'mnemonist';
+
+const MAX_SYMLINK_CACHE_SIZE = 20_000;
+const MAX_REALPATH_CACHE_SIZE = 20_000;
 
 export interface FilterFilesOptions {
   respectGitIgnore?: boolean;
@@ -45,6 +49,18 @@ export class FileDiscoveryService {
   };
   private projectRoot: string;
   private _realProjectRoot?: string;
+  private symlinkCache: LRUCache<string, boolean> = new LRUCache(
+    MAX_SYMLINK_CACHE_SIZE,
+  );
+  private realPathCache: LRUCache<string, string> = new LRUCache(
+    MAX_REALPATH_CACHE_SIZE,
+  );
+
+  clearCache(): void {
+    this.symlinkCache.clear();
+    this.realPathCache.clear();
+    this.initFilters();
+  }
 
   private get realProjectRoot(): string {
     if (!this._realProjectRoot) {
@@ -60,8 +76,14 @@ export class FileDiscoveryService {
   constructor(projectRoot: string, options?: FilterFilesOptions) {
     this.projectRoot = path.resolve(projectRoot);
     this.applyFilterFilesOptions(options);
+    this.initFilters();
+  }
+
+  private initFilters(): void {
     if (isGitRepository(this.projectRoot)) {
       this.gitIgnoreFilter = new GitIgnoreParser(this.projectRoot);
+    } else {
+      this.gitIgnoreFilter = null;
     }
     this.geminiIgnoreFilter = new IgnoreFileParser(
       this.projectRoot,
@@ -72,28 +94,28 @@ export class FileDiscoveryService {
         this.projectRoot,
         this.defaultFilterFileOptions.customIgnoreFilePaths,
       );
+    } else {
+      this.customIgnoreFilter = null;
     }
 
+    const geminiPatterns = this.geminiIgnoreFilter.getPatterns();
+    const customPatterns = this.customIgnoreFilter
+      ? this.customIgnoreFilter.getPatterns()
+      : [];
+    const extraPatterns = [...geminiPatterns, ...customPatterns];
+
     if (this.gitIgnoreFilter) {
-      const geminiPatterns = this.geminiIgnoreFilter.getPatterns();
-      const customPatterns = this.customIgnoreFilter
-        ? this.customIgnoreFilter.getPatterns()
-        : [];
       // Create combined parser: .gitignore + .geminiignore + custom ignore
       this.combinedIgnoreFilter = new GitIgnoreParser(
         this.projectRoot,
         // customPatterns should go the last to ensure overwriting of geminiPatterns
-        [...geminiPatterns, ...customPatterns],
+        extraPatterns,
       );
     } else {
       // Create combined parser when not git repo
-      const geminiPatterns = this.geminiIgnoreFilter.getPatterns();
-      const customPatterns = this.customIgnoreFilter
-        ? this.customIgnoreFilter.getPatterns()
-        : [];
       this.combinedIgnoreFilter = new IgnoreFileParser(
         this.projectRoot,
-        [...geminiPatterns, ...customPatterns],
+        extraPatterns,
         true,
       );
     }
@@ -279,15 +301,31 @@ export class FileDiscoveryService {
         ? filePath
         : path.resolve(this.projectRoot, filePath);
 
-      const isSymlink =
-        options.isSymbolicLink ??
-        fs
-          .lstatSync(absolutePath, { throwIfNoEntry: false })
-          ?.isSymbolicLink() ??
-        false;
+      let isSymlink: boolean;
+      if (options.isSymbolicLink !== undefined) {
+        isSymlink = options.isSymbolicLink;
+        this.symlinkCache.set(absolutePath, isSymlink);
+      } else {
+        const cached = this.symlinkCache.get(absolutePath);
+        if (cached !== undefined) {
+          isSymlink = cached;
+        } else {
+          const stat = fs.lstatSync(absolutePath, { throwIfNoEntry: false });
+          if (stat !== undefined) {
+            isSymlink = stat.isSymbolicLink();
+            this.symlinkCache.set(absolutePath, isSymlink);
+          } else {
+            isSymlink = false;
+          }
+        }
+      }
 
       if (isSymlink) {
-        const realPath = resolveToRealPath(absolutePath);
+        let realPath = this.realPathCache.get(absolutePath);
+        if (!realPath) {
+          realPath = resolveToRealPath(absolutePath);
+          this.realPathCache.set(absolutePath, realPath);
+        }
         if (!isSubpath(this.realProjectRoot, realPath)) {
           return true;
         }

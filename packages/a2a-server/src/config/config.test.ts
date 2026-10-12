@@ -6,7 +6,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as path from 'node:path';
-import { loadConfig } from './config.js';
+import { loadConfig, setIsTrusted, setTargetDir } from './config.js';
+import * as settingsModule from './settings.js';
 import type { Settings } from './settings.js';
 import {
   type ExtensionLoader,
@@ -22,6 +23,8 @@ import {
   ApprovalMode,
   PRIORITY_YOLO_ALLOW_ALL,
   createPolicyEngineConfig,
+  tmpdir,
+  checkPathTrust,
 } from '@google/gemini-cli-core';
 import type { AgentSettings } from '../types.js';
 
@@ -550,61 +553,143 @@ describe('loadConfig', () => {
 
 describe('setIsTrusted', () => {
   beforeEach(() => {
-    vi.resetModules();
-    // Ensure GEMINI_CLI_TRUST_WORKSPACE is not set by default in tests to prevent leakage
+    vi.clearAllMocks();
+    // Ensure GEMINI_CLI_TRUST_WORKSPACE and GEMINI_FOLDER_TRUST are not set by default in tests to prevent leakage
     vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', '');
+    vi.stubEnv('GEMINI_FOLDER_TRUST', '');
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  it('should return agentSettings.isTrusted if defined, ignoring env vars', async () => {
+  it('should return agentSettings.isTrusted if defined, ignoring env vars', () => {
     vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', 'false');
-    const { setIsTrusted } = await import('./config.js');
+    vi.stubEnv('GEMINI_FOLDER_TRUST', 'false');
     expect(setIsTrusted({ isTrusted: true } as AgentSettings)).toBe(true);
 
     vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', 'true');
+    vi.stubEnv('GEMINI_FOLDER_TRUST', 'true');
     expect(setIsTrusted({ isTrusted: false } as AgentSettings)).toBe(false);
   });
 
-  it('should return true when GEMINI_CLI_TRUST_WORKSPACE env var is true and agentSettings.isTrusted is undefined', async () => {
+  it('should return true when GEMINI_CLI_TRUST_WORKSPACE env var is true and agentSettings.isTrusted is undefined', () => {
     vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', 'true');
-    const { setIsTrusted } = await import('./config.js');
     expect(setIsTrusted(undefined)).toBe(true);
     expect(setIsTrusted({} as AgentSettings)).toBe(true);
   });
 
-  it('should return false when GEMINI_CLI_TRUST_WORKSPACE env var is false and agentSettings.isTrusted is undefined', async () => {
+  it('should return false when GEMINI_CLI_TRUST_WORKSPACE env var is false and agentSettings.isTrusted is undefined', () => {
     vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', 'false');
-    const { setIsTrusted } = await import('./config.js');
     expect(setIsTrusted(undefined)).toBe(false);
     expect(setIsTrusted({} as AgentSettings)).toBe(false);
   });
 
-  it('should fallback to false if agentSettings.isTrusted and env var are undefined and no workspaceRoot is provided', async () => {
-    const { setIsTrusted } = await import('./config.js');
+  it('should return true when GEMINI_FOLDER_TRUST env var (from GCA IDE) is true and GEMINI_CLI_TRUST_WORKSPACE is unset', () => {
+    vi.stubEnv('GEMINI_FOLDER_TRUST', 'true');
+    expect(setIsTrusted(undefined)).toBe(true);
+    expect(setIsTrusted({ isTrusted: undefined } as AgentSettings)).toBe(true);
+  });
+
+  it('should return false when GEMINI_FOLDER_TRUST env var (from GCA IDE) is false and GEMINI_CLI_TRUST_WORKSPACE is unset', () => {
+    vi.stubEnv('GEMINI_FOLDER_TRUST', 'false');
+    expect(setIsTrusted(undefined)).toBe(false);
+    expect(setIsTrusted({ isTrusted: undefined } as AgentSettings)).toBe(false);
+  });
+
+  it('should prioritize GEMINI_CLI_TRUST_WORKSPACE over GEMINI_FOLDER_TRUST when both are set', () => {
+    vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', 'false');
+    vi.stubEnv('GEMINI_FOLDER_TRUST', 'true');
+    expect(setIsTrusted(undefined)).toBe(false);
+
+    vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', 'true');
+    vi.stubEnv('GEMINI_FOLDER_TRUST', 'false');
+    expect(setIsTrusted(undefined)).toBe(true);
+  });
+
+  it('should fallback to false if agentSettings.isTrusted and env var are undefined and no workspaceRoot is provided', () => {
     expect(setIsTrusted(undefined)).toBe(false);
     expect(setIsTrusted({} as AgentSettings)).toBe(false);
   });
 
-  it('should respect V2 security.folderTrust.enabled when checking workspace trust', async () => {
-    const settingsModule = await import('./settings.js');
-    const coreModule = await import('@google/gemini-cli-core');
+  it('should respect V2 security.folderTrust.enabled when checking workspace trust', () => {
     vi.spyOn(settingsModule, 'loadSettings').mockReturnValue({
       security: { folderTrust: { enabled: false } },
     });
-    vi.mocked(coreModule.checkPathTrust).mockReturnValueOnce({
+    vi.mocked(checkPathTrust).mockReturnValueOnce({
       isTrusted: true,
       source: 'file',
     });
 
-    const { setIsTrusted } = await import('./config.js');
     expect(setIsTrusted(undefined, '/tmp/workspace')).toBe(true);
-    expect(coreModule.checkPathTrust).toHaveBeenCalledWith(
+    expect(checkPathTrust).toHaveBeenCalledWith(
       expect.objectContaining({
         path: '/tmp/workspace',
         isFolderTrustEnabled: false,
+      }),
+    );
+  });
+});
+
+describe('GCA IDE integration environment variables contract (AgentProcess.ts)', () => {
+  const mockSettings = {} as Settings;
+  const mockExtensionLoader = {} as ExtensionLoader;
+  const taskId = 'test-gca-env-contract';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', '');
+    vi.stubEnv('GEMINI_FOLDER_TRUST', '');
+    vi.stubEnv('GEMINI_YOLO_MODE', '');
+    vi.stubEnv('CHECKPOINTING', '');
+    vi.stubEnv('DEBUG', '');
+    vi.stubEnv('CUSTOM_IGNORE_FILE_PATHS', '');
+    vi.stubEnv('CODER_AGENT_WORKSPACE_PATH', '');
+    vi.stubEnv('CODER_AGENT_ALLOWED_ROOT', '');
+    vi.stubEnv('GEMINI_API_KEY', 'test-gca-key');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('should honor all environment variables injected by GCA AgentProcess when spawning a2a-server', async () => {
+    const gcaWorkspaceDir = path.join(tmpdir(), 'gca-contract-workspace');
+
+    vi.stubEnv('GEMINI_FOLDER_TRUST', 'true');
+    vi.stubEnv('GEMINI_YOLO_MODE', 'true');
+    vi.stubEnv('DEBUG', 'true');
+    vi.stubEnv('CHECKPOINTING', 'false');
+    vi.stubEnv('CUSTOM_IGNORE_FILE_PATHS', '/gca/.aiexclude');
+    vi.stubEnv('CODER_AGENT_WORKSPACE_PATH', gcaWorkspaceDir);
+    vi.stubEnv('CODER_AGENT_ALLOWED_ROOT', tmpdir());
+
+    const resolvedTargetDir = await setTargetDir(undefined);
+    expect(resolvedTargetDir).toContain('gca-contract-workspace');
+
+    const trusted = setIsTrusted({ isTrusted: undefined } as AgentSettings);
+    expect(trusted).toBe(true);
+
+    await loadConfig(
+      mockSettings,
+      mockExtensionLoader,
+      taskId,
+      trusted,
+      resolvedTargetDir,
+    );
+
+    expect(Config).toHaveBeenCalledWith(
+      expect.objectContaining({
+        folderTrust: true,
+        trustedFolder: true,
+        approvalMode: ApprovalMode.YOLO,
+        debugMode: true,
+        checkpointing: false,
+        targetDir: resolvedTargetDir,
+        cwd: resolvedTargetDir,
+        fileFiltering: expect.objectContaining({
+          customIgnoreFilePaths: ['/gca/.aiexclude'],
+        }),
       }),
     );
   });
