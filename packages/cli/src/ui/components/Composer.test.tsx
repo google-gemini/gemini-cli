@@ -918,6 +918,29 @@ describe('Composer', () => {
       );
       unmount();
     });
+
+    it('keeps DetailedMessagesDisplay maxHeight bounded when constrainHeight is false', async () => {
+      const { useTerminalSize } = await import('../hooks/useTerminalSize.js');
+      vi.mocked(useTerminalSize).mockReturnValueOnce({
+        columns: 120,
+        rows: 40,
+      });
+      mockDetailedMessagesDisplay.mockClear();
+
+      const uiState = createMockUIState({
+        showErrorDetails: true,
+        constrainHeight: false,
+      });
+
+      const { unmount } = await renderComposer(uiState);
+
+      expect(mockDetailedMessagesDisplay).toHaveBeenCalledWith(
+        expect.objectContaining({
+          maxHeight: 8,
+        }),
+      );
+      unmount();
+    });
   });
 
   describe('Vim Mode Placeholders', () => {

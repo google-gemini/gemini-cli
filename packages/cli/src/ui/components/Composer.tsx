@@ -133,9 +133,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
         <OverflowProvider>
           <Box flexDirection="column">
             <DetailedMessagesDisplay
-              maxHeight={
-                uiState.constrainHeight ? debugConsoleMaxHeight : undefined
-              }
+              maxHeight={debugConsoleMaxHeight}
               width={uiState.terminalWidth}
               hasFocus={uiState.showErrorDetails}
             />
