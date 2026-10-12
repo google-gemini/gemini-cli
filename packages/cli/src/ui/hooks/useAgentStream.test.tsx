@@ -29,7 +29,7 @@ vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
 
 // --- END MOCKS ---
 
-import { useAgentStream } from './useAgentStream.js';
+import { createCancelledToolCall, useAgentStream } from './useAgentStream.js';
 import { MessageType, StreamingState } from '../types.js';
 
 describe('useAgentStream', () => {
@@ -315,5 +315,22 @@ describe('useAgentStream', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('should provide safe fallback tool and invocation objects in createCancelledToolCall', () => {
+    const cancelledWithEmptyName = createCancelledToolCall({
+      callId: 'call-empty',
+      name: '   ',
+      args: {},
+      isClientInitiated: false,
+      prompt_id: '',
+    });
+
+    expect(cancelledWithEmptyName.tool?.name).toBe('generic_tool');
+    expect(cancelledWithEmptyName.tool?.displayName).toBe('generic_tool');
+    expect(
+      'invocation' in cancelledWithEmptyName &&
+        cancelledWithEmptyName.invocation.getDescription(),
+    ).toBe('generic_tool');
   });
 });

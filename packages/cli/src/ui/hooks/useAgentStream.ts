@@ -56,13 +56,19 @@ export function createCancelledToolCall(
   tool?: AnyDeclarativeTool,
   invocation?: AnyToolInvocation,
 ): CompletedToolCall {
+  const fallbackToolName = request.name.trim() || 'generic_tool';
   return {
     status: CoreToolCallStatus.Cancelled,
     request,
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    tool: tool as AnyDeclarativeTool,
+    tool: (tool ?? {
+      name: fallbackToolName,
+      displayName: fallbackToolName,
+    }) as AnyDeclarativeTool,
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    invocation: invocation as AnyToolInvocation,
+    invocation: (invocation ?? {
+      getDescription: () => fallbackToolName,
+    }) as AnyToolInvocation,
     response: {
       callId: request.callId,
       responseParts: [
