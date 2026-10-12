@@ -238,7 +238,7 @@ export const StatusRow: React.FC<StatusRowProps> = React.memo(
 
       // 2. Shortcut Hint (Fallback)
       if (
-        settings.merged.ui.showShortcutsHint &&
+        settings.merged.ui?.showShortcutsHint &&
         !hideUiDetailsForSuggestions &&
         !hasPendingActionRequired &&
         inputState.buffer.text.length === 0
@@ -286,7 +286,7 @@ export const StatusRow: React.FC<StatusRowProps> = React.memo(
         activeHooks={uiState.activeHooks}
         showLoadingIndicator={showLoadingIndicator}
         errorVerbosity={
-          settings.merged.ui.errorVerbosity as 'low' | 'full' | undefined
+          settings.merged.ui?.errorVerbosity as 'low' | 'full' | undefined
         }
         statusPhrase={statusPhrase}
         onResize={onStatusResize}
