@@ -378,22 +378,33 @@ export function parsePodmanRootlessInfo(output: string): boolean {
   return output.trim().toLowerCase() === 'true';
 }
 
+/**
+ * Timeout for the `podman info` probe so an unresponsive container daemon
+ * cannot hang the CLI indefinitely.
+ */
+const PODMAN_INFO_TIMEOUT_MS = 5_000;
+
 function execFileAsync(command: string, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile(command, args, (err, stdout) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve(stdout);
-      }
-    });
+    execFile(
+      command,
+      args,
+      { timeout: PODMAN_INFO_TIMEOUT_MS },
+      (err, stdout) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(stdout);
+        }
+      },
+    );
   });
 }
 
 /**
  * Detects whether the local Podman service runs rootless. When detection
- * fails (e.g. podman is not installed), returns false so the sandbox
- * behavior stays unchanged.
+ * fails (e.g. podman is not installed) or the probe times out, returns
+ * false so the sandbox behavior stays unchanged.
  */
 export async function isRootlessPodman(): Promise<boolean> {
   try {

@@ -811,7 +811,7 @@ describe('sandboxUtils', () => {
   describe('isRootlessPodman', () => {
     it('should return true when podman reports a rootless service', async () => {
       vi.mocked(execFile).mockImplementation(
-        ((_cmd: string, _args: string[], cb: unknown) => {
+        ((_cmd: string, _args: string[], _options: unknown, cb: unknown) => {
           (
             cb as (err: Error | null, stdout: string, stderr: string) => void
           )(null, 'true\n', '');
@@ -822,7 +822,7 @@ describe('sandboxUtils', () => {
 
     it('should return false when podman reports a rootful service', async () => {
       vi.mocked(execFile).mockImplementation(
-        ((_cmd: string, _args: string[], cb: unknown) => {
+        ((_cmd: string, _args: string[], _options: unknown, cb: unknown) => {
           (
             cb as (err: Error | null, stdout: string, stderr: string) => void
           )(null, 'false', '');
@@ -833,7 +833,7 @@ describe('sandboxUtils', () => {
 
     it('should return false when podman info fails', async () => {
       vi.mocked(execFile).mockImplementation(
-        ((_cmd: string, _args: string[], cb: unknown) => {
+        ((_cmd: string, _args: string[], _options: unknown, cb: unknown) => {
           (
             cb as (err: Error | null, stdout: string, stderr: string) => void
           )(new Error('podman not found'), '', '');
@@ -844,7 +844,7 @@ describe('sandboxUtils', () => {
 
     it('should query podman info for the rootless status', async () => {
       vi.mocked(execFile).mockImplementation(
-        ((_cmd: string, _args: string[], cb: unknown) => {
+        ((_cmd: string, _args: string[], _options: unknown, cb: unknown) => {
           (
             cb as (err: Error | null, stdout: string, stderr: string) => void
           )(null, 'true', '');
@@ -854,8 +854,26 @@ describe('sandboxUtils', () => {
       expect(execFile).toHaveBeenCalledWith(
         'podman',
         ['info', '--format', '{{.Host.Security.Rootless}}'],
+        expect.objectContaining({ timeout: expect.any(Number) }),
         expect.any(Function),
       );
+    });
+
+    it('should return false when the podman info probe times out', async () => {
+      vi.mocked(execFile).mockImplementation(
+        ((_cmd: string, _args: string[], _options: unknown, cb: unknown) => {
+          const err = new Error('Command timed out') as Error & {
+            killed: boolean;
+            signal: string | null;
+          };
+          err.killed = true;
+          err.signal = 'SIGTERM';
+          (
+            cb as (err: Error | null, stdout: string, stderr: string) => void
+          )(err, '', '');
+        }) as unknown as typeof execFile,
+      );
+      expect(await isRootlessPodman()).toBe(false);
     });
   });
 
