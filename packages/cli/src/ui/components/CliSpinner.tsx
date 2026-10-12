@@ -10,6 +10,7 @@ import { Text } from 'ink';
 import React, { type ComponentProps, useEffect, useState } from 'react';
 import { debugState } from '../debug.js';
 import { useSettings } from '../contexts/SettingsContext.js';
+import { IS_TMUX } from '../../utils/env.js';
 
 export type SpinnerProps = ComponentProps<typeof Spinner>;
 
@@ -42,7 +43,7 @@ export const CliSpinner: React.FC<SpinnerProps> = React.memo(
   (props: SpinnerProps) => {
     const settings = useSettings();
     const shouldShow = settings.merged.ui?.showSpinner !== false;
-    const isTmux = Boolean(process.env['TMUX']);
+    const isTmux = IS_TMUX;
 
     useEffect(() => {
       if (shouldShow) {

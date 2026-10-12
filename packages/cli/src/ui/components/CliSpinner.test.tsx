@@ -12,9 +12,20 @@ import { CliSpinner, TMUX_SPINNER_INTERVAL_MS } from './CliSpinner.js';
 import { debugState } from '../debug.js';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
+const envMocks = vi.hoisted(() => ({
+  isTmux: false,
+}));
+
+vi.mock('../../utils/env.js', () => ({
+  get IS_TMUX() {
+    return envMocks.isTmux;
+  },
+}));
+
 describe('<CliSpinner />', () => {
   beforeEach(() => {
     debugState.debugNumAnimatedComponents = 0;
+    envMocks.isTmux = false;
   });
 
   afterEach(() => {
@@ -41,7 +52,7 @@ describe('<CliSpinner />', () => {
 
   it('throttles spinner ticks in tmux and does not re-render parent or sibling components', async () => {
     vi.useFakeTimers();
-    vi.stubEnv('TMUX', '/tmp/tmux-1000/default,123,0');
+    envMocks.isTmux = true;
 
     let parentRenders = 0;
     let siblingRenders = 0;
