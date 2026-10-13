@@ -2201,6 +2201,84 @@ describe('AppContainer State Management', () => {
         unmount();
       });
 
+      it('should await in-flight cancelOngoingRequest promise before quitting on rapid double press', async () => {
+        let resolveCancel!: () => void;
+        const cancelPromise = new Promise<void>((resolve) => {
+          resolveCancel = resolve;
+        });
+        mockCancelOngoingRequest.mockReturnValue(cancelPromise);
+
+        await setupKeypressTest();
+
+        pressKey('\x03', 2); // Rapid double Ctrl+C
+
+        expect(mockCancelOngoingRequest).toHaveBeenCalledTimes(2);
+        // Should not have called /quit yet while cancelPromise is still pending
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+
+        await act(async () => {
+          resolveCancel();
+          await cancelPromise;
+        });
+
+        expect(mockHandleSlashCommand).toHaveBeenCalledWith(
+          '/quit',
+          undefined,
+          undefined,
+          false,
+        );
+        unmount();
+      });
+
+      it('should bound waiting on a hanging cancelOngoingRequest to 1s via Promise.race on rapid double press', async () => {
+        mockCancelOngoingRequest.mockReturnValue(new Promise<void>(() => {}));
+
+        await setupKeypressTest();
+
+        pressKey('\x03', 2); // Rapid double Ctrl+C
+
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(1000);
+        });
+
+        expect(mockHandleSlashCommand).toHaveBeenCalledWith(
+          '/quit',
+          undefined,
+          undefined,
+          false,
+        );
+        unmount();
+      });
+
+      it('should safely handle rejected cancelOngoingRequest promise and still quit on rapid double press', async () => {
+        let rejectCancel!: (err: Error) => void;
+        const cancelPromise = new Promise<void>((_, reject) => {
+          rejectCancel = reject;
+        });
+        mockCancelOngoingRequest.mockReturnValue(cancelPromise);
+
+        await setupKeypressTest();
+
+        pressKey('\x03', 2); // Rapid double Ctrl+C
+
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+
+        await act(async () => {
+          rejectCancel(new Error('Cancel failed'));
+          await cancelPromise.catch(() => {});
+        });
+
+        expect(mockHandleSlashCommand).toHaveBeenCalledWith(
+          '/quit',
+          undefined,
+          undefined,
+          false,
+        );
+        unmount();
+      });
+
       it('should reset press count after a timeout', async () => {
         await setupKeypressTest();
 

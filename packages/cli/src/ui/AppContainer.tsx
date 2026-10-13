@@ -1149,6 +1149,30 @@ Logging in with Google... Restarting Gemini CLI to continue.
     revealCleanUiDetailsTemporarily,
   } = useVisibilityToggle();
 
+  const cancelPromiseRef = useRef<Promise<void> | null>(null);
+
+  const awaitCancelPromise = useCallback(async () => {
+    if (!cancelPromiseRef.current) {
+      return;
+    }
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        cancelPromiseRef.current,
+        new Promise<void>((resolve) => {
+          timeoutId = setTimeout(resolve, 1000);
+        }),
+      ]);
+    } catch (error) {
+      debugLogger.warn(`Error awaiting cancellation: ${error}`);
+    } finally {
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+      }
+      cancelPromiseRef.current = null;
+    }
+  }, []);
+
   const slashCommandActions = useMemo(
     () => ({
       openAuthDialog: () => setAuthState(AuthState.Updating),
@@ -1165,6 +1189,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         closeThemeDialog();
         setQuittingMessages(messages);
         setTimeout(async () => {
+          await awaitCancelPromise();
           await runExitCleanup();
           process.exit(0);
         }, 100);
@@ -1200,6 +1225,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       openVoiceModelDialog,
       openAgentConfigDialog,
       setQuittingMessages,
+      awaitCancelPromise,
       setDebugMessage,
       setShowPrivacyNotice,
       setCorgiMode,
@@ -1375,6 +1401,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     ? // eslint-disable-next-line react-hooks/rules-of-hooks
       useAgentStream({
         agent: streamAgent,
+        config,
         addItem: historyManager.addItem,
         onCancelSubmit,
         isShellFocused: embeddedShellFocused,
@@ -1829,15 +1856,18 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const [renderMarkdown, setRenderMarkdown] = useState<boolean>(true);
 
   const handleExitRepeat = useCallback(
-    (count: number) => {
+    async (count: number) => {
       if (count > 2) {
         recordExitFail(config);
       }
       if (count > 1) {
-        void handleSlashCommand('/quit', undefined, undefined, false);
+        if (cancelPromiseRef.current) {
+          await awaitCancelPromise();
+        }
+        await handleSlashCommand('/quit', undefined, undefined, false);
       }
     },
-    [config, handleSlashCommand],
+    [config, handleSlashCommand, awaitCancelPromise],
   );
 
   const { pressCount: ctrlCPressCount, handlePress: handleCtrlCPress } =
@@ -2116,7 +2146,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       if (keyMatchers[Command.QUIT](key)) {
         // If the user presses Ctrl+C, we want to cancel any ongoing requests.
         // This should happen regardless of the count.
-        void cancelOngoingRequest?.();
+        const cancelPromise = cancelOngoingRequest?.();
+        if (cancelPromise) {
+          cancelPromiseRef.current = cancelPromise;
+        }
 
         handleCtrlCPress();
         return true;
