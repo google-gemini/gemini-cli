@@ -58,6 +58,10 @@ sessions:
 /model set gemini-4-argon --persist
 ```
 
+If the server reports that the model was not found, verify Argon availability
+for your authentication method, account, and project. A Code Assist subscription
+alone doesn't confirm that Argon is available through Google sign-in.
+
 ## Best practices for model selection
 
 - **Default to Auto.** For most users, the _Auto_ option model provides a

@@ -30,6 +30,7 @@ import {
   ModelNotFoundError,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
+  GEMINI_4_ARGON_MODEL,
   getG1CreditBalance,
   shouldAutoUseCredits,
   shouldShowOverageMenu,
@@ -695,6 +696,94 @@ describe('useQuotaAndFallback', () => {
 
         expect(result.current.proQuotaRequest).toBeNull();
       });
+
+      it.each([
+        {
+          model: GEMINI_4_ARGON_MODEL,
+          authType: AuthType.LOGIN_WITH_GOOGLE,
+          userTier: UserTierId.STANDARD,
+          dynamic: false,
+        },
+        {
+          model: GEMINI_4_ARGON_MODEL,
+          authType: AuthType.LOGIN_WITH_GOOGLE,
+          userTier: UserTierId.FREE,
+          dynamic: false,
+        },
+        {
+          model: DEFAULT_GEMINI_MODEL,
+          authType: AuthType.LOGIN_WITH_GOOGLE,
+          userTier: UserTierId.STANDARD,
+          dynamic: false,
+        },
+        {
+          model: GEMINI_4_ARGON_MODEL,
+          authType: AuthType.LOGIN_WITH_GOOGLE,
+          userTier: UserTierId.STANDARD,
+          dynamic: true,
+        },
+        {
+          model: PREVIEW_GEMINI_MODEL,
+          authType: AuthType.USE_GEMINI,
+          userTier: UserTierId.STANDARD,
+          dynamic: false,
+        },
+      ])(
+        'uses neutral availability guidance for $model (auth: $authType, tier: $userTier, dynamic: $dynamic)',
+        async ({ model, authType, userTier, dynamic }) => {
+          vi.spyOn(mockConfig, 'getContentGeneratorConfig').mockReturnValue({
+            authType,
+          });
+          vi.spyOn(
+            mockConfig,
+            'getExperimentalDynamicModelConfiguration',
+          ).mockReturnValue(dynamic);
+          const { result } = await renderHook(() =>
+            useQuotaAndFallback({
+              config: mockConfig,
+              historyManager: mockHistoryManager,
+              userTier,
+              setModelSwitchedFromQuotaError:
+                mockSetModelSwitchedFromQuotaError,
+              onShowAuthSelection: mockOnShowAuthSelection,
+              paidTier: null,
+              settings: mockSettings,
+            }),
+          );
+          const handler = setFallbackHandlerSpy.mock
+            .calls[0][0] as FallbackModelHandler;
+          let promise: Promise<FallbackIntent | null>;
+
+          act(() => {
+            promise = handler(
+              model,
+              model,
+              new ModelNotFoundError('Requested entity was not found.', 404),
+            );
+          });
+
+          const request = result.current.proQuotaRequest;
+          const availabilityContext =
+            authType === AuthType.LOGIN_WITH_GOOGLE
+              ? 'for your current account or project'
+              : 'with your current authentication method';
+          expect(request?.message).toBe(
+            `Model "${model}" is not available ${availabilityContext}.\n` +
+              '/model to switch models.',
+          );
+          expect(request?.message).not.toContain('Preview Release Channel');
+          expect(request?.message).not.toContain('admin');
+          expect(request?.message).not.toContain('personal accounts');
+          expect(request?.isModelNotFoundError).toBe(true);
+          expect(request?.isTerminalQuotaError).toBe(false);
+
+          act(() => {
+            result.current.handleProQuotaChoice('retry_later');
+          });
+          expect(await promise!).toBe('retry_later');
+          expect(result.current.proQuotaRequest).toBeNull();
+        },
+      );
 
       it('should handle ModelNotFoundError with Vertex AI by displaying region-specific availability message and documentation link', async () => {
         vi.spyOn(mockConfig, 'getContentGeneratorConfig').mockReturnValue({

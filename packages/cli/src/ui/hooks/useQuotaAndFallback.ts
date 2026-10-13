@@ -16,6 +16,7 @@ import {
   UserTierId,
   VALID_GEMINI_MODELS,
   isProModel,
+  isPreviewModel,
   isOverageEligibleModel,
   getDisplayString,
   type GeminiUserTier,
@@ -185,7 +186,11 @@ export function useQuotaAndFallback({
             `/model to switch models.`,
           ];
           message = messageLines.join('\n');
-        } else if (VALID_GEMINI_MODELS.has(failedModel)) {
+        } else if (
+          VALID_GEMINI_MODELS.has(failedModel) &&
+          contentGeneratorConfig?.authType === AuthType.LOGIN_WITH_GOOGLE &&
+          isPreviewModel(failedModel, config)
+        ) {
           const detailMessage =
             userTier === UserTierId.FREE
               ? 'This model is not available for personal accounts.'
@@ -193,6 +198,16 @@ export function useQuotaAndFallback({
           const messageLines = [
             `It seems like you don't have access to ${getDisplayString(failedModel)}.`,
             detailMessage,
+          ];
+          message = messageLines.join('\n');
+        } else if (VALID_GEMINI_MODELS.has(failedModel)) {
+          const availabilityContext =
+            contentGeneratorConfig?.authType === AuthType.LOGIN_WITH_GOOGLE
+              ? 'for your current account or project'
+              : 'with your current authentication method';
+          const messageLines = [
+            `Model "${failedModel}" is not available ${availabilityContext}.`,
+            `/model to switch models.`,
           ];
           message = messageLines.join('\n');
         } else {
