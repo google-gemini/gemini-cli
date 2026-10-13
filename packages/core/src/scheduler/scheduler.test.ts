@@ -1058,6 +1058,51 @@ describe('Scheduler (Orchestrator)', () => {
       expect(mockExecutor.execute).not.toHaveBeenCalled();
     });
 
+    it('should not cancel queued tools when cancelAllQueuedOnCancel is false and resolveConfirmation returns Cancel', async () => {
+      const nonCascadingScheduler = new Scheduler({
+        context: mockConfig,
+        messageBus: mockMessageBus,
+        getPreferredEditor,
+        schedulerId: 'root',
+        cancelAllQueuedOnCancel: false,
+      });
+
+      vi.mocked(checkPolicy).mockResolvedValue({
+        decision: PolicyDecision.ASK_USER,
+        rule: undefined,
+      });
+
+      vi.mocked(resolveConfirmation)
+        .mockResolvedValueOnce({
+          outcome: ToolConfirmationOutcome.Cancel,
+          lastDetails: undefined,
+        })
+        .mockResolvedValueOnce({
+          outcome: ToolConfirmationOutcome.ProceedOnce,
+          lastDetails: undefined,
+        });
+
+      await nonCascadingScheduler.schedule([req1, req2], signal);
+
+      expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
+        'call-1',
+        CoreToolCallStatus.Cancelled,
+        'User denied execution.',
+      );
+      expect(mockStateManager.setOutcome).toHaveBeenCalledWith(
+        'call-1',
+        ToolConfirmationOutcome.Cancel,
+      );
+      expect(mockStateManager.cancelAllQueued).not.toHaveBeenCalled();
+      expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
+        'call-2',
+        CoreToolCallStatus.Executing,
+      );
+      expect(mockExecutor.execute).toHaveBeenCalledTimes(1);
+
+      nonCascadingScheduler.dispose();
+    });
+
     it('should mark as cancelled (not errored) when abort happens during confirmation error', async () => {
       vi.mocked(checkPolicy).mockResolvedValue({
         decision: PolicyDecision.ASK_USER,
