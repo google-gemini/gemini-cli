@@ -56,6 +56,7 @@ import { resolveToolDeclaration } from './definitions/resolver.js';
 import { detectOmissionPlaceholders } from './omissionPlaceholderDetector.js';
 import { resolveAndValidatePlanPath } from '../utils/planUtils.js';
 import {
+  GEMINI_4_ARGON_MODEL,
   isGemini3Model,
   isGemini2Model,
   isCustomModel,
@@ -211,6 +212,7 @@ export async function getCorrectedFileContent(
     const resolvedModel = resolveModel(activeModel, false, false, true, config);
 
     const aggressiveUnescape =
+      resolvedModel !== GEMINI_4_ARGON_MODEL &&
       !isGemini3Model(resolvedModel, config) &&
       !isGemini2Model(resolvedModel) &&
       !isCustomModel(resolvedModel, config);

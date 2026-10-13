@@ -5,6 +5,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { DEFAULT_MODEL_CONFIGS } from '../config/defaultModelConfigs.js';
+import { GEMINI_4_ARGON_MODEL } from '../config/models.js';
 import {
   ModelConfigService,
   type ModelConfigAlias,
@@ -1118,6 +1120,31 @@ describe('ModelConfigService', () => {
   });
 
   describe('getAvailableModelOptions', () => {
+    it('should offer Argon as a Pro model without preview access', () => {
+      const service = new ModelConfigService(DEFAULT_MODEL_CONFIGS);
+      const options = service.getAvailableModelOptions({
+        hasAccessToPreview: false,
+        hasAccessToProModel: true,
+      });
+
+      expect(options).toContainEqual({
+        modelId: GEMINI_4_ARGON_MODEL,
+        name: 'Gemini 4 Argon',
+        description: '',
+        tier: 'pro',
+      });
+    });
+
+    it('should hide Argon when Pro model access is disabled', () => {
+      const service = new ModelConfigService(DEFAULT_MODEL_CONFIGS);
+      const options = service.getAvailableModelOptions({
+        hasAccessToPreview: true,
+        hasAccessToProModel: false,
+      });
+
+      expect(options.map((o) => o.modelId)).not.toContain(GEMINI_4_ARGON_MODEL);
+    });
+
     it('should filter out Pro models when hasAccessToProModel is false', () => {
       const config: ModelConfigServiceConfig = {
         modelDefinitions: {

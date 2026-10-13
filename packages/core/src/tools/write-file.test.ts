@@ -27,6 +27,7 @@ import {
   type ToolResult,
 } from './tools.js';
 import type { Config } from '../config/config.js';
+import { GEMINI_4_ARGON_MODEL } from '../config/models.js';
 import { ApprovalMode } from '../policy/types.js';
 import type { ToolRegistry } from './tool-registry.js';
 import path from 'node:path';
@@ -689,6 +690,29 @@ describe('WriteFileTool', () => {
 
   describe('execute', () => {
     const abortSignal = new AbortController().signal;
+
+    it('should preserve literal newline and tab escapes in code written by Argon', async () => {
+      const editCorrector = await vi.importActual<
+        typeof import('../utils/editCorrector.js')
+      >('../utils/editCorrector.js');
+      editCorrector.resetEditCorrectorCaches_TEST_ONLY();
+      mockEnsureCorrectFileContent.mockImplementation(
+        editCorrector.ensureCorrectFileContent,
+      );
+      vi.spyOn(mockConfig, 'getActiveModel').mockReturnValue(
+        GEMINI_4_ARGON_MODEL,
+      );
+      const filePath = path.join(rootDir, 'argon-escaped-code.js');
+      const content = 'const escaped = "\\n\\t";\n';
+
+      const result = await tool
+        .build({ file_path: filePath, content })
+        .execute({ abortSignal });
+
+      expect(result.error).toBeUndefined();
+      expect(fs.readFileSync(filePath, 'utf8')).toBe(content);
+      editCorrector.resetEditCorrectorCaches_TEST_ONLY();
+    });
 
     async function confirmExecution(
       invocation: ToolInvocation<WriteFileToolParams, ToolResult>,

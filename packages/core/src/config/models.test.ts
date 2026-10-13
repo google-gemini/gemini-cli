@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { ThinkingLevel } from '@google/genai';
 import {
   resolveModel,
   resolveClassifierModel,
@@ -15,6 +16,7 @@ import {
   isAutoModel,
   getDisplayString,
   DEFAULT_GEMINI_MODEL,
+  GEMINI_4_ARGON_MODEL,
   PREVIEW_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
@@ -72,6 +74,7 @@ describe('Dynamic Configuration Parity', () => {
     DEFAULT_GEMINI_MODEL_AUTO,
     PREVIEW_GEMINI_MODEL,
     DEFAULT_GEMINI_MODEL,
+    GEMINI_4_ARGON_MODEL,
     'custom-model',
   ];
 
@@ -260,6 +263,13 @@ describe('isPreviewModel', () => {
 });
 
 describe('isProModel', () => {
+  it.each([legacyConfig, dynamicConfig])(
+    'should recognize Gemini 4 Argon as a Pro model',
+    (config) => {
+      expect(isProModel(GEMINI_4_ARGON_MODEL, config)).toBe(true);
+    },
+  );
+
   it('should return true for models containing "pro"', () => {
     expect(isProModel('gemini-3-pro-preview')).toBe(true);
     expect(isProModel('gemini-2.5-pro')).toBe(true);
@@ -300,6 +310,10 @@ describe('isCustomModel', () => {
 });
 
 describe('supportsModernFeatures', () => {
+  it('should support modern features for Gemini 4 Argon', () => {
+    expect(supportsModernFeatures(GEMINI_4_ARGON_MODEL)).toBe(true);
+  });
+
   it('should return true for Gemini 3 models', () => {
     expect(supportsModernFeatures('gemini-3-pro-preview')).toBe(true);
     expect(supportsModernFeatures('gemini-3-flash-preview')).toBe(true);
@@ -325,6 +339,13 @@ describe('supportsModernFeatures', () => {
 });
 
 describe('isGemini3Model', () => {
+  it.each([legacyConfig, dynamicConfig])(
+    'should not classify Gemini 4 Argon as Gemini 3',
+    (config) => {
+      expect(isGemini3Model(GEMINI_4_ARGON_MODEL, config)).toBe(false);
+    },
+  );
+
   it('should return true for gemini-3 models', () => {
     expect(isGemini3Model('gemini-3-pro-preview')).toBe(true);
     expect(isGemini3Model('gemini-3-flash-preview')).toBe(true);
@@ -348,6 +369,15 @@ describe('isGemini3Model', () => {
 });
 
 describe('getDisplayString', () => {
+  it.each([legacyConfig, dynamicConfig])(
+    'should display the Gemini 4 Argon model name',
+    (config) => {
+      expect(getDisplayString(GEMINI_4_ARGON_MODEL, config)).toBe(
+        'Gemini 4 Argon',
+      );
+    },
+  );
+
   it('should return Auto (Gemini 3) for preview auto model', () => {
     expect(getDisplayString(PREVIEW_GEMINI_MODEL_AUTO)).toBe('Auto (Gemini 3)');
   });
@@ -599,6 +629,16 @@ describe('resolveClassifierModel', () => {
 });
 
 describe('isActiveModel', () => {
+  it('should keep Gemini 4 Argon active regardless of Gemini 3 rollout flags', () => {
+    for (const useGemini3_1 of [false, true]) {
+      for (const useCustomToolModel of [false, true]) {
+        expect(
+          isActiveModel(GEMINI_4_ARGON_MODEL, useGemini3_1, useCustomToolModel),
+        ).toBe(true);
+      }
+    }
+  });
+
   it('should return true for valid models when useGemini3_1 is false', () => {
     expect(isActiveModel(DEFAULT_GEMINI_MODEL)).toBe(true);
     expect(isActiveModel(PREVIEW_GEMINI_MODEL)).toBe(true);
@@ -694,6 +734,58 @@ describe('isActiveModel', () => {
       true,
     );
   });
+});
+
+describe('Gemini 4 Argon Config Resolution', () => {
+  it.each([legacyConfig, dynamicConfig])(
+    'should preserve explicit Argon selection without preview access or rollout flags',
+    (config) => {
+      expect(
+        resolveModel(
+          GEMINI_4_ARGON_MODEL,
+          true,
+          true,
+          false,
+          config,
+          true,
+          true,
+        ),
+      ).toBe(GEMINI_4_ARGON_MODEL);
+      expect(isPreviewModel(GEMINI_4_ARGON_MODEL, config)).toBe(false);
+    },
+  );
+
+  it('should use supported high thinking without a thinking budget for Argon chat requests', () => {
+    const resolved = modelConfigService.getResolvedConfig({
+      model: GEMINI_4_ARGON_MODEL,
+      isChatModel: true,
+    });
+    expect(resolved.model).toBe(GEMINI_4_ARGON_MODEL);
+    expect(resolved.generateContentConfig.thinkingConfig).toEqual({
+      includeThoughts: true,
+      thinkingLevel: ThinkingLevel.HIGH,
+    });
+    expect(resolved.generateContentConfig.thinkingConfig?.thinkingLevel).toBe(
+      'HIGH',
+    );
+    expect(
+      resolved.generateContentConfig.thinkingConfig?.thinkingBudget,
+    ).toBeUndefined();
+  });
+
+  it.each([legacyConfig, dynamicConfig])(
+    'should preserve existing auto and pro defaults',
+    (config) => {
+      for (const alias of [GEMINI_MODEL_ALIAS_AUTO, GEMINI_MODEL_ALIAS_PRO]) {
+        expect(resolveModel(alias, false, false, false, config)).toBe(
+          DEFAULT_GEMINI_MODEL,
+        );
+        expect(resolveModel(alias, false, false, true, config)).toBe(
+          PREVIEW_GEMINI_MODEL,
+        );
+      }
+    },
+  );
 });
 
 describe('Gemini 3.1 Config Resolution', () => {

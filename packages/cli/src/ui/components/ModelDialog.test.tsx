@@ -15,12 +15,15 @@ import {
   GEMINI_MODEL_ALIAS_AUTO,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  DEFAULT_MODEL_CONFIGS,
+  GEMINI_4_ARGON_MODEL,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_FLASH_LITE_MODEL,
   AuthType,
+  ModelConfigService,
 } from '@google/gemini-cli-core';
 import type { Config, ModelSlashCommandEvent } from '@google/gemini-cli-core';
 
@@ -152,6 +155,7 @@ describe('<ModelDialog />', () => {
     const output = lastFrame();
     expect(output).toContain('Select Model');
     expect(output).not.toContain(DEFAULT_GEMINI_MODEL);
+    expect(output).not.toContain(GEMINI_4_ARGON_MODEL);
     expect(output).not.toContain(PREVIEW_GEMINI_MODEL);
 
     // Verify order: Flash Preview -> Flash Lite (Preview/Default) -> Flash
@@ -297,6 +301,28 @@ describe('<ModelDialog />', () => {
     unmount();
   });
 
+  it('selects Argon from Auto for Google sign-in without preview access', async () => {
+    const { lastFrame, stdin, waitUntilReady, unmount } =
+      await renderComponent();
+
+    await act(async () => {
+      stdin.write('2'); // Manual
+    });
+    await waitUntilReady();
+    expect(lastFrame()).toContain(GEMINI_4_ARGON_MODEL);
+
+    await act(async () => {
+      stdin.write('4'); // Argon, after the existing stable models
+    });
+    await waitUntilReady();
+
+    await waitFor(() => {
+      expect(mockSetModel).toHaveBeenCalledWith(GEMINI_4_ARGON_MODEL, true);
+      expect(mockOnClose).toHaveBeenCalled();
+    });
+    unmount();
+  });
+
   it('closes dialog on escape in "main" view', async () => {
     const { stdin, waitUntilReady, unmount } = await renderComponent();
 
@@ -360,6 +386,61 @@ describe('<ModelDialog />', () => {
     expect(lastFrame()).toContain('Manual (My Custom Model Display)');
     unmount();
   });
+
+  it.each([
+    { authType: AuthType.LOGIN_WITH_GOOGLE, persist: false, dynamic: false },
+    { authType: AuthType.LOGIN_WITH_GOOGLE, persist: true, dynamic: false },
+    { authType: AuthType.USE_GEMINI, persist: false, dynamic: false },
+    { authType: AuthType.USE_VERTEX_AI, persist: false, dynamic: false },
+    { authType: AuthType.LOGIN_WITH_GOOGLE, persist: true, dynamic: true },
+  ])(
+    'selects Argon without preview access (auth: $authType, persist: $persist, dynamic: $dynamic)',
+    async ({ authType, persist, dynamic }) => {
+      mockGetModel.mockReturnValue(GEMINI_4_ARGON_MODEL);
+      mockGetDisplayString.mockImplementation((model: string) =>
+        model === GEMINI_4_ARGON_MODEL ? 'Gemini 4 Argon' : model,
+      );
+      const config = {
+        ...mockConfig,
+        getExperimentalDynamicModelConfiguration: () => dynamic,
+        getModelConfigService: () =>
+          new ModelConfigService(DEFAULT_MODEL_CONFIGS),
+      } as Config;
+      const { lastFrame, stdin, waitUntilReady, unmount } =
+        await renderComponent(config, authType);
+
+      expect(lastFrame()).toContain('Manual (Gemini 4 Argon)');
+
+      // The current Argon selection opens Manual and stays selected there.
+      await act(async () => {
+        stdin.write('\r');
+      });
+      await waitUntilReady();
+      expect(lastFrame()).toContain('Gemini 4 Argon');
+      expect(lastFrame()).not.toContain(PREVIEW_GEMINI_MODEL);
+
+      if (persist) {
+        await act(async () => {
+          stdin.write('\t');
+        });
+        await waitUntilReady();
+      }
+
+      await act(async () => {
+        stdin.write('\r');
+      });
+      await waitUntilReady();
+
+      await waitFor(() => {
+        expect(mockSetModel).toHaveBeenCalledWith(
+          GEMINI_4_ARGON_MODEL,
+          !persist,
+        );
+        expect(mockOnClose).toHaveBeenCalled();
+      });
+      unmount();
+    },
+  );
 
   describe('Preview Models', () => {
     beforeEach(() => {

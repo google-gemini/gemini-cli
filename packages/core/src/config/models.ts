@@ -64,6 +64,7 @@ export const PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL =
 // cleaned up.
 export let PREVIEW_GEMINI_FLASH_MODEL = 'gemini-3-flash-preview';
 export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro';
+export const GEMINI_4_ARGON_MODEL = 'gemini-4-argon';
 
 // Flash Tier: Base (stable GA) vs. Latest (experiment-gated GA)
 export const BASE_GEMINI_FLASH_MODEL = 'gemini-3.5-flash';
@@ -114,6 +115,7 @@ export const VALID_GEMINI_MODELS = new Set([
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL,
+  GEMINI_4_ARGON_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_3_5_FLASH_MODEL,
   SECONDARY_GEMINI_3_5_FLASH_MODEL,
@@ -482,6 +484,8 @@ export function getDisplayString(
   const useLatestFlashLite = config?.hasLatestFlashLiteGAAccess?.() ?? false;
 
   switch (model) {
+    case GEMINI_4_ARGON_MODEL:
+      return 'Gemini 4 Argon';
     case LEGACY_CCPA_FLASH_MODEL:
     case BASE_GEMINI_FLASH_MODEL:
       return useLatestFlash
@@ -559,7 +563,7 @@ export function isProModel(
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     return config.modelConfigService.getModelDefinition(model)?.tier === 'pro';
   }
-  return model.toLowerCase().includes('pro');
+  return model === GEMINI_4_ARGON_MODEL || model.toLowerCase().includes('pro');
 }
 
 /**
@@ -622,12 +626,13 @@ export function isCustomModel(
 
 /**
  * Checks if the model should be treated as a modern model.
- * This includes Gemini 3 models and any custom models.
+ * This includes Gemini 3, Gemini 4 Argon, and any custom models.
  *
  * @param model The model name to check.
  * @returns True if the model supports modern features like thoughts.
  */
 export function supportsModernFeatures(model: string): boolean {
+  if (model === GEMINI_4_ARGON_MODEL) return true;
   if (isGemini3Model(model)) return true;
   return isCustomModel(model);
 }

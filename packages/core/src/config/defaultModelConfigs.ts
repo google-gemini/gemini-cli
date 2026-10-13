@@ -13,6 +13,7 @@ import {
   BASE_GEMINI_FLASH_LITE_MODEL,
   LATEST_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL,
+  GEMINI_4_ARGON_MODEL,
 } from './models.js';
 
 // The default model configs. We use `base` as the parent for all of our model
@@ -66,6 +67,12 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     // ensure these model configs can be used interactively.
     // TODO(joshualitt): Introduce internal base configs for the various models,
     // note: we will have to think carefully about names.
+    [GEMINI_4_ARGON_MODEL]: {
+      extends: 'chat-base-3',
+      modelConfig: {
+        model: GEMINI_4_ARGON_MODEL,
+      },
+    },
     'gemini-3-pro-preview': {
       extends: 'chat-base-3',
       modelConfig: {
@@ -342,6 +349,14 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
   ],
   modelDefinitions: {
     // Concrete Models
+    [GEMINI_4_ARGON_MODEL]: {
+      displayName: 'Gemini 4 Argon',
+      tier: 'pro',
+      family: 'gemini-4',
+      isPreview: false,
+      isVisible: true,
+      features: { thinking: true, multimodalToolUse: false },
+    },
     'gemini-3.1-flash-lite': {
       tier: 'flash-lite',
       family: 'gemini-3',

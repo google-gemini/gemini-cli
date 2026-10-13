@@ -37,6 +37,27 @@ startup. For more details, refer to the
 Changes to these settings will be applied to all subsequent interactions with
 Gemini CLI.
 
+## Select Gemini 4 Argon
+
+Gemini 4 Argon requires access enabled for your account and project. If you use
+Gemini Code Assist Standard,
+[sign in with Google](../get-started/authentication.mdx#login-google) and
+[set your Google Cloud project](../get-started/authentication.mdx#set-gcp).
+
+To select Gemini 4 Argon when starting Gemini CLI, run:
+
+```bash
+gemini -m gemini-4-argon
+```
+
+In an interactive session, run `/model`, select **Manual**, and select **Gemini
+4 Argon**. You can also select it directly and save your choice for future
+sessions:
+
+```text
+/model set gemini-4-argon --persist
+```
+
 ## Best practices for model selection
 
 - **Default to Auto.** For most users, the _Auto_ option model provides a

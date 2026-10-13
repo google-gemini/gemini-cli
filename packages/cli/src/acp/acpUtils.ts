@@ -14,6 +14,7 @@ import {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  GEMINI_4_ARGON_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
@@ -315,6 +316,10 @@ export function buildAvailableModels(
     {
       value: DEFAULT_GEMINI_FLASH_LITE_MODEL,
       title: getDisplayString(DEFAULT_GEMINI_FLASH_LITE_MODEL),
+    },
+    {
+      value: GEMINI_4_ARGON_MODEL,
+      title: getDisplayString(GEMINI_4_ARGON_MODEL),
     },
   ];
 
