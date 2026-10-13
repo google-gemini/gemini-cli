@@ -17,6 +17,7 @@ import { READ_MCP_RESOURCE_DEFINITION } from './definitions/coreTools.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { ToolErrorType } from './tool-error.js';
 import type { MCPResource } from '../resources/resource-registry.js';
+import { wrapUntrusted } from '../utils/textUtils.js';
 
 export interface ReadMcpResourceParams {
   uri: string;
@@ -149,7 +150,9 @@ class ReadMcpResourceToolInvocation extends BaseToolInvocation<
       }
 
       return {
-        llmContent: contentText || 'No content returned from resource.',
+        llmContent: contentText
+          ? wrapUntrusted(contentText)
+          : 'No content returned from resource.',
         returnDisplay: this.resource
           ? `Successfully read resource "${this.resource.name}" from server "${this.resource.serverName}"`
           : `Successfully read resource: ${uri}`,

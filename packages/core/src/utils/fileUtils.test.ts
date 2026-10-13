@@ -30,6 +30,7 @@ import {
   processSingleFileContent,
   detectBOM,
   readFileWithEncoding,
+  readSecureFileBuffer,
   fileExists,
   readWasmBinaryFromDisk,
   saveTruncatedToolOutput,
@@ -504,6 +505,120 @@ describe('fileUtils', () => {
         const result = await readFileWithEncoding(filePath);
         expect(result).toBe('');
       });
+
+      it('should abort file read if file device or inode changes on open (fstat mismatch)', async () => {
+        const filePath = path.join(testDir, 'file-open.txt');
+        await fsPromises.writeFile(filePath, 'safe content');
+
+        const realStats = await fsPromises.stat(filePath);
+        const openSpy = vi.spyOn(fsPromises, 'open').mockResolvedValueOnce({
+          stat: vi.fn().mockResolvedValue({
+            dev: realStats.dev,
+            ino: realStats.ino + 9999,
+          }),
+          close: vi.fn().mockResolvedValue(undefined),
+        } as unknown as fsPromises.FileHandle);
+
+        try {
+          await expect(readFileWithEncoding(filePath)).rejects.toThrow(
+            /File device or inode changed during read/,
+          );
+        } finally {
+          openSpy.mockRestore();
+        }
+      });
+
+      it('should abort file read if file device or inode changes after read (post-stat mismatch)', async () => {
+        const filePath = path.join(testDir, 'file-post.txt');
+        await fsPromises.writeFile(filePath, 'safe content');
+
+        const realStats = await fsPromises.stat(filePath);
+        let statCallCount = 0;
+        const statSpy = vi
+          .spyOn(fsPromises, 'stat')
+          .mockImplementation(async () => {
+            statCallCount++;
+            if (statCallCount === 1) {
+              return realStats;
+            }
+            return {
+              dev: realStats.dev,
+              ino: realStats.ino + 8888,
+              isDirectory: () => false,
+              isFile: () => true,
+            } as unknown as fs.Stats;
+          });
+
+        try {
+          await expect(readFileWithEncoding(filePath)).rejects.toThrow(
+            /File device or inode changed during read/,
+          );
+        } finally {
+          statSpy.mockRestore();
+        }
+      });
+    });
+
+    describe('readSecureFileBuffer', () => {
+      it('should successfully read file buffer', async () => {
+        const filePath = path.join(testDir, 'secure-buffer.txt');
+        await fsPromises.writeFile(filePath, 'hello secure');
+
+        const buffer = await readSecureFileBuffer(filePath);
+        expect(buffer.toString('utf-8')).toBe('hello secure');
+      });
+
+      it('should read directly from fileHandle when open succeeds', async () => {
+        const filePath = path.join(testDir, 'secure-buffer-handle.txt');
+        await fsPromises.writeFile(filePath, 'hello from disk');
+
+        const realStats = await fsPromises.stat(filePath);
+        const mockReadFile = vi
+          .fn()
+          .mockResolvedValue(Buffer.from('hello from handle'));
+        const openSpy = vi.spyOn(fsPromises, 'open').mockResolvedValueOnce({
+          stat: vi.fn().mockResolvedValue({
+            dev: realStats.dev,
+            ino: realStats.ino,
+          }),
+          readFile: mockReadFile,
+          close: vi.fn().mockResolvedValue(undefined),
+        } as unknown as fsPromises.FileHandle);
+
+        const readFileSpy = vi.spyOn(fsPromises, 'readFile');
+
+        try {
+          const buffer = await readSecureFileBuffer(filePath);
+          expect(buffer.toString('utf-8')).toBe('hello from handle');
+          expect(mockReadFile).toHaveBeenCalledTimes(1);
+          expect(readFileSpy).not.toHaveBeenCalled();
+        } finally {
+          openSpy.mockRestore();
+          readFileSpy.mockRestore();
+        }
+      });
+
+      it('should abort if fstat dev/ino does not match initial stats', async () => {
+        const filePath = path.join(testDir, 'secure-buffer-mismatch.txt');
+        await fsPromises.writeFile(filePath, 'hello secure');
+
+        const realStats = await fsPromises.stat(filePath);
+        const openSpy = vi.spyOn(fsPromises, 'open').mockResolvedValueOnce({
+          stat: vi.fn().mockResolvedValue({
+            dev: realStats.dev,
+            ino: realStats.ino + 7777,
+          }),
+          close: vi.fn().mockResolvedValue(undefined),
+        } as unknown as fsPromises.FileHandle);
+
+        try {
+          await expect(readSecureFileBuffer(filePath)).rejects.toThrow(
+            /File device or inode changed during read/,
+          );
+        } finally {
+          openSpy.mockRestore();
+        }
+      });
     });
 
     describe('isBinaryFile with BOM awareness', () => {
@@ -822,6 +937,7 @@ describe('fileUtils', () => {
     it('should handle read errors for text files', async () => {
       actualNodeFs.writeFileSync(testTextFilePath, 'content'); // File must exist for initial statSync
       const readError = new Error('Simulated read error');
+      vi.spyOn(fsPromises, 'open').mockRejectedValueOnce(readError);
       vi.spyOn(fsPromises, 'readFile').mockRejectedValueOnce(readError);
 
       const result = await processSingleFileContent(
@@ -837,6 +953,7 @@ describe('fileUtils', () => {
       actualNodeFs.writeFileSync(testImageFilePath, 'content'); // File must exist
       mockMimeGetType.mockReturnValue('image/png');
       const readError = new Error('Simulated image read error');
+      vi.spyOn(fsPromises, 'open').mockRejectedValueOnce(readError);
       vi.spyOn(fsPromises, 'readFile').mockRejectedValueOnce(readError);
 
       const result = await processSingleFileContent(
@@ -1206,9 +1323,37 @@ describe('fileUtils', () => {
         statSpy.mockRestore();
       }
     });
+
+    it('should catch dev/ino mismatch and return READ_CONTENT_FAILURE with security error', async () => {
+      actualNodeFs.writeFileSync(testTextFilePath, 'sample content');
+      const realStats = actualNodeFs.statSync(testTextFilePath);
+
+      const openSpy = vi.spyOn(fsPromises, 'open').mockResolvedValueOnce({
+        stat: vi.fn().mockResolvedValue({
+          dev: realStats.dev,
+          ino: realStats.ino + 12345,
+        }),
+        close: vi.fn().mockResolvedValue(undefined),
+      } as unknown as fsPromises.FileHandle);
+
+      try {
+        const result = await processSingleFileContent(
+          testTextFilePath,
+          tempRootDir,
+          new StandardFileSystemService(),
+        );
+
+        expect(result.errorType).toBe(ToolErrorType.READ_CONTENT_FAILURE);
+        expect(result.error).toContain(
+          'File device or inode changed during read',
+        );
+      } finally {
+        openSpy.mockRestore();
+      }
+    });
   });
 
-  describe('saveTruncatedToolOutput & formatTruncatedToolOutput', () => {
+  describe('saveTruncatedToolOutput', () => {
     it('should save content to a file with safe name', async () => {
       const content = 'some content';
       const toolName = 'shell';
@@ -1320,14 +1465,46 @@ describe('fileUtils', () => {
       );
       expect(result.outputFile).toBe(expectedOutputFile);
     });
+  });
 
-    it('should truncate showing first 20% and last 80%', () => {
+  describe('formatTruncatedToolOutput', () => {
+    it('returns the string unchanged without the "Output too large" wrapper when maxChars = 0', () => {
+      const content = 'abcdefghijklmnopqrstuvwxyz';
+      const outputFile = '/tmp/out.txt';
+
+      const result = formatTruncatedToolOutput(content, outputFile, 0);
+
+      expect(result).toBe(content);
+      expect(result).not.toContain('Output too large');
+    });
+
+    it('returns the string unchanged when maxChars < 0 (-1, -1000), verifying output length equals input length', () => {
+      const content = 'abcdefghijklmnopqrstuvwxyz'.repeat(10);
+      const outputFile = '/tmp/out.txt';
+
+      const resultNeg1 = formatTruncatedToolOutput(content, outputFile, -1);
+      expect(resultNeg1).toBe(content);
+      expect(resultNeg1.length).toBe(content.length);
+      expect(resultNeg1).not.toContain('Output too large');
+
+      const resultNeg1000 = formatTruncatedToolOutput(
+        content,
+        outputFile,
+        -1000,
+      );
+      expect(resultNeg1000).toBe(content);
+      expect(resultNeg1000.length).toBe(content.length);
+      expect(resultNeg1000).not.toContain('Output too large');
+    });
+
+    it('correctly truncates when input exceeds maxChars (maxChars > 0)', () => {
       const content = 'abcdefghijklmnopqrstuvwxyz'; // 26 chars
       const outputFile = '/tmp/out.txt';
 
       // maxChars=10 -> head=2 (20%), tail=8 (80%)
       const formatted = formatTruncatedToolOutput(content, outputFile, 10);
 
+      expect(formatted).toContain('Output too large');
       expect(formatted).toContain('Showing first 2 and last 8 characters');
       expect(formatted).toContain('For full output see: /tmp/out.txt');
       expect(formatted).toContain('ab'); // first 2 chars
@@ -1347,6 +1524,14 @@ describe('fileUtils', () => {
       );
       expect(formatted).toContain('For full output see: /tmp/out.txt');
       expect(formatted).toContain('[46,000 characters omitted]'); // 50000 - 800 - 3200
+    });
+
+    it('returns content untouched when content length <= maxChars', () => {
+      const content = 'short content';
+      const outputFile = '/tmp/out.txt';
+
+      const formatted = formatTruncatedToolOutput(content, outputFile, 100);
+      expect(formatted).toBe(content);
     });
   });
 });

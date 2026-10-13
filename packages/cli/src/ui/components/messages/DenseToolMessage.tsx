@@ -157,7 +157,7 @@ function getFileOpData(
     <DiffRenderer
       diffContent={diff.fileDiff}
       filename={diff.fileName}
-      terminalWidth={terminalWidth - PAYLOAD_MARGIN_LEFT}
+      terminalWidth={Math.max(0, (terminalWidth || 0) - PAYLOAD_MARGIN_LEFT)}
       availableTerminalHeight={availableTerminalHeight}
       disableColor={status === CoreToolCallStatus.Cancelled}
     />
@@ -404,7 +404,7 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
       return colorizeCode({
         code: addedContent,
         language: fileExtension,
-        maxWidth: terminalWidth - PAYLOAD_MARGIN_LEFT,
+        maxWidth: Math.max(0, (terminalWidth || 0) - PAYLOAD_MARGIN_LEFT),
         settings,
         disableColor: status === CoreToolCallStatus.Cancelled,
         returnLines: true,
@@ -413,7 +413,7 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
       return renderDiffLines({
         parsedLines,
         filename: diff.fileName,
-        terminalWidth: terminalWidth - PAYLOAD_MARGIN_LEFT,
+        terminalWidth: Math.max(0, (terminalWidth || 0) - PAYLOAD_MARGIN_LEFT),
         disableColor: status === CoreToolCallStatus.Cancelled,
       });
     }
@@ -488,9 +488,13 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
           borderStyle="round"
           borderColor={theme.border.default}
           borderDimColor={true}
-          maxWidth={Math.min(
-            PAYLOAD_MAX_WIDTH,
-            terminalWidth - PAYLOAD_MARGIN_LEFT,
+          minWidth={0}
+          maxWidth={Math.max(
+            0,
+            Math.min(
+              PAYLOAD_MAX_WIDTH,
+              (terminalWidth || 0) - PAYLOAD_MARGIN_LEFT,
+            ),
           )}
         >
           <ScrollableList
@@ -499,12 +503,15 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
             keyExtractor={keyExtractor}
             estimatedItemHeight={() => 1}
             hasFocus={isFocused}
-            width={Math.min(
-              PAYLOAD_MAX_WIDTH,
-              terminalWidth -
-                PAYLOAD_MARGIN_LEFT -
-                PAYLOAD_BORDER_CHROME_WIDTH -
-                PAYLOAD_SCROLL_GUTTER,
+            width={Math.max(
+              0,
+              Math.min(
+                PAYLOAD_MAX_WIDTH,
+                (terminalWidth || 0) -
+                  PAYLOAD_MARGIN_LEFT -
+                  PAYLOAD_BORDER_CHROME_WIDTH -
+                  PAYLOAD_SCROLL_GUTTER,
+              ),
             )}
           />
         </Box>

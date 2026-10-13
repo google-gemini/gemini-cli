@@ -366,5 +366,38 @@ describe('commentJson', () => {
 
       expect(updatedContent).toContain('// This should be preserved');
     });
+
+    it('should ignore dangerous keys (__proto__, constructor, prototype) to prevent prototype pollution', () => {
+      const originalContent = `{
+        "theme": "light"
+      }`;
+
+      fs.writeFileSync(testFilePath, originalContent, 'utf-8');
+
+      const maliciousUpdates = JSON.parse(
+        '{"__proto__": {"polluted": "yes"}, "theme": "dark"}',
+      ) as Record<string, unknown>;
+
+      updateSettingsFilePreservingFormat(testFilePath, maliciousUpdates);
+
+      // Verify prototype was not polluted
+      expect(
+        (Object.prototype as unknown as Record<string, unknown>)['polluted'],
+      ).toBeUndefined();
+
+      const updatedContent = fs.readFileSync(testFilePath, 'utf-8');
+      expect(updatedContent).toContain('"theme": "dark"');
+    });
+
+    it('should handle ENOENT gracefully if file is missing during read', () => {
+      const nonExistentPath = path.join(tempDir, 'missing.json');
+      updateSettingsFilePreservingFormat(nonExistentPath, {
+        theme: 'dark',
+      });
+
+      expect(fs.existsSync(nonExistentPath)).toBe(true);
+      const content = fs.readFileSync(nonExistentPath, 'utf-8');
+      expect(JSON.parse(content)).toEqual({ theme: 'dark' });
+    });
   });
 });

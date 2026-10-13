@@ -191,7 +191,12 @@ function classifyValidationRequiredError(
 
   // Fallback to ErrorInfo metadata if Help detail not found
   if (!validationLink) {
-    validationLink = errorInfo.metadata?.['validation_link'];
+    validationLink =
+      errorInfo.metadata?.['validation_link'] ??
+      errorInfo.metadata?.['validation_url'];
+  }
+  if (!learnMoreUrl) {
+    learnMoreUrl = errorInfo.metadata?.['validation_learn_more_url'];
   }
 
   return new ValidationRequiredError(

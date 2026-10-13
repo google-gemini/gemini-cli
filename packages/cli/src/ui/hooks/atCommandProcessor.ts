@@ -18,6 +18,7 @@ import {
   REFERENCE_CONTENT_END,
   CoreToolCallStatus,
   resolveAtCommandPath,
+  stripLineNumberSuffix,
 } from '@google/gemini-cli-core';
 import { Buffer } from 'node:buffer';
 import type {
@@ -53,13 +54,16 @@ export function unescapeLiteralAt(text: string): string {
  * Regex source for the path/command part of an @ reference.
  * It uses strict ASCII whitespace delimiters to allow Unicode characters like NNBSP in filenames.
  *
- * 1. "(?:[^"]*)" matches a double-quoted string (for Windows paths with spaces).
- * 2. \\. matches any escaped character (e.g., \ ).
- * 3. [^ \t\n\r,;!?()\[\]{}.] matches any character that is NOT a delimiter and NOT a period.
- * 4. \.(?!$|[ \t\n\r]) matches a period ONLY if it is NOT followed by whitespace or end-of-string.
+ * Either:
+ * 1. "(?:[^"\n\r]*)" - a double-quoted string (for paths with spaces, e.g. on Windows) without internal newlines.
+ * 2. An unquoted path consisting of escaped characters or non-delimiter characters (excluding quotes).
+ * 3. \.(?!$|[ \t\n\r]) matches a period ONLY if it is NOT followed by whitespace or end-of-string.
+ *
+ * Notably, a quoted string cannot be extended by unquoted characters, and unquoted paths cannot contain unescaped quotes.
+ * This prevents catastrophic multi-line matches when code like `import { x } from "@scope/pkg";` is processed (#29434).
  */
 export const AT_COMMAND_PATH_REGEX_SOURCE =
-  '(?:(?:"(?:[^"]*)")|(?:\\\\.|[^ \\t\\n\\r,;!?()\\[\\]{}.]|\\.(?!$|[ \\t\\n\\r])))+';
+  '(?:(?:"[^"\\n\\r]*")|(?:\\\\.|[^ \\t\\n\\r,;!?()\\[\\]{}."\'`]|\\.(?!$|[ \\t\\n\\r]))+)';
 
 interface HandleAtCommandParams {
   query: string;
@@ -193,8 +197,18 @@ export async function checkPermissions(
         path.resolve(config.getTargetDir(), pathName),
       );
     } catch {
-      // skip if resolveToRealPath errors out
-      continue;
+      const strippedPath = stripLineNumberSuffix(pathName);
+      if (!strippedPath) {
+        continue;
+      }
+      try {
+        resolvedPathName = resolveToRealPath(
+          path.resolve(config.getTargetDir(), strippedPath),
+        );
+      } catch {
+        // skip if resolveToRealPath errors out
+        continue;
+      }
     }
 
     if (config.validatePathAccess(resolvedPathName, 'read')) {
@@ -211,6 +225,7 @@ interface ResolvedFile {
   pathSpec: string;
   displayLabel: string;
   absolutePath?: string;
+  isDirectory?: boolean;
 }
 
 interface IgnoredFile {
@@ -243,18 +258,29 @@ async function resolveFilePaths(
       continue;
     }
 
+    const basePathName = stripLineNumberSuffix(pathName) ?? pathName;
     const gitIgnored =
       respectFileIgnore.respectGitIgnore &&
-      fileDiscovery.shouldIgnoreFile(pathName, {
+      (fileDiscovery.shouldIgnoreFile(pathName, {
         respectGitIgnore: true,
         respectGeminiIgnore: false,
-      });
+      }) ||
+        (basePathName !== pathName &&
+          fileDiscovery.shouldIgnoreFile(basePathName, {
+            respectGitIgnore: true,
+            respectGeminiIgnore: false,
+          })));
     const geminiIgnored =
       respectFileIgnore.respectGeminiIgnore &&
-      fileDiscovery.shouldIgnoreFile(pathName, {
+      (fileDiscovery.shouldIgnoreFile(pathName, {
         respectGitIgnore: false,
         respectGeminiIgnore: true,
-      });
+      }) ||
+        (basePathName !== pathName &&
+          fileDiscovery.shouldIgnoreFile(basePathName, {
+            respectGitIgnore: false,
+            respectGeminiIgnore: true,
+          })));
 
     if (gitIgnored || geminiIgnored) {
       const reason =
@@ -274,28 +300,20 @@ async function resolveFilePaths(
 
     if (result.status === 'resolved') {
       const { absolutePath, relativePath, stats } = result.resolved;
-      if (stats.isDirectory()) {
-        const pathSpec = path.join(relativePath, '**');
-        resolvedFiles.push({
-          part,
-          pathSpec,
-          displayLabel: path.isAbsolute(pathName) ? relativePath : pathName,
-          absolutePath,
-        });
-        onDebugMessage(
-          `Path ${pathName} resolved to directory, using glob: ${pathSpec}`,
-        );
-      } else {
-        resolvedFiles.push({
-          part,
-          pathSpec: relativePath,
-          displayLabel: path.isAbsolute(pathName) ? relativePath : pathName,
-          absolutePath,
-        });
-        onDebugMessage(
-          `Path ${pathName} resolved to file: ${absolutePath}, using relative path: ${relativePath}`,
-        );
-      }
+      const isDirectory = stats.isDirectory();
+      const normalizedRelativePath = relativePath || '.';
+      resolvedFiles.push({
+        part,
+        pathSpec: normalizedRelativePath,
+        displayLabel: path.isAbsolute(pathName)
+          ? normalizedRelativePath
+          : pathName,
+        absolutePath,
+        isDirectory,
+      });
+      onDebugMessage(
+        `Path ${pathName} resolved to ${isDirectory ? 'directory' : 'file'}: ${absolutePath}, using relative path: ${normalizedRelativePath}`,
+      );
     } else if (
       result.status === 'not_found' ||
       result.status === 'unauthorized'
@@ -304,7 +322,19 @@ async function resolveFilePaths(
       // We also allow glob fallback for "unauthorized" results from resolveAtCommandPath,
       // as they might represent a relative path that matched an unauthorized file in one directory
       // but might have a valid match (via glob) in another.
-      if (config.getEnableRecursiveFileSearch() && globTool) {
+      const MAX_GLOB_SEARCH_PATH_LENGTH = 255;
+      const isPathSuitableForGlob =
+        pathName.length > 0 &&
+        pathName.length <= MAX_GLOB_SEARCH_PATH_LENGTH &&
+        !path.isAbsolute(pathName) &&
+        !pathName.includes('..') &&
+        !/[\r\n\t\0{}*?[\]]/.test(pathName);
+
+      if (
+        config.getEnableRecursiveFileSearch() &&
+        globTool &&
+        isPathSuitableForGlob
+      ) {
         onDebugMessage(
           `Path ${pathName} not found directly, attempting glob search.`,
         );
@@ -313,7 +343,7 @@ async function resolveFilePaths(
           try {
             const globResult = await globTool.buildAndExecute(
               {
-                pattern: `**/*${pathName}*`,
+                pattern: `**/*${basePathName}*`,
                 path: dir,
               },
               signal,
@@ -346,12 +376,12 @@ async function resolveFilePaths(
                 break;
               } else {
                 onDebugMessage(
-                  `Glob search for '**/*${pathName}*' did not return a usable path. Path ${pathName} will be skipped.`,
+                  `Glob search for '**/*${basePathName}*' did not return a usable path. Path ${pathName} will be skipped.`,
                 );
               }
             } else {
               onDebugMessage(
-                `Glob search for '**/*${pathName}*' found no files or an error. Path ${pathName} will be skipped.`,
+                `Glob search for '**/*${basePathName}*' found no files or an error. Path ${pathName} will be skipped.`,
               );
             }
           } catch (globError) {
@@ -512,7 +542,8 @@ async function readLocalFiles(
   display?: IndividualToolCallDisplay;
   error?: string;
 }> {
-  if (resolvedFiles.length === 0) {
+  const filesToRead = resolvedFiles.filter((rf) => !(rf.isDirectory ?? false));
+  if (filesToRead.length === 0) {
     return { parts: [] };
   }
 
@@ -521,15 +552,10 @@ async function readLocalFiles(
     config.getMessageBus(),
   );
 
-  const pathSpecsToRead = resolvedFiles.map((rf) => {
-    if (rf.absolutePath) {
-      return rf.pathSpec.endsWith('**')
-        ? path.join(rf.absolutePath, '**')
-        : rf.absolutePath;
-    }
-    return rf.pathSpec;
-  });
-  const fileLabelsForDisplay = resolvedFiles.map((rf) => rf.displayLabel);
+  const pathSpecsToRead = filesToRead.map(
+    (rf) => rf.absolutePath ?? rf.pathSpec,
+  );
+  const fileLabelsForDisplay = filesToRead.map((rf) => rf.displayLabel);
   const respectFileIgnore = config.getFileFilteringOptions();
 
   const toolArgs = {
@@ -567,7 +593,7 @@ async function readLocalFiles(
             const fileActualContent = match[2].trim();
 
             // Find the display label for this path
-            const resolvedFile = resolvedFiles.find(
+            const resolvedFile = filesToRead.find(
               (rf) =>
                 rf.absolutePath === filePathSpecInContent ||
                 rf.pathSpec === filePathSpecInContent,
@@ -661,7 +687,8 @@ function reportIgnoredFiles(
 
 /**
  * Processes user input containing one or more '@<path>' commands.
- * - Workspace paths are read via the 'read_many_files' tool.
+ * - Workspace file paths are read via the 'read_many_files' tool.
+ * - Workspace directory paths are resolved to relative paths in the query without eagerly reading their contents.
  * - MCP resource URIs are read via each server's `resources/read`.
  * The user query is updated with inline content blocks so the LLM receives the
  * referenced context directly.

@@ -38,6 +38,7 @@ export class OAuth2AuthProvider extends BaseA2AAuthProvider {
 
   private readonly tokenStorage: MCPOAuthTokenStorage;
   private cachedToken: OAuthToken | null = null;
+  private pendingAuthPromise: Promise<OAuthToken> | null = null;
 
   /** Resolved OAuth URLs — may come from config or agent card. */
   private authorizationUrl: string | undefined;
@@ -86,18 +87,35 @@ export class OAuth2AuthProvider extends BaseA2AAuthProvider {
 
   /**
    * Return an Authorization header with a valid Bearer token.
-   * Refreshes or triggers interactive auth as needed.
+   * Refreshes or triggers interactive auth as needed, deduplicating concurrent requests.
    */
   override async headers(): Promise<HttpHeaders> {
-    // 1. Valid cached token → return immediately.
+    // 1. Valid cached token → return immediately and reset retry counter.
     if (
       this.cachedToken &&
       !this.tokenStorage.isTokenExpired(this.cachedToken)
     ) {
+      this.authRetryCount = 0;
       return { Authorization: `Bearer ${this.cachedToken.accessToken}` };
     }
 
-    // 2. Expired but has refresh token → attempt silent refresh.
+    // 2. Coalesce concurrent token refresh / interactive auth requests.
+    if (!this.pendingAuthPromise) {
+      this.pendingAuthPromise = this.acquireToken().finally(() => {
+        this.pendingAuthPromise = null;
+      });
+    }
+
+    const token = await this.pendingAuthPromise;
+    this.authRetryCount = 0;
+    return { Authorization: `Bearer ${token.accessToken}` };
+  }
+
+  /**
+   * Refresh an expired token or run interactive browser-based authentication.
+   */
+  private async acquireToken(): Promise<OAuthToken> {
+    // 1. Expired but has refresh token → attempt silent refresh.
     if (
       this.cachedToken?.refreshToken &&
       this.tokenUrl &&
@@ -119,26 +137,34 @@ export class OAuth2AuthProvider extends BaseA2AAuthProvider {
           this.cachedToken.refreshToken,
         );
         await this.persistToken();
-        return { Authorization: `Bearer ${this.cachedToken.accessToken}` };
+        return this.cachedToken;
       } catch (error) {
         debugLogger.debug(
           `[OAuth2AuthProvider] Refresh failed, falling back to interactive flow: ${getErrorMessage(error)}`,
         );
         // Clear stale credentials and fall through to interactive flow.
+        this.cachedToken = null;
         await this.tokenStorage.deleteCredentials(this.agentName);
       }
     }
 
-    // 3. No valid token → interactive browser-based auth.
+    // 2. No valid token → interactive browser-based auth.
     this.cachedToken = await this.authenticateInteractively();
-    return { Authorization: `Bearer ${this.cachedToken.accessToken}` };
+    return this.cachedToken;
+  }
+
+  /**
+   * Return the maximum number of consecutive authentication retries allowed.
+   */
+  protected getMaxAuthRetries(): number {
+    return BaseA2AAuthProvider.MAX_AUTH_RETRIES;
   }
 
   /**
    * On 401/403, clear the cached token and re-authenticate (up to MAX_AUTH_RETRIES).
    */
   override async shouldRetryWithHeaders(
-    _req: RequestInit,
+    req: RequestInit,
     res: Response,
   ): Promise<HttpHeaders | undefined> {
     if (res.status !== 401 && res.status !== 403) {
@@ -146,10 +172,31 @@ export class OAuth2AuthProvider extends BaseA2AAuthProvider {
       return undefined;
     }
 
-    if (this.authRetryCount >= BaseA2AAuthProvider.MAX_AUTH_RETRIES) {
+    const reqHeaders = new Headers(req.headers);
+    const reqToken = reqHeaders.get('Authorization')?.split(' ')[1];
+
+    // If the token used in the request is already different from our current cached token
+    // (or if the cached token has already been cleared), another concurrent request has
+    // already initiated the re-authentication flow. We can safely retry with the new
+    // token without incrementing the retry count or clearing credentials again.
+    if (
+      reqToken &&
+      (!this.cachedToken || reqToken !== this.cachedToken.accessToken)
+    ) {
+      debugLogger.debug(
+        '[OAuth2AuthProvider] Token already cleared or updated by another request, retrying with new token',
+      );
+      const retryCount = this.authRetryCount;
+      const headers = await this.headers();
+      this.authRetryCount = Math.max(this.authRetryCount, retryCount);
+      return headers;
+    }
+
+    if (this.authRetryCount >= this.getMaxAuthRetries()) {
       return undefined;
     }
-    this.authRetryCount++;
+    const nextRetryCount = this.authRetryCount + 1;
+    this.authRetryCount = nextRetryCount;
 
     debugLogger.debug(
       '[OAuth2AuthProvider] Auth failure, clearing token and re-authenticating',
@@ -157,7 +204,9 @@ export class OAuth2AuthProvider extends BaseA2AAuthProvider {
     this.cachedToken = null;
     await this.tokenStorage.deleteCredentials(this.agentName);
 
-    return this.headers();
+    const headers = await this.headers();
+    this.authRetryCount = nextRetryCount;
+    return headers;
   }
 
   // ---------------------------------------------------------------------------
@@ -246,7 +295,12 @@ export class OAuth2AuthProvider extends BaseA2AAuthProvider {
       `Authentication required for A2A agent: '${this.agentName}'.`,
     );
     if (!consent) {
-      throw new FatalCancellationError('Authentication cancelled by user.');
+      const cancelError = new FatalCancellationError(
+        'Authentication cancelled by user.',
+      );
+      callbackServer.response.catch(() => {});
+      callbackServer.cancel?.(cancelError);
+      throw cancelError;
     }
 
     coreEvents.emitFeedback(

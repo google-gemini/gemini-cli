@@ -335,6 +335,8 @@ export const AppContainer = (props: AppContainerProps) => {
   const overflowingIdsSize = overflowState?.overflowingIds.size ?? 0;
   const hasOverflowState = overflowingIdsSize > 0 || !constrainHeight;
 
+  const prevOverflowingIdsSizeRef = useRef(0);
+
   /**
    * Manages the visibility and x-second timer for the expansion hint.
    *
@@ -347,9 +349,13 @@ export const AppContainer = (props: AppContainerProps) => {
    * to avoid noise, but the user can still trigger it manually with Ctrl+O.
    */
   useEffect(() => {
-    if (hasOverflowState) {
+    if (
+      overflowingIdsSize > prevOverflowingIdsSizeRef.current &&
+      hasOverflowState
+    ) {
       triggerExpandHint(true);
     }
+    prevOverflowingIdsSizeRef.current = overflowingIdsSize;
   }, [hasOverflowState, overflowingIdsSize, triggerExpandHint]);
 
   const [defaultBannerText, setDefaultBannerText] = useState('');
@@ -743,6 +749,10 @@ export const AppContainer = (props: AppContainerProps) => {
     }
   }, [authState, authContext, setAuthState]);
 
+  const handleShowAuthSelection = useCallback(() => {
+    setAuthState(AuthState.Updating);
+  }, [setAuthState]);
+
   const {
     proQuotaRequest,
     handleProQuotaChoice,
@@ -760,7 +770,7 @@ export const AppContainer = (props: AppContainerProps) => {
     paidTier,
     settings,
     setModelSwitchedFromQuotaError,
-    onShowAuthSelection: () => setAuthState(AuthState.Updating),
+    onShowAuthSelection: handleShowAuthSelection,
     errorVerbosity: settings.merged.ui.errorVerbosity,
   });
 
@@ -1816,6 +1826,43 @@ Logging in with Google... Restarting Gemini CLI to continue.
     [handleSlashCommand, settings],
   );
 
+  const isAwaitingLoginRestart = authState === AuthState.AwaitingLoginRestart;
+  const loginRestartMessage =
+    settings.merged.security.auth.selectedType === AuthType.USE_VERTEX_AI
+      ? 'Authenticating to Vertex AI in Cloud Shell requires a restart to apply project settings.'
+      : undefined;
+
+  const dialogsVisible =
+    shouldShowIdePrompt ||
+    isFolderTrustDialogOpen ||
+    isPolicyUpdateDialogOpen ||
+    adminSettingsChanged ||
+    !!commandConfirmationRequest ||
+    !!authConsentRequest ||
+    !!permissionConfirmationRequest ||
+    !!customDialog ||
+    confirmUpdateExtensionRequests.length > 0 ||
+    !!loopDetectionConfirmationRequest ||
+    isThemeDialogOpen ||
+    isSettingsDialogOpen ||
+    isModelDialogOpen ||
+    isVoiceModelDialogOpen ||
+    isAgentConfigDialogOpen ||
+    isPermissionsDialogOpen ||
+    isAuthenticating ||
+    isAuthDialogOpen ||
+    isEditorDialogOpen ||
+    showPrivacyNotice ||
+    showIdeRestartPrompt ||
+    !!proQuotaRequest ||
+    !!validationRequest ||
+    !!overageMenuRequest ||
+    !!emptyWalletRequest ||
+    isSessionBrowserOpen ||
+    authState === AuthState.AwaitingApiKeyInput ||
+    isAwaitingLoginRestart ||
+    !!newAgents;
+
   const handleGlobalKeypress = useCallback(
     (key: Key): boolean => {
       // Debug log keystrokes if enabled
@@ -1910,9 +1957,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
         }
       };
 
-      let enteringConstrainHeightMode = false;
-      if (!constrainHeight) {
-        enteringConstrainHeightMode = true;
+      if (
+        !constrainHeight &&
+        (keyMatchers[Command.SHOW_MORE_LINES](key) ||
+          (keyMatchers[Command.ESCAPE](key) && !dialogsVisible))
+      ) {
         setConstrainHeight(true);
         if (keyMatchers[Command.SHOW_MORE_LINES](key)) {
           toggleLastTurnTools();
@@ -1920,6 +1969,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         if (!isAlternateBuffer) {
           refreshStatic();
         }
+        return true;
       }
 
       if (keyMatchers[Command.SHOW_ERROR_DETAILS](key)) {
@@ -1958,13 +2008,16 @@ Logging in with Google... Restarting Gemini CLI to continue.
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleSlashCommand('/ide status');
         return true;
-      } else if (
-        keyMatchers[Command.SHOW_MORE_LINES](key) &&
-        !enteringConstrainHeightMode
-      ) {
+      } else if (keyMatchers[Command.SHOW_MORE_LINES](key)) {
         setConstrainHeight(false);
         toggleLastTurnTools();
-        refreshStatic();
+        if (
+          !isAlternateBuffer &&
+          !config.getUseTerminalBuffer() &&
+          getLastTurnToolCallIds(historyManager.history, []).length > 0
+        ) {
+          refreshStatic();
+        }
         return true;
       } else if (
         (keyMatchers[Command.FOCUS_SHELL_INPUT](key) ||
@@ -2076,6 +2129,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       startRecording,
       stopRecording,
       mouseMode,
+      dialogsVisible,
     ],
   );
 
@@ -2204,43 +2258,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const nightly = props.version.includes('nightly');
 
-  const isAwaitingLoginRestart = authState === AuthState.AwaitingLoginRestart;
-  const loginRestartMessage =
-    settings.merged.security.auth.selectedType === AuthType.USE_VERTEX_AI
-      ? 'Authenticating to Vertex AI in Cloud Shell requires a restart to apply project settings.'
-      : undefined;
-
-  const dialogsVisible =
-    shouldShowIdePrompt ||
-    isFolderTrustDialogOpen ||
-    isPolicyUpdateDialogOpen ||
-    adminSettingsChanged ||
-    !!commandConfirmationRequest ||
-    !!authConsentRequest ||
-    !!permissionConfirmationRequest ||
-    !!customDialog ||
-    confirmUpdateExtensionRequests.length > 0 ||
-    !!loopDetectionConfirmationRequest ||
-    isThemeDialogOpen ||
-    isSettingsDialogOpen ||
-    isModelDialogOpen ||
-    isVoiceModelDialogOpen ||
-    isAgentConfigDialogOpen ||
-    isPermissionsDialogOpen ||
-    isAuthenticating ||
-    isAuthDialogOpen ||
-    isEditorDialogOpen ||
-    showPrivacyNotice ||
-    showIdeRestartPrompt ||
-    !!proQuotaRequest ||
-    !!validationRequest ||
-    !!overageMenuRequest ||
-    !!emptyWalletRequest ||
-    isSessionBrowserOpen ||
-    authState === AuthState.AwaitingApiKeyInput ||
-    isAwaitingLoginRestart ||
-    !!newAgents;
-
   const hasPendingToolConfirmation = useMemo(
     () => isToolAwaitingConfirmation(pendingHistoryItems),
     [pendingHistoryItems],
@@ -2293,17 +2310,24 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const maxLength = terminalWidth - estimatedStatusLength - 5;
 
-  const { elapsedTime, currentLoadingPhrase, currentTip, currentWittyPhrase } =
-    useLoadingIndicator({
-      streamingState,
-      shouldShowFocusHint,
-      retryStatus,
-      showTips: showStatusTips,
-      showWit: showStatusWit,
-      customWittyPhrases: settings.merged.ui.customWittyPhrases,
-      errorVerbosity: settings.merged.ui.errorVerbosity,
-      maxLength,
-    });
+  const {
+    elapsedTime,
+    currentLoadingPhrase,
+    statusPhrase,
+    currentTip,
+    currentWittyPhrase,
+  } = useLoadingIndicator({
+    streamingState,
+    shouldShowFocusHint,
+    retryStatus,
+    showTips: showStatusTips,
+    showWit: showStatusWit,
+    customWittyPhrases: settings.merged.ui.customWittyPhrases,
+    errorVerbosity: settings.merged.ui.errorVerbosity,
+    maxLength,
+    pauseUpdates:
+      !constrainHeight && !isAlternateBuffer && !config.getUseTerminalBuffer(),
+  });
 
   const allowPlanMode =
     config.isPlanEnabled() &&
@@ -2526,6 +2550,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isFocused,
       elapsedTime,
       currentLoadingPhrase,
+      statusPhrase,
       currentTip,
       currentWittyPhrase,
       historyRemountKey,
@@ -2639,6 +2664,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isFocused,
       elapsedTime,
       currentLoadingPhrase,
+      statusPhrase,
       currentTip,
       currentWittyPhrase,
       historyRemountKey,

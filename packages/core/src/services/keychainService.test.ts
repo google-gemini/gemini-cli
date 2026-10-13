@@ -132,6 +132,7 @@ describe('KeychainService', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     process.env = originalEnv;
   });
 
@@ -170,19 +171,21 @@ describe('KeychainService', () => {
       const originalMock = mockKeytar.getPassword;
       mockKeytar.getPassword = undefined; // Break schema
 
-      const available = await service.isAvailable();
+      try {
+        const available = await service.isAvailable();
 
-      expect(available).toBe(true);
-      expect(debugLogger.debug).toHaveBeenCalledWith(
-        expect.stringContaining('failed structural validation'),
-        expect.objectContaining({ getPassword: expect.any(Array) }),
-      );
-      expect(coreEvents.emitTelemetryKeychainAvailability).toHaveBeenCalledWith(
-        expect.objectContaining({ available: false }),
-      );
-      expect(FileKeychain).toHaveBeenCalled();
-
-      mockKeytar.getPassword = originalMock;
+        expect(available).toBe(true);
+        expect(debugLogger.debug).toHaveBeenCalledWith(
+          expect.stringContaining('failed structural validation'),
+          expect.objectContaining({ getPassword: expect.any(Array) }),
+        );
+        expect(
+          coreEvents.emitTelemetryKeychainAvailability,
+        ).toHaveBeenCalledWith(expect.objectContaining({ available: false }));
+        expect(FileKeychain).toHaveBeenCalled();
+      } finally {
+        mockKeytar.getPassword = originalMock;
+      }
     });
 
     it('should log failure if functional test cycle returns false, then fallback', async () => {
@@ -299,6 +302,39 @@ describe('KeychainService', () => {
       await service.isAvailable();
 
       expect(fs.existsSync).toHaveBeenCalledWith('/path/to/valid.keychain');
+    });
+  });
+
+  describe('WSL Probing', () => {
+    beforeEach(() => {
+      vi.mocked(os.platform).mockReturnValue('linux');
+    });
+
+    it('should fallback to FileKeychain when running in WSL', async () => {
+      vi.stubEnv('WSL_DISTRO_NAME', 'Ubuntu');
+
+      const available = await service.isAvailable();
+
+      expect(available).toBe(true);
+      expect(mockKeytar.setPassword).not.toHaveBeenCalled();
+      expect(FileKeychain).toHaveBeenCalled();
+      expect(debugLogger.debug).toHaveBeenCalledWith(
+        expect.stringContaining('WSL environment detected'),
+      );
+    });
+
+    it('should proceed with native keychain on headless Linux (no display) if functional', async () => {
+      vi.stubEnv('WSL_DISTRO_NAME', '');
+      vi.stubEnv('WSLENV', '');
+      vi.stubEnv('WSL_INTEROP', '');
+      vi.stubEnv('DISPLAY', '');
+      vi.stubEnv('WAYLAND_DISPLAY', '');
+
+      const available = await service.isAvailable();
+
+      expect(available).toBe(true);
+      expect(mockKeytar.setPassword).toHaveBeenCalled();
+      expect(FileKeychain).not.toHaveBeenCalled();
     });
   });
 

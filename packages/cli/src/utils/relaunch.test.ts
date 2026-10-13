@@ -345,6 +345,29 @@ describe('relaunchAppInChildProcess', () => {
       // Should default to exit code 1
       expect(processExitSpy).toHaveBeenCalledWith(1);
     });
+
+    it('should set process.env.GEMINI_CLI_AUTH_OVERRIDE on auth-selected-type IPC message', async () => {
+      const mockChild = createMockChildProcess(0, false);
+      mockedSpawn.mockReturnValue(mockChild);
+
+      delete process.env['GEMINI_CLI_AUTH_OVERRIDE'];
+
+      // Start the runner
+      const relaunchPromise = relaunchAppInChildProcess([], []);
+
+      // Emit IPC message from child
+      mockChild.emit('message', {
+        type: 'auth-selected-type',
+        authType: 'login_with_google',
+      });
+
+      expect(process.env['GEMINI_CLI_AUTH_OVERRIDE']).toBe('login_with_google');
+
+      // Close child
+      mockChild.emit('close', 0);
+
+      await expect(relaunchPromise).rejects.toThrow('PROCESS_EXIT_CALLED');
+    });
   });
 });
 

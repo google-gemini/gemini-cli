@@ -77,6 +77,7 @@ type SelectionListAction =
     };
 
 const NUMBER_INPUT_TIMEOUT_MS = 1000;
+const CRLF_DEBOUNCE_MS = 50;
 
 /**
  * Helper function to find the next enabled index in a given direction, supporting wrapping.
@@ -304,6 +305,7 @@ export function useSelectionList<T>({
   });
   const numberInputRef = useRef('');
   const numberInputTimer = useRef<NodeJS.Timeout | null>(null);
+  const lastCarriageReturnTimeRef = useRef<number | null>(null);
 
   const prevBaseItemsRef = useRef(baseItems);
   const prevInitialIndexRef = useRef(initialIndex);
@@ -398,6 +400,21 @@ export function useSelectionList<T>({
         numberInputRef.current = '';
       }
 
+      const isTrailingLfOfCrlf =
+        sequence === '\n' &&
+        lastCarriageReturnTimeRef.current !== null &&
+        Date.now() - lastCarriageReturnTimeRef.current <= CRLF_DEBOUNCE_MS;
+      if (isTrailingLfOfCrlf) {
+        lastCarriageReturnTimeRef.current = null;
+        return true;
+      }
+
+      if (sequence === '\r') {
+        lastCarriageReturnTimeRef.current = Date.now();
+      } else {
+        lastCarriageReturnTimeRef.current = null;
+      }
+
       if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
         dispatch({ type: 'MOVE_UP' });
         return true;
@@ -408,7 +425,18 @@ export function useSelectionList<T>({
         return true;
       }
 
-      if (keyMatchers[Command.RETURN](key)) {
+      const isEnter =
+        keyMatchers[Command.RETURN](key) ||
+        (key.name === 'enter' && !key.ctrl && !key.alt && !key.cmd);
+      const isLinefeedConfirm = sequence === '\n' && !key.alt && !key.cmd;
+      const isSpaceConfirm =
+        (key.name === 'space' || sequence === ' ') &&
+        !key.ctrl &&
+        !key.alt &&
+        !key.shift &&
+        !key.cmd;
+
+      if (isEnter || isLinefeedConfirm || isSpaceConfirm) {
         dispatch({ type: 'SELECT_CURRENT' });
         return true;
       }

@@ -97,6 +97,7 @@ export * from './utils/path-validator.js';
 export * from './utils/atCommandUtils.js';
 export * from './utils/retry.js';
 export * from './utils/shell-utils.js';
+export * from './utils/security.js';
 export {
   PolicyDecision,
   ApprovalMode,

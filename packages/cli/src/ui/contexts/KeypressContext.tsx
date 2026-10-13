@@ -538,11 +538,24 @@ function* emitKeys(
         } else if (ch === '<') {
           // SGR mouse mode
           ch = yield;
-          sequence += ch;
           // Don't skip on empty string here to avoid timeouts on slow events.
           while (ch === '' || ch === ';' || (ch >= '0' && ch <= '9')) {
-            ch = yield;
             sequence += ch;
+            ch = yield;
+          }
+          if (ch === 'm' || ch === 'M') {
+            sequence += ch;
+          } else if (ch === '\x03') {
+            keypressHandler({
+              name: 'c',
+              ctrl: true,
+              shift: false,
+              alt: false,
+              cmd: false,
+              insertable: false,
+              sequence: '\x03',
+            });
+            continue;
           }
         } else if (ch === 'M') {
           // X11 mouse mode
@@ -855,12 +868,16 @@ export function KeypressProvider({
   useEffect(() => {
     terminalCapabilityManager.enableSupportedModes();
 
+    if (!stdin) {
+      return;
+    }
+
     const wasRaw = stdin.isRaw;
     if (wasRaw === false) {
       setRawMode(true);
     }
 
-    process.stdin.setEncoding('utf8'); // Make data events emit strings
+    stdin.setEncoding?.('utf8'); // Make data events emit strings
 
     let processor = nonKeyboardEventFilter(broadcast);
     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
@@ -881,6 +898,7 @@ export function KeypressProvider({
     }
 
     stdin.on('data', dataListener);
+    stdin.resume?.();
     return () => {
       stdin.removeListener('data', dataListener);
       if (wasRaw === false) {

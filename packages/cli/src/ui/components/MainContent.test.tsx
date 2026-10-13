@@ -9,12 +9,22 @@ import { createMockSettings } from '../../test-utils/settings.js';
 import { makeFakeConfig, CoreToolCallStatus } from '@google/gemini-cli-core';
 import { waitFor } from '../../test-utils/async.js';
 import { MainContent } from './MainContent.js';
+import { Composer } from './Composer.js';
 import { getToolGroupBorderAppearance } from '../utils/borderStyles.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Box, Text } from 'ink';
 import { act, useState, type JSX } from 'react';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { SHELL_COMMAND_NAME } from '../constants.js';
+
+const scrollableListMocks = vi.hoisted(() => ({
+  scrollToEnd: vi.fn(),
+  getScrollState: vi.fn(() => ({
+    scrollTop: 80,
+    scrollHeight: 100,
+    innerHeight: 20,
+  })),
+}));
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -85,23 +95,40 @@ vi.mock('./AppHeader.js', () => ({
   ),
 }));
 
-vi.mock('./shared/ScrollableList.js', () => ({
-  ScrollableList: ({
-    data,
-    renderItem,
-  }: {
-    data: unknown[];
-    renderItem: (props: { item: unknown }) => JSX.Element;
-  }) => (
-    <Box flexDirection="column">
-      <Text>ScrollableList</Text>
-      {data.map((item: unknown, index: number) => (
-        <Box key={index}>{renderItem({ item })}</Box>
-      ))}
-    </Box>
-  ),
-  SCROLL_TO_ITEM_END: 0,
-}));
+vi.mock('./shared/ScrollableList.js', async () => {
+  const { forwardRef, useImperativeHandle } =
+    await vi.importActual<typeof import('react')>('react');
+  const ScrollableList = forwardRef(
+    (
+      {
+        data,
+        renderItem,
+      }: {
+        data: unknown[];
+        renderItem: (props: { item: unknown }) => JSX.Element;
+      },
+      ref,
+    ) => {
+      useImperativeHandle(ref, () => ({
+        scrollToEnd: scrollableListMocks.scrollToEnd,
+        getScrollState: scrollableListMocks.getScrollState,
+      }));
+      return (
+        <Box flexDirection="column">
+          <Text>ScrollableList</Text>
+          {data.map((item: unknown, index: number) => (
+            <Box key={index}>{renderItem({ item })}</Box>
+          ))}
+        </Box>
+      );
+    },
+  );
+  ScrollableList.displayName = 'ScrollableList';
+  return {
+    ScrollableList,
+    SCROLL_TO_ITEM_END: 0,
+  };
+});
 
 import { theme } from '../semantic-colors.js';
 import { type BackgroundTask } from '../hooks/shellReducer.js';
@@ -928,5 +955,240 @@ describe('MainContent', () => {
         unmount();
       },
     );
+  });
+
+  describe('Scroll position preservation and dynamic height partitioning', () => {
+    beforeEach(() => {
+      scrollableListMocks.scrollToEnd.mockClear();
+      scrollableListMocks.getScrollState.mockReset();
+      vi.mocked(useConfirmingTool).mockReturnValue(null);
+      mockUseSettings.mockReturnValue(
+        createMockSettings({
+          security: { enablePermanentToolApproval: true },
+          ui: { errorVerbosity: 'full' },
+        }),
+      );
+    });
+
+    it('calls scrollToEnd when tool confirmation arrives and user is at the bottom', async () => {
+      vi.mocked(useAlternateBuffer).mockReturnValue(true);
+      scrollableListMocks.getScrollState.mockReturnValue({
+        scrollTop: 80,
+        scrollHeight: 100,
+        innerHeight: 20,
+      });
+
+      const confirmingTool = {
+        tool: {
+          callId: 'call-bottom',
+          name: SHELL_COMMAND_NAME,
+          description: 'echo test',
+          status: CoreToolCallStatus.AwaitingApproval,
+          confirmationDetails: {
+            type: 'exec' as const,
+            title: 'Confirm Shell',
+            command: 'echo test',
+            rootCommand: 'echo',
+            rootCommands: ['echo'],
+          },
+        },
+        index: 1,
+        total: 1,
+      };
+      vi.mocked(useConfirmingTool).mockReturnValue(
+        confirmingTool as unknown as ConfirmingToolState,
+      );
+
+      const { unmount } = await renderWithProviders(<MainContent />, {
+        uiState: defaultMockUiState as Partial<UIState>,
+        config: makeFakeConfig({ useAlternateBuffer: true }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+      });
+
+      expect(scrollableListMocks.getScrollState).toHaveBeenCalled();
+      expect(scrollableListMocks.scrollToEnd).toHaveBeenCalledTimes(1);
+      unmount();
+    });
+
+    it('preserves scroll position and does not call scrollToEnd when user has scrolled up', async () => {
+      vi.mocked(useAlternateBuffer).mockReturnValue(true);
+      scrollableListMocks.getScrollState.mockReturnValue({
+        scrollTop: 30,
+        scrollHeight: 100,
+        innerHeight: 20,
+      });
+
+      const confirmingTool = {
+        tool: {
+          callId: 'call-scrolled-up',
+          name: SHELL_COMMAND_NAME,
+          description: 'echo test',
+          status: CoreToolCallStatus.AwaitingApproval,
+          confirmationDetails: {
+            type: 'exec' as const,
+            title: 'Confirm Shell',
+            command: 'echo test',
+            rootCommand: 'echo',
+            rootCommands: ['echo'],
+          },
+        },
+        index: 1,
+        total: 1,
+      };
+      vi.mocked(useConfirmingTool).mockReturnValue(
+        confirmingTool as unknown as ConfirmingToolState,
+      );
+
+      const { unmount } = await renderWithProviders(<MainContent />, {
+        uiState: defaultMockUiState as Partial<UIState>,
+        config: makeFakeConfig({ useAlternateBuffer: true }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+      });
+
+      expect(scrollableListMocks.getScrollState).toHaveBeenCalled();
+      expect(scrollableListMocks.scrollToEnd).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('preserves scroll position when rendered alongside Composer during a pending tool confirmation', async () => {
+      vi.mocked(useAlternateBuffer).mockReturnValue(true);
+      scrollableListMocks.getScrollState.mockReturnValue({
+        scrollTop: 30,
+        scrollHeight: 100,
+        innerHeight: 20,
+      });
+
+      const confirmingTool = {
+        tool: {
+          callId: 'call-composer-scrolled-up',
+          name: SHELL_COMMAND_NAME,
+          description: 'echo test',
+          status: CoreToolCallStatus.AwaitingApproval,
+          resultDisplay: undefined,
+          confirmationDetails: {
+            type: 'exec' as const,
+            title: 'Confirm Shell',
+            command: 'echo test',
+            rootCommand: 'echo',
+            rootCommands: ['echo'],
+          },
+        },
+        index: 1,
+        total: 1,
+      };
+      vi.mocked(useConfirmingTool).mockReturnValue(
+        confirmingTool as unknown as ConfirmingToolState,
+      );
+
+      const uiStateWithPendingTool = {
+        ...defaultMockUiState,
+        activeHooks: [],
+        sessionStats: {
+          sessionId: 'test-session',
+          sessionStartTime: new Date(),
+          metrics: {} as never,
+          lastPromptTokenCount: 0,
+          promptCount: 0,
+        },
+        pendingHistoryItems: [
+          {
+            type: 'tool_group' as const,
+            id: -1,
+            tools: [confirmingTool.tool],
+          },
+        ],
+      };
+
+      const { unmount } = await renderWithProviders(
+        <>
+          <MainContent />
+          <Composer />
+        </>,
+        {
+          uiState: uiStateWithPendingTool as Partial<UIState>,
+          config: makeFakeConfig({ useAlternateBuffer: true }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+        },
+      );
+
+      expect(scrollableListMocks.getScrollState).toHaveBeenCalled();
+      expect(scrollableListMocks.scrollToEnd).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('partitions availableTerminalHeight between pendingHistoryItems and ToolConfirmationQueue in standard buffer mode', async () => {
+      vi.mocked(useAlternateBuffer).mockReturnValue(false);
+
+      const longDiff = '@@ -1,1 +1,40 @@\n' + '+added line\n'.repeat(40);
+      const confirmingTool = {
+        tool: {
+          callId: 'call-partition',
+          name: 'replace',
+          description: 'Editing src/app.ts',
+          status: CoreToolCallStatus.AwaitingApproval,
+          confirmationDetails: {
+            type: 'edit' as const,
+            title: 'Confirm edit',
+            fileName: 'app.ts',
+            filePath: '/src/app.ts',
+            fileDiff: longDiff,
+            originalContent: 'old',
+            newContent: 'new',
+          },
+        },
+        index: 1,
+        total: 1,
+      };
+      vi.mocked(useConfirmingTool).mockReturnValue(
+        confirmingTool as unknown as ConfirmingToolState,
+      );
+
+      const uiState = {
+        ...defaultMockUiState,
+        history: [{ id: 1, type: 'user' as const, text: 'Update file' }],
+        pendingHistoryItems: [
+          {
+            type: 'tool_group' as const,
+            id: -1,
+            tools: [
+              {
+                callId: 'call-shell',
+                name: SHELL_COMMAND_NAME,
+                status: CoreToolCallStatus.Executing,
+                description: 'Running build...',
+                resultDisplay: Array.from(
+                  { length: 20 },
+                  (_, i) => `Build output line ${i + 1}`,
+                ).join('\n'),
+                ptyId: 789,
+                confirmationDetails: undefined,
+              },
+            ],
+          },
+        ],
+        availableTerminalHeight: 20,
+        terminalHeight: 24,
+        constrainHeight: true,
+      };
+
+      const { lastFrame, unmount } = await renderWithProviders(
+        <MainContent />,
+        {
+          uiState: uiState as Partial<UIState>,
+          config: makeFakeConfig({ useAlternateBuffer: false }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
+        },
+      );
+
+      await waitFor(() => {
+        const output = lastFrame();
+        expect(output).toContain('Build output line 20');
+        expect(output).toContain('Editing src/app.ts');
+      });
+
+      const renderedLines = lastFrame().split('\n').length;
+      expect(renderedLines).toBeLessThanOrEqual(uiState.terminalHeight);
+      unmount();
+    });
   });
 });

@@ -12,6 +12,8 @@ import {
   NEVER_ALLOWED_VALUE_PATTERNS,
   sanitizeEnvironment,
   getSecureSanitizationConfig,
+  isDangerousExecutionEnvironmentVariable,
+  BLOCKED_EXECUTION_ENVS,
 } from './environmentSanitization.js';
 
 const EMPTY_OPTIONS = {
@@ -448,5 +450,76 @@ describe('getSecureSanitizationConfig', () => {
     const config = getSecureSanitizationConfig(requestedConfig);
 
     expect(config.enableEnvironmentVariableRedaction).toBe(false);
+  });
+});
+
+describe('isDangerousExecutionEnvironmentVariable', () => {
+  it('should identify dangerous environment variables case-insensitively', () => {
+    expect(isDangerousExecutionEnvironmentVariable('NODE_OPTIONS')).toBe(true);
+    expect(isDangerousExecutionEnvironmentVariable('node_options')).toBe(true);
+    expect(isDangerousExecutionEnvironmentVariable('LD_PRELOAD')).toBe(true);
+    expect(isDangerousExecutionEnvironmentVariable('ld_preload')).toBe(true);
+    expect(isDangerousExecutionEnvironmentVariable('DYLD_LIBRARY_PATH')).toBe(
+      true,
+    );
+    expect(isDangerousExecutionEnvironmentVariable('BASH_ENV')).toBe(true);
+    expect(isDangerousExecutionEnvironmentVariable('PERL5DB')).toBe(true);
+    expect(isDangerousExecutionEnvironmentVariable('JAVA_TOOL_OPTIONS')).toBe(
+      true,
+    );
+    expect(isDangerousExecutionEnvironmentVariable('java_tool_options')).toBe(
+      true,
+    );
+    expect(
+      isDangerousExecutionEnvironmentVariable('DOTNET_STARTUP_HOOKS'),
+    ).toBe(true);
+  });
+
+  it('should identify safe environment variables as not dangerous', () => {
+    expect(isDangerousExecutionEnvironmentVariable('PATH')).toBe(false);
+    expect(isDangerousExecutionEnvironmentVariable('SAFE_VAR')).toBe(false);
+    expect(isDangerousExecutionEnvironmentVariable('GEMINI_CLI_KEY')).toBe(
+      false,
+    );
+  });
+
+  it('should contain all recommended dangerous variables in BLOCKED_EXECUTION_ENVS', () => {
+    const expectedBlocked = [
+      'NODE_OPTIONS',
+      'NODE_CLI_FLAGS',
+      '_FORCE_NODE_OPTIONS',
+      'NODE_PATH',
+      'ELECTRON_RUN_AS_NODE',
+      'PYTHONPATH',
+      'PYTHONSTARTUP',
+      'RUBYOPT',
+      'RUBYLIB',
+      'PERL5OPT',
+      'PERL5LIB',
+      'LD_PRELOAD',
+      'LD_AUDIT',
+      'LD_DEBUG',
+      'LD_PROFILE',
+      'LD_LIBRARY_PATH',
+      'DYLD_INSERT_LIBRARIES',
+      'DYLD_FORCE_FLAT_NAMESPACE',
+      'DYLD_LIBRARY_PATH',
+      'DYLD_FRAMEWORK_PATH',
+      'DYLD_FALLBACK_LIBRARY_PATH',
+      'DYLD_FALLBACK_FRAMEWORK_PATH',
+      'BASH_ENV',
+      'ENV',
+      'PERL5DB',
+      'JAVA_TOOL_OPTIONS',
+      '_JAVA_OPTIONS',
+      'CLASSPATH',
+      'DOTNET_STARTUP_HOOKS',
+      'CORECLR_PROFILER_PATH',
+      'CORECLR_ENABLE_PROFILING',
+    ];
+
+    for (const key of expectedBlocked) {
+      expect(BLOCKED_EXECUTION_ENVS.has(key)).toBe(true);
+    }
   });
 });

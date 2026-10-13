@@ -17,36 +17,6 @@ import {
 
 // --- Global Entry Point ---
 
-// Suppress known race condition error in node-pty on Windows and Linux
-// Tracking bug: https://github.com/microsoft/node-pty/issues/827
-process.on('uncaughtException', (error) => {
-  if (error instanceof Error) {
-    const message = error.message || '';
-    const isPtyResizeError =
-      message === 'Cannot resize a pty that has already exited';
-    const isEbadfError =
-      message.includes('EBADF') ||
-      (error as { code?: string }).code === 'EBADF';
-    const isFromNodePty =
-      error.stack?.includes('node-pty') || error.stack?.includes('PtyResize');
-
-    if ((isPtyResizeError || isEbadfError) && isFromNodePty) {
-      // This error happens with node-pty when resizing a pty that has just exited.
-      // It is a race condition in node-pty that we cannot prevent, so we silence it.
-      return;
-    }
-  }
-
-  // For other errors, we rely on the default behavior, but since we attached a listener,
-  // we must manually replicate it.
-  if (error instanceof Error) {
-    process.stderr.write(error.stack + '\n');
-  } else {
-    process.stderr.write(String(error) + '\n');
-  }
-  process.exit(1);
-});
-
 async function getMemoryNodeArgs(): Promise<string[]> {
   let autoConfigureMemory = true;
   try {
@@ -106,15 +76,26 @@ async function run() {
         env: newEnv,
       });
 
+      // Clear one-time auth override from supervisor environment after passing to child
+      delete process.env['GEMINI_CLI_AUTH_OVERRIDE'];
+      delete newEnv['GEMINI_CLI_AUTH_OVERRIDE'];
+
       if (latestAdminSettings) {
         child.send({ type: 'admin-settings', settings: latestAdminSettings });
       }
 
-      child.on('message', (msg: { type?: string; settings?: unknown }) => {
-        if (msg.type === 'admin-settings-update' && msg.settings) {
-          latestAdminSettings = msg.settings;
-        }
-      });
+      child.on(
+        'message',
+        (msg: { type?: string; settings?: unknown; authType?: string }) => {
+          if (msg.type === 'admin-settings-update' && msg.settings) {
+            latestAdminSettings = msg.settings;
+          }
+          if (msg.type === 'auth-selected-type' && msg.authType) {
+            process.env['GEMINI_CLI_AUTH_OVERRIDE'] = msg.authType;
+            newEnv['GEMINI_CLI_AUTH_OVERRIDE'] = msg.authType;
+          }
+        },
+      );
 
       return new Promise<number>((resolve) => {
         child.on('error', (err) => {

@@ -32,7 +32,15 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { isRecord } from '../utils/markdownUtils.js';
 import type { CheckerRunner } from '../safety/checker-runner.js';
 import { SafetyCheckDecision } from '../safety/protocol.js';
-import { getToolAliases, AGENT_TOOL_NAME } from '../tools/tool-names.js';
+import {
+  isBuildFile,
+  extractFilePathFromArgs,
+} from '../utils/buildFileUtils.js';
+import {
+  getToolAliases,
+  AGENT_TOOL_NAME,
+  EDIT_TOOL_NAMES,
+} from '../tools/tool-names.js';
 import { PARAM_ADDITIONAL_PERMISSIONS } from '../tools/definitions/base-declarations.js';
 import {
   MCP_TOOL_PREFIX,
@@ -329,9 +337,15 @@ export class PolicyEngine {
   private shouldDowngradeForRedirection(
     command: string,
     allowRedirection?: boolean,
+    rule?: PolicyRule,
   ): boolean {
     if (allowRedirection) return false;
     if (!hasRedirection(command)) return false;
+
+    // Require explicit allowRedirection when matching a command-prefix rule.
+    if (rule?.argsPattern && !allowRedirection) {
+      return true;
+    }
 
     // Do not downgrade (do not ask user) if in AUTO_EDIT or YOLO mode.
     // These modes trust the agent's actions (YOLO) or specific task (AUTO_EDIT).
@@ -351,6 +365,7 @@ export class PolicyEngine {
   private async applyShellHeuristics(
     command: string,
     decision: PolicyDecision,
+    dir_path?: string,
   ): Promise<PolicyDecision> {
     if (decision === PolicyDecision.DENY) {
       return PolicyDecision.DENY;
@@ -360,6 +375,25 @@ export class PolicyEngine {
       const parsedObjArgs = shellParse(command);
       const parsedArgs = parsedObjArgs.map(extractStringFromParseEntry);
 
+      const workspace =
+        typeof this.sandboxManager.getWorkspace === 'function'
+          ? this.sandboxManager.getWorkspace()
+          : process.cwd();
+      const effectiveCwd = dir_path
+        ? path.resolve(workspace, dir_path)
+        : workspace;
+
+      if (
+        effectiveCwd !== workspace &&
+        !isSubpath(workspace, effectiveCwd) &&
+        this.approvalMode !== ApprovalMode.YOLO
+      ) {
+        debugLogger.debug(
+          `[PolicyEngine.check] Command working directory is outside workspace, forcing ASK_USER: ${command}`,
+        );
+        return PolicyDecision.ASK_USER;
+      }
+
       if (containsGitCommand(parsedArgs) && !this.isTrustedFolder()) {
         debugLogger.debug(
           `[PolicyEngine.check] Git command evaluated in untrusted workspace. Forcing ASK_USER: ${command}`,
@@ -367,7 +401,7 @@ export class PolicyEngine {
         return PolicyDecision.ASK_USER;
       }
 
-      if (this.sandboxManager.isDangerousCommand(parsedArgs)) {
+      if (this.sandboxManager.isDangerousCommand(parsedArgs, effectiveCwd)) {
         if (this.approvalMode === ApprovalMode.YOLO) {
           debugLogger.debug(
             `[PolicyEngine.check] Command evaluated as dangerous, but YOLO mode is active. Preserving decision: ${command}`,
@@ -382,9 +416,16 @@ export class PolicyEngine {
       }
 
       if (
-        this.sandboxManager.isKnownSafeCommand(parsedArgs) &&
+        this.sandboxManager.isKnownSafeCommand(parsedArgs, effectiveCwd) &&
         decision === PolicyDecision.ASK_USER
       ) {
+        if (effectiveCwd !== workspace && !isSubpath(workspace, effectiveCwd)) {
+          debugLogger.debug(
+            `[PolicyEngine.check] dir_path evaluated outside workspace. Preserving ASK_USER: ${command}`,
+          );
+          return PolicyDecision.ASK_USER;
+        }
+
         if (containsGitCommand(parsedArgs) && !this.isTrustedFolder()) {
           debugLogger.debug(
             `[PolicyEngine.check] Known safe Git command evaluated in untrusted workspace. Preserving ASK_USER: ${command}`,
@@ -413,6 +454,7 @@ export class PolicyEngine {
     rule?: PolicyRule,
     toolAnnotations?: Record<string, unknown>,
     subagent?: string,
+    hasTopLevelHeuristicDowngrade = false,
   ): Promise<CheckResult> {
     if (!command) {
       return {
@@ -476,7 +518,12 @@ export class PolicyEngine {
 
     // Check for redirection on the full command string.
     // Redirection always downgrades ALLOW to ASK_USER (it never upgrades).
-    if (this.shouldDowngradeForRedirection(command, allowRedirection)) {
+    const hasTopLevelRedirectionDowngrade = this.shouldDowngradeForRedirection(
+      command,
+      allowRedirection,
+      rule,
+    );
+    if (hasTopLevelRedirectionDowngrade) {
       if (aggregateDecision === PolicyDecision.ALLOW) {
         debugLogger.debug(
           `[PolicyEngine.check] Downgrading ALLOW to ASK_USER for redirected command: ${command}`,
@@ -485,6 +532,10 @@ export class PolicyEngine {
         responsibleRule = undefined; // Inherent policy
       }
     }
+
+    let evaluatedSubCommands = 0;
+    let allSubCommandsExplicitlyAllowed = true;
+    let lastAllowedSubRule: PolicyRule | undefined;
 
     for (const detail of subCommands) {
       if (REDIRECTION_NAMES.has(detail.name)) {
@@ -499,6 +550,7 @@ export class PolicyEngine {
       // Recursive check for shell wrappers (bash -c, etc.)
       const stripped = stripShellWrapper(subCmd);
       if (stripped !== subCmd) {
+        evaluatedSubCommands++;
         const wrapperResult = await this.check(
           { name: toolName, args: { command: stripped, dir_path } },
           serverName,
@@ -510,16 +562,26 @@ export class PolicyEngine {
         if (wrapperResult.decision === PolicyDecision.DENY)
           return wrapperResult;
         if (wrapperResult.decision === PolicyDecision.ASK_USER) {
+          allSubCommandsExplicitlyAllowed = false;
           if (aggregateDecision === PolicyDecision.ALLOW) {
             responsibleRule = wrapperResult.rule;
           } else {
             responsibleRule ??= wrapperResult.rule;
           }
           aggregateDecision = PolicyDecision.ASK_USER;
+        } else if (
+          wrapperResult.decision === PolicyDecision.ALLOW &&
+          wrapperResult.rule?.decision === PolicyDecision.ALLOW &&
+          Boolean(wrapperResult.rule?.argsPattern)
+        ) {
+          lastAllowedSubRule = wrapperResult.rule;
+        } else {
+          allSubCommandsExplicitlyAllowed = false;
         }
       }
 
       if (!isAtomic) {
+        evaluatedSubCommands++;
         const subResult = await this.check(
           { name: toolName, args: { command: subCmd, dir_path } },
           serverName,
@@ -531,6 +593,7 @@ export class PolicyEngine {
         if (subResult.decision === PolicyDecision.DENY) return subResult;
 
         if (subResult.decision === PolicyDecision.ASK_USER) {
+          allSubCommandsExplicitlyAllowed = false;
           if (aggregateDecision === PolicyDecision.ALLOW) {
             responsibleRule = subResult.rule;
           } else {
@@ -542,14 +605,67 @@ export class PolicyEngine {
         // Downgrade if sub-command has redirection
         if (
           subResult.decision === PolicyDecision.ALLOW &&
-          this.shouldDowngradeForRedirection(subCmd, allowRedirection)
+          this.shouldDowngradeForRedirection(
+            subCmd,
+            subResult.rule?.allowRedirection ?? allowRedirection,
+            subResult.rule,
+          )
         ) {
+          allSubCommandsExplicitlyAllowed = false;
           if (aggregateDecision === PolicyDecision.ALLOW) {
             aggregateDecision = PolicyDecision.ASK_USER;
             responsibleRule = undefined;
           }
+        } else if (
+          subResult.decision === PolicyDecision.ALLOW &&
+          subResult.rule?.decision === PolicyDecision.ALLOW &&
+          Boolean(subResult.rule?.argsPattern)
+        ) {
+          lastAllowedSubRule = subResult.rule;
+        } else {
+          allSubCommandsExplicitlyAllowed = false;
         }
+      } else if (stripped === subCmd) {
+        allSubCommandsExplicitlyAllowed = false;
       }
+    }
+
+    const workspace =
+      typeof this.sandboxManager.getWorkspace === 'function'
+        ? this.sandboxManager.getWorkspace()
+        : process.cwd();
+    const effectiveCwd = dir_path
+      ? path.resolve(workspace, dir_path)
+      : workspace;
+    const isOutsideWorkspace =
+      effectiveCwd !== workspace &&
+      !isSubpath(workspace, effectiveCwd) &&
+      this.approvalMode !== ApprovalMode.YOLO;
+    const parsedObjArgs = shellParse(command);
+    const parsedArgs = parsedObjArgs.map(extractStringFromParseEntry);
+    const isUntrustedGit =
+      containsGitCommand(parsedArgs) && !this.isTrustedFolder();
+    const isDangerous =
+      this.approvalMode !== ApprovalMode.YOLO &&
+      this.sandboxManager.isDangerousCommand(parsedArgs, effectiveCwd);
+
+    // If the top-level compound command (e.g. a `for` loop or subshell) fell through
+    // to a catch-all ASK_USER rule without an argsPattern, but every decomposed
+    // sub-command explicitly matched an ALLOW rule with an argsPattern without redirection,
+    // and neither workspace boundary nor trust constraints are violated, upgrade to ALLOW.
+    if (
+      aggregateDecision === PolicyDecision.ASK_USER &&
+      !rule?.argsPattern &&
+      !hasTopLevelRedirectionDowngrade &&
+      !hasTopLevelHeuristicDowngrade &&
+      !isOutsideWorkspace &&
+      !isUntrustedGit &&
+      !isDangerous &&
+      evaluatedSubCommands > 0 &&
+      allSubCommandsExplicitlyAllowed
+    ) {
+      aggregateDecision = PolicyDecision.ALLOW;
+      responsibleRule = lastAllowedSubRule;
     }
 
     return {
@@ -660,6 +776,7 @@ export class PolicyEngine {
         );
 
         let ruleDecision = rule.decision;
+        let hasTopLevelHeuristicDowngrade = false;
         if (
           !skipHeuristics &&
           isShellCommand &&
@@ -667,7 +784,18 @@ export class PolicyEngine {
           !('commandPrefix' in rule) &&
           !rule.argsPattern
         ) {
-          ruleDecision = await this.applyShellHeuristics(command, ruleDecision);
+          const prevDecision = ruleDecision;
+          ruleDecision = await this.applyShellHeuristics(
+            command,
+            ruleDecision,
+            shellDirPath,
+          );
+          if (
+            prevDecision === PolicyDecision.ALLOW &&
+            ruleDecision === PolicyDecision.ASK_USER
+          ) {
+            hasTopLevelHeuristicDowngrade = true;
+          }
         }
 
         if (isShellCommand && toolName) {
@@ -681,6 +809,7 @@ export class PolicyEngine {
             rule,
             toolAnnotations,
             subagent,
+            hasTopLevelHeuristicDowngrade,
           );
           decision = shellResult.decision;
           matchedRule = shellResult.rule;
@@ -699,38 +828,46 @@ export class PolicyEngine {
         debugLogger.debug(
           `[PolicyEngine.check] NO MATCH in YOLO mode - using ALLOW`,
         );
-        return {
-          decision: PolicyDecision.ALLOW,
-        };
-      }
+        decision = PolicyDecision.ALLOW;
+      } else {
+        debugLogger.debug(
+          `[PolicyEngine.check] NO MATCH - using default decision: ${this.defaultDecision}`,
+        );
+        if (toolName && SHELL_TOOL_NAMES.includes(toolName)) {
+          let heuristicDecision = this.defaultDecision;
+          let hasTopLevelHeuristicDowngrade = false;
+          if (!skipHeuristics && command) {
+            const prevDecision = heuristicDecision;
+            heuristicDecision = await this.applyShellHeuristics(
+              command,
+              heuristicDecision,
+              shellDirPath,
+            );
+            if (
+              prevDecision === PolicyDecision.ALLOW &&
+              heuristicDecision === PolicyDecision.ASK_USER
+            ) {
+              hasTopLevelHeuristicDowngrade = true;
+            }
+          }
 
-      debugLogger.debug(
-        `[PolicyEngine.check] NO MATCH - using default decision: ${this.defaultDecision}`,
-      );
-      if (toolName && SHELL_TOOL_NAMES.includes(toolName)) {
-        let heuristicDecision = this.defaultDecision;
-        if (!skipHeuristics && command) {
-          heuristicDecision = await this.applyShellHeuristics(
+          const shellResult = await this.checkShellCommand(
+            toolName,
             command,
             heuristicDecision,
+            serverName,
+            shellDirPath,
+            false,
+            undefined,
+            toolAnnotations,
+            subagent,
+            hasTopLevelHeuristicDowngrade,
           );
+          decision = shellResult.decision;
+          matchedRule = shellResult.rule;
+        } else {
+          decision = this.defaultDecision;
         }
-
-        const shellResult = await this.checkShellCommand(
-          toolName,
-          command,
-          heuristicDecision,
-          serverName,
-          shellDirPath,
-          false,
-          undefined,
-          toolAnnotations,
-          subagent,
-        );
-        decision = shellResult.decision;
-        matchedRule = shellResult.rule;
-      } else {
-        decision = this.defaultDecision;
       }
     }
 
@@ -760,6 +897,61 @@ export class PolicyEngine {
             decision = PolicyDecision.ASK_USER;
             break;
           }
+        }
+      }
+
+      // Build File Protection: Always require user confirmation when modifying build configuration files
+      const isFileEditTool = toolNamesToTry.some((name) => {
+        if (
+          EDIT_TOOL_NAMES.has(name) ||
+          name === 'replace' ||
+          name === 'write_file'
+        ) {
+          return true;
+        }
+        const editKeywords = new Set([
+          'write',
+          'edit',
+          'replace',
+          'patch',
+          'update',
+          'create',
+          'append',
+          'save',
+        ]);
+        const tokens = name.toLowerCase().split(/[^a-z0-9]+/);
+        return tokens.some((token) => editKeywords.has(token));
+      });
+      if (isFileEditTool) {
+        let targetPath = extractFilePathFromArgs(toolCall.args);
+        if (targetPath) {
+          targetPath = targetPath.trim();
+          if (process.platform === 'win32') {
+            let end = targetPath.length;
+            while (
+              end > 0 &&
+              (targetPath[end - 1] === '.' || targetPath[end - 1] === ' ')
+            ) {
+              end--;
+            }
+            targetPath = targetPath.slice(0, end);
+          }
+        }
+        if (targetPath && isBuildFile(targetPath)) {
+          debugLogger.debug(
+            `[PolicyEngine.check] Target path '${targetPath}' is a build file. Downgrading to ASK_USER.`,
+          );
+          decision = this.nonInteractive
+            ? PolicyDecision.DENY
+            : PolicyDecision.ASK_USER;
+          matchedRule = {
+            toolName: toolCall.name ?? 'replace',
+            decision,
+            priority: Number.MAX_SAFE_INTEGER,
+            source: 'Build File Protection',
+            denyMessage:
+              'Modifying build configuration files requires explicit user confirmation',
+          };
         }
       }
     }
@@ -813,6 +1005,10 @@ export class PolicyEngine {
           }
         }
       }
+    }
+
+    if (this.nonInteractive && decision === PolicyDecision.ASK_USER) {
+      decision = PolicyDecision.DENY;
     }
 
     return {

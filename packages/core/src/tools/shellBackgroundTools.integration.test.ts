@@ -10,6 +10,7 @@ import {
   ListBackgroundProcessesTool,
   ReadBackgroundOutputTool,
 } from './shellBackgroundTools.js';
+import { ShellTool } from './shell.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { NoopSandboxManager } from '../services/sandboxManager.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
@@ -119,5 +120,70 @@ describe('Background Tools Integration', () => {
     // Cleanup
     await ShellExecutionService.kill(pid);
     controller.abort();
+  });
+
+  it('should delete the temporary directory when a short-lived background shell command exits', async () => {
+    const scriptPath = path.join(tempRootDir, 'short-bg.js');
+    fs.writeFileSync(scriptPath, 'setTimeout(() => process.exit(0), 400);');
+
+    const mockContext = {
+      config: {
+        getSessionId: () => 'default',
+        getTargetDir: () => tempRootDir,
+        validatePathAccess: () => null,
+        getShellToolInactivityTimeout: () => 5000,
+        isInteractiveShellEnabled: () => false,
+        getEnableShellOutputEfficiency: () => true,
+        getSandboxEnabled: () => false,
+        getShellBackgroundCompletionBehavior: () => 'silent',
+        getSummarizeToolOutputConfig: () => undefined,
+        getDebugMode: () => false,
+        sanitizationConfig: {
+          allowedEnvironmentVariables: [],
+          blockedEnvironmentVariables: [],
+          enableEnvironmentVariableRedaction: false,
+        },
+        sandboxManager: new NoopSandboxManager(),
+      },
+    } as unknown as AgentLoopContext;
+
+    const shellTool = new ShellTool(mockContext, bus);
+    const invocation = shellTool.build({
+      command: `node "${scriptPath}"`,
+      is_background: true,
+      delay_ms: 100,
+    });
+
+    let assignedPid: number | undefined;
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+      setExecutionIdCallback: (pid) => {
+        assignedPid = pid;
+      },
+    });
+
+    expect(result.llmContent).toContain('Command moved to background');
+    expect(assignedPid).toBeDefined();
+
+    const history = (
+      ShellExecutionService as unknown as {
+        backgroundProcessHistory: Map<
+          string,
+          Map<number, { status: string; tempDir?: string }>
+        >;
+      }
+    ).backgroundProcessHistory.get('default');
+    const record = history?.get(assignedPid!);
+    expect(record?.tempDir).toBeDefined();
+    expect(record?.tempDir).toContain('gemini-shell-');
+    expect(fs.existsSync(record!.tempDir!)).toBe(true);
+
+    await vi.waitFor(
+      () => {
+        expect(record?.status).toBe('exited');
+        expect(fs.existsSync(record!.tempDir!)).toBe(false);
+      },
+      { timeout: 5000 },
+    );
   });
 });
