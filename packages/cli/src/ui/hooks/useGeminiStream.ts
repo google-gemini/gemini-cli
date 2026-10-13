@@ -931,7 +931,7 @@ export const useGeminiStream = (
               (tc.status === CoreToolCallStatus.Success ||
                 tc.status === CoreToolCallStatus.Error ||
                 tc.status === CoreToolCallStatus.Cancelled) &&
-              tc.response?.responseParts?.length > 0
+              (tc.response?.responseParts?.length ?? 0) > 0
             ) {
               synthesizedCalls.push(tc as CompletedToolCall);
             } else {
