@@ -80,6 +80,32 @@ describe('planUtils', () => {
       expect(result).toContain('Plan file is empty');
     });
 
+    it('should return error for whitespace-only content in a UTF-16 file with a BOM', async () => {
+      const planPath = path.join(plansDir, 'utf16-empty.md');
+      fs.writeFileSync(
+        planPath,
+        Buffer.concat([
+          Buffer.from([0xff, 0xfe]),
+          Buffer.from(' \n\t', 'utf16le'),
+        ]),
+      );
+      const result = await validatePlanContent(planPath);
+      expect(result).toContain('Plan file is empty');
+    });
+
+    it('should return null for non-empty content in a UTF-16 file with a BOM', async () => {
+      const planPath = path.join(plansDir, 'utf16-full.md');
+      fs.writeFileSync(
+        planPath,
+        Buffer.concat([
+          Buffer.from([0xff, 0xfe]),
+          Buffer.from('# My Plan', 'utf16le'),
+        ]),
+      );
+      const result = await validatePlanContent(planPath);
+      expect(result).toBeNull();
+    });
+
     it('should return error for unreadable file', async () => {
       const planPath = path.join(plansDir, 'ghost.md');
       const result = await validatePlanContent(planPath);
