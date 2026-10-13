@@ -107,6 +107,12 @@ export const PREVIEW_GEMINI_FLASH_LITE_MODEL = 'none';
 export const GEMMA_4_31B_IT_MODEL = 'gemma-4-31b-it';
 export const GEMMA_4_26B_A4B_IT_MODEL = 'gemma-4-26b-a4b-it';
 
+/**
+ * Gemini 4 flagship. Served by Agent Platform (Vertex AI); backends that do
+ * not carry it reject it with a clear "model not found" error.
+ */
+export const GEMINI_4_ARGON_MODEL = 'gemini-4-argon';
+
 export const VALID_GEMINI_MODELS = new Set([
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
@@ -126,6 +132,7 @@ export const VALID_GEMINI_MODELS = new Set([
 
   GEMMA_4_31B_IT_MODEL,
   GEMMA_4_26B_A4B_IT_MODEL,
+  GEMINI_4_ARGON_MODEL,
 ]);
 
 export interface BackendMappingContext {
