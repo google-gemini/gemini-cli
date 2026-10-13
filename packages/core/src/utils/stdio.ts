@@ -106,6 +106,8 @@ const STANDALONE_MODE_SEQUENCES = new Set([
   HIDE_CURSOR_SEQ,
   '\x1b[?7l',
   '\x1b[?7h',
+  '\x1b[?1004h',
+  '\x1b[?1004l',
   '\x1b[?1049h',
   '\x1b[?1049l',
 ]);
@@ -117,7 +119,12 @@ const STANDALONE_MODE_SEQUENCES = new Set([
  * Non-supporting ANSI terminals silently ignore Mode 2026 without printing stray characters.
  */
 export function wrapWithSynchronizedOutput(chunk: string): string {
-  if (!chunk || STANDALONE_MODE_SEQUENCES.has(chunk)) {
+  if (
+    !chunk ||
+    STANDALONE_MODE_SEQUENCES.has(chunk) ||
+    (chunk.startsWith('\x1b]') &&
+      (chunk.endsWith('\x07') || chunk.endsWith('\x1b\\')))
+  ) {
     return chunk;
   }
   if (isDumbTerminal()) {
