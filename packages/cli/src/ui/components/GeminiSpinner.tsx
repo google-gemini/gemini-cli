@@ -8,8 +8,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Text, useIsScreenReaderEnabled } from 'ink';
 import { CliSpinner, TMUX_SPINNER_INTERVAL_MS } from './CliSpinner.js';
 import type { SpinnerName } from 'cli-spinners';
+import { isTmux } from '@google/gemini-cli-core';
 import { Colors } from '../colors.js';
-import { IS_TMUX } from '../../utils/env.js';
 import tinygradient from 'tinygradient';
 
 const COLOR_CYCLE_DURATION_MS = 4000;
@@ -24,7 +24,7 @@ export const GeminiSpinner: React.FC<GeminiSpinnerProps> = React.memo(
   ({ spinnerType = 'dots', altText }: GeminiSpinnerProps) => {
     const isScreenReaderEnabled = useIsScreenReaderEnabled();
     const [time, setTime] = useState(0);
-    const intervalMs = IS_TMUX
+    const intervalMs = isTmux()
       ? TMUX_SPINNER_INTERVAL_MS
       : DEFAULT_COLOR_CYCLE_INTERVAL_MS;
 

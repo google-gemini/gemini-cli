@@ -27,6 +27,7 @@ describe('stdio utils', () => {
     process.stdout.write = originalStdoutWrite;
     process.stderr.write = originalStderrWrite;
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it('patchStdio redirects stdout and stderr to coreEvents', () => {

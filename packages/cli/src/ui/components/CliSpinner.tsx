@@ -8,9 +8,9 @@ import Spinner from 'ink-spinner';
 import cliSpinners, { type SpinnerName } from 'cli-spinners';
 import { Text } from 'ink';
 import React, { type ComponentProps, useEffect, useState } from 'react';
+import { isTmux } from '@google/gemini-cli-core';
 import { debugState } from '../debug.js';
 import { useSettings } from '../contexts/SettingsContext.js';
-import { IS_TMUX } from '../../utils/env.js';
 
 export type SpinnerProps = ComponentProps<typeof Spinner>;
 
@@ -43,7 +43,7 @@ export const CliSpinner: React.FC<SpinnerProps> = React.memo(
   (props: SpinnerProps) => {
     const settings = useSettings();
     const shouldShow = settings.merged.ui?.showSpinner !== false;
-    const isTmux = IS_TMUX;
+    const inTmux = isTmux();
 
     useEffect(() => {
       if (shouldShow) {
@@ -59,7 +59,7 @@ export const CliSpinner: React.FC<SpinnerProps> = React.memo(
       return null;
     }
 
-    if (isTmux) {
+    if (inTmux) {
       return <TmuxSpinner type={props.type} />;
     }
 

@@ -5,7 +5,7 @@
  */
 
 import { coreEvents } from './events.js';
-import { IS_TMUX, IS_DUMB_TERM } from './env.js';
+import { isTmux, isDumbTerminal } from './compatibility.js';
 
 // Capture the original stdout and stderr write methods before any monkey patching occurs.
 const originalStdoutWrite = process.stdout.write.bind(process.stdout);
@@ -120,14 +120,15 @@ export function wrapWithSynchronizedOutput(chunk: string): string {
   if (!chunk || STANDALONE_MODE_SEQUENCES.has(chunk)) {
     return chunk;
   }
-  if (IS_DUMB_TERM) {
+  if (isDumbTerminal()) {
     return chunk;
   }
 
-  const syncStart = IS_TMUX
+  const inTmux = isTmux();
+  const syncStart = inTmux
     ? TMUX_ENTER_SYNCHRONIZED_OUTPUT_SEQ
     : ENTER_SYNCHRONIZED_OUTPUT_SEQ;
-  const syncEnd = IS_TMUX
+  const syncEnd = inTmux
     ? TMUX_EXIT_SYNCHRONIZED_OUTPUT_SEQ
     : EXIT_SYNCHRONIZED_OUTPUT_SEQ;
 

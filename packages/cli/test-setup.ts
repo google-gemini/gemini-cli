@@ -18,11 +18,6 @@ if (process.env.CI !== undefined) {
   delete process.env.CI;
 }
 
-// Unset TMUX environment variable to ensure consistent spinner and terminal behavior in tests unless explicitly stubbed
-if (process.env.TMUX !== undefined) {
-  delete process.env.TMUX;
-}
-
 global.IS_REACT_ACT_ENVIRONMENT = true;
 
 // Increase max listeners to avoid warnings in large test suites
@@ -61,6 +56,9 @@ let errorSpy: vi.SpyInstance;
 let debugSpy: vi.SpyInstance;
 
 beforeEach(() => {
+  // Unset TMUX environment variable to ensure consistent spinner and terminal behavior in tests unless explicitly stubbed
+  vi.stubEnv('TMUX', '');
+
   // Reset themeManager state to ensure test isolation
   themeManager.resetForTesting();
 
