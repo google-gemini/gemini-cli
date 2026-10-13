@@ -133,6 +133,11 @@ enum StreamProcessingStatus {
   Error,
 }
 
+enum CancellationState {
+  Idle = 'idle',
+  Cancelling = 'cancelling',
+}
+
 const SUPPRESSED_TOOL_ERRORS_NOTE =
   'Some internal tool attempts failed before this final error. Press F12 for diagnostics, or run /settings and change "Error Verbosity" to full for details.';
 const LOW_VERBOSITY_FAILURE_NOTE =
@@ -261,7 +266,10 @@ export const useGeminiStream = (
   const turnCancelledRef = useRef(false);
   const pendingToolCallRequestsRef = useRef<ToolCallRequestInfo[]>([]);
   const activeSchedulePromiseRef = useRef<Promise<unknown> | null>(null);
-  const cancelPromiseRef = useRef<Promise<void> | null>(null);
+  const cancellationStateRef = useRef<CancellationState>(
+    CancellationState.Idle,
+  );
+  const cancelPromiseRef = useRef<Promise<void>>(Promise.resolve());
   const activeQueryIdRef = useRef<string | null>(null);
   const previousApprovalModeRef = useRef<ApprovalMode>(
     config.getApprovalMode(),
@@ -850,8 +858,14 @@ export const useGeminiStream = (
         if (clearBuffer) {
           onCancelSubmit(false, true);
         }
-        if (cancelPromiseRef.current) {
-          await cancelPromiseRef.current;
+        if (cancellationStateRef.current === CancellationState.Cancelling) {
+          try {
+            await cancelPromiseRef.current;
+          } catch (error) {
+            debugLogger.warn(
+              `Error awaiting schedulePromise on cancel: ${error}`,
+            );
+          }
         }
         return;
       }
@@ -956,10 +970,11 @@ export const useGeminiStream = (
           const clientHistory = client?.getHistory?.() ?? [];
           const lastTurn = clientHistory.at(-1);
           if (lastTurn?.role === 'model' && Array.isArray(lastTurn.parts)) {
+            let index = 0;
             for (const part of lastTurn.parts) {
               const fc = part.functionCall;
               if (fc?.name) {
-                const callId = fc.id ?? `${fc.name}-${Date.now()}`;
+                const callId = fc.id ?? `${fc.name}-${Date.now()}-${index++}`;
                 if (!seenCallIds.has(callId)) {
                   seenCallIds.add(callId);
                   synthesizedCalls.push(
@@ -1039,6 +1054,7 @@ export const useGeminiStream = (
 
       const schedulePromise = activeSchedulePromiseRef.current;
       if (schedulePromise) {
+        cancellationStateRef.current = CancellationState.Cancelling;
         const cancelTask = (async () => {
           let timeoutId: ReturnType<typeof setTimeout> | undefined;
           try {
@@ -1052,15 +1068,16 @@ export const useGeminiStream = (
             if (timeoutId !== undefined) {
               clearTimeout(timeoutId);
             }
+            cancellationStateRef.current = CancellationState.Idle;
           }
         })();
         cancelPromiseRef.current = cancelTask;
         try {
           await cancelTask;
-        } finally {
-          if (cancelPromiseRef.current === cancelTask) {
-            cancelPromiseRef.current = null;
-          }
+        } catch (error) {
+          debugLogger.warn(
+            `Error awaiting schedulePromise on cancel: ${error}`,
+          );
         }
       }
     },

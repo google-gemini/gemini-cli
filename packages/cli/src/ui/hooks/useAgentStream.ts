@@ -101,6 +101,11 @@ export interface UseAgentStreamOptions {
   logger?: Logger | null;
 }
 
+enum CancellationState {
+  Idle = 'idle',
+  Cancelling = 'cancelling',
+}
+
 /**
  * useAgentStream implements the interactive agent loop using an AgentProtocol.
  * It is completely agnostic to the specific agent implementation.
@@ -133,7 +138,10 @@ export const useAgentStream = ({
   const toolRequestArgsRef = useRef<Map<string, Record<string, unknown>>>(
     new Map(),
   );
-  const cancelPromiseRef = useRef<Promise<void> | null>(null);
+  const cancellationStateRef = useRef<CancellationState>(
+    CancellationState.Idle,
+  );
+  const cancelPromiseRef = useRef<Promise<void>>(Promise.resolve());
   const [pushedToolCallIds, pushedToolCallIdsRef, setPushedToolCallIds] =
     useStateAndRef<Set<string>>(new Set());
   const [_isFirstToolInGroup, isFirstToolInGroupRef, setIsFirstToolInGroup] =
@@ -189,125 +197,134 @@ export const useAgentStream = ({
         return;
       }
 
-      if (cancelPromiseRef.current) {
+      if (cancellationStateRef.current === CancellationState.Cancelling) {
         if (clearBuffer) {
           onCancelSubmit(false, true);
         }
-        await cancelPromiseRef.current;
+        try {
+          await cancelPromiseRef.current;
+        } catch (error) {
+          debugLogger.warn(`Error awaiting cancelTask: ${error}`);
+        }
         return;
       }
 
+      cancellationStateRef.current = CancellationState.Cancelling;
       const cancelTask = (async () => {
-        let timeoutId: ReturnType<typeof setTimeout> | undefined;
         try {
-          await Promise.race([
-            agent.abort(),
-            new Promise<void>((resolve) => {
-              timeoutId = setTimeout(resolve, 1000);
-            }),
-          ]);
-        } finally {
-          if (timeoutId !== undefined) {
-            clearTimeout(timeoutId);
-          }
-        }
-
-        const unpushedTools = trackedToolsRef.current.filter(
-          (tc) => !pushedToolCallIdsRef.current.has(tc.callId),
-        );
-
-        if (unpushedTools.length > 0) {
-          setTrackedTools((prev) =>
-            prev.map((tc) => {
-              if (
-                !pushedToolCallIdsRef.current.has(tc.callId) &&
-                tc.status !== CoreToolCallStatus.Success &&
-                tc.status !== CoreToolCallStatus.Error &&
-                tc.status !== CoreToolCallStatus.Cancelled
-              ) {
-                return {
-                  ...tc,
-                  status: CoreToolCallStatus.Cancelled,
-                };
-              }
-              return tc;
-            }),
-          );
-        }
-
-        try {
-          const client = config?.getGeminiClient?.();
-          const chat = client?.getChat?.();
-          if (chat) {
-            const seenCallIds = new Set<string>();
-            const synthesizedCalls: CompletedToolCall[] = [];
-
-            for (const tc of unpushedTools) {
-              if (tc.isClientInitiated) {
-                continue;
-              }
-              seenCallIds.add(tc.callId);
-              const name = tc.originalRequestName || tc.name;
-              const args = toolRequestArgsRef.current.get(tc.callId) ?? {};
-              synthesizedCalls.push(
-                createCancelledToolCall({
-                  callId: tc.callId,
-                  name,
-                  args,
-                  isClientInitiated: false,
-                  prompt_id: '',
-                }),
-              );
+          let timeoutId: ReturnType<typeof setTimeout> | undefined;
+          try {
+            await Promise.race([
+              agent.abort(),
+              new Promise<void>((resolve) => {
+                timeoutId = setTimeout(resolve, 1000);
+              }),
+            ]);
+          } finally {
+            if (timeoutId !== undefined) {
+              clearTimeout(timeoutId);
             }
+          }
 
-            const clientHistory = client?.getHistory?.() ?? [];
-            const lastTurn = clientHistory.at(-1);
-            if (lastTurn?.role === 'model' && Array.isArray(lastTurn.parts)) {
-              for (const part of lastTurn.parts) {
-                const fc = part.functionCall;
-                if (fc?.name) {
-                  const callId = fc.id ?? `${fc.name}-${Date.now()}`;
-                  if (!seenCallIds.has(callId)) {
-                    seenCallIds.add(callId);
-                    synthesizedCalls.push(
-                      createCancelledToolCall({
-                        callId,
-                        name: fc.name,
-                        args: fc.args ?? {},
-                        isClientInitiated: false,
-                        prompt_id: '',
-                      }),
-                    );
+          const unpushedTools = trackedToolsRef.current.filter(
+            (tc) => !pushedToolCallIdsRef.current.has(tc.callId),
+          );
+
+          if (unpushedTools.length > 0) {
+            setTrackedTools((prev) =>
+              prev.map((tc) => {
+                if (
+                  !pushedToolCallIdsRef.current.has(tc.callId) &&
+                  tc.status !== CoreToolCallStatus.Success &&
+                  tc.status !== CoreToolCallStatus.Error &&
+                  tc.status !== CoreToolCallStatus.Cancelled
+                ) {
+                  return {
+                    ...tc,
+                    status: CoreToolCallStatus.Cancelled,
+                  };
+                }
+                return tc;
+              }),
+            );
+          }
+
+          try {
+            const client = config?.getGeminiClient?.();
+            const chat = client?.getChat?.();
+            if (chat) {
+              const seenCallIds = new Set<string>();
+              const synthesizedCalls: CompletedToolCall[] = [];
+
+              for (const tc of unpushedTools) {
+                if (tc.isClientInitiated) {
+                  continue;
+                }
+                seenCallIds.add(tc.callId);
+                const name = tc.originalRequestName || tc.name;
+                const args = toolRequestArgsRef.current.get(tc.callId) ?? {};
+                synthesizedCalls.push(
+                  createCancelledToolCall({
+                    callId: tc.callId,
+                    name,
+                    args,
+                    isClientInitiated: false,
+                    prompt_id: '',
+                  }),
+                );
+              }
+
+              const clientHistory = client?.getHistory?.() ?? [];
+              const lastTurn = clientHistory.at(-1);
+              if (lastTurn?.role === 'model' && Array.isArray(lastTurn.parts)) {
+                let index = 0;
+                for (const part of lastTurn.parts) {
+                  const fc = part.functionCall;
+                  if (fc?.name) {
+                    const callId =
+                      fc.id ?? `${fc.name}-${Date.now()}-${index++}`;
+                    if (!seenCallIds.has(callId)) {
+                      seenCallIds.add(callId);
+                      synthesizedCalls.push(
+                        createCancelledToolCall({
+                          callId,
+                          name: fc.name,
+                          args: fc.args ?? {},
+                          isClientInitiated: false,
+                          prompt_id: '',
+                        }),
+                      );
+                    }
                   }
                 }
               }
-            }
 
-            if (synthesizedCalls.length > 0) {
-              const currentModel =
-                client?.getCurrentSequenceModel?.() ??
-                config?.getModel?.() ??
-                '';
-              chat.recordCompletedToolCalls(currentModel, synthesizedCalls);
+              if (synthesizedCalls.length > 0) {
+                const currentModel =
+                  client?.getCurrentSequenceModel?.() ??
+                  config?.getModel?.() ??
+                  '';
+                chat.recordCompletedToolCalls(currentModel, synthesizedCalls);
+              }
             }
+          } catch (error) {
+            debugLogger.warn(
+              `Error recording cancelled tool calls in agent stream: ${error}`,
+            );
           }
-        } catch (error) {
-          debugLogger.warn(
-            `Error recording cancelled tool calls in agent stream: ${error}`,
-          );
-        }
 
-        setStreamingState(StreamingState.Idle);
-        onCancelSubmit(false, clearBuffer);
+          setStreamingState(StreamingState.Idle);
+          onCancelSubmit(false, clearBuffer);
+        } finally {
+          cancellationStateRef.current = CancellationState.Idle;
+        }
       })();
 
       cancelPromiseRef.current = cancelTask;
       try {
         await cancelTask;
-      } finally {
-        if (cancelPromiseRef.current === cancelTask) {
-          cancelPromiseRef.current = null;
-        }
+      } catch (error) {
+        debugLogger.warn(`Error awaiting cancelTask: ${error}`);
       }
     },
     [
