@@ -98,8 +98,13 @@ vi.mock('./ShortcutsHelp.js', () => ({
   ShortcutsHelp: () => <Text>ShortcutsHelp</Text>,
 }));
 
+const mockDetailedMessagesDisplay = vi.hoisted(() => vi.fn());
+
 vi.mock('./DetailedMessagesDisplay.js', () => ({
-  DetailedMessagesDisplay: () => <Text>DetailedMessagesDisplay</Text>,
+  DetailedMessagesDisplay: (props: unknown) => {
+    mockDetailedMessagesDisplay(props);
+    return <Text>DetailedMessagesDisplay</Text>;
+  },
 }));
 
 vi.mock('./InputPrompt.js', () => ({
@@ -889,6 +894,52 @@ describe('Composer', () => {
       const { lastFrame } = await renderComposer(uiState);
 
       expect(lastFrame()).not.toContain('DetailedMessagesDisplay');
+    });
+
+    it('calculates maxHeight from terminal rows rather than columns when constrainHeight is true', async () => {
+      const { useTerminalSize } = await import('../hooks/useTerminalSize.js');
+      vi.mocked(useTerminalSize).mockReturnValueOnce({
+        columns: 200,
+        rows: 40,
+      });
+      mockDetailedMessagesDisplay.mockClear();
+
+      const uiState = createMockUIState({
+        showErrorDetails: true,
+        constrainHeight: true,
+      });
+
+      const { unmount } = await renderComposer(uiState);
+
+      expect(mockDetailedMessagesDisplay).toHaveBeenCalledWith(
+        expect.objectContaining({
+          maxHeight: 8, // Math.floor(Math.max(40 * 0.2, 5)) === 8, not 200 * 0.2 === 40
+        }),
+      );
+      unmount();
+    });
+
+    it('keeps DetailedMessagesDisplay maxHeight bounded when constrainHeight is false', async () => {
+      const { useTerminalSize } = await import('../hooks/useTerminalSize.js');
+      vi.mocked(useTerminalSize).mockReturnValueOnce({
+        columns: 120,
+        rows: 40,
+      });
+      mockDetailedMessagesDisplay.mockClear();
+
+      const uiState = createMockUIState({
+        showErrorDetails: true,
+        constrainHeight: false,
+      });
+
+      const { unmount } = await renderComposer(uiState);
+
+      expect(mockDetailedMessagesDisplay).toHaveBeenCalledWith(
+        expect.objectContaining({
+          maxHeight: 8,
+        }),
+      );
+      unmount();
     });
   });
 
