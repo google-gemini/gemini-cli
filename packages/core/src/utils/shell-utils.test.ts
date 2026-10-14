@@ -684,20 +684,20 @@ describe('detectCommandSubstitution', () => {
       mockPlatform.mockReturnValue('win32');
     });
 
-    it('should allow escaped double quotes with parentheses', () => {
-      expect(detectCommandSubstitution('echo "a \\" b (c)"')).toBe(false);
+    it('should allow PowerShell backtick-escaped double quotes with parentheses', () => {
+      expect(detectCommandSubstitution('echo "a `" b (c)"')).toBe(false);
       expect(
         detectCommandSubstitution(
-          'git commit -m "fix(core): \\"(detail)\\""',
+          'git commit -m "fix(core): `"(detail)`""',
         ),
       ).toBe(false);
       expect(
-        detectCommandSubstitution('git commit -m "fix: \\"quote (detail)"'),
+        detectCommandSubstitution('git commit -m "fix: `"quote (detail)"'),
       ).toBe(false);
       expect(
-        detectCommandSubstitution('git log --format="%h \\" (%an)"'),
+        detectCommandSubstitution('git log --format="%h `" (%an)"'),
       ).toBe(false);
-      expect(detectCommandSubstitution('echo "hello \\" (world)"')).toBe(
+      expect(detectCommandSubstitution('echo "hello `" (world)"')).toBe(
         false,
       );
     });
@@ -714,10 +714,15 @@ describe('detectCommandSubstitution', () => {
       );
     });
 
-    it('should allow escaped substitution syntax', () => {
-      expect(detectCommandSubstitution('echo "\\$(whoami)"')).toBe(false);
+    it('should not treat backslashes as PowerShell escape characters', () => {
+      expect(detectCommandSubstitution('echo "\\$(whoami)"')).toBe(true);
+      expect(detectCommandSubstitution('echo \\$(whoami)')).toBe(true);
+      expect(detectCommandSubstitution('echo \\(whoami\\)')).toBe(true);
+    });
+
+    it('should allow substitution syntax escaped with PowerShell backticks', () => {
       expect(detectCommandSubstitution('echo "`$(whoami)"')).toBe(false);
-      expect(detectCommandSubstitution('echo "\\(whoami\\)"')).toBe(false);
+      expect(detectCommandSubstitution('echo `$(whoami)')).toBe(false);
     });
 
     it('should block actual substitution and subexpressions', () => {

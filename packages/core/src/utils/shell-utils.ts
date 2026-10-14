@@ -1167,7 +1167,7 @@ function detectPowerShellSubstitution(command: string): boolean {
       continue;
     }
 
-    // Inside double quotes: in PowerShell, "" escapes a double quote, ` escapes, and \ escapes quotes/special chars
+    // Inside double quotes, PowerShell uses a backtick to escape special characters.
     if (inDoubleQuote) {
       if (char === '"' && i + 1 < command.length && command[i + 1] === '"') {
         i += 2;
@@ -1176,13 +1176,6 @@ function detectPowerShellSubstitution(command: string): boolean {
       if (char === '`' && i + 1 < command.length) {
         i += 2;
         continue;
-      }
-      if (char === '\\' && i + 1 < command.length) {
-        const next = command[i + 1];
-        if (['$', '`', '"', '\\', '(', ')', "'"].includes(next)) {
-          i += 2;
-          continue;
-        }
       }
       if (char === '"') {
         inDoubleQuote = false;
@@ -1208,10 +1201,6 @@ function detectPowerShellSubstitution(command: string): boolean {
       continue;
     }
     if (char === '`' && i + 1 < command.length) {
-      i += 2;
-      continue;
-    }
-    if (char === '\\' && i + 1 < command.length) {
       i += 2;
       continue;
     }
