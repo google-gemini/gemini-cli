@@ -5,7 +5,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import type { Stats } from 'node:fs';
+import { constants, type Stats } from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { isNodeError } from '../utils/errors.js';
@@ -77,7 +77,7 @@ export class StandardFileSystemService implements FileSystemService {
       // A rename is governed by the directory's permissions alone, so without
       // this check an atomic replace would silently overwrite a read-only
       // file that a plain write refuses with EACCES.
-      await fs.access(realPath, fs.constants.W_OK);
+      await fs.access(realPath, constants.W_OK);
 
       // Hard links share one inode. Renaming a temp file over this name would
       // point it at a new inode and leave the other names on the old content,

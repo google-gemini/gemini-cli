@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { constants } from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { StandardFileSystemService } from './fileSystemService.js';
@@ -160,7 +161,7 @@ describe('StandardFileSystemService', () => {
         fileSystem.writeTextFile(targetFile, 'Hello, World!'),
       ).rejects.toMatchObject({ code: 'EACCES' });
 
-      expect(fs.access).toHaveBeenCalledWith(targetFile, fs.constants.W_OK);
+      expect(fs.access).toHaveBeenCalledWith(targetFile, constants.W_OK);
       expect(fs.writeFile).not.toHaveBeenCalled();
       expect(fs.rename).not.toHaveBeenCalled();
     });
