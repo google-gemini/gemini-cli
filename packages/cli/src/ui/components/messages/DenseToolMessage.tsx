@@ -20,7 +20,6 @@ import {
 } from '@google/gemini-cli-core';
 import {
   type IndividualToolCallDisplay,
-  type SerializableConfirmationDetails,
   type ToolResultDisplay,
   isTodoList,
 } from '../../types.js';
@@ -47,13 +46,6 @@ const PAYLOAD_SCROLL_GUTTER = 1;
 const PAYLOAD_MAX_WIDTH = 120 + PAYLOAD_BORDER_CHROME_WIDTH;
 
 interface DenseToolMessageProps extends IndividualToolCallDisplay {
-  callId: string;
-  name: string;
-  description: string;
-  resultDisplay: ToolResultDisplay | undefined;
-  status: CoreToolCallStatus;
-  confirmationDetails: SerializableConfirmationDetails | undefined;
-  outputFile?: string;
   terminalWidth: number;
   availableTerminalHeight?: number;
 }
@@ -266,9 +258,18 @@ function getGenericSuccessData(
   return { description, summary, payload };
 }
 
-export const DenseToolMessage: React.FC<DenseToolMessageProps> = (
-  props: DenseToolMessageProps,
-) => {
+function renderDiffLineItem(
+  item: React.ReactNode,
+  width: number,
+): React.ReactElement {
+  return (
+    <Box minHeight={1} width={width} flexDirection="column">
+      {item}
+    </Box>
+  );
+}
+
+export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
   const {
     callId,
     name,
@@ -468,11 +469,8 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (
     [],
   );
   const renderItem = useCallback(
-    ({ item }: { item: React.ReactNode }) => (
-      <Box minHeight={1} width={safeContentWidth} flexDirection="column">
-        {item}
-      </Box>
-    ),
+    ({ item }: { item: React.ReactNode }) =>
+      renderDiffLineItem(item, safeContentWidth),
     [safeContentWidth],
   );
 
