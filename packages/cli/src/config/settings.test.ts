@@ -2457,14 +2457,6 @@ describe('Settings Loading and Merging', () => {
       );
     }
 
-    beforeEach(() => {
-      // Ensure the variables injected by `loadEnvironment` are absent before
-      // each test and restored by `vi.unstubAllEnvs()` afterwards.
-      vi.stubEnv('GITHUB_MCP_PAT', undefined);
-      vi.stubEnv('WORKSPACE_API_TOKEN', undefined);
-      vi.stubEnv('MAX_TURNS_FROM_ENV_FILE', undefined);
-    });
-
     it('should resolve placeholders in settings using variables defined only in a .env file', () => {
       setupEnvFileScenario({
         envFileContent:
@@ -2504,10 +2496,12 @@ describe('Settings Loading and Merging', () => {
 
     it('should keep the unexpanded placeholders in originalSettings', () => {
       setupEnvFileScenario({
-        envFileContent: 'GITHUB_MCP_PAT=ghp_secretTokenHere',
+        envFileContent: 'GITHUB_ORIGINAL_MCP_PAT=ghp_secretTokenHere',
         userSettingsContent: {
           mcpServers: {
-            github: { headers: { Authorization: 'Bearer $GITHUB_MCP_PAT' } },
+            github: {
+              headers: { Authorization: 'Bearer $GITHUB_ORIGINAL_MCP_PAT' },
+            },
           },
         },
       });
@@ -2516,7 +2510,7 @@ describe('Settings Loading and Merging', () => {
 
       expect(
         settings.user.originalSettings.mcpServers?.['github']?.headers,
-      ).toEqual({ Authorization: 'Bearer $GITHUB_MCP_PAT' });
+      ).toEqual({ Authorization: 'Bearer $GITHUB_ORIGINAL_MCP_PAT' });
     });
 
     it('should validate settings after .env variables have been resolved', () => {
@@ -2535,9 +2529,9 @@ describe('Settings Loading and Merging', () => {
 
     it('should record validation warnings only once when a .env variable expands to an invalid type', () => {
       setupEnvFileScenario({
-        envFileContent: 'MAX_TURNS_FROM_ENV_FILE=not-a-number',
+        envFileContent: 'INVALID_MAX_TURNS_FROM_ENV_FILE=not-a-number',
         userSettingsContent: {
-          model: { maxSessionTurns: '$MAX_TURNS_FROM_ENV_FILE' },
+          model: { maxSessionTurns: '$INVALID_MAX_TURNS_FROM_ENV_FILE' },
         },
       });
 
@@ -2548,12 +2542,14 @@ describe('Settings Loading and Merging', () => {
     });
 
     it('should prefer variables from the shell environment over .env files', () => {
-      vi.stubEnv('GITHUB_MCP_PAT', 'token-from-shell');
+      vi.stubEnv('SHELL_PRECEDENCE_MCP_PAT', 'token-from-shell');
       setupEnvFileScenario({
-        envFileContent: 'GITHUB_MCP_PAT=token-from-env-file',
+        envFileContent: 'SHELL_PRECEDENCE_MCP_PAT=token-from-env-file',
         userSettingsContent: {
           mcpServers: {
-            github: { headers: { Authorization: 'Bearer $GITHUB_MCP_PAT' } },
+            github: {
+              headers: { Authorization: 'Bearer $SHELL_PRECEDENCE_MCP_PAT' },
+            },
           },
         },
       });
@@ -2571,19 +2567,21 @@ describe('Settings Loading and Merging', () => {
         source: 'file',
       });
       setupEnvFileScenario({
-        envFileContent: 'GITHUB_MCP_PAT=ghp_secretTokenHere',
+        envFileContent: 'UNTRUSTED_MCP_PAT=ghp_secretTokenHere',
         userSettingsContent: {
           mcpServers: {
-            github: { headers: { Authorization: 'Bearer $GITHUB_MCP_PAT' } },
+            github: {
+              headers: { Authorization: 'Bearer $UNTRUSTED_MCP_PAT' },
+            },
           },
         },
       });
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
-      expect(process.env['GITHUB_MCP_PAT']).toBeUndefined();
+      expect(process.env['UNTRUSTED_MCP_PAT']).toBeUndefined();
       expect(settings.merged.mcpServers?.['github']?.headers).toEqual({
-        Authorization: 'Bearer $GITHUB_MCP_PAT',
+        Authorization: 'Bearer $UNTRUSTED_MCP_PAT',
       });
     });
 
