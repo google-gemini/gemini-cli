@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useMemo, useState, useRef } from 'react';
+import { useCallback, useMemo, useState, useRef } from 'react';
 import { Box, Text, type DOMElement } from 'ink';
 import {
   CoreToolCallStatus,
@@ -20,6 +20,7 @@ import {
 } from '@google/gemini-cli-core';
 import {
   type IndividualToolCallDisplay,
+  type SerializableConfirmationDetails,
   type ToolResultDisplay,
   isTodoList,
 } from '../../types.js';
@@ -46,6 +47,13 @@ const PAYLOAD_SCROLL_GUTTER = 1;
 const PAYLOAD_MAX_WIDTH = 120 + PAYLOAD_BORDER_CHROME_WIDTH;
 
 interface DenseToolMessageProps extends IndividualToolCallDisplay {
+  callId: string;
+  name: string;
+  description: string;
+  resultDisplay: ToolResultDisplay | undefined;
+  status: CoreToolCallStatus;
+  confirmationDetails: SerializableConfirmationDetails | undefined;
+  outputFile?: string;
   terminalWidth: number;
   availableTerminalHeight?: number;
 }
@@ -258,7 +266,9 @@ function getGenericSuccessData(
   return { description, summary, payload };
 }
 
-export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
+export const DenseToolMessage: React.FC<DenseToolMessageProps> = (
+  props: DenseToolMessageProps,
+) => {
   const {
     callId,
     name,
@@ -453,12 +463,17 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
     outputFile,
   ]);
 
-  const keyExtractor = (_item: React.ReactNode, index: number) =>
-    `diff-line-${index}`;
-  const renderItem = ({ item }: { item: React.ReactNode }) => (
-    <Box minHeight={1} width={safeContentWidth} flexDirection="column">
-      {item}
-    </Box>
+  const keyExtractor = useCallback(
+    (_item: React.ReactNode, index: number) => `diff-line-${index}`,
+    [],
+  );
+  const renderItem = useCallback(
+    ({ item }: { item: React.ReactNode }) => (
+      <Box minHeight={1} width={safeContentWidth} flexDirection="column">
+        {item}
+      </Box>
+    ),
+    [safeContentWidth],
   );
 
   return (
