@@ -923,22 +923,16 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
   if (authOverride) {
     // Applied to the raw settings so that the override is reflected both in
     // the resolved settings and in the persisted `originalSettings`.
-    const rawUserSettings = userResult.rawSettings;
-    if (
-      typeof rawUserSettings.security !== 'object' ||
-      rawUserSettings.security === null ||
-      Array.isArray(rawUserSettings.security)
-    ) {
-      rawUserSettings.security = {};
-    }
-    if (
-      typeof rawUserSettings.security.auth !== 'object' ||
-      rawUserSettings.security.auth === null ||
-      Array.isArray(rawUserSettings.security.auth)
-    ) {
-      rawUserSettings.security.auth = {};
-    }
-    rawUserSettings.security.auth.selectedType = authOverride;
+    userResult.rawSettings = {
+      ...userResult.rawSettings,
+      security: {
+        ...userResult.rawSettings?.security,
+        auth: {
+          ...userResult.rawSettings?.security?.auth,
+          selectedType: authOverride,
+        },
+      },
+    };
   }
 
   const systemOriginalSettings = structuredClone(systemResult.rawSettings);
