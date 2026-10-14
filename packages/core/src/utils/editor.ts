@@ -404,24 +404,24 @@ export function quoteCmdArg(arg: string): string {
   if (/[\r\n\0]/.test(arg)) {
     throw new Error('Invalid argument: newlines are not allowed');
   }
+  if (arg.includes('"')) {
+    throw new Error(
+      'Invalid argument: double quotes are not allowed on Windows',
+    );
+  }
   if (!arg) {
     return '""';
   }
   if (/^[a-zA-Z0-9\-_.:/\\]+$/.test(arg)) {
     return arg;
   }
-  let result = '"';
+  let result = '"' + arg;
   let backslashCount = 0;
-  for (const char of arg) {
-    if (char === '\\') {
+  for (let i = arg.length - 1; i >= 0; i--) {
+    if (arg[i] === '\\') {
       backslashCount++;
-      result += '\\';
-    } else if (char === '"') {
-      result += '\\'.repeat(backslashCount) + '""';
-      backslashCount = 0;
     } else {
-      backslashCount = 0;
-      result += char;
+      break;
     }
   }
   result += '\\'.repeat(backslashCount) + '"';
