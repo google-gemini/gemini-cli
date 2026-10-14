@@ -3,6 +3,59 @@
 This guide provides instructions for setting up and using local development
 features for Gemini CLI.
 
+## Profile startup during local testing
+
+Use `npm run start:profile` from a source checkout to record startup timings
+while you test Gemini CLI interactively. The command runs `npm start` with your
+existing authentication, settings, environment, and terminal. Regular
+`npm start` runs don't collect profiles.
+
+Install dependencies and build the checkout before your first run:
+
+```bash
+npm ci
+npm run build
+npm run start:profile
+```
+
+Pass your usual CLI arguments after `--`, for example:
+
+```bash
+npm run start:profile -- --model auto
+```
+
+Test normally, then use `/quit` to exit. The profiler prints the output
+directory when it starts and a timing summary when Gemini CLI exits. Each run
+writes `summary.json` and `process-<pid>.json` files in a separate, ignored
+directory under `.gemini/startup-profiles/`. Process files update during the
+session. Set `GEMINI_STARTUP_PROFILE_DIR` to save runs under a different
+directory.
+
+Use the summary fields to compare runs with the same settings and arguments:
+
+- `launchToCliMainMs`: Time from launching the child `npm start` process until
+  the CLI enters `main()`, including launcher processes and module loading.
+- `preMainMs`: Time from the selected CLI process starting until `main()`.
+- `cliStartupEndMs`: Time from launching the child `npm start` process until the
+  existing `cli_startup` phase ends. This boundary precedes UI rendering; it
+  doesn't measure time to the first visible prompt.
+
+The report lists process starts and named startup phases, including
+authentication when that phase runs. Phases can overlap or contain other phases,
+so don't add their durations to calculate total startup time. The profile
+excludes initialization of the outer `npm run start:profile` command. Running
+with `--version` measures the version command's launch path rather than
+authenticated interactive startup.
+
+If no completed `cli_startup` phase appears, the summary omits the startup
+fields. This can happen with `--version`, an early exit, an interrupted
+authentication or trust prompt, or a sandboxed CLI process that the profiler
+can't observe. Host process timings can still appear in the report.
+
+The profiler writes timing and process metadata locally. It doesn't record
+prompts, terminal output, command arguments, environment values, or phase
+details, and it doesn't enable telemetry or debugger pauses.
+
 ## Tracing
 
 Gemini CLI uses OpenTelemetry (OTel) to record traces that help you debug agent
