@@ -1152,18 +1152,58 @@ function detectPowerShellSubstitution(command: string): boolean {
   while (i < command.length) {
     const char = command[i];
 
-    if (char === "'" && !inDoubleQuote) {
-      inSingleQuote = !inSingleQuote;
-      i++;
-      continue;
-    }
-    if (char === '"' && !inSingleQuote) {
-      inDoubleQuote = !inDoubleQuote;
+    // Inside single quotes: in PowerShell, '' escapes a single quote
+    if (inSingleQuote) {
+      if (char === "'" && i + 1 < command.length && command[i + 1] === "'") {
+        i += 2;
+        continue;
+      }
+      if (char === "'") {
+        inSingleQuote = false;
+        i++;
+        continue;
+      }
       i++;
       continue;
     }
 
-    if (inSingleQuote) {
+    // Inside double quotes: in PowerShell, "" escapes a double quote, ` escapes, and \ escapes quotes/special chars
+    if (inDoubleQuote) {
+      if (char === '"' && i + 1 < command.length && command[i + 1] === '"') {
+        i += 2;
+        continue;
+      }
+      if (char === '`' && i + 1 < command.length) {
+        i += 2;
+        continue;
+      }
+      if (char === '\\' && i + 1 < command.length) {
+        const next = command[i + 1];
+        if (['$', '`', '"', '\\', '(', ')', "'"].includes(next)) {
+          i += 2;
+          continue;
+        }
+      }
+      if (char === '"') {
+        inDoubleQuote = false;
+        i++;
+        continue;
+      }
+      if (char === '$' && command[i + 1] === '(') {
+        return true;
+      }
+      i++;
+      continue;
+    }
+
+    // Outside quotes
+    if (char === "'") {
+      inSingleQuote = true;
+      i++;
+      continue;
+    }
+    if (char === '"') {
+      inDoubleQuote = true;
       i++;
       continue;
     }
@@ -1171,13 +1211,17 @@ function detectPowerShellSubstitution(command: string): boolean {
       i += 2;
       continue;
     }
+    if (char === '\\' && i + 1 < command.length) {
+      i += 2;
+      continue;
+    }
     if (char === '$' && command[i + 1] === '(') {
       return true;
     }
-    if (!inDoubleQuote && char === '@' && command[i + 1] === '(') {
+    if (char === '@' && command[i + 1] === '(') {
       return true;
     }
-    if (!inDoubleQuote && char === '(') {
+    if (char === '(') {
       const before = command.slice(0, i).trimEnd();
       const prevChar = before[before.length - 1];
       if (prevChar === '(') {

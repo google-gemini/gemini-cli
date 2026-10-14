@@ -24,6 +24,7 @@ import {
   normalizeCommand,
   hasRedirection,
   resolveExecutable,
+  detectCommandSubstitution,
 } from './shell-utils.js';
 import path from 'node:path';
 
@@ -674,5 +675,56 @@ describe('resolveExecutable', () => {
     mockPlatform.mockReturnValue('linux');
 
     expect(resolveExecutable('anything')).toBeUndefined();
+  });
+});
+
+describe('detectCommandSubstitution', () => {
+  describe('PowerShell (Windows)', () => {
+    beforeEach(() => {
+      mockPlatform.mockReturnValue('win32');
+    });
+
+    it('should allow escaped double quotes with parentheses', () => {
+      expect(detectCommandSubstitution('echo "a \\" b (c)"')).toBe(false);
+      expect(
+        detectCommandSubstitution(
+          'git commit -m "fix(core): \\"(detail)\\""',
+        ),
+      ).toBe(false);
+      expect(
+        detectCommandSubstitution('git commit -m "fix: \\"quote (detail)"'),
+      ).toBe(false);
+      expect(
+        detectCommandSubstitution('git log --format="%h \\" (%an)"'),
+      ).toBe(false);
+      expect(detectCommandSubstitution('echo "hello \\" (world)"')).toBe(
+        false,
+      );
+    });
+
+    it('should allow PowerShell backtick-escaped and doubled quotes', () => {
+      expect(detectCommandSubstitution('echo "test `"quoted`" (foo)"')).toBe(
+        false,
+      );
+      expect(detectCommandSubstitution('echo "test ""quoted"" (foo)"')).toBe(
+        false,
+      );
+      expect(detectCommandSubstitution("echo 'test ''quoted'' (foo)'")).toBe(
+        false,
+      );
+    });
+
+    it('should allow escaped substitution syntax', () => {
+      expect(detectCommandSubstitution('echo "\\$(whoami)"')).toBe(false);
+      expect(detectCommandSubstitution('echo "`$(whoami)"')).toBe(false);
+      expect(detectCommandSubstitution('echo "\\(whoami\\)"')).toBe(false);
+    });
+
+    it('should block actual substitution and subexpressions', () => {
+      expect(detectCommandSubstitution('echo (whoami)')).toBe(true);
+      expect(detectCommandSubstitution('echo @(whoami)')).toBe(true);
+      expect(detectCommandSubstitution('echo $(whoami)')).toBe(true);
+      expect(detectCommandSubstitution('echo "$(whoami)"')).toBe(true);
+    });
   });
 });
