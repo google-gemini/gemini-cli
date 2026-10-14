@@ -124,8 +124,12 @@ export function detectBOM(buf: Buffer): BOMInfo | null {
  * (Node has 'utf16le' but not 'utf16be'.)
  */
 function decodeUTF16BE(buf: Buffer): string {
-  if (buf.length === 0) return '';
-  const swapped = Buffer.from(buf); // swap16 mutates in place, so copy
+  // Ignore a partial trailing code unit (swap16 throws on an odd length),
+  // matching how Node's utf16le decoder and decodeUTF32 treat partial units.
+  const usable = buf.length - (buf.length % 2);
+  if (usable === 0) return '';
+  // swap16 mutates in place, so copy
+  const swapped = Buffer.from(buf.subarray(0, usable));
   swapped.swap16();
   return swapped.toString('utf16le');
 }
@@ -158,6 +162,29 @@ function decodeUTF32(buf: Buffer, littleEndian: boolean): string {
     }
   }
   return out;
+}
+
+/**
+ * Decode a buffer that starts with a detected BOM: skips the BOM and decodes
+ * the remaining bytes according to the BOM's encoding.
+ */
+function decodeBOMContent(buffer: Buffer, bom: BOMInfo): string {
+  const content = buffer.subarray(bom.bomLength);
+  switch (bom.encoding) {
+    case 'utf8':
+      return content.toString('utf8');
+    case 'utf16le':
+      return content.toString('utf16le');
+    case 'utf16be':
+      return decodeUTF16BE(content);
+    case 'utf32le':
+      return decodeUTF32(content, true);
+    case 'utf32be':
+      return decodeUTF32(content, false);
+    default:
+      // Defensive fallback; should be unreachable
+      return content.toString('utf8');
+  }
 }
 
 /**
@@ -246,22 +273,7 @@ export async function readFileWithEncoding(
   }
 
   // Strip BOM and decode per encoding
-  const content = full.subarray(bom.bomLength);
-  switch (bom.encoding) {
-    case 'utf8':
-      return content.toString('utf8');
-    case 'utf16le':
-      return content.toString('utf16le');
-    case 'utf16be':
-      return decodeUTF16BE(content);
-    case 'utf32le':
-      return decodeUTF32(content, true);
-    case 'utf32be':
-      return decodeUTF32(content, false);
-    default:
-      // Defensive fallback; should be unreachable
-      return content.toString('utf8');
-  }
+  return decodeBOMContent(full, bom);
 }
 
 /**
@@ -445,7 +457,7 @@ export async function isEmpty(filePath: string): Promise<boolean> {
 
       const bom = detectBOM(buffer);
       const content = bom
-        ? buffer.subarray(bom.bomLength).toString('utf8')
+        ? decodeBOMContent(buffer, bom)
         : buffer.toString('utf8');
 
       return content.trim().length === 0;

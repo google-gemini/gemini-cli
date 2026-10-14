@@ -72,6 +72,7 @@ import type { ToolRegistry } from '../tools/tool-registry.js';
 import { PolicyDecision, ApprovalMode } from '../policy/types.js';
 import {
   ToolConfirmationOutcome,
+  Kind,
   type AnyDeclarativeTool,
   type AnyToolInvocation,
 } from '../tools/tools.js';
@@ -1400,6 +1401,53 @@ describe('Scheduler (Orchestrator)', () => {
             }),
             response: expect.objectContaining({
               errorType: ToolErrorType.TOOL_NOT_REGISTERED,
+            }),
+          }),
+        );
+      });
+
+      it('should keep the group of the call it replaces', async () => {
+        const agentTool = {
+          name: 'agent-tool',
+          kind: Kind.Agent,
+          build: vi.fn().mockReturnValue({}),
+        } as unknown as AnyDeclarativeTool;
+        const mockToolB = {
+          name: 'tool-b',
+          build: vi.fn().mockReturnValue({}),
+        } as unknown as AnyDeclarativeTool;
+
+        vi.mocked(mockToolRegistry.getTool).mockImplementation((name) =>
+          name === 'tool-b' ? mockToolB : agentTool,
+        );
+
+        mockExecutor.execute.mockImplementation(async ({ call }) => {
+          const { callId, name } = call.request;
+          return {
+            status: 'success',
+            response: { callId, responseParts: [] },
+            request: call.request,
+            // Only the first agent call asks for a tail call.
+            ...(callId === 'call-1' && name === 'agent-tool'
+              ? { tailToolCallRequest: { name: 'tool-b', args: {} } }
+              : {}),
+          } as unknown as SuccessfulToolCall;
+        });
+
+        const agentReq1 = { ...req1, name: 'agent-tool' };
+        const agentReq2 = { ...req2, name: 'agent-tool', args: {} };
+
+        await scheduler.schedule([agentReq1, agentReq2], signal);
+
+        expect(
+          mockStateManager.replaceActiveCallWithTailCall,
+        ).toHaveBeenCalledWith(
+          'call-1',
+          expect.objectContaining({
+            request: expect.objectContaining({
+              callId: 'call-1',
+              name: 'tool-b',
+              groupId: 'call-1',
             }),
           }),
         );

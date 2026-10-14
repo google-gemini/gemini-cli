@@ -18,6 +18,28 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.64.0 - 2026-10-13
+
+- **Atomic Operations & State Persistence:** Serialized file tool operations
+  with atomic writes and introduced atomic CLI state persistence with automatic
+  recovery from backup on corruption
+  ([#29499](https://github.com/google-gemini/gemini-cli/pull/29499) by
+  @elberthc-byte,
+  [#29558](https://github.com/google-gemini/gemini-cli/pull/29558) by
+  @urielefrenvirtusa).
+- **Chat Recording Optimization:** Implemented append-only delta patching and
+  bounded history windowing in ChatRecordingService to optimize memory and disk
+  efficiency during long-running sessions
+  ([#29568](https://github.com/google-gemini/gemini-cli/pull/29568) by
+  @jvargassanchez-dot).
+- **CLI Interaction & Input Robustness:** Resolved `@file:line` references,
+  prevented CPU hangs on `@` in code blocks, and ensured Ctrl+C emergency aborts
+  reliably reach cancellation handlers
+  ([#29581](https://github.com/google-gemini/gemini-cli/pull/29581) by
+  @jesussamuel-byte,
+  [#29586](https://github.com/google-gemini/gemini-cli/pull/29586) by
+  @urielefrenvirtusa).
+
 ## Announcements: v0.63.0 - 2026-10-06
 
 - **Autonomous Plan Execution:** Enabled autonomous plan execution in
