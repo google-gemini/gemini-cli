@@ -36,6 +36,17 @@ vi.mock('./installationInfo.js', async () => {
   };
 });
 
+const mockGetPackageJson = vi.hoisted(() => vi.fn());
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    getPackageJson: mockGetPackageJson,
+  };
+});
+
 vi.mock('./updateEventEmitter.js', async (importOriginal) =>
   importOriginal<typeof import('./updateEventEmitter.js')>(),
 );
@@ -53,6 +64,7 @@ describe('handleAutoUpdate', () => {
     vi.stubEnv('SANDBOX', '');
     mockSpawn = vi.fn();
     vi.clearAllMocks();
+    mockGetPackageJson.mockResolvedValue({ version: '2.0.0' });
     vi.spyOn(updateEventEmitter, 'emit');
     mockUpdateInfo = {
       update: {
@@ -387,6 +399,92 @@ describe('handleAutoUpdate', () => {
       });
 
       // Simulate successful execution
+      setTimeout(() => {
+        mockChildProcess.emit('close', 0);
+        resolve();
+      }, 0);
+
+      handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
+    });
+
+    expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-success', {
+      message:
+        'Update successful! The new version will be used on your next run.',
+    });
+  });
+
+  it('should not emit "update-success" when the active binary is not updated due to PATH shadowing', async () => {
+    mockGetPackageJson.mockResolvedValue({ version: '1.0.0' });
+
+    await new Promise<void>((resolve) => {
+      mockGetInstallationInfo.mockReturnValue({
+        updateCommand: 'npm i -g @google/gemini-cli@latest',
+        updateMessage: 'This is an additional message.',
+        isGlobal: true,
+        packageManager: PackageManager.NPM,
+      });
+
+      // Simulate child process completing successfully (code 0)
+      setTimeout(() => {
+        mockChildProcess.emit('close', 0);
+        resolve();
+      }, 0);
+
+      handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
+    });
+
+    // Due to PATH shadowing / prefix mismatch, process exit code 0 does not mean
+    // the active binary was updated. handleAutoUpdate should emit update-failed with warning.
+    expect(updateEventEmitter.emit).not.toHaveBeenCalledWith(
+      'update-success',
+      expect.anything(),
+    );
+    expect(updateEventEmitter.emit).toHaveBeenCalledWith(
+      'update-failed',
+      expect.objectContaining({
+        message: expect.stringContaining(
+          'shadowed by another installation in your PATH',
+        ),
+      }),
+    );
+  });
+
+  it('should emit "update-success" when package version cannot be determined (graceful fallback)', async () => {
+    mockGetPackageJson.mockResolvedValue(undefined);
+
+    await new Promise<void>((resolve) => {
+      mockGetInstallationInfo.mockReturnValue({
+        updateCommand: 'npm i -g @google/gemini-cli@latest',
+        updateMessage: 'This is an additional message.',
+        isGlobal: true,
+        packageManager: PackageManager.NPM,
+      });
+
+      setTimeout(() => {
+        mockChildProcess.emit('close', 0);
+        resolve();
+      }, 0);
+
+      handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
+    });
+
+    expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-success', {
+      message:
+        'Update successful! The new version will be used on your next run.',
+    });
+  });
+
+  it('should emit "update-success" when getPackageJson throws (graceful fallback)', async () => {
+    mockGetPackageJson.mockRejectedValue(new Error('File read error'));
+
+    await new Promise<void>((resolve) => {
+      mockGetInstallationInfo.mockReturnValue({
+        updateCommand: 'npm i -g @google/gemini-cli@latest',
+        updateMessage: 'This is an additional message.',
+        isGlobal: true,
+        packageManager: PackageManager.NPM,
+      });
+
       setTimeout(() => {
         mockChildProcess.emit('close', 0);
         resolve();

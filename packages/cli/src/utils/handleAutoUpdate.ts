@@ -11,9 +11,13 @@ import { updateEventEmitter } from './updateEventEmitter.js';
 import { MessageType, type HistoryItem } from '../ui/types.js';
 import { spawnWrapper } from './spawnWrapper.js';
 import type { spawn } from 'node:child_process';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import semver from 'semver';
 import {
   debugLogger,
   getChannelFromVersion,
+  getPackageJson,
   RELEASE_CHANNEL_STABILITY,
 } from '@google/gemini-cli-core';
 
@@ -70,6 +74,9 @@ export function handleAutoUpdate(
   projectRoot: string,
   isSandboxEnabled: boolean,
   spawnFn: typeof spawn = spawnWrapper,
+  getPackageJsonFn: (
+    cwd: string,
+  ) => Promise<{ version?: string } | undefined> = getPackageJson,
 ) {
   if (!info) {
     return;
@@ -163,9 +170,40 @@ export function handleAutoUpdate(
   // Un-reference the child process to allow the parent to exit independently.
   updateProcess.unref();
 
-  updateProcess.on('close', (code) => {
+  updateProcess.on('close', async (code) => {
     _updateInProgress = false;
     if (code === 0) {
+      let isVerified = true;
+      try {
+        const cliPath = process.argv[1];
+        if (cliPath && info.update.latest) {
+          let checkDir: string;
+          try {
+            checkDir = path.dirname(fs.realpathSync(cliPath));
+          } catch {
+            checkDir = path.dirname(cliPath);
+          }
+          const updatedPkg = await getPackageJsonFn(checkDir);
+          if (
+            updatedPkg?.version &&
+            semver.valid(updatedPkg.version) &&
+            semver.valid(info.update.latest) &&
+            semver.lt(updatedPkg.version, info.update.latest)
+          ) {
+            isVerified = false;
+          }
+        }
+      } catch (err) {
+        debugLogger.log('Failed to verify binary update version:', err);
+      }
+
+      if (!isVerified) {
+        updateEventEmitter.emit('update-failed', {
+          message: `Automatic update completed, but the active binary (${process.argv[1]}) was not updated. It may be shadowed by another installation in your PATH. Please try updating manually:\n\n${updateCommand}`,
+        });
+        return;
+      }
+
       updateEventEmitter.emit('update-success', {
         message:
           'Update successful! The new version will be used on your next run.',
