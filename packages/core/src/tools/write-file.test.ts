@@ -846,21 +846,27 @@ describe('WriteFileTool', () => {
         fs.chmodSync(filePath, 0o444);
         mockEnsureCorrectFileContent.mockResolvedValue('Attempted overwrite.');
 
-        const params = {
-          file_path: filePath,
-          content: 'Attempted overwrite.',
-        };
-        const invocation = tool.build(params);
+        try {
+          const params = {
+            file_path: filePath,
+            content: 'Attempted overwrite.',
+          };
+          const invocation = tool.build(params);
 
-        await confirmExecution(invocation);
+          await confirmExecution(invocation);
 
-        const result = await invocation.execute({ abortSignal });
+          const result = await invocation.execute({ abortSignal });
 
-        expect(result.error?.type).toBe(ToolErrorType.PERMISSION_DENIED);
-        expect(result.llmContent).toMatch(/Permission denied writing to file/);
-        expect(fs.readFileSync(filePath, 'utf8')).toBe(initialContent);
-
-        fs.chmodSync(filePath, 0o600);
+          expect(result.error?.type).toBe(ToolErrorType.PERMISSION_DENIED);
+          expect(result.llmContent).toMatch(
+            /Permission denied writing to file/,
+          );
+          expect(fs.readFileSync(filePath, 'utf8')).toBe(initialContent);
+        } finally {
+          // Leave the file writable so afterEach can remove rootDir even if
+          // an assertion above failed.
+          fs.chmodSync(filePath, 0o600);
+        }
       },
     );
 

@@ -123,16 +123,22 @@ describe('StandardFileSystemService atomicity', () => {
       await fsp.writeFile(filePath, 'original');
       await fsp.chmod(filePath, 0o444);
 
-      // A rename only consults the directory's permissions, so the check has
-      // to come from writeTextFile itself, and it must surface the same code
-      // a plain write would on every platform.
-      await expect(
-        service.writeTextFile(filePath, 'replaced'),
-      ).rejects.toMatchObject({ code: 'EACCES' });
+      try {
+        // A rename only consults the directory's permissions, so the check
+        // has to come from writeTextFile itself, and it must surface the same
+        // code a plain write would on every platform.
+        await expect(
+          service.writeTextFile(filePath, 'replaced'),
+        ).rejects.toMatchObject({ code: 'EACCES' });
 
-      await expect(fsp.readFile(filePath, 'utf-8')).resolves.toBe('original');
-      // The refusal must happen before a temp file is created.
-      await expect(fsp.readdir(dir)).resolves.toEqual(['locked.txt']);
+        await expect(fsp.readFile(filePath, 'utf-8')).resolves.toBe('original');
+        // The refusal must happen before a temp file is created.
+        await expect(fsp.readdir(dir)).resolves.toEqual(['locked.txt']);
+      } finally {
+        // Leave the file writable so afterEach can remove the directory even
+        // if an assertion above failed.
+        await fsp.chmod(filePath, 0o600);
+      }
     },
   );
 
