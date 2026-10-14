@@ -166,6 +166,47 @@ describe('StandardFileSystemService', () => {
       expect(fs.rename).not.toHaveBeenCalled();
     });
 
+    it('should report a read-only destination as EACCES on Windows', async () => {
+      vi.spyOn(process, 'platform', 'get').mockReturnValue('win32');
+      vi.mocked(fs.stat).mockResolvedValue({
+        mode: 0o444,
+        nlink: 1,
+      } as unknown as Awaited<ReturnType<typeof fs.stat>>);
+      // libuv reports the read-only attribute as EPERM from access(), while a
+      // plain write on the same file fails with EACCES.
+      vi.mocked(fs.access).mockRejectedValue(
+        Object.assign(new Error('operation not permitted'), { code: 'EPERM' }),
+      );
+
+      await expect(
+        fileSystem.writeTextFile(targetFile, 'Hello, World!'),
+      ).rejects.toMatchObject({
+        code: 'EACCES',
+        path: targetFile,
+        syscall: 'access',
+      });
+
+      expect(fs.writeFile).not.toHaveBeenCalled();
+    });
+
+    it('should keep EPERM from the write access check on other platforms', async () => {
+      vi.spyOn(process, 'platform', 'get').mockReturnValue('linux');
+      vi.mocked(fs.stat).mockResolvedValue({
+        mode: 0o644,
+        nlink: 1,
+      } as unknown as Awaited<ReturnType<typeof fs.stat>>);
+      // An immutable file fails with EPERM for a plain write too.
+      vi.mocked(fs.access).mockRejectedValue(
+        Object.assign(new Error('operation not permitted'), { code: 'EPERM' }),
+      );
+
+      await expect(
+        fileSystem.writeTextFile(targetFile, 'Hello, World!'),
+      ).rejects.toMatchObject({ code: 'EPERM' });
+
+      expect(fs.writeFile).not.toHaveBeenCalled();
+    });
+
     it('should not check write access when creating a new file', async () => {
       vi.mocked(fs.writeFile).mockResolvedValue();
       vi.mocked(fs.rename).mockResolvedValue();

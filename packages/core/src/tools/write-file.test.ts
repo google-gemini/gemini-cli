@@ -836,9 +836,8 @@ describe('WriteFileTool', () => {
       );
     });
 
-    // Windows reports a read-only file as EPERM and root bypasses mode bits,
-    // so neither reaches the PERMISSION_DENIED branch.
-    it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)(
+    // Root bypasses mode bits, so it never reaches the PERMISSION_DENIED branch.
+    it.skipIf(process.getuid?.() === 0)(
       'should return PERMISSION_DENIED without modifying a read-only file',
       async () => {
         const filePath = path.join(rootDir, 'execute_read_only_file.txt');
@@ -860,6 +859,8 @@ describe('WriteFileTool', () => {
         expect(result.error?.type).toBe(ToolErrorType.PERMISSION_DENIED);
         expect(result.llmContent).toMatch(/Permission denied writing to file/);
         expect(fs.readFileSync(filePath, 'utf8')).toBe(initialContent);
+
+        fs.chmodSync(filePath, 0o600);
       },
     );
 

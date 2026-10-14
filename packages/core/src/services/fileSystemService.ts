@@ -77,7 +77,7 @@ export class StandardFileSystemService implements FileSystemService {
       // A rename is governed by the directory's permissions alone, so without
       // this check an atomic replace would silently overwrite a read-only
       // file that a plain write refuses with EACCES.
-      await fs.access(realPath, constants.W_OK);
+      await this.assertWritable(realPath);
 
       // Hard links share one inode. Renaming a temp file over this name would
       // point it at a new inode and leave the other names on the old content,
@@ -136,6 +136,32 @@ export class StandardFileSystemService implements FileSystemService {
     } catch {
       // New file, or a destination we cannot stat; treat it as absent.
       return undefined;
+    }
+  }
+
+  /**
+   * Rejects with the same error a plain write would raise when `filePath`
+   * exists but is not writable.
+   */
+  private async assertWritable(filePath: string): Promise<void> {
+    try {
+      await fs.access(filePath, constants.W_OK);
+    } catch (error) {
+      // libuv reports a read-only file as EPERM on Windows, whereas opening it
+      // for writing fails with EACCES there as it does everywhere else. Keep
+      // the code a plain write would have produced so that callers classify
+      // the failure as a permission error on every platform.
+      if (
+        process.platform === 'win32' &&
+        isNodeError(error) &&
+        error.code === 'EPERM'
+      ) {
+        throw Object.assign(
+          new Error(`EACCES: permission denied, access '${filePath}'`),
+          { code: 'EACCES', path: filePath, syscall: 'access' },
+        );
+      }
+      throw error;
     }
   }
 
