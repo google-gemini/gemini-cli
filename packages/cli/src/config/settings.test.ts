@@ -2585,6 +2585,25 @@ describe('Settings Loading and Merging', () => {
       });
     });
 
+    it('should not resolve or validate workspace settings in an untrusted workspace to avoid leaking shell secrets in validation errors', () => {
+      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
+        isTrusted: false,
+        source: 'file',
+      });
+      vi.stubEnv('SECRET_TOKEN_FROM_SHELL', 'super-secret-shell-value');
+      setupEnvFileScenario({
+        envFileContent: '',
+        workspaceSettingsContent: {
+          advanced: { dnsResolutionOrder: '$SECRET_TOKEN_FROM_SHELL' },
+        },
+      });
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.errors).toEqual([]);
+      expect(settings.workspace.settings).toEqual({});
+    });
+
     it('should evaluate workspace trust with settings resolved from the shell environment', () => {
       // The trust check gates whether a workspace .env file may be loaded, so
       // it must be evaluated against the environment as it exists *before*

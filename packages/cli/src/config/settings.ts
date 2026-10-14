@@ -367,6 +367,20 @@ export class LoadedSettings {
       return;
     }
     this.isTrusted = isTrusted;
+    if (
+      isTrusted &&
+      Object.keys(this._workspaceFile.settings).length === 0 &&
+      Object.keys(this._workspaceFile.originalSettings).length > 0
+    ) {
+      this._workspaceFile = {
+        ...this._workspaceFile,
+        settings: resolveSettings(
+          this._workspaceFile.originalSettings,
+          this._workspaceFile.path,
+          this.errors,
+        ),
+      };
+    }
     this.workspace = isTrusted
       ? this._workspaceFile
       : this.createEmptyWorkspace(this._workspaceFile);
@@ -385,13 +399,17 @@ export class LoadedSettings {
 
   private computeMergedSettings(forceTrusted = false): MergedSettings {
     const isTrusted = forceTrusted || this.isTrusted;
-    const workspace = forceTrusted ? this._workspaceFile : this.workspace;
+    const workspaceSettings = forceTrusted
+      ? Object.keys(this._workspaceFile.settings).length > 0
+        ? this._workspaceFile.settings
+        : this._workspaceFile.originalSettings
+      : this.workspace.settings;
 
     const merged = mergeSettings(
       this.system.settings,
       this.systemDefaults.settings,
       this.user.settings,
-      workspace.settings,
+      workspaceSettings,
       isTrusted,
     );
 
@@ -786,6 +804,44 @@ interface RawSettingsFile {
 }
 
 /**
+ * Expands environment variable placeholders in `rawSettings` against the
+ * current `process.env` and validates the result.
+ *
+ * Validation issues are only recorded in `settingsErrors` when provided, so
+ * that the preliminary pass (which runs before `.env` files are loaded) does
+ * not report placeholders that are resolved later on.
+ */
+function resolveSettings(
+  rawSettings: Settings,
+  filePath: string,
+  settingsErrors?: SettingsError[],
+): Settings {
+  if (Object.keys(rawSettings).length === 0) {
+    return {};
+  }
+
+  const expandedSettings = resolveEnvVarsInObject(rawSettings);
+
+  // Validate settings structure with Zod after environment variable expansion
+  const validationResult = validateSettings(expandedSettings);
+  if (!validationResult.success && validationResult.error) {
+    if (settingsErrors) {
+      settingsErrors.push({
+        message: formatValidationError(validationResult.error, filePath),
+        path: filePath,
+        severity: 'warning',
+      });
+    }
+    return expandedSettings;
+  }
+
+  // Since we've successfully validated expandedSettings against settingsZodSchema,
+  // it's safe to cast the resulting data to the Settings type.
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  return (validationResult.data as Settings) ?? expandedSettings;
+}
+
+/**
  * Internal implementation of the settings loading logic.
  */
 function _doLoadSettings(workspaceDir: string): LoadedSettings {
@@ -802,7 +858,7 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
 
   /**
    * Reads and parses a settings file. Environment variable placeholders are
-   * intentionally left unresolved here, see `resolve` below.
+   * intentionally left unresolved here, see `resolveSettings` above.
    */
   const load = (filePath: string): RawSettingsFile => {
     try {
@@ -833,44 +889,6 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
       });
     }
     return { rawSettings: {} };
-  };
-
-  /**
-   * Expands environment variable placeholders in `rawSettings` against the
-   * current `process.env` and validates the result.
-   *
-   * Validation issues are only recorded when `recordValidationErrors` is set,
-   * so that the preliminary pass (which runs before `.env` files are loaded)
-   * does not report placeholders that are resolved later on.
-   */
-  const resolve = (
-    rawSettings: Settings,
-    filePath: string,
-    recordValidationErrors: boolean,
-  ): Settings => {
-    if (Object.keys(rawSettings).length === 0) {
-      return {};
-    }
-
-    const expandedSettings = resolveEnvVarsInObject(rawSettings);
-
-    // Validate settings structure with Zod after environment variable expansion
-    const validationResult = validateSettings(expandedSettings);
-    if (!validationResult.success && validationResult.error) {
-      if (recordValidationErrors) {
-        settingsErrors.push({
-          message: formatValidationError(validationResult.error, filePath),
-          path: filePath,
-          severity: 'warning',
-        });
-      }
-      return expandedSettings;
-    }
-
-    // Since we've successfully validated expandedSettings against settingsZodSchema,
-    // it's safe to cast the resulting data to the Settings type.
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return (validationResult.data as Settings) ?? expandedSettings;
   };
 
   const securityCache = createPathSecurityCache();
@@ -944,34 +962,19 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
     workspaceResult.rawSettings,
   );
 
-  const resolveAllScopes = (recordValidationErrors: boolean) => {
-    systemSettings = resolve(
-      systemResult.rawSettings,
-      systemSettingsPath,
-      recordValidationErrors,
-    );
-    systemDefaultSettings = resolve(
-      systemDefaultsResult.rawSettings,
-      systemDefaultsPath,
-      recordValidationErrors,
-    );
-    userSettings = resolve(
-      userResult.rawSettings,
-      USER_SETTINGS_PATH,
-      recordValidationErrors,
-    );
-    workspaceSettings = resolve(
-      workspaceResult.rawSettings,
-      workspaceSettingsPath,
-      recordValidationErrors,
-    );
-  };
-
   // Preliminary pass: resolve placeholders against the environment as it is
-  // before any `.env` file is loaded. The workspace trust check and
-  // `loadEnvironment` depend on these settings, so they can only observe
-  // variables from the shell environment, never from `.env` files.
-  resolveAllScopes(false);
+  // before any `.env` file is loaded. The workspace trust check only depends on
+  // system and user settings, so workspace settings are not resolved before
+  // trust is established.
+  systemSettings = resolveSettings(
+    systemResult.rawSettings,
+    systemSettingsPath,
+  );
+  systemDefaultSettings = resolveSettings(
+    systemDefaultsResult.rawSettings,
+    systemDefaultsPath,
+  );
+  userSettings = resolveSettings(userResult.rawSettings, USER_SETTINGS_PATH);
 
   // For the initial trust check, we can only use user and system settings.
   const initialTrustCheckSettings = customDeepMerge(
@@ -984,6 +987,13 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
   const isTrusted =
     isWorkspaceTrusted(initialTrustCheckSettings as Settings, workspaceDir)
       ?.isTrusted ?? false;
+
+  if (isTrusted) {
+    workspaceSettings = resolveSettings(
+      workspaceResult.rawSettings,
+      workspaceSettingsPath,
+    );
+  }
 
   // Create a temporary merged settings object to pass to loadEnvironment.
   const tempMergedSettings = mergeSettings(
@@ -1000,8 +1010,30 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
 
   // Final pass: variables from `.env` files are now part of `process.env`, so
   // resolve the settings again to expand the placeholders that reference them.
-  // Validation issues are only reported from this pass.
-  resolveAllScopes(true);
+  // Validation issues are only reported from this pass. Workspace settings are
+  // only resolved and validated when the workspace is trusted.
+  systemSettings = resolveSettings(
+    systemResult.rawSettings,
+    systemSettingsPath,
+    settingsErrors,
+  );
+  systemDefaultSettings = resolveSettings(
+    systemDefaultsResult.rawSettings,
+    systemDefaultsPath,
+    settingsErrors,
+  );
+  userSettings = resolveSettings(
+    userResult.rawSettings,
+    USER_SETTINGS_PATH,
+    settingsErrors,
+  );
+  workspaceSettings = isTrusted
+    ? resolveSettings(
+        workspaceResult.rawSettings,
+        workspaceSettingsPath,
+        settingsErrors,
+      )
+    : {};
 
   // Support legacy theme names
   if (userSettings.ui?.theme === 'VS') {
