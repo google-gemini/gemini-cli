@@ -2400,7 +2400,7 @@ describe('useGeminiStream', () => {
 
       // Cancel to make isResponding false
       await act(async () => {
-        result.current.cancelOngoingRequest();
+        await result.current.cancelOngoingRequest();
       });
 
       expect(result.current.retryStatus).toBeNull();
@@ -2443,7 +2443,7 @@ describe('useGeminiStream', () => {
       expect(result.current.retryStatus).toEqual(retryPayload);
 
       await act(async () => {
-        result.current.cancelOngoingRequest();
+        await result.current.cancelOngoingRequest();
       });
 
       await waitFor(() => {
@@ -4756,5 +4756,131 @@ describe('useGeminiStream', () => {
       await userPromptCall![1]({ metadata: spanMetadata });
     });
     expect(spanMetadata.input).toBe('telemetry test query');
+  });
+
+  describe('cancelOngoingRequest session log harmonization & timeout bound', () => {
+    it('immediately synthesizes and records filler functionResponse via recordCompletedToolCalls when cancelling active tools', async () => {
+      const executingToolCall: TrackedExecutingToolCall = {
+        request: {
+          callId: 'call-abc',
+          name: 'run_shell_command',
+          args: { command: 'sleep 30' },
+          isClientInitiated: false,
+          prompt_id: 'prompt-1',
+        },
+        status: CoreToolCallStatus.Executing,
+        tool: {
+          name: 'run_shell_command',
+          displayName: 'Shell',
+        } as unknown as AnyDeclarativeTool,
+        invocation: {
+          getDescription: () => 'sleep 30',
+        } as unknown as AnyToolInvocation,
+      };
+
+      const { result, client } = await renderTestHook([executingToolCall]);
+      const mockRecordCompletedToolCalls =
+        client.getChat().recordCompletedToolCalls;
+
+      await act(async () => {
+        await result.current.cancelOngoingRequest();
+      });
+
+      expect(mockCancelAllToolCalls).toHaveBeenCalledTimes(1);
+      expect(mockRecordCompletedToolCalls).toHaveBeenCalledTimes(1);
+      expect(mockRecordCompletedToolCalls).toHaveBeenCalledWith(
+        expect.any(String),
+        [
+          expect.objectContaining({
+            status: CoreToolCallStatus.Cancelled,
+            request: executingToolCall.request,
+            response: expect.objectContaining({
+              callId: 'call-abc',
+              responseParts: [
+                {
+                  functionResponse: {
+                    id: 'call-abc',
+                    name: 'run_shell_command',
+                    response: {
+                      error:
+                        '[Operation Cancelled] Reason: User cancelled operation',
+                    },
+                  },
+                },
+              ],
+            }),
+          }),
+        ],
+      );
+    });
+
+    it('bounds waiting on an unresponsive tool schedule promise at 1000ms', async () => {
+      vi.useFakeTimers();
+      try {
+        mockScheduleToolCalls.mockImplementation(
+          () => new Promise<CompletedToolCall[]>(() => {}),
+        );
+
+        mockSendMessageStream.mockReturnValue(
+          (async function* () {
+            yield {
+              type: ServerGeminiEventType.ToolCallRequest,
+              value: {
+                callId: 'call-hang',
+                name: 'hanging_tool',
+                args: {},
+                isClientInitiated: false,
+                prompt_id: 'prompt-hang',
+              },
+            };
+          })(),
+        );
+
+        const { result, client } = await renderTestHook();
+        const mockRecordCompletedToolCalls =
+          client.getChat().recordCompletedToolCalls;
+
+        act(() => {
+          void result.current.submitQuery('run hanging tool');
+        });
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(10);
+        });
+
+        expect(mockScheduleToolCalls).toHaveBeenCalledTimes(1);
+
+        let cancelResolved = false;
+        let cancelPromise!: Promise<void>;
+        act(() => {
+          cancelPromise = result.current.cancelOngoingRequest().then(() => {
+            cancelResolved = true;
+          });
+        });
+
+        expect(mockRecordCompletedToolCalls).toHaveBeenCalledWith(
+          expect.any(String),
+          [
+            expect.objectContaining({
+              status: CoreToolCallStatus.Cancelled,
+              request: expect.objectContaining({
+                callId: 'call-hang',
+                name: 'hanging_tool',
+              }),
+            }),
+          ],
+        );
+        expect(cancelResolved).toBe(false);
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(1000);
+          await cancelPromise;
+        });
+
+        expect(cancelResolved).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 });
