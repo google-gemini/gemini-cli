@@ -2415,6 +2415,190 @@ describe('Settings Loading and Merging', () => {
     });
   });
 
+  describe('resolving settings placeholders from .env files', () => {
+    const WORKSPACE_ENV_PATH = path.resolve(
+      path.join(MOCK_WORKSPACE_DIR, '.env'),
+    );
+
+    /**
+     * Sets up a workspace containing a project `.env` file alongside the
+     * given user and workspace settings files.
+     */
+    function setupEnvFileScenario({
+      envFileContent,
+      userSettingsContent = {},
+      workspaceSettingsContent = {},
+    }: {
+      envFileContent: string;
+      userSettingsContent?: Record<string, unknown>;
+      workspaceSettingsContent?: Record<string, unknown>;
+    }) {
+      (mockFsExistsSync as Mock).mockImplementation((p: fs.PathLike) =>
+        [
+          path.resolve(USER_SETTINGS_PATH),
+          path.resolve(MOCK_WORKSPACE_SETTINGS_PATH),
+          WORKSPACE_ENV_PATH,
+        ].includes(path.resolve(p.toString())),
+      );
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          const normalizedP = path.resolve(p.toString());
+          if (normalizedP === path.resolve(USER_SETTINGS_PATH)) {
+            return JSON.stringify(userSettingsContent);
+          }
+          if (normalizedP === path.resolve(MOCK_WORKSPACE_SETTINGS_PATH)) {
+            return JSON.stringify(workspaceSettingsContent);
+          }
+          if (normalizedP === WORKSPACE_ENV_PATH) {
+            return envFileContent;
+          }
+          return '{}';
+        },
+      );
+    }
+
+    beforeEach(() => {
+      // Ensure the variables injected by `loadEnvironment` are absent before
+      // each test and restored by `vi.unstubAllEnvs()` afterwards.
+      vi.stubEnv('GITHUB_MCP_PAT', undefined);
+      vi.stubEnv('WORKSPACE_API_TOKEN', undefined);
+      vi.stubEnv('MAX_TURNS_FROM_ENV_FILE', undefined);
+    });
+
+    it('should resolve placeholders in settings using variables defined only in a .env file', () => {
+      setupEnvFileScenario({
+        envFileContent:
+          'GITHUB_MCP_PAT=ghp_secretTokenHere\nWORKSPACE_API_TOKEN=ws-token',
+        userSettingsContent: {
+          mcpServers: {
+            github: {
+              httpUrl: 'https://api.githubcopilot.com/mcp/',
+              headers: { Authorization: 'Bearer $GITHUB_MCP_PAT' },
+            },
+          },
+        },
+        workspaceSettingsContent: {
+          mcpServers: {
+            internal: {
+              url: 'https://internal.example.com/sse?token=${WORKSPACE_API_TOKEN}',
+            },
+          },
+        },
+      });
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged.mcpServers?.['github']?.headers).toEqual({
+        Authorization: 'Bearer ghp_secretTokenHere',
+      });
+      expect(settings.merged.mcpServers?.['internal']?.url).toBe(
+        'https://internal.example.com/sse?token=ws-token',
+      );
+      expect(settings.user.settings.mcpServers?.['github']?.headers).toEqual({
+        Authorization: 'Bearer ghp_secretTokenHere',
+      });
+      expect(settings.workspace.settings.mcpServers?.['internal']?.url).toBe(
+        'https://internal.example.com/sse?token=ws-token',
+      );
+    });
+
+    it('should keep the unexpanded placeholders in originalSettings', () => {
+      setupEnvFileScenario({
+        envFileContent: 'GITHUB_MCP_PAT=ghp_secretTokenHere',
+        userSettingsContent: {
+          mcpServers: {
+            github: { headers: { Authorization: 'Bearer $GITHUB_MCP_PAT' } },
+          },
+        },
+      });
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(
+        settings.user.originalSettings.mcpServers?.['github']?.headers,
+      ).toEqual({ Authorization: 'Bearer $GITHUB_MCP_PAT' });
+    });
+
+    it('should validate settings after .env variables have been resolved', () => {
+      setupEnvFileScenario({
+        envFileContent: 'MAX_TURNS_FROM_ENV_FILE=15',
+        userSettingsContent: {
+          model: { maxSessionTurns: '$MAX_TURNS_FROM_ENV_FILE' },
+        },
+      });
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged.model.maxSessionTurns).toBe(15);
+      expect(settings.errors).toHaveLength(0);
+    });
+
+    it('should prefer variables from the shell environment over .env files', () => {
+      vi.stubEnv('GITHUB_MCP_PAT', 'token-from-shell');
+      setupEnvFileScenario({
+        envFileContent: 'GITHUB_MCP_PAT=token-from-env-file',
+        userSettingsContent: {
+          mcpServers: {
+            github: { headers: { Authorization: 'Bearer $GITHUB_MCP_PAT' } },
+          },
+        },
+      });
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged.mcpServers?.['github']?.headers).toEqual({
+        Authorization: 'Bearer token-from-shell',
+      });
+    });
+
+    it('should not resolve placeholders from a .env file in an untrusted workspace', () => {
+      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
+        isTrusted: false,
+        source: 'file',
+      });
+      setupEnvFileScenario({
+        envFileContent: 'GITHUB_MCP_PAT=ghp_secretTokenHere',
+        userSettingsContent: {
+          mcpServers: {
+            github: { headers: { Authorization: 'Bearer $GITHUB_MCP_PAT' } },
+          },
+        },
+      });
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(process.env['GITHUB_MCP_PAT']).toBeUndefined();
+      expect(settings.merged.mcpServers?.['github']?.headers).toEqual({
+        Authorization: 'Bearer $GITHUB_MCP_PAT',
+      });
+    });
+
+    it('should evaluate workspace trust with settings resolved from the shell environment', () => {
+      // The trust check gates whether a workspace .env file may be loaded, so
+      // it must be evaluated against the environment as it exists *before*
+      // any .env file is loaded, with placeholders resolved and coerced.
+      vi.stubEnv('FOLDER_TRUST_FROM_SHELL', 'false');
+      setupEnvFileScenario({
+        envFileContent: 'GITHUB_MCP_PAT=ghp_secretTokenHere',
+        userSettingsContent: {
+          security: { folderTrust: { enabled: '$FOLDER_TRUST_FROM_SHELL' } },
+        },
+      });
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(isWorkspaceTrusted).toHaveBeenCalledWith(
+        expect.objectContaining({
+          security: expect.objectContaining({
+            folderTrust: expect.objectContaining({ enabled: false }),
+          }),
+        }),
+        MOCK_WORKSPACE_DIR,
+      );
+      expect(settings.merged.security.folderTrust.enabled).toBe(false);
+    });
+  });
+
   describe('migrateDeprecatedSettings', () => {
     let mockFsExistsSync: Mock;
     let mockFsReadFileSync: Mock;

@@ -777,6 +777,15 @@ export function loadSettings(
 }
 
 /**
+ * A settings file as read from disk, before environment variable placeholders
+ * have been resolved.
+ */
+interface RawSettingsFile {
+  rawSettings: Settings;
+  rawJson?: string;
+}
+
+/**
  * Internal implementation of the settings loading logic.
  */
 function _doLoadSettings(workspaceDir: string): LoadedSettings {
@@ -791,9 +800,11 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
   const storage = new Storage(workspaceDir);
   const workspaceSettingsPath = storage.getWorkspaceSettingsPath();
 
-  const load = (
-    filePath: string,
-  ): { settings: Settings; rawSettings: Settings; rawJson?: string } => {
+  /**
+   * Reads and parses a settings file. Environment variable placeholders are
+   * intentionally left unresolved here, see `resolve` below.
+   */
+  const load = (filePath: string): RawSettingsFile => {
     try {
       if (fs.existsSync(filePath)) {
         const content = fs.readFileSync(filePath, 'utf-8');
@@ -809,45 +820,10 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
             path: filePath,
             severity: 'error',
           });
-          return { settings: {}, rawSettings: {} };
+          return { rawSettings: {} };
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const settingsObject = rawSettings as Record<string, unknown>;
-
-        // Expand environment variables
-        const expandedSettings = resolveEnvVarsInObject(
-          settingsObject as Settings,
-        );
-
-        // Validate settings structure with Zod after environment variable expansion
-        const validationResult = validateSettings(expandedSettings);
-        if (!validationResult.success && validationResult.error) {
-          const errorMessage = formatValidationError(
-            validationResult.error,
-            filePath,
-          );
-          settingsErrors.push({
-            message: errorMessage,
-            path: filePath,
-            severity: 'warning',
-          });
-          return {
-            settings: expandedSettings,
-            rawSettings: settingsObject as Settings,
-            rawJson: content,
-          };
-        }
-
-        // Return the successfully cast and validated data
-        return {
-          // Since we've successfully validated expandedSettings against settingsZodSchema,
-          // it's safe to cast the resulting data to the Settings type.
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          settings: (validationResult.data as Settings) ?? expandedSettings,
-          rawSettings: settingsObject as Settings,
-          rawJson: content,
-        };
+        return { rawSettings: rawSettings as Settings, rawJson: content };
       }
     } catch (error: unknown) {
       settingsErrors.push({
@@ -856,7 +832,41 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
         severity: 'error',
       });
     }
-    return { settings: {}, rawSettings: {} };
+    return { rawSettings: {} };
+  };
+
+  /**
+   * Expands environment variable placeholders in `rawSettings` against the
+   * current `process.env` and validates the result.
+   *
+   * Validation issues are only recorded when `recordValidationErrors` is set,
+   * so that the preliminary pass (which runs before `.env` files are loaded)
+   * does not report placeholders that are resolved later on.
+   */
+  const resolve = (
+    rawSettings: Settings,
+    filePath: string,
+    recordValidationErrors: boolean,
+  ): Settings => {
+    const expandedSettings = resolveEnvVarsInObject(rawSettings);
+
+    // Validate settings structure with Zod after environment variable expansion
+    const validationResult = validateSettings(expandedSettings);
+    if (!validationResult.success && validationResult.error) {
+      if (recordValidationErrors) {
+        settingsErrors.push({
+          message: formatValidationError(validationResult.error, filePath),
+          path: filePath,
+          severity: 'warning',
+        });
+      }
+      return expandedSettings;
+    }
+
+    // Since we've successfully validated expandedSettings against settingsZodSchema,
+    // it's safe to cast the resulting data to the Settings type.
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    return (validationResult.data as Settings) ?? expandedSettings;
   };
 
   const securityCache = createPathSecurityCache();
@@ -864,9 +874,9 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
   const loadSystemFile = (
     filePath: string,
     fileLabel: string,
-  ): { settings: Settings; rawSettings: Settings; rawJson?: string } => {
+  ): RawSettingsFile => {
     if (!fs.existsSync(filePath)) {
-      return { settings: {}, rawSettings: {} };
+      return { rawSettings: {} };
     }
 
     const check = isFileAndDirectorySecureSync(filePath, securityCache);
@@ -876,7 +886,7 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
         path: filePath,
         severity: 'warning',
       });
-      return { settings: {}, rawSettings: {} };
+      return { rawSettings: {} };
     }
 
     return load(filePath);
@@ -889,33 +899,10 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
   );
   const userResult = load(USER_SETTINGS_PATH);
 
-  let workspaceResult: {
-    settings: Settings;
-    rawSettings: Settings;
-    rawJson?: string;
-  } = {
-    settings: {} as Settings,
-    rawSettings: {} as Settings,
-    rawJson: undefined,
-  };
+  let workspaceResult: RawSettingsFile = { rawSettings: {} };
   if (!storage.isWorkspaceHomeDir()) {
     workspaceResult = load(workspaceSettingsPath);
   }
-
-  const systemOriginalSettings = structuredClone(systemResult.rawSettings);
-  const systemDefaultsOriginalSettings = structuredClone(
-    systemDefaultsResult.rawSettings,
-  );
-  const userOriginalSettings = structuredClone(userResult.rawSettings);
-  const workspaceOriginalSettings = structuredClone(
-    workspaceResult.rawSettings,
-  );
-
-  // Environment variables for runtime use are already resolved and validated in load()
-  systemSettings = systemResult.settings;
-  systemDefaultSettings = systemDefaultsResult.settings;
-  userSettings = userResult.settings;
-  workspaceSettings = workspaceResult.settings;
 
   // Support environment variable override from relaunch supervisor across exit code 199
   const envAuthOverride = process.env['GEMINI_CLI_AUTH_OVERRIDE'];
@@ -930,33 +917,55 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
         (envAuthOverride as AuthType)
       : undefined;
   if (authOverride) {
-    if (!userSettings.security) {
-      userSettings.security = {};
+    // Applied to the raw settings so that the override is reflected both in
+    // the resolved settings and in the persisted `originalSettings`.
+    const rawUserSettings = userResult.rawSettings;
+    if (!rawUserSettings.security) {
+      rawUserSettings.security = {};
     }
-    if (!userSettings.security.auth) {
-      userSettings.security.auth = {};
+    if (!rawUserSettings.security.auth) {
+      rawUserSettings.security.auth = {};
     }
-    userSettings.security.auth.selectedType = authOverride;
-    if (!userOriginalSettings.security) {
-      userOriginalSettings.security = {};
-    }
-    if (!userOriginalSettings.security.auth) {
-      userOriginalSettings.security.auth = {};
-    }
-    userOriginalSettings.security.auth.selectedType = authOverride;
+    rawUserSettings.security.auth.selectedType = authOverride;
   }
 
-  // Support legacy theme names
-  if (userSettings.ui?.theme === 'VS') {
-    userSettings.ui.theme = DefaultLight.name;
-  } else if (userSettings.ui?.theme === 'VS2015') {
-    userSettings.ui.theme = DefaultDark.name;
-  }
-  if (workspaceSettings.ui?.theme === 'VS') {
-    workspaceSettings.ui.theme = DefaultLight.name;
-  } else if (workspaceSettings.ui?.theme === 'VS2015') {
-    workspaceSettings.ui.theme = DefaultDark.name;
-  }
+  const systemOriginalSettings = structuredClone(systemResult.rawSettings);
+  const systemDefaultsOriginalSettings = structuredClone(
+    systemDefaultsResult.rawSettings,
+  );
+  const userOriginalSettings = structuredClone(userResult.rawSettings);
+  const workspaceOriginalSettings = structuredClone(
+    workspaceResult.rawSettings,
+  );
+
+  const resolveAllScopes = (recordValidationErrors: boolean) => {
+    systemSettings = resolve(
+      systemResult.rawSettings,
+      systemSettingsPath,
+      recordValidationErrors,
+    );
+    systemDefaultSettings = resolve(
+      systemDefaultsResult.rawSettings,
+      systemDefaultsPath,
+      recordValidationErrors,
+    );
+    userSettings = resolve(
+      userResult.rawSettings,
+      USER_SETTINGS_PATH,
+      recordValidationErrors,
+    );
+    workspaceSettings = resolve(
+      workspaceResult.rawSettings,
+      workspaceSettingsPath,
+      recordValidationErrors,
+    );
+  };
+
+  // Preliminary pass: resolve placeholders against the environment as it is
+  // before any `.env` file is loaded. The workspace trust check and
+  // `loadEnvironment` depend on these settings, so they can only observe
+  // variables from the shell environment, never from `.env` files.
+  resolveAllScopes(false);
 
   // For the initial trust check, we can only use user and system settings.
   const initialTrustCheckSettings = customDeepMerge(
@@ -982,6 +991,23 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
   // loadEnvironment depends on settings so we have to create a temp version of
   // the settings to avoid a cycle
   loadEnvironment(tempMergedSettings, workspaceDir);
+
+  // Final pass: variables from `.env` files are now part of `process.env`, so
+  // resolve the settings again to expand the placeholders that reference them.
+  // Validation issues are only reported from this pass.
+  resolveAllScopes(true);
+
+  // Support legacy theme names
+  if (userSettings.ui?.theme === 'VS') {
+    userSettings.ui.theme = DefaultLight.name;
+  } else if (userSettings.ui?.theme === 'VS2015') {
+    userSettings.ui.theme = DefaultDark.name;
+  }
+  if (workspaceSettings.ui?.theme === 'VS') {
+    workspaceSettings.ui.theme = DefaultLight.name;
+  } else if (workspaceSettings.ui?.theme === 'VS2015') {
+    workspaceSettings.ui.theme = DefaultDark.name;
+  }
 
   // Check for any fatal errors before proceeding
   const fatalErrors = settingsErrors.filter((e) => e.severity === 'error');
