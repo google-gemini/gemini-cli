@@ -547,6 +547,7 @@ export async function downloadFile(
     https
       .get(url, { headers }, (res) => {
         if (res.statusCode === 302 || res.statusCode === 301) {
+          res.resume?.();
           if (redirectCount >= 10) {
             return rejectOnce(new Error('Too many redirects'));
           }
@@ -562,6 +563,7 @@ export async function downloadFile(
           return;
         }
         if (res.statusCode !== 200) {
+          res.resume?.();
           return rejectOnce(
             new Error(`Request failed with status code ${res.statusCode}`),
           );
@@ -575,6 +577,7 @@ export async function downloadFile(
           // the failure to the caller. The incomplete archive is removed once
           // the handle has been closed.
           res.unpipe?.(file);
+          res.destroy?.();
           file.destroy();
           rejectOnce(error);
         };
