@@ -31,7 +31,7 @@ export class PrivateIpError extends Error {
 }
 
 let defaultHeadersTimeout = 60000; // 60 seconds
-const defaultBodyTimeout = 300000; // 5 minutes
+let defaultBodyTimeout = 300000; // 5 minutes
 let currentProxy: string | undefined = undefined;
 
 function getBuildConnector():
@@ -220,18 +220,37 @@ undici.setGlobalDispatcher(
   }),
 );
 
-export function updateGlobalFetchTimeouts(timeoutMs: number) {
+function assertValidTimeout(timeoutMs: number) {
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
     throw new RangeError(
       `Invalid timeout value: ${timeoutMs}. Must be a positive finite number.`,
     );
   }
-  defaultHeadersTimeout = timeoutMs;
+}
+
+/**
+ * Updates the timeouts used by the global fetch dispatcher and the safe agent.
+ *
+ * @param headersTimeoutMs Time to wait for the response headers.
+ * @param bodyTimeoutMs Maximum idle time between body chunks. When omitted,
+ *   the current body timeout is kept.
+ */
+export function updateGlobalFetchTimeouts(
+  headersTimeoutMs: number,
+  bodyTimeoutMs?: number,
+) {
+  assertValidTimeout(headersTimeoutMs);
+  if (bodyTimeoutMs !== undefined) {
+    assertValidTimeout(bodyTimeoutMs);
+  }
+  defaultHeadersTimeout = headersTimeoutMs;
+  if (bodyTimeoutMs !== undefined) {
+    defaultBodyTimeout = bodyTimeoutMs;
+  }
   defaultSafeAgent = createSafeAgent({
     headersTimeout: defaultHeadersTimeout,
     bodyTimeout: defaultBodyTimeout,
   });
-  // We keep body timeout high for LLM streaming responses
   if (currentProxy) {
     setGlobalProxy(currentProxy);
   } else {
@@ -242,6 +261,19 @@ export function updateGlobalFetchTimeouts(timeoutMs: number) {
       }),
     );
   }
+}
+
+/**
+ * Returns the timeouts currently applied to the global fetch dispatcher.
+ */
+export function getGlobalFetchTimeouts(): {
+  headersTimeoutMs: number;
+  bodyTimeoutMs: number;
+} {
+  return {
+    headersTimeoutMs: defaultHeadersTimeout,
+    bodyTimeoutMs: defaultBodyTimeout,
+  };
 }
 
 /**

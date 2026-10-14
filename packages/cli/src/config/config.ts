@@ -1101,6 +1101,8 @@ export async function loadCliConfig(
     billing: settings.billing,
     vertexAiRouting: settings.billing?.vertexAi,
     maxAttempts: settings.general?.maxAttempts,
+    requestHeadersTimeoutMs: settings.general?.requestHeadersTimeoutMs,
+    requestBodyTimeoutMs: settings.general?.requestBodyTimeoutMs,
     ptyInfo: ptyInfo?.name,
     disableLLMCorrection: settings.tools?.disableLLMCorrection,
     rawOutput: argv.rawOutput,
