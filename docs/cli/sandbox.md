@@ -118,6 +118,13 @@ mount your local project folder and operate within `/Users/you/project` inside
 the container. This allows the AI to seamlessly read and modify your project
 files while remaining isolated from the rest of your system.
 
+<!-- prettier-ignore -->
+> [!NOTE]
+> IDE integration with the Gemini CLI Companion extension isn't available from
+> inside a container sandbox when your IDE runs on the host machine. This
+> applies to Docker, Podman, gVisor/runsc, and LXC. For details, see
+> [Using with sandboxing](../ide-integration/index.md#using-with-sandboxing).
+
 **Quick setup:**
 
 To enable Docker sandboxing, run Gemini CLI with the sandbox flag and specify
@@ -436,6 +443,14 @@ $env:SANDBOX_SET_UID_GID="false"  # Disable UID/GID mapping
 
 - Check sandbox profile allows network.
 - Verify proxy configuration.
+
+**IDE integration doesn't connect**
+
+- Inside a container sandbox, `/ide status` reports
+  `Failed to connect to IDE companion extension` even when the extension is
+  installed. This is expected: the companion server only accepts connections on
+  the host's loopback interface. See
+  [Using with sandboxing](../ide-integration/index.md#using-with-sandboxing).
 
 ### Debug mode
 

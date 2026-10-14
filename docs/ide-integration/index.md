@@ -214,12 +214,19 @@ If you are using Gemini CLI within a sandbox, be aware of the following:
 - **On macOS:** The IDE integration requires network access to communicate with
   the IDE companion extension. You must use a Seatbelt profile that allows
   network access.
-- **In a Docker container:** If you run Gemini CLI inside a Docker (or Podman)
-  container, the IDE integration can still connect to the VS Code extension
-  running on your host machine. The CLI is configured to automatically find the
-  IDE server on `host.docker.internal`. No special configuration is usually
-  required, but you may need to ensure your Docker networking setup allows
-  connections from the container to the host.
+- **In a container sandbox (Docker, Podman, gVisor/runsc, or LXC):** IDE
+  integration isn't available when Gemini CLI runs inside a container sandbox
+  and your IDE runs on the host machine. The companion extension's server only
+  accepts connections on the host's loopback interface (`127.0.0.1`), validates
+  the `Host` header, and requires an authentication token that Gemini CLI
+  doesn't forward into the sandbox. In this configuration, `/ide status` and
+  `/ide enable` report `Failed to connect to IDE companion extension`. To use
+  IDE integration, run Gemini CLI without a container sandbox, or use macOS
+  Seatbelt instead.
+- **In a dev container or Remote - SSH session:** IDE integration works when the
+  IDE's extension host runs in the same environment as Gemini CLI, for example
+  in a VS Code dev container or a Remote - SSH session, because the companion
+  server and Gemini CLI share the same loopback interface.
 
 ## Troubleshooting
 
@@ -239,6 +246,9 @@ If you are using Gemini CLI within a sandbox, be aware of the following:
         your IDE and that it is enabled.
     2.  Open a new terminal window in your IDE to ensure it picks up the correct
         environment.
+    3.  If Gemini CLI is running inside a container sandbox
+        (`GEMINI_SANDBOX=docker`, `podman`, `runsc`, or `lxc`), IDE integration
+        isn't available. See [Using with sandboxing](#using-with-sandboxing).
 
 - **Message:**
   `🔴 Disconnected: IDE connection error. The connection was lost unexpectedly. Please try reconnecting by running /ide enable`
