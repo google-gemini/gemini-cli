@@ -220,10 +220,20 @@ undici.setGlobalDispatcher(
   }),
 );
 
+/**
+ * Largest delay Node.js timers accept (2^31 - 1 ms, about 24.8 days). Larger
+ * values overflow and fire after 1 ms, which would abort every request.
+ */
+export const MAX_FETCH_TIMEOUT_MS = 2_147_483_647;
+
 function assertValidTimeout(timeoutMs: number) {
-  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+  if (
+    !Number.isFinite(timeoutMs) ||
+    timeoutMs <= 0 ||
+    timeoutMs > MAX_FETCH_TIMEOUT_MS
+  ) {
     throw new RangeError(
-      `Invalid timeout value: ${timeoutMs}. Must be a positive finite number.`,
+      `Invalid timeout value: ${timeoutMs}. Must be a positive number no greater than ${MAX_FETCH_TIMEOUT_MS}.`,
     );
   }
 }

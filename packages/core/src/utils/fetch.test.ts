@@ -42,6 +42,7 @@ const {
   setGlobalProxy,
   createSafeProxyAgent,
   createSafeAgent,
+  MAX_FETCH_TIMEOUT_MS,
 } = await import('./fetch.js');
 interface ErrorWithCode extends Error {
   code?: string;
@@ -311,9 +312,26 @@ describe('fetch utils', () => {
       expect(() => updateGlobalFetchTimeouts(60000, Infinity)).toThrow(
         RangeError,
       );
+      expect(() => updateGlobalFetchTimeouts(2_147_483_648)).toThrow(
+        RangeError,
+      );
+      expect(() => updateGlobalFetchTimeouts(60000, 2_147_483_648)).toThrow(
+        RangeError,
+      );
       expect(getGlobalFetchTimeouts()).toEqual({
         headersTimeoutMs: 60000,
         bodyTimeoutMs: 300000,
+      });
+    });
+  });
+
+  describe('MAX_FETCH_TIMEOUT_MS', () => {
+    it('should accept timeouts up to the Node.js timer limit', () => {
+      updateGlobalFetchTimeouts(MAX_FETCH_TIMEOUT_MS, MAX_FETCH_TIMEOUT_MS);
+
+      expect(getGlobalFetchTimeouts()).toEqual({
+        headersTimeoutMs: 2_147_483_647,
+        bodyTimeoutMs: 2_147_483_647,
       });
     });
   });

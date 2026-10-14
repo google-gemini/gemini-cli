@@ -244,6 +244,7 @@ vi.mock('../utils/events.js', async (importOriginal) => {
 });
 
 vi.mock('../utils/fetch.js', () => ({
+  MAX_FETCH_TIMEOUT_MS: 2_147_483_647,
   setGlobalProxy: mockSetGlobalProxy,
   updateGlobalFetchTimeouts: mockUpdateGlobalFetchTimeouts,
   getGlobalFetchTimeouts: vi.fn(() => ({
@@ -881,6 +882,37 @@ describe('Server Config (config.ts)', () => {
         });
         expect(config.getRequestTimeoutMs()).toBeUndefined();
       });
+
+      it('should accept a requestHeadersTimeoutMs setting at the Node.js timer limit', () => {
+        const config = new Config({
+          ...baseParams,
+          requestHeadersTimeoutMs: 2_147_483_647,
+        });
+        expect(config.getRequestTimeoutMs()).toBe(2_147_483_647);
+      });
+
+      it('should ignore a requestHeadersTimeoutMs setting above the Node.js timer limit', () => {
+        const config = new Config({
+          ...baseParams,
+          requestHeadersTimeoutMs: 2_147_483_648,
+        });
+        expect(config.getRequestTimeoutMs()).toBeUndefined();
+      });
+
+      it('should return undefined if the flag exceeds the Node.js timer limit', () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.DEFAULT_REQUEST_TIMEOUT]: {
+                intValue: '2147484',
+              },
+            },
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(config.getRequestTimeoutMs()).toBeUndefined();
+      });
     });
 
     describe('getRequestBodyTimeoutMs', () => {
@@ -898,7 +930,7 @@ describe('Server Config (config.ts)', () => {
       });
 
       it('should ignore invalid requestBodyTimeoutMs values', () => {
-        for (const value of [-1, 0, Number.NaN, Infinity]) {
+        for (const value of [-1, 0, Number.NaN, Infinity, 2_147_483_648]) {
           const config = new Config({
             ...baseParams,
             requestBodyTimeoutMs: value,
