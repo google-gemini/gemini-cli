@@ -230,6 +230,7 @@ describe('IdeClient after the IDE server restarts (Reload Window)', () => {
       await s.stop({ cleanup: true });
     }
     await fs.rm(tmp, { recursive: true, force: true });
+    vi.unstubAllEnvs();
   });
 
   it('reconnects to the restarted server although a leaked port file matches the frozen env port', async () => {

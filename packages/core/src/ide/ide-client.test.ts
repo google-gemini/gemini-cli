@@ -450,6 +450,77 @@ describe('IdeClient', () => {
     });
   });
 
+  describe('failed connection attempts', () => {
+    const getClient = (ideClient: IdeClient) =>
+      (ideClient as unknown as { client: Client | undefined }).client;
+
+    beforeEach(() => {
+      vi.mocked(validateWorkspacePath).mockReturnValue({ isValid: true });
+    });
+
+    it('should not keep a client whose HTTP connection failed', async () => {
+      mockDiscoveredConfigs([{ port: '1111' }]);
+      mockClient.connect.mockRejectedValue(new Error('ECONNREFUSED'));
+
+      const ideClient = await IdeClient.getInstance();
+      await ideClient.connect();
+
+      expect(ideClient.getConnectionStatus().status).toBe(
+        IDEConnectionStatus.Disconnected,
+      );
+      expect(getClient(ideClient)).toBeUndefined();
+      expect(mockHttpTransport.close).toHaveBeenCalled();
+    });
+
+    it('should not keep a client whose stdio connection failed', async () => {
+      mockDiscoveredConfigs([{ stdio: { command: 'ide-bridge', args: [] } }]);
+      mockClient.connect.mockRejectedValue(new Error('spawn failed'));
+
+      const ideClient = await IdeClient.getInstance();
+      await ideClient.connect();
+
+      expect(ideClient.getConnectionStatus().status).toBe(
+        IDEConnectionStatus.Disconnected,
+      );
+      expect(getClient(ideClient)).toBeUndefined();
+      expect(mockStdioTransport.close).toHaveBeenCalled();
+    });
+
+    it('should make openDiff and closeDiff fail fast after a failed attempt', async () => {
+      mockDiscoveredConfigs([{ port: '1111' }]);
+      mockClient.connect.mockRejectedValue(new Error('ECONNREFUSED'));
+
+      const ideClient = await IdeClient.getInstance();
+      await ideClient.connect();
+
+      await expect(ideClient.openDiff('/test.txt', 'content')).rejects.toThrow(
+        'IDE client is not connected.',
+      );
+      await expect(ideClient.closeDiff('/test.txt')).resolves.toBeUndefined();
+      expect(mockClient.request).not.toHaveBeenCalled();
+    });
+
+    it('should keep the client of a later successful attempt', async () => {
+      // First candidate fails, second one connects: the client that is kept
+      // must be the one that actually connected.
+      mockDiscoveredConfigs([{ port: '1111' }, { port: '2222' }]);
+      const failedClient = createMockClient();
+      failedClient.connect.mockRejectedValue(new Error('ECONNREFUSED'));
+      const connectedClient = createMockClient();
+      vi.mocked(Client)
+        .mockReturnValueOnce(failedClient)
+        .mockReturnValueOnce(connectedClient);
+
+      const ideClient = await IdeClient.getInstance();
+      await ideClient.connect();
+
+      expect(ideClient.getConnectionStatus().status).toBe(
+        IDEConnectionStatus.Connected,
+      );
+      expect(getClient(ideClient)).toBe(connectedClient);
+    });
+  });
+
   describe('isDiffingEnabled', () => {
     it('should return false if not connected', async () => {
       const ideClient = await IdeClient.getInstance();

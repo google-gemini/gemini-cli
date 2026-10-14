@@ -624,10 +624,22 @@ export class IdeClient {
     });
   }
 
+  /**
+   * Forgets a client whose connection attempt failed, so that `openDiff` and
+   * `closeDiff` fail fast on `!this.client` instead of talking to a client
+   * that never connected. A newer attempt's client is left alone.
+   */
+  private dropFailedClient(client: Client | undefined) {
+    if (client && this.client === client) {
+      this.client = undefined;
+    }
+  }
+
   private async establishHttpConnection(
     port: string,
     authToken: string | undefined,
   ): Promise<boolean> {
+    let client: Client | undefined;
     let transport: StreamableHTTPClientTransport | undefined;
     try {
       const ideServerHost = getIdeServerHost();
@@ -640,22 +652,25 @@ export class IdeClient {
       logger.debug('Attempting to connect to IDE via HTTP SSE');
       logger.debug(`Server URL: ${serverUrl}`);
       this.retireClient();
-      this.client = new Client({
+      client = new Client({
         name: 'streamable-http-client',
         version: await getVersion(),
       });
+      this.client = client;
       transport = new StreamableHTTPClientTransport(new URL(serverUrl), {
         fetch: await createProxyAwareFetch(ideServerHost),
         requestInit: {
           headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
         },
       });
-      await this.client.connect(transport);
+      await client.connect(transport);
       this.registerClientHandlers();
       await this.discoverTools();
       this.setState(IDEConnectionStatus.Connected);
       return true;
-    } catch {
+    } catch (error) {
+      logger.debug(`Failed to connect to IDE on port ${port}:`, error);
+      this.dropFailedClient(client);
       if (transport) {
         try {
           await transport.close();
@@ -671,25 +686,29 @@ export class IdeClient {
     command,
     args,
   }: StdioConfig): Promise<boolean> {
+    let client: Client | undefined;
     let transport: StdioClientTransport | undefined;
     try {
       logger.debug('Attempting to connect to IDE via stdio');
       this.retireClient();
-      this.client = new Client({
+      client = new Client({
         name: 'stdio-client',
         version: await getVersion(),
       });
+      this.client = client;
 
       transport = new StdioClientTransport({
         command,
         args,
       });
-      await this.client.connect(transport);
+      await client.connect(transport);
       this.registerClientHandlers();
       await this.discoverTools();
       this.setState(IDEConnectionStatus.Connected);
       return true;
-    } catch {
+    } catch (error) {
+      logger.debug('Failed to connect to IDE via stdio:', error);
+      this.dropFailedClient(client);
       if (transport) {
         try {
           await transport.close();
