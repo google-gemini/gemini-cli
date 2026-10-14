@@ -1714,6 +1714,51 @@ describe('startInteractiveUI', () => {
     expect(reactElement).toBeDefined();
   });
 
+  it('should enable incrementalRendering when terminalBuffer is enabled and alternateBuffer is disabled', async () => {
+    const { render } = await import('ink');
+    const renderSpy = vi.mocked(render);
+    renderSpy.mockClear();
+
+    const terminalBufferConfig = createMockConfig({
+      getProjectRoot: () => '/root',
+      getScreenReader: () => false,
+      getDebugMode: () => false,
+      getUseAlternateBuffer: () => false,
+      getUseTerminalBuffer: () => true,
+    });
+    const terminalBufferSettings = {
+      merged: {
+        ui: {
+          hideWindowTitle: false,
+          useAlternateBuffer: false,
+          terminalBuffer: true,
+          incrementalRendering: true,
+        },
+        general: {
+          debugKeystrokeLogging: false,
+        },
+      },
+    } as LoadedSettings;
+
+    await startTestInteractiveUI(
+      terminalBufferConfig,
+      terminalBufferSettings,
+      mockStartupWarnings,
+      mockWorkspaceRoot,
+      undefined,
+      mockInitializationResult,
+    );
+
+    const [, options] = renderSpy.mock.calls[0];
+    expect(options).toEqual(
+      expect.objectContaining({
+        alternateBuffer: false,
+        terminalBuffer: true,
+        incrementalRendering: true,
+      }),
+    );
+  });
+
   it('should enable mouse events when alternate buffer is enabled', async () => {
     const { enableMouseEvents } = await import('@google/gemini-cli-core');
     await startTestInteractiveUI(
