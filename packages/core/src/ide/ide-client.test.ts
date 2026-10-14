@@ -24,10 +24,12 @@ import * as os from 'node:os';
 
 import {
   getConnectionConfigFromFile,
+  getConnectionConfigsFromFile,
   getStdioConfigFromEnv,
   getPortFromEnv,
   validateWorkspacePath,
   getIdeServerHost,
+  type IdeConnectionConfig,
 } from './ide-connection-utils.js';
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -56,10 +58,26 @@ describe('IdeClient', () => {
   let mockHttpTransport: Mocked<StreamableHTTPClientTransport>;
   let mockStdioTransport: Mocked<StdioClientTransport>;
 
+  const createMockClient = () =>
+    ({
+      connect: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+      setNotificationHandler: vi.fn(),
+      callTool: vi.fn(),
+      request: vi.fn(),
+    }) as unknown as Mocked<Client>;
+
+  /** Mocks what port-file discovery finds, best candidate first. */
+  const mockDiscoveredConfigs = (configs: IdeConnectionConfig[]) => {
+    vi.mocked(getConnectionConfigFromFile).mockResolvedValue(configs[0]);
+    vi.mocked(getConnectionConfigsFromFile).mockResolvedValue(configs);
+  };
+
   beforeEach(async () => {
     // Reset singleton instance for test isolation
-    (IdeClient as unknown as { instance: IdeClient | undefined }).instance =
-      undefined;
+    (
+      IdeClient as unknown as { instancePromise: Promise<IdeClient> | null }
+    ).instancePromise = null;
 
     // Mock environment variables
     process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = '/test/workspace';
@@ -77,15 +95,10 @@ describe('IdeClient', () => {
     });
     vi.mocked(os.tmpdir).mockReturnValue('/tmp');
     vi.mocked(getIdeServerHost).mockReturnValue('127.0.0.1');
+    mockDiscoveredConfigs([]);
 
     // Mock MCP client and transports
-    mockClient = {
-      connect: vi.fn().mockResolvedValue(undefined),
-      close: vi.fn(),
-      setNotificationHandler: vi.fn(),
-      callTool: vi.fn(),
-      request: vi.fn(),
-    } as unknown as Mocked<Client>;
+    mockClient = createMockClient();
     mockHttpTransport = {
       close: vi.fn(),
     } as unknown as Mocked<StreamableHTTPClientTransport>;
@@ -107,13 +120,13 @@ describe('IdeClient', () => {
   describe('connect', () => {
     it('should connect using HTTP when port is provided in config file', async () => {
       const config = { port: '8080' };
-      vi.mocked(getConnectionConfigFromFile).mockResolvedValue(config);
+      mockDiscoveredConfigs([config]);
       vi.mocked(validateWorkspacePath).mockReturnValue({ isValid: true });
 
       const ideClient = await IdeClient.getInstance();
       await ideClient.connect();
 
-      expect(getConnectionConfigFromFile).toHaveBeenCalledWith(12345);
+      expect(getConnectionConfigsFromFile).toHaveBeenCalledWith(12345);
       expect(StreamableHTTPClientTransport).toHaveBeenCalledWith(
         new URL('http://127.0.0.1:8080/mcp'),
         expect.any(Object),
@@ -127,7 +140,7 @@ describe('IdeClient', () => {
     it('should connect using stdio when stdio config is provided in file', async () => {
       // Update the mock to use the new utility
       const config = { stdio: { command: 'test-cmd', args: ['--foo'] } };
-      vi.mocked(getConnectionConfigFromFile).mockResolvedValue(config);
+      mockDiscoveredConfigs([config]);
       vi.mocked(validateWorkspacePath).mockReturnValue({ isValid: true });
 
       const ideClient = await IdeClient.getInstance();
@@ -148,7 +161,7 @@ describe('IdeClient', () => {
         port: '8080',
         stdio: { command: 'test-cmd', args: ['--foo'] },
       };
-      vi.mocked(getConnectionConfigFromFile).mockResolvedValue(config);
+      mockDiscoveredConfigs([config]);
       vi.mocked(validateWorkspacePath).mockReturnValue({ isValid: true });
 
       const ideClient = await IdeClient.getInstance();
@@ -162,7 +175,7 @@ describe('IdeClient', () => {
     });
 
     it('should connect using HTTP when port is provided in environment variables', async () => {
-      vi.mocked(getConnectionConfigFromFile).mockResolvedValue(undefined);
+      mockDiscoveredConfigs([]);
       vi.mocked(validateWorkspacePath).mockReturnValue({ isValid: true });
       vi.mocked(getPortFromEnv).mockReturnValue('9090');
 
@@ -180,7 +193,7 @@ describe('IdeClient', () => {
     });
 
     it('should connect using stdio when stdio config is in environment variables', async () => {
-      vi.mocked(getConnectionConfigFromFile).mockResolvedValue(undefined);
+      mockDiscoveredConfigs([]);
       vi.mocked(validateWorkspacePath).mockReturnValue({ isValid: true });
       vi.mocked(getStdioConfigFromEnv).mockReturnValue({
         command: 'env-cmd',
@@ -202,7 +215,7 @@ describe('IdeClient', () => {
 
     it('should prioritize file config over environment variables', async () => {
       const config = { port: '8080' };
-      vi.mocked(getConnectionConfigFromFile).mockResolvedValue(config);
+      mockDiscoveredConfigs([config]);
       vi.mocked(validateWorkspacePath).mockReturnValue({ isValid: true });
       vi.mocked(getPortFromEnv).mockReturnValue('9090');
 
@@ -219,7 +232,7 @@ describe('IdeClient', () => {
     });
 
     it('should be disconnected if no config is found', async () => {
-      vi.mocked(getConnectionConfigFromFile).mockResolvedValue(undefined);
+      mockDiscoveredConfigs([]);
       vi.mocked(validateWorkspacePath).mockReturnValue({ isValid: true });
 
       const ideClient = await IdeClient.getInstance();
@@ -234,6 +247,207 @@ describe('IdeClient', () => {
         'Failed to connect',
       );
     });
+
+    describe('with several discovered configs', () => {
+      beforeEach(() => {
+        vi.mocked(validateWorkspacePath).mockReturnValue({ isValid: true });
+      });
+
+      it('should try the next discovered config when the first one does not answer', async () => {
+        mockDiscoveredConfigs([
+          { port: '1111', authToken: 'stale-token' },
+          { port: '2222', authToken: 'live-token' },
+        ]);
+        mockClient.connect
+          .mockRejectedValueOnce(new Error('ECONNREFUSED'))
+          .mockResolvedValueOnce(undefined);
+
+        const ideClient = await IdeClient.getInstance();
+        await ideClient.connect();
+
+        expect(StreamableHTTPClientTransport).toHaveBeenCalledTimes(2);
+        expect(StreamableHTTPClientTransport).toHaveBeenNthCalledWith(
+          1,
+          new URL('http://127.0.0.1:1111/mcp'),
+          expect.objectContaining({
+            requestInit: { headers: { Authorization: 'Bearer stale-token' } },
+          }),
+        );
+        expect(StreamableHTTPClientTransport).toHaveBeenNthCalledWith(
+          2,
+          new URL('http://127.0.0.1:2222/mcp'),
+          expect.objectContaining({
+            requestInit: { headers: { Authorization: 'Bearer live-token' } },
+          }),
+        );
+        expect(ideClient.getConnectionStatus().status).toBe(
+          IDEConnectionStatus.Connected,
+        );
+      });
+
+      it('should stop at the first discovered config that answers', async () => {
+        mockDiscoveredConfigs([{ port: '1111' }, { port: '2222' }]);
+
+        const ideClient = await IdeClient.getInstance();
+        await ideClient.connect();
+
+        expect(StreamableHTTPClientTransport).toHaveBeenCalledTimes(1);
+        expect(StreamableHTTPClientTransport).toHaveBeenCalledWith(
+          new URL('http://127.0.0.1:1111/mcp'),
+          expect.any(Object),
+        );
+        expect(ideClient.getConnectionStatus().status).toBe(
+          IDEConnectionStatus.Connected,
+        );
+      });
+
+      it('should try a stdio config after an http config that does not answer', async () => {
+        mockDiscoveredConfigs([
+          { port: '1111' },
+          { stdio: { command: 'ide-bridge', args: [] } },
+        ]);
+        mockClient.connect
+          .mockRejectedValueOnce(new Error('ECONNREFUSED'))
+          .mockResolvedValueOnce(undefined);
+
+        const ideClient = await IdeClient.getInstance();
+        await ideClient.connect();
+
+        expect(StreamableHTTPClientTransport).toHaveBeenCalledTimes(1);
+        expect(StdioClientTransport).toHaveBeenCalledWith({
+          command: 'ide-bridge',
+          args: [],
+        });
+        expect(ideClient.getConnectionStatus().status).toBe(
+          IDEConnectionStatus.Connected,
+        );
+      });
+
+      it('should fall back to the environment after every discovered config failed', async () => {
+        mockDiscoveredConfigs([{ port: '1111' }, { port: '2222' }]);
+        vi.mocked(getPortFromEnv).mockReturnValue('9090');
+        mockClient.connect
+          .mockRejectedValueOnce(new Error('ECONNREFUSED'))
+          .mockRejectedValueOnce(new Error('ECONNREFUSED'))
+          .mockResolvedValueOnce(undefined);
+
+        const ideClient = await IdeClient.getInstance();
+        await ideClient.connect();
+
+        expect(StreamableHTTPClientTransport).toHaveBeenCalledTimes(3);
+        expect(StreamableHTTPClientTransport).toHaveBeenLastCalledWith(
+          new URL('http://127.0.0.1:9090/mcp'),
+          expect.any(Object),
+        );
+        expect(ideClient.getConnectionStatus().status).toBe(
+          IDEConnectionStatus.Connected,
+        );
+      });
+
+      it('should be disconnected when no discovered config answers and there is no fallback', async () => {
+        mockDiscoveredConfigs([{ port: '1111' }, { port: '2222' }]);
+        mockClient.connect.mockRejectedValue(new Error('ECONNREFUSED'));
+
+        const ideClient = await IdeClient.getInstance();
+        await ideClient.connect();
+
+        expect(StreamableHTTPClientTransport).toHaveBeenCalledTimes(2);
+        expect(ideClient.getConnectionStatus().status).toBe(
+          IDEConnectionStatus.Disconnected,
+        );
+        expect(ideClient.getConnectionStatus().details).toContain(
+          'Failed to connect',
+        );
+      });
+    });
+  });
+
+  describe('reconnecting', () => {
+    let firstClient: Mocked<Client>;
+    let secondClient: Mocked<Client>;
+
+    beforeEach(() => {
+      vi.mocked(validateWorkspacePath).mockReturnValue({ isValid: true });
+      firstClient = createMockClient();
+      secondClient = createMockClient();
+      vi.mocked(Client)
+        .mockReturnValueOnce(firstClient)
+        .mockReturnValueOnce(secondClient);
+    });
+
+    it('should close the superseded client before connecting a new one', async () => {
+      mockDiscoveredConfigs([{ port: '1111' }]);
+      const ideClient = await IdeClient.getInstance();
+      await ideClient.connect();
+      expect(firstClient.close).not.toHaveBeenCalled();
+
+      // The IDE server restarted on another port.
+      mockDiscoveredConfigs([{ port: '2222' }]);
+      await ideClient.connect();
+
+      expect(firstClient.close).toHaveBeenCalledTimes(1);
+      expect(firstClient.onerror).toBeUndefined();
+      expect(firstClient.onclose).toBeUndefined();
+      expect(secondClient.connect).toHaveBeenCalledWith(mockHttpTransport);
+      expect(ideClient.getConnectionStatus().status).toBe(
+        IDEConnectionStatus.Connected,
+      );
+    });
+
+    it('should ignore errors and close events reported by a superseded client', async () => {
+      mockDiscoveredConfigs([{ port: '1111' }]);
+      const ideClient = await IdeClient.getInstance();
+      await ideClient.connect();
+      // Keep references to the handlers the first connection registered: the
+      // transport behind them keeps retrying the dead server for a while.
+      const supersededOnError = firstClient.onerror!;
+      const supersededOnClose = firstClient.onclose!;
+
+      mockDiscoveredConfigs([{ port: '2222' }]);
+      await ideClient.connect();
+      expect(ideClient.getConnectionStatus().status).toBe(
+        IDEConnectionStatus.Connected,
+      );
+
+      supersededOnError(new Error('fetch failed'));
+      supersededOnClose();
+
+      expect(ideClient.getConnectionStatus()).toEqual({
+        status: IDEConnectionStatus.Connected,
+        details: undefined,
+      });
+    });
+
+    it('should still report errors and close events from the current client', async () => {
+      mockDiscoveredConfigs([{ port: '1111' }]);
+      const ideClient = await IdeClient.getInstance();
+      await ideClient.connect();
+      mockDiscoveredConfigs([{ port: '2222' }]);
+      await ideClient.connect();
+
+      secondClient.onerror!(new Error('fetch failed'));
+
+      expect(ideClient.getConnectionStatus().status).toBe(
+        IDEConnectionStatus.Disconnected,
+      );
+      expect(ideClient.getConnectionStatus().details).toContain(
+        'IDE connection error',
+      );
+    });
+
+    it('should not fail the new connection when closing the superseded client rejects', async () => {
+      mockDiscoveredConfigs([{ port: '1111' }]);
+      const ideClient = await IdeClient.getInstance();
+      await ideClient.connect();
+      firstClient.close.mockRejectedValue(new Error('already closed'));
+
+      mockDiscoveredConfigs([{ port: '2222' }]);
+      await ideClient.connect();
+
+      expect(ideClient.getConnectionStatus().status).toBe(
+        IDEConnectionStatus.Connected,
+      );
+    });
   });
 
   describe('isDiffingEnabled', () => {
@@ -244,7 +458,7 @@ describe('IdeClient', () => {
 
     it('should return false if tool discovery fails', async () => {
       const config = { port: '8080' };
-      vi.mocked(getConnectionConfigFromFile).mockResolvedValue(config);
+      mockDiscoveredConfigs([config]);
       vi.mocked(validateWorkspacePath).mockReturnValue({ isValid: true });
       mockClient.request.mockRejectedValue(new Error('Method not found'));
 
@@ -259,7 +473,7 @@ describe('IdeClient', () => {
 
     it('should return false if diffing tools are not available', async () => {
       const config = { port: '8080' };
-      vi.mocked(getConnectionConfigFromFile).mockResolvedValue(config);
+      mockDiscoveredConfigs([config]);
       vi.mocked(validateWorkspacePath).mockReturnValue({ isValid: true });
       mockClient.request.mockResolvedValue({
         tools: [{ name: 'someOtherTool' }],
@@ -276,7 +490,7 @@ describe('IdeClient', () => {
 
     it('should return false if only openDiff tool is available', async () => {
       const config = { port: '8080' };
-      vi.mocked(getConnectionConfigFromFile).mockResolvedValue(config);
+      mockDiscoveredConfigs([config]);
       vi.mocked(validateWorkspacePath).mockReturnValue({ isValid: true });
       mockClient.request.mockResolvedValue({
         tools: [{ name: 'openDiff' }],
@@ -293,7 +507,7 @@ describe('IdeClient', () => {
 
     it('should return true if connected and diffing tools are available', async () => {
       const config = { port: '8080' };
-      vi.mocked(getConnectionConfigFromFile).mockResolvedValue(config);
+      mockDiscoveredConfigs([config]);
       vi.mocked(validateWorkspacePath).mockReturnValue({ isValid: true });
       mockClient.request.mockResolvedValue({
         tools: [{ name: 'openDiff' }, { name: 'closeDiff' }],
@@ -588,7 +802,7 @@ describe('IdeClient', () => {
     it('should connect with an auth token if provided in the discovery file', async () => {
       const authToken = 'test-auth-token';
       const config = { port: '8080', authToken };
-      vi.mocked(getConnectionConfigFromFile).mockResolvedValue(config);
+      mockDiscoveredConfigs([config]);
       vi.mocked(validateWorkspacePath).mockReturnValue({ isValid: true });
 
       const ideClient = await IdeClient.getInstance();
@@ -610,7 +824,7 @@ describe('IdeClient', () => {
     });
 
     it('should connect with an auth token from environment variable if config file is missing', async () => {
-      vi.mocked(getConnectionConfigFromFile).mockResolvedValue(undefined);
+      mockDiscoveredConfigs([]);
       vi.mocked(validateWorkspacePath).mockReturnValue({ isValid: true });
       vi.mocked(getPortFromEnv).mockReturnValue('9090');
       process.env['GEMINI_CLI_IDE_AUTH_TOKEN'] = 'env-auth-token';

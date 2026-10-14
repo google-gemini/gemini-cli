@@ -27,6 +27,7 @@ import {
 import { debugLogger } from '../utils/debugLogger.js';
 import {
   getConnectionConfigFromFile,
+  getConnectionConfigsFromFile,
   getIdeServerHost,
   getPortFromEnv,
   getStdioConfigFromEnv,
@@ -138,9 +139,10 @@ export class IdeClient {
 
     this.setState(IDEConnectionStatus.Connecting);
 
-    const connectionConfig = this.ideProcessInfo
-      ? await getConnectionConfigFromFile(this.ideProcessInfo.pid)
-      : undefined;
+    const candidates = this.ideProcessInfo
+      ? await getConnectionConfigsFromFile(this.ideProcessInfo.pid)
+      : [];
+    const connectionConfig = candidates[0];
     const authToken =
       connectionConfig?.authToken ?? process.env['GEMINI_CLI_IDE_AUTH_TOKEN'];
 
@@ -158,20 +160,24 @@ export class IdeClient {
       return;
     }
 
-    if (connectionConfig) {
-      if (connectionConfig.port) {
+    // More than one port file can describe this workspace: other IDE windows,
+    // or a file left behind by an extension host that was killed before it
+    // could clean up (e.g. "Reload Window"). Try them in order rather than
+    // giving up on the first one that does not answer.
+    for (const candidate of candidates) {
+      const candidateAuthToken =
+        candidate.authToken ?? process.env['GEMINI_CLI_IDE_AUTH_TOKEN'];
+      if (candidate.port) {
         const connected = await this.establishHttpConnection(
-          connectionConfig.port,
-          authToken,
+          candidate.port,
+          candidateAuthToken,
         );
         if (connected) {
           return;
         }
       }
-      if (connectionConfig.stdio) {
-        const connected = await this.establishStdioConnection(
-          connectionConfig.stdio,
-        );
+      if (candidate.stdio) {
+        const connected = await this.establishStdioConnection(candidate.stdio);
         if (connected) {
           return;
         }
@@ -514,6 +520,11 @@ export class IdeClient {
     if (!this.client) {
       return;
     }
+    // Bind the handlers to the client that registered them. After a
+    // reconnect, the transport of the superseded client keeps retrying the
+    // old server and reporting failures; those must not revert the state of
+    // the connection that replaced it.
+    const client = this.client;
 
     this.client.setNotificationHandler(
       IdeContextNotificationSchema,
@@ -528,6 +539,9 @@ export class IdeClient {
       },
     );
     this.client.onerror = (_error) => {
+      if (this.client !== client) {
+        return;
+      }
       const errorMessage = _error instanceof Error ? _error.message : `_error`;
       this.setState(
         IDEConnectionStatus.Disconnected,
@@ -536,6 +550,9 @@ export class IdeClient {
       );
     };
     this.client.onclose = () => {
+      if (this.client !== client) {
+        return;
+      }
       this.setState(
         IDEConnectionStatus.Disconnected,
         `IDE connection closed. To reconnect, run /ide enable.`,
@@ -587,6 +604,26 @@ export class IdeClient {
     );
   }
 
+  /**
+   * Detaches and closes the current client, if any, before it is replaced.
+   *
+   * Without this, the transport of the superseded client keeps its socket and
+   * reconnection timers alive and its handlers keep reporting into this
+   * instance long after a new connection has been established.
+   */
+  private retireClient() {
+    const superseded = this.client;
+    if (!superseded) {
+      return;
+    }
+    this.client = undefined;
+    superseded.onerror = undefined;
+    superseded.onclose = undefined;
+    superseded.close().catch((error: unknown) => {
+      logger.debug('Failed to close superseded IDE client:', error);
+    });
+  }
+
   private async establishHttpConnection(
     port: string,
     authToken: string | undefined,
@@ -602,6 +639,7 @@ export class IdeClient {
       const serverUrl = `http://${ideServerHost}:${portNumber}/mcp`;
       logger.debug('Attempting to connect to IDE via HTTP SSE');
       logger.debug(`Server URL: ${serverUrl}`);
+      this.retireClient();
       this.client = new Client({
         name: 'streamable-http-client',
         version: await getVersion(),
@@ -636,6 +674,7 @@ export class IdeClient {
     let transport: StdioClientTransport | undefined;
     try {
       logger.debug('Attempting to connect to IDE via stdio');
+      this.retireClient();
       this.client = new Client({
         name: 'stdio-client',
         version: await getVersion(),

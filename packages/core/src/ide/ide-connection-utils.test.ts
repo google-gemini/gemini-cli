@@ -18,6 +18,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import {
   getConnectionConfigFromFile,
+  getConnectionConfigsFromFile,
   validateWorkspacePath,
   getIdeServerHost,
 } from './ide-connection-utils.js';
@@ -579,6 +580,153 @@ describe('ide-connection-utils', () => {
       const result = await getConnectionConfigFromFile(12345);
 
       expect(result).toBeUndefined();
+    });
+  });
+
+  describe('getConnectionConfigsFromFile', () => {
+    const mockReaddir = (files: string[]) => {
+      vi.mocked(fs.promises.readFile).mockRejectedValueOnce(
+        new Error('not found'),
+      ); // legacy single-file path
+      (
+        vi.mocked(fs.promises.readdir) as Mock<
+          (path: fs.PathLike) => Promise<string[]>
+        >
+      ).mockResolvedValue(files);
+    };
+
+    it('should return the legacy pid file as the only candidate', async () => {
+      const config = { port: '1234', workspacePath: '/test/workspace' };
+      vi.mocked(fs.promises.readFile).mockResolvedValue(JSON.stringify(config));
+
+      const result = await getConnectionConfigsFromFile(12345);
+
+      expect(result).toEqual([config]);
+    });
+
+    it('should return an empty list when no config files are found', async () => {
+      mockReaddir([]);
+
+      const result = await getConnectionConfigsFromFile(12345);
+
+      expect(result).toEqual([]);
+    });
+
+    it('should return an empty list if readdir throws an error', async () => {
+      vi.mocked(fs.promises.readFile).mockRejectedValue(new Error('not found'));
+      vi.mocked(fs.promises.readdir).mockRejectedValue(
+        new Error('readdir failed'),
+      );
+
+      const result = await getConnectionConfigsFromFile(12345);
+
+      expect(result).toEqual([]);
+    });
+
+    it('should return every config matching the current workspace, in sorted order', async () => {
+      const stale = { port: '1111', workspacePath: '/test/workspace' };
+      const live = { port: '2222', workspacePath: '/test/workspace' };
+      const other = { port: '3333', workspacePath: '/elsewhere' };
+      mockReaddir([
+        'gemini-ide-server-12345-1111.json',
+        'gemini-ide-server-12345-2222.json',
+        'gemini-ide-server-12345-3333.json',
+      ]);
+      vi.mocked(fs.promises.readFile)
+        .mockResolvedValueOnce(JSON.stringify(stale))
+        .mockResolvedValueOnce(JSON.stringify(live))
+        .mockResolvedValueOnce(JSON.stringify(other));
+
+      const result = await getConnectionConfigsFromFile(12345);
+
+      expect(result).toEqual([stale, live]);
+    });
+
+    it('should move the config matching the port from the environment to the front', async () => {
+      vi.stubEnv('GEMINI_CLI_IDE_SERVER_PORT', '3333');
+      const first = { port: '1111', workspacePath: '/test/workspace' };
+      const second = { port: '2222', workspacePath: '/test/workspace' };
+      const fromEnv = { port: 3333, workspacePath: '/test/workspace' };
+      mockReaddir([
+        'gemini-ide-server-12345-1111.json',
+        'gemini-ide-server-12345-2222.json',
+        'gemini-ide-server-12345-3333.json',
+      ]);
+      vi.mocked(fs.promises.readFile)
+        .mockResolvedValueOnce(JSON.stringify(first))
+        .mockResolvedValueOnce(JSON.stringify(second))
+        .mockResolvedValueOnce(JSON.stringify(fromEnv));
+
+      const result = await getConnectionConfigsFromFile(12345);
+
+      // The others are kept as fallbacks: the env port may belong to a server
+      // that is gone while its file was left behind.
+      expect(result).toEqual([fromEnv, first, second]);
+    });
+
+    it('should keep the order when the port from the environment matches no file', async () => {
+      vi.stubEnv('GEMINI_CLI_IDE_SERVER_PORT', '9999');
+      const first = { port: '1111', workspacePath: '/test/workspace' };
+      const second = { port: '2222', workspacePath: '/test/workspace' };
+      mockReaddir([
+        'gemini-ide-server-12345-1111.json',
+        'gemini-ide-server-12345-2222.json',
+      ]);
+      vi.mocked(fs.promises.readFile)
+        .mockResolvedValueOnce(JSON.stringify(first))
+        .mockResolvedValueOnce(JSON.stringify(second));
+
+      const result = await getConnectionConfigsFromFile(12345);
+
+      expect(result).toEqual([first, second]);
+    });
+
+    it('should return only the best mismatched config when no file matches the workspace', async () => {
+      const mismatched1 = { port: '1111', workspacePath: '/elsewhere' };
+      const mismatched2 = { port: '2222', workspacePath: '/elsewhere-too' };
+      mockReaddir([
+        'gemini-ide-server-12345-1111.json',
+        'gemini-ide-server-12345-2222.json',
+      ]);
+      vi.mocked(fs.promises.readFile)
+        .mockResolvedValueOnce(JSON.stringify(mismatched1))
+        .mockResolvedValueOnce(JSON.stringify(mismatched2));
+
+      const result = await getConnectionConfigsFromFile(12345);
+
+      expect(result).toEqual([mismatched1]);
+    });
+
+    it('should skip unreadable or malformed files', async () => {
+      const valid = { port: '2222', workspacePath: '/test/workspace' };
+      mockReaddir([
+        'gemini-ide-server-12345-1111.json',
+        'gemini-ide-server-12345-2222.json',
+      ]);
+      vi.mocked(fs.promises.readFile)
+        .mockResolvedValueOnce('{ not json')
+        .mockResolvedValueOnce(JSON.stringify(valid));
+
+      const result = await getConnectionConfigsFromFile(12345);
+
+      expect(result).toEqual([valid]);
+    });
+
+    it('getConnectionConfigFromFile should return the first candidate', async () => {
+      vi.stubEnv('GEMINI_CLI_IDE_SERVER_PORT', '2222');
+      const first = { port: '1111', workspacePath: '/test/workspace' };
+      const fromEnv = { port: '2222', workspacePath: '/test/workspace' };
+      mockReaddir([
+        'gemini-ide-server-12345-1111.json',
+        'gemini-ide-server-12345-2222.json',
+      ]);
+      vi.mocked(fs.promises.readFile)
+        .mockResolvedValueOnce(JSON.stringify(first))
+        .mockResolvedValueOnce(JSON.stringify(fromEnv));
+
+      const result = await getConnectionConfigFromFile(12345);
+
+      expect(result).toEqual(fromEnv);
     });
   });
 
