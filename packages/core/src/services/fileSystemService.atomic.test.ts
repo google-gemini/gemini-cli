@@ -113,4 +113,44 @@ describe('StandardFileSystemService atomicity', () => {
     const lstat = await fsp.lstat(symlinkPath);
     expect(lstat.isSymbolicLink()).toBe(true);
   });
+
+  // Root bypasses mode bits, so the write succeeds for it just as a plain
+  // fs.writeFile would.
+  it.skipIf(process.getuid?.() === 0)(
+    'refuses to overwrite a read-only file',
+    async () => {
+      const filePath = path.join(dir, 'locked.txt');
+      await fsp.writeFile(filePath, 'original');
+      await fsp.chmod(filePath, 0o444);
+
+      // A rename only consults the directory's permissions, so the check has
+      // to come from writeTextFile itself. libuv reports a read-only file as
+      // EPERM on Windows and EACCES everywhere else.
+      await expect(
+        service.writeTextFile(filePath, 'replaced'),
+      ).rejects.toMatchObject({
+        code: process.platform === 'win32' ? 'EPERM' : 'EACCES',
+      });
+
+      await expect(fsp.readFile(filePath, 'utf-8')).resolves.toBe('original');
+      // The refusal must happen before a temp file is created.
+      await expect(fsp.readdir(dir)).resolves.toEqual(['locked.txt']);
+    },
+  );
+
+  it('keeps every hard link pointing at the new content', async () => {
+    const linkA = path.join(dir, 'a.txt');
+    const linkB = path.join(dir, 'b.txt');
+    await fsp.writeFile(linkA, 'shared');
+    await fsp.link(linkA, linkB);
+
+    await service.writeTextFile(linkA, 'edited');
+
+    // A rename would give a.txt a new inode and leave b.txt on the old one.
+    await expect(fsp.readFile(linkA, 'utf-8')).resolves.toBe('edited');
+    await expect(fsp.readFile(linkB, 'utf-8')).resolves.toBe('edited');
+    const stats = await fsp.stat(linkA);
+    expect(stats.nlink).toBe(2);
+    await expect(fsp.readdir(dir)).resolves.toEqual(['a.txt', 'b.txt']);
+  });
 });

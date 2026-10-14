@@ -144,5 +144,56 @@ describe('StandardFileSystemService', () => {
 
       expect(fs.rename).toHaveBeenCalledTimes(2);
     });
+
+    it('should fail before creating a temp file when the destination is not writable', async () => {
+      vi.mocked(fs.stat).mockResolvedValue({
+        mode: 0o444,
+        nlink: 1,
+      } as unknown as Awaited<ReturnType<typeof fs.stat>>);
+      // A rename only checks the directory's permissions, so this is the
+      // only place a read-only destination can be refused.
+      vi.mocked(fs.access).mockRejectedValue(
+        Object.assign(new Error('permission denied'), { code: 'EACCES' }),
+      );
+
+      await expect(
+        fileSystem.writeTextFile(targetFile, 'Hello, World!'),
+      ).rejects.toMatchObject({ code: 'EACCES' });
+
+      expect(fs.access).toHaveBeenCalledWith(targetFile, fs.constants.W_OK);
+      expect(fs.writeFile).not.toHaveBeenCalled();
+      expect(fs.rename).not.toHaveBeenCalled();
+    });
+
+    it('should not check write access when creating a new file', async () => {
+      vi.mocked(fs.writeFile).mockResolvedValue();
+      vi.mocked(fs.rename).mockResolvedValue();
+      vi.mocked(fs.stat).mockRejectedValue(new Error('ENOENT'));
+
+      await fileSystem.writeTextFile(targetFile, 'Hello, World!');
+
+      expect(fs.access).not.toHaveBeenCalled();
+      expect(fs.rename).toHaveBeenCalled();
+    });
+
+    it('should write in place when the destination has multiple hard links', async () => {
+      vi.mocked(fs.writeFile).mockResolvedValue();
+      vi.mocked(fs.access).mockResolvedValue();
+      vi.mocked(fs.stat).mockResolvedValue({
+        mode: 0o644,
+        nlink: 2,
+      } as unknown as Awaited<ReturnType<typeof fs.stat>>);
+
+      await fileSystem.writeTextFile(targetFile, 'Hello, World!');
+
+      // Renaming a temp file over one name of a hard link would give it a new
+      // inode and leave the other names on the old content.
+      expect(fs.writeFile).toHaveBeenCalledWith(
+        targetFile,
+        'Hello, World!',
+        'utf-8',
+      );
+      expect(fs.rename).not.toHaveBeenCalled();
+    });
   });
 });
