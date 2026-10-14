@@ -76,6 +76,11 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
     isToolGroupBoundary
   );
 
+  const effectiveAvailableTerminalHeight =
+    availableTerminalHeight !== undefined && needTopMargin
+      ? Math.max(availableTerminalHeight - 1, 1)
+      : availableTerminalHeight;
+
   return (
     <Box
       flexDirection="column"
@@ -105,7 +110,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           text={itemForDisplay.text}
           isPending={isPending}
           availableTerminalHeight={
-            availableTerminalHeightGemini ?? availableTerminalHeight
+            availableTerminalHeightGemini ?? effectiveAvailableTerminalHeight
           }
           terminalWidth={terminalWidth}
         />
@@ -115,7 +120,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           text={itemForDisplay.text}
           isPending={isPending}
           availableTerminalHeight={
-            availableTerminalHeightGemini ?? availableTerminalHeight
+            availableTerminalHeightGemini ?? effectiveAvailableTerminalHeight
           }
           terminalWidth={terminalWidth}
         />
@@ -190,7 +195,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         <ToolGroupMessage
           item={itemForDisplay}
           toolCalls={itemForDisplay.tools}
-          availableTerminalHeight={availableTerminalHeight}
+          availableTerminalHeight={effectiveAvailableTerminalHeight}
           terminalWidth={terminalWidth}
           borderTop={itemForDisplay.borderTop}
           borderBottom={itemForDisplay.borderBottom}
