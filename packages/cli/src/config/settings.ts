@@ -848,6 +848,10 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
     filePath: string,
     recordValidationErrors: boolean,
   ): Settings => {
+    if (Object.keys(rawSettings).length === 0) {
+      return {};
+    }
+
     const expandedSettings = resolveEnvVarsInObject(rawSettings);
 
     // Validate settings structure with Zod after environment variable expansion
@@ -920,10 +924,18 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
     // Applied to the raw settings so that the override is reflected both in
     // the resolved settings and in the persisted `originalSettings`.
     const rawUserSettings = userResult.rawSettings;
-    if (!rawUserSettings.security) {
+    if (
+      typeof rawUserSettings.security !== 'object' ||
+      rawUserSettings.security === null ||
+      Array.isArray(rawUserSettings.security)
+    ) {
       rawUserSettings.security = {};
     }
-    if (!rawUserSettings.security.auth) {
+    if (
+      typeof rawUserSettings.security.auth !== 'object' ||
+      rawUserSettings.security.auth === null ||
+      Array.isArray(rawUserSettings.security.auth)
+    ) {
       rawUserSettings.security.auth = {};
     }
     rawUserSettings.security.auth.selectedType = authOverride;

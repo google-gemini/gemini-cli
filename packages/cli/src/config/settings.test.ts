@@ -2533,6 +2533,20 @@ describe('Settings Loading and Merging', () => {
       expect(settings.errors).toHaveLength(0);
     });
 
+    it('should record validation warnings only once when a .env variable expands to an invalid type', () => {
+      setupEnvFileScenario({
+        envFileContent: 'MAX_TURNS_FROM_ENV_FILE=not-a-number',
+        userSettingsContent: {
+          model: { maxSessionTurns: '$MAX_TURNS_FROM_ENV_FILE' },
+        },
+      });
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.errors).toHaveLength(1);
+      expect(settings.errors[0]?.severity).toBe('warning');
+    });
+
     it('should prefer variables from the shell environment over .env files', () => {
       vi.stubEnv('GITHUB_MCP_PAT', 'token-from-shell');
       setupEnvFileScenario({
