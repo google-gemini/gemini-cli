@@ -42,9 +42,9 @@ export const formatDuration = (milliseconds: number): string => {
     return `${roundedMs}ms`;
   }
 
-  const formattedSeconds = (milliseconds / 1000).toFixed(1);
-  if (Number(formattedSeconds) < 60) {
-    return `${formattedSeconds}s`;
+  // 59950ms is the smallest duration that rounds to 60.0s at one decimal place.
+  if (milliseconds < 59950) {
+    return `${(milliseconds / 1000).toFixed(1)}s`;
   }
 
   const totalSeconds = Math.round(milliseconds / 1000);
