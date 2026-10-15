@@ -21,12 +21,17 @@ export function getSafeGitEnv(
     }
   }
 
+  const baseSshCommand = cleanedEnv['GIT_SSH_COMMAND']?.trim() || 'ssh';
+  const gitSshCommand = baseSshCommand.includes('BatchMode=yes')
+    ? baseSshCommand
+    : `${baseSshCommand} -o BatchMode=yes`;
+
   return {
     ...cleanedEnv,
     GIT_TERMINAL_PROMPT: '0',
     GIT_ASKPASS: '',
     SSH_ASKPASS: '',
-    GIT_SSH_COMMAND: 'ssh -o BatchMode=yes',
+    GIT_SSH_COMMAND: gitSshCommand,
     GH_PROMPT_DISABLED: '1',
     GCM_INTERACTIVE: 'never',
     GIT_CONFIG_GLOBAL: devNullPath,

@@ -90,7 +90,7 @@ describe('gitUtils', () => {
         GIT_TERMINAL_PROMPT: '1',
         GIT_ASKPASS: '/usr/bin/ssh-askpass',
         SSH_ASKPASS: '/usr/bin/ssh-askpass',
-        GIT_SSH_COMMAND: 'ssh',
+        GIT_SSH_COMMAND: 'ssh -i /path/to/key',
         GH_PROMPT_DISABLED: '0',
         GCM_INTERACTIVE: 'always',
       });
@@ -98,9 +98,21 @@ describe('gitUtils', () => {
       expect(safeEnv['GIT_TERMINAL_PROMPT']).toBe('0');
       expect(safeEnv['GIT_ASKPASS']).toBe('');
       expect(safeEnv['SSH_ASKPASS']).toBe('');
-      expect(safeEnv['GIT_SSH_COMMAND']).toBe('ssh -o BatchMode=yes');
+      expect(safeEnv['GIT_SSH_COMMAND']).toBe(
+        'ssh -i /path/to/key -o BatchMode=yes',
+      );
       expect(safeEnv['GH_PROMPT_DISABLED']).toBe('1');
       expect(safeEnv['GCM_INTERACTIVE']).toBe('never');
+    });
+
+    it('should not duplicate BatchMode=yes if already present in GIT_SSH_COMMAND', () => {
+      const safeEnv = getSafeGitEnv({
+        GIT_SSH_COMMAND: 'ssh -i /path/to/key -o BatchMode=yes',
+      });
+
+      expect(safeEnv['GIT_SSH_COMMAND']).toBe(
+        'ssh -i /path/to/key -o BatchMode=yes',
+      );
     });
 
     it('should not configure diff.external to an empty string', () => {
