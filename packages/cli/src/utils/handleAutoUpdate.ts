@@ -94,7 +94,8 @@ export function handleAutoUpdate(
     }
   }
 
-  if (!info.update.latest || !semver.valid(info.update.latest)) {
+  const latestVersion = info.update?.latest ?? '';
+  if (!latestVersion || !semver.valid(latestVersion)) {
     debugLogger.warn(
       'Update check: latest version is missing or invalid. Skipping automatic update for safety.',
     );
