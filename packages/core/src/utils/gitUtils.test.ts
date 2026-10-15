@@ -61,6 +61,12 @@ describe('gitUtils', () => {
 
     it('should set default security overrides and expected count', () => {
       const safeEnv = getSafeGitEnv({});
+      expect(safeEnv['GIT_TERMINAL_PROMPT']).toBe('0');
+      expect(safeEnv['GIT_ASKPASS']).toBe('');
+      expect(safeEnv['SSH_ASKPASS']).toBe('');
+      expect(safeEnv['GIT_SSH_COMMAND']).toBe('ssh -o BatchMode=yes');
+      expect(safeEnv['GH_PROMPT_DISABLED']).toBe('1');
+      expect(safeEnv['GCM_INTERACTIVE']).toBe('never');
       expect(safeEnv['GIT_CONFIG_NOSYSTEM']).toBe('1');
       expect(safeEnv['GIT_CONFIG_COUNT']).toBe('7');
       expect(safeEnv['GIT_CONFIG_KEY_0']).toBe('credential.helper');
@@ -77,6 +83,67 @@ describe('gitUtils', () => {
       expect(safeEnv['GIT_CONFIG_VALUE_5']).toBe('');
       expect(safeEnv['GIT_CONFIG_KEY_6']).toBe('sequence.editor');
       expect(safeEnv['GIT_CONFIG_VALUE_6']).toBe('');
+    });
+
+    it('should override interactive prompt environment variables from baseEnv', () => {
+      const safeEnv = getSafeGitEnv({
+        GIT_TERMINAL_PROMPT: '1',
+        GIT_ASKPASS: '/usr/bin/ssh-askpass',
+        SSH_ASKPASS: '/usr/bin/ssh-askpass',
+        GIT_SSH_COMMAND: 'ssh -i /path/to/key',
+        GH_PROMPT_DISABLED: '0',
+        GCM_INTERACTIVE: 'always',
+      });
+
+      expect(safeEnv['GIT_TERMINAL_PROMPT']).toBe('0');
+      expect(safeEnv['GIT_ASKPASS']).toBe('');
+      expect(safeEnv['SSH_ASKPASS']).toBe('');
+      expect(safeEnv['GIT_SSH_COMMAND']).toBe(
+        'ssh -o BatchMode=yes -i /path/to/key',
+      );
+      expect(safeEnv['GH_PROMPT_DISABLED']).toBe('1');
+      expect(safeEnv['GCM_INTERACTIVE']).toBe('never');
+    });
+
+    it('should not duplicate BatchMode=yes if already present in GIT_SSH_COMMAND', () => {
+      const safeEnv = getSafeGitEnv({
+        GIT_SSH_COMMAND: 'ssh -i /path/to/key -o BatchMode=yes',
+      });
+
+      expect(safeEnv['GIT_SSH_COMMAND']).toBe(
+        'ssh -i /path/to/key -o BatchMode=yes',
+      );
+    });
+
+    it('should prepend BatchMode=yes before BatchMode=no in GIT_SSH_COMMAND', () => {
+      const safeEnv = getSafeGitEnv({
+        GIT_SSH_COMMAND: 'ssh -o BatchMode=no -i /path/to/key',
+      });
+
+      expect(safeEnv['GIT_SSH_COMMAND']).toBe(
+        'ssh -o BatchMode=yes -o BatchMode=no -i /path/to/key',
+      );
+    });
+
+    it('should handle GIT_SSH and plink correctly', () => {
+      const safeEnv1 = getSafeGitEnv({
+        GIT_SSH: 'plink',
+      });
+      expect(safeEnv1['GIT_SSH_COMMAND']).toBe('plink -batch');
+
+      const safeEnv2 = getSafeGitEnv({
+        GIT_SSH: 'C:/Program Files/PuTTY/plink.exe',
+      });
+      expect(safeEnv2['GIT_SSH_COMMAND']).toBe(
+        '"C:/Program Files/PuTTY/plink.exe" -batch',
+      );
+
+      const safeEnv3 = getSafeGitEnv({
+        GIT_SSH_COMMAND: '/home/user/plink-helper/ssh',
+      });
+      expect(safeEnv3['GIT_SSH_COMMAND']).toBe(
+        '/home/user/plink-helper/ssh -o BatchMode=yes',
+      );
     });
 
     it('should not configure diff.external to an empty string', () => {
