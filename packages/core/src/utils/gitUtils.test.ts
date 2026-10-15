@@ -127,6 +127,13 @@ describe('gitUtils', () => {
       expect(safeEnv2['GIT_SSH_COMMAND']).toBe(
         '"C:/Program Files/PuTTY/plink.exe" -batch',
       );
+
+      const safeEnv3 = getSafeGitEnv({
+        GIT_SSH_COMMAND: '/home/user/plink-helper/ssh',
+      });
+      expect(safeEnv3['GIT_SSH_COMMAND']).toBe(
+        '/home/user/plink-helper/ssh -o BatchMode=yes',
+      );
     });
 
     it('should not configure diff.external to an empty string', () => {

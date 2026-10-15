@@ -33,7 +33,12 @@ export function getSafeGitEnv(
     baseSshCommand = 'ssh';
   }
 
-  const isPlink = /plink/i.test(baseSshCommand);
+  const execMatch = baseSshCommand.match(/^\s*(?:"([^"]+)"|'([^']+)'|(\S+))/);
+  const executable = execMatch
+    ? execMatch[1] || execMatch[2] || execMatch[3] || ''
+    : '';
+  const execName = executable.split(/[/\\]/).pop() || '';
+  const isPlink = /^(?:tortoise)?plink(?:\.exe)?$/i.test(execName);
   const batchFlag = isPlink ? '-batch' : '-o BatchMode=yes';
   const gitSshCommand = baseSshCommand.includes(
     isPlink ? '-batch' : 'BatchMode=yes',
