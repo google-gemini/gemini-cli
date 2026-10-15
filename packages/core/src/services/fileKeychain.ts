@@ -15,6 +15,16 @@ import { debugLogger } from '../utils/debugLogger.js';
 
 type CredentialsData = Record<string, Record<string, string>>;
 
+/**
+ * Looks up an own entry only, so service and account names such as
+ * `__proto__` or `constructor` never resolve to `Object.prototype` members.
+ * Writes use computed keys in object literals, which always create own
+ * properties (even for `__proto__`), instead of assignment.
+ */
+function getOwn<T>(record: Record<string, T>, key: string): T | undefined {
+  return Object.hasOwn(record, key) ? record[key] : undefined;
+}
+
 // A lock left behind by a crashed process is considered stale (and taken
 // over) after this long. Live holders refresh it every LOCK_STALE_MS / 2.
 const LOCK_STALE_MS = 5000;
@@ -198,7 +208,8 @@ export class FileKeychain implements Keychain {
 
   async getPassword(service: string, account: string): Promise<string | null> {
     const data = await this.loadData();
-    return data[service]?.[account] ?? null;
+    const serviceData = getOwn(data, service);
+    return (serviceData && getOwn(serviceData, account)) ?? null;
   }
 
   async setPassword(
@@ -208,24 +219,24 @@ export class FileKeychain implements Keychain {
   ): Promise<void> {
     await this.withLock(async () => {
       const data = await this.loadData();
-      if (!data[service]) {
-        data[service] = {};
-      }
-      data[service][account] = password;
-      await this.saveData(data);
+      await this.saveData({
+        ...data,
+        [service]: { ...getOwn(data, service), [account]: password },
+      });
     });
   }
 
   async deletePassword(service: string, account: string): Promise<boolean> {
     return this.withLock(async () => {
       const data = await this.loadData();
-      if (!data[service] || !(account in data[service])) {
+      const serviceData = getOwn(data, service);
+      if (!serviceData || !Object.hasOwn(serviceData, account)) {
         return false;
       }
 
-      delete data[service][account];
+      delete serviceData[account];
 
-      if (Object.keys(data[service]).length === 0) {
+      if (Object.keys(serviceData).length === 0) {
         delete data[service];
       }
 
@@ -250,7 +261,7 @@ export class FileKeychain implements Keychain {
     service: string,
   ): Promise<Array<{ account: string; password: string }>> {
     const data = await this.loadData();
-    const serviceData = data[service] || {};
+    const serviceData = getOwn(data, service) ?? {};
     return Object.entries(serviceData).map(([account, password]) => ({
       account,
       password,

@@ -92,6 +92,65 @@ describe('FileKeychain', () => {
     });
   });
 
+  describe('reserved key names', () => {
+    const reservedNames = ['__proto__', 'constructor', 'prototype'];
+
+    afterEach(() => {
+      for (const name of ['polluted', ...reservedNames]) {
+        expect(Object.prototype.hasOwnProperty.call({}, name)).toBe(false);
+      }
+      expect(({} as Record<string, unknown>)['polluted']).toBeUndefined();
+    });
+
+    it.each(reservedNames)(
+      'stores %s as an ordinary service name without touching Object.prototype',
+      async (name) => {
+        const keychain = new FileKeychain();
+
+        await keychain.setPassword(name, 'polluted', 'secret');
+
+        expect(({} as Record<string, unknown>)['polluted']).toBeUndefined();
+        expect(await keychain.getPassword(name, 'polluted')).toBe('secret');
+        expect(await keychain.findCredentials(name)).toEqual([
+          { account: 'polluted', password: 'secret' },
+        ]);
+        expect(await keychain.deletePassword(name, 'polluted')).toBe(true);
+        expect(await keychain.getPassword(name, 'polluted')).toBeNull();
+      },
+    );
+
+    it.each(reservedNames)(
+      'stores %s as an ordinary account name',
+      async (name) => {
+        const keychain = new FileKeychain();
+        await keychain.setPassword('svc', 'other', 'x');
+
+        await keychain.setPassword('svc', name, 'secret');
+
+        expect(await keychain.getPassword('svc', name)).toBe('secret');
+        expect(await keychain.findCredentials('svc')).toContainEqual({
+          account: name,
+          password: 'secret',
+        });
+        expect(await keychain.deletePassword('svc', name)).toBe(true);
+        expect(await keychain.getPassword('svc', name)).toBeNull();
+        expect(await keychain.getPassword('svc', 'other')).toBe('x');
+      },
+    );
+
+    it('does not report missing entries for names inherited from Object.prototype', async () => {
+      const keychain = new FileKeychain();
+      await keychain.setPassword('svc', 'alice', 'a');
+
+      expect(await keychain.getPassword('__proto__', 'alice')).toBeNull();
+      expect(await keychain.getPassword('svc', 'toString')).toBeNull();
+      expect(await keychain.findCredentials('__proto__')).toEqual([]);
+      expect(await keychain.deletePassword('__proto__', 'alice')).toBe(false);
+      expect(await keychain.deletePassword('svc', 'constructor')).toBe(false);
+      expect(await keychain.getPassword('svc', 'alice')).toBe('a');
+    });
+  });
+
   describe('concurrent writers', () => {
     it('does not lose entries when several writers save at the same time', async () => {
       // Separate instances stand in for separate CLI processes.
