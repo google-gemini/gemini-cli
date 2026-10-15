@@ -666,6 +666,75 @@ describe('handleAutoUpdate', () => {
     );
   });
 
+  it('should skip update and not spawn process if latest version is missing or empty', () => {
+    const emptyLatestUpdateInfo: UpdateObject = {
+      ...mockUpdateInfo,
+      update: {
+        ...mockUpdateInfo.update,
+        latest: '',
+      },
+    };
+
+    handleAutoUpdate(
+      emptyLatestUpdateInfo,
+      mockSettings,
+      '/root',
+      false,
+      mockSpawn,
+    );
+
+    expect(mockSpawn).not.toHaveBeenCalled();
+    expect(updateEventEmitter.emit).not.toHaveBeenCalledWith(
+      'update-success',
+      expect.anything(),
+    );
+  });
+
+  it('should include resolved binary path in update-failed message when verification fails', async () => {
+    mockGetPackageJson.mockResolvedValue({
+      name: '@google/gemini-cli',
+      version: '1.0.0',
+    });
+
+    const originalArgv1 = process.argv[1];
+    process.argv[1] = '/custom/bin/gemini';
+
+    try {
+      await new Promise<void>((resolve) => {
+        mockGetInstallationInfo.mockReturnValue({
+          updateCommand: 'npm i -g @google/gemini-cli@latest',
+          updateMessage: 'This is an additional message.',
+          isGlobal: true,
+          packageManager: PackageManager.NPM,
+        });
+
+        setTimeout(() => {
+          mockChildProcess.emit('close', 0);
+          resolve();
+        }, 0);
+
+        handleAutoUpdate(
+          mockUpdateInfo,
+          mockSettings,
+          '/root',
+          false,
+          mockSpawn,
+        );
+      });
+
+      expect(updateEventEmitter.emit).toHaveBeenCalledWith(
+        'update-failed',
+        expect.objectContaining({
+          message: expect.stringContaining(
+            'active binary (/custom/bin/gemini) was not updated',
+          ),
+        }),
+      );
+    } finally {
+      process.argv[1] = originalArgv1;
+    }
+  });
+
   it('should suppress update if isSandboxEnabled is true', () => {
     handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', true, mockSpawn);
 

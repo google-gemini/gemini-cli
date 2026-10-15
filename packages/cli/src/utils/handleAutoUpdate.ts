@@ -94,9 +94,9 @@ export function handleAutoUpdate(
     }
   }
 
-  if (info.update.latest && !semver.valid(info.update.latest)) {
+  if (!info.update.latest || !semver.valid(info.update.latest)) {
     debugLogger.warn(
-      'Update check: latest version is invalid. Skipping automatic update for safety.',
+      'Update check: latest version is missing or invalid. Skipping automatic update for safety.',
     );
     return;
   }
@@ -213,7 +213,7 @@ export function handleAutoUpdate(
 
       if (!isVerified) {
         updateEventEmitter.emit('update-failed', {
-          message: `Automatic update completed, but the active binary (${resolvedCliPath ?? process.argv[1]}) was not updated. It may be shadowed by another installation in your PATH. Please try updating manually:\n\n${updateCommand}`,
+          message: `Automatic update completed, but the active binary (${resolvedCliPath ?? process.argv[1] ?? 'unknown path'}) was not updated. It may be shadowed by another installation in your PATH. Please try updating manually:\n\n${updateCommand}`,
         });
         return;
       }
