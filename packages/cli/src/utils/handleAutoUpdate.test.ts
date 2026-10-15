@@ -64,7 +64,10 @@ describe('handleAutoUpdate', () => {
     vi.stubEnv('SANDBOX', '');
     mockSpawn = vi.fn();
     vi.clearAllMocks();
-    mockGetPackageJson.mockResolvedValue({ version: '2.0.0' });
+    mockGetPackageJson.mockResolvedValue({
+      name: '@google/gemini-cli',
+      version: '2.0.0',
+    });
     vi.spyOn(updateEventEmitter, 'emit');
     mockUpdateInfo = {
       update: {
@@ -414,7 +417,10 @@ describe('handleAutoUpdate', () => {
   });
 
   it('should not emit "update-success" when the active binary is not updated due to PATH shadowing', async () => {
-    mockGetPackageJson.mockResolvedValue({ version: '1.0.0' });
+    mockGetPackageJson.mockResolvedValue({
+      name: '@google/gemini-cli',
+      version: '1.0.0',
+    });
 
     await new Promise<void>((resolve) => {
       mockGetInstallationInfo.mockReturnValue({
@@ -502,9 +508,9 @@ describe('handleAutoUpdate', () => {
   it('should use pre-resolved CLI path and verify even if path resolution was relative or custom', async () => {
     mockGetPackageJson.mockImplementation(async (cwd: string) => {
       if (cwd.includes('custom-bin')) {
-        return { version: '1.0.0' };
+        return { name: '@google/gemini-cli', version: '1.0.0' };
       }
-      return { version: '2.0.0' };
+      return { name: '@google/gemini-cli', version: '2.0.0' };
     });
 
     const originalArgv1 = process.argv[1];
@@ -605,6 +611,58 @@ describe('handleAutoUpdate', () => {
           'shadowed by another installation in your PATH',
         ),
       }),
+    );
+  });
+
+  it('should not fail verification if parent package.json is nameless', async () => {
+    // Nameless package.json in parent directory should not trigger false failure
+    mockGetPackageJson.mockResolvedValue({
+      version: '1.0.0',
+    });
+
+    await new Promise<void>((resolve) => {
+      mockGetInstallationInfo.mockReturnValue({
+        updateCommand: 'npm i -g @google/gemini-cli@latest',
+        updateMessage: 'This is an additional message.',
+        isGlobal: true,
+        packageManager: PackageManager.NPM,
+      });
+
+      setTimeout(() => {
+        mockChildProcess.emit('close', 0);
+        resolve();
+      }, 0);
+
+      handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
+    });
+
+    expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-success', {
+      message:
+        'Update successful! The new version will be used on your next run.',
+    });
+  });
+
+  it('should skip update and not spawn process if latest version is invalid semver', () => {
+    const maliciousUpdateInfo: UpdateObject = {
+      ...mockUpdateInfo,
+      update: {
+        ...mockUpdateInfo.update,
+        latest: '2.0.0; touch /tmp/pwned',
+      },
+    };
+
+    handleAutoUpdate(
+      maliciousUpdateInfo,
+      mockSettings,
+      '/root',
+      false,
+      mockSpawn,
+    );
+
+    expect(mockSpawn).not.toHaveBeenCalled();
+    expect(updateEventEmitter.emit).not.toHaveBeenCalledWith(
+      'update-success',
+      expect.anything(),
     );
   });
 

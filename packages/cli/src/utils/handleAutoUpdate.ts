@@ -94,6 +94,13 @@ export function handleAutoUpdate(
     }
   }
 
+  if (info.update.latest && !semver.valid(info.update.latest)) {
+    debugLogger.warn(
+      'Update check: latest version is invalid. Skipping automatic update for safety.',
+    );
+    return;
+  }
+
   if (isSandboxEnabled) {
     updateEventEmitter.emit('update-info', {
       message: `${info.message}\nAutomatic update is not available in sandbox mode.`,
@@ -192,7 +199,7 @@ export function handleAutoUpdate(
           const updatedPkg = await getPackageJsonFn(checkDir);
           if (
             updatedPkg?.version &&
-            (!updatedPkg.name || updatedPkg.name === info.update.name) &&
+            updatedPkg.name === info.update.name &&
             semver.valid(updatedPkg.version) &&
             semver.valid(info.update.latest) &&
             semver.lt(updatedPkg.version, info.update.latest)
