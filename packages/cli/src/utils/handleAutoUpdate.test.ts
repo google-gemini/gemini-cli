@@ -642,6 +642,49 @@ describe('handleAutoUpdate', () => {
     });
   });
 
+  it('should not fail verification if info.update.name is missing', async () => {
+    mockGetPackageJson.mockResolvedValue({
+      name: '@google/gemini-cli',
+      version: '1.0.0',
+    });
+
+    const infoWithoutName: UpdateObject = {
+      ...mockUpdateInfo,
+      update: {
+        ...mockUpdateInfo.update,
+        // @ts-expect-error intentionally undefined name for test
+        name: undefined,
+      },
+    };
+
+    await new Promise<void>((resolve) => {
+      mockGetInstallationInfo.mockReturnValue({
+        updateCommand: 'npm i -g @google/gemini-cli@latest',
+        updateMessage: 'This is an additional message.',
+        isGlobal: true,
+        packageManager: PackageManager.NPM,
+      });
+
+      setTimeout(() => {
+        mockChildProcess.emit('close', 0);
+        resolve();
+      }, 0);
+
+      handleAutoUpdate(
+        infoWithoutName,
+        mockSettings,
+        '/root',
+        false,
+        mockSpawn,
+      );
+    });
+
+    expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-success', {
+      message:
+        'Update successful! The new version will be used on your next run.',
+    });
+  });
+
   it('should skip update and not spawn process if latest version is invalid semver', () => {
     const maliciousUpdateInfo: UpdateObject = {
       ...mockUpdateInfo,
