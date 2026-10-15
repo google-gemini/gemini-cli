@@ -106,6 +106,21 @@ describe('formatters', () => {
       );
     });
 
+    it('should round milliseconds before picking the unit', () => {
+      expect(formatDuration(999.4)).toBe('999ms');
+      expect(formatDuration(999.5)).toBe('1.0s');
+    });
+
+    it('should round seconds before picking the unit', () => {
+      expect(formatDuration(59949)).toBe('59.9s');
+      expect(formatDuration(59950)).toBe('1m');
+      expect(formatDuration(59999)).toBe('1m');
+    });
+
+    it('should round up to the hour', () => {
+      expect(formatDuration(3599999)).toBe('1h');
+    });
+
     it('should handle negative durations', () => {
       expect(formatDuration(-100)).toBe('0s');
     });

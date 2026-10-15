@@ -31,19 +31,22 @@ export const formatDuration = (milliseconds: number): string => {
     return '0s';
   }
 
-  if (milliseconds < 1000) {
-    return `${Math.round(milliseconds)}ms`;
+  const roundedMs = Math.round(milliseconds);
+  if (roundedMs < 1000) {
+    return `${roundedMs}ms`;
   }
 
-  const totalSeconds = milliseconds / 1000;
-
-  if (totalSeconds < 60) {
-    return `${totalSeconds.toFixed(1)}s`;
+  // Round to the displayed precision before picking a unit so a value just
+  // under a boundary does not round up into the next unit's range.
+  const tenthsOfSecond = Math.round(milliseconds / 100);
+  if (tenthsOfSecond < 600) {
+    return `${(tenthsOfSecond / 10).toFixed(1)}s`;
   }
 
+  const totalSeconds = Math.round(milliseconds / 1000);
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = Math.floor(totalSeconds % 60);
+  const seconds = totalSeconds % 60;
 
   const parts: string[] = [];
 
