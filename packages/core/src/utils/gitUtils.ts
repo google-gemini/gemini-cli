@@ -21,10 +21,25 @@ export function getSafeGitEnv(
     }
   }
 
-  const baseSshCommand = cleanedEnv['GIT_SSH_COMMAND']?.trim() || 'ssh';
-  const gitSshCommand = baseSshCommand.includes('BatchMode=yes')
+  let baseSshCommand = cleanedEnv['GIT_SSH_COMMAND'];
+  if (!baseSshCommand && cleanedEnv['GIT_SSH']) {
+    const gitSsh = cleanedEnv['GIT_SSH'];
+    baseSshCommand =
+      gitSsh.includes(' ') && !gitSsh.startsWith('"') && !gitSsh.startsWith("'")
+        ? '"' + gitSsh + '"'
+        : gitSsh;
+  }
+  if (!baseSshCommand) {
+    baseSshCommand = 'ssh';
+  }
+
+  const isPlink = /plink/i.test(baseSshCommand);
+  const batchFlag = isPlink ? '-batch' : '-o BatchMode=yes';
+  const gitSshCommand = baseSshCommand.includes(
+    isPlink ? '-batch' : 'BatchMode=yes',
+  )
     ? baseSshCommand
-    : `${baseSshCommand} -o BatchMode=yes`;
+    : baseSshCommand + ' ' + batchFlag;
 
   return {
     ...cleanedEnv,

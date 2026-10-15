@@ -115,6 +115,20 @@ describe('gitUtils', () => {
       );
     });
 
+    it('should handle GIT_SSH and plink correctly', () => {
+      const safeEnv1 = getSafeGitEnv({
+        GIT_SSH: 'plink',
+      });
+      expect(safeEnv1['GIT_SSH_COMMAND']).toBe('plink -batch');
+
+      const safeEnv2 = getSafeGitEnv({
+        GIT_SSH: 'C:/Program Files/PuTTY/plink.exe',
+      });
+      expect(safeEnv2['GIT_SSH_COMMAND']).toBe(
+        '"C:/Program Files/PuTTY/plink.exe" -batch',
+      );
+    });
+
     it('should not configure diff.external to an empty string', () => {
       const safeEnv = getSafeGitEnv({});
       const count = parseInt(safeEnv['GIT_CONFIG_COUNT'] || '0', 10);
