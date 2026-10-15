@@ -76,7 +76,9 @@ export function handleAutoUpdate(
   spawnFn: typeof spawn = spawnWrapper,
   getPackageJsonFn: (
     cwd: string,
-  ) => Promise<{ name?: string; version?: string } | undefined> = getPackageJson,
+  ) => Promise<
+    { name?: string; version?: string } | undefined
+  > = getPackageJson,
 ) {
   if (!info) {
     return;

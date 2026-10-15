@@ -524,7 +524,13 @@ describe('handleAutoUpdate', () => {
           resolve();
         }, 0);
 
-        handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
+        handleAutoUpdate(
+          mockUpdateInfo,
+          mockSettings,
+          '/root',
+          false,
+          mockSpawn,
+        );
       });
 
       expect(updateEventEmitter.emit).toHaveBeenCalledWith(
