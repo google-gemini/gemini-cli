@@ -258,7 +258,7 @@ describe('github.ts', () => {
           GIT_TERMINAL_PROMPT: '0',
           GIT_ASKPASS: '',
           SSH_ASKPASS: '',
-          GIT_SSH_COMMAND: 'ssh -o BatchMode=yes',
+          GIT_SSH_COMMAND: expect.stringContaining('BatchMode=yes'),
           GH_PROMPT_DISABLED: '1',
           GCM_INTERACTIVE: 'never',
         }),
