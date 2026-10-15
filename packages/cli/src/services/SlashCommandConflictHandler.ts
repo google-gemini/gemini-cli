@@ -37,19 +37,38 @@ export class SlashCommandConflictHandler {
       clearTimeout(this.flushTimeout);
       this.flushTimeout = null;
     }
+    this.pendingConflicts = [];
+    this.notifiedConflicts.clear();
+  }
+
+  private getConflictKey(c: SlashCommandConflict): string {
+    const sourceId =
+      c.loserExtensionName || c.loserMcpServerName || c.loserKind;
+    return `${c.name}:${sourceId}:${c.renamedTo}`;
   }
 
   private handleConflicts(payload: SlashCommandConflictsPayload) {
+    const currentConflictKeys = new Set(
+      payload.conflicts.map((c) => this.getConflictKey(c)),
+    );
+    for (const key of this.notifiedConflicts) {
+      if (!currentConflictKeys.has(key)) {
+        this.notifiedConflicts.delete(key);
+      }
+    }
+
+    const pendingKeys = new Set(
+      this.pendingConflicts.map((c) => this.getConflictKey(c)),
+    );
+
     const newConflicts = payload.conflicts.filter((c) => {
       // Use a unique key to prevent duplicate notifications for the same conflict
-      const sourceId =
-        c.loserExtensionName || c.loserMcpServerName || c.loserKind;
-      const key = `${c.name}:${sourceId}:${c.renamedTo}`;
+      const key = this.getConflictKey(c);
       if (this.notifiedConflicts.has(key)) {
         return false;
       }
       this.notifiedConflicts.add(key);
-      return true;
+      return !pendingKeys.has(key);
     });
 
     if (newConflicts.length > 0) {
