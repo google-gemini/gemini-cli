@@ -169,7 +169,8 @@ Each server configuration supports the following properties:
   platforms), or `%VAR_NAME%` (Windows only).
 - **`cwd`** (string): Working directory for Stdio transport
 - **`timeout`** (number): Request timeout in milliseconds (default: 600,000ms =
-  10 minutes)
+  10 minutes). Tool discovery (`tools/list`) defaults to 60,000ms (1 minute) so
+  an unresponsive server fails fast; setting `timeout` overrides both.
 - **`trust`** (boolean): When `true`, bypasses all tool call confirmations for
   this server (default: `false`)
 - **`includeTools`** (string[]): List of tool names to include from this MCP
