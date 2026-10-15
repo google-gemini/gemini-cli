@@ -401,10 +401,13 @@ describe('handleAutoUpdate', () => {
         packageManager: PackageManager.NPM,
       });
 
+      updateEventEmitter.once('update-success', () => {
+        resolve();
+      });
+
       // Simulate successful execution
       setTimeout(() => {
         mockChildProcess.emit('close', 0);
-        resolve();
       }, 0);
 
       handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
@@ -430,10 +433,13 @@ describe('handleAutoUpdate', () => {
         packageManager: PackageManager.NPM,
       });
 
+      updateEventEmitter.once('update-failed', () => {
+        resolve();
+      });
+
       // Simulate child process completing successfully (code 0)
       setTimeout(() => {
         mockChildProcess.emit('close', 0);
-        resolve();
       }, 0);
 
       handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
@@ -466,9 +472,12 @@ describe('handleAutoUpdate', () => {
         packageManager: PackageManager.NPM,
       });
 
+      updateEventEmitter.once('update-success', () => {
+        resolve();
+      });
+
       setTimeout(() => {
         mockChildProcess.emit('close', 0);
-        resolve();
       }, 0);
 
       handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
@@ -491,9 +500,12 @@ describe('handleAutoUpdate', () => {
         packageManager: PackageManager.NPM,
       });
 
+      updateEventEmitter.once('update-success', () => {
+        resolve();
+      });
+
       setTimeout(() => {
         mockChildProcess.emit('close', 0);
-        resolve();
       }, 0);
 
       handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
@@ -525,9 +537,12 @@ describe('handleAutoUpdate', () => {
           packageManager: PackageManager.NPM,
         });
 
+        updateEventEmitter.once('update-failed', () => {
+          resolve();
+        });
+
         setTimeout(() => {
           mockChildProcess.emit('close', 0);
-          resolve();
         }, 0);
 
         handleAutoUpdate(
@@ -567,9 +582,12 @@ describe('handleAutoUpdate', () => {
         packageManager: PackageManager.NPM,
       });
 
+      updateEventEmitter.once('update-success', () => {
+        resolve();
+      });
+
       setTimeout(() => {
         mockChildProcess.emit('close', 0);
-        resolve();
       }, 0);
 
       handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
@@ -596,9 +614,12 @@ describe('handleAutoUpdate', () => {
         packageManager: PackageManager.NPM,
       });
 
+      updateEventEmitter.once('update-failed', () => {
+        resolve();
+      });
+
       setTimeout(() => {
         mockChildProcess.emit('close', 0);
-        resolve();
       }, 0);
 
       handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
@@ -628,9 +649,12 @@ describe('handleAutoUpdate', () => {
         packageManager: PackageManager.NPM,
       });
 
+      updateEventEmitter.once('update-success', () => {
+        resolve();
+      });
+
       setTimeout(() => {
         mockChildProcess.emit('close', 0);
-        resolve();
       }, 0);
 
       handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
@@ -665,9 +689,12 @@ describe('handleAutoUpdate', () => {
         packageManager: PackageManager.NPM,
       });
 
+      updateEventEmitter.once('update-success', () => {
+        resolve();
+      });
+
       setTimeout(() => {
         mockChildProcess.emit('close', 0);
-        resolve();
       }, 0);
 
       handleAutoUpdate(
@@ -751,9 +778,12 @@ describe('handleAutoUpdate', () => {
           packageManager: PackageManager.NPM,
         });
 
+        updateEventEmitter.once('update-failed', () => {
+          resolve();
+        });
+
         setTimeout(() => {
           mockChildProcess.emit('close', 0);
-          resolve();
         }, 0);
 
         handleAutoUpdate(
