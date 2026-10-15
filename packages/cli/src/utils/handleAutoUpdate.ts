@@ -76,7 +76,7 @@ export function handleAutoUpdate(
   spawnFn: typeof spawn = spawnWrapper,
   getPackageJsonFn: (
     cwd: string,
-  ) => Promise<{ version?: string } | undefined> = getPackageJson,
+  ) => Promise<{ name?: string; version?: string } | undefined> = getPackageJson,
 ) {
   if (!info) {
     return;
@@ -190,6 +190,7 @@ export function handleAutoUpdate(
           const updatedPkg = await getPackageJsonFn(checkDir);
           if (
             updatedPkg?.version &&
+            (!updatedPkg.name || updatedPkg.name === info.update.name) &&
             semver.valid(updatedPkg.version) &&
             semver.valid(info.update.latest) &&
             semver.lt(updatedPkg.version, info.update.latest)

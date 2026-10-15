@@ -540,6 +540,68 @@ describe('handleAutoUpdate', () => {
     }
   });
 
+  it('should not fail verification if package name differs from expected CLI package (parent monorepo fallback)', async () => {
+    // Parent package has an older version (1.0.0), but belongs to a different package name
+    mockGetPackageJson.mockResolvedValue({
+      name: 'root-monorepo',
+      version: '1.0.0',
+    });
+
+    await new Promise<void>((resolve) => {
+      mockGetInstallationInfo.mockReturnValue({
+        updateCommand: 'npm i -g @google/gemini-cli@latest',
+        updateMessage: 'This is an additional message.',
+        isGlobal: true,
+        packageManager: PackageManager.NPM,
+      });
+
+      setTimeout(() => {
+        mockChildProcess.emit('close', 0);
+        resolve();
+      }, 0);
+
+      handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
+    });
+
+    // Since package name does not match @google/gemini-cli, it should not falsely treat it as an outdated CLI package
+    expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-success', {
+      message:
+        'Update successful! The new version will be used on your next run.',
+    });
+  });
+
+  it('should fail verification when package name matches but version is outdated', async () => {
+    mockGetPackageJson.mockResolvedValue({
+      name: '@google/gemini-cli',
+      version: '1.0.0',
+    });
+
+    await new Promise<void>((resolve) => {
+      mockGetInstallationInfo.mockReturnValue({
+        updateCommand: 'npm i -g @google/gemini-cli@latest',
+        updateMessage: 'This is an additional message.',
+        isGlobal: true,
+        packageManager: PackageManager.NPM,
+      });
+
+      setTimeout(() => {
+        mockChildProcess.emit('close', 0);
+        resolve();
+      }, 0);
+
+      handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
+    });
+
+    expect(updateEventEmitter.emit).toHaveBeenCalledWith(
+      'update-failed',
+      expect.objectContaining({
+        message: expect.stringContaining(
+          'shadowed by another installation in your PATH',
+        ),
+      }),
+    );
+  });
+
   it('should suppress update if isSandboxEnabled is true', () => {
     handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', true, mockSpawn);
 
