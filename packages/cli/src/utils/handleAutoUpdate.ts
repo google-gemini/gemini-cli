@@ -199,7 +199,7 @@ export function handleAutoUpdate(
           const updatedPkg = await getPackageJsonFn(checkDir);
           if (
             updatedPkg?.version &&
-            updatedPkg.name === info.update.name &&
+            (updatedPkg.name ?? '') === info.update.name &&
             semver.valid(updatedPkg.version) &&
             semver.valid(info.update.latest) &&
             semver.lt(updatedPkg.version, info.update.latest)
