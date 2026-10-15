@@ -126,10 +126,15 @@ interface BackgroundedToolInfo {
 const isTopicTool = (name: string): boolean =>
   name === UPDATE_TOPIC_TOOL_NAME || name === UPDATE_TOPIC_DISPLAY_NAME;
 
+const EMPTY_RESPONSE_NUDGE_MESSAGE =
+  '[System: You successfully executed a tool but returned an empty response. Please analyze the tool output and explain your progress or final answer.]';
+
 enum StreamProcessingStatus {
   Completed,
   UserCancelled,
   Error,
+  /** A continuation ended normally without any visible text or tool calls. */
+  EmptyContinuation,
 }
 
 enum CancellationState {
@@ -1665,9 +1670,12 @@ export const useGeminiStream = (
       userMessageTimestamp: number,
       signal: AbortSignal,
       isContinuation?: boolean,
-      prompt_id?: string,
     ): Promise<StreamProcessingStatus> => {
       let geminiMessageBuffer = '';
+      // Set when the stream ended for a reason other than the model simply
+      // finishing (cancellation, errors, hooks, limits), so an empty buffer
+      // must not be treated as an empty model response.
+      let endedAbnormally = false;
       const toolCallRequests: ToolCallRequestInfo[] = [];
       for await (const event of stream) {
         if (
@@ -1695,12 +1703,15 @@ export const useGeminiStream = (
             pendingToolCallRequestsRef.current.push(event.value);
             break;
           case ServerGeminiEventType.UserCancelled:
+            endedAbnormally = true;
             handleUserCancelledEvent(userMessageTimestamp);
             break;
           case ServerGeminiEventType.Error:
+            endedAbnormally = true;
             handleErrorEvent(event.value, userMessageTimestamp);
             break;
           case ServerGeminiEventType.AgentExecutionStopped:
+            endedAbnormally = true;
             handleAgentExecutionStoppedEvent(
               event.value.reason,
               userMessageTimestamp,
@@ -1709,6 +1720,7 @@ export const useGeminiStream = (
             );
             break;
           case ServerGeminiEventType.AgentExecutionBlocked:
+            endedAbnormally = true;
             handleAgentExecutionBlockedEvent(
               event.value.reason,
               userMessageTimestamp,
@@ -1724,9 +1736,11 @@ export const useGeminiStream = (
             // do nothing
             break;
           case ServerGeminiEventType.MaxSessionTurns:
+            endedAbnormally = true;
             handleMaxSessionTurnsEvent();
             break;
           case ServerGeminiEventType.ContextWindowWillOverflow:
+            endedAbnormally = true;
             handleContextWindowWillOverflowEvent(
               event.value.estimatedRequestTokenCount,
               event.value.remainingTokenCount,
@@ -1745,11 +1759,14 @@ export const useGeminiStream = (
             // handle later because we want to move pending history to history
             // before we add loop detected message to history
             loopDetectedRef.current = true;
+            endedAbnormally = true;
             break;
           case ServerGeminiEventType.Retry:
             // Handled transparently by the backend stream retries.
             break;
           case ServerGeminiEventType.InvalidStream:
+            // The core already retries empty responses with its own nudge.
+            endedAbnormally = true;
             handleInvalidStreamEvent(event.value, userMessageTimestamp);
             break;
           default: {
@@ -1776,25 +1793,13 @@ export const useGeminiStream = (
           }
           pendingToolCallRequestsRef.current = [];
         }
-      } else {
-        const hasVisibleText = geminiMessageBuffer.trim().length > 0;
-        if (
-          isContinuation &&
-          !hasVisibleText &&
-          autoNudgeAttemptCountRef.current < MAX_AUTO_NUDGE_ATTEMPTS
-        ) {
-          autoNudgeAttemptCountRef.current += 1;
-          const nudgeMessage =
-            '[System: You successfully executed a tool but returned an empty response. Please analyze the tool output and explain your progress or final answer.]';
-
-          // Automatically continue the query with the nudge
-          // eslint-disable-next-line @typescript-eslint/no-floating-promises
-          submitQueryRef.current?.(
-            [{ text: nudgeMessage }],
-            { isContinuation: true },
-            prompt_id,
-          );
-        }
+      } else if (
+        isContinuation &&
+        !endedAbnormally &&
+        !signal.aborted &&
+        geminiMessageBuffer.trim().length === 0
+      ) {
+        return StreamProcessingStatus.EmptyContinuation;
       }
       return StreamProcessingStatus.Completed;
     },
@@ -1919,7 +1924,6 @@ export const useGeminiStream = (
                 userMessageTimestamp,
                 abortSignal,
                 options?.isContinuation,
-                prompt_id,
               );
 
               if (processingStatus === StreamProcessingStatus.UserCancelled) {
@@ -1929,6 +1933,23 @@ export const useGeminiStream = (
               if (pendingHistoryItemRef.current) {
                 addItem(pendingHistoryItemRef.current, userMessageTimestamp);
                 setPendingHistoryItem(null);
+              }
+              if (
+                processingStatus === StreamProcessingStatus.EmptyContinuation &&
+                !turnCancelledRef.current &&
+                activeQueryIdRef.current === queryId &&
+                autoNudgeAttemptCountRef.current < MAX_AUTO_NUDGE_ATTEMPTS
+              ) {
+                autoNudgeAttemptCountRef.current += 1;
+                // Awaited rather than fired and forgotten, so this request
+                // stays responding until the nudge has finished and a
+                // cancellation in between is honoured.
+                await submitQueryRef.current?.(
+                  [{ text: EMPTY_RESPONSE_NUDGE_MESSAGE }],
+                  { isContinuation: true },
+                  prompt_id,
+                );
+                return;
               }
               if (loopDetectedRef.current) {
                 loopDetectedRef.current = false;
