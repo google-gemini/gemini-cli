@@ -18,6 +18,11 @@ vi.mock('../utils/paths.js', async (importOriginal) => {
   return { ...actual, homedir: mockHomedir };
 });
 
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>();
+  return { ...actual, platform: vi.fn(actual.platform) };
+});
+
 describe('FileKeychain', () => {
   let testHome: string;
   let credentialsPath: string;
@@ -130,6 +135,25 @@ describe('FileKeychain', () => {
     });
   });
 
+  describe('stale locks', () => {
+    it('promptly takes over a lock left behind by a crashed process', async () => {
+      const keychain = new FileKeychain();
+      // proper-lockfile represents a held lock as a `<file>.lock` directory
+      // whose mtime is refreshed while the holder is alive.
+      const lockDir = `${credentialsPath}.lock`;
+      await fs.mkdir(lockDir, { recursive: true });
+      const crashedAt = new Date(Date.now() - 5_500);
+      await fs.utimes(lockDir, crashedAt, crashedAt);
+
+      const start = Date.now();
+      await keychain.setPassword('svc', 'alice', 'a');
+
+      expect(Date.now() - start).toBeLessThan(2_000);
+      expect(await keychain.getPassword('svc', 'alice')).toBe('a');
+      expect(await listGeminiDir()).toEqual(['gemini-credentials.json']);
+    });
+  });
+
   describe('atomic writes', () => {
     it('keeps the existing credentials intact when a write is interrupted', async () => {
       const keychain = new FileKeychain();
@@ -191,15 +215,43 @@ describe('FileKeychain', () => {
       const keychain = new FileKeychain();
       await keychain.setPassword('svc', 'alice', 'a');
       vi.spyOn(fs, 'rename').mockRejectedValue(
-        Object.assign(new Error('EACCES'), { code: 'EACCES' }),
+        Object.assign(new Error('EROFS'), { code: 'EROFS' }),
       );
 
       await expect(keychain.setPassword('svc', 'bob', 'b')).rejects.toThrow(
+        'EROFS',
+      );
+
+      expect(fs.rename).toHaveBeenCalledTimes(1);
+      expect(await listGeminiDir()).toEqual(['gemini-credentials.json']);
+      expect(await keychain.getPassword('svc', 'alice')).toBe('a');
+    });
+
+    it('retries a rename that fails with EACCES on Windows', async () => {
+      vi.mocked(os.platform).mockReturnValue('win32');
+      const keychain = new FileKeychain();
+      vi.spyOn(fs, 'rename').mockRejectedValueOnce(
+        Object.assign(new Error('EACCES'), { code: 'EACCES' }),
+      );
+
+      await keychain.setPassword('svc', 'alice', 'a');
+
+      expect(fs.rename).toHaveBeenCalledTimes(2);
+      expect(await keychain.getPassword('svc', 'alice')).toBe('a');
+    });
+
+    it('does not retry a rename that fails with EACCES on other platforms', async () => {
+      vi.mocked(os.platform).mockReturnValue('linux');
+      const keychain = new FileKeychain();
+      vi.spyOn(fs, 'rename').mockRejectedValue(
+        Object.assign(new Error('EACCES'), { code: 'EACCES' }),
+      );
+
+      await expect(keychain.setPassword('svc', 'alice', 'a')).rejects.toThrow(
         'EACCES',
       );
 
-      expect(await listGeminiDir()).toEqual(['gemini-credentials.json']);
-      expect(await keychain.getPassword('svc', 'alice')).toBe('a');
+      expect(fs.rename).toHaveBeenCalledTimes(1);
     });
   });
 });

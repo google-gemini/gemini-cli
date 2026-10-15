@@ -15,13 +15,30 @@ import { debugLogger } from '../utils/debugLogger.js';
 
 type CredentialsData = Record<string, Record<string, string>>;
 
-// Up to ~5 seconds of waiting for another process to finish its write.
+// A lock left behind by a crashed process is considered stale (and taken
+// over) after this long. Live holders refresh it every LOCK_STALE_MS / 2.
+const LOCK_STALE_MS = 5000;
+// Up to ~7 seconds of waiting, so a stale lock is always recovered before
+// we give up.
 const LOCK_RETRY_OPTIONS = {
-  retries: 50,
+  retries: 70,
   minTimeout: 20,
   maxTimeout: 100,
 };
 const RENAME_MAX_ATTEMPTS = 5;
+
+/**
+ * On Windows, rename can fail transiently while another process (antivirus,
+ * search indexer, a concurrent reader) has the destination open. EACCES is
+ * only transient there; elsewhere it is a real permission error.
+ */
+function isRetryableRenameError(code: string | undefined): boolean {
+  return (
+    code === 'EBUSY' ||
+    code === 'EPERM' ||
+    (code === 'EACCES' && os.platform() === 'win32')
+  );
+}
 
 export class FileKeychain implements Keychain {
   private readonly tokenFilePath: string;
@@ -140,10 +157,7 @@ export class FileKeychain implements Keychain {
         } catch (error: unknown) {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           const code = (error as NodeJS.ErrnoException).code;
-          // On Windows, rename can fail transiently while another process
-          // has the destination open.
-          const isRetryable = code === 'EBUSY' || code === 'EPERM';
-          if (!isRetryable || attempt >= RENAME_MAX_ATTEMPTS) {
+          if (!isRetryableRenameError(code) || attempt >= RENAME_MAX_ATTEMPTS) {
             throw error;
           }
           await new Promise((resolve) =>
@@ -168,6 +182,7 @@ export class FileKeychain implements Keychain {
     // `realpath: false` lets us lock the credentials file before it exists.
     const release = await lock(this.tokenFilePath, {
       realpath: false,
+      stale: LOCK_STALE_MS,
       retries: LOCK_RETRY_OPTIONS,
     });
     try {
