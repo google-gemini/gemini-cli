@@ -725,8 +725,8 @@ describe('handleAutoUpdate', () => {
       expect(updateEventEmitter.emit).toHaveBeenCalledWith(
         'update-failed',
         expect.objectContaining({
-          message: expect.stringContaining(
-            'active binary (/custom/bin/gemini) was not updated',
+          message: expect.stringMatching(
+            /active binary \(.*custom.bin.gemini\) was not updated/,
           ),
         }),
       );
