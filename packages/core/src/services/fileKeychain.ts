@@ -8,8 +8,20 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import * as crypto from 'node:crypto';
+import { lock } from 'proper-lockfile';
 import type { Keychain } from './keychainTypes.js';
 import { GEMINI_DIR, homedir } from '../utils/paths.js';
+import { debugLogger } from '../utils/debugLogger.js';
+
+type CredentialsData = Record<string, Record<string, string>>;
+
+// Up to ~5 seconds of waiting for another process to finish its write.
+const LOCK_RETRY_OPTIONS = {
+  retries: 50,
+  minTimeout: 20,
+  maxTimeout: 100,
+};
+const RENAME_MAX_ATTEMPTS = 5;
 
 export class FileKeychain implements Keychain {
   private readonly tokenFilePath: string;
@@ -82,7 +94,7 @@ export class FileKeychain implements Keychain {
     await fs.mkdir(dir, { recursive: true, mode: 0o700 });
   }
 
-  private async loadData(): Promise<Record<string, Record<string, string>>> {
+  private async loadData(): Promise<CredentialsData> {
     let data: string;
     try {
       data = await fs.readFile(this.tokenFilePath, 'utf-8');
@@ -98,7 +110,7 @@ export class FileKeychain implements Keychain {
     try {
       const decrypted = this.decrypt(data);
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      return JSON.parse(decrypted) as Record<string, Record<string, string>>;
+      return JSON.parse(decrypted) as CredentialsData;
     } catch {
       throw new Error(
         `Corrupted credentials file detected at: ${this.tokenFilePath}\n` +
@@ -107,13 +119,66 @@ export class FileKeychain implements Keychain {
     }
   }
 
-  private async saveData(
-    data: Record<string, Record<string, string>>,
-  ): Promise<void> {
+  /**
+   * Writes the credentials atomically: the encrypted payload goes to a unique
+   * temporary file that is then renamed over the credentials file, so a crash
+   * or a full disk can never leave a truncated (undecryptable) file behind.
+   */
+  private async saveData(data: CredentialsData): Promise<void> {
     await this.ensureDirectoryExists();
     const json = JSON.stringify(data, null, 2);
     const encrypted = this.encrypt(json);
-    await fs.writeFile(this.tokenFilePath, encrypted, { mode: 0o600 });
+    const tmpPath = `${this.tokenFilePath}.${crypto.randomUUID()}.tmp`;
+    let renamed = false;
+    try {
+      await fs.writeFile(tmpPath, encrypted, { mode: 0o600 });
+      for (let attempt = 1; ; attempt++) {
+        try {
+          await fs.rename(tmpPath, this.tokenFilePath);
+          renamed = true;
+          break;
+        } catch (error: unknown) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          const code = (error as NodeJS.ErrnoException).code;
+          // On Windows, rename can fail transiently while another process
+          // has the destination open.
+          const isRetryable = code === 'EBUSY' || code === 'EPERM';
+          if (!isRetryable || attempt >= RENAME_MAX_ATTEMPTS) {
+            throw error;
+          }
+          await new Promise((resolve) =>
+            setTimeout(resolve, 2 ** (attempt - 1) * 50),
+          );
+        }
+      }
+    } finally {
+      if (!renamed) {
+        await fs.rm(tmpPath, { force: true }).catch(() => {});
+      }
+    }
+  }
+
+  /**
+   * Runs a read-modify-write of the credentials file under an exclusive
+   * cross-process lock, so concurrent writers (e.g. a token refresh in one
+   * terminal and a login in another) cannot overwrite each other's entries.
+   */
+  private async withLock<T>(fn: () => Promise<T>): Promise<T> {
+    await this.ensureDirectoryExists();
+    // `realpath: false` lets us lock the credentials file before it exists.
+    const release = await lock(this.tokenFilePath, {
+      realpath: false,
+      retries: LOCK_RETRY_OPTIONS,
+    });
+    try {
+      return await fn();
+    } finally {
+      try {
+        await release();
+      } catch (error) {
+        debugLogger.error('Failed to release credentials file lock:', error);
+      }
+    }
   }
 
   async getPassword(service: string, account: string): Promise<string | null> {
@@ -126,17 +191,23 @@ export class FileKeychain implements Keychain {
     account: string,
     password: string,
   ): Promise<void> {
-    const data = await this.loadData();
-    if (!data[service]) {
-      data[service] = {};
-    }
-    data[service][account] = password;
-    await this.saveData(data);
+    await this.withLock(async () => {
+      const data = await this.loadData();
+      if (!data[service]) {
+        data[service] = {};
+      }
+      data[service][account] = password;
+      await this.saveData(data);
+    });
   }
 
   async deletePassword(service: string, account: string): Promise<boolean> {
-    const data = await this.loadData();
-    if (data[service] && account in data[service]) {
+    return this.withLock(async () => {
+      const data = await this.loadData();
+      if (!data[service] || !(account in data[service])) {
+        return false;
+      }
+
       delete data[service][account];
 
       if (Object.keys(data[service]).length === 0) {
@@ -157,8 +228,7 @@ export class FileKeychain implements Keychain {
         await this.saveData(data);
       }
       return true;
-    }
-    return false;
+    });
   }
 
   async findCredentials(
