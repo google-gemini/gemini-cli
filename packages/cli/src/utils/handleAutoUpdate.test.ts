@@ -499,6 +499,47 @@ describe('handleAutoUpdate', () => {
     });
   });
 
+  it('should use pre-resolved CLI path and verify even if path resolution was relative or custom', async () => {
+    mockGetPackageJson.mockImplementation(async (cwd: string) => {
+      if (cwd.includes('custom-bin')) {
+        return { version: '1.0.0' };
+      }
+      return { version: '2.0.0' };
+    });
+
+    const originalArgv1 = process.argv[1];
+    process.argv[1] = '/tmp/custom-bin/gemini';
+
+    try {
+      await new Promise<void>((resolve) => {
+        mockGetInstallationInfo.mockReturnValue({
+          updateCommand: 'npm i -g @google/gemini-cli@latest',
+          updateMessage: 'This is an additional message.',
+          isGlobal: true,
+          packageManager: PackageManager.NPM,
+        });
+
+        setTimeout(() => {
+          mockChildProcess.emit('close', 0);
+          resolve();
+        }, 0);
+
+        handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
+      });
+
+      expect(updateEventEmitter.emit).toHaveBeenCalledWith(
+        'update-failed',
+        expect.objectContaining({
+          message: expect.stringContaining(
+            'shadowed by another installation in your PATH',
+          ),
+        }),
+      );
+    } finally {
+      process.argv[1] = originalArgv1;
+    }
+  });
+
   it('should suppress update if isSandboxEnabled is true', () => {
     handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', true, mockSpawn);
 

@@ -82,6 +82,16 @@ export function handleAutoUpdate(
     return;
   }
 
+  const rawCliPath = process.argv[1];
+  let resolvedCliPath: string | undefined;
+  if (rawCliPath) {
+    try {
+      resolvedCliPath = fs.realpathSync(rawCliPath);
+    } catch {
+      resolvedCliPath = path.resolve(rawCliPath);
+    }
+  }
+
   if (isSandboxEnabled) {
     updateEventEmitter.emit('update-info', {
       message: `${info.message}\nAutomatic update is not available in sandbox mode.`,
@@ -175,14 +185,8 @@ export function handleAutoUpdate(
     if (code === 0) {
       let isVerified = true;
       try {
-        const cliPath = process.argv[1];
-        if (cliPath && info.update.latest) {
-          let checkDir: string;
-          try {
-            checkDir = path.dirname(fs.realpathSync(cliPath));
-          } catch {
-            checkDir = path.dirname(cliPath);
-          }
+        if (resolvedCliPath && info.update.latest) {
+          const checkDir = path.dirname(resolvedCliPath);
           const updatedPkg = await getPackageJsonFn(checkDir);
           if (
             updatedPkg?.version &&
@@ -199,7 +203,7 @@ export function handleAutoUpdate(
 
       if (!isVerified) {
         updateEventEmitter.emit('update-failed', {
-          message: `Automatic update completed, but the active binary (${process.argv[1]}) was not updated. It may be shadowed by another installation in your PATH. Please try updating manually:\n\n${updateCommand}`,
+          message: `Automatic update completed, but the active binary (${resolvedCliPath ?? process.argv[1]}) was not updated. It may be shadowed by another installation in your PATH. Please try updating manually:\n\n${updateCommand}`,
         });
         return;
       }
