@@ -99,7 +99,7 @@ describe('gitUtils', () => {
       expect(safeEnv['GIT_ASKPASS']).toBe('');
       expect(safeEnv['SSH_ASKPASS']).toBe('');
       expect(safeEnv['GIT_SSH_COMMAND']).toBe(
-        'ssh -i /path/to/key -o BatchMode=yes',
+        'ssh -o BatchMode=yes -i /path/to/key',
       );
       expect(safeEnv['GH_PROMPT_DISABLED']).toBe('1');
       expect(safeEnv['GCM_INTERACTIVE']).toBe('never');
@@ -112,6 +112,16 @@ describe('gitUtils', () => {
 
       expect(safeEnv['GIT_SSH_COMMAND']).toBe(
         'ssh -i /path/to/key -o BatchMode=yes',
+      );
+    });
+
+    it('should prepend BatchMode=yes before BatchMode=no in GIT_SSH_COMMAND', () => {
+      const safeEnv = getSafeGitEnv({
+        GIT_SSH_COMMAND: 'ssh -o BatchMode=no -i /path/to/key',
+      });
+
+      expect(safeEnv['GIT_SSH_COMMAND']).toBe(
+        'ssh -o BatchMode=yes -o BatchMode=no -i /path/to/key',
       );
     });
 

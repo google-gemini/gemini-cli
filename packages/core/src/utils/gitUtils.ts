@@ -40,11 +40,20 @@ export function getSafeGitEnv(
   const execName = executable.split(/[/\\]/).pop() || '';
   const isPlink = /^(?:tortoise)?plink(?:\.exe)?$/i.test(execName);
   const batchFlag = isPlink ? '-batch' : '-o BatchMode=yes';
-  const gitSshCommand = baseSshCommand.includes(
-    isPlink ? '-batch' : 'BatchMode=yes',
-  )
-    ? baseSshCommand
-    : baseSshCommand + ' ' + batchFlag;
+  const hasBatchFlag = isPlink
+    ? /(?:^|\s)-batch(?:\s|$)/.test(baseSshCommand)
+    : /\bbatchmode\s*=\s*yes\b/i.test(baseSshCommand) &&
+      !/\bbatchmode\s*=\s*no\b/i.test(baseSshCommand);
+
+  let gitSshCommand = baseSshCommand;
+  if (!hasBatchFlag && execMatch) {
+    const execLength = execMatch[0].length;
+    gitSshCommand =
+      baseSshCommand.slice(0, execLength) +
+      ' ' +
+      batchFlag +
+      baseSshCommand.slice(execLength);
+  }
 
   return {
     ...cleanedEnv,
