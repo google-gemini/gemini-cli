@@ -2604,15 +2604,17 @@ describe('Settings Loading and Merging', () => {
       expect(settings.workspace.settings).toEqual({});
     });
 
-    it('should evaluate workspace trust with settings resolved from the shell environment', () => {
+    it('should evaluate workspace trust with settings resolved from the shell environment even when other settings reference .env variables', () => {
       // The trust check gates whether a workspace .env file may be loaded, so
       // it must be evaluated against the environment as it exists *before*
-      // any .env file is loaded, with placeholders resolved and coerced.
+      // any .env file is loaded, with placeholders resolved and coerced even if
+      // another typed setting still holds an unexpanded .env placeholder.
       vi.stubEnv('FOLDER_TRUST_FROM_SHELL', 'false');
       setupEnvFileScenario({
-        envFileContent: 'GITHUB_MCP_PAT=ghp_secretTokenHere',
+        envFileContent: 'TRUST_CHECK_MAX_TURNS=25',
         userSettingsContent: {
           security: { folderTrust: { enabled: '$FOLDER_TRUST_FROM_SHELL' } },
+          model: { maxSessionTurns: '$TRUST_CHECK_MAX_TURNS' },
         },
       });
 
@@ -2627,6 +2629,8 @@ describe('Settings Loading and Merging', () => {
         MOCK_WORKSPACE_DIR,
       );
       expect(settings.merged.security.folderTrust.enabled).toBe(false);
+      expect(settings.merged.model.maxSessionTurns).toBe(25);
+      expect(settings.errors).toEqual([]);
     });
   });
 

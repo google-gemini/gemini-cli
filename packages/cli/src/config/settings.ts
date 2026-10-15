@@ -803,6 +803,78 @@ interface RawSettingsFile {
   rawJson?: string;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function getParentRecord(
+  root: unknown,
+  objectPath: readonly string[],
+): Record<string, unknown> | undefined {
+  let current = root;
+  for (let i = 0; i < objectPath.length - 1; i++) {
+    if (!isRecord(current)) {
+      return undefined;
+    }
+    current = current[objectPath[i]];
+  }
+  return isRecord(current) ? current : undefined;
+}
+
+/**
+ * When a settings object fails full-schema validation (for example, during the
+ * preliminary pre-`.env` pass when a typed field still holds an unexpanded
+ * `$VAR` placeholder), re-runs validation on a copy with the failing object
+ * properties removed so that all valid fields (such as boolean/number shell
+ * variables) are still coerced to their target types.
+ */
+function coerceValidSettings(
+  expandedSettings: Settings,
+  issues: ReadonlyArray<{ path: ReadonlyArray<string | number> }>,
+): Settings {
+  const clone = structuredClone(expandedSettings);
+  const pathsToRestore: string[][] = [];
+
+  for (const issue of issues) {
+    const firstNumberIdx = issue.path.findIndex((p) => typeof p === 'number');
+    const objectPath = (
+      firstNumberIdx === -1 ? issue.path : issue.path.slice(0, firstNumberIdx)
+    ).filter((p): p is string => typeof p === 'string');
+
+    if (objectPath.length === 0) {
+      return expandedSettings;
+    }
+
+    const lastKey = objectPath[objectPath.length - 1];
+    const container = getParentRecord(clone, objectPath);
+    if (container && Object.hasOwn(container, lastKey)) {
+      delete container[lastKey];
+      pathsToRestore.push(objectPath);
+    }
+  }
+
+  const partialValidation = validateSettings(clone);
+  if (!partialValidation.success || !partialValidation.data) {
+    return expandedSettings;
+  }
+
+  const coerced = partialValidation.data as Settings;
+  for (const objectPath of pathsToRestore) {
+    const lastKey = objectPath[objectPath.length - 1];
+    const sourceContainer = getParentRecord(expandedSettings, objectPath);
+    const targetContainer = getParentRecord(coerced, objectPath);
+    if (
+      sourceContainer &&
+      targetContainer &&
+      Object.hasOwn(sourceContainer, lastKey)
+    ) {
+      targetContainer[lastKey] = sourceContainer[lastKey];
+    }
+  }
+
+  return coerced;
+}
+
 /**
  * Expands environment variable placeholders in `rawSettings` against the
  * current `process.env` and validates the result.
@@ -832,7 +904,7 @@ function resolveSettings(
         severity: 'warning',
       });
     }
-    return expandedSettings;
+    return coerceValidSettings(expandedSettings, validationResult.error.issues);
   }
 
   // Since we've successfully validated expandedSettings against settingsZodSchema,
