@@ -61,6 +61,12 @@ describe('gitUtils', () => {
 
     it('should set default security overrides and expected count', () => {
       const safeEnv = getSafeGitEnv({});
+      expect(safeEnv['GIT_TERMINAL_PROMPT']).toBe('0');
+      expect(safeEnv['GIT_ASKPASS']).toBe('');
+      expect(safeEnv['SSH_ASKPASS']).toBe('');
+      expect(safeEnv['GIT_SSH_COMMAND']).toBe('ssh -o BatchMode=yes');
+      expect(safeEnv['GH_PROMPT_DISABLED']).toBe('1');
+      expect(safeEnv['GCM_INTERACTIVE']).toBe('never');
       expect(safeEnv['GIT_CONFIG_NOSYSTEM']).toBe('1');
       expect(safeEnv['GIT_CONFIG_COUNT']).toBe('7');
       expect(safeEnv['GIT_CONFIG_KEY_0']).toBe('credential.helper');
@@ -77,6 +83,24 @@ describe('gitUtils', () => {
       expect(safeEnv['GIT_CONFIG_VALUE_5']).toBe('');
       expect(safeEnv['GIT_CONFIG_KEY_6']).toBe('sequence.editor');
       expect(safeEnv['GIT_CONFIG_VALUE_6']).toBe('');
+    });
+
+    it('should override interactive prompt environment variables from baseEnv', () => {
+      const safeEnv = getSafeGitEnv({
+        GIT_TERMINAL_PROMPT: '1',
+        GIT_ASKPASS: '/usr/bin/ssh-askpass',
+        SSH_ASKPASS: '/usr/bin/ssh-askpass',
+        GIT_SSH_COMMAND: 'ssh',
+        GH_PROMPT_DISABLED: '0',
+        GCM_INTERACTIVE: 'always',
+      });
+
+      expect(safeEnv['GIT_TERMINAL_PROMPT']).toBe('0');
+      expect(safeEnv['GIT_ASKPASS']).toBe('');
+      expect(safeEnv['SSH_ASKPASS']).toBe('');
+      expect(safeEnv['GIT_SSH_COMMAND']).toBe('ssh -o BatchMode=yes');
+      expect(safeEnv['GH_PROMPT_DISABLED']).toBe('1');
+      expect(safeEnv['GCM_INTERACTIVE']).toBe('never');
     });
 
     it('should not configure diff.external to an empty string', () => {
