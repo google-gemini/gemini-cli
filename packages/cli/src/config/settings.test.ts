@@ -2594,7 +2594,7 @@ describe('Settings Loading and Merging', () => {
       setupEnvFileScenario({
         envFileContent: '',
         workspaceSettingsContent: {
-          advanced: { dnsResolutionOrder: '$SECRET_TOKEN_FROM_SHELL' },
+          model: { maxSessionTurns: '$SECRET_TOKEN_FROM_SHELL' },
         },
       });
 
@@ -2602,6 +2602,34 @@ describe('Settings Loading and Merging', () => {
 
       expect(settings.errors).toEqual([]);
       expect(settings.workspace.settings).toEqual({});
+
+      settings.setTrusted(true);
+
+      expect(settings.workspace.settings).toEqual({
+        model: { maxSessionTurns: 'super-secret-shell-value' },
+      });
+      expect(settings.errors).toHaveLength(1);
+    });
+
+    it('should normalize legacy theme names when an initially untrusted workspace is later trusted', () => {
+      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
+        isTrusted: false,
+        source: 'file',
+      });
+      setupEnvFileScenario({
+        envFileContent: '',
+        workspaceSettingsContent: {
+          ui: { theme: 'VS2015' },
+        },
+      });
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.workspace.settings).toEqual({});
+
+      settings.setTrusted(true);
+
+      expect(settings.workspace.settings.ui?.theme).toBe('Default');
+      expect(settings.merged.ui.theme).toBe('Default');
     });
 
     it('should evaluate workspace trust with settings resolved from the shell environment even when other settings reference .env variables', () => {

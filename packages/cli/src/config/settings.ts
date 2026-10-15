@@ -372,13 +372,15 @@ export class LoadedSettings {
       Object.keys(this._workspaceFile.settings).length === 0 &&
       Object.keys(this._workspaceFile.originalSettings).length > 0
     ) {
+      const resolvedWorkspaceSettings = resolveSettings(
+        this._workspaceFile.originalSettings,
+        this._workspaceFile.path,
+        this.errors,
+      );
+      normalizeLegacyTheme(resolvedWorkspaceSettings);
       this._workspaceFile = {
         ...this._workspaceFile,
-        settings: resolveSettings(
-          this._workspaceFile.originalSettings,
-          this._workspaceFile.path,
-          this.errors,
-        ),
+        settings: resolvedWorkspaceSettings,
       };
     }
     this.workspace = isTrusted
@@ -875,6 +877,14 @@ function coerceValidSettings(
   return coerced;
 }
 
+function normalizeLegacyTheme(settings: Settings): void {
+  if (settings.ui?.theme === 'VS') {
+    settings.ui.theme = DefaultLight.name;
+  } else if (settings.ui?.theme === 'VS2015') {
+    settings.ui.theme = DefaultDark.name;
+  }
+}
+
 /**
  * Expands environment variable placeholders in `rawSettings` against the
  * current `process.env` and validates the result.
@@ -1108,16 +1118,8 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
     : {};
 
   // Support legacy theme names
-  if (userSettings.ui?.theme === 'VS') {
-    userSettings.ui.theme = DefaultLight.name;
-  } else if (userSettings.ui?.theme === 'VS2015') {
-    userSettings.ui.theme = DefaultDark.name;
-  }
-  if (workspaceSettings.ui?.theme === 'VS') {
-    workspaceSettings.ui.theme = DefaultLight.name;
-  } else if (workspaceSettings.ui?.theme === 'VS2015') {
-    workspaceSettings.ui.theme = DefaultDark.name;
-  }
+  normalizeLegacyTheme(userSettings);
+  normalizeLegacyTheme(workspaceSettings);
 
   // Check for any fatal errors before proceeding
   const fatalErrors = settingsErrors.filter((e) => e.severity === 'error');
