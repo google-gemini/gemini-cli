@@ -497,6 +497,55 @@ describe('ReadManyFilesTool', () => {
       );
     });
 
+    it('should skip images whose name only overlaps a directory in the pattern', async () => {
+      createBinaryFile(
+        'reports/report.png',
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      );
+      createFile('reports/notes.txt', 'text notes');
+      // The pattern selects files inside `*report*` directories, it does not
+      // name `report.png` itself.
+      const params = { include: ['**/*report*/**'] };
+      const invocation = tool.build(params);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
+        '- `reports/report.png` (Reason: asset file (image/pdf/audio) was not explicitly requested by name or extension)',
+      );
+    });
+
+    it('should skip images matched by a broad glob when another pattern names a different path', async () => {
+      createBinaryFile(
+        'assets/logo.png',
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      );
+      createFile('src/logo.txt', 'logo notes');
+      const params = { include: ['assets/**', 'src/logo.txt'] };
+      const invocation = tool.build(params);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
+        '- `assets/logo.png` (Reason: asset file (image/pdf/audio) was not explicitly requested by name or extension)',
+      );
+    });
+
+    it('should include images requested by path regardless of case', async () => {
+      createBinaryFile(
+        'assets/Logo.PNG',
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      );
+      const params = { include: ['assets/*.png'] };
+      const invocation = tool.build(params);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
+        'Successfully read and concatenated content from **1 file(s)**',
+      );
+    });
+
     it('should include PDF files as inlineData parts if explicitly requested by extension', async () => {
       createBinaryFile('important.pdf', Buffer.from('%PDF-1.4...'));
       const params = { include: ['*.pdf'] }; // Explicitly requesting .pdf files
