@@ -63,7 +63,6 @@ export function getSafeGitEnv(
     GIT_SSH_COMMAND: gitSshCommand,
     GH_PROMPT_DISABLED: '1',
     GCM_INTERACTIVE: 'never',
-    GIT_CONFIG_GLOBAL: devNullPath,
     GIT_CONFIG_SYSTEM: devNullPath,
     GIT_CONFIG_NOSYSTEM: '1',
     GIT_CONFIG_COUNT: '7',
