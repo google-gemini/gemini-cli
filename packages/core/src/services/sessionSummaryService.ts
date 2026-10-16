@@ -11,6 +11,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import type { Content } from '@google/genai';
 import { getResponseText } from '../utils/partUtils.js';
 import { LlmRole } from '../telemetry/types.js';
+import { safeTemplateReplace } from '../utils/textUtils.js';
 
 const DEFAULT_MAX_MESSAGES = 20;
 const DEFAULT_TIMEOUT_MS = 5000;
@@ -27,7 +28,7 @@ Examples:
 - "Debug memory leak in production"
 
 Conversation:
-{conversation}
+{{conversation}}
 
 Summary (max 80 chars):`;
 
@@ -104,7 +105,9 @@ export class SessionSummaryService {
         })
         .join('\n\n');
 
-      const prompt = SUMMARY_PROMPT.replace('{conversation}', conversationText);
+      const prompt = safeTemplateReplace(SUMMARY_PROMPT, {
+        conversation: conversationText,
+      });
 
       // Create abort controller with timeout
       const abortController = new AbortController();

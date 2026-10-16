@@ -10,6 +10,7 @@ import {
   ShellExecutionService,
   flatMapTextParts,
   PolicyDecision,
+  safeLiteralReplace,
 } from '@google/gemini-cli-core';
 
 import type { CommandContext } from '../../ui/commands/types.js';
@@ -70,7 +71,13 @@ export class ShellProcessor implements IPromptProcessor {
 
     if (!prompt.includes(SHELL_INJECTION_TRIGGER)) {
       return [
-        { text: prompt.replaceAll(SHORTHAND_ARGS_PLACEHOLDER, userArgsRaw) },
+        {
+          text: safeLiteralReplace(
+            prompt,
+            SHORTHAND_ARGS_PLACEHOLDER,
+            userArgsRaw,
+          ),
+        },
       ];
     }
 
@@ -90,7 +97,13 @@ export class ShellProcessor implements IPromptProcessor {
     // If extractInjections found no closed blocks (and didn't throw), treat as raw.
     if (injections.length === 0) {
       return [
-        { text: prompt.replaceAll(SHORTHAND_ARGS_PLACEHOLDER, userArgsRaw) },
+        {
+          text: safeLiteralReplace(
+            prompt,
+            SHORTHAND_ARGS_PLACEHOLDER,
+            userArgsRaw,
+          ),
+        },
       ];
     }
 
@@ -105,7 +118,8 @@ export class ShellProcessor implements IPromptProcessor {
           return { ...injection, resolvedCommand: undefined };
         }
 
-        const resolvedCommand = command.replaceAll(
+        const resolvedCommand = safeLiteralReplace(
+          command,
           SHORTHAND_ARGS_PLACEHOLDER,
           userArgsEscaped,
         );
@@ -155,7 +169,8 @@ export class ShellProcessor implements IPromptProcessor {
     for (const injection of resolvedInjections) {
       // Append the text segment BEFORE the injection, substituting {{args}} with RAW input.
       const segment = prompt.substring(lastIndex, injection.startIndex);
-      processedPrompt += segment.replaceAll(
+      processedPrompt += safeLiteralReplace(
+        segment,
         SHORTHAND_ARGS_PLACEHOLDER,
         userArgsRaw,
       );
@@ -207,7 +222,8 @@ export class ShellProcessor implements IPromptProcessor {
 
     // Append the remaining text AFTER the last injection, substituting {{args}} with RAW input.
     const finalSegment = prompt.substring(lastIndex);
-    processedPrompt += finalSegment.replaceAll(
+    processedPrompt += safeLiteralReplace(
+      finalSegment,
       SHORTHAND_ARGS_PLACEHOLDER,
       userArgsRaw,
     );
