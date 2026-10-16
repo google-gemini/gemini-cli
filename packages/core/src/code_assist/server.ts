@@ -494,8 +494,17 @@ export class CodeAssistServer implements ContentGenerator {
         crlfDelay: Infinity, // Recognizes '\r\n' and '\n' as line breaks
       });
 
+      // Treat the end of the stream like a trailing blank line, so a final
+      // event that is missing its terminating blank line is still dispatched.
+      // Each event is a JSON object, so a truncated one fails to parse and is
+      // logged below instead of being silently dropped.
+      async function* linesThenEndOfStream(): AsyncGenerator<string> {
+        yield* rl;
+        yield '';
+      }
+
       let bufferedLines: string[] = [];
-      for await (const line of rl) {
+      for await (const line of linesThenEndOfStream()) {
         if (line.startsWith('data: ')) {
           bufferedLines.push(line.slice(6).trim());
         } else if (line === '') {

@@ -503,6 +503,41 @@ describe('CodeAssistServer', () => {
     expect(results).toHaveLength(0);
   });
 
+  it('should yield the final event when the stream ends without a trailing blank line', async () => {
+    const { server, mockRequest } = createTestServer();
+
+    const { Readable } = await import('node:stream');
+    const mockStream = new Readable({
+      read() {},
+    });
+
+    mockRequest.mockResolvedValue({ data: mockStream });
+
+    const stream = await server.requestStreamingPost('testStream', {});
+
+    const firstEvent = {
+      candidates: [{ content: { parts: [{ text: 'a' }] } }],
+    };
+    const finalEvent = {
+      candidates: [
+        { finishReason: 'STOP', content: { parts: [{ text: 'b' }] } },
+      ],
+    };
+
+    setTimeout(() => {
+      mockStream.push('data: ' + JSON.stringify(firstEvent) + '\n\n');
+      mockStream.push('data: ' + JSON.stringify(finalEvent)); // no blank line
+      mockStream.push(null);
+    }, 0);
+
+    const results = [];
+    for await (const res of stream) {
+      results.push(res);
+    }
+
+    expect(results).toEqual([firstEvent, finalEvent]);
+  });
+
   it('should call the onboardUser endpoint', async () => {
     const { server } = createTestServer();
 
@@ -963,6 +998,49 @@ data: ${jsonString}
 
       setTimeout(() => {
         mockStream.push('data: { "invalid": json }\n\n');
+        mockStream.push(null);
+      }, 0);
+
+      const results = [];
+      for await (const res of stream) {
+        results.push(res);
+      }
+
+      expect(results).toHaveLength(0);
+      expect(logInvalidChunk).toHaveBeenCalledWith(
+        config,
+        expect.objectContaining({
+          error_message: 'Malformed JSON chunk',
+        }),
+      );
+    });
+
+    it('should log InvalidChunkEvent when the stream ends mid-event', async () => {
+      const config = makeFakeConfig();
+      const mockRequest = vi.fn();
+      const client = { request: mockRequest } as unknown as OAuth2Client;
+      const server = new CodeAssistServer(
+        client,
+        'test-project',
+        {},
+        'test-session',
+        UserTierId.FREE,
+        undefined,
+        undefined,
+        config,
+      );
+
+      const { Readable } = await import('node:stream');
+      const mockStream = new Readable({
+        read() {},
+      });
+
+      mockRequest.mockResolvedValue({ data: mockStream });
+
+      const stream = await server.requestStreamingPost('testStream', {});
+
+      setTimeout(() => {
+        mockStream.push('data: {"candidates": [{"content": {');
         mockStream.push(null);
       }, 0);
 
