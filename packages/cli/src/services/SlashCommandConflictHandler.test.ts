@@ -153,7 +153,7 @@ describe('SlashCommandConflictHandler', () => {
     expect(coreEvents.emitFeedback).toHaveBeenCalledTimes(2);
   });
 
-  it('should deduplicate already notified conflicts', () => {
+  it('should deduplicate conflicts within a single debounce window', () => {
     const conflict = {
       name: 'deploy',
       renamedTo: 'firebase.deploy',
@@ -162,15 +162,34 @@ describe('SlashCommandConflictHandler', () => {
       winnerKind: CommandKind.BUILT_IN,
     };
 
+    // Two rapid-fire events before the debounce fires — only one notification.
+    simulateEvent([conflict]);
+    simulateEvent([conflict]);
+    vi.advanceTimersByTime(600);
+    expect(coreEvents.emitFeedback).toHaveBeenCalledTimes(1);
+  });
+
+  it('should re-notify when a previously-resolved conflict reappears (issue #24333)', () => {
+    const conflict = {
+      name: 'deploy',
+      renamedTo: 'firebase.deploy',
+      loserExtensionName: 'firebase',
+      loserKind: CommandKind.EXTENSION_FILE,
+      winnerKind: CommandKind.BUILT_IN,
+    };
+
+    // First appearance — user is notified.
     simulateEvent([conflict]);
     vi.advanceTimersByTime(600);
     expect(coreEvents.emitFeedback).toHaveBeenCalledTimes(1);
 
     vi.mocked(coreEvents.emitFeedback).mockClear();
 
+    // Conflict disappears (no event). Then reappears in a new debounce window.
     simulateEvent([conflict]);
     vi.advanceTimersByTime(600);
-    expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
+    // User should be notified again — the dedupe state was reset after the flush.
+    expect(coreEvents.emitFeedback).toHaveBeenCalledTimes(1);
   });
 
   it('should display a descriptive message for a skill conflict', () => {
