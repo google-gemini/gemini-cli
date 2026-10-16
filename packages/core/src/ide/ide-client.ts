@@ -280,11 +280,12 @@ export class IdeClient {
         });
     });
 
-    // Ensure the mutex is released only after the diff interaction is complete.
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    promise.finally(release);
-
-    return promise;
+    // Release the mutex only after the diff interaction is complete. Return
+    // the chained promise rather than the original one: `finally()` settles
+    // the same way as `promise`, so a rejection stays observable by the
+    // caller and no floating promise is left behind to surface as an
+    // unhandled rejection.
+    return promise.finally(release);
   }
 
   /**

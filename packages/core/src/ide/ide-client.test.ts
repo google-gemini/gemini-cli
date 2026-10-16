@@ -500,6 +500,22 @@ describe('IdeClient', () => {
       expect(mockClient.request).not.toHaveBeenCalled();
     });
 
+    it('should release the diff mutex when openDiff rejects', async () => {
+      mockDiscoveredConfigs([{ port: '1111' }]);
+      mockClient.connect.mockRejectedValue(new Error('ECONNREFUSED'));
+
+      const ideClient = await IdeClient.getInstance();
+      await ideClient.connect();
+
+      await expect(ideClient.openDiff('/a.txt', 'content')).rejects.toThrow(
+        'IDE client is not connected.',
+      );
+      // If the rejected diff had kept the mutex, this call would never settle.
+      await expect(ideClient.openDiff('/b.txt', 'content')).rejects.toThrow(
+        'IDE client is not connected.',
+      );
+    });
+
     it('should keep the client of a later successful attempt', async () => {
       // First candidate fails, second one connects: the client that is kept
       // must be the one that actually connected.
