@@ -140,7 +140,11 @@ async function run() {
               process.kill(process.pid, signal);
             } catch {
               resolve(1);
+              return;
             }
+            setTimeout(() => {
+              resolve(1);
+            }, 100).unref();
             return;
           }
           resolve(code ?? 1);

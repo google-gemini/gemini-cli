@@ -489,11 +489,13 @@ describe('relaunchAppInChildProcess', () => {
         const mockChild = createMockChildProcess(0, false);
         mockedSpawn.mockReturnValue(mockChild);
 
-        void relaunchAppInChildProcess([], []);
+        const relaunchPromise = relaunchAppInChildProcess([], []);
 
         mockChild.emit('close', null, 'SIGTERM');
 
         expect(processKillSpy).toHaveBeenCalledWith(process.pid, 'SIGTERM');
+        await expect(relaunchPromise).rejects.toThrow('PROCESS_EXIT_CALLED');
+        expect(processExitSpy).toHaveBeenCalledWith(1);
       } finally {
         processKillSpy.mockRestore();
       }
