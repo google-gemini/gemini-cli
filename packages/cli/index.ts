@@ -13,18 +13,11 @@ import {
   RELAUNCH_EXIT_CODE,
   getSpawnConfig,
   getScriptArgs,
+  setupSignalForwarding,
+  handleChildProcessClose,
 } from './src/utils/processUtils.js';
 
 // --- Global Entry Point ---
-
-const FORWARDED_SIGNALS: readonly NodeJS.Signals[] = [
-  'SIGTERM',
-  'SIGHUP',
-  'SIGINT',
-  'SIGQUIT',
-  'SIGUSR1',
-  'SIGUSR2',
-];
 
 async function getMemoryNodeArgs(): Promise<string[]> {
   let autoConfigureMemory = true;
@@ -100,29 +93,7 @@ async function run() {
         },
       );
 
-      const forwarders = new Map<NodeJS.Signals, () => void>();
-      for (const sig of FORWARDED_SIGNALS) {
-        const handler = () => {
-          if (sig === 'SIGINT' || sig === 'SIGQUIT') {
-            // Do not forward terminal-generated signals to avoid double-signals
-            // and abrupt termination on Windows. The child receives them directly.
-            return;
-          }
-          try {
-            child.kill(sig);
-          } catch {
-            // Child may already be gone
-          }
-        };
-        forwarders.set(sig, handler);
-        process.on(sig, handler);
-      }
-      const removeForwarders = () => {
-        for (const [sig, handler] of forwarders) {
-          process.off(sig, handler);
-        }
-        forwarders.clear();
-      };
+      const removeForwarders = setupSignalForwarding(child);
 
       return new Promise<number>((resolve) => {
         child.on('error', (err) => {
@@ -133,21 +104,7 @@ async function run() {
           resolve(1);
         });
         child.on('close', (code, signal) => {
-          removeForwarders();
-          process.stdin.resume();
-          if (signal) {
-            try {
-              process.kill(process.pid, signal);
-            } catch {
-              resolve(1);
-              return;
-            }
-            setTimeout(() => {
-              resolve(1);
-            }, 100).unref();
-            return;
-          }
-          resolve(code ?? 1);
+          handleChildProcessClose(code, signal, removeForwarders, resolve);
         });
       });
     };

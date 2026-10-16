@@ -14,7 +14,7 @@ import {
   type MockInstance,
 } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { RELAUNCH_EXIT_CODE } from './processUtils.js';
+import { FORWARDED_SIGNALS, RELAUNCH_EXIT_CODE } from './processUtils.js';
 import { spawn, type ChildProcess } from 'node:child_process';
 
 const mocks = vi.hoisted(() => ({
@@ -141,18 +141,10 @@ describe('relaunchAppInChildProcess', () => {
   const originalExecArgv = [...process.execArgv];
   const originalArgv = [...process.argv];
   const originalExecPath = process.execPath;
-  const trackedSignals: readonly NodeJS.Signals[] = [
-    'SIGTERM',
-    'SIGHUP',
-    'SIGINT',
-    'SIGQUIT',
-    'SIGUSR1',
-    'SIGUSR2',
-  ];
   const initialListeners = new Map<NodeJS.Signals, NodeJS.SignalsListener[]>();
 
   beforeEach(() => {
-    for (const sig of trackedSignals) {
+    for (const sig of FORWARDED_SIGNALS) {
       initialListeners.set(sig, process.listeners(sig));
     }
 
@@ -179,7 +171,7 @@ describe('relaunchAppInChildProcess', () => {
   });
 
   afterEach(() => {
-    for (const sig of trackedSignals) {
+    for (const sig of FORWARDED_SIGNALS) {
       process.removeAllListeners(sig);
       const listeners = initialListeners.get(sig) || [];
       for (const listener of listeners) {
@@ -420,16 +412,8 @@ describe('relaunchAppInChildProcess', () => {
     });
 
     it('should remove signal forwarders on close and not leak listeners across relaunches', async () => {
-      const signals: readonly NodeJS.Signals[] = [
-        'SIGTERM',
-        'SIGHUP',
-        'SIGINT',
-        'SIGQUIT',
-        'SIGUSR1',
-        'SIGUSR2',
-      ];
       const initialCounts = new Map(
-        signals.map((sig) => [sig, process.listenerCount(sig)]),
+        FORWARDED_SIGNALS.map((sig) => [sig, process.listenerCount(sig)]),
       );
 
       let spawnCount = 0;
@@ -447,7 +431,7 @@ describe('relaunchAppInChildProcess', () => {
       );
 
       expect(spawnCount).toBe(2);
-      for (const sig of signals) {
+      for (const sig of FORWARDED_SIGNALS) {
         expect(process.listenerCount(sig)).toBe(initialCounts.get(sig));
       }
     });
