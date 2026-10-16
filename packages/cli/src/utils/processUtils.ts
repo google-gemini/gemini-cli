@@ -10,10 +10,11 @@ import { waitForUpdateCompletion } from './handleAutoUpdate.js';
 
 /**
  * Signals intercepted by the parent process when supervising a child process.
- * Terminal-generated signals (`SIGINT`, `SIGQUIT`) are intercepted to prevent
- * premature parent exit without being forwarded via `child.kill()`, whereas
- * termination and user signals (`SIGTERM`, `SIGHUP`, `SIGUSR1`, `SIGUSR2`)
- * are forwarded to the child process.
+ * On POSIX platforms, all of these signals are forwarded to the child process
+ * so signals sent directly to the parent PID (e.g., by process supervisors)
+ * reach the child. On Windows (`win32`), `SIGINT` and `SIGQUIT` are intercepted
+ * on the parent without calling `child.kill()` to avoid abrupt termination via
+ * `TerminateProcess`.
  */
 export const FORWARDED_SIGNALS: readonly NodeJS.Signals[] = [
   'SIGTERM',
@@ -33,9 +34,11 @@ export function setupSignalForwarding(child: ChildProcess): () => void {
   const forwarders = new Map<NodeJS.Signals, () => void>();
   for (const sig of FORWARDED_SIGNALS) {
     const handler = () => {
-      if (sig === 'SIGINT' || sig === 'SIGQUIT') {
-        // Do not forward terminal-generated signals to avoid double-signals
-        // and abrupt termination on Windows. The child receives them directly.
+      if (
+        process.platform === 'win32' &&
+        (sig === 'SIGINT' || sig === 'SIGQUIT')
+      ) {
+        // Do not forward terminal-generated signals on Windows to avoid abrupt parent termination.
         return;
       }
       try {
@@ -79,7 +82,7 @@ export function handleChildProcessClose(
     }
     setTimeout(() => {
       resolve(1);
-    }, 100).unref();
+    }, 100);
     return;
   }
   resolve(code ?? 1);

@@ -284,6 +284,7 @@ describe('SEA handling utilities', () => {
     });
 
     it('registers forwarders for FORWARDED_SIGNALS and removes them on cleanup', () => {
+      const originalPlatform = process.platform;
       const initialCounts = new Map(
         FORWARDED_SIGNALS.map((sig) => [sig, process.listenerCount(sig)]),
       );
@@ -291,19 +292,36 @@ describe('SEA handling utilities', () => {
 
       const removeForwarders = setupSignalForwarding(mockChild);
 
-      for (const sig of FORWARDED_SIGNALS) {
-        expect(process.listenerCount(sig)).toBe(
-          (initialCounts.get(sig) ?? 0) + 1,
-        );
+      try {
+        for (const sig of FORWARDED_SIGNALS) {
+          expect(process.listenerCount(sig)).toBe(
+            (initialCounts.get(sig) ?? 0) + 1,
+          );
+        }
+
+        Object.defineProperty(process, 'platform', {
+          value: 'linux',
+          configurable: true,
+        });
+        process.emit('SIGTERM', 'SIGTERM');
+        expect(mockChild.kill).toHaveBeenCalledWith('SIGTERM');
+        process.emit('SIGINT', 'SIGINT');
+        expect(mockChild.kill).toHaveBeenCalledWith('SIGINT');
+
+        vi.mocked(mockChild.kill).mockClear();
+        Object.defineProperty(process, 'platform', {
+          value: 'win32',
+          configurable: true,
+        });
+        process.emit('SIGINT', 'SIGINT');
+        expect(mockChild.kill).not.toHaveBeenCalledWith('SIGINT');
+      } finally {
+        Object.defineProperty(process, 'platform', {
+          value: originalPlatform,
+          configurable: true,
+        });
+        removeForwarders();
       }
-
-      process.emit('SIGTERM', 'SIGTERM');
-      expect(mockChild.kill).toHaveBeenCalledWith('SIGTERM');
-
-      process.emit('SIGINT', 'SIGINT');
-      expect(mockChild.kill).not.toHaveBeenCalledWith('SIGINT');
-
-      removeForwarders();
 
       for (const sig of FORWARDED_SIGNALS) {
         expect(process.listenerCount(sig)).toBe(initialCounts.get(sig));

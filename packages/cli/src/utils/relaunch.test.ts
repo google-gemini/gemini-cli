@@ -383,28 +383,39 @@ describe('relaunchAppInChildProcess', () => {
       await expect(relaunchPromise).rejects.toThrow('PROCESS_EXIT_CALLED');
     });
 
-    it('should forward termination signals (SIGTERM, SIGHUP, SIGUSR1, SIGUSR2) but not terminal-generated signals (SIGINT, SIGQUIT)', async () => {
+    it('should forward all signals on POSIX platforms and skip SIGINT/SIGQUIT on Windows', async () => {
+      const originalPlatform = process.platform;
       const mockChild = createMockChildProcess(0, false);
       mockedSpawn.mockReturnValue(mockChild);
 
       const relaunchPromise = relaunchAppInChildProcess([], []);
 
-      const forwarded: readonly NodeJS.Signals[] = [
-        'SIGTERM',
-        'SIGHUP',
-        'SIGUSR1',
-        'SIGUSR2',
-      ];
-      const notForwarded: readonly NodeJS.Signals[] = ['SIGINT', 'SIGQUIT'];
+      try {
+        Object.defineProperty(process, 'platform', {
+          value: 'linux',
+          configurable: true,
+        });
+        for (const sig of FORWARDED_SIGNALS) {
+          process.emit(sig, sig);
+          expect(mockChild.kill).toHaveBeenCalledWith(sig);
+        }
 
-      for (const sig of forwarded) {
-        process.emit(sig, sig);
-        expect(mockChild.kill).toHaveBeenCalledWith(sig);
-      }
-
-      for (const sig of notForwarded) {
-        process.emit(sig, sig);
-        expect(mockChild.kill).not.toHaveBeenCalledWith(sig);
+        vi.mocked(mockChild.kill).mockClear();
+        Object.defineProperty(process, 'platform', {
+          value: 'win32',
+          configurable: true,
+        });
+        for (const sig of ['SIGINT', 'SIGQUIT'] as const) {
+          process.emit(sig, sig);
+          expect(mockChild.kill).not.toHaveBeenCalledWith(sig);
+        }
+        process.emit('SIGTERM', 'SIGTERM');
+        expect(mockChild.kill).toHaveBeenCalledWith('SIGTERM');
+      } finally {
+        Object.defineProperty(process, 'platform', {
+          value: originalPlatform,
+          configurable: true,
+        });
       }
 
       mockChild.emit('close', 0);
