@@ -112,6 +112,78 @@ if (gaxiosViolations.length > 0) {
   process.exitCode = 1;
 }
 
+// Check that workspace package.json declared dependencies match resolutions in package-lock.json.
+// Prevents offline/sandboxed builds (e.g. Nix, hermetic CI) from failing with ETARGET or ENOTCACHED
+// due to version mismatches between package.json and locked package trees.
+function satisfies(resolved, spec) {
+  if (spec.startsWith('npm:')) {
+    spec = spec.slice(spec.lastIndexOf('@') + 1);
+  }
+  if (spec === resolved || spec === '*' || spec === 'latest') return true;
+  if (spec.endsWith('.x')) {
+    const prefix = spec.slice(0, -2);
+    return resolved.startsWith(prefix + '.') || resolved === prefix;
+  }
+  if (/^\d+\.\d+\.\d+/.test(spec)) {
+    return spec === resolved;
+  }
+  return true;
+}
+
+const packagesDir = join(root, 'packages');
+const workspaceMismatches = [];
+
+if (fs.existsSync(packagesDir)) {
+  const workspaceDirs = fs
+    .readdirSync(packagesDir)
+    .map((dir) => join('packages', dir))
+    .filter((p) => fs.existsSync(join(root, p, 'package.json')));
+
+  for (const ws of workspaceDirs) {
+    const wsPkg = readJsonFile(join(root, ws, 'package.json'));
+    if (!wsPkg) continue;
+
+    const allDeps = {
+      ...(wsPkg.dependencies || {}),
+      ...(wsPkg.devDependencies || {}),
+    };
+
+    for (const [dep, spec] of Object.entries(allDeps)) {
+      if (spec.startsWith('file:')) continue;
+      const linkPkg =
+        packages[`${ws}/node_modules/${dep}`] ||
+        packages[`node_modules/${dep}`];
+      const resolvedPkg =
+        linkPkg && linkPkg.link ? packages[linkPkg.resolved] : linkPkg;
+
+      if (!resolvedPkg) {
+        workspaceMismatches.push(
+          `[${ws}] ${dep}: missing from package-lock.json (declared: ${spec})`,
+        );
+        continue;
+      }
+
+      const resolved = resolvedPkg.version;
+      if (!satisfies(resolved, spec)) {
+        workspaceMismatches.push(
+          `[${ws}] ${dep}: package.json requires exact ${spec}, but package-lock.json resolves to ${resolved}`,
+        );
+      }
+    }
+  }
+}
+
+if (workspaceMismatches.length > 0) {
+  console.error(
+    '\nError: Workspace dependencies in package.json are out-of-sync with package-lock.json:',
+  );
+  workspaceMismatches.forEach((m) => console.error(`- ${m}`));
+  console.error(
+    '\nPlease update package.json or run `npm install --package-lock-only` to synchronize the lockfile.',
+  );
+  process.exitCode = 1;
+}
+
 if (!process.exitCode) {
   process.exitCode = 0;
 }
