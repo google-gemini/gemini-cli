@@ -291,9 +291,10 @@ describe('loadCustomKeybindings', () => {
     const { config, errors } = await loadCustomKeybindings();
 
     expect(errors).toHaveLength(0);
+    // Preserves order so keys[0] ('ctrl+x') has primary display precedence
     expect(config.get(Command.QUIT)).toEqual([
-      new KeyBinding('ctrl+d'),
       new KeyBinding('ctrl+x'),
+      new KeyBinding('ctrl+d'),
       new KeyBinding('ctrl+c'),
     ]);
   });
@@ -323,8 +324,8 @@ describe('loadCustomKeybindings', () => {
 
     expect(errors).toHaveLength(0);
     expect(config.get(Command.QUIT)).toEqual([
-      new KeyBinding('ctrl+d'),
       new KeyBinding('ctrl+x'),
+      new KeyBinding('ctrl+d'),
       new KeyBinding('ctrl+c'),
     ]);
   });
@@ -336,7 +337,18 @@ describe('loadCustomKeybindings', () => {
     const { config, errors } = await loadCustomKeybindings();
 
     expect(errors.length).toBeGreaterThan(0);
-    expect(errors[0]).toMatch(/Must specify either "key" or "keys"/);
+    expect(errors[0]).toMatch(/Must specify either "key" or/);
+    expect(config.get(Command.QUIT)).toEqual([new KeyBinding('ctrl+c')]);
+  });
+
+  it('returns validation errors when "keys" is an empty array', async () => {
+    const invalidJson = JSON.stringify([{ command: Command.QUIT, keys: [] }]);
+    await fs.writeFile(tempFilePath, invalidJson, 'utf8');
+
+    const { config, errors } = await loadCustomKeybindings();
+
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0]).toMatch(/at least 1 element|non-empty/);
     expect(config.get(Command.QUIT)).toEqual([new KeyBinding('ctrl+c')]);
   });
 

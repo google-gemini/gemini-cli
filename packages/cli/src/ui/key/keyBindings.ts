@@ -704,16 +704,21 @@ const keybindingsSchema = z
           };
         }),
         key: z.string().optional(),
-        keys: z.array(z.string()).optional(),
+        keys: z.array(z.string()).min(1).optional(),
       })
-      .refine((data) => data.key !== undefined || data.keys !== undefined, {
-        message: 'Must specify either "key" or "keys".',
-      })
+      .refine(
+        (data) =>
+          data.key !== undefined ||
+          (data.keys !== undefined && data.keys.length > 0),
+        {
+          message: 'Must specify either "key" or a non-empty "keys" array.',
+        },
+      )
       .transform((data) => {
         const keys = [
           ...(data.key !== undefined ? [data.key] : []),
           ...(data.keys ?? []),
-        ];
+        ].reverse();
         return keys.map((key) => ({
           commandEntry: data.command,
           key,
