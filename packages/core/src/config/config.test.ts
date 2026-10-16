@@ -233,6 +233,7 @@ const mockCoreEvents = vi.hoisted(() => ({
 }));
 
 const mockSetGlobalProxy = vi.hoisted(() => vi.fn());
+const mockUpdateGlobalFetchTimeouts = vi.hoisted(() => vi.fn());
 
 vi.mock('../utils/events.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../utils/events.js')>();
@@ -243,8 +244,13 @@ vi.mock('../utils/events.js', async (importOriginal) => {
 });
 
 vi.mock('../utils/fetch.js', () => ({
+  MAX_FETCH_TIMEOUT_MS: 2_147_483_647,
   setGlobalProxy: mockSetGlobalProxy,
-  updateGlobalFetchTimeouts: vi.fn(),
+  updateGlobalFetchTimeouts: mockUpdateGlobalFetchTimeouts,
+  getGlobalFetchTimeouts: vi.fn(() => ({
+    headersTimeoutMs: 60000,
+    bodyTimeoutMs: 300000,
+  })),
 }));
 
 vi.mock('../context/memoryContextManager.js', () => ({
@@ -828,6 +834,149 @@ describe('Server Config (config.ts)', () => {
           },
         } as unknown as ConfigParameters);
         expect(config.getRequestTimeoutMs()).toBeUndefined();
+      });
+
+      it('should return undefined if intValue is zero', () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.DEFAULT_REQUEST_TIMEOUT]: {
+                intValue: '0',
+              },
+            },
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(config.getRequestTimeoutMs()).toBeUndefined();
+      });
+
+      it('should return the requestHeadersTimeoutMs setting when set', () => {
+        const config = new Config({
+          ...baseParams,
+          requestHeadersTimeoutMs: 900000,
+        });
+        expect(config.getRequestTimeoutMs()).toBe(900000);
+      });
+
+      it('should prefer the requestHeadersTimeoutMs setting over the experiment flag', () => {
+        const config = new Config({
+          ...baseParams,
+          requestHeadersTimeoutMs: 900000,
+          experiments: {
+            flags: {
+              [ExperimentFlags.DEFAULT_REQUEST_TIMEOUT]: {
+                intValue: '30',
+              },
+            },
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(config.getRequestTimeoutMs()).toBe(900000);
+      });
+
+      it('should ignore a non-positive requestHeadersTimeoutMs setting', () => {
+        const config = new Config({
+          ...baseParams,
+          requestHeadersTimeoutMs: 0,
+        });
+        expect(config.getRequestTimeoutMs()).toBeUndefined();
+      });
+
+      it('should accept a requestHeadersTimeoutMs setting at the Node.js timer limit', () => {
+        const config = new Config({
+          ...baseParams,
+          requestHeadersTimeoutMs: 2_147_483_647,
+        });
+        expect(config.getRequestTimeoutMs()).toBe(2_147_483_647);
+      });
+
+      it('should ignore a requestHeadersTimeoutMs setting above the Node.js timer limit', () => {
+        const config = new Config({
+          ...baseParams,
+          requestHeadersTimeoutMs: 2_147_483_648,
+        });
+        expect(config.getRequestTimeoutMs()).toBeUndefined();
+      });
+
+      it('should return undefined if the flag exceeds the Node.js timer limit', () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.DEFAULT_REQUEST_TIMEOUT]: {
+                intValue: '2147484',
+              },
+            },
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(config.getRequestTimeoutMs()).toBeUndefined();
+      });
+    });
+
+    describe('getRequestBodyTimeoutMs', () => {
+      it('should return undefined if the setting is not set', () => {
+        const config = new Config(baseParams);
+        expect(config.getRequestBodyTimeoutMs()).toBeUndefined();
+      });
+
+      it('should return the requestBodyTimeoutMs setting when set', () => {
+        const config = new Config({
+          ...baseParams,
+          requestBodyTimeoutMs: 1200000,
+        });
+        expect(config.getRequestBodyTimeoutMs()).toBe(1200000);
+      });
+
+      it('should ignore invalid requestBodyTimeoutMs values', () => {
+        for (const value of [-1, 0, Number.NaN, Infinity, 2_147_483_648]) {
+          const config = new Config({
+            ...baseParams,
+            requestBodyTimeoutMs: value,
+          });
+          expect(config.getRequestBodyTimeoutMs()).toBeUndefined();
+        }
+      });
+    });
+
+    describe('request timeouts on refreshAuth', () => {
+      beforeEach(() => {
+        mockUpdateGlobalFetchTimeouts.mockClear();
+        vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+          authType: AuthType.USE_GEMINI,
+        });
+      });
+
+      it('should not update fetch timeouts when nothing is configured', async () => {
+        const config = new Config(baseParams);
+        await config.refreshAuth(AuthType.USE_GEMINI);
+        expect(mockUpdateGlobalFetchTimeouts).not.toHaveBeenCalled();
+      });
+
+      it('should apply configured timeouts with API key auth', async () => {
+        const config = new Config({
+          ...baseParams,
+          requestHeadersTimeoutMs: 900000,
+          requestBodyTimeoutMs: 1200000,
+        });
+        await config.refreshAuth(AuthType.USE_GEMINI);
+        expect(mockUpdateGlobalFetchTimeouts).toHaveBeenCalledWith(
+          900000,
+          1200000,
+        );
+      });
+
+      it('should keep the current headers timeout when only the body timeout is configured', async () => {
+        const config = new Config({
+          ...baseParams,
+          requestBodyTimeoutMs: 1200000,
+        });
+        await config.refreshAuth(AuthType.USE_GEMINI);
+        expect(mockUpdateGlobalFetchTimeouts).toHaveBeenCalledWith(
+          60000,
+          1200000,
+        );
       });
     });
   });

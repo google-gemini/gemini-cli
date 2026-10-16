@@ -175,7 +175,12 @@ import {
 } from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
 import { AcknowledgedAgentsService } from '../agents/acknowledgedAgents.js';
-import { setGlobalProxy, updateGlobalFetchTimeouts } from '../utils/fetch.js';
+import {
+  getGlobalFetchTimeouts,
+  MAX_FETCH_TIMEOUT_MS,
+  setGlobalProxy,
+  updateGlobalFetchTimeouts,
+} from '../utils/fetch.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { ragLogger } from '../utils/ragLogger.js';
@@ -696,6 +701,8 @@ export interface ConfigParameters {
   disableModelRouterForAuth?: AuthType[];
   retryFetchErrors?: boolean;
   maxAttempts?: number;
+  requestHeadersTimeoutMs?: number;
+  requestBodyTimeoutMs?: number;
   enableShellOutputEfficiency?: boolean;
   shellToolInactivityTimeout?: number;
   fakeResponses?: string;
@@ -753,6 +760,22 @@ export interface ConfigParameters {
   };
   vertexAiRouting?: VertexAiRoutingConfig;
   logRagSnippets?: boolean;
+}
+
+function validateRequestTimeout(
+  settingName: string,
+  value: number | undefined,
+): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Number.isFinite(value) || value <= 0 || value > MAX_FETCH_TIMEOUT_MS) {
+    debugLogger.warn(
+      `Ignoring invalid ${settingName} value: ${value}. Must be a positive number of milliseconds no greater than ${MAX_FETCH_TIMEOUT_MS}.`,
+    );
+    return undefined;
+  }
+  return value;
 }
 
 export class Config implements McpContext, AgentLoopContext {
@@ -933,6 +956,8 @@ export class Config implements McpContext, AgentLoopContext {
 
   private readonly retryFetchErrors: boolean;
   private readonly maxAttempts: number;
+  private readonly requestHeadersTimeoutMs: number | undefined;
+  private readonly requestBodyTimeoutMs: number | undefined;
   private readonly enableShellOutputEfficiency: boolean;
   private readonly shellToolInactivityTimeout: number;
   readonly fakeResponses?: string;
@@ -1389,6 +1414,14 @@ export class Config implements McpContext, AgentLoopContext {
       params.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
       DEFAULT_MAX_ATTEMPTS,
     );
+    this.requestHeadersTimeoutMs = validateRequestTimeout(
+      'general.requestHeadersTimeoutMs',
+      params.requestHeadersTimeoutMs,
+    );
+    this.requestBodyTimeoutMs = validateRequestTimeout(
+      'general.requestBodyTimeoutMs',
+      params.requestBodyTimeoutMs,
+    );
     this.disableYoloMode = params.disableYoloMode ?? false;
     this.rawOutput = params.rawOutput ?? false;
     this.acceptRawOutputRisk = params.acceptRawOutputRisk ?? false;
@@ -1642,8 +1675,12 @@ export class Config implements McpContext, AgentLoopContext {
     ]);
 
     const requestTimeoutMs = this.getRequestTimeoutMs();
-    if (requestTimeoutMs !== undefined) {
-      updateGlobalFetchTimeouts(requestTimeoutMs);
+    const requestBodyTimeoutMs = this.getRequestBodyTimeoutMs();
+    if (requestTimeoutMs !== undefined || requestBodyTimeoutMs !== undefined) {
+      updateGlobalFetchTimeouts(
+        requestTimeoutMs ?? getGlobalFetchTimeouts().headersTimeoutMs,
+        requestBodyTimeoutMs,
+      );
     }
 
     // Initialize BaseLlmClient now that the ContentGenerator and experiments are available
@@ -3668,18 +3705,35 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   /**
-   * Returns the configured default request timeout in milliseconds.
+   * Returns the configured request headers timeout in milliseconds.
+   *
+   * The `general.requestHeadersTimeoutMs` setting takes precedence over the
+   * `DEFAULT_REQUEST_TIMEOUT` experiment flag.
    */
   getRequestTimeoutMs(): number | undefined {
+    if (this.requestHeadersTimeoutMs !== undefined) {
+      return this.requestHeadersTimeoutMs;
+    }
     const flag =
       this.experiments?.flags?.[ExperimentFlags.DEFAULT_REQUEST_TIMEOUT];
     if (flag?.intValue !== undefined) {
       const seconds = parseInt(flag.intValue, 10);
-      if (Number.isInteger(seconds) && seconds >= 0) {
+      if (
+        Number.isInteger(seconds) &&
+        seconds > 0 &&
+        seconds * 1000 <= MAX_FETCH_TIMEOUT_MS
+      ) {
         return seconds * 1000; // Convert seconds to milliseconds
       }
     }
     return undefined;
+  }
+
+  /**
+   * Returns the configured request body (idle) timeout in milliseconds.
+   */
+  getRequestBodyTimeoutMs(): number | undefined {
+    return this.requestBodyTimeoutMs;
   }
 
   /**
