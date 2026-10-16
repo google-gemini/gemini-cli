@@ -223,6 +223,10 @@ class GrepToolInvocation extends BaseToolInvocation<
           return {
             llmContent: `Path is not a valid directory or file: ${searchDirAbs}`,
             returnDisplay: 'Error: Path is not a valid directory or file.',
+            error: {
+              message: `Path is not a valid directory or file: ${searchDirAbs}`,
+              type: ToolErrorType.PATH_IS_NOT_A_DIRECTORY,
+            },
           };
         }
       } catch (error: unknown) {
@@ -236,9 +240,14 @@ class GrepToolInvocation extends BaseToolInvocation<
             },
           };
         }
+        const errorMessage = `Failed to access path stats for ${searchDirAbs}: ${getErrorMessage(error)}`;
         return {
-          llmContent: `Failed to access path stats for ${searchDirAbs}: ${getErrorMessage(error)}`,
+          llmContent: errorMessage,
           returnDisplay: 'Error: Failed to access path.',
+          error: {
+            message: errorMessage,
+            type: ToolErrorType.GREP_EXECUTION_ERROR,
+          },
         };
       }
 
@@ -351,6 +360,10 @@ class GrepToolInvocation extends BaseToolInvocation<
       return {
         llmContent: `Error during grep search operation: ${errorMessage}`,
         returnDisplay: `Error: ${errorMessage}`,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.GREP_EXECUTION_ERROR,
+        },
       };
     }
   }
