@@ -839,37 +839,119 @@ export function getCommandRoots(command: string): string[] {
     .filter(Boolean);
 }
 
+/**
+ * Checks whether a POSIX shell CLI token represents the command execution termination flag.
+ * Supports standalone -c or +c, as well as valid short-flag chains ending in 'c'
+ * (e.g. -xc, -ec, -exic, -lc, +xc) while excluding argument-taking flags like 'o' and 'O'.
+ */
+function isPosixTerminationFlag(token: string): boolean {
+  return /^[+-][a-np-zA-NP-Z]*c$/.test(token);
+}
+
 export function stripShellWrapper(command: string): string {
-  const pattern =
-    /^\s*(?:(?:(?:\S+\/)?(?:sh|bash|zsh))\s+-c|cmd\.exe\s+\/c|powershell(?:\.exe)?\s+(?:-NoProfile\s+)?-Command|pwsh(?:\.exe)?\s+(?:-NoProfile\s+)?-Command)\s+/i;
-  const match = command.match(pattern);
-  if (match) {
-    let newCommand = command.substring(match[0].length).trim();
-    if (
-      newCommand.length >= 2 &&
-      ((newCommand.startsWith('"') && newCommand.endsWith('"')) ||
-        (newCommand.startsWith("'") && newCommand.endsWith("'")))
-    ) {
-      const isPosixShell = match[0].trim().endsWith('-c');
-      if (isPosixShell && newCommand.startsWith('"')) {
-        try {
-          const parsed = parse(newCommand, (key) => '$' + key);
-          const firstEntry = parsed[0];
-          if (parsed.length === 1 && typeof firstEntry === 'string') {
-            newCommand = firstEntry;
+  let payload: string | null = null;
+  let isPosixShell = false;
+
+  // 1. Check for Windows shell wrappers (cmd.exe, powershell, pwsh)
+  const winMatch = command.match(
+    /^\s*(?:cmd\.exe\s+\/c|powershell(?:\.exe)?\s+(?:-NoProfile\s+)?-Command|pwsh(?:\.exe)?\s+(?:-NoProfile\s+)?-Command)\s+/i,
+  );
+  if (winMatch) {
+    payload = command.substring(winMatch[0].length).trim();
+  } else {
+    // 2. Check for POSIX shell wrappers (sh, bash, zsh) with intermediate/chained flags
+    const posixMatch = command.match(/^\s*(?:(?:\S+[/\\])?(sh|bash|zsh))\b/i);
+    if (posixMatch) {
+      let pos = posixMatch[0].length;
+      const len = command.length;
+      let expectsArg = false;
+
+      while (pos < len) {
+        while (pos < len && /\s/.test(command[pos])) pos++;
+        if (pos >= len) break;
+
+        const tokenStart = pos;
+        while (pos < len && !/\s/.test(command[pos])) {
+          if (command[pos] === '"' || command[pos] === "'") {
+            const q = command[pos++];
+            while (pos < len && command[pos] !== q) {
+              if (q === '"' && command[pos] === '\\' && pos + 1 < len) pos++;
+              pos++;
+            }
+            if (pos < len) pos++;
+          } else if (command[pos] === '\\' && pos + 1 < len) {
+            pos += 2;
           } else {
-            newCommand = newCommand.substring(1, newCommand.length - 1);
+            pos++;
           }
-        } catch {
-          newCommand = newCommand.substring(1, newCommand.length - 1);
         }
-      } else {
-        newCommand = newCommand.substring(1, newCommand.length - 1);
+
+        let token = command.substring(tokenStart, pos);
+        if (
+          token.length >= 2 &&
+          ((token.startsWith('"') && token.endsWith('"')) ||
+            (token.startsWith("'") && token.endsWith("'")))
+        ) {
+          token = token.slice(1, -1);
+        }
+
+        if (expectsArg) {
+          expectsArg = false;
+          continue;
+        }
+
+        if (isPosixTerminationFlag(token)) {
+          payload = command.substring(pos).trim();
+          isPosixShell = true;
+          break;
+        }
+
+        if (!token.startsWith('-') && !token.startsWith('+')) {
+          break; // Fail closed on non-flag token before -c
+        }
+
+        const lower = token.toLowerCase();
+        if (
+          lower === '-o' ||
+          lower === '+o' ||
+          lower === '-O' ||
+          lower === '--rcfile' ||
+          lower === '--init-file'
+        ) {
+          expectsArg = true;
+        }
       }
     }
-    return newCommand;
   }
-  return command.trim();
+
+  if (payload === null) {
+    return command.trim();
+  }
+
+  // 3. Unquote payload if wrapped in matching quotes
+  if (
+    payload.length >= 2 &&
+    ((payload.startsWith('"') && payload.endsWith('"')) ||
+      (payload.startsWith("'") && payload.endsWith("'")))
+  ) {
+    if (isPosixShell && payload.startsWith('"')) {
+      try {
+        const parsed = parse(payload, (key) => '$' + key);
+        const firstEntry = parsed[0];
+        if (parsed.length === 1 && typeof firstEntry === 'string') {
+          payload = firstEntry;
+        } else {
+          payload = payload.substring(1, payload.length - 1);
+        }
+      } catch {
+        payload = payload.substring(1, payload.length - 1);
+      }
+    } else {
+      payload = payload.substring(1, payload.length - 1);
+    }
+  }
+
+  return payload;
 }
 
 /**

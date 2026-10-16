@@ -21,6 +21,7 @@ import {
   parseCommandDetails,
   splitCommands,
   stripShellWrapper,
+  detectCommandSubstitution,
   normalizeCommand,
   hasRedirection,
   resolveExecutable,
@@ -397,6 +398,90 @@ describe('stripShellWrapper', () => {
     const multiLine = 'bash -c "hg commit -m \\"title\n\nbody\\""';
     const expected = 'hg commit -m "title\n\nbody"';
     expect(stripShellWrapper(multiLine)).toEqual(expected);
+  });
+
+  describe('Security Regression: intermediate and chained flags before -c', () => {
+    describe('positive cases', () => {
+      const testCases = [
+        ['bash -c', "bash -c 'echo $(whoami)'", 'echo $(whoami)'],
+        ['bash -e -c', "bash -e -c 'echo $(whoami)'", 'echo $(whoami)'],
+        [
+          'bash -o pipefail -c',
+          "bash -o pipefail -c 'echo $(whoami)'",
+          'echo $(whoami)',
+        ],
+        ['sh -l -c', "sh -l -c 'echo $(whoami)'", 'echo $(whoami)'],
+        ['bash -lc', "bash -lc 'echo $(whoami)'", 'echo $(whoami)'],
+        ['bash -xc', "bash -xc 'echo $(whoami)'", 'echo $(whoami)'],
+        ['bash -ec', "bash -ec 'echo $(whoami)'", 'echo $(whoami)'],
+        ['bash -exic', "bash -exic 'echo $(whoami)'", 'echo $(whoami)'],
+        ['zsh -xc', "zsh -xc 'echo $(whoami)'", 'echo $(whoami)'],
+        ['sh -xc', "sh -xc 'echo $(whoami)'", 'echo $(whoami)'],
+        ['bash +xc', "bash +xc 'echo $(whoami)'", 'echo $(whoami)'],
+      ];
+
+      it.each(testCases)(
+        'should strip %s wrapper and detect $(...) command substitution',
+        (_label, input, expectedStripped) => {
+          const stripped = stripShellWrapper(input);
+          expect(stripped).toEqual(expectedStripped);
+          expect(detectCommandSubstitution(stripped)).toBe(true);
+        },
+      );
+
+      it('should detect backtick substitution in stripped command', () => {
+        const stripped = stripShellWrapper("bash -xc 'echo `whoami`'");
+        expect(stripped).toEqual('echo `whoami`');
+        expect(detectCommandSubstitution(stripped)).toBe(true);
+      });
+
+      it('should detect process substitution <(...) in stripped command', () => {
+        const stripped = stripShellWrapper("bash -xc 'cat <(whoami)'");
+        expect(stripped).toEqual('cat <(whoami)');
+        expect(detectCommandSubstitution(stripped)).toBe(true);
+      });
+
+      it('should not detect command substitution when the command payload is safe', () => {
+        const stripped = stripShellWrapper("bash -exic 'echo safe_command'");
+        expect(stripped).toEqual('echo safe_command');
+        expect(detectCommandSubstitution(stripped)).toBe(false);
+      });
+
+      it('should support escaped spaces in intermediate flag arguments', () => {
+        const stripped = stripShellWrapper(
+          "bash --rcfile my\\ dir/rc -xc 'echo $(whoami)'",
+        );
+        expect(stripped).toEqual('echo $(whoami)');
+        expect(detectCommandSubstitution(stripped)).toBe(true);
+      });
+    });
+
+    describe('negative/safety cases (must not treat arbitrary tokens as -c termination)', () => {
+      const negativeCases = [
+        ['long option ending in c (--exec)', "bash --exec 'echo $(whoami)'"],
+        ['long option ending in c (--rc)', "bash --rc 'echo $(whoami)'"],
+        [
+          'non-flag filename ending in c (file.c)',
+          "bash file.c 'echo $(whoami)'",
+        ],
+        ['digit flag ending in c (-1c)', "bash -1c 'echo $(whoami)'"],
+        ['hyphen after c (-c-)', "bash -c- 'echo $(whoami)'"],
+        ['path separator after c (-c/foo)', "bash -c/foo 'echo $(whoami)'"],
+        ['c consumed as argument to -o (-oc)', "bash -oc 'echo $(whoami)'"],
+        [
+          'c consumed as argument to -o in chain (-xoc)',
+          "bash -xoc 'echo $(whoami)'",
+        ],
+        ['c not the final character (-ce)', "bash -ce 'echo $(whoami)'"],
+      ];
+
+      it.each(negativeCases)(
+        'should not strip wrapper for %s',
+        (_label, input) => {
+          expect(stripShellWrapper(input)).toEqual(input);
+        },
+      );
+    });
   });
 });
 
