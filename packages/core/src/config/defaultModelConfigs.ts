@@ -138,6 +138,12 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         model: 'gemini-3.8-flash',
       },
     },
+    'gemini-4-argon': {
+      extends: 'chat-base-3',
+      modelConfig: {
+        model: 'gemini-4-argon',
+      },
+    },
     'gemma-4-31b-it': {
       extends: 'chat-base-3',
       modelConfig: {
@@ -418,6 +424,14 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       isPreview: false,
       isVisible: true,
       features: { thinking: false, multimodalToolUse: false },
+    },
+    'gemini-4-argon': {
+      displayName: 'Gemini 4 Argon',
+      tier: 'pro',
+      family: 'gemini-4',
+      isPreview: false,
+      isVisible: true,
+      features: { thinking: true, multimodalToolUse: true },
     },
     'gemma-4-31b-it': {
       displayName: 'gemma-4-31b-it',

@@ -11,6 +11,7 @@ import {
   Kind,
   ApprovalMode,
   GEMINI_MODEL_ALIAS_AUTO,
+  GEMINI_4_ARGON_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
@@ -347,6 +348,14 @@ export function buildAvailableModels(
 
     manualOptions.unshift(...previewOptions);
   }
+
+  // Gemini 4 flagship, served on Agent Platform (Vertex AI). Kept in the
+  // manual list for every auth method; backends that do not carry it return a
+  // clear "model not found" error.
+  manualOptions.push({
+    value: GEMINI_4_ARGON_MODEL,
+    title: getDisplayString(GEMINI_4_ARGON_MODEL),
+  });
 
   const scaleOptions = (
     options: Array<{ value: string; title: string; description?: string }>,

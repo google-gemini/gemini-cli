@@ -41,6 +41,7 @@ import {
   LATEST_GEMINI_FLASH_LITE_MODEL,
   GEMMA_4_31B_IT_MODEL,
   GEMMA_4_26B_A4B_IT_MODEL,
+  GEMINI_4_ARGON_MODEL,
   getAutoModelDescription,
 } from './models.js';
 import type { Config } from './config.js';
@@ -448,6 +449,7 @@ describe('resolveModel', () => {
       expect(resolveModel(DEFAULT_GEMINI_FLASH_LITE_MODEL)).toBe(
         DEFAULT_GEMINI_FLASH_LITE_MODEL,
       );
+      expect(resolveModel(GEMINI_4_ARGON_MODEL)).toBe(GEMINI_4_ARGON_MODEL);
     });
 
     it('should return a custom model name when requested', () => {
@@ -603,6 +605,7 @@ describe('isActiveModel', () => {
     expect(isActiveModel(DEFAULT_GEMINI_MODEL)).toBe(true);
     expect(isActiveModel(PREVIEW_GEMINI_MODEL)).toBe(true);
     expect(isActiveModel(DEFAULT_GEMINI_FLASH_MODEL)).toBe(true);
+    expect(isActiveModel(GEMINI_4_ARGON_MODEL)).toBe(true);
   });
 
   it('should return true for Gemma 4 models when experimentalGemma is not provided (defaults to true)', () => {
