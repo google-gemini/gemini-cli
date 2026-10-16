@@ -292,4 +292,39 @@ describe('activate', () => {
       await expect(handler({ filePath: '/test.ts' })).resolves.not.toThrow();
     });
   });
+
+  it('should push every disposable to context.subscriptions (no comma-expression leaks)', async () => {
+    // Give each registered command an identifiable disposable so we can
+    // assert it was tracked. See https://github.com/google-gemini/gemini-cli/issues/27790
+    vi.mocked(vscode.commands.registerCommand).mockImplementation(
+      (command: string) =>
+        ({ dispose: vi.fn(), command }) as unknown as vscode.Disposable,
+    );
+
+    await activate(context);
+
+    const findCommandDisposable = (id: string) =>
+      vi
+        .mocked(vscode.commands.registerCommand)
+        .mock.results.find(
+          (r) => (r.value as { command: string }).command === id,
+        )?.value;
+    for (const id of ['gemini.diff.accept', 'gemini.diff.cancel']) {
+      expect(context.subscriptions).toContain(findCommandDisposable(id));
+    }
+
+    // Use the latest registration rather than results[0]: Vitest does not
+    // clear mock call history between tests by default, so results[0] could
+    // belong to an earlier test if other tests also call activate().
+    const folderDisposable = vi
+      .mocked(vscode.workspace.onDidChangeWorkspaceFolders)
+      .mock.results.at(-1)?.value;
+    const trustDisposable = vi
+      .mocked(vscode.workspace.onDidGrantWorkspaceTrust)
+      .mock.results.at(-1)?.value;
+    expect(context.subscriptions).toContain(folderDisposable);
+    expect(context.subscriptions).toContain(trustDisposable);
+
+    vi.mocked(vscode.commands.registerCommand).mockReset();
+  });
 });
