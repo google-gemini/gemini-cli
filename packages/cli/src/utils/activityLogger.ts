@@ -10,6 +10,7 @@ import zlib from 'node:zlib';
 import fs from 'node:fs';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
+import { StringDecoder } from 'node:string_decoder';
 import {
   CoreEvent,
   coreEvents,
@@ -565,25 +566,42 @@ export class ActivityLogger extends EventEmitter {
 
       req.on('response', (res: http.IncomingMessage) => {
         const responseChunks: Buffer[] = [];
+        const decoder = new StringDecoder('utf8');
         let chunkIndex = 0;
 
         res.on('data', (chunk: Buffer) => {
           const chunkBuffer = Buffer.from(chunk);
           responseChunks.push(chunkBuffer);
+          const chunkData = decoder.write(chunkBuffer);
 
-          // Emit chunk update for streaming
-          self.safeEmitNetwork({
-            id,
-            pending: true,
-            chunk: {
-              index: chunkIndex++,
-              data: chunkBuffer.toString('utf8'),
-              timestamp: Date.now(),
-            },
-          });
+          if (chunkData) {
+            // Emit chunk update for streaming
+            self.safeEmitNetwork({
+              id,
+              pending: true,
+              chunk: {
+                index: chunkIndex++,
+                data: chunkData,
+                timestamp: Date.now(),
+              },
+            });
+          }
         });
 
         res.on('end', () => {
+          const trailingChunk = decoder.end();
+          if (trailingChunk) {
+            self.safeEmitNetwork({
+              id,
+              pending: true,
+              chunk: {
+                index: chunkIndex++,
+                data: trailingChunk,
+                timestamp: Date.now(),
+              },
+            });
+          }
+
           const buffer = Buffer.concat(responseChunks);
           const encoding = res.headers['content-encoding'];
 

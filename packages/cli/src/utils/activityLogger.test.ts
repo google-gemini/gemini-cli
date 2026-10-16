@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import http from 'node:http';
+import https from 'node:https';
+import { EventEmitter } from 'node:events';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ActivityLogger, type NetworkLog } from './activityLogger.js';
 import type { ConsoleLogPayload } from '@google/gemini-cli-core';
@@ -219,6 +222,216 @@ describe('ActivityLogger', () => {
       expect(headers.has('x-activity-request-id')).toBe(true);
     } finally {
       global.fetch = originalFetch;
+      // @ts-expect-error - reset private property
+      logger.isInterceptionEnabled = false;
+    }
+  });
+
+  it('preserves multibyte UTF-8 characters split across Node HTTP data chunks', () => {
+    const originalHttpRequest = http.request;
+    const originalHttpsRequest = https.request;
+
+    const fakeReq = Object.assign(new EventEmitter(), {
+      method: 'GET',
+      getHeaders: () => ({}),
+      write: vi.fn(),
+      end: vi.fn(),
+    }) as unknown as http.ClientRequest;
+
+    const mockHttpRequest = vi.fn(() => fakeReq);
+    Object.defineProperty(http, 'request', {
+      value: mockHttpRequest,
+      writable: true,
+      configurable: true,
+    });
+
+    try {
+      // @ts-expect-error - accessing private property for testing
+      logger.isInterceptionEnabled = false;
+      logger.enable();
+
+      const req = http.request('http://api.example.com/stream');
+      req.end();
+
+      const response = Object.assign(new EventEmitter(), {
+        statusCode: 200,
+        headers: {},
+      }) as unknown as http.IncomingMessage;
+
+      req.emit('response', response);
+
+      const euro = Buffer.from('€');
+      response.emit('data', euro.subarray(0, 1));
+      response.emit('data', euro.subarray(1));
+      response.emit('end');
+
+      const events = logger.getBufferedLogs().network;
+      const chunkEvents = events.flatMap((event) =>
+        event.chunk ? [event.chunk] : [],
+      );
+      const streamed = chunkEvents.map((chunk) => chunk.data).join('');
+      const completed = events.find((event) => event.response)?.response?.body;
+
+      expect(streamed).toBe('€');
+      expect(completed).toBe('€');
+      expect(chunkEvents).toEqual([
+        expect.objectContaining({ index: 0, data: '€' }),
+      ]);
+    } finally {
+      Object.defineProperty(http, 'request', {
+        value: originalHttpRequest,
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(https, 'request', {
+        value: originalHttpsRequest,
+        writable: true,
+        configurable: true,
+      });
+      // @ts-expect-error - reset private property
+      logger.isInterceptionEnabled = false;
+    }
+  });
+
+  it('preserves 4-byte UTF-8 characters split across multiple Node HTTPS data chunks', () => {
+    const originalHttpRequest = http.request;
+    const originalHttpsRequest = https.request;
+
+    const fakeReq = Object.assign(new EventEmitter(), {
+      method: 'POST',
+      getHeaders: () => ({}),
+      write: vi.fn(),
+      end: vi.fn(),
+    }) as unknown as http.ClientRequest;
+
+    const mockHttpsRequest = vi.fn(() => fakeReq);
+    Object.defineProperty(https, 'request', {
+      value: mockHttpsRequest,
+      writable: true,
+      configurable: true,
+    });
+
+    try {
+      // @ts-expect-error - accessing private property for testing
+      logger.isInterceptionEnabled = false;
+      logger.enable();
+
+      const req = https.request('https://api.example.com/stream');
+      req.end();
+
+      const response = Object.assign(new EventEmitter(), {
+        statusCode: 200,
+        headers: {},
+      }) as unknown as http.IncomingMessage;
+
+      req.emit('response', response);
+
+      const rocket = Buffer.from('🚀');
+      response.emit(
+        'data',
+        Buffer.concat([Buffer.from('Hi '), rocket.subarray(0, 1)]),
+      );
+      response.emit('data', rocket.subarray(1, 3));
+      response.emit(
+        'data',
+        Buffer.concat([rocket.subarray(3), Buffer.from('!')]),
+      );
+      response.emit('end');
+
+      const events = logger.getBufferedLogs().network;
+      const chunkEvents = events.flatMap((event) =>
+        event.chunk ? [event.chunk] : [],
+      );
+      const streamed = chunkEvents.map((chunk) => chunk.data).join('');
+      const completed = events.find((event) => event.response)?.response?.body;
+
+      expect(streamed).toBe('Hi 🚀!');
+      expect(completed).toBe('Hi 🚀!');
+      expect(chunkEvents).toEqual([
+        expect.objectContaining({ index: 0, data: 'Hi ' }),
+        expect.objectContaining({ index: 1, data: '🚀!' }),
+      ]);
+    } finally {
+      Object.defineProperty(http, 'request', {
+        value: originalHttpRequest,
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(https, 'request', {
+        value: originalHttpsRequest,
+        writable: true,
+        configurable: true,
+      });
+      // @ts-expect-error - reset private property
+      logger.isInterceptionEnabled = false;
+    }
+  });
+
+  it('flushes trailing incomplete UTF-8 bytes at the end of a Node HTTP response', () => {
+    const originalHttpRequest = http.request;
+    const originalHttpsRequest = https.request;
+
+    const fakeReq = Object.assign(new EventEmitter(), {
+      method: 'GET',
+      getHeaders: () => ({}),
+      write: vi.fn(),
+      end: vi.fn(),
+    }) as unknown as http.ClientRequest;
+
+    const mockHttpRequest = vi.fn(() => fakeReq);
+    Object.defineProperty(http, 'request', {
+      value: mockHttpRequest,
+      writable: true,
+      configurable: true,
+    });
+
+    try {
+      // @ts-expect-error - accessing private property for testing
+      logger.isInterceptionEnabled = false;
+      logger.enable();
+
+      const req = http.request('http://api.example.com/truncated');
+      req.end();
+
+      const response = Object.assign(new EventEmitter(), {
+        statusCode: 200,
+        headers: {},
+      }) as unknown as http.IncomingMessage;
+
+      req.emit('response', response);
+
+      const euro = Buffer.from('€');
+      response.emit(
+        'data',
+        Buffer.concat([Buffer.from('abc'), euro.subarray(0, 1)]),
+      );
+      response.emit('data', euro.subarray(1, 2));
+      response.emit('end');
+
+      const events = logger.getBufferedLogs().network;
+      const chunkEvents = events.flatMap((event) =>
+        event.chunk ? [event.chunk] : [],
+      );
+      const streamed = chunkEvents.map((chunk) => chunk.data).join('');
+      const completed = events.find((event) => event.response)?.response?.body;
+
+      expect(streamed).toBe('abc\uFFFD');
+      expect(completed).toBe('abc\uFFFD');
+      expect(chunkEvents).toEqual([
+        expect.objectContaining({ index: 0, data: 'abc' }),
+        expect.objectContaining({ index: 1, data: '\uFFFD' }),
+      ]);
+    } finally {
+      Object.defineProperty(http, 'request', {
+        value: originalHttpRequest,
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(https, 'request', {
+        value: originalHttpsRequest,
+        writable: true,
+        configurable: true,
+      });
       // @ts-expect-error - reset private property
       logger.isInterceptionEnabled = false;
     }
