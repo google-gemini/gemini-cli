@@ -8,8 +8,47 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import * as crypto from 'node:crypto';
+import { lock } from 'proper-lockfile';
 import type { Keychain } from './keychainTypes.js';
 import { GEMINI_DIR, homedir } from '../utils/paths.js';
+import { debugLogger } from '../utils/debugLogger.js';
+
+type CredentialsData = Record<string, Record<string, string>>;
+
+/**
+ * Looks up an own entry only, so service and account names such as
+ * `__proto__` or `constructor` never resolve to `Object.prototype` members.
+ * Writes use computed keys in object literals, which always create own
+ * properties (even for `__proto__`), instead of assignment.
+ */
+function getOwn<T>(record: Record<string, T>, key: string): T | undefined {
+  return Object.hasOwn(record, key) ? record[key] : undefined;
+}
+
+// A lock left behind by a crashed process is considered stale (and taken
+// over) after this long. Live holders refresh it every LOCK_STALE_MS / 2.
+const LOCK_STALE_MS = 5000;
+// Up to ~7 seconds of waiting, so a stale lock is always recovered before
+// we give up.
+const LOCK_RETRY_OPTIONS = {
+  retries: 70,
+  minTimeout: 20,
+  maxTimeout: 100,
+};
+const RENAME_MAX_ATTEMPTS = 5;
+
+/**
+ * On Windows, rename can fail transiently while another process (antivirus,
+ * search indexer, a concurrent reader) has the destination open. EACCES is
+ * only transient there; elsewhere it is a real permission error.
+ */
+function isRetryableRenameError(code: string | undefined): boolean {
+  return (
+    code === 'EBUSY' ||
+    code === 'EPERM' ||
+    (code === 'EACCES' && os.platform() === 'win32')
+  );
+}
 
 export class FileKeychain implements Keychain {
   private readonly tokenFilePath: string;
@@ -82,7 +121,7 @@ export class FileKeychain implements Keychain {
     await fs.mkdir(dir, { recursive: true, mode: 0o700 });
   }
 
-  private async loadData(): Promise<Record<string, Record<string, string>>> {
+  private async loadData(): Promise<CredentialsData> {
     let data: string;
     try {
       data = await fs.readFile(this.tokenFilePath, 'utf-8');
@@ -98,7 +137,7 @@ export class FileKeychain implements Keychain {
     try {
       const decrypted = this.decrypt(data);
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      return JSON.parse(decrypted) as Record<string, Record<string, string>>;
+      return JSON.parse(decrypted) as CredentialsData;
     } catch {
       throw new Error(
         `Corrupted credentials file detected at: ${this.tokenFilePath}\n` +
@@ -107,18 +146,70 @@ export class FileKeychain implements Keychain {
     }
   }
 
-  private async saveData(
-    data: Record<string, Record<string, string>>,
-  ): Promise<void> {
+  /**
+   * Writes the credentials atomically: the encrypted payload goes to a unique
+   * temporary file that is then renamed over the credentials file, so a crash
+   * or a full disk can never leave a truncated (undecryptable) file behind.
+   */
+  private async saveData(data: CredentialsData): Promise<void> {
     await this.ensureDirectoryExists();
     const json = JSON.stringify(data, null, 2);
     const encrypted = this.encrypt(json);
-    await fs.writeFile(this.tokenFilePath, encrypted, { mode: 0o600 });
+    const tmpPath = `${this.tokenFilePath}.${crypto.randomUUID()}.tmp`;
+    let renamed = false;
+    try {
+      await fs.writeFile(tmpPath, encrypted, { mode: 0o600 });
+      for (let attempt = 1; ; attempt++) {
+        try {
+          await fs.rename(tmpPath, this.tokenFilePath);
+          renamed = true;
+          break;
+        } catch (error: unknown) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          const code = (error as NodeJS.ErrnoException).code;
+          if (!isRetryableRenameError(code) || attempt >= RENAME_MAX_ATTEMPTS) {
+            throw error;
+          }
+          await new Promise((resolve) =>
+            setTimeout(resolve, 2 ** (attempt - 1) * 50),
+          );
+        }
+      }
+    } finally {
+      if (!renamed) {
+        await fs.rm(tmpPath, { force: true }).catch(() => {});
+      }
+    }
+  }
+
+  /**
+   * Runs a read-modify-write of the credentials file under an exclusive
+   * cross-process lock, so concurrent writers (e.g. a token refresh in one
+   * terminal and a login in another) cannot overwrite each other's entries.
+   */
+  private async withLock<T>(fn: () => Promise<T>): Promise<T> {
+    await this.ensureDirectoryExists();
+    // `realpath: false` lets us lock the credentials file before it exists.
+    const release = await lock(this.tokenFilePath, {
+      realpath: false,
+      stale: LOCK_STALE_MS,
+      retries: LOCK_RETRY_OPTIONS,
+    });
+    try {
+      return await fn();
+    } finally {
+      try {
+        await release();
+      } catch (error) {
+        debugLogger.error('Failed to release credentials file lock:', error);
+      }
+    }
   }
 
   async getPassword(service: string, account: string): Promise<string | null> {
     const data = await this.loadData();
-    return data[service]?.[account] ?? null;
+    const serviceData = getOwn(data, service);
+    return (serviceData && getOwn(serviceData, account)) ?? null;
   }
 
   async setPassword(
@@ -126,20 +217,26 @@ export class FileKeychain implements Keychain {
     account: string,
     password: string,
   ): Promise<void> {
-    const data = await this.loadData();
-    if (!data[service]) {
-      data[service] = {};
-    }
-    data[service][account] = password;
-    await this.saveData(data);
+    await this.withLock(async () => {
+      const data = await this.loadData();
+      await this.saveData({
+        ...data,
+        [service]: { ...getOwn(data, service), [account]: password },
+      });
+    });
   }
 
   async deletePassword(service: string, account: string): Promise<boolean> {
-    const data = await this.loadData();
-    if (data[service] && account in data[service]) {
-      delete data[service][account];
+    return this.withLock(async () => {
+      const data = await this.loadData();
+      const serviceData = getOwn(data, service);
+      if (!serviceData || !Object.hasOwn(serviceData, account)) {
+        return false;
+      }
 
-      if (Object.keys(data[service]).length === 0) {
+      delete serviceData[account];
+
+      if (Object.keys(serviceData).length === 0) {
         delete data[service];
       }
 
@@ -157,15 +254,14 @@ export class FileKeychain implements Keychain {
         await this.saveData(data);
       }
       return true;
-    }
-    return false;
+    });
   }
 
   async findCredentials(
     service: string,
   ): Promise<Array<{ account: string; password: string }>> {
     const data = await this.loadData();
-    const serviceData = data[service] || {};
+    const serviceData = getOwn(data, service) ?? {};
     return Object.entries(serviceData).map(([account, password]) => ({
       account,
       password,
