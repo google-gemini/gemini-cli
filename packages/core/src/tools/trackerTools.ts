@@ -97,9 +97,9 @@ export async function buildTodosReturnDisplay(
 
     const children = childrenMap.get(task.id) ?? [];
     children.sort(sortTasks);
-    for (const child of children) {
-      addTask(child, depth + 1, visited);
-    }
+    renderChildrenByDependency(children, depth, visited, (child, d) =>
+      addTask(child, d, visited),
+    );
     visited.delete(task.id);
   };
 
@@ -638,13 +638,20 @@ class TrackerVisualizeInvocation extends BaseToolInvocation<
 
       const indent = '  '.repeat(depth);
       output += `${indent}${statusEmojis[task.status]} ${task.id} ${TASK_TYPE_LABELS[task.type]} ${task.title}\n`;
-      if (task.dependencies.length > 0) {
-        output += `${indent}  └─ Depends on: ${task.dependencies.join(', ')}\n`;
+
+      const siblings = task.parentId
+        ? (childrenMap.get(task.parentId) ?? [])
+        : [];
+      const siblingIds = new Set(siblings.map((s) => s.id));
+      const externalDeps = task.dependencies.filter((d) => !siblingIds.has(d));
+      if (externalDeps.length > 0) {
+        output += `${indent}  └─ Depends on: ${externalDeps.join(', ')}\n`;
       }
+
       const children = childrenMap.get(task.id) ?? [];
-      for (const child of children) {
-        renderTask(child, depth + 1, visited);
-      }
+      renderChildrenByDependency(children, depth, visited, (child, d) =>
+        renderTask(child, d, visited),
+      );
       visited.delete(task.id);
     };
 
@@ -690,5 +697,62 @@ export class TrackerVisualizeTool extends BaseDeclarativeTool<
   }
   override getSchema(modelId?: string) {
     return resolveToolDeclaration(TRACKER_VISUALIZE_DEFINITION, modelId);
+  }
+}
+
+// --- render children by dependency ---
+
+function renderChildrenByDependency(
+  children: TrackerTask[],
+  parentDepth: number,
+  visited: Set<string>,
+  renderFn: (task: TrackerTask, depth: number) => void,
+): void {
+  if (children.length === 0) return;
+
+  const childIds = new Set(children.map((c) => c.id));
+
+  const dependentsMap = new Map<string, TrackerTask[]>();
+  const hasSiblingDep = new Set<string>();
+
+  for (const child of children) {
+    for (const depId of child.dependencies) {
+      if (childIds.has(depId)) {
+        hasSiblingDep.add(child.id);
+        if (!dependentsMap.has(depId)) {
+          dependentsMap.set(depId, []);
+        }
+        dependentsMap.get(depId)!.push(child);
+      }
+    }
+  }
+
+  const depRoots = children.filter((c) => !hasSiblingDep.has(c.id));
+  const rendered = new Set<string>();
+
+  const renderDepChain = (task: TrackerTask, depth: number) => {
+    if (rendered.has(task.id)) return;
+    rendered.add(task.id);
+    renderFn(task, depth);
+
+    const dependents = dependentsMap.get(task.id) ?? [];
+    for (const dep of dependents) {
+      const allDepsRendered = dep.dependencies
+        .filter((id) => childIds.has(id))
+        .every((id) => rendered.has(id));
+      if (allDepsRendered) {
+        renderDepChain(dep, depth + 1);
+      }
+    }
+  };
+
+  for (const root of depRoots) {
+    renderDepChain(root, parentDepth + 1);
+  }
+
+  for (const child of children) {
+    if (!rendered.has(child.id)) {
+      renderFn(child, parentDepth + 1);
+    }
   }
 }
