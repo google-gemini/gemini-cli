@@ -369,24 +369,28 @@ describe('relaunchAppInChildProcess', () => {
       await expect(relaunchPromise).rejects.toThrow('PROCESS_EXIT_CALLED');
     });
 
-    it('should forward termination signals (SIGTERM, SIGHUP, SIGINT, SIGQUIT, SIGUSR1, SIGUSR2) from parent to child process', async () => {
+    it('should forward termination signals (SIGTERM, SIGHUP, SIGUSR1, SIGUSR2) but not terminal-generated signals (SIGINT, SIGQUIT)', async () => {
       const mockChild = createMockChildProcess(0, false);
       mockedSpawn.mockReturnValue(mockChild);
 
       const relaunchPromise = relaunchAppInChildProcess([], []);
 
-      const signals: readonly NodeJS.Signals[] = [
+      const forwarded: readonly NodeJS.Signals[] = [
         'SIGTERM',
         'SIGHUP',
-        'SIGINT',
-        'SIGQUIT',
         'SIGUSR1',
         'SIGUSR2',
       ];
+      const notForwarded: readonly NodeJS.Signals[] = ['SIGINT', 'SIGQUIT'];
 
-      for (const sig of signals) {
+      for (const sig of forwarded) {
         process.emit(sig, sig);
         expect(mockChild.kill).toHaveBeenCalledWith(sig);
+      }
+
+      for (const sig of notForwarded) {
+        process.emit(sig, sig);
+        expect(mockChild.kill).not.toHaveBeenCalledWith(sig);
       }
 
       mockChild.emit('close', 0);

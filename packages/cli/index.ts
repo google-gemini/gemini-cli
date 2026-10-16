@@ -103,6 +103,11 @@ async function run() {
       const forwarders = new Map<NodeJS.Signals, () => void>();
       for (const sig of FORWARDED_SIGNALS) {
         const handler = () => {
+          if (sig === 'SIGINT' || sig === 'SIGQUIT') {
+            // Do not forward terminal-generated signals to avoid double-signals
+            // and abrupt termination on Windows. The child receives them directly.
+            return;
+          }
           try {
             child.kill(sig);
           } catch {
