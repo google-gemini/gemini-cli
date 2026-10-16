@@ -159,6 +159,69 @@ describe('evalTest reliability logic', () => {
     expect(entries[3].status).toBe('SKIP');
   });
 
+  it('should retry 3 times on 429 RESOURCE_EXHAUSTED error and then SKIP', async () => {
+    const mockRig = new TestRig() as any;
+    (TestRig as any).mockReturnValue(mockRig);
+
+    // Simulate permanent 429 rate limit error
+    mockRig.run.mockRejectedValue(
+      new Error('status: RESOURCE_EXHAUSTED - quota exceeded'),
+    );
+
+    await internalEvalTest({
+      suiteName: 'test',
+      suiteType: 'behavioral',
+      name: 'test-api-429',
+      prompt: 'do something',
+      assert: async () => {},
+    });
+
+    // 1 initial + 3 retries = 4 total
+    expect(mockRig.run).toHaveBeenCalledTimes(4);
+
+    const logContent = fs
+      .readFileSync(RELIABILITY_LOG, 'utf-8')
+      .trim()
+      .split('\n');
+    const entries = logContent.map((line) => JSON.parse(line));
+    expect(entries[0].errorCode).toBe('429');
+    expect(entries[0].status).toBe('RETRY');
+    expect(entries[3].status).toBe('SKIP');
+  });
+
+  it('should retry on 429 Too Many Requests quota error message', async () => {
+    const mockRig = new TestRig() as any;
+    (TestRig as any).mockReturnValue(mockRig);
+
+    // Fail once with a quota-exhausted message, then succeed
+    mockRig.run
+      .mockRejectedValueOnce(
+        new Error('You exceeded your current quota, please check your plan'),
+      )
+      .mockResolvedValueOnce('Success');
+
+    await internalEvalTest({
+      suiteName: 'test',
+      suiteType: 'behavioral',
+      name: 'test-quota-recovery',
+      prompt: 'do something',
+      assert: async () => {},
+    });
+
+    // 1 failure + 1 success = 2 total runs
+    expect(mockRig.run).toHaveBeenCalledTimes(2);
+
+    // Log should have one RETRY entry with code 429
+    const logContent = fs
+      .readFileSync(RELIABILITY_LOG, 'utf-8')
+      .trim()
+      .split('\n');
+    expect(logContent.length).toBe(1);
+    const entry = JSON.parse(logContent[0]);
+    expect(entry.status).toBe('RETRY');
+    expect(entry.errorCode).toBe('429');
+  });
+
   it('should throw if an absolute path is used in files', async () => {
     const mockRig = new TestRig() as any;
     (TestRig as any).mockReturnValue(mockRig);
