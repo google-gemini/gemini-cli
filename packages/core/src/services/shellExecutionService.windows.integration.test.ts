@@ -8,8 +8,10 @@ import { describe, it, expect } from 'vitest';
 import os from 'node:os';
 import { ShellExecutionService } from './shellExecutionService.js';
 import { NoopSandboxManager } from './sandboxManager.js';
+import { resolveExecutable } from '../utils/shell-utils.js';
 
 const isWindows = os.platform() === 'win32';
+const hasPwsh = isWindows && Boolean(resolveExecutable('pwsh.exe'));
 
 /**
  * Real-shell integration tests that reproduce the regression class from
@@ -22,7 +24,7 @@ const isWindows = os.platform() === 'win32';
  * gemini-cli selects pwsh.exe from PATH; they fail when the pipeline
  * routes through Windows PowerShell 5.1.
  */
-describe.skipIf(!isWindows)(
+describe.skipIf(!hasPwsh)(
   'ShellExecutionService Windows quoting (real shell)',
   () => {
     const baseConfig = {
