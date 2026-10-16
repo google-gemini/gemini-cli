@@ -481,6 +481,7 @@ describe('relaunchAppInChildProcess', () => {
     });
 
     it('should re-raise signal on parent process when child is terminated by signal', async () => {
+      vi.useFakeTimers();
       const processKillSpy = vi
         .spyOn(process, 'kill')
         .mockImplementation(() => true);
@@ -494,10 +495,15 @@ describe('relaunchAppInChildProcess', () => {
         mockChild.emit('close', null, 'SIGTERM');
 
         expect(processKillSpy).toHaveBeenCalledWith(process.pid, 'SIGTERM');
+
+        // Fast-forward the 100ms fallback timer
+        vi.runAllTimers();
+
         await expect(relaunchPromise).rejects.toThrow('PROCESS_EXIT_CALLED');
         expect(processExitSpy).toHaveBeenCalledWith(1);
       } finally {
         processKillSpy.mockRestore();
+        vi.useRealTimers();
       }
     });
   });
