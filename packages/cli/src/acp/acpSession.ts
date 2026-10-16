@@ -40,6 +40,7 @@ import {
   resolveAtCommandPath,
   type ResolvedAtCommandPath,
   tokenLimit,
+  ToolExecutor,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import type { Part, FunctionCall } from '@google/genai';
@@ -868,41 +869,46 @@ export class Session {
         ),
       );
 
+      const request: ToolCallRequestInfo = {
+        callId,
+        name: fc.name,
+        args,
+        isClientInitiated: false,
+        prompt_id: promptId,
+      };
+      // The output the model sees is truncated as the scheduler truncates
+      // it (tools.truncateToolOutputThreshold, the full output saved to a
+      // file): this path executes the tool itself, so it must apply it too,
+      // or a single large output can exceed the model's input limit.
+      const { truncatedContent, outputFile } = await new ToolExecutor(
+        this.context,
+      ).truncateOutputIfNeeded(request, tool, toolResult.llmContent);
+      const responseParts = convertToFunctionResponse(
+        fc.name,
+        callId,
+        truncatedContent,
+        this.context.config.getActiveModel(),
+        this.context.config,
+      );
+
       this.chat.recordCompletedToolCalls(this.context.config.getActiveModel(), [
         {
           status: CoreToolCallStatus.Success,
-          request: {
-            callId,
-            name: fc.name,
-            args,
-            isClientInitiated: false,
-            prompt_id: promptId,
-          },
+          request,
           tool,
           invocation,
           response: {
             callId,
-            responseParts: convertToFunctionResponse(
-              fc.name,
-              callId,
-              toolResult.llmContent,
-              this.context.config.getActiveModel(),
-              this.context.config,
-            ),
+            responseParts,
             resultDisplay: toolResult.returnDisplay,
             error: undefined,
             errorType: undefined,
+            outputFile,
           },
         },
       ]);
 
-      return convertToFunctionResponse(
-        fc.name,
-        callId,
-        toolResult.llmContent,
-        this.context.config.getActiveModel(),
-        this.context.config,
-      );
+      return responseParts;
     } catch (e) {
       const error = e instanceof Error ? e : new Error(String(e));
 
