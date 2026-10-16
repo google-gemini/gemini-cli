@@ -40,7 +40,6 @@ import {
   GeminiCliOperation,
   getPlanModeExitMessage,
   isBackgroundExecutionData,
-  Kind,
   ACTIVATE_SKILL_TOOL_NAME,
   isRenderedInHistory,
   buildToolVisibilityContext,
@@ -475,48 +474,26 @@ export const useGeminiStream = (
 
   // Push completed tools to history as they finish
   useEffect(() => {
+    const isFinished = (tc: TrackedToolCall) =>
+      tc.status === 'success' ||
+      tc.status === 'error' ||
+      tc.status === 'cancelled';
+
     const toolsToPush: TrackedToolCall[] = [];
-    for (let i = 0; i < toolCalls.length; i++) {
-      const tc = toolCalls[i];
+    for (const tc of toolCalls) {
       if (pushedToolCallIdsRef.current.has(tc.request.callId)) continue;
 
-      if (
-        tc.status === 'success' ||
-        tc.status === 'error' ||
-        tc.status === 'cancelled'
-      ) {
-        // TODO(#22883): This lookahead logic is a tactical UI fix to prevent parallel agents
-        // from tearing visually when they finish at slightly different times.
-        // Architecturally, `useGeminiStream` should not be responsible for stitching
-        // together semantic batches using timing/refs. `packages/core` should be
-        // refactored to emit structured `ToolBatch` or `Turn` objects, and this layer
-        // should simply render those semantic boundaries.
-        // If this is an agent tool, look ahead to ensure all subsequent
-        // contiguous agents in the same batch are also finished before pushing.
-        const isAgent = tc.tool?.kind === Kind.Agent;
-        if (isAgent) {
-          let contigAgentsComplete = true;
-          for (let j = i + 1; j < toolCalls.length; j++) {
-            const nextTc = toolCalls[j];
-            if (nextTc.tool?.kind === Kind.Agent) {
-              if (
-                nextTc.status !== 'success' &&
-                nextTc.status !== 'error' &&
-                nextTc.status !== 'cancelled'
-              ) {
-                contigAgentsComplete = false;
-                break;
-              }
-            } else {
-              // End of the contiguous agent block
-              break;
-            }
-          }
-
-          if (!contigAgentsComplete) {
-            // Wait for the entire contiguous block of agents to finish
-            break;
-          }
+      if (isFinished(tc)) {
+        // Calls that share a group ID are presented together, so wait until
+        // every call in the group has finished before pushing any of them.
+        const { groupId } = tc.request;
+        if (
+          groupId !== undefined &&
+          toolCalls.some(
+            (other) => other.request.groupId === groupId && !isFinished(other),
+          )
+        ) {
+          break;
         }
 
         toolsToPush.push(tc);
@@ -533,23 +510,19 @@ export const useGeminiStream = (
         settings.merged.ui?.compactToolOutput === true;
 
       const groups: TrackedToolCall[][] = [];
-      let currentGroup: TrackedToolCall[] = [];
+      let currentGroupId: string | undefined;
 
       for (const tc of toolsToPush) {
         newPushed.add(tc.request.callId);
 
-        if (tc.tool?.kind === Kind.Agent) {
-          currentGroup.push(tc);
+        // Calls that share a group ID are adjacent and go into one history item.
+        const { groupId } = tc.request;
+        if (groupId !== undefined && groupId === currentGroupId) {
+          groups[groups.length - 1].push(tc);
         } else {
-          if (currentGroup.length > 0) {
-            groups.push(currentGroup);
-            currentGroup = [];
-          }
           groups.push([tc]);
         }
-      }
-      if (currentGroup.length > 0) {
-        groups.push(currentGroup);
+        currentGroupId = groupId;
       }
 
       for (let i = 0; i < groups.length; i++) {
