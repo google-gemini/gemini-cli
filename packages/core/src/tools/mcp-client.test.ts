@@ -36,6 +36,7 @@ import {
   hasNetworkTransport,
   isEnabled,
   McpClient,
+  MCP_DISCOVERY_TIMEOUT_MSEC,
   populateMcpServerCommand,
   discoverPrompts,
   type McpContext,
@@ -191,7 +192,62 @@ describe('mcp-client', () => {
       });
       expect(mockedClient.listTools).toHaveBeenCalledWith(
         {},
-        expect.objectContaining({ timeout: 600000, progressReporter: client }),
+        expect.objectContaining({
+          timeout: MCP_DISCOVERY_TIMEOUT_MSEC,
+          progressReporter: client,
+        }),
+      );
+    });
+
+    it('should use the configured server timeout for tool discovery', async () => {
+      const mockedClient = {
+        connect: vi.fn(),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+        setNotificationHandler: vi.fn(),
+        getServerCapabilities: vi.fn().mockReturnValue({ tools: {} }),
+        listTools: vi.fn().mockResolvedValue({
+          tools: [
+            {
+              name: 'testFunction',
+              inputSchema: { type: 'object', properties: {} },
+            },
+          ],
+        }),
+        listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
+        request: vi.fn().mockResolvedValue({}),
+      };
+      vi.mocked(ClientLib.Client).mockReturnValue(
+        mockedClient as unknown as ClientLib.Client,
+      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
+      const client = new McpClient(
+        'test-server',
+        { command: 'test-command', timeout: 1234 },
+        workspaceContext,
+        MOCK_CONTEXT,
+        false,
+        '0.0.1',
+      );
+      await client.connect();
+      await client.discoverInto(MOCK_CONTEXT, {
+        toolRegistry: {
+          registerTool: vi.fn(),
+          sortTools: vi.fn(),
+          getMessageBus: vi.fn().mockReturnValue(undefined),
+        } as unknown as ToolRegistry,
+        promptRegistry: {
+          registerPrompt: vi.fn(),
+        } as unknown as PromptRegistry,
+        resourceRegistry: {
+          setResourcesForServer: vi.fn(),
+        } as unknown as ResourceRegistry,
+      });
+      expect(mockedClient.listTools).toHaveBeenCalledWith(
+        {},
+        expect.objectContaining({ timeout: 1234 }),
       );
     });
 
@@ -1786,6 +1842,7 @@ describe('mcp-client', () => {
         expect.anything(),
         expect.objectContaining({
           signal: expect.any(AbortSignal),
+          timeout: 50,
         }),
       );
 
