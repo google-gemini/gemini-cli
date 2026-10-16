@@ -33,6 +33,12 @@ export type ConnectionConfig = {
   stdio?: StdioConfig;
 };
 
+/** A connection config as written to a port file by the IDE companion. */
+export type IdeConnectionConfig = ConnectionConfig & {
+  workspacePath?: string;
+  ideInfo?: IdeInfo;
+};
+
 export function validateWorkspacePath(
   ideWorkspacePath: string | undefined,
   cwd: string,
@@ -129,11 +135,41 @@ async function verifyAndReadFile(
   }
 }
 
+/**
+ * Returns the best connection config discovered for `pid`, if any.
+ *
+ * Prefer {@link getConnectionConfigsFromFile} when actually connecting: a port
+ * file can outlive its server, so the best-ranked candidate is not necessarily
+ * a live one.
+ */
 export async function getConnectionConfigFromFile(
   pid: number,
-): Promise<
-  (ConnectionConfig & { workspacePath?: string; ideInfo?: IdeInfo }) | undefined
-> {
+): Promise<IdeConnectionConfig | undefined> {
+  return (await getConnectionConfigsFromFile(pid))[0];
+}
+
+/**
+ * Returns every connection config discovered for `pid`, best candidate first.
+ *
+ * More than one file can describe the current workspace: all windows of one
+ * IDE instance share the same parent pid, and a file is left behind whenever
+ * an extension host is killed before it can clean up (e.g. VS Code's
+ * "Reload Window" with an older companion). Callers should try the candidates
+ * in order and move on when one does not answer.
+ *
+ * Ordering:
+ * 1. the file whose port matches `GEMINI_CLI_IDE_SERVER_PORT` — the window the
+ *    terminal was created in — if any;
+ * 2. the remaining files that match the current workspace, in
+ *    {@link sortConnectionFiles} order.
+ *
+ * When no file matches the current workspace, a single best-sorted entry is
+ * returned so that downstream logic can raise the detailed "Directory
+ * mismatch" error instead of a generic connection error.
+ */
+export async function getConnectionConfigsFromFile(
+  pid: number,
+): Promise<IdeConnectionConfig[]> {
   // For backwards compatibility
   try {
     const portFile = path.join(
@@ -147,14 +183,10 @@ export async function getConnectionConfigFromFile(
       throw new Error('Verification failed or file not found');
     }
     const parsed: unknown = JSON.parse(portFileContents);
-    type ConfigType = ConnectionConfig & {
-      workspacePath?: string;
-      ideInfo?: IdeInfo;
-    };
-    const isConfig = (val: unknown): val is ConfigType =>
+    const isConfig = (val: unknown): val is IdeConnectionConfig =>
       typeof val === 'object' && val !== null;
     if (isConfig(parsed)) {
-      return parsed;
+      return [parsed];
     }
     throw new Error('Invalid connection config format');
   } catch {
@@ -170,11 +202,11 @@ export async function getConnectionConfigFromFile(
     portFiles = await fs.promises.readdir(portFileDir);
   } catch (e) {
     logger.debug('Failed to read IDE connection directory:', e);
-    return undefined;
+    return [];
   }
 
   if (!portFiles) {
-    return undefined;
+    return [];
   }
 
   const matchingFiles = portFiles.filter((file) =>
@@ -182,7 +214,7 @@ export async function getConnectionConfigFromFile(
   );
 
   if (matchingFiles.length === 0) {
-    return undefined;
+    return [];
   }
 
   sortConnectionFiles(matchingFiles, pid);
@@ -194,21 +226,13 @@ export async function getConnectionConfigFromFile(
   );
 
   const parsedContents = fileContents.map(
-    (
-      content,
-    ):
-      | (ConnectionConfig & { workspacePath?: string; ideInfo?: IdeInfo })
-      | undefined => {
+    (content): IdeConnectionConfig | undefined => {
       if (!content) {
         return undefined;
       }
       try {
         const parsed: unknown = JSON.parse(content);
-        type ConfigType = ConnectionConfig & {
-          workspacePath?: string;
-          ideInfo?: IdeInfo;
-        };
-        const isConfig = (val: unknown): val is ConfigType =>
+        const isConfig = (val: unknown): val is IdeConnectionConfig =>
           typeof val === 'object' && val !== null;
         if (isConfig(parsed)) {
           return parsed;
@@ -222,12 +246,7 @@ export async function getConnectionConfigFromFile(
   );
 
   const validWorkspaces = parsedContents.filter(
-    (
-      content,
-    ): content is ConnectionConfig & {
-      workspacePath?: string;
-      ideInfo?: IdeInfo;
-    } => {
+    (content): content is IdeConnectionConfig => {
       if (!content) {
         return false;
       }
@@ -239,20 +258,20 @@ export async function getConnectionConfigFromFile(
     },
   );
 
+  const portFromEnv = getPortFromEnv();
+  const matchesEnvPort = (content: IdeConnectionConfig | undefined) =>
+    !!content &&
+    content.port !== undefined &&
+    String(content.port) === portFromEnv;
+
   if (validWorkspaces.length === 0) {
     // If no workspace matches the current CWD, but we found and parsed
     // valid connection config file(s), return the best-sorted config.
     // This lets downstream connection logic raise a helpful, detailed
     // "Directory mismatch" warning instead of a generic connection error.
     let fileIndex = -1;
-    const portFromEnv = getPortFromEnv();
     if (portFromEnv) {
-      fileIndex = parsedContents.findIndex(
-        (content) =>
-          !!content &&
-          content.port !== undefined &&
-          String(content.port) === portFromEnv,
-      );
+      fileIndex = parsedContents.findIndex(matchesEnvPort);
     }
     if (fileIndex === -1) {
       fileIndex = parsedContents.findIndex((content) => !!content);
@@ -263,46 +282,25 @@ export async function getConnectionConfigFromFile(
       logger.debug(
         `Selected best mismatched IDE connection file: ${matchingFiles[fileIndex]}`,
       );
-      return selected;
+      return [selected];
     }
-    return undefined;
+    return [];
   }
 
-  if (validWorkspaces.length === 1) {
-    const selected = validWorkspaces[0];
-    const fileIndex = parsedContents.indexOf(selected);
-    if (fileIndex !== -1) {
-      logger.debug(`Selected IDE connection file: ${matchingFiles[fileIndex]}`);
-    }
-    return selected;
-  }
-
-  const portFromEnv = getPortFromEnv();
+  const candidates = [...validWorkspaces];
   if (portFromEnv) {
-    const matchingPortIndex = validWorkspaces.findIndex(
-      (content) =>
-        content.port !== undefined && String(content.port) === portFromEnv,
-    );
-    if (matchingPortIndex !== -1) {
-      const selected = validWorkspaces[matchingPortIndex];
-      const fileIndex = parsedContents.indexOf(selected);
-      if (fileIndex !== -1) {
-        logger.debug(
-          `Selected IDE connection file (matched port from env): ${matchingFiles[fileIndex]}`,
-        );
-      }
-      return selected;
+    const matchingPortIndex = candidates.findIndex(matchesEnvPort);
+    if (matchingPortIndex > 0) {
+      candidates.unshift(...candidates.splice(matchingPortIndex, 1));
     }
   }
 
-  const selected = validWorkspaces[0];
-  const fileIndex = parsedContents.indexOf(selected);
-  if (fileIndex !== -1) {
-    logger.debug(
-      `Selected first valid IDE connection file: ${matchingFiles[fileIndex]}`,
-    );
-  }
-  return selected;
+  logger.debug(
+    `IDE connection candidates (in order): ${candidates
+      .map((candidate) => matchingFiles[parsedContents.indexOf(candidate)])
+      .join(', ')}`,
+  );
+  return candidates;
 }
 
 // Sort files to prioritize the one matching the target pid,
