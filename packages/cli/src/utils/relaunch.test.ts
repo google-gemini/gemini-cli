@@ -141,8 +141,21 @@ describe('relaunchAppInChildProcess', () => {
   const originalExecArgv = [...process.execArgv];
   const originalArgv = [...process.argv];
   const originalExecPath = process.execPath;
+  const trackedSignals: readonly NodeJS.Signals[] = [
+    'SIGTERM',
+    'SIGHUP',
+    'SIGINT',
+    'SIGQUIT',
+    'SIGUSR1',
+    'SIGUSR2',
+  ];
+  const initialListeners = new Map<NodeJS.Signals, NodeJS.SignalsListener[]>();
 
   beforeEach(() => {
+    for (const sig of trackedSignals) {
+      initialListeners.set(sig, process.listeners(sig));
+    }
+
     vi.clearAllMocks();
     mocks.writeToStderr.mockClear();
 
@@ -166,6 +179,15 @@ describe('relaunchAppInChildProcess', () => {
   });
 
   afterEach(() => {
+    for (const sig of trackedSignals) {
+      process.removeAllListeners(sig);
+      const listeners = initialListeners.get(sig) || [];
+      for (const listener of listeners) {
+        process.on(sig, listener);
+      }
+    }
+    initialListeners.clear();
+
     vi.unstubAllEnvs();
     process.execArgv = [...originalExecArgv];
     process.argv = [...originalArgv];
