@@ -132,9 +132,17 @@ async function run() {
           );
           resolve(1);
         });
-        child.on('close', (code) => {
+        child.on('close', (code, signal) => {
           removeForwarders();
           process.stdin.resume();
+          if (signal) {
+            try {
+              process.kill(process.pid, signal);
+            } catch {
+              resolve(1);
+            }
+            return;
+          }
           resolve(code ?? 1);
         });
       });

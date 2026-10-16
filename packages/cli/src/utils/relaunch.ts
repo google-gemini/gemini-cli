@@ -120,10 +120,18 @@ export async function relaunchAppInChildProcess(
         removeForwarders();
         reject(err);
       });
-      child.on('close', (code) => {
+      child.on('close', (code, signal) => {
         removeForwarders();
         // Resume stdin before the parent process exits.
         process.stdin.resume();
+        if (signal) {
+          try {
+            process.kill(process.pid, signal);
+          } catch {
+            resolve(1);
+          }
+          return;
+        }
         resolve(code ?? 1);
       });
     });

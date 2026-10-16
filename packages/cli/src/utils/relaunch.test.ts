@@ -479,6 +479,25 @@ describe('relaunchAppInChildProcess', () => {
       mockChild.emit('close', 0);
       await expect(relaunchPromise).rejects.toThrow('PROCESS_EXIT_CALLED');
     });
+
+    it('should re-raise signal on parent process when child is terminated by signal', async () => {
+      const processKillSpy = vi
+        .spyOn(process, 'kill')
+        .mockImplementation(() => true);
+
+      try {
+        const mockChild = createMockChildProcess(0, false);
+        mockedSpawn.mockReturnValue(mockChild);
+
+        void relaunchAppInChildProcess([], []);
+
+        mockChild.emit('close', null, 'SIGTERM');
+
+        expect(processKillSpy).toHaveBeenCalledWith(process.pid, 'SIGTERM');
+      } finally {
+        processKillSpy.mockRestore();
+      }
+    });
   });
 });
 
