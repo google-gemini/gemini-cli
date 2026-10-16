@@ -183,6 +183,27 @@ describe('LSTool', () => {
       });
     });
 
+    it('should report entries omitted by path validation', async () => {
+      const rejectedFile = path.join(tempRootDir, 'rejected.txt');
+      await fs.writeFile(rejectedFile, 'content');
+
+      vi.spyOn(mockConfig, 'validatePathAccess').mockImplementation(
+        (absolutePath) =>
+          absolutePath === rejectedFile ? 'Invalid path: test error' : null,
+      );
+
+      const invocation = lsTool.build({ dir_path: tempRootDir });
+      const result = await invocation.execute({ abortSignal });
+
+      expect(result.llmContent).toContain(
+        '(1 item(s) omitted because their paths failed validation)',
+      );
+      expect(result.returnDisplay).toEqual({
+        summary: 'Found 0 item(s). (1 omitted: path validation failed)',
+        files: [],
+      });
+    });
+
     it('should respect gitignore patterns', async () => {
       await fs.writeFile(path.join(tempRootDir, 'file1.txt'), 'content1');
       await fs.writeFile(path.join(tempRootDir, 'file2.log'), 'content1');

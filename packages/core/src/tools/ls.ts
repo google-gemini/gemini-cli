@@ -226,6 +226,7 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
         });
 
       const entries = [];
+      let validationFailureCount = 0;
       for (const relativePath of filteredPaths) {
         const fullPath = path.resolve(this.config.getTargetDir(), relativePath);
 
@@ -234,6 +235,7 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
           'read',
         );
         if (validationError) {
+          validationFailureCount++;
           continue;
         }
 
@@ -278,6 +280,9 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
       if (ignoredCount > 0) {
         resultMessage += `\n\n(${ignoredCount} ignored)`;
       }
+      if (validationFailureCount > 0) {
+        resultMessage += `\n\n(${validationFailureCount} item(s) omitted because their paths failed validation)`;
+      }
 
       // Discover JIT subdirectory context for the listed directory
       const jitContext = await discoverJitContext(this.config, resolvedDirPath);
@@ -288,6 +293,9 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
       let displayMessage = `Found ${entries.length} item(s).`;
       if (ignoredCount > 0) {
         displayMessage += ` (${ignoredCount} ignored)`;
+      }
+      if (validationFailureCount > 0) {
+        displayMessage += ` (${validationFailureCount} omitted: path validation failed)`;
       }
 
       return {
