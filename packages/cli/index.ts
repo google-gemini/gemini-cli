@@ -17,6 +17,15 @@ import {
 
 // --- Global Entry Point ---
 
+const FORWARDED_SIGNALS: readonly NodeJS.Signals[] = [
+  'SIGTERM',
+  'SIGHUP',
+  'SIGINT',
+  'SIGQUIT',
+  'SIGUSR1',
+  'SIGUSR2',
+];
+
 async function getMemoryNodeArgs(): Promise<string[]> {
   let autoConfigureMemory = true;
   try {
@@ -62,12 +71,6 @@ async function run() {
 
     let latestAdminSettings: unknown = undefined;
 
-    // Prevent the parent process from exiting prematurely on signals.
-    // The child process will receive the same signals and handle its own cleanup.
-    for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
-      process.on(sig as NodeJS.Signals, () => {});
-    }
-
     const runner = () => {
       process.stdin.pause();
 
@@ -97,14 +100,35 @@ async function run() {
         },
       );
 
+      const forwarders = new Map<NodeJS.Signals, () => void>();
+      for (const sig of FORWARDED_SIGNALS) {
+        const handler = () => {
+          try {
+            child.kill(sig);
+          } catch {
+            // Child may already be gone
+          }
+        };
+        forwarders.set(sig, handler);
+        process.on(sig, handler);
+      }
+      const removeForwarders = () => {
+        for (const [sig, handler] of forwarders) {
+          process.off(sig, handler);
+        }
+        forwarders.clear();
+      };
+
       return new Promise<number>((resolve) => {
         child.on('error', (err) => {
+          removeForwarders();
           process.stderr.write(
             'Error: Failed to start child process: ' + err.message + '\n',
           );
           resolve(1);
         });
         child.on('close', (code) => {
+          removeForwarders();
           process.stdin.resume();
           resolve(code ?? 1);
         });

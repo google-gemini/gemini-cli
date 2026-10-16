@@ -368,6 +368,91 @@ describe('relaunchAppInChildProcess', () => {
 
       await expect(relaunchPromise).rejects.toThrow('PROCESS_EXIT_CALLED');
     });
+
+    it('should forward termination signals (SIGTERM, SIGHUP, SIGINT, SIGQUIT, SIGUSR1, SIGUSR2) from parent to child process', async () => {
+      const mockChild = createMockChildProcess(0, false);
+      mockedSpawn.mockReturnValue(mockChild);
+
+      const relaunchPromise = relaunchAppInChildProcess([], []);
+
+      const signals: readonly NodeJS.Signals[] = [
+        'SIGTERM',
+        'SIGHUP',
+        'SIGINT',
+        'SIGQUIT',
+        'SIGUSR1',
+        'SIGUSR2',
+      ];
+
+      for (const sig of signals) {
+        process.emit(sig, sig);
+        expect(mockChild.kill).toHaveBeenCalledWith(sig);
+      }
+
+      mockChild.emit('close', 0);
+      await expect(relaunchPromise).rejects.toThrow('PROCESS_EXIT_CALLED');
+    });
+
+    it('should remove signal forwarders on close and not leak listeners across relaunches', async () => {
+      const signals: readonly NodeJS.Signals[] = [
+        'SIGTERM',
+        'SIGHUP',
+        'SIGINT',
+        'SIGQUIT',
+        'SIGUSR1',
+        'SIGUSR2',
+      ];
+      const initialCounts = new Map(
+        signals.map((sig) => [sig, process.listenerCount(sig)]),
+      );
+
+      let spawnCount = 0;
+      mockedSpawn.mockImplementation(() => {
+        spawnCount++;
+        const child = createMockChildProcess(0, false);
+        setImmediate(() => {
+          child.emit('close', spawnCount === 1 ? RELAUNCH_EXIT_CODE : 0);
+        });
+        return child;
+      });
+
+      await expect(relaunchAppInChildProcess([], [])).rejects.toThrow(
+        'PROCESS_EXIT_CALLED',
+      );
+
+      expect(spawnCount).toBe(2);
+      for (const sig of signals) {
+        expect(process.listenerCount(sig)).toBe(initialCounts.get(sig));
+      }
+    });
+
+    it('should remove signal forwarders when child emits error', async () => {
+      const initialSigtermCount = process.listenerCount('SIGTERM');
+      const mockChild = createMockChildProcess(0, false);
+      mockedSpawn.mockReturnValue(mockChild);
+
+      const relaunchPromise = relaunchAppInChildProcess([], []);
+      mockChild.emit('error', new Error('Spawn failed'));
+
+      await expect(relaunchPromise).rejects.toThrow('PROCESS_EXIT_CALLED');
+      expect(process.listenerCount('SIGTERM')).toBe(initialSigtermCount);
+    });
+
+    it('should ignore errors thrown by child.kill when forwarding signals', async () => {
+      const mockChild = createMockChildProcess(0, false);
+      vi.mocked(mockChild.kill).mockImplementation(() => {
+        throw new Error('ESRCH');
+      });
+      mockedSpawn.mockReturnValue(mockChild);
+
+      const relaunchPromise = relaunchAppInChildProcess([], []);
+
+      expect(() => process.emit('SIGTERM', 'SIGTERM')).not.toThrow();
+      expect(mockChild.kill).toHaveBeenCalledWith('SIGTERM');
+
+      mockChild.emit('close', 0);
+      await expect(relaunchPromise).rejects.toThrow('PROCESS_EXIT_CALLED');
+    });
   });
 });
 

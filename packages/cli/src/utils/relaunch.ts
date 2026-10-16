@@ -15,6 +15,15 @@ import {
   type AdminControlsSettings,
 } from '@google/gemini-cli-core';
 
+const FORWARDED_SIGNALS: readonly NodeJS.Signals[] = [
+  'SIGTERM',
+  'SIGHUP',
+  'SIGINT',
+  'SIGQUIT',
+  'SIGUSR1',
+  'SIGUSR2',
+];
+
 export async function relaunchOnExitCode(runner: () => Promise<number>) {
   while (true) {
     try {
@@ -82,9 +91,32 @@ export async function relaunchAppInChildProcess(
       },
     );
 
+    const forwarders = new Map<NodeJS.Signals, () => void>();
+    for (const sig of FORWARDED_SIGNALS) {
+      const handler = () => {
+        try {
+          child.kill(sig);
+        } catch {
+          // Child may already be gone
+        }
+      };
+      forwarders.set(sig, handler);
+      process.on(sig, handler);
+    }
+    const removeForwarders = () => {
+      for (const [sig, handler] of forwarders) {
+        process.off(sig, handler);
+      }
+      forwarders.clear();
+    };
+
     return new Promise<number>((resolve, reject) => {
-      child.on('error', reject);
+      child.on('error', (err) => {
+        removeForwarders();
+        reject(err);
+      });
       child.on('close', (code) => {
+        removeForwarders();
         // Resume stdin before the parent process exits.
         process.stdin.resume();
         resolve(code ?? 1);
