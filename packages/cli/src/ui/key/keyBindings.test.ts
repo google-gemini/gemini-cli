@@ -281,4 +281,134 @@ describe('loadCustomKeybindings', () => {
     // Defaults should still be present
     expect(config.get(Command.RETURN)).toEqual([new KeyBinding('enter')]);
   });
+
+  it('supports "keys" array to add multiple bindings in a single entry', async () => {
+    const customJson = JSON.stringify([
+      { command: Command.QUIT, keys: ['ctrl+x', 'ctrl+d'] },
+    ]);
+    await fs.writeFile(tempFilePath, customJson, 'utf8');
+
+    const { config, errors } = await loadCustomKeybindings();
+
+    expect(errors).toHaveLength(0);
+    // Preserves order so keys[0] ('ctrl+x') has primary display precedence
+    expect(config.get(Command.QUIT)).toEqual([
+      new KeyBinding('ctrl+x'),
+      new KeyBinding('ctrl+d'),
+      new KeyBinding('ctrl+c'),
+    ]);
+  });
+
+  it('supports "keys" array with minus prefix to unbind multiple bindings in a single entry', async () => {
+    const customJson = JSON.stringify([
+      {
+        command: `-${Command.NEWLINE}`,
+        keys: ['alt+enter', 'ctrl+enter', 'shift+enter', 'ctrl+j'],
+      },
+    ]);
+    await fs.writeFile(tempFilePath, customJson, 'utf8');
+
+    const { config, errors } = await loadCustomKeybindings();
+
+    expect(errors).toHaveLength(0);
+    expect(config.get(Command.NEWLINE)).toEqual([new KeyBinding('cmd+enter')]);
+  });
+
+  it('supports combining "key" and "keys" in the same entry', async () => {
+    const customJson = JSON.stringify([
+      { command: Command.QUIT, key: 'ctrl+x', keys: ['ctrl+d'] },
+    ]);
+    await fs.writeFile(tempFilePath, customJson, 'utf8');
+
+    const { config, errors } = await loadCustomKeybindings();
+
+    expect(errors).toHaveLength(0);
+    expect(config.get(Command.QUIT)).toEqual([
+      new KeyBinding('ctrl+x'),
+      new KeyBinding('ctrl+d'),
+      new KeyBinding('ctrl+c'),
+    ]);
+  });
+
+  it('returns validation errors when neither "key" nor "keys" is provided', async () => {
+    const invalidJson = JSON.stringify([{ command: Command.QUIT }]);
+    await fs.writeFile(tempFilePath, invalidJson, 'utf8');
+
+    const { config, errors } = await loadCustomKeybindings();
+
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0]).toMatch(/Must specify either "key" or/);
+    expect(config.get(Command.QUIT)).toEqual([new KeyBinding('ctrl+c')]);
+  });
+
+  it('returns validation errors when "keys" is an empty array', async () => {
+    const invalidJson = JSON.stringify([{ command: Command.QUIT, keys: [] }]);
+    await fs.writeFile(tempFilePath, invalidJson, 'utf8');
+
+    const { config, errors } = await loadCustomKeybindings();
+
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0]).toMatch(/at least 1 element|non-empty/);
+    expect(config.get(Command.QUIT)).toEqual([new KeyBinding('ctrl+c')]);
+  });
+
+  it('returns validation errors when "keys" is not an array of strings', async () => {
+    const invalidJson = JSON.stringify([
+      { command: Command.QUIT, keys: 'ctrl+x' },
+    ]);
+    await fs.writeFile(tempFilePath, invalidJson, 'utf8');
+
+    const { config, errors } = await loadCustomKeybindings();
+
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0]).toMatch(/Expected array, received string/);
+    expect(config.get(Command.QUIT)).toEqual([new KeyBinding('ctrl+c')]);
+  });
+
+  it('honors issue #22813 configuration with "keys" array to unbind and rebind input.newline and input.submit', async () => {
+    const issueJson = `[
+      {
+        // unbind defaults for input.newline
+        "command": "-input.newline",
+        "keys": [
+          "alt+enter",
+          "ctrl+enter",
+          "shift+enter",
+          "ctrl+j"
+        ]
+      },
+      {
+        // unbind default for input.submit
+        "command": "-input.submit",
+        "key": "enter"
+      },
+      {
+        // create newline with enter
+        "command": "input.newline",
+        "key": "enter"
+      },
+      {
+        // submit prompt with ctrl+enter
+        "command": "input.submit",
+        "key": "ctrl+enter"
+      }
+    ]`;
+
+    await fs.writeFile(tempFilePath, issueJson, 'utf8');
+
+    const { config, errors } = await loadCustomKeybindings();
+
+    expect(errors).toEqual([]);
+
+    const submitBindings = config.get(Command.SUBMIT) ?? [];
+    expect(submitBindings).toContainEqual(new KeyBinding('ctrl+enter'));
+    expect(submitBindings).not.toContainEqual(new KeyBinding('enter'));
+
+    const newlineBindings = config.get(Command.NEWLINE) ?? [];
+    expect(newlineBindings).toContainEqual(new KeyBinding('enter'));
+    expect(newlineBindings).not.toContainEqual(new KeyBinding('ctrl+enter'));
+    expect(newlineBindings).not.toContainEqual(new KeyBinding('alt+enter'));
+    expect(newlineBindings).not.toContainEqual(new KeyBinding('shift+enter'));
+    expect(newlineBindings).not.toContainEqual(new KeyBinding('ctrl+j'));
+  });
 });
