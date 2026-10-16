@@ -73,6 +73,21 @@ describe('IdeClient', () => {
     vi.mocked(getConnectionConfigsFromFile).mockResolvedValue(configs);
   };
 
+  /** The MCP client the instance currently exposes to openDiff/closeDiff. */
+  const getClient = (ideClient: IdeClient) =>
+    (ideClient as unknown as { client: Client | undefined }).client;
+
+  /** Makes the next Client.connect() hang until the returned function is called. */
+  const holdHandshake = (client: Mocked<Client>) => {
+    let finishHandshake!: () => void;
+    client.connect.mockReturnValue(
+      new Promise<void>((resolve) => {
+        finishHandshake = resolve;
+      }),
+    );
+    return () => finishHandshake();
+  };
+
   beforeEach(async () => {
     // Reset singleton instance for test isolation
     (
@@ -448,12 +463,41 @@ describe('IdeClient', () => {
         IDEConnectionStatus.Connected,
       );
     });
+
+    it('should expose neither client while the replacement is still connecting', async () => {
+      mockDiscoveredConfigs([{ port: '1111' }]);
+      const ideClient = await IdeClient.getInstance();
+      await ideClient.connect();
+      expect(getClient(ideClient)).toBe(firstClient);
+      // Forget the tools/list call made by the first connection's discovery.
+      firstClient.request.mockClear();
+
+      mockDiscoveredConfigs([{ port: '2222' }]);
+      const finishHandshake = holdHandshake(secondClient);
+      const reconnecting = ideClient.connect();
+      await vi.waitFor(() => expect(secondClient.connect).toHaveBeenCalled());
+
+      // The superseded client is already retired and the new one has not
+      // finished its handshake: requests must fail fast on either.
+      expect(firstClient.close).toHaveBeenCalledTimes(1);
+      expect(getClient(ideClient)).toBeUndefined();
+      await expect(ideClient.openDiff('/test.txt', 'content')).rejects.toThrow(
+        'IDE client is not connected.',
+      );
+      expect(firstClient.request).not.toHaveBeenCalled();
+      expect(secondClient.request).not.toHaveBeenCalled();
+
+      finishHandshake();
+      await reconnecting;
+
+      expect(getClient(ideClient)).toBe(secondClient);
+      expect(ideClient.getConnectionStatus().status).toBe(
+        IDEConnectionStatus.Connected,
+      );
+    });
   });
 
   describe('failed connection attempts', () => {
-    const getClient = (ideClient: IdeClient) =>
-      (ideClient as unknown as { client: Client | undefined }).client;
-
     beforeEach(() => {
       vi.mocked(validateWorkspacePath).mockReturnValue({ isValid: true });
     });
@@ -534,6 +578,64 @@ describe('IdeClient', () => {
         IDEConnectionStatus.Connected,
       );
       expect(getClient(ideClient)).toBe(connectedClient);
+    });
+
+    it.each([
+      ['HTTP', { port: '1111' }],
+      ['stdio', { stdio: { command: 'ide-bridge', args: [] } }],
+    ])(
+      'should not expose a client before its %s connection is established',
+      async (_transport, config) => {
+        mockDiscoveredConfigs([config]);
+        const finishHandshake = holdHandshake(mockClient);
+
+        const ideClient = await IdeClient.getInstance();
+        const connecting = ideClient.connect();
+        await vi.waitFor(() => expect(mockClient.connect).toHaveBeenCalled());
+
+        // While the handshake is in flight, callers must fail fast rather
+        // than send requests through a client that has not connected yet.
+        expect(getClient(ideClient)).toBeUndefined();
+        expect(ideClient.getConnectionStatus().status).toBe(
+          IDEConnectionStatus.Connecting,
+        );
+        await expect(
+          ideClient.openDiff('/test.txt', 'content'),
+        ).rejects.toThrow('IDE client is not connected.');
+        await expect(ideClient.closeDiff('/test.txt')).resolves.toBeUndefined();
+        expect(mockClient.request).not.toHaveBeenCalled();
+
+        finishHandshake();
+        await connecting;
+
+        expect(getClient(ideClient)).toBe(mockClient);
+        expect(ideClient.getConnectionStatus().status).toBe(
+          IDEConnectionStatus.Connected,
+        );
+      },
+    );
+
+    it('should not keep a client whose setup failed after the handshake', async () => {
+      // The handshake succeeds, but registering handlers throws: the client
+      // was already published, so it must be dropped again and its transport
+      // closed, exactly as for a handshake failure.
+      mockDiscoveredConfigs([{ port: '1111' }]);
+      mockClient.setNotificationHandler.mockImplementationOnce(() => {
+        throw new Error('handler registration failed');
+      });
+
+      const ideClient = await IdeClient.getInstance();
+      await ideClient.connect();
+
+      expect(mockClient.connect).toHaveBeenCalledTimes(1);
+      expect(getClient(ideClient)).toBeUndefined();
+      expect(mockHttpTransport.close).toHaveBeenCalled();
+      expect(ideClient.getConnectionStatus().status).toBe(
+        IDEConnectionStatus.Disconnected,
+      );
+      await expect(ideClient.openDiff('/test.txt', 'content')).rejects.toThrow(
+        'IDE client is not connected.',
+      );
     });
   });
 

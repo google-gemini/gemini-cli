@@ -626,9 +626,11 @@ export class IdeClient {
   }
 
   /**
-   * Forgets a client whose connection attempt failed, so that `openDiff` and
-   * `closeDiff` fail fast on `!this.client` instead of talking to a client
-   * that never connected. A newer attempt's client is left alone.
+   * Forgets a client whose connection attempt failed after it had already
+   * been published (e.g. a status listener threw while finishing setup), so
+   * that `openDiff` and `closeDiff` fail fast on `!this.client` instead of
+   * talking to a client whose transport the caller is about to close. A
+   * newer attempt's client is left alone.
    */
   private dropFailedClient(client: Client | undefined) {
     if (client && this.client === client) {
@@ -657,7 +659,6 @@ export class IdeClient {
         name: 'streamable-http-client',
         version: await getVersion(),
       });
-      this.client = client;
       transport = new StreamableHTTPClientTransport(new URL(serverUrl), {
         fetch: await createProxyAwareFetch(ideServerHost),
         requestInit: {
@@ -665,6 +666,9 @@ export class IdeClient {
         },
       });
       await client.connect(transport);
+      // Publish the client only once the MCP handshake has completed, so
+      // that nothing can send requests through a half-connected client.
+      this.client = client;
       this.registerClientHandlers();
       await this.discoverTools();
       this.setState(IDEConnectionStatus.Connected);
@@ -696,13 +700,15 @@ export class IdeClient {
         name: 'stdio-client',
         version: await getVersion(),
       });
-      this.client = client;
 
       transport = new StdioClientTransport({
         command,
         args,
       });
       await client.connect(transport);
+      // Publish the client only once the MCP handshake has completed, so
+      // that nothing can send requests through a half-connected client.
+      this.client = client;
       this.registerClientHandlers();
       await this.discoverTools();
       this.setState(IDEConnectionStatus.Connected);
