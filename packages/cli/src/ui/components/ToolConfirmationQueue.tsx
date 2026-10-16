@@ -58,6 +58,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
     mainAreaWidth,
     terminalHeight,
     constrainHeight,
+    dialogsVisible,
     availableTerminalHeight: uiAvailableHeight,
   } = useUIState();
   const { tool, index, total } = confirmingTool;
@@ -129,7 +130,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
             terminalWidth={safeContentWidth} // Adjust for parent border/padding
             availableTerminalHeight={availableContentHeight}
             toolName={tool.name}
-            isFocused={true}
+            isFocused={!dialogsVisible}
           />
         </Box>
       </Box>
@@ -210,7 +211,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
           terminalWidth={safeContentWidth} // Adjust for parent border/padding
           availableTerminalHeight={availableContentHeight}
           toolName={tool.name}
-          isFocused={true}
+          isFocused={!dialogsVisible}
         />
       </Box>
       <Box
