@@ -35,6 +35,7 @@ import {
 import { formatBytes } from '../utils/formatters.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
+  IGNORED_COMMAND_ROOTS,
   getCommandRoots,
   initializeShellParsers,
   stripShellWrapper,
@@ -329,7 +330,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
     if (this.context.config.getSandboxEnabled()) {
       const command = stripShellWrapper(this.params.command);
-      const rootCommands = getCommandRoots(command);
+      const rootCommands = getCommandRoots(command).filter(
+        (r) => !IGNORED_COMMAND_ROOTS.has(r),
+      );
       const rawRootCommand = rootCommands[0];
 
       if (rawRootCommand) {
@@ -453,7 +456,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
     }
 
     const rootCommands = [...new Set(getCommandRoots(command))];
-    const rootCommand = rootCommands[0] || 'shell';
+    const filteredRoots = rootCommands.filter(
+      (r) => !IGNORED_COMMAND_ROOTS.has(r),
+    );
+    const rootCommand = filteredRoots[0] || rootCommands[0] || 'shell';
 
     const history = this.getHistory();
     const untrustedContext = extractUntrustedContext(history);
@@ -973,7 +979,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
         if (sandboxDenial) {
           const strippedCommand = stripShellWrapper(this.params.command);
           const rootCommands = getCommandRoots(strippedCommand).filter(
-            (r) => r !== 'shopt',
+            (r) => !IGNORED_COMMAND_ROOTS.has(r),
           );
           const rootCommandDisplay =
             rootCommands.length > 0 ? rootCommands[0] : 'shell';

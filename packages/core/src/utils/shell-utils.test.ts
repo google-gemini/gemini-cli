@@ -15,6 +15,7 @@ import {
 } from 'vitest';
 import {
   escapeShellArg,
+  getCommandName,
   getCommandRoots,
   getShellConfiguration,
   initializeShellParsers,
@@ -24,6 +25,7 @@ import {
   normalizeCommand,
   hasRedirection,
   resolveExecutable,
+  IGNORED_COMMAND_ROOTS,
 } from './shell-utils.js';
 import path from 'node:path';
 
@@ -130,6 +132,69 @@ describe('normalizeCommand', () => {
     expect(normalizeCommand('C:\\Program Files\\nodejs\\node.exe')).toBe(
       'node',
     );
+  });
+});
+
+describe('IGNORED_COMMAND_ROOTS', () => {
+  it('should include shopt, set, and trap', () => {
+    expect(IGNORED_COMMAND_ROOTS.has('shopt')).toBe(true);
+    expect(IGNORED_COMMAND_ROOTS.has('set')).toBe(true);
+    expect(IGNORED_COMMAND_ROOTS.has('trap')).toBe(true);
+  });
+});
+
+describe('getCommandName', () => {
+  it('should extract the command name for simple commands', async () => {
+    expect(await getCommandName('ls', ['-la'])).toBe('ls');
+    expect(await getCommandName('git', ['status'])).toBe('git');
+  });
+
+  it('should strip shell wrappers like bash -c or sh -c', async () => {
+    expect(await getCommandName('bash', ['-c', 'npm test'])).toBe('npm');
+    expect(await getCommandName('sh', ['-c', 'cargo build'])).toBe('cargo');
+  });
+
+  it('should ignore shell builtins like shopt and set', async () => {
+    expect(
+      await getCommandName('bash', ['-c', 'shopt -u nullglob; npm test']),
+    ).toBe('npm');
+    expect(await getCommandName('bash', ['-c', 'set -e; pytest tests/'])).toBe(
+      'pytest',
+    );
+  });
+
+  it('should ignore trap injected by background PID tracking wrapper', async () => {
+    const wrappedGradle = [
+      "_bgpids_file='/tmp/gemini-shell-1234/bgpids.tmp'",
+      '(',
+      '  trap \'jobs -p > "$_bgpids_file"\' EXIT',
+      './gradlew build',
+      ')',
+      '__code=$?',
+      'exit $__code',
+    ].join('\n');
+    expect(await getCommandName('bash', ['-c', wrappedGradle])).toBe(
+      './gradlew',
+    );
+  });
+
+  it('should correctly extract commands when wrapped with trap and other shell options', async () => {
+    const wrappedNpm = [
+      "_bgpids_file='/tmp/gemini-shell-5678/bgpids.tmp'",
+      '(',
+      '  trap \'jobs -p > "$_bgpids_file"\' EXIT',
+      '  set -e',
+      '  shopt -u nullglob',
+      'npm test',
+      ')',
+      '__code=$?',
+      'exit $__code',
+    ].join('\n');
+    expect(await getCommandName('bash', ['-c', wrappedNpm])).toBe('npm');
+  });
+
+  it('should fall back to basename of command if only ignored roots are present', async () => {
+    expect(await getCommandName('/bin/bash', ['-c', 'trap'])).toBe('bash');
   });
 });
 
