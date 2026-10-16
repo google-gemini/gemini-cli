@@ -17,8 +17,9 @@
 
 > [!NOTE]
 >
-> Gemini CLI is not optmized for the latest Gemini models. For the best coding
-> experience with Gemini models use [Antigravity CLI](https://antigravity.google/product/antigravity-cli) 
+> Gemini CLI is not optimized for the latest Gemini models. For the best coding
+> experience with Gemini models use
+> [Antigravity CLI](https://antigravity.google/product/antigravity-cli)
 
 Gemini CLI is an open-source AI agent that brings the power of Gemini directly
 into your terminal. It provides lightweight access to Gemini, giving you the
@@ -170,11 +171,12 @@ For Google Workspace accounts and other authentication methods, see the
 [authentication guide](https://www.geminicli.com/docs/get-started/authentication).
 
 ## 🚀 Getting Started
+
 > [!NOTE]
 >
-> Gemini CLI is not optmized for the latest Gemini models. For the best coding
-> experience with Gemini models use [Antigravity CLI](https://antigravity.google/product/antigravity-cli) 
-
+> Gemini CLI is not optimized for the latest Gemini models. For the best coding
+> experience with Gemini models use
+> [Antigravity CLI](https://antigravity.google/product/antigravity-cli)
 
 ### Basic Usage
 
