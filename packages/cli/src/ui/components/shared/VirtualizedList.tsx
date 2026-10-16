@@ -354,7 +354,11 @@ function VirtualizedList<T>(
       prevTotalHeight.current - prevContainerHeight.current - 1;
     const wasAtBottom = contentPreviouslyFit || wasScrolledToBottomPixels;
 
-    if (wasAtBottom && actualScrollTop >= prevScrollTop.current) {
+    // Only re-enable isStickingToBottom when the user is genuinely at the
+    // bottom (not just when content previously fit). This prevents the scroll
+    // from jumping back to the bottom when the user has scrolled up to review
+    // changes (e.g., after Ctrl+S) and new content arrives. (#5009)
+    if (!contentPreviouslyFit && wasScrolledToBottomPixels && actualScrollTop >= prevScrollTop.current) {
       if (!isStickingToBottom) {
         setIsStickingToBottom(true);
       }
