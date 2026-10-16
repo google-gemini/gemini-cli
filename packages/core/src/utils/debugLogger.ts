@@ -47,7 +47,7 @@ class DebugLogger {
 
   log(...args: unknown[]): void {
     this.writeToFile('LOG', args);
-    console.log(...args);
+    console.error(...args);
   }
 
   warn(...args: unknown[]): void {
@@ -62,7 +62,7 @@ class DebugLogger {
 
   debug(...args: unknown[]): void {
     this.writeToFile('DEBUG', args);
-    console.debug(...args);
+    console.error(...args);
   }
 }
 
