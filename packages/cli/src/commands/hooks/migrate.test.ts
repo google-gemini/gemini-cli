@@ -178,7 +178,7 @@ describe('migrate command', () => {
         PostToolUse: [{ hooks: [{ type: 'command', command: 'echo 2' }] }],
         UserPromptSubmit: [{ hooks: [{ type: 'command', command: 'echo 3' }] }],
         Stop: [{ hooks: [{ type: 'command', command: 'echo 4' }] }],
-        SubAgentStop: [{ hooks: [{ type: 'command', command: 'echo 5' }] }],
+        SubagentStop: [{ hooks: [{ type: 'command', command: 'echo 5' }] }],
         SessionStart: [{ hooks: [{ type: 'command', command: 'echo 6' }] }],
         SessionEnd: [{ hooks: [{ type: 'command', command: 'echo 7' }] }],
         PreCompact: [{ hooks: [{ type: 'command', command: 'echo 8' }] }],
@@ -201,6 +201,30 @@ describe('migrate command', () => {
     expect(migratedHooks).toHaveProperty('SessionEnd');
     expect(migratedHooks).toHaveProperty('PreCompress');
     expect(migratedHooks).toHaveProperty('Notification');
+  });
+
+  it('should keep both Stop and SubagentStop hooks under AfterAgent', async () => {
+    const claudeSettings = {
+      hooks: {
+        Stop: [{ hooks: [{ type: 'command', command: 'echo stop' }] }],
+        SubagentStop: [
+          { hooks: [{ type: 'command', command: 'echo subagent' }] },
+        ],
+      },
+    };
+
+    mockedFs.existsSync.mockReturnValue(true);
+    mockedFs.readFileSync.mockReturnValue(JSON.stringify(claudeSettings));
+
+    await handleMigrateFromClaude();
+
+    const migratedHooks = mockSetValue.mock.calls[0][2];
+
+    expect(migratedHooks).not.toHaveProperty('SubagentStop');
+    expect(migratedHooks.AfterAgent).toEqual([
+      { hooks: [{ type: 'command', command: 'echo stop' }] },
+      { hooks: [{ type: 'command', command: 'echo subagent' }] },
+    ]);
   });
 
   it('should transform tool names in matchers', async () => {
