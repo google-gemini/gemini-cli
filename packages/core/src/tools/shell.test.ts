@@ -86,6 +86,7 @@ import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
   recordModifiedBuildFile,
   resetModifiedBuildFiles,
+  getModifiedBuildFiles,
 } from '../utils/untrustedContextTracker.js';
 
 interface TestableMockMessageBus extends MessageBus {
@@ -1136,6 +1137,32 @@ EOF`;
       expect(confirmation && confirmation.type).toBe('exec');
       const execConf = confirmation as ToolExecuteConfirmationDetails;
       expect(execConf.modifiedBuildFiles).toContain('/workspace/foo/BUILD');
+    });
+
+    it('should reset modifiedBuildFiles when user confirms build command execution', async () => {
+      const bus = (shellTool as unknown as { messageBus: MessageBus })
+        .messageBus;
+      const mockBus = getMockMessageBusInstance(
+        bus,
+      ) as unknown as TestableMockMessageBus;
+      mockBus.defaultToolDecision = 'allow';
+
+      recordModifiedBuildFile('/workspace/foo/BUILD', mockConfig);
+
+      const params = { command: 'blaze test //foo:all' };
+      const invocation = shellTool.build(params);
+
+      const confirmation = (await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      )) as ToolExecuteConfirmationDetails;
+
+      expect(confirmation.modifiedBuildFiles).toContain('/workspace/foo/BUILD');
+
+      // User confirms execution
+      await confirmation.onConfirm(ToolConfirmationOutcome.ProceedOnce);
+
+      // Subsequent check should be cleared
+      expect(getModifiedBuildFiles(mockConfig)).toEqual([]);
     });
 
     it('should prompt for confirmation when forcedDecision is ask_user even in YOLO mode', async () => {
