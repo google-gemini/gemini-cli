@@ -26,16 +26,14 @@ import {
   type ScheduledToolCall,
 } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
-import {
-  UPDATE_TOPIC_TOOL_NAME,
-  EDIT_TOOL_NAMES,
-} from '../tools/tool-names.js';
+import { UPDATE_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
 import { PolicyDecision, type ApprovalMode } from '../policy/types.js';
 import {
+  Kind,
   ToolConfirmationOutcome,
   type AnyDeclarativeTool,
 } from '../tools/tools.js';
-import { getToolSuggestion } from '../utils/tool-utils.js';
+import { getToolSuggestion, isParallelizable } from '../utils/tool-utils.js';
 import { runInDevTraceSpan } from '../telemetry/trace.js';
 import { logToolCall } from '../telemetry/loggers.js';
 import { ToolCallEvent } from '../telemetry/types.js';
@@ -69,6 +67,23 @@ export interface SchedulerOptions {
   subagent?: string;
   parentCallId?: string;
   onWaitingForConfirmation?: (waiting: boolean) => void;
+  cancelAllQueuedOnCancel?: boolean;
+}
+
+interface TaintRiskDetectable {
+  hasTaintedOrBuildFileRisk: () => boolean;
+}
+
+function isTaintRiskDetectable(
+  invocation: unknown,
+): invocation is TaintRiskDetectable {
+  return (
+    typeof invocation === 'object' &&
+    invocation !== null &&
+    'hasTaintedOrBuildFileRisk' in invocation &&
+    typeof (invocation as { hasTaintedOrBuildFileRisk?: unknown })
+      .hasTaintedOrBuildFileRisk === 'function'
+  );
 }
 
 const createErrorResponse = (
@@ -93,6 +108,31 @@ const createErrorResponse = (
 });
 
 /**
+ * Assigns a group ID to every run of two or more adjacent requests for which
+ * `isGroupable` returns true. All requests in a run get the call ID of the
+ * first request in it. Requests that are not part of a run get `undefined`.
+ */
+function getToolCallGroupIds(
+  requests: readonly ToolCallRequestInfo[],
+  isGroupable: (request: ToolCallRequestInfo) => boolean,
+): Array<string | undefined> {
+  const groupable = requests.map(isGroupable);
+  const groupIds: Array<string | undefined> = requests.map(() => undefined);
+
+  let runStart = 0;
+  for (let i = 0; i <= requests.length; i++) {
+    if (i < requests.length && groupable[i]) continue;
+
+    // The run of groupable requests in [runStart, i) has ended.
+    if (i - runStart >= 2) {
+      groupIds.fill(requests[runStart].callId, runStart, i);
+    }
+    runStart = i + 1;
+  }
+  return groupIds;
+}
+
+/**
  * Event-Driven Orchestrator for Tool Execution.
  * Coordinates execution via state updates and event listening.
  */
@@ -110,6 +150,7 @@ export class Scheduler {
   private readonly subagent?: string;
   private readonly parentCallId?: string;
   private readonly onWaitingForConfirmation?: (waiting: boolean) => void;
+  private readonly cancelAllQueuedOnCancel: boolean;
 
   private isProcessing = false;
   private isCancelling = false;
@@ -124,6 +165,7 @@ export class Scheduler {
     this.subagent = options.subagent;
     this.parentCallId = options.parentCallId;
     this.onWaitingForConfirmation = options.onWaitingForConfirmation;
+    this.cancelAllQueuedOnCancel = options.cancelAllQueuedOnCancel ?? true;
     this.state = new SchedulerStateManager(
       this.messageBus,
       this.schedulerId,
@@ -318,11 +360,16 @@ export class Scheduler {
 
     try {
       const toolRegistry = this.context.toolRegistry;
-      const newCalls: ToolCall[] = sortedRequests.map((request) => {
+      const groupIds = getToolCallGroupIds(
+        sortedRequests,
+        (request) => toolRegistry.getTool(request.name)?.kind === Kind.Agent,
+      );
+      const newCalls: ToolCall[] = sortedRequests.map((request, index) => {
         const enrichedRequest: ToolCallRequestInfo = {
           ...request,
           schedulerId: this.schedulerId,
           parentCallId: this.parentCallId,
+          groupId: groupIds[index],
         };
         const tool = toolRegistry.getTool(request.name);
 
@@ -470,10 +517,10 @@ export class Scheduler {
       }
 
       // If the first tool is parallelizable, batch all contiguous parallelizable tools.
-      if (this._isParallelizable(next.request)) {
+      if (isParallelizable(next.request)) {
         while (this.state.queueLength > 0) {
           const peeked = this.state.peekQueue();
-          if (peeked && this._isParallelizable(peeked.request)) {
+          if (peeked && isParallelizable(peeked.request)) {
             this.state.dequeue();
           } else {
             break;
@@ -558,25 +605,6 @@ export class Scheduler {
     return false;
   }
 
-  private _isParallelizable(request: ToolCallRequestInfo): boolean {
-    // update_topic tool is forced as sequential call
-    if (
-      request.name === UPDATE_TOPIC_TOOL_NAME ||
-      EDIT_TOOL_NAMES.has(request.name)
-    ) {
-      return false;
-    }
-    if (request.args) {
-      const wait = request.args['wait_for_previous'];
-      if (typeof wait === 'boolean') {
-        return !wait;
-      }
-    }
-
-    // Default to parallel if the flag is omitted.
-    return true;
-  }
-
   private async _processValidatingCall(
     active: ValidatingToolCall,
     signal: AbortSignal,
@@ -656,6 +684,17 @@ export class Scheduler {
       decision = PolicyDecision.ASK_USER;
     }
 
+    const hasTaintRisk =
+      isTaintRiskDetectable(toolCall.invocation) &&
+      toolCall.invocation.hasTaintedOrBuildFileRisk();
+
+    if (decision === PolicyDecision.ALLOW && hasTaintRisk) {
+      decision =
+        (this.config.isInteractive?.() ?? true)
+          ? PolicyDecision.ASK_USER
+          : PolicyDecision.DENY;
+    }
+
     if (decision === PolicyDecision.DENY) {
       const { errorMessage, errorType } = getPolicyDenialError(
         this.config,
@@ -679,6 +718,12 @@ export class Scheduler {
     let lastDetails: SerializableConfirmationDetails | undefined;
 
     if (decision === PolicyDecision.ASK_USER) {
+      const forcedDecision =
+        hookDecision === 'ask' ||
+        (policyDecision === PolicyDecision.ALLOW && hasTaintRisk)
+          ? 'ask_user'
+          : undefined;
+
       const result = await resolveConfirmation(toolCall, signal, {
         config: this.config,
         messageBus: this.messageBus,
@@ -688,7 +733,7 @@ export class Scheduler {
         schedulerId: this.schedulerId,
         onWaitingForConfirmation: this.onWaitingForConfirmation,
         systemMessage: hookSystemMessage,
-        forcedDecision: hookDecision === 'ask' ? 'ask_user' : undefined,
+        forcedDecision,
       });
       outcome = result.outcome;
       lastDetails = result.lastDetails;
@@ -708,14 +753,16 @@ export class Scheduler {
       );
     }
 
-    // Handle cancellation (cascades to entire batch)
+    // Handle cancellation (cascades to entire batch by default unless disabled)
     if (outcome === ToolConfirmationOutcome.Cancel) {
       this.state.updateStatus(
         callId,
         CoreToolCallStatus.Cancelled,
         'User denied execution.',
       );
-      this.state.cancelAllQueued('User cancelled operation');
+      if (this.cancelAllQueuedOnCancel) {
+        this.state.cancelAllQueued('User cancelled operation');
+      }
       return; // Skip execution
     }
 
@@ -810,6 +857,7 @@ export class Scheduler {
         isClientInitiated: result.request.isClientInitiated,
         prompt_id: result.request.prompt_id,
         schedulerId: this.schedulerId,
+        groupId: result.request.groupId,
       };
 
       if (!newTool) {

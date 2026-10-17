@@ -96,6 +96,10 @@ export function detectLineEnding(content: string): '\r\n' | '\n' {
   return content.includes('\r\n') ? '\r\n' : '\n';
 }
 
+const graphemeSegmenter = new Intl.Segmenter(undefined, {
+  granularity: 'grapheme',
+});
+
 /**
  * Truncates a string to a maximum length, appending a suffix if truncated.
  * @param str The string to truncate.
@@ -112,26 +116,14 @@ export function truncateString(
     return str;
   }
 
-  // This regex matches a "Grapheme Cluster" manually:
-  // 1. A surrogate pair OR a single character...
-  // 2. Followed by any number of "Combining Marks" (\p{M})
-  // 'u' flag is required for Unicode property escapes
-  const graphemeRegex = /(?:[\uD800-\uDBFF][\uDC00-\uDFFF]|.)\p{M}*/gu;
-
-  let truncatedStr = '';
-  let match: RegExpExecArray | null;
-
-  while ((match = graphemeRegex.exec(str)) !== null) {
-    const segment = match[0];
-
-    // If adding the whole cluster (base char + accent) exceeds maxLength, stop.
-    if (truncatedStr.length + segment.length > maxLength) {
-      break;
-    }
-
-    truncatedStr += segment;
-    if (truncatedStr.length >= maxLength) break;
+  if (maxLength <= 0) {
+    return suffix;
   }
+
+  // Find the grapheme cluster containing code-unit index `maxLength`.
+  // Its start `index` is the largest grapheme cluster boundary <= maxLength.
+  const boundary = graphemeSegmenter.segment(str).containing(maxLength);
+  let truncatedStr = str.slice(0, boundary ? boundary.index : maxLength);
 
   // Final safety check for dangling high surrogates
   if (truncatedStr.length > 0) {

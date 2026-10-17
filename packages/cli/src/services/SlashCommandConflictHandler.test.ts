@@ -127,18 +127,19 @@ describe('SlashCommandConflictHandler', () => {
   });
 
   it('should debounce multiple events within the flush window', () => {
-    simulateEvent([
-      {
-        name: 'a',
-        renamedTo: 'user.a',
-        loserKind: CommandKind.USER_FILE,
-        winnerKind: CommandKind.BUILT_IN,
-      },
-    ]);
+    const conflictA = {
+      name: 'a',
+      renamedTo: 'user.a',
+      loserKind: CommandKind.USER_FILE,
+      winnerKind: CommandKind.BUILT_IN,
+    };
+
+    simulateEvent([conflictA]);
 
     vi.advanceTimersByTime(200);
 
     simulateEvent([
+      conflictA,
       {
         name: 'b',
         renamedTo: 'user.b',
@@ -170,6 +171,108 @@ describe('SlashCommandConflictHandler', () => {
 
     simulateEvent([conflict]);
     vi.advanceTimersByTime(600);
+    expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
+  });
+
+  it('should re-notify when a resolved conflict reappears', () => {
+    const conflict = {
+      name: 'deploy',
+      renamedTo: 'firebase.deploy',
+      loserExtensionName: 'firebase',
+      loserKind: CommandKind.EXTENSION_FILE,
+      winnerKind: CommandKind.BUILT_IN,
+    };
+
+    simulateEvent([conflict]);
+    vi.advanceTimersByTime(600);
+    expect(coreEvents.emitFeedback).toHaveBeenCalledTimes(1);
+
+    vi.mocked(coreEvents.emitFeedback).mockClear();
+
+    simulateEvent([]);
+    vi.advanceTimersByTime(600);
+    expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
+
+    simulateEvent([conflict]);
+    vi.advanceTimersByTime(600);
+    expect(coreEvents.emitFeedback).toHaveBeenCalledTimes(1);
+  });
+
+  it('should only re-notify for conflicts that were resolved and reappeared while keeping active ones deduplicated', () => {
+    const conflictA = {
+      name: 'deploy',
+      renamedTo: 'firebase.deploy',
+      loserExtensionName: 'firebase',
+      loserKind: CommandKind.EXTENSION_FILE,
+      winnerKind: CommandKind.BUILT_IN,
+    };
+    const conflictB = {
+      name: 'test',
+      renamedTo: 'jest.test',
+      loserExtensionName: 'jest',
+      loserKind: CommandKind.EXTENSION_FILE,
+      winnerKind: CommandKind.BUILT_IN,
+    };
+
+    simulateEvent([conflictA, conflictB]);
+    vi.advanceTimersByTime(600);
+    expect(coreEvents.emitFeedback).toHaveBeenCalledTimes(2);
+
+    vi.mocked(coreEvents.emitFeedback).mockClear();
+
+    simulateEvent([conflictB]);
+    vi.advanceTimersByTime(600);
+    expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
+
+    simulateEvent([conflictA, conflictB]);
+    vi.advanceTimersByTime(600);
+    expect(coreEvents.emitFeedback).toHaveBeenCalledTimes(1);
+    expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+      'info',
+      "Extension 'firebase' command '/deploy' was renamed to '/firebase.deploy' because it conflicts with built-in command.",
+    );
+  });
+
+  it('should not duplicate pending notifications if a conflict is resolved and reappears within the same debounce window', () => {
+    const conflict = {
+      name: 'deploy',
+      renamedTo: 'firebase.deploy',
+      loserExtensionName: 'firebase',
+      loserKind: CommandKind.EXTENSION_FILE,
+      winnerKind: CommandKind.BUILT_IN,
+    };
+
+    simulateEvent([conflict]);
+    vi.advanceTimersByTime(100);
+
+    simulateEvent([]);
+    vi.advanceTimersByTime(100);
+
+    simulateEvent([conflict]);
+    vi.advanceTimersByTime(600);
+
+    expect(coreEvents.emitFeedback).toHaveBeenCalledTimes(1);
+    expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+      'info',
+      "Extension 'firebase' command '/deploy' was renamed to '/firebase.deploy' because it conflicts with built-in command.",
+    );
+  });
+
+  it('should not notify if a conflict is resolved within the debounce window', () => {
+    const conflict = {
+      name: 'deploy',
+      renamedTo: 'firebase.deploy',
+      loserExtensionName: 'firebase',
+      loserKind: CommandKind.EXTENSION_FILE,
+      winnerKind: CommandKind.BUILT_IN,
+    };
+
+    simulateEvent([conflict]);
+    vi.advanceTimersByTime(200);
+
+    simulateEvent([]);
+    vi.advanceTimersByTime(600);
+
     expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
   });
 

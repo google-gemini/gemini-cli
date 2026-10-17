@@ -24,6 +24,7 @@ export interface UseLoadingIndicatorProps {
   customWittyPhrases?: string[];
   errorVerbosity?: 'low' | 'full';
   maxLength?: number;
+  pauseUpdates?: boolean;
 }
 
 export const useLoadingIndicator = ({
@@ -35,13 +36,16 @@ export const useLoadingIndicator = ({
   customWittyPhrases,
   errorVerbosity = 'full',
   maxLength,
+  pauseUpdates = false,
 }: UseLoadingIndicatorProps) => {
   const [timerResetKey, setTimerResetKey] = useState(0);
-  const isTimerActive = streamingState === StreamingState.Responding;
+  const isTimerActive =
+    streamingState === StreamingState.Responding && !pauseUpdates;
 
   const elapsedTimeFromTimer = useTimer(isTimerActive, timerResetKey);
 
-  const isPhraseCyclingActive = streamingState === StreamingState.Responding;
+  const isPhraseCyclingActive =
+    streamingState === StreamingState.Responding && !pauseUpdates;
   const isWaiting = streamingState === StreamingState.WaitingForConfirmation;
 
   const { currentTip, currentWittyPhrase } = usePhraseCycler(
@@ -94,6 +98,7 @@ export const useLoadingIndicator = ({
         ? retainedElapsedTime
         : elapsedTimeFromTimer,
     currentLoadingPhrase: retryPhrase || currentTip || currentWittyPhrase,
+    statusPhrase: retryPhrase ?? undefined,
     currentTip,
     currentWittyPhrase,
   };

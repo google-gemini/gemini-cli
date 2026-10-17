@@ -59,6 +59,8 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
   isExpandable,
   originalRequestName,
 }) => {
+  const safeTerminalWidth = Math.max(0, Math.floor(terminalWidth || 0));
+
   const { isExpanded: isExpandedInContext } = useToolActions();
 
   const isExpanded =
@@ -99,7 +101,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
     const isExecuting = status === CoreToolCallStatus.Executing;
     if (isExecuting && ptyId) {
       try {
-        const childWidth = terminalWidth - 4; // account for padding and borders
+        const childWidth = safeTerminalWidth - 4; // account for padding and borders
         const finalHeight =
           availableHeight ?? ACTIVE_SHELL_MAX_LINES - SHELL_CONTENT_OVERHEAD;
 
@@ -119,7 +121,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
         }
       }
     }
-  }, [ptyId, status, terminalWidth, availableHeight]);
+  }, [ptyId, status, safeTerminalWidth, availableHeight]);
 
   const { setEmbeddedShellFocused } = useUIActions();
   const wasFocusedRef = React.useRef(false);
@@ -159,7 +161,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
   return (
     <>
       <StickyHeader
-        width={terminalWidth}
+        width={safeTerminalWidth}
         isFirst={isFirst}
         borderColor={borderColor}
         borderDimColor={borderDimColor}
@@ -190,7 +192,8 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
 
       <Box
         ref={contentRef}
-        width={terminalWidth}
+        width={safeTerminalWidth}
+        minWidth={0}
         borderStyle="round"
         borderColor={borderColor}
         borderDimColor={borderDimColor}
@@ -204,7 +207,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
         <ToolResultDisplay
           resultDisplay={resultDisplay}
           availableTerminalHeight={availableTerminalHeight}
-          terminalWidth={terminalWidth}
+          terminalWidth={safeTerminalWidth}
           renderOutputAsMarkdown={renderOutputAsMarkdown}
           hasFocus={isThisShellFocused}
           maxLines={maxLines}

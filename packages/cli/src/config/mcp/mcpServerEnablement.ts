@@ -222,9 +222,13 @@ export class McpServerEnablementManager {
   /**
    * Check if server is enabled in FILE (persistent config only).
    * Does NOT include session state.
+   * Fails closed (`false`) if the config file exists on disk but cannot be read or parsed.
    */
   async isFileEnabled(serverName: string): Promise<boolean> {
     const config = await this.readConfig();
+    if (!config) {
+      return false;
+    }
     const state = config[normalizeServerId(serverName)];
     return state?.enabled ?? true;
   }
@@ -250,10 +254,14 @@ export class McpServerEnablementManager {
   /**
    * Enable a server persistently.
    * Removes the server from config file (defaults to enabled).
+   * Does not overwrite the config file if existing contents cannot be read or parsed.
    */
   async enable(serverName: string): Promise<void> {
     const normalizedName = normalizeServerId(serverName);
     const config = await this.readConfig();
+    if (!config) {
+      return;
+    }
 
     if (normalizedName in config) {
       delete config[normalizedName];
@@ -264,9 +272,13 @@ export class McpServerEnablementManager {
   /**
    * Disable a server persistently.
    * Adds server to config file with enabled: false.
+   * Does not overwrite the config file if existing contents cannot be read or parsed.
    */
   async disable(serverName: string): Promise<void> {
     const config = await this.readConfig();
+    if (!config) {
+      return;
+    }
     config[normalizeServerId(serverName)] = { enabled: false };
     await this.writeConfig(config);
   }
@@ -337,7 +349,9 @@ export class McpServerEnablementManager {
       let wasDisabled = false;
       if (state.isPersistentDisabled) {
         await this.enable(normalizedName);
-        wasDisabled = true;
+        if (await this.isFileEnabled(normalizedName)) {
+          wasDisabled = true;
+        }
       }
       if (state.isSessionDisabled) {
         this.clearSessionDisable(normalizedName);
@@ -354,12 +368,27 @@ export class McpServerEnablementManager {
 
   /**
    * Read config from file asynchronously.
+   * Returns `{}` if the file does not exist (`ENOENT`), or `null` if the file
+   * cannot be read or parsed as a valid JSON object.
    */
-  private async readConfig(): Promise<McpServerEnablementConfig> {
+  private async readConfig(): Promise<McpServerEnablementConfig | null> {
     try {
       const content = await fs.readFile(this.configFilePath, 'utf-8');
+      const parsed: unknown = JSON.parse(content);
+      if (
+        typeof parsed !== 'object' ||
+        parsed === null ||
+        Array.isArray(parsed)
+      ) {
+        coreEvents.emitFeedback(
+          'error',
+          'Failed to read MCP server enablement config.',
+          new Error('MCP server enablement config must be a JSON object.'),
+        );
+        return null;
+      }
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      return JSON.parse(content) as McpServerEnablementConfig;
+      return parsed as McpServerEnablementConfig;
     } catch (error) {
       if (
         error instanceof Error &&
@@ -373,7 +402,7 @@ export class McpServerEnablementManager {
         'Failed to read MCP server enablement config.',
         error,
       );
-      return {};
+      return null;
     }
   }
 

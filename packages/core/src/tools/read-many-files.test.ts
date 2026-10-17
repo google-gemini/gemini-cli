@@ -17,7 +17,7 @@ import { mockControl } from '../__mocks__/fs/promises.js';
 import { ReadManyFilesTool } from './read-many-files.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import path from 'node:path';
-import { isSubpath } from '../utils/paths.js';
+import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import fs from 'node:fs'; // Actual fs for setup
 import os from 'node:os';
 import type { Config } from '../config/config.js';
@@ -83,10 +83,10 @@ describe('ReadManyFilesTool', () => {
   let mockReadFileFn: Mock;
 
   beforeEach(async () => {
-    tempRootDir = fs.realpathSync(
+    tempRootDir = resolveToRealPath(
       fs.mkdtempSync(path.join(os.tmpdir(), 'read-many-files-root-')),
     );
-    tempDirOutsideRoot = fs.realpathSync(
+    tempDirOutsideRoot = resolveToRealPath(
       fs.mkdtempSync(path.join(os.tmpdir(), 'read-many-files-external-')),
     );
     fs.writeFileSync(path.join(tempRootDir, GEMINI_IGNORE_FILE_NAME), 'foo.*');
@@ -554,10 +554,10 @@ describe('ReadManyFilesTool', () => {
     });
 
     it('should read files from multiple workspace directories', async () => {
-      const tempDir1 = fs.realpathSync(
+      const tempDir1 = resolveToRealPath(
         fs.mkdtempSync(path.join(os.tmpdir(), 'multi-dir-1-')),
       );
-      const tempDir2 = fs.realpathSync(
+      const tempDir2 = resolveToRealPath(
         fs.mkdtempSync(path.join(os.tmpdir(), 'multi-dir-2-')),
       );
       const fileService = new FileDiscoveryService(tempDir1);

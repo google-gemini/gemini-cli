@@ -578,4 +578,45 @@ describe('scrubHistory', () => {
       { text: 'World' },
     ]);
   });
+
+  it('should preserve nested parts array within functionResponse', () => {
+    const history: HistoryTurn[] = [
+      {
+        id: '1',
+        content: {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'readFile',
+                id: 'call-1',
+                response: { mimeType: 'image/png' },
+                parts: [
+                  {
+                    inlineData: {
+                      mimeType: 'image/png',
+                      data: 'base64data',
+                    },
+                  },
+                ],
+              } as unknown as Part['functionResponse'],
+            } as unknown as Part,
+          ],
+        },
+      },
+    ];
+
+    const scrubbed = scrubHistory(history);
+    expect(scrubbed.length).toBe(1);
+    const fr = scrubbed[0].content.parts![0].functionResponse;
+    expect(fr).toBeDefined();
+    expect((fr as unknown as Record<string, unknown>)['parts']).toEqual([
+      {
+        inlineData: {
+          mimeType: 'image/png',
+          data: 'base64data',
+        },
+      },
+    ]);
+  });
 });

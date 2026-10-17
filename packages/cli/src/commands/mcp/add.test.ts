@@ -317,6 +317,35 @@ describe('mcp add command', () => {
         );
         expect(debugLoggerErrorSpy).not.toHaveBeenCalled();
       });
+
+      it('should show home directory error when workspace.path is empty string and readOnly is true', async () => {
+        mockedLoadSettings.mockReturnValue({
+          forScope: () => ({ settings: {}, readOnly: true }),
+          setValue: mockSetValue,
+          workspace: { path: '', readOnly: true },
+          user: { path: '/home/user/.gemini/settings.json', readOnly: false },
+        });
+
+        const mockProcessExit = vi
+          .spyOn(process, 'exit')
+          .mockImplementation((() => {
+            throw new Error('process.exit called');
+          }) as (code?: number | string | null) => never);
+
+        try {
+          await expect(
+            parser.parseAsync(`add ${serverName} ${command}`),
+          ).rejects.toThrow('process.exit called');
+
+          expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
+            'Error: Please use --scope user to edit settings in the home directory.',
+          );
+          expect(mockProcessExit).toHaveBeenCalledWith(1);
+          expect(mockSetValue).not.toHaveBeenCalled();
+        } finally {
+          mockProcessExit.mockRestore();
+        }
+      });
     });
 
     describe('when in a subdirectory of home (not a project)', () => {
@@ -416,6 +445,59 @@ describe('mcp add command', () => {
           }),
         }),
       );
+    });
+  });
+
+  describe('when in an untrusted workspace', () => {
+    const serverName = 'newsrv';
+    const command = 'echo';
+
+    beforeEach(() => {
+      mockedLoadSettings.mockReturnValue({
+        isTrusted: false,
+        forScope: (s: SettingScope) =>
+          s === SettingScope.Workspace
+            ? { settings: {}, readOnly: true }
+            : { settings: {}, readOnly: false },
+        setValue: mockSetValue,
+        workspace: {
+          path: '/path/to/project/.gemini/settings.json',
+          readOnly: true,
+        },
+        user: { path: '/home/user/.gemini/settings.json', readOnly: false },
+      });
+    });
+
+    it('should abort with an error and exit(1) when adding to project scope by default', async () => {
+      const mockProcessExit = vi
+        .spyOn(process, 'exit')
+        .mockImplementation((() => {
+          throw new Error('process.exit called');
+        }) as (code?: number | string | null) => never);
+
+      try {
+        await expect(
+          parser.parseAsync(`add ${serverName} ${command}`),
+        ).rejects.toThrow('process.exit called');
+
+        expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
+          'Error: Cannot modify settings in an untrusted workspace. To enable this, verify the source of the repository and set GEMINI_CLI_TRUST_WORKSPACE=true or move your configuration to the global settings file.',
+        );
+        expect(mockProcessExit).toHaveBeenCalledWith(1);
+        expect(mockSetValue).not.toHaveBeenCalled();
+      } finally {
+        mockProcessExit.mockRestore();
+      }
+    });
+
+    it('should allow adding to user scope when --scope=user is specified', async () => {
+      await parser.parseAsync(`add --scope user ${serverName} ${command}`);
+      expect(mockSetValue).toHaveBeenCalledWith(
+        SettingScope.User,
+        'mcpServers',
+        expect.any(Object),
+      );
+      expect(debugLoggerErrorSpy).not.toHaveBeenCalled();
     });
   });
 });

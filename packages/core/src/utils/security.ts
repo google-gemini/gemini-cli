@@ -65,7 +65,7 @@ export class SecurityValidator {
   }
 }
 
-function getWindowsPowerShellPath(): string {
+export function getWindowsPowerShellPath(): string {
   let systemRoot =
     process.env['SystemRoot'] ||
     process.env['systemroot'] ||
@@ -73,8 +73,12 @@ function getWindowsPowerShellPath(): string {
     process.env['WINDIR'] ||
     'C:\\Windows';
 
-  // Securely validate systemRoot to prevent UNC path injection or path traversal
-  if (!/^[a-zA-Z]:\\/.test(systemRoot)) {
+  // Securely validate systemRoot to prevent UNC path injection or path traversal.
+  // systemRoot must match a valid Windows directory (e.g. C:\Windows or D:\Windows) without traversal segments.
+  if (
+    !/^[a-zA-Z]:\\Windows\\?$/i.test(systemRoot) ||
+    systemRoot.includes('..')
+  ) {
     systemRoot = 'C:\\Windows';
   }
 

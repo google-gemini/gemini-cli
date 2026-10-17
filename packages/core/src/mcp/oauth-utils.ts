@@ -175,6 +175,12 @@ export interface OAuthAuthorizationServerMetadata {
   grant_types_supported?: string[];
   code_challenge_methods_supported?: string[];
   scopes_supported?: string[];
+  /**
+   * RFC 9207 Section 3: Indicates whether the authorization server provides
+   * the "iss" parameter in the authorization response. Defaults to false when
+   * omitted.
+   */
+  authorization_response_iss_parameter_supported?: boolean;
 }
 
 /**
@@ -314,6 +320,13 @@ export class OAuthUtils {
       tokenUrl: metadata.token_endpoint,
       scopes: metadata.scopes_supported || [],
       registrationUrl: metadata.registration_endpoint,
+      // RFC 9207 Section 3: the flag defaults to false when omitted. Discovered
+      // configurations therefore always carry an explicit boolean, which lets
+      // the callback policy distinguish them from an explicitly configured issuer.
+      // Only a literal boolean `true` enables the flag, so loosely typed values
+      // returned by some servers (e.g. "false" or "0") are not coerced to true.
+      authorizationResponseIssParameterSupported:
+        metadata.authorization_response_iss_parameter_supported === true,
     };
   }
 

@@ -242,7 +242,7 @@ describe('handleAtCommand', () => {
     );
   });
 
-  it('should process a valid directory path and convert to glob', async () => {
+  it('should resolve a valid directory path without eagerly reading all files', async () => {
     const fileContent = 'This is the file content.';
     const filePath = await createTestFile(
       path.join(testRootDir, 'path', 'to', 'file.txt'),
@@ -250,9 +250,7 @@ describe('handleAtCommand', () => {
     );
     const dirPath = path.dirname(filePath);
     const relativeDirPath = getRelativePath(dirPath);
-    const relativeFilePath = getRelativePath(filePath);
     const query = `@${dirPath}`;
-    const resolvedGlob = path.join(relativeDirPath, '**');
 
     const result = await handleAtCommand({
       query,
@@ -264,16 +262,114 @@ describe('handleAtCommand', () => {
     });
 
     expect(result).toEqual({
+      processedQuery: [{ text: `@${relativeDirPath}` }],
+    });
+    expect(mockAddItem).not.toHaveBeenCalled();
+    expect(mockOnDebugMessage).toHaveBeenCalledWith(
+      `Path ${dirPath} resolved to directory: ${dirPath}, using relative path: ${relativeDirPath}`,
+    );
+  });
+
+  it('should normalize an absolute path to the workspace root directory to @.', async () => {
+    const query = `List files in @${testRootDir}`;
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 1261,
+      signal: abortController.signal,
+    });
+
+    expect(result).toEqual({
+      processedQuery: [{ text: 'List files in @.' }],
+    });
+    expect(mockAddItem).not.toHaveBeenCalled();
+    expect(mockOnDebugMessage).toHaveBeenCalledWith(
+      `Path ${testRootDir} resolved to directory: ${testRootDir}, using relative path: .`,
+    );
+  });
+
+  it('should not eagerly read file contents when asking to list files in @<directory>', async () => {
+    await createTestFile(
+      path.join(testRootDir, 'Documents', 'internal', 'dev-link.sh'),
+      '#!/bin/bash\necho "dev-link"',
+    );
+    await createTestFile(
+      path.join(
+        testRootDir,
+        'Documents',
+        'internal',
+        'poc',
+        'gemini_poc',
+        'lib',
+        'large_module.py',
+      ),
+      'x = 1\n'.repeat(1000),
+    );
+
+    const query = 'List all files stored in @Documents/internal/';
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 127,
+      signal: abortController.signal,
+    });
+
+    expect(result).toEqual({
       processedQuery: [
-        { text: `@${resolvedGlob}` },
+        { text: 'List all files stored in @Documents/internal/' },
+      ],
+    });
+    expect(mockAddItem).not.toHaveBeenCalled();
+  });
+
+  it('should read @<file> content while skipping eager file reads for @<directory> in mixed queries', async () => {
+    const fileContent = 'File A content';
+    const filePath = await createTestFile(
+      path.join(testRootDir, 'fileA.txt'),
+      fileContent,
+    );
+    await createTestFile(
+      path.join(testRootDir, 'Documents', 'internal', 'nested.txt'),
+      'Nested directory file content that should not be eagerly read',
+    );
+
+    const relativeFilePath = getRelativePath(filePath);
+    const query = `Compare @${relativeFilePath} with files in @Documents/internal/`;
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 1271,
+      signal: abortController.signal,
+    });
+
+    expect(result).toEqual({
+      processedQuery: [
+        {
+          text: `Compare @${relativeFilePath} with files in @Documents/internal/`,
+        },
         { text: '\n--- Content from referenced files ---' },
         { text: `\nContent from @${relativeFilePath}:\n` },
         { text: fileContent },
         { text: '\n--- End of content ---' },
       ],
     });
-    expect(mockOnDebugMessage).toHaveBeenCalledWith(
-      `Path ${dirPath} resolved to directory, using glob: ${resolvedGlob}`,
+    expect(mockAddItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'tool_group',
+        tools: [
+          expect.objectContaining({ status: CoreToolCallStatus.Success }),
+        ],
+      }),
+      1271,
     );
   });
 
@@ -1271,17 +1367,13 @@ describe('handleAtCommand', () => {
 
       expect(result.processedQuery).not.toBeNull();
       expect(result.error).toBeUndefined();
-      expect(result.processedQuery).toEqual(
-        expect.arrayContaining([
-          { text: `Check @${path.join(subDirPath, '**')} please.` },
-          expect.objectContaining({
-            text: '\n--- Content from referenced files ---',
-          }),
-        ]),
-      );
+      expect(result.processedQuery).toEqual([
+        { text: `Check @${subDirPath} please.` },
+      ]);
+      expect(mockAddItem).not.toHaveBeenCalled();
 
       expect(mockOnDebugMessage).toHaveBeenCalledWith(
-        expect.stringContaining(`using glob: ${path.join(subDirPath, '**')}`),
+        expect.stringContaining(`using relative path: ${subDirPath}`),
       );
     });
   });
@@ -1590,6 +1682,222 @@ describe('handleAtCommand', () => {
       ),
     );
   });
+
+  // Regression tests for #29434: code with @ inside quotes should not trigger runaway glob searches or hangs
+  it('does not greedily consume code across quotes when @ is inside quotes (#29434)', async () => {
+    const query =
+      'import { x } from "@scope/pkg";\nconst a = "foo";\nconsole.log("hello");';
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 704,
+      signal: abortController.signal,
+    });
+
+    // The query should be processed without hanging or throwing
+    expect(result.processedQuery).not.toBeNull();
+    expect(result.error).toBeUndefined();
+  });
+
+  it('does not hang when input contains @scope/pkg followed by many imports (#29434)', async () => {
+    let query = 'import { useThing } from "@scope/pkg";\n';
+    for (let i = 1; i <= 60; i++) {
+      query += `import { alpha${i}, beta${i}, gamma${i} } from "~/modules/feature${i}/index";\n`;
+    }
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 705,
+      signal: abortController.signal,
+    });
+
+    expect(result.processedQuery).not.toBeNull();
+    expect(result.error).toBeUndefined();
+  });
+
+  it('does not invoke recursive glob search on paths exceeding MAX_GLOB_SEARCH_PATH_LENGTH (#29434)', async () => {
+    const globSpy = vi.fn();
+    const mockGlobTool = {
+      buildAndExecute: globSpy,
+    };
+    vi.spyOn(mockConfig.getToolRegistry(), 'getTool').mockReturnValue(
+      mockGlobTool as never,
+    );
+
+    // Path with individual components < 255 but total length > 255
+    const excessivelyLongNonexistent = 'sub/'.repeat(65) + 'file.ts';
+    const query = `@${excessivelyLongNonexistent}`;
+
+    await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 706,
+      signal: abortController.signal,
+    });
+
+    // Glob search should be skipped for excessively long path names
+    expect(globSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not invoke recursive glob search on paths containing newlines (#29434)', async () => {
+    const globSpy = vi.fn();
+    const mockGlobTool = {
+      buildAndExecute: globSpy,
+    };
+    vi.spyOn(mockConfig.getToolRegistry(), 'getTool').mockReturnValue(
+      mockGlobTool as never,
+    );
+
+    // Path containing newline characters should never trigger glob fallback
+    const query = '@"invalid\npath"';
+
+    await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 707,
+      signal: abortController.signal,
+    });
+
+    expect(globSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not invoke recursive glob search on paths containing curly braces (#29434)', async () => {
+    const globSpy = vi.fn();
+    const mockGlobTool = {
+      buildAndExecute: globSpy,
+    };
+    vi.spyOn(mockConfig.getToolRegistry(), 'getTool').mockReturnValue(
+      mockGlobTool as never,
+    );
+
+    // Paths containing curly braces can cause catastrophic brace expansion in minimatch
+    const query = '@"foo{a,b}{c,d}"';
+
+    await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 708,
+      signal: abortController.signal,
+    });
+
+    expect(globSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not invoke recursive glob search on paths containing directory traversal sequences (#29434)', async () => {
+    const globSpy = vi.fn();
+    const mockGlobTool = {
+      buildAndExecute: globSpy,
+    };
+    vi.spyOn(mockConfig.getToolRegistry(), 'getTool').mockReturnValue(
+      mockGlobTool as never,
+    );
+
+    // Paths containing directory traversal sequences should never trigger glob fallback
+    const query = '@../sibling/nonexistent.txt';
+
+    await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 709,
+      signal: abortController.signal,
+    });
+
+    expect(globSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not invoke recursive glob search on absolute paths that do not exist (#29434)', async () => {
+    const globSpy = vi.fn();
+    const mockGlobTool = {
+      buildAndExecute: globSpy,
+    };
+    vi.spyOn(mockConfig.getToolRegistry(), 'getTool').mockReturnValue(
+      mockGlobTool as never,
+    );
+
+    const query = '@/usr/bin/nonexistent-binary-path-xyz';
+
+    await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 710,
+      signal: abortController.signal,
+    });
+
+    expect(globSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not invoke recursive glob search on paths containing glob wildcards (#29434)', async () => {
+    const globSpy = vi.fn();
+    const mockGlobTool = {
+      buildAndExecute: globSpy,
+    };
+    vi.spyOn(mockConfig.getToolRegistry(), 'getTool').mockReturnValue(
+      mockGlobTool as never,
+    );
+
+    const query = '@"test*wildcard?.txt"';
+
+    await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 711,
+      signal: abortController.signal,
+    });
+
+    expect(globSpy).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    '@src/app.js:10',
+    '@src/app.js:10-20',
+    '@src/app.js:10:5',
+    '@src/app.js#L10',
+    '@src/app.js#L10-L25',
+    '@src/app.js#L10-#L25',
+  ])(
+    'should resolve file references with line numbers or ranges (%s) without falling back to glob',
+    async (atRef) => {
+      const fileContent = 'const x = 42;';
+      await createTestFile(
+        path.join(testRootDir, 'src', 'app.js'),
+        fileContent,
+      );
+
+      const result = await handleAtCommand({
+        query: `Explain ${atRef}`,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 712,
+        signal: abortController.signal,
+      });
+
+      expect(result.processedQuery).toContainEqual(
+        expect.objectContaining({ text: fileContent }),
+      );
+      expect(mockOnDebugMessage).not.toHaveBeenCalledWith(
+        expect.stringContaining('not found directly, attempting glob search.'),
+      );
+    },
+  );
 });
 
 describe('escapeAtSymbols', () => {

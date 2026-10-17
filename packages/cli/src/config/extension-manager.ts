@@ -83,6 +83,7 @@ import {
 import type { EventEmitter } from 'node:stream';
 import { themeManager } from '../ui/themes/theme-manager.js';
 import { getFormattedSettingValue } from '../commands/extensions/utils.js';
+import { removeDirectoryWithRetry } from '../utils/retry.js';
 
 interface ExtensionManagerParams {
   enabledExtensionOverrides?: string[];
@@ -497,7 +498,13 @@ Would you like to attempt to install via "git clone" instead?`,
         }
       } finally {
         if (tempDir) {
-          await fs.promises.rm(tempDir, { recursive: true, force: true });
+          try {
+            await removeDirectoryWithRetry(tempDir);
+          } catch (cleanupError) {
+            debugLogger.warn(
+              `Failed to clean up temp directory ${tempDir}: ${getErrorMessage(cleanupError)}`,
+            );
+          }
         }
       }
       return extension;
@@ -566,10 +573,7 @@ Would you like to attempt to install via "git clone" instead?`,
         : path.basename(extension.path),
     );
 
-    await fs.promises.rm(storage.getExtensionDir(), {
-      recursive: true,
-      force: true,
-    });
+    await removeDirectoryWithRetry(storage.getExtensionDir());
 
     // The rest of the cleanup below here is only for true uninstalls, not
     // uninstalls related to updates.
@@ -720,21 +724,30 @@ Would you like to attempt to install via "git clone" instead?`,
     const installMetadata = loadInstallMetadata(extensionDir);
     let effectiveExtensionPath = extensionDir;
     if ((this.settings.security?.allowedExtensions?.length ?? 0) > 0) {
-      if (!installMetadata?.source) {
-        throw new Error(
+      // The metadata is parsed JSON that is not validated, so a source that is
+      // not a string is as unusable as a missing one.
+      if (
+        !installMetadata?.source ||
+        typeof installMetadata.source !== 'string'
+      ) {
+        debugLogger.warn(
           `Failed to load extension ${extensionDir}. The ${INSTALL_METADATA_FILENAME} file is missing or misconfigured.`,
         );
+        return null;
       }
+      const source = getRealPath(installMetadata.source);
       const extensionAllowed = this.settings.security?.allowedExtensions.some(
         (pattern) => {
           try {
-            return new RegExp(pattern).test(
-              getRealPath(installMetadata?.source ?? ''),
-            );
+            return new RegExp(pattern).test(source);
           } catch (e) {
-            throw new Error(
-              `Invalid regex pattern in allowedExtensions setting: "${pattern}. Error: ${getErrorMessage(e)}`,
+            // An invalid pattern cannot match anything. Ignore it, so the
+            // patterns listed after it are still evaluated and one bad entry
+            // does not make every extension unavailable.
+            debugLogger.warn(
+              `Invalid regex pattern in allowedExtensions setting: "${pattern}". Error: ${getErrorMessage(e)}`,
             );
+            return false;
           }
         },
       );
