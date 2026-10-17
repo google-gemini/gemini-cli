@@ -9,6 +9,8 @@ import {
   RELAUNCH_EXIT_CODE,
   getSpawnConfig,
   getScriptArgs,
+  setupSignalForwarding,
+  handleChildProcessClose,
 } from './processUtils.js';
 import {
   writeToStderr,
@@ -82,12 +84,15 @@ export async function relaunchAppInChildProcess(
       },
     );
 
+    const removeForwarders = setupSignalForwarding(child);
+
     return new Promise<number>((resolve, reject) => {
-      child.on('error', reject);
-      child.on('close', (code) => {
-        // Resume stdin before the parent process exits.
-        process.stdin.resume();
-        resolve(code ?? 1);
+      child.on('error', (err) => {
+        removeForwarders();
+        reject(err);
+      });
+      child.on('close', (code, signal) => {
+        handleChildProcessClose(code, signal, removeForwarders, resolve);
       });
     });
   };
