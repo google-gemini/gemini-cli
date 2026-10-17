@@ -550,7 +550,8 @@ describe('github.ts', () => {
       const mockReq = new EventEmitter();
       const mockRes =
         new EventEmitter() as unknown as import('node:http').IncomingMessage;
-      Object.assign(mockRes, { statusCode: 404 });
+      const resume = vi.fn();
+      Object.assign(mockRes, { statusCode: 404, resume });
 
       vi.mocked(https.get).mockImplementation((url, options, cb) => {
         if (typeof options === 'function') {
@@ -563,6 +564,7 @@ describe('github.ts', () => {
       await expect(downloadFile('url', '/dest')).rejects.toThrow(
         'Request failed with status code 404',
       );
+      expect(resume).toHaveBeenCalled();
     });
 
     it('should follow redirects', async () => {
@@ -611,9 +613,11 @@ describe('github.ts', () => {
       const mockReq = new EventEmitter();
       const mockResRedirect =
         new EventEmitter() as unknown as import('node:http').IncomingMessage;
+      const resume = vi.fn();
       Object.assign(mockResRedirect, {
         statusCode: 302,
         headers: { location: 'new-url' },
+        resume,
       });
 
       vi.mocked(https.get).mockImplementation((url, options, cb) => {
@@ -625,15 +629,18 @@ describe('github.ts', () => {
       await expect(downloadFile('url', '/dest')).rejects.toThrow(
         'Too many redirects',
       );
+      expect(resume).toHaveBeenCalled();
     }, 10000); // Increase timeout for this test if needed, though with mocks it should be fast
 
     it('should fail if redirect location is missing', async () => {
       const mockReq = new EventEmitter();
       const mockResRedirect =
         new EventEmitter() as unknown as import('node:http').IncomingMessage;
+      const resume = vi.fn();
       Object.assign(mockResRedirect, {
         statusCode: 302,
         headers: {}, // No location
+        resume,
       });
 
       vi.mocked(https.get).mockImplementation((url, options, cb) => {
@@ -645,6 +652,7 @@ describe('github.ts', () => {
       await expect(downloadFile('url', '/dest')).rejects.toThrow(
         'Redirect response missing Location header',
       );
+      expect(resume).toHaveBeenCalled();
     });
 
     it('should pass custom headers', async () => {
@@ -677,6 +685,116 @@ describe('github.ts', () => {
         }),
         expect.anything(),
       );
+    });
+
+    it('should reject and remove the archive when the response stream fails', async () => {
+      const mockReq = new EventEmitter();
+      const mockRes =
+        new EventEmitter() as unknown as import('node:http').IncomingMessage;
+      const unpipe = vi.fn();
+      const resDestroy = vi.fn();
+      Object.assign(mockRes, {
+        statusCode: 200,
+        pipe: vi.fn(),
+        unpipe,
+        destroy: resDestroy,
+      });
+
+      vi.mocked(https.get).mockImplementation((url, options, cb) => {
+        if (typeof options === 'function') cb = options;
+        if (cb) cb(mockRes);
+        return mockReq as unknown as import('node:http').ClientRequest;
+      });
+
+      const mockStream = new EventEmitter() as unknown as fs.WriteStream;
+      const destroy = vi.fn();
+      Object.assign(mockStream, { close: vi.fn(), destroy });
+      vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
+
+      const promise = downloadFile('url', '/dest');
+      mockRes.emit('error', new Error('socket hang up'));
+
+      await expect(promise).rejects.toThrow('socket hang up');
+      expect(unpipe).toHaveBeenCalledWith(mockStream);
+      expect(resDestroy).toHaveBeenCalled();
+      expect(destroy).toHaveBeenCalled();
+
+      // The partial archive is only removed once the stream has closed, so the
+      // file handle is released first.
+      expect(fs.unlink).not.toHaveBeenCalled();
+      mockStream.emit('close');
+      expect(fs.unlink).toHaveBeenCalledWith('/dest', expect.any(Function));
+    });
+
+    it('should reject and remove the archive when writing it fails', async () => {
+      const mockReq = new EventEmitter();
+      const mockRes =
+        new EventEmitter() as unknown as import('node:http').IncomingMessage;
+      const unpipe = vi.fn();
+      const resDestroy = vi.fn();
+      Object.assign(mockRes, {
+        statusCode: 200,
+        pipe: vi.fn(),
+        unpipe,
+        destroy: resDestroy,
+      });
+
+      vi.mocked(https.get).mockImplementation((url, options, cb) => {
+        if (typeof options === 'function') cb = options;
+        if (cb) cb(mockRes);
+        return mockReq as unknown as import('node:http').ClientRequest;
+      });
+
+      const mockStream = new EventEmitter() as unknown as fs.WriteStream;
+      const destroy = vi.fn();
+      Object.assign(mockStream, { close: vi.fn(), destroy });
+      vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
+
+      const promise = downloadFile('url', '/dest');
+      mockStream.emit('error', new Error('ENOSPC: no space left on device'));
+
+      await expect(promise).rejects.toThrow('ENOSPC');
+      expect(destroy).toHaveBeenCalled();
+      expect(resDestroy).toHaveBeenCalled();
+      expect(unpipe).toHaveBeenCalledWith(mockStream);
+
+      mockStream.emit('close');
+      expect(fs.unlink).toHaveBeenCalledWith('/dest', expect.any(Function));
+    });
+
+    it('should reject once and ignore failures that arrive afterwards', async () => {
+      const mockReq = new EventEmitter();
+      const mockRes =
+        new EventEmitter() as unknown as import('node:http').IncomingMessage;
+      Object.assign(mockRes, {
+        statusCode: 200,
+        pipe: vi.fn(),
+        unpipe: vi.fn(),
+      });
+
+      vi.mocked(https.get).mockImplementation((url, options, cb) => {
+        if (typeof options === 'function') cb = options;
+        if (cb) cb(mockRes);
+        return mockReq as unknown as import('node:http').ClientRequest;
+      });
+
+      const mockStream = new EventEmitter() as unknown as fs.WriteStream;
+      Object.assign(mockStream, { close: vi.fn(), destroy: vi.fn() });
+      vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
+
+      const promise = downloadFile('url', '/dest');
+      mockRes.emit('error', new Error('first failure'));
+
+      // Later failures on either stream must not be reported as unhandled
+      // errors, and must not settle the promise a second time.
+      expect(() =>
+        mockStream.emit('error', new Error('second failure')),
+      ).not.toThrow();
+      expect(() =>
+        mockRes.emit('error', new Error('third failure')),
+      ).not.toThrow();
+
+      await expect(promise).rejects.toThrow('first failure');
     });
   });
 
