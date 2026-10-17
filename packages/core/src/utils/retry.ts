@@ -10,6 +10,7 @@ import {
   RetryableQuotaError,
   ValidationRequiredError,
   classifyGoogleError,
+  isQuotaExhaustedError,
 } from './googleQuotaErrors.js';
 import { delay, createAbortError } from './delay.js';
 import { debugLogger } from './debugLogger.js';
@@ -26,6 +27,10 @@ export interface RetryOptions {
   shouldRetryOnError: (error: Error, retryFetchErrors?: boolean) => boolean;
   shouldRetryOnContent?: (content: GenerateContentResponse) => boolean;
   onPersistent429?: (
+    authType?: string,
+    error?: unknown,
+  ) => Promise<string | boolean | null>;
+  onQuotaExhausted?: (
     authType?: string,
     error?: unknown,
   ) => Promise<string | boolean | null>;
@@ -276,6 +281,7 @@ export async function retryWithBackoff<T>(
     initialDelayMs,
     maxDelayMs,
     onPersistent429,
+    onQuotaExhausted,
     onValidationRequired,
     authType,
     shouldRetryOnError,
@@ -344,6 +350,16 @@ export async function retryWithBackoff<T>(
       let classifiedError = classifyGoogleError(error);
 
       const errorCode = getErrorStatus(error);
+
+      if (onQuotaExhausted && isQuotaExhaustedError(classifiedError)) {
+        const fallbackModel = await onQuotaExhausted(authType, classifiedError);
+        if (fallbackModel) {
+          attempt = 0; // Reset attempts and retry with the new model.
+          currentDelay = initialDelayMs;
+          continue;
+        }
+        throw enrichQuotaError(classifiedError, authType);
+      }
 
       if (
         classifiedError instanceof TerminalQuotaError ||

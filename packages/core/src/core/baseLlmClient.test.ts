@@ -32,6 +32,12 @@ import { MalformedJsonResponseEvent, LlmRole } from '../telemetry/types.js';
 import { getErrorMessage } from '../utils/errors.js';
 import type { ModelConfigService } from '../services/modelConfigService.js';
 import { makeResolvedModelConfig } from '../services/modelConfigServiceTestUtils.js';
+import {
+  BASE_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL,
+  GEMINI_MODEL_ALIAS_AUTO,
+} from '../config/models.js';
+import { TerminalQuotaError } from '../utils/googleQuotaErrors.js';
 
 vi.mock('../utils/errorReporting.js');
 vi.mock('../telemetry/loggers.js');
@@ -638,6 +644,7 @@ describe('BaseLlmClient', () => {
 
       // Reflect setActiveModel into getActiveModel so availability-driven updates
       // are visible to the client under test.
+      mockConfig.getModel.mockReturnValue('auto');
       mockConfig.getActiveModel = vi.fn().mockReturnValue('test-model');
       mockConfig.setActiveModel = vi.fn((model: string) => {
         vi.mocked(mockConfig.getActiveModel).mockReturnValue(model);
@@ -872,6 +879,154 @@ describe('BaseLlmClient', () => {
       ).toHaveBeenCalledWith({ model: fallbackModel });
       expect(secondCall?.model).toBe(fallbackModel);
       expect(secondCall?.config?.temperature).toBe(0.9);
+    });
+  });
+
+  describe('Auto quota exhaustion routing', () => {
+    let quotaOptions: GenerateContentOptions;
+    let mockAvailabilityService: ModelAvailabilityService;
+
+    beforeEach(() => {
+      mockAvailabilityService = createAvailabilityServiceMock();
+      mockConfig.getModel.mockReturnValue(GEMINI_MODEL_ALIAS_AUTO);
+      mockConfig.getActiveModel = vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL);
+      mockConfig.setActiveModel = vi.fn((model: string) => {
+        vi.mocked(mockConfig.getActiveModel).mockReturnValue(model);
+      });
+      mockConfig.rotateSessionId = vi.fn();
+      mockConfig.getFallbackModelHandler = vi.fn();
+      mockConfig.getLastRetrievedQuota = vi.fn().mockReturnValue(undefined);
+      mockConfig.getProModelNoAccessSync = vi.fn().mockReturnValue(false);
+      mockConfig.hasLatestFlashGAAccess = vi.fn().mockReturnValue(false);
+      mockConfig.hasLatestFlashLiteGAAccess = vi.fn().mockReturnValue(false);
+      vi.spyOn(mockConfig, 'getModelAvailabilityService').mockReturnValue(
+        mockAvailabilityService,
+      );
+      vi.mocked(mockAvailabilityService.selectFirstAvailable).mockReturnValue({
+        selectedModel: BASE_GEMINI_FLASH_MODEL,
+        skipped: [],
+      });
+
+      quotaOptions = {
+        modelConfigKey: { model: DEFAULT_GEMINI_MODEL, isChatModel: true },
+        contents: [{ role: 'user', parts: [{ text: 'Continue the task.' }] }],
+        abortSignal: new AbortController().signal,
+        promptId: 'quota-exhausted-prompt-id',
+        role: LlmRole.MAIN,
+      };
+    });
+
+    it('installs the quota-exhausted callback for Auto chat selections', async () => {
+      mockGenerateContent.mockResolvedValue(createMockResponse('ok'));
+
+      await client.generateContent(quotaOptions);
+
+      const retryCall = vi.mocked(retryWithBackoff).mock.calls[0];
+      expect(retryCall?.[1]?.onQuotaExhausted).toBeDefined();
+    });
+
+    it('omits the quota-exhausted callback for manual selections', async () => {
+      mockConfig.getModel.mockReturnValue(DEFAULT_GEMINI_MODEL);
+      mockGenerateContent.mockResolvedValue(createMockResponse('ok'));
+
+      await client.generateContent(quotaOptions);
+
+      const retryCall = vi.mocked(retryWithBackoff).mock.calls[0];
+      expect(retryCall?.[1]?.onQuotaExhausted).toBeUndefined();
+    });
+
+    it('omits the quota-exhausted callback for non-routing utility models', async () => {
+      const flashLiteKey = {
+        ...quotaOptions.modelConfigKey,
+        model: 'test-flash-lite-utility',
+        isChatModel: false,
+      };
+      vi.mocked(mockAvailabilityService.selectFirstAvailable).mockReturnValue({
+        selectedModel: 'test-flash-lite-utility',
+        skipped: [],
+      });
+      mockGenerateContent.mockResolvedValue(createMockResponse('ok'));
+
+      await client.generateContent({
+        ...quotaOptions,
+        modelConfigKey: flashLiteKey,
+      });
+
+      const retryCall = vi.mocked(retryWithBackoff).mock.calls[0];
+      expect(retryCall?.[1]?.onQuotaExhausted).toBeUndefined();
+    });
+
+    it('exhausted quota falls back to the other tier without prompting', async () => {
+      vi.mocked(mockAvailabilityService.selectFirstAvailable)
+        .mockReturnValueOnce({
+          selectedModel: DEFAULT_GEMINI_MODEL,
+          skipped: [],
+        })
+        .mockReturnValue({
+          selectedModel: BASE_GEMINI_FLASH_MODEL,
+          skipped: [],
+        });
+      mockGenerateContent.mockResolvedValue(createMockResponse('ok'));
+
+      await client.generateContent(quotaOptions);
+
+      const retryCall = vi.mocked(retryWithBackoff).mock.calls[0];
+      const onQuotaExhausted = retryCall?.[1]?.onQuotaExhausted;
+      expect(onQuotaExhausted).toBeDefined();
+
+      const fallback = await onQuotaExhausted?.(
+        AuthType.LOGIN_WITH_GOOGLE,
+        new TerminalQuotaError(
+          'The selected model has exhausted its quota.',
+          undefined,
+          3600,
+        ),
+      );
+
+      expect(fallback).toBe(BASE_GEMINI_FLASH_MODEL);
+      expect(mockConfig.rotateSessionId).toHaveBeenCalledTimes(1);
+      expect(mockConfig.getActiveModel()).toBe(BASE_GEMINI_FLASH_MODEL);
+      expect(mockAvailabilityService.markTerminal).toHaveBeenCalledWith(
+        DEFAULT_GEMINI_MODEL,
+        'quota',
+      );
+      expect(mockConfig.getFallbackModelHandler).not.toHaveBeenCalled();
+    });
+
+    it('returns null when the routed model is already quota-exhausted', async () => {
+      vi.mocked(mockAvailabilityService.selectFirstAvailable)
+        .mockReturnValueOnce({
+          selectedModel: DEFAULT_GEMINI_MODEL,
+          skipped: [],
+        })
+        .mockReturnValue({
+          selectedModel: BASE_GEMINI_FLASH_MODEL,
+          skipped: [],
+        });
+      mockGenerateContent.mockResolvedValue(createMockResponse('ok'));
+
+      await client.generateContent(quotaOptions);
+
+      const retryCall = vi.mocked(retryWithBackoff).mock.calls[0];
+      const onQuotaExhausted = retryCall?.[1]?.onQuotaExhausted;
+
+      vi.mocked(mockAvailabilityService.snapshot).mockImplementation(
+        (model: string) =>
+          model === BASE_GEMINI_FLASH_MODEL
+            ? { available: false, reason: 'quota' }
+            : { available: true },
+      );
+
+      const fallback = await onQuotaExhausted?.(
+        AuthType.LOGIN_WITH_GOOGLE,
+        new TerminalQuotaError(
+          'The selected model has exhausted its quota.',
+          undefined,
+          3600,
+        ),
+      );
+
+      expect(fallback).toBeNull();
     });
   });
 });

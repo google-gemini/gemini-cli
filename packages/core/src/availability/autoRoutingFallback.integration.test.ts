@@ -151,6 +151,7 @@ describe('Auto Routing Fallback Integration', () => {
     ]);
 
     // Verify attempts
+    expect(config.getModel()).toBe(PREVIEW_GEMINI_MODEL_AUTO);
     expect(attemptsPro).toBe(3);
     expect(attemptsFlash).toBe(10);
   });
@@ -226,9 +227,11 @@ describe('Auto Routing Fallback Integration', () => {
     expect(handler).toHaveBeenCalledTimes(1);
     expect(handler).toHaveBeenCalledWith(
       'gemini-3-pro-preview',
-      'gemini-3-flash-preview',
+      'gemini-3-pro-preview',
       expect.any(RetryableQuotaError),
     );
+    expect(configNonAuto.getModel()).toBe(PREVIEW_GEMINI_MODEL);
+    expect(configNonAuto.getActiveModel()).toBe(PREVIEW_GEMINI_MODEL);
   });
 
   it('should fallback to gemini-3.8-flash when hasLatestFlashGAAccess is enabled', async () => {
@@ -396,6 +399,7 @@ describe('Auto Routing Fallback Integration', () => {
     ]);
 
     // Verify attempts
+    expect(configDynamic.getModel()).toBe(PREVIEW_GEMINI_MODEL_AUTO);
     expect(attemptsPro).toBe(3);
     expect(attemptsFlash).toBe(10);
   });
