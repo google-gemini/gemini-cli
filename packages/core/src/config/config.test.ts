@@ -2808,6 +2808,39 @@ describe('Config getHooks', () => {
   });
 
   describe('setModel', () => {
+    it.each(['auto', DEFAULT_GEMINI_MODEL_AUTO, PREVIEW_GEMINI_MODEL_AUTO])(
+      'preserves the %s selection during automatic fallback',
+      (model) => {
+        const config = new Config({ ...baseParams, model });
+        const availability = config.getModelAvailabilityService();
+        availability.markTerminal(DEFAULT_GEMINI_MODEL, 'quota');
+
+        config.activateFallbackMode(DEFAULT_GEMINI_FLASH_MODEL);
+
+        expect(config.getModel()).toBe(model);
+        expect(config.getActiveModel()).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+        expect(availability.snapshot(DEFAULT_GEMINI_MODEL)).toEqual({
+          available: false,
+          reason: 'quota',
+        });
+      },
+    );
+
+    it('preserves exhausted quota during automatic fallback but resets it for explicit model selection', () => {
+      const config = new Config(baseParams);
+      const availability = config.getModelAvailabilityService();
+      availability.markTerminal(DEFAULT_GEMINI_MODEL, 'quota');
+
+      config.activateFallbackMode(DEFAULT_GEMINI_FLASH_MODEL);
+
+      expect(availability.snapshot(DEFAULT_GEMINI_MODEL)).toEqual({
+        available: false,
+        reason: 'quota',
+      });
+      config.setModel(DEFAULT_GEMINI_MODEL);
+      expect(availability.snapshot(DEFAULT_GEMINI_MODEL).available).toBe(true);
+    });
+
     it('should allow setting a pro (any) model and reset availability', () => {
       const config = new Config(baseParams);
       const service = config.getModelAvailabilityService();

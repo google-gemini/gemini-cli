@@ -14,6 +14,17 @@ import { HookSystem } from '../hooks/hookSystem.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 import { LlmRole } from '../telemetry/types.js';
+import { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
+import { ModelConfigService } from '../services/modelConfigService.js';
+import { DEFAULT_MODEL_CONFIGS } from '../config/defaultModelConfigs.js';
+import {
+  BASE_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
+  DEFAULT_GEMINI_MODEL,
+} from '../config/models.js';
+import { UserTierId } from '../code_assist/types.js';
+import { TerminalQuotaError } from '../utils/googleQuotaErrors.js';
+import { coreEvents } from '../utils/events.js';
 
 // Mock fs module
 vi.mock('node:fs', async (importOriginal) => {
@@ -140,8 +151,183 @@ describe('GeminiChat Network Retries', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
+
+  it('immediately retries Auto Pro hard quota on Flash through the actual retry and fallback paths', async () => {
+    vi.useFakeTimers();
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'quota-routing-test-project');
+    const { retryWithBackoff } =
+      await vi.importActual<typeof import('../utils/retry.js')>(
+        '../utils/retry.js',
+      );
+    mockRetryWithBackoff.mockImplementation(retryWithBackoff);
+    const selectedModel = DEFAULT_GEMINI_MODEL;
+    let activeModel = selectedModel;
+    const availability = new ModelAvailabilityService();
+    const providerConfig = mockConfig.getContentGeneratorConfig();
+    const emitRetryAttempt = vi.spyOn(coreEvents, 'emitRetryAttempt');
+    Object.defineProperty(mockConfig, 'modelConfigService', {
+      value: new ModelConfigService(DEFAULT_MODEL_CONFIGS),
+    });
+    vi.mocked(mockConfig.getModel).mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO);
+    vi.mocked(mockConfig.getActiveModel).mockImplementation(() => activeModel);
+    vi.mocked(mockConfig.setActiveModel).mockImplementation((model) => {
+      activeModel = model;
+    });
+    vi.mocked(mockConfig.getModelAvailabilityService).mockReturnValue(
+      availability,
+    );
+    mockConfig.getHasAccessToPreviewModel = vi.fn(() => false);
+    mockConfig.getExperimentalDynamicModelConfiguration = vi.fn(() => false);
+    mockConfig.getUserTier = vi.fn(() => UserTierId.STANDARD);
+    mockConfig.rotateSessionId = vi.fn();
+    mockConfig.setModel = vi.fn();
+    mockConfig.activateFallbackMode = vi.fn();
+    vi.mocked(mockContentGenerator.generateContentStream)
+      .mockRejectedValueOnce(
+        new TerminalQuotaError(
+          'Pro daily quota exhausted.',
+          { code: 429, message: 'Pro daily quota exhausted.', details: [] },
+          3600,
+          'QUOTA_EXHAUSTED',
+        ),
+      )
+      .mockImplementationOnce(async () =>
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: {
+                  role: 'model',
+                  parts: [{ text: 'Recovered on Flash' }],
+                },
+                finishReason: 'STOP',
+              },
+            ],
+          } as GenerateContentResponse;
+        })(),
+      );
+
+    const stream = await chat.sendMessageStream(
+      { model: selectedModel, isChatModel: true },
+      'Continue the task.',
+      'prompt-id-pro-quota',
+      new AbortController().signal,
+      LlmRole.MAIN,
+    );
+    const events: StreamEvent[] = [];
+    for await (const event of stream) {
+      events.push(event);
+    }
+
+    expect(
+      vi
+        .mocked(mockContentGenerator.generateContentStream)
+        .mock.calls.map(([request]) => request.model),
+    ).toEqual([selectedModel, BASE_GEMINI_FLASH_MODEL]);
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: StreamEventType.CHUNK,
+        value: expect.objectContaining({
+          candidates: [
+            expect.objectContaining({
+              content: {
+                role: 'model',
+                parts: [{ text: 'Recovered on Flash' }],
+              },
+            }),
+          ],
+        }),
+      }),
+    ]);
+    expect(mockConfig.getActiveModel()).toBe(BASE_GEMINI_FLASH_MODEL);
+    expect(mockConfig.getModel()).toBe(DEFAULT_GEMINI_MODEL_AUTO);
+    expect(mockConfig.getContentGenerator()).toBe(mockContentGenerator);
+    expect(mockConfig.getContentGeneratorConfig()).toBe(providerConfig);
+    expect(providerConfig.authType).toBe('oauth-personal');
+    expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe(
+      'quota-routing-test-project',
+    );
+    expect(availability.snapshot(selectedModel)).toEqual({
+      available: false,
+      reason: 'quota',
+    });
+    expect(mockConfig.setModel).not.toHaveBeenCalled();
+    expect(mockConfig.activateFallbackMode).not.toHaveBeenCalled();
+    expect(mockConfig.rotateSessionId).toHaveBeenCalledTimes(1);
+    expect(mockLogNetworkRetryAttempt).not.toHaveBeenCalled();
+    expect(emitRetryAttempt).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  }, 2000);
+
+  it.each([
+    DEFAULT_GEMINI_MODEL,
+    BASE_GEMINI_FLASH_MODEL,
+    'gemini-3-pro-preview',
+  ])(
+    'stops manual %s hard quota through the actual retry path without waiting or switching',
+    async (selectedModel) => {
+      vi.useFakeTimers();
+      const { retryWithBackoff } =
+        await vi.importActual<typeof import('../utils/retry.js')>(
+          '../utils/retry.js',
+        );
+      mockRetryWithBackoff.mockImplementation(retryWithBackoff);
+      const providerConfig = mockConfig.getContentGeneratorConfig();
+      Object.defineProperty(mockConfig, 'modelConfigService', {
+        value: new ModelConfigService(DEFAULT_MODEL_CONFIGS),
+      });
+      vi.mocked(mockConfig.getModel).mockReturnValue(selectedModel);
+      vi.mocked(mockConfig.getActiveModel).mockReturnValue(selectedModel);
+      vi.mocked(mockConfig.getModelAvailabilityService).mockReturnValue(
+        new ModelAvailabilityService(),
+      );
+      mockConfig.getHasAccessToPreviewModel = vi.fn(() => true);
+      mockConfig.getUserTier = vi.fn(() => UserTierId.STANDARD);
+      mockConfig.getFallbackModelHandler = vi.fn();
+      mockConfig.rotateSessionId = vi.fn();
+      mockConfig.setModel = vi.fn();
+      mockConfig.activateFallbackMode = vi.fn();
+      vi.mocked(mockContentGenerator.generateContentStream).mockRejectedValue(
+        new TerminalQuotaError(
+          'Manual quota exhausted.',
+          { code: 429, message: 'Manual quota exhausted.', details: [] },
+          3600,
+          'QUOTA_EXHAUSTED',
+        ),
+      );
+
+      await expect(
+        (async () => {
+          const stream = await chat.sendMessageStream(
+            { model: selectedModel, isChatModel: true },
+            'Continue the task.',
+            'manual-quota',
+            new AbortController().signal,
+            LlmRole.MAIN,
+          );
+          for await (const _event of stream) {
+            /* Drain the production stream. */
+          }
+        })(),
+      ).rejects.toThrow('Manual quota exhausted.');
+
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
+        1,
+      );
+      expect(mockConfig.getActiveModel()).toBe(selectedModel);
+      expect(mockConfig.getModel()).toBe(selectedModel);
+      expect(mockConfig.getContentGeneratorConfig()).toBe(providerConfig);
+      expect(mockConfig.setModel).not.toHaveBeenCalled();
+      expect(mockConfig.activateFallbackMode).not.toHaveBeenCalled();
+      expect(mockConfig.rotateSessionId).not.toHaveBeenCalled();
+      expect(mockConfig.getFallbackModelHandler).toHaveBeenCalledTimes(1);
+      expect(vi.getTimerCount()).toBe(0);
+    },
+    2000,
+  );
 
   it('should retry when a 503 ApiError occurs during stream iteration', async () => {
     // 1. Mock the API to yield one chunk, then throw a 503 error.

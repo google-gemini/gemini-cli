@@ -24,11 +24,17 @@ import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
+  GEMINI_MODEL_ALIAS_FLASH,
+  GEMINI_MODEL_ALIAS_PRO,
   PREVIEW_GEMINI_MODEL_AUTO,
+  VALID_GEMINI_MODELS,
+  getBackendModelMappings,
   isAutoModel,
   isGemini3Model,
+  isProModel,
   resolveModel,
 } from '../config/models.js';
+import { TerminalQuotaError } from '../utils/googleQuotaErrors.js';
 import { normalizeModelId } from '../utils/modelUtils.js';
 import type { ModelSelectionResult } from './modelAvailabilityService.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
@@ -240,6 +246,144 @@ export function resolvePolicyAction(
   return policy.actions?.[failureKind] ?? 'prompt';
 }
 
+function getQuotaModelMappings(config: Config): Record<string, string> {
+  const authType = config.getContentGeneratorConfig?.()?.authType;
+  return getBackendModelMappings(
+    config,
+    authType === 'oauth-personal' || authType === 'compute-default-credentials',
+  );
+}
+
+/** Resolves aliases and launch-flag rewrites for request-level quota checks. */
+function resolveConfiguredModelId(config: Config, model: string): string {
+  return normalizeModelId(
+    resolveModel(
+      model,
+      config.getGemini31LaunchedSync?.() ?? false,
+      config.getUseCustomToolModelSync?.() ?? false,
+      config.getHasAccessToPreviewModel?.() ?? false,
+      config,
+      config.hasLatestFlashGAAccess?.() ?? false,
+      config.hasLatestFlashLiteGAAccess?.() ?? false,
+    ),
+  );
+}
+
+/** Whether the requested backend model is explicitly advertised with zero quota. */
+export function hasZeroQuotaForModel(config: Config, model: string): boolean {
+  const mappings = getQuotaModelMappings(config);
+  const quotaId = (id: string) => {
+    const normalized = normalizeModelId(id);
+    return mappings[normalized] ?? normalized;
+  };
+  return (
+    config
+      .getLastRetrievedQuota?.()
+      ?.buckets?.some(
+        (bucket) =>
+          bucket.modelId &&
+          quotaId(bucket.modelId) === quotaId(model) &&
+          (bucket.remainingFraction === 0 ||
+            (bucket.remainingAmount !== undefined &&
+              Number(bucket.remainingAmount) === 0)),
+      ) ?? false
+  );
+}
+
+/** Record all IDs that send requests to the same exhausted backend model. */
+export function markQuotaExhausted(config: Config, model: string): void {
+  const normalized = normalizeModelId(model);
+  const mappings = getQuotaModelMappings(config);
+  const backendModel = mappings[normalized] ?? normalized;
+  const resolvedModel = resolveConfiguredModelId(config, model);
+  const availability = config.getModelAvailabilityService();
+  availability.markTerminal(normalized, 'quota');
+  availability.markTerminal(backendModel, 'quota');
+  if (resolvedModel !== normalized && resolvedModel !== backendModel) {
+    availability.markTerminal(resolvedModel, 'quota');
+  }
+  for (const [alias, target] of Object.entries(mappings)) {
+    if (target === backendModel) availability.markTerminal(alias, 'quota');
+  }
+}
+
+function isQuotaRoutingModel(model: string): boolean {
+  return (
+    VALID_GEMINI_MODELS.has(model) &&
+    (isProModel(model) ||
+      (model.includes('flash') && !model.includes('flash-lite')))
+  );
+}
+
+/** Only Auto selections may move between model tiers after exhausting quota. */
+export function canUseQuotaFallback(config: Config, model: string): boolean {
+  return (
+    isAutoModel(normalizeModelId(config.getModel()), config) &&
+    isQuotaRoutingModel(normalizeModelId(model))
+  );
+}
+
+/**
+ * Selects across Pro and Flash after hard quota exhaustion. Custom model IDs
+ * retain their explicit-selection behavior. Unknown quota is attemptable;
+ * advertised zero quota and models already known to be unavailable are skipped.
+ */
+export function resolveQuotaFallbackModel(
+  config: Config,
+  requestedModel: string,
+): ModelSelectionResult | undefined {
+  const requested = resolveConfiguredModelId(config, requestedModel);
+  if (!canUseQuotaFallback(config, requested)) return undefined;
+
+  const mappings = getQuotaModelMappings(config);
+  const quotaId = (model: string) => {
+    const normalized = normalizeModelId(model);
+    return mappings[normalized] ?? normalized;
+  };
+  const buckets = config.getLastRetrievedQuota?.()?.buckets ?? [];
+  const quotaFor = (model: string) =>
+    buckets.filter(
+      (bucket) => bucket.modelId && quotaId(bucket.modelId) === quotaId(model),
+    );
+  const proModel = resolveConfiguredModelId(config, GEMINI_MODEL_ALIAS_PRO);
+  const flashModel = resolveConfiguredModelId(config, GEMINI_MODEL_ALIAS_FLASH);
+  const candidates = isProModel(requested)
+    ? [requested, flashModel, proModel]
+    : [requested, proModel, flashModel];
+  const noProAccess = config.getProModelNoAccessSync?.() ?? false;
+  const availability = config.getModelAvailabilityService();
+  const seen = new Set<string>();
+  const skipped: ModelSelectionResult['skipped'] = [];
+  const eligible = candidates.filter((model) => {
+    const actualModel = normalizeModelId(
+      config.modelConfigService.getResolvedConfig({ model }).model,
+    );
+    const id = quotaId(actualModel);
+    if (seen.has(id)) return false;
+    seen.add(id);
+    if (noProAccess && isProModel(actualModel)) return false;
+    const health = availability.snapshot(actualModel);
+    if (!health.available) {
+      skipped.push({ model, reason: health.reason ?? 'unknown' });
+      return false;
+    }
+    if (
+      [...quotaFor(model), ...quotaFor(actualModel)].some(
+        (bucket) =>
+          bucket.remainingFraction === 0 ||
+          (bucket.remainingAmount !== undefined &&
+            Number(bucket.remainingAmount) === 0),
+      )
+    ) {
+      skipped.push({ model, reason: 'quota' });
+      return false;
+    }
+    return true;
+  });
+  const selection = availability.selectFirstAvailable(eligible);
+  return { ...selection, skipped: [...selection.skipped, ...skipped] };
+}
+
 /**
  * Creates a context provider for retry logic that returns the availability
  * sevice and resolves the current model's policy.
@@ -271,6 +415,30 @@ export function selectModelForAvailability(
   config: Config,
   requestedModel: string,
 ): ModelSelectionResult {
+  const resolvedRequestedModel = resolveConfiguredModelId(
+    config,
+    requestedModel,
+  );
+  const requestedHealth = config
+    .getModelAvailabilityService?.()
+    ?.snapshot?.(resolvedRequestedModel);
+  if (
+    !isAutoModel(normalizeModelId(config.getModel()), config) &&
+    (requestedHealth?.reason === 'quota' ||
+      hasZeroQuotaForModel(config, resolvedRequestedModel))
+  ) {
+    // A manual selection whose own quota is exhausted keeps the selected model
+    // instead of letting availability substitute another model for the request.
+    return { selectedModel: requestedModel, skipped: [] };
+  }
+  if (
+    hasZeroQuotaForModel(config, resolvedRequestedModel) ||
+    requestedHealth?.reason === 'quota'
+  ) {
+    const quotaSelection = resolveQuotaFallbackModel(config, requestedModel);
+    if (quotaSelection) return quotaSelection;
+  }
+
   const chain = resolvePolicyChain(config, requestedModel);
   const selection = config
     .getModelAvailabilityService?.()
@@ -296,6 +464,12 @@ export function applyModelSelection(
   const resolved = config.modelConfigService.getResolvedConfig(modelConfigKey);
   const model = resolved.model;
   const selection = selectModelForAvailability(config, model);
+
+  if (selection?.selectedModel === null) {
+    throw new TerminalQuotaError(
+      'No model with available quota remains for this selection.',
+    );
+  }
 
   if (!selection) {
     return { model, config: resolved.generateContentConfig };
@@ -333,6 +507,7 @@ export function applyModelSelection(
 export function applyAvailabilityTransition(
   getContext: (() => RetryAvailabilityContext | undefined) | undefined,
   failureKind: FailureKind,
+  terminalReason?: 'quota' | 'capacity',
 ): void {
   const context = getContext?.();
   if (!context) return;
@@ -343,7 +518,7 @@ export function applyAvailabilityTransition(
   if (transition === 'terminal') {
     context.service.markTerminal(
       context.policy.model,
-      failureKind === 'terminal' ? 'quota' : 'capacity',
+      terminalReason ?? (failureKind === 'terminal' ? 'quota' : 'capacity'),
     );
   } else if (transition === 'sticky_retry') {
     context.service.markRetryOncePerTurn(
