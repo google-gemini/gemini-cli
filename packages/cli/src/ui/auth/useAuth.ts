@@ -16,7 +16,10 @@ import {
   ChangeAuthRequestedError,
   ValidationCancelledError,
 } from '@google/gemini-cli-core';
-import { getErrorMessage } from '@google/gemini-cli-core';
+import {
+  getErrorMessage,
+  sanitizeUrlsInMessage,
+} from '@google/gemini-cli-core';
 import { AuthState } from '../types.js';
 import { validateAuthMethod } from '../../config/auth.js';
 
@@ -163,7 +166,9 @@ export const useAuthCommand = (
           // Show the error message directly without "Failed to login" prefix
           onAuthError(getErrorMessage(e));
         } else {
-          onAuthError(`Failed to sign in. Message: ${getErrorMessage(e)}`);
+          onAuthError(
+            `Failed to sign in. Message: ${sanitizeUrlsInMessage(getErrorMessage(e))}`,
+          );
         }
       }
     })();
