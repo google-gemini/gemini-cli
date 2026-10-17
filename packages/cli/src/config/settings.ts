@@ -509,7 +509,7 @@ export class LoadedSettings {
         key,
         structuredClone(valueToSet),
       );
-      saveSettings(settingsFile);
+      saveSettings(settingsFile, key);
     }
 
     this._merged = this.computeMergedSettings();
@@ -1406,7 +1406,10 @@ export function migrateDeprecatedSettings(
   return anyModified;
 }
 
-export function saveSettings(settingsFile: SettingsFile): void {
+export function saveSettings(
+  settingsFile: SettingsFile,
+  changedKey?: string,
+): void {
   // Clear the entire cache on any save.
   settingsCache.clear();
 
@@ -1420,10 +1423,20 @@ export function saveSettings(settingsFile: SettingsFile): void {
     const settingsToSave = settingsFile.originalSettings;
 
     // Use the format-preserving update function
-    updateSettingsFilePreservingFormat(
-      settingsFile.path,
-      settingsToSave as Record<string, unknown>,
-    );
+    if (changedKey === undefined) {
+      updateSettingsFilePreservingFormat(
+        settingsFile.path,
+        settingsToSave as Record<string, unknown>,
+      );
+    } else {
+      // The file may have been edited by another session since it was loaded.
+      // Persist only the explicitly changed property, not the startup snapshot.
+      updateSettingsFilePreservingFormat(
+        settingsFile.path,
+        settingsToSave as Record<string, unknown>,
+        changedKey.split('.'),
+      );
+    }
   } catch (error) {
     const detailedErrorMessage = getFsErrorMessage(error);
     coreEvents.emitFeedback(

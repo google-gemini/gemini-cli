@@ -31,11 +31,13 @@ describe('quitCommand', () => {
         },
       },
     });
+    const saveSettings = vi.spyOn(mockContext.services.settings, 'setValue');
 
     if (!quitCommand.action) throw new Error('Action is not defined');
     const result = quitCommand.action(mockContext, '');
 
     expect(formatDuration).toHaveBeenCalledWith(3600000); // 1 hour in ms
+    expect(saveSettings).not.toHaveBeenCalled();
     expect(result).toEqual({
       type: 'quit',
       deleteSession: false,
