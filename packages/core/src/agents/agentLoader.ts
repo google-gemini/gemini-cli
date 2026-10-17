@@ -97,14 +97,17 @@ const localAgentSchema = z
     display_name: z.string().optional(),
     tools: z
       .array(
-        z
-          .string()
-          .refine(
-            (val: string) => isValidToolName(val, { allowWildcards: true }),
-            {
-              message: 'Invalid tool name',
-            },
-          ),
+        z.string().refine(
+          (val: string) =>
+            isValidToolName(val, {
+              allowWildcards: true,
+              // Agents may also list other agents (or themselves) here.
+              allowAgentNames: true,
+            }),
+          {
+            message: 'Invalid tool or agent name',
+          },
+        ),
       )
       .optional(),
     mcp_servers: z.record(mcpServerSchema).optional(),
