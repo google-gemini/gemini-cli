@@ -10,6 +10,8 @@ import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { theme } from '../semantic-colors.js';
 import { AuthType } from '@google/gemini-cli-core';
 import { isUltraTier } from '../../utils/tierUtils.js';
+import { useKeypress } from '../hooks/useKeypress.js';
+import { KeypressPriority } from '../contexts/KeypressContext.js';
 
 interface ProQuotaDialogProps {
   failedModel: string;
@@ -36,6 +38,18 @@ export function ProQuotaDialog({
   tierName,
   onChoice,
 }: ProQuotaDialogProps): React.JSX.Element {
+  useKeypress(
+    (key) => {
+      if (key.name === 'escape') {
+        onChoice('retry_later');
+        return true;
+      }
+      return false;
+    },
+    // Resolve the quota choice before the stream's general Escape handler.
+    { isActive: true, priority: KeypressPriority.High },
+  );
+
   let items;
   // Do not provide a fallback option if failed model and fallbackmodel are same.
   if (failedModel === fallbackModel) {
