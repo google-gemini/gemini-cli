@@ -2161,47 +2161,54 @@ describe('mcp-client', () => {
         expect(mockGetValidTokenWithMetadata).toHaveBeenCalledTimes(2);
       });
 
-      it('wraps fetch to convert GET 404 to 405 for POST-only servers (e.g. n8n)', async () => {
-        const mockFetch = vi
-          .fn()
-          .mockResolvedValue(
-            new Response(null, { status: 404, statusText: 'Not Found' }),
-          );
-        vi.stubGlobal('fetch', mockFetch);
+      it.each(['', 'localhost'])(
+        'converts GET 404 to 405 for POST-only servers with NO_PROXY=%s',
+        async (noProxy) => {
+          vi.stubEnv('NO_PROXY', noProxy);
+          vi.stubEnv('no_proxy', '');
+          const { fetch: undiciFetch } = await import('undici');
+          const mockFetch = vi
+            .fn()
+            .mockResolvedValue(
+              new Response(null, { status: 404, statusText: 'Not Found' }),
+            );
+          vi.stubGlobal('fetch', mockFetch);
+          vi.mocked(undiciFetch).mockImplementation(mockFetch);
 
-        try {
-          const transport = await createTransport(
-            'test-server',
-            { httpUrl: 'http://test-server' },
-            false,
-            MOCK_CONTEXT,
-          );
+          try {
+            const transport = await createTransport(
+              'test-server',
+              { httpUrl: 'http://test-server' },
+              false,
+              MOCK_CONTEXT,
+            );
 
-          const wrappedFetch = (
-            unwrap(transport) as unknown as {
-              _fetch: (
-                url: URL | string,
-                init?: RequestInit,
-              ) => Promise<Response>;
-            }
-          )._fetch;
+            const wrappedFetch = (
+              unwrap(transport) as unknown as {
+                _fetch: (
+                  url: URL | string,
+                  init?: RequestInit,
+                ) => Promise<Response>;
+              }
+            )._fetch;
 
-          // GET 404 → 405: server doesn't support optional SSE GET stream
-          const getRes = await wrappedFetch('http://test-server', {
-            method: 'GET',
-          });
-          expect(getRes.status).toBe(405);
-          expect(getRes.statusText).toBe('Method Not Allowed');
+            // GET 404 → 405: server doesn't support optional SSE GET stream
+            const getRes = await wrappedFetch('http://test-server', {
+              method: 'GET',
+            });
+            expect(getRes.status).toBe(405);
+            expect(getRes.statusText).toBe('Method Not Allowed');
 
-          // POST 404 → unchanged: real "not found" errors must still propagate
-          const postRes = await wrappedFetch('http://test-server', {
-            method: 'POST',
-          });
-          expect(postRes.status).toBe(404);
-        } finally {
-          vi.unstubAllGlobals();
-        }
-      });
+            // POST 404 → unchanged: real "not found" errors must still propagate
+            const postRes = await wrappedFetch('http://test-server', {
+              method: 'POST',
+            });
+            expect(postRes.status).toBe(404);
+          } finally {
+            vi.unstubAllGlobals();
+          }
+        },
+      );
 
       it('respects NO_PROXY for network transports', async () => {
         const mockFetch = vi
