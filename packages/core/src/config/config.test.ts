@@ -3396,6 +3396,34 @@ describe('Config Quota & Preview Model Access', () => {
       expect(config.getHasAccessToPreviewModel()).toBe(false);
     });
 
+    it('should notify again after the session changes', async () => {
+      mockCodeAssistServer.retrieveUserQuota.mockRejectedValue(
+        new Error('Network error'),
+      );
+
+      await config.refreshUserQuota();
+      config.setSessionId('new-session');
+      await config.refreshUserQuota();
+
+      expect(mockCoreEvents.emitFeedback).toHaveBeenCalledTimes(2);
+    });
+
+    it('should notify again when authentication is refreshed', async () => {
+      mockCodeAssistServer.retrieveUserQuota.mockRejectedValue(
+        new Error('Network error'),
+      );
+      vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+        authType: AuthType.USE_GEMINI,
+      });
+
+      await config.refreshUserQuota();
+      expect(mockCoreEvents.emitFeedback).toHaveBeenCalledTimes(1);
+
+      await config.refreshAuth(AuthType.USE_GEMINI);
+
+      expect(mockCoreEvents.emitFeedback).toHaveBeenCalledTimes(2);
+    });
+
     it('should notify once while quota data is unavailable', async () => {
       mockCodeAssistServer.retrieveUserQuota.mockRejectedValue(
         new Error('Network error'),

@@ -1593,6 +1593,7 @@ export class Config implements McpContext, AgentLoopContext {
   ) {
     // Reset availability service when switching auth
     this.modelAvailabilityService.reset();
+    this.quotaFetchFailureNotified = false;
     this.fallbackOverrides.clear();
     this.modelConfigService.clearRuntimeOverrides();
 
@@ -1863,6 +1864,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.lastModeSwitchTime = performance.now();
     this.compressionTruncationCounter = 0;
     this.quotaErrorOccurred = false;
+    this.quotaFetchFailureNotified = false;
     this.creditsNotificationShown = false;
     this.modelAvailabilityService.reset();
     this.modelQuotas.clear();
