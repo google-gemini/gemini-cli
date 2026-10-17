@@ -1162,7 +1162,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     // Map to keep track of tool name by callId for activity emission
     const toolNameMap = new Map<string, string>();
     // Synchronous results (like unauthorized calls)
-    const syncResults = new Map<string, Part>();
+    const syncResults = new Map<string, Part[]>();
 
     for (const [index, functionCall] of functionCalls.entries()) {
       const callId = functionCall.id ?? `${promptId}-${index}`;
@@ -1171,13 +1171,15 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       if (parseError) {
         debugLogger.warn(`[LocalAgentExecutor] ${parseError}`);
 
-        syncResults.set(callId, {
-          functionResponse: {
-            name: functionCall.name,
-            id: callId,
-            response: { error: parseError },
+        syncResults.set(callId, [
+          {
+            functionResponse: {
+              name: functionCall.name,
+              id: callId,
+              response: { error: parseError },
+            },
           },
-        });
+        ]);
 
         this.emitActivity('ERROR', {
           context: 'tool_call',
@@ -1219,13 +1221,15 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         const error = createUnauthorizedToolError(toolName);
         debugLogger.warn(`[LocalAgentExecutor] Blocked call: ${error}`);
 
-        syncResults.set(callId, {
-          functionResponse: {
-            name: toolName,
-            id: callId,
-            response: { error },
+        syncResults.set(callId, [
+          {
+            functionResponse: {
+              name: toolName,
+              id: callId,
+              response: { error },
+            },
           },
-        });
+        ]);
 
         this.emitActivity('ERROR', {
           context: 'tool_call_unauthorized',
@@ -1343,13 +1347,15 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             // Soft rejection: we do NOT set aborted=true, allowing the agent to rethink.
 
             // Provide the direct instruction to the model as the tool error response.
-            syncResults.set(call.request.callId, {
-              functionResponse: {
-                name: toolName,
-                id: call.request.callId,
-                response: { error },
+            syncResults.set(call.request.callId, [
+              {
+                functionResponse: {
+                  name: toolName,
+                  id: call.request.callId,
+                  response: { error },
+                },
               },
-            });
+            ]);
             continue; // Skip the generic syncResults.set below
           } else {
             // Hard abort (Ctrl+C)
@@ -1365,19 +1371,21 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         }
 
         // Add result to syncResults for other statuses (success, error, hard abort)
-        syncResults.set(call.request.callId, call.response.responseParts[0]);
+        syncResults.set(call.request.callId, call.response.responseParts);
       }
     }
 
-    // Ensure exactly one response per function call to satisfy the Gemini API protocol.
+    // Keep each function response and its sibling media parts in call order.
     const toolResponseParts: Part[] = [];
     for (const [index, functionCall] of functionCalls.entries()) {
       const callId = functionCall.id ?? `${promptId}-${index}`;
-      const part = syncResults.get(callId);
+      const parts = syncResults.get(callId);
 
-      if (part) {
+      if (parts && parts.length > 0) {
         toolResponseParts.push(
-          truncateFunctionResponsePart(part, MAX_STORED_TOOL_OUTPUT_BYTES),
+          ...parts.map((part) =>
+            truncateFunctionResponsePart(part, MAX_STORED_TOOL_OUTPUT_BYTES),
+          ),
         );
         continue;
       }
