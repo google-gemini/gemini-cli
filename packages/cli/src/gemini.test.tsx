@@ -86,6 +86,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
+    isHeadlessMode: vi.fn(() => false),
     recordSlowRender: vi.fn(),
     logUserPrompt: vi.fn(),
     writeToStdout: vi.fn((...args) =>
