@@ -192,6 +192,12 @@ You can check your current token usage and applicable limits using the
 session's token usage, as well as information about the limits associated with
 your current quota.
 
+Quota information comes from Gemini CLI's configured service integration.
+`/stats model` displays this information; it is not a public quota API for other
+tools. When a Code Assist quota request fails or returns no usable quota
+buckets, Gemini CLI displays a warning and continues. Other authentication
+methods may not provide quota details.
+
 For more information on the `/stats` command and its subcommands, see the
 [Command Reference](../reference/commands.md#stats).
 

@@ -856,6 +856,7 @@ export class Config implements McpContext, AgentLoopContext {
   fallbackModelHandler?: FallbackModelHandler;
   validationHandler?: ValidationHandler;
   private quotaErrorOccurred: boolean = false;
+  private quotaFetchFailureNotified = false;
   private creditsNotificationShown: boolean = false;
   private modelQuotas: Map<
     string,
@@ -878,6 +879,17 @@ export class Config implements McpContext, AgentLoopContext {
       this.lastEmittedQuotaLimit = limit;
       coreEvents.emitQuotaChanged(remaining, limit, resetTime);
     }
+  }
+
+  private notifyQuotaUnavailable(): void {
+    if (this.quotaFetchFailureNotified) {
+      return;
+    }
+    this.quotaFetchFailureNotified = true;
+    coreEvents.emitFeedback(
+      'warning',
+      'Quota information is unavailable. Check your connection and whether your account is eligible for Gemini Code Assist.',
+    );
   }
 
   private readonly summarizeToolOutput:
@@ -2321,6 +2333,15 @@ export class Config implements McpContext, AgentLoopContext {
       const quota = await codeAssistServer.retrieveUserQuota({
         project: codeAssistServer.projectId,
       });
+      const hasQuotaData =
+        quota.buckets?.some(
+          (bucket) => bucket.modelId && bucket.remainingFraction != null,
+        ) ?? false;
+      if (hasQuotaData) {
+        this.quotaFetchFailureNotified = false;
+      } else {
+        this.notifyQuotaUnavailable();
+      }
 
       if (quota.buckets) {
         this.lastRetrievedQuota = quota;
@@ -2387,6 +2408,7 @@ export class Config implements McpContext, AgentLoopContext {
       return quota;
     } catch (e) {
       debugLogger.debug('Failed to retrieve user quota', e);
+      this.notifyQuotaUnavailable();
       return undefined;
     }
   }

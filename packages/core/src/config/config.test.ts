@@ -3368,6 +3368,10 @@ describe('Config Quota & Preview Model Access', () => {
 
       await config.refreshUserQuota();
       expect(config.getHasAccessToPreviewModel()).toBe(false);
+      expect(mockCoreEvents.emitFeedback).toHaveBeenCalledWith(
+        'warning',
+        'Quota information is unavailable. Check your connection and whether your account is eligible for Gemini Code Assist.',
+      );
     });
 
     it('should return undefined and not update if codeAssistServer is missing', async () => {
@@ -3384,8 +3388,47 @@ describe('Config Quota & Preview Model Access', () => {
       );
       const result = await config.refreshUserQuota();
       expect(result).toBeUndefined();
+      expect(mockCoreEvents.emitFeedback).toHaveBeenCalledWith(
+        'warning',
+        'Quota information is unavailable. Check your connection and whether your account is eligible for Gemini Code Assist.',
+      );
       // Never set => stays null (unknown); getter returns false by default
       expect(config.getHasAccessToPreviewModel()).toBe(false);
+    });
+
+    it('should notify once while quota data is unavailable', async () => {
+      mockCodeAssistServer.retrieveUserQuota.mockRejectedValue(
+        new Error('Network error'),
+      );
+
+      await config.refreshUserQuota();
+      await config.refreshUserQuota();
+
+      expect(mockCoreEvents.emitFeedback).toHaveBeenCalledTimes(1);
+
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({});
+      await config.refreshUserQuota();
+      mockCodeAssistServer.retrieveUserQuota.mockRejectedValue(
+        new Error('Network error'),
+      );
+      await config.refreshUserQuota();
+      expect(mockCoreEvents.emitFeedback).toHaveBeenCalledTimes(1);
+
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
+        buckets: [
+          {
+            modelId: 'gemini-3-pro',
+            remainingFraction: 1,
+          },
+        ],
+      });
+      await config.refreshUserQuota();
+      mockCodeAssistServer.retrieveUserQuota.mockRejectedValue(
+        new Error('Network error'),
+      );
+      await config.refreshUserQuota();
+
+      expect(mockCoreEvents.emitFeedback).toHaveBeenCalledTimes(2);
     });
     it('should derive quota from remainingFraction when remainingAmount is missing', async () => {
       mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
