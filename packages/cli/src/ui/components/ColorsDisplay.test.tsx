@@ -33,6 +33,7 @@ describe('ColorsDisplay', () => {
       },
       border: {
         default: '#555555',
+        focused: '#0000ff',
       },
       ui: {
         comment: '#666666',
