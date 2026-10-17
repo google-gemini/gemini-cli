@@ -15,10 +15,17 @@ import {
   ProjectIdRequiredError,
   ChangeAuthRequestedError,
   ValidationCancelledError,
+  getErrorMessage,
 } from '@google/gemini-cli-core';
-import { getErrorMessage } from '@google/gemini-cli-core';
 import { AuthState } from '../types.js';
 import { validateAuthMethod } from '../../config/auth.js';
+
+function stripTrailingPeriodsFromUrls(message: string): string {
+  if (!message) {
+    return '';
+  }
+  return message.replace(/(https?:\/\/\S+)\.(?=\s|$)/g, '$1');
+}
 
 export async function validateAuthMethodWithSettings(
   authType: AuthType,
@@ -46,11 +53,16 @@ export const useAuthCommand = (
   initialAuthError: string | null = null,
   initialAccountSuspensionInfo: AccountSuspensionInfo | null = null,
 ) => {
+  const sanitizedInitialAuthError = initialAuthError
+    ? stripTrailingPeriodsFromUrls(initialAuthError)
+    : null;
   const [authState, setAuthState] = useState<AuthState>(
-    initialAuthError ? AuthState.Updating : AuthState.Unauthenticated,
+    sanitizedInitialAuthError ? AuthState.Updating : AuthState.Unauthenticated,
   );
 
-  const [authError, setAuthError] = useState<string | null>(initialAuthError);
+  const [authError, setAuthError] = useState<string | null>(
+    sanitizedInitialAuthError,
+  );
   const [accountSuspensionInfo, setAccountSuspensionInfo] =
     useState<AccountSuspensionInfo | null>(initialAccountSuspensionInfo);
   const [apiKeyDefaultValue, setApiKeyDefaultValue] = useState<
@@ -59,8 +71,9 @@ export const useAuthCommand = (
 
   const onAuthError = useCallback(
     (error: string | null) => {
-      setAuthError(error);
-      if (error) {
+      const sanitized = error ? stripTrailingPeriodsFromUrls(error) : null;
+      setAuthError(sanitized);
+      if (sanitized) {
         setAuthState(AuthState.Updating);
       }
     },
@@ -163,7 +176,8 @@ export const useAuthCommand = (
           // Show the error message directly without "Failed to login" prefix
           onAuthError(getErrorMessage(e));
         } else {
-          onAuthError(`Failed to sign in. Message: ${getErrorMessage(e)}`);
+          const message = stripTrailingPeriodsFromUrls(getErrorMessage(e));
+          onAuthError(`Failed to sign in. Message: ${message}`);
         }
       }
     })();

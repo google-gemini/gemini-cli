@@ -315,6 +315,40 @@ describe('useAuth', () => {
       expect(result.current.authState).toBe(AuthState.Updating);
     });
 
+    it('should remove a trailing period from URLs in sign-in errors', async () => {
+      const { result } = await renderHook(() =>
+        useAuthCommand(createSettings(AuthType.LOGIN_WITH_GOOGLE), mockConfig),
+      );
+
+      await act(async () => {
+        deferredRefreshAuth.reject(
+          new Error(
+            'This client is no longer supported for Gemini Code Assist for individuals. To continue using Gemini, please migrate to the Antigravity suite of products: https://antigravity.google.',
+          ),
+        );
+      });
+
+      expect(result.current.authError).toBe(
+        'Failed to sign in. Message: This client is no longer supported for Gemini Code Assist for individuals. To continue using Gemini, please migrate to the Antigravity suite of products: https://antigravity.google',
+      );
+      expect(result.current.authState).toBe(AuthState.Updating);
+    });
+
+    it('should remove a trailing period from URLs in initialAuthError', async () => {
+      const { result } = await renderHook(() =>
+        useAuthCommand(
+          createSettings(AuthType.LOGIN_WITH_GOOGLE),
+          mockConfig,
+          'Failed to sign in. Message: This client is no longer supported for Gemini Code Assist for individuals. To continue using Gemini, please migrate to the Antigravity suite of products: https://antigravity.google.',
+        ),
+      );
+
+      expect(result.current.authError).toBe(
+        'Failed to sign in. Message: This client is no longer supported for Gemini Code Assist for individuals. To continue using Gemini, please migrate to the Antigravity suite of products: https://antigravity.google',
+      );
+      expect(result.current.authState).toBe(AuthState.Updating);
+    });
+
     it('should handle ProjectIdRequiredError without "Failed to login" prefix', async () => {
       const projectIdError = new ProjectIdRequiredError();
       const { result } = await renderHook(() =>
