@@ -467,6 +467,82 @@ describe('AcpSessionManager', () => {
     expect(mockConfig.getGeminiClient().resumeChat).toHaveBeenCalled();
   });
 
+  describe('history replay', () => {
+    const writeChatSession = async (sessionId: string) => {
+      const testDir = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'acp-load-replay-'),
+      );
+      const storage = new Storage(testDir, sessionId);
+      await storage.initialize();
+      const chatsDir = path.join(storage.getProjectTempDir(), 'chats');
+      await fs.mkdir(chatsDir, { recursive: true });
+      const now = new Date().toISOString();
+      const header = {
+        sessionId,
+        projectHash: 'test-hash',
+        startTime: now,
+        lastUpdated: now,
+        kind: 'main',
+      };
+      const messages = [
+        { id: 'm1', timestamp: now, type: 'user', content: 'hello' },
+        { id: 'm2', timestamp: now, type: 'gemini', content: 'world' },
+        { id: 'm3', timestamp: now, type: 'user', content: 'again' },
+        { id: 'm4', timestamp: now, type: 'gemini', content: 'done' },
+      ];
+      await fs.writeFile(
+        path.join(
+          chatsDir,
+          `session-2026-09-30-${sessionId.slice(0, 8)}.jsonl`,
+        ),
+        [header, ...messages].map((r) => JSON.stringify(r) + '\n').join(''),
+      );
+      return testDir;
+    };
+
+    it('should send the whole replayed history before the loadSession response', async () => {
+      const sessionId = 'test-session-replay-order';
+      const testDir = await writeChatSession(sessionId);
+      // Like the real connection, each notification resolves once written.
+      mockConnection.sessionUpdate.mockImplementation(
+        () => new Promise((resolve) => setTimeout(resolve, 0)),
+      );
+
+      await manager.loadSession(
+        { sessionId, cwd: testDir, mcpServers: [] },
+        {},
+      );
+
+      const replayed = mockConnection.sessionUpdate.mock.calls
+        .map(([params]) => params.update)
+        .filter(
+          (update) =>
+            update.sessionUpdate === 'user_message_chunk' ||
+            update.sessionUpdate === 'agent_message_chunk',
+        )
+        .map((update) =>
+          'content' in update && update.content.type === 'text'
+            ? update.content.text
+            : undefined,
+        );
+      expect(replayed).toEqual(['hello', 'world', 'again', 'done']);
+    });
+
+    it('should still load the session when replaying the history fails', async () => {
+      const sessionId = 'test-session-replay-fail';
+      const testDir = await writeChatSession(sessionId);
+      mockConnection.sessionUpdate.mockRejectedValue(new Error('write failed'));
+
+      const response = await manager.loadSession(
+        { sessionId, cwd: testDir, mcpServers: [] },
+        {},
+      );
+
+      expect(response.modes).toBeDefined();
+      expect(manager.getSession(sessionId)).toBeDefined();
+    });
+  });
+
   it('should reject loading an invalid session identifier without leaking event listeners', async () => {
     const testDir = await fs.mkdtemp(
       path.join(os.tmpdir(), 'acp-load-invalid-'),

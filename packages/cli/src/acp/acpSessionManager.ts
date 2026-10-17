@@ -280,10 +280,14 @@ export class AcpSessionManager {
         },
       };
 
-      // Stream history back to client
-      session.streamHistory(messages).catch((err) => {
+      // Stream history back to client. ACP requires the whole replay to be
+      // sent before the session/load response, so clients can tell replayed
+      // updates from those of the next prompt.
+      try {
+        await session.streamHistory(messages);
+      } catch (err) {
         debugLogger.error(`Error streaming history: ${err}`);
-      });
+      }
 
       setTimeout(() => {
         session?.sendAvailableCommands().catch((err) => {
