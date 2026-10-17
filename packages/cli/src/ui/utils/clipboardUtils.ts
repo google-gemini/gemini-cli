@@ -26,6 +26,7 @@ export const IMAGE_EXTENSIONS = [
   '.webp',
   '.heic',
   '.heif',
+  '.bmp',
 ];
 
 /** Matches strings that start with a path prefix (/, ~, ., Windows drive letter, or UNC path) */
@@ -40,22 +41,51 @@ function getUserLinuxClipboardTool(): typeof linuxClipboardTool {
     return linuxClipboardTool;
   }
 
-  let toolName: 'wl-paste' | 'xclip' | null = null;
+  const isToolInstalled = (cmd: string): boolean => {
+    try {
+      execSync(`command -v ${cmd}`, { stdio: 'ignore' });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const displayServer = process.env['XDG_SESSION_TYPE'];
+  const hasWaylandDisplay = Boolean(process.env['WAYLAND_DISPLAY']);
+  const hasX11Display = Boolean(process.env['DISPLAY']);
 
-  if (displayServer === 'wayland') toolName = 'wl-paste';
-  else if (displayServer === 'x11') toolName = 'xclip';
-  else return null;
+  let toolName: 'wl-paste' | 'xclip' | null = null;
 
-  try {
-    // output is piped to stdio: 'ignore' to suppress the path printing to console
-    execSync(`command -v ${toolName}`, { stdio: 'ignore' });
-    linuxClipboardTool = toolName;
-    return toolName;
-  } catch (e) {
-    debugLogger.warn(`${toolName} not found. Please install it: ${e}`);
+  if (displayServer === 'wayland' || (!displayServer && hasWaylandDisplay)) {
+    toolName = 'wl-paste';
+  } else if (displayServer === 'x11' || (!displayServer && hasX11Display)) {
+    toolName = 'xclip';
+  } else if (hasWaylandDisplay) {
+    toolName = 'wl-paste';
+  } else if (hasX11Display) {
+    toolName = 'xclip';
+  } else {
     return null;
   }
+
+  if (isToolInstalled(toolName)) {
+    linuxClipboardTool = toolName;
+    return toolName;
+  }
+
+  const fallbackTool = toolName === 'wl-paste' ? 'xclip' : 'wl-paste';
+  if (
+    (fallbackTool === 'xclip' && hasX11Display && isToolInstalled('xclip')) ||
+    (fallbackTool === 'wl-paste' &&
+      hasWaylandDisplay &&
+      isToolInstalled('wl-paste'))
+  ) {
+    linuxClipboardTool = fallbackTool;
+    return fallbackTool;
+  }
+
+  debugLogger.warn(`${toolName} not found. Please install it.`);
+  return null;
 }
 
 /**
@@ -126,22 +156,53 @@ async function saveFromCommand(
 }
 
 /**
- * Checks if the Wayland clipboard contains an image using wl-paste.
+ * Supported clipboard image MIME types and their extensions in order of preference.
  */
-async function checkWlPasteForImage() {
+const LINUX_CLIPBOARD_IMAGE_FORMATS = [
+  { mimeType: 'image/png', extension: 'png' },
+  { mimeType: 'image/jpeg', extension: 'jpg' },
+  { mimeType: 'image/webp', extension: 'webp' },
+  { mimeType: 'image/bmp', extension: 'bmp' },
+  { mimeType: 'image/x-bmp', extension: 'bmp' },
+];
+
+/**
+ * Checks if the Wayland clipboard contains an image using wl-paste and resolves the format.
+ */
+async function getWlPasteImageFormat(): Promise<{
+  mimeType: string;
+  extension: string;
+} | null> {
   try {
     const { stdout } = await spawnAsync('wl-paste', ['--list-types']);
-    return stdout.includes('image/');
+    const types = stdout.split(/\r?\n/).map((t) => t.trim());
+    for (const format of LINUX_CLIPBOARD_IMAGE_FORMATS) {
+      if (types.includes(format.mimeType)) {
+        return format;
+      }
+    }
+    const anyImage = types.find((t) => t.startsWith('image/'));
+    if (anyImage) {
+      const ext = anyImage.split('/')[1]?.split('+')[0] || 'png';
+      return { mimeType: anyImage, extension: ext };
+    }
   } catch (e) {
     debugLogger.warn('Error checking wl-clipboard for image:', e);
   }
-  return false;
+  return null;
+}
+
+async function checkWlPasteForImage(): Promise<boolean> {
+  return (await getWlPasteImageFormat()) !== null;
 }
 
 /**
- * Checks if the X11 clipboard contains an image using xclip.
+ * Checks if the X11 clipboard contains an image using xclip and resolves the format.
  */
-async function checkXclipForImage() {
+async function getXclipImageFormat(): Promise<{
+  mimeType: string;
+  extension: string;
+} | null> {
   try {
     const { stdout } = await spawnAsync('xclip', [
       '-selection',
@@ -150,11 +211,25 @@ async function checkXclipForImage() {
       'TARGETS',
       '-o',
     ]);
-    return stdout.includes('image/');
+    const types = stdout.split(/\r?\n/).map((t) => t.trim());
+    for (const format of LINUX_CLIPBOARD_IMAGE_FORMATS) {
+      if (types.includes(format.mimeType)) {
+        return format;
+      }
+    }
+    const anyImage = types.find((t) => t.startsWith('image/'));
+    if (anyImage) {
+      const ext = anyImage.split('/')[1]?.split('+')[0] || 'png';
+      return { mimeType: anyImage, extension: ext };
+    }
   } catch (e) {
     debugLogger.warn('Error checking xclip for image:', e);
   }
-  return false;
+  return null;
+}
+
+async function checkXclipForImage(): Promise<boolean> {
+  return (await getXclipImageFormat()) !== null;
 }
 
 /**
@@ -205,10 +280,13 @@ export async function clipboardHasImage(): Promise<boolean> {
 /**
  * Saves clipboard content to a file using wl-paste (Wayland).
  */
-async function saveFileWithWlPaste(tempFilePath: string) {
+async function saveFileWithWlPaste(
+  tempFilePath: string,
+  mimeType = 'image/png',
+) {
   const success = await saveFromCommand(
     'wl-paste',
-    ['--no-newline', '--type', 'image/png'],
+    ['--no-newline', '--type', mimeType],
     tempFilePath,
   );
   if (success) {
@@ -226,10 +304,13 @@ async function saveFileWithWlPaste(tempFilePath: string) {
 /**
  * Saves clipboard content to a file using xclip (X11).
  */
-const saveFileWithXclip = async (tempFilePath: string) => {
+const saveFileWithXclip = async (
+  tempFilePath: string,
+  mimeType = 'image/png',
+) => {
   const success = await saveFromCommand(
     'xclip',
-    ['-selection', 'clipboard', '-t', 'image/png', '-o'],
+    ['-selection', 'clipboard', '-t', mimeType, '-o'],
     tempFilePath,
   );
   if (success) {
@@ -280,15 +361,34 @@ export async function saveClipboardImage(
     const timestamp = new Date().getTime();
 
     if (process.platform === 'linux') {
-      const tempFilePath = path.join(tempDir, `clipboard-${timestamp}.png`);
       const tool = getUserLinuxClipboardTool();
 
       if (tool === 'wl-paste') {
-        if (await saveFileWithWlPaste(tempFilePath)) return tempFilePath;
+        const format = (await getWlPasteImageFormat()) ?? {
+          mimeType: 'image/png',
+          extension: 'png',
+        };
+        const tempFilePath = path.join(
+          tempDir,
+          `clipboard-${timestamp}.${format.extension}`,
+        );
+        if (await saveFileWithWlPaste(tempFilePath, format.mimeType)) {
+          return tempFilePath;
+        }
         return null;
       }
       if (tool === 'xclip') {
-        if (await saveFileWithXclip(tempFilePath)) return tempFilePath;
+        const format = (await getXclipImageFormat()) ?? {
+          mimeType: 'image/png',
+          extension: 'png',
+        };
+        const tempFilePath = path.join(
+          tempDir,
+          `clipboard-${timestamp}.${format.extension}`,
+        );
+        if (await saveFileWithXclip(tempFilePath, format.mimeType)) {
+          return tempFilePath;
+        }
         return null;
       }
       return null;
