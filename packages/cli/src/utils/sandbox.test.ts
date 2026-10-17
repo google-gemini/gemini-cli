@@ -20,18 +20,27 @@ import {
 import { createMockSandboxConfig } from '@google/gemini-cli-test-utils';
 import { EventEmitter } from 'node:events';
 
-const { mockedHomedir, mockedGetContainerPath, mockedExecCommands } =
-  vi.hoisted(() => ({
-    mockedHomedir: vi.fn().mockReturnValue('/home/user'),
-    mockedGetContainerPath: vi.fn().mockImplementation((p: string) => p),
-    mockedExecCommands: [] as string[],
-  }));
+const {
+  mockedHomedir,
+  mockedGetContainerPath,
+  mockedExecCommands,
+  mockedPersistSandboxState,
+  mockedRestoreSandboxState,
+} = vi.hoisted(() => ({
+  mockedHomedir: vi.fn().mockReturnValue('/home/user'),
+  mockedGetContainerPath: vi.fn().mockImplementation((p: string) => p),
+  mockedExecCommands: [] as string[],
+  mockedPersistSandboxState: vi.fn(),
+  mockedRestoreSandboxState: vi.fn(),
+}));
 
 vi.mock('./sandboxUtils.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./sandboxUtils.js')>();
   return {
     ...actual,
     getContainerPath: mockedGetContainerPath,
+    persistSandboxState: mockedPersistSandboxState,
+    restoreSandboxState: mockedRestoreSandboxState,
   };
 });
 
@@ -1071,6 +1080,14 @@ describe('sandbox', () => {
       expect(fs.chmodSync).toHaveBeenCalledWith(
         expect.stringContaining('gemini-sandbox-'),
         0o700,
+      );
+      expect(mockedRestoreSandboxState).toHaveBeenCalledWith(
+        '/home/user/.gemini/sandbox',
+        expect.stringContaining('gemini-sandbox-'),
+      );
+      expect(mockedPersistSandboxState).toHaveBeenCalledWith(
+        expect.stringContaining('gemini-sandbox-'),
+        '/home/user/.gemini/sandbox',
       );
     });
 

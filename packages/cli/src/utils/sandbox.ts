@@ -42,6 +42,8 @@ import {
   BUILTIN_SEATBELT_PROFILES,
   isSensitiveHostPath,
   sanitizeSettingsForSandbox,
+  persistSandboxState,
+  restoreSandboxState,
 } from './sandboxUtils.js';
 import { BUILTIN_SEATBELT_PROFILE_CONTENTS } from './sandboxBuiltinProfiles.js';
 
@@ -67,11 +69,25 @@ export async function start_sandbox(
   let stopProxy: (() => void) | undefined = undefined;
   let tempProfileFile: string | null = null;
   let sandboxTmpDir: string | null = null;
+  let sandboxStateDir: string | null = null;
 
   const cleanup = () => {
     if (sandboxTmpDir) {
       const dirToDelete = sandboxTmpDir;
+      const stateDir = sandboxStateDir;
       sandboxTmpDir = null;
+      sandboxStateDir = null;
+
+      if (stateDir && fs.existsSync(dirToDelete)) {
+        try {
+          persistSandboxState(dirToDelete, stateDir);
+        } catch (err) {
+          debugLogger.warn(
+            `Failed to persist sandbox state: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      }
+
       try {
         if (fs.existsSync(dirToDelete)) {
           fs.rmSync(dirToDelete, { recursive: true, force: true });
@@ -524,9 +540,9 @@ export async function start_sandbox(
       }
     }
 
-    // Sanitize user settings before mounting into the sandbox container.
-    // We STRICTLY do NOT mount ~/.gemini root directory or sensitive credential files
-    // (oauth_creds.json, .env, etc.). We only mount the sanitized settings file as read-only (:ro).
+    // Sanitize user settings before mounting into the sandbox container. We do
+    // not expose the user's normal ~/.gemini credentials. State created by the
+    // sandbox is restored from a separate, sandbox-only directory instead.
     const userHomeDirOnHost = homedir();
     let rawSettings: Record<string, unknown> = {};
 
@@ -559,6 +575,11 @@ export async function start_sandbox(
       JSON.stringify(sanitizedSettings, null, 2),
       { mode: 0o600 },
     );
+
+    if (userHomeDirOnHost) {
+      sandboxStateDir = path.join(userHomeDirOnHost, GEMINI_DIR, 'sandbox');
+      restoreSandboxState(sandboxStateDir, sandboxTmpDir);
+    }
 
     // Mount isolated sanitized settings directory inside container
     const userSettingsDirInSandbox = getContainerPath(
