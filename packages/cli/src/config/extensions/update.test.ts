@@ -42,6 +42,10 @@ vi.mock('./github.js', () => ({
 
 vi.mock('../extension.js', () => ({
   loadInstallMetadata: vi.fn(),
+  getPackageVersion: vi.fn(),
+  formatVersion: vi.fn(
+    (configVersion: string, _packageVersion?: string) => configVersion,
+  ),
 }));
 
 vi.mock('node:fs', async (importOriginal) => {
