@@ -107,56 +107,23 @@ describe('activate', () => {
     );
   });
 
-  describe('update notification', () => {
-    beforeEach(() => {
-      // Prevent the "installed" message from showing
-      vi.mocked(context.globalState.get).mockReturnValue(true);
-    });
+  it('should not make any network requests during activation', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    await activate(context);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
 
-    it('should show an update notification if a newer version is available', async () => {
-      vi.spyOn(global, 'fetch').mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          results: [
-            {
-              extensions: [
-                {
-                  versions: [{ version: '1.2.0' }],
-                },
-              ],
-            },
-          ],
-        }),
-      } as Response);
-
-      const showInformationMessageMock = vi.mocked(
-        vscode.window.showInformationMessage,
-      );
-
-      await activate(context);
-
-      expect(showInformationMessageMock).toHaveBeenCalledWith(
-        'A new version (1.2.0) of the Gemini CLI Companion extension is available.',
-        'Update to latest version',
-      );
-    });
-
-    it('should not show an update notification if the version is the same', async () => {
-      vi.spyOn(global, 'fetch').mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          results: [
-            {
-              extensions: [
-                {
-                  versions: [{ version: '1.1.0' }],
-                },
-              ],
-            },
-          ],
-        }),
-      } as Response);
-
+  it.each([
+    {
+      ide: IDE_DEFINITIONS.cloudshell,
+    },
+    { ide: IDE_DEFINITIONS.firebasestudio },
+  ])(
+    'does not show install message for $ide.name and makes no network requests',
+    async ({ ide }) => {
+      vi.mocked(detectIdeFromEnv).mockReturnValue(ide);
+      vi.mocked(context.globalState.get).mockReturnValue(undefined);
+      const fetchSpy = vi.spyOn(globalThis, 'fetch');
       const showInformationMessageMock = vi.mocked(
         vscode.window.showInformationMessage,
       );
@@ -164,132 +131,28 @@ describe('activate', () => {
       await activate(context);
 
       expect(showInformationMessageMock).not.toHaveBeenCalled();
-    });
+      expect(fetchSpy).not.toHaveBeenCalled();
+    },
+  );
 
-    it.each([
-      {
-        ide: IDE_DEFINITIONS.cloudshell,
-      },
-      { ide: IDE_DEFINITIONS.firebasestudio },
-    ])(
-      'does not show install or update messages for $ide.name',
-      async ({ ide }) => {
-        vi.mocked(detectIdeFromEnv).mockReturnValue(ide);
-        vi.mocked(context.globalState.get).mockReturnValue(undefined);
-        vi.spyOn(global, 'fetch').mockResolvedValue({
-          ok: true,
-          json: async () => ({
-            results: [
-              {
-                extensions: [
-                  {
-                    versions: [{ version: '1.2.0' }],
-                  },
-                ],
-              },
-            ],
-          }),
-        } as Response);
-        const showInformationMessageMock = vi.mocked(
-          vscode.window.showInformationMessage,
-        );
+  it('should register gemini.diff.open command and handle empty or partial arguments safely', async () => {
+    const registerCommandMock = vi.mocked(vscode.commands.registerCommand);
 
-        await activate(context);
+    await activate(context);
 
-        expect(showInformationMessageMock).not.toHaveBeenCalled();
-      },
+    const openCommandCall = registerCommandMock.mock.calls.find(
+      (call) => call[0] === 'gemini.diff.open',
     );
+    expect(openCommandCall).toBeDefined();
 
-    it('should not show an update notification if the version is older', async () => {
-      vi.spyOn(global, 'fetch').mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          results: [
-            {
-              extensions: [
-                {
-                  versions: [{ version: '1.0.0' }],
-                },
-              ],
-            },
-          ],
-        }),
-      } as Response);
+    const handler = openCommandCall![1] as (args?: {
+      filePath?: string;
+      newContent?: string;
+    }) => Promise<void>;
+    expect(handler).toBeInstanceOf(Function);
 
-      const showInformationMessageMock = vi.mocked(
-        vscode.window.showInformationMessage,
-      );
-
-      await activate(context);
-
-      expect(showInformationMessageMock).not.toHaveBeenCalled();
-    });
-
-    it('should execute the install command when the user clicks "Update"', async () => {
-      vi.spyOn(global, 'fetch').mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          results: [
-            {
-              extensions: [
-                {
-                  versions: [{ version: '1.2.0' }],
-                },
-              ],
-            },
-          ],
-        }),
-      } as Response);
-      vi.mocked(vscode.window.showInformationMessage).mockResolvedValue(
-        'Update to latest version' as never,
-      );
-      const executeCommandMock = vi.mocked(vscode.commands.executeCommand);
-
-      await activate(context);
-
-      // Wait for the promise from showInformationMessage.then() to resolve
-      await new Promise(process.nextTick);
-
-      expect(executeCommandMock).toHaveBeenCalledWith(
-        'workbench.extensions.installExtension',
-        'Google.gemini-cli-vscode-ide-companion',
-      );
-    });
-
-    it('should handle fetch errors gracefully', async () => {
-      vi.spyOn(global, 'fetch').mockResolvedValue({
-        ok: false,
-        statusText: 'Internal Server Error',
-      } as Response);
-
-      const showInformationMessageMock = vi.mocked(
-        vscode.window.showInformationMessage,
-      );
-
-      await activate(context);
-
-      expect(showInformationMessageMock).not.toHaveBeenCalled();
-    });
-
-    it('should register gemini.diff.open command and handle empty or partial arguments safely', async () => {
-      const registerCommandMock = vi.mocked(vscode.commands.registerCommand);
-
-      await activate(context);
-
-      const openCommandCall = registerCommandMock.mock.calls.find(
-        (call) => call[0] === 'gemini.diff.open',
-      );
-      expect(openCommandCall).toBeDefined();
-
-      const handler = openCommandCall![1] as (args?: {
-        filePath?: string;
-        newContent?: string;
-      }) => Promise<void>;
-      expect(handler).toBeInstanceOf(Function);
-
-      // Call handler with empty or partial args to ensure it doesn't throw or crash
-      await expect(handler()).resolves.not.toThrow();
-      await expect(handler({ filePath: '/test.ts' })).resolves.not.toThrow();
-    });
+    // Call handler with empty or partial args to ensure it doesn't throw or crash
+    await expect(handler()).resolves.not.toThrow();
+    await expect(handler({ filePath: '/test.ts' })).resolves.not.toThrow();
   });
 });
