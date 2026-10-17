@@ -40,6 +40,13 @@ Slash commands provide meta-level control over the CLI itself.
 ### `/auth`
 
 - **Description:** Open a dialog that lets you change the authentication method.
+- **Subcommands:**
+  - **`signin`** (or **`login`**): Open the authentication dialog. Confirming a
+    method saves the selected authentication type. Selecting **Sign in with
+    Google** clears cached OAuth credentials so you can sign in again. Opening
+    or canceling the dialog doesn't reset your settings.
+  - **`signout`** (or **`logout`**): Clear cached credentials and remove the
+    selected authentication type from user settings. Other settings remain.
 
 ### `/bug`
 
@@ -327,6 +334,8 @@ Slash commands provide meta-level control over the CLI itself.
 ### `/quit` (or `/exit`)
 
 - **Description:** Exit Gemini CLI.
+- **Settings:** Keep saved preferences and sign-in credentials for the next
+  session.
 - **Flags:**
   - **`--delete`** _(optional)_: Exit and permanently delete the current
     session's history and temporary files (chat recording, tool outputs). Useful

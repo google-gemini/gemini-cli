@@ -47,10 +47,12 @@ function writeAtomicSync(filePath: string, content: string): void {
 
 /**
  * Updates a JSON file while preserving comments and formatting.
+ * When provided, propertyPath limits synchronization to that property.
  */
 export function updateSettingsFilePreservingFormat(
   filePath: string,
   updates: Record<string, unknown>,
+  propertyPath?: readonly string[],
 ): void {
   const dirPath = path.dirname(filePath);
   if (!fs.existsSync(dirPath)) {
@@ -58,7 +60,10 @@ export function updateSettingsFilePreservingFormat(
   }
 
   if (!fs.existsSync(filePath)) {
-    writeAtomicSync(filePath, JSON.stringify(updates, null, 2));
+    const initialSettings = propertyPath
+      ? applyPropertyUpdate({}, updates, propertyPath)
+      : updates;
+    writeAtomicSync(filePath, JSON.stringify(initialSettings, null, 2));
     return;
   }
 
@@ -72,8 +77,13 @@ export function updateSettingsFilePreservingFormat(
       if (
         typeof rawParsed !== 'object' ||
         rawParsed === null ||
-        Array.isArray(rawParsed)
+        Array.isArray(rawParsed) ||
+        (propertyPath &&
+          Object.prototype.toString.call(rawParsed) !== '[object Object]')
       ) {
+        if (propertyPath) {
+          throw new Error('Settings file must contain a JSON object.');
+        }
         parsed = {};
       } else {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -87,7 +97,10 @@ export function updateSettingsFilePreservingFormat(
       'code' in error &&
       error.code === 'ENOENT'
     ) {
-      writeAtomicSync(filePath, JSON.stringify(updates, null, 2));
+      const initialSettings = propertyPath
+        ? applyPropertyUpdate({}, updates, propertyPath)
+        : updates;
+      writeAtomicSync(filePath, JSON.stringify(initialSettings, null, 2));
       return;
     }
     coreEvents.emitFeedback(
@@ -98,10 +111,62 @@ export function updateSettingsFilePreservingFormat(
     return;
   }
 
-  const updatedStructure = applyUpdates(parsed, updates);
+  const updatedStructure = propertyPath
+    ? applyPropertyUpdate(parsed, updates, propertyPath)
+    : applyUpdates(parsed, updates);
   const updatedContent = stringify(updatedStructure, null, 2);
 
   writeAtomicSync(filePath, updatedContent);
+}
+
+function isPropertyContainer(value: unknown): value is Record<string, unknown> {
+  // Arrays support numeric property paths, just as setNestedProperty does.
+  return typeof value === 'object' && value !== null;
+}
+
+/**
+ * Updates one property against the current file, retaining unrelated edits made
+ * after settings were loaded. An object-valued property still replaces that
+ * entire property, including removing keys omitted from the new value.
+ */
+function applyPropertyUpdate(
+  current: Record<string, unknown>,
+  updates: Record<string, unknown>,
+  propertyPath: readonly string[],
+): Record<string, unknown> {
+  const [key, ...remaining] = propertyPath;
+  if (
+    !key ||
+    isDangerousKey(key) ||
+    !Object.prototype.hasOwnProperty.call(updates, key)
+  ) {
+    return current;
+  }
+  if (remaining.length > 0) {
+    const desiredChild = updates[key];
+    if (isPropertyContainer(desiredChild)) {
+      const currentChild: unknown =
+        isPropertyContainer(current[key]) &&
+        Array.isArray(current[key]) === Array.isArray(desiredChild)
+          ? current[key]
+          : Array.isArray(desiredChild)
+            ? []
+            : {};
+      if (isPropertyContainer(currentChild)) {
+        current[key] = applyPropertyUpdate(
+          currentChild,
+          desiredChild,
+          remaining,
+        );
+      }
+    }
+  } else if (updates[key] === undefined) {
+    preserveCommentsOnPropertyDeletion(current, key);
+    delete current[key];
+  } else {
+    applyKeyDiff(current, updates, key);
+  }
+  return current;
 }
 
 /**
@@ -176,8 +241,11 @@ function preserveCommentsOnPropertyDeletion(
 function applyKeyDiff(
   base: Record<string, unknown>,
   desired: Record<string, unknown>,
+  propertyKey?: string,
 ): void {
-  for (const existingKey of Object.getOwnPropertyNames(base)) {
+  for (const existingKey of propertyKey === undefined
+    ? Object.getOwnPropertyNames(base)
+    : [propertyKey]) {
     if (isDangerousKey(existingKey)) {
       continue;
     }
@@ -187,7 +255,9 @@ function applyKeyDiff(
     }
   }
 
-  for (const nextKey of Object.getOwnPropertyNames(desired)) {
+  for (const nextKey of propertyKey === undefined
+    ? Object.getOwnPropertyNames(desired)
+    : [propertyKey]) {
     if (isDangerousKey(nextKey)) {
       continue;
     }
