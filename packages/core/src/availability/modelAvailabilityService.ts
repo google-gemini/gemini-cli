@@ -159,8 +159,16 @@ export class ModelAvailabilityService {
     }
   }
 
-  reset() {
-    this.health.clear();
+  reset(options: { preserveQuota?: boolean } = {}): void {
+    if (!options.preserveQuota) {
+      this.health.clear();
+      return;
+    }
+    for (const [model, state] of this.health.entries()) {
+      if (state.status !== 'terminal' || state.reason !== 'quota') {
+        this.health.delete(model);
+      }
+    }
   }
 
   private setState(model: ModelId, nextState: HealthState) {

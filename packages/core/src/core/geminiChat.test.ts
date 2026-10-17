@@ -3964,6 +3964,7 @@ describe('GeminiChat', () => {
     let mockAvailabilityService: ModelAvailabilityService;
 
     beforeEach(async () => {
+      vi.mocked(mockConfig.getModel).mockReturnValue('auto');
       mockAvailabilityService = createAvailabilityServiceMock();
       vi.mocked(mockConfig.getModelAvailabilityService).mockReturnValue(
         mockAvailabilityService,
