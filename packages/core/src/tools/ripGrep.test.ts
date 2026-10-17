@@ -11,6 +11,7 @@ import {
   resolveRipgrepPath,
 } from './ripGrep.js';
 import type { GrepResult } from './tools.js';
+import { ToolErrorType } from './tool-error.js';
 import path from 'node:path';
 import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import fs from 'node:fs/promises';
@@ -459,6 +460,7 @@ describe('RipGrepTool', () => {
       expect((result.returnDisplay as GrepResult).summary).toBe(
         'No matches found',
       );
+      expect(result.error).toBeUndefined();
     });
 
     it('should throw error for invalid regex pattern during build', async () => {
@@ -468,7 +470,7 @@ describe('RipGrepTool', () => {
       );
     });
 
-    it('should ignore invalid regex error from ripgrep when it is not a user error', async () => {
+    it('should return a GREP_EXECUTION_ERROR when ripgrep exits with an error code', async () => {
       mockSpawn.mockImplementation(
         createMockSpawn({
           outputData: '',
@@ -487,6 +489,74 @@ describe('RipGrepTool', () => {
       expect(result.returnDisplay).toContain(
         'Error: Process exited with code 2',
       );
+      expect(result.error).toEqual({
+        message: expect.stringContaining('Process exited with code 2'),
+        type: ToolErrorType.GREP_EXECUTION_ERROR,
+      });
+    });
+
+    it('should return a GREP_EXECUTION_ERROR when ripgrep fails to spawn', async () => {
+      mockSpawn.mockImplementation(() => {
+        const mockProcess = createMockSpawn({ exitCode: null })();
+        setTimeout(() => {
+          mockProcess.emit('error', new Error('spawn /mock/rg EACCES'));
+        }, 0);
+        return mockProcess;
+      });
+
+      const invocation = grepTool.build({ pattern: 'foo' });
+      const result = await invocation.execute({ abortSignal });
+
+      expect(result.llmContent).toContain('spawn /mock/rg EACCES');
+      expect(result.error).toEqual({
+        message: 'spawn /mock/rg EACCES',
+        type: ToolErrorType.GREP_EXECUTION_ERROR,
+      });
+    });
+
+    describe('when the search path cannot be inspected', () => {
+      afterEach(() => {
+        vi.restoreAllMocks();
+      });
+
+      it('should return a PATH_IS_NOT_A_DIRECTORY error if the path is neither a file nor a directory', async () => {
+        vi.spyOn(fs, 'stat').mockResolvedValueOnce({
+          isDirectory: () => false,
+          isFile: () => false,
+        } as Awaited<ReturnType<typeof fs.stat>>);
+
+        const invocation = grepTool.build({ pattern: 'foo' });
+        const result = await invocation.execute({ abortSignal });
+
+        expect(result.returnDisplay).toBe(
+          'Error: Path is not a valid directory or file.',
+        );
+        expect(result.error).toEqual({
+          message: expect.stringContaining(
+            'Path is not a valid directory or file',
+          ),
+          type: ToolErrorType.PATH_IS_NOT_A_DIRECTORY,
+        });
+        expect(mockSpawn).not.toHaveBeenCalled();
+      });
+
+      it('should return a GREP_EXECUTION_ERROR if the path stats cannot be read', async () => {
+        vi.spyOn(fs, 'stat').mockRejectedValueOnce(
+          Object.assign(new Error('EACCES: permission denied'), {
+            code: 'EACCES',
+          }),
+        );
+
+        const invocation = grepTool.build({ pattern: 'foo' });
+        const result = await invocation.execute({ abortSignal });
+
+        expect(result.returnDisplay).toBe('Error: Failed to access path.');
+        expect(result.error).toEqual({
+          message: expect.stringContaining('EACCES: permission denied'),
+          type: ToolErrorType.GREP_EXECUTION_ERROR,
+        });
+        expect(mockSpawn).not.toHaveBeenCalled();
+      });
     });
 
     it('should handle massive output by terminating early without crashing (Regression)', async () => {
@@ -684,7 +754,7 @@ describe('RipGrepTool', () => {
       );
     });
 
-    it('should throw an error if ripgrep is not available', async () => {
+    it('should return a GREP_EXECUTION_ERROR if ripgrep is not available', async () => {
       vi.mocked(mockConfig.getRipgrepPath).mockResolvedValue(null);
 
       const params: RipGrepToolParams = { pattern: 'world' };
@@ -692,6 +762,10 @@ describe('RipGrepTool', () => {
 
       const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toContain('Cannot find bundled ripgrep binary');
+      expect(result.error).toEqual({
+        message: 'Cannot find bundled ripgrep binary.',
+        type: ToolErrorType.GREP_EXECUTION_ERROR,
+      });
 
       // restore the mock for subsequent tests
       vi.mocked(mockConfig.getRipgrepPath).mockResolvedValue('/mock/rg');
