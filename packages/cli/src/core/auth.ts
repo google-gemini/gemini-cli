@@ -20,6 +20,12 @@ export interface InitialAuthResult {
   accountSuspensionInfo: AccountSuspensionInfo | null;
 }
 
+const ANTIGRAVITY_URL = 'https://antigravity.google';
+
+function normalizeAuthErrorMessage(message: string): string {
+  return message.replaceAll(`${ANTIGRAVITY_URL}.`, ANTIGRAVITY_URL);
+}
+
 /**
  * Handles the initial authentication flow.
  * @param config The application config.
@@ -64,7 +70,9 @@ export async function performInitialAuth(
       };
     }
     return {
-      authError: `Failed to sign in. Message: ${getErrorMessage(e)}`,
+      authError: `Failed to sign in. Message: ${normalizeAuthErrorMessage(
+        getErrorMessage(e),
+      )}`,
       accountSuspensionInfo: null,
     };
   }
