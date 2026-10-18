@@ -10,6 +10,31 @@ import path from 'node:path';
 import { isNodeError } from '../utils/errors.js';
 import { resolveToRealPath } from '../utils/paths.js';
 
+// Linux and macOS cap a single path component at 255 bytes (NAME_MAX).
+const MAX_NAME_BYTES = 255;
+
+function buildTempPath(realPath: string): string {
+  const suffix = `.${randomUUID()}.tmp`;
+  const base = path.basename(realPath);
+  const budget = MAX_NAME_BYTES - Buffer.byteLength(suffix);
+
+  // Short names keep today's format: <destination>.<uuid>.tmp
+  if (Buffer.byteLength(base) <= budget) {
+    return `${realPath}${suffix}`;
+  }
+
+  // Keep whole characters only, so a multi-byte character is never cut in half.
+  let kept = '';
+  let bytes = 0;
+  for (const ch of base) {
+    const size = Buffer.byteLength(ch);
+    if (bytes + size > budget) break;
+    kept += ch;
+    bytes += size;
+  }
+  return path.join(path.dirname(realPath), `${kept}${suffix}`);
+}
+
 /**
  * Interface for file system operations that may be delegated to different implementations
  */
@@ -70,7 +95,7 @@ export class StandardFileSystemService implements FileSystemService {
     // The temp file must share a directory with the destination so that the
     // rename stays within one filesystem, and must be uniquely named so that
     // concurrent writers do not clobber each other's temp file.
-    const tmpPath = `${realPath}.${randomUUID()}.tmp`;
+    const tmpPath = buildTempPath(realPath);
 
     // A fresh temp file does not inherit the destination's permissions, so
     // without this, replacing a 0600 file would silently widen it to the
