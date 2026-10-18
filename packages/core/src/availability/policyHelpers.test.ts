@@ -16,6 +16,8 @@ import type { RetryAvailabilityContext } from './modelPolicy.js';
 import type { Config } from '../config/config.js';
 import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
+  LATEST_GEMINI_FLASH_LITE_MODEL,
   BASE_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
@@ -26,6 +28,8 @@ import { AuthType } from '../core/contentGenerator.js';
 import { ModelConfigService } from '../services/modelConfigService.js';
 import { DEFAULT_MODEL_CONFIGS } from '../config/defaultModelConfigs.js';
 import { ApprovalMode } from '../policy/types.js';
+import { ModelAvailabilityService } from './modelAvailabilityService.js';
+import { ThinkingLevel } from '@google/genai';
 
 const createMockConfig = (overrides: Partial<Config> = {}): Config => {
   const config = {
@@ -455,6 +459,91 @@ describe('policyHelpers', () => {
       ).not.toHaveBeenCalled();
       expect(config.setActiveModel).toHaveBeenCalledWith('gemini-pro');
       expect(result.maxAttempts).toBe(1);
+    });
+
+    describe('alias generateContentConfig resolution', () => {
+      const aliasConfig = {
+        temperature: 0,
+        maxOutputTokens: 64,
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+      };
+
+      const createAliasConfig = (
+        availability: ModelAvailabilityService,
+      ): Config => {
+        const modelConfigService = new ModelConfigService({
+          ...DEFAULT_MODEL_CONFIGS,
+          customAliases: {
+            'my-lite': {
+              extends: 'base',
+              modelConfig: {
+                model: 'flash-lite',
+                generateContentConfig: aliasConfig,
+              },
+            },
+            'my-lite-pinned': {
+              extends: 'base',
+              modelConfig: {
+                model: LATEST_GEMINI_FLASH_LITE_MODEL,
+                generateContentConfig: aliasConfig,
+              },
+            },
+          },
+        });
+        return createExtendedMockConfig({
+          modelConfigService,
+          getModelAvailabilityService: () => availability,
+        });
+      };
+
+      it('keeps the alias config when the alias model is a tier name that resolves to its own first choice', () => {
+        const config = createAliasConfig(new ModelAvailabilityService());
+
+        const result = applyModelSelection(config, {
+          model: 'my-lite',
+          isChatModel: true,
+        });
+
+        // The tier resolved to its own first choice, so this is not an
+        // availability fallback and the alias settings must be preserved.
+        expect(result.model).toBe(DEFAULT_GEMINI_FLASH_LITE_MODEL);
+        expect(result.config.temperature).toBe(0);
+        expect(result.config.maxOutputTokens).toBe(64);
+        expect(result.config.thinkingConfig).toEqual({
+          thinkingLevel: ThinkingLevel.LOW,
+        });
+      });
+
+      it('keeps the alias config when the alias model is a concrete model name', () => {
+        const config = createAliasConfig(new ModelAvailabilityService());
+
+        const result = applyModelSelection(config, {
+          model: 'my-lite-pinned',
+          isChatModel: true,
+        });
+
+        expect(result.model).toBe(LATEST_GEMINI_FLASH_LITE_MODEL);
+        expect(result.config.temperature).toBe(0);
+        expect(result.config.maxOutputTokens).toBe(64);
+        expect(result.config.thinkingConfig).toEqual({
+          thinkingLevel: ThinkingLevel.LOW,
+        });
+      });
+
+      it('re-resolves the config when the tier actually falls back to another model', () => {
+        const availability = new ModelAvailabilityService();
+        availability.markTerminal(DEFAULT_GEMINI_FLASH_LITE_MODEL, 'quota');
+        const config = createAliasConfig(availability);
+
+        const result = applyModelSelection(config, {
+          model: 'my-lite',
+          isChatModel: true,
+        });
+
+        expect(result.model).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+        expect(result.config.temperature).toBe(1);
+        expect(result.config.maxOutputTokens).toBeUndefined();
+      });
     });
   });
 
