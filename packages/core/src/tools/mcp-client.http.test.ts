@@ -31,7 +31,7 @@ describe('MCP HTTP fetch', () => {
 
   function proxyEnvironment(noProxy = '127.0.0.1') {
     vi.stubEnv('NO_PROXY', noProxy);
-    vi.stubEnv('no_proxy', '');
+    vi.stubEnv('no_proxy', noProxy);
     vi.stubEnv('HTTP_PROXY', 'http://127.0.0.1:1');
     vi.stubEnv('http_proxy', 'http://127.0.0.1:1');
     vi.stubEnv('HTTPS_PROXY', 'http://127.0.0.1:1');
