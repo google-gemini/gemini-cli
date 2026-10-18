@@ -191,8 +191,8 @@ describe('clipboardUtils', () => {
 
     it('should detect wl-paste when XDG_SESSION_TYPE is unset but WAYLAND_DISPLAY is set (WSL2 Wayland fallback)', async () => {
       mockPlatform('linux');
-      delete process.env['XDG_SESSION_TYPE'];
-      process.env['WAYLAND_DISPLAY'] = 'wayland-0';
+      vi.stubEnv('XDG_SESSION_TYPE', '');
+      vi.stubEnv('WAYLAND_DISPLAY', 'wayland-0');
       vi.mocked(execSync).mockReturnValue(Buffer.from(''));
       vi.mocked(spawnAsync).mockResolvedValueOnce({
         stdout: 'image/png\ntext/plain',
