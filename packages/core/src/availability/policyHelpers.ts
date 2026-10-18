@@ -24,8 +24,6 @@ import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
-  GEMINI_MODEL_ALIAS_FLASH,
-  GEMINI_MODEL_ALIAS_PRO,
   PREVIEW_GEMINI_MODEL_AUTO,
   VALID_GEMINI_MODELS,
   getBackendModelMappings,
@@ -345,11 +343,15 @@ export function resolveQuotaFallbackModel(
     buckets.filter(
       (bucket) => bucket.modelId && quotaId(bucket.modelId) === quotaId(model),
     );
-  const proModel = resolveConfiguredModelId(config, GEMINI_MODEL_ALIAS_PRO);
-  const flashModel = resolveConfiguredModelId(config, GEMINI_MODEL_ALIAS_FLASH);
-  const candidates = isProModel(requested)
-    ? [requested, flashModel, proModel]
-    : [requested, proModel, flashModel];
+  // Use the selected Auto policy rather than global tier aliases: stable Auto
+  // and custom chains may deliberately exclude otherwise accessible models.
+  const policyModel =
+    Object.entries(mappings).find(
+      ([, backend]) => backend === requested,
+    )?.[0] ?? requested;
+  const candidates = resolvePolicyChain(config, policyModel, true)
+    .map(({ model }) => resolveConfiguredModelId(config, model))
+    .filter(isQuotaRoutingModel);
   const noProAccess = config.getProModelNoAccessSync?.() ?? false;
   const availability = config.getModelAvailabilityService();
   const seen = new Set<string>();

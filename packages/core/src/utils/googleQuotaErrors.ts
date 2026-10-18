@@ -87,7 +87,8 @@ export function isQuotaExhaustedError(
     for (const detail of error.cause.details) {
       if (
         detail['@type'] === 'type.googleapis.com/google.rpc.ErrorInfo' &&
-        detail.reason === 'RATE_LIMIT_EXCEEDED'
+        (detail.reason === 'RATE_LIMIT_EXCEEDED' ||
+          detail.metadata?.['quota_limit']?.includes('PerMinute'))
       ) {
         return false;
       }
