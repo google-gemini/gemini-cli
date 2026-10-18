@@ -30,6 +30,7 @@ import { waitFor } from '../../test-utils/async.js';
 import { UIStateContext, useUIState } from '../contexts/UIStateContext.js';
 import { ToolActionsProvider } from '../contexts/ToolActionsContext.js';
 import { useEditorSettings } from '../hooks/useEditorSettings.js';
+import { useKeypress } from '../hooks/useKeypress.js';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
 import { EditorSettingsDialog } from './EditorSettingsDialog.js';
 
@@ -103,11 +104,24 @@ describe('Tool confirmation while selecting an external editor', () => {
         schedulerId: 'editor-selection-test',
       });
       const controller = new AbortController();
+      const cancelRequest = vi.fn(() => controller.abort());
 
       function ConfirmationWithEditorDialog() {
         const uiState = useUIState();
         const [call, setCall] = useState<ToolCall>();
         const editor = useEditorSettings(settings, vi.fn(), vi.fn());
+
+        // The stream handler can subscribe after the modal on a parent render.
+        useKeypress(
+          (key) => {
+            if (key.name === 'escape') {
+              cancelRequest();
+              return true;
+            }
+            return false;
+          },
+          { isActive: true },
+        );
 
         useEffect(() => {
           const onUpdate = (event: ToolCallsUpdateMessage) => {
@@ -223,6 +237,7 @@ describe('Tool confirmation while selecting an external editor', () => {
         expect(lastFrame()).toContain('Target: package.json');
         expect(lastFrame()).toContain('Apply this change?');
         expect(settled).toBe(false);
+        expect(cancelRequest).not.toHaveBeenCalled();
         expect(execute).not.toHaveBeenCalled();
         expect(onConfirm).toHaveBeenCalledTimes(1);
         expect(settings.setValue).not.toHaveBeenCalled();
