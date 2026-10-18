@@ -193,7 +193,7 @@ export const getCachedStringWidth = (str: string): number => {
 
   let width: number;
   try {
-    width = stringWidth(str);
+    width = measureStringWidth(str);
   } catch {
     // Fallback for characters that cause string-width to crash (e.g. U+0602)
     // See: https://github.com/google-gemini/gemini-cli/issues/16418
@@ -204,6 +204,21 @@ export const getCachedStringWidth = (str: string): number => {
 
   return width;
 };
+
+// Thai SARA AM (U+0E33) and Lao SARA AM (U+0EB3) are spacing vowels. Terminals
+// (wcwidth) render each as one column, but Intl.Segmenter-based width
+// calculation folds them into the preceding grapheme cluster, under-counting
+// by one column per occurrence.
+// See: https://github.com/google-gemini/gemini-cli/issues/25369
+const SARA_AM_REGEX = /[ำຳ]/g;
+
+function measureStringWidth(str: string): number {
+  const saraAmCount = str.match(SARA_AM_REGEX)?.length ?? 0;
+  if (saraAmCount === 0) {
+    return stringWidth(str);
+  }
+  return stringWidth(str.replace(SARA_AM_REGEX, '')) + saraAmCount;
+}
 
 const regex = ansiRegex();
 

@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { render } from 'ink';
+import { render, setStringWidthFunction } from 'ink';
 import { basename } from 'node:path';
 import { AppContainer } from './ui/AppContainer.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
@@ -51,6 +51,7 @@ import { TerminalProvider } from './ui/contexts/TerminalContext.js';
 import { OverflowProvider } from './ui/contexts/OverflowContext.js';
 import { profiler } from './ui/components/DebugProfiler.js';
 import { initializeConsoleStore } from './ui/hooks/useConsoleMessages.js';
+import { getCachedStringWidth } from './ui/utils/textUtils.js';
 
 const SLOW_RENDER_MS = 200;
 
@@ -138,6 +139,9 @@ export async function startInteractiveUI(
     // Wait a moment for shpool to stabilize terminal size and state.
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
+  // Make Ink measure text the same way the rest of the CLI (and terminals) do,
+  // e.g. Thai SARA AM (U+0E33) occupies a column. See #25369.
+  setStringWidthFunction(getCachedStringWidth);
   const instance = render(
     process.env['DEBUG'] ? (
       <React.StrictMode>
