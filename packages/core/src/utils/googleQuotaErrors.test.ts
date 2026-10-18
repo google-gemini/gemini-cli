@@ -96,6 +96,30 @@ describe('isQuotaExhaustedError', () => {
     expect(isQuotaExhaustedError(error)).toBe(false);
   });
 
+  it('excludes per-minute ErrorInfo metadata even when a long delay is classified as terminal', () => {
+    const error = classifyGoogleError({
+      error: {
+        code: 429,
+        message: 'Too many requests',
+        details: [
+          {
+            '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+            reason: 'RESOURCE_EXHAUSTED',
+            domain: 'generativelanguage.googleapis.com',
+            metadata: { quota_limit: 'RequestsPerMinute_PerProject_PerUser' },
+          },
+          {
+            '@type': 'type.googleapis.com/google.rpc.RetryInfo',
+            retryDelay: '600s',
+          },
+        ],
+      },
+    });
+
+    expect(error).toBeInstanceOf(TerminalQuotaError);
+    expect(isQuotaExhaustedError(error)).toBe(false);
+  });
+
   it('recognizes rate-limit evidence preserved only in the underlying error details', () => {
     const error = new TerminalQuotaError(
       'Too many requests',

@@ -14,6 +14,9 @@ import {
 } from '../utils/googleQuotaErrors.js';
 import {
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+  BASE_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
@@ -77,6 +80,133 @@ describe('Auto Routing Fallback Integration', () => {
     vi.useRealTimers();
     vi.restoreAllMocks();
     resetModelsForTesting();
+  });
+
+  it.each([
+    [DEFAULT_GEMINI_MODEL, BASE_GEMINI_FLASH_MODEL],
+    [BASE_GEMINI_FLASH_MODEL, DEFAULT_GEMINI_MODEL],
+  ])(
+    'retries stable Auto %s quota on %s immediately despite preview access',
+    async (requestedModel, expectedModel) => {
+      config = new Config({
+        sessionId: 'stable-auto-quota',
+        targetDir: '/test',
+        debugMode: false,
+        cwd: '/test',
+        model: DEFAULT_GEMINI_MODEL_AUTO,
+      });
+      vi.spyOn(config, 'getGemini31LaunchedSync').mockReturnValue(true);
+      const fallbackHandler = vi.fn();
+      config.setFallbackModelHandler(fallbackHandler);
+      client = new BaseLlmClient(
+        fakeGenerator,
+        config,
+        AuthType.LOGIN_WITH_GOOGLE,
+      );
+      const generate = vi
+        .spyOn(fakeGenerator, 'generateContent')
+        .mockRejectedValueOnce(
+          new TerminalQuotaError(
+            'Daily quota exhausted',
+            { code: 429, message: 'Daily quota exhausted', details: [] },
+            3600,
+            'QUOTA_EXHAUSTED',
+          ),
+        )
+        .mockResolvedValue({
+          candidates: [
+            { content: { role: 'model', parts: [{ text: 'Recovered' }] } },
+          ],
+        } as GenerateContentResponse);
+
+      const response = await client.generateContent({
+        modelConfigKey: { model: requestedModel, isChatModel: true },
+        contents: [{ role: 'user', parts: [{ text: 'Continue' }] }],
+        abortSignal: new AbortController().signal,
+        promptId: 'stable-auto-quota',
+        role: LlmRole.MAIN,
+      });
+
+      expect(response.candidates?.[0]?.content?.parts).toEqual([
+        { text: 'Recovered' },
+      ]);
+      expect(generate.mock.calls.map(([request]) => request.model)).toEqual([
+        requestedModel,
+        expectedModel,
+      ]);
+      expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL_AUTO);
+      expect(config.getActiveModel()).toBe(expectedModel);
+      expect(
+        config.getModelAvailabilityService().snapshot(requestedModel),
+      ).toEqual({
+        available: false,
+        reason: 'quota',
+      });
+      expect(fallbackHandler).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+    },
+  );
+
+  it('keeps per-minute ErrorInfo metadata in the existing fallback flow', async () => {
+    config = new Config({
+      sessionId: 'per-minute-metadata',
+      targetDir: '/test',
+      debugMode: false,
+      cwd: '/test',
+      model: PREVIEW_GEMINI_MODEL_AUTO,
+    });
+    vi.spyOn(config, 'isInteractive').mockReturnValue(true);
+    const fallbackHandler = vi.fn(async (): Promise<FallbackIntent> => 'stop');
+    config.setFallbackModelHandler(fallbackHandler);
+    client = new BaseLlmClient(
+      fakeGenerator,
+      config,
+      AuthType.LOGIN_WITH_GOOGLE,
+    );
+    const generate = vi
+      .spyOn(fakeGenerator, 'generateContent')
+      .mockRejectedValue({
+        error: {
+          code: 429,
+          message: 'Too many requests',
+          details: [
+            {
+              '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+              reason: 'RESOURCE_EXHAUSTED',
+              domain: 'generativelanguage.googleapis.com',
+              metadata: { quota_limit: 'RequestsPerMinute_PerProject_PerUser' },
+            },
+            {
+              '@type': 'type.googleapis.com/google.rpc.RetryInfo',
+              retryDelay: '600s',
+            },
+          ],
+        },
+      });
+
+    await expect(
+      client.generateContent({
+        modelConfigKey: { model: PREVIEW_GEMINI_MODEL, isChatModel: true },
+        contents: [{ role: 'user', parts: [{ text: 'Continue' }] }],
+        abortSignal: new AbortController().signal,
+        promptId: 'per-minute-metadata',
+        role: LlmRole.MAIN,
+      }),
+    ).rejects.toThrow('Too many requests');
+
+    expect(generate).toHaveBeenCalledTimes(1);
+    expect(fallbackHandler).toHaveBeenCalledWith(
+      PREVIEW_GEMINI_MODEL,
+      PREVIEW_GEMINI_FLASH_MODEL,
+      expect.any(TerminalQuotaError),
+    );
+    expect(config.getActiveModel()).toBe(PREVIEW_GEMINI_MODEL);
+    expect(
+      config.getModelAvailabilityService().snapshot(PREVIEW_GEMINI_MODEL),
+    ).toEqual({
+      available: true,
+    });
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it('should fallback to Flash after 3 tries and try 10 times for Flash in auto mode', async () => {
