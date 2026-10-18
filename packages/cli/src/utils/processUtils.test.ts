@@ -5,8 +5,12 @@
  */
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import type { ChildProcess } from 'node:child_process';
 import {
   RELAUNCH_EXIT_CODE,
+  FORWARDED_SIGNALS,
+  setupSignalForwarding,
+  handleChildProcessClose,
   relaunchApp,
   _resetRelaunchStateForTesting,
   isStandardSea,
@@ -253,6 +257,118 @@ describe('SEA handling utilities', () => {
       expect(() => {
         getSpawnConfig(['--title=A\\B'], []);
       }).toThrow();
+    });
+  });
+
+  describe('setupSignalForwarding and handleChildProcessClose', () => {
+    const initialListeners = new Map<
+      NodeJS.Signals,
+      NodeJS.SignalsListener[]
+    >();
+
+    beforeEach(() => {
+      for (const sig of FORWARDED_SIGNALS) {
+        initialListeners.set(sig, process.listeners(sig));
+      }
+    });
+
+    afterEach(() => {
+      for (const sig of FORWARDED_SIGNALS) {
+        process.removeAllListeners(sig);
+        const listeners = initialListeners.get(sig) || [];
+        for (const listener of listeners) {
+          process.on(sig, listener);
+        }
+      }
+      initialListeners.clear();
+    });
+
+    it('registers forwarders for FORWARDED_SIGNALS and removes them on cleanup', () => {
+      const originalPlatform = process.platform;
+      const initialCounts = new Map(
+        FORWARDED_SIGNALS.map((sig) => [sig, process.listenerCount(sig)]),
+      );
+      const mockChild = { kill: vi.fn() } as unknown as ChildProcess;
+
+      const removeForwarders = setupSignalForwarding(mockChild);
+
+      try {
+        for (const sig of FORWARDED_SIGNALS) {
+          expect(process.listenerCount(sig)).toBe(
+            (initialCounts.get(sig) ?? 0) + 1,
+          );
+        }
+
+        Object.defineProperty(process, 'platform', {
+          value: 'linux',
+          configurable: true,
+        });
+        process.emit('SIGTERM', 'SIGTERM');
+        expect(mockChild.kill).toHaveBeenCalledWith('SIGTERM');
+        process.emit('SIGINT', 'SIGINT');
+        expect(mockChild.kill).toHaveBeenCalledWith('SIGINT');
+
+        vi.mocked(mockChild.kill).mockClear();
+        Object.defineProperty(process, 'platform', {
+          value: 'win32',
+          configurable: true,
+        });
+        process.emit('SIGINT', 'SIGINT');
+        expect(mockChild.kill).not.toHaveBeenCalledWith('SIGINT');
+      } finally {
+        Object.defineProperty(process, 'platform', {
+          value: originalPlatform,
+          configurable: true,
+        });
+        removeForwarders();
+      }
+
+      for (const sig of FORWARDED_SIGNALS) {
+        expect(process.listenerCount(sig)).toBe(initialCounts.get(sig));
+      }
+    });
+
+    it('handleChildProcessClose resolves with exit code when no signal is present', () => {
+      const removeForwarders = vi.fn();
+      const resolve = vi.fn();
+      const stdinResumeSpy = vi
+        .spyOn(process.stdin, 'resume')
+        .mockReturnValue(process.stdin);
+
+      try {
+        handleChildProcessClose(0, null, removeForwarders, resolve);
+        expect(removeForwarders).toHaveBeenCalledTimes(1);
+        expect(stdinResumeSpy).toHaveBeenCalledTimes(1);
+        expect(resolve).toHaveBeenCalledWith(0);
+      } finally {
+        stdinResumeSpy.mockRestore();
+      }
+    });
+
+    it('handleChildProcessClose re-raises signal on parent and resolves via fallback timer', () => {
+      vi.useFakeTimers();
+      const removeForwarders = vi.fn();
+      const resolve = vi.fn();
+      const stdinResumeSpy = vi
+        .spyOn(process.stdin, 'resume')
+        .mockReturnValue(process.stdin);
+      const processKillSpy = vi
+        .spyOn(process, 'kill')
+        .mockImplementation(() => true);
+
+      try {
+        handleChildProcessClose(null, 'SIGTERM', removeForwarders, resolve);
+        expect(removeForwarders).toHaveBeenCalledTimes(1);
+        expect(stdinResumeSpy).toHaveBeenCalledTimes(1);
+        expect(processKillSpy).toHaveBeenCalledWith(process.pid, 'SIGTERM');
+
+        vi.runAllTimers();
+        expect(resolve).toHaveBeenCalledWith(1);
+      } finally {
+        processKillSpy.mockRestore();
+        stdinResumeSpy.mockRestore();
+        vi.useRealTimers();
+      }
     });
   });
 });

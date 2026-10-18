@@ -66,9 +66,14 @@ variables using `$VAR_NAME`, `${VAR_NAME}`, or `${VAR_NAME:-DEFAULT_VALUE}`
 syntax. These variables will be automatically resolved when the settings are
 loaded. For example, if you have an environment variable `MY_API_TOKEN`, you
 could use it in `settings.json` like this: `"apiKey": "$MY_API_TOKEN"`. If you
-want to provide a fallback value, use `${MY_API_TOKEN:-default-token}`.
-Additionally, each extension can have its own `.env` file in its directory,
-which will be loaded automatically.
+want to provide a fallback value, use `${MY_API_TOKEN:-default-token}`. You can
+reference variables from your shell environment as well as variables loaded from
+[`.env` files](#environment-variables-and-env-files). The settings that control
+how `.env` files are loaded, such as `security.folderTrust.enabled`,
+`advanced.ignoreLocalEnv`, `advanced.excludedEnvVars`, and `tools.sandbox`, are
+evaluated before any `.env` file is loaded, so they can only reference variables
+from your shell environment. Additionally, each extension can have its own
+`.env` file in its directory, which will be loaded automatically.
 
 **Note for Enterprise Users:** For guidance on deploying and managing Gemini CLI
 in a corporate environment, see the
@@ -2550,6 +2555,8 @@ see [Telemetry](../cli/telemetry.md).
   - **`otlpEndpoint`** (string): The endpoint for the OTLP Exporter.
   - **`otlpProtocol`** (string): The protocol for the OTLP Exporter (`grpc` or
     `http`).
+  - **`otlpHeaders`** (object): Custom headers to send with OTLP Exporter
+    requests.
   - **`logPrompts`** (boolean): Whether or not to include the content of user
     prompts in the logs.
   - **`outfile`** (string): The file to write telemetry to when `target` is
@@ -2766,6 +2773,11 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
 - **`GEMINI_TELEMETRY_OTLP_PROTOCOL`**:
   - Sets the OTLP protocol (`grpc` or `http`).
   - Overrides the `telemetry.otlpProtocol` setting.
+- **`GEMINI_TELEMETRY_OTLP_HEADERS`**:
+  - Sets custom headers for OTLP exporter requests (as a JSON object string or
+    comma-separated `key=value` pairs; also falls back to
+    `OTEL_EXPORTER_OTLP_HEADERS`).
+  - Merges with and overrides headers in the `telemetry.otlpHeaders` setting.
 - **`GEMINI_TELEMETRY_LOG_PROMPTS`**:
   - Set to `true` or `1` to enable or disable logging of user prompts. Any other
     value is treated as disabling it.

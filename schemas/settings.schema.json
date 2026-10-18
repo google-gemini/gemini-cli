@@ -4282,6 +4282,13 @@
           "description": "Protocol for OTLP exporters.",
           "enum": ["grpc", "http"]
         },
+        "otlpHeaders": {
+          "type": "object",
+          "description": "Custom headers to send with OTLP exporter requests.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
         "traces": {
           "type": "boolean",
           "description": "Whether detailed traces with large attributes are captured."

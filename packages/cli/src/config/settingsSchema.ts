@@ -3239,6 +3239,11 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
         description: 'Protocol for OTLP exporters.',
         enum: ['grpc', 'http'],
       },
+      otlpHeaders: {
+        type: 'object',
+        description: 'Custom headers to send with OTLP exporter requests.',
+        additionalProperties: { type: 'string' },
+      },
       traces: {
         type: 'boolean',
         description:

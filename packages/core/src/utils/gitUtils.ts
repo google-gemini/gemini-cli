@@ -21,9 +21,48 @@ export function getSafeGitEnv(
     }
   }
 
+  let baseSshCommand = cleanedEnv['GIT_SSH_COMMAND'];
+  if (!baseSshCommand && cleanedEnv['GIT_SSH']) {
+    const gitSsh = cleanedEnv['GIT_SSH'];
+    baseSshCommand =
+      gitSsh.includes(' ') && !gitSsh.startsWith('"') && !gitSsh.startsWith("'")
+        ? '"' + gitSsh + '"'
+        : gitSsh;
+  }
+  if (!baseSshCommand) {
+    baseSshCommand = 'ssh';
+  }
+
+  const execMatch = baseSshCommand.match(/^\s*(?:"([^"]+)"|'([^']+)'|(\S+))/);
+  const executable = execMatch
+    ? execMatch[1] || execMatch[2] || execMatch[3] || ''
+    : '';
+  const execName = executable.split(/[/\\]/).pop() || '';
+  const isPlink = /^(?:tortoise)?plink(?:\.exe)?$/i.test(execName);
+  const batchFlag = isPlink ? '-batch' : '-o BatchMode=yes';
+  const hasBatchFlag = isPlink
+    ? /(?:^|\s)-batch(?:\s|$)/.test(baseSshCommand)
+    : /\bbatchmode\s*=\s*yes\b/i.test(baseSshCommand) &&
+      !/\bbatchmode\s*=\s*no\b/i.test(baseSshCommand);
+
+  let gitSshCommand = baseSshCommand;
+  if (!hasBatchFlag && execMatch) {
+    const execLength = execMatch[0].length;
+    gitSshCommand =
+      baseSshCommand.slice(0, execLength) +
+      ' ' +
+      batchFlag +
+      baseSshCommand.slice(execLength);
+  }
+
   return {
     ...cleanedEnv,
     GIT_TERMINAL_PROMPT: '0',
+    GIT_ASKPASS: '',
+    SSH_ASKPASS: '',
+    GIT_SSH_COMMAND: gitSshCommand,
+    GH_PROMPT_DISABLED: '1',
+    GCM_INTERACTIVE: 'never',
     GIT_CONFIG_GLOBAL: devNullPath,
     GIT_CONFIG_SYSTEM: devNullPath,
     GIT_CONFIG_NOSYSTEM: '1',

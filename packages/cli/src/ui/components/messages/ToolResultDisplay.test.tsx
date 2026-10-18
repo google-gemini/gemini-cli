@@ -475,4 +475,48 @@ describe('ToolResultDisplay', () => {
 
     unmount();
   });
+
+  it('constrains wrapped markdown and code blocks within safeContentWidth in alternate buffer mode', async () => {
+    const markdownWithCodeAndLongText = [
+      '```ts',
+      ...Array.from({ length: 15 }, (_, i) => `const x${i} = ${i};`),
+      '//' + 'A'.repeat(90),
+      '```',
+    ].join('\n');
+
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+      <ToolResultDisplay
+        resultDisplay={markdownWithCodeAndLongText}
+        terminalWidth={50}
+        availableTerminalHeight={14}
+        renderOutputAsMarkdown={true}
+      />,
+      {
+        width: 50,
+        config: makeFakeConfig({ useAlternateBuffer: true }),
+        settings: createMockSettings({
+          ui: { useAlternateBuffer: true, showLineNumbers: true },
+        }),
+        uiState: { constrainHeight: true },
+      },
+    );
+    await waitUntilReady();
+
+    const output = lastFrame();
+    const lines = output.split('\n').filter((line) => line.length > 0);
+    expect(lines.length).toBeGreaterThan(0);
+    // childWidth is 50 - 4 = 46; every rendered line (including scrollbar) must fit within 46 cols
+    for (const line of lines) {
+      expect(line.length).toBeLessThanOrEqual(46);
+    }
+    // Wrapped code lines should leave 1 column of buffer for the scrollbar
+    const codeLines = lines.filter((line) => line.includes('AAAA'));
+    expect(codeLines.length).toBeGreaterThan(0);
+    for (const line of codeLines) {
+      const withoutScrollbar = line.replace(/[█▀▄\s]+$/, '');
+      expect(withoutScrollbar.length).toBeLessThanOrEqual(45);
+    }
+
+    unmount();
+  });
 });

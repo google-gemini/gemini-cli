@@ -833,6 +833,35 @@ describe('oauth-flow', () => {
         vi.useRealTimers();
       }
     });
+
+    it('should close the server and reject response when cancel is called', async () => {
+      const server = startCallbackServer('cancel-state');
+      await server.port;
+
+      const responseResult = server.response.then(
+        () => new Error('Expected rejection'),
+        (e: Error) => e,
+      );
+
+      server.cancel?.(new Error('Cancelled by caller'));
+
+      const error = await responseResult;
+      expect(error.message).toBe('Cancelled by caller');
+    });
+
+    it('should not throw if cancel is called after the server has already closed', async () => {
+      const server = startCallbackServer('my-state');
+      const port = await server.port;
+
+      await realFetch(
+        `http://localhost:${port}${REDIRECT_PATH}?code=auth-code-123&state=my-state`,
+      );
+      await server.response;
+
+      expect(() => {
+        server.cancel?.(new Error('Cancelled after close'));
+      }).not.toThrow();
+    });
   });
 
   describe('exchangeCodeForToken', () => {
