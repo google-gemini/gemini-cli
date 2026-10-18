@@ -46,6 +46,7 @@ export function resolvePolicyChain(
   config: Config,
   preferredModel?: string,
   wrapsAround: boolean = false,
+  modelIdForComparison: (model: string) => string = normalizeModelId,
 ): ModelPolicyChain {
   const normalizedPreferredModel = preferredModel
     ? normalizeModelId(preferredModel)
@@ -129,7 +130,12 @@ export function resolvePolicyChain(
       // No matching modelChains found, default to single model chain
       chain = createSingleModelChain(modelFromConfig);
     }
-    chain = applyDynamicSlicing(chain, resolvedModel, effectiveWrapsAround);
+    chain = applyDynamicSlicing(
+      chain,
+      resolvedModel,
+      effectiveWrapsAround,
+      modelIdForComparison,
+    );
   } else {
     // --- LEGACY PATH ---
 
@@ -168,7 +174,12 @@ export function resolvePolicyChain(
     } else {
       chain = createSingleModelChain(modelFromConfig);
     }
-    chain = applyDynamicSlicing(chain, resolvedModel, effectiveWrapsAround);
+    chain = applyDynamicSlicing(
+      chain,
+      resolvedModel,
+      effectiveWrapsAround,
+      modelIdForComparison,
+    );
   }
   // Apply Unified Silent Injection for Plan Mode with defensive checks
   if (config?.getApprovalMode?.() === ApprovalMode.PLAN) {
@@ -188,10 +199,11 @@ function applyDynamicSlicing(
   chain: ModelPolicy[],
   resolvedModel: string,
   wrapsAround: boolean,
+  modelIdForComparison: (model: string) => string,
 ): ModelPolicyChain {
-  const normalizedResolved = normalizeModelId(resolvedModel);
+  const normalizedResolved = modelIdForComparison(resolvedModel);
   const activeIndex = chain.findIndex(
-    (policy) => normalizeModelId(policy.model) === normalizedResolved,
+    (policy) => modelIdForComparison(policy.model) === normalizedResolved,
   );
   if (activeIndex !== -1) {
     return wrapsAround
@@ -345,11 +357,7 @@ export function resolveQuotaFallbackModel(
     );
   // Use the selected Auto policy rather than global tier aliases: stable Auto
   // and custom chains may deliberately exclude otherwise accessible models.
-  const policyModel =
-    Object.entries(mappings).find(
-      ([, backend]) => backend === requested,
-    )?.[0] ?? requested;
-  const candidates = resolvePolicyChain(config, policyModel, true)
+  const candidates = resolvePolicyChain(config, requested, true, quotaId)
     .map(({ model }) => resolveConfiguredModelId(config, model))
     .filter(isQuotaRoutingModel);
   const noProAccess = config.getProModelNoAccessSync?.() ?? false;

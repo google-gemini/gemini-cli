@@ -656,6 +656,39 @@ describe('hard quota model selection', () => {
     ).toBeNull();
   });
 
+  it.each([
+    [BASE_GEMINI_FLASH_MODEL, DEFAULT_GEMINI_MODEL],
+    [LEGACY_CCPA_FLASH_MODEL, DEFAULT_GEMINI_MODEL],
+    [DEFAULT_GEMINI_MODEL, LEGACY_CCPA_FLASH_MODEL],
+  ])(
+    'retains the backend-alias custom Auto chain from %s to %s',
+    (requested, expected) => {
+      const { config } = fixture(requested, [], {
+        getModel: () => 'auto',
+        getExperimentalDynamicModelConfiguration: () => true,
+        modelConfigService: new ModelConfigService({
+          ...DEFAULT_MODEL_CONFIGS,
+          modelChains: {
+            ...DEFAULT_MODEL_CONFIGS.modelChains,
+            auto: [
+              createDefaultPolicy(DEFAULT_GEMINI_MODEL),
+              createDefaultPolicy(LEGACY_CCPA_FLASH_MODEL),
+            ],
+          },
+        }),
+      });
+      markQuotaExhausted(config, requested);
+
+      expect(resolveQuotaFallbackModel(config, requested)?.selectedModel).toBe(
+        expected,
+      );
+      markQuotaExhausted(config, expected);
+      expect(
+        resolveQuotaFallbackModel(config, requested)?.selectedModel,
+      ).toBeNull();
+    },
+  );
+
   it('uses the order and models of a custom Auto chain', () => {
     const { config } = fixture(DEFAULT_GEMINI_MODEL, [], {
       getModel: () => 'auto',

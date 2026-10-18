@@ -17,6 +17,7 @@ import {
   BASE_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
+  LEGACY_CCPA_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
@@ -29,6 +30,7 @@ import { LlmRole } from '../telemetry/types.js';
 import type { GenerateContentResponse } from '@google/genai';
 import { normalizeModelId } from '../utils/modelUtils.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
+import { createDefaultPolicy } from './policyCatalog.js';
 
 vi.mock('node:fs');
 
@@ -142,6 +144,89 @@ describe('Auto Routing Fallback Integration', () => {
         available: false,
         reason: 'quota',
       });
+      expect(fallbackHandler).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+    },
+  );
+
+  it.each([
+    [LEGACY_CCPA_FLASH_MODEL, DEFAULT_GEMINI_MODEL],
+    [DEFAULT_GEMINI_MODEL, LEGACY_CCPA_FLASH_MODEL],
+  ])(
+    'retains a custom Auto backend-alias chain while retrying %s on %s',
+    async (requestedModel, expectedModel) => {
+      config = new Config({
+        sessionId: 'custom-auto-quota',
+        targetDir: '/test',
+        debugMode: false,
+        cwd: '/test',
+        model: 'auto',
+        modelConfigServiceConfig: {
+          modelChains: {
+            auto: [
+              createDefaultPolicy(DEFAULT_GEMINI_MODEL),
+              createDefaultPolicy(LEGACY_CCPA_FLASH_MODEL, {
+                isLastResort: true,
+              }),
+            ],
+          },
+        },
+      });
+      vi.spyOn(config, 'getHasAccessToPreviewModel').mockReturnValue(false);
+      vi.spyOn(
+        config,
+        'getExperimentalDynamicModelConfiguration',
+      ).mockReturnValue(true);
+      // A real Code Assist config advertises the backend identity mapping.
+      vi.spyOn(config, 'getContentGeneratorConfig').mockReturnValue({
+        authType: AuthType.LOGIN_WITH_GOOGLE,
+      });
+      const fallbackHandler = vi.fn();
+      config.setFallbackModelHandler(fallbackHandler);
+      client = new BaseLlmClient(
+        fakeGenerator,
+        config,
+        AuthType.LOGIN_WITH_GOOGLE,
+      );
+      const generate = vi
+        .spyOn(fakeGenerator, 'generateContent')
+        .mockRejectedValueOnce(
+          new TerminalQuotaError(
+            'Custom Auto daily quota exhausted',
+            {
+              code: 429,
+              message: 'Custom Auto daily quota exhausted',
+              details: [],
+            },
+            3600,
+            'QUOTA_EXHAUSTED',
+          ),
+        )
+        .mockResolvedValue({
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'Custom chain recovered' }],
+              },
+            },
+          ],
+        } as GenerateContentResponse);
+
+      await client.generateContent({
+        modelConfigKey: { model: requestedModel, isChatModel: true },
+        contents: [{ role: 'user', parts: [{ text: 'Continue' }] }],
+        abortSignal: new AbortController().signal,
+        promptId: 'custom-auto-quota',
+        role: LlmRole.MAIN,
+      });
+
+      expect(generate.mock.calls.map(([request]) => request.model)).toEqual([
+        requestedModel,
+        expectedModel,
+      ]);
+      expect(config.getModel()).toBe('auto');
+      expect(config.getActiveModel()).toBe(expectedModel);
       expect(fallbackHandler).not.toHaveBeenCalled();
       expect(vi.getTimerCount()).toBe(0);
     },
