@@ -1400,35 +1400,34 @@ export class GeminiChat {
     // Iterate through every message, ensuring that the first function call in
     // each model message's list of parts has a valid thoughtSignature property.
     // If it does not, we replace the function call with a copy that uses the
-    // synthetic thought signature.
-    const newContents = requestContents.slice(); // Shallow copy the array
-    for (let i = 0; i < newContents.length; i++) {
-      const content = newContents[i];
+    // synthetic thought signature, allocating new arrays lazily only when needed.
+    let newContents: Content[] | undefined = undefined;
+    for (let i = 0; i < requestContents.length; i++) {
+      const content = requestContents[i];
       if (content.role === 'model' && content.parts) {
-        let modified = false;
-        const newParts = content.parts.slice();
-        for (let j = 0; j < newParts.length; j++) {
-          const part = newParts[j] as ThoughtPart;
+        for (let j = 0; j < content.parts.length; j++) {
+          const part = content.parts[j] as ThoughtPart;
           if (part.functionCall) {
             if (!part.thoughtSignature) {
+              if (!newContents) {
+                newContents = requestContents.slice();
+              }
+              const newParts = content.parts.slice();
               newParts[j] = {
                 ...part,
                 thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE,
               };
-              modified = true;
+              newContents[i] = {
+                ...content,
+                parts: newParts,
+              };
             }
             break; // Only consider the first function call
           }
         }
-        if (modified) {
-          newContents[i] = {
-            ...content,
-            parts: newParts,
-          };
-        }
       }
     }
-    return newContents;
+    return newContents ?? requestContents;
   }
 
   setTools(tools: Tool[]): void {

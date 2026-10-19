@@ -3952,14 +3952,33 @@ describe('GeminiChat', () => {
       const chat = new GeminiChat(mockConfig, '', []);
       const history: Content[] = [];
       const newContents = chat.ensureActiveLoopHasThoughtSignatures(history);
-      expect(newContents).toEqual([]);
+      expect(newContents).toBe(history);
     });
 
     it('should handle history with only a user message', () => {
       const chat = new GeminiChat(mockConfig, '', []);
       const history: Content[] = [{ role: 'user', parts: [{ text: 'Hello' }] }];
       const newContents = chat.ensureActiveLoopHasThoughtSignatures(history);
-      expect(newContents).toEqual(history);
+      expect(newContents).toBe(history);
+    });
+
+    it('should return the original array reference without cloning if all model function calls are already signed or none exist', () => {
+      const chat = new GeminiChat(mockConfig, '', []);
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+        { role: 'model', parts: [{ text: 'Hi' }] },
+        {
+          role: 'model',
+          parts: [
+            {
+              functionCall: { name: 'signed_tool', args: {} },
+              thoughtSignature: 'existing-signature',
+            },
+          ],
+        },
+      ];
+      const result = chat.ensureActiveLoopHasThoughtSignatures(history);
+      expect(result).toBe(history);
     });
 
     it('reproduction: should ensure historical model turns outside the active loop have thoughtSignature on first functionCall', () => {
