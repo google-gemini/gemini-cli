@@ -1406,8 +1406,8 @@ export class GeminiChat {
       const content = requestContents[i];
       if (content.role === 'model' && content.parts) {
         for (let j = 0; j < content.parts.length; j++) {
-          const part = content.parts[j] as ThoughtPart;
-          if (part.functionCall) {
+          const part = content.parts[j] as ThoughtPart | undefined;
+          if (part?.functionCall) {
             if (!part.thoughtSignature) {
               if (!newContents) {
                 newContents = requestContents.slice();
