@@ -240,6 +240,9 @@ describe('isAuthenticationError', () => {
       isAuthenticationError(new Error('Command failed with exit status 401')),
     ).toBe(false);
     expect(
+      isAuthenticationError(new Error('Process exited with status 401')),
+    ).toBe(false);
+    expect(
       isAuthenticationError(new Error('Process exited with code 401')),
     ).toBe(false);
 

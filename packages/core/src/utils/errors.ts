@@ -271,7 +271,7 @@ function parseResponseData(error: GaxiosError): ResponseData | undefined {
 }
 
 const HTTP_401_REGEX =
-  /(?:\bHTTP(?:\/\d(?:\.\d)?)?(?:\s+(?:status|error))?|(?<!\bexit\s+)\bstatus(?:code|\s*code)?)[:\s]+401\b|(?:\b401\b[^\w\r\n]{1,4}\bUnauthorized\b|\bUnauthorized\b[^\w\r\n]{1,4}\b401\b)/i;
+  /(?:\bHTTP(?:\/\d(?:\.\d)?)?(?:\s+(?:status|error))?|(?<!\b(?:exit|exited)\s+(?:with\s+)?)\bstatus(?:code|\s*code)?)[:\s]+401\b|(?:\b401\b[^\w\r\n]{1,4}\bUnauthorized\b|\bUnauthorized\b[^\w\r\n]{1,4}\b401\b)/i;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
