@@ -270,6 +270,9 @@ function parseResponseData(error: GaxiosError): ResponseData | undefined {
   return undefined;
 }
 
+const HTTP_401_REGEX =
+  /(?:\bHTTP(?:\/\d(?:\.\d)?)?(?:\s+(?:status|error))?|\bstatus\s*code|\bstatusCode)[:\s]+401\b|(?:\b401\b[^\w\r\n]{1,4}\bUnauthorized\b|\bUnauthorized\b[^\w\r\n]{1,4}\b401\b)/i;
+
 /**
  * Checks if an error is a 401 authentication error.
  * Uses structured error properties from MCP SDK errors.
@@ -280,10 +283,27 @@ function parseResponseData(error: GaxiosError): ResponseData | undefined {
 export function isAuthenticationError(error: unknown): boolean {
   // Check for MCP SDK errors with code property
   // (SseError and StreamableHTTPError both have numeric 'code' property)
-  if (error && typeof error === 'object' && 'code' in error) {
-    const errorCode: unknown = (error as Record<string, unknown>)['code'];
-    if (typeof errorCode === 'number' && errorCode === 401) {
-      return true;
+  if (error && typeof error === 'object') {
+    if ('code' in error) {
+      const errorCode: unknown = (error as Record<string, unknown>)['code'];
+      if (typeof errorCode === 'number' && errorCode === 401) {
+        return true;
+      }
+    }
+
+    if ('status' in error) {
+      const status: unknown = (error as Record<string, unknown>)['status'];
+      if (typeof status === 'number' && status === 401) {
+        return true;
+      }
+    }
+
+    if ('statusCode' in error) {
+      const statusCode: unknown =
+        (error as Record<string, unknown>)['statusCode'];
+      if (typeof statusCode === 'number' && statusCode === 401) {
+        return true;
+      }
     }
   }
 
@@ -299,7 +319,7 @@ export function isAuthenticationError(error: unknown): boolean {
   // Fallback: Check for MCP SDK's plain Error messages with HTTP 401
   // The SDK sometimes throws: new Error(`Error POSTing to endpoint (HTTP 401): ...`)
   const message = getErrorMessage(error);
-  if (message.includes('401')) {
+  if (HTTP_401_REGEX.test(message)) {
     return true;
   }
 
