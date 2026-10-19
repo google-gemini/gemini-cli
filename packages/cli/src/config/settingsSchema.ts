@@ -190,7 +190,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: [] as NumericalRoutingRule[],
         description:
-          'Ordered score bands. Each rule uses an inclusive maxScore and a model ID. Scores above all bands use the existing Flash/Pro threshold.',
+          'Score bands matched in ascending maxScore order. Each maxScore is inclusive. Scores above all configured bands use the model in the final band.',
         showInDialog: false,
         items: {
           type: 'object',
