@@ -273,6 +273,10 @@ function parseResponseData(error: GaxiosError): ResponseData | undefined {
 const HTTP_401_REGEX =
   /(?:\bHTTP(?:\/\d(?:\.\d)?)?(?:\s+(?:status|error))?|\bstatus\s*code|\bstatusCode)[:\s]+401\b|(?:\b401\b[^\w\r\n]{1,4}\bUnauthorized\b|\bUnauthorized\b[^\w\r\n]{1,4}\b401\b)/i;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 /**
  * Checks if an error is a 401 authentication error.
  * Uses structured error properties from MCP SDK errors.
@@ -281,27 +285,24 @@ const HTTP_401_REGEX =
  * @returns true if this is a 401/authentication error
  */
 export function isAuthenticationError(error: unknown): boolean {
-  // Check for MCP SDK errors with code property
-  // (SseError and StreamableHTTPError both have numeric 'code' property)
-  if (error && typeof error === 'object') {
-    if ('code' in error) {
-      const errorCode: unknown = (error as Record<string, unknown>)['code'];
-      if (typeof errorCode === 'number' && errorCode === 401) {
-        return true;
-      }
+  const friendly = toFriendlyError(error);
+  if (friendly instanceof UnauthorizedError) {
+    return true;
+  }
+
+  // Check for structured error properties (e.g. MCP SDK, HTTP clients)
+  if (isRecord(error)) {
+    if (
+      error['code'] === 401 ||
+      error['status'] === 401 ||
+      error['statusCode'] === 401
+    ) {
+      return true;
     }
 
-    if ('status' in error) {
-      const status: unknown = (error as Record<string, unknown>)['status'];
-      if (typeof status === 'number' && status === 401) {
-        return true;
-      }
-    }
-
-    if ('statusCode' in error) {
-      const statusCode: unknown =
-        (error as Record<string, unknown>)['statusCode'];
-      if (typeof statusCode === 'number' && statusCode === 401) {
+    const response = error['response'];
+    if (isRecord(response)) {
+      if (response['status'] === 401 || response['statusCode'] === 401) {
         return true;
       }
     }

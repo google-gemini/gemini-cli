@@ -85,6 +85,45 @@ describe('isAuthenticationError', () => {
     expect(isAuthenticationError({ statusCode: 404 })).toBe(false);
   });
 
+  it('should detect error with nested response.status or response.statusCode: 401 (gaxios/axios style)', () => {
+    expect(isAuthenticationError({ response: { status: 401 } })).toBe(true);
+    expect(isAuthenticationError({ response: { statusCode: 401 } })).toBe(
+      true,
+    );
+    expect(isAuthenticationError({ response: { status: 500 } })).toBe(false);
+    expect(isAuthenticationError({ response: { statusCode: 404 } })).toBe(
+      false,
+    );
+    expect(isAuthenticationError({ response: null })).toBe(false);
+    expect(isAuthenticationError({ response: 'invalid' })).toBe(false);
+  });
+
+  it('should detect structured API errors that map to UnauthorizedError via toFriendlyError', () => {
+    const gaxiosError = {
+      response: {
+        data: {
+          error: {
+            code: 401,
+            message: 'Invalid API key',
+          },
+        },
+      },
+    };
+    expect(isAuthenticationError(gaxiosError)).toBe(true);
+
+    const badRequestGaxiosError = {
+      response: {
+        data: {
+          error: {
+            code: 400,
+            message: 'Bad Request',
+          },
+        },
+      },
+    };
+    expect(isAuthenticationError(badRequestGaxiosError)).toBe(false);
+  });
+
   it('should detect UnauthorizedError instance', () => {
     const error = new UnauthorizedError('Authentication required');
     expect(isAuthenticationError(error)).toBe(true);
