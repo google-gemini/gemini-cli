@@ -1382,11 +1382,21 @@ export class GeminiChat {
   }
 
   // To ensure our requests validate, the first function call in every model
-  // turn across the conversation history must have a `thoughtSignature` property.
+  // turn across the conversation history must have a thoughtSignature property.
   // If we do not do this, the API rejects the request with a 400 Bad Request error.
+  //
+  // Rationale for using undocumented/internal SDK properties:
+  // The thoughtSignature property is an internal/undocumented field in the Gemini SDK/API.
+  // It is required to bypass thought signature validation for historical turns to prevent
+  // HTTP 400 Bad Request errors. Since there is no public API to manage these signatures
+  // on historical turns, we must use this internal property directly.
   ensureActiveLoopHasThoughtSignatures(
     requestContents: readonly Content[],
   ): readonly Content[] {
+    interface ThoughtPart extends Part {
+      thoughtSignature?: string;
+    }
+
     // Iterate through every message, ensuring that the first function call in
     // each model message's list of parts has a valid thoughtSignature property.
     // If it does not, we replace the function call with a copy that uses the
@@ -1398,7 +1408,7 @@ export class GeminiChat {
         let modified = false;
         const newParts = content.parts.slice();
         for (let j = 0; j < newParts.length; j++) {
-          const part = newParts[j];
+          const part = newParts[j] as ThoughtPart;
           if (part.functionCall) {
             if (!part.thoughtSignature) {
               newParts[j] = {
