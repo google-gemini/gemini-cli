@@ -642,6 +642,12 @@ export class ActivityLogger extends EventEmitter {
               processBuffer(Buffer.concat(responseChunks));
             }
           });
+
+          decompressor.on('close', () => {
+            if (responseEnded && !responseEmitted) {
+              processBuffer(Buffer.concat(responseChunks));
+            }
+          });
         }
 
         res.on('data', (chunk: Buffer) => {
@@ -649,8 +655,19 @@ export class ActivityLogger extends EventEmitter {
           responseChunks.push(chunkBuffer);
 
           if (decompressor) {
-            if (!decompressionFailed) {
-              decompressor.write(chunkBuffer);
+            if (
+              !decompressionFailed &&
+              !decompressor.destroyed &&
+              !decompressor.writableEnded
+            ) {
+              try {
+                decompressor.write(chunkBuffer);
+              } catch {
+                decompressionFailed = true;
+                if (responseEnded) {
+                  processBuffer(Buffer.concat(responseChunks));
+                }
+              }
             }
           } else {
             emitChunk(decoder.write(chunkBuffer));
@@ -660,10 +677,19 @@ export class ActivityLogger extends EventEmitter {
         res.on('end', () => {
           responseEnded = true;
           if (decompressor) {
-            if (decompressionFailed) {
+            if (
+              decompressionFailed ||
+              decompressor.destroyed ||
+              decompressor.writableEnded
+            ) {
               processBuffer(Buffer.concat(responseChunks));
             } else {
-              decompressor.end();
+              try {
+                decompressor.end();
+              } catch {
+                decompressionFailed = true;
+                processBuffer(Buffer.concat(responseChunks));
+              }
             }
           } else {
             emitChunk(decoder.end());

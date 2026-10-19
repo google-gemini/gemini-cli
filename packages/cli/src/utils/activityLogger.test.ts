@@ -666,4 +666,97 @@ describe('ActivityLogger', () => {
       logger.isInterceptionEnabled = false;
     }
   });
+
+  it('handles synchronous errors from decompressor.write and decompressor.end gracefully', async () => {
+    const originalHttpRequest = http.request;
+    const originalHttpsRequest = https.request;
+
+    const fakeReq = Object.assign(new EventEmitter(), {
+      method: 'GET',
+      getHeaders: () => ({}),
+      write: vi.fn(),
+      end: vi.fn(),
+    }) as unknown as http.ClientRequest;
+
+    const mockHttpRequest = vi.fn(() => fakeReq);
+    Object.defineProperty(http, 'request', {
+      value: mockHttpRequest,
+      writable: true,
+      configurable: true,
+    });
+
+    const createGunzipSpy = vi.spyOn(zlib, 'createGunzip');
+
+    try {
+      // @ts-expect-error - accessing private property for testing
+      logger.isInterceptionEnabled = false;
+      logger.enable();
+
+      // Case 1: decompressor.write throws synchronously
+      const writeThrowingStream = Object.assign(new EventEmitter(), {
+        destroyed: false,
+        writableEnded: false,
+        write: vi.fn(() => {
+          throw new Error('write after end');
+        }),
+        end: vi.fn(),
+      }) as unknown as zlib.Gunzip;
+      createGunzipSpy.mockReturnValueOnce(writeThrowingStream);
+
+      const req1 = http.request('http://api.example.com/sync-write-throw');
+      req1.end();
+
+      const res1 = Object.assign(new EventEmitter(), {
+        statusCode: 200,
+        headers: { 'content-encoding': 'gzip' },
+      }) as unknown as http.IncomingMessage;
+      req1.emit('response', res1);
+      res1.emit('data', Buffer.from('raw-fallback-from-write'));
+      res1.emit('end');
+
+      // Case 2: decompressor.end throws synchronously
+      const endThrowingStream = Object.assign(new EventEmitter(), {
+        destroyed: false,
+        writableEnded: false,
+        write: vi.fn(() => true),
+        end: vi.fn(() => {
+          throw new Error('stream already closed');
+        }),
+      }) as unknown as zlib.Gunzip;
+      createGunzipSpy.mockReturnValueOnce(endThrowingStream);
+
+      const req2 = http.request('http://api.example.com/sync-end-throw');
+      req2.end();
+
+      const res2 = Object.assign(new EventEmitter(), {
+        statusCode: 200,
+        headers: { 'content-encoding': 'gzip' },
+      }) as unknown as http.IncomingMessage;
+      req2.emit('response', res2);
+      res2.emit('data', Buffer.from('raw-fallback-from-end'));
+      res2.emit('end');
+
+      const events = logger.getBufferedLogs().network;
+      const bodies = events
+        .filter((event) => event.pending === false && event.response)
+        .map((event) => event.response?.body);
+
+      expect(bodies).toContain('raw-fallback-from-write');
+      expect(bodies).toContain('raw-fallback-from-end');
+    } finally {
+      createGunzipSpy.mockRestore();
+      Object.defineProperty(http, 'request', {
+        value: originalHttpRequest,
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(https, 'request', {
+        value: originalHttpsRequest,
+        writable: true,
+        configurable: true,
+      });
+      // @ts-expect-error - reset private property
+      logger.isInterceptionEnabled = false;
+    }
+  });
 });
