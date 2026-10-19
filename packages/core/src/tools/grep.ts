@@ -13,6 +13,7 @@ import { globStream } from 'glob';
 import { execStreaming } from '../utils/shell-utils.js';
 import {
   DEFAULT_TOTAL_MAX_MATCHES,
+  MAX_TOTAL_MAX_MATCHES,
   DEFAULT_SEARCH_TIMEOUT_MS,
 } from './constants.js';
 import {
@@ -739,8 +740,15 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
       return 'total_max_matches must be at least 1.';
     }
 
-    // The upper bound (MAX_TOTAL_MAX_MATCHES) is enforced by the JSON schema's
-    // `maximum` constraint, which rejects the call before this runs.
+    // The JSON schema's `maximum` constraint also rejects this, but we validate
+    // explicitly here as a defensive backstop for programmatic callers that may
+    // bypass schema validation.
+    if (
+      params.total_max_matches !== undefined &&
+      params.total_max_matches > MAX_TOTAL_MAX_MATCHES
+    ) {
+      return `total_max_matches must be at most ${MAX_TOTAL_MAX_MATCHES}.`;
+    }
 
     // Only validate dir_path if one is provided
     if (params.dir_path) {
