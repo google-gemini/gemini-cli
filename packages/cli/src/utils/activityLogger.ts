@@ -566,73 +566,108 @@ export class ActivityLogger extends EventEmitter {
 
       req.on('response', (res: http.IncomingMessage) => {
         const responseChunks: Buffer[] = [];
+        const decompressedChunks: Buffer[] = [];
         const decoder = new StringDecoder('utf8');
         let chunkIndex = 0;
+
+        const emitChunk = (chunkData: string) => {
+          if (!chunkData) return;
+          self.safeEmitNetwork({
+            id,
+            pending: true,
+            chunk: {
+              index: chunkIndex++,
+              data: chunkData,
+              timestamp: Date.now(),
+            },
+          });
+        };
+
+        let responseEmitted = false;
+        const processBuffer = (finalBuffer: Buffer) => {
+          if (responseEmitted) return;
+          responseEmitted = true;
+          const resBody = finalBuffer.toString('utf8');
+          const startTime = self.requestStartTimes.get(id);
+          const durationMs = startTime ? Date.now() - startTime : 0;
+          self.requestStartTimes.delete(id);
+
+          self.safeEmitNetwork({
+            id,
+            pending: false,
+            response: {
+              status: res.statusCode || 0,
+              headers: self.stringifyHeaders(res.headers),
+              body: resBody,
+              durationMs,
+            },
+          });
+        };
+
+        const rawEncoding = res.headers['content-encoding'];
+        const encoding =
+          typeof rawEncoding === 'string'
+            ? rawEncoding.toLowerCase().trim()
+            : '';
+        let decompressor: zlib.Gunzip | zlib.Inflate | null = null;
+        if (encoding === 'gzip' || encoding === 'x-gzip') {
+          decompressor = zlib.createGunzip({
+            flush: zlib.constants.Z_SYNC_FLUSH,
+          });
+        } else if (encoding === 'deflate') {
+          decompressor = zlib.createInflate({
+            flush: zlib.constants.Z_SYNC_FLUSH,
+          });
+        }
+
+        let decompressionFailed = false;
+        let responseEnded = false;
+
+        if (decompressor) {
+          decompressor.on('data', (decompressedChunk: Buffer) => {
+            if (decompressionFailed || responseEmitted) return;
+            decompressedChunks.push(decompressedChunk);
+            emitChunk(decoder.write(decompressedChunk));
+          });
+
+          decompressor.on('end', () => {
+            if (decompressionFailed || responseEmitted) return;
+            emitChunk(decoder.end());
+            processBuffer(Buffer.concat(decompressedChunks));
+          });
+
+          decompressor.on('error', () => {
+            decompressionFailed = true;
+            if (responseEnded) {
+              processBuffer(Buffer.concat(responseChunks));
+            }
+          });
+        }
 
         res.on('data', (chunk: Buffer) => {
           const chunkBuffer = Buffer.from(chunk);
           responseChunks.push(chunkBuffer);
-          const chunkData = decoder.write(chunkBuffer);
 
-          if (chunkData) {
-            // Emit chunk update for streaming
-            self.safeEmitNetwork({
-              id,
-              pending: true,
-              chunk: {
-                index: chunkIndex++,
-                data: chunkData,
-                timestamp: Date.now(),
-              },
-            });
+          if (decompressor) {
+            if (!decompressionFailed) {
+              decompressor.write(chunkBuffer);
+            }
+          } else {
+            emitChunk(decoder.write(chunkBuffer));
           }
         });
 
         res.on('end', () => {
-          const trailingChunk = decoder.end();
-          if (trailingChunk) {
-            self.safeEmitNetwork({
-              id,
-              pending: true,
-              chunk: {
-                index: chunkIndex++,
-                data: trailingChunk,
-                timestamp: Date.now(),
-              },
-            });
-          }
-
-          const buffer = Buffer.concat(responseChunks);
-          const encoding = res.headers['content-encoding'];
-
-          const processBuffer = (finalBuffer: Buffer) => {
-            const resBody = finalBuffer.toString('utf8');
-            const startTime = self.requestStartTimes.get(id);
-            const durationMs = startTime ? Date.now() - startTime : 0;
-            self.requestStartTimes.delete(id);
-
-            self.safeEmitNetwork({
-              id,
-              pending: false,
-              response: {
-                status: res.statusCode || 0,
-                headers: self.stringifyHeaders(res.headers),
-                body: resBody,
-                durationMs,
-              },
-            });
-          };
-
-          if (encoding === 'gzip') {
-            zlib.gunzip(buffer, (err, decompressed) => {
-              processBuffer(err ? buffer : decompressed);
-            });
-          } else if (encoding === 'deflate') {
-            zlib.inflate(buffer, (err, decompressed) => {
-              processBuffer(err ? buffer : decompressed);
-            });
+          responseEnded = true;
+          if (decompressor) {
+            if (decompressionFailed) {
+              processBuffer(Buffer.concat(responseChunks));
+            } else {
+              decompressor.end();
+            }
           } else {
-            processBuffer(buffer);
+            emitChunk(decoder.end());
+            processBuffer(Buffer.concat(responseChunks));
           }
         });
       });

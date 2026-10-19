@@ -6,6 +6,7 @@
 
 import http from 'node:http';
 import https from 'node:https';
+import zlib from 'node:zlib';
 import { EventEmitter } from 'node:events';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ActivityLogger, type NetworkLog } from './activityLogger.js';
@@ -421,6 +422,235 @@ describe('ActivityLogger', () => {
         expect.objectContaining({ index: 0, data: 'abc' }),
         expect.objectContaining({ index: 1, data: '\uFFFD' }),
       ]);
+    } finally {
+      Object.defineProperty(http, 'request', {
+        value: originalHttpRequest,
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(https, 'request', {
+        value: originalHttpsRequest,
+        writable: true,
+        configurable: true,
+      });
+      // @ts-expect-error - reset private property
+      logger.isInterceptionEnabled = false;
+    }
+  });
+
+  it('decompresses gzip-encoded Node HTTP response chunks before decoding UTF-8', async () => {
+    const originalHttpRequest = http.request;
+    const originalHttpsRequest = https.request;
+
+    const fakeReq = Object.assign(new EventEmitter(), {
+      method: 'GET',
+      getHeaders: () => ({}),
+      write: vi.fn(),
+      end: vi.fn(),
+    }) as unknown as http.ClientRequest;
+
+    const mockHttpRequest = vi.fn(() => fakeReq);
+    Object.defineProperty(http, 'request', {
+      value: mockHttpRequest,
+      writable: true,
+      configurable: true,
+    });
+
+    try {
+      // @ts-expect-error - accessing private property for testing
+      logger.isInterceptionEnabled = false;
+      logger.enable();
+
+      const req = http.request('http://api.example.com/gzip-stream');
+      req.end();
+
+      const response = Object.assign(new EventEmitter(), {
+        statusCode: 200,
+        headers: { 'content-encoding': 'gzip' },
+      }) as unknown as http.IncomingMessage;
+
+      req.emit('response', response);
+
+      const expectedText = 'Hello € world 🚀!';
+      const compressed = zlib.gzipSync(Buffer.from(expectedText, 'utf8'));
+
+      const completedPromise = new Promise<void>((resolve) => {
+        const onNetwork = (log: NetworkLog) => {
+          if (log.pending === false && log.response) {
+            logger.off('network', onNetwork);
+            resolve();
+          }
+        };
+        logger.on('network', onNetwork);
+      });
+
+      response.emit('data', compressed.subarray(0, 12));
+      response.emit('data', compressed.subarray(12, 22));
+      response.emit('data', compressed.subarray(22));
+      response.emit('end');
+
+      await completedPromise;
+
+      const events = logger.getBufferedLogs().network;
+      const chunkEvents = events.flatMap((event) =>
+        event.chunk ? [event.chunk] : [],
+      );
+      const streamed = chunkEvents.map((chunk) => chunk.data).join('');
+      const responseIndex = events.findIndex(
+        (event) => event.pending === false && event.response !== undefined,
+      );
+      const lastChunkEventIndex = events.reduce(
+        (lastIdx, event, idx) => (event.chunk ? idx : lastIdx),
+        -1,
+      );
+
+      expect(streamed).toBe(expectedText);
+      expect(events[responseIndex]?.response?.body).toBe(expectedText);
+      expect(lastChunkEventIndex).toBeGreaterThan(0);
+      expect(lastChunkEventIndex).toBeLessThan(responseIndex);
+    } finally {
+      Object.defineProperty(http, 'request', {
+        value: originalHttpRequest,
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(https, 'request', {
+        value: originalHttpsRequest,
+        writable: true,
+        configurable: true,
+      });
+      // @ts-expect-error - reset private property
+      logger.isInterceptionEnabled = false;
+    }
+  });
+
+  it('decompresses deflate-encoded Node HTTP response chunks before decoding UTF-8', async () => {
+    const originalHttpRequest = http.request;
+    const originalHttpsRequest = https.request;
+
+    const fakeReq = Object.assign(new EventEmitter(), {
+      method: 'GET',
+      getHeaders: () => ({}),
+      write: vi.fn(),
+      end: vi.fn(),
+    }) as unknown as http.ClientRequest;
+
+    const mockHttpRequest = vi.fn(() => fakeReq);
+    Object.defineProperty(http, 'request', {
+      value: mockHttpRequest,
+      writable: true,
+      configurable: true,
+    });
+
+    try {
+      // @ts-expect-error - accessing private property for testing
+      logger.isInterceptionEnabled = false;
+      logger.enable();
+
+      const req = http.request('http://api.example.com/deflate-stream');
+      req.end();
+
+      const response = Object.assign(new EventEmitter(), {
+        statusCode: 200,
+        headers: { 'content-encoding': 'deflate' },
+      }) as unknown as http.IncomingMessage;
+
+      req.emit('response', response);
+
+      const expectedText = 'Deflate € payload 🚀';
+      const compressed = zlib.deflateSync(Buffer.from(expectedText, 'utf8'));
+
+      const completedPromise = new Promise<void>((resolve) => {
+        const onNetwork = (log: NetworkLog) => {
+          if (log.pending === false && log.response) {
+            logger.off('network', onNetwork);
+            resolve();
+          }
+        };
+        logger.on('network', onNetwork);
+      });
+
+      response.emit('data', compressed.subarray(0, 8));
+      response.emit('data', compressed.subarray(8));
+      response.emit('end');
+
+      await completedPromise;
+
+      const events = logger.getBufferedLogs().network;
+      const streamed = events
+        .flatMap((event) => (event.chunk ? [event.chunk.data] : []))
+        .join('');
+      const completed = events.find((event) => event.response)?.response?.body;
+
+      expect(streamed).toBe(expectedText);
+      expect(completed).toBe(expectedText);
+    } finally {
+      Object.defineProperty(http, 'request', {
+        value: originalHttpRequest,
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(https, 'request', {
+        value: originalHttpsRequest,
+        writable: true,
+        configurable: true,
+      });
+      // @ts-expect-error - reset private property
+      logger.isInterceptionEnabled = false;
+    }
+  });
+
+  it('falls back to raw buffer when compressed Node HTTP response fails decompression', async () => {
+    const originalHttpRequest = http.request;
+    const originalHttpsRequest = https.request;
+
+    const fakeReq = Object.assign(new EventEmitter(), {
+      method: 'GET',
+      getHeaders: () => ({}),
+      write: vi.fn(),
+      end: vi.fn(),
+    }) as unknown as http.ClientRequest;
+
+    const mockHttpRequest = vi.fn(() => fakeReq);
+    Object.defineProperty(http, 'request', {
+      value: mockHttpRequest,
+      writable: true,
+      configurable: true,
+    });
+
+    try {
+      // @ts-expect-error - accessing private property for testing
+      logger.isInterceptionEnabled = false;
+      logger.enable();
+
+      const req = http.request('http://api.example.com/corrupt-gzip');
+      req.end();
+
+      const response = Object.assign(new EventEmitter(), {
+        statusCode: 200,
+        headers: { 'content-encoding': 'gzip' },
+      }) as unknown as http.IncomingMessage;
+
+      req.emit('response', response);
+
+      const completedPromise = new Promise<void>((resolve) => {
+        const onNetwork = (log: NetworkLog) => {
+          if (log.pending === false && log.response) {
+            logger.off('network', onNetwork);
+            resolve();
+          }
+        };
+        logger.on('network', onNetwork);
+      });
+
+      response.emit('data', Buffer.from('not-valid-gzip-data'));
+      response.emit('end');
+
+      await completedPromise;
+
+      const events = logger.getBufferedLogs().network;
+      const completed = events.find((event) => event.response)?.response?.body;
+      expect(completed).toBe('not-valid-gzip-data');
     } finally {
       Object.defineProperty(http, 'request', {
         value: originalHttpRequest,
