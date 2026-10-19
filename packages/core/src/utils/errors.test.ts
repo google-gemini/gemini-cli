@@ -87,9 +87,7 @@ describe('isAuthenticationError', () => {
 
   it('should detect error with nested response.status or response.statusCode: 401 (gaxios/axios style)', () => {
     expect(isAuthenticationError({ response: { status: 401 } })).toBe(true);
-    expect(isAuthenticationError({ response: { statusCode: 401 } })).toBe(
-      true,
-    );
+    expect(isAuthenticationError({ response: { statusCode: 401 } })).toBe(true);
     expect(isAuthenticationError({ response: { status: 500 } })).toBe(false);
     expect(isAuthenticationError({ response: { statusCode: 404 } })).toBe(
       false,
@@ -172,9 +170,7 @@ describe('isAuthenticationError', () => {
     expect(isAuthenticationError(new Error('status code: 401'))).toBe(true);
     expect(isAuthenticationError(new Error('statusCode: 401'))).toBe(true);
     expect(
-      isAuthenticationError(
-        new Error('Request failed with status code 401'),
-      ),
+      isAuthenticationError(new Error('Request failed with status code 401')),
     ).toBe(true);
     expect(
       isAuthenticationError(
@@ -200,9 +196,7 @@ describe('isAuthenticationError', () => {
         new Error('Error connecting to http://localhost:1401'),
       ),
     ).toBe(false);
-    expect(
-      isAuthenticationError(new Error('port 4012 is in use')),
-    ).toBe(false);
+    expect(isAuthenticationError(new Error('port 4012 is in use'))).toBe(false);
 
     // Line numbers and file paths
     expect(
@@ -213,12 +207,8 @@ describe('isAuthenticationError', () => {
     expect(
       isAuthenticationError(new Error('error at line 401: missing semicolon')),
     ).toBe(false);
-    expect(
-      isAuthenticationError(new Error('line 401')),
-    ).toBe(false);
-    expect(
-      isAuthenticationError(new Error('index.ts:401:5')),
-    ).toBe(false);
+    expect(isAuthenticationError(new Error('line 401'))).toBe(false);
+    expect(isAuthenticationError(new Error('index.ts:401:5'))).toBe(false);
 
     // Process exit codes and numbers
     expect(
@@ -238,9 +228,7 @@ describe('isAuthenticationError', () => {
     expect(
       isAuthenticationError(new Error('Record with ID 401 not found')),
     ).toBe(false);
-    expect(
-      isAuthenticationError(new Error('User 401 not found')),
-    ).toBe(false);
+    expect(isAuthenticationError(new Error('User 401 not found'))).toBe(false);
   });
 });
 
