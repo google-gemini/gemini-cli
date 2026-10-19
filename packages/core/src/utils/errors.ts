@@ -271,7 +271,7 @@ function parseResponseData(error: GaxiosError): ResponseData | undefined {
 }
 
 const HTTP_401_REGEX =
-  /(?:\bHTTP(?:\/\d(?:\.\d)?)?(?:\s+(?:status|error))?|\bstatus\s*code|\bstatusCode)[:\s]+401\b|(?:\b401\b[^\w\r\n]{1,4}\bUnauthorized\b|\bUnauthorized\b[^\w\r\n]{1,4}\b401\b)/i;
+  /(?:\bHTTP(?:\/\d(?:\.\d)?)?(?:\s+(?:status|error))?|(?<!\bexit\s+)\bstatus(?:code|\s*code)?)[:\s]+401\b|(?:\b401\b[^\w\r\n]{1,4}\bUnauthorized\b|\bUnauthorized\b[^\w\r\n]{1,4}\b401\b)/i;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -292,17 +292,15 @@ export function isAuthenticationError(error: unknown): boolean {
 
   // Check for structured error properties (e.g. MCP SDK, HTTP clients)
   if (isRecord(error)) {
-    if (
-      error['code'] === 401 ||
-      error['status'] === 401 ||
-      error['statusCode'] === 401
-    ) {
+    const code = error['code'] ?? error['status'] ?? error['statusCode'];
+    if (code === 401 || code === '401') {
       return true;
     }
 
     const response = error['response'];
     if (isRecord(response)) {
-      if (response['status'] === 401 || response['statusCode'] === 401) {
+      const responseCode = response['status'] ?? response['statusCode'];
+      if (responseCode === 401 || responseCode === '401') {
         return true;
       }
     }

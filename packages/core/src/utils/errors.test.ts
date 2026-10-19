@@ -81,15 +81,29 @@ describe('isAuthenticationError', () => {
   it('should detect error with status or statusCode: 401 property', () => {
     expect(isAuthenticationError({ status: 401 })).toBe(true);
     expect(isAuthenticationError({ statusCode: 401 })).toBe(true);
+    expect(isAuthenticationError({ code: 401 })).toBe(true);
+    expect(isAuthenticationError({ status: '401' })).toBe(true);
+    expect(isAuthenticationError({ statusCode: '401' })).toBe(true);
+    expect(isAuthenticationError({ code: '401' })).toBe(true);
     expect(isAuthenticationError({ status: 500 })).toBe(false);
     expect(isAuthenticationError({ statusCode: 404 })).toBe(false);
+    expect(isAuthenticationError({ status: '500' })).toBe(false);
+    expect(isAuthenticationError({ statusCode: '404' })).toBe(false);
   });
 
   it('should detect error with nested response.status or response.statusCode: 401 (gaxios/axios style)', () => {
     expect(isAuthenticationError({ response: { status: 401 } })).toBe(true);
     expect(isAuthenticationError({ response: { statusCode: 401 } })).toBe(true);
+    expect(isAuthenticationError({ response: { status: '401' } })).toBe(true);
+    expect(isAuthenticationError({ response: { statusCode: '401' } })).toBe(
+      true,
+    );
     expect(isAuthenticationError({ response: { status: 500 } })).toBe(false);
     expect(isAuthenticationError({ response: { statusCode: 404 } })).toBe(
+      false,
+    );
+    expect(isAuthenticationError({ response: { status: '500' } })).toBe(false);
+    expect(isAuthenticationError({ response: { statusCode: '404' } })).toBe(
       false,
     );
     expect(isAuthenticationError({ response: null })).toBe(false);
@@ -169,6 +183,11 @@ describe('isAuthenticationError', () => {
     expect(isAuthenticationError(new Error('Status code 401'))).toBe(true);
     expect(isAuthenticationError(new Error('status code: 401'))).toBe(true);
     expect(isAuthenticationError(new Error('statusCode: 401'))).toBe(true);
+    expect(isAuthenticationError(new Error('status: 401'))).toBe(true);
+    expect(isAuthenticationError(new Error('status 401'))).toBe(true);
+    expect(isAuthenticationError(new Error('Failed with status 401'))).toBe(
+      true,
+    );
     expect(
       isAuthenticationError(new Error('Request failed with status code 401')),
     ).toBe(true);
