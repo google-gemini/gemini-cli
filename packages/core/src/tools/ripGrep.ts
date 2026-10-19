@@ -260,9 +260,12 @@ class GrepToolInvocation extends BaseToolInvocation<
         configTimeout && configTimeout > DEFAULT_SEARCH_TIMEOUT_MS
           ? configTimeout
           : DEFAULT_SEARCH_TIMEOUT_MS;
+      let timedOut = false;
       const timeoutId = setTimeout(() => {
+        timedOut = true;
         timeoutController.abort();
       }, timeoutMs);
+      const timeoutMessage = `Operation timed out after ${timeoutMs}ms. In large repositories, consider narrowing your search scope by specifying a 'dir_path' or an 'include_pattern'.`;
 
       // Link the passed signal to our timeout controller
       const onAbort = () => timeoutController.abort();
@@ -290,15 +293,29 @@ class GrepToolInvocation extends BaseToolInvocation<
           signal: timeoutController.signal,
         });
       } catch (error) {
-        if (timeoutController.signal.aborted) {
-          throw new Error(
-            `Operation timed out after ${timeoutMs}ms. In large repositories, consider narrowing your search scope by specifying a 'dir_path' or an 'include_pattern'.`,
-          );
+        if (timedOut) {
+          throw new Error(timeoutMessage);
         }
         throw error;
       } finally {
         clearTimeout(timeoutId);
         signal.removeEventListener('abort', onAbort);
+      }
+
+      // When the timeout fires, execStreaming kills ripgrep and resolves with the
+      // matches it had collected so far, so a timed out search has to be detected
+      // here as well: returning the partial results (or, after the context pass
+      // below, an empty list) as a successful search hides the timeout from the
+      // model, which then has no reason to narrow the search or retry.
+      if (timedOut) {
+        return {
+          llmContent: timeoutMessage,
+          returnDisplay: `Error: ${timeoutMessage}`,
+          error: {
+            message: timeoutMessage,
+            type: ToolErrorType.GREP_EXECUTION_ERROR,
+          },
+        };
       }
 
       if (!this.params.no_ignore) {
@@ -362,6 +379,12 @@ class GrepToolInvocation extends BaseToolInvocation<
     searchDirAbs: string,
     signal: AbortSignal,
   ): Promise<GrepMatch[]> {
+    // A second ripgrep pass on an already aborted signal produces no output at
+    // all, which would replace the matches collected so far with an empty list.
+    if (signal.aborted) {
+      return allMatches;
+    }
+
     if (
       matchCount >= 1 &&
       matchCount <= 3 &&
@@ -389,6 +412,12 @@ class GrepToolInvocation extends BaseToolInvocation<
         max_matches_per_file: this.params.max_matches_per_file,
         signal,
       });
+
+      // Never drop matches that the first pass found: if the context pass comes
+      // back empty (for example because it was cut short), keep them instead.
+      if (enrichedMatches.length === 0) {
+        return allMatches;
+      }
 
       if (!this.params.no_ignore) {
         const allowedFiles = this.fileDiscoveryService.filterFiles(uniqueFiles);
