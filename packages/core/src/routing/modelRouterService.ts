@@ -46,6 +46,13 @@ export class ModelRouterService {
     // Approval mode is next.
     strategies.push(new ApprovalModeStrategy());
 
+    const hasCustomNumericalRules =
+      this.config.hasCustomNumericalRoutingRules?.() ?? false;
+    if (hasCustomNumericalRules) {
+      // Custom numerical rules take precedence so they can target any model.
+      strategies.push(new NumericalClassifierStrategy());
+    }
+
     // Then, if enabled, the Gemma classifier is used.
     if (this.config.getGemmaModelRouterSettings()?.enabled) {
       strategies.push(new GemmaClassifierStrategy());
@@ -54,8 +61,10 @@ export class ModelRouterService {
     // The generic classifier is next.
     strategies.push(new ClassifierStrategy());
 
-    // The numerical classifier is next.
-    strategies.push(new NumericalClassifierStrategy());
+    // Preserve the existing default numerical routing order.
+    if (!hasCustomNumericalRules) {
+      strategies.push(new NumericalClassifierStrategy());
+    }
 
     // The default strategy is the terminal strategy.
     const terminalStrategy = new DefaultStrategy();

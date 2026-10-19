@@ -17,6 +17,7 @@ import {
   type MCPServerConfig,
   type RequiredMcpServerConfig,
   type BugCommandSettings,
+  type NumericalRoutingRule,
   type TelemetrySettings,
   type AuthType,
   type AgentOverride,
@@ -170,6 +171,47 @@ const SETTINGS_SCHEMA = {
     additionalProperties: {
       type: 'object',
       ref: 'MCPServerConfig',
+    },
+  },
+
+  routing: {
+    type: 'object',
+    label: 'Routing',
+    category: 'Model',
+    requiresRestart: true,
+    default: {},
+    description: 'Configure numerical complexity score routing.',
+    showInDialog: false,
+    properties: {
+      numericalRules: {
+        type: 'array',
+        label: 'Numerical Routing Rules',
+        category: 'Model',
+        requiresRestart: true,
+        default: [] as NumericalRoutingRule[],
+        description:
+          'Ordered score bands. Each rule uses an inclusive maxScore and a model ID. Scores above all bands use the existing Flash/Pro threshold.',
+        showInDialog: false,
+        items: {
+          type: 'object',
+          properties: {
+            maxScore: {
+              type: 'number',
+              label: 'Maximum Score',
+              category: 'Model',
+              requiresRestart: true,
+              default: 100,
+            },
+            model: {
+              type: 'string',
+              label: 'Model ID',
+              category: 'Model',
+              requiresRestart: true,
+              default: '',
+            },
+          },
+        },
+      },
     },
   },
 
