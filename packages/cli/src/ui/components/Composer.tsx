@@ -37,9 +37,9 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const config = useConfig();
   const { vimEnabled, vimMode } = useVimMode();
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
-  const { columns: terminalWidth } = useTerminalSize();
+  const { columns: terminalWidth, rows: terminalHeight } = useTerminalSize();
   const isNarrow = isNarrowWidth(terminalWidth);
-  const debugConsoleMaxHeight = Math.floor(Math.max(terminalWidth * 0.2, 5));
+  const debugConsoleMaxHeight = Math.floor(Math.max(terminalHeight * 0.2, 5));
   const [suggestionsVisible, setSuggestionsVisible] = useState(false);
 
   const isAlternateBuffer = useAlternateBuffer();
@@ -133,9 +133,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
         <OverflowProvider>
           <Box flexDirection="column">
             <DetailedMessagesDisplay
-              maxHeight={
-                uiState.constrainHeight ? debugConsoleMaxHeight : undefined
-              }
+              maxHeight={debugConsoleMaxHeight}
               width={uiState.terminalWidth}
               hasFocus={uiState.showErrorDetails}
             />

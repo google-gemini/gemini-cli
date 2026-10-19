@@ -367,6 +367,22 @@ export class LoadedSettings {
       return;
     }
     this.isTrusted = isTrusted;
+    if (
+      isTrusted &&
+      Object.keys(this._workspaceFile.settings).length === 0 &&
+      Object.keys(this._workspaceFile.originalSettings).length > 0
+    ) {
+      const resolvedWorkspaceSettings = resolveSettings(
+        this._workspaceFile.originalSettings,
+        this._workspaceFile.path,
+        this.errors,
+      );
+      normalizeLegacyTheme(resolvedWorkspaceSettings);
+      this._workspaceFile = {
+        ...this._workspaceFile,
+        settings: resolvedWorkspaceSettings,
+      };
+    }
     this.workspace = isTrusted
       ? this._workspaceFile
       : this.createEmptyWorkspace(this._workspaceFile);
@@ -385,13 +401,17 @@ export class LoadedSettings {
 
   private computeMergedSettings(forceTrusted = false): MergedSettings {
     const isTrusted = forceTrusted || this.isTrusted;
-    const workspace = forceTrusted ? this._workspaceFile : this.workspace;
+    const workspaceSettings = forceTrusted
+      ? Object.keys(this._workspaceFile.settings).length > 0
+        ? this._workspaceFile.settings
+        : this._workspaceFile.originalSettings
+      : this.workspace.settings;
 
     const merged = mergeSettings(
       this.system.settings,
       this.systemDefaults.settings,
       this.user.settings,
-      workspace.settings,
+      workspaceSettings,
       isTrusted,
     );
 
@@ -777,6 +797,133 @@ export function loadSettings(
 }
 
 /**
+ * A settings file as read from disk, before environment variable placeholders
+ * have been resolved.
+ */
+interface RawSettingsFile {
+  rawSettings: Settings;
+  rawJson?: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function getParentRecord(
+  root: unknown,
+  objectPath: readonly string[],
+): Record<string, unknown> | undefined {
+  let current = root;
+  for (let i = 0; i < objectPath.length - 1; i++) {
+    if (!isRecord(current)) {
+      return undefined;
+    }
+    current = current[objectPath[i]];
+  }
+  return isRecord(current) ? current : undefined;
+}
+
+/**
+ * When a settings object fails full-schema validation (for example, during the
+ * preliminary pre-`.env` pass when a typed field still holds an unexpanded
+ * `$VAR` placeholder), re-runs validation on a copy with the failing object
+ * properties removed so that all valid fields (such as boolean/number shell
+ * variables) are still coerced to their target types.
+ */
+function coerceValidSettings(
+  expandedSettings: Settings,
+  issues: ReadonlyArray<{ path: ReadonlyArray<string | number> }>,
+): Settings {
+  const clone = structuredClone(expandedSettings);
+  const pathsToRestore: string[][] = [];
+
+  for (const issue of issues) {
+    const firstNumberIdx = issue.path.findIndex((p) => typeof p === 'number');
+    const objectPath = (
+      firstNumberIdx === -1 ? issue.path : issue.path.slice(0, firstNumberIdx)
+    ).filter((p): p is string => typeof p === 'string');
+
+    if (objectPath.length === 0) {
+      return expandedSettings;
+    }
+
+    const lastKey = objectPath[objectPath.length - 1];
+    const container = getParentRecord(clone, objectPath);
+    if (container && Object.hasOwn(container, lastKey)) {
+      delete container[lastKey];
+      pathsToRestore.push(objectPath);
+    }
+  }
+
+  const partialValidation = validateSettings(clone);
+  if (!partialValidation.success || !partialValidation.data) {
+    return expandedSettings;
+  }
+
+  const coerced = partialValidation.data as Settings;
+  for (const objectPath of pathsToRestore) {
+    const lastKey = objectPath[objectPath.length - 1];
+    const sourceContainer = getParentRecord(expandedSettings, objectPath);
+    const targetContainer = getParentRecord(coerced, objectPath);
+    if (
+      sourceContainer &&
+      targetContainer &&
+      Object.hasOwn(sourceContainer, lastKey)
+    ) {
+      targetContainer[lastKey] = sourceContainer[lastKey];
+    }
+  }
+
+  return coerced;
+}
+
+function normalizeLegacyTheme(settings: Settings): void {
+  if (settings.ui?.theme === 'VS') {
+    settings.ui.theme = DefaultLight.name;
+  } else if (settings.ui?.theme === 'VS2015') {
+    settings.ui.theme = DefaultDark.name;
+  }
+}
+
+/**
+ * Expands environment variable placeholders in `rawSettings` against the
+ * current `process.env` and validates the result.
+ *
+ * Validation issues are only recorded in `settingsErrors` when provided, so
+ * that the preliminary pass (which runs before `.env` files are loaded) does
+ * not report placeholders that are resolved later on.
+ */
+function resolveSettings(
+  rawSettings: Settings,
+  filePath: string,
+  settingsErrors?: SettingsError[],
+): Settings {
+  if (Object.keys(rawSettings).length === 0) {
+    return {};
+  }
+
+  const expandedSettings = resolveEnvVarsInObject(rawSettings);
+
+  // Validate settings structure with Zod after environment variable expansion
+  const validationResult = validateSettings(expandedSettings);
+  if (!validationResult.success && validationResult.error) {
+    if (settingsErrors) {
+      settingsErrors.push({
+        message: formatValidationError(validationResult.error, filePath),
+        path: filePath,
+        severity: 'warning',
+      });
+    }
+    return coerceValidSettings(expandedSettings, validationResult.error.issues);
+  }
+
+  // Since we've successfully validated expandedSettings against settingsZodSchema,
+  // it's safe to cast the resulting data to the Settings type.
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  return (validationResult.data as Settings) ?? expandedSettings;
+}
+
+/**
  * Internal implementation of the settings loading logic.
  */
 function _doLoadSettings(workspaceDir: string): LoadedSettings {
@@ -791,9 +938,11 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
   const storage = new Storage(workspaceDir);
   const workspaceSettingsPath = storage.getWorkspaceSettingsPath();
 
-  const load = (
-    filePath: string,
-  ): { settings: Settings; rawSettings: Settings; rawJson?: string } => {
+  /**
+   * Reads and parses a settings file. Environment variable placeholders are
+   * intentionally left unresolved here, see `resolveSettings` above.
+   */
+  const load = (filePath: string): RawSettingsFile => {
     try {
       if (fs.existsSync(filePath)) {
         const content = fs.readFileSync(filePath, 'utf-8');
@@ -809,45 +958,10 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
             path: filePath,
             severity: 'error',
           });
-          return { settings: {}, rawSettings: {} };
+          return { rawSettings: {} };
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const settingsObject = rawSettings as Record<string, unknown>;
-
-        // Expand environment variables
-        const expandedSettings = resolveEnvVarsInObject(
-          settingsObject as Settings,
-        );
-
-        // Validate settings structure with Zod after environment variable expansion
-        const validationResult = validateSettings(expandedSettings);
-        if (!validationResult.success && validationResult.error) {
-          const errorMessage = formatValidationError(
-            validationResult.error,
-            filePath,
-          );
-          settingsErrors.push({
-            message: errorMessage,
-            path: filePath,
-            severity: 'warning',
-          });
-          return {
-            settings: expandedSettings,
-            rawSettings: settingsObject as Settings,
-            rawJson: content,
-          };
-        }
-
-        // Return the successfully cast and validated data
-        return {
-          // Since we've successfully validated expandedSettings against settingsZodSchema,
-          // it's safe to cast the resulting data to the Settings type.
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          settings: (validationResult.data as Settings) ?? expandedSettings,
-          rawSettings: settingsObject as Settings,
-          rawJson: content,
-        };
+        return { rawSettings: rawSettings as Settings, rawJson: content };
       }
     } catch (error: unknown) {
       settingsErrors.push({
@@ -856,7 +970,7 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
         severity: 'error',
       });
     }
-    return { settings: {}, rawSettings: {} };
+    return { rawSettings: {} };
   };
 
   const securityCache = createPathSecurityCache();
@@ -864,9 +978,9 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
   const loadSystemFile = (
     filePath: string,
     fileLabel: string,
-  ): { settings: Settings; rawSettings: Settings; rawJson?: string } => {
+  ): RawSettingsFile => {
     if (!fs.existsSync(filePath)) {
-      return { settings: {}, rawSettings: {} };
+      return { rawSettings: {} };
     }
 
     const check = isFileAndDirectorySecureSync(filePath, securityCache);
@@ -876,7 +990,7 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
         path: filePath,
         severity: 'warning',
       });
-      return { settings: {}, rawSettings: {} };
+      return { rawSettings: {} };
     }
 
     return load(filePath);
@@ -889,33 +1003,10 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
   );
   const userResult = load(USER_SETTINGS_PATH);
 
-  let workspaceResult: {
-    settings: Settings;
-    rawSettings: Settings;
-    rawJson?: string;
-  } = {
-    settings: {} as Settings,
-    rawSettings: {} as Settings,
-    rawJson: undefined,
-  };
+  let workspaceResult: RawSettingsFile = { rawSettings: {} };
   if (!storage.isWorkspaceHomeDir()) {
     workspaceResult = load(workspaceSettingsPath);
   }
-
-  const systemOriginalSettings = structuredClone(systemResult.rawSettings);
-  const systemDefaultsOriginalSettings = structuredClone(
-    systemDefaultsResult.rawSettings,
-  );
-  const userOriginalSettings = structuredClone(userResult.rawSettings);
-  const workspaceOriginalSettings = structuredClone(
-    workspaceResult.rawSettings,
-  );
-
-  // Environment variables for runtime use are already resolved and validated in load()
-  systemSettings = systemResult.settings;
-  systemDefaultSettings = systemDefaultsResult.settings;
-  userSettings = userResult.settings;
-  workspaceSettings = workspaceResult.settings;
 
   // Support environment variable override from relaunch supervisor across exit code 199
   const envAuthOverride = process.env['GEMINI_CLI_AUTH_OVERRIDE'];
@@ -930,33 +1021,42 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
         (envAuthOverride as AuthType)
       : undefined;
   if (authOverride) {
-    if (!userSettings.security) {
-      userSettings.security = {};
-    }
-    if (!userSettings.security.auth) {
-      userSettings.security.auth = {};
-    }
-    userSettings.security.auth.selectedType = authOverride;
-    if (!userOriginalSettings.security) {
-      userOriginalSettings.security = {};
-    }
-    if (!userOriginalSettings.security.auth) {
-      userOriginalSettings.security.auth = {};
-    }
-    userOriginalSettings.security.auth.selectedType = authOverride;
+    // Applied to the raw settings so that the override is reflected both in
+    // the resolved settings and in the persisted `originalSettings`.
+    userResult.rawSettings = {
+      ...userResult.rawSettings,
+      security: {
+        ...userResult.rawSettings?.security,
+        auth: {
+          ...userResult.rawSettings?.security?.auth,
+          selectedType: authOverride,
+        },
+      },
+    };
   }
 
-  // Support legacy theme names
-  if (userSettings.ui?.theme === 'VS') {
-    userSettings.ui.theme = DefaultLight.name;
-  } else if (userSettings.ui?.theme === 'VS2015') {
-    userSettings.ui.theme = DefaultDark.name;
-  }
-  if (workspaceSettings.ui?.theme === 'VS') {
-    workspaceSettings.ui.theme = DefaultLight.name;
-  } else if (workspaceSettings.ui?.theme === 'VS2015') {
-    workspaceSettings.ui.theme = DefaultDark.name;
-  }
+  const systemOriginalSettings = structuredClone(systemResult.rawSettings);
+  const systemDefaultsOriginalSettings = structuredClone(
+    systemDefaultsResult.rawSettings,
+  );
+  const userOriginalSettings = structuredClone(userResult.rawSettings);
+  const workspaceOriginalSettings = structuredClone(
+    workspaceResult.rawSettings,
+  );
+
+  // Preliminary pass: resolve placeholders against the environment as it is
+  // before any `.env` file is loaded. The workspace trust check only depends on
+  // system and user settings, so workspace settings are not resolved before
+  // trust is established.
+  systemSettings = resolveSettings(
+    systemResult.rawSettings,
+    systemSettingsPath,
+  );
+  systemDefaultSettings = resolveSettings(
+    systemDefaultsResult.rawSettings,
+    systemDefaultsPath,
+  );
+  userSettings = resolveSettings(userResult.rawSettings, USER_SETTINGS_PATH);
 
   // For the initial trust check, we can only use user and system settings.
   const initialTrustCheckSettings = customDeepMerge(
@@ -970,6 +1070,13 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
     isWorkspaceTrusted(initialTrustCheckSettings as Settings, workspaceDir)
       ?.isTrusted ?? false;
 
+  if (isTrusted) {
+    workspaceSettings = resolveSettings(
+      workspaceResult.rawSettings,
+      workspaceSettingsPath,
+    );
+  }
+
   // Create a temporary merged settings object to pass to loadEnvironment.
   const tempMergedSettings = mergeSettings(
     systemSettings,
@@ -982,6 +1089,37 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
   // loadEnvironment depends on settings so we have to create a temp version of
   // the settings to avoid a cycle
   loadEnvironment(tempMergedSettings, workspaceDir);
+
+  // Final pass: variables from `.env` files are now part of `process.env`, so
+  // resolve the settings again to expand the placeholders that reference them.
+  // Validation issues are only reported from this pass. Workspace settings are
+  // only resolved and validated when the workspace is trusted.
+  systemSettings = resolveSettings(
+    systemResult.rawSettings,
+    systemSettingsPath,
+    settingsErrors,
+  );
+  systemDefaultSettings = resolveSettings(
+    systemDefaultsResult.rawSettings,
+    systemDefaultsPath,
+    settingsErrors,
+  );
+  userSettings = resolveSettings(
+    userResult.rawSettings,
+    USER_SETTINGS_PATH,
+    settingsErrors,
+  );
+  workspaceSettings = isTrusted
+    ? resolveSettings(
+        workspaceResult.rawSettings,
+        workspaceSettingsPath,
+        settingsErrors,
+      )
+    : {};
+
+  // Support legacy theme names
+  normalizeLegacyTheme(userSettings);
+  normalizeLegacyTheme(workspaceSettings);
 
   // Check for any fatal errors before proceeding
   const fatalErrors = settingsErrors.filter((e) => e.severity === 'error');

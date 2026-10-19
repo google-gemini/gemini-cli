@@ -20,6 +20,7 @@ import {
   type ResumedSessionData,
   coreEvents,
   createWorkingStdio,
+  isTmux,
   disableMouseEvents,
   enableMouseEvents,
   disableLineWrapping,
@@ -94,7 +95,9 @@ export async function startInteractiveUI(
   });
   consolePatcher.patch();
 
-  const { stdout: inkStdout, stderr: inkStderr } = createWorkingStdio();
+  const { stdout: inkStdout, stderr: inkStderr } = createWorkingStdio({
+    synchronizedOutput: process.platform !== 'win32' || isTmux(),
+  });
 
   const isShpool = !!process.env['SHPOOL_SESSION_NAME'];
 
@@ -164,7 +167,7 @@ export async function startInteractiveUI(
         config.getUseRenderProcess() && config.getUseTerminalBuffer(),
       incrementalRendering:
         settings.merged.ui.incrementalRendering !== false &&
-        useAlternateBuffer &&
+        (useAlternateBuffer || config.getUseTerminalBuffer()) &&
         !isShpool,
       debugRainbow: settings.merged.ui.debugRainbow === true,
     },
