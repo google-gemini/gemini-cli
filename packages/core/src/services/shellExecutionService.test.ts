@@ -2615,7 +2615,7 @@ describe('ShellExecutionService environment variables', () => {
 
   it('should include headless git and gh environment variables in non-interactive mode and append git config safely', async () => {
     vi.resetModules();
-    vi.stubEnv('GIT_CONFIG_GLOBAL', undefined);
+    vi.stubEnv('GIT_CONFIG_GLOBAL', '');
     vi.stubEnv('GIT_CONFIG_COUNT', '2');
     vi.stubEnv('GIT_CONFIG_KEY_0', 'core.editor');
     vi.stubEnv('GIT_CONFIG_VALUE_0', 'vim');

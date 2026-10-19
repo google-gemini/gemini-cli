@@ -593,6 +593,10 @@ export class ShellExecutionService {
       baseEnv[key] = sourceEnv[key];
     }
 
+    if (!baseEnv['GIT_CONFIG_GLOBAL']) {
+      delete baseEnv['GIT_CONFIG_GLOBAL'];
+    }
+
     let gitConfigCount = parseInt(baseEnv['GIT_CONFIG_COUNT'] || '0', 10);
     const devNullPath = os.platform() === 'win32' ? 'NUL' : '/dev/null';
 

@@ -259,7 +259,7 @@ describe('gitUtils', () => {
 
       const env = getSafeGitEnv({
         ...process.env,
-        GIT_CONFIG_GLOBAL: undefined,
+        GIT_CONFIG_GLOBAL: '',
         HOME: fakeHome,
         USERPROFILE: fakeHome,
         XDG_CONFIG_HOME: path.join(fakeHome, '.config'),
@@ -339,6 +339,8 @@ describe('gitUtils', () => {
       const env = getSafeGitEnv({
         ...process.env,
         GIT_CONFIG_GLOBAL: customConfigPath,
+        HOME: tempDir,
+        USERPROFILE: tempDir,
       });
 
       expect(env['GIT_CONFIG_GLOBAL']).toBe(customConfigPath);
