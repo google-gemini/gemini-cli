@@ -222,6 +222,16 @@ const SHELL_HEIGHT_PADDING = 10;
 
 const ENTER_SYNCHRONIZED_OUTPUT = '\x1b[?2026h';
 const EXIT_SYNCHRONIZED_OUTPUT = '\x1b[?2026l';
+
+/**
+ * Erases only the visible viewport and moves the cursor to the top-left corner.
+ *
+ * This intentionally avoids `ansiEscapes.clearTerminal`, which also emits
+ * `\x1b[3J` (Erase Saved Lines) and causes terminal emulators to purge their
+ * native scrollback history, wiping out earlier turns of the conversation.
+ */
+const CLEAR_VIEWPORT = ansiEscapes.eraseScreen + ansiEscapes.cursorTo(0, 0);
+
 const RESIZE_DEBOUNCE_MS = 100;
 const RESIZE_CORK_SAFETY_TIMEOUT_MS = 1000;
 
@@ -805,7 +815,8 @@ export const AppContainer = (props: AppContainerProps) => {
         isRefreshingStaticRef.current = true;
         stdout.write(ENTER_SYNCHRONIZED_OUTPUT);
       }
-      stdout.write(ansiEscapes.clearTerminal);
+      // Only clear the viewport so the terminal's scrollback is preserved.
+      stdout.write(CLEAR_VIEWPORT);
     }
     if (!isAlternateBuffer || config.getUseTerminalBuffer()) {
       setHistoryRemountKey((prev) => prev + 1);
