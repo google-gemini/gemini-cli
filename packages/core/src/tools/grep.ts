@@ -739,6 +739,9 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
       return 'total_max_matches must be at least 1.';
     }
 
+    // The upper bound (MAX_TOTAL_MAX_MATCHES) is enforced by the JSON schema's
+    // `maximum` constraint, which rejects the call before this runs.
+
     // Only validate dir_path if one is provided
     if (params.dir_path) {
       let resolvedPath: string;

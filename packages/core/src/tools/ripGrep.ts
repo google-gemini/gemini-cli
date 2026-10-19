@@ -689,6 +689,9 @@ export class RipGrepTool extends BaseDeclarativeTool<
       return 'total_max_matches must be at least 1.';
     }
 
+    // The upper bound (MAX_TOTAL_MAX_MATCHES) is enforced by the JSON schema's
+    // `maximum` constraint, which rejects the call before this runs.
+
     // Only validate path if one is provided
     if (params.dir_path) {
       let resolvedPath: string;

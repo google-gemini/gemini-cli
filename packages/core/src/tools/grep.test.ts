@@ -6,6 +6,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { GrepTool, type GrepToolParams } from './grep.js';
+import { MAX_TOTAL_MAX_MATCHES } from './constants.js';
 import type { ToolResult, GrepResult, ExecuteOptions } from './tools.js';
 import path from 'node:path';
 import { isSubpath, resolveToRealPath } from '../utils/paths.js';
@@ -161,6 +162,24 @@ describe('GrepTool', () => {
       expect(grepTool.validateToolParams(params)).toContain(
         `Path is not a directory: ${filePath}`,
       );
+    });
+
+    it('should return error when total_max_matches exceeds the maximum', () => {
+      const params: GrepToolParams = {
+        pattern: 'hello',
+        total_max_matches: MAX_TOTAL_MAX_MATCHES + 1,
+      };
+      expect(grepTool.validateToolParams(params)).toContain(
+        'total_max_matches must be <= 5000',
+      );
+    });
+
+    it('should return null when total_max_matches is at the maximum', () => {
+      const params: GrepToolParams = {
+        pattern: 'hello',
+        total_max_matches: MAX_TOTAL_MAX_MATCHES,
+      };
+      expect(grepTool.validateToolParams(params)).toBeNull();
     });
   });
 

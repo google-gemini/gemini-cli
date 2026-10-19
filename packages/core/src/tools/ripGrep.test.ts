@@ -17,6 +17,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import type { Config } from '../config/config.js';
 import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
+import { MAX_TOTAL_MAX_MATCHES } from './constants.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { PassThrough, Readable } from 'node:stream';
@@ -245,6 +246,24 @@ describe('RipGrepTool', () => {
       const params: RipGrepToolParams = {
         pattern: 'hello',
         dir_path: filePath,
+      };
+      expect(grepTool.validateToolParams(params)).toBeNull();
+    });
+
+    it('should return error when total_max_matches exceeds the maximum', () => {
+      const params: RipGrepToolParams = {
+        pattern: 'hello',
+        total_max_matches: MAX_TOTAL_MAX_MATCHES + 1,
+      };
+      expect(grepTool.validateToolParams(params)).toMatch(
+        /total_max_matches must be <= 5000/,
+      );
+    });
+
+    it('should accept total_max_matches at the maximum', () => {
+      const params: RipGrepToolParams = {
+        pattern: 'hello',
+        total_max_matches: MAX_TOTAL_MAX_MATCHES,
       };
       expect(grepTool.validateToolParams(params)).toBeNull();
     });
