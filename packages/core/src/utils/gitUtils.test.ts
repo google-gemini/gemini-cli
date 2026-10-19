@@ -259,6 +259,7 @@ describe('gitUtils', () => {
 
       const env = getSafeGitEnv({
         ...process.env,
+        GIT_CONFIG_GLOBAL: undefined,
         HOME: fakeHome,
         USERPROFILE: fakeHome,
         XDG_CONFIG_HOME: path.join(fakeHome, '.config'),
@@ -318,6 +319,44 @@ describe('gitUtils', () => {
         { cwd: repoDir, env },
       );
       expect(logRes.stdout.trim()).toBe('Global User <global@example.com>');
+    });
+
+    it('should preserve custom GIT_CONFIG_GLOBAL when explicitly set in baseEnv', async () => {
+      const customConfigPath = path.join(tempDir, 'custom.gitconfig');
+      const repoDir = path.join(tempDir, 'custom-repo');
+      await fs.mkdir(repoDir, { recursive: true });
+
+      await fs.writeFile(
+        customConfigPath,
+        [
+          '[user]',
+          '  name = Custom Global User',
+          '  email = custom@example.com',
+          '',
+        ].join('\n'),
+      );
+
+      const env = getSafeGitEnv({
+        ...process.env,
+        GIT_CONFIG_GLOBAL: customConfigPath,
+      });
+
+      expect(env['GIT_CONFIG_GLOBAL']).toBe(customConfigPath);
+
+      await spawnAsync('git', ['init'], { cwd: repoDir, env });
+      const nameRes = await spawnAsync(
+        'git',
+        ['config', '--get', 'user.name'],
+        { cwd: repoDir, env },
+      );
+      expect(nameRes.stdout.trim()).toBe('Custom Global User');
+
+      const emailRes = await spawnAsync(
+        'git',
+        ['config', '--get', 'user.email'],
+        { cwd: repoDir, env },
+      );
+      expect(emailRes.stdout.trim()).toBe('custom@example.com');
     });
   });
 
