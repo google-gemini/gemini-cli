@@ -940,7 +940,7 @@ describe('normalizePath', () => {
       expect(isTrustedSystemPath('/Library/rg')).toBe(false);
     });
 
-    it('should allow Termux system paths on Android or when TERMUX_VERSION/PREFIX is set', () => {
+    it('should allow Termux system paths on Android or when TERMUX_VERSION is set', () => {
       mockPlatform('android');
       expect(
         isTrustedSystemPath('/data/data/com.termux/files/usr/bin/rg'),
@@ -951,19 +951,22 @@ describe('normalizePath', () => {
         ),
       ).toBe(true);
 
-      // On standard linux, without TERMUX_VERSION or PREFIX, it is rejected
+      // On standard linux, without TERMUX_VERSION, it is rejected even if PREFIX is set
       mockPlatform('linux');
-      expect(
-        isTrustedSystemPath('/data/data/com.termux/files/usr/bin/rg'),
-      ).toBe(false);
+      vi.stubEnv('PREFIX', '/custom/termux/prefix/usr');
+      expect(isTrustedSystemPath('/custom/termux/prefix/usr/bin/rg')).toBe(
+        false,
+      );
+      vi.unstubAllEnvs();
 
       // With TERMUX_VERSION set on linux, it is allowed
+      mockPlatform('linux');
       vi.stubEnv('TERMUX_VERSION', '0.118.0');
       expect(
         isTrustedSystemPath('/data/data/com.termux/files/usr/bin/rg'),
       ).toBe(true);
 
-      // Custom PREFIX support
+      // Custom PREFIX support when TERMUX_VERSION is set
       vi.stubEnv('PREFIX', '/custom/termux/prefix/usr');
       expect(isTrustedSystemPath('/custom/termux/prefix/usr/bin/rg')).toBe(
         true,

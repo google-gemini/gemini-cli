@@ -609,11 +609,10 @@ export function isTrustedSystemPath(filePath: string): boolean {
       '/google/src/cloud',
     ];
 
-    if (
-      platform === 'android' ||
-      !!process.env['TERMUX_VERSION'] ||
-      !!process.env['PREFIX']
-    ) {
+    const isAndroidOrTermux =
+      platform === 'android' || !!process.env['TERMUX_VERSION'];
+
+    if (isAndroidOrTermux) {
       trustedPrefixes.push(
         '/data/data/com.termux/files/usr/bin',
         '/data/data/com.termux/files/usr/bin/applets',
