@@ -5,11 +5,13 @@
  */
 
 import { lookup } from 'node:dns/promises';
+import { isIP } from 'node:net';
 import type { MCPOAuthConfig } from './oauth-provider.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
   isAddressPrivate,
+  isEnterprisePrivateAddress,
   isLoopbackHost,
   sanitizeHostname,
 } from '../utils/fetch.js';
@@ -51,10 +53,14 @@ export function isLoopbackUrl(urlStr: string): boolean {
  */
 export interface OAuthUrlValidationOptions {
   allowLoopback?: boolean;
+  allowPrivateNetwork?: boolean;
   expectedOrigin?: string;
   allowRelative?: boolean;
   baseUri?: string;
 }
+
+const PRIVATE_NETWORK_REMEDIATION_HINT =
+  'Set "oauth.allowPrivateNetwork": true in settings.json for this MCP server if it is on a trusted private network.';
 
 /**
  * Validates an OAuth endpoint URL against SSRF, scheme, and origin constraints per RFC 9728 Section 7.7.
@@ -125,11 +131,20 @@ export async function validateOAuthEndpointUrl(
     return parsed.toString();
   }
 
-  // Non-loopback host: check literal IP
+  // Non-loopback host: check literal IP or internal hostname suffix
   if (isAddressPrivate(hostname)) {
-    throw new OAuthSecurityError(
-      `OAuth endpoint "${resolvedUrl}" points to private or reserved IP address which is blocked.`,
-    );
+    const isEnterprisePrivate = isEnterprisePrivateAddress(hostname);
+    if (!options?.allowPrivateNetwork || !isEnterprisePrivate) {
+      const hint = isEnterprisePrivate
+        ? ` ${PRIVATE_NETWORK_REMEDIATION_HINT}`
+        : '';
+      throw new OAuthSecurityError(
+        `OAuth endpoint "${resolvedUrl}" points to private or reserved IP address which is blocked.${hint}`,
+      );
+    }
+    if (isIP(hostname) !== 0) {
+      return parsed.toString();
+    }
   }
 
   // Asynchronous DNS resolution to prevent DNS rebinding / SSRF
@@ -143,9 +158,15 @@ export async function validateOAuthEndpointUrl(
 
     for (const addr of addresses) {
       if (isAddressPrivate(addr.address)) {
-        throw new OAuthSecurityError(
-          `OAuth endpoint "${resolvedUrl}" resolves to private network address "${addr.address}" which is blocked.`,
-        );
+        const isEnterprisePrivate = isEnterprisePrivateAddress(addr.address);
+        if (!options?.allowPrivateNetwork || !isEnterprisePrivate) {
+          const hint = isEnterprisePrivate
+            ? ` ${PRIVATE_NETWORK_REMEDIATION_HINT}`
+            : '';
+          throw new OAuthSecurityError(
+            `OAuth endpoint "${resolvedUrl}" resolves to private network address "${addr.address}" which is blocked.${hint}`,
+          );
+        }
       }
     }
   } catch (error) {
@@ -244,12 +265,17 @@ export class OAuthUtils {
    */
   static async fetchProtectedResourceMetadata(
     resourceMetadataUrl: string,
-    options?: { allowLoopback?: boolean; expectedOrigin?: string },
+    options?: {
+      allowLoopback?: boolean;
+      expectedOrigin?: string;
+      allowPrivateNetwork?: boolean;
+    },
   ): Promise<OAuthProtectedResourceMetadata | null> {
     try {
       const validatedUrl = await validateOAuthEndpointUrl(resourceMetadataUrl, {
         allowLoopback: options?.allowLoopback,
         expectedOrigin: options?.expectedOrigin,
+        allowPrivateNetwork: options?.allowPrivateNetwork,
       });
 
       const response = await fetch(validatedUrl);
@@ -278,13 +304,14 @@ export class OAuthUtils {
    */
   static async fetchAuthorizationServerMetadata(
     authServerMetadataUrl: string,
-    options?: { allowLoopback?: boolean },
+    options?: { allowLoopback?: boolean; allowPrivateNetwork?: boolean },
   ): Promise<OAuthAuthorizationServerMetadata | null> {
     try {
       const validatedUrl = await validateOAuthEndpointUrl(
         authServerMetadataUrl,
         {
           allowLoopback: options?.allowLoopback,
+          allowPrivateNetwork: options?.allowPrivateNetwork,
         },
       );
 
@@ -340,10 +367,11 @@ export class OAuthUtils {
    */
   static async discoverAuthorizationServerMetadata(
     authServerUrl: string,
-    options?: { allowLoopback?: boolean },
+    options?: { allowLoopback?: boolean; allowPrivateNetwork?: boolean },
   ): Promise<OAuthAuthorizationServerMetadata | null> {
     const validatedBaseUrl = await validateOAuthEndpointUrl(authServerUrl, {
       allowLoopback: options?.allowLoopback,
+      allowPrivateNetwork: options?.allowPrivateNetwork,
     });
 
     const authServerUrlObj = new URL(validatedBaseUrl);
@@ -416,9 +444,11 @@ export class OAuthUtils {
    */
   static async discoverOAuthConfig(
     serverUrl: string,
+    options?: { allowPrivateNetwork?: boolean },
   ): Promise<MCPOAuthConfig | null> {
     try {
       const allowLoopback = isLoopbackUrl(serverUrl);
+      const allowPrivateNetwork = options?.allowPrivateNetwork;
       const expectedOrigin = new URL(serverUrl).origin;
 
       // RFC 9728 §3.1: Construct well-known URL by inserting /.well-known/oauth-protected-resource
@@ -426,7 +456,7 @@ export class OAuthUtils {
       const wellKnownUrls = this.buildWellKnownUrls(serverUrl);
       let resourceMetadata = await this.fetchProtectedResourceMetadata(
         wellKnownUrls.protectedResource,
-        { allowLoopback, expectedOrigin },
+        { allowLoopback, expectedOrigin, allowPrivateNetwork },
       );
 
       // Fallback: If path-based discovery fails and we have a path, try root-based discovery
@@ -437,7 +467,7 @@ export class OAuthUtils {
           const rootBasedUrls = this.buildWellKnownUrls(serverUrl, true);
           resourceMetadata = await this.fetchProtectedResourceMetadata(
             rootBasedUrls.protectedResource,
-            { allowLoopback, expectedOrigin },
+            { allowLoopback, expectedOrigin, allowPrivateNetwork },
           );
         }
       }
@@ -459,13 +489,19 @@ export class OAuthUtils {
         }
       }
 
+      const authServerDiscoveryOptions = {
+        allowLoopback,
+        ...(allowPrivateNetwork !== undefined ? { allowPrivateNetwork } : {}),
+      };
+
       if (resourceMetadata?.authorization_servers?.length) {
         // Use the first authorization server
         const authServerUrl = resourceMetadata.authorization_servers[0];
         const authServerMetadata =
-          await this.discoverAuthorizationServerMetadata(authServerUrl, {
-            allowLoopback,
-          });
+          await this.discoverAuthorizationServerMetadata(
+            authServerUrl,
+            authServerDiscoveryOptions,
+          );
 
         if (authServerMetadata) {
           const config = this.metadataToOAuthConfig(authServerMetadata);
@@ -483,9 +519,7 @@ export class OAuthUtils {
       debugLogger.debug(`Trying OAuth discovery fallback at ${serverUrl}`);
       const authServerMetadata = await this.discoverAuthorizationServerMetadata(
         serverUrl,
-        {
-          allowLoopback,
-        },
+        authServerDiscoveryOptions,
       );
 
       if (authServerMetadata) {
@@ -539,6 +573,7 @@ export class OAuthUtils {
   static async discoverOAuthFromWWWAuthenticate(
     wwwAuthenticate: string,
     mcpServerUrl?: string,
+    options?: { allowPrivateNetwork?: boolean },
   ): Promise<MCPOAuthConfig | null> {
     const resourceMetadataUri =
       this.parseWWWAuthenticateHeader(wwwAuthenticate);
@@ -547,6 +582,7 @@ export class OAuthUtils {
     }
 
     const allowLoopback = mcpServerUrl ? isLoopbackUrl(mcpServerUrl) : false;
+    const allowPrivateNetwork = options?.allowPrivateNetwork;
     const expectedOrigin = mcpServerUrl
       ? new URL(mcpServerUrl).origin
       : undefined;
@@ -558,6 +594,7 @@ export class OAuthUtils {
         expectedOrigin,
         allowRelative: true,
         baseUri: mcpServerUrl,
+        allowPrivateNetwork,
       },
     );
 
@@ -566,6 +603,7 @@ export class OAuthUtils {
       {
         allowLoopback,
         expectedOrigin,
+        allowPrivateNetwork,
       },
     );
 
@@ -593,6 +631,7 @@ export class OAuthUtils {
       authServerUrl,
       {
         allowLoopback,
+        ...(allowPrivateNetwork !== undefined ? { allowPrivateNetwork } : {}),
       },
     );
 
