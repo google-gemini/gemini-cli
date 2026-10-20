@@ -9,7 +9,11 @@ import * as path from 'node:path';
 import type { Config } from '../config/config.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import { bfsFileSearchSync } from './bfsFileSearch.js';
-import { isSubpath, resolveDefensiveToolPath } from './paths.js';
+import {
+  isSubpath,
+  resolveDefensiveToolPath,
+  resolveToRealPath,
+} from './paths.js';
 
 type SuccessfulPathCorrection = {
   success: true;
@@ -53,10 +57,10 @@ export function resolveActiveWorkspaceDir(
     return defaultTargetDir;
   }
 
-  const resolvedActiveFilePath = path.resolve(activeFile.path);
+  const resolvedActiveFilePath = resolveToRealPath(activeFile.path);
   const matchingWorkspaceDirs = workspaceContext
     .getDirectories()
-    .map((dir) => path.resolve(dir))
+    .map((dir) => resolveToRealPath(dir))
     .filter((dir) => isSubpath(dir, resolvedActiveFilePath))
     .sort((a, b) => b.length - a.length);
 
@@ -88,7 +92,7 @@ export function resolveActiveWorkspaceDir(
     currentDir = parentDir;
   }
 
-  const resolvedDefaultTargetDir = path.resolve(defaultTargetDir);
+  const resolvedDefaultTargetDir = resolveToRealPath(defaultTargetDir);
   if (
     relativeFilePath &&
     !path.isAbsolute(relativeFilePath) &&
@@ -106,7 +110,7 @@ export function resolveActiveWorkspaceDir(
       (normalizedInput === relToDefault ||
         normalizedInput.startsWith(`${relToDefault}/`))
     ) {
-      return defaultTargetDir;
+      return resolvedDefaultTargetDir;
     }
   }
 
@@ -128,18 +132,22 @@ export function correctPath(
   filePath: string,
   config: Config,
 ): PathCorrectionResult {
-  const targetDir = resolveActiveWorkspaceDir(config, filePath);
+  const targetDir = resolveToRealPath(
+    resolveActiveWorkspaceDir(config, filePath),
+  );
   const sanitizedPath = resolveDefensiveToolPath(filePath, targetDir);
 
   // Check for direct path relative to the active target directory.
-  const directPath = path.join(targetDir, sanitizedPath);
+  const directPath = resolveToRealPath(path.join(targetDir, sanitizedPath));
   if (fs.existsSync(directPath)) {
     return { success: true, correctedPath: directPath };
   }
 
-  const fallbackTargetDir = config.getTargetDir();
+  const fallbackTargetDir = resolveToRealPath(config.getTargetDir());
   if (targetDir !== fallbackTargetDir) {
-    const fallbackDirectPath = path.join(fallbackTargetDir, sanitizedPath);
+    const fallbackDirectPath = resolveToRealPath(
+      path.join(fallbackTargetDir, sanitizedPath),
+    );
     if (fs.existsSync(fallbackDirectPath)) {
       return { success: true, correctedPath: fallbackDirectPath };
     }
@@ -151,7 +159,7 @@ export function correctPath(
   const basename = path.basename(sanitizedPath);
   const normalizedTarget = sanitizedPath.replace(/\\/g, '/');
 
-  if (targetDir !== path.resolve(fallbackTargetDir)) {
+  if (targetDir !== fallbackTargetDir) {
     const activeFoundFiles = bfsFileSearchSync(targetDir, {
       fileName: basename,
       maxDirs: 50,
