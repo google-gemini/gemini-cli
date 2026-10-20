@@ -1319,8 +1319,14 @@ describe('runNonInteractive', () => {
 
       await expect(runPromise).rejects.toThrow('process.exit(130) called');
 
-      expect(processOffSpy).toHaveBeenCalledWith('SIGINT', expect.any(Function));
-      expect(processOffSpy).toHaveBeenCalledWith('SIGTERM', expect.any(Function));
+      expect(processOffSpy).toHaveBeenCalledWith(
+        'SIGINT',
+        expect.any(Function),
+      );
+      expect(processOffSpy).toHaveBeenCalledWith(
+        'SIGTERM',
+        expect.any(Function),
+      );
     } finally {
       Object.defineProperty(process.stdin, 'isTTY', {
         value: originalIsTTY,

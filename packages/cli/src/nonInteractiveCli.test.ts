@@ -1245,8 +1245,14 @@ describe('runNonInteractive', () => {
         prompt_id: 'prompt-signal-cleanup',
       });
 
-      expect(processOffSpy).toHaveBeenCalledWith('SIGINT', expect.any(Function));
-      expect(processOffSpy).toHaveBeenCalledWith('SIGTERM', expect.any(Function));
+      expect(processOffSpy).toHaveBeenCalledWith(
+        'SIGINT',
+        expect.any(Function),
+      );
+      expect(processOffSpy).toHaveBeenCalledWith(
+        'SIGTERM',
+        expect.any(Function),
+      );
     } finally {
       Object.defineProperty(process.stdin, 'isTTY', {
         value: originalIsTTY,

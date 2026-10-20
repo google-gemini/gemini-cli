@@ -237,6 +237,8 @@ export async function runNonInteractive(
       process.stdout.on('error', (err: NodeJS.ErrnoException) => {
         if (err.code === 'EPIPE') {
           // Exit gracefully if the pipe is closed.
+          cleanupCancellation();
+          consolePatcher.cleanup();
           process.exit(0);
         }
       });
