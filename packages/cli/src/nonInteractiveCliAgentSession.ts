@@ -330,6 +330,7 @@ export async function runNonInteractive({
       abortController.signal.addEventListener('abort', abortSession);
       if (abortController.signal.aborted) {
         handleCancellationError(config);
+        throw new Error('Cancelled');
       }
 
       // Start the agentic loop (runs in background)
@@ -655,6 +656,7 @@ export async function runNonInteractive({
           case 'agent_end': {
             if (event.reason === 'aborted') {
               handleCancellationError(config);
+              throw new Error('Cancelled');
             } else if (event.reason === 'max_turns') {
               const isConfiguredTurnLimit =
                 typeof event.data?.['maxTurns'] === 'number' ||
@@ -703,6 +705,10 @@ export async function runNonInteractive({
         }
       }
     } catch (error) {
+      if (abortController.signal.aborted) {
+        handleCancellationError(config);
+        throw new Error('Cancelled');
+      }
       errorToHandle = error;
     } finally {
       // Cleanup cancellation listeners before other cleanup
@@ -712,10 +718,11 @@ export async function runNonInteractive({
       scheduler?.dispose();
       consolePatcher.cleanup();
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
+    }
 
-      if (abortController.signal.aborted) {
-        handleCancellationError(config);
-      }
+    if (abortController.signal.aborted) {
+      handleCancellationError(config);
+      throw new Error('Cancelled');
     }
 
     if (errorToHandle) {

@@ -437,6 +437,7 @@ export async function runNonInteractive(
             return;
           } else if (event.type === GeminiEventType.UserCancelled) {
             handleCancellationError(config);
+            throw new Error('Cancelled');
           } else if (event.type === GeminiEventType.AgentExecutionBlocked) {
             const blockMessage = `Agent execution blocked: ${event.value.systemMessage?.trim() || event.value.reason}`;
             if (config.getOutputFormat() === OutputFormat.TEXT) {
@@ -494,6 +495,7 @@ export async function runNonInteractive(
         if (toolCallRequests.length > 0) {
           if (abortController.signal.aborted) {
             handleCancellationError(config);
+            throw new Error('Cancelled');
           }
           textOutput.ensureTrailingNewline();
           const completedToolCalls = await scheduler.schedule(
@@ -634,6 +636,10 @@ export async function runNonInteractive(
         }
       }
     } catch (error) {
+      if (abortController.signal.aborted) {
+        handleCancellationError(config);
+        throw new Error('Cancelled');
+      }
       errorToHandle = error;
     } finally {
       // Cleanup cancellation listeners before other cleanup
@@ -642,10 +648,11 @@ export async function runNonInteractive(
       scheduler?.dispose();
       consolePatcher.cleanup();
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
+    }
 
-      if (abortController.signal.aborted) {
-        handleCancellationError(config);
-      }
+    if (abortController.signal.aborted) {
+      handleCancellationError(config);
+      throw new Error('Cancelled');
     }
 
     if (errorToHandle) {
