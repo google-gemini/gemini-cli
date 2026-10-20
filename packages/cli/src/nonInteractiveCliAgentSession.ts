@@ -54,7 +54,11 @@ import stripAnsi from 'strip-ansi';
 import { handleSlashCommand } from './nonInteractiveCliCommands.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { handleAtCommand } from './ui/hooks/atCommandProcessor.js';
-import { handleError, handleToolError } from './utils/errors.js';
+import {
+  handleError,
+  handleToolError,
+  handleCancellationError,
+} from './utils/errors.js';
 import { TextOutput } from './ui/utils/textOutput.js';
 
 interface RunNonInteractiveParams {
@@ -123,11 +127,31 @@ export async function runNonInteractive({
     let isAborting = false;
     let cancelMessageTimer: NodeJS.Timeout | null = null;
 
-    // Setup stdin listener for Ctrl+C detection
+    // Setup stdin listener for Ctrl+C detection and process signal handlers
     let stdinWasRaw = false;
     let rl: readline.Interface | null = null;
 
-    const setupStdinCancellation = () => {
+    const triggerAbort = () => {
+      // Only handle once
+      if (isAborting) {
+        return;
+      }
+
+      isAborting = true;
+
+      // Only show message if cancellation takes longer than 200ms
+      // This reduces verbosity for fast cancellations
+      cancelMessageTimer = setTimeout(() => {
+        process.stderr.write('\nCancelling...\n');
+      }, 200);
+
+      abortController.abort();
+    };
+
+    const setupCancellation = () => {
+      process.on('SIGINT', triggerAbort);
+      process.on('SIGTERM', triggerAbort);
+
       // Only setup if stdin is a TTY (user can interact)
       if (!process.stdin.isTTY) {
         return;
@@ -154,27 +178,17 @@ export async function runNonInteractive({
       ) => {
         // Detect Ctrl+C: either ctrl+c key combo or raw character code 3
         if ((key && key.ctrl && key.name === 'c') || str === '\u0003') {
-          // Only handle once
-          if (isAborting) {
-            return;
-          }
-
-          isAborting = true;
-
-          // Only show message if cancellation takes longer than 200ms
-          // This reduces verbosity for fast cancellations
-          cancelMessageTimer = setTimeout(() => {
-            process.stderr.write('\nCancelling...\n');
-          }, 200);
-
-          abortController.abort();
+          triggerAbort();
         }
       };
 
       process.stdin.on('keypress', keypressHandler);
     };
 
-    const cleanupStdinCancellation = () => {
+    const cleanupCancellation = () => {
+      process.off('SIGINT', triggerAbort);
+      process.off('SIGTERM', triggerAbort);
+
       // Clear any pending cancel message timer
       if (cancelMessageTimer) {
         clearTimeout(cancelMessageTimer);
@@ -213,8 +227,8 @@ export async function runNonInteractive({
         );
       }
 
-      // Setup stdin cancellation listener
-      setupStdinCancellation();
+      // Setup cancellation listeners
+      setupCancellation();
 
       coreEvents.on(CoreEvent.UserFeedback, handleUserFeedback);
       coreEvents.drainBacklogs();
@@ -223,7 +237,7 @@ export async function runNonInteractive({
       process.stdout.on('error', (err: NodeJS.ErrnoException) => {
         if (err.code === 'EPIPE') {
           // Exit gracefully if the pipe is closed.
-          cleanupStdinCancellation();
+          cleanupCancellation();
           consolePatcher.cleanup();
           process.exit(0);
         }
@@ -315,7 +329,7 @@ export async function runNonInteractive({
       };
       abortController.signal.addEventListener('abort', abortSession);
       if (abortController.signal.aborted) {
-        throw new FatalCancellationError('Operation cancelled.');
+        handleCancellationError(config);
       }
 
       // Start the agentic loop (runs in background)
@@ -640,7 +654,7 @@ export async function runNonInteractive({
           }
           case 'agent_end': {
             if (event.reason === 'aborted') {
-              throw new FatalCancellationError('Operation cancelled.');
+              handleCancellationError(config);
             } else if (event.reason === 'max_turns') {
               const isConfiguredTurnLimit =
                 typeof event.data?.['maxTurns'] === 'number' ||
@@ -688,11 +702,15 @@ export async function runNonInteractive({
             break;
         }
       }
+
+      if (abortController.signal.aborted) {
+        handleCancellationError(config);
+      }
     } catch (error) {
       errorToHandle = error;
     } finally {
-      // Cleanup stdin cancellation before other cleanup
-      cleanupStdinCancellation();
+      // Cleanup cancellation listeners before other cleanup
+      cleanupCancellation();
       abortController.signal.removeEventListener('abort', abortSession);
 
       scheduler?.dispose();

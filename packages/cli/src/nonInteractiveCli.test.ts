@@ -12,6 +12,7 @@ import type {
   AnyDeclarativeTool,
   AnyToolInvocation,
   UserFeedbackPayload,
+  ToolCallRequestInfo,
 } from '@google/gemini-cli-core';
 import {
   ToolErrorType,
@@ -1158,6 +1159,271 @@ describe('runNonInteractive', () => {
     }
     // Spies are automatically restored by vi.restoreAllMocks() in afterEach,
     // but we can also do it manually if needed.
+  });
+
+  it('should register a SIGINT listener to abort execution in non-TTY mode', async () => {
+    // Ensure non-TTY environment (e.g. Docker, CI, piped input)
+    const originalIsTTY = process.stdin.isTTY;
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: false,
+      configurable: true,
+    });
+
+    const processOnSpy = vi.spyOn(process, 'on');
+
+    mockGeminiClient.sendMessageStream.mockImplementation(() =>
+      (async function* () {
+        yield { type: GeminiEventType.Content, value: 'Hello' };
+      })(),
+    );
+
+    await runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: 'Test non-TTY signal registration',
+      prompt_id: 'prompt-signal-registration',
+    });
+
+    // In non-TTY mode, the CLI must listen for SIGINT on process to handle cancellation
+    const sigintCall = processOnSpy.mock.calls.find(
+      (call) => call[0] === 'SIGINT',
+    );
+    expect(sigintCall).toBeDefined();
+
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: originalIsTTY,
+      configurable: true,
+    });
+  });
+
+  it('should register a SIGTERM listener to abort execution in non-TTY mode', async () => {
+    const originalIsTTY = process.stdin.isTTY;
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: false,
+      configurable: true,
+    });
+
+    const processOnSpy = vi.spyOn(process, 'on');
+
+    mockGeminiClient.sendMessageStream.mockImplementation(() =>
+      (async function* () {
+        yield { type: GeminiEventType.Content, value: 'Hello' };
+      })(),
+    );
+
+    await runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: 'Test non-TTY SIGTERM registration',
+      prompt_id: 'prompt-sigterm-registration',
+    });
+
+    const sigtermCall = processOnSpy.mock.calls.find(
+      (call) => call[0] === 'SIGTERM',
+    );
+    expect(sigtermCall).toBeDefined();
+
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: originalIsTTY,
+      configurable: true,
+    });
+  });
+
+  it('should remove SIGINT and SIGTERM listeners on cleanup', async () => {
+    const originalIsTTY = process.stdin.isTTY;
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: false,
+      configurable: true,
+    });
+
+    const processOffSpy = vi.spyOn(process, 'off');
+
+    mockGeminiClient.sendMessageStream.mockImplementation(() =>
+      (async function* () {
+        yield { type: GeminiEventType.Content, value: 'Done' };
+      })(),
+    );
+
+    await runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: 'Test signal cleanup',
+      prompt_id: 'prompt-signal-cleanup',
+    });
+
+    expect(processOffSpy).toHaveBeenCalledWith('SIGINT', expect.any(Function));
+    expect(processOffSpy).toHaveBeenCalledWith('SIGTERM', expect.any(Function));
+
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: originalIsTTY,
+      configurable: true,
+    });
+  });
+
+  it('should abort and prevent tool execution when SIGINT handler is invoked during streaming', async () => {
+    const originalIsTTY = process.stdin.isTTY;
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: false,
+      configurable: true,
+    });
+
+    const processOnSpy = vi.spyOn(process, 'on');
+    const errors = await import('./utils/errors.js');
+    const handleCancellationErrorSpy = vi
+      .spyOn(errors, 'handleCancellationError')
+      .mockImplementation(() => {
+        throw new Error('Cancelled via SIGINT');
+      });
+
+    const toolCall: ToolCallRequestInfo = {
+      callId: 'call-sigint-delayed',
+      name: 'run_shell_command',
+      args: { command: 'echo late-side-effect' },
+      isClientInitiated: false,
+      prompt_id: 'prompt-sigint-abort',
+    };
+
+    let streamSignal: AbortSignal | undefined;
+    mockGeminiClient.sendMessageStream.mockImplementation(
+      (_messages, signal: AbortSignal) =>
+        (async function* () {
+          streamSignal = signal;
+          yield { type: GeminiEventType.ToolCallRequest, value: toolCall };
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        })(),
+    );
+
+    const runPromise = runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: 'Test SIGINT abort execution',
+      prompt_id: 'prompt-sigint-abort',
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const sigintCall = processOnSpy.mock.calls.find(
+      (call) => call[0] === 'SIGINT',
+    );
+    expect(sigintCall).toBeDefined();
+    const sigintHandler = sigintCall?.[1] as (() => void) | undefined;
+    sigintHandler?.();
+
+    try {
+      await runPromise;
+    } catch {
+      // Expected rejection
+    }
+
+    expect(streamSignal?.aborted).toBe(true);
+    expect(mockSchedulerSchedule).not.toHaveBeenCalled();
+
+    handleCancellationErrorSpy.mockRestore();
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: originalIsTTY,
+      configurable: true,
+    });
+  });
+
+  it('should abort and prevent tool execution when SIGTERM handler is invoked during streaming', async () => {
+    const originalIsTTY = process.stdin.isTTY;
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: false,
+      configurable: true,
+    });
+
+    const processOnSpy = vi.spyOn(process, 'on');
+    const errors = await import('./utils/errors.js');
+    const handleCancellationErrorSpy = vi
+      .spyOn(errors, 'handleCancellationError')
+      .mockImplementation(() => {
+        throw new Error('Cancelled via SIGTERM');
+      });
+
+    const toolCall: ToolCallRequestInfo = {
+      callId: 'call-sigterm-delayed',
+      name: 'run_shell_command',
+      args: { command: 'echo late-side-effect' },
+      isClientInitiated: false,
+      prompt_id: 'prompt-sigterm-abort',
+    };
+
+    let streamSignal: AbortSignal | undefined;
+    mockGeminiClient.sendMessageStream.mockImplementation(
+      (_messages, signal: AbortSignal) =>
+        (async function* () {
+          streamSignal = signal;
+          yield { type: GeminiEventType.ToolCallRequest, value: toolCall };
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        })(),
+    );
+
+    const runPromise = runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: 'Test SIGTERM abort execution',
+      prompt_id: 'prompt-sigterm-abort',
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const sigtermCall = processOnSpy.mock.calls.find(
+      (call) => call[0] === 'SIGTERM',
+    );
+    expect(sigtermCall).toBeDefined();
+    const sigtermHandler = sigtermCall?.[1] as (() => void) | undefined;
+    sigtermHandler?.();
+
+    try {
+      await runPromise;
+    } catch {
+      // Expected rejection
+    }
+
+    expect(streamSignal?.aborted).toBe(true);
+    expect(mockSchedulerSchedule).not.toHaveBeenCalled();
+
+    handleCancellationErrorSpy.mockRestore();
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: originalIsTTY,
+      configurable: true,
+    });
+  });
+
+  it('should not execute tool calls when stream yields UserCancelled event', async () => {
+    const toolCall: ToolCallRequestInfo = {
+      callId: 'call-1',
+      name: 'run_shell_command',
+      args: { command: 'echo late-side-effect' },
+      isClientInitiated: false,
+      prompt_id: 'prompt-user-cancelled',
+    };
+
+    mockGeminiClient.sendMessageStream.mockImplementation(() =>
+      (async function* () {
+        yield { type: GeminiEventType.ToolCallRequest, value: toolCall };
+        yield { type: GeminiEventType.UserCancelled };
+      })(),
+    );
+
+    const errors = await import('./utils/errors.js');
+    const handleCancellationErrorSpy = vi
+      .spyOn(errors, 'handleCancellationError')
+      .mockImplementation(() => {
+        throw new Error('Cancelled');
+      });
+
+    try {
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'Test UserCancelled event',
+        prompt_id: 'prompt-user-cancelled',
+      });
+    } catch {
+      // Expected if cancellation throws
+    }
+
+    expect(mockSchedulerSchedule).not.toHaveBeenCalled();
+    handleCancellationErrorSpy.mockRestore();
   });
 
   it('should throw FatalInputError if a command requires confirmation', async () => {

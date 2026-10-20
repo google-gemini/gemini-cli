@@ -126,11 +126,33 @@ export async function runNonInteractive(
     let isAborting = false;
     let cancelMessageTimer: NodeJS.Timeout | null = null;
 
-    // Setup stdin listener for Ctrl+C detection
+    // Setup stdin listener for Ctrl+C detection and process signal handlers
     let stdinWasRaw = false;
     let rl: readline.Interface | null = null;
 
-    const setupStdinCancellation = () => {
+    const triggerAbort = () => {
+      // Only handle once
+      if (isAborting) {
+        return;
+      }
+
+      isAborting = true;
+
+      // Only show message if cancellation takes longer than 200ms
+      // This reduces verbosity for fast cancellations
+      cancelMessageTimer = setTimeout(() => {
+        process.stderr.write('\nCancelling...\n');
+      }, 200);
+
+      abortController.abort();
+      // Note: Don't exit here - let the abort flow through the system
+      // and trigger handleCancellationError() which will exit with proper code
+    };
+
+    const setupCancellation = () => {
+      process.on('SIGINT', triggerAbort);
+      process.on('SIGTERM', triggerAbort);
+
       // Only setup if stdin is a TTY (user can interact)
       if (!process.stdin.isTTY) {
         return;
@@ -157,29 +179,17 @@ export async function runNonInteractive(
       ) => {
         // Detect Ctrl+C: either ctrl+c key combo or raw character code 3
         if ((key && key.ctrl && key.name === 'c') || str === '\u0003') {
-          // Only handle once
-          if (isAborting) {
-            return;
-          }
-
-          isAborting = true;
-
-          // Only show message if cancellation takes longer than 200ms
-          // This reduces verbosity for fast cancellations
-          cancelMessageTimer = setTimeout(() => {
-            process.stderr.write('\nCancelling...\n');
-          }, 200);
-
-          abortController.abort();
-          // Note: Don't exit here - let the abort flow through the system
-          // and trigger handleCancellationError() which will exit with proper code
+          triggerAbort();
         }
       };
 
       process.stdin.on('keypress', keypressHandler);
     };
 
-    const cleanupStdinCancellation = () => {
+    const cleanupCancellation = () => {
+      process.off('SIGINT', triggerAbort);
+      process.off('SIGTERM', triggerAbort);
+
       // Clear any pending cancel message timer
       if (cancelMessageTimer) {
         clearTimeout(cancelMessageTimer);
@@ -217,8 +227,8 @@ export async function runNonInteractive(
         );
       }
 
-      // Setup stdin cancellation listener
-      setupStdinCancellation();
+      // Setup cancellation listeners
+      setupCancellation();
 
       coreEvents.on(CoreEvent.UserFeedback, handleUserFeedback);
       coreEvents.drainBacklogs();
@@ -425,6 +435,8 @@ export async function runNonInteractive(
               textOutput.ensureTrailingNewline(); // Ensure a final newline
             }
             return;
+          } else if (event.type === GeminiEventType.UserCancelled) {
+            handleCancellationError(config);
           } else if (event.type === GeminiEventType.AgentExecutionBlocked) {
             const blockMessage = `Agent execution blocked: ${event.value.systemMessage?.trim() || event.value.reason}`;
             if (config.getOutputFormat() === OutputFormat.TEXT) {
@@ -480,6 +492,9 @@ export async function runNonInteractive(
         }
 
         if (toolCallRequests.length > 0) {
+          if (abortController.signal.aborted) {
+            handleCancellationError(config);
+          }
           textOutput.ensureTrailingNewline();
           const completedToolCalls = await scheduler.schedule(
             toolCallRequests,
@@ -621,8 +636,8 @@ export async function runNonInteractive(
     } catch (error) {
       errorToHandle = error;
     } finally {
-      // Cleanup stdin cancellation before other cleanup
-      cleanupStdinCancellation();
+      // Cleanup cancellation listeners before other cleanup
+      cleanupCancellation();
 
       scheduler?.dispose();
       consolePatcher.cleanup();
