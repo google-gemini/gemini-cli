@@ -275,6 +275,15 @@ class GrepToolInvocation extends BaseToolInvocation<
         signal.addEventListener('abort', onAbort, { once: true });
       }
 
+      const timeoutResult: ToolResult = {
+        llmContent: timeoutMessage,
+        returnDisplay: `Error: ${timeoutMessage}`,
+        error: {
+          message: timeoutMessage,
+          type: ToolErrorType.GREP_EXECUTION_ERROR,
+        },
+      };
+
       let allMatches: GrepMatch[];
       try {
         allMatches = await this.performRipgrepSearch({
@@ -292,9 +301,41 @@ class GrepToolInvocation extends BaseToolInvocation<
           max_matches_per_file: this.params.max_matches_per_file,
           signal: timeoutController.signal,
         });
+
+        // The context pass below runs ripgrep a second time, so it stays inside
+        // the deadline: the timeout message promises one budget for the whole
+        // search, and a hung second pass would otherwise never surface.
+        if (!timedOut) {
+          if (!this.params.no_ignore) {
+            const uniqueFiles = Array.from(
+              new Set(allMatches.map((m) => m.filePath)),
+            );
+            const absoluteFilePaths = uniqueFiles.map((f) =>
+              path.resolve(searchDirAbs, f),
+            );
+            const allowedFiles =
+              this.fileDiscoveryService.filterFiles(absoluteFilePaths);
+            const allowedSet = new Set(allowedFiles);
+            allMatches = allMatches.filter((m) =>
+              allowedSet.has(path.resolve(searchDirAbs, m.filePath)),
+            );
+          }
+
+          const matchCount = allMatches.filter((m) => !m.isContext).length;
+          allMatches = await this.enrichWithRipgrepAutoContext(
+            allMatches,
+            matchCount,
+            totalMaxMatches,
+            searchDirAbs,
+            timeoutController.signal,
+          );
+        }
       } catch (error) {
+        // A search that fails after the deadline is still a timeout, so it is
+        // reported through the structured error instead of the generic catch
+        // that wraps execute().
         if (timedOut) {
-          throw new Error(timeoutMessage);
+          return timeoutResult;
         }
         throw error;
       } finally {
@@ -304,43 +345,12 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       // When the timeout fires, execStreaming kills ripgrep and resolves with the
       // matches it had collected so far, so a timed out search has to be detected
-      // here as well: returning the partial results (or, after the context pass
-      // below, an empty list) as a successful search hides the timeout from the
-      // model, which then has no reason to narrow the search or retry.
+      // here as well: returning the partial results (or, after the context pass,
+      // an empty list) as a successful search hides the timeout from the model,
+      // which then has no reason to narrow the search or retry.
       if (timedOut) {
-        return {
-          llmContent: timeoutMessage,
-          returnDisplay: `Error: ${timeoutMessage}`,
-          error: {
-            message: timeoutMessage,
-            type: ToolErrorType.GREP_EXECUTION_ERROR,
-          },
-        };
+        return timeoutResult;
       }
-
-      if (!this.params.no_ignore) {
-        const uniqueFiles = Array.from(
-          new Set(allMatches.map((m) => m.filePath)),
-        );
-        const absoluteFilePaths = uniqueFiles.map((f) =>
-          path.resolve(searchDirAbs, f),
-        );
-        const allowedFiles =
-          this.fileDiscoveryService.filterFiles(absoluteFilePaths);
-        const allowedSet = new Set(allowedFiles);
-        allMatches = allMatches.filter((m) =>
-          allowedSet.has(path.resolve(searchDirAbs, m.filePath)),
-        );
-      }
-
-      const matchCount = allMatches.filter((m) => !m.isContext).length;
-      allMatches = await this.enrichWithRipgrepAutoContext(
-        allMatches,
-        matchCount,
-        totalMaxMatches,
-        searchDirAbs,
-        timeoutController.signal,
-      );
 
       const searchLocationDescription = `in path "${searchDirDisplay}"`;
 

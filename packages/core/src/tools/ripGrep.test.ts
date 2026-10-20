@@ -995,6 +995,88 @@ describe('RipGrepTool', () => {
       expect(result.llmContent).toContain('Operation timed out after');
       expect(result.llmContent).not.toContain('Found 5 matches');
     });
+
+    // A failed ripgrep start surfaces as a rejection while the search is
+    // already past its deadline, which must still read as a timeout.
+    function createFailingSpawn() {
+      return () => {
+        const stdout = new PassThrough();
+        const stderr = new PassThrough();
+        const mockProcess = new EventEmitter() as ChildProcess;
+        mockProcess.stdout = stdout;
+        mockProcess.stderr = stderr;
+        // @ts-expect-error - mocking private/internal property
+        mockProcess.killed = false;
+        // @ts-expect-error - mocking private/internal property
+        mockProcess.exitCode = null;
+
+        setTimeout(() => {
+          mockProcess.emit('error', new Error('ripgrep failed to start'));
+        }, 0);
+
+        mockProcess.kill = vi.fn(() => {
+          // @ts-expect-error - mocking private/internal property
+          mockProcess.killed = true;
+          stdout.end();
+          return true;
+        });
+
+        return mockProcess;
+      };
+    }
+
+    it('should report a timeout error when the search fails after the deadline passed', async () => {
+      vi.useFakeTimers();
+      mockSpawn.mockImplementation(createFailingSpawn());
+
+      const invocation = grepTool.build({
+        pattern: 'hello',
+        dir_path: tempRootDir,
+      });
+      const resultPromise = invocation.execute({ abortSignal });
+
+      await drainTimers(DEFAULT_SEARCH_TIMEOUT_MS * 3);
+      const result = await resultPromise;
+
+      expect(result.error?.type).toBe(ToolErrorType.GREP_EXECUTION_ERROR);
+      expect(result.llmContent).toContain(
+        `Operation timed out after ${DEFAULT_SEARCH_TIMEOUT_MS}ms`,
+      );
+      expect(result.llmContent).not.toContain(
+        'Error during grep search operation',
+      );
+    });
+
+    it('should apply the same deadline to the context pass', async () => {
+      vi.useFakeTimers();
+      mockSpawn
+        .mockImplementationOnce(
+          createMockSpawn({
+            outputData: createMatchLine('fileA.txt', 1, 'hello world') + '\n',
+            exitCode: 0,
+          }),
+        )
+        .mockImplementationOnce(
+          createRunningSpawn([createMatchLine('fileA.txt', 1, 'hello world')]),
+        );
+
+      const invocation = grepTool.build({
+        pattern: 'hello',
+        dir_path: tempRootDir,
+      });
+      const resultPromise = invocation.execute({ abortSignal });
+
+      await drainTimers(DEFAULT_SEARCH_TIMEOUT_MS * 3);
+      const result = await resultPromise;
+
+      // The second call proves the context pass started and was cut short.
+      expect(mockSpawn).toHaveBeenCalledTimes(2);
+      expect(result.error?.type).toBe(ToolErrorType.GREP_EXECUTION_ERROR);
+      expect(result.llmContent).toContain(
+        `Operation timed out after ${DEFAULT_SEARCH_TIMEOUT_MS}ms`,
+      );
+      expect(result.llmContent).not.toContain('Found 1 match');
+    });
   });
 
   describe('error handling and edge cases', () => {
