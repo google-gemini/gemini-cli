@@ -642,6 +642,10 @@ export async function runNonInteractive(
       scheduler?.dispose();
       consolePatcher.cleanup();
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
+
+      if (abortController.signal.aborted) {
+        handleCancellationError(config);
+      }
     }
 
     if (errorToHandle) {

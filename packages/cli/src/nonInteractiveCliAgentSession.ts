@@ -702,10 +702,6 @@ export async function runNonInteractive({
             break;
         }
       }
-
-      if (abortController.signal.aborted) {
-        handleCancellationError(config);
-      }
     } catch (error) {
       errorToHandle = error;
     } finally {
@@ -716,6 +712,10 @@ export async function runNonInteractive({
       scheduler?.dispose();
       consolePatcher.cleanup();
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
+
+      if (abortController.signal.aborted) {
+        handleCancellationError(config);
+      }
     }
 
     if (errorToHandle) {

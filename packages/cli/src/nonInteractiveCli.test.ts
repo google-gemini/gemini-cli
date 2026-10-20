@@ -1121,20 +1121,9 @@ describe('runNonInteractive', () => {
       keypressHandler('\u0003', { ctrl: true, name: 'c' });
     }
 
-    // The promise should reject with 'Aborted' because our mock stream throws it,
-    // and nonInteractiveCli catches it and calls handleError, which doesn't necessarily throw.
-    // Wait, if handleError is called, we should check that.
-    // But here we want to check if Ctrl+C works.
-
-    // In our current setup, Ctrl+C aborts the signal. The stream throws 'Aborted'.
-    // nonInteractiveCli catches 'Aborted' and calls handleError.
-
-    // If we want to test that handleCancellationError is called, we need the loop to detect abortion.
-    // But our stream throws before the loop can detect it.
-
-    // Let's just check that the promise rejects with 'Aborted' for now,
-    // which proves the abortion signal reached the stream.
-    await expect(runPromise).rejects.toThrow('Aborted');
+    // Now handleCancellationError is reliably called in finally on cancellation
+    await expect(runPromise).rejects.toThrow('Cancelled');
+    expect(handleCancellationErrorSpy).toHaveBeenCalled();
 
     expect(
       processStderrSpy.mock.calls.some(
