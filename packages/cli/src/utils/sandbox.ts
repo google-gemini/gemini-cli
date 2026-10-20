@@ -825,6 +825,11 @@ export async function start_sandbox(
       try {
         await bridge.connectUpstream();
         ideBridge = bridge;
+        // Registered now, not after spawn, so a failure anywhere between here
+        // and the container start still closes the companion connection.
+        stopIdeBridge = () => {
+          void bridge.stop();
+        };
       } catch (err) {
         debugLogger.debug(
           'IDE companion is not reachable from the host; IDE integration will be unavailable inside the sandbox:',
@@ -1064,9 +1069,6 @@ export async function start_sandbox(
 
     if (ideBridge) {
       const container = sandboxProcess;
-      stopIdeBridge = () => {
-        void ideBridge.stop();
-      };
       void ideBridge.attach({
         execCommand: [
           command,

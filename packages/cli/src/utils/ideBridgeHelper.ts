@@ -57,6 +57,30 @@ function serve() {
     // no stale socket
   }
   let session = null;
+  // Host -> sandbox traffic is newline-delimited JSON-RPC. Forward whole
+  // messages only, and only to a connected session: a message that started
+  // before the session attached is dropped in full rather than delivered as
+  // a fragment that would break the CLI's framing.
+  let pending = '';
+  let skipPartialLine = false;
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('data', (chunk) => {
+    pending += chunk;
+    let newline;
+    while ((newline = pending.indexOf('\\n')) !== -1) {
+      const line = pending.slice(0, newline + 1);
+      pending = pending.slice(newline + 1);
+      if (skipPartialLine) {
+        skipPartialLine = false;
+        continue;
+      }
+      if (session) session.write(line);
+    }
+  });
+  // Sandbox -> host traffic is passed through as is; if a connector dies in
+  // the middle of a message, terminate the fragment so it cannot be glued to
+  // the next session's first message on the host side.
+  let lastByteWasNewline = true;
   const server = net.createServer((socket) => {
     if (session) {
       // One CLI session at a time; a reconnecting CLI gets the socket once
@@ -65,14 +89,17 @@ function serve() {
       return;
     }
     session = socket;
+    skipPartialLine = pending.length > 0;
     socket.on('error', () => {});
-    socket.pipe(process.stdout, { end: false });
-    const forward = (chunk) => {
-      socket.write(chunk);
-    };
-    process.stdin.on('data', forward);
+    socket.on('data', (chunk) => {
+      lastByteWasNewline = chunk[chunk.length - 1] === 0x0a;
+      process.stdout.write(chunk);
+    });
     socket.on('close', () => {
-      process.stdin.off('data', forward);
+      if (!lastByteWasNewline) {
+        process.stdout.write('\\n');
+        lastByteWasNewline = true;
+      }
       session = null;
     });
   });
@@ -85,10 +112,11 @@ function serve() {
     }
     process.stderr.write(READY_MARKER + '\\n');
   });
-  // The launcher closing the pipe means the sandbox is shutting down.
+  // The launcher closing the pipe means the sandbox is shutting down. stdin
+  // stays in flowing mode so 'end' fires promptly even while no session is
+  // attached (and so the host never blocks on pipe backpressure).
   process.stdin.on('end', () => process.exit(0));
   process.stdin.on('error', () => process.exit(0));
-  process.stdin.resume();
 }
 
 // CLI side: spawned by the stdio MCP transport inside the container.

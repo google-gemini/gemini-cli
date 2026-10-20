@@ -411,10 +411,21 @@ export class IdeBridge {
       });
       let settled = false;
       let stderr = '';
+      // Start-up listeners only; serve() installs its own once attached.
+      const onData = (chunk: Buffer) => {
+        stderr += chunk.toString();
+        if (stderr.includes(IDE_BRIDGE_READY_MARKER)) {
+          settle(child);
+        }
+      };
+      const onFailure = () => settle(undefined);
       const settle = (result: ChildProcess | undefined) => {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
+        child.stderr?.off('data', onData);
+        child.off('error', onFailure);
+        child.off('exit', onFailure);
         if (!result) {
           child.kill();
           if (stderr.trim()) {
@@ -427,14 +438,9 @@ export class IdeBridge {
         () => settle(undefined),
         HELPER_START_TIMEOUT_MS,
       );
-      child.stderr?.on('data', (chunk: Buffer) => {
-        stderr += chunk.toString();
-        if (stderr.includes(IDE_BRIDGE_READY_MARKER)) {
-          settle(child);
-        }
-      });
-      child.on('error', () => settle(undefined));
-      child.on('exit', () => settle(undefined));
+      child.stderr?.on('data', onData);
+      child.on('error', onFailure);
+      child.on('exit', onFailure);
     });
   }
 
