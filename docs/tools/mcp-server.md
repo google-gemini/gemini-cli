@@ -433,6 +433,12 @@ Use the `/mcp auth` command to manage OAuth authentication:
   random port, e.g., `http://localhost:<random-port>/oauth/callback`)
 - **`tokenParamName`** (string): Query parameter name for tokens in SSE URLs
 - **`audiences`** (string[]): Audiences the token is valid for
+- **`allowPrivateNetwork`** (boolean): Allow OAuth discovery, registration,
+  authorization, and token endpoints that resolve to private enterprise network
+  addresses (RFC 1918, RFC 6598 Carrier-Grade NAT, RFC 4193 IPv6 Unique Local,
+  and `.internal` or `.local` domains). Defaults to `false`. HTTPS is still
+  required for non-loopback endpoints, and link-local (`169.254.0.0/16`,
+  `fe80::/10`) and loopback (`127.0.0.0/8`, `::1`) addresses remain restricted.
 
 #### Token management
 
