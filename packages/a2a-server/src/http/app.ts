@@ -133,7 +133,7 @@ async function handleExecuteCommand(
 ) {
   logger.info('[CoreAgent] Received /executeCommand request: ', req.body);
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  const { command, args } = req.body;
+  const { command, args } = req.body ?? {};
   try {
     if (typeof command !== 'string') {
       return res.status(400).json({ error: 'Invalid "command" field.' });
@@ -277,20 +277,20 @@ export async function createApp() {
     expressApp.use((req, res, next) => {
       requestStorage.run({ req }, next);
     });
+    expressApp.use(express.json());
 
     const appBuilder = new A2AExpressApp(requestHandler, customUserBuilder);
     expressApp = appBuilder.setupRoutes(expressApp, '');
-    expressApp.use(express.json());
 
     expressApp.post('/tasks', async (req, res) => {
       try {
         const taskId = uuidv4();
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const agentSettings = req.body.agentSettings as
+        const agentSettings = req.body?.agentSettings as
           | AgentSettings
           | undefined;
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        const contextId = req.body.contextId || uuidv4();
+        const contextId = req.body?.contextId || uuidv4();
         const wrapper = await agentExecutor.createTask(
           taskId,
           contextId,
