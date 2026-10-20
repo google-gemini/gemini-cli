@@ -57,64 +57,74 @@ export function resolveActiveWorkspaceDir(
     return defaultTargetDir;
   }
 
-  const resolvedActiveFilePath = resolveToRealPath(activeFile.path);
-  const matchingWorkspaceDirs = workspaceContext
-    .getDirectories()
-    .map((dir) => resolveToRealPath(dir))
-    .filter((dir) => isSubpath(dir, resolvedActiveFilePath))
-    .sort((a, b) => b.length - a.length);
+  try {
+    const resolvedActiveFilePath = resolveToRealPath(activeFile.path);
+    const matchingWorkspaceDirs = workspaceContext
+      .getDirectories()
+      .map((dir) => {
+        try {
+          return resolveToRealPath(dir);
+        } catch {
+          return '';
+        }
+      })
+      .filter((dir) => dir !== '' && isSubpath(dir, resolvedActiveFilePath))
+      .sort((a, b) => b.length - a.length);
 
-  if (matchingWorkspaceDirs.length === 0) {
-    return defaultTargetDir;
-  }
+    if (matchingWorkspaceDirs.length === 0) {
+      return defaultTargetDir;
+    }
 
-  let activeWorkspaceDir = matchingWorkspaceDirs[0];
+    let activeWorkspaceDir = matchingWorkspaceDirs[0];
 
-  // If the matching workspace root is a parent folder containing multiple nested
-  // Git repositories, narrow to the nested repository root containing activeFile.
-  let currentDir = path.dirname(resolvedActiveFilePath);
-  while (
-    currentDir !== activeWorkspaceDir &&
-    isSubpath(activeWorkspaceDir, currentDir)
-  ) {
-    try {
-      if (fs.existsSync(path.join(currentDir, '.git'))) {
-        activeWorkspaceDir = currentDir;
+    // If the matching workspace root is a parent folder containing multiple nested
+    // Git repositories, narrow to the nested repository root containing activeFile.
+    let currentDir = path.dirname(resolvedActiveFilePath);
+    while (
+      currentDir !== activeWorkspaceDir &&
+      isSubpath(activeWorkspaceDir, currentDir)
+    ) {
+      try {
+        if (fs.existsSync(path.join(currentDir, '.git'))) {
+          activeWorkspaceDir = currentDir;
+          break;
+        }
+      } catch {
+        // Ignore filesystem errors while probing for nested .git boundaries
+      }
+      const parentDir = path.dirname(currentDir);
+      if (parentDir === currentDir) {
         break;
       }
-    } catch {
-      // Ignore filesystem errors while probing for nested .git boundaries
+      currentDir = parentDir;
     }
-    const parentDir = path.dirname(currentDir);
-    if (parentDir === currentDir) {
-      break;
-    }
-    currentDir = parentDir;
-  }
 
-  const resolvedDefaultTargetDir = resolveToRealPath(defaultTargetDir);
-  if (
-    relativeFilePath &&
-    !path.isAbsolute(relativeFilePath) &&
-    activeWorkspaceDir !== resolvedDefaultTargetDir &&
-    isSubpath(resolvedDefaultTargetDir, activeWorkspaceDir)
-  ) {
-    const relToDefault = path
-      .relative(resolvedDefaultTargetDir, activeWorkspaceDir)
-      .replace(/\\/g, '/');
-    const normalizedInput = relativeFilePath
-      .replace(/^@[/\\]?/, '')
-      .replace(/\\/g, '/');
+    const resolvedDefaultTargetDir = resolveToRealPath(defaultTargetDir);
     if (
-      relToDefault &&
-      (normalizedInput === relToDefault ||
-        normalizedInput.startsWith(`${relToDefault}/`))
+      relativeFilePath &&
+      !path.isAbsolute(relativeFilePath) &&
+      activeWorkspaceDir !== resolvedDefaultTargetDir &&
+      isSubpath(resolvedDefaultTargetDir, activeWorkspaceDir)
     ) {
-      return resolvedDefaultTargetDir;
+      const relToDefault = path
+        .relative(resolvedDefaultTargetDir, activeWorkspaceDir)
+        .replace(/\\/g, '/');
+      const normalizedInput = relativeFilePath
+        .replace(/^@[/\\]?/, '')
+        .replace(/\\/g, '/');
+      if (
+        relToDefault &&
+        (normalizedInput === relToDefault ||
+          normalizedInput.startsWith(`${relToDefault}/`))
+      ) {
+        return resolvedDefaultTargetDir;
+      }
     }
-  }
 
-  return activeWorkspaceDir;
+    return activeWorkspaceDir;
+  } catch {
+    return defaultTargetDir;
+  }
 }
 
 /**

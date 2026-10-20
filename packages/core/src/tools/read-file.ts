@@ -123,20 +123,21 @@ class ReadFileToolInvocation extends BaseToolInvocation<
   }
 
   async execute(_options: ExecuteOptions): Promise<ToolResult> {
+    const targetDir = resolveActiveWorkspaceDir(
+      this.config,
+      this.params.file_path,
+    );
     const sanitizedPath = resolveDefensiveToolPath(
       this.params.file_path,
-      this.config.getTargetDir(),
+      targetDir,
     );
     let targetPathToRead = this.resolvedPath;
     try {
       targetPathToRead = resolveToRealPath(
-        path.resolve(this.config.getTargetDir(), sanitizedPath),
+        path.resolve(targetDir, sanitizedPath),
       );
     } catch {
-      targetPathToRead = path.resolve(
-        this.config.getTargetDir(),
-        sanitizedPath,
-      );
+      targetPathToRead = path.resolve(targetDir, sanitizedPath);
     }
 
     const validationError = this.config.validatePathAccess(
@@ -156,7 +157,7 @@ class ReadFileToolInvocation extends BaseToolInvocation<
 
     const result = await processSingleFileContent(
       targetPathToRead,
-      this.config.getTargetDir(),
+      targetDir,
       this.config.getFileSystemService(),
       this.params.start_line,
       this.params.end_line,

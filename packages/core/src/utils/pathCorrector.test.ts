@@ -144,4 +144,47 @@ describe('pathCorrector', () => {
       expect(result.correctedPath).toBe(activeTargetFile);
     }
   });
+
+  it('should fall back to default target directory if resolving paths throws an error', () => {
+    vi.spyOn(mockConfig, 'getIdeMode').mockReturnValue(true);
+    const activeTargetFile = path.join(otherWorkspaceDir, 'index.ts');
+    fs.writeFileSync(activeTargetFile, 'export {};');
+
+    ideContextStore.set({
+      workspaceState: {
+        openFiles: [
+          {
+            path: activeTargetFile,
+            timestamp: Date.now(),
+            isActive: true,
+          },
+        ],
+      },
+    });
+
+    vi.spyOn(mockConfig, 'getWorkspaceContext').mockReturnValue(
+      createMockWorkspaceContext(rootDir, [
+        path.join(tempDir, 'unreadable\0dir'),
+        otherWorkspaceDir,
+      ]),
+    );
+
+    expect(resolveActiveWorkspaceDir(mockConfig, 'README.md')).toBe(
+      otherWorkspaceDir,
+    );
+
+    ideContextStore.set({
+      workspaceState: {
+        openFiles: [
+          {
+            path: path.join(tempDir, 'invalid\0file.ts'),
+            timestamp: Date.now(),
+            isActive: true,
+          },
+        ],
+      },
+    });
+
+    expect(resolveActiveWorkspaceDir(mockConfig, 'README.md')).toBe(rootDir);
+  });
 });
