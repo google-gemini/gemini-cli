@@ -20,7 +20,7 @@ type IdeContextSubscriber = (ideContext?: IdeContext) => void;
  */
 const EXCLUDED_IDE_CONTEXT_PATH_PATTERNS: readonly RegExp[] = [
   /(?:^|\/)\.(?:vscode|gemini)\/settings\.json$/i,
-  /(?:^|\/)(?:user(?:\/profiles\/[^/]+)?|machine)\/settings\.json$/i,
+  /(?:^|\/)(?:Code(?:[^/]*)\/User(?:\/profiles\/[^/]+)?|\.vscode-server\/.+\/Machine)\/settings\.json$/i,
   /(?:^|\/)gemini\.md$/i,
 ];
 

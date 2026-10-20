@@ -403,6 +403,7 @@ describe('ideContext', () => {
       'C:\\workspace\\.vscode\\settings.json',
       '/workspace/.gemini/settings.json',
       '/Users/user/Library/Application Support/Code/User/settings.json',
+      '/Users/user/Library/Application Support/Code - Insiders/User/settings.json',
       '/home/user/.config/Code/User/profiles/default/settings.json',
       'C:\\Users\\user\\AppData\\Roaming\\Code\\User\\settings.json',
       '/home/user/.vscode-server/data/Machine/settings.json',
@@ -419,6 +420,8 @@ describe('ideContext', () => {
       '',
       '/workspace/src/index.ts',
       '/workspace/src/settings.json',
+      '/workspace/src/user/settings.json',
+      '/workspace/src/machine/settings.json',
       '/workspace/docs/gemini-guide.md',
       'C:\\workspace\\src\\app.ts',
     ])('returns false for regular project path %s', (filePath) => {
