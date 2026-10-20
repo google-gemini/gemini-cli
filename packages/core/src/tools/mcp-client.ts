@@ -922,29 +922,24 @@ async function handleAutomaticOAuth(
     debugLogger.log(`🔐 '${mcpServerName}' requires OAuth authentication`);
 
     const serverUrl = mcpServerConfig.httpUrl || mcpServerConfig.url;
-    const discoveryOptions =
-      mcpServerConfig.oauth?.allowPrivateNetwork !== undefined
-        ? { allowPrivateNetwork: mcpServerConfig.oauth.allowPrivateNetwork }
-        : undefined;
+    const discoveryOptions = {
+      allowPrivateNetwork: mcpServerConfig.oauth?.allowPrivateNetwork,
+    };
 
     // Try to discover OAuth config from the WWW-Authenticate header first
-    let oauthConfig = discoveryOptions
-      ? await OAuthUtils.discoverOAuthFromWWWAuthenticate(
-          wwwAuthenticate,
-          serverUrl,
-          discoveryOptions,
-        )
-      : await OAuthUtils.discoverOAuthFromWWWAuthenticate(
-          wwwAuthenticate,
-          serverUrl,
-        );
+    let oauthConfig = await OAuthUtils.discoverOAuthFromWWWAuthenticate(
+      wwwAuthenticate,
+      serverUrl,
+      discoveryOptions,
+    );
 
     if (!oauthConfig && hasNetworkTransport(mcpServerConfig)) {
       // Fallback: try to discover OAuth config from the base URL
       const baseUrl = OAuthUtils.extractBaseUrl(serverUrl!);
-      oauthConfig = discoveryOptions
-        ? await OAuthUtils.discoverOAuthConfig(baseUrl, discoveryOptions)
-        : await OAuthUtils.discoverOAuthConfig(baseUrl);
+      oauthConfig = await OAuthUtils.discoverOAuthConfig(
+        baseUrl,
+        discoveryOptions,
+      );
     }
 
     if (!oauthConfig) {
@@ -969,9 +964,7 @@ async function handleAutomaticOAuth(
       authorizationResponseIssParameterSupported:
         mcpServerConfig.oauth?.authorizationResponseIssParameterSupported ??
         oauthConfig.authorizationResponseIssParameterSupported,
-      ...(mcpServerConfig.oauth?.allowPrivateNetwork !== undefined
-        ? { allowPrivateNetwork: mcpServerConfig.oauth.allowPrivateNetwork }
-        : {}),
+      allowPrivateNetwork: mcpServerConfig.oauth?.allowPrivateNetwork,
     };
 
     // Perform OAuth authentication
@@ -2138,18 +2131,15 @@ export async function connectToMcpServer(
             mcpServerConfig.httpUrl || mcpServerConfig.url!,
           );
           const baseUrl = `${serverUrl.protocol}//${serverUrl.host}`;
-          const discoveryOptions =
-            mcpServerConfig.oauth?.allowPrivateNetwork !== undefined
-              ? {
-                  allowPrivateNetwork:
-                    mcpServerConfig.oauth.allowPrivateNetwork,
-                }
-              : undefined;
+          const discoveryOptions = {
+            allowPrivateNetwork: mcpServerConfig.oauth?.allowPrivateNetwork,
+          };
 
           // Try to discover OAuth configuration from the base URL
-          const oauthConfig = discoveryOptions
-            ? await OAuthUtils.discoverOAuthConfig(baseUrl, discoveryOptions)
-            : await OAuthUtils.discoverOAuthConfig(baseUrl);
+          const oauthConfig = await OAuthUtils.discoverOAuthConfig(
+            baseUrl,
+            discoveryOptions,
+          );
           if (oauthConfig) {
             debugLogger.log(
               `Discovered OAuth configuration from base URL for server '${mcpServerName}'`,
@@ -2166,12 +2156,7 @@ export async function connectToMcpServer(
                 mcpServerConfig.oauth
                   ?.authorizationResponseIssParameterSupported ??
                 oauthConfig.authorizationResponseIssParameterSupported,
-              ...(mcpServerConfig.oauth?.allowPrivateNetwork !== undefined
-                ? {
-                    allowPrivateNetwork:
-                      mcpServerConfig.oauth.allowPrivateNetwork,
-                  }
-                : {}),
+              allowPrivateNetwork: mcpServerConfig.oauth?.allowPrivateNetwork,
             };
 
             // Perform OAuth authentication
