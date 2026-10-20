@@ -131,9 +131,9 @@ export async function runNonInteractive(
     let rl: readline.Interface | null = null;
 
     const triggerAbort = () => {
-      // Only handle once
+      // If already aborting, force exit immediately on repeated signal
       if (isAborting) {
-        return;
+        process.exit(130);
       }
 
       isAborting = true;

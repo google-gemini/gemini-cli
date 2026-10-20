@@ -1377,6 +1377,58 @@ describe('runNonInteractive', () => {
     });
   });
 
+  it('should immediately force exit with code 130 on repeated interrupt signal', async () => {
+    const originalIsTTY = process.stdin.isTTY;
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: false,
+      configurable: true,
+    });
+
+    const processOnSpy = vi.spyOn(process, 'on');
+
+    mockGeminiClient.sendMessageStream.mockImplementation(
+      (_messages, signal: AbortSignal) =>
+        (async function* () {
+          yield { type: GeminiEventType.Content, value: 'Thinking...' };
+          await new Promise((_resolve, reject) => {
+            signal.addEventListener('abort', () => {
+              reject(new Error('Aborted'));
+            });
+          });
+        })(),
+    );
+
+    const runPromise = runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: 'Test repeated signal',
+      prompt_id: 'prompt-repeated-signal',
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const sigintCall = processOnSpy.mock.calls.find(
+      (call) => call[0] === 'SIGINT',
+    );
+    const sigintHandler = sigintCall?.[1] as (() => void) | undefined;
+
+    // First signal initiates cancellation
+    sigintHandler?.();
+
+    // Second signal triggers immediate force exit
+    expect(() => sigintHandler?.()).toThrow('process.exit(130) called');
+
+    try {
+      await runPromise;
+    } catch {
+      // Expected
+    }
+
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: originalIsTTY,
+      configurable: true,
+    });
+  });
+
   it('should not execute tool calls when stream yields UserCancelled event', async () => {
     const toolCall: ToolCallRequestInfo = {
       callId: 'call-1',
