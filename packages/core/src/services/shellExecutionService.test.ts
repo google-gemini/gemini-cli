@@ -2615,6 +2615,7 @@ describe('ShellExecutionService environment variables', () => {
 
   it('should include headless git and gh environment variables in non-interactive mode and append git config safely', async () => {
     vi.resetModules();
+    vi.stubEnv('GIT_CONFIG_GLOBAL', '');
     vi.stubEnv('GIT_CONFIG_COUNT', '2');
     vi.stubEnv('GIT_CONFIG_KEY_0', 'core.editor');
     vi.stubEnv('GIT_CONFIG_VALUE_0', 'vim');
@@ -2645,9 +2646,9 @@ describe('ShellExecutionService environment variables', () => {
     expect(cpEnv).toHaveProperty('DISPLAY', '');
     expect(cpEnv).toHaveProperty('DBUS_SESSION_BUS_ADDRESS', '');
 
-    // Global / system config neutralization paths
+    // System config neutralization paths (while preserving user global ~/.gitconfig)
     const devNullPath = os.platform() === 'win32' ? 'NUL' : '/dev/null';
-    expect(cpEnv).toHaveProperty('GIT_CONFIG_GLOBAL', devNullPath);
+    expect(cpEnv.GIT_CONFIG_GLOBAL).toBeUndefined();
     expect(cpEnv).toHaveProperty('GIT_CONFIG_SYSTEM', devNullPath);
     expect(cpEnv).toHaveProperty('GIT_CONFIG_NOSYSTEM', '1');
 
@@ -2718,6 +2719,38 @@ describe('ShellExecutionService environment variables', () => {
     expect(cpEnv).toHaveProperty('GIT_CONFIG_COUNT');
 
     // Ensure child_process exits
+    mockChildProcess.emit('exit', 0, null);
+    mockChildProcess.emit('close', 0, null);
+    await new Promise(process.nextTick);
+
+    vi.unstubAllEnvs();
+  });
+
+  it('should preserve user-specified GIT_CONFIG_GLOBAL when set in environment', async () => {
+    vi.resetModules();
+    vi.stubEnv('GIT_CONFIG_GLOBAL', '/custom/user/.gitconfig');
+
+    const { ShellExecutionService } = await import(
+      './shellExecutionService.js'
+    );
+
+    mockGetPty.mockResolvedValue(null);
+    await ShellExecutionService.execute(
+      'test-cp-custom-git-global',
+      '/',
+      vi.fn(),
+      new AbortController().signal,
+      false,
+      shellExecutionConfig,
+    );
+
+    expect(mockCpSpawn).toHaveBeenCalled();
+    const cpEnv = mockCpSpawn.mock.calls[0][2].env;
+    expect(cpEnv).toHaveProperty(
+      'GIT_CONFIG_GLOBAL',
+      '/custom/user/.gitconfig',
+    );
+
     mockChildProcess.emit('exit', 0, null);
     mockChildProcess.emit('close', 0, null);
     await new Promise(process.nextTick);
