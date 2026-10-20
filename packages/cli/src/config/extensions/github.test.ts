@@ -134,6 +134,8 @@ describe('github.ts', () => {
       ['https://github.com/owner/repo', 'owner', 'repo'],
       ['https://github.com/owner/repo.git', 'owner', 'repo'],
       ['git@github.com:owner/repo.git', 'owner', 'repo'],
+      ['github.com/owner/repo', 'owner', 'repo'],
+      ['github:owner/repo', 'owner', 'repo'],
       ['owner/repo', 'owner', 'repo'],
     ])('should parse %s to %s/%s', (url, owner, repo) => {
       expect(tryParseGithubUrl(url)).toEqual({ owner, repo });

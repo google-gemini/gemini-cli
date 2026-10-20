@@ -10,6 +10,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import {
   ExtensionManager,
+  inferInstallMetadata,
   resolveContextFilePaths,
   validateContextFilePath,
 } from './extension-manager.js';
@@ -1058,5 +1059,133 @@ describe('ExtensionManager', () => {
         vi.mocked(fs.promises.rm).mock.calls.length,
       ).toBeGreaterThanOrEqual(2);
     });
+  });
+});
+
+describe('inferInstallMetadata', () => {
+  it('correctly handles git protocol URLs', async () => {
+    const urls = [
+      'https://github.com/owner/repo',
+      'http://github.com/owner/repo',
+      'git@github.com:owner/repo.git',
+      'sso://user/repo',
+      'gitlab:owner/repo',
+      'ssh://git@host/repo',
+    ];
+    for (const url of urls) {
+      const result = await inferInstallMetadata(url, {
+        ref: 'main',
+        autoUpdate: true,
+      });
+      expect(result).toEqual({
+        source: url,
+        type: 'git',
+        ref: 'main',
+        autoUpdate: true,
+        allowPreRelease: undefined,
+      });
+    }
+  });
+
+  it('normalizes github: protocol URLs to HTTPS', async () => {
+    const result = await inferInstallMetadata(
+      'github:PaddleHQ/paddle-agent-skills',
+    );
+    expect(result).toEqual({
+      source: 'https://github.com/PaddleHQ/paddle-agent-skills',
+      type: 'git',
+      ref: undefined,
+      autoUpdate: undefined,
+      allowPreRelease: undefined,
+    });
+  });
+
+  it('normalizes github.com/ URLs to HTTPS', async () => {
+    const result = await inferInstallMetadata('github.com/user/repo', {
+      ref: 'dev',
+    });
+    expect(result).toEqual({
+      source: 'https://github.com/user/repo',
+      type: 'git',
+      ref: 'dev',
+      autoUpdate: undefined,
+      allowPreRelease: undefined,
+    });
+  });
+
+  it('recognizes bare owner/repo GitHub shorthand and normalizes to HTTPS', async () => {
+    const result = await inferInstallMetadata('PaddleHQ/paddle-agent-skills', {
+      ref: 'v1.0.0',
+      autoUpdate: true,
+      allowPreRelease: true,
+    });
+    expect(result).toEqual({
+      source: 'https://github.com/PaddleHQ/paddle-agent-skills',
+      type: 'git',
+      ref: 'v1.0.0',
+      autoUpdate: true,
+      allowPreRelease: true,
+    });
+  });
+
+  it('recognizes bare owner/repo without flags when it is not a local directory', async () => {
+    const result = await inferInstallMetadata('PaddleHQ/paddle-agent-skills');
+    expect(result).toEqual({
+      source: 'https://github.com/PaddleHQ/paddle-agent-skills',
+      type: 'git',
+      ref: undefined,
+      autoUpdate: undefined,
+      allowPreRelease: undefined,
+    });
+  });
+
+  it('preserves existing local directory paths', async () => {
+    const tempDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-local-ext-'),
+    );
+    try {
+      const result = await inferInstallMetadata(tempDir);
+      expect(result).toEqual({
+        source: tempDir,
+        type: 'local',
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('preserves existing local directory matching owner/repo pattern', async () => {
+    const tempDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-local-ext-'),
+    );
+    const subDir = path.join(tempDir, 'sub-ext');
+    fs.mkdirSync(subDir, { recursive: true });
+    const originalCwd = process.cwd();
+    try {
+      const relativePath = `${path.basename(tempDir)}/${path.basename(subDir)}`;
+      process.chdir(path.dirname(tempDir));
+      const result = await inferInstallMetadata(relativePath);
+      expect(result).toEqual({
+        source: relativePath,
+        type: 'local',
+      });
+    } finally {
+      process.chdir(originalCwd);
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('throws when local directory does not exist', async () => {
+    await expect(
+      inferInstallMetadata('./non-existent-directory'),
+    ).rejects.toThrow('Install source not found.');
+  });
+
+  it('throws when --ref or --auto-update is used with a local directory path', async () => {
+    await expect(
+      inferInstallMetadata('./non-existent-directory', { ref: 'main' }),
+    ).rejects.toThrow(
+      '--ref and --auto-update are not applicable for local extensions.',
+    );
   });
 });
