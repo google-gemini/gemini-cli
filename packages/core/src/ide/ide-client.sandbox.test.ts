@@ -29,12 +29,10 @@
  * tmpdir (and therefore the connection file) is not visible, and `/.dockerenv`
  * exists. The gVisor-specific part of the issue (netstack's private loopback
  * under `docker --network host`) is a kernel-level behaviour that cannot be
- * modelled in a unit test; see the shell reproduction that accompanies this
- * file for that.
- *
- * Expected state today: the control passes, the end-to-end sandbox case is
- * annotated `it.fails` (known limitation), and the diagnostic case fails
- * until the connection failure message names the sandbox.
+ * modelled in a unit test. The fix — the launcher bridging the connection over
+ * `docker exec` stdio — lives in packages/cli (see ideBridge.ts and its test);
+ * this file pins down why that bridge is needed and what the CLI tells users
+ * when it is absent.
  */
 
 import {
@@ -298,25 +296,26 @@ describe('IdeClient inside a container sandbox (#21331)', () => {
     expect(client.isDiffingEnabled()).toBe(true);
   });
 
-  // Documents the limitation behind #21331: the companion is reachable only on
-  // the host loopback, so a CLI inside a container sandbox cannot connect.
-  // `it.fails` makes this test go red the day a sandbox-capable transport
-  // lands, so the annotation and the docs can be updated together.
-  it.fails(
-    'connects from inside a container sandbox when the companion runs on the host',
-    async () => {
-      enterContainerSandbox();
+  // Why the sandbox launcher bridges the connection over stdio (see
+  // packages/cli/src/utils/ideBridge.ts) instead of forwarding the port: a
+  // CLI inside a container cannot reach a companion that listens only on the
+  // host loopback interface, and under gVisor the loopback is private to the
+  // sandbox altogether.
+  it('cannot reach a loopback-only companion over a forwarded HTTP port from inside a container', async () => {
+    enterContainerSandbox();
 
-      client = await freshIdeClient();
-      await client.connect({ logToConsole: false });
+    client = await freshIdeClient();
+    await client.connect({ logToConsole: false });
 
-      expect(describeOutcome(client, companion.seen)).toMatch(CONNECTED_LINE);
-    },
-  );
+    const outcome = describeOutcome(client, companion.seen);
+    expect(outcome).not.toMatch(CONNECTED_LINE);
+    // Nothing ever passes both the Host and bearer gates.
+    expect(companion.seen.every((r) => r.status !== 200)).toBe(true);
+  });
 
-  // The actionable half of #21331: when the connection cannot succeed, the
-  // message must name the sandbox instead of sending users to `/ide install`
-  // for an extension that is installed and running.
+  // When the connection cannot succeed inside a sandbox, the message must name
+  // the sandbox instead of sending users to `/ide install` for an extension
+  // that is installed and running on the host.
   it('tells sandboxed users why the companion is unreachable instead of suggesting /ide install', async () => {
     enterContainerSandbox();
 
@@ -324,11 +323,21 @@ describe('IdeClient inside a container sandbox (#21331)', () => {
     await client.connect({ logToConsole: false });
 
     const outcome = describeOutcome(client, companion.seen);
-    // Once a sandbox transport exists this scenario simply connects; until
-    // then the failure must name the real cause.
-    if (!CONNECTED_LINE.test(outcome)) {
-      expect(outcome).not.toContain('/ide install');
-      expect(client.getConnectionStatus().details).toMatch(/sandbox/i);
-    }
+    expect(outcome).not.toMatch(CONNECTED_LINE);
+    expect(outcome).not.toContain('/ide install');
+    expect(client.getConnectionStatus().details).toMatch(/inside a sandbox/);
+  });
+
+  it('keeps the /ide install advice outside a sandbox', async () => {
+    // Host topology, but the extension is not running: nothing advertises a
+    // port or workspace, so the CLI should still point at /ide install.
+    vi.stubEnv('GEMINI_CLI_IDE_SERVER_PORT', '');
+    vi.stubEnv('GEMINI_CLI_IDE_WORKSPACE_PATH', '');
+    delete process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
+
+    client = await freshIdeClient();
+    await client.connect({ logToConsole: false });
+
+    expect(client.getConnectionStatus().details).toContain('/ide install');
   });
 });

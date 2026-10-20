@@ -167,6 +167,13 @@ export {
 } from './ide/detect-ide.js';
 export * from './ide/constants.js';
 export * from './ide/types.js';
+export {
+  createProxyAwareFetch,
+  getConnectionConfigFromFile,
+  getPortFromEnv,
+  type ConnectionConfig,
+} from './ide/ide-connection-utils.js';
+export { getIdeProcessInfo } from './ide/process-utils.js';
 
 // Export Shell Execution Service
 export * from './services/shellExecutionService.js';
