@@ -593,16 +593,18 @@ export class ShellExecutionService {
       baseEnv[key] = sourceEnv[key];
     }
 
+    if (!baseEnv['GIT_CONFIG_GLOBAL']) {
+      delete baseEnv['GIT_CONFIG_GLOBAL'];
+    }
+
     let gitConfigCount = parseInt(baseEnv['GIT_CONFIG_COUNT'] || '0', 10);
     const devNullPath = os.platform() === 'win32' ? 'NUL' : '/dev/null';
 
-    baseEnv['GIT_CONFIG_GLOBAL'] = devNullPath;
     baseEnv['GIT_CONFIG_SYSTEM'] = devNullPath;
     baseEnv['GIT_CONFIG_NOSYSTEM'] = '1';
 
     sanitizationConfig.allowedEnvironmentVariables.push(
       'GIT_CONFIG_COUNT',
-      'GIT_CONFIG_GLOBAL',
       'GIT_CONFIG_SYSTEM',
       'GIT_CONFIG_NOSYSTEM',
     );
