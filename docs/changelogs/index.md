@@ -18,6 +18,25 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.65.0 - 2026-10-20
+
+- **Custom Telemetry Headers:** Added support for configuring custom OTLP
+  headers in telemetry configuration
+  ([#29641](https://github.com/google-gemini/gemini-cli/pull/29641) by
+  @jesussamuel-byte).
+- **Filesystem & Traversal Performance:** Optimized ignore pattern filtering
+  with subtree pruning and deferred recursive file reads for directory
+  references ([#29582](https://github.com/google-gemini/gemini-cli/pull/29582)
+  by @amelidev, [#29617](https://github.com/google-gemini/gemini-cli/pull/29617)
+  by @jvargassanchez-dot).
+- **Workspace Security & Session Resilience:** Enforced read-only workspace
+  settings in untrusted folders, resolved infinite OAuth retry loops, and
+  prevented session poisoning on rapid Ctrl+C interruptions
+  ([#29583](https://github.com/google-gemini/gemini-cli/pull/29583) by
+  @jvargassanchez-dot,
+  [#29655](https://github.com/google-gemini/gemini-cli/pull/29655) by
+  @villahernandez-coder).
+
 ## Announcements: v0.64.0 - 2026-10-13
 
 - **Atomic Operations & State Persistence:** Serialized file tool operations
