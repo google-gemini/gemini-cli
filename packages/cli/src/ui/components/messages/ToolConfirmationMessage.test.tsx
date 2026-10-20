@@ -1009,6 +1009,41 @@ describe('ToolConfirmationMessage', () => {
       expect(frame).toContain('BUILD');
       unmount();
     });
+
+    it('should deduplicate identical build file basenames in caution warning', async () => {
+      const confirmationDetails: SerializableConfirmationDetails = {
+        type: 'exec',
+        title: 'Confirm Shell Command',
+        command: 'npm test',
+        rootCommand: 'npm',
+        rootCommands: ['npm'],
+        modifiedBuildFiles: [
+          '/workspace/package.json',
+          '/workspace/package.json',
+          '/workspace/subpkg/package.json',
+        ],
+      };
+
+      const { lastFrame, unmount } = await renderWithProviders(
+        <ToolConfirmationMessage
+          callId="test-build-mod-dedup"
+          confirmationDetails={confirmationDetails}
+          config={mockConfig}
+          getPreferredEditor={vi.fn()}
+          availableTerminalHeight={30}
+          terminalWidth={80}
+          toolName="run_shell_command"
+        />,
+      );
+
+      const frame = lastFrame();
+      expect(frame).toContain(
+        'CAUTION: Build Configuration Was Recently Modified',
+      );
+      expect(frame).toContain('Build file(s) (package.json) were modified');
+      expect(frame).not.toContain('package.json, package.json');
+      unmount();
+    });
   });
 
   describe('narrow and negative terminal widths for edit confirmations', () => {
