@@ -1669,6 +1669,7 @@ export const useGeminiStream = (
     ): Promise<StreamProcessingStatus> => {
       let geminiMessageBuffer = '';
       const toolCallRequests: ToolCallRequestInfo[] = [];
+      let hasTerminalEvent = false;
       for await (const event of stream) {
         if (
           event.type !== ServerGeminiEventType.Thought &&
@@ -1696,11 +1697,18 @@ export const useGeminiStream = (
             break;
           case ServerGeminiEventType.UserCancelled:
             handleUserCancelledEvent(userMessageTimestamp);
-            break;
+            if (pendingHistoryItemRef.current) {
+              addItem(pendingHistoryItemRef.current, userMessageTimestamp);
+              setPendingHistoryItem(null);
+            }
+            pendingToolCallRequestsRef.current = [];
+            return StreamProcessingStatus.UserCancelled;
           case ServerGeminiEventType.Error:
+            hasTerminalEvent = true;
             handleErrorEvent(event.value, userMessageTimestamp);
             break;
           case ServerGeminiEventType.AgentExecutionStopped:
+            hasTerminalEvent = true;
             handleAgentExecutionStoppedEvent(
               event.value.reason,
               userMessageTimestamp,
@@ -1709,6 +1717,7 @@ export const useGeminiStream = (
             );
             break;
           case ServerGeminiEventType.AgentExecutionBlocked:
+            hasTerminalEvent = true;
             handleAgentExecutionBlockedEvent(
               event.value.reason,
               userMessageTimestamp,
@@ -1724,9 +1733,11 @@ export const useGeminiStream = (
             // do nothing
             break;
           case ServerGeminiEventType.MaxSessionTurns:
+            hasTerminalEvent = true;
             handleMaxSessionTurnsEvent();
             break;
           case ServerGeminiEventType.ContextWindowWillOverflow:
+            hasTerminalEvent = true;
             handleContextWindowWillOverflowEvent(
               event.value.estimatedRequestTokenCount,
               event.value.remainingTokenCount,
@@ -1750,6 +1761,7 @@ export const useGeminiStream = (
             // Handled transparently by the backend stream retries.
             break;
           case ServerGeminiEventType.InvalidStream:
+            hasTerminalEvent = true;
             handleInvalidStreamEvent(event.value, userMessageTimestamp);
             break;
           default: {
@@ -1758,6 +1770,14 @@ export const useGeminiStream = (
             return unreachable;
           }
         }
+      }
+      if (signal.aborted || turnCancelledRef.current) {
+        if (pendingHistoryItemRef.current) {
+          addItem(pendingHistoryItemRef.current, userMessageTimestamp);
+          setPendingHistoryItem(null);
+        }
+        pendingToolCallRequestsRef.current = [];
+        return StreamProcessingStatus.UserCancelled;
       }
       if (toolCallRequests.length > 0) {
         if (pendingHistoryItemRef.current) {
@@ -1781,6 +1801,8 @@ export const useGeminiStream = (
         if (
           isContinuation &&
           !hasVisibleText &&
+          !hasTerminalEvent &&
+          !loopDetectedRef.current &&
           autoNudgeAttemptCountRef.current < MAX_AUTO_NUDGE_ATTEMPTS
         ) {
           autoNudgeAttemptCountRef.current += 1;
@@ -1877,7 +1899,12 @@ export const useGeminiStream = (
               prompt_id!,
             );
 
-            if (!shouldProceed || queryToSend === null) {
+            if (
+              !shouldProceed ||
+              queryToSend === null ||
+              turnCancelledRef.current ||
+              abortSignal.aborted
+            ) {
               return;
             }
 
@@ -2298,6 +2325,11 @@ export const useGeminiStream = (
             parts: responsesToSend,
           });
         }
+        return;
+      }
+
+      if (turnCancelledRef.current) {
+        setIsResponding(false);
         return;
       }
 
