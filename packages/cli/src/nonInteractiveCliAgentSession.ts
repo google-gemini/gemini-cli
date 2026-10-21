@@ -130,6 +130,18 @@ export async function runNonInteractive({
     // Setup stdin listener for Ctrl+C detection and process signal handlers
     let stdinWasRaw = false;
     let rl: readline.Interface | null = null;
+    let keypressHandler:
+      | ((str: string, key: { name?: string; ctrl?: boolean }) => void)
+      | null = null;
+
+    const handleStdoutError = (err: NodeJS.ErrnoException) => {
+      if (err.code === 'EPIPE') {
+        // Exit gracefully if the pipe is closed.
+        cleanupCancellation();
+        consolePatcher.cleanup();
+        process.exit(0);
+      }
+    };
 
     const triggerAbort = () => {
       // If already aborting, force exit immediately on repeated signal
@@ -172,7 +184,7 @@ export async function runNonInteractive({
       readline.emitKeypressEvents(process.stdin, rl);
 
       // Listen for Ctrl+C
-      const keypressHandler = (
+      keypressHandler = (
         str: string,
         key: { name?: string; ctrl?: boolean },
       ) => {
@@ -188,6 +200,7 @@ export async function runNonInteractive({
     const cleanupCancellation = () => {
       process.off('SIGINT', triggerAbort);
       process.off('SIGTERM', triggerAbort);
+      process.stdout.off('error', handleStdoutError);
 
       // Clear any pending cancel message timer
       if (cancelMessageTimer) {
@@ -202,7 +215,12 @@ export async function runNonInteractive({
       }
 
       // Remove keypress listener
-      process.stdin.removeAllListeners('keypress');
+      if (keypressHandler) {
+        process.stdin.off('keypress', keypressHandler);
+        keypressHandler = null;
+      } else {
+        process.stdin.removeAllListeners('keypress');
+      }
 
       // Restore stdin to original state
       if (process.stdin.isTTY) {
@@ -234,14 +252,7 @@ export async function runNonInteractive({
       coreEvents.drainBacklogs();
 
       // Handle EPIPE errors when the output is piped to a command that closes early.
-      process.stdout.on('error', (err: NodeJS.ErrnoException) => {
-        if (err.code === 'EPIPE') {
-          // Exit gracefully if the pipe is closed.
-          cleanupCancellation();
-          consolePatcher.cleanup();
-          process.exit(0);
-        }
-      });
+      process.stdout.on('error', handleStdoutError);
 
       const geminiClient = config.getGeminiClient();
       scheduler = new Scheduler({
