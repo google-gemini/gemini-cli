@@ -132,14 +132,16 @@ async function drainStdin() {
  *
  * @see https://github.com/google-gemini/gemini-cli/issues/15874
  */
-async function gracefulShutdown(_reason: string) {
+async function gracefulShutdown(reason: string) {
   if (isShuttingDown) {
     return;
   }
   isShuttingDown = true;
 
   await runExitCleanup();
-  process.exit(ExitCodes.SUCCESS);
+  const exitCode =
+    reason === 'SIGINT' ? 130 : reason === 'SIGTERM' ? 143 : ExitCodes.SUCCESS;
+  process.exit(exitCode);
 }
 
 export function setupSignalHandlers() {

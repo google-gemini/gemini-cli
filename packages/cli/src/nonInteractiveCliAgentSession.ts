@@ -58,6 +58,7 @@ import {
   handleError,
   handleToolError,
   handleCancellationError,
+  isFatalCancellationError,
 } from './utils/errors.js';
 import { TextOutput } from './ui/utils/textOutput.js';
 
@@ -141,9 +142,11 @@ export async function runNonInteractive({
         consolePatcher.cleanup();
         process.exit(0);
       }
+      throw err;
     };
 
     const triggerAbort = () => {
+      process.stderr.write('\n[AGENT_DEBUG] triggerAbort invoked!\n');
       // If already aborting, force exit immediately on repeated signal
       if (isAborting) {
         process.exit(130);
@@ -340,8 +343,7 @@ export async function runNonInteractive({
       };
       abortController.signal.addEventListener('abort', abortSession);
       if (abortController.signal.aborted) {
-        handleCancellationError(config);
-        throw new Error('Cancelled');
+        throw new FatalCancellationError('Operation cancelled.');
       }
 
       // Start the agentic loop (runs in background)
@@ -666,8 +668,7 @@ export async function runNonInteractive({
           }
           case 'agent_end': {
             if (event.reason === 'aborted') {
-              handleCancellationError(config);
-              throw new Error('Cancelled');
+              throw new FatalCancellationError('Operation cancelled.');
             } else if (event.reason === 'max_turns') {
               const isConfiguredTurnLimit =
                 typeof event.data?.['maxTurns'] === 'number' ||
@@ -716,10 +717,6 @@ export async function runNonInteractive({
         }
       }
     } catch (error) {
-      if (abortController.signal.aborted) {
-        handleCancellationError(config);
-        throw new Error('Cancelled');
-      }
       errorToHandle = error;
     } finally {
       // Cleanup cancellation listeners before other cleanup
@@ -731,9 +728,11 @@ export async function runNonInteractive({
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
     }
 
-    if (abortController.signal.aborted) {
+    if (
+      abortController.signal.aborted ||
+      isFatalCancellationError(errorToHandle)
+    ) {
       handleCancellationError(config);
-      throw new Error('Cancelled');
     }
 
     if (errorToHandle) {

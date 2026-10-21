@@ -16,6 +16,7 @@ import {
   convertSessionToClientHistory,
   GeminiEventType,
   FatalInputError,
+  FatalCancellationError,
   promptIdContext,
   OutputFormat,
   JsonFormatter,
@@ -50,6 +51,7 @@ import {
   handleToolError,
   handleCancellationError,
   handleMaxTurnsExceededError,
+  isFatalCancellationError,
 } from './utils/errors.js';
 import { TextOutput } from './ui/utils/textOutput.js';
 import { runNonInteractive as runNonInteractiveAgentSession } from './nonInteractiveCliAgentSession.js';
@@ -140,6 +142,7 @@ export async function runNonInteractive(
         consolePatcher.cleanup();
         process.exit(0);
       }
+      throw err;
     };
 
     const triggerAbort = () => {
@@ -449,8 +452,7 @@ export async function runNonInteractive(
             }
             return;
           } else if (event.type === GeminiEventType.UserCancelled) {
-            handleCancellationError(config);
-            throw new Error('Cancelled');
+            throw new FatalCancellationError('Operation cancelled.');
           } else if (event.type === GeminiEventType.AgentExecutionBlocked) {
             const blockMessage = `Agent execution blocked: ${event.value.systemMessage?.trim() || event.value.reason}`;
             if (config.getOutputFormat() === OutputFormat.TEXT) {
@@ -507,8 +509,7 @@ export async function runNonInteractive(
 
         if (toolCallRequests.length > 0) {
           if (abortController.signal.aborted) {
-            handleCancellationError(config);
-            throw new Error('Cancelled');
+            throw new FatalCancellationError('Operation cancelled.');
           }
           textOutput.ensureTrailingNewline();
           const completedToolCalls = await scheduler.schedule(
@@ -649,10 +650,6 @@ export async function runNonInteractive(
         }
       }
     } catch (error) {
-      if (abortController.signal.aborted) {
-        handleCancellationError(config);
-        throw new Error('Cancelled');
-      }
       errorToHandle = error;
     } finally {
       // Cleanup cancellation listeners before other cleanup
@@ -663,9 +660,11 @@ export async function runNonInteractive(
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
     }
 
-    if (abortController.signal.aborted) {
+    if (
+      abortController.signal.aborted ||
+      isFatalCancellationError(errorToHandle)
+    ) {
       handleCancellationError(config);
-      throw new Error('Cancelled');
     }
 
     if (errorToHandle) {
