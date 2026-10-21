@@ -28,6 +28,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import {
   getConnectionConfigFromFile,
   getConnectionConfigsFromFile,
+  getConnectionFailureAdvice,
   getIdeServerHost,
   getPortFromEnv,
   getStdioConfigFromEnv,
@@ -205,7 +206,7 @@ export class IdeClient {
 
     this.setState(
       IDEConnectionStatus.Disconnected,
-      `Failed to connect to IDE companion extension in ${this.currentIde.displayName}. Please ensure the extension is running. To install the extension, run /ide install.`,
+      `Failed to connect to IDE companion extension in ${this.currentIde.displayName}. ${getConnectionFailureAdvice()}`,
       logError,
     );
   }
@@ -280,11 +281,9 @@ export class IdeClient {
         });
     });
 
-    // Release the mutex only after the diff interaction is complete. Return
-    // the chained promise rather than the original one: `finally()` settles
-    // the same way as `promise`, so a rejection stays observable by the
-    // caller and no floating promise is left behind to surface as an
-    // unhandled rejection.
+    // Ensure the mutex is released only after the diff interaction is complete.
+    // Returning the chained promise keeps a rejected diff from surfacing as an
+    // unhandled rejection in addition to the caller's error.
     return promise.finally(release);
   }
 
