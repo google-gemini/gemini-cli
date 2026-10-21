@@ -96,7 +96,11 @@ export async function runExitCleanup(): Promise<void> {
     try {
       // drain stdin to prevent printing garbage on exit
       // https://github.com/google-gemini/gemini-cli/issues/16801
-      await drainStdin();
+      try {
+        await drainStdin();
+      } catch {
+        // Ignore errors during stdin draining to ensure cleanup continues.
+      }
 
       runSyncCleanup();
       for (const fn of cleanupFunctions) {

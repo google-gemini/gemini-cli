@@ -170,7 +170,7 @@ export async function runNonInteractive(
       process.on('SIGTERM', triggerAbort);
 
       // Only setup if stdin is a TTY (user can interact)
-      if (!process.stdin.isTTY) {
+      if (!process.stdin?.isTTY) {
         return;
       }
 
@@ -228,7 +228,7 @@ export async function runNonInteractive(
       }
 
       // Restore stdin to original state
-      if (process.stdin.isTTY) {
+      if (process.stdin?.isTTY) {
         process.stdin.setRawMode(stdinWasRaw);
         process.stdin.pause();
       }
