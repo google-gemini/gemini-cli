@@ -4,13 +4,31 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as path from 'node:path';
 import type { Content } from '@google/genai';
 import { parse as shellParse } from 'shell-quote';
-import { getCommandRoots } from './shell-utils.js';
+import { getCommandRoots, normalizeCommand } from './shell-utils.js';
+import { SHELL_TOOL_NAME } from '../tools/definitions/base-declarations.js';
 
 export interface UntrustedContextData {
   untrustedTexts: string[];
   untrustedTokens: Set<string>;
+  /**
+   * Subset of `untrustedTokens` indexed from content other than local shell
+   * command output (e.g. web, MCP, or remote fetch results). When omitted,
+   * every entry in `untrustedTokens` is treated as external.
+   */
+  externalTokens?: Set<string>;
+}
+
+/**
+ * Options that scope untrusted flag detection to the current workspace.
+ */
+export interface UntrustedFlagOptions {
+  /** Directory used to resolve relative path arguments. */
+  cwd?: string;
+  /** Returns true when an absolute path is inside the workspace boundary. */
+  isPathWithinWorkspace?: (absolutePath: string) => boolean;
 }
 
 interface LogResponse {
@@ -19,7 +37,45 @@ interface LogResponse {
 }
 
 const UNTRUSTED_CONTEXT_REGEX =
-  /<untrusted_context[^>]*>([\s\S]*?)<\/untrusted_context>/gi;
+  /<untrusted_context([^>]*)>([\s\S]*?)<\/untrusted_context>/gi;
+
+/**
+ * Source attribute recorded on shell output produced by commands that retrieve
+ * remote content, so that output keeps external provenance.
+ */
+export const REMOTE_SHELL_OUTPUT_SOURCE = 'shell_remote';
+
+/**
+ * Root commands whose output primarily relays content retrieved from remote
+ * hosts rather than content produced in the local workspace.
+ */
+const REMOTE_CONTENT_COMMAND_ROOTS: ReadonlySet<string> = new Set([
+  'curl',
+  'wget',
+  'gh',
+  'ssh',
+]);
+
+/**
+ * Commands that run another command passed as an argument (for example,
+ * `sudo curl ...`), so their arguments are also checked for remote retrieval.
+ */
+const COMMAND_WRAPPER_ROOTS: ReadonlySet<string> = new Set([
+  'sudo',
+  'doas',
+  'env',
+  'time',
+  'timeout',
+  'nice',
+  'nohup',
+  'xargs',
+  'command',
+  'exec',
+  'stdbuf',
+]);
+
+/** Reads the value of the `source` attribute of an `<untrusted_context>` tag. */
+const SOURCE_ATTRIBUTE_REGEX = /\bsource\s*=\s*["']?([\w-]+)/i;
 
 /**
  * Root commands that invoke build engines, test runners, or dependency lifecycles.
@@ -217,6 +273,7 @@ const FILE_MODE_STRING_REGEX = /^[dcbpsl-][rwxstST-]{9}[+@.]?$/i;
 const BARE_DASHES_REGEX = /^--+$/;
 const BARE_SHELL_VARIABLE_REGEX =
   /^\$(?:[a-zA-Z_][a-zA-Z0-9_]*|\{[a-zA-Z_][a-zA-Z0-9_]*\})$/;
+const EXECUTABLE_SCRIPT_REGEX = /\.(sh|bash|zsh|ps1|bat|cmd|exe)$/i;
 
 function isHighRiskPatternToken(token: string): boolean {
   return (
@@ -227,8 +284,35 @@ function isHighRiskPatternToken(token: string): boolean {
     token.startsWith('./') ||
     token.startsWith('../') ||
     /^[a-zA-Z]:[\\/]/.test(token) ||
-    /\.(sh|bash|zsh|ps1|bat|cmd|exe)$/i.test(token)
+    EXECUTABLE_SCRIPT_REGEX.test(token)
   );
+}
+
+/**
+ * Returns true when a path argument resolves inside the workspace boundary and
+ * is not a URL, an executable script, or a path containing shell expansions
+ * that could resolve elsewhere at runtime.
+ */
+function isWorkspaceLocalPath(
+  token: string,
+  options?: UntrustedFlagOptions,
+): boolean {
+  if (
+    !options?.cwd ||
+    !options.isPathWithinWorkspace ||
+    token.startsWith('http://') ||
+    token.startsWith('https://') ||
+    EXECUTABLE_SCRIPT_REGEX.test(token) ||
+    /[$`~]/.test(token)
+  ) {
+    return false;
+  }
+  try {
+    return options.isPathWithinWorkspace(path.resolve(options.cwd, token));
+  } catch {
+    // Paths that can't be resolved are not treated as workspace-local.
+    return false;
+  }
 }
 
 function hasUntrustedSubstring(
@@ -253,9 +337,10 @@ export function extractUntrustedContext(
 ): UntrustedContextData {
   const untrustedTexts: string[] = [];
   const untrustedTokens = new Set<string>();
+  const externalTokens = new Set<string>();
 
   if (!history || history.length === 0) {
-    return { untrustedTexts, untrustedTokens };
+    return { untrustedTexts, untrustedTokens, externalTokens };
   }
 
   for (const message of history) {
@@ -263,6 +348,7 @@ export function extractUntrustedContext(
     for (const part of message.parts) {
       // Find untrusted content in either text parts or tool response parts
       let contentToSearch = '';
+      const isShellOutput = part.functionResponse?.name === SHELL_TOOL_NAME;
       if (part.text) {
         contentToSearch = part.text;
       } else if (
@@ -283,8 +369,20 @@ export function extractUntrustedContext(
       if (!contentToSearch) continue;
 
       for (const match of contentToSearch.matchAll(UNTRUSTED_CONTEXT_REGEX)) {
-        const untrustedContent = match[1]?.trim();
+        const untrustedContent = match[2]?.trim();
         if (untrustedContent) {
+          // Local shell output is indexed for path and high-risk flag checks,
+          // while unknown-flag matching only considers external content.
+          const isExternal =
+            !isShellOutput ||
+            SOURCE_ATTRIBUTE_REGEX.exec(match[1] ?? '')?.[1] ===
+              REMOTE_SHELL_OUTPUT_SOURCE;
+          const addToken = (token: string) => {
+            untrustedTokens.add(token);
+            if (isExternal) {
+              externalTokens.add(token);
+            }
+          };
           const normalizedContent = untrustedContent.replace(/\\/g, '/');
           untrustedTexts.push(normalizedContent);
 
@@ -312,7 +410,7 @@ export function extractUntrustedContext(
             const isShortFlag =
               token.startsWith('-') && !token.startsWith('--');
             const tokenToStore = isShortFlag ? token : token.toLowerCase();
-            untrustedTokens.add(tokenToStore);
+            addToken(tokenToStore);
 
             // Split on equals to handle key-value pairs (e.g., --run_under=/tmp/payload.sh)
             if (token.includes('=')) {
@@ -328,7 +426,7 @@ export function extractUntrustedContext(
                   const isPartShortFlag =
                     trimmedPart.startsWith('-') &&
                     !trimmedPart.startsWith('--');
-                  untrustedTokens.add(
+                  addToken(
                     isPartShortFlag ? trimmedPart : trimmedPart.toLowerCase(),
                   );
                 }
@@ -340,7 +438,7 @@ export function extractUntrustedContext(
     }
   }
 
-  return { untrustedTexts, untrustedTokens };
+  return { untrustedTexts, untrustedTokens, externalTokens };
 }
 
 /**
@@ -349,11 +447,13 @@ export function extractUntrustedContext(
  *
  * @param command The shell command string.
  * @param untrustedContext The extracted untrusted context data.
+ * @param options Optional workspace scope used to treat local paths as trusted.
  * @returns An array of detected flags or arguments sourced from untrusted text.
  */
 export function findUntrustedFlags(
   command: string,
   untrustedContext: UntrustedContextData,
+  options?: UntrustedFlagOptions,
 ): string[] {
   if (
     !command ||
@@ -430,11 +530,16 @@ export function findUntrustedFlags(
       const tokenToLookup = isShortFlag ? rawFlagName : lowerToken;
       const flagToLookup = isShortFlag ? rawFlagName : flagToCheck;
 
-      // Check 1A: Full flag or flag name exists in untrusted tokens (unless it is a known safe flag)
+      // Check 1A: Full flag or flag name exists in untrusted tokens (unless it is a known safe flag).
+      // Flags that do not take high-risk values are only matched against external content.
+      const flagSourceTokens =
+        isHighRiskFlag || !untrustedContext.externalTokens
+          ? untrustedContext.untrustedTokens
+          : untrustedContext.externalTokens;
       if (
         !isSafeFlag &&
-        (untrustedContext.untrustedTokens.has(tokenToLookup) ||
-          untrustedContext.untrustedTokens.has(flagToLookup))
+        (flagSourceTokens.has(tokenToLookup) ||
+          flagSourceTokens.has(flagToLookup))
       ) {
         detected.add(token);
         if (token.includes('=') || !isHighRiskFlag) {
@@ -444,13 +549,15 @@ export function findUntrustedFlags(
 
       // Check 1B: Attached '=value'
       if (valToCheck && rawValToCheck) {
+        const isRiskyValuePattern =
+          isHighRiskPatternToken(rawValToCheck) &&
+          (isHighRiskFlag || !isWorkspaceLocalPath(rawValToCheck, options));
         const isValUntrusted =
           untrustedContext.untrustedTokens.has(valToCheck) &&
-          (isHighRiskFlag ||
-            (!isSafeFlag && isHighRiskPatternToken(rawValToCheck)));
+          (isHighRiskFlag || (!isSafeFlag && isRiskyValuePattern));
         const isHighRiskValSubstring =
           (!isSafeFlag || isHighRiskFlag) &&
-          isHighRiskPatternToken(rawValToCheck) &&
+          isRiskyValuePattern &&
           hasUntrustedSubstring(untrustedContext, valToCheck);
         if (isValUntrusted || isHighRiskValSubstring) {
           detected.add(token);
@@ -481,7 +588,10 @@ export function findUntrustedFlags(
         continue;
       }
 
-      if (isHighRiskPatternToken(token)) {
+      if (
+        isHighRiskPatternToken(token) &&
+        !isWorkspaceLocalPath(token, options)
+      ) {
         if (untrustedContext.untrustedTokens.has(lowerToken)) {
           detected.add(token);
           continue;
@@ -545,10 +655,44 @@ export function isBuildOrTestCommand(command: string): boolean {
   );
 }
 
+/**
+ * Checks whether a shell command retrieves content from remote hosts, in which
+ * case its output keeps external provenance for untrusted flag detection.
+ *
+ * @param command The shell command string.
+ * @returns True if the command invokes a remote content retrieval tool.
+ */
+export function isRemoteContentCommand(command: string): boolean {
+  if (!command) {
+    return false;
+  }
+  let roots: string[] = [];
+  try {
+    roots = getCommandRoots(command).map((root) => normalizeCommand(root));
+  } catch {
+    // Ignore and fall back to the words of the command.
+  }
+  // Check every word when the parser is unavailable or when a root runs another
+  // command (for example, `sudo curl`). Treating a command as remote by mistake
+  // only makes the check stricter.
+  const candidates =
+    roots.length === 0 || roots.some((root) => COMMAND_WRAPPER_ROOTS.has(root))
+      ? command
+          .trim()
+          .split(/[\s;&|()]+/)
+          .map((word) => normalizeCommand(word))
+      : roots;
+  return candidates.some((name) => REMOTE_CONTENT_COMMAND_ROOTS.has(name));
+}
+
 const MODIFIED_BUILD_FILES_SYMBOL = Symbol('sessionModifiedBuildFiles');
+const ACKNOWLEDGED_UNTRUSTED_FLAGS_SYMBOL = Symbol(
+  'sessionAcknowledgedUntrustedFlags',
+);
 
 interface SessionRecord {
   [MODIFIED_BUILD_FILES_SYMBOL]?: Set<string>;
+  [ACKNOWLEDGED_UNTRUSTED_FLAGS_SYMBOL]?: Map<string, Set<string>>;
 }
 
 function hasSessionRecord(sessionKey: object): sessionKey is SessionRecord {
@@ -589,5 +733,61 @@ export function getModifiedBuildFiles(sessionKey: object): string[] {
 export function resetModifiedBuildFiles(sessionKey: object): void {
   if (hasSessionRecord(sessionKey)) {
     delete sessionKey[MODIFIED_BUILD_FILES_SYMBOL];
+  }
+}
+
+function getRootCommandScope(rootCommands: readonly string[]): string {
+  return [...new Set(rootCommands)].sort().join(',');
+}
+
+/**
+ * Records flags or arguments the user approved for the given root commands, so
+ * later invocations in the same session do not request confirmation for them.
+ */
+export function acknowledgeUntrustedFlags(
+  flags: readonly string[],
+  rootCommands: readonly string[],
+  sessionKey: object,
+): void {
+  if (flags.length === 0 || !hasSessionRecord(sessionKey)) {
+    return;
+  }
+  let acknowledged = sessionKey[ACKNOWLEDGED_UNTRUSTED_FLAGS_SYMBOL];
+  if (!acknowledged) {
+    acknowledged = new Map<string, Set<string>>();
+    sessionKey[ACKNOWLEDGED_UNTRUSTED_FLAGS_SYMBOL] = acknowledged;
+  }
+  const scope = getRootCommandScope(rootCommands);
+  const scopedFlags = acknowledged.get(scope) ?? new Set<string>();
+  for (const flag of flags) {
+    scopedFlags.add(flag);
+  }
+  acknowledged.set(scope, scopedFlags);
+}
+
+/**
+ * Returns the flags that were not yet acknowledged for the given root commands.
+ */
+export function getUnacknowledgedUntrustedFlags(
+  flags: readonly string[],
+  rootCommands: readonly string[],
+  sessionKey: object,
+): string[] {
+  const scopedFlags = hasSessionRecord(sessionKey)
+    ? sessionKey[ACKNOWLEDGED_UNTRUSTED_FLAGS_SYMBOL]?.get(
+        getRootCommandScope(rootCommands),
+      )
+    : undefined;
+  return scopedFlags
+    ? flags.filter((flag) => !scopedFlags.has(flag))
+    : [...flags];
+}
+
+/**
+ * Clears the flags acknowledged in this session.
+ */
+export function resetAcknowledgedUntrustedFlags(sessionKey: object): void {
+  if (hasSessionRecord(sessionKey)) {
+    delete sessionKey[ACKNOWLEDGED_UNTRUSTED_FLAGS_SYMBOL];
   }
 }
