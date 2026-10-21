@@ -31,6 +31,7 @@ import {
   initializeShellParsers,
   getCommandRoots,
   stripShellWrapper,
+  IGNORED_COMMAND_ROOTS,
 } from '../../utils/shell-utils.js';
 import {
   isKnownSafeCommand,
@@ -268,7 +269,7 @@ export class WindowsSandboxManager implements SandboxManager {
     const fullCmd = [command, ...args].join(' ');
     const stripped = stripShellWrapper(fullCmd);
     const roots = getCommandRoots(stripped).filter(
-      (r) => r !== 'shopt' && r !== 'set',
+      (r) => !IGNORED_COMMAND_ROOTS.has(r),
     );
     const isGitCommand = roots.includes('git');
 

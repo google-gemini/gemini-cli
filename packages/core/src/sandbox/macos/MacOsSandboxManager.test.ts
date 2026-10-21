@@ -6,6 +6,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MacOsSandboxManager } from './MacOsSandboxManager.js';
 import { type ExecutionPolicy } from '../../services/sandboxManager.js';
+import type { SandboxPolicyManager } from '../../policy/sandboxPolicyManager.js';
 import * as seatbeltArgsBuilder from './seatbeltArgsBuilder.js';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -285,6 +286,44 @@ describe('MacOsSandboxManager', () => {
               forbidden: expect.arrayContaining(['/tmp/conflict']),
             }),
           }),
+        );
+      });
+
+      it('applies per-command permissions for background PID wrapped commands (ignoring trap)', async () => {
+        const mockPolicyManager = {
+          getCommandPermissions: vi.fn().mockReturnValue({
+            fileSystem: {
+              read: ['/home/user/.gradle'],
+              write: ['/home/user/.gradle'],
+            },
+            network: true,
+          }),
+        };
+        const customManager = new MacOsSandboxManager({
+          workspace: mockWorkspace,
+          modeConfig: { allowOverrides: true },
+          policyManager: mockPolicyManager as unknown as SandboxPolicyManager,
+        });
+
+        const wrappedGradleCmd = [
+          "_bgpids_file='/tmp/gemini-shell-123/bgpids.tmp'",
+          '(',
+          '  trap \'jobs -p > "$_bgpids_file"\' EXIT',
+          './gradlew build',
+          ')',
+          '__code=$?',
+          'exit $__code',
+        ].join('\n');
+
+        await customManager.prepareCommand({
+          command: 'bash',
+          args: ['-c', wrappedGradleCmd],
+          cwd: mockWorkspace,
+          env: {},
+        });
+
+        expect(mockPolicyManager.getCommandPermissions).toHaveBeenCalledWith(
+          './gradlew',
         );
       });
     });

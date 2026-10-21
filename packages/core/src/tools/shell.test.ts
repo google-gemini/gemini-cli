@@ -1456,6 +1456,34 @@ EOF`;
         expect(details.rootCommand).toBe('ls, grep');
       }
     });
+
+    it('should ignore shell builtins when registering approvals on confirm', async () => {
+      const shellTool = new ShellTool(mockConfig, createMockMessageBus());
+      const command = 'set -e; npm install';
+      const invocation = shellTool.build({
+        command,
+        additional_permissions: { network: true },
+      });
+
+      // @ts-expect-error - getConfirmationDetails is protected
+      const details = await invocation.getConfirmationDetails(
+        new AbortController().signal,
+      );
+
+      expect(details).not.toBe(false);
+      expect(details.type).toBe('sandbox_expansion');
+      if (details.type === 'sandbox_expansion') {
+        await details.onConfirm(ToolConfirmationOutcome.ProceedAlwaysAndSave);
+        expect(
+          mockConfig.sandboxPolicyManager.addPersistentApproval,
+        ).toHaveBeenCalledWith('npm', { network: true });
+
+        await details.onConfirm(ToolConfirmationOutcome.ProceedAlways);
+        expect(
+          mockConfig.sandboxPolicyManager.addSessionApproval,
+        ).toHaveBeenCalledWith('npm', { network: true });
+      }
+    });
   });
 
   describe('sandbox heuristics', () => {

@@ -6,6 +6,7 @@
 
 import { type SandboxRequest } from '../../services/sandboxManager.js';
 import {
+  getCommandName as getShellCommandName,
   getCommandRoots,
   initializeShellParsers,
   splitCommands,
@@ -13,7 +14,6 @@ import {
 } from '../../utils/shell-utils.js';
 import { isKnownSafeCommand } from './commandSafety.js';
 import { parse as shellParse } from 'shell-quote';
-import path from 'node:path';
 
 export async function isStrictlyApproved(
   req: SandboxRequest,
@@ -50,16 +50,7 @@ export async function isStrictlyApproved(
 }
 
 export async function getCommandName(req: SandboxRequest): Promise<string> {
-  await initializeShellParsers();
-  const fullCmd = [req.command, ...req.args].join(' ');
-  const stripped = stripShellWrapper(fullCmd);
-  const roots = getCommandRoots(stripped).filter(
-    (r) => r !== 'shopt' && r !== 'set',
-  );
-  if (roots.length > 0) {
-    return roots[0];
-  }
-  return path.basename(req.command);
+  return getShellCommandName(req.command, req.args);
 }
 
 export function verifySandboxOverrides(

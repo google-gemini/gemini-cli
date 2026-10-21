@@ -6,6 +6,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { LinuxSandboxManager } from './LinuxSandboxManager.js';
+import * as shellUtils from '../../utils/shell-utils.js';
+import type { SandboxPolicyManager } from '../../policy/sandboxPolicyManager.js';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -164,6 +166,50 @@ describe('LinuxSandboxManager', () => {
           policy: { networkAccess: true },
         }),
       ).rejects.toThrow(/Cannot override/);
+    });
+
+    it('applies per-command permissions for background PID wrapped commands (ignoring trap)', async () => {
+      const mockPolicyManager = {
+        getCommandPermissions: vi.fn().mockReturnValue({
+          fileSystem: {
+            read: ['/home/user/.gradle'],
+            write: ['/home/user/.gradle'],
+          },
+          network: true,
+        }),
+      };
+      const customManager = new LinuxSandboxManager({
+        workspace,
+        modeConfig: { allowOverrides: true },
+        policyManager: mockPolicyManager as unknown as SandboxPolicyManager,
+      });
+
+      const wrappedGradleCmd = [
+        "_bgpids_file='/tmp/gemini-shell-123/bgpids.tmp'",
+        '(',
+        '  trap \'jobs -p > "$_bgpids_file"\' EXIT',
+        './gradlew build',
+        ')',
+        '__code=$?',
+        'exit $__code',
+      ].join('\n');
+
+      vi.spyOn(shellUtils, 'getCommandRoots').mockReturnValue([
+        'trap',
+        './gradlew',
+        'exit',
+      ]);
+
+      await customManager.prepareCommand({
+        command: 'bash',
+        args: ['-c', wrappedGradleCmd],
+        cwd: workspace,
+        env: {},
+      });
+
+      expect(mockPolicyManager.getCommandPermissions).toHaveBeenCalledWith(
+        './gradlew',
+      );
     });
   });
 });
