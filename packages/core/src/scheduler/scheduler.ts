@@ -29,6 +29,7 @@ import { ToolErrorType } from '../tools/tool-error.js';
 import { UPDATE_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
 import { PolicyDecision, type ApprovalMode } from '../policy/types.js';
 import {
+  Kind,
   ToolConfirmationOutcome,
   type AnyDeclarativeTool,
 } from '../tools/tools.js';
@@ -105,6 +106,31 @@ const createErrorResponse = (
   errorType,
   contentLength: error.message.length,
 });
+
+/**
+ * Assigns a group ID to every run of two or more adjacent requests for which
+ * `isGroupable` returns true. All requests in a run get the call ID of the
+ * first request in it. Requests that are not part of a run get `undefined`.
+ */
+function getToolCallGroupIds(
+  requests: readonly ToolCallRequestInfo[],
+  isGroupable: (request: ToolCallRequestInfo) => boolean,
+): Array<string | undefined> {
+  const groupable = requests.map(isGroupable);
+  const groupIds: Array<string | undefined> = requests.map(() => undefined);
+
+  let runStart = 0;
+  for (let i = 0; i <= requests.length; i++) {
+    if (i < requests.length && groupable[i]) continue;
+
+    // The run of groupable requests in [runStart, i) has ended.
+    if (i - runStart >= 2) {
+      groupIds.fill(requests[runStart].callId, runStart, i);
+    }
+    runStart = i + 1;
+  }
+  return groupIds;
+}
 
 /**
  * Event-Driven Orchestrator for Tool Execution.
@@ -334,11 +360,16 @@ export class Scheduler {
 
     try {
       const toolRegistry = this.context.toolRegistry;
-      const newCalls: ToolCall[] = sortedRequests.map((request) => {
+      const groupIds = getToolCallGroupIds(
+        sortedRequests,
+        (request) => toolRegistry.getTool(request.name)?.kind === Kind.Agent,
+      );
+      const newCalls: ToolCall[] = sortedRequests.map((request, index) => {
         const enrichedRequest: ToolCallRequestInfo = {
           ...request,
           schedulerId: this.schedulerId,
           parentCallId: this.parentCallId,
+          groupId: groupIds[index],
         };
         const tool = toolRegistry.getTool(request.name);
 
@@ -826,6 +857,7 @@ export class Scheduler {
         isClientInitiated: result.request.isClientInitiated,
         prompt_id: result.request.prompt_id,
         schedulerId: this.schedulerId,
+        groupId: result.request.groupId,
       };
 
       if (!newTool) {

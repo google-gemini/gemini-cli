@@ -78,6 +78,64 @@ describe('isAuthenticationError', () => {
     expect(isAuthenticationError(error)).toBe(true);
   });
 
+  it('should detect error with status or statusCode: 401 property', () => {
+    expect(isAuthenticationError({ status: 401 })).toBe(true);
+    expect(isAuthenticationError({ statusCode: 401 })).toBe(true);
+    expect(isAuthenticationError({ code: 401 })).toBe(true);
+    expect(isAuthenticationError({ status: '401' })).toBe(true);
+    expect(isAuthenticationError({ statusCode: '401' })).toBe(true);
+    expect(isAuthenticationError({ code: '401' })).toBe(true);
+    expect(isAuthenticationError({ status: 500 })).toBe(false);
+    expect(isAuthenticationError({ statusCode: 404 })).toBe(false);
+    expect(isAuthenticationError({ status: '500' })).toBe(false);
+    expect(isAuthenticationError({ statusCode: '404' })).toBe(false);
+  });
+
+  it('should detect error with nested response.status or response.statusCode: 401 (gaxios/axios style)', () => {
+    expect(isAuthenticationError({ response: { status: 401 } })).toBe(true);
+    expect(isAuthenticationError({ response: { statusCode: 401 } })).toBe(true);
+    expect(isAuthenticationError({ response: { status: '401' } })).toBe(true);
+    expect(isAuthenticationError({ response: { statusCode: '401' } })).toBe(
+      true,
+    );
+    expect(isAuthenticationError({ response: { status: 500 } })).toBe(false);
+    expect(isAuthenticationError({ response: { statusCode: 404 } })).toBe(
+      false,
+    );
+    expect(isAuthenticationError({ response: { status: '500' } })).toBe(false);
+    expect(isAuthenticationError({ response: { statusCode: '404' } })).toBe(
+      false,
+    );
+    expect(isAuthenticationError({ response: null })).toBe(false);
+    expect(isAuthenticationError({ response: 'invalid' })).toBe(false);
+  });
+
+  it('should detect structured API errors that map to UnauthorizedError via toFriendlyError', () => {
+    const gaxiosError = {
+      response: {
+        data: {
+          error: {
+            code: 401,
+            message: 'Invalid API key',
+          },
+        },
+      },
+    };
+    expect(isAuthenticationError(gaxiosError)).toBe(true);
+
+    const badRequestGaxiosError = {
+      response: {
+        data: {
+          error: {
+            code: 400,
+            message: 'Bad Request',
+          },
+        },
+      },
+    };
+    expect(isAuthenticationError(badRequestGaxiosError)).toBe(false);
+  });
+
   it('should detect UnauthorizedError instance', () => {
     const error = new UnauthorizedError('Authentication required');
     expect(isAuthenticationError(error)).toBe(true);
@@ -101,8 +159,98 @@ describe('isAuthenticationError', () => {
 
   it('should detect 401 in various message formats', () => {
     expect(isAuthenticationError(new Error('401 Unauthorized'))).toBe(true);
+    expect(isAuthenticationError(new Error('401: Unauthorized'))).toBe(true);
+    expect(isAuthenticationError(new Error('401 - Unauthorized'))).toBe(true);
+    expect(isAuthenticationError(new Error('[401] Unauthorized'))).toBe(true);
+    expect(isAuthenticationError(new Error('(401) Unauthorized'))).toBe(true);
+    expect(isAuthenticationError(new Error('Unauthorized (401)'))).toBe(true);
+    expect(isAuthenticationError(new Error('Unauthorized: 401'))).toBe(true);
     expect(isAuthenticationError(new Error('HTTP 401'))).toBe(true);
+    expect(isAuthenticationError(new Error('HTTP 401: Unauthorized'))).toBe(
+      true,
+    );
+    expect(isAuthenticationError(new Error('(HTTP 401)'))).toBe(true);
+    expect(isAuthenticationError(new Error('[HTTP 401]'))).toBe(true);
+    expect(isAuthenticationError(new Error('HTTP/1.1 401 Unauthorized'))).toBe(
+      true,
+    );
+    expect(isAuthenticationError(new Error('HTTP/2 401'))).toBe(true);
+    expect(isAuthenticationError(new Error('HTTP status: 401'))).toBe(true);
+    expect(isAuthenticationError(new Error('HTTP status 401'))).toBe(true);
+    expect(isAuthenticationError(new Error('HTTP error 401'))).toBe(true);
+    expect(isAuthenticationError(new Error('HTTP error: 401'))).toBe(true);
     expect(isAuthenticationError(new Error('Status code: 401'))).toBe(true);
+    expect(isAuthenticationError(new Error('Status code 401'))).toBe(true);
+    expect(isAuthenticationError(new Error('status code: 401'))).toBe(true);
+    expect(isAuthenticationError(new Error('statusCode: 401'))).toBe(true);
+    expect(isAuthenticationError(new Error('status: 401'))).toBe(true);
+    expect(isAuthenticationError(new Error('status 401'))).toBe(true);
+    expect(isAuthenticationError(new Error('Failed with status 401'))).toBe(
+      true,
+    );
+    expect(
+      isAuthenticationError(new Error('Request failed with status code 401')),
+    ).toBe(true);
+    expect(
+      isAuthenticationError(
+        new Error(
+          'Error POSTing to endpoint (HTTP 401): {"error":"unauthorized"}',
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  it('should return false for non-auth errors containing "401" as a substring or token', () => {
+    // Port numbers containing 401
+    expect(
+      isAuthenticationError(new Error('connect ECONNREFUSED 127.0.0.1:4012')),
+    ).toBe(false);
+    expect(
+      isAuthenticationError(
+        new Error('Failed to connect to http://localhost:4012/sse'),
+      ),
+    ).toBe(false);
+    expect(
+      isAuthenticationError(
+        new Error('Error connecting to http://localhost:1401'),
+      ),
+    ).toBe(false);
+    expect(isAuthenticationError(new Error('port 4012 is in use'))).toBe(false);
+
+    // Line numbers and file paths
+    expect(
+      isAuthenticationError(
+        new Error('SyntaxError: Unexpected token at file.js:401:12'),
+      ),
+    ).toBe(false);
+    expect(
+      isAuthenticationError(new Error('error at line 401: missing semicolon')),
+    ).toBe(false);
+    expect(isAuthenticationError(new Error('line 401'))).toBe(false);
+    expect(isAuthenticationError(new Error('index.ts:401:5'))).toBe(false);
+
+    // Process exit codes and numbers
+    expect(
+      isAuthenticationError(new Error('Process exited with code 4010')),
+    ).toBe(false);
+    expect(
+      isAuthenticationError(new Error('Command failed with exit status 4010')),
+    ).toBe(false);
+    expect(
+      isAuthenticationError(new Error('Command failed with exit status 401')),
+    ).toBe(false);
+    expect(
+      isAuthenticationError(new Error('Process exited with status 401')),
+    ).toBe(false);
+    expect(
+      isAuthenticationError(new Error('Process exited with code 401')),
+    ).toBe(false);
+
+    // Entity IDs and other non-HTTP 401 contexts
+    expect(
+      isAuthenticationError(new Error('Record with ID 401 not found')),
+    ).toBe(false);
+    expect(isAuthenticationError(new Error('User 401 not found'))).toBe(false);
   });
 });
 
