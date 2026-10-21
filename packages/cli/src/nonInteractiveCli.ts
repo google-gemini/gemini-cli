@@ -55,6 +55,7 @@ import {
 } from './utils/errors.js';
 import { TextOutput } from './ui/utils/textOutput.js';
 import { runNonInteractive as runNonInteractiveAgentSession } from './nonInteractiveCliAgentSession.js';
+import { runExitCleanup } from './utils/cleanup.js';
 
 interface RunNonInteractiveParams {
   config: Config;
@@ -658,6 +659,8 @@ export async function runNonInteractive(
       scheduler?.dispose();
       consolePatcher.cleanup();
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
+
+      await runExitCleanup();
     }
 
     if (
