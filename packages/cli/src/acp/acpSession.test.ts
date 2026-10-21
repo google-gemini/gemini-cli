@@ -30,6 +30,7 @@ import {
   MessageBusType,
   type ToolConfirmationRequest,
   DiscoveredMCPTool,
+  truncateToolOutputIfNeeded,
 } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../config/settings.js';
 import { type Part, FinishReason } from '@google/genai';
@@ -58,6 +59,7 @@ vi.mock(
       ReadManyFilesTool: vi.fn(),
       logToolCall: vi.fn(),
       processSingleFileContent: vi.fn(),
+      truncateToolOutputIfNeeded: vi.fn(),
     };
   },
 );
@@ -494,6 +496,53 @@ describe('Session', () => {
         },
       },
     });
+  });
+
+  it('should truncate tool output before recording the function response', async () => {
+    vi.mocked(truncateToolOutputIfNeeded).mockResolvedValue({
+      truncatedContent: 'Truncated tool result',
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: GeminiEventType.ToolCallRequest,
+        value: {
+          callId: 'call-1',
+          name: 'test_tool',
+          args: { foo: 'bar' },
+          isClientInitiated: false,
+          prompt_id: 'prompt-1',
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: GeminiEventType.Content,
+        value: 'Result',
+      },
+    ]);
+
+    mockSendMessageStream
+      .mockReturnValueOnce(stream1)
+      .mockReturnValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    expect(truncateToolOutputIfNeeded).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolName: 'test_tool',
+        callId: 'call-1',
+        content: 'Tool Result',
+      }),
+    );
+
+    const [recordedCall] = mockChat.recordCompletedToolCalls.mock.calls[0][1];
+    expect(JSON.stringify(recordedCall.response?.responseParts)).toContain(
+      'Truncated tool result',
+    );
   });
 
   it('should handle tool call permission request', async () => {

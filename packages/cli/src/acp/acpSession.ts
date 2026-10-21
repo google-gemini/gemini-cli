@@ -40,6 +40,7 @@ import {
   resolveAtCommandPath,
   type ResolvedAtCommandPath,
   tokenLimit,
+  truncateToolOutputIfNeeded,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import type { Part, FunctionCall } from '@google/genai';
@@ -838,6 +839,13 @@ export class Session {
       const toolResult: ToolResult = await invocation.execute({
         abortSignal,
       });
+      const { truncatedContent } = await truncateToolOutputIfNeeded({
+        context: this.context,
+        toolName: fc.name ?? '',
+        callId,
+        tool,
+        content: toolResult.llmContent,
+      });
       const content = toToolCallContent(toolResult);
 
       const updateContent: acp.ToolCallContent[] = content ? [content] : [];
@@ -885,7 +893,7 @@ export class Session {
             responseParts: convertToFunctionResponse(
               fc.name,
               callId,
-              toolResult.llmContent,
+              truncatedContent,
               this.context.config.getActiveModel(),
               this.context.config,
             ),
@@ -899,7 +907,7 @@ export class Session {
       return convertToFunctionResponse(
         fc.name,
         callId,
-        toolResult.llmContent,
+        truncatedContent,
         this.context.config.getActiveModel(),
         this.context.config,
       );
