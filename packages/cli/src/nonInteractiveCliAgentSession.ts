@@ -218,11 +218,9 @@ export async function runNonInteractive({
       }
 
       // Remove keypress listener
-      if (keypressHandler) {
+      if (keypressHandler && process.stdin) {
         process.stdin.off('keypress', keypressHandler);
         keypressHandler = null;
-      } else {
-        process.stdin.removeAllListeners('keypress');
       }
 
       // Restore stdin to original state
