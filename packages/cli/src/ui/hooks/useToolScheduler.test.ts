@@ -506,7 +506,6 @@ describe('useToolScheduler', () => {
     expect(result.current[0]).toHaveLength(1);
     expect(result.current[0][0].status).toBe(CoreToolCallStatus.Executing);
 
-    // Background tool should not be shown
     const backgroundTool = {
       status: CoreToolCallStatus.Executing as const,
       request: {
