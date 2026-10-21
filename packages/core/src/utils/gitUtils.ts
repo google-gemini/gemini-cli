@@ -14,6 +14,7 @@ export function getSafeGitEnv(
   const devNullPath = process.platform === 'win32' ? 'NUL' : '/dev/null';
 
   // Strip pre-existing GIT_CONFIG_* and GIT_CONFIG_PARAMETERS variables to prevent environment pollution
+  // (non-empty GIT_CONFIG_GLOBAL is explicitly restored below).
   const cleanedEnv: Record<string, string | undefined> = {};
   for (const [key, value] of Object.entries(baseEnv)) {
     if (!key.startsWith('GIT_CONFIG_') && key !== 'GIT_CONFIG_PARAMETERS') {
@@ -63,7 +64,9 @@ export function getSafeGitEnv(
     GIT_SSH_COMMAND: gitSshCommand,
     GH_PROMPT_DISABLED: '1',
     GCM_INTERACTIVE: 'never',
-    GIT_CONFIG_GLOBAL: devNullPath,
+    ...(baseEnv['GIT_CONFIG_GLOBAL']
+      ? { GIT_CONFIG_GLOBAL: baseEnv['GIT_CONFIG_GLOBAL'] }
+      : {}),
     GIT_CONFIG_SYSTEM: devNullPath,
     GIT_CONFIG_NOSYSTEM: '1',
     GIT_CONFIG_COUNT: '7',
