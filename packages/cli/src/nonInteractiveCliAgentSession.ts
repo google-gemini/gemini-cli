@@ -147,7 +147,6 @@ export async function runNonInteractive({
     };
 
     const triggerAbort = () => {
-      process.stderr.write('\n[AGENT_DEBUG] triggerAbort invoked!\n');
       // If already aborting, force exit immediately on repeated signal
       if (isAborting) {
         process.exit(130);
