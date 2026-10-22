@@ -6,7 +6,7 @@
 
 /**
  * Implements an in-memory cache for file search results.
- * This cache optimizes subsequent searches by leveraging previously computed results.
+ * This cache reuses results for identical queries.
  */
 export class ResultCache {
   private readonly cache: Map<string, string[]>;
@@ -36,24 +36,9 @@ export class ResultCache {
 
     this.misses++;
 
-    // This is the core optimization of the memory cache.
-    // If a user first searches for "foo", and then for "foobar",
-    // we don't need to search through all files again. We can start
-    // from the results of the "foo" search.
-    // This finds the most specific, already-cached query that is a prefix
-    // of the current query.
-    let bestBaseQuery = '';
-    for (const key of this.cache?.keys?.() ?? []) {
-      if (query.startsWith(key) && key.length > bestBaseQuery.length) {
-        bestBaseQuery = key;
-      }
-    }
-
-    const filesToSearch = bestBaseQuery
-      ? this.cache.get(bestBaseQuery)!
-      : this.allFiles;
-
-    return { files: filesToSearch, isExactMatch: false };
+    // A query's string prefix may use a different matcher or a more restrictive
+    // glob, so its cached results are not a safe candidate pool.
+    return { files: this.allFiles, isExactMatch: false };
   }
 
   /**
