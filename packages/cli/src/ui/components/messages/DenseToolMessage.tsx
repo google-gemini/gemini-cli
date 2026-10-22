@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useMemo, useState, useRef } from 'react';
+import { useCallback, useMemo, useState, useRef } from 'react';
 import { Box, Text, type DOMElement } from 'ink';
 import {
   CoreToolCallStatus,
@@ -42,8 +42,8 @@ import { getFileExtension } from '../../utils/fileUtils.js';
 
 const PAYLOAD_MARGIN_LEFT = 6;
 const PAYLOAD_BORDER_CHROME_WIDTH = 4; // paddingX=1 (2 cols) + borders (2 cols)
-const PAYLOAD_SCROLL_GUTTER = 4;
-const PAYLOAD_MAX_WIDTH = 120 + PAYLOAD_SCROLL_GUTTER;
+const PAYLOAD_SCROLL_GUTTER = 1;
+const PAYLOAD_MAX_WIDTH = 120 + PAYLOAD_BORDER_CHROME_WIDTH;
 
 interface DenseToolMessageProps extends IndividualToolCallDisplay {
   terminalWidth: number;
@@ -258,6 +258,17 @@ function getGenericSuccessData(
   return { description, summary, payload };
 }
 
+function renderDiffLineItem(
+  item: React.ReactNode,
+  width: number,
+): React.ReactElement {
+  return (
+    <Box minHeight={1} width={width} flexDirection="column">
+      {item}
+    </Box>
+  );
+}
+
 export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
   const {
     callId,
@@ -387,6 +398,18 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
 
   const { description, summary } = viewParts;
 
+  const totalContainerWidth = Math.max(
+    0,
+    Math.min(PAYLOAD_MAX_WIDTH, (terminalWidth || 0) - PAYLOAD_MARGIN_LEFT),
+  );
+  const borderSpace = PAYLOAD_BORDER_CHROME_WIDTH;
+  const scrollbarBuffer = PAYLOAD_SCROLL_GUTTER;
+  const safeContentWidth = Math.max(
+    0,
+    totalContainerWidth - borderSpace - scrollbarBuffer,
+  );
+  const scrollableWidth = Math.max(0, totalContainerWidth - borderSpace);
+
   const diffLines = useMemo(() => {
     if (!diff || !isExpanded || !isAlternateBuffer) return [];
 
@@ -404,7 +427,7 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
       return colorizeCode({
         code: addedContent,
         language: fileExtension,
-        maxWidth: Math.max(0, (terminalWidth || 0) - PAYLOAD_MARGIN_LEFT),
+        maxWidth: safeContentWidth,
         settings,
         disableColor: status === CoreToolCallStatus.Cancelled,
         returnLines: true,
@@ -413,11 +436,11 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
       return renderDiffLines({
         parsedLines,
         filename: diff.fileName,
-        terminalWidth: Math.max(0, (terminalWidth || 0) - PAYLOAD_MARGIN_LEFT),
+        terminalWidth: safeContentWidth,
         disableColor: status === CoreToolCallStatus.Cancelled,
       });
     }
-  }, [diff, isExpanded, isAlternateBuffer, terminalWidth, settings, status]);
+  }, [diff, isExpanded, isAlternateBuffer, safeContentWidth, settings, status]);
 
   const showPayload = useMemo(() => {
     const policy = !isAlternateBuffer || !diff || isExpanded;
@@ -441,10 +464,14 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
     outputFile,
   ]);
 
-  const keyExtractor = (_item: React.ReactNode, index: number) =>
-    `diff-line-${index}`;
-  const renderItem = ({ item }: { item: React.ReactNode }) => (
-    <Box minHeight={1}>{item}</Box>
+  const keyExtractor = useCallback(
+    (_item: React.ReactNode, index: number) => `diff-line-${index}`,
+    [],
+  );
+  const renderItem = useCallback(
+    ({ item }: { item: React.ReactNode }) =>
+      renderDiffLineItem(item, safeContentWidth),
+    [safeContentWidth],
   );
 
   return (
@@ -489,13 +516,8 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
           borderColor={theme.border.default}
           borderDimColor={true}
           minWidth={0}
-          maxWidth={Math.max(
-            0,
-            Math.min(
-              PAYLOAD_MAX_WIDTH,
-              (terminalWidth || 0) - PAYLOAD_MARGIN_LEFT,
-            ),
-          )}
+          width={totalContainerWidth}
+          maxWidth={totalContainerWidth}
         >
           <ScrollableList
             data={diffLines}
@@ -503,16 +525,7 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
             keyExtractor={keyExtractor}
             estimatedItemHeight={() => 1}
             hasFocus={isFocused}
-            width={Math.max(
-              0,
-              Math.min(
-                PAYLOAD_MAX_WIDTH,
-                (terminalWidth || 0) -
-                  PAYLOAD_MARGIN_LEFT -
-                  PAYLOAD_BORDER_CHROME_WIDTH -
-                  PAYLOAD_SCROLL_GUTTER,
-              ),
-            )}
+            width={scrollableWidth}
           />
         </Box>
       )}

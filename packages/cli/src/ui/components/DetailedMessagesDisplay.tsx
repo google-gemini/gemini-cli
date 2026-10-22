@@ -61,6 +61,12 @@ export const DetailedMessagesDisplay: React.FC<
     return null;
   }
 
+  const headerAndBorderHeight = 4;
+  const listHeight =
+    maxHeight !== undefined
+      ? Math.max(1, maxHeight - headerAndBorderHeight)
+      : undefined;
+
   return (
     <Box
       flexDirection="column"
@@ -79,9 +85,10 @@ export const DetailedMessagesDisplay: React.FC<
           Debug Console <Text color={theme.text.secondary}>(F12 to close)</Text>
         </Text>
       </Box>
-      <Box height={maxHeight} width={width - borderAndPadding}>
+      <Box height={listHeight} width={width - borderAndPadding}>
         <ScrollableList
           ref={scrollableListRef}
+          containerHeight={listHeight}
           data={messages}
           renderItem={({ item: msg }: { item: ConsoleMessageItem }) => {
             let textColor = theme.text.primary;
