@@ -3987,7 +3987,9 @@ describe('GeminiChat', () => {
         { role: 'user', parts: [{ text: 'Old search prompt' }] },
         {
           role: 'model',
-          parts: [{ functionCall: { name: 'default_api:grep_search', args: {} } }],
+          parts: [
+            { functionCall: { name: 'default_api:grep_search', args: {} } },
+          ],
         },
         {
           role: 'user',
@@ -4018,7 +4020,9 @@ describe('GeminiChat', () => {
         { role: 'user', parts: [{ text: 'Search for files' }] },
         {
           role: 'model',
-          parts: [{ functionCall: { name: 'default_api:grep_search', args: {} } }],
+          parts: [
+            { functionCall: { name: 'default_api:grep_search', args: {} } },
+          ],
         },
         {
           role: 'user',
