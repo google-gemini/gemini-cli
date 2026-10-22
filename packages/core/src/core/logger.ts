@@ -305,7 +305,8 @@ export class Logger {
     if (
       path.basename(fileName) !== fileName ||
       tag.includes('/') ||
-      tag.includes('\\')
+      tag.includes('\\') ||
+      tag.includes('\0')
     ) {
       return null;
     }

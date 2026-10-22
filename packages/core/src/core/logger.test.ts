@@ -778,6 +778,16 @@ describe('Logger', () => {
         await fs.rm(outsidePath, { force: true });
       }
     });
+
+    it('should reject null bytes in legacy raw fallback without throwing ERR_INVALID_ARG_VALUE', async () => {
+      const nullByteTag = 'bad\0tag';
+
+      await expect(logger.checkpointExists(nullByteTag)).resolves.toBe(false);
+      await expect(logger.loadCheckpoint(nullByteTag)).resolves.toEqual({
+        history: [],
+      });
+      await expect(logger.deleteCheckpoint(nullByteTag)).resolves.toBe(false);
+    });
   });
 
   describe('close', () => {
