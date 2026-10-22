@@ -973,6 +973,27 @@ describe('normalizePath', () => {
       ).toBe(true);
     });
 
+    it('should ignore untrusted or malicious PREFIX values on Android', () => {
+      mockPlatform('android');
+
+      // Relative path / traversal attempt
+      vi.stubEnv('PREFIX', '../../tmp');
+      expect(isTrustedSystemPath('/tmp/bin/rg')).toBe(false);
+      expect(isTrustedSystemPath('../../tmp/bin/rg')).toBe(false);
+
+      // User-writable or arbitrary directory
+      vi.stubEnv('PREFIX', '/sdcard/Download');
+      expect(isTrustedSystemPath('/sdcard/Download/bin/rg')).toBe(false);
+
+      vi.stubEnv('PREFIX', '/tmp');
+      expect(isTrustedSystemPath('/tmp/bin/rg')).toBe(false);
+
+      // Falls back to safe default
+      expect(
+        isTrustedSystemPath('/data/data/com.termux/files/usr/bin/rg'),
+      ).toBe(true);
+    });
+
     it('should allow 1P internal hermetic execution paths', () => {
       mockPlatform('linux');
 

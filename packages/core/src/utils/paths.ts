@@ -595,10 +595,17 @@ export function isTrustedSystemPath(filePath: string): boolean {
       (prefix) => normPath === prefix || normPath.startsWith(prefix + '/'),
     );
   } else if (platform === 'android') {
-    const termuxPrefix =
-      process.env['PREFIX'] || '/data/data/com.termux/files/usr';
+    let termuxPrefix = '/data/data/com.termux/files/usr';
+    const envPrefix = process.env['PREFIX'];
+    if (
+      envPrefix &&
+      path.posix.isAbsolute(envPrefix) &&
+      /^\/data\/(?:data|user\/\d+)\/com\.termux\b/.test(envPrefix)
+    ) {
+      termuxPrefix = envPrefix;
+    }
     const trustedPrefixes = [
-      path.join(termuxPrefix, 'bin'),
+      path.posix.join(termuxPrefix, 'bin'),
       '/data/data/com.termux/files/usr/bin',
       '/system/bin',
       '/system/xbin',
