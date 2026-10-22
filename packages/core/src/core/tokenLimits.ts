@@ -10,6 +10,7 @@ import {
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL,
+  GEMINI_4_ARGON_MODEL,
   GEMMA_4_31B_IT_MODEL,
   GEMMA_4_26B_A4B_IT_MODEL,
 } from '../config/models.js';
@@ -27,6 +28,7 @@ export function tokenLimit(model: Model): TokenCount {
     case GEMMA_4_31B_IT_MODEL:
     case GEMMA_4_26B_A4B_IT_MODEL:
       return GEMMA_4_TOKEN_LIMIT;
+    case GEMINI_4_ARGON_MODEL:
     case PREVIEW_GEMINI_MODEL:
     case PREVIEW_GEMINI_FLASH_MODEL:
     case DEFAULT_GEMINI_MODEL:

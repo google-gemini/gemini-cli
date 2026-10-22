@@ -29,6 +29,7 @@ import {
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
+  GEMINI_4_ARGON_MODEL,
   PREVIEW_GEMINI_FLASH_LITE_MODEL,
   BASE_GEMINI_FLASH_MODEL,
   LATEST_GEMINI_FLASH_MODEL,
@@ -323,6 +324,7 @@ export function findCompressSplitPoint(
 
 export function modelStringToModelConfigAlias(model: string): string {
   switch (model) {
+    case GEMINI_4_ARGON_MODEL:
     case PREVIEW_GEMINI_MODEL:
     case PREVIEW_GEMINI_3_1_MODEL:
       return 'chat-compression-3-pro';

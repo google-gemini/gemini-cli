@@ -9,6 +9,7 @@ import {
   resolveModel,
   resolveClassifierModel,
   isGemini3Model,
+  isGemini4Model,
   isGemini2Model,
   isCustomModel,
   supportsModernFeatures,
@@ -39,6 +40,7 @@ import {
   isProModel,
   LATEST_GEMINI_FLASH_MODEL,
   LATEST_GEMINI_FLASH_LITE_MODEL,
+  GEMINI_4_ARGON_MODEL,
   GEMMA_4_31B_IT_MODEL,
   GEMMA_4_26B_A4B_IT_MODEL,
   getAutoModelDescription,
@@ -72,6 +74,7 @@ describe('Dynamic Configuration Parity', () => {
     DEFAULT_GEMINI_MODEL_AUTO,
     PREVIEW_GEMINI_MODEL,
     DEFAULT_GEMINI_MODEL,
+    GEMINI_4_ARGON_MODEL,
     'custom-model',
   ];
 
@@ -264,6 +267,7 @@ describe('isProModel', () => {
     expect(isProModel('gemini-3-pro-preview')).toBe(true);
     expect(isProModel('gemini-2.5-pro')).toBe(true);
     expect(isProModel('pro')).toBe(true);
+    expect(isProModel(GEMINI_4_ARGON_MODEL)).toBe(true);
   });
 
   it('should return false for models without "pro"', () => {
@@ -300,9 +304,10 @@ describe('isCustomModel', () => {
 });
 
 describe('supportsModernFeatures', () => {
-  it('should return true for Gemini 3 models', () => {
+  it('should return true for Gemini 3 and Gemini 4 models', () => {
     expect(supportsModernFeatures('gemini-3-pro-preview')).toBe(true);
     expect(supportsModernFeatures('gemini-3-flash-preview')).toBe(true);
+    expect(supportsModernFeatures(GEMINI_4_ARGON_MODEL)).toBe(true);
   });
 
   it('should return true for custom models', () => {
@@ -347,6 +352,19 @@ describe('isGemini3Model', () => {
   });
 });
 
+describe('isGemini4Model', () => {
+  it('should return true for gemini-4 models', () => {
+    expect(isGemini4Model(GEMINI_4_ARGON_MODEL)).toBe(true);
+    expect(isGemini4Model(GEMINI_4_ARGON_MODEL, dynamicConfig)).toBe(true);
+  });
+
+  it('should return false for non-gemini-4 models', () => {
+    expect(isGemini4Model('gemini-3-pro-preview')).toBe(false);
+    expect(isGemini4Model('gemini-2.5-pro')).toBe(false);
+    expect(isGemini4Model('gpt-4')).toBe(false);
+  });
+});
+
 describe('getDisplayString', () => {
   it('should return Auto (Gemini 3) for preview auto model', () => {
     expect(getDisplayString(PREVIEW_GEMINI_MODEL_AUTO)).toBe('Auto (Gemini 3)');
@@ -382,6 +400,7 @@ describe('getDisplayString', () => {
 
   it('should return the model name as is for other models', () => {
     expect(getDisplayString('custom-model')).toBe('custom-model');
+    expect(getDisplayString(GEMINI_4_ARGON_MODEL)).toBe(GEMINI_4_ARGON_MODEL);
     expect(getDisplayString(GEMMA_4_31B_IT_MODEL)).toBe(GEMMA_4_31B_IT_MODEL);
     expect(getDisplayString(GEMMA_4_26B_A4B_IT_MODEL)).toBe(
       GEMMA_4_26B_A4B_IT_MODEL,
@@ -393,8 +412,9 @@ describe('getDisplayString', () => {
 });
 
 describe('supportsMultimodalFunctionResponse', () => {
-  it('should return true for gemini-3 model', () => {
+  it('should return true for gemini-3 and gemini-4 models', () => {
     expect(supportsMultimodalFunctionResponse('gemini-3-pro')).toBe(true);
+    expect(supportsMultimodalFunctionResponse(GEMINI_4_ARGON_MODEL)).toBe(true);
   });
 
   it('should return false for gemini-2 models', () => {
