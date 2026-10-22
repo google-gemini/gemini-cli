@@ -1382,47 +1382,37 @@ export class GeminiChat {
   }
 
   // To ensure our requests validate, the first function call in every model
-  // turn within the active loop must have a `thoughtSignature` property.
-  // If we do not do this, we will get back 400 errors from the API.
+  // turn across the conversation history must have a thoughtSignature property.
+  // If we do not do this, the API rejects the request with a 400 Bad Request error.
+  //
+  // Rationale for using undocumented/internal SDK properties:
+  // The thoughtSignature property is an internal/undocumented field in the Gemini SDK/API.
+  // It is required to bypass thought signature validation for historical turns to prevent
+  // HTTP 400 Bad Request errors. Since there is no public API to manage these signatures
+  // on historical turns, we must use this internal property directly.
   ensureActiveLoopHasThoughtSignatures(
     requestContents: readonly Content[],
   ): readonly Content[] {
-    // First, find the start of the active loop by finding the last user turn
-    // with a text message, i.e. that is not a function response. Testing for
-    // text alone is not enough: `coalesceConsecutiveRoles` can merge a function
-    // response turn with the prompt that follows it, and starting the loop at
-    // such a turn starts it later than the API starts the turn, leaving earlier
-    // function calls unsigned but still validated.
-    let activeLoopStartIndex = -1;
-    for (let i = requestContents.length - 1; i >= 0; i--) {
+    interface ThoughtPart extends Part {
+      thoughtSignature?: string;
+    }
+
+    // Iterate through every message, ensuring that the first function call in
+    // each model message's list of parts has a valid thoughtSignature property.
+    // If it does not, we replace the function call with a copy that uses the
+    // synthetic thought signature, allocating new arrays lazily only when needed.
+    let newContents: Content[] | undefined = undefined;
+    for (let i = 0; i < requestContents.length; i++) {
       const content = requestContents[i];
-      if (
-        content.role === 'user' &&
-        content.parts?.some((part) => part.text) &&
-        !content.parts?.some((part) => part.functionResponse)
-      ) {
-        activeLoopStartIndex = i;
-        break;
-      }
-    }
-
-    if (activeLoopStartIndex === -1) {
-      return requestContents;
-    }
-
-    // Iterate through every message in the active loop, ensuring that the first
-    // function call in each message's list of parts has a valid
-    // thoughtSignature property. If it does not we replace the function call
-    // with a copy that uses the synthetic thought signature.
-    const newContents = requestContents.slice(); // Shallow copy the array
-    for (let i = activeLoopStartIndex; i < newContents.length; i++) {
-      const content = newContents[i];
       if (content.role === 'model' && content.parts) {
-        const newParts = content.parts.slice();
-        for (let j = 0; j < newParts.length; j++) {
-          const part = newParts[j];
-          if (part.functionCall) {
+        for (let j = 0; j < content.parts.length; j++) {
+          const part = content.parts[j] as ThoughtPart | undefined;
+          if (part?.functionCall) {
             if (!part.thoughtSignature) {
+              if (!newContents) {
+                newContents = requestContents.slice();
+              }
+              const newParts = content.parts.slice();
               newParts[j] = {
                 ...part,
                 thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE,
@@ -1437,7 +1427,7 @@ export class GeminiChat {
         }
       }
     }
-    return newContents;
+    return newContents ?? requestContents;
   }
 
   setTools(tools: Tool[]): void {
