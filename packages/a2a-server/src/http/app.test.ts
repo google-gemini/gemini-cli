@@ -1267,6 +1267,13 @@ describe('E2E Tests', () => {
       expect(getExtensionsSpy).not.toHaveBeenCalled();
     });
 
+    it('should return 400 when request body is empty', async () => {
+      const agent = request.agent(app);
+      const res = await agent.post('/executeCommand').expect(400);
+      expect(res.body.error).toBe('Invalid "command" field.');
+      expect(getExtensionsSpy).not.toHaveBeenCalled();
+    });
+
     it('should return 400 if args is not an array', async () => {
       const agent = request.agent(app);
       const res = await agent
@@ -1539,6 +1546,60 @@ describe('E2E Tests', () => {
 
       loadSettingsSpy.mockRestore();
       checkPathTrustSpy.mockRestore();
+    });
+
+    it('should mount express.json() before A2AExpressApp.setupRoutes so SDK routes receive parsed req.body', async () => {
+      const sdkExpressMod = await import('@a2a-js/sdk/server/express');
+      const originalSetupRoutes =
+        sdkExpressMod.A2AExpressApp.prototype.setupRoutes;
+
+      const setupRoutesSpy = vi
+        .spyOn(sdkExpressMod.A2AExpressApp.prototype, 'setupRoutes')
+        .mockImplementation(function (
+          this: InstanceType<typeof sdkExpressMod.A2AExpressApp>,
+          expressApp,
+          baseUrl,
+          middlewares,
+          agentCardPath,
+        ) {
+          expressApp.post('/__sdk_route_body_probe', (req, res) => {
+            res.status(200).json({ parsedBody: req.body ?? null });
+          });
+          return originalSetupRoutes.call(
+            this,
+            expressApp,
+            baseUrl,
+            middlewares,
+            agentCardPath,
+          );
+        });
+
+      try {
+        const testApp = await createApp();
+        const payload = {
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'message/send',
+          params: {
+            message: {
+              kind: 'message',
+              role: 'user',
+              parts: [{ kind: 'text', text: 'hello' }],
+              messageId: 'probe-msg-1',
+            },
+          },
+        };
+
+        const res = await request(testApp)
+          .post('/__sdk_route_body_probe')
+          .set('Content-Type', 'application/json')
+          .send(payload)
+          .expect(200);
+
+        expect(res.body).toEqual({ parsedBody: payload });
+      } finally {
+        setupRoutesSpy.mockRestore();
+      }
     });
   });
 });

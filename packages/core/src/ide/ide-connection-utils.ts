@@ -33,6 +33,25 @@ export type ConnectionConfig = {
   stdio?: StdioConfig;
 };
 
+/**
+ * Whether this CLI is running inside a Gemini CLI sandbox (the sandbox
+ * launcher sets `SANDBOX` for every sandbox type).
+ */
+export function isRunningInSandbox(): boolean {
+  return !!process.env['SANDBOX'];
+}
+
+/**
+ * Guidance for a failed companion connection. Inside a sandbox, `/ide install`
+ * cannot reach the IDE on the host and the connection is bridged by the
+ * sandbox launcher, so the advice differs.
+ */
+export function getConnectionFailureAdvice(): string {
+  return isRunningInSandbox()
+    ? 'Gemini CLI is running inside a sandbox: make sure the extension is installed and running in your IDE, then restart Gemini CLI so the sandbox can bridge the connection.'
+    : 'Please ensure the extension is running. To install the extension, run /ide install.';
+}
+
 export function validateWorkspacePath(
   ideWorkspacePath: string | undefined,
   cwd: string,
@@ -40,7 +59,7 @@ export function validateWorkspacePath(
   if (ideWorkspacePath === undefined) {
     return {
       isValid: false,
-      error: `Failed to connect to IDE companion extension. Please ensure the extension is running. To install the extension, run /ide install.`,
+      error: `Failed to connect to IDE companion extension. ${getConnectionFailureAdvice()}`,
     };
   }
 

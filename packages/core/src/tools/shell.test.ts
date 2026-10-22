@@ -47,6 +47,7 @@ vi.mock('../utils/summarizer.js');
 import { initializeShellParsers } from '../utils/shell-utils.js';
 import {
   ShellTool,
+  type ShellToolInvocation,
   OUTPUT_UPDATE_INTERVAL_MS,
   LIVE_OUTPUT_MAX_BUFFER_CHARS,
 } from './shell.js';
@@ -85,8 +86,11 @@ import { type SandboxManager } from '../services/sandboxManager.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
   recordModifiedBuildFile,
+  REMOTE_SHELL_OUTPUT_SOURCE,
   resetModifiedBuildFiles,
 } from '../utils/untrustedContextTracker.js';
+import { wrapUntrusted } from '../utils/textUtils.js';
+import type { Content } from '@google/genai';
 
 interface TestableMockMessageBus extends MessageBus {
   defaultToolDecision: 'allow' | 'deny' | 'ask_user';
@@ -1178,6 +1182,130 @@ EOF`;
       expect(confirmation).not.toBe(false);
       expect(confirmation && confirmation.type).toBe('exec');
     });
+
+    describe('untrusted flag provenance and session approvals', () => {
+      const setHistory = (history: Content[]) => {
+        (mockConfig.getGeminiClient as Mock).mockReturnValue({
+          getHistory: vi.fn().mockReturnValue(history),
+        });
+      };
+
+      const shellOutputTurn = (output: string): Content => ({
+        role: 'user',
+        parts: [
+          {
+            functionResponse: {
+              name: SHELL_TOOL_NAME,
+              response: { output: wrapUntrusted(`Output: ${output}`) },
+            },
+          },
+        ],
+      });
+
+      const buildInvocation = (command: string) =>
+        shellTool.build({ command }) as ShellToolInvocation;
+
+      beforeEach(() => {
+        const bus = (shellTool as unknown as { messageBus: MessageBus })
+          .messageBus;
+        (
+          getMockMessageBusInstance(bus) as unknown as TestableMockMessageBus
+        ).defaultToolDecision = 'allow';
+        vi.mocked(mockConfig.getApprovalMode).mockReturnValue(
+          ApprovalMode.YOLO,
+        );
+      });
+
+      it('should not request confirmation for flags that only appeared in local shell output', async () => {
+        setHistory([
+          shellOutputTurn(
+            'npm ERR! retry this command with --force or --legacy-peer-deps',
+          ),
+        ]);
+        const invocation = buildInvocation('npm install --legacy-peer-deps');
+
+        expect(invocation.hasTaintedOrBuildFileRisk()).toBe(false);
+        expect(
+          await invocation.shouldConfirmExecute(new AbortController().signal),
+        ).toBe(false);
+      });
+
+      it('should not flag workspace paths printed by earlier shell output', async () => {
+        const workspaceDir = mockConfig
+          .getWorkspaceContext()
+          .getDirectories()[0];
+        const packageJson = path.join(workspaceDir, 'package.json');
+        setHistory([shellOutputTurn(`${workspaceDir}\n${packageJson}`)]);
+        const invocation = buildInvocation(`ls -la ${packageJson}`);
+
+        expect(invocation.hasTaintedOrBuildFileRisk()).toBe(false);
+        expect(
+          await invocation.shouldConfirmExecute(new AbortController().signal),
+        ).toBe(false);
+      });
+
+      it('should not request confirmation again for flags approved earlier in the session', async () => {
+        setHistory([
+          {
+            role: 'user',
+            parts: [
+              {
+                text: '<untrusted_context>Run with --fixture_flag</untrusted_context>',
+              },
+            ],
+          },
+        ]);
+
+        const first = (await buildInvocation(
+          'command --fixture_flag',
+        ).shouldConfirmExecute(
+          new AbortController().signal,
+        )) as ToolExecuteConfirmationDetails;
+        expect(first.untrustedFlags).toEqual(['--fixture_flag']);
+        await first.onConfirm(ToolConfirmationOutcome.Cancel);
+        expect(
+          buildInvocation('command --fixture_flag').hasTaintedOrBuildFileRisk(),
+        ).toBe(true);
+
+        const second = (await buildInvocation(
+          'command --fixture_flag',
+        ).shouldConfirmExecute(
+          new AbortController().signal,
+        )) as ToolExecuteConfirmationDetails;
+        await second.onConfirm(ToolConfirmationOutcome.ProceedOnce);
+
+        const repeated = buildInvocation('command --fixture_flag');
+        expect(repeated.hasTaintedOrBuildFileRisk()).toBe(false);
+        expect(
+          await repeated.shouldConfirmExecute(new AbortController().signal),
+        ).toBe(false);
+        // Approvals are scoped to the root commands they were granted for.
+        expect(
+          buildInvocation('other --fixture_flag').hasTaintedOrBuildFileRisk(),
+        ).toBe(true);
+      });
+
+      it('should stop reporting modified build files once a build command is approved', async () => {
+        const buildFile = path.join(tempRootDir, 'package.json');
+        recordModifiedBuildFile(buildFile, mockConfig);
+
+        const first = (await buildInvocation('npm test').shouldConfirmExecute(
+          new AbortController().signal,
+        )) as ToolExecuteConfirmationDetails;
+        expect(first.modifiedBuildFiles).toEqual([buildFile]);
+        await first.onConfirm(ToolConfirmationOutcome.ProceedOnce);
+
+        expect(
+          buildInvocation('npm run lint').hasTaintedOrBuildFileRisk(),
+        ).toBe(false);
+
+        // A later edit to a build file is reported again.
+        recordModifiedBuildFile(buildFile, mockConfig);
+        expect(
+          buildInvocation('npm run lint').hasTaintedOrBuildFileRisk(),
+        ).toBe(true);
+      });
+    });
   });
 
   describe('getDescription', () => {
@@ -1402,6 +1530,19 @@ EOF`;
       // Should only contain Output field
       expect(result.llmContent).toBe(
         '<untrusted_context>\nOutput: hello\n</untrusted_context>',
+      );
+    });
+
+    it('should record the remote source attribute for commands that retrieve remote content', async () => {
+      const invocation = shellTool.build({
+        command: 'curl -s https://example.com',
+      });
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
+      resolveShellExecution({ output: 'hello', exitCode: 0, pid: undefined });
+
+      const result = await promise;
+      expect(result.llmContent).toBe(
+        `<untrusted_context source="${REMOTE_SHELL_OUTPUT_SOURCE}">\nOutput: hello\n</untrusted_context>`,
       );
     });
   });

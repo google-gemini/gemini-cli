@@ -39,6 +39,10 @@ import { GlobTool } from '../tools/glob.js';
 import { ActivateSkillTool } from '../tools/activate-skill.js';
 import { EditTool } from '../tools/edit.js';
 import { ShellTool } from '../tools/shell.js';
+import {
+  resetAcknowledgedUntrustedFlags,
+  resetModifiedBuildFiles,
+} from '../utils/untrustedContextTracker.js';
 import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
 import {
@@ -1847,6 +1851,8 @@ export class Config implements McpContext, AgentLoopContext {
     this.approvedPlanPath = undefined;
     this.topicState.reset();
     this.skillManager.reset();
+    resetModifiedBuildFiles(this);
+    resetAcknowledgedUntrustedFlags(this);
     this.latestApiRequest = undefined;
     this.lastModeSwitchTime = performance.now();
     this.compressionTruncationCounter = 0;

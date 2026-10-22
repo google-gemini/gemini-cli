@@ -3124,6 +3124,11 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
             description:
               'Whether the authorization server returns the "iss" parameter in the authorization response (RFC 9207). When true, callbacks without "iss" are rejected; when false, they are accepted. A provided "iss" is always validated. Overrides the "authorization_response_iss_parameter_supported" value discovered from server metadata.',
           },
+          allowPrivateNetwork: {
+            type: 'boolean',
+            description:
+              'Allow OAuth endpoints on private enterprise networks (RFC 1918, RFC 6598, RFC 4193, .internal, .local).',
+          },
         },
       },
       authProviderType: {
@@ -3196,6 +3201,11 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
             type: 'boolean',
             description:
               'Whether the authorization server returns the "iss" parameter in the authorization response (RFC 9207). When true, callbacks without "iss" are rejected; when false, they are accepted. A provided "iss" is always validated. Overrides the "authorization_response_iss_parameter_supported" value discovered from server metadata.',
+          },
+          allowPrivateNetwork: {
+            type: 'boolean',
+            description:
+              'Allow OAuth endpoints on private enterprise networks (RFC 1918, RFC 6598, RFC 4193, .internal, .local).',
           },
         },
       },

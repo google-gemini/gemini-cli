@@ -5,6 +5,7 @@
  */
 
 import { coreEvents } from './events.js';
+import { isTmux, isDumbTerminal } from './compatibility.js';
 
 // Capture the original stdout and stderr write methods before any monkey patching occurs.
 const originalStdoutWrite = process.stdout.write.bind(process.stdout);
@@ -89,20 +90,87 @@ function isKey<T extends object>(
 
 // Matches ANSI cursor positioning sequences emitted by Ink at the end of a frame
 // (e.g. cursorTo `\x1b[<col>G` or `\x1b[<row>;<col>H`, or cursorLeft `\x1b[D`),
-// optionally followed by the synchronized output exit sequence (`\x1b[?2026l`).
+// optionally followed by the synchronized output exit sequence (`\x1b[?2026l` or `\x1bP=2s\x1b\\`).
 const INK_CURSOR_POSITION_END_REGEX =
   // eslint-disable-next-line no-control-regex
-  /\x1b\[(?:\d+G|\d+;\d+H|D)(\x1b\[\?2026l)?$/;
+  /\x1b\[(?:\d+G|\d+;\d+H|D)(\x1b\[\?2026l|\x1bP=2s\x1b\\)?$/;
 const SHOW_CURSOR_SEQ = '\x1b[?25h';
 const HIDE_CURSOR_SEQ = '\x1b[?25l';
-const EXIT_SYNCHRONIZED_OUTPUT_SEQ = '\x1b[?2026l';
+export const ENTER_SYNCHRONIZED_OUTPUT_SEQ = '\x1b[?2026h';
+export const EXIT_SYNCHRONIZED_OUTPUT_SEQ = '\x1b[?2026l';
+export const TMUX_ENTER_SYNCHRONIZED_OUTPUT_SEQ = '\x1bP=1s\x1b\\';
+export const TMUX_EXIT_SYNCHRONIZED_OUTPUT_SEQ = '\x1bP=2s\x1b\\';
+
+const STANDALONE_MODE_SEQUENCES = new Set([
+  SHOW_CURSOR_SEQ,
+  HIDE_CURSOR_SEQ,
+  '\x1b[?7l',
+  '\x1b[?7h',
+  '\x1b[?1004h',
+  '\x1b[?1004l',
+  '\x1b[?1049h',
+  '\x1b[?1049l',
+]);
+
+/**
+ * Wraps a terminal frame output string with synchronized output escape sequences
+ * (DEC Private Mode 2026 `\x1b[?2026h` / `\x1b[?2026l`, or tmux DCS `\x1bP=1s\x1b\\` / `\x1bP=2s\x1b\\`
+ * when `process.env.TMUX` is present).
+ * Non-supporting ANSI terminals silently ignore Mode 2026 without printing stray characters.
+ */
+export function wrapWithSynchronizedOutput(chunk: string): string {
+  if (
+    !chunk ||
+    STANDALONE_MODE_SEQUENCES.has(chunk) ||
+    (chunk.startsWith('\x1b]') &&
+      (chunk.endsWith('\x07') || chunk.endsWith('\x1b\\')))
+  ) {
+    return chunk;
+  }
+  if (isDumbTerminal()) {
+    return chunk;
+  }
+
+  const inTmux = isTmux();
+  const syncStart = inTmux
+    ? TMUX_ENTER_SYNCHRONIZED_OUTPUT_SEQ
+    : ENTER_SYNCHRONIZED_OUTPUT_SEQ;
+  const syncEnd = inTmux
+    ? TMUX_EXIT_SYNCHRONIZED_OUTPUT_SEQ
+    : EXIT_SYNCHRONIZED_OUTPUT_SEQ;
+
+  if (chunk.startsWith(syncStart) && chunk.endsWith(syncEnd)) {
+    return chunk;
+  }
+
+  let inner = chunk;
+  if (
+    inner.startsWith(ENTER_SYNCHRONIZED_OUTPUT_SEQ) &&
+    inner.endsWith(EXIT_SYNCHRONIZED_OUTPUT_SEQ)
+  ) {
+    inner = inner.slice(
+      ENTER_SYNCHRONIZED_OUTPUT_SEQ.length,
+      -EXIT_SYNCHRONIZED_OUTPUT_SEQ.length,
+    );
+  } else if (
+    inner.startsWith(TMUX_ENTER_SYNCHRONIZED_OUTPUT_SEQ) &&
+    inner.endsWith(TMUX_EXIT_SYNCHRONIZED_OUTPUT_SEQ)
+  ) {
+    inner = inner.slice(
+      TMUX_ENTER_SYNCHRONIZED_OUTPUT_SEQ.length,
+      -TMUX_EXIT_SYNCHRONIZED_OUTPUT_SEQ.length,
+    );
+  }
+
+  return `${syncStart}${inner}${syncEnd}`;
+}
 
 /**
  * Creates proxies for process.stdout and process.stderr that use the real write methods
  * (writeToStdout and writeToStderr) bypassing any monkey patching.
  * This is used to write to the real output even when stdio is patched.
  */
-export function createWorkingStdio() {
+export function createWorkingStdio(options?: { synchronizedOutput?: boolean }) {
   let cursorShownForIme = false;
 
   const workingStdoutWrite = (
@@ -132,11 +200,18 @@ export function createWorkingStdio() {
       } else if (cursorShownForIme) {
         if (chunk.endsWith(EXIT_SYNCHRONIZED_OUTPUT_SEQ)) {
           args[0] = `${chunk.slice(0, -EXIT_SYNCHRONIZED_OUTPUT_SEQ.length)}${HIDE_CURSOR_SEQ}${EXIT_SYNCHRONIZED_OUTPUT_SEQ}`;
+        } else if (chunk.endsWith(TMUX_EXIT_SYNCHRONIZED_OUTPUT_SEQ)) {
+          args[0] = `${chunk.slice(0, -TMUX_EXIT_SYNCHRONIZED_OUTPUT_SEQ.length)}${HIDE_CURSOR_SEQ}${TMUX_EXIT_SYNCHRONIZED_OUTPUT_SEQ}`;
         } else {
           args[0] = `${chunk}${HIDE_CURSOR_SEQ}`;
         }
         cursorShownForIme = false;
       }
+    }
+
+    const currentChunk = args[0];
+    if (options?.synchronizedOutput && typeof currentChunk === 'string') {
+      args[0] = wrapWithSynchronizedOutput(currentChunk);
     }
 
     return writeToStdout(...args);
