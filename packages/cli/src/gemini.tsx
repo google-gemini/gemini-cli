@@ -98,6 +98,7 @@ import { createPolicyUpdater } from './config/policy.js';
 
 import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { runDeferredCommand } from './deferred.js';
+import { handleList as handleListModels } from './commands/models/list.js';
 import { cleanupBackgroundLogs } from './utils/logCleanup.js';
 import { SlashCommandConflictHandler } from './services/SlashCommandConflictHandler.js';
 
@@ -680,6 +681,13 @@ export async function main() {
 
   // Run deferred command now that we have admin settings.
   await runDeferredCommand(settings.merged);
+
+  if (argv.listModels) {
+    const outputFormat = argv.outputFormat === 'json' ? 'json' : 'text';
+    await handleListModels({ outputFormat, loadedSettings: settings });
+    await runExitCleanup();
+    process.exit(ExitCodes.SUCCESS);
+  }
 
   // hop into sandbox if we are outside and sandboxing is enabled
   if (!process.env['SANDBOX'] && !argv.isCommand) {
