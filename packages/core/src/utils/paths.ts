@@ -594,6 +594,21 @@ export function isTrustedSystemPath(filePath: string): boolean {
     return trustedPrefixes.some(
       (prefix) => normPath === prefix || normPath.startsWith(prefix + '/'),
     );
+  } else if (platform === 'android') {
+    const termuxPrefix =
+      process.env['PREFIX'] || '/data/data/com.termux/files/usr';
+    const trustedPrefixes = [
+      path.join(termuxPrefix, 'bin'),
+      '/data/data/com.termux/files/usr/bin',
+      '/system/bin',
+      '/system/xbin',
+      '/bin',
+      '/usr/bin',
+    ].map((p) => normalizePath(p));
+
+    return trustedPrefixes.some(
+      (prefix) => normPath === prefix || normPath.startsWith(prefix + '/'),
+    );
   } else {
     const trustedPrefixes = [
       '/usr/bin',
