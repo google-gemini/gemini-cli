@@ -367,6 +367,8 @@ export async function runNonInteractive(
               });
             }
             toolCallRequests.push(event.value);
+          } else if (event.type === GeminiEventType.Retry) {
+            toolCallRequests.length = 0;
           } else if (event.type === GeminiEventType.LoopDetected) {
             const message = 'Loop detected, stopping execution';
             if (streamFormatter) {
@@ -378,6 +380,8 @@ export async function runNonInteractive(
               });
             }
             warnings.push(message);
+            toolCallRequests.length = 0;
+            break;
           } else if (event.type === GeminiEventType.MaxSessionTurns) {
             const message = 'Maximum session turns exceeded';
             if (streamFormatter) {
@@ -389,6 +393,14 @@ export async function runNonInteractive(
               });
             }
             warnings.push(message);
+            toolCallRequests.length = 0;
+            break;
+          } else if (
+            event.type === GeminiEventType.UserCancelled ||
+            event.type === GeminiEventType.ContextWindowWillOverflow
+          ) {
+            toolCallRequests.length = 0;
+            break;
           } else if (event.type === GeminiEventType.Error) {
             throw event.value.error;
           } else if (event.type === GeminiEventType.AgentExecutionStopped) {

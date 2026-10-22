@@ -915,5 +915,78 @@ describe('Turn', () => {
       }
       expect(turn.getDebugResponses()).toEqual([resp1, resp2]);
     });
+
+    it('should clear pendingToolCalls when a mid-stream error occurs after a function call chunk', async () => {
+      const mockResponseStream = (async function* () {
+        yield {
+          type: StreamEventType.CHUNK,
+          value: {
+            functionCalls: [
+              {
+                id: 'fc1',
+                name: 'ReadFile',
+                args: { path: 'file.txt' },
+              },
+            ],
+          } as unknown as GenerateContentResponse,
+        };
+        throw new Error('Mid-stream network failure');
+      })();
+      mockSendMessageStream.mockResolvedValue(mockResponseStream);
+
+      const events = [];
+      for await (const event of turn.run(
+        { model: 'gemini' },
+        [{ text: 'Use tool' }],
+        new AbortController().signal,
+      )) {
+        events.push(event);
+      }
+
+      expect(
+        events.some((e) => e.type === GeminiEventType.ToolCallRequest),
+      ).toBe(true);
+      expect(events.some((e) => e.type === GeminiEventType.Error)).toBe(true);
+      expect(turn.pendingToolCalls).toEqual([]);
+    });
+
+    it('should reset pendingToolCalls and debugResponses when a mid-stream retry occurs', async () => {
+      const resp1 = {
+        functionCalls: [
+          {
+            id: 'fc_stale',
+            name: 'StaleTool',
+            args: {},
+          },
+        ],
+      } as unknown as GenerateContentResponse;
+      const resp2 = {
+        functionCalls: [
+          {
+            id: 'fc_fresh',
+            name: 'FreshTool',
+            args: {},
+          },
+        ],
+      } as unknown as GenerateContentResponse;
+      const mockResponseStream = (async function* () {
+        yield { type: StreamEventType.CHUNK, value: resp1 };
+        yield { type: StreamEventType.RETRY };
+        yield { type: StreamEventType.CHUNK, value: resp2 };
+      })();
+      mockSendMessageStream.mockResolvedValue(mockResponseStream);
+
+      for await (const _ of turn.run(
+        { model: 'gemini' },
+        [{ text: 'Retry tool' }],
+        new AbortController().signal,
+      )) {
+        // consume stream
+      }
+
+      expect(turn.pendingToolCalls).toHaveLength(1);
+      expect(turn.pendingToolCalls[0]?.name).toBe('FreshTool');
+      expect(turn.getDebugResponses()).toEqual([resp2]);
+    });
   });
 });

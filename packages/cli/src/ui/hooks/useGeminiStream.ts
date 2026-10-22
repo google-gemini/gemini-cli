@@ -1539,6 +1539,7 @@ export const useGeminiStream = (
     ): Promise<StreamProcessingStatus> => {
       let geminiMessageBuffer = '';
       const toolCallRequests: ToolCallRequestInfo[] = [];
+      let status = StreamProcessingStatus.Completed;
       for await (const event of stream) {
         if (
           event.type !== ServerGeminiEventType.Thought &&
@@ -1564,12 +1565,18 @@ export const useGeminiStream = (
             toolCallRequests.push(event.value);
             break;
           case ServerGeminiEventType.UserCancelled:
+            toolCallRequests.length = 0;
+            status = StreamProcessingStatus.UserCancelled;
             handleUserCancelledEvent(userMessageTimestamp);
             break;
           case ServerGeminiEventType.Error:
+            toolCallRequests.length = 0;
+            status = StreamProcessingStatus.Error;
             handleErrorEvent(event.value, userMessageTimestamp);
             break;
           case ServerGeminiEventType.AgentExecutionStopped:
+            toolCallRequests.length = 0;
+            status = StreamProcessingStatus.Error;
             handleAgentExecutionStoppedEvent(
               event.value.reason,
               userMessageTimestamp,
@@ -1593,9 +1600,13 @@ export const useGeminiStream = (
             // do nothing
             break;
           case ServerGeminiEventType.MaxSessionTurns:
+            toolCallRequests.length = 0;
+            status = StreamProcessingStatus.Error;
             handleMaxSessionTurnsEvent();
             break;
           case ServerGeminiEventType.ContextWindowWillOverflow:
+            toolCallRequests.length = 0;
+            status = StreamProcessingStatus.Error;
             handleContextWindowWillOverflowEvent(
               event.value.estimatedRequestTokenCount,
               event.value.remainingTokenCount,
@@ -1613,12 +1624,18 @@ export const useGeminiStream = (
           case ServerGeminiEventType.LoopDetected:
             // handle later because we want to move pending history to history
             // before we add loop detected message to history
+            toolCallRequests.length = 0;
+            status = StreamProcessingStatus.Error;
             loopDetectedRef.current = true;
             break;
           case ServerGeminiEventType.Retry:
-            // Handled transparently by the backend stream retries.
+            // Discard any tool calls collected during the failed stream attempt.
+            toolCallRequests.length = 0;
+            geminiMessageBuffer = '';
             break;
           case ServerGeminiEventType.InvalidStream:
+            toolCallRequests.length = 0;
+            status = StreamProcessingStatus.Error;
             handleInvalidStreamEvent(event.value, userMessageTimestamp);
             break;
           default: {
@@ -1628,13 +1645,16 @@ export const useGeminiStream = (
           }
         }
       }
-      if (toolCallRequests.length > 0) {
+      if (
+        status === StreamProcessingStatus.Completed &&
+        toolCallRequests.length > 0
+      ) {
         if (pendingHistoryItemRef.current) {
           addItem(pendingHistoryItemRef.current, userMessageTimestamp);
           setPendingHistoryItem(null);
         }
         await scheduleToolCalls(toolCallRequests, signal);
-      } else {
+      } else if (status === StreamProcessingStatus.Completed) {
         const hasVisibleText = geminiMessageBuffer.trim().length > 0;
         if (
           isContinuation &&
@@ -1654,7 +1674,7 @@ export const useGeminiStream = (
           );
         }
       }
-      return StreamProcessingStatus.Completed;
+      return status;
     },
     [
       handleContentEvent,

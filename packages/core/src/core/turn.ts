@@ -293,17 +293,24 @@ export class Turn {
 
       for await (const streamEvent of responseStream) {
         if (signal?.aborted) {
+          this.pendingToolCalls.length = 0;
           yield { type: GeminiEventType.UserCancelled };
           return;
         }
 
         // Handle the new RETRY event
         if (streamEvent.type === 'retry') {
+          this.pendingToolCalls.length = 0;
+          this.pendingCitations.clear();
+          this.debugResponses = [];
+          this.cachedResponseText = undefined;
+          this.finishReason = undefined;
           yield { type: GeminiEventType.Retry };
           continue; // Skip to the next event in the stream
         }
 
         if (streamEvent.type === 'agent_execution_stopped') {
+          this.pendingToolCalls.length = 0;
           yield {
             type: GeminiEventType.AgentExecutionStopped,
             value: { reason: streamEvent.reason },
@@ -414,6 +421,7 @@ export class Turn {
         }
       }
     } catch (e) {
+      this.pendingToolCalls.length = 0;
       if (signal.aborted) {
         yield { type: GeminiEventType.UserCancelled };
         // Regular cancellation error, fail gracefully.
