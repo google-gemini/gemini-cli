@@ -5,7 +5,11 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
-import { detectSteeringChanges, isTestFile } from '../changed_prompt.js';
+import {
+  detectSteeringChanges,
+  getChunkedDiff,
+  isTestFile,
+} from '../changed_prompt.js';
 
 const NO_DIFF = () => '';
 
@@ -143,5 +147,53 @@ describe('detectSteeringChanges', () => {
       'Matched steering signature in core: inputSchema',
     ]);
     expect(getDiff).toHaveBeenCalledWith(files);
+  });
+});
+
+describe('getChunkedDiff', () => {
+  it('returns an empty diff without invoking git when there are no files', () => {
+    const runGit = vi.fn(() => '');
+    expect(getChunkedDiff('HEAD', [], runGit)).toBe('');
+    expect(runGit).not.toHaveBeenCalled();
+  });
+
+  it('diffs a small set of files in a single git call', () => {
+    const runGit = vi.fn(() => '+inputSchema\n');
+    const files = ['packages/core/src/a.ts', 'packages/core/src/b.ts'];
+    expect(getChunkedDiff('abc123', files, runGit)).toBe('+inputSchema\n');
+    expect(runGit).toHaveBeenCalledTimes(1);
+    expect(runGit).toHaveBeenCalledWith([
+      'diff',
+      '-U0',
+      'FETCH_HEAD...abc123',
+      '--',
+      ...files,
+    ]);
+  });
+
+  it('splits large change sets into bounded git calls and concatenates the output', () => {
+    // Keeps each `git diff` invocation under the OS command-line length limit
+    // (notably on Windows) so main() does not fall back to running the evals.
+    const files = Array.from(
+      { length: 250 },
+      (_, i) => `packages/core/src/file-${i}.ts`,
+    );
+    const runGit = vi.fn((args) => `chunk(${args.length - 4})\n`);
+
+    const diff = getChunkedDiff('HEAD', files, runGit);
+
+    expect(runGit).toHaveBeenCalledTimes(3);
+    const chunks = runGit.mock.calls.map((call) => call[0].slice(4));
+    expect(chunks.map((chunk) => chunk.length)).toEqual([100, 100, 50]);
+    expect(chunks.flat()).toEqual(files);
+    for (const call of runGit.mock.calls) {
+      expect(call[0].slice(0, 4)).toEqual([
+        'diff',
+        '-U0',
+        'FETCH_HEAD...HEAD',
+        '--',
+      ]);
+    }
+    expect(diff).toBe('chunk(100)\nchunk(100)\nchunk(50)\n');
   });
 });

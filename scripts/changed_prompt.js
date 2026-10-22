@@ -99,6 +99,39 @@ export function detectSteeringChanges(changedFiles, getDiff, options = {}) {
   return { detected, reasons };
 }
 
+/**
+ * Upper bound on the number of paths passed to a single `git diff` call.
+ *
+ * Passing every changed file as an argument can exceed the OS command-line
+ * limit on very large change sets (notably on Windows, ~32K characters), which
+ * would make `main()` fall back to running the evals. Diffing in chunks keeps
+ * the call well under that limit; the per-file output is identical.
+ */
+const DIFF_CHUNK_SIZE = 100;
+
+/**
+ * Returns the `-U0` unified diff of `files` against `FETCH_HEAD...head`,
+ * concatenating the output of one `git diff` call per chunk of files.
+ *
+ * @param {string} head - Revision to compare against `FETCH_HEAD`.
+ * @param {string[]} files - Repository-relative paths to diff.
+ * @param {(args: string[]) => string} [runGit] - Runs `git` with the given
+ *   arguments and returns its stdout. Injectable for tests.
+ * @returns {string}
+ */
+export function getChunkedDiff(
+  head,
+  files,
+  runGit = (args) => execFileSync('git', args, { encoding: 'utf-8' }),
+) {
+  let diff = '';
+  for (let i = 0; i < files.length; i += DIFF_CHUNK_SIZE) {
+    const chunk = files.slice(i, i + DIFF_CHUNK_SIZE);
+    diff += runGit(['diff', '-U0', `FETCH_HEAD...${head}`, '--', ...chunk]);
+  }
+  return diff;
+}
+
 function main() {
   const targetBranch = process.env.GITHUB_BASE_REF || 'main';
   const verbose = process.argv.includes('--verbose');
@@ -122,14 +155,7 @@ function main() {
       .split('\n')
       .filter(Boolean);
 
-    const getDiff = (files) =>
-      execFileSync(
-        'git',
-        ['diff', '-U0', `FETCH_HEAD...${head}`, '--', ...files],
-        {
-          encoding: 'utf-8',
-        },
-      );
+    const getDiff = (files) => getChunkedDiff(head, files);
 
     const { detected, reasons } = detectSteeringChanges(changedFiles, getDiff, {
       steeringOnly,
