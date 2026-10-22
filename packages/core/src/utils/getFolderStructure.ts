@@ -117,13 +117,19 @@ async function readFullStructure(
           error.code === 'ENOENT' ||
           error.code === 'EPERM')
       ) {
-        debugLogger.warn(
-          `Warning: Could not read directory ${currentPath}: ${error.message}`,
-        );
         if (currentPath === rootPath && error.code === 'ENOENT') {
+          debugLogger.warn(
+            `Warning: Could not read directory ${currentPath}: ${error.message}`,
+          );
           return null; // Root directory itself not found
         }
-        // For other EACCES/ENOENT/EPERM on subdirectories, just skip them.
+        // Only warn for permission errors on subdirectories; transient ENOENT
+        // on subdirectories (e.g., short-lived lock directories) is expected.
+        if (error.code !== 'ENOENT') {
+          debugLogger.warn(
+            `Warning: Could not read directory ${currentPath}: ${error.message}`,
+          );
+        }
         continue;
       }
       throw error;
