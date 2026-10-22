@@ -2345,7 +2345,7 @@ describe('useGeminiStream', () => {
       expect(result.current.streamingState).toBe(StreamingState.Idle);
     });
 
-    it('reproduces b/575483842: cancelling during continuation stream after SearchText completes must not auto-nudge and schedule Shell tools', async () => {
+    it('should not auto-nudge or schedule follow-up tools when cancelled during a continuation stream', async () => {
       // Simulate real GeminiClient.sendMessageStream behavior when aborted:
       // Turn 1 (initial user prompt): requests SearchText tools
       // Turn 2 (continuation with SearchText results): waits for model, then when signal aborts, yields UserCancelled and ends
@@ -2364,7 +2364,7 @@ describe('useGeminiStream', () => {
                   name: 'grep_search',
                   args: { pattern: '@tools', dir_path: 'docs' },
                   isClientInitiated: false,
-                  prompt_id: 'prompt-575483842',
+                  prompt_id: 'prompt-1',
                 },
               };
               yield {
@@ -2374,7 +2374,7 @@ describe('useGeminiStream', () => {
                   name: 'grep_search',
                   args: { pattern: 'tools', dir_path: 'packages/cli/src' },
                   isClientInitiated: false,
-                  prompt_id: 'prompt-575483842',
+                  prompt_id: 'prompt-1',
                 },
               };
               return;
@@ -2404,7 +2404,7 @@ describe('useGeminiStream', () => {
                 name: 'run_shell_command',
                 args: { command: 'git status' },
                 isClientInitiated: false,
-                prompt_id: 'prompt-575483842',
+                prompt_id: 'prompt-1',
               },
             };
             yield {
@@ -2414,7 +2414,7 @@ describe('useGeminiStream', () => {
                 name: 'run_shell_command',
                 args: { command: 'git worktree list' },
                 isClientInitiated: false,
-                prompt_id: 'prompt-575483842',
+                prompt_id: 'prompt-1',
               },
             };
           })();
@@ -2431,11 +2431,9 @@ describe('useGeminiStream', () => {
 
       const { result } = await renderTestHook();
 
-      // 1. User submits `explain @/usr/local/google/home/jesussamuel/ughcl/gemini-cli/tools/`
+      // 1. User submits `explain @tools/`
       await act(async () => {
-        await result.current.submitQuery(
-          'explain @/usr/local/google/home/jesussamuel/ughcl/gemini-cli/tools/',
-        );
+        await result.current.submitQuery('explain @tools/');
       });
 
       expect(mockScheduleToolCalls).toHaveBeenCalledTimes(1);
@@ -2448,7 +2446,7 @@ describe('useGeminiStream', () => {
             name: 'grep_search',
             args: { pattern: '@tools', dir_path: 'docs' },
             isClientInitiated: false,
-            prompt_id: 'prompt-575483842',
+            prompt_id: 'prompt-1',
           },
           status: CoreToolCallStatus.Success,
           responseSubmittedToGemini: false,
@@ -2473,7 +2471,7 @@ describe('useGeminiStream', () => {
             name: 'grep_search',
             args: { pattern: 'tools', dir_path: 'packages/cli/src' },
             isClientInitiated: false,
-            prompt_id: 'prompt-575483842',
+            prompt_id: 'prompt-1',
           },
           status: CoreToolCallStatus.Success,
           responseSubmittedToGemini: false,
