@@ -3067,7 +3067,9 @@ describe('connectToMcpServer with OAuth', () => {
     expect(client).toBe(mockedClient);
     expect(mockedClient.connect).toHaveBeenCalledTimes(2);
     expect(mockAuthProvider.authenticate).toHaveBeenCalledOnce();
-    expect(OAuthUtils.discoverOAuthConfig).toHaveBeenCalledWith(serverUrl);
+    expect(OAuthUtils.discoverOAuthConfig).toHaveBeenCalledWith(serverUrl, {
+      allowPrivateNetwork: undefined,
+    });
 
     const authHeader = (unwrap(capturedTransport) as TestableTransport)
       ._requestInit?.headers?.['Authorization'];
@@ -3108,6 +3110,7 @@ describe('connectToMcpServer with OAuth', () => {
     expect(OAuthUtils.discoverOAuthFromWWWAuthenticate).toHaveBeenCalledWith(
       wwwAuthHeader,
       serverUrl,
+      { allowPrivateNetwork: undefined },
     );
     expect(OAuthUtils.discoverOAuthConfig).not.toHaveBeenCalled();
     expect(mockAuthProvider.authenticate).toHaveBeenCalledOnce();
@@ -3152,9 +3155,12 @@ describe('connectToMcpServer with OAuth', () => {
     expect(OAuthUtils.discoverOAuthFromWWWAuthenticate).toHaveBeenCalledWith(
       wwwAuthHeader,
       serverUrl,
+      { allowPrivateNetwork: undefined },
     );
     expect(OAuthUtils.extractBaseUrl).toHaveBeenCalledWith(serverUrl);
-    expect(OAuthUtils.discoverOAuthConfig).toHaveBeenCalledWith(baseUrl);
+    expect(OAuthUtils.discoverOAuthConfig).toHaveBeenCalledWith(baseUrl, {
+      allowPrivateNetwork: undefined,
+    });
     expect(mockAuthProvider.authenticate).toHaveBeenCalledOnce();
   });
 
