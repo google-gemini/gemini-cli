@@ -10,6 +10,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { execSync } from 'node:child_process';
 import { TestRig } from '@google/gemini-cli-test-utils';
+import { formatToolLogChain } from '../scripts/utils/tool-log-formatter.js';
 import {
   createUnauthorizedToolError,
   parseAgentMarkdown,
@@ -32,7 +33,7 @@ export const EVAL_MODEL =
 // Indicates the consistency expectation for this test.
 // - ALWAYS_PASSES - Means that the test is expected to pass 100% of the time. These
 //   These tests are typically trivial and test basic functionality with unambiguous
-//   prompts. For example: "call save_memory to remember foo" should be fairly reliable.
+//   prompts. For example: "remember foo" should be fairly reliable.
 //   These are the first line of defense against regressions in key behaviors and run in
 //   every CI. You can run these locally with 'npm run test:always_passing_evals'.
 //
@@ -186,6 +187,23 @@ export async function internalEvalTest(evalCase: EvalCase) {
 
       await evalCase.assert(rig, result);
       isSuccess = true;
+    } catch (error: unknown) {
+      const toolLogs = rig.readToolLogs();
+      if (toolLogs && toolLogs.length > 0) {
+        const summary = formatToolLogChain(toolLogs);
+        if (error instanceof Error) {
+          try {
+            error.message = `${error.message}\n\nTool Call Chain (${toolLogs.length} calls):\n${summary}`;
+          } catch {
+            // Error object may be frozen or have a read-only message property.
+            // The original error is still re-thrown, so no failure is hidden.
+            console.warn(
+              `[eval] Could not append tool call chain to error message (${toolLogs.length} calls)`,
+            );
+          }
+        }
+      }
+      throw error;
     } finally {
       if (isSuccess) {
         await fs.promises.unlink(activityLogFile).catch((err) => {

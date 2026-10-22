@@ -9,6 +9,7 @@ import fs from 'node:fs/promises';
 import {
   calculateTurnStats,
   calculateRewindImpact,
+  isToolResponseMessage,
   revertFileChanges,
 } from './rewindFileOps.js';
 import {
@@ -119,6 +120,140 @@ describe('rewindFileOps', () => {
         addedLines: 3,
         removedLines: 3,
       });
+    });
+
+    it('aggregates stats across multiple tool rounds separated by tool responses', async () => {
+      const { getFileDiffFromResultDisplay, computeModelAddedAndRemovedLines } =
+        await import('@google/gemini-cli-core');
+      vi.mocked(getFileDiffFromResultDisplay).mockImplementation(
+        (resultDisplay) =>
+          ({
+            filePath: String(resultDisplay),
+            fileName: String(resultDisplay),
+            originalContent: 'old',
+            newContent: 'new',
+            isNewFile: false,
+            diffStat: {
+              model_added_lines: 0,
+              model_removed_lines: 0,
+              model_added_chars: 0,
+              model_removed_chars: 0,
+              user_added_lines: 0,
+              user_removed_lines: 0,
+              user_added_chars: 0,
+              user_removed_chars: 0,
+            },
+            fileDiff: 'diff',
+          }) as ReturnType<typeof getFileDiffFromResultDisplay>,
+      );
+      vi.mocked(computeModelAddedAndRemovedLines).mockReturnValue({
+        addedLines: 2,
+        removedLines: 1,
+      });
+
+      const userMsg = {
+        type: 'user',
+        content: [{ text: 'Edit both files' }],
+      } as unknown as MessageRecord;
+      const toolResponse = (id: string) =>
+        ({
+          type: 'user',
+          content: [
+            { functionResponse: { id, name: 'replace', response: {} } },
+          ],
+        }) as unknown as MessageRecord;
+      const editRound = (file: string) =>
+        ({
+          type: 'gemini',
+          toolCalls: [{ name: 'replace', args: {}, resultDisplay: file }],
+        }) as unknown as MessageRecord;
+      const nextUserMsg = {
+        type: 'user',
+        content: [{ text: 'Next prompt' }],
+      } as unknown as MessageRecord;
+
+      const conversation = {
+        messages: [
+          userMsg,
+          editRound('a.ts'),
+          toolResponse('1'),
+          editRound('b.ts'),
+          toolResponse('2'),
+          nextUserMsg,
+          editRound('c.ts'),
+        ],
+      };
+
+      const result = calculateTurnStats(
+        conversation as unknown as ConversationRecord,
+        userMsg,
+      );
+      expect(result).toEqual({
+        fileCount: 2,
+        addedLines: 4,
+        removedLines: 2,
+      });
+    });
+  });
+
+  describe('isToolResponseMessage', () => {
+    const userMessage = (content: unknown) =>
+      ({ type: 'user', content }) as unknown as MessageRecord;
+    const functionResponsePart = {
+      functionResponse: { id: '1', name: 'read_file', response: {} },
+    };
+
+    it('returns true for a message with only functionResponse parts', () => {
+      expect(
+        isToolResponseMessage(
+          userMessage([functionResponsePart, functionResponsePart]),
+        ),
+      ).toBe(true);
+    });
+
+    it('returns true when functionResponse parts carry binary siblings', () => {
+      expect(
+        isToolResponseMessage(
+          userMessage([
+            functionResponsePart,
+            { inlineData: { mimeType: 'image/png', data: 'abc' } },
+            { fileData: { mimeType: 'video/mp4', fileUri: 'gs://x' } },
+          ]),
+        ),
+      ).toBe(true);
+    });
+
+    it('returns false when functionResponse parts are mixed with user text', () => {
+      expect(
+        isToolResponseMessage(
+          userMessage([functionResponsePart, { text: 'Do something else' }]),
+        ),
+      ).toBe(false);
+    });
+
+    it('returns false for plain text user messages', () => {
+      expect(isToolResponseMessage(userMessage('hello'))).toBe(false);
+      expect(isToolResponseMessage(userMessage([{ text: 'hello' }]))).toBe(
+        false,
+      );
+    });
+
+    it('returns false for empty or binary-only user messages', () => {
+      expect(isToolResponseMessage(userMessage([]))).toBe(false);
+      expect(
+        isToolResponseMessage(
+          userMessage([{ inlineData: { mimeType: 'image/png', data: 'a' } }]),
+        ),
+      ).toBe(false);
+    });
+
+    it('returns false for non-user messages', () => {
+      expect(
+        isToolResponseMessage({
+          type: 'gemini',
+          content: [functionResponsePart],
+        } as unknown as MessageRecord),
+      ).toBe(false);
     });
   });
 

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { InitCommand } from './init.js';
 import {
   performInit,
@@ -60,7 +60,7 @@ describe('InitCommand', () => {
   const mockWorkspacePath = path.resolve('/tmp');
 
   beforeEach(() => {
-    process.env['CODER_AGENT_WORKSPACE_PATH'] = mockWorkspacePath;
+    vi.stubEnv('CODER_AGENT_WORKSPACE_PATH', mockWorkspacePath);
     eventBus = {
       publish: vi.fn(),
     } as unknown as ExecutionEventBus;
@@ -78,6 +78,10 @@ describe('InitCommand', () => {
     mockExecute = vi.fn();
     vi.spyOn(mockExecutorInstance, 'execute').mockImplementation(mockExecute);
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('has requiresWorkspace set to true', () => {

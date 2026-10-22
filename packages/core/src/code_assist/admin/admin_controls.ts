@@ -87,7 +87,9 @@ export function sanitizeAdminSettings(
     mcpSetting: {
       mcpEnabled: sanitized.mcpSetting?.mcpEnabled ?? false,
       mcpConfig: mcpConfig ?? {},
-      requiredMcpConfig: mcpConfig?.requiredMcpServers,
+      ...(mcpConfig?.requiredMcpServers && {
+        requiredMcpConfig: mcpConfig.requiredMcpServers,
+      }),
     },
   };
 }

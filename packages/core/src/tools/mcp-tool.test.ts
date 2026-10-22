@@ -189,29 +189,80 @@ describe('DiscoveredMCPTool', () => {
       undefined,
     );
 
-    it('should return command as title if it exists', () => {
+    it('should return command as title if command is the sole functional parameter', () => {
       const invocation = commandTool.build({ command: 'ls -la' });
       expect(invocation.getDisplayTitle?.()).toBe('ls -la');
+      expect(invocation.getDescription()).toBe('ls -la');
+      expect(invocation.getExplanation?.()).toBe('');
     });
 
-    it('should return displayName if command does not exist', () => {
+    it('should return strictly command for getDisplayTitle and clean signature for getDescription when multiple functional parameters exist', () => {
+      const invocation = commandTool.build({
+        command: 'date',
+        projectPath: '/path/to/project',
+      });
+      expect(invocation.getDisplayTitle?.()).toBe('date');
+      expect(invocation.getDescription()).toBe(
+        `${serverToolName}(command: date, projectPath: /path/to/project)`,
+      );
+      expect(invocation.getExplanation?.()).toBe(
+        '[projectPath: /path/to/project]',
+      );
+    });
+
+    it('should segregate conversational parameters into getExplanation and exclude them from title', () => {
+      const invocation = commandTool.build({
+        command: 'date',
+        projectPath: '/path/to/project',
+        description: 'I will now run date to check the system clock',
+      });
+      expect(invocation.getDisplayTitle?.()).toBe('date');
+      expect(invocation.getDescription()).toBe(
+        `${serverToolName}(command: date, projectPath: /path/to/project)`,
+      );
+      expect(invocation.getDescription()).not.toContain('{');
+      expect(invocation.getDescription()).not.toContain('I will now run');
+      expect(invocation.getExplanation?.()).toBe(
+        '[projectPath: /path/to/project] I will now run date to check the system clock',
+      );
+    });
+
+    it('should return function signature if command does not exist', () => {
       const invocation = tool.build({ param: 'testValue' });
-      expect(invocation.getDisplayTitle?.()).toBe(tool.displayName);
+      expect(invocation.getDisplayTitle?.()).toBe(
+        `${serverToolName}(param: testValue)`,
+      );
     });
 
-    it('should return stringified json for getExplanation', () => {
-      const params = { command: 'ls -la', path: '/' };
+    it('should return fallback displayName when no functional parameters exist', () => {
+      const noParamTool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        serverToolName,
+        baseDescription,
+        { type: 'object', properties: {} },
+        createMockMessageBus(),
+      );
+      const invocation = noParamTool.build({});
+      expect(invocation.getDisplayTitle?.()).toBe(noParamTool.displayName);
+    });
+
+    it('should truncate long conversational explanations for getExplanation', () => {
+      const longString = 'a'.repeat(600);
+      const params = { command: 'echo', description: longString };
       const invocation = commandTool.build(params);
-      expect(invocation.getExplanation?.()).toBe(safeJsonStringify(params));
+      const explanation = invocation.getExplanation?.() ?? '';
+      expect(explanation).toHaveLength(503);
+      expect(explanation.endsWith('...')).toBe(true);
     });
 
-    it('should truncate and summarize long json payloads for getExplanation', () => {
+    it('should truncate and summarize long contextual payloads for getExplanation (PR #23179 compatibility)', () => {
       const longString = 'a'.repeat(600);
       const params = { command: 'echo', text: longString, other: 'value' };
       const invocation = commandTool.build(params);
       const explanation = invocation.getExplanation?.() ?? '';
-      expect(explanation).toMatch(
-        /^\[Payload omitted due to length with parameters: command, text, other\]$/,
+      expect(explanation).toBe(
+        '[Payload omitted due to length with parameters: command, text, other]',
       );
     });
   });
@@ -252,7 +303,9 @@ describe('DiscoveredMCPTool', () => {
         mockToolSuccessResultObject,
       );
       expect(toolResult.llmContent).toEqual([
-        { text: stringifiedResponseContent },
+        {
+          text: `<untrusted_context>\n${stringifiedResponseContent}\n</untrusted_context>`,
+        },
       ]);
       expect(toolResult.returnDisplay).toBe(stringifiedResponseContent);
     });
@@ -435,7 +488,9 @@ describe('DiscoveredMCPTool', () => {
           mockToolSuccessResultObject,
         );
         expect(toolResult.llmContent).toEqual([
-          { text: stringifiedResponseContent },
+          {
+            text: `<untrusted_context>\n${stringifiedResponseContent}\n</untrusted_context>`,
+          },
         ]);
         expect(toolResult.returnDisplay).toBe(stringifiedResponseContent);
       },
@@ -456,7 +511,11 @@ describe('DiscoveredMCPTool', () => {
         abortSignal: new AbortController().signal,
       });
       // 1. Assert that the llmContent sent to the scheduler is a clean Part array.
-      expect(toolResult.llmContent).toEqual([{ text: successMessage }]);
+      expect(toolResult.llmContent).toEqual([
+        {
+          text: `<untrusted_context>\n${successMessage}\n</untrusted_context>`,
+        },
+      ]);
 
       // 2. Assert that the display output is the simple text message.
       expect(toolResult.returnDisplay).toBe(successMessage);
@@ -550,7 +609,9 @@ describe('DiscoveredMCPTool', () => {
         abortSignal: new AbortController().signal,
       });
       expect(toolResult.llmContent).toEqual([
-        { text: 'This is the text content.' },
+        {
+          text: '<untrusted_context>\nThis is the text content.\n</untrusted_context>',
+        },
       ]);
       expect(toolResult.returnDisplay).toBe('This is the text content.');
     });
@@ -613,9 +674,9 @@ describe('DiscoveredMCPTool', () => {
         abortSignal: new AbortController().signal,
       });
       expect(toolResult.llmContent).toEqual([
-        { text: 'First part.' },
+        { text: '<untrusted_context>\nFirst part.\n</untrusted_context>' },
         {
-          text: `[Tool '${serverToolName}' provided the following image data with mime-type: image/jpeg]`,
+          text: "[Tool 'actual-server-tool-name' provided the following image data with mime-type: image/jpeg]",
         },
         {
           inlineData: {
@@ -623,7 +684,7 @@ describe('DiscoveredMCPTool', () => {
             data: 'BASE64_IMAGE_DATA',
           },
         },
-        { text: 'Second part.' },
+        { text: '<untrusted_context>\nSecond part.\n</untrusted_context>' },
       ]);
       expect(toolResult.returnDisplay).toBe(
         'First part.\n[Image: image/jpeg]\nSecond part.',
@@ -645,7 +706,9 @@ describe('DiscoveredMCPTool', () => {
       const toolResult = await invocation.execute({
         abortSignal: new AbortController().signal,
       });
-      expect(toolResult.llmContent).toEqual([{ text: 'Valid part.' }]);
+      expect(toolResult.llmContent).toEqual([
+        { text: '<untrusted_context>\nValid part.\n</untrusted_context>' },
+      ]);
       expect(toolResult.returnDisplay).toBe(
         'Valid part.\n[Unknown content type: future_block]',
       );
@@ -685,13 +748,17 @@ describe('DiscoveredMCPTool', () => {
         abortSignal: new AbortController().signal,
       });
       expect(toolResult.llmContent).toEqual([
-        { text: 'Here is a resource.' },
+        {
+          text: '<untrusted_context>\nHere is a resource.\n</untrusted_context>',
+        },
         {
           text: 'Resource Link: My Resource at file:///path/to/resource',
         },
-        { text: 'Embedded text content.' },
         {
-          text: `[Tool '${serverToolName}' provided the following image data with mime-type: image/jpeg]`,
+          text: '<untrusted_context>\nEmbedded text content.\n</untrusted_context>',
+        },
+        {
+          text: "[Tool 'actual-server-tool-name' provided the following image data with mime-type: image/jpeg]",
         },
         {
           inlineData: {
@@ -771,7 +838,9 @@ describe('DiscoveredMCPTool', () => {
           abortSignal: controller.signal,
         });
 
-        expect(result.llmContent).toEqual([{ text: 'Success' }]);
+        expect(result.llmContent).toEqual([
+          { text: '<untrusted_context>\nSuccess\n</untrusted_context>' },
+        ]);
         expect(result.returnDisplay).toBe('Success');
         expect(mockCallTool).toHaveBeenCalledWith([
           { name: serverToolName, args: params },
@@ -1035,11 +1104,36 @@ describe('DiscoveredMCPTool', () => {
   });
 
   describe('DiscoveredMCPToolInvocation', () => {
-    it('should return the stringified params from getDescription', () => {
+    it('should return clean function signature from getDescription', () => {
       const params = { param: 'testValue', param2: 'anotherOne' };
       const invocation = tool.build(params);
       const description = invocation.getDescription();
-      expect(description).toBe('{"param":"testValue","param2":"anotherOne"}');
+      expect(description).toBe(
+        `${serverToolName}(param: testValue, param2: anotherOne)`,
+      );
+    });
+
+    it('should wrap text output in <untrusted_context> tags', async () => {
+      const params = { param: 'testValue' };
+      const invocation = tool.build(params);
+
+      const mockMcpToolResponseParts: Part[] = [
+        {
+          functionResponse: {
+            name: serverToolName,
+            response: { content: [{ type: 'text', text: 'Hello from MCP' }] },
+          },
+        },
+      ];
+      mockCallTool.mockResolvedValueOnce(mockMcpToolResponseParts);
+
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(result.llmContent).toEqual([
+        { text: '<untrusted_context>\nHello from MCP\n</untrusted_context>' },
+      ]);
     });
   });
 });

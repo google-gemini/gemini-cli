@@ -39,16 +39,14 @@ decision = "allow"
 priority = 15
 modes = ["autoEdit"]
 
-[rule.safety_checker]
+[[safety_checker]]
+toolName = "replace"
+priority = 15
+modes = ["autoEdit"]
+[safety_checker.checker]
 type = "in-process"
 name = "allowed-path"
 required_context = ["environment"]
-
-[[rule]]
-toolName = "save_memory"
-decision = "ask_user"
-priority = 10
-interactive = true
 
 [[rule]]
 toolName = "run_shell_command"
@@ -74,7 +72,11 @@ decision = "allow"
 priority = 15
 modes = ["autoEdit"]
 
-[rule.safety_checker]
+[[safety_checker]]
+toolName = "write_file"
+priority = 15
+modes = ["autoEdit"]
+[safety_checker.checker]
 type = "in-process"
 name = "allowed-path"
 required_context = ["environment"]
@@ -96,7 +98,6 @@ interactive = true
 [[rule]]
 toolName = [
   "replace",
-  "save_memory",
   "run_shell_command",
   "write_file",
   "activate_skill",

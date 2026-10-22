@@ -22,10 +22,8 @@ import { Storage } from '../config/storage.js';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
-import { GEMINI_DIR, homedir as pathsHomedir } from '../utils/paths.js';
+import { homedir as pathsHomedir } from '../utils/paths.js';
 import { spawnAsync } from '../utils/shell-utils.js';
-
-const PROJECT_SLUG = 'project-slug';
 
 vi.mock('../utils/shell-utils.js', () => ({
   spawnAsync: vi.fn(),
@@ -53,9 +51,13 @@ vi.mock('simple-git', () => ({
 }));
 
 const hoistedIsGitRepositoryMock = vi.hoisted(() => vi.fn());
-vi.mock('../utils/gitUtils.js', () => ({
-  isGitRepository: hoistedIsGitRepositoryMock,
-}));
+vi.mock('../utils/gitUtils.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/gitUtils.js')>();
+  return {
+    ...actual,
+    isGitRepository: hoistedIsGitRepositoryMock,
+  };
+});
 
 const hoistedMockHomedir = vi.hoisted(() => vi.fn());
 vi.mock('node:os', async (importOriginal) => {
@@ -131,11 +133,13 @@ describe('GitService', () => {
       commit: 'initial',
     });
     storage = new Storage(projectRoot);
+    await storage.initialize();
   });
 
   afterEach(async () => {
-    vi.restoreAllMocks();
-    await fs.rm(testRootDir, { recursive: true, force: true });
+    if (testRootDir) {
+      await fs.rm(testRootDir, { recursive: true, force: true });
+    }
   });
 
   describe('constructor', () => {
@@ -147,7 +151,9 @@ describe('GitService', () => {
   describe('verifyGitAvailability', () => {
     it('should resolve true if git --version command succeeds', async () => {
       await expect(GitService.verifyGitAvailability()).resolves.toBe(true);
-      expect(spawnAsync).toHaveBeenCalledWith('git', ['--version']);
+      expect(spawnAsync).toHaveBeenCalledWith('git', ['--version'], {
+        env: expect.anything(),
+      });
     });
 
     it('should resolve false if git --version command fails', async () => {
@@ -181,7 +187,7 @@ describe('GitService', () => {
     let gitConfigPath: string;
 
     beforeEach(async () => {
-      repoDir = path.join(homedir, GEMINI_DIR, 'history', PROJECT_SLUG);
+      repoDir = storage.getHistoryDir();
       gitConfigPath = path.join(repoDir, '.gitconfig');
     });
 
@@ -205,7 +211,10 @@ describe('GitService', () => {
       hoistedMockCheckIsRepo.mockResolvedValue(false);
       const service = new GitService(projectRoot, storage);
       await service.setupShadowGitRepository();
-      expect(hoistedMockSimpleGit).toHaveBeenCalledWith(repoDir);
+      expect(hoistedMockSimpleGit).toHaveBeenCalledWith(
+        repoDir,
+        expect.anything(),
+      );
       expect(hoistedMockInit).toHaveBeenCalled();
     });
 
@@ -480,6 +489,38 @@ describe('GitService', () => {
       expect(hoistedMockCommit).not.toHaveBeenCalled();
       expect(hoistedMockRaw).toHaveBeenCalledWith('rev-parse', 'HEAD');
       expect(commitHash).toBe('current-head-hash');
+    });
+
+    it('does not interleave staging and committing across concurrent snapshots', async () => {
+      const events: string[] = [];
+      hoistedMockAdd.mockImplementation(async () => {
+        events.push('add:start');
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        events.push('add:end');
+      });
+      hoistedMockStatus.mockResolvedValue({ isClean: () => false });
+      hoistedMockCommit.mockImplementation(async (message: string) => {
+        events.push(`commit:${message}`);
+        return { commit: `hash-${message}` };
+      });
+
+      const service = new GitService(projectRoot, storage);
+      await Promise.all([
+        service.createFileSnapshot('A'),
+        service.createFileSnapshot('B'),
+      ]);
+
+      // `add('.')` stages the whole working tree, so a second snapshot that
+      // stages while the first has not committed yet folds the first
+      // snapshot's files into its own commit.
+      expect(events).toEqual([
+        'add:start',
+        'add:end',
+        'commit:A',
+        'add:start',
+        'add:end',
+        'commit:B',
+      ]);
     });
   });
 });

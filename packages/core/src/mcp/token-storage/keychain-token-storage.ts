@@ -36,7 +36,7 @@ export class KeychainTokenStorage
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const credentials = JSON.parse(data) as OAuthCredentials;
 
-      if (this.isTokenExpired(credentials)) {
+      if (this.isTokenExpired(credentials) && !credentials.token.refreshToken) {
         return null;
       }
 
@@ -64,11 +64,7 @@ export class KeychainTokenStorage
 
   async deleteCredentials(serverName: string): Promise<void> {
     const sanitizedName = this.sanitizeServerName(serverName);
-    const deleted = await this.keychainService.deletePassword(sanitizedName);
-
-    if (!deleted) {
-      throw new Error(`No credentials found for ${serverName}`);
-    }
+    await this.keychainService.deletePassword(sanitizedName);
   }
 
   async listServers(): Promise<string[]> {
@@ -104,7 +100,7 @@ export class KeychainTokenStorage
         try {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           const data = JSON.parse(cred.password) as OAuthCredentials;
-          if (!this.isTokenExpired(data)) {
+          if (!this.isTokenExpired(data) || data.token.refreshToken) {
             result.set(cred.account, data);
           }
         } catch (error) {

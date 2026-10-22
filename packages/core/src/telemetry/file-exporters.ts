@@ -29,6 +29,27 @@ class FileExporter {
     return safeJsonStringify(data, 2) + '\n';
   }
 
+  /**
+   * Ensures that all pending writes are flushed to the underlying stream.
+   */
+  forceFlush(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!this.writeStream.writable) {
+        resolve();
+        return;
+      }
+      // write('') will be queued after all previous writes and its callback
+      // will be called when it (and thus all previous writes) are flushed.
+      this.writeStream.write('', (err) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
   shutdown(): Promise<void> {
     return new Promise((resolve) => {
       this.writeStream.end(resolve);
@@ -85,9 +106,5 @@ export class FileMetricExporter
 
   getPreferredAggregationTemporality(): AggregationTemporality {
     return AggregationTemporality.CUMULATIVE;
-  }
-
-  async forceFlush(): Promise<void> {
-    return Promise.resolve();
   }
 }

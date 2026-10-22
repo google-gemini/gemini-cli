@@ -13,11 +13,6 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: '📝 Print Inputs'
-      shell: 'bash'
-      env:
-        JSON_INPUTS: '${{ toJSON(inputs) }}'
-      run: 'echo "$JSON_INPUTS"'
     - name: 'Install system dependencies'
       if: "runner.os == 'Linux'"
       run: |
@@ -42,5 +37,12 @@ runs:
         echo "::endgroup::"
         echo "::group::Integration Tests (docker sandbox)"
         npm run test:integration:sandbox:docker
+        echo "::endgroup::"
+        echo "::group::Integration Tests (VS Code)"
+        if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+          xvfb-run -a npm run test:integration:vscode --if-present
+        else
+          npm run test:integration:vscode --if-present
+        fi
         echo "::endgroup::"
       shell: 'bash'

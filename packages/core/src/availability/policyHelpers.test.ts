@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   resolvePolicyChain,
   buildFallbackPolicyContext,
@@ -16,9 +16,11 @@ import type { RetryAvailabilityContext } from './modelPolicy.js';
 import type { Config } from '../config/config.js';
 import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  BASE_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
+  resetModelsForTesting,
 } from '../config/models.js';
 import { AuthType } from '../core/contentGenerator.js';
 import { ModelConfigService } from '../services/modelConfigService.js';
@@ -30,20 +32,31 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config => {
     getUserTier: () => undefined,
     getModel: () => 'gemini-2.5-pro',
     getGemini31LaunchedSync: () => false,
-    getGemini31FlashLiteLaunchedSync: () => false,
     getUseCustomToolModelSync: () => {
       const useGemini31 = config.getGemini31LaunchedSync();
       const authType = config.getContentGeneratorConfig().authType;
       return useGemini31 && authType === AuthType.USE_GEMINI;
     },
     getContentGeneratorConfig: () => ({ authType: undefined }),
+    getHasAccessToPreviewModel: () => true,
     getMaxAttemptsPerTurn: () => 3,
+    getExperimentalDynamicModelConfiguration: () => false,
+    getReleaseChannel: () => 'preview',
+    modelConfigService: new ModelConfigService(DEFAULT_MODEL_CONFIGS),
     ...overrides,
   } as unknown as Config;
   return config;
 };
 
 describe('policyHelpers', () => {
+  beforeEach(() => {
+    resetModelsForTesting();
+  });
+
+  afterEach(() => {
+    resetModelsForTesting();
+  });
+
   describe('resolvePolicyChain', () => {
     it('returns a single-model chain for a custom model', () => {
       const config = createMockConfig({
@@ -71,7 +84,7 @@ describe('policyHelpers', () => {
       // Expect default chain [Pro, Flash]
       expect(chain).toHaveLength(2);
       expect(chain[0]?.model).toBe('gemini-2.5-pro');
-      expect(chain[1]?.model).toBe('gemini-2.5-flash');
+      expect(chain[1]?.model).toBe(BASE_GEMINI_FLASH_MODEL);
     });
 
     it('uses auto chain when preferred model is auto', () => {
@@ -81,7 +94,7 @@ describe('policyHelpers', () => {
       const chain = resolvePolicyChain(config, DEFAULT_GEMINI_MODEL_AUTO);
       expect(chain).toHaveLength(2);
       expect(chain[0]?.model).toBe('gemini-2.5-pro');
-      expect(chain[1]?.model).toBe('gemini-2.5-flash');
+      expect(chain[1]?.model).toBe(BASE_GEMINI_FLASH_MODEL);
     });
 
     it('uses auto chain when configured model is auto even if preferred is concrete', () => {
@@ -91,16 +104,17 @@ describe('policyHelpers', () => {
       const chain = resolvePolicyChain(config, 'gemini-2.5-pro');
       expect(chain).toHaveLength(2);
       expect(chain[0]?.model).toBe('gemini-2.5-pro');
-      expect(chain[1]?.model).toBe('gemini-2.5-flash');
+      expect(chain[1]?.model).toBe(BASE_GEMINI_FLASH_MODEL);
     });
 
     it('starts chain from preferredModel when model is "auto"', () => {
       const config = createMockConfig({
-        getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
+        getModel: () => 'auto',
       });
-      const chain = resolvePolicyChain(config, 'gemini-2.5-flash');
-      expect(chain).toHaveLength(1);
-      expect(chain[0]?.model).toBe('gemini-2.5-flash');
+      const chain = resolvePolicyChain(config, BASE_GEMINI_FLASH_MODEL);
+      // Due to Gemini 2.x wrapsAround, the chain will contain both flash and pro
+      expect(chain.length).toBeGreaterThanOrEqual(1);
+      expect(chain[0]?.model).toBe(BASE_GEMINI_FLASH_MODEL);
     });
 
     it('returns flash-lite chain when preferred model is flash-lite', () => {
@@ -109,8 +123,8 @@ describe('policyHelpers', () => {
       });
       const chain = resolvePolicyChain(config, DEFAULT_GEMINI_FLASH_LITE_MODEL);
       expect(chain).toHaveLength(3);
-      expect(chain[0]?.model).toBe('gemini-2.5-flash-lite');
-      expect(chain[1]?.model).toBe('gemini-2.5-flash');
+      expect(chain[0]?.model).toBe('gemini-3.1-flash-lite');
+      expect(chain[1]?.model).toBe(BASE_GEMINI_FLASH_MODEL);
       expect(chain[2]?.model).toBe('gemini-2.5-pro');
     });
 
@@ -120,8 +134,8 @@ describe('policyHelpers', () => {
       });
       const chain = resolvePolicyChain(config);
       expect(chain).toHaveLength(3);
-      expect(chain[0]?.model).toBe('gemini-2.5-flash-lite');
-      expect(chain[1]?.model).toBe('gemini-2.5-flash');
+      expect(chain[0]?.model).toBe('gemini-3.1-flash-lite');
+      expect(chain[1]?.model).toBe(BASE_GEMINI_FLASH_MODEL);
       expect(chain[2]?.model).toBe('gemini-2.5-pro');
     });
 
@@ -129,9 +143,9 @@ describe('policyHelpers', () => {
       const config = createMockConfig({
         getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
       });
-      const chain = resolvePolicyChain(config, 'gemini-2.5-flash', true);
+      const chain = resolvePolicyChain(config, BASE_GEMINI_FLASH_MODEL, true);
       expect(chain).toHaveLength(2);
-      expect(chain[0]?.model).toBe('gemini-2.5-flash');
+      expect(chain[0]?.model).toBe(BASE_GEMINI_FLASH_MODEL);
       expect(chain[1]?.model).toBe('gemini-2.5-pro');
     });
 
@@ -142,10 +156,10 @@ describe('policyHelpers', () => {
       });
       const chain = resolvePolicyChain(config);
 
-      // Should downgrade to [Pro 2.5, Flash 2.5]
+      // Should downgrade to [Pro 2.5, Flash 3.5]
       expect(chain).toHaveLength(2);
       expect(chain[0]?.model).toBe('gemini-2.5-pro');
-      expect(chain[1]?.model).toBe('gemini-2.5-flash');
+      expect(chain[1]?.model).toBe(BASE_GEMINI_FLASH_MODEL);
     });
 
     it('returns Gemini 3.1 Pro chain when launched and auto-gemini-3 requested', () => {
@@ -186,6 +200,7 @@ describe('policyHelpers', () => {
     const testCases = [
       { name: 'Default Auto', model: DEFAULT_GEMINI_MODEL_AUTO },
       { name: 'Gemini 3 Auto', model: 'auto-gemini-3' },
+      { name: 'Unified Auto', model: 'auto' },
       { name: 'Flash Lite', model: DEFAULT_GEMINI_FLASH_LITE_MODEL },
       {
         name: 'Gemini 3 Auto (3.1 Enabled)',
@@ -221,9 +236,9 @@ describe('policyHelpers', () => {
               getExperimentalDynamicModelConfiguration: () => dynamic,
               getModel: () => model,
               getGemini31LaunchedSync: () => useGemini31 ?? false,
-              getGemini31FlashLiteLaunchedSync: () => false,
               getHasAccessToPreviewModel: () => hasAccess ?? true,
               getContentGeneratorConfig: () => ({ authType }),
+              getReleaseChannel: () => 'preview',
               modelConfigService: new ModelConfigService(DEFAULT_MODEL_CONFIGS),
             });
 

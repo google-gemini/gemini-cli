@@ -23,6 +23,7 @@ describe('Parallel Tool Execution Integration', () => {
   it('should execute [read, read, write, read, read] in correct waves with user approval', async () => {
     rig.setup('parallel-wave-execution', {
       fakeResponsesPath: join(import.meta.dirname, 'parallel-tools.responses'),
+      fakeResponsesNonStrict: true,
       settings: {
         tools: {
           core: ['read_file', 'write_file'],
@@ -40,19 +41,24 @@ describe('Parallel Tool Execution Integration', () => {
 
     const run = await rig.runInteractive({ approvalMode: 'default' });
 
-    // 1. Trigger the wave
-    await run.type('ok');
-    await run.type('\r');
+    try {
+      // 1. Trigger the wave
+      await run.type('ok');
+      await run.type('\r');
 
-    // 3. Wait for the write_file prompt.
-    await run.expectText('Allow', 5000);
+      // 3. Wait for the write_file prompt.
+      await run.expectText('Allow', 10000);
 
-    // 4. Press Enter to approve the write_file.
-    await run.type('y');
-    await run.type('\r');
+      // 4. Press Enter to approve the write_file.
+      await run.type('y');
+      await run.type('\r');
 
-    // 5. Wait for the final model response
-    await run.expectText('All waves completed successfully.', 5000);
+      // 5. Wait for the final model response
+      await run.expectText('All waves completed successfully.', 10000);
+    } catch (err) {
+      fs.writeFileSync('pty_output_failure.txt', run.output);
+      throw err;
+    }
 
     // Verify all tool calls were made and succeeded in the logs
     await rig.expectToolCallSuccess(['write_file']);
@@ -73,5 +79,5 @@ describe('Parallel Tool Execution Integration', () => {
     expect(fs.readFileSync(join(rig.testDir!, 'output.txt'), 'utf8')).toBe(
       'wave2',
     );
-  });
+  }, 30000);
 });

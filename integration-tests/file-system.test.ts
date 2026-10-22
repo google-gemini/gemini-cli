@@ -172,7 +172,7 @@ describe('file-system', () => {
     ).toBeDefined();
 
     const newFileContent = rig.readFile(fileName);
-    expect(newFileContent).toBe('1.0.1');
+    expect(newFileContent.trimEnd()).toBe('1.0.1');
   });
 
   it.skip('should replace multiple instances of a string', async () => {

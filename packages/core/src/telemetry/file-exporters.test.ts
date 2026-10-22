@@ -6,6 +6,10 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
+  AggregationTemporality,
+  type ResourceMetrics,
+} from '@opentelemetry/sdk-metrics';
+import {
   FileSpanExporter,
   FileLogExporter,
   FileMetricExporter,
@@ -13,19 +17,17 @@ import {
 import { ExportResultCode } from '@opentelemetry/core';
 import type { ReadableSpan } from '@opentelemetry/sdk-trace-base';
 import type { ReadableLogRecord } from '@opentelemetry/sdk-logs';
-import {
-  AggregationTemporality,
-  type ResourceMetrics,
-} from '@opentelemetry/sdk-metrics';
 import * as fs from 'node:fs';
 
 function createMockWriteStream(): {
   write: ReturnType<typeof vi.fn>;
   end: ReturnType<typeof vi.fn>;
+  writable: boolean;
 } {
   return {
     write: vi.fn((_data: string, cb: (err?: Error | null) => void) => cb()),
     end: vi.fn((cb: () => void) => cb()),
+    writable: true,
   };
 }
 
@@ -186,8 +188,51 @@ describe('FileMetricExporter', () => {
     );
   });
 
-  it('should resolve forceFlush', async () => {
+  it('should resolve forceFlush after pending writes complete', async () => {
+    let writeFinished = false;
+    mockWriteStream.write.mockImplementation(
+      (_data: string, cb: (err?: Error | null) => void) => {
+        setTimeout(() => {
+          writeFinished = true;
+          cb();
+        }, 50);
+        return true;
+      },
+    );
+
     const exporter = new FileMetricExporter('/tmp/test-metrics.log');
+
+    // Start an export
+    const exportDone = new Promise<void>((resolve) => {
+      exporter.export({ resource: { attributes: {} } } as ResourceMetrics, () =>
+        resolve(),
+      );
+    });
+
+    const flushPromise = exporter.forceFlush();
+
+    expect(writeFinished).toBe(false);
+    await flushPromise;
+    expect(writeFinished).toBe(true);
+    await exportDone;
+  });
+
+  it('should handle write error in forceFlush', async () => {
+    const writeError = new Error('flush failed');
+    mockWriteStream.write.mockImplementation(
+      (_data: string, cb: (err?: Error | null) => void) => cb(writeError),
+    );
+
+    const exporter = new FileMetricExporter('/tmp/test-metrics.log');
+    await expect(exporter.forceFlush()).rejects.toThrow('flush failed');
+  });
+
+  it('should resolve forceFlush immediately if stream is not writable', async () => {
+    const exporter = new FileMetricExporter('/tmp/test-metrics.log');
+    // @ts-expect-error - accessing protected member for test
+    exporter.writeStream.writable = false;
+
     await expect(exporter.forceFlush()).resolves.toBeUndefined();
+    expect(mockWriteStream.write).not.toHaveBeenCalled();
   });
 });

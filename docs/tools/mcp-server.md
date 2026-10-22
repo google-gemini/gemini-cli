@@ -221,8 +221,10 @@ spawning MCP server processes.
 #### Automatic redaction
 
 By default, the CLI redacts sensitive environment variables from the base
-environment (inherited from the host process) to prevent unintended exposure to
-third-party MCP servers. This includes:
+environment (inherited from the host process). This prevents the accidental
+leakage of sensitive host environment variables (like AWS keys or GitHub tokens)
+to arbitrary third-party MCP servers that might execute malicious code or log
+your environment. This includes:
 
 - Core project keys: `GEMINI_API_KEY`, `GOOGLE_API_KEY`, etc.
 - Variables matching sensitive patterns: `*TOKEN*`, `*SECRET*`, `*PASSWORD*`,
@@ -232,7 +234,8 @@ third-party MCP servers. This includes:
 #### Explicit overrides
 
 If an environment variable must be passed to an MCP server, you must explicitly
-state it in the `env` property of the server configuration in `settings.json`.
+state it in the `env` property of the server configuration in `settings.json`
+(or `mcp_config.json` if configuring standard MCP clients or remote skills).
 Explicitly defined variables (including those from extensions) are trusted and
 are **not** subjected to the automatic redaction process.
 
@@ -246,6 +249,24 @@ specific data with that server.
 > Instead, use environment variable expansion
 > (for example, `"MY_KEY": "$MY_KEY"`) to securely pull the value from your host
 > environment at runtime.
+
+**Example: Passing a GitHub Token securely to the
+[official GitHub MCP server](https://github.com/github/github-mcp-server) via
+`mcp_config.json`**
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@github/github-mcp-server"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "$GITHUB_PERSONAL_ACCESS_TOKEN"
+      }
+    }
+  }
+}
+```
 
 ### OAuth support for remote MCP servers
 
@@ -301,6 +322,81 @@ This feature will not work in:
 - Remote SSH sessions without X11 forwarding
 - Containerized environments without browser support
 
+#### Authorization server requirements (RFC 9207)
+
+<!-- prettier-ignore -->
+> [!IMPORTANT]
+> Gemini CLI validates the `iss` (issuer) parameter in OAuth authorization
+> responses per [RFC 9207](https://www.rfc-editor.org/rfc/rfc9207) and the MCP
+> specification:
+>
+> - Whenever the `iss` parameter is present in the callback redirect and an
+>   expected `issuer` is discovered or configured, `iss` **must** match the
+>   expected issuer URL.
+> - When the authorization server metadata sets
+>   `authorization_response_iss_parameter_supported: true`, the callback
+>   redirect **must** include the `iss` parameter.
+> - When the discovered authorization server metadata omits
+>   `authorization_response_iss_parameter_supported` or sets it to `false` (for
+>   example, providers that do not declare RFC 9207 support), callbacks without
+>   `iss` are accepted.
+> - When you configure `issuer` explicitly in `settings.json` and Gemini CLI
+>   doesn't discover authorization server metadata, the callback redirect
+>   **must** include the `iss` parameter. To accept callbacks without `iss` for
+>   such a server, set `authorizationResponseIssParameterSupported` to `false`
+>   in the `oauth` configuration.
+
+##### Expected authorization callback example
+
+When the authorization server declares
+`authorization_response_iss_parameter_supported: true`, the redirect URI must
+include the `iss` parameter:
+
+```http
+HTTP/1.1 302 Found
+Location: http://localhost:<port>/oauth/callback?code=AUTH_CODE&state=STATE&iss=https%3A%2F%2Fauth.example.com
+```
+
+- **Valid response (accepted):** `iss` matches the configured or discovered
+  issuer (`https://auth.example.com`), or `iss` is omitted when the discovered
+  metadata doesn't set `authorization_response_iss_parameter_supported` to
+  `true`.
+- **Missing `iss` when required (rejected):**
+  `http://localhost:<port>/oauth/callback?code=AUTH_CODE&state=STATE` when
+  `authorization_response_iss_parameter_supported` is `true`, or when `issuer`
+  is configured explicitly without discovered metadata (fails with HTTP 400:
+  `Missing issuer parameter in response`).
+- **Mismatched `iss` (rejected):** `iss` points to a different domain or
+  includes userinfo (fails with HTTP 400: `Issuer mismatch`).
+
+##### Configuration example with explicit issuer
+
+If your remote MCP server uses an authorization server with a known issuer URL:
+
+```json
+{
+  "mcpServers": {
+    "secureRemoteServer": {
+      "url": "https://mcp.example.com/sse",
+      "oauth": {
+        "enabled": true,
+        "issuer": "https://auth.example.com",
+        "authorizationUrl": "https://auth.example.com/oauth/authorize",
+        "tokenUrl": "https://auth.example.com/oauth/token",
+        "clientId": "gemini-cli-client",
+        "scopes": ["mcp:read", "mcp:write"]
+      }
+    }
+  }
+}
+```
+
+With this configuration, Gemini CLI requires the `iss` parameter in the
+authorization callback. If the authorization server doesn't return `iss` in its
+redirects, add `"authorizationResponseIssParameterSupported": false` to the
+`oauth` block. Gemini CLI then accepts callbacks without `iss` while still
+rejecting any `iss` value that doesn't match the configured `issuer`.
+
 #### Managing OAuth authentication
 
 Use the `/mcp auth` command to manage OAuth authentication:
@@ -324,12 +420,25 @@ Use the `/mcp auth` command to manage OAuth authentication:
 - **`clientSecret`** (string): OAuth client secret (optional for public clients)
 - **`authorizationUrl`** (string): OAuth authorization endpoint (auto-discovered
   if omitted)
+- **`issuer`** (string): Authorization server issuer URL (auto-discovered if
+  omitted; validated per RFC 9207)
+- **`authorizationResponseIssParameterSupported`** (boolean): Whether the
+  authorization server returns the `iss` parameter in authorization responses
+  (RFC 9207). Auto-discovered from the authorization server metadata; defaults
+  to `true` when `issuer` is configured explicitly without discovered metadata.
+  Set to `false` to accept callbacks without `iss` for such a server.
 - **`tokenUrl`** (string): OAuth token endpoint (auto-discovered if omitted)
 - **`scopes`** (string[]): Required OAuth scopes
 - **`redirectUri`** (string): Custom redirect URI (defaults to an OS-assigned
   random port, e.g., `http://localhost:<random-port>/oauth/callback`)
 - **`tokenParamName`** (string): Query parameter name for tokens in SSE URLs
 - **`audiences`** (string[]): Audiences the token is valid for
+- **`allowPrivateNetwork`** (boolean): Allow OAuth discovery, registration,
+  authorization, and token endpoints that resolve to private enterprise network
+  addresses (RFC 1918, RFC 6598 Carrier-Grade NAT, RFC 4193 IPv6 Unique Local,
+  and `.internal` or `.local` domains). Defaults to `false`. HTTPS is still
+  required for non-loopback endpoints, and link-local (`169.254.0.0/16`,
+  `fe80::/10`) and loopback (`127.0.0.0/8`, `::1`) addresses remain restricted.
 
 #### Token management
 
@@ -747,6 +856,7 @@ defaults:
 
 - **Tool lists:** Tool lists are merged securely to ensure the most restrictive
   policy wins:
+
   - **Exclusions (`excludeTools`):** Arrays are combined (unioned). If either
     source blocks a tool, it remains disabled.
   - **Inclusions (`includeTools`):** Arrays are intersected. If both sources

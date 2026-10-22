@@ -28,8 +28,8 @@ const mockCommands: readonly SlashCommand[] = [
     altNames: ['mem'],
     subCommands: [
       {
-        name: 'add',
-        description: 'Add to memory',
+        name: 'list',
+        description: 'List memory files',
         action: async () => {},
         kind: CommandKind.BUILT_IN,
       },
@@ -64,27 +64,27 @@ describe('parseSlashCommand', () => {
   });
 
   it('should parse a subcommand', () => {
-    const result = parseSlashCommand('/memory add', mockCommands);
-    expect(result.commandToExecute?.name).toBe('add');
+    const result = parseSlashCommand('/memory list', mockCommands);
+    expect(result.commandToExecute?.name).toBe('list');
     expect(result.args).toBe('');
-    expect(result.canonicalPath).toEqual(['memory', 'add']);
+    expect(result.canonicalPath).toEqual(['memory', 'list']);
   });
 
   it('should parse a subcommand with arguments', () => {
     const result = parseSlashCommand(
-      '/memory add some important data',
+      '/memory list some important data',
       mockCommands,
     );
-    expect(result.commandToExecute?.name).toBe('add');
+    expect(result.commandToExecute?.name).toBe('list');
     expect(result.args).toBe('some important data');
-    expect(result.canonicalPath).toEqual(['memory', 'add']);
+    expect(result.canonicalPath).toEqual(['memory', 'list']);
   });
 
   it('should handle a command alias', () => {
-    const result = parseSlashCommand('/mem add some data', mockCommands);
-    expect(result.commandToExecute?.name).toBe('add');
+    const result = parseSlashCommand('/mem list some data', mockCommands);
+    expect(result.commandToExecute?.name).toBe('list');
     expect(result.args).toBe('some data');
-    expect(result.canonicalPath).toEqual(['memory', 'add']);
+    expect(result.canonicalPath).toEqual(['memory', 'list']);
   });
 
   it('should handle a subcommand alias', () => {
@@ -113,12 +113,12 @@ describe('parseSlashCommand', () => {
 
   it('should handle extra whitespace', () => {
     const result = parseSlashCommand(
-      '  /memory   add  some data  ',
+      '  /memory   list  some data  ',
       mockCommands,
     );
-    expect(result.commandToExecute?.name).toBe('add');
+    expect(result.commandToExecute?.name).toBe('list');
     expect(result.args).toBe('some data');
-    expect(result.canonicalPath).toEqual(['memory', 'add']);
+    expect(result.canonicalPath).toEqual(['memory', 'list']);
   });
 
   it('should return undefined if query does not start with a slash', () => {

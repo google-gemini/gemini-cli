@@ -120,7 +120,6 @@ each tool.
 | :----------------------------------------------- | :------ | :----------------------------------------------------------------------------------- |
 | [`activate_skill`](../tools/activate-skill.md)   | `Other` | Loads specialized procedural expertise from the `.gemini/skills` directory.          |
 | [`get_internal_docs`](../tools/internal-docs.md) | `Think` | Accesses Gemini CLI's own documentation for accurate answers about its capabilities. |
-| [`save_memory`](../tools/memory.md)              | `Think` | Persists specific facts and project details to your `GEMINI.md` file.                |
 
 ### Planning
 
@@ -149,10 +148,10 @@ each tool.
 
 ### Web
 
-| Tool                                          | Kind     | Description                                                                                                                                                                                                                                                                     |
-| :-------------------------------------------- | :------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [`google_web_search`](../tools/web-search.md) | `Search` | Performs a Google Search to find up-to-date information.                                                                                                                                                                                                                        |
-| [`web_fetch`](../tools/web-fetch.md)          | `Fetch`  | Retrieves and processes content from specific URLs. **Warning:** This tool can access local and private network addresses (for example, localhost), which may pose a security risk if used with untrusted prompts. In Plan Mode, this tool requires explicit user confirmation. |
+| Tool                                          | Kind     | Description                                                                                                                                                                              |
+| :-------------------------------------------- | :------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`google_web_search`](../tools/web-search.md) | `Search` | Performs a Google Search to find up-to-date information.                                                                                                                                 |
+| [`web_fetch`](../tools/web-fetch.md)          | `Fetch`  | Retrieves and processes content from specific URLs. Outbound requests are validated against private and reserved IP ranges. In Plan Mode, this tool requires explicit user confirmation. |
 
 ### Tool argument keys
 
@@ -173,7 +172,6 @@ representation of each tool's arguments.
 | `replace`                | `file_path`, `old_string`, `new_string`, `instruction`, `allow_multiple`                                                                                                                             |
 | `ask_user`               | `questions` (array of `question`, `header`, `type`, `options`)                                                                                                                                       |
 | `write_todos`            | `todos` (array of `description`, `status`)                                                                                                                                                           |
-| `save_memory`            | `fact`                                                                                                                                                                                               |
 | `activate_skill`         | `name`                                                                                                                                                                                               |
 | `get_internal_docs`      | `path`                                                                                                                                                                                               |
 | `enter_plan_mode`        | `reason`                                                                                                                                                                                             |

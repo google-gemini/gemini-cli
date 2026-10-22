@@ -140,15 +140,6 @@ export interface SessionSelectionResult {
 }
 
 /**
- * Checks if a session has at least one user or assistant (gemini) message.
- * Sessions with only system messages (info, error, warning) are considered empty.
- * @param messages - The array of message records to check
- * @returns true if the session has meaningful content
- */
-export const hasUserOrAssistantMessage = (messages: MessageRecord[]): boolean =>
-  messages.some((msg) => msg.type === 'user' || msg.type === 'gemini');
-
-/**
  * Cleans and sanitizes message content for display by:
  * - Converting newlines to spaces
  * - Collapsing multiple whitespace to single spaces
@@ -240,6 +231,17 @@ export interface GetSessionOptions {
 }
 
 /**
+ * Options for resolving sessions.
+ */
+export interface ResolveSessionOptions {
+  /**
+   * Whether to allow resolving sessions that have no resumable content yet
+   * (e.g., newly established ACP sessions).
+   */
+  allowEmpty?: boolean;
+}
+
+/**
  * Loads all session files (including corrupted ones) from the chats directory.
  * @returns Array of session file entries, with sessionInfo null for corrupted files
  */
@@ -270,17 +272,27 @@ export const getAllSessionFiles = async (
           }
 
           // Validate required fields
-          if (
-            !content.sessionId ||
-            !content.startTime ||
-            !content.lastUpdated
-          ) {
+          if (!content.sessionId) {
             // Missing required fields - treat as corrupted
             return { fileName: file, sessionInfo: null };
           }
 
-          // Skip sessions that only contain system messages (info, error, warning)
-          if (!content.hasUserOrAssistantMessage) {
+          const fileTimestamp =
+            !content.startTime || !content.lastUpdated
+              ? (
+                  await fs.stat(filePath).catch(() => undefined)
+                )?.mtime.toISOString()
+              : undefined;
+          const fallbackTimestamp = fileTimestamp ?? new Date().toISOString();
+          const startTime =
+            content.startTime || content.lastUpdated || fallbackTimestamp;
+          const lastUpdated =
+            content.lastUpdated || content.startTime || fallbackTimestamp;
+
+          // Skip sessions with no resumable conversation content, including
+          // startup-only, system-only, command-only, and internal-context-only
+          // sessions.
+          if (!content.hasResumableContent) {
             return { fileName: file, sessionInfo: null };
           }
 
@@ -319,8 +331,8 @@ export const getAllSessionFiles = async (
             id: content.sessionId,
             file: file.replace(/\.jsonl?$/, ''),
             fileName: file,
-            startTime: content.startTime,
-            lastUpdated: content.lastUpdated,
+            startTime,
+            lastUpdated,
             messageCount: content.messageCount ?? content.messages.length,
             displayName: content.summary
               ? stripUnsafeCharacters(content.summary)
@@ -491,14 +503,102 @@ export class SessionSelector {
   }
 
   /**
+   * Resolves a session directly by its full UUID, bypassing interactive terminal list
+   * filtering (such as `hasResumableContent: false`).
+   *
+   * @param id - Full session UUID
+   * @returns Promise resolving to session selection result
+   * @throws SessionError if the session file does not exist or is invalid
+   */
+  async resolveSessionById(id: string): Promise<SessionSelectionResult> {
+    const trimmedId = id.trim();
+    const chatsDir = path.join(this.storage.getProjectTempDir(), 'chats');
+    const files = await fs.readdir(chatsDir).catch(() => []);
+
+    const shortId = trimmedId.slice(0, 8);
+    const candidateFiles = files.filter(
+      (f) =>
+        f.startsWith(SESSION_FILE_PREFIX) &&
+        (f.endsWith(`-${shortId}.json`) || f.endsWith(`-${shortId}.jsonl`)),
+    );
+
+    const matches: Array<{
+      filePath: string;
+      sessionData: ConversationRecord;
+    }> = [];
+
+    for (const fileName of candidateFiles) {
+      try {
+        const sessionPath = path.join(chatsDir, fileName);
+        const sessionData = await loadConversationRecord(sessionPath);
+        if (
+          sessionData &&
+          sessionData.sessionId === trimmedId &&
+          sessionData.kind !== 'subagent'
+        ) {
+          matches.push({ filePath: sessionPath, sessionData });
+        }
+      } catch {
+        // Ignore unparseable files
+      }
+    }
+
+    if (matches.length === 0) {
+      throw SessionError.invalidSessionIdentifier(trimmedId, chatsDir);
+    }
+
+    // If duplicate records exist, choose the most recently updated one
+    matches.sort((a, b) => {
+      const getTime = (dateStr: string | undefined) => {
+        if (!dateStr) return 0;
+        const t = new Date(dateStr).getTime();
+        return isNaN(t) ? 0 : t;
+      };
+      const timeA = getTime(
+        a.sessionData.lastUpdated?.trim() || a.sessionData.startTime,
+      );
+      const timeB = getTime(
+        b.sessionData.lastUpdated?.trim() || b.sessionData.startTime,
+      );
+      return timeB - timeA;
+    });
+
+    const { filePath, sessionData } = matches[0];
+    const messages = sessionData.messages ?? [];
+    const firstUserMsg = extractFirstUserMessage(messages);
+    const messageCount = messages.length;
+    const timestamp =
+      sessionData.lastUpdated?.trim() ||
+      sessionData.startTime?.trim() ||
+      new Date().toISOString();
+    const displayInfo = `Session ${sessionData.sessionId}: ${firstUserMsg} (${messageCount} messages, ${formatRelativeTime(timestamp)})`;
+
+    return {
+      sessionPath: filePath,
+      sessionData,
+      displayInfo,
+    };
+  }
+
+  /**
    * Resolves a resume argument to a specific session.
    *
    * @param resumeArg - Can be "latest", a full UUID, or an index number (1-based)
+   * @param options - Optional resolution options (e.g. allowEmpty to bypass resumable content filtering for exact UUIDs)
    * @returns Promise resolving to session selection result
    */
-  async resolveSession(resumeArg: string): Promise<SessionSelectionResult> {
-    let selectedSession: SessionInfo;
+  async resolveSession(
+    resumeArg: string,
+    options?: ResolveSessionOptions,
+  ): Promise<SessionSelectionResult> {
     const trimmedResumeArg = resumeArg.trim();
+
+    const isIndex = /^\d+$/.test(trimmedResumeArg);
+    if (options?.allowEmpty && trimmedResumeArg !== RESUME_LATEST && !isIndex) {
+      return this.resolveSessionById(trimmedResumeArg);
+    }
+
+    let selectedSession: SessionInfo;
 
     if (trimmedResumeArg === RESUME_LATEST) {
       const sessions = await this.listSessions();
@@ -546,12 +646,17 @@ export class SessionSelector {
       if (!sessionData) {
         throw new Error('Failed to load session data');
       }
+      const normalizedSessionData = {
+        ...sessionData,
+        startTime: sessionData.startTime || sessionInfo.startTime,
+        lastUpdated: sessionData.lastUpdated || sessionInfo.lastUpdated,
+      };
 
       const displayInfo = `Session ${sessionInfo.index}: ${sessionInfo.firstUserMessage} (${sessionInfo.messageCount} messages, ${formatRelativeTime(sessionInfo.lastUpdated)})`;
 
       return {
         sessionPath,
-        sessionData,
+        sessionData: normalizedSessionData,
         displayInfo,
       };
     } catch (error) {
@@ -593,7 +698,16 @@ export function convertSessionToHistoryFormats(
     const contentString = partListUnionToString(msg.content);
     const uiText = displayContentString || contentString;
 
-    if (uiText.trim()) {
+    // Skip internal context messages in the UI history
+    const trimmedText = uiText.trim();
+    if (
+      trimmedText.startsWith('<session_context>') ||
+      trimmedText.startsWith('<hook_context>')
+    ) {
+      continue;
+    }
+
+    if (trimmedText) {
       let messageType: MessageType;
       switch (msg.type) {
         case 'user':

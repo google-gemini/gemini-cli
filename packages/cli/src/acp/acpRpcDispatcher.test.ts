@@ -71,6 +71,7 @@ describe('GeminiAgent - RPC Dispatcher', () => {
       validatePathAccess: vi.fn().mockReturnValue(null),
       getWorkspaceContext: vi.fn().mockReturnValue({
         addReadOnlyPath: vi.fn(),
+        getDirectories: vi.fn().mockReturnValue(['/tmp']),
       }),
       getPolicyEngine: vi.fn().mockReturnValue({
         addRule: vi.fn(),
@@ -334,5 +335,17 @@ describe('GeminiAgent - RPC Dispatcher', () => {
         modelId: 'gemini-2.0-pro-exp',
       }),
     ).rejects.toThrow('Session not found: unknown');
+  });
+
+  it('should delegate dispose to sessionManager', async () => {
+    const disposeMock = vi.fn().mockResolvedValue(undefined);
+    (agent as unknown as { sessionManager: { dispose: Mock } }).sessionManager =
+      {
+        dispose: disposeMock,
+      };
+
+    await agent.dispose();
+
+    expect(disposeMock).toHaveBeenCalledTimes(1);
   });
 });

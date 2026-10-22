@@ -4,7 +4,7 @@ exports[`ToolConfirmationMessage Redirection > should display redirection warnin
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ echo "hello" > test.txt                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-Allow execution of [echo]?
+Allow execution of [Shell]?
 Redirection detected. To auto-accept, press Shift+Tab
 
 ● 1. Allow once               

@@ -1,0 +1,12 @@
+node_modules
+dist
+npm-debug.log
+.git
+.gitignore
+*.py
+*.pyc
+__pycache__
+requirements.txt
+project.toml
+**/*.test.ts
+

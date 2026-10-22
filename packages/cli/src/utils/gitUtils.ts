@@ -69,7 +69,13 @@ export const getLatestGitHubRelease = async (
         'X-GitHub-Api-Version': '2022-11-28',
       },
       dispatcher: proxy ? new ProxyAgent(proxy) : undefined,
-      signal: AbortSignal.any([AbortSignal.timeout(30_000), controller.signal]),
+      /* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
+      signal: (
+        AbortSignal as unknown as {
+          any: (signals: AbortSignal[]) => AbortSignal;
+        }
+      ).any([AbortSignal.timeout(30_000), controller.signal]),
+      /* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
     } as RequestInit);
 
     if (!response.ok) {
@@ -83,8 +89,7 @@ export const getLatestGitHubRelease = async (
     if (!releaseTag) {
       throw new Error(`Response did not include tag_name field`);
     }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    return releaseTag;
+    return typeof releaseTag === 'string' ? releaseTag : '';
   } catch (error) {
     debugLogger.debug(
       `Failed to determine latest run-gemini-cli release:`,

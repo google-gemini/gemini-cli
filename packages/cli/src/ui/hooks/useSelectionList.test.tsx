@@ -348,7 +348,7 @@ describe('useSelectionList', () => {
     });
   });
 
-  describe('Selection (Enter)', () => {
+  describe('Selection (Enter / Space)', () => {
     it('should call onSelect when "return" is pressed on enabled item', async () => {
       const { waitUntilReady } = await renderSelectionListHook({
         items,
@@ -359,6 +359,74 @@ describe('useSelectionList', () => {
       await waitUntilReady();
       expect(mockOnSelect).toHaveBeenCalledTimes(1);
       expect(mockOnSelect).toHaveBeenCalledWith('C');
+    });
+
+    it('should call onSelect when "space" is pressed on enabled item', async () => {
+      const { waitUntilReady } = await renderSelectionListHook({
+        items,
+        initialIndex: 2,
+        onSelect: mockOnSelect,
+      });
+      pressKey('space', ' ');
+      await waitUntilReady();
+      expect(mockOnSelect).toHaveBeenCalledTimes(1);
+      expect(mockOnSelect).toHaveBeenCalledWith('C');
+    });
+
+    it('should not call onSelect when modified space (Shift+Space or Ctrl+Space) is pressed', async () => {
+      const { waitUntilReady } = await renderSelectionListHook({
+        items,
+        initialIndex: 2,
+        onSelect: mockOnSelect,
+      });
+      pressKey('space', ' ', { shift: true });
+      pressKey('space', ' ', { ctrl: true });
+      await waitUntilReady();
+      expect(mockOnSelect).not.toHaveBeenCalled();
+    });
+
+    it('should call onSelect when Enter has shift=true (e.g. from bufferFastReturn)', async () => {
+      const { waitUntilReady } = await renderSelectionListHook({
+        items,
+        initialIndex: 2,
+        onSelect: mockOnSelect,
+      });
+      pressKey('enter', '\r', { shift: true });
+      await waitUntilReady();
+      expect(mockOnSelect).toHaveBeenCalledTimes(1);
+      expect(mockOnSelect).toHaveBeenCalledWith('C');
+    });
+
+    it('should call onSelect when standalone linefeed (\\n) is pressed', async () => {
+      const { waitUntilReady } = await renderSelectionListHook({
+        items,
+        initialIndex: 2,
+        onSelect: mockOnSelect,
+      });
+      pressKey('j', '\n', { ctrl: true });
+      await waitUntilReady();
+      expect(mockOnSelect).toHaveBeenCalledTimes(1);
+      expect(mockOnSelect).toHaveBeenCalledWith('C');
+    });
+
+    it('should debounce trailing \\n in a CRLF (\\r\\n) sequence while allowing consecutive CRLFs', async () => {
+      const { waitUntilReady } = await renderSelectionListHook({
+        items,
+        initialIndex: 2,
+        onSelect: mockOnSelect,
+      });
+      // First CRLF: \r followed immediately by \n
+      pressKey('enter', '\r');
+      pressKey('j', '\n', { ctrl: true });
+      await waitUntilReady();
+      expect(mockOnSelect).toHaveBeenCalledTimes(1);
+      expect(mockOnSelect).toHaveBeenCalledWith('C');
+
+      // Second CRLF immediately after: should also trigger once
+      pressKey('enter', '\r');
+      pressKey('j', '\n', { ctrl: true });
+      await waitUntilReady();
+      expect(mockOnSelect).toHaveBeenCalledTimes(2);
     });
 
     it('should not call onSelect if the active item is disabled', async () => {

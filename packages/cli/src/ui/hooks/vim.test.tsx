@@ -2258,6 +2258,80 @@ describe('useVim hook', async () => {
     });
   });
 
+  describe('should handle unmapped keys in Normal mode', () => {
+    type UnmappedKeyCase = {
+      char: string;
+      insertable: boolean;
+    };
+    it.each<UnmappedKeyCase>([
+      { char: 'm', insertable: true },
+      { char: 'n', insertable: true },
+      { char: 'p', insertable: true },
+      { char: 'q', insertable: true },
+      { char: 's', insertable: true },
+      { char: 'v', insertable: true },
+      { char: 'y', insertable: true },
+      { char: 'z', insertable: true },
+      { char: 'H', insertable: true },
+      { char: 'J', insertable: true },
+      { char: 'K', insertable: true },
+      { char: 'L', insertable: true },
+      { char: 'M', insertable: true },
+      { char: 'N', insertable: true },
+      { char: 'P', insertable: true },
+      { char: 'Q', insertable: true },
+      { char: 'R', insertable: true },
+      { char: 'S', insertable: true },
+      { char: 'U', insertable: true },
+      { char: 'V', insertable: true },
+      { char: 'Y', insertable: true },
+      { char: 'Z', insertable: true },
+      { char: '/', insertable: true },
+      { char: '#', insertable: true },
+      { char: '%', insertable: true },
+      { char: '&', insertable: true },
+      { char: "'", insertable: true },
+      { char: '(', insertable: true },
+      { char: ')', insertable: true },
+      { char: '*', insertable: true },
+      { char: '+', insertable: true },
+      { char: '-', insertable: true },
+      { char: '/', insertable: true },
+      { char: ':', insertable: true },
+      { char: '<', insertable: true },
+      { char: '=', insertable: true },
+      { char: '>', insertable: true },
+      { char: '@', insertable: true },
+      { char: '[', insertable: true },
+      { char: '\\', insertable: true },
+      { char: ']', insertable: true },
+      { char: '_', insertable: true },
+      { char: '`', insertable: true },
+      { char: '{', insertable: true },
+      { char: '|', insertable: true },
+      { char: '}', insertable: true },
+    ])(
+      '$char: should be swallowed and do nothing in Normal mode',
+      async ({ char, insertable }) => {
+        const { result } = await renderVimHook();
+        exitInsertMode(result);
+
+        let handled = false;
+        act(() => {
+          handled = result.current.handleInput(
+            createKey({ sequence: char, name: char, insertable }),
+          );
+        });
+
+        expect(handled).toBe(true);
+        expect(mockVimContext.setVimMode).not.toHaveBeenCalledWith('INSERT');
+
+        expect(mockBuffer.vimFindCharForward).not.toHaveBeenCalled();
+        expect(mockBuffer.vimFindCharBackward).not.toHaveBeenCalled();
+      },
+    );
+  });
+
   describe('Operator + find motions (df, dt, dF, dT, cf, ct, cF, cT)', async () => {
     it('df{char}: executes delete-to-char, not a dangling operator', async () => {
       const { result } = await renderVimHook();

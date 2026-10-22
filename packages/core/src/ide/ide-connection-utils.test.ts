@@ -31,12 +31,33 @@ vi.mock('node:fs', async (importOriginal) => {
       ...actual.promises,
       readFile: vi.fn(),
       readdir: vi.fn(),
+      realpath: vi.fn((p) => Promise.resolve(p)),
+      stat: vi.fn(() =>
+        Promise.resolve({ uid: process.getuid ? process.getuid() : 1000 }),
+      ),
+      open: vi.fn((filePath: string) =>
+        Promise.resolve({
+          stat: () => fs.promises.stat(filePath),
+          readFile: (options?: string | { encoding?: string }) =>
+            fs.promises.readFile(
+              filePath,
+              options as unknown as BufferEncoding | undefined,
+            ),
+          close: () => Promise.resolve(),
+        } as unknown as fs.promises.FileHandle),
+      ),
     },
     realpathSync: (p: string) => p,
     existsSync: vi.fn(() => false),
   };
 });
 vi.mock('node:os');
+vi.mock('undici', () => ({
+  EnvHttpProxyAgent: vi.fn(),
+  fetch: vi.fn(),
+  setGlobalDispatcher: vi.fn(),
+  Agent: vi.fn(),
+}));
 
 describe('ide-connection-utils', () => {
   beforeEach(() => {
@@ -424,6 +445,141 @@ describe('ide-connection-utils', () => {
 
       expect(result).toEqual(config2);
     });
+
+    it('should NOT filter out config if all found config files are mismatched/invalid workspaces, returning the best sorted match so that the correct Directory Mismatch error is raised downstream', async () => {
+      const invalidConfig1 = {
+        port: '1111',
+        workspacePath: '/invalid/workspace1',
+      };
+      const invalidConfig2 = {
+        port: '2222',
+        workspacePath: '/invalid/workspace2',
+      };
+      vi.mocked(fs.promises.readFile).mockRejectedValueOnce(
+        new Error('not found'),
+      );
+      (
+        vi.mocked(fs.promises.readdir) as Mock<
+          (path: fs.PathLike) => Promise<string[]>
+        >
+      ).mockResolvedValue([
+        'gemini-ide-server-12345-111.json',
+        'gemini-ide-server-12345-222.json',
+      ]);
+      vi.mocked(fs.promises.readFile)
+        .mockResolvedValueOnce(JSON.stringify(invalidConfig1))
+        .mockResolvedValueOnce(JSON.stringify(invalidConfig2));
+
+      const result = await getConnectionConfigFromFile(12345);
+
+      expect(result).toEqual(invalidConfig1);
+    });
+
+    it('should prioritize the config matching the port from the environment variable when all found config files are mismatched/invalid workspaces', async () => {
+      vi.stubEnv('GEMINI_CLI_IDE_SERVER_PORT', '2222');
+      const invalidConfig1 = {
+        port: '1111',
+        workspacePath: '/invalid/workspace1',
+      };
+      const invalidConfig2 = {
+        port: '2222',
+        workspacePath: '/invalid/workspace2',
+      };
+      vi.mocked(fs.promises.readFile).mockRejectedValueOnce(
+        new Error('not found'),
+      );
+      (
+        vi.mocked(fs.promises.readdir) as Mock<
+          (path: fs.PathLike) => Promise<string[]>
+        >
+      ).mockResolvedValue([
+        'gemini-ide-server-12345-111.json',
+        'gemini-ide-server-12345-222.json',
+      ]);
+      vi.mocked(fs.promises.readFile)
+        .mockResolvedValueOnce(JSON.stringify(invalidConfig1))
+        .mockResolvedValueOnce(JSON.stringify(invalidConfig2));
+
+      const result = await getConnectionConfigFromFile(12345);
+
+      expect(result).toEqual(invalidConfig2);
+    });
+
+    it.runIf(process.getuid !== undefined)(
+      'should reject and ignore config files owned by a different user UID to prevent hijacking/information disclosure',
+      async () => {
+        const config1 = {
+          port: '1111',
+          workspacePath: '/test/workspace',
+        };
+        vi.mocked(fs.promises.readFile).mockRejectedValueOnce(
+          new Error('not found'),
+        );
+        (
+          vi.mocked(fs.promises.readdir) as Mock<
+            (path: fs.PathLike) => Promise<string[]>
+          >
+        ).mockResolvedValue(['gemini-ide-server-12345-111.json']);
+        vi.mocked(fs.promises.readFile).mockResolvedValueOnce(
+          JSON.stringify(config1),
+        );
+
+        const otherUid = (process.getuid ? process.getuid() : 1000) + 1;
+        vi.mocked(fs.promises.stat).mockResolvedValueOnce({
+          uid: otherUid,
+        } as unknown as fs.Stats);
+
+        const result = await getConnectionConfigFromFile(12345);
+
+        expect(result).toBeUndefined();
+      },
+    );
+
+    it('should accept and parse config files owned by the current user UID', async () => {
+      const config1 = {
+        port: '1111',
+        workspacePath: '/test/workspace',
+      };
+      vi.mocked(fs.promises.readFile).mockRejectedValueOnce(
+        new Error('not found'),
+      );
+      (
+        vi.mocked(fs.promises.readdir) as Mock<
+          (path: fs.PathLike) => Promise<string[]>
+        >
+      ).mockResolvedValue(['gemini-ide-server-12345-111.json']);
+      vi.mocked(fs.promises.readFile).mockResolvedValueOnce(
+        JSON.stringify(config1),
+      );
+
+      const currentUid = process.getuid ? process.getuid() : 1000;
+      vi.mocked(fs.promises.stat).mockResolvedValueOnce({
+        uid: currentUid,
+      } as unknown as fs.Stats);
+
+      const result = await getConnectionConfigFromFile(12345);
+
+      expect(result).toEqual(config1);
+    });
+
+    it('should reject and ignore config files if fs.promises.open throws an error', async () => {
+      vi.mocked(fs.promises.readFile).mockRejectedValueOnce(
+        new Error('not found'),
+      );
+      (
+        vi.mocked(fs.promises.readdir) as Mock<
+          (path: fs.PathLike) => Promise<string[]>
+        >
+      ).mockResolvedValue(['gemini-ide-server-12345-111.json']);
+
+      vi.mocked(fs.promises.open).mockRejectedValueOnce(
+        new Error('symlink loop / permission denied'),
+      );
+
+      const result = await getConnectionConfigFromFile(12345);
+
+      expect(result).toBeUndefined();
+    });
   });
 
   describe('validateWorkspacePath', () => {
@@ -698,12 +854,36 @@ describe('ide-connection-utils', () => {
   });
 
   describe('createProxyAwareFetch', () => {
-    it('should return a proxy-aware fetcher function', async () => {
+    it('should return a proxy-aware fetcher function that respects NO_PROXY and includes ideServerHost', async () => {
       const { createProxyAwareFetch } = await import(
         './ide-connection-utils.js'
       );
-      const fetcher = await createProxyAwareFetch('127.0.0.1');
+      const { EnvHttpProxyAgent } = await import('undici');
+      const ideServerHost = '127.0.0.1';
+      const existingNoProxy = 'google.com,example.com';
+      vi.stubEnv('NO_PROXY', existingNoProxy);
+
+      const fetcher = await createProxyAwareFetch(ideServerHost);
       expect(typeof fetcher).toBe('function');
+
+      expect(EnvHttpProxyAgent).toHaveBeenCalledWith({
+        noProxy: `${existingNoProxy},${ideServerHost}`,
+      });
+    });
+
+    it('should handle missing NO_PROXY when creating proxy-aware fetcher', async () => {
+      const { createProxyAwareFetch } = await import(
+        './ide-connection-utils.js'
+      );
+      const { EnvHttpProxyAgent } = await import('undici');
+      const ideServerHost = 'host.docker.internal';
+      vi.stubEnv('NO_PROXY', '');
+
+      await createProxyAwareFetch(ideServerHost);
+
+      expect(EnvHttpProxyAgent).toHaveBeenCalledWith({
+        noProxy: ideServerHost,
+      });
     });
   });
 });

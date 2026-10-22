@@ -33,7 +33,6 @@ export {
   WRITE_TODOS_TOOL_NAME,
   WEB_FETCH_TOOL_NAME,
   READ_MANY_FILES_TOOL_NAME,
-  MEMORY_TOOL_NAME,
   GET_INTERNAL_DOCS_TOOL_NAME,
   ACTIVATE_SKILL_TOOL_NAME,
   ASK_USER_TOOL_NAME,
@@ -81,7 +80,6 @@ export {
   READ_MANY_PARAM_EXCLUDE,
   READ_MANY_PARAM_RECURSIVE,
   READ_MANY_PARAM_USE_DEFAULT_EXCLUDES,
-  MEMORY_PARAM_FACT,
   TODOS_PARAM_TODOS,
   TODOS_ITEM_PARAM_DESCRIPTION,
   TODOS_ITEM_PARAM_STATUS,
@@ -194,13 +192,6 @@ export const READ_MANY_FILES_DEFINITION: ToolDefinition = {
     return DEFAULT_LEGACY_SET.read_many_files;
   },
   overrides: (modelId) => getToolSet(modelId).read_many_files,
-};
-
-export const MEMORY_DEFINITION: ToolDefinition = {
-  get base() {
-    return DEFAULT_LEGACY_SET.save_memory;
-  },
-  overrides: (modelId) => getToolSet(modelId).save_memory,
 };
 
 export const WRITE_TODOS_DEFINITION: ToolDefinition = {

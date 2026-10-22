@@ -21,6 +21,7 @@ import {
   ROOT_SCHEDULER_ID,
   CoreToolCallStatus,
   type WaitingToolCall,
+  SubagentState,
 } from '@google/gemini-cli-core';
 import { createMockMessageBus } from '@google/gemini-cli-core/src/test-utils/mock-message-bus.js';
 
@@ -630,7 +631,7 @@ describe('useToolScheduler', () => {
           id: '1',
           type: 'thought',
           content: 'Thinking...',
-          status: 'running',
+          status: SubagentState.RUNNING,
         },
       });
     });
@@ -648,7 +649,7 @@ describe('useToolScheduler', () => {
           id: '2',
           type: 'tool_call',
           content: 'Calling tool',
-          status: 'completed',
+          status: SubagentState.COMPLETED,
         },
       });
     });
@@ -697,7 +698,7 @@ describe('useToolScheduler', () => {
           id: '1',
           type: 'thought',
           content: 'Thinking...',
-          status: 'running',
+          status: SubagentState.RUNNING,
         },
       });
     });
@@ -716,7 +717,7 @@ describe('useToolScheduler', () => {
           id: '1',
           type: 'thought',
           content: 'Thinking... Done!',
-          status: 'completed',
+          status: SubagentState.COMPLETED,
         },
       });
     });
@@ -726,6 +727,8 @@ describe('useToolScheduler', () => {
     expect(result.current[0][0].subagentHistory![0].content).toBe(
       'Thinking... Done!',
     );
-    expect(result.current[0][0].subagentHistory![0].status).toBe('completed');
+    expect(result.current[0][0].subagentHistory![0].status).toBe(
+      SubagentState.COMPLETED,
+    );
   });
 });

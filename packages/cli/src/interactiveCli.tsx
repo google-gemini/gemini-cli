@@ -20,6 +20,7 @@ import {
   type ResumedSessionData,
   coreEvents,
   createWorkingStdio,
+  isTmux,
   disableMouseEvents,
   enableMouseEvents,
   disableLineWrapping,
@@ -94,7 +95,9 @@ export async function startInteractiveUI(
   });
   consolePatcher.patch();
 
-  const { stdout: inkStdout, stderr: inkStderr } = createWorkingStdio();
+  const { stdout: inkStdout, stderr: inkStderr } = createWorkingStdio({
+    synchronizedOutput: process.platform !== 'win32' || isTmux(),
+  });
 
   const isShpool = !!process.env['SHPOOL_SESSION_NAME'];
 
@@ -164,7 +167,7 @@ export async function startInteractiveUI(
         config.getUseRenderProcess() && config.getUseTerminalBuffer(),
       incrementalRendering:
         settings.merged.ui.incrementalRendering !== false &&
-        useAlternateBuffer &&
+        (useAlternateBuffer || config.getUseTerminalBuffer()) &&
         !isShpool,
       debugRainbow: settings.merged.ui.debugRainbow === true,
     },
@@ -194,6 +197,20 @@ export async function startInteractiveUI(
     });
 
   const cleanupUnmount = () => instance.unmount();
+  const cleanupNonResumableCurrentSession = async () => {
+    if (resumedSessionData) {
+      return;
+    }
+    try {
+      await config
+        .getGeminiClient()
+        ?.getChatRecordingService()
+        ?.deleteCurrentSessionIfNotResumableAsync();
+    } catch (e: unknown) {
+      debugLogger.error('Error cleaning up non-resumable session:', e);
+    }
+  };
+  registerCleanup(cleanupNonResumableCurrentSession);
   registerCleanup(cleanupUnmount);
 
   const cleanupTtyCheck = setupTtyCheck();
@@ -210,6 +227,13 @@ export async function startInteractiveUI(
       cleanupConsolePatcher();
     } catch (e: unknown) {
       debugLogger.error('Error cleaning up console patcher:', e);
+    }
+
+    try {
+      removeCleanup(cleanupNonResumableCurrentSession);
+      await cleanupNonResumableCurrentSession();
+    } catch (e: unknown) {
+      debugLogger.error('Error removing non-resumable session cleanup:', e);
     }
 
     try {

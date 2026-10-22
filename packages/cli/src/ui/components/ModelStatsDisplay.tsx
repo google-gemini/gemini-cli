@@ -299,7 +299,7 @@ export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
     },
     ...modelNames.map((name) => ({
       key: name,
-      header: name,
+      header: getDisplayString(name),
       flexGrow: 1,
       renderCell: (row: StatRowData) => {
         // Don't render anything for section headers in model columns

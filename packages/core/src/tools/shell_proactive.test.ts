@@ -83,6 +83,7 @@ describe('ShellTool Proactive Expansion', () => {
         getModeConfig: vi.fn().mockReturnValue({ readonly: false }),
       },
       getEnableInteractiveShell: vi.fn().mockReturnValue(false),
+      isInteractiveShellEnabled: vi.fn().mockReturnValue(false),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       getShellToolInactivityTimeout: vi.fn().mockReturnValue(1000),
     } as unknown as Config;

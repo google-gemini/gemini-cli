@@ -6,7 +6,7 @@
 
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { isSubpath } from './paths.js';
+import { isSubpath, resolveToRealPath } from './paths.js';
 import { debugLogger } from './debugLogger.js';
 
 // Simple console logger for import processing
@@ -397,9 +397,28 @@ export function validateImportPath(
     return false;
   }
 
-  const resolvedPath = path.resolve(basePath, importPath);
+  let resolvedPath: string;
+  try {
+    // Canonicalize the path on the actual physical disk to resolve symlinks
+    resolvedPath = resolveToRealPath(path.resolve(basePath, importPath));
+  } catch {
+    // If path resolution fails (e.g., infinite recursion or invalid path), fail-closed and reject it
+    return false;
+  }
 
-  return allowedDirectories.some((allowedDir) =>
-    isSubpath(allowedDir, resolvedPath),
+  const realAllowedDirs = allowedDirectories
+    .map((dir) => {
+      const trimmed = dir.trim();
+      if (!trimmed) return null;
+      try {
+        return resolveToRealPath(trimmed);
+      } catch {
+        return null;
+      }
+    })
+    .filter((dir): dir is string => dir !== null);
+
+  return realAllowedDirs.some((realAllowedDir) =>
+    isSubpath(realAllowedDir, resolvedPath),
   );
 }

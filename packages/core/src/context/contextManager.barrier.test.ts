@@ -5,11 +5,13 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { randomUUID } from 'node:crypto';
 import { testTruncateProfile } from './testing/testProfile.js';
 import {
   createSyntheticHistory,
   createMockContextConfig,
   setupContextComponentTest,
+  deriveStableId,
 } from './testing/contextTestUtils.js';
 
 describe('ContextManager Sync Pressure Barrier Tests', () => {
@@ -31,21 +33,40 @@ describe('ContextManager Sync Pressure Barrier Tests', () => {
     );
 
     // 2. Add System Prompt (Episode 0 - Protected)
+    const envId = deriveStableId(['environment-context']);
     chatHistory.set([
-      { role: 'user', parts: [{ text: 'System prompt' }] },
-      { role: 'model', parts: [{ text: 'Understood.' }] },
+      {
+        id: envId,
+        content: {
+          role: 'user',
+          parts: [{ text: '<session_context>\nSystem prompt' }],
+        },
+      },
+      {
+        id: 'h2',
+        content: { role: 'model', parts: [{ text: 'Understood.' }] },
+      },
     ]);
 
     // 3. Add massive history that blows past the 150k maxTokens limit
-    // 20 turns * 10,000 tokens/turn = ~200,000 tokens
-    const massiveHistory = createSyntheticHistory(20, 35000);
+    // 20 turns * ~20,000 tokens/turn (10k user + 10k model) = ~400,000 tokens
+    const massiveHistory = createSyntheticHistory(20, 10000).map((c) => ({
+      id: randomUUID(),
+      content: c,
+    }));
     chatHistory.set([...chatHistory.get(), ...massiveHistory]);
 
     // 4. Add the Latest Turn (Protected)
     chatHistory.set([
       ...chatHistory.get(),
-      { role: 'user', parts: [{ text: 'Final question.' }] },
-      { role: 'model', parts: [{ text: 'Final answer.' }] },
+      {
+        id: 'h-last-user',
+        content: { role: 'user', parts: [{ text: 'Final question.' }] },
+      },
+      {
+        id: 'h-last-model',
+        content: { role: 'model', parts: [{ text: 'Final answer.' }] },
+      },
     ]);
 
     const rawHistoryLength = chatHistory.get().length;
@@ -58,30 +79,27 @@ describe('ContextManager Sync Pressure Barrier Tests', () => {
 
     expect(projection.length).toBeLessThan(rawHistoryLength);
 
-    // Verify Episode 0 (System) was pruned, so we now start with a sentinel due to role alternation
-    expect(projection[0].role).toBe('user');
-    expect(projection[0].parts![0].text).toContain('User turn 17');
+    // Verify Episode 0 (System) was PRESERVED because it is pinned Turn 0.
+    expect(projection[0].id).toBe(envId);
+    expect(projection[0].content.role).toBe('user');
 
+    const projectionString = JSON.stringify(projection);
+    expect(projectionString).toContain('User turn 17');
     // Filter out synthetic Yield nodes (they are model responses without actual tool/text bodies)
     const contentNodes = projection.filter(
       (p) =>
-        p.parts && p.parts.some((part) => part.text && part.text !== 'Yield'),
+        p.content.parts &&
+        p.content.parts.some((part) => part.text && part.text !== 'Yield'),
     );
 
     // Verify the latest turn is perfectly preserved at the back
-    // Note: The HistoryHardener appends a "Please continue." user turn if we end on model,
-    // so we look at the turns before the sentinel.
-    const lastSentinel = contentNodes[contentNodes.length - 1];
-    const lastModel = contentNodes[contentNodes.length - 2];
-    const lastUser = contentNodes[contentNodes.length - 3];
-
-    expect(lastSentinel.role).toBe('user');
-    expect(lastSentinel.parts![0].text).toBe('Please continue.');
-
-    expect(lastUser.role).toBe('user');
-    expect(lastUser.parts![0].text).toBe('Final question.');
+    const lastModel = contentNodes[contentNodes.length - 1].content;
+    const lastUser = contentNodes[contentNodes.length - 2].content;
 
     expect(lastModel.role).toBe('model');
     expect(lastModel.parts![0].text).toBe('Final answer.');
+
+    expect(lastUser.role).toBe('user');
+    expect(lastUser.parts![0].text).toBe('Final question.');
   });
 });

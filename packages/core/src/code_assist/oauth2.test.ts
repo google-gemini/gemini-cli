@@ -25,6 +25,7 @@ import {
   clearCachedCredentialFile,
   clearOauthClientCache,
   authEvents,
+  readOAuthCredsWithRetry,
 } from './oauth2.js';
 import { UserAccountManager } from '../utils/userAccountManager.js';
 import * as fs from 'node:fs';
@@ -279,6 +280,72 @@ describe('oauth2', () => {
       expect(userAccountManager.getCachedGoogleAccount()).toBe(
         'test-google-account@gmail.com',
       );
+    });
+
+    it('should merge credentials on token refresh preserving refresh_token and other fields', async () => {
+      const mockAuthUrl = 'https://example.com/auth';
+      const mockTokens = {
+        access_token: 'test-access-token',
+        refresh_token: 'test-refresh-token',
+      };
+      const credsPath = path.join(tempHomeDir, GEMINI_DIR, 'oauth_creds.json');
+      await fs.promises.mkdir(path.dirname(credsPath), { recursive: true });
+
+      const initialCreds = {
+        access_token: 'old-access-token',
+        refresh_token: 'persistent-refresh-token',
+        expiry_date: 111111,
+        scope: 'email profile',
+        token_type: 'Bearer',
+      };
+      await fs.promises.writeFile(credsPath, JSON.stringify(initialCreds));
+
+      const mockGenerateAuthUrl = vi.fn().mockReturnValue(mockAuthUrl);
+      const mockGetToken = vi.fn().mockResolvedValue({ tokens: mockTokens });
+      const mockSetCredentials = vi.fn();
+      const mockGetAccessToken = vi
+        .fn()
+        .mockResolvedValue({ token: 'mock-access-token' });
+      const mockGetTokenInfo = vi.fn().mockResolvedValue({});
+      let tokensListener: ((tokens: Credentials) => void) | undefined;
+      const mockOAuth2Client = {
+        generateAuthUrl: mockGenerateAuthUrl,
+        getToken: mockGetToken,
+        setCredentials: mockSetCredentials,
+        getAccessToken: mockGetAccessToken,
+        getTokenInfo: mockGetTokenInfo,
+        credentials: mockTokens,
+        on: vi.fn((event, listener) => {
+          if (event === 'tokens') {
+            tokensListener = listener;
+          }
+        }),
+      } as unknown as OAuth2Client;
+      vi.mocked(OAuth2Client).mockImplementation(() => mockOAuth2Client);
+
+      await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
+
+      // Trigger token event with refresh payload (missing refresh_token, scope, token_type etc.)
+      const refreshPayload: Credentials = {
+        access_token: 'new-access-token',
+        expiry_date: 222222,
+      };
+
+      if (tokensListener) {
+        await (
+          tokensListener as unknown as (tokens: Credentials) => Promise<void>
+        )(refreshPayload);
+      }
+
+      expect(fs.existsSync(credsPath)).toBe(true);
+      const updatedCreds = JSON.parse(fs.readFileSync(credsPath, 'utf-8'));
+      expect(updatedCreds).toEqual({
+        access_token: 'new-access-token',
+        refresh_token: 'persistent-refresh-token',
+        expiry_date: 222222,
+        scope: 'email profile',
+        token_type: 'Bearer',
+      });
     });
 
     it('should clear credentials file', async () => {
@@ -679,6 +746,64 @@ describe('oauth2', () => {
         });
         expect(mockFromJSON).toHaveBeenCalledWith(byoidCredentials);
         expect(client).toBe(mockExternalAccountClient);
+      });
+
+      it('should fall back to GOOGLE_APPLICATION_CREDENTIALS if default cached credentials are invalid or expired', async () => {
+        // Setup default cached credentials that are expired/invalid
+        const defaultCreds = { refresh_token: 'expired-token' };
+        const defaultCredsPath = path.join(
+          tempHomeDir,
+          GEMINI_DIR,
+          'oauth_creds.json',
+        );
+        await fs.promises.mkdir(path.dirname(defaultCredsPath), {
+          recursive: true,
+        });
+        await fs.promises.writeFile(
+          defaultCredsPath,
+          JSON.stringify(defaultCreds),
+        );
+
+        // Setup valid fallback credentials via environment variable
+        const envCreds = { refresh_token: 'valid-env-token' };
+        const envCredsPath = path.join(tempHomeDir, 'env_creds.json');
+        await fs.promises.writeFile(envCredsPath, JSON.stringify(envCreds));
+        vi.stubEnv('GOOGLE_APPLICATION_CREDENTIALS', envCredsPath);
+
+        let currentCredentials: Credentials | null = null;
+        const mockClient = {
+          setCredentials: vi.fn((creds) => {
+            currentCredentials = creds as Credentials;
+          }),
+          getAccessToken: vi.fn(async () => {
+            if (
+              currentCredentials &&
+              currentCredentials.refresh_token === 'expired-token'
+            ) {
+              throw new Error('Token is expired or revoked');
+            }
+            return { token: 'valid-token' };
+          }),
+          getTokenInfo: vi.fn(async (_token) => {
+            if (
+              currentCredentials &&
+              currentCredentials.refresh_token === 'expired-token'
+            ) {
+              throw new Error('Token is expired or revoked');
+            }
+            return {};
+          }),
+          on: vi.fn(),
+        };
+
+        vi.mocked(OAuth2Client).mockImplementation(
+          () => mockClient as unknown as OAuth2Client,
+        );
+
+        await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
+
+        // Assert that fallback envCreds were eventually loaded and used
+        expect(mockClient.setCredentials).toHaveBeenCalledWith(envCreds);
       });
     });
 
@@ -1782,6 +1907,78 @@ describe('oauth2', () => {
         OAuthCredentialStorage.clearCredentials as Mock,
       ).toHaveBeenCalled();
       expect(fs.existsSync(credsPath)).toBe(true); // The unencrypted file should remain
+    });
+  });
+
+  describe('readOAuthCredsWithRetry', () => {
+    let tempDir: string;
+    let tempFilePath: string;
+
+    beforeEach(() => {
+      tempDir = fs.mkdtempSync(
+        path.join(os.tmpdir(), 'gemini-cli-oauth-retry-test-'),
+      );
+      tempFilePath = path.join(tempDir, 'creds.json');
+    });
+
+    afterEach(() => {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+      vi.restoreAllMocks();
+    });
+
+    it('should read file content successfully on first attempt', async () => {
+      fs.writeFileSync(tempFilePath, '{"test": true}', 'utf-8');
+      const content = await readOAuthCredsWithRetry(tempFilePath);
+      expect(content).toBe('{"test": true}');
+    });
+
+    it('should immediately throw ENOENT without retrying', async () => {
+      const nonExistent = path.join(tempDir, 'does-not-exist.json');
+      let readAttempts = 0;
+      const originalReadFile = fs.promises.readFile;
+      vi.spyOn(fs.promises, 'readFile').mockImplementation(async (p, opts) => {
+        readAttempts++;
+        return originalReadFile(p, opts);
+      });
+
+      await expect(readOAuthCredsWithRetry(nonExistent, 3)).rejects.toThrow();
+      expect(readAttempts).toBe(1);
+    });
+
+    it('should retry on transient errors and succeed', async () => {
+      fs.writeFileSync(tempFilePath, '{"recovered": true}', 'utf-8');
+      let attempts = 0;
+      const originalReadFile = fs.promises.readFile;
+      vi.spyOn(fs.promises, 'readFile').mockImplementation(
+        async (path, options) => {
+          attempts++;
+          if (attempts < 2) {
+            const err = new Error('Resource busy or locked');
+            (err as unknown as { code: string }).code = 'EBUSY';
+            throw err;
+          }
+          return originalReadFile(path, options);
+        },
+      );
+
+      const content = await readOAuthCredsWithRetry(tempFilePath);
+      expect(content).toBe('{"recovered": true}');
+      expect(attempts).toBe(2);
+    });
+
+    it('should throw if max retries exceeded', async () => {
+      const busyErr = new Error('Resource busy');
+      (busyErr as unknown as { code: string }).code = 'EBUSY';
+      let attempts = 0;
+      vi.spyOn(fs.promises, 'readFile').mockImplementation(async () => {
+        attempts++;
+        throw busyErr;
+      });
+
+      await expect(readOAuthCredsWithRetry(tempFilePath, 3)).rejects.toThrow(
+        'Resource busy',
+      );
+      expect(attempts).toBe(3);
     });
   });
 });

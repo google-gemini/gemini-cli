@@ -191,8 +191,8 @@
     <text x="711" y="546" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="563" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="9" y="563" fill="#ffffff" textLength="180" lengthAdjust="spacingAndGlyphs"> Allow execution of </text>
-    <text x="189" y="563" fill="#ffffaf" textLength="54" lengthAdjust="spacingAndGlyphs" font-weight="bold">[echo]</text>
-    <text x="243" y="563" fill="#ffffff" textLength="468" lengthAdjust="spacingAndGlyphs">?                                                   </text>
+    <text x="189" y="563" fill="#ffffaf" textLength="63" lengthAdjust="spacingAndGlyphs" font-weight="bold">[Shell]</text>
+    <text x="252" y="563" fill="#ffffff" textLength="459" lengthAdjust="spacingAndGlyphs">?                                                  </text>
     <text x="711" y="563" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="580" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="711" y="580" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>

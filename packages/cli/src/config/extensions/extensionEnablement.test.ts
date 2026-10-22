@@ -71,7 +71,7 @@ describe('ExtensionEnablementManager', () => {
     vi.spyOn(fs, 'writeFileSync').mockImplementation(
       (
         path: fs.PathOrFileDescriptor,
-        data: string | ArrayBufferView<ArrayBufferLike>,
+        data: string | NodeJS.ArrayBufferView,
       ) => {
         inMemoryFs[path.toString()] = data.toString(); // Convert ArrayBufferView to string for inMemoryFs
       },

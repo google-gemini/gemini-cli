@@ -80,6 +80,8 @@ describe('useIncludeDirsTrust', () => {
       clearPendingIncludeDirectories: vi.fn(),
       getFolderTrust: vi.fn().mockReturnValue(true),
       getWorkspaceContext: () => mockWorkspaceContext,
+      shouldLoadMemoryFromIncludeDirectories: vi.fn().mockReturnValue(false),
+      getMemoryContextManager: vi.fn(),
       getGeminiClient: vi
         .fn()
         .mockReturnValue({ addDirectoryContext: vi.fn() }),

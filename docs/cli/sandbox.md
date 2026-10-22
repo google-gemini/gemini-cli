@@ -87,8 +87,9 @@ preferred container solution.
 
 Lightweight, built-in sandboxing using `sandbox-exec`.
 
-**Default profile**: `permissive-open` - restricts writes outside project
-directory but allows most other operations.
+**Default profile**: `permissive-open` - denies operations by default; confines
+writes to the project directory while allowing broad file reads and network
+access.
 
 Built-in profiles (set via `SEATBELT_PROFILE` env var):
 
@@ -116,6 +117,14 @@ run the CLI from `/Users/you/project` on your host machine, the sandbox will
 mount your local project folder and operate within `/Users/you/project` inside
 the container. This allows the AI to seamlessly read and modify your project
 files while remaining isolated from the rest of your system.
+
+**How it works (IDE integration):**
+
+When you start Gemini CLI from your IDE's integrated terminal, the host process
+bridges the IDE companion connection into the container over `docker exec` (or
+`podman exec`). The companion's port and authentication token stay on the host;
+only the IDE calls that Gemini CLI needs are relayed. For details, see
+[Using with sandboxing](../ide-integration/index.md#using-with-sandboxing).
 
 **Quick setup:**
 
@@ -218,6 +227,14 @@ To set up runsc:
 1.  Install the runsc binary.
 2.  Configure the Docker daemon to use the runsc runtime.
 3.  Verify the installation.
+
+gVisor gives the container its own user-space network stack, so services bound
+to your host's loopback interface aren't reachable from inside the sandbox, even
+with `--network host`. Gemini CLI's IDE integration doesn't rely on container
+networking: the host process bridges the connection over `docker exec` (see
+[Using with sandboxing](../ide-integration/index.md#using-with-sandboxing)). If
+you configure the `runsc` runtime with `--network=none`, the sandboxed CLI has
+no external network access at all and can't reach the Gemini API.
 
 ### 5. LXC/LXD (Linux only, experimental)
 
@@ -435,6 +452,14 @@ $env:SANDBOX_SET_UID_GID="false"  # Disable UID/GID mapping
 
 - Check sandbox profile allows network.
 - Verify proxy configuration.
+
+**IDE integration doesn't connect**
+
+- Inside a container sandbox, the connection is bridged by the host process when
+  the sandbox starts. Make sure the IDE companion extension is running, then
+  restart Gemini CLI from the IDE's integrated terminal.
+- Run with `DEBUG=1` and look for `[IdeBridge]` messages. See
+  [Using with sandboxing](../ide-integration/index.md#using-with-sandboxing).
 
 ### Debug mode
 

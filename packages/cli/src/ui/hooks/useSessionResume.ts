@@ -7,14 +7,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   coreEvents,
-  type Config,
-  type ResumedSessionData,
   convertSessionToClientHistory,
 } from '@google/gemini-cli-core';
-import type { Part } from '@google/genai';
+import type {
+  HistoryTurn,
+  Config,
+  ResumedSessionData,
+} from '@google/gemini-cli-core';
 import type { HistoryItemWithoutId } from '../types.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { convertSessionToHistoryFormats } from './useSessionBrowser.js';
+import type { Part } from '@google/genai';
 
 interface UseSessionResumeParams {
   config: Config;
@@ -54,7 +57,9 @@ export function useSessionResume({
   const loadHistoryForResume = useCallback(
     async (
       uiHistory: HistoryItemWithoutId[],
-      clientHistory: Array<{ role: 'user' | 'model'; parts: Part[] }>,
+      clientHistory: Array<
+        { role: 'user' | 'model'; parts: Part[] } | HistoryTurn
+      >,
       resumedData: ResumedSessionData,
     ) => {
       // Wait for the client.

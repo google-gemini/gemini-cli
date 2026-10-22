@@ -36,6 +36,7 @@ const mockCoreEvents = vi.hoisted(() => ({
   emitFeedback: vi.fn(),
   emitHookStart: vi.fn(),
   emitHookEnd: vi.fn(),
+  emitHookSystemMessage: vi.fn(),
 }));
 
 vi.mock('../utils/debugLogger.js', () => ({
@@ -889,6 +890,102 @@ describe('HookEventHandler', () => {
         expect.any(Function),
         expect.any(Function),
       );
+    });
+  });
+
+  describe('systemMessage event emission', () => {
+    const buildMocks = (
+      outputFormat: 'json' | 'text',
+      systemMessage: string,
+    ) => {
+      const hookConfig: HookConfig = {
+        type: HookType.Command,
+        command: './hook.sh',
+        timeout: 30000,
+      };
+      const results: HookExecutionResult[] = [
+        {
+          success: true,
+          duration: 10,
+          hookConfig,
+          eventName: HookEventName.SessionStart,
+          output: { systemMessage },
+          outputFormat,
+        },
+      ];
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockReturnValue({
+        eventName: HookEventName.SessionStart,
+        hookConfigs: [hookConfig],
+        sequential: false,
+      });
+      vi.mocked(mockHookRunner.executeHooksParallel).mockResolvedValue(results);
+      vi.mocked(mockHookAggregator.aggregateResults).mockReturnValue({
+        success: true,
+        allOutputs: [],
+        errors: [],
+        totalDuration: 10,
+      });
+    };
+
+    it('emits HookSystemMessage for json-format hook output', async () => {
+      buildMocks('json', 'json banner');
+
+      await hookEventHandler.fireSessionStartEvent(SessionStartSource.Startup);
+
+      expect(mockCoreEvents.emitHookSystemMessage).toHaveBeenCalledTimes(1);
+      expect(mockCoreEvents.emitHookSystemMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventName: HookEventName.SessionStart,
+          message: 'json banner',
+        }),
+      );
+    });
+
+    it('emits HookSystemMessage for text-format hook output', async () => {
+      buildMocks('text', 'plain-text banner');
+
+      await hookEventHandler.fireSessionStartEvent(SessionStartSource.Startup);
+
+      expect(mockCoreEvents.emitHookSystemMessage).toHaveBeenCalledTimes(1);
+      expect(mockCoreEvents.emitHookSystemMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventName: HookEventName.SessionStart,
+          message: 'plain-text banner',
+        }),
+      );
+    });
+
+    it('does not emit when systemMessage is absent', async () => {
+      const hookConfig: HookConfig = {
+        type: HookType.Command,
+        command: './hook.sh',
+        timeout: 30000,
+      };
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockReturnValue({
+        eventName: HookEventName.SessionStart,
+        hookConfigs: [hookConfig],
+        sequential: false,
+      });
+      vi.mocked(mockHookRunner.executeHooksParallel).mockResolvedValue([
+        {
+          success: true,
+          duration: 10,
+          hookConfig,
+          eventName: HookEventName.SessionStart,
+          output: {},
+          outputFormat: 'json',
+        },
+      ]);
+      vi.mocked(mockHookAggregator.aggregateResults).mockReturnValue({
+        success: true,
+        allOutputs: [],
+        errors: [],
+        totalDuration: 10,
+      });
+
+      await hookEventHandler.fireSessionStartEvent(SessionStartSource.Startup);
+
+      expect(mockCoreEvents.emitHookSystemMessage).not.toHaveBeenCalled();
     });
   });
 });

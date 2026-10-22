@@ -21,7 +21,12 @@ import {
   allowEditorTypeInSandbox,
   isEditorAvailable,
   isEditorAvailableAsync,
+  isValidEditorType,
+  getEditorWaitFlag,
+  getEditorExtraArgs,
   resolveEditorAsync,
+  resolveEditorTypeFromCommand,
+  quoteCmdArg,
   type EditorType,
 } from './editor.js';
 import { coreEvents, CoreEvent } from './events.js';
@@ -33,6 +38,10 @@ vi.mock('child_process', () => ({
   execSync: vi.fn(),
   spawn: vi.fn(),
   spawnSync: vi.fn(() => ({ error: null, status: 0 })),
+}));
+
+vi.mock('./headless.js', () => ({
+  isHeadlessMode: vi.fn(() => false),
 }));
 
 const originalPlatform = process.platform;
@@ -84,6 +93,20 @@ describe('editor utils', () => {
         win32Commands: ['agy.cmd', 'antigravity.cmd', 'antigravity'],
       },
       { editor: 'hx', commands: ['hx'], win32Commands: ['hx'] },
+      {
+        editor: 'sublimetext',
+        commands: ['subl'],
+        win32Commands: ['subl'],
+      },
+      { editor: 'lapce', commands: ['lapce'], win32Commands: ['lapce'] },
+      { editor: 'nova', commands: ['nova'], win32Commands: ['nova'] },
+      { editor: 'bbedit', commands: ['bbedit'], win32Commands: ['bbedit'] },
+      {
+        editor: 'emacsclient',
+        commands: ['emacsclient'],
+        win32Commands: ['emacsclient'],
+      },
+      { editor: 'micro', commands: ['micro'], win32Commands: ['micro'] },
     ];
 
     for (const { editor, commands, win32Commands } of testCases) {
@@ -188,6 +211,7 @@ describe('editor utils', () => {
         commands: ['agy', 'antigravity'],
         win32Commands: ['agy.cmd', 'antigravity.cmd', 'antigravity'],
       },
+      { editor: 'bbedit', commands: ['bbedit'], win32Commands: ['bbedit'] },
     ];
 
     for (const { editor, commands, win32Commands } of guiEditors) {
@@ -317,6 +341,7 @@ describe('editor utils', () => {
     }
 
     it('should return the correct command for emacs with escaped paths', () => {
+      Object.defineProperty(process, 'platform', { value: 'linux' });
       const command = getDiffCommand(
         'old file "quote".txt',
         'new file \\back\\slash.txt',
@@ -331,12 +356,52 @@ describe('editor utils', () => {
       });
     });
 
+    it('should return the correct command for emacsclient', () => {
+      const command = getDiffCommand('old.txt', 'new.txt', 'emacsclient');
+      expect(command).toEqual({
+        command: 'emacsclient',
+        args: ['-nw', '--eval', '(ediff "old.txt" "new.txt")'],
+      });
+    });
+
+    it('should return the correct command for emacsclient with escaped paths', () => {
+      const command = getDiffCommand(
+        'old file "quote".txt',
+        'new file \\back\\slash.txt',
+        'emacsclient',
+      );
+      expect(command).toEqual({
+        command: 'emacsclient',
+        args: [
+          '-nw',
+          '--eval',
+          '(ediff "old file \\"quote\\".txt" "new file \\\\back\\\\slash.txt")',
+        ],
+      });
+    });
+
     it('should return the correct command for helix', () => {
       const command = getDiffCommand('old.txt', 'new.txt', 'hx');
       expect(command).toEqual({
         command: 'hx',
         args: ['--vsplit', '--', 'old.txt', 'new.txt'],
       });
+    });
+
+    it('should return null for sublimetext (no CLI diff support)', () => {
+      expect(getDiffCommand('old.txt', 'new.txt', 'sublimetext')).toBeNull();
+    });
+
+    it('should return null for lapce (no CLI diff support)', () => {
+      expect(getDiffCommand('old.txt', 'new.txt', 'lapce')).toBeNull();
+    });
+
+    it('should return null for nova (no CLI diff support)', () => {
+      expect(getDiffCommand('old.txt', 'new.txt', 'nova')).toBeNull();
+    });
+
+    it('should return null for micro (no CLI diff support)', () => {
+      expect(getDiffCommand('old.txt', 'new.txt', 'micro')).toBeNull();
     });
 
     it('should return null for an unsupported editor', () => {
@@ -353,6 +418,7 @@ describe('editor utils', () => {
       'windsurf',
       'cursor',
       'zed',
+      'bbedit',
     ];
 
     for (const editor of guiEditors) {
@@ -473,7 +539,14 @@ describe('editor utils', () => {
       });
     }
 
-    const terminalEditors: EditorType[] = ['vim', 'neovim', 'emacs', 'hx'];
+    // micro has no CLI diff support (getDiffCommand returns null) so is excluded here
+    const terminalEditors: EditorType[] = [
+      'vim',
+      'neovim',
+      'emacs',
+      'hx',
+      'emacsclient',
+    ];
 
     for (const editor of terminalEditors) {
       it(`should call spawnSync for ${editor}`, async () => {
@@ -499,6 +572,198 @@ describe('editor utils', () => {
         'No diff tool available. Install a supported editor.',
       );
     });
+
+    it('should strictly quote arguments with spaces or shell characters on Windows', async () => {
+      Object.defineProperty(process, 'platform', { value: 'win32' });
+      const mockSpawnOn = vi.fn((event, cb) => {
+        if (event === 'close') cb(0);
+      });
+      (spawn as Mock).mockReturnValue({ on: mockSpawnOn });
+
+      await openDiff(
+        'C:\\Users\\John Doe\\My Projects\\old_v1.txt',
+        'file & calc.exe | dir',
+        'vscode',
+      );
+
+      expect(spawn).toHaveBeenCalledWith(
+        'code.cmd',
+        [
+          '--wait',
+          '--diff',
+          '"C:\\Users\\John Doe\\My Projects\\old_v1.txt"',
+          '"file & calc.exe | dir"',
+        ],
+        {
+          stdio: 'inherit',
+          shell: true,
+        },
+      );
+    });
+
+    it.each(['linux', 'darwin'])(
+      'should not quote arguments on non-Windows platforms (%s)',
+      async (platform) => {
+        Object.defineProperty(process, 'platform', { value: platform });
+        const mockSpawnOn = vi.fn((event, cb) => {
+          if (event === 'close') cb(0);
+        });
+        (spawn as Mock).mockReturnValue({ on: mockSpawnOn });
+
+        await openDiff(
+          'path with spaces/old.txt',
+          'file & calc.exe | dir',
+          'vscode',
+        );
+
+        expect(spawn).toHaveBeenCalledWith(
+          'code',
+          [
+            '--wait',
+            '--diff',
+            'path with spaces/old.txt',
+            'file & calc.exe | dir',
+          ],
+          {
+            stdio: 'inherit',
+            shell: false,
+          },
+        );
+      },
+    );
+
+    it('should not pre-quote arguments for terminal editors on Windows (spawnSync without shell)', async () => {
+      Object.defineProperty(process, 'platform', { value: 'win32' });
+      (execSync as Mock).mockReturnValue(Buffer.from('C:\\vim\\vim.exe'));
+
+      await openDiff(
+        'C:\\Users\\John Doe\\old.txt',
+        'C:\\Users\\John Doe\\new.txt',
+        'vim',
+      );
+
+      expect(spawnSync).toHaveBeenCalledWith(
+        'vim',
+        expect.arrayContaining([
+          'C:\\Users\\John Doe\\old.txt',
+          'C:\\Users\\John Doe\\new.txt',
+        ]),
+        {
+          stdio: 'inherit',
+        },
+      );
+    });
+
+    it('should reject, not spawn, and emit ExternalEditorClosed on Windows if path contains newline or double quotes', async () => {
+      Object.defineProperty(process, 'platform', { value: 'win32' });
+      const emitSpy = vi.spyOn(coreEvents, 'emit');
+
+      await expect(
+        openDiff('old\nfile.txt', 'new.txt', 'vscode'),
+      ).rejects.toThrow('Invalid argument: newlines are not allowed');
+      await expect(
+        openDiff('old"file".txt', 'new.txt', 'vscode'),
+      ).rejects.toThrow(
+        'Invalid argument: double quotes are not allowed on Windows',
+      );
+      expect(spawn).not.toHaveBeenCalled();
+      expect(emitSpy).toHaveBeenCalledWith(CoreEvent.ExternalEditorClosed);
+    });
+  });
+
+  describe('quoteCmdArg', () => {
+    it('should return empty quotes for empty string', () => {
+      expect(quoteCmdArg('')).toBe('""');
+    });
+
+    it('should leave safe alphanumeric and path characters unquoted', () => {
+      expect(quoteCmdArg('--wait')).toBe('--wait');
+      expect(quoteCmdArg('--diff')).toBe('--diff');
+      expect(quoteCmdArg('simple_file.txt')).toBe('simple_file.txt');
+      expect(quoteCmdArg('C:\\path\\to\\file-1.2.txt')).toBe(
+        'C:\\path\\to\\file-1.2.txt',
+      );
+      expect(quoteCmdArg('C:\\temp\\')).toBe('C:\\temp\\');
+      expect(quoteCmdArg('relative/path/to/file.ts')).toBe(
+        'relative/path/to/file.ts',
+      );
+    });
+
+    it('should quote paths with multiple spaced tokens or whitespace', () => {
+      expect(
+        quoteCmdArg('C:\\Users\\John Doe\\My Documents\\Project One\\file.txt'),
+      ).toBe('"C:\\Users\\John Doe\\My Documents\\Project One\\file.txt"');
+      expect(quoteCmdArg('   ')).toBe('"   "');
+      expect(quoteCmdArg('file\tname.txt')).toBe('"file\tname.txt"');
+    });
+
+    it('should quote strings containing shell operators and delimiters (&, &&, |, ||, <, >, ^, parentheses, ;, ,, =, !)', () => {
+      expect(quoteCmdArg('file & calc.exe')).toBe('"file & calc.exe"');
+      expect(quoteCmdArg('file && calc.exe')).toBe('"file && calc.exe"');
+      expect(quoteCmdArg('file | dir')).toBe('"file | dir"');
+      expect(quoteCmdArg('file || dir')).toBe('"file || dir"');
+      expect(quoteCmdArg('file&whoami.txt')).toBe('"file&whoami.txt"');
+      expect(quoteCmdArg('file|pipe.txt')).toBe('"file|pipe.txt"');
+      expect(quoteCmdArg('file<in>out.txt')).toBe('"file<in>out.txt"');
+      expect(quoteCmdArg('file^caret.txt')).toBe('"file^caret.txt"');
+      expect(quoteCmdArg('file(1).txt')).toBe('"file(1).txt"');
+      expect(quoteCmdArg('file;name.txt')).toBe('"file;name.txt"');
+      expect(quoteCmdArg('file,name.txt')).toBe('"file,name.txt"');
+      expect(quoteCmdArg('file=name.txt')).toBe('"file=name.txt"');
+      expect(quoteCmdArg('file!var!.txt')).toBe('"file!var!.txt"');
+    });
+
+    it('should preserve percent signs without carets inside quotes', () => {
+      expect(quoteCmdArg('file%TEMP%.txt')).toBe('"file%TEMP%.txt"');
+    });
+
+    it('should throw an error if argument contains double quotes', () => {
+      expect(() => quoteCmdArg('file"name".txt')).toThrow(
+        'Invalid argument: double quotes are not allowed on Windows',
+      );
+      expect(() => quoteCmdArg('"quoted"')).toThrow(
+        'Invalid argument: double quotes are not allowed on Windows',
+      );
+      expect(() => quoteCmdArg('file\\"name".txt')).toThrow(
+        'Invalid argument: double quotes are not allowed on Windows',
+      );
+      expect(() => quoteCmdArg('foo\\" & calc.exe & "bar')).toThrow(
+        'Invalid argument: double quotes are not allowed on Windows',
+      );
+      expect(() => quoteCmdArg('C:\\dir\\"sub"\\')).toThrow(
+        'Invalid argument: double quotes are not allowed on Windows',
+      );
+    });
+
+    it('should double trailing backslashes to prevent escaping the closing quote', () => {
+      expect(quoteCmdArg('C:\\dir with spaces\\')).toBe(
+        '"C:\\dir with spaces\\\\"',
+      );
+      expect(quoteCmdArg('C:\\dir with spaces\\\\')).toBe(
+        '"C:\\dir with spaces\\\\\\\\"',
+      );
+      const manyBackslashes = '\\'.repeat(5000) + ' trailing space';
+      expect(quoteCmdArg(manyBackslashes)).toBe(`"${manyBackslashes}"`);
+      const manyTrailingBackslashes = 'leading space ' + '\\'.repeat(5000);
+      expect(quoteCmdArg(manyTrailingBackslashes)).toBe(
+        `"leading space ${'\\'.repeat(10000)}"`,
+      );
+    });
+
+    it('should throw an error if argument contains newline, carriage return, or null characters', () => {
+      expect(() => quoteCmdArg('file\nname.txt')).toThrow(
+        'Invalid argument: newlines are not allowed',
+      );
+      expect(() => quoteCmdArg('file\rname.txt')).toThrow(
+        'Invalid argument: newlines are not allowed',
+      );
+      expect(() => quoteCmdArg('file\r\nname.txt')).toThrow(
+        'Invalid argument: newlines are not allowed',
+      );
+      expect(() => quoteCmdArg('file\0name.txt')).toThrow(
+        'Invalid argument: newlines are not allowed',
+      );
+    });
   });
 
   describe('allowEditorTypeInSandbox', () => {
@@ -518,6 +783,15 @@ describe('editor utils', () => {
 
     it('should allow emacs when not in sandbox mode', () => {
       expect(allowEditorTypeInSandbox('emacs')).toBe(true);
+    });
+
+    it('should allow emacsclient in sandbox mode', () => {
+      vi.stubEnv('SANDBOX', 'sandbox');
+      expect(allowEditorTypeInSandbox('emacsclient')).toBe(true);
+    });
+
+    it('should allow emacsclient when not in sandbox mode', () => {
+      expect(allowEditorTypeInSandbox('emacsclient')).toBe(true);
     });
 
     it('should allow neovim in sandbox mode', () => {
@@ -544,6 +818,10 @@ describe('editor utils', () => {
       'windsurf',
       'cursor',
       'zed',
+      'sublimetext',
+      'lapce',
+      'nova',
+      'bbedit',
     ];
     for (const editor of guiEditors) {
       it(`should not allow ${editor} in sandbox mode`, () => {
@@ -775,6 +1053,127 @@ describe('editor utils', () => {
       const result = await resolvePromise;
       expect(result).toBe('vim');
       expect(emitSpy).toHaveBeenCalledWith(CoreEvent.RequestEditorSelection);
+    });
+  });
+
+  describe('isValidEditorType', () => {
+    it('should return true for known editor identifiers', () => {
+      expect(isValidEditorType('vscode')).toBe(true);
+      expect(isValidEditorType('vim')).toBe(true);
+      expect(isValidEditorType('sublimetext')).toBe(true);
+      expect(isValidEditorType('emacsclient')).toBe(true);
+      expect(isValidEditorType('micro')).toBe(true);
+      expect(isValidEditorType('lapce')).toBe(true);
+      expect(isValidEditorType('nova')).toBe(true);
+      expect(isValidEditorType('bbedit')).toBe(true);
+    });
+
+    it('should return false for unrecognized strings', () => {
+      expect(isValidEditorType('emacsclient -nw')).toBe(false);
+      expect(isValidEditorType('subl')).toBe(false);
+      expect(isValidEditorType('code')).toBe(false);
+      expect(isValidEditorType('')).toBe(false);
+      expect(isValidEditorType('notepad')).toBe(false);
+    });
+  });
+
+  describe('getEditorWaitFlag', () => {
+    it('should return -w for sublimetext', () => {
+      expect(getEditorWaitFlag('sublimetext')).toBe('-w');
+    });
+
+    it('should return --wait for all other GUI editors', () => {
+      const standardGuiEditors: EditorType[] = [
+        'vscode',
+        'vscodium',
+        'windsurf',
+        'cursor',
+        'zed',
+        'antigravity',
+        'lapce',
+        'nova',
+        'bbedit',
+      ];
+      for (const editor of standardGuiEditors) {
+        expect(getEditorWaitFlag(editor)).toBe('--wait');
+      }
+    });
+  });
+
+  describe('resolveEditorTypeFromCommand', () => {
+    it('should resolve known command names to their editor type', () => {
+      expect(resolveEditorTypeFromCommand('cursor')).toBe('cursor');
+      expect(resolveEditorTypeFromCommand('code')).toBe('vscode');
+      expect(resolveEditorTypeFromCommand('codium')).toBe('vscodium');
+      expect(resolveEditorTypeFromCommand('vim')).toBe('vim');
+    });
+
+    it('should be case-insensitive', () => {
+      expect(resolveEditorTypeFromCommand('Cursor')).toBe('cursor');
+      expect(resolveEditorTypeFromCommand('CODE')).toBe('vscode');
+    });
+
+    it('should return undefined for unknown commands', () => {
+      expect(resolveEditorTypeFromCommand('unknowntool')).toBeUndefined();
+      expect(resolveEditorTypeFromCommand('')).toBeUndefined();
+    });
+  });
+
+  describe('getEditorExtraArgs', () => {
+    it('should return [-nw] for emacsclient', () => {
+      expect(getEditorExtraArgs('emacsclient')).toEqual(['-nw']);
+    });
+
+    it('should return [] for VS Code-family editors by default', () => {
+      const vscodeEditors: EditorType[] = [
+        'vscode',
+        'vscodium',
+        'cursor',
+        'windsurf',
+      ];
+      for (const editor of vscodeEditors) {
+        expect(getEditorExtraArgs(editor)).toEqual([]);
+      }
+    });
+
+    it('should return [--new-window] for VS Code-family editors when newWindow is true', () => {
+      const vscodeEditors: EditorType[] = [
+        'vscode',
+        'vscodium',
+        'cursor',
+        'windsurf',
+      ];
+      for (const editor of vscodeEditors) {
+        expect(getEditorExtraArgs(editor, { newWindow: true })).toEqual([
+          '--new-window',
+        ]);
+      }
+    });
+
+    it('should return [] for VS Code-family editors when newWindow is false', () => {
+      const vscodeEditors: EditorType[] = [
+        'vscode',
+        'vscodium',
+        'cursor',
+        'windsurf',
+      ];
+      for (const editor of vscodeEditors) {
+        expect(getEditorExtraArgs(editor, { newWindow: false })).toEqual([]);
+      }
+    });
+
+    it('should return [] for all other editors', () => {
+      const otherEditors: EditorType[] = [
+        'vim',
+        'neovim',
+        'emacs',
+        'hx',
+        'sublimetext',
+        'micro',
+      ];
+      for (const editor of otherEditors) {
+        expect(getEditorExtraArgs(editor)).toEqual([]);
+      }
     });
   });
 });

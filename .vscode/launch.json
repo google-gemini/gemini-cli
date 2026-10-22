@@ -43,9 +43,13 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "Launch Program",
+      "name": "CLI: Run Current File",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--import", "tsx"],
       "skipFiles": ["<node_internals>/**"],
       "program": "${file}",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
       "outFiles": ["${workspaceFolder}/**/*.js"]
     },
     {

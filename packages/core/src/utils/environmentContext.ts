@@ -7,6 +7,8 @@
 import type { Part, Content } from '@google/genai';
 import type { Config } from '../config/config.js';
 import { getFolderStructure } from './getFolderStructure.js';
+import type { HistoryTurn } from '../core/agentChatHistory.js';
+import { deriveStableId } from './cryptoUtils.js';
 
 export const INITIAL_HISTORY_LENGTH = 1;
 
@@ -61,12 +63,7 @@ export async function getEnvironmentContext(config: Config): Promise<Part[]> {
   // - Tier 1 (global): system instruction only
   // - Tier 2 (extension + project): first user message (here)
   // - Tier 3 (subdirectory): tool output (JIT)
-  // When JIT is enabled, Tier 2 memory is provided by getSessionMemory().
-  // When JIT is disabled, all memory is in the system instruction and
-  // getEnvironmentMemory() provides the project memory for this message.
-  const environmentMemory = config.isJitContextEnabled?.()
-    ? config.getSessionMemory()
-    : config.getEnvironmentMemory();
+  const environmentMemory = config.getSessionMemory();
 
   const context = `
 <session_context>
@@ -86,15 +83,28 @@ ${environmentMemory}
 
 export async function getInitialChatHistory(
   config: Config,
-  extraHistory?: Content[],
-): Promise<Content[]> {
+  extraHistory?: ReadonlyArray<Content | HistoryTurn>,
+): Promise<Array<Content | HistoryTurn>> {
+  const envId = deriveStableId(['environment-context']);
+
+  if (extraHistory && extraHistory.length > 0) {
+    const first = extraHistory[0];
+    const firstId = 'id' in first ? first.id : undefined;
+    if (firstId === envId) {
+      return [...extraHistory];
+    }
+  }
+
   const envParts = await getEnvironmentContext(config);
   const envContextString = envParts.map((part) => part.text || '').join('\n\n');
 
   return [
     {
-      role: 'user',
-      parts: [{ text: envContextString }],
+      id: deriveStableId(['environment-context']),
+      content: {
+        role: 'user',
+        parts: [{ text: envContextString }],
+      },
     },
     ...(extraHistory ?? []),
   ];

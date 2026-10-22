@@ -7,7 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { debugLogger } from './debugLogger.js';
-import { resolveToRealPath } from './paths.js';
+import { resolveToRealPath, hasBlockedPathSegment } from './paths.js';
 
 export type Unsubscribe = () => void;
 
@@ -124,8 +124,10 @@ export class WorkspaceContext {
       if (!fs.existsSync(pathToAdd)) {
         return;
       }
-      // Resolve symlinks
-      const resolved = fs.realpathSync(path.resolve(this.targetDir, pathToAdd));
+      // Resolve symlinks and SFNs canonically
+      const resolved = resolveToRealPath(
+        path.resolve(this.targetDir, pathToAdd),
+      );
       this.readOnlyPaths.add(resolved);
     } catch (e) {
       debugLogger.warn(`Failed to add read-only path ${pathToAdd}:`, e);
@@ -143,7 +145,8 @@ export class WorkspaceContext {
       throw new Error(`Path is not a directory: ${absolutePath}`);
     }
 
-    return fs.realpathSync(absolutePath);
+    // Resolve workspace directory canonically (supporting Windows SFNs)
+    return resolveToRealPath(absolutePath);
   }
 
   /**
@@ -184,6 +187,10 @@ export class WorkspaceContext {
 
       for (const dir of this.directories) {
         if (this.isPathWithinRoot(fullyResolvedPath, dir)) {
+          const relative = path.relative(dir, fullyResolvedPath);
+          if (hasBlockedPathSegment(relative)) {
+            return false;
+          }
           return true;
         }
       }

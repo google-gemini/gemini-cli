@@ -11,6 +11,6 @@ interactive = false
 
 [[rule]]
 toolName = "invoke_agent"
-decision = "deny"
+decision = "allow"
 priority = 999
 interactive = false

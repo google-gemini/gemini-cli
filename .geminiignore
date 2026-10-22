@@ -1,1 +1,2 @@
 packages/core/src/services/scripts/*.exe
+gha-creds-*.json

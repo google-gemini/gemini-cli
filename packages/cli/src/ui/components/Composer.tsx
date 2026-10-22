@@ -37,9 +37,9 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const config = useConfig();
   const { vimEnabled, vimMode } = useVimMode();
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
-  const { columns: terminalWidth } = useTerminalSize();
+  const { columns: terminalWidth, rows: terminalHeight } = useTerminalSize();
   const isNarrow = isNarrowWidth(terminalWidth);
-  const debugConsoleMaxHeight = Math.floor(Math.max(terminalWidth * 0.2, 5));
+  const debugConsoleMaxHeight = Math.floor(Math.max(terminalHeight * 0.2, 5));
   const [suggestionsVisible, setSuggestionsVisible] = useState(false);
 
   const isAlternateBuffer = useAlternateBuffer();
@@ -48,8 +48,11 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const hideContextSummary =
     suggestionsVisible && suggestionsPosition === 'above';
 
-  const { hasPendingActionRequired, shouldCollapseDuringApproval } =
-    useComposerStatus();
+  const {
+    hasPendingActionRequired,
+    hasPendingToolConfirmation,
+    shouldCollapseDuringApproval,
+  } = useComposerStatus();
 
   const isPassiveShortcutsHelpState =
     uiState.isInputActive &&
@@ -59,10 +62,10 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const { setShortcutsHelpVisible } = uiActions;
 
   useEffect(() => {
-    if (hasPendingActionRequired) {
+    if (hasPendingActionRequired && !hasPendingToolConfirmation) {
       appEvents.emit(AppEvent.ScrollToBottom);
     }
-  }, [hasPendingActionRequired]);
+  }, [hasPendingActionRequired, hasPendingToolConfirmation]);
 
   useEffect(() => {
     if (uiState.shortcutsHelpVisible && !isPassiveShortcutsHelpState) {
@@ -130,9 +133,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
         <OverflowProvider>
           <Box flexDirection="column">
             <DetailedMessagesDisplay
-              maxHeight={
-                uiState.constrainHeight ? debugConsoleMaxHeight : undefined
-              }
+              maxHeight={debugConsoleMaxHeight}
               width={uiState.terminalWidth}
               hasFocus={uiState.showErrorDetails}
             />
@@ -152,8 +153,10 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           setShellModeActive={uiActions.setShellModeActive}
           approvalMode={uiState.showApprovalModeIndicator}
           onEscapePromptChange={uiActions.onEscapePromptChange}
-          focus={isFocused}
+          focus={isFocused && !hasPendingActionRequired}
           vimHandleInput={uiActions.vimHandleInput}
+          vimEnabled={vimEnabled}
+          vimMode={vimMode}
           isEmbeddedShellFocused={uiState.embeddedShellFocused}
           popAllMessages={uiActions.popAllMessages}
           onQueueMessage={uiActions.addMessage}

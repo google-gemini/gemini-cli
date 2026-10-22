@@ -46,9 +46,10 @@ const mockIdeClient = vi.hoisted(() => ({
   getInstance: vi.fn().mockReturnValue(new Promise(() => {})),
 }));
 
-// Mock stdout
+// Mock stdout and ink app
 const mocks = vi.hoisted(() => ({
   mockStdout: { write: vi.fn() },
+  mockRerender: vi.fn(),
 }));
 const terminalNotificationsMocks = vi.hoisted(() => ({
   notifyViaTerminal: vi.fn().mockResolvedValue(true),
@@ -113,12 +114,15 @@ import {
   type OverflowActions,
 } from './contexts/OverflowContext.js';
 
-// Mock useStdout to capture terminal title writes
+// Mock useStdout and useApp to capture terminal title writes and spy on re-renders
 vi.mock('ink', async (importOriginal) => {
   const actual = await importOriginal<typeof import('ink')>();
   return {
     ...actual,
     useStdout: () => ({ stdout: mocks.mockStdout }),
+    useApp: () => ({
+      rerender: mocks.mockRerender,
+    }),
     measureElement: vi.fn(),
   };
 });
@@ -150,6 +154,9 @@ vi.mock('./hooks/useQuotaAndFallback.js');
 vi.mock('./hooks/useHistoryManager.js');
 vi.mock('./hooks/useThemeCommand.js');
 vi.mock('./auth/useAuth.js');
+vi.mock('../config/auth.js', () => ({
+  validateAuthMethod: vi.fn().mockResolvedValue(null),
+}));
 vi.mock('./hooks/useEditorSettings.js');
 vi.mock('./hooks/useSettingsCommand.js');
 vi.mock('./hooks/useModelCommand.js');
@@ -214,9 +221,12 @@ vi.mock('../utils/handleAutoUpdate.js');
 vi.mock('./utils/ConsolePatcher.js');
 vi.mock('../utils/cleanup.js');
 
+import { appEvents, AppEvent } from '../utils/events.js';
+
 import { useHistory } from './hooks/useHistoryManager.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
 import { useAuthCommand } from './auth/useAuth.js';
+import { validateAuthMethod } from '../config/auth.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSettingsCommand } from './hooks/useSettingsCommand.js';
 import { useModelCommand } from './hooks/useModelCommand.js';
@@ -242,6 +252,7 @@ import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import * as useKeypressModule from './hooks/useKeypress.js';
 import { useSuspend } from './hooks/useSuspend.js';
+import { useTerminalSize } from './hooks/useTerminalSize.js';
 import {
   writeToStdout,
   enableMouseEvents,
@@ -252,6 +263,17 @@ import {
   WARNING_PROMPT_DURATION_MS,
   EXPAND_HINT_DURATION_MS,
 } from './constants.js';
+
+// In the default inline mode, refreshStatic must only clear the visible
+// viewport. It must never emit `\x1b[3J` (Erase Saved Lines), which purges the
+// terminal's native scrollback history.
+const CLEAR_VIEWPORT = ansiEscapes.eraseScreen + ansiEscapes.cursorTo(0, 0);
+const ERASE_SCROLLBACK = '\x1b[3J';
+
+const getScrollbackPurgingWrites = () =>
+  mocks.mockStdout.write.mock.calls.filter((call: unknown[]) =>
+    String(call[0]).includes(ERASE_SCROLLBACK),
+  );
 
 describe('AppContainer State Management', () => {
   let mockConfig: Config;
@@ -326,6 +348,7 @@ describe('AppContainer State Management', () => {
   const mockedUseTerminalTheme = useTerminalTheme as Mock;
   const mockedUseShellInactivityStatus = useShellInactivityStatus as Mock;
   const mockedUseFocusState = useFocus as Mock;
+  const mockedUseTerminalSize = useTerminalSize as Mock;
 
   const DEFAULT_GEMINI_STREAM_MOCK = {
     streamingState: 'idle',
@@ -458,6 +481,10 @@ describe('AppContainer State Management', () => {
     mockedUseSuspend.mockReturnValue({
       handleSuspend: vi.fn(),
     });
+    mockedUseTerminalSize.mockReturnValue({
+      columns: 80,
+      rows: 24,
+    });
     mockedUseHookDisplayState.mockReturnValue([]);
     mockedUseTerminalTheme.mockReturnValue(undefined);
     mockedUseShellInactivityStatus.mockReturnValue({
@@ -487,12 +514,12 @@ describe('AppContainer State Management', () => {
     vi.spyOn(mockConfig, 'initialize').mockResolvedValue(undefined);
     vi.spyOn(mockConfig, 'getDebugMode').mockReturnValue(false);
 
-    mockExtensionManager = vi.mockObject({
+    mockExtensionManager = {
       getExtensions: vi.fn().mockReturnValue([]),
       setRequestConsent: vi.fn(),
       setRequestSetting: vi.fn(),
       start: vi.fn(),
-    } as unknown as ExtensionManager);
+    } as unknown as MockedObject<ExtensionManager>;
     vi.spyOn(mockConfig, 'getExtensionLoader').mockReturnValue(
       mockExtensionManager,
     );
@@ -576,6 +603,36 @@ describe('AppContainer State Management', () => {
   });
 
   describe('State Initialization', () => {
+    it('calls validateAuthMethod and onAuthError if validation fails', async () => {
+      const mockOnAuthError = vi.fn();
+      mockedUseAuthCommand.mockReturnValue({
+        authState: 'authenticated',
+        setAuthState: vi.fn(),
+        authError: null,
+        onAuthError: mockOnAuthError,
+      });
+      vi.mocked(validateAuthMethod).mockResolvedValueOnce('Validation Failed');
+
+      const { unmount } = await act(async () =>
+        renderAppContainer({
+          settings: createMockSettings({
+            merged: {
+              security: {
+                auth: { selectedType: 'oauth-personal', useExternal: false },
+              },
+            },
+          }),
+        }),
+      );
+
+      await waitFor(() => {
+        expect(validateAuthMethod).toHaveBeenCalledWith('oauth-personal');
+        expect(mockOnAuthError).toHaveBeenCalledWith('Validation Failed');
+      });
+
+      unmount();
+    });
+
     it('sends a macOS notification when confirmation is pending and terminal is unfocused', async () => {
       mockedUseFocusState.mockReturnValue({
         isFocused: false,
@@ -1263,6 +1320,42 @@ describe('AppContainer State Management', () => {
 
       // Should not call resumeChat when client is not initialized
       expect(mockResumeChat).not.toHaveBeenCalled();
+      unmount();
+    });
+  });
+
+  describe('SessionStart Hook Rendering', () => {
+    it('does not render systemMessage directly (avoids duplicate with HookSystemMessage event)', async () => {
+      const mockAddItem = vi.fn();
+      mockedUseHistory.mockReturnValue({
+        history: [],
+        addItem: mockAddItem,
+        updateItem: vi.fn(),
+        clearItems: vi.fn(),
+        loadHistory: vi.fn(),
+      });
+
+      const fireSessionStartEvent = vi.fn().mockResolvedValue({
+        systemMessage: 'Hello from SessionStart hook',
+        getAdditionalContext: vi.fn(() => undefined),
+      });
+      vi.spyOn(mockConfig, 'getHookSystem').mockReturnValue({
+        fireSessionEndEvent: vi.fn().mockResolvedValue(undefined),
+        fireSessionStartEvent,
+      } as unknown as ReturnType<Config['getHookSystem']>);
+
+      const { unmount } = await act(async () => renderAppContainer());
+      await waitFor(() => expect(fireSessionStartEvent).toHaveBeenCalled());
+
+      // The direct-render path (the bug) would call addItem with the
+      // systemMessage text and no `source` field. The HookSystemMessage
+      // event-listener path (the correct one) always sets `source`.
+      const directRenderCall = mockAddItem.mock.calls.find(
+        ([item]) =>
+          item?.text === 'Hello from SessionStart hook' && !item?.source,
+      );
+      expect(directRenderCall).toBeUndefined();
+
       unmount();
     });
   });
@@ -2121,6 +2214,84 @@ describe('AppContainer State Management', () => {
         unmount();
       });
 
+      it('should await in-flight cancelOngoingRequest promise before quitting on rapid double press', async () => {
+        let resolveCancel!: () => void;
+        const cancelPromise = new Promise<void>((resolve) => {
+          resolveCancel = resolve;
+        });
+        mockCancelOngoingRequest.mockReturnValue(cancelPromise);
+
+        await setupKeypressTest();
+
+        pressKey('\x03', 2); // Rapid double Ctrl+C
+
+        expect(mockCancelOngoingRequest).toHaveBeenCalledTimes(2);
+        // Should not have called /quit yet while cancelPromise is still pending
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+
+        await act(async () => {
+          resolveCancel();
+          await cancelPromise;
+        });
+
+        expect(mockHandleSlashCommand).toHaveBeenCalledWith(
+          '/quit',
+          undefined,
+          undefined,
+          false,
+        );
+        unmount();
+      });
+
+      it('should bound waiting on a hanging cancelOngoingRequest to 1s via Promise.race on rapid double press', async () => {
+        mockCancelOngoingRequest.mockReturnValue(new Promise<void>(() => {}));
+
+        await setupKeypressTest();
+
+        pressKey('\x03', 2); // Rapid double Ctrl+C
+
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(1000);
+        });
+
+        expect(mockHandleSlashCommand).toHaveBeenCalledWith(
+          '/quit',
+          undefined,
+          undefined,
+          false,
+        );
+        unmount();
+      });
+
+      it('should safely handle rejected cancelOngoingRequest promise and still quit on rapid double press', async () => {
+        let rejectCancel!: (err: Error) => void;
+        const cancelPromise = new Promise<void>((_, reject) => {
+          rejectCancel = reject;
+        });
+        mockCancelOngoingRequest.mockReturnValue(cancelPromise);
+
+        await setupKeypressTest();
+
+        pressKey('\x03', 2); // Rapid double Ctrl+C
+
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+
+        await act(async () => {
+          rejectCancel(new Error('Cancel failed'));
+          await cancelPromise.catch(() => {});
+        });
+
+        expect(mockHandleSlashCommand).toHaveBeenCalledWith(
+          '/quit',
+          undefined,
+          undefined,
+          false,
+        );
+        unmount();
+      });
+
       it('should reset press count after a timeout', async () => {
         await setupKeypressTest();
 
@@ -2849,6 +3020,33 @@ describe('AppContainer State Management', () => {
       unmount!();
     });
 
+    it('calls app.rerender() when ExternalEditorClosed event is received in terminalBuffer mode', async () => {
+      vi.spyOn(mockConfig, 'getUseTerminalBuffer').mockReturnValue(true);
+      vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(false);
+      vi.spyOn(mockConfig, 'getScreenReader').mockReturnValue(false);
+
+      mocks.mockRerender.mockClear();
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = await renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      const handler = mockCoreEvents.on.mock.calls.find(
+        (call: unknown[]) => call[0] === CoreEvent.ExternalEditorClosed,
+      )?.[1];
+      expect(handler).toBeDefined();
+
+      act(() => {
+        handler();
+      });
+
+      expect(mocks.mockRerender).toHaveBeenCalledTimes(1);
+      unmount!();
+    });
+
     it('updates currentModel when ModelChanged event is received', async () => {
       // Arrange: Mock initial model
       vi.spyOn(mockConfig, 'getModel').mockReturnValue('initial-model');
@@ -3122,12 +3320,287 @@ describe('AppContainer State Management', () => {
         await new Promise((resolve) => setTimeout(resolve, 100));
       });
 
-      // Check that clearTerminal was NOT written to stdout
-      const clearTerminalCalls = mocks.mockStdout.write.mock.calls.filter(
-        (call: unknown[]) => call[0] === ansiEscapes.clearTerminal,
+      // Check that refreshStatic did NOT clear the viewport
+      const clearViewportCalls = mocks.mockStdout.write.mock.calls.filter(
+        (call: unknown[]) => call[0] === CLEAR_VIEWPORT,
       );
 
-      expect(clearTerminalCalls).toHaveLength(0);
+      expect(clearViewportCalls).toHaveLength(0);
+      unmount();
+    });
+
+    it('keeps constrainHeight true when OpenDebugConsole event is triggered', async () => {
+      const { unmount } = await act(async () => renderAppContainer());
+      expect(capturedUIState).toBeTruthy();
+      expect(capturedUIState.showErrorDetails).toBe(false);
+      expect(capturedUIState.constrainHeight).toBe(true);
+
+      const openDebugConsoleHandler = vi
+        .mocked(appEvents.on)
+        .mock.calls.find(
+          (call: unknown[]) => call[0] === AppEvent.OpenDebugConsole,
+        )?.[1] as (() => void) | undefined;
+      expect(openDebugConsoleHandler).toBeDefined();
+
+      act(() => {
+        openDebugConsoleHandler!();
+      });
+
+      expect(capturedUIState.showErrorDetails).toBe(true);
+      expect(capturedUIState.constrainHeight).toBe(true);
+      unmount();
+    });
+
+    it('debounces refreshStatic when terminal width changes in default inline mode, and ignores height-only changes', async () => {
+      vi.useFakeTimers();
+      try {
+        vi.spyOn(mockConfig, 'getUseTerminalBuffer').mockReturnValue(false);
+        vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(false);
+
+        const { rerender, unmount } = await act(async () =>
+          renderAppContainer(),
+        );
+        expect(capturedUIState).toBeTruthy();
+
+        const initialRemountKey = capturedUIState.historyRemountKey;
+        mocks.mockStdout.write.mockClear();
+
+        // Initial mount should not trigger refreshStatic after 100ms
+        act(() => {
+          vi.advanceTimersByTime(100);
+        });
+        expect(mocks.mockStdout.write).not.toHaveBeenCalledWith(CLEAR_VIEWPORT);
+        expect(capturedUIState.historyRemountKey).toBe(initialRemountKey);
+
+        // Simulate height-only resize (e.g. mobile virtual keyboard toggle)
+        mockedUseTerminalSize.mockReturnValue({ columns: 80, rows: 16 });
+        await act(async () => {
+          rerender(getAppContainer());
+        });
+        act(() => {
+          vi.advanceTimersByTime(100);
+        });
+        expect(mocks.mockStdout.write).not.toHaveBeenCalledWith(CLEAR_VIEWPORT);
+        expect(capturedUIState.historyRemountKey).toBe(initialRemountKey);
+
+        // Simulate rapid consecutive horizontal resizes (columns: 80 -> 70 -> 60)
+        mockedUseTerminalSize.mockReturnValue({ columns: 70, rows: 16 });
+        await act(async () => {
+          rerender(getAppContainer());
+        });
+        act(() => {
+          vi.advanceTimersByTime(60);
+        });
+        expect(mocks.mockStdout.write).not.toHaveBeenCalledWith(CLEAR_VIEWPORT);
+
+        // Second resize before 100ms elapses should reset the debounce timer
+        mockedUseTerminalSize.mockReturnValue({ columns: 60, rows: 16 });
+        await act(async () => {
+          rerender(getAppContainer());
+        });
+        act(() => {
+          vi.advanceTimersByTime(60);
+        });
+        expect(mocks.mockStdout.write).not.toHaveBeenCalledWith(CLEAR_VIEWPORT);
+        expect(capturedUIState.historyRemountKey).toBe(initialRemountKey);
+
+        // Remaining 40ms completes the 100ms debounce from the last width change
+        act(() => {
+          vi.advanceTimersByTime(40);
+        });
+        expect(mocks.mockStdout.write).toHaveBeenCalledWith(CLEAR_VIEWPORT);
+        expect(capturedUIState.historyRemountKey).toBe(initialRemountKey + 1);
+
+        unmount();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('corks stdout during horizontal resize, discards intermediate buffered writes, and wraps refreshStatic in synchronized output', async () => {
+      vi.useFakeTimers();
+      const mockStdoutWithCork = mocks.mockStdout as {
+        write: Mock;
+        columns?: number;
+        cork?: Mock;
+        uncork?: Mock;
+        prependListener?: Mock;
+        off?: Mock;
+        _writableState?: {
+          corked: number;
+          length: number;
+          writelen?: number;
+          buffered: Array<{
+            chunk?: string | Buffer | Uint8Array;
+            encoding?: string;
+            callback?: (err?: Error | null) => void;
+          }>;
+          bufferedIndex: number;
+        };
+      };
+
+      let resizeListener: (() => void) | undefined;
+      const bufferedCallback = vi.fn();
+      const writableState = {
+        corked: 0,
+        length: 0,
+        writelen: 0,
+        buffered: [] as Array<{
+          chunk?: string | Buffer | Uint8Array;
+          encoding?: string;
+          callback?: (err?: Error | null) => void;
+        }>,
+        bufferedIndex: 0,
+      };
+
+      mockStdoutWithCork.columns = 80;
+      mockStdoutWithCork._writableState = writableState;
+      mockStdoutWithCork.cork = vi.fn(() => {
+        writableState.corked += 1;
+      });
+      mockStdoutWithCork.uncork = vi.fn(() => {
+        writableState.corked = Math.max(0, writableState.corked - 1);
+      });
+      mockStdoutWithCork.prependListener = vi.fn(
+        (event: string, cb: () => void) => {
+          if (event === 'resize') {
+            resizeListener = cb;
+          }
+        },
+      );
+      mockStdoutWithCork.off = vi.fn();
+
+      try {
+        vi.spyOn(mockConfig, 'getUseTerminalBuffer').mockReturnValue(false);
+        vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(false);
+
+        const { rerender, unmount } = await act(async () =>
+          renderAppContainer(),
+        );
+        expect(resizeListener).toBeTypeOf('function');
+        mocks.mockStdout.write.mockClear();
+        mockStdoutWithCork.cork.mockClear();
+        mockStdoutWithCork.uncork.mockClear();
+
+        // Simulate horizontal resize event before Ink.resized runs
+        mockStdoutWithCork.columns = 60;
+        resizeListener!();
+        expect(mockStdoutWithCork.cork).toHaveBeenCalledTimes(1);
+        expect(writableState.corked).toBe(1);
+
+        // Simulate intermediate buffered frame written while corked during resize drag
+        // alongside an active in-flight write at index 0 (bufferedIndex = 1, writelen = 10)
+        const inFlightCallback = vi.fn();
+        const discardedChunk = 'intermediate frame';
+        writableState.buffered.push(
+          {
+            chunk: 'in-flight',
+            encoding: 'utf8',
+            callback: inFlightCallback,
+          },
+          {
+            chunk: discardedChunk,
+            encoding: 'utf8',
+            callback: bufferedCallback,
+          },
+        );
+        writableState.bufferedIndex = 1;
+        writableState.writelen = 10;
+        writableState.length = 10 + Buffer.byteLength(discardedChunk, 'utf8');
+
+        mockedUseTerminalSize.mockReturnValue({ columns: 60, rows: 24 });
+        await act(async () => {
+          rerender(getAppContainer());
+        });
+
+        // Advance 80ms (timer for 60 cols has 20ms left), then emit a new raw
+        // stdout resize event (columns = 50) BEFORE React commits the new size.
+        act(() => {
+          vi.advanceTimersByTime(80);
+        });
+        mockStdoutWithCork.columns = 50;
+        resizeListener!();
+
+        // Advancing past the original 100ms mark (20ms more) must NOT flush or
+        // uncork stdout for the stale 60-col width.
+        act(() => {
+          vi.advanceTimersByTime(30);
+        });
+        expect(mocks.mockStdout.write).not.toHaveBeenCalled();
+        expect(mockStdoutWithCork.uncork).not.toHaveBeenCalled();
+        expect(writableState.corked).toBe(1);
+
+        // Now React commits the 50-col width and settles for 100ms
+        mockedUseTerminalSize.mockReturnValue({ columns: 50, rows: 24 });
+        await act(async () => {
+          rerender(getAppContainer());
+        });
+        act(() => {
+          vi.advanceTimersByTime(100);
+        });
+
+        // Intermediate buffered frame should have been discarded before the viewport clear,
+        // truncating buffered to startIndex (1) and preserving in-flight write state
+        expect(inFlightCallback).not.toHaveBeenCalled();
+        expect(bufferedCallback).toHaveBeenCalledWith(null);
+        expect(writableState.buffered).toHaveLength(1);
+        expect(writableState.bufferedIndex).toBe(1);
+        expect(writableState.length).toBe(10);
+        expect(writableState.writelen).toBe(10);
+
+        // The viewport clear should be wrapped in DEC Synchronized Output (\x1b[?2026h ... \x1b[?2026l) and uncorked in useLayoutEffect
+        expect(mocks.mockStdout.write).toHaveBeenNthCalledWith(
+          1,
+          '\x1b[?2026h',
+        );
+        expect(mocks.mockStdout.write).toHaveBeenNthCalledWith(
+          2,
+          CLEAR_VIEWPORT,
+        );
+        expect(mocks.mockStdout.write).toHaveBeenNthCalledWith(
+          3,
+          '\x1b[?2026l',
+        );
+        expect(getScrollbackPurgingWrites()).toHaveLength(0);
+        expect(mockStdoutWithCork.uncork).toHaveBeenCalledTimes(1);
+        expect(writableState.corked).toBe(0);
+
+        unmount();
+      } finally {
+        delete mockStdoutWithCork.columns;
+        delete mockStdoutWithCork.cork;
+        delete mockStdoutWithCork.uncork;
+        delete mockStdoutWithCork.prependListener;
+        delete mockStdoutWithCork.off;
+        delete mockStdoutWithCork._writableState;
+        vi.useRealTimers();
+      }
+    });
+
+    it('refreshStatic clears only the viewport and preserves terminal scrollback in default inline mode', async () => {
+      vi.spyOn(mockConfig, 'getUseTerminalBuffer').mockReturnValue(false);
+      vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(false);
+
+      const { unmount } = await act(async () => renderAppContainer());
+      expect(capturedUIActions).toBeTruthy();
+
+      const initialRemountKey = capturedUIState.historyRemountKey;
+      mocks.mockStdout.write.mockClear();
+
+      act(() => {
+        capturedUIActions.refreshStatic();
+      });
+
+      // Only the visible viewport is erased so earlier turns remain available
+      // in the terminal's native scrollback.
+      expect(mocks.mockStdout.write).toHaveBeenCalledWith(CLEAR_VIEWPORT);
+      expect(mocks.mockStdout.write).not.toHaveBeenCalledWith(
+        ansiEscapes.clearTerminal,
+      );
+      expect(getScrollbackPurgingWrites()).toHaveLength(0);
+      // Static history is still remounted so it is re-rendered after the clear.
+      expect(capturedUIState.historyRemountKey).toBe(initialRemountKey + 1);
+
       unmount();
     });
   });
@@ -3194,10 +3667,8 @@ describe('AppContainer State Management', () => {
 
       // Should be reset
       expect(capturedUIState.constrainHeight).toBe(true);
-      // Should NOT refresh static's clearTerminal in alternate buffer
-      expect(mocks.mockStdout.write).not.toHaveBeenCalledWith(
-        ansiEscapes.clearTerminal,
-      );
+      // Should NOT refresh static's viewport clear in alternate buffer
+      expect(mocks.mockStdout.write).not.toHaveBeenCalledWith(CLEAR_VIEWPORT);
       unmount();
     });
   });
@@ -3441,6 +3912,174 @@ describe('AppContainer State Management', () => {
       await waitFor(() => {
         expect(capturedUIState.showIsExpandableHint).toBe(true);
       });
+
+      unmount();
+    });
+
+    it('does not collapse unconstrained height on navigation keys, but collapses on Escape', async () => {
+      const { stdin, unmount } = await act(async () => renderAppContainer());
+      await waitFor(() => expect(capturedOverflowActions).toBeTruthy());
+
+      expect(capturedUIState.constrainHeight).toBe(true);
+
+      // Expand via Ctrl+O
+      act(() => {
+        stdin.write('\x0f');
+      });
+      expect(capturedUIState.constrainHeight).toBe(false);
+
+      mocks.mockStdout.write.mockClear();
+
+      // Simulate PageUp and Up Arrow navigation keys
+      act(() => {
+        stdin.write('\x1b[5~');
+        stdin.write('\x1b[A');
+      });
+
+      // Should remain expanded and not clear terminal
+      expect(capturedUIState.constrainHeight).toBe(false);
+      expect(mocks.mockStdout.write).not.toHaveBeenCalledWith(CLEAR_VIEWPORT);
+
+      // Simulate Escape key to exit expanded view
+      act(() => {
+        stdin.write('\x1b');
+      });
+      act(() => {
+        vi.advanceTimersByTime(100);
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState.constrainHeight).toBe(true);
+      });
+
+      unmount();
+    });
+
+    it('does not reset the hint timer when an overflowing ID is removed while others remain', async () => {
+      const { unmount } = await act(async () => renderAppContainer());
+      await waitFor(() => expect(capturedOverflowActions).toBeTruthy());
+
+      act(() => {
+        capturedOverflowActions.addOverflowingId('test-id-1');
+        capturedOverflowActions.addOverflowingId('test-id-2');
+      });
+
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState.showIsExpandableHint).toBe(true);
+      });
+
+      // Advance half the duration
+      act(() => {
+        vi.advanceTimersByTime(EXPAND_HINT_DURATION_MS / 2);
+      });
+      expect(capturedUIState.showIsExpandableHint).toBe(true);
+
+      // Removing one overflowing ID should NOT reset the hint timer
+      act(() => {
+        capturedOverflowActions.removeOverflowingId('test-id-2');
+      });
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+
+      // Advance the remaining half of the original timer
+      act(() => {
+        vi.advanceTimersByTime(EXPAND_HINT_DURATION_MS / 2 - 1);
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState.showIsExpandableHint).toBe(false);
+      });
+
+      unmount();
+    });
+
+    it('does not clear terminal when expanding with Ctrl+O if there are no last-turn tool calls in history', async () => {
+      const { stdin, unmount } = await act(async () => renderAppContainer());
+
+      mocks.mockStdout.write.mockClear();
+
+      // Expand with Ctrl+O when history has no last-turn tool calls
+      act(() => {
+        stdin.write('\x0f');
+      });
+
+      expect(capturedUIState.constrainHeight).toBe(false);
+      expect(mocks.mockStdout.write).not.toHaveBeenCalledWith(CLEAR_VIEWPORT);
+
+      // Collapse with Ctrl+O should still refresh static and clear terminal
+      act(() => {
+        stdin.write('\x0f');
+      });
+
+      expect(capturedUIState.constrainHeight).toBe(true);
+      expect(mocks.mockStdout.write).toHaveBeenCalledWith(CLEAR_VIEWPORT);
+
+      unmount();
+    });
+
+    it('clears terminal when expanding with Ctrl+O if there are last-turn tool calls in history', async () => {
+      (useHistory as Mock).mockReturnValue({
+        history: [
+          { id: 1, type: 'user', text: 'run something' },
+          {
+            id: 2,
+            type: 'tool_group',
+            tools: [
+              {
+                callId: 'call-1',
+                name: 'test_tool',
+                description: 'desc',
+                status: CoreToolCallStatus.Success,
+                resultDisplay: 'result',
+                confirmationDetails: undefined,
+              },
+            ],
+          },
+        ],
+        addItem: vi.fn(),
+        updateItem: vi.fn(),
+        clearItems: vi.fn(),
+        loadHistory: vi.fn(),
+      });
+
+      const { stdin, unmount } = await act(async () => renderAppContainer());
+
+      mocks.mockStdout.write.mockClear();
+
+      act(() => {
+        stdin.write('\x0f');
+      });
+
+      expect(capturedUIState.constrainHeight).toBe(false);
+      expect(mocks.mockStdout.write).toHaveBeenCalledWith(CLEAR_VIEWPORT);
+
+      unmount();
+    });
+
+    it('passes pauseUpdates=true to useLoadingIndicator when expanded in standard mode', async () => {
+      const { stdin, unmount } = await act(async () => renderAppContainer());
+
+      expect(useLoadingIndicator).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          pauseUpdates: false,
+        }),
+      );
+
+      act(() => {
+        stdin.write('\x0f');
+      });
+
+      expect(capturedUIState.constrainHeight).toBe(false);
+      expect(useLoadingIndicator).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          pauseUpdates: true,
+        }),
+      );
 
       unmount();
     });

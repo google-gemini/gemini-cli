@@ -52,7 +52,7 @@ exports[`ToolConfirmationQueue > height allocation and layout > should handle se
 │       Original: https://täst.com/                                            │
 │       Actual Host (Punycode): https://xn--tst-qla.com/                       │
 │                                                                              │
-│ Allow execution of [echo]?                                                   │
+│ Allow execution of [Shell]?                                                  │
 │                                                                              │
 │ ● 1. Allow once                                                              │
 │   2. Allow for this session                                                  │
@@ -138,7 +138,7 @@ exports[`ToolConfirmationQueue > height allocation and layout > should render th
 │ │ echo "Line 49"                                                           │ │
 │ │ echo "Line 50"                                                           │ │
 │ ╰──────────────────────────────────────────────────────────────────────────╯ │
-│ Allow execution of [echo]?                                                   │
+│ Allow execution of [Shell]?                                                  │
 │                                                                              │
 │ ● 1. Allow once                                                              │
 │   2. Allow for this session                                                  │
@@ -202,7 +202,7 @@ exports[`ToolConfirmationQueue > renders the confirming tool with progress indic
 │ ╭──────────────────────────────────────────────────────────────────────────╮ │
 │ │ ls                                                                       │ │
 │ ╰──────────────────────────────────────────────────────────────────────────╯ │
-│ Allow execution of [ls]?                                                     │
+│ Allow execution of [Shell]?                                                  │
 │                                                                              │
 │ ● 1. Allow once                                                              │
 │   2. Allow for this session                                                  │

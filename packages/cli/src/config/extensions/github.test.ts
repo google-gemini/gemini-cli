@@ -76,6 +76,7 @@ describe('github.ts', () => {
       submoduleUpdate: ReturnType<typeof vi.fn>;
       listRemote: ReturnType<typeof vi.fn>;
       revparse: ReturnType<typeof vi.fn>;
+      env: ReturnType<typeof vi.fn>;
     };
 
     beforeEach(() => {
@@ -87,6 +88,7 @@ describe('github.ts', () => {
         submoduleUpdate: vi.fn(),
         listRemote: vi.fn(),
         revparse: vi.fn(),
+        env: vi.fn().mockReturnThis(),
       };
       vi.mocked(simpleGit).mockReturnValue(mockGit as unknown as SimpleGit);
     });
@@ -212,6 +214,7 @@ describe('github.ts', () => {
       getRemotes: ReturnType<typeof vi.fn>;
       listRemote: ReturnType<typeof vi.fn>;
       revparse: ReturnType<typeof vi.fn>;
+      env: ReturnType<typeof vi.fn>;
     };
 
     beforeEach(() => {
@@ -222,6 +225,7 @@ describe('github.ts', () => {
         getRemotes: vi.fn(),
         listRemote: vi.fn(),
         revparse: vi.fn(),
+        env: vi.fn().mockReturnThis(),
       };
       vi.mocked(simpleGit).mockReturnValue(mockGit as unknown as SimpleGit);
     });
@@ -254,6 +258,53 @@ describe('github.ts', () => {
       } as unknown as GeminiCLIExtension;
       expect(await checkForExtensionUpdate(ext, mockExtensionManager)).toBe(
         ExtensionUpdateState.UPDATE_AVAILABLE,
+      );
+      expect(mockGit.env).toHaveBeenCalledWith(
+        expect.objectContaining({
+          GIT_TERMINAL_PROMPT: '0',
+          GIT_ASKPASS: '',
+          SSH_ASKPASS: '',
+          GIT_SSH_COMMAND: expect.stringContaining('BatchMode=yes'),
+          GH_PROMPT_DISABLED: '1',
+          GCM_INTERACTIVE: 'never',
+        }),
+      );
+    });
+
+    it('should return ERROR when git listRemote fails due to disabled terminal prompts on private repos', async () => {
+      mockGit.getRemotes.mockResolvedValue([
+        {
+          name: 'origin',
+          refs: { fetch: 'https://github.com/owner/private-repo.git' },
+        },
+      ]);
+      mockGit.listRemote.mockRejectedValue(
+        new Error(
+          "fatal: could not read Username for 'https://github.com': terminal prompts disabled",
+        ),
+      );
+
+      const ext = {
+        name: 'private-ext',
+        path: '/path/to/private-ext',
+        installMetadata: {
+          type: 'git',
+          source: 'https://github.com/owner/private-repo.git',
+        },
+      } as unknown as GeminiCLIExtension;
+
+      expect(await checkForExtensionUpdate(ext, mockExtensionManager)).toBe(
+        ExtensionUpdateState.ERROR,
+      );
+      expect(mockGit.env).toHaveBeenCalledWith(
+        expect.objectContaining({
+          GIT_TERMINAL_PROMPT: '0',
+          GIT_ASKPASS: '',
+          SSH_ASKPASS: '',
+          GIT_SSH_COMMAND: expect.stringContaining('BatchMode=yes'),
+          GH_PROMPT_DISABLED: '1',
+          GCM_INTERACTIVE: 'never',
+        }),
       );
     });
 

@@ -6,6 +6,7 @@
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { PipelineOrchestrator } from './orchestrator.js';
+import { ContextWorkingBufferImpl } from './contextWorkingBuffer.js';
 import {
   createMockEnvironment,
   createDummyNode,
@@ -18,7 +19,6 @@ import type {
   ProcessArgs,
 } from '../pipeline.js';
 import type { PipelineDef, AsyncPipelineDef } from '../config/types.js';
-import type { ContextEventBus } from '../eventBus.js';
 import type { ConcreteNode, UserPrompt } from '../graph/types.js';
 
 // A realistic mock processor that modifies the text of the first target node
@@ -77,11 +77,10 @@ function createMockAsyncProcessor(
 
 describe('PipelineOrchestrator (Component)', () => {
   let env: ContextEnvironment;
-  let eventBus: ContextEventBus;
+  let orchestrator: PipelineOrchestrator;
 
   beforeEach(() => {
     env = createMockEnvironment();
-    eventBus = env.eventBus;
   });
 
   afterEach(() => {
@@ -92,13 +91,13 @@ describe('PipelineOrchestrator (Component)', () => {
     pipelines: PipelineDef[],
     asyncPipelines: AsyncPipelineDef[] = [],
   ) => {
-    const orchestrator = new PipelineOrchestrator(
+    orchestrator = new PipelineOrchestrator(
       pipelines,
       asyncPipelines,
       env,
-      eventBus,
       env.tracer,
     );
+
     return orchestrator;
   };
 
@@ -117,12 +116,14 @@ describe('PipelineOrchestrator (Component)', () => {
         payload: { text: 'Original' },
       });
 
-      const processed = await orchestrator.executeTriggerSync(
+      const processedBuffer = await orchestrator.executeTriggerSync(
         'new_message',
-        [originalNode],
+        ContextWorkingBufferImpl.initialize([originalNode]),
         new Set([originalNode.id]),
         new Set(),
       );
+
+      const processed = processedBuffer.nodes;
 
       expect(processed.length).toBe(1);
       const resultingNode = processed[0] as UserPrompt;
@@ -144,12 +145,14 @@ describe('PipelineOrchestrator (Component)', () => {
         payload: { text: 'Original' },
       });
 
-      const processed = await orchestrator.executeTriggerSync(
+      const processedBuffer = await orchestrator.executeTriggerSync(
         'new_message',
-        [originalNode],
+        ContextWorkingBufferImpl.initialize([originalNode]),
         new Set([originalNode.id]),
         new Set(),
       );
+
+      const processed = processedBuffer.nodes;
 
       expect(processed).toEqual([originalNode]); // Untouched
     });
@@ -172,12 +175,14 @@ describe('PipelineOrchestrator (Component)', () => {
       });
 
       // The throwing processor should be caught and logged, allowing Mod to still run.
-      const processed = await orchestrator.executeTriggerSync(
+      const processedBuffer = await orchestrator.executeTriggerSync(
         'new_message',
-        [originalNode],
+        ContextWorkingBufferImpl.initialize([originalNode]),
         new Set([originalNode.id]),
         new Set(),
       );
+
+      const processed = processedBuffer.nodes;
 
       expect(processed.length).toBe(1);
       const resultingNode = processed[0] as UserPrompt;
@@ -207,13 +212,14 @@ describe('PipelineOrchestrator (Component)', () => {
       const node1 = createDummyNode('ep1', NodeType.USER_PROMPT, 10);
       const node2 = createDummyNode('ep1', NodeType.AGENT_THOUGHT, 20);
 
-      eventBus.emitChunkReceived({
-        nodes: [node1, node2],
-        targetNodeIds: new Set([node2.id]),
-      });
+      await orchestrator.executeTriggerSync(
+        'nodes_added',
+        ContextWorkingBufferImpl.initialize([node1, node2]),
+        new Set([node2.id]),
+      );
 
       // Yield event loop
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       expect(executeSpy).toHaveBeenCalledTimes(1);
       const callArgs = executeSpy.mock.calls[0][0];

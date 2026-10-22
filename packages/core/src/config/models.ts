@@ -6,10 +6,13 @@
 
 export interface ModelResolutionContext {
   useGemini3_1?: boolean;
-  useGemini3_1FlashLite?: boolean;
+  useLatestFlashLite?: boolean;
+  useLatestFlash?: boolean;
+  useGemini3_5Flash?: boolean;
   useCustomTools?: boolean;
   hasAccessToPreview?: boolean;
   requestedModel?: string;
+  releaseChannel?: string;
 }
 
 /**
@@ -48,18 +51,58 @@ export interface IModelConfigService {
 export interface ModelCapabilityContext {
   readonly modelConfigService: IModelConfigService;
   getExperimentalDynamicModelConfiguration(): boolean;
+  hasLatestFlashGAAccess?(): boolean;
+  hasLatestFlashLiteGAAccess?(): boolean;
+  getHasAccessToPreviewModel?(): boolean;
 }
 
 export const PREVIEW_GEMINI_MODEL = 'gemini-3-pro-preview';
 export const PREVIEW_GEMINI_3_1_MODEL = 'gemini-3.1-pro-preview';
 export const PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL =
   'gemini-3.1-pro-preview-customtools';
-export const PREVIEW_GEMINI_FLASH_MODEL = 'gemini-3-flash-preview';
-export const PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL =
-  'gemini-3.1-flash-lite-preview';
+// TODO: set to none and const once the experiment for 3_5 flash rollut can be
+// cleaned up.
+export let PREVIEW_GEMINI_FLASH_MODEL = 'gemini-3-flash-preview';
 export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro';
-export const DEFAULT_GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
-export const DEFAULT_GEMINI_FLASH_LITE_MODEL = 'gemini-2.5-flash-lite';
+
+// Flash Tier: Base (stable GA) vs. Latest (experiment-gated GA)
+export const BASE_GEMINI_FLASH_MODEL = 'gemini-3.5-flash';
+export const LATEST_GEMINI_FLASH_MODEL = 'gemini-3.8-flash';
+export const LEGACY_CCPA_FLASH_MODEL = 'gemini-3-flash';
+
+// Backward-compatible aliases
+export const DEFAULT_GEMINI_3_5_FLASH_MODEL = BASE_GEMINI_FLASH_MODEL;
+export const SECONDARY_GEMINI_3_5_FLASH_MODEL = LEGACY_CCPA_FLASH_MODEL;
+
+// Flash Lite Tier: Base (stable GA) vs. Latest (experiment-gated GA)
+export const BASE_GEMINI_FLASH_LITE_MODEL = 'gemini-3.1-flash-lite';
+export const LATEST_GEMINI_FLASH_LITE_MODEL = 'gemini-3.5-flash-lite';
+
+// Runtime active defaults (mutated when experiment flags are evaluated)
+export let DEFAULT_GEMINI_FLASH_MODEL = BASE_GEMINI_FLASH_MODEL;
+export let DEFAULT_GEMINI_FLASH_LITE_MODEL = BASE_GEMINI_FLASH_LITE_MODEL;
+
+export function setFlashModels(preview: string, defaultFlash: string) {
+  PREVIEW_GEMINI_FLASH_MODEL = preview;
+  DEFAULT_GEMINI_FLASH_MODEL = defaultFlash;
+}
+
+export function setFlashLiteModel(defaultFlashLite: string) {
+  DEFAULT_GEMINI_FLASH_LITE_MODEL = defaultFlashLite;
+}
+
+/**
+ * Resets the mutated model constants to their baseline defaults.
+ * For use in test cleanup to prevent cross-test state leakage.
+ */
+export function resetModelsForTesting() {
+  PREVIEW_GEMINI_FLASH_MODEL = 'gemini-3-flash-preview';
+  DEFAULT_GEMINI_FLASH_MODEL = BASE_GEMINI_FLASH_MODEL;
+  DEFAULT_GEMINI_FLASH_LITE_MODEL = BASE_GEMINI_FLASH_LITE_MODEL;
+}
+
+/** @deprecated Gemini 3.1 Flash Lite is now GA. Use DEFAULT_GEMINI_FLASH_LITE_MODEL. */
+export const PREVIEW_GEMINI_FLASH_LITE_MODEL = 'none';
 
 export const GEMMA_4_31B_IT_MODEL = 'gemma-4-31b-it';
 export const GEMMA_4_26B_A4B_IT_MODEL = 'gemma-4-26b-a4b-it';
@@ -69,16 +112,60 @@ export const VALID_GEMINI_MODELS = new Set([
   PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
-  PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
+  PREVIEW_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_3_5_FLASH_MODEL,
+  SECONDARY_GEMINI_3_5_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  BASE_GEMINI_FLASH_MODEL,
+  LATEST_GEMINI_FLASH_MODEL,
+  LEGACY_CCPA_FLASH_MODEL,
+  BASE_GEMINI_FLASH_LITE_MODEL,
+  LATEST_GEMINI_FLASH_LITE_MODEL,
 
   GEMMA_4_31B_IT_MODEL,
   GEMMA_4_26B_A4B_IT_MODEL,
 ]);
 
+export interface BackendMappingContext {
+  hasLatestFlashGAAccess?: () => boolean;
+  hasLatestFlashLiteGAAccess?: () => boolean;
+}
+
+/**
+ * Dynamically maps model IDs for outbound backend requests:
+ * - When LATEST_FLASH_GA_LAUNCHED is true: rewrites BASE_GEMINI_FLASH_MODEL ('gemini-3.5-flash')
+ *   and LEGACY_CCPA_FLASH_MODEL ('gemini-3-flash') -> LATEST_GEMINI_FLASH_MODEL ('gemini-3.8-flash').
+ * - When LATEST_FLASH_GA_LAUNCHED is false on Code Assist (CCPA): maps 'gemini-3.5-flash' -> 'gemini-3-flash'.
+ * - When LATEST_FLASH_LITE_GA_LAUNCHED is true: rewrites BASE_GEMINI_FLASH_LITE_MODEL ('gemini-3.1-flash-lite')
+ *   -> LATEST_GEMINI_FLASH_LITE_MODEL ('gemini-3.5-flash-lite').
+ */
+export function getBackendModelMappings(
+  context?: BackendMappingContext,
+  isCodeAssistBackend: boolean = true,
+): Record<string, string> {
+  const mappings: Record<string, string> = {};
+  const useLatestFlash = context?.hasLatestFlashGAAccess?.() ?? false;
+  const useLatestFlashLite = context?.hasLatestFlashLiteGAAccess?.() ?? false;
+
+  if (useLatestFlash) {
+    mappings[BASE_GEMINI_FLASH_MODEL] = LATEST_GEMINI_FLASH_MODEL;
+    mappings[LEGACY_CCPA_FLASH_MODEL] = LATEST_GEMINI_FLASH_MODEL;
+  } else if (isCodeAssistBackend) {
+    mappings[BASE_GEMINI_FLASH_MODEL] = LEGACY_CCPA_FLASH_MODEL;
+  }
+
+  if (useLatestFlashLite) {
+    mappings[BASE_GEMINI_FLASH_LITE_MODEL] = LATEST_GEMINI_FLASH_LITE_MODEL;
+  }
+
+  return mappings;
+}
+
+/** @deprecated Use GEMINI_MODEL_ALIAS_AUTO instead. */
 export const PREVIEW_GEMINI_MODEL_AUTO = 'auto-gemini-3';
+/** @deprecated Use GEMINI_MODEL_ALIAS_AUTO instead. */
 export const DEFAULT_GEMINI_MODEL_AUTO = 'auto-gemini-2.5';
 
 // Model aliases for user convenience.
@@ -92,22 +179,45 @@ export const DEFAULT_GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';
 // Cap the thinking at 8192 to prevent run-away thinking loops.
 export const DEFAULT_THINKING_MODE = 8192;
 
+export function getAutoModelDescription(
+  hasAccessToPreview: boolean,
+  useGemini3_1: boolean = false,
+  useLatestFlash: boolean = false,
+) {
+  const proModel = hasAccessToPreview
+    ? useGemini3_1
+      ? PREVIEW_GEMINI_3_1_MODEL
+      : PREVIEW_GEMINI_MODEL
+    : DEFAULT_GEMINI_MODEL;
+  const flashModel = hasAccessToPreview
+    ? useLatestFlash
+      ? LATEST_GEMINI_FLASH_MODEL
+      : PREVIEW_GEMINI_FLASH_MODEL
+    : DEFAULT_GEMINI_FLASH_MODEL;
+  return `Let Gemini CLI decide the best model for the task: ${getDisplayString(proModel)}, ${getDisplayString(flashModel)}`;
+}
+
 /**
- * Resolves the requested model alias (e.g., 'auto-gemini-3', 'pro', 'flash', 'flash-lite')
+ * Resolves the requested model alias (e.g., 'auto', 'pro', 'flash', 'flash-lite')
  * to a concrete model name.
  *
  * @param requestedModel The model alias or concrete model name requested by the user.
  * @param useGemini3_1 Whether to use Gemini 3.1 Pro Preview for auto/pro aliases.
+ * @param useCustomToolModel Whether to use the custom tool model.
  * @param hasAccessToPreview Whether the user has access to preview models.
+ * @param config Optional config object for dynamic model configuration.
+ * @param useLatestFlash Whether to use the latest Flash GA model.
+ * @param useLatestFlashLite Whether to use the latest Flash Lite GA model.
  * @returns The resolved concrete model name.
  */
 export function resolveModel(
   requestedModel: string,
   useGemini3_1: boolean = false,
-  useGemini3_1FlashLite: boolean = false,
   useCustomToolModel: boolean = false,
   hasAccessToPreview: boolean = true,
   config?: ModelCapabilityContext,
+  useLatestFlash: boolean = false,
+  useLatestFlashLite: boolean = false,
 ): string {
   // Defensive check against non-string inputs at runtime
   const normalizedModel = Array.isArray(requestedModel)
@@ -116,21 +226,31 @@ export function resolveModel(
       ? String(requestedModel ?? '').trim() || ''
       : requestedModel.trim() || '';
 
+  const effectiveUseLatestFlash =
+    useLatestFlash || (config?.hasLatestFlashGAAccess?.() ?? false);
+  const effectiveUseLatestFlashLite =
+    useLatestFlashLite || (config?.hasLatestFlashLiteGAAccess?.() ?? false);
+
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     const resolved = config.modelConfigService.resolveModelId(normalizedModel, {
       useGemini3_1,
-      useGemini3_1FlashLite,
       useCustomTools: useCustomToolModel,
       hasAccessToPreview,
+      useLatestFlash: effectiveUseLatestFlash,
+      useLatestFlashLite: effectiveUseLatestFlashLite,
     });
 
     if (!hasAccessToPreview && isPreviewModel(resolved, config)) {
       // Fallback for unknown preview models.
       if (resolved.includes('flash-lite')) {
-        return DEFAULT_GEMINI_FLASH_LITE_MODEL;
+        return effectiveUseLatestFlashLite
+          ? LATEST_GEMINI_FLASH_LITE_MODEL
+          : BASE_GEMINI_FLASH_LITE_MODEL;
       }
       if (resolved.includes('flash')) {
-        return DEFAULT_GEMINI_FLASH_MODEL;
+        return effectiveUseLatestFlash
+          ? LATEST_GEMINI_FLASH_MODEL
+          : BASE_GEMINI_FLASH_MODEL;
       }
       return DEFAULT_GEMINI_MODEL;
     }
@@ -140,10 +260,16 @@ export function resolveModel(
 
   let resolved: string;
   switch (normalizedModel) {
-    case PREVIEW_GEMINI_MODEL:
-    case PREVIEW_GEMINI_MODEL_AUTO:
     case GEMINI_MODEL_ALIAS_AUTO:
     case GEMINI_MODEL_ALIAS_PRO: {
+      if (!hasAccessToPreview) {
+        resolved = DEFAULT_GEMINI_MODEL;
+        break;
+      }
+      // fallthrough
+    }
+    case PREVIEW_GEMINI_MODEL:
+    case PREVIEW_GEMINI_MODEL_AUTO: {
       if (useGemini3_1) {
         resolved = useCustomToolModel
           ? PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL
@@ -158,13 +284,15 @@ export function resolveModel(
       break;
     }
     case GEMINI_MODEL_ALIAS_FLASH: {
-      resolved = PREVIEW_GEMINI_FLASH_MODEL;
+      resolved = effectiveUseLatestFlash
+        ? LATEST_GEMINI_FLASH_MODEL
+        : PREVIEW_GEMINI_FLASH_MODEL;
       break;
     }
     case GEMINI_MODEL_ALIAS_FLASH_LITE: {
-      resolved = useGemini3_1FlashLite
-        ? PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL
-        : DEFAULT_GEMINI_FLASH_LITE_MODEL;
+      resolved = effectiveUseLatestFlashLite
+        ? LATEST_GEMINI_FLASH_LITE_MODEL
+        : BASE_GEMINI_FLASH_LITE_MODEL;
       break;
     }
     default: {
@@ -173,13 +301,31 @@ export function resolveModel(
     }
   }
 
+  if (resolved === 'none') {
+    return effectiveUseLatestFlashLite
+      ? LATEST_GEMINI_FLASH_LITE_MODEL
+      : BASE_GEMINI_FLASH_LITE_MODEL;
+  }
+
+  if (
+    effectiveUseLatestFlash &&
+    isPromotableFlashModel(resolved) &&
+    normalizedModel !== PREVIEW_GEMINI_FLASH_MODEL
+  ) {
+    return LATEST_GEMINI_FLASH_MODEL;
+  }
+
+  if (effectiveUseLatestFlashLite && isPromotableFlashLiteModel(resolved)) {
+    return LATEST_GEMINI_FLASH_LITE_MODEL;
+  }
+
   if (!hasAccessToPreview && isPreviewModel(resolved)) {
     // Downgrade to stable models if user lacks preview access.
     switch (resolved) {
       case PREVIEW_GEMINI_FLASH_MODEL:
-        return DEFAULT_GEMINI_FLASH_MODEL;
-      case PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL:
-        return DEFAULT_GEMINI_FLASH_LITE_MODEL;
+        return effectiveUseLatestFlash
+          ? LATEST_GEMINI_FLASH_MODEL
+          : BASE_GEMINI_FLASH_MODEL;
       case PREVIEW_GEMINI_MODEL:
       case PREVIEW_GEMINI_3_1_MODEL:
       case PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL:
@@ -187,10 +333,14 @@ export function resolveModel(
       default:
         // Fallback for unknown preview models, preserving original logic.
         if (resolved.includes('flash-lite')) {
-          return DEFAULT_GEMINI_FLASH_LITE_MODEL;
+          return effectiveUseLatestFlashLite
+            ? LATEST_GEMINI_FLASH_LITE_MODEL
+            : BASE_GEMINI_FLASH_LITE_MODEL;
         }
         if (resolved.includes('flash')) {
-          return DEFAULT_GEMINI_FLASH_MODEL;
+          return effectiveUseLatestFlash
+            ? LATEST_GEMINI_FLASH_MODEL
+            : BASE_GEMINI_FLASH_MODEL;
         }
         return DEFAULT_GEMINI_MODEL;
     }
@@ -199,10 +349,32 @@ export function resolveModel(
   return resolved;
 }
 
+function isPromotableFlashModel(model: string): boolean {
+  // Keep explicit versioned model IDs intact so callers can pin newer or older
+  // Flash models. Rollout remapping only applies to known aliases/backend IDs.
+  return (
+    model === DEFAULT_GEMINI_FLASH_MODEL ||
+    model === PREVIEW_GEMINI_FLASH_MODEL ||
+    model === DEFAULT_GEMINI_3_5_FLASH_MODEL ||
+    model === SECONDARY_GEMINI_3_5_FLASH_MODEL ||
+    model === GEMINI_MODEL_ALIAS_FLASH ||
+    model === BASE_GEMINI_FLASH_MODEL ||
+    model === LEGACY_CCPA_FLASH_MODEL
+  );
+}
+
+function isPromotableFlashLiteModel(model: string): boolean {
+  return (
+    model === DEFAULT_GEMINI_FLASH_LITE_MODEL ||
+    model === BASE_GEMINI_FLASH_LITE_MODEL ||
+    model === GEMINI_MODEL_ALIAS_FLASH_LITE
+  );
+}
+
 /**
  * Resolves the appropriate model based on the classifier's decision.
  *
- * @param requestedModel The current requested model (e.g. auto-gemini-2.5).
+ * @param requestedModel The current requested model (e.g. auto).
  * @param modelAlias The alias selected by the classifier ('flash' or 'pro').
  * @param useGemini3_1 Whether to use Gemini 3.1 Pro Preview.
  * @param useCustomToolModel Whether to use the custom tool model.
@@ -213,20 +385,29 @@ export function resolveClassifierModel(
   requestedModel: string,
   modelAlias: string,
   useGemini3_1: boolean = false,
-  useGemini3_1FlashLite: boolean = false,
   useCustomToolModel: boolean = false,
   hasAccessToPreview: boolean = true,
   config?: ModelCapabilityContext,
+  useLatestFlash: boolean = false,
+  useLatestFlashLite: boolean = false,
 ): string {
+  const effectiveUseLatestFlash =
+    useLatestFlash || (config?.hasLatestFlashGAAccess?.() ?? false);
+  const effectiveUseLatestFlashLite =
+    useLatestFlashLite || (config?.hasLatestFlashLiteGAAccess?.() ?? false);
+  const effectiveHasAccessToPreview =
+    hasAccessToPreview || (config?.getHasAccessToPreviewModel?.() ?? false);
+
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     return config.modelConfigService.resolveClassifierModelId(
       modelAlias,
       requestedModel,
       {
         useGemini3_1,
-        useGemini3_1FlashLite,
         useCustomTools: useCustomToolModel,
-        hasAccessToPreview,
+        hasAccessToPreview: effectiveHasAccessToPreview,
+        useLatestFlash: effectiveUseLatestFlash,
+        useLatestFlashLite: effectiveUseLatestFlashLite,
       },
     );
   }
@@ -236,21 +417,53 @@ export function resolveClassifierModel(
       requestedModel === DEFAULT_GEMINI_MODEL_AUTO ||
       requestedModel === DEFAULT_GEMINI_MODEL
     ) {
-      return DEFAULT_GEMINI_FLASH_MODEL;
+      return effectiveUseLatestFlash
+        ? LATEST_GEMINI_FLASH_MODEL
+        : BASE_GEMINI_FLASH_MODEL;
     }
     if (
       requestedModel === PREVIEW_GEMINI_MODEL_AUTO ||
-      requestedModel === PREVIEW_GEMINI_MODEL
+      requestedModel === PREVIEW_GEMINI_MODEL ||
+      requestedModel === GEMINI_MODEL_ALIAS_AUTO
     ) {
-      return PREVIEW_GEMINI_FLASH_MODEL;
+      if (effectiveUseLatestFlash) {
+        return LATEST_GEMINI_FLASH_MODEL;
+      }
+      return effectiveHasAccessToPreview
+        ? PREVIEW_GEMINI_FLASH_MODEL
+        : BASE_GEMINI_FLASH_MODEL;
     }
-    return resolveModel(GEMINI_MODEL_ALIAS_FLASH);
+    return resolveModel(
+      GEMINI_MODEL_ALIAS_FLASH,
+      false,
+      false,
+      effectiveHasAccessToPreview,
+      config,
+      effectiveUseLatestFlash,
+      effectiveUseLatestFlashLite,
+    );
   }
+
+  if (modelAlias === GEMINI_MODEL_ALIAS_FLASH_LITE) {
+    return resolveModel(
+      GEMINI_MODEL_ALIAS_FLASH_LITE,
+      false,
+      false,
+      effectiveHasAccessToPreview,
+      config,
+      effectiveUseLatestFlash,
+      effectiveUseLatestFlashLite,
+    );
+  }
+
   return resolveModel(
     requestedModel,
     useGemini3_1,
-    useGemini3_1FlashLite,
     useCustomToolModel,
+    effectiveHasAccessToPreview,
+    config,
+    effectiveUseLatestFlash,
+    effectiveUseLatestFlashLite,
   );
 }
 
@@ -265,7 +478,21 @@ export function getDisplayString(
     }
   }
 
+  const useLatestFlash = config?.hasLatestFlashGAAccess?.() ?? false;
+  const useLatestFlashLite = config?.hasLatestFlashLiteGAAccess?.() ?? false;
+
   switch (model) {
+    case LEGACY_CCPA_FLASH_MODEL:
+    case BASE_GEMINI_FLASH_MODEL:
+      return useLatestFlash
+        ? LATEST_GEMINI_FLASH_MODEL
+        : BASE_GEMINI_FLASH_MODEL;
+    case BASE_GEMINI_FLASH_LITE_MODEL:
+      return useLatestFlashLite
+        ? LATEST_GEMINI_FLASH_LITE_MODEL
+        : BASE_GEMINI_FLASH_LITE_MODEL;
+    case GEMINI_MODEL_ALIAS_AUTO:
+      return 'Auto';
     case PREVIEW_GEMINI_MODEL_AUTO:
       return 'Auto (Gemini 3)';
     case DEFAULT_GEMINI_MODEL_AUTO:
@@ -280,8 +507,8 @@ export function getDisplayString(
       return PREVIEW_GEMINI_FLASH_MODEL;
     case PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL:
       return PREVIEW_GEMINI_3_1_MODEL;
-    case PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL:
-      return PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL;
+    case PREVIEW_GEMINI_FLASH_LITE_MODEL:
+      return PREVIEW_GEMINI_FLASH_LITE_MODEL;
     default:
       return model;
   }
@@ -298,6 +525,9 @@ export function isPreviewModel(
   model: string,
   config?: ModelCapabilityContext,
 ): boolean {
+  if (model === 'none') {
+    return false;
+  }
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     return (
       config.modelConfigService.getModelDefinition(model)?.isPreview === true
@@ -311,7 +541,7 @@ export function isPreviewModel(
     model === PREVIEW_GEMINI_FLASH_MODEL ||
     model === PREVIEW_GEMINI_MODEL_AUTO ||
     model === GEMINI_MODEL_ALIAS_AUTO ||
-    model === PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL
+    model === PREVIEW_GEMINI_FLASH_LITE_MODEL
   );
 }
 
@@ -345,7 +575,7 @@ export function isGemini3Model(
 ): boolean {
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     // Legacy behavior resolves the model first.
-    const resolved = resolveModel(model);
+    const resolved = resolveModel(model, false, false, true, config);
     return (
       config.modelConfigService.getModelDefinition(resolved)?.family ===
       'gemini-3'
@@ -380,7 +610,7 @@ export function isCustomModel(
   config?: ModelCapabilityContext,
 ): boolean {
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
-    const resolved = resolveModel(model, false, false, false, true, config);
+    const resolved = resolveModel(model, false, false, true, config);
     return (
       config.modelConfigService.getModelDefinition(resolved)?.tier ===
         'custom' || !resolved.startsWith('gemini-')
@@ -453,18 +683,17 @@ export function supportsMultimodalFunctionResponse(
 export function isActiveModel(
   model: string,
   useGemini3_1: boolean = false,
-  useGemini3_1FlashLite: boolean = false,
   useCustomToolModel: boolean = false,
   experimentalGemma: boolean = true,
 ): boolean {
-  if (!VALID_GEMINI_MODELS.has(model)) {
+  if (!VALID_GEMINI_MODELS.has(model) || model === 'none') {
     return false;
   }
   if (model === GEMMA_4_31B_IT_MODEL || model === GEMMA_4_26B_A4B_IT_MODEL) {
     return experimentalGemma;
   }
-  if (model === PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL) {
-    return useGemini3_1FlashLite;
+  if (model === PREVIEW_GEMINI_FLASH_LITE_MODEL) {
+    return false;
   }
   if (useGemini3_1) {
     if (model === PREVIEW_GEMINI_MODEL) {
@@ -482,3 +711,7 @@ export function isActiveModel(
     );
   }
 }
+
+export const CCPA_AI_MODEL_MAPPINGS: Record<string, string> = {
+  [DEFAULT_GEMINI_3_5_FLASH_MODEL]: SECONDARY_GEMINI_3_5_FLASH_MODEL,
+};

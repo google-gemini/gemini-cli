@@ -12,6 +12,7 @@ import {
   startupProfiler,
   convertSessionToClientHistory,
   createPolicyUpdater,
+  Storage,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { randomUUID } from 'node:crypto';
@@ -48,10 +49,17 @@ export class AcpSessionManager {
     return this.sessions.get(sessionId);
   }
 
-  dispose(): void {
-    for (const session of this.sessions.values()) {
-      session.dispose();
-    }
+  async dispose(): Promise<void> {
+    const disposePromises = Array.from(this.sessions.entries()).map(
+      async ([sessionId, session]) => {
+        try {
+          await session.dispose();
+        } catch (err) {
+          debugLogger.error(`Error disposing session ${sessionId}: ${err}`);
+        }
+      },
+    );
+    await Promise.all(disposePromises);
     this.sessions.clear();
   }
 
@@ -69,7 +77,10 @@ export class AcpSessionManager {
     );
 
     const authType =
-      loadedSettings.merged.security.auth.selectedType || AuthType.USE_GEMINI;
+      loadedSettings.merged.security.auth.selectedType ||
+      (authDetails.baseUrl || process.env['GOOGLE_GEMINI_BASE_URL']
+        ? AuthType.GATEWAY
+        : AuthType.USE_GEMINI);
 
     let isAuthenticated = false;
     let authErrorMessage = '';
@@ -100,138 +111,220 @@ export class AcpSessionManager {
     }
 
     if (!isAuthenticated) {
+      try {
+        await config?.dispose?.();
+      } catch (disposeError) {
+        debugLogger.error(`Error disposing config: ${disposeError}`);
+      }
       throw new acp.RequestError(
         -32000,
         authErrorMessage || 'Authentication required.',
       );
     }
 
-    if (this.clientCapabilities?.fs) {
-      const acpFileSystemService = new AcpFileSystemService(
-        this.connection,
+    let session: Session | undefined;
+    try {
+      if (this.clientCapabilities?.fs) {
+        const acpFileSystemService = new AcpFileSystemService(
+          this.connection,
+          sessionId,
+          this.clientCapabilities.fs,
+          config.getFileSystemService(),
+          cwd,
+        );
+        config.setFileSystemService(acpFileSystemService);
+      }
+
+      await config.initialize();
+      startupProfiler.flush(config);
+      startAutoMemoryIfEnabled(config);
+
+      const geminiClient = config.getGeminiClient();
+
+      const chat = geminiClient.isInitialized?.()
+        ? geminiClient.getChat()
+        : await geminiClient.startChat();
+
+      session = new Session(
         sessionId,
-        this.clientCapabilities.fs,
-        config.getFileSystemService(),
-        cwd,
+        chat,
+        config,
+        this.connection,
+        this.settings,
       );
-      config.setFileSystemService(acpFileSystemService);
+      this.sessions.set(sessionId, session);
+
+      const { availableModels, currentModelId } = buildAvailableModels(
+        config,
+        loadedSettings,
+      );
+
+      const response = {
+        sessionId,
+        modes: {
+          availableModes: buildAvailableModes(config.isPlanEnabled()),
+          currentModeId: config.getApprovalMode(),
+        },
+        models: {
+          availableModels,
+          currentModelId,
+        },
+      };
+
+      setTimeout(() => {
+        session?.sendAvailableCommands().catch((err) => {
+          debugLogger.error(`Error sending available commands: ${err}`);
+        });
+      }, 0);
+
+      return response;
+    } catch (error) {
+      if (session) {
+        this.sessions.delete(sessionId);
+        try {
+          await session.dispose();
+        } catch (disposeError) {
+          debugLogger.error(
+            `Error disposing session in newSession: ${disposeError}`,
+          );
+        }
+      } else if (config) {
+        try {
+          await config.dispose?.();
+        } catch (disposeError) {
+          debugLogger.error(
+            `Error disposing config in newSession: ${disposeError}`,
+          );
+        }
+      }
+      throw error;
     }
-
-    await config.initialize();
-    startupProfiler.flush(config);
-    startAutoMemoryIfEnabled(config);
-
-    const geminiClient = config.getGeminiClient();
-
-    const chat = await geminiClient.startChat();
-
-    const session = new Session(
-      sessionId,
-      chat,
-      config,
-      this.connection,
-      this.settings,
-    );
-    this.sessions.set(sessionId, session);
-
-    setTimeout(() => {
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      session.sendAvailableCommands();
-    }, 0);
-
-    const { availableModels, currentModelId } = buildAvailableModels(
-      config,
-      loadedSettings,
-    );
-
-    const response = {
-      sessionId,
-      modes: {
-        availableModes: buildAvailableModes(config.isPlanEnabled()),
-        currentModeId: config.getApprovalMode(),
-      },
-      models: {
-        availableModels,
-        currentModelId,
-      },
-    };
-    return response;
   }
 
   async loadSession(
     { sessionId, cwd, mcpServers }: acp.LoadSessionRequest,
     authDetails: AuthDetails,
   ): Promise<acp.LoadSessionResponse> {
-    const config = await this.initializeSessionConfig(
+    if (!/^[a-zA-Z0-9-_]+$/.test(sessionId)) {
+      throw new acp.RequestError(-32602, 'Invalid session identifier format.');
+    }
+
+    const storage = new Storage(cwd);
+    await storage.initialize();
+    const sessionSelector = new SessionSelector(storage);
+
+    const { sessionData, sessionPath } = await sessionSelector.resolveSession(
       sessionId,
-      cwd,
-      mcpServers,
-      authDetails,
-    );
-
-    const sessionSelector = new SessionSelector(config.storage);
-
-    const { sessionData, sessionPath } =
-      await sessionSelector.resolveSession(sessionId);
-
-    const clientHistory = convertSessionToClientHistory(sessionData.messages);
-
-    const geminiClient = config.getGeminiClient();
-    await geminiClient.initialize();
-    await geminiClient.resumeChat(clientHistory, {
-      conversation: sessionData,
-      filePath: sessionPath,
-    });
-
-    const session = new Session(
-      sessionId,
-      geminiClient.getChat(),
-      config,
-      this.connection,
-      this.settings,
+      { allowEmpty: true },
     );
 
     const existingSession = this.sessions.get(sessionId);
     if (existingSession) {
-      existingSession.dispose();
+      try {
+        await existingSession.dispose();
+      } catch (err) {
+        debugLogger.error(
+          `Error disposing existing session ${sessionId}: ${err}`,
+        );
+      } finally {
+        this.sessions.delete(sessionId);
+      }
     }
 
-    this.sessions.set(sessionId, session);
+    let config: Config | undefined;
+    let session: Session | undefined;
+    try {
+      config = await this.prepareSessionConfig(
+        sessionId,
+        cwd,
+        mcpServers,
+        authDetails,
+      );
 
-    // Stream history back to client
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    session.streamHistory(sessionData.messages);
+      await config.initialize();
+      startupProfiler.flush(config);
+      startAutoMemoryIfEnabled(config);
 
-    setTimeout(() => {
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      session.sendAvailableCommands();
-    }, 0);
+      const messages = sessionData.messages ?? [];
+      const clientHistory = convertSessionToClientHistory(messages);
 
-    const { availableModels, currentModelId } = buildAvailableModels(
-      config,
-      this.settings,
-    );
+      const geminiClient = config.getGeminiClient();
+      await geminiClient.resumeChat(clientHistory, {
+        conversation: sessionData,
+        filePath: sessionPath,
+      });
 
-    const response = {
-      modes: {
-        availableModes: buildAvailableModes(config.isPlanEnabled()),
-        currentModeId: config.getApprovalMode(),
-      },
-      models: {
-        availableModels,
-        currentModelId,
-      },
-    };
-    return response;
+      session = new Session(
+        sessionId,
+        geminiClient.getChat(),
+        config,
+        this.connection,
+        this.settings,
+      );
+
+      this.sessions.set(sessionId, session);
+
+      const { availableModels, currentModelId } = buildAvailableModels(
+        config,
+        this.settings,
+      );
+
+      const response = {
+        modes: {
+          availableModes: buildAvailableModes(config.isPlanEnabled()),
+          currentModeId: config.getApprovalMode(),
+        },
+        models: {
+          availableModels,
+          currentModelId,
+        },
+      };
+
+      // Stream history back to client
+      session.streamHistory(messages).catch((err) => {
+        debugLogger.error(`Error streaming history: ${err}`);
+      });
+
+      setTimeout(() => {
+        session?.sendAvailableCommands().catch((err) => {
+          debugLogger.error(`Error sending available commands: ${err}`);
+        });
+      }, 0);
+
+      return response;
+    } catch (error) {
+      if (session) {
+        this.sessions.delete(sessionId);
+        try {
+          await session.dispose();
+        } catch (disposeError) {
+          debugLogger.error(
+            `Error disposing session in loadSession: ${disposeError}`,
+          );
+        }
+      } else if (config) {
+        try {
+          await config.dispose?.();
+        } catch (disposeError) {
+          debugLogger.error(`Error disposing config: ${disposeError}`);
+        }
+      }
+      throw error;
+    }
   }
 
-  private async initializeSessionConfig(
+  private async prepareSessionConfig(
     sessionId: string,
     cwd: string,
     mcpServers: acp.McpServer[],
     authDetails: AuthDetails,
   ): Promise<Config> {
-    const selectedAuthType = this.settings.merged.security.auth.selectedType;
+    const selectedAuthType =
+      this.settings.merged.security.auth.selectedType ||
+      (authDetails.baseUrl || process.env['GOOGLE_GEMINI_BASE_URL']
+        ? AuthType.GATEWAY
+        : undefined);
+
     if (!selectedAuthType) {
       throw acp.RequestError.authRequired();
     }
@@ -251,26 +344,34 @@ export class AcpSessionManager {
       );
     } catch (e) {
       debugLogger.error(`Authentication failed: ${e}`);
+      try {
+        await config?.dispose?.();
+      } catch (disposeError) {
+        debugLogger.error(`Error disposing config: ${disposeError}`);
+      }
       throw acp.RequestError.authRequired();
     }
 
     // 3. Set the ACP FileSystemService (if supported) before config initialization
-    if (this.clientCapabilities?.fs) {
-      const acpFileSystemService = new AcpFileSystemService(
-        this.connection,
-        sessionId,
-        this.clientCapabilities.fs,
-        config.getFileSystemService(),
-        cwd,
-      );
-      config.setFileSystemService(acpFileSystemService);
+    try {
+      if (this.clientCapabilities?.fs) {
+        const acpFileSystemService = new AcpFileSystemService(
+          this.connection,
+          sessionId,
+          this.clientCapabilities.fs,
+          config.getFileSystemService(),
+          cwd,
+        );
+        config.setFileSystemService(acpFileSystemService);
+      }
+    } catch (e) {
+      try {
+        await config?.dispose?.();
+      } catch (disposeError) {
+        debugLogger.error(`Error disposing config: ${disposeError}`);
+      }
+      throw e;
     }
-
-    // 4. Now that we are authenticated, it is safe to initialize the config
-    // which starts the MCP servers and other heavy resources.
-    await config.initialize();
-    startupProfiler.flush(config);
-    startAutoMemoryIfEnabled(config);
 
     return config;
   }

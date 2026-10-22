@@ -690,7 +690,12 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
         keyMatchers[Command.MOVE_RIGHT](key) ||
         keyMatchers[Command.RETURN](key) ||
         keyMatchers[Command.ESCAPE](key) ||
-        keyMatchers[Command.QUIT](key)
+        keyMatchers[Command.QUIT](key) ||
+        ((key.name === 'space' || key.sequence === ' ') &&
+          !key.ctrl &&
+          !key.alt &&
+          !key.shift &&
+          !key.cmd)
       ) {
         return false;
       }
@@ -916,6 +921,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
         onSelect={handleSelect}
         onHighlight={handleHighlight}
         focusKey={isCustomOptionFocused ? 'other' : undefined}
+        priority={!isCustomOptionFocused}
         maxItemsToShow={maxItemsToShow}
         showScrollArrows={true}
         renderItem={(item, context) => {
@@ -1004,13 +1010,15 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
                 )}
               </Box>
               {optionItem.description && (
-                <Text color={theme.text.secondary} wrap="wrap">
-                  {' '}
-                  <RenderInline
-                    text={optionItem.description}
-                    defaultColor={theme.text.secondary}
-                  />
-                </Text>
+                // Padding aligns with option label: 4 for multi-select (checkbox + space), 1 for single-select
+                <Box paddingLeft={showCheck ? 4 : 1}>
+                  <Text color={theme.text.secondary} wrap="wrap">
+                    <RenderInline
+                      text={optionItem.description}
+                      defaultColor={theme.text.secondary}
+                    />
+                  </Text>
+                </Box>
               )}
             </Box>
           );

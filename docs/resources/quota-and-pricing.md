@@ -127,6 +127,7 @@ Standard/Plus and AI Expanded, are not supported._
   license seats. For predictable costs, you can sign in with Google.
 
   This includes the following request limits:
+
   - Gemini Code Assist Standard edition:
     - 1500 maximum model requests / user / day
   - Gemini Code Assist Enterprise edition:

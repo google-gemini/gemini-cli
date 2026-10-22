@@ -8,10 +8,7 @@ import { useEffect } from 'react';
 import { type Config } from '@google/gemini-cli-core';
 import { loadTrustedFolders } from '../../config/trustedFolders.js';
 import { expandHomeDir, batchAddDirectories } from '../utils/directoryUtils.js';
-import {
-  debugLogger,
-  refreshServerHierarchicalMemory,
-} from '@google/gemini-cli-core';
+import { debugLogger } from '@google/gemini-cli-core';
 import { MultiFolderTrustDialog } from '../components/MultiFolderTrustDialog.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { MessageType, type HistoryItem } from '../types.js';
@@ -35,7 +32,7 @@ async function finishAddingDirectories(
 
   try {
     if (config.shouldLoadMemoryFromIncludeDirectories()) {
-      await refreshServerHierarchicalMemory(config);
+      await config.getMemoryContextManager()?.refresh();
     }
   } catch (error) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion

@@ -275,6 +275,10 @@ vi.mock('./validateNonInterActiveAuth.js', () => ({
   validateNonInteractiveAuth: vi.fn().mockResolvedValue('google'),
 }));
 
+vi.mock('./config/auth.js', () => ({
+  validateAuthMethod: vi.fn().mockResolvedValue(null),
+}));
+
 describe('gemini.tsx main function', () => {
   let originalIsTTY: boolean | undefined;
   let initialUnhandledRejectionListeners: NodeJS.UnhandledRejectionListener[] =
@@ -1189,6 +1193,39 @@ describe('resolveSessionId', () => {
     expect(sessionId).toBe('new-id');
     expect(resumedSessionData).toBeUndefined();
   });
+
+  it('should exit with FATAL_INPUT_ERROR when explicit resume session is missing', async () => {
+    vi.mocked(SessionSelector).mockImplementation(
+      () =>
+        ({
+          resolveSession: vi
+            .fn()
+            .mockRejectedValue(SessionError.noSessionsFound()),
+        }) as unknown as InstanceType<typeof SessionSelector>,
+    );
+
+    const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+    const processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((code) => {
+        throw new MockProcessExitError(code);
+      });
+
+    try {
+      await resolveSessionId('explicit-session-id');
+    } catch (e) {
+      if (!(e instanceof MockProcessExitError)) throw e;
+    }
+
+    expect(emitFeedbackSpy).toHaveBeenCalledWith(
+      'error',
+      expect.stringContaining('Error resuming session:'),
+    );
+    expect(processExitSpy).toHaveBeenCalledWith(ExitCodes.FATAL_INPUT_ERROR);
+
+    emitFeedbackSpy.mockRestore();
+    processExitSpy.mockRestore();
+  });
 });
 
 describe('gemini.tsx main function exit codes', () => {
@@ -1240,6 +1277,44 @@ describe('gemini.tsx main function exit codes', () => {
     } catch (e) {
       expect(e).toBeInstanceOf(MockProcessExitError);
       expect((e as MockProcessExitError).code).toBe(42);
+    }
+  });
+
+  it('should exit with 41 for validateAuthMethod failure during sandbox setup', async () => {
+    vi.stubEnv('SANDBOX', '');
+    vi.mocked(loadSandboxConfig).mockResolvedValue(
+      createMockSandboxConfig({
+        command: 'docker',
+        image: 'test-image',
+      }),
+    );
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        refreshAuth: vi.fn().mockResolvedValue(undefined),
+        getRemoteAdminSettings: vi.fn().mockReturnValue(undefined),
+        isInteractive: vi.fn().mockReturnValue(true),
+      }),
+    );
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: {
+          security: { auth: { selectedType: 'google', useExternal: false } },
+        },
+      }),
+    );
+    vi.mocked(parseArguments).mockResolvedValue({} as CliArgs);
+
+    const authModule = await import('./config/auth.js');
+    vi.mocked(authModule.validateAuthMethod).mockResolvedValueOnce(
+      'Auth method invalid',
+    );
+
+    try {
+      await main();
+      expect.fail('Should have thrown MockProcessExitError');
+    } catch (e) {
+      expect(e).toBeInstanceOf(MockProcessExitError);
+      expect((e as MockProcessExitError).code).toBe(41);
     }
   });
 
@@ -1639,6 +1714,51 @@ describe('startInteractiveUI', () => {
     expect(reactElement).toBeDefined();
   });
 
+  it('should enable incrementalRendering when terminalBuffer is enabled and alternateBuffer is disabled', async () => {
+    const { render } = await import('ink');
+    const renderSpy = vi.mocked(render);
+    renderSpy.mockClear();
+
+    const terminalBufferConfig = createMockConfig({
+      getProjectRoot: () => '/root',
+      getScreenReader: () => false,
+      getDebugMode: () => false,
+      getUseAlternateBuffer: () => false,
+      getUseTerminalBuffer: () => true,
+    });
+    const terminalBufferSettings = {
+      merged: {
+        ui: {
+          hideWindowTitle: false,
+          useAlternateBuffer: false,
+          terminalBuffer: true,
+          incrementalRendering: true,
+        },
+        general: {
+          debugKeystrokeLogging: false,
+        },
+      },
+    } as LoadedSettings;
+
+    await startTestInteractiveUI(
+      terminalBufferConfig,
+      terminalBufferSettings,
+      mockStartupWarnings,
+      mockWorkspaceRoot,
+      undefined,
+      mockInitializationResult,
+    );
+
+    const [, options] = renderSpy.mock.calls[0];
+    expect(options).toEqual(
+      expect.objectContaining({
+        alternateBuffer: false,
+        terminalBuffer: true,
+        incrementalRendering: true,
+      }),
+    );
+  });
+
   it('should enable mouse events when alternate buffer is enabled', async () => {
     const { enableMouseEvents } = await import('@google/gemini-cli-core');
     await startTestInteractiveUI(
@@ -1682,8 +1802,9 @@ describe('startInteractiveUI', () => {
 
     // Verify all startup tasks were called
     expect(getVersion).toHaveBeenCalledTimes(1);
-    // 5 cleanups: mouseEvents, consolePatcher, lineWrapping, instance.unmount, and TTY check
-    expect(registerCleanup).toHaveBeenCalledTimes(5);
+    // 6 cleanups: mouseEvents, lineWrapping, non-resumable session cleanup,
+    // instance.unmount, TTY check, and consolePatcher
+    expect(registerCleanup).toHaveBeenCalledTimes(6);
 
     // Verify cleanup handler is registered with unmount function
     const cleanupFn = vi.mocked(registerCleanup).mock.calls[0][0];
@@ -1763,5 +1884,55 @@ describe('startInteractiveUI', () => {
       expect(writeSpy).not.toHaveBeenCalledWith('\x1b[?7l');
     }
     writeSpy.mockRestore();
+  });
+
+  it('should not delete session on exit when resumedSessionData is provided', async () => {
+    const mockDeleteIfNotResumable = vi.fn().mockResolvedValue(undefined);
+    const mockChatRecordingService = {
+      deleteCurrentSessionIfNotResumableAsync: mockDeleteIfNotResumable,
+    };
+    const mockGeminiClient = {
+      getChatRecordingService: vi
+        .fn()
+        .mockReturnValue(mockChatRecordingService),
+    };
+    const mockConfigWithClient = {
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
+      ...mockConfig,
+      getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
+    } as unknown as Config;
+
+    const mockResumedData: ResumedSessionData = {
+      filePath: '/path/to/session.jsonl',
+      conversation: {
+        sessionId: 'resumed-session-id',
+        projectHash: 'hash',
+        startTime: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
+        messages: [],
+      },
+    };
+
+    const { registerCleanup } = await import('./utils/cleanup.js');
+    const registerCleanupMock = vi.mocked(registerCleanup);
+    registerCleanupMock.mockClear();
+
+    await startTestInteractiveUI(
+      mockConfigWithClient,
+      mockSettings,
+      mockStartupWarnings,
+      mockWorkspaceRoot,
+      mockResumedData,
+      mockInitializationResult,
+    );
+
+    for (const call of registerCleanupMock.mock.calls) {
+      const fn = call[0];
+      if (typeof fn === 'function') {
+        await fn();
+      }
+    }
+
+    expect(mockDeleteIfNotResumable).not.toHaveBeenCalled();
   });
 });

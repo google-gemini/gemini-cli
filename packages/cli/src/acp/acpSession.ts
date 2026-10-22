@@ -34,6 +34,12 @@ import {
   isNodeError,
   REFERENCE_CONTENT_START,
   InvalidStreamError,
+  MessageBusType,
+  PolicyDecision,
+  type ToolConfirmationRequest,
+  resolveAtCommandPath,
+  type ResolvedAtCommandPath,
+  tokenLimit,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import type { Part, FunctionCall } from '@google/genai';
@@ -61,6 +67,7 @@ export class Session {
   private pendingPrompt: AbortController | null = null;
   private commandHandler = new CommandHandler();
   private callIdCounter = 0;
+  private readonly disposeController = new AbortController();
 
   private generateCallId(name: string): string {
     return `${name}-${Date.now()}-${++this.callIdCounter}`;
@@ -77,7 +84,97 @@ export class Session {
       CoreEvent.ApprovalModeChanged,
       this.handleApprovalModeChanged,
     );
+
+    // Subscribe to tool confirmation requests to handle policy checks (e.g. auto-allowing safe shell commands)
+    this.context.config
+      .getMessageBus()
+      ?.subscribe(
+        MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        this.handleToolConfirmationRequest,
+        { signal: this.disposeController.signal },
+      );
   }
+
+  private handleToolConfirmationRequest = async (
+    request: ToolConfirmationRequest,
+  ) => {
+    try {
+      const policyEngine = this.context.config.getPolicyEngine?.();
+      const messageBus = this.context.config.getMessageBus();
+
+      if (!messageBus) {
+        return;
+      }
+
+      if (!policyEngine) {
+        debugLogger.warn(
+          'Policy engine missing. Denying tool confirmation request.',
+        );
+        await messageBus.publish({
+          type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+          correlationId: request.correlationId,
+          confirmed: false,
+          requiresUserConfirmation: false,
+        });
+        return;
+      }
+
+      const toolName = request.toolCall.name?.trim();
+      if (!toolName) {
+        debugLogger.warn(
+          'Tool confirmation request missing tool name. Denying.',
+        );
+        await messageBus.publish({
+          type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+          correlationId: request.correlationId,
+          confirmed: false,
+          requiresUserConfirmation: false,
+        });
+        return;
+      }
+
+      const tool = this.context.toolRegistry.getTool(toolName);
+      if (!tool) {
+        debugLogger.warn(
+          `Tool confirmation request for unknown tool: ${toolName}. Denying.`,
+        );
+        await messageBus.publish({
+          type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+          correlationId: request.correlationId,
+          confirmed: false,
+          requiresUserConfirmation: false,
+        });
+        return;
+      }
+
+      const serverName =
+        tool instanceof DiscoveredMCPTool ? tool.serverName : undefined;
+      const toolAnnotations = tool.toolAnnotations;
+
+      const result = await policyEngine.check(
+        request.toolCall,
+        serverName,
+        toolAnnotations,
+        request.subagent,
+      );
+
+      await messageBus.publish({
+        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        correlationId: request.correlationId,
+        confirmed: result.decision === PolicyDecision.ALLOW,
+        requiresUserConfirmation: result.decision === PolicyDecision.ASK_USER,
+      });
+    } catch (error) {
+      debugLogger.error('Error handling tool confirmation request:', error);
+      // Fail closed on exception
+      await this.context.config.getMessageBus()?.publish({
+        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        correlationId: request.correlationId,
+        confirmed: false,
+        requiresUserConfirmation: false,
+      });
+    }
+  };
 
   private handleApprovalModeChanged = (payload: ApprovalModeChangedPayload) => {
     if (payload.sessionId === this.id) {
@@ -91,11 +188,19 @@ export class Session {
     }
   };
 
-  dispose(): void {
+  async dispose(): Promise<void> {
     coreEvents.off(
       CoreEvent.ApprovalModeChanged,
       this.handleApprovalModeChanged,
     );
+    this.disposeController.abort();
+    if (this.context.config?.dispose) {
+      try {
+        await this.context.config.dispose();
+      } catch (err) {
+        debugLogger.error(`Error disposing config: ${err}`);
+      }
+    }
   }
 
   async cancelPendingPrompt(): Promise<void> {
@@ -252,6 +357,11 @@ export class Session {
       if (handled) {
         return {
           stopReason: 'end_turn',
+          usage: {
+            inputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 0,
+          },
           _meta: {
             quota: {
               token_count: { input_tokens: 0, output_tokens: 0 },
@@ -264,7 +374,39 @@ export class Session {
 
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
+    let totalCachedTokens = 0;
+    let totalThoughtTokens = 0;
     const modelUsageMap = new Map<string, { input: number; output: number }>();
+
+    const buildPromptResponse = (
+      stopReason: acp.StopReason,
+    ): acp.PromptResponse => ({
+      stopReason,
+      usage: {
+        inputTokens: totalInputTokens,
+        outputTokens: totalOutputTokens,
+        cachedReadTokens: totalCachedTokens || undefined,
+        thoughtTokens: totalThoughtTokens || undefined,
+        totalTokens: totalInputTokens + totalOutputTokens,
+      },
+      _meta: {
+        quota: {
+          token_count: {
+            input_tokens: totalInputTokens,
+            output_tokens: totalOutputTokens,
+          },
+          model_usage: Array.from(modelUsageMap.entries()).map(
+            ([modelName, counts]) => ({
+              model: modelName,
+              token_count: {
+                input_tokens: counts.input,
+                output_tokens: counts.output,
+              },
+            }),
+          ),
+        },
+      },
+    });
 
     let currentParts: Part[] = parts;
     let turnCount = 0;
@@ -273,26 +415,7 @@ export class Session {
     while (true) {
       turnCount++;
       if (maxTurns >= 0 && turnCount > maxTurns) {
-        return {
-          stopReason: 'max_turn_requests',
-          _meta: {
-            quota: {
-              token_count: {
-                input_tokens: totalInputTokens,
-                output_tokens: totalOutputTokens,
-              },
-              model_usage: Array.from(modelUsageMap.entries()).map(
-                ([modelName, counts]) => ({
-                  model: modelName,
-                  token_count: {
-                    input_tokens: counts.input,
-                    output_tokens: counts.output,
-                  },
-                }),
-              ),
-            },
-          },
-        };
+        return buildPromptResponse('max_turn_requests');
       }
 
       if (pendingSend.signal.aborted) {
@@ -304,6 +427,8 @@ export class Session {
       let turnModelId = this.context.config.getModel();
       let turnInputTokens = 0;
       let turnOutputTokens = 0;
+      let turnCachedTokens = 0;
+      let turnThoughtTokens = 0;
 
       try {
         const responseStream = this.context.geminiClient.sendMessageStream(
@@ -350,6 +475,18 @@ export class Session {
                 turnInputTokens = usage.promptTokenCount ?? turnInputTokens;
                 turnOutputTokens =
                   usage.candidatesTokenCount ?? turnOutputTokens;
+                turnCachedTokens =
+                  usage.cachedContentTokenCount ?? turnCachedTokens;
+                turnThoughtTokens =
+                  usage.thoughtsTokenCount ?? turnThoughtTokens;
+
+                await this.sendUpdate({
+                  sessionUpdate: 'usage_update',
+                  used: turnInputTokens + turnOutputTokens,
+                  size: tokenLimit(
+                    turnModelId || this.context.config.getModel(),
+                  ),
+                });
               }
               break;
             }
@@ -413,30 +550,16 @@ export class Session {
             (error.type === 'NO_RESPONSE_TEXT' ||
               error.type === 'NO_FINISH_REASON' ||
               error.type === 'MALFORMED_FUNCTION_CALL' ||
-              error.type === 'UNEXPECTED_TOOL_CALL'))
+              error.type === 'UNEXPECTED_TOOL_CALL' ||
+              error.type === 'MAX_TOKENS_EXCEEDED' ||
+              error.type === 'SAFETY_BLOCKED' ||
+              error.type === 'RECITATION_BLOCKED' ||
+              error.type === 'OTHER_BLOCKED' ||
+              error.type === 'THINKING_ONLY_RESPONSE'))
         ) {
           // The stream ended with an empty response or malformed tool call.
           // Treat this as a graceful end to the model's turn rather than a crash.
-          return {
-            stopReason: 'end_turn',
-            _meta: {
-              quota: {
-                token_count: {
-                  input_tokens: totalInputTokens,
-                  output_tokens: totalOutputTokens,
-                },
-                model_usage: Array.from(modelUsageMap.entries()).map(
-                  ([modelName, counts]) => ({
-                    model: modelName,
-                    token_count: {
-                      input_tokens: counts.input,
-                      output_tokens: counts.output,
-                    },
-                  }),
-                ),
-              },
-            },
-          };
+          return buildPromptResponse('end_turn');
         }
 
         throw new acp.RequestError(
@@ -447,6 +570,8 @@ export class Session {
 
       totalInputTokens += turnInputTokens;
       totalOutputTokens += turnOutputTokens;
+      totalCachedTokens += turnCachedTokens;
+      totalThoughtTokens += turnThoughtTokens;
 
       if (turnInputTokens > 0 || turnOutputTokens > 0) {
         const existing = modelUsageMap.get(turnModelId) ?? {
@@ -459,26 +584,7 @@ export class Session {
       }
 
       if (stopReason !== 'end_turn') {
-        return {
-          stopReason,
-          _meta: {
-            quota: {
-              token_count: {
-                input_tokens: totalInputTokens,
-                output_tokens: totalOutputTokens,
-              },
-              model_usage: Array.from(modelUsageMap.entries()).map(
-                ([modelName, counts]) => ({
-                  model: modelName,
-                  token_count: {
-                    input_tokens: counts.input,
-                    output_tokens: counts.output,
-                  },
-                }),
-              ),
-            },
-          },
-        };
+        return buildPromptResponse(stopReason);
       }
 
       if (toolCallRequests.length === 0) {
@@ -500,28 +606,7 @@ export class Session {
       currentParts = toolResponseParts;
     }
 
-    const modelUsageArray = Array.from(modelUsageMap.entries()).map(
-      ([modelName, counts]) => ({
-        model: modelName,
-        token_count: {
-          input_tokens: counts.input,
-          output_tokens: counts.output,
-        },
-      }),
-    );
-
-    return {
-      stopReason: 'end_turn',
-      _meta: {
-        quota: {
-          token_count: {
-            input_tokens: totalInputTokens,
-            output_tokens: totalOutputTokens,
-          },
-          model_usage: modelUsageArray,
-        },
-      },
-    };
+    return buildPromptResponse('end_turn');
   }
 
   private async handleCommand(
@@ -641,12 +726,22 @@ export class Session {
           });
         }
 
-        if (content.length === 0 && explanation) {
+        if (explanation) {
           content.push({
             type: 'content',
             content: { type: 'text', text: explanation },
           });
         }
+
+        await this.sendUpdate({
+          sessionUpdate: 'tool_call',
+          toolCallId: callId,
+          status: 'pending',
+          title: displayTitle,
+          content,
+          locations: invocation.toolLocations(),
+          kind: toAcpToolKind(tool.kind),
+        });
 
         const params: acp.RequestPermissionRequest = {
           sessionId: this.id,
@@ -689,10 +784,24 @@ export class Session {
         );
 
         switch (outcome) {
-          case ToolConfirmationOutcome.Cancel:
-            return errorResponse(
-              new Error(`Tool "${fc.name}" was canceled by the user.`),
+          case ToolConfirmationOutcome.Cancel: {
+            const cancelError = new Error(
+              `Tool "${fc.name}" was canceled by the user.`,
             );
+            await this.sendUpdate({
+              sessionUpdate: 'tool_call_update',
+              toolCallId: callId,
+              status: 'failed',
+              content: [
+                {
+                  type: 'content',
+                  content: { type: 'text', text: cancelError.message },
+                },
+              ],
+              kind: toAcpToolKind(tool.kind),
+            });
+            return errorResponse(cancelError);
+          }
           case ToolConfirmationOutcome.ProceedOnce:
           case ToolConfirmationOutcome.ProceedAlways:
           case ToolConfirmationOutcome.ProceedAlwaysAndSave:
@@ -928,99 +1037,121 @@ export class Session {
       let currentPathSpec = pathName;
       let resolvedSuccessfully = false;
       let readDirectly = false;
-      try {
-        const absolutePath = path.resolve(
+      let isDirectory = false;
+
+      const result = await resolveAtCommandPath(
+        pathName,
+        this.context.config,
+        (msg) => this.debug(msg),
+      );
+
+      let validationError: string | null = null;
+      let absolutePath: string;
+      let resolved: ResolvedAtCommandPath | undefined;
+
+      if (result.status === 'resolved') {
+        resolved = result.resolved;
+        absolutePath = resolved.absolutePath;
+      } else if (result.status === 'unauthorized') {
+        absolutePath = result.absolutePath;
+        validationError = result.error;
+      } else if (result.status === 'invalid') {
+        // Already logged in resolveAtCommandPath
+        continue;
+      } else {
+        // Result is not_found.
+        // We still check if it's an unauthorized absolute path that we can ask permission for,
+        // specifically for paths that are completely outside the root and not even in any workspace directory.
+        // For relative paths not found anywhere, we resolve relative to targetDir for permission check.
+        absolutePath = path.resolve(
           this.context.config.getTargetDir(),
           pathName,
         );
+      }
 
-        let validationError = this.context.config.validatePathAccess(
-          absolutePath,
-          'read',
-        );
-
-        // We ask the user for explicit permission to read them if outside sandboxed workspace boundaries (and not already authorized).
-        if (
-          validationError &&
-          !isWithinRoot(absolutePath, this.context.config.getTargetDir())
-        ) {
-          try {
-            const stats = await fs.stat(absolutePath);
-            if (stats.isFile()) {
-              const syntheticCallId = `resolve-prompt-${pathName}-${randomUUID()}`;
-              const params = {
-                sessionId: this.id,
-                options: [
-                  {
-                    optionId: ToolConfirmationOutcome.ProceedOnce,
-                    name: 'Allow once',
-                    kind: 'allow_once',
-                  },
-                  {
-                    optionId: ToolConfirmationOutcome.Cancel,
-                    name: 'Deny',
-                    kind: 'reject_once',
-                  },
-                ] as acp.PermissionOption[],
-                toolCall: {
-                  toolCallId: syntheticCallId,
-                  status: 'pending',
-                  title: `Allow access to absolute path: ${pathName}`,
-                  content: [
-                    {
-                      type: 'content',
-                      content: {
-                        type: 'text',
-                        text: `The Agent needs access to read an attached file outside your workspace: ${pathName}`,
-                      },
-                    },
-                  ],
-                  locations: [],
-                  kind: 'read',
+      if (
+        !resolved &&
+        validationError &&
+        !isWithinRoot(absolutePath, this.context.config.getTargetDir())
+      ) {
+        try {
+          const stats = await fs.stat(absolutePath);
+          if (stats.isFile()) {
+            const syntheticCallId = `resolve-prompt-${pathName}-${randomUUID()}`;
+            const params = {
+              sessionId: this.id,
+              options: [
+                {
+                  optionId: ToolConfirmationOutcome.ProceedOnce,
+                  name: 'Allow once',
+                  kind: 'allow_once',
                 },
-              };
-
-              const output = RequestPermissionResponseSchema.parse(
-                await this.connection.requestPermission(params),
-              );
-
-              const outcome =
-                output.outcome.outcome === 'cancelled'
-                  ? ToolConfirmationOutcome.Cancel
-                  : z
-                      .nativeEnum(ToolConfirmationOutcome)
-                      .parse(output.outcome.optionId);
-
-              if (outcome === ToolConfirmationOutcome.ProceedOnce) {
-                this.context.config
-                  .getWorkspaceContext()
-                  .addReadOnlyPath(absolutePath);
-                validationError = null;
-              } else {
-                this.debug(
-                  `Direct read authorization denied for absolute path ${pathName}`,
-                );
-                directContents.push({
-                  spec: pathName,
-                  content: `[Warning: Access to absolute path \`${pathName}\` denied by user.]`,
-                });
-                continue;
-              }
-            }
-          } catch (error) {
-            this.debug(
-              `Failed to request permission for absolute attachment ${pathName}: ${getErrorMessage(error)}`,
-            );
-            await this.sendUpdate({
-              sessionUpdate: 'agent_thought_chunk',
-              content: {
-                type: 'text',
-                text: `Warning: Failed to display permission dialog for \`${absolutePath}\`. Error: ${getErrorMessage(error)}`,
+                {
+                  optionId: ToolConfirmationOutcome.Cancel,
+                  name: 'Deny',
+                  kind: 'reject_once',
+                },
+              ] as acp.PermissionOption[],
+              toolCall: {
+                toolCallId: syntheticCallId,
+                status: 'pending',
+                title: `Allow access to absolute path: ${pathName}`,
+                content: [
+                  {
+                    type: 'content',
+                    content: {
+                      type: 'text',
+                      text: `The Agent needs access to read an attached file outside your workspace: ${pathName}`,
+                    },
+                  },
+                ],
+                locations: [],
+                kind: 'read',
               },
-            });
-          }
-        }
+            };
 
+            const output = RequestPermissionResponseSchema.parse(
+              await this.connection.requestPermission(params),
+            );
+
+            const outcome =
+              output.outcome.outcome === 'cancelled'
+                ? ToolConfirmationOutcome.Cancel
+                : z
+                    .nativeEnum(ToolConfirmationOutcome)
+                    .parse(output.outcome.optionId);
+
+            if (outcome === ToolConfirmationOutcome.ProceedOnce) {
+              this.context.config
+                .getWorkspaceContext()
+                .addReadOnlyPath(absolutePath);
+              validationError = null;
+            } else {
+              this.debug(
+                `Direct read authorization denied for absolute path ${pathName}`,
+              );
+              directContents.push({
+                spec: pathName,
+                content: `[Warning: Access to absolute path \`${pathName}\` denied by user.]`,
+              });
+              continue;
+            }
+          }
+        } catch (error) {
+          this.debug(
+            `Failed to request permission for absolute attachment ${pathName}: ${getErrorMessage(error)}`,
+          );
+          await this.sendUpdate({
+            sessionUpdate: 'agent_thought_chunk',
+            content: {
+              type: 'text',
+              text: `Warning: Failed to display permission dialog for \`${absolutePath}\`. Error: ${getErrorMessage(error)}`,
+            },
+          });
+        }
+      }
+
+      try {
         if (!validationError) {
           // If it's an absolute path that is authorized (e.g. added via readOnlyPaths),
           // read it directly to avoid ReadManyFilesTool absolute path resolution issues.
@@ -1033,7 +1164,9 @@ export class Session {
             !readDirectly
           ) {
             try {
-              const stats = await fs.stat(absolutePath);
+              const stats = resolved
+                ? resolved.stats
+                : await fs.stat(absolutePath);
               if (stats.isFile()) {
                 const fileReadResult = await processSingleFileContent(
                   absolutePath,
@@ -1092,19 +1225,13 @@ export class Session {
           }
 
           if (!readDirectly) {
-            const stats = await fs.stat(absolutePath);
-            if (stats.isDirectory()) {
-              currentPathSpec = pathName.endsWith('/')
-                ? `${pathName}**`
-                : `${pathName}/**`;
-              this.debug(
-                `Path ${pathName} resolved to directory, using glob: ${currentPathSpec}`,
-              );
-            } else {
-              this.debug(
-                `Path ${pathName} resolved to file: ${currentPathSpec}`,
-              );
-            }
+            const stats = resolved
+              ? resolved.stats
+              : await fs.stat(absolutePath);
+            isDirectory = stats.isDirectory();
+            this.debug(
+              `Path ${pathName} resolved to ${isDirectory ? 'directory' : 'file'}: ${currentPathSpec}`,
+            );
             resolvedSuccessfully = true;
           }
         } else {
@@ -1177,11 +1304,11 @@ export class Session {
         }
       }
       if (resolvedSuccessfully) {
-        if (!readDirectly) {
+        if (!readDirectly && !isDirectory) {
           pathSpecsToRead.push(currentPathSpec);
+          contentLabelsForDisplay.push(pathName);
         }
         atPathToResolvedSpecMap.set(pathName, currentPathSpec);
-        contentLabelsForDisplay.push(pathName);
       }
     }
 
@@ -1245,8 +1372,10 @@ export class Session {
       embeddedContext.length === 0 &&
       directContents.length === 0
     ) {
-      // Fallback for lone "@" or completely invalid @-commands resulting in empty initialQueryText
-      debugLogger.warn('No valid file paths found in @ commands to read.');
+      if (atPathToResolvedSpecMap.size === 0) {
+        // Fallback for lone "@" or completely invalid @-commands resulting in empty initialQueryText
+        debugLogger.warn('No valid file paths found in @ commands to read.');
+      }
       return [{ text: initialQueryText }];
     }
 
@@ -1260,11 +1389,16 @@ export class Session {
       try {
         const invocation = readManyFilesTool.build(toolArgs);
 
+        const displayTitle =
+          typeof invocation.getDisplayTitle === 'function'
+            ? invocation.getDisplayTitle()
+            : invocation.getDescription();
+
         await this.sendUpdate({
           sessionUpdate: 'tool_call',
           toolCallId: callId,
           status: 'in_progress',
-          title: invocation.getDescription(),
+          title: displayTitle,
           content: [],
           locations: invocation.toolLocations(),
           kind: toAcpToolKind(readManyFilesTool.kind),
@@ -1282,7 +1416,7 @@ export class Session {
           sessionUpdate: 'tool_call_update',
           toolCallId: callId,
           status: 'completed',
-          title: invocation.getDescription(),
+          title: displayTitle,
           content: content ? [content] : [],
           locations: invocation.toolLocations(),
           kind: toAcpToolKind(readManyFilesTool.kind),

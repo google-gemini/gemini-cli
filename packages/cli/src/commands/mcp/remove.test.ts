@@ -103,6 +103,42 @@ describe('mcp remove command', () => {
       );
       debugLogSpy.mockRestore();
     });
+
+    it('should show home directory error when removing from project scope in home directory', async () => {
+      vi.spyOn(
+        await import('../../config/settings.js'),
+        'loadSettings',
+      ).mockReturnValue({
+        forScope: () => ({ settings: mockSettings, readOnly: true }),
+        setValue: mockSetValue,
+        workspace: { path: '', readOnly: true },
+        user: { path: '/home/user/.gemini/settings.json', readOnly: false },
+      } as unknown as LoadedSettings);
+
+      const debugErrorSpy = vi
+        .spyOn(debugLogger, 'error')
+        .mockImplementation(() => {});
+      const mockProcessExit = vi
+        .spyOn(process, 'exit')
+        .mockImplementation((() => {
+          throw new Error('process.exit called');
+        }) as (code?: number | string | null) => never);
+
+      try {
+        await expect(parser.parseAsync('remove test-server')).rejects.toThrow(
+          'process.exit called',
+        );
+
+        expect(debugErrorSpy).toHaveBeenCalledWith(
+          'Error: Please use --scope user to edit settings in the home directory.',
+        );
+        expect(mockProcessExit).toHaveBeenCalledWith(1);
+        expect(mockSetValue).not.toHaveBeenCalled();
+      } finally {
+        debugErrorSpy.mockRestore();
+        mockProcessExit.mockRestore();
+      }
+    });
   });
 
   describe('integration tests with real file I/O', () => {
@@ -257,6 +293,51 @@ describe('mcp remove command', () => {
       expect(updatedContent).not.toContain('"server1"');
 
       debugLogSpy.mockRestore();
+    });
+
+    it('should abort with an error and not modify settings.json when workspace is untrusted', async () => {
+      const trustedFolders = await import('../../config/trustedFolders.js');
+      vi.mocked(trustedFolders.isWorkspaceTrusted).mockReturnValueOnce({
+        isTrusted: false,
+        source: 'file',
+      });
+
+      const originalContent = `{
+        "ui": {
+          "theme": "dark"
+        },
+        "mcpServers": {
+          "server1": {
+            "command": "node",
+            "args": ["s1.js"]
+          }
+        }
+      }`;
+      fs.writeFileSync(settingsPath, originalContent, 'utf-8');
+
+      const debugErrorSpy = vi
+        .spyOn(debugLogger, 'error')
+        .mockImplementation(() => {});
+      const mockProcessExit = vi
+        .spyOn(process, 'exit')
+        .mockImplementation((() => {
+          throw new Error('process.exit called');
+        }) as (code?: number | string | null) => never);
+
+      try {
+        await expect(parser.parseAsync('remove server1')).rejects.toThrow(
+          'process.exit called',
+        );
+
+        expect(debugErrorSpy).toHaveBeenCalledWith(
+          'Error: Cannot modify settings in an untrusted workspace. To enable this, verify the source of the repository and set GEMINI_CLI_TRUST_WORKSPACE=true or move your configuration to the global settings file.',
+        );
+        expect(mockProcessExit).toHaveBeenCalledWith(1);
+        expect(fs.readFileSync(settingsPath, 'utf-8')).toBe(originalContent);
+      } finally {
+        debugErrorSpy.mockRestore();
+        mockProcessExit.mockRestore();
+      }
     });
   });
 });

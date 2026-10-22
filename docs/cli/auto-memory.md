@@ -29,11 +29,10 @@ You'll use Auto Memory when you want to:
   avoid them.
 - **Bootstrap a skills library** without writing every `SKILL.md` by hand.
 
-Auto Memory complements—but does not replace—the
-[`save_memory` tool](../tools/memory.md), which captures single facts into
-`GEMINI.md` when the agent explicitly calls it. Auto Memory infers candidates
-from past sessions, writes reviewable patches or skill drafts, and never applies
-them without your approval.
+Auto Memory complements direct memory-file editing. The agent can still persist
+explicit user instructions by editing the appropriate Markdown memory file; Auto
+Memory infers candidates from past sessions, writes reviewable patches or skill
+drafts, and never applies them without your approval.
 
 ## Prerequisites
 
