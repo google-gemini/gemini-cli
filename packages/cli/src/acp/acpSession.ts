@@ -757,6 +757,16 @@ export class Session {
             content,
             locations: invocation.toolLocations(),
             kind: toAcpToolKind(tool.kind),
+            ...(confirmationDetails.type === 'mcp' && {
+              _meta: {
+                'gemini-cli': {
+                  mcp: {
+                    server_name: confirmationDetails.serverName,
+                    tool_name: confirmationDetails.toolName,
+                  },
+                },
+              },
+            }),
           },
         };
 

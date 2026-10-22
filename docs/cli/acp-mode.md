@@ -70,6 +70,15 @@ This mechanism lets for a powerful, two-way integration where the agent can
 leverage the IDE's capabilities to perform tasks. The MCP client logic is in
 `packages/core/src/tools/mcp-client.ts`.
 
+When Gemini CLI asks the client for permission to run an MCP tool via
+`session/request_permission`, the request's `toolCall._meta['gemini-cli'].mcp`
+contains `server_name` (the configured name under which the MCP server was
+registered) and `tool_name` (the tool's own name as declared by that server).
+Clients can compare the server name with the servers they supplied instead of
+parsing the tool call title. Clients may also pre-authorise a client-supplied
+MCP server in `session/new` by passing `_meta: { trust: true }` on the server
+entry.
+
 ## Capabilities and supported methods
 
 The ACP protocol exposes a number of methods for ACP clients (for example IDEs)

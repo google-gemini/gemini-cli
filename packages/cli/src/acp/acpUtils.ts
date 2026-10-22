@@ -137,19 +137,19 @@ export function toPermissionOptions(
         options.push(
           {
             optionId: ToolConfirmationOutcome.ProceedAlwaysServer,
-            name: 'Allow all server tools for this session',
+            name: `Allow all "${confirmation.serverName}" server tools for this session`,
             kind: 'allow_always',
           },
           {
             optionId: ToolConfirmationOutcome.ProceedAlwaysTool,
-            name: 'Allow tool for this session',
+            name: `Allow tool "${confirmation.toolName}" for this session`,
             kind: 'allow_always',
           },
         );
         if (enablePermanentToolApproval) {
           options.push({
             optionId: ToolConfirmationOutcome.ProceedAlwaysAndSave,
-            name: 'Allow tool for all future sessions',
+            name: `Allow tool "${confirmation.toolName}" for all future sessions`,
             kind: 'allow_always',
           });
         }

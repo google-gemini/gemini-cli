@@ -337,6 +337,44 @@ describe('AcpSessionManager', () => {
     );
   });
 
+  it('should pass trust metadata from client-supplied mcp servers to MCPServerConfig', async () => {
+    mockConfig.getContentGeneratorConfig = vi.fn().mockReturnValue({
+      apiKey: 'test-key',
+    });
+    const mcpServers = [
+      {
+        name: 'trusted-server',
+        command: 'node',
+        args: ['server.js'],
+        env: [],
+        _meta: { trust: true },
+      },
+    ];
+
+    await manager.newSession(
+      {
+        cwd: '/tmp',
+        mcpServers,
+      },
+      {},
+    );
+
+    expect(loadCliConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mcpServers: expect.objectContaining({
+          'trusted-server': expect.objectContaining({
+            command: 'node',
+            args: ['server.js'],
+            trust: true,
+          }),
+        }),
+      }),
+      'test-session-id',
+      mockArgv,
+      { cwd: '/tmp' },
+    );
+  });
+
   it('should handle authentication failure gracefully', async () => {
     mockConfig.refreshAuth.mockRejectedValue(new Error('Auth failed'));
 
