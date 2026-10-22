@@ -265,7 +265,8 @@ export function buildAvailableModels(
   const preferredModel = config.getModel() || GEMINI_MODEL_ALIAS_AUTO;
   const shouldShowPreviewModels = config.getHasAccessToPreviewModel();
   const useGemini31 = config.getGemini31LaunchedSync?.() ?? false;
-  const useGemini3_5Flash = config.hasGemini35FlashGAAccess?.() ?? false;
+  const useLatestFlash = config.hasLatestFlashGAAccess?.() ?? false;
+  const useLatestFlashLite = config.hasLatestFlashLiteGAAccess?.() ?? false;
   const selectedAuthType = settings.merged.security.auth.selectedType;
   const useCustomToolModel =
     useGemini31 && selectedAuthType === AuthType.USE_GEMINI;
@@ -277,7 +278,8 @@ export function buildAvailableModels(
   ) {
     const options = config.getModelConfigService().getAvailableModelOptions({
       useGemini3_1: useGemini31,
-      useGemini3_5Flash,
+      useLatestFlash,
+      useLatestFlashLite,
       useCustomTools: useCustomToolModel,
       hasAccessToPreview: shouldShowPreviewModels,
     });
@@ -296,7 +298,7 @@ export function buildAvailableModels(
       description: getAutoModelDescription(
         shouldShowPreviewModels,
         useGemini31,
-        useGemini3_5Flash,
+        useLatestFlash,
       ),
     },
   ];

@@ -280,6 +280,38 @@ describe('<HistoryItemDisplay />', () => {
     unmount();
   });
 
+  it('subtracts top margin from availableTerminalHeight when isToolGroupBoundary is true', async () => {
+    vi.mocked(ToolGroupMessage).mockClear();
+    const historyItem: HistoryItem = {
+      id: 1,
+      type: 'tool_group',
+      tools: [
+        {
+          callId: '123',
+          name: 'run_shell_command',
+          description: 'Run a shell command',
+          resultDisplay: 'output',
+          status: CoreToolCallStatus.Executing,
+          confirmationDetails: undefined,
+        },
+      ],
+    };
+
+    const { unmount } = await renderWithProviders(
+      <HistoryItemDisplay
+        item={historyItem}
+        terminalWidth={80}
+        availableTerminalHeight={10}
+        isPending={true}
+        isToolGroupBoundary={true}
+      />,
+    );
+
+    const passedProps = vi.mocked(ToolGroupMessage).mock.calls[0][0];
+    expect(passedProps.availableTerminalHeight).toBe(9);
+    unmount();
+  });
+
   describe('thinking items', () => {
     it('renders thinking item when enabled', async () => {
       const item: HistoryItem = {

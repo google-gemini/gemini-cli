@@ -110,6 +110,7 @@ export class MCPOAuthTokenStorage implements TokenStorage {
     const tokenFile = this.getTokenFilePath();
 
     try {
+      await fs.mkdir(path.dirname(tokenFile), { recursive: true });
       await fs.writeFile(
         tokenFile,
         JSON.stringify(tokenArray, null, 2),

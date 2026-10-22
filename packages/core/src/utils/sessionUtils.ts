@@ -106,21 +106,61 @@ export function isIgnoredUserContent(trimmedContent: string): boolean {
 
 /**
  * Converts session/conversation data into Gemini client history formats.
+ *
+ * When a model (`gemini`) turn contains `toolCalls`, this function performs a
+ * forward scan up to the next model turn to check whether subsequent `user`
+ * messages already record `functionResponse` parts for those tool calls:
+ * - Tool calls already covered by a subsequent `user` turn are not re-synthesized.
+ * - Any remaining tool calls with a `result` are either queued in
+ *   `pendingPartsToAppend` to be merged into the existing `user` tool-response
+ *   turn in that round, or synthesized into a fallback `${msg.id}_response`
+ *   turn for legacy recordings that lack a recorded `user` response turn.
+ * - Within each tool exchange round, `seenFunctionResponseIds` deduplicates
+ *   `functionResponse` parts by ID so previously inflated recordings recover cleanly.
  */
 export function convertSessionToClientHistory(
   messages: ConversationRecord['messages'],
 ): HistoryTurn[] {
   const clientHistory: HistoryTurn[] = [];
+  const seenFunctionResponseIds = new Set<string>();
+  const pendingPartsToAppend = new Map<string, Part[]>();
 
-  for (const msg of messages) {
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
     if (msg.type === 'info' || msg.type === 'error' || msg.type === 'warning') {
       continue;
     }
 
     if (msg.type === 'user') {
-      const contentString = partListUnionToString(msg.content);
-      const trimmedContent = contentString.trim();
-      if (isIgnoredUserContent(trimmedContent)) {
+      const extraParts = pendingPartsToAppend.get(msg.id) || [];
+      pendingPartsToAppend.delete(msg.id);
+      if (extraParts.length === 0) {
+        if (!msg.content) {
+          continue;
+        }
+        const contentString = partListUnionToString(msg.content);
+        const trimmedContent = contentString.trim();
+        if (isIgnoredUserContent(trimmedContent)) {
+          continue;
+        }
+      }
+
+      const parts = [
+        ...(msg.content ? ensurePartArray(msg.content) : []),
+        ...extraParts,
+      ].filter((part) => {
+        const respId = part?.functionResponse?.id;
+        if (!respId) {
+          return true;
+        }
+        if (seenFunctionResponseIds.has(respId)) {
+          return false;
+        }
+        seenFunctionResponseIds.add(respId);
+        return true;
+      });
+
+      if (parts.length === 0) {
         continue;
       }
 
@@ -128,10 +168,11 @@ export function convertSessionToClientHistory(
         id: msg.id,
         content: {
           role: 'user',
-          parts: ensurePartArray(msg.content),
+          parts,
         },
       });
     } else if (msg.type === 'gemini') {
+      seenFunctionResponseIds.clear();
       const modelParts: Part[] = [];
 
       const contentParts = msg.content ? ensurePartArray(msg.content) : [];
@@ -184,9 +225,34 @@ export function convertSessionToClientHistory(
 
         // 4. Generate tool response turns
         if (msg.toolCalls && msg.toolCalls.length > 0) {
+          const recordedResponseIds = new Set<string>();
+          let hasUntrackedFunctionResponse = false;
+          let targetUserMsgId: string | undefined;
+          for (let j = i + 1; j < messages.length; j++) {
+            const nextMsg = messages[j];
+            if (nextMsg.type === 'gemini') {
+              break;
+            }
+            if (nextMsg.type === 'user' && nextMsg.content) {
+              for (const part of ensurePartArray(nextMsg.content)) {
+                if (part?.functionResponse) {
+                  targetUserMsgId ??= nextMsg.id;
+                  if (part.functionResponse.id) {
+                    recordedResponseIds.add(part.functionResponse.id);
+                  } else {
+                    hasUntrackedFunctionResponse = true;
+                  }
+                }
+              }
+            }
+          }
+
           const functionResponseParts: Part[] = [];
           for (const toolCall of msg.toolCalls) {
-            if (toolCall.result) {
+            const isAlreadyRecorded = toolCall.id
+              ? recordedResponseIds.has(toolCall.id)
+              : hasUntrackedFunctionResponse;
+            if (toolCall.result && !isAlreadyRecorded) {
               let responseData: Part;
 
               if (typeof toolCall.result === 'string') {
@@ -211,13 +277,38 @@ export function convertSessionToClientHistory(
           }
 
           if (functionResponseParts.length > 0) {
-            clientHistory.push({
-              id: `${msg.id}_response`,
-              content: {
-                role: 'user',
-                parts: functionResponseParts,
-              },
-            });
+            if (targetUserMsgId) {
+              const existingPending =
+                pendingPartsToAppend.get(targetUserMsgId) || [];
+              pendingPartsToAppend.set(targetUserMsgId, [
+                ...existingPending,
+                ...functionResponseParts,
+              ]);
+            } else {
+              const dedupedResponseParts = functionResponseParts.filter(
+                (part) => {
+                  const respId = part?.functionResponse?.id;
+                  if (!respId) {
+                    return true;
+                  }
+                  if (seenFunctionResponseIds.has(respId)) {
+                    return false;
+                  }
+                  seenFunctionResponseIds.add(respId);
+                  return true;
+                },
+              );
+
+              if (dedupedResponseParts.length > 0) {
+                clientHistory.push({
+                  id: `${msg.id}_response`,
+                  content: {
+                    role: 'user',
+                    parts: dedupedResponseParts,
+                  },
+                });
+              }
+            }
           }
         }
       }

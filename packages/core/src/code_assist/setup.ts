@@ -30,7 +30,7 @@ import {
 export class ProjectIdRequiredError extends Error {
   constructor() {
     super(
-      'This account requires setting the GOOGLE_CLOUD_PROJECT or GOOGLE_CLOUD_PROJECT_ID env var. See https://goo.gle/gemini-cli-auth-docs#workspace-gca',
+      'This account requires setting the GOOGLE_CLOUD_PROJECT or GOOGLE_CLOUD_PROJECT_ID env var. See https://geminicli.com/docs/get-started/authentication/#set-gcp',
     );
     this.name = 'ProjectIdRequiredError';
   }
@@ -171,6 +171,8 @@ async function _doSetupUser(
   };
 
   const validationHandler = config.getValidationHandler();
+  const MAX_VALIDATION_ATTEMPTS = 3;
+  let validationAttempts = 0;
 
   let loadRes: LoadCodeAssistResponse;
   while (true) {
@@ -186,7 +188,12 @@ async function _doSetupUser(
       validateLoadCodeAssistResponse(loadRes);
       break;
     } catch (e) {
-      if (e instanceof ValidationRequiredError && validationHandler) {
+      if (
+        e instanceof ValidationRequiredError &&
+        validationHandler &&
+        validationAttempts < MAX_VALIDATION_ATTEMPTS
+      ) {
+        validationAttempts++;
         const intent = await validationHandler(
           e.validationLink,
           e.validationDescription,

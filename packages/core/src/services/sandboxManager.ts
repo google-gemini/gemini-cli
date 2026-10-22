@@ -168,12 +168,12 @@ export interface SandboxManager {
   /**
    * Checks if a command with its arguments is known to be safe for this sandbox.
    */
-  isKnownSafeCommand(args: string[]): boolean;
+  isKnownSafeCommand(args: string[], cwd?: string): boolean;
 
   /**
    * Checks if a command with its arguments is explicitly known to be dangerous for this sandbox.
    */
-  isDangerousCommand(args: string[]): boolean;
+  isDangerousCommand(args: string[], cwd?: string): boolean;
 
   /**
    * Parses the output of a command to detect sandbox denials.
@@ -307,16 +307,18 @@ export class NoopSandboxManager implements SandboxManager {
     };
   }
 
-  isKnownSafeCommand(args: string[]): boolean {
+  isKnownSafeCommand(args: string[], cwd?: string): boolean {
+    const effectiveCwd = cwd ?? this.getWorkspace();
     return os.platform() === 'win32'
-      ? isWindowsSafeCommand(args)
-      : isMacSafeCommand(args);
+      ? isWindowsSafeCommand(args, effectiveCwd, this.getWorkspace())
+      : isMacSafeCommand(args, effectiveCwd, this.getWorkspace());
   }
 
-  isDangerousCommand(args: string[]): boolean {
+  isDangerousCommand(args: string[], cwd?: string): boolean {
+    const effectiveCwd = cwd ?? this.getWorkspace();
     return os.platform() === 'win32'
-      ? isWindowsDangerousCommand(args)
-      : isMacDangerousCommand(args);
+      ? isWindowsDangerousCommand(args, effectiveCwd, this.getWorkspace())
+      : isMacDangerousCommand(args, effectiveCwd, this.getWorkspace());
   }
 
   parseDenials(): undefined {
@@ -342,11 +344,11 @@ export class LocalSandboxManager implements SandboxManager {
     throw new Error('Tool sandboxing is not yet implemented.');
   }
 
-  isKnownSafeCommand(_args: string[]): boolean {
+  isKnownSafeCommand(_args: string[], _cwd?: string): boolean {
     return false;
   }
 
-  isDangerousCommand(_args: string[]): boolean {
+  isDangerousCommand(_args: string[], _cwd?: string): boolean {
     return false;
   }
 
