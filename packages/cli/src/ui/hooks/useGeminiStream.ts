@@ -939,6 +939,7 @@ export const useGeminiStream = (
             seenCallIds.add(req.callId);
             synthesizedCalls.push(createCancelledToolCall(req));
           }
+          pendingToolCallRequestsRef.current = [];
 
           const clientHistory = client?.getHistory?.() ?? [];
           const lastTurn = clientHistory.at(-1);
@@ -1697,10 +1698,6 @@ export const useGeminiStream = (
             break;
           case ServerGeminiEventType.UserCancelled:
             handleUserCancelledEvent(userMessageTimestamp);
-            if (pendingHistoryItemRef.current) {
-              addItem(pendingHistoryItemRef.current, userMessageTimestamp);
-              setPendingHistoryItem(null);
-            }
             pendingToolCallRequestsRef.current = [];
             return StreamProcessingStatus.UserCancelled;
           case ServerGeminiEventType.Error:
@@ -1772,10 +1769,6 @@ export const useGeminiStream = (
         }
       }
       if (signal.aborted || turnCancelledRef.current) {
-        if (pendingHistoryItemRef.current) {
-          addItem(pendingHistoryItemRef.current, userMessageTimestamp);
-          setPendingHistoryItem(null);
-        }
         pendingToolCallRequestsRef.current = [];
         return StreamProcessingStatus.UserCancelled;
       }
@@ -1905,6 +1898,9 @@ export const useGeminiStream = (
               turnCancelledRef.current ||
               abortSignal.aborted
             ) {
+              if (turnCancelledRef.current || abortSignal.aborted) {
+                pendingToolCallRequestsRef.current = [];
+              }
               return;
             }
 
@@ -1993,6 +1989,7 @@ export const useGeminiStream = (
                 });
               }
             } catch (error: unknown) {
+              pendingToolCallRequestsRef.current = [];
               spanMetadata.error = error;
               if (error instanceof UnauthorizedError) {
                 onAuthError('Session expired or is unauthorized.');
@@ -2159,6 +2156,7 @@ export const useGeminiStream = (
 
       if (turnCancelledRef.current) {
         setIsResponding(false);
+        pendingToolCallRequestsRef.current = [];
         const geminiTools = completedAndReadyToSubmitTools.filter(
           (t) => !t.request.isClientInitiated,
         );
@@ -2330,6 +2328,13 @@ export const useGeminiStream = (
 
       if (turnCancelledRef.current) {
         setIsResponding(false);
+        pendingToolCallRequestsRef.current = [];
+        if (geminiClient && responsesToSend.length > 0) {
+          await geminiClient.addHistory({
+            role: 'user',
+            parts: responsesToSend,
+          });
+        }
         return;
       }
 

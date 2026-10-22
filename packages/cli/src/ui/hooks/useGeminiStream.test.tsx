@@ -248,17 +248,15 @@ vi.mock('./useStateAndRef.js', async () => {
         return [state, ref, setStateInternal];
       }
 
-      let val = initial;
-      const ref = { current: val };
+      const ref = React.useRef(initial);
       const setVal = vi.fn((updater) => {
         if (typeof updater === 'function') {
-          val = updater(val);
+          ref.current = updater(ref.current);
         } else {
-          val = updater;
+          ref.current = updater;
         }
-        ref.current = val;
       });
-      return [val, ref, setVal];
+      return [ref.current, ref, setVal];
     }),
   };
 });
