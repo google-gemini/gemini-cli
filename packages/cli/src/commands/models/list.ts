@@ -15,6 +15,7 @@ import { loadSettings, type LoadedSettings } from '../../config/settings.js';
 import { loadCliConfig, type CliArgs } from '../../config/config.js';
 import { buildAvailableModels } from '../../acp/acpUtils.js';
 import { exitCli } from '../utils.js';
+import { initializeOutputListenersAndFlush } from '../../gemini.js';
 
 export interface ModelListing {
   modelId: string;
@@ -95,9 +96,10 @@ export async function handleList(
 ): Promise<void> {
   const workspaceDir = process.cwd();
   const settings = options?.loadedSettings ?? loadSettings(workspaceDir);
-  const argv: CliArgs = options?.argv
-    ? { ...DEFAULT_CLI_ARGS, ...options.argv }
-    : DEFAULT_CLI_ARGS;
+  const argv: CliArgs = {
+    ...DEFAULT_CLI_ARGS,
+    ...options?.argv,
+  };
 
   const config = await loadCliConfig(
     settings.merged,
@@ -109,6 +111,8 @@ export async function handleList(
       loadedSettings: settings,
     },
   );
+
+  initializeOutputListenersAndFlush(config);
 
   await config.storage.initialize();
 
@@ -157,8 +161,13 @@ export const listCommand: CommandModule<object, ListArgs> = {
       });
     } catch (error) {
       process.stderr.write(
-        `Error: ${error instanceof Error ? error.message : String(error)}\n`,
+        'Error: ' +
+          (error instanceof Error
+            ? error.stack || error.message
+            : String(error)) +
+          '\n',
       );
+      process.exitCode = 1;
     } finally {
       await exitCli();
     }

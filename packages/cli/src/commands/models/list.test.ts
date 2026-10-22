@@ -33,8 +33,12 @@ vi.mock('../../acp/acpUtils.js');
 vi.mock('../utils.js', () => ({
   exitCli: vi.fn(),
 }));
+vi.mock('../../gemini.js', () => ({
+  initializeOutputListenersAndFlush: vi.fn(),
+}));
 
 describe('models list command', () => {
+  const originalExitCode = process.exitCode;
   const mockLoadSettings = vi.mocked(loadSettings);
   const mockLoadCliConfig = vi.mocked(loadCliConfig);
   const mockBuildAvailableModels = vi.mocked(buildAvailableModels);
@@ -77,6 +81,7 @@ describe('models list command', () => {
   });
 
   afterEach(() => {
+    process.exitCode = originalExitCode;
     vi.restoreAllMocks();
   });
 
@@ -286,6 +291,7 @@ describe('models list command', () => {
       expect(stderrSpy).toHaveBeenCalledWith(
         expect.stringContaining('Error: Config load failure'),
       );
+      expect(process.exitCode).toBe(1);
       expect(mockExitCli).toHaveBeenCalled();
     });
   });
