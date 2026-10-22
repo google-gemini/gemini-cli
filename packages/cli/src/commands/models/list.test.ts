@@ -146,6 +146,20 @@ describe('models list command', () => {
       expect(listings[0].name).toBe('nameless-model');
       expect(listings[0].displayName).toBe('nameless-model');
     });
+
+    it('should handle undefined availableModels gracefully', () => {
+      mockBuildAvailableModels.mockReturnValue({
+        availableModels: undefined as unknown as [],
+        currentModelId: 'auto',
+      });
+
+      const mockConfig = {} as unknown as Config;
+      const mockSettings = { merged: {} } as unknown as LoadedSettings;
+
+      const listings = getModelListings(mockConfig, mockSettings);
+
+      expect(listings).toEqual([]);
+    });
   });
 
   describe('handleList', () => {
@@ -228,6 +242,29 @@ describe('models list command', () => {
         .join('');
       const parsed = JSON.parse(output) as ModelListing[];
       expect(parsed[0].modelId).toBe('auto');
+    });
+
+    it('should write error to stderr and still call exitCli on failure', async () => {
+      const stderrSpy = vi
+        .spyOn(process.stderr, 'write')
+        .mockImplementation(() => true);
+      mockLoadCliConfig.mockRejectedValueOnce(
+        new Error('Config load failure'),
+      );
+
+      if (typeof listCommand.handler === 'function') {
+        await listCommand.handler({
+          'output-format': 'text',
+          loadedSettings: { merged: {} } as unknown as LoadedSettings,
+          $0: 'models',
+          _: [],
+        });
+      }
+
+      expect(stderrSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Error: Config load failure'),
+      );
+      expect(mockExitCli).toHaveBeenCalled();
     });
   });
 });

@@ -684,9 +684,18 @@ export async function main() {
 
   if (argv.listModels) {
     const outputFormat = argv.outputFormat === 'json' ? 'json' : 'text';
-    await handleListModels({ outputFormat, loadedSettings: settings });
-    await runExitCleanup();
-    process.exit(ExitCodes.SUCCESS);
+    try {
+      await handleListModels({ outputFormat, loadedSettings: settings });
+      await runExitCleanup();
+      process.exit(ExitCodes.SUCCESS);
+    } catch (error) {
+      debugLogger.error('Failed to list models:', error);
+      process.stderr.write(
+        `Error: ${error instanceof Error ? error.message : String(error)}\n`,
+      );
+      await runExitCleanup();
+      process.exit(ExitCodes.FATAL_INPUT_ERROR);
+    }
   }
 
   // hop into sandbox if we are outside and sandboxing is enabled

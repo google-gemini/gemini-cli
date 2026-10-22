@@ -72,7 +72,7 @@ export function getModelListings(
 ): ModelListing[] {
   const { availableModels } = buildAvailableModels(config, settings);
 
-  return availableModels.map((m) => {
+  return (availableModels ?? []).map((m) => {
     const inputTokens = tokenLimit(m.modelId) ?? DEFAULT_TOKEN_LIMIT;
     const outputTokens = 8192;
     return {
@@ -143,10 +143,17 @@ export const listCommand: CommandModule<object, ListArgs> = {
     }),
   handler: async (argv) => {
     const outputFormat = argv['output-format'] === 'json' ? 'json' : 'text';
-    await handleList({
-      outputFormat,
-      loadedSettings: argv.loadedSettings,
-    });
-    await exitCli();
+    try {
+      await handleList({
+        outputFormat,
+        loadedSettings: argv.loadedSettings,
+      });
+    } catch (error) {
+      process.stderr.write(
+        `Error: ${error instanceof Error ? error.message : String(error)}\n`,
+      );
+    } finally {
+      await exitCli();
+    }
   },
 };
