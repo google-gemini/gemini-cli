@@ -12,6 +12,32 @@ import type { IdeContext } from './types.js';
 
 type IdeContextSubscriber = (ideContext?: IdeContext) => void;
 
+/**
+ * Patterns of IDE/CLI configuration and instruction metadata files that should
+ * be excluded from IDE open-file context synchronization to prevent leaking
+ * IDE plugin rules (such as VS Code Gemini Code Assist settings or GEMINI.md)
+ * into Gemini CLI prompts.
+ */
+const EXCLUDED_IDE_CONTEXT_PATH_PATTERNS: readonly RegExp[] = [
+  /(?:^|\/)\.(?:vscode|gemini)\/settings\.json$/i,
+  /(?:^|\/)(?:(?:Code|VSCodium|Cursor|Windsurf)(?:[^/]*)\/User(?:\/profiles\/[^/]+)?|\.(?:vscode|vscodium|cursor|windsurf)-server\/[^/]+\/Machine)\/settings\.json$/i,
+  /(?:^|\/)gemini\.md$/i,
+];
+
+/**
+ * Returns true if the given file path is an IDE or CLI configuration/metadata
+ * file that should not be tracked in IDE open-file context.
+ */
+export function isExcludedIdeContextFile(filePath: string): boolean {
+  if (!filePath) {
+    return false;
+  }
+  const normalized = filePath.replace(/\\/g, '/').trim();
+  return EXCLUDED_IDE_CONTEXT_PATH_PATTERNS.some((pattern) =>
+    pattern.test(normalized),
+  );
+}
+
 export class IdeContextStore {
   private ideContextState?: IdeContext;
   private readonly subscribers = new Set<IdeContextSubscriber>();
@@ -35,6 +61,12 @@ export class IdeContextStore {
       this.ideContextState = newIdeContext;
       this.notifySubscribers();
       return;
+    }
+
+    if (workspaceState.openFiles) {
+      workspaceState.openFiles = workspaceState.openFiles.filter(
+        (file) => !isExcludedIdeContextFile(file.path),
+      );
     }
 
     const { openFiles } = workspaceState;
