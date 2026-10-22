@@ -754,6 +754,30 @@ describe('Logger', () => {
       const loaded = await logger.loadCheckpoint(tag);
       expect(loaded.history).toEqual(taggedConversation);
     });
+
+    it('should not traverse outside geminiDir via the legacy raw fallback on load, delete, or exists', async () => {
+      const outsidePath = path.resolve(TEST_GEMINI_DIR, '..', 'secret.json');
+      await fs.writeFile(
+        outsidePath,
+        JSON.stringify([{ role: 'user', parts: [{ text: 'secret' }] }]),
+      );
+
+      try {
+        const traversalTag = 'x/../../secret';
+
+        const exists = await logger.checkpointExists(traversalTag);
+        expect(exists).toBe(false);
+
+        const loaded = await logger.loadCheckpoint(traversalTag);
+        expect(loaded).toEqual({ history: [] });
+
+        const deleted = await logger.deleteCheckpoint(traversalTag);
+        expect(deleted).toBe(false);
+        expect(existsSync(outsidePath)).toBe(true);
+      } finally {
+        await fs.rm(outsidePath, { force: true });
+      }
+    });
   });
 
   describe('close', () => {
