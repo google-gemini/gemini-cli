@@ -38,6 +38,7 @@ export function createMockWorkspaceContext(
       .mockImplementation((path: string) =>
         allDirs.some((dir) => path.startsWith(dir)),
       ),
+    getBlockedPathSegment: vi.fn().mockReturnValue(null),
   } as unknown as WorkspaceContext;
 
   return mockWorkspaceContext;

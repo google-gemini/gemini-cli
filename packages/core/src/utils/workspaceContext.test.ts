@@ -553,7 +553,27 @@ describe('WorkspaceContext with optional directories', () => {
 
       for (const p of safePaths) {
         expect(workspaceContext.isPathWithinWorkspace(p)).toBe(true);
+        expect(workspaceContext.getBlockedPathSegment(p)).toBeNull();
       }
+    });
+
+    it('should report the blocked segment only for paths inside workspace roots', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+
+      expect(
+        workspaceContext.getBlockedPathSegment(
+          path.join(cwd, 'node_modules', 'pkg'),
+        ),
+      ).toBe('node_modules');
+      expect(
+        workspaceContext.getBlockedPathSegment(path.join(cwd, '.git', 'HEAD')),
+      ).toBe('.git');
+      expect(
+        workspaceContext.getBlockedPathSegment(path.join(cwd, '.env')),
+      ).toBe('.env');
+      expect(
+        workspaceContext.getBlockedPathSegment('/outside/workspace/node_modules'),
+      ).toBeNull();
     });
   });
 });

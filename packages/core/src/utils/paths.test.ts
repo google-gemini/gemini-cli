@@ -22,6 +22,7 @@ import {
   isTrustedSystemPath,
   resolveDefensiveToolPath,
   hasBlockedPathSegment,
+  getBlockedPathSegment,
   stripExtendedLengthPrefix,
 } from './paths.js';
 
@@ -1038,6 +1039,15 @@ describe('normalizePath', () => {
       expect(hasBlockedPathSegment('gh1a2b~1.json')).toBe(true);
       expect(hasBlockedPathSegment('gha-cr~1.jso')).toBe(true);
       expect(hasBlockedPathSegment('gh1a2b~1.jso')).toBe(true);
+    });
+
+    it('should return the offending segment from getBlockedPathSegment or null for safe paths', () => {
+      expect(getBlockedPathSegment('node_modules/lodash/index.js')).toBe(
+        'node_modules',
+      );
+      expect(getBlockedPathSegment('src/.git/config')).toBe('.git');
+      expect(getBlockedPathSegment('config/.env.local')).toBe('.env.local');
+      expect(getBlockedPathSegment('safe/path/here')).toBeNull();
     });
   });
 });

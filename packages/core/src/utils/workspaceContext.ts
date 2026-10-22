@@ -7,7 +7,11 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { debugLogger } from './debugLogger.js';
-import { resolveToRealPath, hasBlockedPathSegment } from './paths.js';
+import {
+  resolveToRealPath,
+  hasBlockedPathSegment,
+  getBlockedPathSegment,
+} from './paths.js';
 
 export type Unsubscribe = () => void;
 
@@ -197,6 +201,30 @@ export class WorkspaceContext {
       return false;
     } catch {
       return false;
+    }
+  }
+
+  /**
+   * Returns the blocked path segment if `pathToCheck` resolves within any
+   * workspace directory but contains a blocked segment (e.g. `.git`, `.env`,
+   * `node_modules`, `gha-creds-*.json`). Returns null otherwise.
+   */
+  getBlockedPathSegment(pathToCheck: string): string | null {
+    try {
+      const fullyResolvedPath = this.fullyResolvedPath(pathToCheck);
+
+      for (const dir of this.directories) {
+        if (this.isPathWithinRoot(fullyResolvedPath, dir)) {
+          const relative = path.relative(dir, fullyResolvedPath);
+          const blocked = getBlockedPathSegment(relative);
+          if (blocked) {
+            return blocked;
+          }
+        }
+      }
+      return null;
+    } catch {
+      return null;
     }
   }
 
