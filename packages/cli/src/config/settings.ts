@@ -211,12 +211,12 @@ export interface SettingsFile {
   readOnly?: boolean;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 function asRecord(value: unknown): Record<string, unknown> | undefined {
-  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return value as Record<string, unknown>;
-  }
-  return undefined;
+  return isRecord(value) ? value : undefined;
 }
 
 function setNestedProperty(
@@ -816,10 +816,6 @@ export function loadSettings(
 interface RawSettingsFile {
   rawSettings: Settings;
   rawJson?: string;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function getParentRecord(
