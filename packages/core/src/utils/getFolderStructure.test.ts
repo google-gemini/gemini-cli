@@ -32,7 +32,7 @@ import * as os from 'node:os';
 import { getFolderStructure } from './getFolderStructure.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import * as path from 'node:path';
-import { GEMINI_DIR } from './paths.js';
+import { GEMINI_DIR, resolveToRealPath } from './paths.js';
 import { GEMINI_IGNORE_FILE_NAME } from 'src/config/constants.js';
 
 describe('getFolderStructure', () => {
@@ -271,6 +271,33 @@ ${testRootDir}${path.sep}
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining(
           `Warning: Could not read directory ${restrictedDirPath}:`,
+        ),
+      );
+    } finally {
+      beforeReaddirHook = null;
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('should return an error message and warn with resolved real path when reading the root directory fails with EACCES', async () => {
+    beforeReaddirHook = (targetPath: string) => {
+      if (targetPath === testRootDir) {
+        throw Object.assign(
+          new Error(`EACCES: permission denied, scandir '${testRootDir}'`),
+          { code: 'EACCES' },
+        );
+      }
+    };
+    const warnSpy = vi.spyOn(debugLogger, 'warn').mockImplementation(() => {});
+
+    try {
+      const structure = await getFolderStructure(testRootDir);
+      expect(structure).toContain(
+        `Error: Could not read directory "${testRootDir}". Check path and permissions.`,
+      );
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          `Warning: Could not read directory ${resolveToRealPath(testRootDir)}:`,
         ),
       );
     } finally {
