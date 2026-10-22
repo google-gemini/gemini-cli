@@ -37,7 +37,7 @@ import { toContents } from '../code_assist/converter.js';
 import { isStructuredError } from '../utils/quotaErrorDetection.js';
 import { runInDevTraceSpan, type SpanMetadata } from '../telemetry/trace.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import { isAbortError, getErrorType } from '../utils/errors.js';
+import { isCancellationError, getErrorType } from '../utils/errors.js';
 import {
   GeminiCliOperation,
   GEN_AI_PROMPT_NAME,
@@ -322,7 +322,7 @@ export class LoggingContentGenerator implements ContentGenerator {
     generationConfig?: GenerateContentConfig,
     serverDetails?: ServerDetails,
   ): void {
-    if (isAbortError(error)) {
+    if (isCancellationError(error)) {
       // Don't log aborted requests (e.g., user cancellation, internal timeouts) as API errors.
       return;
     }
