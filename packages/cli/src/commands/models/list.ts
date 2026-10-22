@@ -32,6 +32,7 @@ export interface ModelListing {
 export interface HandleListModelsOptions {
   outputFormat?: 'text' | 'json';
   loadedSettings?: LoadedSettings;
+  argv?: Partial<CliArgs>;
 }
 
 const DEFAULT_CLI_ARGS: CliArgs = {
@@ -94,17 +95,22 @@ export async function handleList(
 ): Promise<void> {
   const workspaceDir = process.cwd();
   const settings = options?.loadedSettings ?? loadSettings(workspaceDir);
+  const argv: CliArgs = options?.argv
+    ? { ...DEFAULT_CLI_ARGS, ...options.argv }
+    : DEFAULT_CLI_ARGS;
 
   const config = await loadCliConfig(
     settings.merged,
     'models-list-session',
-    DEFAULT_CLI_ARGS,
+    argv,
     {
       cwd: workspaceDir,
       skipExtensions: true,
       loadedSettings: settings,
     },
   );
+
+  await config.storage.initialize();
 
   const models = getModelListings(config, settings);
 
@@ -125,7 +131,7 @@ export async function handleList(
   }
 }
 
-interface ListArgs {
+interface ListArgs extends Partial<CliArgs> {
   'output-format'?: string;
   loadedSettings?: LoadedSettings;
 }
@@ -147,6 +153,7 @@ export const listCommand: CommandModule<object, ListArgs> = {
       await handleList({
         outputFormat,
         loadedSettings: argv.loadedSettings,
+        argv,
       });
     } catch (error) {
       process.stderr.write(

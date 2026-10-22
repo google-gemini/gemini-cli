@@ -64,7 +64,9 @@ describe('models list command', () => {
     mockLoadSettings.mockReturnValue({
       merged: {},
     } as unknown as LoadedSettings);
-    mockLoadCliConfig.mockResolvedValue({} as unknown as Config);
+    mockLoadCliConfig.mockResolvedValue({
+      storage: { initialize: vi.fn().mockResolvedValue(undefined) },
+    } as unknown as Config);
     mockBuildAvailableModels.mockReturnValue({
       availableModels: sampleAvailableModels,
       currentModelId: 'auto',
@@ -196,6 +198,26 @@ describe('models list command', () => {
       expect(parsed[0].displayName).toBe('Auto');
       expect(parsed[0].contextLimits.inputTokens).toBe(1_048_576);
       expect(parsed[0].contextLimits.outputTokens).toBe(8192);
+    });
+
+    it('should pass custom argv and initialize storage when handleList is called', async () => {
+      const mockStorage = { initialize: vi.fn().mockResolvedValue(undefined) };
+      mockLoadCliConfig.mockResolvedValueOnce({
+        storage: mockStorage,
+      } as unknown as Config);
+
+      await handleList({
+        outputFormat: 'text',
+        argv: { debug: true },
+      });
+
+      expect(mockLoadCliConfig).toHaveBeenCalledWith(
+        expect.anything(),
+        'models-list-session',
+        expect.objectContaining({ debug: true }),
+        expect.anything(),
+      );
+      expect(mockStorage.initialize).toHaveBeenCalled();
     });
   });
 

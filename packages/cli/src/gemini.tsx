@@ -685,7 +685,7 @@ export async function main() {
   if (argv.listModels) {
     const outputFormat = argv.outputFormat === 'json' ? 'json' : 'text';
     try {
-      await handleListModels({ outputFormat, loadedSettings: settings });
+      await handleListModels({ outputFormat, loadedSettings: settings, argv });
       await runExitCleanup();
       process.exit(ExitCodes.SUCCESS);
     } catch (error) {
