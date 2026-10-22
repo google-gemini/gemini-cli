@@ -13,6 +13,8 @@ import {
   RELAUNCH_EXIT_CODE,
   getSpawnConfig,
   getScriptArgs,
+  setupSignalForwarding,
+  handleChildProcessClose,
 } from './src/utils/processUtils.js';
 
 // --- Global Entry Point ---
@@ -62,12 +64,6 @@ async function run() {
 
     let latestAdminSettings: unknown = undefined;
 
-    // Prevent the parent process from exiting prematurely on signals.
-    // The child process will receive the same signals and handle its own cleanup.
-    for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
-      process.on(sig as NodeJS.Signals, () => {});
-    }
-
     const runner = () => {
       process.stdin.pause();
 
@@ -97,16 +93,18 @@ async function run() {
         },
       );
 
+      const removeForwarders = setupSignalForwarding(child);
+
       return new Promise<number>((resolve) => {
         child.on('error', (err) => {
+          removeForwarders();
           process.stderr.write(
             'Error: Failed to start child process: ' + err.message + '\n',
           );
           resolve(1);
         });
-        child.on('close', (code) => {
-          process.stdin.resume();
-          resolve(code ?? 1);
+        child.on('close', (code, signal) => {
+          handleChildProcessClose(code, signal, removeForwarders, resolve);
         });
       });
     };

@@ -66,9 +66,14 @@ variables using `$VAR_NAME`, `${VAR_NAME}`, or `${VAR_NAME:-DEFAULT_VALUE}`
 syntax. These variables will be automatically resolved when the settings are
 loaded. For example, if you have an environment variable `MY_API_TOKEN`, you
 could use it in `settings.json` like this: `"apiKey": "$MY_API_TOKEN"`. If you
-want to provide a fallback value, use `${MY_API_TOKEN:-default-token}`.
-Additionally, each extension can have its own `.env` file in its directory,
-which will be loaded automatically.
+want to provide a fallback value, use `${MY_API_TOKEN:-default-token}`. You can
+reference variables from your shell environment as well as variables loaded from
+[`.env` files](#environment-variables-and-env-files). The settings that control
+how `.env` files are loaded, such as `security.folderTrust.enabled`,
+`advanced.ignoreLocalEnv`, `advanced.excludedEnvVars`, and `tools.sandbox`, are
+evaluated before any `.env` file is loaded, so they can only reference variables
+from your shell environment. Additionally, each extension can have its own
+`.env` file in its directory, which will be loaded automatically.
 
 **Note for Enterprise Users:** For guidance on deploying and managing Gemini CLI
 in a corporate environment, see the
