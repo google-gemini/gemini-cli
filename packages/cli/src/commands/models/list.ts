@@ -5,7 +5,11 @@
  */
 
 import type { CommandModule } from 'yargs';
-import { type Config, tokenLimit } from '@google/gemini-cli-core';
+import {
+  type Config,
+  tokenLimit,
+  DEFAULT_TOKEN_LIMIT,
+} from '@google/gemini-cli-core';
 import chalk from 'chalk';
 import { loadSettings, type LoadedSettings } from '../../config/settings.js';
 import { loadCliConfig, type CliArgs } from '../../config/config.js';
@@ -69,7 +73,7 @@ export function getModelListings(
   const { availableModels } = buildAvailableModels(config, settings);
 
   return availableModels.map((m) => {
-    const inputTokens = tokenLimit(m.modelId);
+    const inputTokens = tokenLimit(m.modelId) ?? DEFAULT_TOKEN_LIMIT;
     const outputTokens = 8192;
     return {
       modelId: m.modelId,

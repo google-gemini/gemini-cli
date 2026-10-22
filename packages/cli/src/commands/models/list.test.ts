@@ -101,6 +101,29 @@ describe('models list command', () => {
       expect(listings[1].contextLimits.inputTokens).toBe(1_048_576);
       expect(listings[1].contextLimits.outputTokens).toBe(8192);
     });
+
+    it('should fall back to DEFAULT_TOKEN_LIMIT for unknown or custom models', () => {
+      mockBuildAvailableModels.mockReturnValue({
+        availableModels: [
+          {
+            modelId: 'custom-new-model',
+            name: 'Custom New Model',
+            description: 'Custom model test',
+          },
+        ],
+        currentModelId: 'custom-new-model',
+      });
+
+      const mockConfig = {} as unknown as Config;
+      const mockSettings = { merged: {} } as unknown as LoadedSettings;
+
+      const listings = getModelListings(mockConfig, mockSettings);
+
+      expect(listings).toHaveLength(1);
+      expect(listings[0].modelId).toBe('custom-new-model');
+      expect(listings[0].contextLimits.inputTokens).toBe(1_048_576);
+      expect(listings[0].contextLimits.outputTokens).toBe(8192);
+    });
   });
 
   describe('handleList', () => {
