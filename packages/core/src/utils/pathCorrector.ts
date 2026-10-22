@@ -13,7 +13,16 @@ import {
   isSubpath,
   resolveDefensiveToolPath,
   resolveToRealPath,
+  toPathKey,
 } from './paths.js';
+
+function resolveToRealPathSafe(pathStr: string): string {
+  try {
+    return resolveToRealPath(pathStr);
+  } catch {
+    return path.resolve(pathStr);
+  }
+}
 
 type SuccessfulPathCorrection = {
   success: true;
@@ -81,7 +90,7 @@ export function resolveActiveWorkspaceDir(
     // Git repositories, narrow to the nested repository root containing activeFile.
     let currentDir = path.dirname(resolvedActiveFilePath);
     while (
-      currentDir !== activeWorkspaceDir &&
+      toPathKey(currentDir) !== toPathKey(activeWorkspaceDir) &&
       isSubpath(activeWorkspaceDir, currentDir)
     ) {
       try {
@@ -103,7 +112,7 @@ export function resolveActiveWorkspaceDir(
     if (
       relativeFilePath &&
       !path.isAbsolute(relativeFilePath) &&
-      activeWorkspaceDir !== resolvedDefaultTargetDir &&
+      toPathKey(activeWorkspaceDir) !== toPathKey(resolvedDefaultTargetDir) &&
       isSubpath(resolvedDefaultTargetDir, activeWorkspaceDir)
     ) {
       const relToDefault = path
@@ -112,10 +121,18 @@ export function resolveActiveWorkspaceDir(
       const normalizedInput = relativeFilePath
         .replace(/^@[/\\]?/, '')
         .replace(/\\/g, '/');
+      const isCaseInsensitive =
+        process.platform === 'win32' || process.platform === 'darwin';
+      const relCompare = isCaseInsensitive
+        ? relToDefault.toLowerCase()
+        : relToDefault;
+      const inputCompare = isCaseInsensitive
+        ? normalizedInput.toLowerCase()
+        : normalizedInput;
       if (
-        relToDefault &&
-        (normalizedInput === relToDefault ||
-          normalizedInput.startsWith(`${relToDefault}/`))
+        relCompare &&
+        (inputCompare === relCompare ||
+          inputCompare.startsWith(`${relCompare}/`))
       ) {
         return resolvedDefaultTargetDir;
       }
@@ -142,20 +159,20 @@ export function correctPath(
   filePath: string,
   config: Config,
 ): PathCorrectionResult {
-  const targetDir = resolveToRealPath(
+  const targetDir = resolveToRealPathSafe(
     resolveActiveWorkspaceDir(config, filePath),
   );
   const sanitizedPath = resolveDefensiveToolPath(filePath, targetDir);
 
   // Check for direct path relative to the active target directory.
-  const directPath = resolveToRealPath(path.join(targetDir, sanitizedPath));
+  const directPath = resolveToRealPathSafe(path.join(targetDir, sanitizedPath));
   if (fs.existsSync(directPath)) {
     return { success: true, correctedPath: directPath };
   }
 
-  const fallbackTargetDir = resolveToRealPath(config.getTargetDir());
-  if (targetDir !== fallbackTargetDir) {
-    const fallbackDirectPath = resolveToRealPath(
+  const fallbackTargetDir = resolveToRealPathSafe(config.getTargetDir());
+  if (toPathKey(targetDir) !== toPathKey(fallbackTargetDir)) {
+    const fallbackDirectPath = resolveToRealPathSafe(
       path.join(fallbackTargetDir, sanitizedPath),
     );
     if (fs.existsSync(fallbackDirectPath)) {
@@ -169,7 +186,7 @@ export function correctPath(
   const basename = path.basename(sanitizedPath);
   const normalizedTarget = sanitizedPath.replace(/\\/g, '/');
 
-  if (targetDir !== fallbackTargetDir) {
+  if (toPathKey(targetDir) !== toPathKey(fallbackTargetDir)) {
     const activeFoundFiles = bfsFileSearchSync(targetDir, {
       fileName: basename,
       maxDirs: 50,

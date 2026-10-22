@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ReadFileTool, type ReadFileToolParams } from './read-file.js';
 import { ToolErrorType } from './tool-error.js';
 import path from 'node:path';
-import { isSubpath } from '../utils/paths.js';
+import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import os from 'node:os';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
@@ -750,10 +750,10 @@ describe('ReadFileTool', () => {
 
   describe('IDE multi-root workspace resolution', () => {
     it('should resolve and read relative file paths against the active IDE workspace directory', async () => {
-      const realTmp = await fsp.realpath(os.tmpdir());
-      const secondWorkspaceDir = await fsp.mkdtemp(
-        path.join(realTmp, 'read-file-tool-second-'),
+      const rawSecondWorkspaceDir = await fsp.mkdtemp(
+        path.join(os.tmpdir(), 'read-file-tool-second-'),
       );
+      const secondWorkspaceDir = resolveToRealPath(rawSecondWorkspaceDir);
 
       try {
         const activeOpenFile = path.join(secondWorkspaceDir, 'index.ts');

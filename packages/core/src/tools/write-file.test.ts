@@ -1331,7 +1331,7 @@ describe('WriteFileTool', () => {
       // The UI description displays only the relative path ("Writing to tests/gemini_test_repo_parent.txt"),
       // hiding that it resolved against data-model-core/mmm instead of mmm-tools/FLUX
       expect(invocation.getDescription()).toBe(
-        'Writing to tests/gemini_test_repo_parent.txt',
+        `Writing to ${path.join('tests', 'gemini_test_repo_parent.txt')}`,
       );
 
       await invocation.execute({ abortSignal });

@@ -187,4 +187,35 @@ describe('pathCorrector', () => {
 
     expect(resolveActiveWorkspaceDir(mockConfig, 'README.md')).toBe(rootDir);
   });
+
+  it('should handle backslash-separated prefixed relative paths without duplicating nested repo segments', () => {
+    const nestedRepoDir = path.join(rootDir, 'mmm-tools', 'FLUX');
+    fs.mkdirSync(path.join(nestedRepoDir, '.git'), { recursive: true });
+    const activeFile = path.join(nestedRepoDir, 'src', 'index.ts');
+    fs.mkdirSync(path.dirname(activeFile), { recursive: true });
+    fs.writeFileSync(activeFile, 'export {};');
+
+    vi.spyOn(mockConfig, 'getIdeMode').mockReturnValue(true);
+    ideContextStore.set({
+      workspaceState: {
+        openFiles: [
+          {
+            path: activeFile,
+            timestamp: Date.now(),
+            isActive: true,
+          },
+        ],
+      },
+    });
+
+    expect(resolveActiveWorkspaceDir(mockConfig, 'tests\\new-file.txt')).toBe(
+      nestedRepoDir,
+    );
+    expect(
+      resolveActiveWorkspaceDir(
+        mockConfig,
+        'mmm-tools\\FLUX\\tests\\new-file.txt',
+      ),
+    ).toBe(rootDir);
+  });
 });
