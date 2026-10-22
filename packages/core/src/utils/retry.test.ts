@@ -1055,6 +1055,89 @@ describe('retryWithBackoff', () => {
       expect(fn).toHaveBeenCalledTimes(3);
       expect(onPersistent429).toHaveBeenCalledTimes(1);
     });
+
+    it('should not treat quota reset messages as transient capacity exhaustion', async () => {
+      const quotaResetError = new TerminalQuotaError(
+        'You have exhausted your capacity on this model. Your quota will reset after 14h31m12s.',
+        {
+          code: 429,
+          message:
+            'You have exhausted your capacity on this model. Your quota will reset after 14h31m12s.',
+          details: [],
+        },
+        52272,
+      );
+
+      const fn = vi.fn().mockRejectedValue(quotaResetError);
+      const onPersistent429 = vi.fn().mockResolvedValue(null);
+
+      await expect(
+        retryWithBackoff(fn, {
+          maxAttempts: 5,
+          initialDelayMs: 1,
+          maxDelayMs: 10,
+          onPersistent429,
+        }),
+      ).rejects.toThrow(TerminalQuotaError);
+
+      expect(fn).toHaveBeenCalledTimes(1);
+      expect(onPersistent429).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not silently retry capacity exhaustion when retryDelayMs exceeds maxDelayMs', async () => {
+      const longDelayCapacityError = new TerminalQuotaError(
+        'MODEL_CAPACITY_EXHAUSTED',
+        {
+          code: 429,
+          message: 'MODEL_CAPACITY_EXHAUSTED',
+          details: [],
+        },
+        57798, // ~16 hours
+        'MODEL_CAPACITY_EXHAUSTED',
+      );
+
+      const fn = vi.fn().mockRejectedValue(longDelayCapacityError);
+      const onPersistent429 = vi.fn().mockResolvedValue(null);
+
+      await expect(
+        retryWithBackoff(fn, {
+          maxAttempts: 5,
+          initialDelayMs: 1,
+          maxDelayMs: 30000,
+          onPersistent429,
+        }),
+      ).rejects.toThrow(TerminalQuotaError);
+
+      expect(fn).toHaveBeenCalledTimes(1);
+      expect(onPersistent429).toHaveBeenCalledTimes(1);
+    });
+
+    it('should promote RetryableQuotaError to TerminalQuotaError when retryDelayMs exceeds maxDelayMs', async () => {
+      const excessiveDelayRetryableError = new RetryableQuotaError(
+        'Rate limit exceeded',
+        {
+          code: 429,
+          message: 'Rate limit exceeded',
+          details: [],
+        },
+        600, // 600s > maxDelayMs
+      );
+
+      const fn = vi.fn().mockRejectedValue(excessiveDelayRetryableError);
+      const onPersistent429 = vi.fn().mockResolvedValue(null);
+
+      await expect(
+        retryWithBackoff(fn, {
+          maxAttempts: 5,
+          initialDelayMs: 1,
+          maxDelayMs: 30000,
+          onPersistent429,
+        }),
+      ).rejects.toThrow(TerminalQuotaError);
+
+      expect(fn).toHaveBeenCalledTimes(1);
+      expect(onPersistent429).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('ValidationRequiredError handling', () => {

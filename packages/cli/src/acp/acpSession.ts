@@ -11,6 +11,7 @@ import {
   coreEvents,
   CoreEvent,
   type ApprovalModeChangedPayload,
+  type RetryAttemptPayload,
   logToolCall,
   convertToFunctionResponse,
   ToolConfirmationOutcome,
@@ -84,6 +85,7 @@ export class Session {
       CoreEvent.ApprovalModeChanged,
       this.handleApprovalModeChanged,
     );
+    coreEvents.on(CoreEvent.RetryAttempt, this.handleRetryAttempt);
 
     // Subscribe to tool confirmation requests to handle policy checks (e.g. auto-allowing safe shell commands)
     this.context.config
@@ -188,11 +190,45 @@ export class Session {
     }
   };
 
+  private handleRetryAttempt = (payload: RetryAttemptPayload) => {
+    if (payload.sessionId !== undefined) {
+      const configSessionId = this.context.config.getSessionId?.();
+      if (
+        payload.sessionId !== this.id &&
+        payload.sessionId !== configSessionId
+      ) {
+        return;
+      }
+    } else if (!this.pendingPrompt) {
+      return;
+    }
+
+    const delaySec = Math.max(1, Math.round(payload.delayMs / 1000));
+    const errorSuffix = payload.error ? ` after ${payload.error}` : '';
+    void this.sendUpdate({
+      sessionUpdate: 'agent_thought_chunk',
+      content: {
+        type: 'text',
+        text: `Retrying model request for ${payload.model}${errorSuffix} (attempt ${payload.attempt}/${payload.maxAttempts}, waiting ${delaySec}s)...`,
+      },
+      _meta: {
+        retry: {
+          attempt: payload.attempt,
+          maxAttempts: payload.maxAttempts,
+          delayMs: payload.delayMs,
+          error: payload.error,
+          model: payload.model,
+        },
+      },
+    });
+  };
+
   async dispose(): Promise<void> {
     coreEvents.off(
       CoreEvent.ApprovalModeChanged,
       this.handleApprovalModeChanged,
     );
+    coreEvents.off(CoreEvent.RetryAttempt, this.handleRetryAttempt);
     this.disposeController.abort();
     if (this.context.config?.dispose) {
       try {

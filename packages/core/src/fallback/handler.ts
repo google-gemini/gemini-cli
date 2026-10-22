@@ -32,10 +32,18 @@ export async function handleFallback(
   const failureKind = classifyFailureKind(error);
 
   const chain = resolvePolicyChain(config);
-  const { failedPolicy, candidates } = buildFallbackPolicyContext(
+  let { failedPolicy, candidates } = buildFallbackPolicyContext(
     chain,
     failedModel,
   );
+  if (!failedPolicy) {
+    const modelChain = resolvePolicyChain(config, failedModel);
+    const modelContext = buildFallbackPolicyContext(modelChain, failedModel);
+    failedPolicy = modelContext.failedPolicy;
+    if (modelContext.candidates.length > 0) {
+      candidates = modelContext.candidates;
+    }
+  }
 
   const availability = config.getModelAvailabilityService();
   const getAvailabilityContext = () => {
@@ -111,6 +119,17 @@ export async function handleFallback(
 
   const handler = config.getFallbackModelHandler();
   if (typeof handler !== 'function') {
+    if (!config.isInteractive?.() && fallbackModel !== failedModel) {
+      applyAvailabilityTransition(getAvailabilityContext, failureKind);
+      const overrideFailedModel =
+        failedModel !== activeModel ? failedModel : undefined;
+      return processIntent(
+        config,
+        'retry_always',
+        fallbackModel,
+        overrideFailedModel,
+      );
+    }
     return null;
   }
 

@@ -20,6 +20,7 @@ import type { ModelAvailabilityService } from '../availability/modelAvailability
 import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 import { AuthType } from '../core/contentGenerator.js';
 import {
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
@@ -420,6 +421,69 @@ describe('handleFallback', () => {
 
       expect(result).toBe(true);
       expect(policyConfig.activateFallbackMode).not.toHaveBeenCalled();
+    });
+
+    it('resolves utility model chain and marks failed utility model terminal silently', async () => {
+      vi.mocked(policyConfig.getModel).mockReturnValue(
+        DEFAULT_GEMINI_MODEL_AUTO,
+      );
+      vi.mocked(policyConfig.getActiveModel).mockReturnValue(MOCK_PRO_MODEL);
+      vi.mocked(policyConfig.getFallbackModelHandler).mockReturnValue(
+        undefined,
+      );
+
+      const result = await handleFallback(
+        policyConfig,
+        DEFAULT_GEMINI_FLASH_LITE_MODEL,
+        AUTH_OAUTH,
+        new TerminalQuotaError('Daily quota exhausted', {
+          code: 429,
+          message: 'Daily quota exhausted',
+          details: [],
+        }),
+      );
+
+      expect(result).toBe(true);
+      expect(availability.markTerminal).toHaveBeenCalledWith(
+        DEFAULT_GEMINI_FLASH_LITE_MODEL,
+        'quota',
+      );
+      expect(policyConfig.activateFallbackMode).toHaveBeenCalledWith(
+        DEFAULT_GEMINI_FLASH_MODEL,
+        DEFAULT_GEMINI_FLASH_LITE_MODEL,
+      );
+    });
+
+    it('automatically activates fallback in non-interactive mode when no fallbackModelHandler is registered', async () => {
+      vi.mocked(policyConfig.getModel).mockReturnValue(
+        DEFAULT_GEMINI_MODEL_AUTO,
+      );
+      vi.mocked(policyConfig.getActiveModel).mockReturnValue(MOCK_PRO_MODEL);
+      vi.mocked(policyConfig.getFallbackModelHandler).mockReturnValue(
+        undefined,
+      );
+      policyConfig.isInteractive = vi.fn().mockReturnValue(false);
+
+      const result = await handleFallback(
+        policyConfig,
+        MOCK_PRO_MODEL,
+        AUTH_OAUTH,
+        new TerminalQuotaError('Daily quota exhausted', {
+          code: 429,
+          message: 'Daily quota exhausted',
+          details: [],
+        }),
+      );
+
+      expect(result).toBe(true);
+      expect(availability.markTerminal).toHaveBeenCalledWith(
+        MOCK_PRO_MODEL,
+        'quota',
+      );
+      expect(policyConfig.activateFallbackMode).toHaveBeenCalledWith(
+        DEFAULT_GEMINI_FLASH_MODEL,
+        undefined,
+      );
     });
   });
 });
