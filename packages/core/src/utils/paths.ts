@@ -597,12 +597,13 @@ export function isTrustedSystemPath(filePath: string): boolean {
   } else if (platform === 'android') {
     let termuxPrefix = '/data/data/com.termux/files/usr';
     const envPrefix = process.env['PREFIX'];
-    if (
-      envPrefix &&
-      path.posix.isAbsolute(envPrefix) &&
-      /^\/data\/(?:data|user\/\d+)\/com\.termux\b/.test(envPrefix)
-    ) {
-      termuxPrefix = envPrefix;
+    if (envPrefix && path.posix.isAbsolute(envPrefix)) {
+      const resolvedPrefix = path.posix.normalize(envPrefix);
+      if (
+        /^\/data\/(?:data|user\/\d+)\/com\.termux(?:\/|$)/.test(resolvedPrefix)
+      ) {
+        termuxPrefix = resolvedPrefix;
+      }
     }
     const trustedPrefixes = [
       path.posix.join(termuxPrefix, 'bin'),

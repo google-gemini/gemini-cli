@@ -981,12 +981,24 @@ describe('normalizePath', () => {
       expect(isTrustedSystemPath('/tmp/bin/rg')).toBe(false);
       expect(isTrustedSystemPath('../../tmp/bin/rg')).toBe(false);
 
+      // Path traversal attempt via absolute path
+      vi.stubEnv('PREFIX', '/data/data/com.termux/../../tmp');
+      expect(isTrustedSystemPath('/tmp/bin/rg')).toBe(false);
+
       // User-writable or arbitrary directory
       vi.stubEnv('PREFIX', '/sdcard/Download');
       expect(isTrustedSystemPath('/sdcard/Download/bin/rg')).toBe(false);
 
       vi.stubEnv('PREFIX', '/tmp');
       expect(isTrustedSystemPath('/tmp/bin/rg')).toBe(false);
+
+      // Malicious package name prefixing com.termux
+      vi.stubEnv('PREFIX', '/data/data/com.termux.malicious/files/usr');
+      expect(
+        isTrustedSystemPath(
+          '/data/data/com.termux.malicious/files/usr/bin/rg',
+        ),
+      ).toBe(false);
 
       // Falls back to safe default
       expect(
