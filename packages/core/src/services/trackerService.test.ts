@@ -117,6 +117,192 @@ describe('TrackerService', () => {
     expect(updated.status).toBe('closed');
   });
 
+  it('should set timestamps on create and update', async () => {
+    const beforeCreate = new Date().toISOString();
+    const task = await service.createTask({
+      title: 'Timed Task',
+      description: 'Test timestamps',
+      type: TaskType.TASK,
+      status: TaskStatus.OPEN,
+      dependencies: [],
+    });
+    const afterCreate = new Date().toISOString();
+
+    expect(task.createdAt).toBeDefined();
+    expect(task.updatedAt).toBeDefined();
+    expect(task.createdAt! >= beforeCreate).toBe(true);
+    expect(task.createdAt! <= afterCreate).toBe(true);
+
+    const beforeUpdate = new Date().toISOString();
+    const updated = await service.updateTask(task.id, {
+      title: 'Updated',
+    });
+    const afterUpdate = new Date().toISOString();
+
+    expect(updated.updatedAt! >= beforeUpdate).toBe(true);
+    expect(updated.updatedAt! <= afterUpdate).toBe(true);
+    expect(updated.createdAt).toBe(task.createdAt);
+  });
+
+  it('should delete a task', async () => {
+    const task = await service.createTask({
+      title: 'To Delete',
+      description: 'Will be deleted',
+      type: TaskType.TASK,
+      status: TaskStatus.OPEN,
+      dependencies: [],
+    });
+
+    await service.deleteTask(task.id);
+    const retrieved = await service.getTask(task.id);
+    expect(retrieved).toBeNull();
+
+    const list = await service.listTasks();
+    expect(list.length).toBe(0);
+  });
+
+  it('should throw when deleting a non-existent task', async () => {
+    await expect(service.deleteTask('abcdef')).rejects.toThrow(
+      /Task with ID abcdef not found/,
+    );
+  });
+
+  it('should reject invalid task ID formats (path traversal guard)', async () => {
+    await expect(service.deleteTask('../../etc')).rejects.toThrow(
+      /Invalid task ID format/,
+    );
+    await expect(service.deleteTask('')).rejects.toThrow(
+      /Invalid task ID format/,
+    );
+    await expect(service.deleteTask('abc')).rejects.toThrow(
+      /Invalid task ID format/,
+    );
+    await expect(service.deleteTask('ZZZZZZ')).rejects.toThrow(
+      /Invalid task ID format/,
+    );
+  });
+
+  it('should block deletion of tasks with children at service layer', async () => {
+    const parent = await service.createTask({
+      title: 'Parent',
+      description: 'Has children',
+      type: TaskType.EPIC,
+      status: TaskStatus.OPEN,
+      dependencies: [],
+    });
+    await service.createTask({
+      title: 'Child',
+      description: 'Belongs to parent',
+      type: TaskType.TASK,
+      status: TaskStatus.OPEN,
+      dependencies: [],
+      parentId: parent.id,
+    });
+
+    await expect(service.deleteTask(parent.id)).rejects.toThrow(
+      /Cannot delete task.*child task/,
+    );
+  });
+
+  it('should update updatedAt when cascading dep removal', async () => {
+    const dep = await service.createTask({
+      title: 'Dep',
+      description: 'D',
+      type: TaskType.TASK,
+      status: TaskStatus.OPEN,
+      dependencies: [],
+    });
+    const main = await service.createTask({
+      title: 'Main',
+      description: 'M',
+      type: TaskType.TASK,
+      status: TaskStatus.OPEN,
+      dependencies: [dep.id],
+    });
+    const mainUpdatedBefore = main.updatedAt;
+
+    // Small delay to ensure timestamp differs
+    await new Promise((r) => setTimeout(r, 10));
+    await service.deleteTask(dep.id);
+
+    const mainAfter = await service.getTask(main.id);
+    expect(mainAfter?.updatedAt).not.toBe(mainUpdatedBefore);
+  });
+
+  it('should remove deleted task from other tasks dependencies', async () => {
+    const dep = await service.createTask({
+      title: 'Dependency',
+      description: 'Will be deleted',
+      type: TaskType.TASK,
+      status: TaskStatus.OPEN,
+      dependencies: [],
+    });
+    const main = await service.createTask({
+      title: 'Main',
+      description: 'Depends on dep',
+      type: TaskType.TASK,
+      status: TaskStatus.OPEN,
+      dependencies: [dep.id],
+    });
+
+    await service.deleteTask(dep.id);
+
+    const updatedMain = await service.getTask(main.id);
+    expect(updatedMain?.dependencies).toEqual([]);
+  });
+
+  it('should clear all tasks', async () => {
+    await service.createTask({
+      title: 'Task 1',
+      description: 'D1',
+      type: TaskType.TASK,
+      status: TaskStatus.OPEN,
+      dependencies: [],
+    });
+    await service.createTask({
+      title: 'Task 2',
+      description: 'D2',
+      type: TaskType.TASK,
+      status: TaskStatus.OPEN,
+      dependencies: [],
+    });
+
+    await service.clearTasks();
+    const tasks = await service.listTasks();
+    expect(tasks.length).toBe(0);
+  });
+
+  it('should update preloadedTasks in-place when cleaning up deps during delete', async () => {
+    const dep = await service.createTask({
+      title: 'Dep',
+      description: 'D',
+      type: TaskType.TASK,
+      status: TaskStatus.OPEN,
+      dependencies: [],
+    });
+    const main = await service.createTask({
+      title: 'Main',
+      description: 'M',
+      type: TaskType.TASK,
+      status: TaskStatus.OPEN,
+      dependencies: [dep.id],
+    });
+
+    // Pre-load the task list and pass it to deleteTask
+    const preloaded = await service.listTasks();
+    expect(preloaded.length).toBe(2);
+
+    await service.deleteTask(dep.id, preloaded);
+
+    // The dep task should be spliced out
+    expect(preloaded.length).toBe(1);
+    expect(preloaded[0].id).toBe(main.id);
+    // The main task in the preloaded array should have its deps cleaned
+    expect(preloaded[0].dependencies).toEqual([]);
+    // updatedAt should be refreshed in-place
+    expect(preloaded[0].updatedAt).not.toBe(main.updatedAt);
+  });
+
   it('should detect circular dependencies', async () => {
     const taskA = await service.createTask({
       title: 'Task A',
