@@ -9,7 +9,10 @@ import { authCommand } from './authCommand.js';
 import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { SettingScope } from '../../config/settings.js';
-import type { GeminiClient } from '@google/gemini-cli-core';
+import {
+  clearCachedCredentialFile,
+  type GeminiClient,
+} from '@google/gemini-cli-core';
 
 vi.mock('@google/gemini-cli-core', async () => {
   const actual = await vi.importActual('@google/gemini-cli-core');
@@ -70,6 +73,8 @@ describe('authCommand', () => {
       expect(loginCommand?.name).toBe('signin');
       const result = loginCommand!.action!(mockContext, '');
       expect(result).toEqual({ type: 'dialog', dialog: 'auth' });
+      expect(mockContext.services.settings.setValue).not.toHaveBeenCalled();
+      expect(clearCachedCredentialFile).not.toHaveBeenCalled();
     });
   });
 
