@@ -124,6 +124,28 @@ describe('models list command', () => {
       expect(listings[0].contextLimits.inputTokens).toBe(1_048_576);
       expect(listings[0].contextLimits.outputTokens).toBe(8192);
     });
+
+    it('should fall back to modelId when name is undefined', () => {
+      mockBuildAvailableModels.mockReturnValue({
+        availableModels: [
+          {
+            modelId: 'nameless-model',
+            name: undefined as unknown as string,
+            description: 'Model without a name',
+          },
+        ],
+        currentModelId: 'nameless-model',
+      });
+
+      const mockConfig = {} as unknown as Config;
+      const mockSettings = { merged: {} } as unknown as LoadedSettings;
+
+      const listings = getModelListings(mockConfig, mockSettings);
+
+      expect(listings).toHaveLength(1);
+      expect(listings[0].name).toBe('nameless-model');
+      expect(listings[0].displayName).toBe('nameless-model');
+    });
   });
 
   describe('handleList', () => {

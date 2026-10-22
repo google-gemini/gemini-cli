@@ -78,8 +78,8 @@ export function getModelListings(
     return {
       modelId: m.modelId,
       id: m.modelId,
-      name: m.name,
-      displayName: m.name,
+      name: m.name ?? m.modelId,
+      displayName: m.name ?? m.modelId,
       description: m.description ?? '',
       contextLimits: {
         inputTokens,
