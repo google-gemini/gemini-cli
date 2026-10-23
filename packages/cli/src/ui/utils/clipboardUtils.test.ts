@@ -188,6 +188,60 @@ describe('clipboardUtils', () => {
 
       expect(result).toBe(false);
     });
+
+    it('should detect wl-paste when XDG_SESSION_TYPE is unset but WAYLAND_DISPLAY is set (WSL2 Wayland fallback)', async () => {
+      mockPlatform('linux');
+      vi.stubEnv('XDG_SESSION_TYPE', '');
+      vi.stubEnv('WAYLAND_DISPLAY', 'wayland-0');
+      vi.mocked(execSync).mockReturnValue(Buffer.from(''));
+      vi.mocked(spawnAsync).mockResolvedValueOnce({
+        stdout: 'image/png\ntext/plain',
+        stderr: '',
+      });
+
+      const result = await clipboardUtils.clipboardHasImage();
+
+      expect(result).toBe(true);
+      expect(execSync).toHaveBeenCalledWith(
+        expect.stringContaining('wl-paste'),
+        expect.anything(),
+      );
+      expect(spawnAsync).toHaveBeenCalledWith('wl-paste', ['--list-types']);
+    });
+
+    it('should detect xclip when XDG_SESSION_TYPE is unset but DISPLAY is set (WSL2 X11 fallback)', async () => {
+      mockPlatform('linux');
+      delete process.env['XDG_SESSION_TYPE'];
+      delete process.env['WAYLAND_DISPLAY'];
+      process.env['DISPLAY'] = ':0';
+      vi.mocked(execSync).mockReturnValue(Buffer.from(''));
+      vi.mocked(spawnAsync).mockResolvedValueOnce({
+        stdout: 'image/png\nTARGETS',
+        stderr: '',
+      });
+
+      const result = await clipboardUtils.clipboardHasImage();
+
+      expect(result).toBe(true);
+      expect(execSync).toHaveBeenCalledWith(
+        expect.stringContaining('xclip'),
+        expect.anything(),
+      );
+    });
+
+    it('should return true when clipboard provides image/bmp (WSL2 format)', async () => {
+      mockPlatform('linux');
+      process.env['XDG_SESSION_TYPE'] = 'wayland';
+      vi.mocked(execSync).mockReturnValue(Buffer.from(''));
+      vi.mocked(spawnAsync).mockResolvedValueOnce({
+        stdout: 'image/bmp\ntext/plain',
+        stderr: '',
+      });
+
+      const result = await clipboardUtils.clipboardHasImage();
+
+      expect(result).toBe(true);
+    });
   });
 
   describe('saveClipboardImage (Linux)', () => {
@@ -333,6 +387,43 @@ describe('clipboardUtils', () => {
 
       expect(result).toMatch(/clipboard-\d+\.png$/);
       expect(spawn).toHaveBeenCalledWith('xclip', expect.any(Array));
+    });
+
+    it('should save image as bmp and request image/bmp when clipboard provides image/bmp', async () => {
+      process.env['XDG_SESSION_TYPE'] = 'wayland';
+      vi.mocked(execSync).mockReturnValue(Buffer.from(''));
+      vi.mocked(spawnAsync).mockResolvedValue({
+        stdout: 'image/bmp',
+        stderr: '',
+      });
+
+      vi.mocked(fs.stat).mockResolvedValue(MOCK_FILE_STATS);
+
+      const mockChild = createMockChildProcess(true, 0);
+      vi.mocked(spawn).mockReturnValueOnce(
+        mockChild as unknown as ChildProcess,
+      );
+
+      const mockStream = new EventEmitter() as EventEmitter & {
+        writableFinished: boolean;
+      };
+      mockStream.writableFinished = false;
+      vi.mocked(createWriteStream).mockReturnValue(
+        mockStream as unknown as WriteStream,
+      );
+
+      const promise = clipboardUtils.saveClipboardImage(mockTargetDir);
+
+      mockStream.writableFinished = true;
+      mockStream.emit('finish');
+
+      const result = await promise;
+
+      expect(result).toMatch(/clipboard-\d+\.bmp$/);
+      expect(spawn).toHaveBeenCalledWith(
+        'wl-paste',
+        expect.arrayContaining(['--type', 'image/bmp']),
+      );
     });
 
     it('should return null if tool is not yet detected', async () => {
