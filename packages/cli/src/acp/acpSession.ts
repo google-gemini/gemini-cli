@@ -469,6 +469,18 @@ export class Session {
               toolCallRequests.push(event.value);
               break;
 
+            case GeminiEventType.Retry:
+              toolCallRequests.length = 0;
+              break;
+
+            case GeminiEventType.InvalidStream:
+            case GeminiEventType.AgentExecutionStopped:
+              toolCallRequests.length = 0;
+              break;
+
+            case GeminiEventType.UserCancelled:
+              return { stopReason: 'cancelled' };
+
             case GeminiEventType.Finished: {
               const usage = event.value.usageMetadata;
               if (usage) {

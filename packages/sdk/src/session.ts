@@ -262,6 +262,17 @@ export class GeminiCliSession {
             isClientInitiated: false,
             prompt_id: sessionId,
           });
+        } else if (
+          event.type === GeminiEventType.Retry ||
+          event.type === GeminiEventType.Error ||
+          event.type === GeminiEventType.InvalidStream ||
+          event.type === GeminiEventType.UserCancelled ||
+          event.type === GeminiEventType.AgentExecutionStopped ||
+          event.type === GeminiEventType.ContextWindowWillOverflow ||
+          event.type === GeminiEventType.LoopDetected ||
+          event.type === GeminiEventType.MaxSessionTurns
+        ) {
+          toolCallsToSchedule.length = 0;
         }
       }
 
