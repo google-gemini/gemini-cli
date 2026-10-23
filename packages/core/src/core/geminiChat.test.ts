@@ -1608,7 +1608,7 @@ describe('GeminiChat', () => {
       updateSpy.mockRestore();
     });
 
-    it('should roll back the un-responded user turn from history when the stream is aborted/cancelled', async () => {
+    it('should preserve the user prompt when the stream is aborted/cancelled', async () => {
       const initialHistoryLength = chat.agentHistory.length;
       const abortController = new AbortController();
 
@@ -1648,8 +1648,68 @@ describe('GeminiChat', () => {
         })(),
       ).rejects.toThrow();
 
-      // Verify history has been rolled back to its initial state
-      expect(chat.agentHistory.length).toBe(initialHistoryLength);
+      expect(chat.agentHistory.length).toBe(initialHistoryLength + 1);
+      expect(chat.getHistory().at(-1)).toEqual({
+        role: 'user',
+        parts: [{ text: 'test abort message' }],
+      });
+    });
+
+    it('should cancel a mid-stream retry delay immediately without retrying the API', async () => {
+      vi.mocked(globalThis.setTimeout).mockRestore();
+      vi.useFakeTimers();
+      try {
+        const controller = new AbortController();
+        vi.mocked(
+          mockContentGenerator.generateContentStream,
+        ).mockImplementation(async () =>
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: {
+                    role: 'model',
+                    parts: [{ text: 'partial response' }],
+                  },
+                },
+              ],
+            } as GenerateContentResponse;
+            throw new ApiError({ message: 'Rate limit reached', status: 429 });
+          })(),
+        );
+
+        const stream = await chat.sendMessageStream(
+          { model: 'gemini-2.5-pro' },
+          'Keep this prompt after cancellation',
+          'cancel-backoff-prompt',
+          controller.signal,
+          LlmRole.MAIN,
+        );
+        const consuming = (async () => {
+          for await (const _ of stream) {
+            // Advance the stream until it is waiting for the retry timer.
+          }
+        })().catch((error: unknown) => error);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(mockLogNetworkRetryAttempt).toHaveBeenCalledTimes(1);
+        expect(vi.getTimerCount()).toBe(1);
+
+        controller.abort();
+        await expect(consuming).resolves.toMatchObject({ name: 'AbortError' });
+
+        expect(vi.getTimerCount()).toBe(0);
+        expect(
+          mockContentGenerator.generateContentStream,
+        ).toHaveBeenCalledTimes(1);
+        expect(chat.getHistory()).toEqual([
+          {
+            role: 'user',
+            parts: [{ text: 'Keep this prompt after cancellation' }],
+          },
+        ]);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('should roll back the un-responded user turn from history when stream consumption is broken out of early', async () => {
@@ -1705,7 +1765,7 @@ describe('GeminiChat', () => {
       expect(chat.agentHistory.length).toBe(initialHistoryLength);
     });
 
-    it('should roll back the entire multi-turn request including function responses when a continuation stream is aborted/cancelled', async () => {
+    it('should preserve completed turns and tool responses when a continuation stream is aborted/cancelled', async () => {
       const initialHistoryLength = chat.agentHistory.length;
       const abortController = new AbortController();
 
@@ -1784,8 +1844,20 @@ describe('GeminiChat', () => {
         })(),
       ).rejects.toThrow();
 
-      // Verify history has been rolled back entirely to initialHistoryLength (before the original prompt started)!
-      expect(chat.agentHistory.length).toBe(initialHistoryLength);
+      expect(chat.agentHistory.length).toBe(initialHistoryLength + 3);
+      expect(chat.getHistory().map((turn) => turn.role)).toEqual([
+        'user',
+        'model',
+        'user',
+      ]);
+      expect(chat.getHistory()[0].parts).toEqual([
+        { text: 'user original prompt' },
+      ]);
+      expect(chat.getHistory().at(-1)?.parts?.[0]?.functionResponse).toEqual({
+        id: 'call_id_1',
+        name: 'my_tool',
+        response: { result: 'success' },
+      });
     });
 
     it('should roll back the un-responded user turn from history when an ApiError is thrown', async () => {

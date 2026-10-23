@@ -4,11 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../test-utils/render.js';
-import { act } from 'react';
+import { renderWithProviders as render } from '../../test-utils/render.js';
+import { act, useState } from 'react';
+import { Text } from 'ink';
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { ProQuotaDialog } from './ProQuotaDialog.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
+import { useKeypress } from '../hooks/useKeypress.js';
 
 import {
   PREVIEW_GEMINI_MODEL,
@@ -382,6 +384,63 @@ describe('ProQuotaDialog', () => {
   });
 
   describe('onChoice handling', () => {
+    it.each([
+      ['terminal', '\u001b'],
+      ['Kitty', '\u001b[27u'],
+    ])(
+      'should stop the quota interaction with one %s Escape',
+      async (_, escape) => {
+        const onGlobalEscape = vi.fn();
+
+        function QuotaInteraction() {
+          const [isOpen, setIsOpen] = useState(true);
+          useKeypress(
+            (key) => {
+              if (key.name === 'escape') {
+                onGlobalEscape();
+                return true;
+              }
+              return false;
+            },
+            { isActive: true },
+          );
+
+          return isOpen ? (
+            <ProQuotaDialog
+              failedModel="gemini-2.5-pro"
+              fallbackModel="gemini-2.5-flash"
+              message="Quota exhausted"
+              isTerminalQuotaError
+              onChoice={(choice) => {
+                mockOnChoice(choice);
+                setIsOpen(false);
+              }}
+            />
+          ) : (
+            <Text>Request stopped</Text>
+          );
+        }
+
+        const { stdin, waitUntilReady, lastFrame, unmount } = await render(
+          <QuotaInteraction />,
+        );
+
+        await act(async () => {
+          stdin.write(escape);
+        });
+        await act(async () => {
+          await waitUntilReady();
+        });
+        await waitUntilReady();
+
+        expect(mockOnChoice).toHaveBeenCalledExactlyOnceWith('retry_later');
+        expect(onGlobalEscape).not.toHaveBeenCalled();
+        expect(lastFrame()).toContain('Request stopped');
+        expect(lastFrame()).not.toContain('Quota exhausted');
+        unmount();
+      },
+    );
+
     it('should call onChoice with the selected value', async () => {
       const { unmount } = await render(
         <ProQuotaDialog

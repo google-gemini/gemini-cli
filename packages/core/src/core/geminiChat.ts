@@ -29,7 +29,11 @@ import {
   isRetryableError,
   getRetryErrorType,
 } from '../utils/retry.js';
-import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
+import {
+  TerminalQuotaError,
+  RetryableQuotaError,
+  type ValidationRequiredError,
+} from '../utils/googleQuotaErrors.js';
 import {
   resolveModel,
   supportsModernFeatures,
@@ -39,6 +43,7 @@ import { hasCycleInSchema } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
 import type { CompletedToolCall } from '../scheduler/types.js';
 import { isAbortError } from '../utils/errors.js';
+import { delay } from '../utils/delay.js';
 import {
   logContentRetry,
   logContentRetryFailure,
@@ -391,9 +396,6 @@ export class GeminiChat {
   private lastPromptTokenCount: number;
   private callCounter = 0;
   agentHistory: AgentChatHistory;
-  private lastPromptId?: string;
-  private promptOriginalHistoryLength?: number;
-  private promptOriginalTokenCount?: number;
 
   constructor(
     readonly context: AgentLoopContext,
@@ -504,17 +506,6 @@ export class GeminiChat {
 
     const historyLengthBefore = this.agentHistory.length;
     const baselinePromptTokenCount = this.lastPromptTokenCount;
-
-    if (this.lastPromptId && this.lastPromptId !== prompt_id) {
-      this.promptOriginalHistoryLength = undefined;
-      this.promptOriginalTokenCount = undefined;
-    }
-    this.lastPromptId = prompt_id;
-
-    if (this.promptOriginalHistoryLength === undefined) {
-      this.promptOriginalHistoryLength = historyLengthBefore;
-      this.promptOriginalTokenCount = baselinePromptTokenCount;
-    }
 
     let streamDoneResolver: () => void;
     const streamDonePromise = new Promise<void>((resolve) => {
@@ -788,7 +779,7 @@ export class GeminiChat {
                   error: errorType,
                   model,
                 });
-                await new Promise((res) => setTimeout(res, delayMs));
+                await delay(delayMs, signal);
                 continue;
               }
             }
@@ -817,19 +808,16 @@ export class GeminiChat {
             (caughtError instanceof Error &&
               (caughtError.name === 'CanceledError' ||
                 caughtError.name === 'FatalCancellationError'));
-          const originalLength = this.promptOriginalHistoryLength;
-          const originalTokenCount = this.promptOriginalTokenCount;
-          if (isAborted && originalLength !== undefined) {
-            this.agentHistory.rollback(originalLength);
-            this.chatRecordingService.updateMessagesFromHistory(
-              this.agentHistory.get(),
+          const isQuotaError =
+            caughtError instanceof TerminalQuotaError ||
+            caughtError instanceof RetryableQuotaError;
+          if (isAborted || isQuotaError) {
+            // Cancellation or exhausted quota does not undo the user's prompt or
+            // completed tool rounds. Rewinding the recorder here also removed
+            // them from resumed sessions after quitting or signing out.
+            this.lastPromptTokenCount = estimateTokenCountSync(
+              this.agentHistory.flatMap((turn) => turn.content.parts || []),
             );
-            if (originalTokenCount !== undefined) {
-              this.lastPromptTokenCount = originalTokenCount;
-            }
-            this.promptOriginalHistoryLength = undefined;
-            this.promptOriginalTokenCount = undefined;
-            this.lastPromptId = undefined;
           } else if (!isOriginalFunctionResponse) {
             this.agentHistory.rollback(historyLengthBefore);
             this.chatRecordingService.updateMessagesFromHistory(
