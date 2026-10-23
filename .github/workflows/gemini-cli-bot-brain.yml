@@ -50,6 +50,8 @@ jobs:
       actions: 'read'
     env:
       GEMINI_CLI_TRUST_WORKSPACE: 'true'
+    outputs:
+      enable_prs: '${{ steps.run_brain.outputs.enable_prs }}'
     steps:
       - name: 'Determine Checkout Ref'
         id: 'determine_ref'
@@ -119,6 +121,7 @@ jobs:
         run: 'npx tsx tools/gemini-cli-bot/metrics/index.ts'
 
       - name: 'Run Brain Phases'
+        id: 'run_brain'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
@@ -129,10 +132,21 @@ jobs:
           TRIGGER_COMMENT_ID: '${{ github.event.comment.id || github.event.inputs.comment_id }}'
         run: |
           PROMPT_PATH="tools/gemini-cli-bot/brain/scheduled.md"
-          if [ "${{ github.event_name }}" = "issue_comment" ] || [ "${{ github.event.inputs.run_interactive }}" = "true" ]; then
+          if [ "${{ github.event.inputs.run_interactive }}" = "true" ]; then
             PROMPT_PATH="tools/gemini-cli-bot/brain/interactive.md"
             export ENABLE_PRS="true"
+          elif [ "${{ github.event_name }}" = "issue_comment" ]; then
+            PROMPT_PATH="tools/gemini-cli-bot/brain/interactive.md"
+            # Escalate to PR-authoring mode only when the triggering comment
+            # itself explicitly opts in -- not for every @gemini-cli mention --
+            # since the issue/PR context pulled in below can carry untrusted
+            # text from earlier, non-collaborator comments in the same thread.
+            TRIGGER_COMMENT_BODY=$(gh api "repos/${{ github.repository }}/issues/comments/$TRIGGER_COMMENT_ID" -q '.body' 2>/dev/null || gh api "repos/${{ github.repository }}/pulls/comments/$TRIGGER_COMMENT_ID" -q '.body' 2>/dev/null || echo "")
+            if echo "$TRIGGER_COMMENT_BODY" | grep -qiE '@gemini-cli\b.*\b(fix|enable-prs)\b'; then
+              export ENABLE_PRS="true"
+            fi
           fi
+          echo "enable_prs=$ENABLE_PRS" >> "$GITHUB_OUTPUT"
 
           touch trigger_context.md
           if [ -n "$TRIGGER_ISSUE_NUMBER" ]; then
@@ -170,7 +184,7 @@ jobs:
           fi
 
       - name: 'Run Critique Phase'
-        if: "${{ github.event.inputs.enable_prs == 'true' || github.event_name == 'issue_comment' || github.event.inputs.run_interactive == 'true' }}"
+        if: "${{ steps.run_brain.outputs.enable_prs == 'true' }}"
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
@@ -192,7 +206,7 @@ jobs:
           fi
 
       - name: 'Generate Patch'
-        if: "${{ github.event.inputs.enable_prs == 'true' || github.event_name == 'issue_comment' || github.event.inputs.run_interactive == 'true' }}"
+        if: "${{ steps.run_brain.outputs.enable_prs == 'true' }}"
         run: |
           touch bot-changes.patch
           touch pr-description.md
@@ -230,7 +244,7 @@ jobs:
     steps:
       - name: 'Generate GitHub App Token 🔑'
         id: 'generate_token'
-        if: "${{ github.event.inputs.enable_prs == 'true' || github.event_name == 'issue_comment' || github.event.inputs.run_interactive == 'true' }}"
+        if: "${{ needs.reasoning.outputs.enable_prs == 'true' }}"
         uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b' # ratchet:actions/create-github-app-token@v2
         with:
           app-id: '${{ secrets.APP_ID }}'
@@ -270,7 +284,7 @@ jobs:
           path: '${{ runner.temp }}/brain-data/'
 
       - name: 'Create or Update PR'
-        if: "${{ github.event.inputs.enable_prs == 'true' || github.event_name == 'issue_comment' || github.event.inputs.run_interactive == 'true' }}"
+        if: "${{ needs.reasoning.outputs.enable_prs == 'true' }}"
         env:
           GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
           FALLBACK_PAT: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
