@@ -609,9 +609,16 @@ export const ToolConfirmationMessage: React.FC<
           confirmationDetails.modifiedBuildFiles &&
           confirmationDetails.modifiedBuildFiles.length > 0
         ) {
+          const modifiedBuildFileNames = [
+            ...new Set(
+              confirmationDetails.modifiedBuildFiles.map((f) =>
+                path.basename(f),
+              ),
+            ),
+          ].join(', ');
           const buildModWarningText =
             `⚠️ CAUTION: Build Configuration Was Recently Modified\n` +
-            `Build file(s) (${confirmationDetails.modifiedBuildFiles.map((f) => path.basename(f)).join(', ')}) were modified earlier in this session. Running '${confirmationDetails.rootCommand}' will execute the updated build definitions.\n` +
+            `Build file(s) (${modifiedBuildFileNames}) were modified earlier in this session. Running '${confirmationDetails.rootCommand}' will execute the updated build definitions.\n` +
             `Ensure you trust all modifications made to build files before approving execution.`;
           securityWarnings = securityWarnings ? (
             <>
