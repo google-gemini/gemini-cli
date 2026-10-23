@@ -700,7 +700,7 @@ describe('FileSearch', () => {
     await expect(searchPromise).rejects.toThrow(AbortError);
   });
 
-  it('should leverage ResultCache for bestBaseQuery optimization', async () => {
+  it('should return narrower glob results after a broader search', async () => {
     tmpDir = await createTmpDir({
       src: {
         'foo.js': '',
@@ -736,14 +736,83 @@ describe('FileSearch', () => {
       'src/nested/baz.js',
     ]);
 
-    // Perform a more specific search that should leverage the broad search's cached results
+    // A narrower query must still return the matching files.
     const specificResults = await fileSearch.search('src/**/*.js');
     expect(specificResults).toEqual(['src/foo.js', 'src/nested/baz.js']);
-
-    // Although we can't directly inspect ResultCache.hits/misses from here,
-    // the correctness of specificResults after a broad search implicitly
-    // verifies that the caching mechanism, including bestBaseQuery, is working.
   });
+
+  it.each([
+    {
+      prefix: 'Src',
+      fuzzyResults: ['SrcUpper.ts'],
+      expected: ['SrcUpper.ts', 'srcmissing.ts', 'srcutils.ts'],
+    },
+    {
+      prefix: 'SrcMissing',
+      fuzzyResults: [],
+      expected: ['srcmissing.ts'],
+    },
+  ])(
+    'should keep glob results complete after a fuzzy search for $prefix',
+    async ({ prefix, fuzzyResults, expected }) => {
+      tmpDir = await createTmpDir({
+        'SrcUpper.ts': '',
+        'srcmissing.ts': '',
+        'srcutils.ts': '',
+      });
+
+      const fileSearch = FileSearchFactory.create({
+        projectRoot: tmpDir,
+        fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+          respectGitIgnore: false,
+          respectGeminiIgnore: false,
+        }),
+        ignoreDirs: [],
+        cache: false,
+        cacheTtl: 0,
+        enableRecursiveFileSearch: true,
+        enableFuzzySearch: true,
+      });
+
+      await fileSearch.initialize();
+
+      expect(await fileSearch.search(prefix)).toEqual(fuzzyResults);
+
+      expect(await fileSearch.search(`${prefix}*`)).toEqual(expected);
+    },
+  );
+
+  it.each([true, false])(
+    'should keep negated glob results complete with fuzzy search enabled: %s',
+    async (enableFuzzySearch) => {
+      tmpDir = await createTmpDir({
+        'file.ts': '',
+        'file.tsx': '',
+        'notes.md': '',
+      });
+
+      const fileSearch = FileSearchFactory.create({
+        projectRoot: tmpDir,
+        fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+          respectGitIgnore: false,
+          respectGeminiIgnore: false,
+        }),
+        ignoreDirs: [],
+        cache: false,
+        cacheTtl: 0,
+        enableRecursiveFileSearch: true,
+        enableFuzzySearch,
+      });
+
+      await fileSearch.initialize();
+
+      expect(await fileSearch.search('!*.ts')).toEqual(['notes.md']);
+      expect(await fileSearch.search('!*.tsx')).toEqual([
+        'file.ts',
+        'notes.md',
+      ]);
+    },
+  );
 
   it('should be case-insensitive by default', async () => {
     tmpDir = await createTmpDir({
