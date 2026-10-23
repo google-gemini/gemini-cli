@@ -11,6 +11,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { start_sandbox } from './sandbox.js';
+import { IdeBridge, resolveIdeBridgeUpstream } from './ideBridge.js';
+import {
+  IDE_BRIDGE_HELPER_FILENAME,
+  IDE_BRIDGE_SOCKET_PATH,
+} from './ideBridgeHelper.js';
 import {
   FatalSandboxError,
   homedir,
@@ -38,6 +43,7 @@ vi.mock('./sandboxUtils.js', async (importOriginal) => {
 vi.mock('node:child_process');
 vi.mock('node:os');
 vi.mock('node:fs');
+vi.mock('./ideBridge.js');
 vi.mock('node:crypto', () => ({
   randomBytes: vi.fn().mockReturnValue(Buffer.from('a1b2c3d4e5f6', 'hex')),
 }));
@@ -1796,6 +1802,186 @@ describe('sandbox', () => {
         'docker',
         expect.arrayContaining(['run', '--runtime=runsc']),
         expect.objectContaining({ stdio: 'inherit' }),
+      );
+    });
+  });
+
+  describe('IDE bridge', () => {
+    const upstream = {
+      port: '45678',
+      authToken: 'host-only-token',
+      workspacePaths: ['/test/project'],
+    };
+
+    interface MockProcessWithStdout extends EventEmitter {
+      stdout: EventEmitter;
+    }
+
+    /** Mocks the image check and the container run, like the other tests. */
+    function mockContainerRun() {
+      const imageCheck = new EventEmitter() as MockProcessWithStdout;
+      imageCheck.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          imageCheck.stdout.emit('data', Buffer.from('image-id'));
+          imageCheck.emit('close', 0);
+        }, 1);
+        return imageCheck as unknown as ReturnType<typeof spawn>;
+      });
+      const container = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      > & { exitCode: number | null; signalCode: string | null };
+      container.exitCode = null;
+      container.signalCode = null;
+      container.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return container;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => container);
+      return container;
+    }
+
+    function containerArgs(): string[] {
+      const call = vi
+        .mocked(spawn)
+        .mock.calls.find((c) => Array.isArray(c[1]) && c[1][0] === 'run');
+      return (call?.[1] as string[]) ?? [];
+    }
+
+    beforeEach(() => {
+      process.env['GEMINI_CLI_IDE_SERVER_PORT'] = '45678';
+      process.env['GEMINI_CLI_IDE_AUTH_TOKEN'] = 'host-only-token';
+      process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = '/test/project';
+      process.env['TERM_PROGRAM'] = 'vscode';
+      vi.mocked(resolveIdeBridgeUpstream).mockResolvedValue(upstream);
+      vi.mocked(IdeBridge.prototype.connectUpstream).mockResolvedValue(
+        undefined,
+      );
+      vi.mocked(IdeBridge.prototype.attach).mockResolvedValue(undefined);
+      vi.mocked(IdeBridge.prototype.stop).mockResolvedValue(undefined);
+    });
+
+    it('bridges the IDE connection over exec instead of forwarding the port or token', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      const args = containerArgs();
+      const envs = args.filter((_, i) => args[i - 1] === '--env');
+      // The companion's port and token stay on the host.
+      expect(
+        envs.some((e) => e.startsWith('GEMINI_CLI_IDE_SERVER_PORT=')),
+      ).toBe(false);
+      expect(envs.some((e) => e.startsWith('GEMINI_CLI_IDE_AUTH_TOKEN='))).toBe(
+        false,
+      );
+      // The CLI inside reaches the bridge through its stdio transport.
+      expect(envs).toContain('GEMINI_CLI_IDE_SERVER_STDIO_COMMAND=node');
+      expect(envs).toContain(
+        `GEMINI_CLI_IDE_SERVER_STDIO_ARGS=${JSON.stringify([
+          `/home/node/.gemini/${IDE_BRIDGE_HELPER_FILENAME}`,
+          'connect',
+          IDE_BRIDGE_SOCKET_PATH,
+        ])}`,
+      );
+      expect(envs).toContain('GEMINI_CLI_IDE_WORKSPACE_PATH=/test/project');
+      expect(envs).toContain('TERM_PROGRAM=vscode');
+      // The helper is delivered through the mounted sandbox temp directory.
+      expect(fs.writeFileSync).toHaveBeenCalledWith(
+        expect.stringMatching(new RegExp(`${IDE_BRIDGE_HELPER_FILENAME}$`)),
+        expect.stringContaining('gemini-ide-bridge'),
+        { mode: 0o600 },
+      );
+      expect(IdeBridge).toHaveBeenCalledWith({
+        upstream,
+        helperPathInContainer: `/home/node/.gemini/${IDE_BRIDGE_HELPER_FILENAME}`,
+        socketPathInContainer: IDE_BRIDGE_SOCKET_PATH,
+      });
+      expect(IdeBridge.prototype.connectUpstream).toHaveBeenCalled();
+      const containerName = args[args.indexOf('--name') + 1];
+      const attachOptions = vi.mocked(IdeBridge.prototype.attach).mock
+        .calls[0]?.[0];
+      // `<command> exec -i [--user uid:gid] <container>`; the bridge appends
+      // the helper invocation itself.
+      expect(attachOptions?.execCommand.slice(0, 3)).toEqual([
+        'docker',
+        'exec',
+        '-i',
+      ]);
+      expect(attachOptions?.execCommand.at(-1)).toBe(containerName);
+      expect(attachOptions?.isSandboxAlive()).toBe(true);
+      expect(IdeBridge.prototype.stop).toHaveBeenCalled();
+    });
+
+    it('passes the mapped uid/gid to exec when the sandbox runs as the current user', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      process.env['SANDBOX_SET_UID_GID'] = 'true';
+      mockedExecCommands.length = 0;
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      const attachOptions = vi.mocked(IdeBridge.prototype.attach).mock
+        .calls[0]?.[0];
+      expect(attachOptions?.execCommand.slice(0, 5)).toEqual([
+        'docker',
+        'exec',
+        '-i',
+        '--user',
+        '1000:1000',
+      ]);
+    });
+
+    it('does not set the bridge up when the companion is unreachable from the host', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      vi.mocked(IdeBridge.prototype.connectUpstream).mockRejectedValue(
+        new Error('ECONNREFUSED'),
+      );
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      const envs = containerArgs().filter(
+        (a, i, all) => all[i - 1] === '--env',
+      );
+      expect(
+        envs.some((e) => e.startsWith('GEMINI_CLI_IDE_SERVER_STDIO')),
+      ).toBe(false);
+      expect(
+        envs.some((e) => e.startsWith('GEMINI_CLI_IDE_SERVER_PORT=')),
+      ).toBe(false);
+      expect(envs).toContain('TERM_PROGRAM=vscode');
+      expect(IdeBridge.prototype.attach).not.toHaveBeenCalled();
+    });
+
+    it('does nothing IDE-specific when no companion is advertised', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      vi.mocked(resolveIdeBridgeUpstream).mockResolvedValue(undefined);
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      expect(IdeBridge).not.toHaveBeenCalled();
+      const envs = containerArgs().filter(
+        (a, i, all) => all[i - 1] === '--env',
+      );
+      expect(envs.some((e) => e.startsWith('GEMINI_CLI_IDE_SERVER_'))).toBe(
+        false,
       );
     });
   });

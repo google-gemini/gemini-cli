@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ReadFileTool, type ReadFileToolParams } from './read-file.js';
 import { ToolErrorType } from './tool-error.js';
 import path from 'node:path';
-import { isSubpath } from '../utils/paths.js';
+import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import os from 'node:os';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
@@ -19,6 +19,7 @@ import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.j
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
+import { ideContextStore } from '../ide/ideContext.js';
 
 vi.mock('../telemetry/loggers.js', () => ({
   logFileOperation: vi.fn(),
@@ -87,6 +88,7 @@ describe('ReadFileTool', () => {
   });
 
   afterEach(async () => {
+    ideContextStore.clear();
     // Clean up the temporary root directory
     if (fs.existsSync(tempRootDir)) {
       await fsp.rm(tempRootDir, { recursive: true, force: true });
@@ -743,6 +745,83 @@ describe('ReadFileTool', () => {
       expect(jitTextPart!['text']).toContain(
         'Auth rules: use httpOnly cookies.',
       );
+    });
+  });
+
+  describe('IDE multi-root workspace resolution', () => {
+    it('should resolve and read relative file paths against the active IDE workspace directory', async () => {
+      const rawSecondWorkspaceDir = await fsp.mkdtemp(
+        path.join(os.tmpdir(), 'read-file-tool-second-'),
+      );
+      const secondWorkspaceDir = resolveToRealPath(rawSecondWorkspaceDir);
+
+      try {
+        const activeOpenFile = path.join(secondWorkspaceDir, 'index.ts');
+        const targetReadFile = path.join(secondWorkspaceDir, 'README.md');
+        await fsp.writeFile(activeOpenFile, 'export const x = 1;', 'utf-8');
+        await fsp.writeFile(
+          targetReadFile,
+          '# Second Workspace Readme',
+          'utf-8',
+        );
+        await fsp.writeFile(
+          path.join(tempRootDir, 'README.md'),
+          '# First Workspace Readme',
+          'utf-8',
+        );
+
+        ideContextStore.set({
+          workspaceState: {
+            openFiles: [
+              {
+                path: activeOpenFile,
+                timestamp: Date.now(),
+                isActive: true,
+              },
+            ],
+          },
+        });
+
+        const ideConfig = {
+          getFileService: () => new FileDiscoveryService(tempRootDir),
+          getFileSystemService: () => new StandardFileSystemService(),
+          getTargetDir: () => tempRootDir,
+          getIdeMode: () => true,
+          getWorkspaceContext: () =>
+            createMockWorkspaceContext(tempRootDir, [secondWorkspaceDir]),
+          getFileFilteringOptions: () => ({
+            respectGitIgnore: true,
+            respectGeminiIgnore: true,
+          }),
+          storage: {
+            getProjectTempDir: () => path.join(tempRootDir, '.temp'),
+          },
+          isInteractive: () => false,
+          isPathAllowed(this: Config, absolutePath: string): boolean {
+            return this.getWorkspaceContext().isPathWithinWorkspace(
+              absolutePath,
+            );
+          },
+          validatePathAccess(
+            this: Config,
+            absolutePath: string,
+          ): string | null {
+            return this.isPathAllowed(absolutePath)
+              ? null
+              : 'Path not in workspace';
+          },
+        } as unknown as Config;
+
+        const ideReadTool = new ReadFileTool(ideConfig, createMockMessageBus());
+        const invocation = ideReadTool.build({ file_path: 'README.md' });
+        expect(invocation.toolLocations()[0].path).toBe(targetReadFile);
+
+        const result = await invocation.execute({ abortSignal });
+        expect(result.error).toBeUndefined();
+        expect(result.llmContent).toContain('# Second Workspace Readme');
+      } finally {
+        await fsp.rm(secondWorkspaceDir, { recursive: true, force: true });
+      }
     });
   });
 });

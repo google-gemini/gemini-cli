@@ -286,4 +286,192 @@ description: Test sanitization
       'https://antigravity.google/docs/cli-getting-started',
     );
   });
+
+  it('should handle UTF-8 BOM in SKILL.md', async () => {
+    const skillDir = path.join(testRootDir, 'bom-skill');
+    await fs.mkdir(skillDir, { recursive: true });
+    const skillFile = path.join(skillDir, 'SKILL.md');
+    await fs.writeFile(
+      skillFile,
+      `\uFEFF---\nname: bom-skill\ndescription: A single line description that is relatively long and contains some punctuation.\n---\n# Instructions\nBody\n`,
+    );
+
+    const skills = await loadSkillsFromDir(testRootDir);
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe('bom-skill');
+    expect(skills[0].description).toBe(
+      'A single line description that is relatively long and contains some punctuation.',
+    );
+    expect(skills[0].body).toBe('# Instructions\nBody');
+  });
+
+  it('should handle UTF-16 LE BOM in SKILL.md', async () => {
+    const skillDir = path.join(testRootDir, 'utf16le-skill');
+    await fs.mkdir(skillDir, { recursive: true });
+    const skillFile = path.join(skillDir, 'SKILL.md');
+    const text = `---\r\nname: utf16le-skill\r\ndescription: Single line description saved in UTF-16 LE.\r\n---\r\n# Test Skill\r\nContent here.\r\n`;
+    const utf16leBuffer = Buffer.concat([
+      Buffer.from([0xff, 0xfe]),
+      Buffer.from(text, 'utf16le'),
+    ]);
+    await fs.writeFile(skillFile, utf16leBuffer);
+
+    const skills = await loadSkillsFromDir(testRootDir);
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe('utf16le-skill');
+    expect(skills[0].description).toBe(
+      'Single line description saved in UTF-16 LE.',
+    );
+    expect(skills[0].body).toBe('# Test Skill\r\nContent here.');
+  });
+
+  it('should handle trailing spaces after frontmatter markers without dropping body', async () => {
+    const skillDir = path.join(testRootDir, 'space-skill');
+    await fs.mkdir(skillDir, { recursive: true });
+    const skillFile = path.join(skillDir, 'SKILL.md');
+    await fs.writeFile(
+      skillFile,
+      `---  \nname: space-skill\ndescription: A skill with trailing spaces\n--- \n# Instructions\nBody\n`,
+    );
+
+    const skills = await loadSkillsFromDir(testRootDir);
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe('space-skill');
+    expect(skills[0].description).toBe('A skill with trailing spaces');
+    expect(skills[0].body).toBe('# Instructions\nBody');
+  });
+
+  it('should not swallow subsequent keys into single-line description in fallback parser', async () => {
+    const skillDir = path.join(testRootDir, 'swallow-skill');
+    await fs.mkdir(skillDir, { recursive: true });
+    const skillFile = path.join(skillDir, 'SKILL.md');
+    await fs.writeFile(
+      skillFile,
+      `---
+  description: A single line description: with a colon.
+  version: 1.0.0
+  name: my-skill
+---
+# Test Skill
+Content here.
+`,
+    );
+
+    const skills = await loadSkillsFromDir(testRootDir);
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe('my-skill');
+    expect(skills[0].description).toBe(
+      'A single line description: with a colon.',
+    );
+  });
+
+  it('should strip outer quotes from name and description in fallback parser', async () => {
+    const skillDir = path.join(testRootDir, 'quoted-fallback-skill');
+    await fs.mkdir(skillDir, { recursive: true });
+    const skillFile = path.join(skillDir, 'SKILL.md');
+    await fs.writeFile(
+      skillFile,
+      `---
+name: "test-skill"
+description: "A single line description with "inner" quotes: and a colon"
+---
+`,
+    );
+
+    const skills = await loadSkillsFromDir(testRootDir);
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe('test-skill');
+    expect(skills[0].description).toBe(
+      'A single line description with "inner" quotes: and a colon',
+    );
+  });
+
+  it('should handle space before colon and case-insensitivity in fallback parser', async () => {
+    const skillDir = path.join(testRootDir, 'case-space-skill');
+    await fs.mkdir(skillDir, { recursive: true });
+    const skillFile = path.join(skillDir, 'SKILL.md');
+    await fs.writeFile(
+      skillFile,
+      `---
+Name : robust-name
+DESCRIPTION : robust: description
+---
+`,
+    );
+
+    const skills = await loadSkillsFromDir(testRootDir);
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe('robust-name');
+    expect(skills[0].description).toBe('robust: description');
+  });
+
+  it('should not treat "Note:" as a new key in multi-line description in fallback parser', async () => {
+    const skillDir = path.join(testRootDir, 'note-skill');
+    await fs.mkdir(skillDir, { recursive: true });
+    const skillFile = path.join(skillDir, 'SKILL.md');
+    await fs.writeFile(
+      skillFile,
+      `---
+name: note-skill
+description: This is a description
+  Note: This should be part of the description
+---
+`,
+    );
+
+    const skills = await loadSkillsFromDir(testRootDir);
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe('note-skill');
+    expect(skills[0].description).toBe(
+      'This is a description Note: This should be part of the description',
+    );
+  });
+
+  it('should handle unindented wrapped description lines and block scalar indicators in fallback parser', async () => {
+    const wrappedDir = path.join(testRootDir, 'wrapped-skill');
+    await fs.mkdir(wrappedDir, { recursive: true });
+    await fs.writeFile(
+      path.join(wrappedDir, 'SKILL.md'),
+      `---
+description: A single line description that is relatively long
+and wraps onto the next line without indentation.
+name: wrapped-skill
+---
+`,
+    );
+
+    const foldedDir = path.join(testRootDir, 'folded-fallback-skill');
+    await fs.mkdir(foldedDir, { recursive: true });
+    await fs.writeFile(
+      path.join(foldedDir, 'SKILL.md'),
+      `---
+name: folded-skill
+description: >
+  A multi-line description: with an unquoted colon on an unindented line
+and another line.
+---
+`,
+    );
+
+    const skills = await loadSkillsFromDir(testRootDir);
+
+    const wrapped = skills.find((s) => s.name === 'wrapped-skill');
+    expect(wrapped).toBeDefined();
+    expect(wrapped!.description).toBe(
+      'A single line description that is relatively long and wraps onto the next line without indentation.',
+    );
+
+    const folded = skills.find((s) => s.name === 'folded-skill');
+    expect(folded).toBeDefined();
+    expect(folded!.description).toBe(
+      'A multi-line description: with an unquoted colon on an unindented line and another line.',
+    );
+  });
 });

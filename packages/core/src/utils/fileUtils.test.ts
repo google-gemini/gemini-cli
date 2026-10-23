@@ -217,6 +217,93 @@ describe('fileUtils', () => {
       const testFile = path.join(tempRootDir, 'ghost.txt');
       expect(await isEmpty(testFile)).toBe(true);
     });
+
+    describe('files with a BOM', () => {
+      const encodeUtf16Be = (text: string): Buffer =>
+        Buffer.from(text, 'utf16le').swap16();
+
+      const encodeUtf32 = (text: string, littleEndian: boolean): Buffer => {
+        const codePoints = Array.from(text, (ch) => ch.codePointAt(0) ?? 0);
+        const encoded = Buffer.alloc(codePoints.length * 4);
+        codePoints.forEach((codePoint, i) => {
+          if (littleEndian) {
+            encoded.writeUInt32LE(codePoint, i * 4);
+          } else {
+            encoded.writeUInt32BE(codePoint, i * 4);
+          }
+        });
+        return encoded;
+      };
+
+      const encodings = [
+        {
+          name: 'UTF-8',
+          bom: [0xef, 0xbb, 0xbf],
+          encode: (text: string) => Buffer.from(text, 'utf8'),
+        },
+        {
+          name: 'UTF-16 LE',
+          bom: [0xff, 0xfe],
+          encode: (text: string) => Buffer.from(text, 'utf16le'),
+        },
+        {
+          name: 'UTF-16 BE',
+          bom: [0xfe, 0xff],
+          encode: encodeUtf16Be,
+        },
+        {
+          name: 'UTF-32 LE',
+          bom: [0xff, 0xfe, 0x00, 0x00],
+          encode: (text: string) => encodeUtf32(text, true),
+        },
+        {
+          name: 'UTF-32 BE',
+          bom: [0x00, 0x00, 0xfe, 0xff],
+          encode: (text: string) => encodeUtf32(text, false),
+        },
+      ];
+
+      const writeBomFile = (bom: number[], encoded: Buffer): string => {
+        const testFile = path.join(tempRootDir, 'bom.txt');
+        actualNodeFs.writeFileSync(
+          testFile,
+          Buffer.concat([Buffer.from(bom), encoded]),
+        );
+        return testFile;
+      };
+
+      it.each(encodings)(
+        'should return true for a $name file that contains only whitespace',
+        async ({ bom, encode }) => {
+          const testFile = writeBomFile(bom, encode(' \n\t'));
+          expect(await isEmpty(testFile)).toBe(true);
+        },
+      );
+
+      it.each(encodings)(
+        'should return true for a $name file that is larger than the sampled prefix and contains only whitespace',
+        async ({ bom, encode }) => {
+          const testFile = writeBomFile(bom, encode(' '.repeat(3000)));
+          expect(await isEmpty(testFile)).toBe(true);
+        },
+      );
+
+      it.each(encodings)(
+        'should return false for a $name file that contains text',
+        async ({ bom, encode }) => {
+          const testFile = writeBomFile(bom, encode('  plan'));
+          expect(await isEmpty(testFile)).toBe(false);
+        },
+      );
+
+      it('should not treat a UTF-16 BE file with a partial trailing code unit as empty', async () => {
+        const testFile = writeBomFile(
+          [0xfe, 0xff],
+          Buffer.concat([encodeUtf16Be('plan'), Buffer.from([0x00])]),
+        );
+        expect(await isEmpty(testFile)).toBe(false);
+      });
+    });
   });
 
   describe('fileExists', () => {

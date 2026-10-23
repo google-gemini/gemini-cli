@@ -270,6 +270,13 @@ function parseResponseData(error: GaxiosError): ResponseData | undefined {
   return undefined;
 }
 
+const HTTP_401_REGEX =
+  /(?:\bHTTP(?:\/\d(?:\.\d)?)?(?:\s+(?:status|error))?|(?<!\b(?:exit|exited)\s+(?:with\s+)?)\bstatus(?:code|\s*code)?)[:\s]+401\b|(?:\b401\b[^\w\r\n]{1,4}\bUnauthorized\b|\bUnauthorized\b[^\w\r\n]{1,4}\b401\b)/i;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 /**
  * Checks if an error is a 401 authentication error.
  * Uses structured error properties from MCP SDK errors.
@@ -278,12 +285,24 @@ function parseResponseData(error: GaxiosError): ResponseData | undefined {
  * @returns true if this is a 401/authentication error
  */
 export function isAuthenticationError(error: unknown): boolean {
-  // Check for MCP SDK errors with code property
-  // (SseError and StreamableHTTPError both have numeric 'code' property)
-  if (error && typeof error === 'object' && 'code' in error) {
-    const errorCode: unknown = (error as Record<string, unknown>)['code'];
-    if (typeof errorCode === 'number' && errorCode === 401) {
+  const friendly = toFriendlyError(error);
+  if (friendly instanceof UnauthorizedError) {
+    return true;
+  }
+
+  // Check for structured error properties (e.g. MCP SDK, HTTP clients)
+  if (isRecord(error)) {
+    const code = error['code'] ?? error['status'] ?? error['statusCode'];
+    if (code === 401 || code === '401') {
       return true;
+    }
+
+    const response = error['response'];
+    if (isRecord(response)) {
+      const responseCode = response['status'] ?? response['statusCode'];
+      if (responseCode === 401 || responseCode === '401') {
+        return true;
+      }
     }
   }
 
@@ -299,7 +318,7 @@ export function isAuthenticationError(error: unknown): boolean {
   // Fallback: Check for MCP SDK's plain Error messages with HTTP 401
   // The SDK sometimes throws: new Error(`Error POSTing to endpoint (HTTP 401): ...`)
   const message = getErrorMessage(error);
-  if (message.includes('401')) {
+  if (HTTP_401_REGEX.test(message)) {
     return true;
   }
 

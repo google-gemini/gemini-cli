@@ -49,6 +49,12 @@ import {
 import { GeminiClient } from '../core/client.js';
 import { GitService } from '../services/gitService.js';
 import { ShellTool } from '../tools/shell.js';
+import {
+  acknowledgeUntrustedFlags,
+  getModifiedBuildFiles,
+  getUnacknowledgedUntrustedFlags,
+  recordModifiedBuildFile,
+} from '../utils/untrustedContextTracker.js';
 import { AgentTool } from '../agents/agent-tool.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { GrepTool } from '../tools/grep.js';
@@ -2055,6 +2061,22 @@ describe('Server Config (config.ts)', () => {
 
     expect(config.getSessionId()).toBe('session-two');
     expect(config.getApprovedPlanPath()).toBeUndefined();
+  });
+
+  it('clears tracked build file edits and approved command flags when starting a new session', () => {
+    const config = new Config({
+      ...baseParams,
+      sessionId: 'session-one',
+    });
+    recordModifiedBuildFile('/tmp/session-one/package.json', config);
+    acknowledgeUntrustedFlags(['-k'], ['pytest'], config);
+
+    config.resetNewSessionState('session-two');
+
+    expect(getModifiedBuildFiles(config)).toEqual([]);
+    expect(getUnacknowledgedUntrustedFlags(['-k'], ['pytest'], config)).toEqual(
+      ['-k'],
+    );
   });
 
   it('performs a comprehensive reset of all session-scoped state when sessionId changes', async () => {
