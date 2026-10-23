@@ -93,6 +93,10 @@ export const READ_MANY_PARAM_USE_DEFAULT_EXCLUDES = 'useDefaultExcludes';
 export const GET_INTERNAL_DOCS_TOOL_NAME = 'get_internal_docs';
 export const DOCS_PARAM_PATH = 'path';
 
+// -- get_cli_reference --
+export const GET_CLI_REFERENCE_TOOL_NAME = 'get_cli_reference';
+export const CLI_REFERENCE_PARAM_CATEGORY = 'category';
+
 // -- activate_skill --
 export const ACTIVATE_SKILL_TOOL_NAME = 'activate_skill';
 export const SKILL_PARAM_NAME = 'name';
