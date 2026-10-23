@@ -39,8 +39,24 @@ function countToolResultChars(
   if (Array.isArray(resultDisplay)) {
     let chars = 0;
     for (const line of resultDisplay) {
-      for (const token of line) {
-        chars += token.text.length;
+      if (Array.isArray(line)) {
+        for (const token of line) {
+          if (
+            token &&
+            typeof token === 'object' &&
+            'text' in token &&
+            typeof token.text === 'string'
+          ) {
+            chars += Array.from(token.text).length;
+          } else if (typeof token === 'string') {
+            chars += Array.from(token).length;
+          }
+          if (chars >= limit) {
+            break;
+          }
+        }
+      } else if (typeof line === 'string') {
+        chars += Array.from(line).length;
       }
       if (chars >= limit) {
         break;
@@ -67,12 +83,13 @@ export function countHistoryItemChars(
   let chars: number;
   if (item.type === 'tool_group') {
     chars = 0;
-    for (const tool of item.tools) {
+    const tools = item.tools ?? [];
+    for (const tool of tools) {
       if (chars >= limit) {
         break;
       }
       chars +=
-        tool.description.length +
+        Array.from(tool.description ?? '').length +
         countToolResultChars(tool.resultDisplay, limit - chars);
     }
   } else if (typeof item.text === 'string') {
@@ -98,7 +115,7 @@ export function countHistoryItemMinRows(
 ): number {
   let rows: number;
   if (item.type === 'tool_group') {
-    rows = item.tools.length;
+    rows = item.tools?.length ?? 0;
   } else if (typeof item.text === 'string') {
     const columns = Math.max(1, width);
     rows = 0;

@@ -97,8 +97,14 @@ describe('countHistoryItemChars', () => {
 
   it('treats tool results restored outside the declared types safely', () => {
     // Resumed sessions restore resultDisplay from JSON without validation, so
-    // null or other primitives must not throw while counting.
-    const restoredResults: unknown[] = [null, true, 42];
+    // null, primitives, 1D arrays, or malformed token entries must not throw.
+    const restoredResults: unknown[] = [
+      null,
+      true,
+      42,
+      ['line1', 'line2'],
+      [['raw-token', { text: 'ok' }, null, {}]],
+    ];
     const toolGroup: HistoryItem = {
       id: 1,
       type: 'tool_group',
@@ -110,9 +116,24 @@ describe('countHistoryItemChars', () => {
       ),
     };
 
-    // Descriptions (2 + 2 + 2) + null (no output) + two values that are not
-    // plain text (500 each).
-    expect(countHistoryItemChars(toolGroup)).toBe(6 + 0 + 500 + 500);
+    // Descriptions (5 * 2) + null (0) + two non-text values (500 each) +
+    // 1D string array (5 + 5) + mixed token line (9 + 2).
+    expect(countHistoryItemChars(toolGroup)).toBe(10 + 0 + 500 + 500 + 10 + 11);
+  });
+
+  it('handles missing tools or tool descriptions in malformed tool groups', () => {
+    const missingTools = {
+      id: 1,
+      type: 'tool_group',
+    } as unknown as HistoryItem;
+    const missingDescription = {
+      id: 2,
+      type: 'tool_group',
+      tools: [{ ...toolCall('t0', 'out'), description: undefined }],
+    } as unknown as HistoryItem;
+
+    expect(countHistoryItemChars(missingTools)).toBe(0);
+    expect(countHistoryItemChars(missingDescription)).toBe(3);
   });
 
   it('stops counting at the provided limit', () => {
@@ -165,6 +186,12 @@ describe('countHistoryItemMinRows', () => {
       ],
     };
     expect(countHistoryItemMinRows(toolGroup, 80)).toBe(3);
+    expect(
+      countHistoryItemMinRows(
+        { id: 2, type: 'tool_group' } as unknown as HistoryItem,
+        80,
+      ),
+    ).toBe(0);
   });
 
   it('counts one row for items without text', () => {
