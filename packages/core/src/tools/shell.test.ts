@@ -1717,6 +1717,40 @@ EOF`;
       expect(details.additionalPermissions.fileSystem.read).toContain(user3Dir);
     });
 
+    it('should NOT run sandbox denial detection for a backgrounded command', async () => {
+      const sandboxManager = {
+        parseDenials: vi.fn().mockReturnValue({
+          network: true,
+          filePaths: [],
+        }),
+        prepareCommand: vi.fn(),
+        isKnownSafeCommand: vi.fn(),
+        isDangerousCommand: vi.fn(),
+      } as unknown as SandboxManager;
+      mockSandboxManager = sandboxManager;
+
+      const invocation = shellTool.build({ command: 'npm run dev' });
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
+
+      // A backgrounded command is still running, so it has no exit code yet.
+      resolveExecutionPromise({
+        exitCode: null,
+        output: 'Error: connect ECONNREFUSED 127.0.0.1:5432',
+        executionMethod: 'child_process',
+        signal: null,
+        error: null,
+        aborted: false,
+        pid: 12345,
+        rawOutput: Buffer.from('Error: connect ECONNREFUSED 127.0.0.1:5432'),
+        backgrounded: true,
+      });
+
+      const result = await promise;
+
+      expect(sandboxManager.parseDenials).not.toHaveBeenCalled();
+      expect(result.error).toBeUndefined();
+    });
+
     it('should proactively suggest expansion for npm install in confirmation', async () => {
       const homeDir = path.join(tempRootDir, 'home');
       fs.mkdirSync(homeDir);
