@@ -1055,6 +1055,132 @@ describe('useGeminiStream', () => {
     );
   });
 
+  describe('auto-nudge on empty continuation responses', () => {
+    const NUDGE_TEXT = '[System: You successfully executed a tool';
+    const toolResponse: Part[] = [{ text: 'tool output' }];
+
+    const submitContinuation = async (
+      result: Awaited<ReturnType<typeof renderTestHook>>['result'],
+    ) => {
+      await act(async () => {
+        await result.current.submitQuery(
+          toolResponse,
+          { isContinuation: true },
+          'prompt-id-nudge',
+        );
+      });
+    };
+
+    const sentTexts = () =>
+      mockSendMessageStream.mock.calls.map(
+        (call) => ((call[0] as Part[])[0] as { text?: string }).text ?? '',
+      );
+
+    it('waits for the nudge to finish and stops after the attempt limit', async () => {
+      mockSendMessageStream.mockImplementation(() => (async function* () {})());
+      const { result } = await renderTestHook();
+
+      await submitContinuation(result);
+
+      // The original continuation plus two nudges, all finished by the time
+      // the continuation's own promise resolves (no fire-and-forget).
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(3);
+      const texts = sentTexts();
+      expect(texts[0]).toBe('tool output');
+      expect(texts[1]).toContain(NUDGE_TEXT);
+      expect(texts[2]).toContain(NUDGE_TEXT);
+      for (const call of mockSendMessageStream.mock.calls) {
+        expect(call[2]).toBe('prompt-id-nudge');
+      }
+      expect(result.current.streamingState).toBe(StreamingState.Idle);
+    });
+
+    it.each([
+      [
+        'an error',
+        {
+          type: ServerGeminiEventType.Error,
+          value: { error: { message: 'boom' } },
+        },
+      ],
+      [
+        'an invalid stream (the core already retried with its own nudge)',
+        {
+          type: ServerGeminiEventType.InvalidStream,
+          value: { type: 'NO_RESPONSE_TEXT', message: 'empty response text' },
+        },
+      ],
+      [
+        'a hook stopping the agent',
+        {
+          type: ServerGeminiEventType.AgentExecutionStopped,
+          value: { reason: 'stopped by hook' },
+        },
+      ],
+      [
+        'a hook blocking the agent',
+        {
+          type: ServerGeminiEventType.AgentExecutionBlocked,
+          value: { reason: 'blocked by hook' },
+        },
+      ],
+      ['a user cancellation', { type: ServerGeminiEventType.UserCancelled }],
+      [
+        'the session turn limit',
+        { type: ServerGeminiEventType.MaxSessionTurns },
+      ],
+    ])('does not nudge when the stream ended with %s', async (_, event) => {
+      mockSendMessageStream.mockImplementation(() =>
+        (async function* () {
+          yield event;
+        })(),
+      );
+      const { result } = await renderTestHook();
+
+      await submitContinuation(result);
+
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not nudge after the user cancels while the continuation is streaming', async () => {
+      let releaseStream!: () => void;
+      const streamGate = new Promise<void>((resolve) => {
+        releaseStream = resolve;
+      });
+      mockSendMessageStream.mockImplementation(() =>
+        (async function* () {
+          await streamGate;
+          // Ends without content, like an empty model response.
+          yield* [];
+        })(),
+      );
+      const { result } = await renderTestHook();
+
+      let continuation!: Promise<void>;
+      await act(async () => {
+        continuation = result.current.submitQuery(
+          toolResponse,
+          { isContinuation: true },
+          'prompt-id-nudge',
+        );
+      });
+      await waitFor(() => {
+        expect(mockSendMessageStream).toHaveBeenCalledTimes(1);
+      });
+
+      await act(async () => {
+        await result.current.cancelOngoingRequest();
+      });
+      await act(async () => {
+        releaseStream();
+        await continuation;
+      });
+
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(1);
+      expect(result.current.streamingState).toBe(StreamingState.Idle);
+    });
+  });
+
   it('should handle all tool calls being cancelled by rolling back the history', async () => {
     const cancelledToolCalls: TrackedToolCall[] = [
       {
