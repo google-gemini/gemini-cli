@@ -98,7 +98,10 @@ function migrateClaudeHook(claudeHook: unknown): unknown {
   // Map timeout field (Claude uses seconds, Gemini uses milliseconds)
   const timeout = hook['timeout'];
   if (typeof timeout === 'number' && Number.isFinite(timeout) && timeout > 0) {
-    migrated['timeout'] = Math.round(timeout * MS_PER_SECOND);
+    const ms = Math.round(timeout * MS_PER_SECOND);
+    if (Number.isFinite(ms) && ms > 0) {
+      migrated['timeout'] = ms;
+    }
   }
 
   return migrated;
