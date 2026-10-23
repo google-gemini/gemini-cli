@@ -390,7 +390,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 
 ============================================================
-which@5.0.0
+which@2.0.2
 (git+https://github.com/npm/node-which.git)
 
 The ISC License
@@ -411,7 +411,7 @@ IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 
 ============================================================
-isexe@3.1.5
+isexe@2.0.0
 (No repository found)
 
 # Blue Oak Model License
