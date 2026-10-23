@@ -297,6 +297,31 @@ describe('TerminalCapabilityManager', () => {
       expect(manager.areAmbiguousCharactersWide()).toBe(false);
     });
 
+    it('should still honour the probe response after a stray cursor position report', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      const promise = manager.detectCapabilities();
+
+      // A leftover report (e.g. from a shell prompt that queried the cursor
+      // position) arrives first, in its own chunk, followed by the real
+      // answer to our probe.
+      stdin.emit('data', Buffer.from('\x1b[12;40R'));
+      stdin.emit('data', Buffer.from('\x1b[1;3R'));
+      stdin.emit('data', Buffer.from(DA1));
+
+      await promise;
+      expect(manager.areAmbiguousCharactersWide()).toBe(true);
+    });
+
+    it('should use the first plausible report when several arrive in one chunk', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      const promise = manager.detectCapabilities();
+
+      stdin.emit('data', Buffer.from('\x1b[12;40R\x1b[1;2R\x1b[1;3R' + DA1));
+
+      await promise;
+      expect(manager.areAmbiguousCharactersWide()).toBe(false);
+    });
+
     it('should handle a cursor position report split across chunks', async () => {
       const manager = TerminalCapabilityManager.getInstance();
       const promise = manager.detectCapabilities();

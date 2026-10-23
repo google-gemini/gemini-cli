@@ -83,9 +83,11 @@ export class TerminalCapabilityManager {
   // modifyOtherKeys response: CSI > 4 ; level m
   // eslint-disable-next-line no-control-regex
   private static readonly MODIFY_OTHER_KEYS_REGEX = /\x1b\[>4;(\d+)m/;
-  // Cursor Position Report: CSI row ; column R
+  // Cursor Position Report: CSI row ; column R. Global so that every report in
+  // the buffer can be inspected (a stray one may precede the probe's answer).
   private static readonly CURSOR_POSITION_REGEX = new RegExp(
     `${ESC}\\[(\\d+);(\\d+)R`,
+    'g',
   );
 
   private detectionComplete = false;
@@ -237,21 +239,25 @@ export class TerminalCapabilityManager {
 
         // Check the cursor position reported after the ambiguous-width probe.
         if (!cursorPositionReceived) {
-          const match = buffer.match(
+          for (const match of buffer.matchAll(
             TerminalCapabilityManager.CURSOR_POSITION_REGEX,
-          );
-          if (match) {
-            cursorPositionReceived = true;
+          )) {
             const column = parseInt(match[2], 10);
             // The probe glyph is printed at column 1, so the cursor ends up on
             // column 2 when it occupies one cell and column 3 when it occupies
-            // two. Anything else is not a response to our probe.
+            // two. Anything else (e.g. a stray report left over from the
+            // shell) is not a response to our probe, so keep looking.
+            if (column !== 2 && column !== 3) {
+              continue;
+            }
+            cursorPositionReceived = true;
             this.ambiguousCharactersWide = column === 3;
             debugLogger.log(
               `Detected ambiguous-width characters as ${
                 this.ambiguousCharactersWide ? 'wide' : 'narrow'
               } (cursor column ${column})`,
             );
+            break;
           }
         }
 
