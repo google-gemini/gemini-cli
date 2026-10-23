@@ -4,13 +4,35 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import fsPromises from 'node:fs/promises';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { debugLogger } from './debugLogger.js';
+import * as fsPromises from 'node:fs/promises';
+
+let beforeReaddirHook: ((targetPath: string) => Promise<void> | void) | null =
+  null;
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  const readdir = async (
+    ...args: Parameters<typeof actual.readdir>
+  ): ReturnType<typeof actual.readdir> => {
+    await beforeReaddirHook?.(String(args[0]));
+    return actual.readdir(...args);
+  };
+  return {
+    ...actual,
+    default: {
+      ...actual,
+      readdir,
+    },
+    readdir,
+  };
+});
 import * as os from 'node:os';
 import { getFolderStructure } from './getFolderStructure.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import * as path from 'node:path';
-import { GEMINI_DIR } from './paths.js';
+import { GEMINI_DIR, resolveToRealPath } from './paths.js';
 import { GEMINI_IGNORE_FILE_NAME } from 'src/config/constants.js';
 
 describe('getFolderStructure', () => {
@@ -204,6 +226,84 @@ ${testRootDir}${path.sep}
     expect(structure).toContain(
       `Error: Could not read directory "${nonExistentPath}". Check path and permissions.`,
     );
+  });
+
+  it('should not warn when a transient subdirectory disappears with ENOENT during scan', async () => {
+    await createTestFile('fileA.txt');
+    await createEmptyDir('projects.json.lock');
+    const lockDirPath = path.join(testRootDir, 'projects.json.lock');
+
+    beforeReaddirHook = async (targetPath: string) => {
+      if (targetPath === lockDirPath) {
+        await fsPromises.rmdir(lockDirPath);
+      }
+    };
+    const warnSpy = vi.spyOn(debugLogger, 'warn').mockImplementation(() => {});
+
+    try {
+      const structure = await getFolderStructure(testRootDir);
+      expect(structure).toContain('fileA.txt');
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      beforeReaddirHook = null;
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('should still warn when reading a subdirectory fails with EACCES', async () => {
+    await createEmptyDir('restricted');
+    const restrictedDirPath = path.join(testRootDir, 'restricted');
+
+    beforeReaddirHook = (targetPath: string) => {
+      if (targetPath === restrictedDirPath) {
+        throw Object.assign(
+          new Error(
+            `EACCES: permission denied, scandir '${restrictedDirPath}'`,
+          ),
+          { code: 'EACCES' },
+        );
+      }
+    };
+    const warnSpy = vi.spyOn(debugLogger, 'warn').mockImplementation(() => {});
+
+    try {
+      await getFolderStructure(testRootDir);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          `Warning: Could not read directory ${restrictedDirPath}:`,
+        ),
+      );
+    } finally {
+      beforeReaddirHook = null;
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('should return an error message and warn with resolved real path when reading the root directory fails with EACCES', async () => {
+    beforeReaddirHook = (targetPath: string) => {
+      if (targetPath === testRootDir) {
+        throw Object.assign(
+          new Error(`EACCES: permission denied, scandir '${testRootDir}'`),
+          { code: 'EACCES' },
+        );
+      }
+    };
+    const warnSpy = vi.spyOn(debugLogger, 'warn').mockImplementation(() => {});
+
+    try {
+      const structure = await getFolderStructure(testRootDir);
+      expect(structure).toContain(
+        `Error: Could not read directory "${testRootDir}". Check path and permissions.`,
+      );
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          `Warning: Could not read directory ${resolveToRealPath(testRootDir)}:`,
+        ),
+      );
+    } finally {
+      beforeReaddirHook = null;
+      warnSpy.mockRestore();
+    }
   });
 
   it('should handle deep folder structure within limits', async () => {
