@@ -61,6 +61,8 @@ describe('NumericalClassifierStrategy', () => {
       getModel: vi.fn().mockReturnValue(PREVIEW_GEMINI_MODEL_AUTO),
       getSessionId: vi.fn().mockReturnValue('control-group-id'), // Default to Control Group (Hash 71 >= 50)
       getNumericalRoutingEnabled: vi.fn().mockResolvedValue(true),
+      getNumericalRoutingRules: vi.fn().mockReturnValue([]),
+      hasCustomNumericalRoutingRules: vi.fn().mockReturnValue(false),
       getResolvedClassifierThreshold: vi.fn().mockResolvedValue(90),
       getClassifierThreshold: vi.fn().mockResolvedValue(undefined),
       getGemini31Launched: vi.fn().mockResolvedValue(false),
@@ -212,6 +214,60 @@ describe('NumericalClassifierStrategy', () => {
           reasoning: expect.stringContaining('Score: 95 / Threshold: 90'),
         },
       });
+    });
+  });
+
+  describe('Custom Numerical Routing', () => {
+    beforeEach(() => {
+      vi.mocked(mockConfig.getNumericalRoutingRules).mockReturnValue([
+        { maxScore: 10, model: 'gemini-2.5-flash' },
+        { maxScore: 30, model: 'gemini-3-flash-preview' },
+        { maxScore: 80, model: 'gemini-3-pro-preview' },
+      ]);
+      vi.mocked(mockConfig.hasCustomNumericalRoutingRules).mockReturnValue(
+        true,
+      );
+    });
+
+    it('routes to the first matching score band regardless of rule order', async () => {
+      vi.mocked(mockConfig.getNumericalRoutingRules).mockReturnValue([
+        { maxScore: 80, model: 'gemini-3-pro-preview' },
+        { maxScore: 10, model: 'gemini-2.5-flash' },
+        { maxScore: 30, model: 'gemini-3-flash-preview' },
+      ]);
+      vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue({
+        complexity_reasoning: 'Routine task',
+        complexity_score: 30,
+      });
+
+      const decision = await strategy.route(
+        mockContext,
+        mockConfig,
+        mockBaseLlmClient,
+        mockLocalLiteRtLmClient,
+      );
+
+      expect(decision?.model).toBe('gemini-3-flash-preview');
+      expect(decision?.metadata.reasoning).toContain('Max score: 30');
+    });
+
+    it('uses the final configured model when the score exceeds all max scores', async () => {
+      vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue({
+        complexity_reasoning: 'High complexity task',
+        complexity_score: 95,
+      });
+
+      const decision = await strategy.route(
+        mockContext,
+        mockConfig,
+        mockBaseLlmClient,
+        mockLocalLiteRtLmClient,
+      );
+
+      expect(decision?.model).toBe('gemini-3-pro-preview');
+      expect(decision?.metadata.reasoning).toContain(
+        'Above final max score: 80',
+      );
     });
   });
 
