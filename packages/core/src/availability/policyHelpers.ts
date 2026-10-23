@@ -304,7 +304,16 @@ export function applyModelSelection(
   const finalModel = selection.selectedModel ?? model;
   let generateContentConfig = resolved.generateContentConfig;
 
-  if (finalModel !== model) {
+  // `model` may be a tier name such as `flash-lite` rather than a concrete
+  // model ID. The policy chain resolves a tier to a concrete model, so a
+  // selection that lands on the tier's own first choice is not a fallback and
+  // must keep the config the alias resolved to. Only a genuine availability
+  // fallback to another model re-resolves the config by concrete model name.
+  const tierFirstChoice = normalizeModelId(
+    resolvePolicyChain(config, model)[0]?.model ?? model,
+  );
+
+  if (finalModel !== model && finalModel !== tierFirstChoice) {
     const fallbackResolved = config.modelConfigService.getResolvedConfig({
       ...modelConfigKey,
       model: finalModel,
