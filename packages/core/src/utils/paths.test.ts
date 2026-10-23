@@ -940,6 +940,72 @@ describe('normalizePath', () => {
       expect(isTrustedSystemPath('/Library/rg')).toBe(false);
     });
 
+    it('should allow trusted paths on Android (Termux)', () => {
+      mockPlatform('android');
+      vi.stubEnv('PREFIX', '/data/data/com.termux/files/usr');
+
+      expect(
+        isTrustedSystemPath('/data/data/com.termux/files/usr/bin/rg'),
+      ).toBe(true);
+      expect(isTrustedSystemPath('/system/bin/rg')).toBe(true);
+      expect(isTrustedSystemPath('/system/xbin/rg')).toBe(true);
+
+      // Custom PREFIX (e.g. multi-user / work profile)
+      vi.stubEnv('PREFIX', '/data/user/10/com.termux/files/usr');
+      expect(
+        isTrustedSystemPath('/data/user/10/com.termux/files/usr/bin/rg'),
+      ).toBe(true);
+
+      // Untrusted paths on Android
+      expect(isTrustedSystemPath('/sdcard/Download/rg')).toBe(false);
+      expect(isTrustedSystemPath('/data/local/tmp/rg')).toBe(false);
+      expect(
+        isTrustedSystemPath('/data/data/com.termux/files/home/bin/rg'),
+      ).toBe(false);
+    });
+
+    it('should allow default Termux paths on Android when PREFIX is not set', () => {
+      mockPlatform('android');
+      vi.stubEnv('PREFIX', '');
+
+      expect(
+        isTrustedSystemPath('/data/data/com.termux/files/usr/bin/rg'),
+      ).toBe(true);
+    });
+
+    it('should ignore untrusted or malicious PREFIX values on Android', () => {
+      mockPlatform('android');
+
+      // Relative path / traversal attempt
+      vi.stubEnv('PREFIX', '../../tmp');
+      expect(isTrustedSystemPath('/tmp/bin/rg')).toBe(false);
+      expect(isTrustedSystemPath('../../tmp/bin/rg')).toBe(false);
+
+      // Path traversal attempt via absolute path
+      vi.stubEnv('PREFIX', '/data/data/com.termux/../../tmp');
+      expect(isTrustedSystemPath('/tmp/bin/rg')).toBe(false);
+
+      // User-writable or arbitrary directory
+      vi.stubEnv('PREFIX', '/sdcard/Download');
+      expect(isTrustedSystemPath('/sdcard/Download/bin/rg')).toBe(false);
+
+      vi.stubEnv('PREFIX', '/tmp');
+      expect(isTrustedSystemPath('/tmp/bin/rg')).toBe(false);
+
+      // Malicious package name prefixing com.termux
+      vi.stubEnv('PREFIX', '/data/data/com.termux.malicious/files/usr');
+      expect(
+        isTrustedSystemPath(
+          '/data/data/com.termux.malicious/files/usr/bin/rg',
+        ),
+      ).toBe(false);
+
+      // Falls back to safe default
+      expect(
+        isTrustedSystemPath('/data/data/com.termux/files/usr/bin/rg'),
+      ).toBe(true);
+    });
+
     it('should allow 1P internal hermetic execution paths', () => {
       mockPlatform('linux');
 
