@@ -57,6 +57,27 @@ describe('textUtils', () => {
       expect(() => getCachedStringWidth(charWithAnsi)).not.toThrow();
       expect(typeof getCachedStringWidth(charWithAnsi)).toBe('number');
     });
+
+    // Terminals (wcwidth) render Thai SARA AM (U+0E33) as one column, whereas
+    // string-width folds it into the preceding grapheme cluster.
+    // See: https://github.com/google-gemini/gemini-cli/issues/25369
+    it.each([
+      ['กำ', 2], // กำ: consonant + SARA AM
+      ['ทำ', 2], // ทำ
+      ['น้ำ', 2], // น้ำ: consonant + tone mark (0) + SARA AM
+      ['กำลัง', 4], // กำลัง
+      ['แนะนำ', 5], // แนะนำ
+      ['ำ', 1], // standalone SARA AM
+      ['ຫຳ', 2], // Lao: ຫ + SARA AM (U+0EB3)
+      ['aกำb', 4], // mixed with ASCII
+    ])('should count SARA AM as one column: %j -> %i', (input, expected) => {
+      expect(getCachedStringWidth(input)).toBe(expected);
+    });
+
+    it('should not change the width of Thai text without SARA AM', () => {
+      expect(getCachedStringWidth('กั')).toBe(1); // กั
+      expect(getCachedStringWidth('ก้')).toBe(1); // ก้
+    });
   });
 
   describe('stripUnsafeCharacters', () => {
