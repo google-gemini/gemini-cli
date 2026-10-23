@@ -532,33 +532,77 @@ export async function downloadFile(
   }
 
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const resolveOnce = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    const rejectOnce = (error: unknown) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
+
     https
       .get(url, { headers }, (res) => {
         if (res.statusCode === 302 || res.statusCode === 301) {
+          res.resume?.();
           if (redirectCount >= 10) {
-            return reject(new Error('Too many redirects'));
+            return rejectOnce(new Error('Too many redirects'));
           }
 
           if (!res.headers.location) {
-            return reject(
+            return rejectOnce(
               new Error('Redirect response missing Location header'),
             );
           }
           downloadFile(res.headers.location, dest, options, redirectCount + 1)
-            .then(resolve)
-            .catch(reject);
+            .then(resolveOnce)
+            .catch(rejectOnce);
           return;
         }
         if (res.statusCode !== 200) {
-          return reject(
+          res.resume?.();
+          return rejectOnce(
             new Error(`Request failed with status code ${res.statusCode}`),
           );
         }
         const file = fs.createWriteStream(dest);
+        let failed = false;
+        const failDownload = (error: unknown) => {
+          if (failed) return;
+          failed = true;
+          // Stop consuming the response, release the file handle and report
+          // the failure to the caller. The incomplete archive is removed once
+          // the handle has been closed.
+          res.unpipe?.(file);
+          res.destroy?.();
+          file.destroy();
+          rejectOnce(error);
+        };
+        res.on('error', failDownload);
+        file.on('error', failDownload);
+        file.on('close', () => {
+          if (failed) {
+            removeIncompleteDownload(dest);
+          }
+        });
+        file.on('finish', () => file.close(() => resolveOnce()));
         res.pipe(file);
-        file.on('finish', () => file.close(resolve as () => void));
       })
-      .on('error', reject);
+      .on('error', rejectOnce);
+  });
+}
+
+/**
+ * Best-effort removal of a partially downloaded archive. Failures are ignored:
+ * the file may never have been created, and the caller already receives the
+ * download error.
+ */
+function removeIncompleteDownload(dest: string): void {
+  fs.unlink(dest, () => {
+    // Intentionally ignored.
   });
 }
 
