@@ -59,6 +59,7 @@ async function defaultSessionView(context: CommandContext) {
     userEmail,
     tier,
     currentModel,
+    stats: context.session.stats.metrics,
     creditBalance,
   };
 
@@ -126,6 +127,7 @@ export const statsCommand: SlashCommand = {
           pooledRemaining,
           pooledLimit,
           pooledResetTime,
+          stats: context.session.stats.metrics,
         } as HistoryItemModelStats);
       },
     },
@@ -138,6 +140,7 @@ export const statsCommand: SlashCommand = {
       action: (context: CommandContext) => {
         context.ui.addItem({
           type: MessageType.TOOL_STATS,
+          stats: context.session.stats.metrics,
         } as HistoryItemToolStats);
       },
     },
