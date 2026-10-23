@@ -14,6 +14,7 @@ import {
   enableBracketedPasteMode,
   disableBracketedPasteMode,
   disableMouseEvents,
+  enableLineWrapping,
 } from '@google/gemini-cli-core';
 import { parseColor } from '../themes/color-utils.js';
 
@@ -21,8 +22,13 @@ export type TerminalBackgroundColor = string | undefined;
 
 const ESC = '\x1b';
 
+// Resets every terminal mode the CLI may have switched on, in one synchronous
+// write, so that abrupt exits (signals, process.exit() from error paths) do
+// not leave the user's shell in a broken state. Auto-wrap (DECAWM, `?7h`) is
+// restored last because it is turned off in the alternate buffer and on
+// terminals that render ambiguous-width characters as wide.
 const TERMINAL_CLEANUP_SEQUENCE =
-  '\x1b[<u\x1b[>4;0m\x1b[?2004l\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l';
+  '\x1b[<u\x1b[>4;0m\x1b[?2004l\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l\x1b[?7h';
 
 export function cleanupTerminalOnExit() {
   try {
@@ -38,6 +44,7 @@ export function cleanupTerminalOnExit() {
   disableModifyOtherKeys();
   disableBracketedPasteMode();
   disableMouseEvents();
+  enableLineWrapping();
 }
 
 export class TerminalCapabilityManager {
@@ -83,10 +90,13 @@ export class TerminalCapabilityManager {
   // modifyOtherKeys response: CSI > 4 ; level m
   // eslint-disable-next-line no-control-regex
   private static readonly MODIFY_OTHER_KEYS_REGEX = /\x1b\[>4;(\d+)m/;
-  // Cursor Position Report: CSI row ; column R. Global so that every report in
-  // the buffer can be inspected (a stray one may precede the probe's answer).
+  // Cursor Position Report: CSI row ; column R. Built from the ESC constant
+  // instead of a regex literal so the control character needs no
+  // `no-control-regex` suppression; compiled once here. Global so that every
+  // report in the buffer can be inspected (a stray one may precede the
+  // probe's answer).
   private static readonly CURSOR_POSITION_REGEX = new RegExp(
-    `${ESC}\\[(\\d+);(\\d+)R`,
+    String.raw`${ESC}\[(\d+);(\d+)R`,
     'g',
   );
 

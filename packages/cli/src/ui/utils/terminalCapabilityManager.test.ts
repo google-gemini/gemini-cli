@@ -5,11 +5,19 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { TerminalCapabilityManager } from './terminalCapabilityManager.js';
+import {
+  TerminalCapabilityManager,
+  cleanupTerminalOnExit,
+} from './terminalCapabilityManager.js';
 import { EventEmitter } from 'node:events';
 import {
   enableKittyKeyboardProtocol,
   enableModifyOtherKeys,
+  disableKittyKeyboardProtocol,
+  disableModifyOtherKeys,
+  disableBracketedPasteMode,
+  disableMouseEvents,
+  enableLineWrapping,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 
@@ -30,6 +38,8 @@ vi.mock('@google/gemini-cli-core', () => ({
   disableModifyOtherKeys: vi.fn(),
   enableBracketedPasteMode: vi.fn(),
   disableBracketedPasteMode: vi.fn(),
+  disableMouseEvents: vi.fn(),
+  enableLineWrapping: vi.fn(),
 }));
 
 describe('TerminalCapabilityManager', () => {
@@ -664,6 +674,51 @@ describe('TerminalCapabilityManager', () => {
 
     it('returns false otherwise', () => {
       expect(manager.isWindowsTerminal({})).toBe(false);
+    });
+  });
+
+  describe('cleanupTerminalOnExit', () => {
+    it('restores auto-wrap together with the other terminal modes in one synchronous write', () => {
+      cleanupTerminalOnExit();
+
+      expect(fs.writeSync).toHaveBeenCalledTimes(1);
+      const [fd, sequence] = vi.mocked(fs.writeSync).mock.calls[0] as [
+        number,
+        string,
+      ];
+      expect(fd).toBe(stdout.fd);
+      // Kitty keyboard pop, modifyOtherKeys off, bracketed paste off, mouse
+      // modes off, and finally auto-wrap (DECAWM) back on: it is turned off in
+      // the alternate buffer and on ambiguous-wide terminals, and this hook is
+      // the last line of defence on signals and process.exit().
+      expect(sequence).toBe(
+        '\x1b[<u\x1b[>4;0m\x1b[?2004l\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l\x1b[?7h',
+      );
+      expect(enableLineWrapping).not.toHaveBeenCalled();
+    });
+
+    it('falls back to the individual resets, including auto-wrap, when stdout has no file descriptor', () => {
+      stdout.fd = undefined;
+
+      cleanupTerminalOnExit();
+
+      expect(fs.writeSync).not.toHaveBeenCalled();
+      expect(disableKittyKeyboardProtocol).toHaveBeenCalledTimes(1);
+      expect(disableModifyOtherKeys).toHaveBeenCalledTimes(1);
+      expect(disableBracketedPasteMode).toHaveBeenCalledTimes(1);
+      expect(disableMouseEvents).toHaveBeenCalledTimes(1);
+      expect(enableLineWrapping).toHaveBeenCalledTimes(1);
+    });
+
+    it('falls back to the individual resets when the synchronous write fails', () => {
+      vi.mocked(fs.writeSync).mockImplementation(() => {
+        throw new Error('EBADF');
+      });
+
+      cleanupTerminalOnExit();
+
+      expect(enableLineWrapping).toHaveBeenCalledTimes(1);
+      expect(disableMouseEvents).toHaveBeenCalledTimes(1);
     });
   });
 });
