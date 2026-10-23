@@ -765,6 +765,97 @@ describe('fileUtils', () => {
           openSpy.mockRestore();
         }
       });
+
+      describe('when path stat reports dev 0 (libuv 1.49-1.50 on Windows)', () => {
+        const originalPlatform = process.platform;
+
+        afterEach(() => {
+          Object.defineProperty(process, 'platform', {
+            value: originalPlatform,
+          });
+        });
+
+        const openWithHandleStats = (stats: { dev: number; ino: number }) =>
+          vi.spyOn(fsPromises, 'open').mockResolvedValueOnce({
+            stat: vi.fn().mockResolvedValue(stats),
+            readFile: vi.fn().mockResolvedValue(Buffer.from('hello secure')),
+            close: vi.fn().mockResolvedValue(undefined),
+          } as unknown as fsPromises.FileHandle);
+
+        it('should read the file on win32 when only dev differs', async () => {
+          Object.defineProperty(process, 'platform', { value: 'win32' });
+          const filePath = path.join(testDir, 'secure-buffer-dev-zero.txt');
+          await fsPromises.writeFile(filePath, 'hello secure');
+
+          const realStats = await fsPromises.stat(filePath);
+          const pathStats = {
+            dev: 0,
+            ino: realStats.ino,
+          } as unknown as fs.Stats;
+          const openSpy = openWithHandleStats({
+            dev: 1514377941,
+            ino: realStats.ino,
+          });
+
+          try {
+            const buffer = await readSecureFileBuffer(filePath, pathStats);
+            expect(buffer.toString('utf-8')).toBe('hello secure');
+          } finally {
+            openSpy.mockRestore();
+          }
+        });
+
+        it('should still abort on win32 when ino differs', async () => {
+          Object.defineProperty(process, 'platform', { value: 'win32' });
+          const filePath = path.join(testDir, 'secure-buffer-dev-zero-ino.txt');
+          await fsPromises.writeFile(filePath, 'hello secure');
+
+          const realStats = await fsPromises.stat(filePath);
+          const pathStats = {
+            dev: 0,
+            ino: realStats.ino,
+          } as unknown as fs.Stats;
+          const openSpy = openWithHandleStats({
+            dev: 1514377941,
+            ino: realStats.ino + 4242,
+          });
+
+          try {
+            await expect(
+              readSecureFileBuffer(filePath, pathStats),
+            ).rejects.toThrow(/File device or inode changed during read/);
+          } finally {
+            openSpy.mockRestore();
+          }
+        });
+
+        it('should still abort on other platforms when dev differs', async () => {
+          Object.defineProperty(process, 'platform', { value: 'linux' });
+          const filePath = path.join(
+            testDir,
+            'secure-buffer-dev-zero-linux.txt',
+          );
+          await fsPromises.writeFile(filePath, 'hello secure');
+
+          const realStats = await fsPromises.stat(filePath);
+          const pathStats = {
+            dev: 0,
+            ino: realStats.ino,
+          } as unknown as fs.Stats;
+          const openSpy = openWithHandleStats({
+            dev: 1514377941,
+            ino: realStats.ino,
+          });
+
+          try {
+            await expect(
+              readSecureFileBuffer(filePath, pathStats),
+            ).rejects.toThrow(/File device or inode changed during read/);
+          } finally {
+            openSpy.mockRestore();
+          }
+        });
+      });
     });
 
     describe('isBinaryFile with BOM awareness', () => {

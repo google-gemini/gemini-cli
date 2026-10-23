@@ -188,6 +188,37 @@ function decodeBOMContent(buffer: Buffer, bom: BOMInfo): string {
 }
 
 /**
+ * Returns true when two stat results identify different files.
+ *
+ * Missing dev/ino values are treated as unknown and never reported as a change.
+ * On Windows, libuv 1.49.x-1.50.x report `dev: 0` from path-based stat while
+ * fstat on an open handle reports the real volume serial, so a zero `dev` there
+ * is also treated as unknown and only `ino` is compared.
+ */
+function fileIdentityChanged(
+  a: fs.Stats | undefined,
+  b: fs.Stats | undefined,
+): boolean {
+  if (
+    !a ||
+    !b ||
+    a.dev === undefined ||
+    a.ino === undefined ||
+    b.dev === undefined ||
+    b.ino === undefined
+  ) {
+    return false;
+  }
+  if (a.ino !== b.ino) {
+    return true;
+  }
+  if (process.platform === 'win32' && (a.dev === 0 || b.dev === 0)) {
+    return false;
+  }
+  return a.dev !== b.dev;
+}
+
+/**
  * Reads a file as a Buffer while verifying device and inode (dev + ino) before,
  * during (via fstat on the opened file descriptor), and after reading to ensure
  * file consistency.
@@ -208,15 +239,7 @@ export async function readSecureFileBuffer(
       }
       if (fileHandle && typeof fileHandle.stat === 'function') {
         const handleStats = await fileHandle.stat();
-        if (
-          initialStats.dev !== undefined &&
-          initialStats.ino !== undefined &&
-          handleStats &&
-          handleStats.dev !== undefined &&
-          handleStats.ino !== undefined &&
-          (initialStats.dev !== handleStats.dev ||
-            initialStats.ino !== handleStats.ino)
-        ) {
+        if (fileIdentityChanged(initialStats, handleStats)) {
           throw new Error(
             `File device or inode changed during read: ${filePath}`,
           );
@@ -235,14 +258,7 @@ export async function readSecureFileBuffer(
     } catch {
       // If post-stat failed due to file removal, ignore here
     }
-    if (
-      postStats &&
-      initialStats.dev !== undefined &&
-      initialStats.ino !== undefined &&
-      postStats.dev !== undefined &&
-      postStats.ino !== undefined &&
-      (initialStats.dev !== postStats.dev || initialStats.ino !== postStats.ino)
-    ) {
+    if (fileIdentityChanged(initialStats, postStats)) {
       throw new Error(`File device or inode changed during read: ${filePath}`);
     }
 
