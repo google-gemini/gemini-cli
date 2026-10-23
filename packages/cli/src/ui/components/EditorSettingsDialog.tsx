@@ -58,7 +58,7 @@ export function EditorSettingsDialog({
       }
       return false;
     },
-    { isActive: true },
+    { isActive: true, priority: true },
   );
 
   const editorItems: EditorDisplay[] =
