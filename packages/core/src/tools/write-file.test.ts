@@ -836,6 +836,40 @@ describe('WriteFileTool', () => {
       );
     });
 
+    // Root bypasses mode bits, so it never reaches the PERMISSION_DENIED branch.
+    it.skipIf(process.getuid?.() === 0)(
+      'should return PERMISSION_DENIED without modifying a read-only file',
+      async () => {
+        const filePath = path.join(rootDir, 'execute_read_only_file.txt');
+        const initialContent = 'Guarded content.';
+        fs.writeFileSync(filePath, initialContent, 'utf8');
+        fs.chmodSync(filePath, 0o444);
+        mockEnsureCorrectFileContent.mockResolvedValue('Attempted overwrite.');
+
+        try {
+          const params = {
+            file_path: filePath,
+            content: 'Attempted overwrite.',
+          };
+          const invocation = tool.build(params);
+
+          await confirmExecution(invocation);
+
+          const result = await invocation.execute({ abortSignal });
+
+          expect(result.error?.type).toBe(ToolErrorType.PERMISSION_DENIED);
+          expect(result.llmContent).toMatch(
+            /Permission denied writing to file/,
+          );
+          expect(fs.readFileSync(filePath, 'utf8')).toBe(initialContent);
+        } finally {
+          // Leave the file writable so afterEach can remove rootDir even if
+          // an assertion above failed.
+          fs.chmodSync(filePath, 0o600);
+        }
+      },
+    );
+
     it('should create directory if it does not exist', async () => {
       const dirPath = path.join(rootDir, 'new_dir_for_write');
       const filePath = path.join(dirPath, 'file_in_new_dir.txt');
