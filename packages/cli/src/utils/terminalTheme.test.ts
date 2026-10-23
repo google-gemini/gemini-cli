@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { setupTerminalAndTheme } from './terminalTheme.js';
 import { terminalCapabilityManager } from '../ui/utils/terminalCapabilityManager.js';
+import { setAmbiguousCharactersWide } from '../ui/utils/textUtils.js';
 import { themeManager } from '../ui/themes/theme-manager.js';
 import { coreEvents, type Config } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../config/settings.js';
@@ -16,7 +17,12 @@ vi.mock('../ui/utils/terminalCapabilityManager.js', () => ({
   terminalCapabilityManager: {
     detectCapabilities: vi.fn(),
     getTerminalBackgroundColor: vi.fn(),
+    areAmbiguousCharactersWide: vi.fn(),
   },
+}));
+
+vi.mock('../ui/utils/textUtils.js', () => ({
+  setAmbiguousCharactersWide: vi.fn(),
 }));
 
 vi.mock('../ui/themes/theme-manager.js', () => ({
@@ -111,5 +117,53 @@ describe('setupTerminalAndTheme', () => {
     await setupTerminalAndTheme(mockConfig, mockSettings);
 
     expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
+  });
+
+  describe('ambiguous-width character handling', () => {
+    it('applies the detected wide rendering to layout measurements', async () => {
+      vi.mocked(
+        terminalCapabilityManager.areAmbiguousCharactersWide,
+      ).mockReturnValue(true);
+
+      await setupTerminalAndTheme(mockConfig, mockSettings);
+
+      expect(terminalCapabilityManager.detectCapabilities).toHaveBeenCalled();
+      expect(setAmbiguousCharactersWide).toHaveBeenCalledWith(true);
+    });
+
+    it('keeps the default narrow measurement when the terminal is standard', async () => {
+      vi.mocked(
+        terminalCapabilityManager.areAmbiguousCharactersWide,
+      ).mockReturnValue(false);
+
+      await setupTerminalAndTheme(mockConfig, mockSettings);
+
+      expect(setAmbiguousCharactersWide).toHaveBeenCalledWith(false);
+    });
+
+    it('does not probe or reconfigure measurements when not interactive', async () => {
+      vi.mocked(mockConfig.isInteractive).mockReturnValue(false);
+
+      await setupTerminalAndTheme(mockConfig, mockSettings);
+
+      expect(
+        terminalCapabilityManager.detectCapabilities,
+      ).not.toHaveBeenCalled();
+      expect(setAmbiguousCharactersWide).not.toHaveBeenCalled();
+    });
+
+    it('does not probe or reconfigure measurements when stdin is not a TTY', async () => {
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: false,
+        configurable: true,
+      });
+
+      await setupTerminalAndTheme(mockConfig, mockSettings);
+
+      expect(
+        terminalCapabilityManager.detectCapabilities,
+      ).not.toHaveBeenCalled();
+      expect(setAmbiguousCharactersWide).not.toHaveBeenCalled();
+    });
   });
 });

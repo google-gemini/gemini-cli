@@ -5,11 +5,19 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { TerminalCapabilityManager } from './terminalCapabilityManager.js';
+import {
+  TerminalCapabilityManager,
+  cleanupTerminalOnExit,
+} from './terminalCapabilityManager.js';
 import { EventEmitter } from 'node:events';
 import {
   enableKittyKeyboardProtocol,
   enableModifyOtherKeys,
+  disableKittyKeyboardProtocol,
+  disableModifyOtherKeys,
+  disableBracketedPasteMode,
+  disableMouseEvents,
+  enableLineWrapping,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 
@@ -30,6 +38,8 @@ vi.mock('@google/gemini-cli-core', () => ({
   disableModifyOtherKeys: vi.fn(),
   enableBracketedPasteMode: vi.fn(),
   disableBracketedPasteMode: vi.fn(),
+  disableMouseEvents: vi.fn(),
+  enableLineWrapping: vi.fn(),
 }));
 
 describe('TerminalCapabilityManager', () => {
@@ -233,6 +243,143 @@ describe('TerminalCapabilityManager', () => {
     await promise;
     manager.enableSupportedModes();
     expect(manager.isKittyProtocolEnabled()).toBe(true);
+  });
+
+  describe('ambiguous-width character detection', () => {
+    const DA1 = '\x1b[?62c';
+
+    it('should default to narrow before detection runs', () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      expect(manager.areAmbiguousCharactersWide()).toBe(false);
+    });
+
+    it('should detect wide rendering when the cursor lands on column 3', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      const promise = manager.detectCapabilities();
+
+      // Cursor Position Report after printing one glyph at column 1.
+      stdin.emit('data', Buffer.from('\x1b[1;3R'));
+      stdin.emit('data', Buffer.from(DA1));
+
+      await promise;
+      expect(manager.areAmbiguousCharactersWide()).toBe(true);
+    });
+
+    it('should detect narrow rendering when the cursor lands on column 2', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      const promise = manager.detectCapabilities();
+
+      stdin.emit('data', Buffer.from('\x1b[24;2R'));
+      stdin.emit('data', Buffer.from(DA1));
+
+      await promise;
+      expect(manager.areAmbiguousCharactersWide()).toBe(false);
+    });
+
+    it('should stay narrow when the terminal does not report a cursor position', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      const promise = manager.detectCapabilities();
+
+      stdin.emit('data', Buffer.from(DA1));
+
+      await promise;
+      expect(manager.areAmbiguousCharactersWide()).toBe(false);
+    });
+
+    it('should stay narrow when detection times out', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      const promise = manager.detectCapabilities();
+
+      await vi.advanceTimersByTimeAsync(1000);
+      await promise;
+      expect(manager.areAmbiguousCharactersWide()).toBe(false);
+    });
+
+    it('should ignore cursor columns that cannot come from the probe', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      const promise = manager.detectCapabilities();
+
+      // e.g. a report produced by something other than our one-glyph probe.
+      stdin.emit('data', Buffer.from('\x1b[12;40R'));
+      stdin.emit('data', Buffer.from(DA1));
+
+      await promise;
+      expect(manager.areAmbiguousCharactersWide()).toBe(false);
+    });
+
+    it('should still honour the probe response after a stray cursor position report', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      const promise = manager.detectCapabilities();
+
+      // A leftover report (e.g. from a shell prompt that queried the cursor
+      // position) arrives first, in its own chunk, followed by the real
+      // answer to our probe.
+      stdin.emit('data', Buffer.from('\x1b[12;40R'));
+      stdin.emit('data', Buffer.from('\x1b[1;3R'));
+      stdin.emit('data', Buffer.from(DA1));
+
+      await promise;
+      expect(manager.areAmbiguousCharactersWide()).toBe(true);
+    });
+
+    it('should use the first plausible report when several arrive in one chunk', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      const promise = manager.detectCapabilities();
+
+      stdin.emit('data', Buffer.from('\x1b[12;40R\x1b[1;2R\x1b[1;3R' + DA1));
+
+      await promise;
+      expect(manager.areAmbiguousCharactersWide()).toBe(false);
+    });
+
+    it('should handle a cursor position report split across chunks', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      const promise = manager.detectCapabilities();
+
+      stdin.emit('data', Buffer.from('\x1b[1;'));
+      stdin.emit('data', Buffer.from('3R'));
+      stdin.emit('data', Buffer.from(DA1));
+
+      await promise;
+      expect(manager.areAmbiguousCharactersWide()).toBe(true);
+    });
+
+    it('should detect wide rendering alongside the other responses', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      const promise = manager.detectCapabilities();
+
+      stdin.emit('data', Buffer.from('\x1b[?1u'));
+      stdin.emit('data', Buffer.from('\x1b]11;rgb:0000/0000/0000\x1b\\'));
+      stdin.emit('data', Buffer.from('\x1bP>|WezTerm 20240203\x1b\\'));
+      stdin.emit('data', Buffer.from('\x1b[>4;2m'));
+      stdin.emit('data', Buffer.from('\x1b[1;3R'));
+      stdin.emit('data', Buffer.from(DA1));
+
+      await promise;
+      expect(manager.areAmbiguousCharactersWide()).toBe(true);
+      expect(manager.getTerminalName()).toBe('WezTerm 20240203');
+      expect(manager.getTerminalBackgroundColor()).toBe('#000000');
+    });
+
+    it('should print the probe glyph hidden, before the DA1 sentinel, and clear the line', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      const promise = manager.detectCapabilities();
+      stdin.emit('data', Buffer.from(DA1));
+      await promise;
+
+      const written = vi.mocked(fs.writeSync).mock.calls[0][1];
+      const probe = '\r\u2500\x1b[6n';
+      const hidden = '\x1b[8m';
+      const da1Query = '\x1b[c';
+      const clearLine = '\x1b[2K\r';
+
+      expect(written).toContain(probe);
+      expect(written.indexOf(hidden)).toBeLessThan(written.indexOf(probe));
+      expect(written.indexOf(probe)).toBeLessThan(written.indexOf(da1Query));
+      expect(written.indexOf(da1Query)).toBeLessThan(
+        written.indexOf(clearLine),
+      );
+    });
   });
 
   describe('modifyOtherKeys detection', () => {
@@ -527,6 +674,51 @@ describe('TerminalCapabilityManager', () => {
 
     it('returns false otherwise', () => {
       expect(manager.isWindowsTerminal({})).toBe(false);
+    });
+  });
+
+  describe('cleanupTerminalOnExit', () => {
+    it('restores auto-wrap together with the other terminal modes in one synchronous write', () => {
+      cleanupTerminalOnExit();
+
+      expect(fs.writeSync).toHaveBeenCalledTimes(1);
+      const [fd, sequence] = vi.mocked(fs.writeSync).mock.calls[0] as [
+        number,
+        string,
+      ];
+      expect(fd).toBe(stdout.fd);
+      // Kitty keyboard pop, modifyOtherKeys off, bracketed paste off, mouse
+      // modes off, and finally auto-wrap (DECAWM) back on: it is turned off in
+      // the alternate buffer and on ambiguous-wide terminals, and this hook is
+      // the last line of defence on signals and process.exit().
+      expect(sequence).toBe(
+        '\x1b[<u\x1b[>4;0m\x1b[?2004l\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l\x1b[?7h',
+      );
+      expect(enableLineWrapping).not.toHaveBeenCalled();
+    });
+
+    it('falls back to the individual resets, including auto-wrap, when stdout has no file descriptor', () => {
+      stdout.fd = undefined;
+
+      cleanupTerminalOnExit();
+
+      expect(fs.writeSync).not.toHaveBeenCalled();
+      expect(disableKittyKeyboardProtocol).toHaveBeenCalledTimes(1);
+      expect(disableModifyOtherKeys).toHaveBeenCalledTimes(1);
+      expect(disableBracketedPasteMode).toHaveBeenCalledTimes(1);
+      expect(disableMouseEvents).toHaveBeenCalledTimes(1);
+      expect(enableLineWrapping).toHaveBeenCalledTimes(1);
+    });
+
+    it('falls back to the individual resets when the synchronous write fails', () => {
+      vi.mocked(fs.writeSync).mockImplementation(() => {
+        throw new Error('EBADF');
+      });
+
+      cleanupTerminalOnExit();
+
+      expect(enableLineWrapping).toHaveBeenCalledTimes(1);
+      expect(disableMouseEvents).toHaveBeenCalledTimes(1);
     });
   });
 });
