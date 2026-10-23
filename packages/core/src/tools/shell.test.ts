@@ -2157,5 +2157,40 @@ EOF`;
       });
       expect(result.returnDisplay).not.toContain('Blocked');
     });
+    it('should allow PowerShell commands with escaped quotes and parentheses', async () => {
+      mockPlatform.mockReturnValue('win32');
+      mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
+        pid: 12345,
+        result: Promise.resolve({
+          output: 'result',
+          rawOutput: Buffer.from('result'),
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+          backgrounded: false,
+        }),
+      }));
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const testCommands = [
+        'echo "a \\" b (c)"',
+        'git commit -m "fix(core): \\"(detail)\\""',
+        'git commit -m "fix: \\"quote (detail)"',
+        'git log --format="%h \\" (%an)"',
+        'echo "hello \\" (world)"',
+        'echo "test `"quoted`" (foo)"',
+        'echo "test ""quoted"" (foo)"',
+        "echo 'test ''quoted'' (foo)'",
+      ];
+      for (const command of testCommands) {
+        const invocation = tool.build({ command });
+        const result = await invocation.execute({
+          abortSignal: new AbortController().signal,
+        });
+        expect(result.returnDisplay).not.toContain('Blocked');
+      }
+    });
   });
 });
