@@ -18,6 +18,7 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   GEMINI_MODEL_ALIAS_AUTO,
+  GEMINI_4_ARGON_MODEL,
   GEMMA_4_31B_IT_MODEL,
   GEMMA_4_26B_A4B_IT_MODEL,
   ModelSlashCommandEvent,
@@ -253,6 +254,15 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         },
       );
     }
+
+    // Gemini 4 flagship, served on Agent Platform (Vertex AI). Kept in the
+    // manual list for every auth method; backends that do not carry it return
+    // a clear "model not found" error.
+    options.push({
+      value: GEMINI_4_ARGON_MODEL,
+      title: getDisplayString(GEMINI_4_ARGON_MODEL),
+      key: GEMINI_4_ARGON_MODEL,
+    });
 
     if (shouldShowPreviewModels) {
       const previewProModel = useGemini31
