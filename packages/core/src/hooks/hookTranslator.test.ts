@@ -448,6 +448,50 @@ describe('HookTranslator', () => {
         'Hello response',
       );
     });
+
+    it('should preserve extended usageMetadata fields when translating SDK response to hook format and back', () => {
+      const sdkResponse = {
+        text: 'Thinking response',
+        candidates: [
+          {
+            content: {
+              role: 'model',
+              parts: [{ text: 'Thinking response' }],
+            },
+            finishReason: 'STOP',
+            index: 0,
+          },
+        ],
+        usageMetadata: {
+          promptTokenCount: 400,
+          candidatesTokenCount: 300,
+          thoughtsTokenCount: 700,
+          toolUsePromptTokenCount: 100,
+          cachedContentTokenCount: 50,
+          totalTokenCount: 1500,
+        },
+      } as unknown as GenerateContentResponse;
+
+      const hookResponse = translator.toHookLLMResponse(sdkResponse);
+      expect(hookResponse.usageMetadata).toEqual({
+        promptTokenCount: 400,
+        candidatesTokenCount: 300,
+        thoughtsTokenCount: 700,
+        toolUsePromptTokenCount: 100,
+        cachedContentTokenCount: 50,
+        totalTokenCount: 1500,
+      });
+
+      const roundTripped = translator.fromHookLLMResponse(hookResponse);
+      expect(roundTripped.usageMetadata).toEqual({
+        promptTokenCount: 400,
+        candidatesTokenCount: 300,
+        thoughtsTokenCount: 700,
+        toolUsePromptTokenCount: 100,
+        cachedContentTokenCount: 50,
+        totalTokenCount: 1500,
+      });
+    });
   });
 
   describe('Tool Config Translation', () => {

@@ -5,6 +5,7 @@
  */
 
 import fs from 'node:fs/promises';
+import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -118,6 +119,46 @@ describe('McpServerEnablementManager', () => {
 
     expect(instance2.isSessionDisabled('test-server')).toBe(true);
     expect(instance1).toBe(instance2);
+  });
+
+  it('should fail closed and preserve the config file when JSON is malformed', async () => {
+    const configPath = path.join(
+      '/virtual-home/.gemini',
+      'mcp-server-enablement.json',
+    );
+    const malformedContent =
+      '{\n  "disabled-server": { "enabled": false },\n  "truncated": ';
+    inMemoryFs[configPath] = malformedContent;
+
+    // 1. isFileEnabled should fail closed (false) rather than defaulting to true
+    expect(await manager.isFileEnabled('disabled-server')).toBe(false);
+    expect(await manager.isFileEnabled('other-server')).toBe(false);
+
+    // 2. disable() should not overwrite the malformed file
+    await manager.disable('another-server');
+    expect(inMemoryFs[configPath]).toBe(malformedContent);
+    expect(fs.writeFile).not.toHaveBeenCalled();
+
+    // 3. enable() should not overwrite the malformed file
+    await manager.enable('disabled-server');
+    expect(inMemoryFs[configPath]).toBe(malformedContent);
+    expect(fs.writeFile).not.toHaveBeenCalled();
+
+    // 4. autoEnableServers() should not report persistent-disabled servers as enabled when file cannot be updated
+    expect(await manager.autoEnableServers(['disabled-server'])).toEqual([]);
+  });
+
+  it('should fail closed and preserve the config file when JSON root is not a plain object', async () => {
+    const configPath = path.join(
+      '/virtual-home/.gemini',
+      'mcp-server-enablement.json',
+    );
+    inMemoryFs[configPath] = '["not-an-object"]';
+
+    expect(await manager.isFileEnabled('server')).toBe(false);
+    await manager.disable('server');
+    expect(inMemoryFs[configPath]).toBe('["not-an-object"]');
+    expect(fs.writeFile).not.toHaveBeenCalled();
   });
 });
 

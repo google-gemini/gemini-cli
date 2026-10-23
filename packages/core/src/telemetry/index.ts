@@ -23,6 +23,7 @@ export {
   resolveTelemetrySettings,
   parseBooleanEnvFlag,
   parseTelemetryTargetValue,
+  parseOtlpHeaders,
 } from './config.js';
 export {
   GcpTraceExporter,

@@ -55,6 +55,8 @@ import {
   getPlanModeExitMessage,
   UPDATE_TOPIC_TOOL_NAME,
   TRUE_EMPTY_RESPONSE_MESSAGE,
+  DEFAULT_GEMINI_FLASH_MODEL,
+  Kind,
 } from '@google/gemini-cli-core';
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -91,6 +93,19 @@ const MockedGeminiClientClass = vi.hoisted(() =>
     this.setHistory = vi.fn().mockImplementation((newHistory: any[]) => {
       mockHistory = [...newHistory];
     });
+    this.discardTrailingUnansweredToolCallTurn = vi
+      .fn()
+      .mockImplementation(() => {
+        const last = mockHistory[mockHistory.length - 1];
+        if (
+          last?.role !== 'model' ||
+          !last.parts?.some((part: any) => !!part.functionCall)
+        ) {
+          return false;
+        }
+        mockHistory = mockHistory.slice(0, -1);
+        return true;
+      });
     this.generateContent = vi.fn().mockResolvedValue({
       candidates: [
         { content: { parts: [{ text: 'Got it. Focusing on tests only.' }] } },
@@ -1131,7 +1146,7 @@ describe('useGeminiStream', () => {
       ),
     );
 
-    // Call submitQuery to populate the user turn and set historyLengthAfterUserPromptRef
+    // Call submitQuery to populate the user turn
     await act(async () => {
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
       result.current.submitQuery('User prompt');
@@ -1164,6 +1179,161 @@ describe('useGeminiStream', () => {
       // Ensure we do NOT call back to the API a second time (only the initial user turn was sent)
       expect(mockSendMessageStream).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it('should keep the user prompt and completed tool rounds when a later tool batch is declined', async () => {
+    const cancelledToolCalls: TrackedToolCall[] = [
+      {
+        request: {
+          callId: '2',
+          name: 'testTool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-4',
+        },
+        status: CoreToolCallStatus.Cancelled,
+        response: {
+          callId: '2',
+          responseParts: [{ text: CoreToolCallStatus.Cancelled }],
+          errorType: undefined,
+        },
+        responseSubmittedToGemini: false,
+        tool: {
+          displayName: 'mock tool',
+        },
+        invocation: {
+          getDescription: () => `Mock description`,
+        },
+      } as any,
+    ];
+    const client = new MockedGeminiClientClass(mockConfig);
+    const priorTurn = [
+      { role: 'user', parts: [{ text: 'Earlier prompt' }] },
+      { role: 'model', parts: [{ text: 'Earlier answer' }] },
+    ];
+    client.setHistory(priorTurn);
+    // Model the real sendMessageStream contract: the user turn is recorded in
+    // the client history when the request is sent, not before submitQuery.
+    mockSendMessageStream.mockImplementation((query: PartListUnion) => {
+      const parts = (Array.isArray(query) ? query : [query]).map((part) =>
+        typeof part === 'string' ? { text: part } : part,
+      );
+      client.setHistory([...client.getHistory(), { role: 'user', parts }]);
+      return (async function* () {
+        yield { type: ServerGeminiEventType.Content, value: 'Working on it' };
+      })();
+    });
+
+    let capturedOnComplete:
+      | ((completedTools: TrackedToolCall[]) => Promise<void>)
+      | null = null;
+
+    mockUseToolScheduler.mockImplementation((onComplete) => {
+      capturedOnComplete = onComplete;
+      return [
+        [],
+        mockScheduleToolCalls,
+        mockMarkToolsAsSubmitted,
+        vi.fn(),
+        mockCancelAllToolCalls,
+        0,
+      ];
+    });
+
+    const { result } = await renderHookWithProviders(() =>
+      useGeminiStream(
+        client,
+        [],
+        mockAddItem,
+        mockConfig,
+        mockLoadedSettings,
+        mockOnDebugMessage,
+        mockHandleSlashCommand,
+        false,
+        () => 'vscode' as EditorType,
+        () => {},
+        () => Promise.resolve(),
+        false,
+        () => {},
+        () => {},
+        () => {},
+        80,
+        24,
+      ),
+    );
+
+    // Turn 1 starts: sendMessageStream records the user prompt.
+    await act(async () => {
+      await result.current.submitQuery('User prompt');
+    });
+
+    // The model answers with a first tool call, which completes and is sent
+    // back to the model as a continuation turn.
+    const firstRoundResponse: Part[] = [
+      {
+        functionResponse: {
+          name: 'testTool',
+          id: '1',
+          response: { output: 'first result' },
+        },
+      },
+    ];
+    client.setHistory([
+      ...client.getHistory(),
+      {
+        role: 'model',
+        parts: [{ functionCall: { name: 'testTool', id: '1', args: {} } }],
+      },
+    ]);
+    await act(async () => {
+      await result.current.submitQuery(firstRoundResponse, {
+        isContinuation: true,
+      });
+    });
+
+    // The model requests a second tool call within the same chain.
+    client.setHistory([
+      ...client.getHistory(),
+      {
+        role: 'model',
+        parts: [{ functionCall: { name: 'testTool', id: '2', args: {} } }],
+      },
+    ]);
+    vi.mocked(client.setHistory).mockClear();
+
+    // The second tool call is declined.
+    await act(async () => {
+      if (capturedOnComplete) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        await capturedOnComplete(cancelledToolCalls);
+      }
+    });
+
+    try {
+      await waitFor(() => {
+        expect(mockMarkToolsAsSubmitted).toHaveBeenCalledWith(['2']);
+        expect(client.addHistory).not.toHaveBeenCalled();
+        // Only the trailing unanswered call is removed, without re-setting
+        // the whole history (which would re-record every turn).
+        expect(
+          client.discardTrailingUnansweredToolCallTurn,
+        ).toHaveBeenCalledTimes(1);
+        expect(client.setHistory).not.toHaveBeenCalled();
+        // The previous turn, the user prompt and the completed first round
+        // are preserved.
+        expect(client.getHistory()).toEqual([
+          ...priorTurn,
+          { role: 'user', parts: [{ text: 'User prompt' }] },
+          {
+            role: 'model',
+            parts: [{ functionCall: { name: 'testTool', id: '1', args: {} } }],
+          },
+          { role: 'user', parts: firstRoundResponse },
+        ]);
+      });
+    } finally {
+      mockSendMessageStream.mockImplementation(() => (async function* () {})());
+    }
   });
 
   it('should record tool responses in history when the model was switched due to a quota error', async () => {
@@ -1596,7 +1766,7 @@ describe('useGeminiStream', () => {
       ),
     );
 
-    // Call submitQuery to populate the user turn and set historyLengthAfterUserPromptRef
+    // Call submitQuery to populate the user turn
     await act(async () => {
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
       result.current.submitQuery('User prompt');
@@ -2231,7 +2401,7 @@ describe('useGeminiStream', () => {
 
       // Cancel to make isResponding false
       await act(async () => {
-        result.current.cancelOngoingRequest();
+        await result.current.cancelOngoingRequest();
       });
 
       expect(result.current.retryStatus).toBeNull();
@@ -2274,7 +2444,7 @@ describe('useGeminiStream', () => {
       expect(result.current.retryStatus).toEqual(retryPayload);
 
       await act(async () => {
-        result.current.cancelOngoingRequest();
+        await result.current.cancelOngoingRequest();
       });
 
       await waitFor(() => {
@@ -2645,7 +2815,7 @@ describe('useGeminiStream', () => {
           mockAuthType,
           undefined,
           'gemini-2.5-pro',
-          'gemini-2.5-flash',
+          DEFAULT_GEMINI_FLASH_MODEL,
         );
       });
     });
@@ -3882,7 +4052,7 @@ describe('useGeminiStream', () => {
         expect.any(String),
         undefined,
         'gemini-2.5-pro',
-        'gemini-2.5-flash',
+        DEFAULT_GEMINI_FLASH_MODEL,
       );
     });
 
@@ -4478,6 +4648,182 @@ describe('useGeminiStream', () => {
     });
   });
 
+  describe('Grouped Tool Calls', () => {
+    const createToolCall = (
+      callId: string,
+      {
+        status = CoreToolCallStatus.Success,
+        kind = Kind.Agent,
+        groupId,
+      }: { status?: CoreToolCallStatus; kind?: Kind; groupId?: string } = {},
+    ): TrackedToolCall =>
+      ({
+        request: {
+          callId,
+          name: `tool-${callId}`,
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-1',
+          groupId,
+        },
+        status,
+        responseSubmittedToGemini: false,
+        response: {
+          callId,
+          responseParts: [],
+          resultDisplay: `result of ${callId}`,
+          error: undefined,
+          errorType: undefined,
+        },
+        tool: {
+          name: `tool-${callId}`,
+          displayName: `tool-${callId}`,
+          description: `description of ${callId}`,
+          kind,
+          build: vi.fn(),
+        },
+        invocation: {
+          getDescription: () => `Mock description of ${callId}`,
+        },
+      }) as unknown as TrackedToolCall;
+
+    const setToolCalls = (toolCalls: TrackedToolCall[]) => {
+      mockUseToolScheduler.mockReturnValue([
+        toolCalls,
+        mockScheduleToolCalls,
+        mockMarkToolsAsSubmitted,
+        vi.fn(),
+        mockCancelAllToolCalls,
+        0,
+      ]);
+    };
+
+    const renderWithToolCalls = async (toolCalls: TrackedToolCall[]) => {
+      setToolCalls(toolCalls);
+      return renderHookWithProviders(() =>
+        useGeminiStream(
+          mockConfig.getGeminiClient(),
+          [],
+          mockAddItem,
+          mockConfig,
+          mockLoadedSettings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          () => {},
+          () => {},
+          80,
+          24,
+        ),
+      );
+    };
+
+    // The call IDs of every tool group pushed to history. `useStateAndRef` is
+    // mocked in this file, so the effect that pushes finished tools starts from
+    // scratch on every render. The assertions below therefore check which
+    // groups were pushed rather than how many times `addItem` was called.
+    const getPushedGroups = (): string[][] =>
+      mockAddItem.mock.calls
+        .map(([item]) => item)
+        .filter((item) => item.type === 'tool_group')
+        .map((item) =>
+          item.tools.map((tool: { callId: string }) => tool.callId),
+        );
+
+    it('should hold back a group until every call in it has finished', async () => {
+      const { rerender } = await renderWithToolCalls([
+        createToolCall('agent-1', { groupId: 'agent-1' }),
+        createToolCall('agent-2', {
+          status: CoreToolCallStatus.Executing,
+          groupId: 'agent-1',
+        }),
+      ]);
+
+      expect(getPushedGroups()).toEqual([]);
+
+      setToolCalls([
+        createToolCall('agent-1', { groupId: 'agent-1' }),
+        createToolCall('agent-2', { groupId: 'agent-1' }),
+      ]);
+      rerender();
+
+      expect(getPushedGroups()).toContainEqual(['agent-1', 'agent-2']);
+    });
+
+    it('should treat failed and cancelled calls as finished', async () => {
+      await renderWithToolCalls([
+        createToolCall('agent-1', { groupId: 'agent-1' }),
+        createToolCall('agent-2', {
+          status: CoreToolCallStatus.Error,
+          groupId: 'agent-1',
+        }),
+        createToolCall('agent-3', {
+          status: CoreToolCallStatus.Cancelled,
+          groupId: 'agent-1',
+        }),
+      ]);
+
+      expect(getPushedGroups()).toContainEqual([
+        'agent-1',
+        'agent-2',
+        'agent-3',
+      ]);
+    });
+
+    it('should group by group ID rather than by tool kind', async () => {
+      const { rerender } = await renderWithToolCalls([
+        createToolCall('read-1', { kind: Kind.Read, groupId: 'read-1' }),
+        createToolCall('read-2', {
+          kind: Kind.Read,
+          status: CoreToolCallStatus.Executing,
+          groupId: 'read-1',
+        }),
+      ]);
+
+      expect(getPushedGroups()).toEqual([]);
+
+      setToolCalls([
+        createToolCall('read-1', { kind: Kind.Read, groupId: 'read-1' }),
+        createToolCall('read-2', { kind: Kind.Read, groupId: 'read-1' }),
+      ]);
+      rerender();
+
+      expect(getPushedGroups()).toContainEqual(['read-1', 'read-2']);
+    });
+
+    it('should push calls without a group ID individually, whatever their kind', async () => {
+      await renderWithToolCalls([
+        createToolCall('agent-1'),
+        createToolCall('agent-2'),
+      ]);
+
+      const groups = getPushedGroups();
+      expect(groups).toContainEqual(['agent-1']);
+      expect(groups).toContainEqual(['agent-2']);
+      expect(groups).not.toContainEqual(['agent-1', 'agent-2']);
+    });
+
+    it('should push finished calls ahead of a group that is still running', async () => {
+      await renderWithToolCalls([
+        createToolCall('read-1', { kind: Kind.Read }),
+        createToolCall('agent-1', { groupId: 'agent-1' }),
+        createToolCall('agent-2', {
+          status: CoreToolCallStatus.Executing,
+          groupId: 'agent-1',
+        }),
+      ]);
+
+      const groups = getPushedGroups();
+      expect(groups).toContainEqual(['read-1']);
+      expect(groups.flat()).not.toContain('agent-1');
+    });
+  });
+
   describe('Stream Splitting', () => {
     it('should not add empty history item when splitting message results in empty or whitespace-only beforeText', async () => {
       // Mock split point to always be 0, causing beforeText to be empty
@@ -4587,5 +4933,131 @@ describe('useGeminiStream', () => {
       await userPromptCall![1]({ metadata: spanMetadata });
     });
     expect(spanMetadata.input).toBe('telemetry test query');
+  });
+
+  describe('cancelOngoingRequest session log harmonization & timeout bound', () => {
+    it('immediately synthesizes and records filler functionResponse via recordCompletedToolCalls when cancelling active tools', async () => {
+      const executingToolCall: TrackedExecutingToolCall = {
+        request: {
+          callId: 'call-abc',
+          name: 'run_shell_command',
+          args: { command: 'sleep 30' },
+          isClientInitiated: false,
+          prompt_id: 'prompt-1',
+        },
+        status: CoreToolCallStatus.Executing,
+        tool: {
+          name: 'run_shell_command',
+          displayName: 'Shell',
+        } as unknown as AnyDeclarativeTool,
+        invocation: {
+          getDescription: () => 'sleep 30',
+        } as unknown as AnyToolInvocation,
+      };
+
+      const { result, client } = await renderTestHook([executingToolCall]);
+      const mockRecordCompletedToolCalls =
+        client.getChat().recordCompletedToolCalls;
+
+      await act(async () => {
+        await result.current.cancelOngoingRequest();
+      });
+
+      expect(mockCancelAllToolCalls).toHaveBeenCalledTimes(1);
+      expect(mockRecordCompletedToolCalls).toHaveBeenCalledTimes(1);
+      expect(mockRecordCompletedToolCalls).toHaveBeenCalledWith(
+        expect.any(String),
+        [
+          expect.objectContaining({
+            status: CoreToolCallStatus.Cancelled,
+            request: executingToolCall.request,
+            response: expect.objectContaining({
+              callId: 'call-abc',
+              responseParts: [
+                {
+                  functionResponse: {
+                    id: 'call-abc',
+                    name: 'run_shell_command',
+                    response: {
+                      error:
+                        '[Operation Cancelled] Reason: User cancelled operation',
+                    },
+                  },
+                },
+              ],
+            }),
+          }),
+        ],
+      );
+    });
+
+    it('bounds waiting on an unresponsive tool schedule promise at 1000ms', async () => {
+      vi.useFakeTimers();
+      try {
+        mockScheduleToolCalls.mockImplementation(
+          () => new Promise<CompletedToolCall[]>(() => {}),
+        );
+
+        mockSendMessageStream.mockReturnValue(
+          (async function* () {
+            yield {
+              type: ServerGeminiEventType.ToolCallRequest,
+              value: {
+                callId: 'call-hang',
+                name: 'hanging_tool',
+                args: {},
+                isClientInitiated: false,
+                prompt_id: 'prompt-hang',
+              },
+            };
+          })(),
+        );
+
+        const { result, client } = await renderTestHook();
+        const mockRecordCompletedToolCalls =
+          client.getChat().recordCompletedToolCalls;
+
+        act(() => {
+          void result.current.submitQuery('run hanging tool');
+        });
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(10);
+        });
+
+        expect(mockScheduleToolCalls).toHaveBeenCalledTimes(1);
+
+        let cancelResolved = false;
+        let cancelPromise!: Promise<void>;
+        act(() => {
+          cancelPromise = result.current.cancelOngoingRequest().then(() => {
+            cancelResolved = true;
+          });
+        });
+
+        expect(mockRecordCompletedToolCalls).toHaveBeenCalledWith(
+          expect.any(String),
+          [
+            expect.objectContaining({
+              status: CoreToolCallStatus.Cancelled,
+              request: expect.objectContaining({
+                callId: 'call-hang',
+                name: 'hanging_tool',
+              }),
+            }),
+          ],
+        );
+        expect(cancelResolved).toBe(false);
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(1000);
+          await cancelPromise;
+        });
+
+        expect(cancelResolved).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 });

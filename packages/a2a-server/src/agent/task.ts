@@ -35,6 +35,7 @@ import {
   type AnsiToken,
   isSubagentProgress,
   EDIT_TOOL_NAMES,
+  isParallelizable,
   processRestorableToolCalls,
   MessageBusType,
   type ToolCallsUpdateMessage,
@@ -94,6 +95,8 @@ export class Task {
     candidatesTokenCount?: number;
     totalTokenCount?: number;
     cachedContentTokenCount?: number;
+    thoughtsTokenCount?: number;
+    toolUsePromptTokenCount?: number;
   };
   private get isYoloMatch(): boolean {
     return (
@@ -106,6 +109,7 @@ export class Task {
   private pendingOutcomes: Map<string, ToolConfirmationOutcome | undefined> =
     new Map(); // toolCallId --> outcome
   private toolsAlreadyConfirmed: Set<string> = new Set();
+  private queuedToolCalls: Set<string> = new Set();
   private toolUpdateEmitter = new EventEmitter();
   private cancellationError?: Error;
 
@@ -201,6 +205,7 @@ export class Task {
   }
 
   private _resolveToolCall(toolCallId: string): void {
+    this.queuedToolCalls.delete(toolCallId);
     if (this.pendingToolCalls.has(toolCallId)) {
       this.pendingToolCalls.delete(toolCallId);
       this.toolUpdateEmitter.emit('update');
@@ -214,15 +219,23 @@ export class Task {
     if (this.pendingToolCalls.size === 0) {
       return false;
     }
+    let hasAwaitingApproval = false;
     for (const [callId, status] of this.pendingToolCalls.entries()) {
-      if (
-        status !== CoreToolCallStatus.AwaitingApproval ||
-        this.toolsAlreadyConfirmed.has(callId)
+      if (this.toolsAlreadyConfirmed.has(callId)) {
+        return false;
+      }
+      if (status === CoreToolCallStatus.AwaitingApproval) {
+        hasAwaitingApproval = true;
+      } else if (
+        status === CoreToolCallStatus.Executing ||
+        ((status === CoreToolCallStatus.Scheduled ||
+          status === CoreToolCallStatus.Validating) &&
+          !this.queuedToolCalls.has(callId))
       ) {
         return false;
       }
     }
-    return true;
+    return hasAwaitingApproval;
   }
 
   async waitForPendingTools(): Promise<void> {
@@ -256,6 +269,7 @@ export class Task {
     this.pendingToolCalls.clear();
     this.pendingCorrelationIds.clear();
     this.toolsAlreadyConfirmed.clear();
+    this.queuedToolCalls.clear();
 
     this.scheduler.cancelAll();
     this.toolUpdateEmitter.emit('update');
@@ -307,6 +321,7 @@ export class Task {
 
     if (final && this.usageMetadata) {
       metadata.usageMetadata = this.usageMetadata;
+      this.usageMetadata = undefined;
     }
 
     return {
@@ -416,6 +431,7 @@ export class Task {
       context: this.config,
       messageBus,
       getPreferredEditor: () => DEFAULT_GUI_EDITOR,
+      cancelAllQueuedOnCancel: false,
     });
 
     this.messageBusListener = this.handleEventDrivenToolCallsUpdate.bind(this);
@@ -451,6 +467,26 @@ export class Task {
     }
 
     const toolCalls = event.toolCalls;
+
+    const nonTerminalCalls = toolCalls.filter(
+      (tc) =>
+        tc.status !== CoreToolCallStatus.Success &&
+        tc.status !== CoreToolCallStatus.Error &&
+        tc.status !== CoreToolCallStatus.Cancelled,
+    );
+    let activeWaveOpen = true;
+    nonTerminalCalls.forEach((tc, index) => {
+      const callId = tc.request.callId;
+      if (index === 0) {
+        this.queuedToolCalls.delete(callId);
+        activeWaveOpen = isParallelizable(tc.request);
+      } else if (activeWaveOpen && isParallelizable(tc.request)) {
+        this.queuedToolCalls.delete(callId);
+      } else {
+        activeWaveOpen = false;
+        this.queuedToolCalls.add(callId);
+      }
+    });
 
     toolCalls.forEach((tc) => {
       this.handleEventDrivenToolCall(tc);
@@ -551,9 +587,10 @@ export class Task {
     for (const [callId, status] of this.pendingToolCalls.entries()) {
       if (
         status === CoreToolCallStatus.Executing ||
-        status === CoreToolCallStatus.Scheduled ||
-        status === CoreToolCallStatus.Validating ||
-        this.toolsAlreadyConfirmed.has(callId)
+        this.toolsAlreadyConfirmed.has(callId) ||
+        ((status === CoreToolCallStatus.Scheduled ||
+          status === CoreToolCallStatus.Validating) &&
+          !this.queuedToolCalls.has(callId))
       ) {
         isExecuting = true;
       } else if (status === CoreToolCallStatus.AwaitingApproval) {
@@ -887,14 +924,66 @@ export class Task {
         if (
           event.value &&
           typeof event.value === 'object' &&
-          'usageMetadata' in event.value
+          'usageMetadata' in event.value &&
+          event.value.usageMetadata
         ) {
-          this.usageMetadata = event.value
-            .usageMetadata as typeof this.usageMetadata;
+          const incoming = event.value.usageMetadata as NonNullable<
+            typeof this.usageMetadata
+          >;
+          const prev = this.usageMetadata;
+          const sumOptional = (a?: number, b?: number): number | undefined =>
+            a !== undefined || b !== undefined
+              ? (a ?? 0) + (b ?? 0)
+              : undefined;
+
+          const promptTokenCount =
+            incoming.promptTokenCount ?? prev?.promptTokenCount;
+          const candidatesTokenCount = sumOptional(
+            prev?.candidatesTokenCount,
+            incoming.candidatesTokenCount,
+          );
+          const thoughtsTokenCount = sumOptional(
+            prev?.thoughtsTokenCount,
+            incoming.thoughtsTokenCount,
+          );
+          const toolUsePromptTokenCount = sumOptional(
+            prev?.toolUsePromptTokenCount,
+            incoming.toolUsePromptTokenCount,
+          );
+          const cachedContentTokenCount =
+            incoming.cachedContentTokenCount ?? prev?.cachedContentTokenCount;
+
+          const hasComponentCounts =
+            promptTokenCount !== undefined ||
+            candidatesTokenCount !== undefined ||
+            thoughtsTokenCount !== undefined ||
+            toolUsePromptTokenCount !== undefined;
+          const computedTotal = hasComponentCounts
+            ? (promptTokenCount ?? 0) +
+              (candidatesTokenCount ?? 0) +
+              (toolUsePromptTokenCount ?? 0) +
+              (thoughtsTokenCount ?? 0)
+            : undefined;
+          const totalTokenCount =
+            computedTotal !== undefined
+              ? Math.max(computedTotal, incoming.totalTokenCount ?? 0)
+              : (incoming.totalTokenCount ?? prev?.totalTokenCount);
+
+          this.usageMetadata = {
+            ...(promptTokenCount !== undefined && { promptTokenCount }),
+            ...(candidatesTokenCount !== undefined && { candidatesTokenCount }),
+            ...(totalTokenCount !== undefined && { totalTokenCount }),
+            ...(cachedContentTokenCount !== undefined && {
+              cachedContentTokenCount,
+            }),
+            ...(thoughtsTokenCount !== undefined && { thoughtsTokenCount }),
+            ...(toolUsePromptTokenCount !== undefined && {
+              toolUsePromptTokenCount,
+            }),
+          };
         }
         break;
       case GeminiEventType.ModelInfo:
-        this.usageMetadata = undefined;
         this.modelInfo = event.value;
         break;
       case GeminiEventType.Retry:
@@ -997,6 +1086,11 @@ export class Task {
     logger.info(
       `[Task] Handling tool confirmation for callId: ${callId} with outcome: ${outcomeString}`,
     );
+    if (this.taskState === 'input-required') {
+      this.setTaskStateAndPublishUpdate('working', {
+        kind: CoderAgentEvent.StateChangeEvent,
+      });
+    }
     try {
       // Temporarily unset GCP environment variables so they do not leak into
       // tool calls.
@@ -1215,7 +1309,8 @@ export class Task {
       // If not, and no new text, we are just waiting.
       if (
         this.pendingToolCalls.size > 0 &&
-        this.taskState !== 'input-required'
+        this.taskState !== 'input-required' &&
+        this.taskState !== 'working'
       ) {
         const stateChange: StateChange = {
           kind: CoderAgentEvent.StateChangeEvent,

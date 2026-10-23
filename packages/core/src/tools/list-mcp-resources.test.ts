@@ -64,6 +64,8 @@ describe('ListMcpResourcesTool', () => {
     };
 
     expect(mockMcpManager.getAllResources).toHaveBeenCalled();
+    expect(result.llmContent.startsWith('<untrusted_context>')).toBe(true);
+    expect(result.llmContent.endsWith('</untrusted_context>')).toBe(true);
     expect(result.llmContent).toContain('Available MCP Resources:');
     expect(result.llmContent).toContain('protocol://r1');
     expect(result.llmContent).toContain('protocol://r2');

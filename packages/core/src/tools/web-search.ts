@@ -24,6 +24,7 @@ import { WEB_SEARCH_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { LlmRole } from '../telemetry/llmRole.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import { wrapUntrusted } from '../utils/textUtils.js';
 
 interface GroundingChunkWeb {
   uri?: string;
@@ -173,7 +174,7 @@ class WebSearchToolInvocation extends BaseToolInvocation<
       }
 
       return {
-        llmContent: `Web search results for "${this.params.query}":\n\n${modifiedResponseText}`,
+        llmContent: `Web search results for "${this.params.query}":\n\n${wrapUntrusted(modifiedResponseText)}`,
         returnDisplay: `Search results for "${this.params.query}" returned.`,
         sources,
       };

@@ -70,6 +70,7 @@ import {
 } from '../availability/policyHelpers.js';
 import { coreEvents } from '../utils/events.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -115,6 +116,19 @@ export const SYNTHETIC_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
  */
 export const INTERRUPTED_RESPONSE_PLACEHOLDER =
   '[The previous response was interrupted before it completed.]';
+
+/**
+ * Error payload used for synthesized function responses that close a model
+ * function call whose real response never arrived.
+ */
+export const INTERRUPTED_TOOL_RESPONSE_ERROR =
+  'Response was lost or interrupted.';
+
+/**
+ * Text used for a synthesized user turn when the request would otherwise not
+ * end with a user turn that carries content.
+ */
+export const CONTINUE_PROMPT_TEXT = 'Please continue.';
 
 /**
  * Internal interface for parts that carry the magic 'callIndex' property
@@ -511,12 +525,13 @@ export class GeminiChat {
     let userContent = createUserContent(message);
     const isOriginalFunctionResponse = isFunctionResponse(userContent);
 
-    // A turn can end leaving history on an unanswered tool response: a stream
-    // error after the response was committed, or a cancelled tool call. Close
-    // it before recording a genuinely new user message, otherwise the two user
-    // turns are coalesced into one and the model continues the trailing text
-    // instead of answering it.
+    // If history ended on an unanswered model tool call or an unanswered tool response
+    // (e.g. cancelled tool call, interrupted stream, or user follow-up prompt), close it
+    // with dedicated synthetic turns before recording a genuinely new user message, so
+    // tool call pairing and role alternation are maintained and the user's prompt stays
+    // a turn of its own.
     if (!isOriginalFunctionResponse) {
+      this.closeUnansweredToolCallsTurn();
       this.closeUnansweredToolResponseTurn();
     }
 
@@ -559,6 +574,7 @@ export class GeminiChat {
         const lastTurn = history[history.length - 1];
         if (
           !lastTurn ||
+          lastTurn.content.role !== 'user' ||
           partListUnionToString(lastTurn.content.parts || []) !==
             userMessageContent
         ) {
@@ -630,6 +646,7 @@ export class GeminiChat {
         const lastTurn = history[history.length - 1];
         if (
           !lastTurn ||
+          lastTurn.content.role !== 'user' ||
           partListUnionToString(lastTurn.content.parts || []) !==
             partListUnionToString(userContent.parts || [])
         ) {
@@ -637,6 +654,10 @@ export class GeminiChat {
         }
       }
     }
+
+    // Durable history repair runs once per send, outside the retry loop, so
+    // retried attempts never append duplicate synthetic turns.
+    this.replaceEmptyTrailingUserTurn();
 
     const requestHistory = this.getHistoryTurns(true);
 
@@ -825,25 +846,91 @@ export class GeminiChat {
   }
 
   /**
+   * Appends a dedicated synthetic user turn with matching functionResponse
+   * parts when history ends with an unclosed model functionCall. The
+   * subsequent user prompt is then recorded as a clean turn of its own (after
+   * `closeUnansweredToolResponseTurn` adds the closing model turn).
+   */
+  private closeUnansweredToolCallsTurn(): void {
+    const turns = this.agentHistory.get();
+    const last = turns[turns.length - 1];
+    if (last?.content.role !== 'model') {
+      return;
+    }
+    const missingResponses = buildInterruptedToolResponseParts(
+      last.content.parts ?? [],
+    );
+    if (missingResponses.length === 0) {
+      return;
+    }
+    const id = this.chatRecordingService.recordSyntheticMessage(
+      'user',
+      missingResponses,
+    );
+    this.agentHistory.push({
+      id,
+      content: { role: 'user', parts: missingResponses },
+    });
+  }
+
+  /**
+   * Replaces the parts of a trailing user turn that carries no content (e.g.
+   * only empty text parts) with a continuation prompt, keeping the in-memory
+   * history and the session log in sync. Runs once per send so that the
+   * persisted history never keeps an empty user turn between model turns.
+   */
+  private replaceEmptyTrailingUserTurn(): void {
+    const turns = this.agentHistory.get();
+    const last = turns[turns.length - 1];
+    if (last?.content.role !== 'user' || hasNonEmptyParts(last.content)) {
+      return;
+    }
+    this.agentHistory.set([
+      ...turns.slice(0, -1),
+      {
+        id: last.id,
+        content: { ...last.content, parts: [{ text: CONTINUE_PROMPT_TEXT }] },
+      },
+    ]);
+    this.chatRecordingService.updateMessagesFromHistory(
+      this.agentHistory.get(),
+    );
+  }
+
+  /**
    * Appends a closing model turn when history ends with an unanswered tool
    * response, so the next user message stays a turn of its own.
    */
   private closeUnansweredToolResponseTurn(): void {
     const turns = this.agentHistory.get();
-    const last = turns[turns.length - 1];
+    let targetTurn = turns[turns.length - 1];
+    let hadEmptyTrailingModelTurn = false;
     if (
-      last?.content.role !== 'user' ||
-      !last.content.parts?.some((part) => !!part.functionResponse)
+      targetTurn?.content.role === 'model' &&
+      (!targetTurn.content.parts || targetTurn.content.parts.length === 0)
+    ) {
+      hadEmptyTrailingModelTurn = true;
+      targetTurn = turns[turns.length - 2];
+    }
+    if (
+      targetTurn?.content.role !== 'user' ||
+      !targetTurn.content.parts?.some((part) => !!part.functionResponse)
     ) {
       return;
     }
-    this.agentHistory.push({
-      id: randomUUID(),
-      content: {
-        role: 'model',
-        parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
-      },
-    });
+    if (hadEmptyTrailingModelTurn) {
+      const lastTurn = turns[turns.length - 1];
+      lastTurn.content.parts = [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }];
+      this.chatRecordingService.updateMessagesFromHistory(turns);
+    } else {
+      this.agentHistory.push({
+        id: randomUUID(),
+        content: {
+          role: 'model',
+          parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+        },
+      });
+    }
   }
 
   private extractBinaryInjections(
@@ -1072,12 +1159,23 @@ export class GeminiChat {
         this.tools = await this.onModelChanged(modelToUse);
       }
 
+      // Normalize the outbound payload so it always ends with a user turn that
+      // carries content. This is a pure transformation: retries, per-call
+      // history overrides and hook-modified contents never leak into the
+      // persistent history or the session log.
+      const normalizedContents = ensureTerminalUserTurn(contentsToUse);
+      if (normalizedContents !== contentsToUse) {
+        debugLogger.warn(
+          'Final contents do not end with a valid user turn. Normalizing contents to satisfy Gemini API invariant.',
+        );
+      }
+
       // Track final request parameters for AfterModel hooks
       lastModelToUse = modelToUse;
       lastConfig = config;
-      lastContentsToUse = contentsToUse;
+      lastContentsToUse = normalizedContents;
 
-      const finalContents = stripToolCallIdPrefixes(contentsToUse);
+      const finalContents = stripToolCallIdPrefixes(normalizedContents);
 
       return this.context.config.getContentGenerator().generateContentStream(
         {
@@ -1217,6 +1315,33 @@ export class GeminiChat {
     ensureStableToolIds(this.agentHistory.get() as HistoryTurn[]);
   }
 
+  /**
+   * Removes the trailing model turn when it holds function calls that were
+   * never answered (e.g. every call in the batch was declined). Earlier
+   * completed tool rounds and the originating user prompt are kept, and the
+   * durable IDs of the remaining turns are preserved.
+   *
+   * @returns true when a turn was removed.
+   */
+  discardTrailingUnansweredToolCallTurn(): boolean {
+    const turns = this.agentHistory.get();
+    const last = turns[turns.length - 1];
+    if (
+      last?.content.role !== 'model' ||
+      !last.content.parts?.some((part) => !!part.functionCall)
+    ) {
+      return false;
+    }
+    this.agentHistory.rollback(turns.length - 1);
+    this.lastPromptTokenCount = estimateTokenCountSync(
+      this.agentHistory.flatMap((c) => c.content.parts || []),
+    );
+    this.chatRecordingService.updateMessagesFromHistory(
+      this.agentHistory.get(),
+    );
+    return true;
+  }
+
   setHistory(history: ReadonlyArray<Content | HistoryTurn>): void {
     const wrappedHistory: HistoryTurn[] = history.map((item) => {
       if ('id' in item && 'content' in item) {
@@ -1257,47 +1382,37 @@ export class GeminiChat {
   }
 
   // To ensure our requests validate, the first function call in every model
-  // turn within the active loop must have a `thoughtSignature` property.
-  // If we do not do this, we will get back 400 errors from the API.
+  // turn across the conversation history must have a thoughtSignature property.
+  // If we do not do this, the API rejects the request with a 400 Bad Request error.
+  //
+  // Rationale for using undocumented/internal SDK properties:
+  // The thoughtSignature property is an internal/undocumented field in the Gemini SDK/API.
+  // It is required to bypass thought signature validation for historical turns to prevent
+  // HTTP 400 Bad Request errors. Since there is no public API to manage these signatures
+  // on historical turns, we must use this internal property directly.
   ensureActiveLoopHasThoughtSignatures(
     requestContents: readonly Content[],
   ): readonly Content[] {
-    // First, find the start of the active loop by finding the last user turn
-    // with a text message, i.e. that is not a function response. Testing for
-    // text alone is not enough: `coalesceConsecutiveRoles` can merge a function
-    // response turn with the prompt that follows it, and starting the loop at
-    // such a turn starts it later than the API starts the turn, leaving earlier
-    // function calls unsigned but still validated.
-    let activeLoopStartIndex = -1;
-    for (let i = requestContents.length - 1; i >= 0; i--) {
+    interface ThoughtPart extends Part {
+      thoughtSignature?: string;
+    }
+
+    // Iterate through every message, ensuring that the first function call in
+    // each model message's list of parts has a valid thoughtSignature property.
+    // If it does not, we replace the function call with a copy that uses the
+    // synthetic thought signature, allocating new arrays lazily only when needed.
+    let newContents: Content[] | undefined = undefined;
+    for (let i = 0; i < requestContents.length; i++) {
       const content = requestContents[i];
-      if (
-        content.role === 'user' &&
-        content.parts?.some((part) => part.text) &&
-        !content.parts?.some((part) => part.functionResponse)
-      ) {
-        activeLoopStartIndex = i;
-        break;
-      }
-    }
-
-    if (activeLoopStartIndex === -1) {
-      return requestContents;
-    }
-
-    // Iterate through every message in the active loop, ensuring that the first
-    // function call in each message's list of parts has a valid
-    // thoughtSignature property. If it does not we replace the function call
-    // with a copy that uses the synthetic thought signature.
-    const newContents = requestContents.slice(); // Shallow copy the array
-    for (let i = activeLoopStartIndex; i < newContents.length; i++) {
-      const content = newContents[i];
       if (content.role === 'model' && content.parts) {
-        const newParts = content.parts.slice();
-        for (let j = 0; j < newParts.length; j++) {
-          const part = newParts[j];
-          if (part.functionCall) {
+        for (let j = 0; j < content.parts.length; j++) {
+          const part = content.parts[j] as ThoughtPart | undefined;
+          if (part?.functionCall) {
             if (!part.thoughtSignature) {
+              if (!newContents) {
+                newContents = requestContents.slice();
+              }
+              const newParts = content.parts.slice();
               newParts[j] = {
                 ...part,
                 thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE,
@@ -1312,7 +1427,7 @@ export class GeminiChat {
         }
       }
     }
-    return newContents;
+    return newContents ?? requestContents;
   }
 
   setTools(tools: Tool[]): void {
@@ -1753,61 +1868,148 @@ export function isInvalidArgumentError(errorMessage: string): boolean {
   return errorMessage.includes('Request contains an invalid argument');
 }
 
+/**
+ * Returns true for a part that only holds an empty `text` value (optionally
+ * alongside bookkeeping keys) and no other payload.
+ */
+function isEmptyTextPart(part: Part): boolean {
+  if (part.text !== '') {
+    return false;
+  }
+  return !Object.keys(part).some(
+    (key) => key !== 'text' && key !== 'thought' && key !== 'callIndex',
+  );
+}
+
+/**
+ * Returns true when the content has at least one part that survives
+ * `stripToolCallIdPrefixes` (i.e. it is not an empty text part).
+ */
+function hasNonEmptyParts(content: Content): boolean {
+  return (content.parts ?? []).some((part) => !isEmptyTextPart(part));
+}
+
+/**
+ * Builds functionResponse parts that close every functionCall in `parts`
+ * whose real response was lost or interrupted.
+ */
+export function buildInterruptedToolResponseParts(
+  parts: readonly Part[],
+): Part[] {
+  return parts
+    .filter((part) => !!part?.functionCall)
+    .map((part) => ({
+      functionResponse: {
+        name: part.functionCall!.name?.trim() || 'generic_tool',
+        id: part.functionCall!.id,
+        response: { error: INTERRUPTED_TOOL_RESPONSE_ERROR },
+      },
+    }));
+}
+
+/**
+ * Ensures the request contents end with a user turn that carries content, as
+ * required by the Gemini API. Pure: returns the same array when no change is
+ * needed, otherwise a new array; the input is never mutated.
+ *
+ * - A trailing user turn without content gets a continuation prompt.
+ * - A trailing model turn with function calls gets matching responses.
+ * - Any other trailing turn (or no turn at all) gets a continuation prompt.
+ */
+export function ensureTerminalUserTurn(contents: Content[]): Content[] {
+  const last = contents.at(-1);
+  if (last?.role === 'user' && hasNonEmptyParts(last)) {
+    return contents;
+  }
+  if (last?.role === 'user') {
+    return [
+      ...contents.slice(0, -1),
+      { ...last, parts: [{ text: CONTINUE_PROMPT_TEXT }] },
+    ];
+  }
+  const missingResponses = buildInterruptedToolResponseParts(last?.parts ?? []);
+  const parts =
+    missingResponses.length > 0
+      ? missingResponses
+      : [{ text: CONTINUE_PROMPT_TEXT }];
+  return [...contents, { role: 'user', parts }];
+}
+
 export function stripToolCallIdPrefixes(contents: Content[]): Content[] {
-  return contents.map((content) => {
-    const parts = (content.parts || [])
-      .map((part) => {
-        const newPart = { ...part };
-        if (newPart.functionCall) {
-          const fc = newPart.functionCall;
-          const name = fc.name?.trim() || 'generic_tool';
-          if (fc.id && fc.id.startsWith(`${name}__`)) {
-            newPart.functionCall = {
-              name: fc.name,
-              args: fc.args,
-              id: fc.id.substring(name.length + 2),
-            };
+  const stripped = contents
+    .map((content) => {
+      const parts = (content.parts || [])
+        .map((part) => {
+          const newPart = { ...part };
+          if (newPart.functionCall) {
+            const fc = newPart.functionCall;
+            const name = fc.name?.trim() || 'generic_tool';
+            if (fc.id && fc.id.startsWith(`${name}__`)) {
+              newPart.functionCall = {
+                ...fc,
+                id: fc.id.substring(name.length + 2),
+              };
+            }
           }
-        }
-        if (newPart.functionResponse) {
-          const fr = newPart.functionResponse;
-          const name = fr.name?.trim() || 'generic_tool';
-          if (fr.id && fr.id.startsWith(`${name}__`)) {
-            newPart.functionResponse = {
-              name: fr.name,
-              response: fr.response,
-              id: fr.id.substring(name.length + 2),
-            };
+          if (newPart.functionResponse) {
+            const fr = newPart.functionResponse;
+            const name = fr.name?.trim() || 'generic_tool';
+            if (fr.id && fr.id.startsWith(`${name}__`)) {
+              newPart.functionResponse = {
+                // History parts are plain JSON objects, not class instances.
+                // eslint-disable-next-line @typescript-eslint/no-misused-spread
+                ...fr,
+                id: fr.id.substring(name.length + 2),
+              };
+            }
           }
-        }
 
-        // If there's an empty text key alongside other active properties, remove the empty text key
-        // so it doesn't trigger "contains empty parts" validation errors on the Gemini API.
-        const hasOtherKeys = Object.keys(newPart).some(
-          (key) => key !== 'text' && key !== 'thought' && key !== 'callIndex',
-        );
-        if (newPart.text !== undefined && newPart.text === '' && hasOtherKeys) {
-          delete newPart.text;
-        }
+          // If there's an empty text key alongside other active properties, remove the empty text key
+          // so it doesn't trigger "contains empty parts" validation errors on the Gemini API.
+          const hasOtherKeys = Object.keys(newPart).some(
+            (key) => key !== 'text' && key !== 'thought' && key !== 'callIndex',
+          );
+          if (
+            newPart.text !== undefined &&
+            newPart.text === '' &&
+            hasOtherKeys
+          ) {
+            delete newPart.text;
+          }
 
-        return newPart;
-      })
-      .filter((part) => {
+          return newPart;
+        })
         // Filter out truly empty parts that have only text: '' and no payload
-        const hasOtherKeys = Object.keys(part).some(
-          (key) => key !== 'text' && key !== 'thought' && key !== 'callIndex',
-        );
-        if (part.text !== undefined && part.text === '' && !hasOtherKeys) {
-          return false;
-        }
-        return true;
-      });
+        .filter((part) => !isEmptyTextPart(part));
 
-    return {
-      ...content,
-      parts,
-    };
-  });
+      return {
+        ...content,
+        parts,
+      };
+    })
+    .filter((content) => content.parts.length > 0);
+
+  return coalesceConsecutiveContents(stripped);
+}
+
+export function coalesceConsecutiveContents(contents: Content[]): Content[] {
+  const result: Content[] = [];
+  for (const item of contents) {
+    const lastIdx = result.length - 1;
+    const last = result[lastIdx];
+    if (last && last.role && last.role === item.role) {
+      const hasParts = last.parts || item.parts;
+      result[lastIdx] = {
+        ...last,
+        parts: hasParts
+          ? [...(last.parts || []), ...(item.parts || [])]
+          : undefined,
+      };
+    } else {
+      result.push({ ...item });
+    }
+  }
+  return result;
 }
 
 export function coalesceConsecutiveRoles(

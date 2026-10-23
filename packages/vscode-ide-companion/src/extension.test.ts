@@ -12,6 +12,8 @@ import {
   detectIdeFromEnv,
 } from '@google/gemini-cli-core/src/ide/detect-ide.js';
 
+const { vscodeMock } = await vi.hoisted(() => import('./utils/vscode-mock.js'));
+
 vi.mock('@google/gemini-cli-core/src/ide/detect-ide.js', async () => {
   const actual = await vi.importActual(
     '@google/gemini-cli-core/src/ide/detect-ide.js',
@@ -23,52 +25,12 @@ vi.mock('@google/gemini-cli-core/src/ide/detect-ide.js', async () => {
 });
 
 vi.mock('vscode', () => ({
+  ...vscodeMock,
   window: {
+    ...vscodeMock.window,
     createOutputChannel: vi.fn(() => ({
       appendLine: vi.fn(),
     })),
-    showInformationMessage: vi.fn(),
-    createTerminal: vi.fn(() => ({
-      show: vi.fn(),
-      sendText: vi.fn(),
-    })),
-    onDidChangeActiveTextEditor: vi.fn(),
-    activeTextEditor: undefined,
-    tabGroups: {
-      all: [],
-      close: vi.fn(),
-    },
-    showTextDocument: vi.fn(),
-    showWorkspaceFolderPick: vi.fn(),
-  },
-  workspace: {
-    workspaceFolders: [],
-    onDidCloseTextDocument: vi.fn(),
-    registerTextDocumentContentProvider: vi.fn(),
-    onDidChangeWorkspaceFolders: vi.fn(),
-    onDidGrantWorkspaceTrust: vi.fn(),
-    getConfiguration: vi.fn(() => ({
-      get: vi.fn(),
-    })),
-  },
-  commands: {
-    registerCommand: vi.fn(),
-    executeCommand: vi.fn(),
-  },
-  Uri: {
-    joinPath: vi.fn(),
-  },
-  ExtensionMode: {
-    Development: 1,
-    Production: 2,
-  },
-  EventEmitter: vi.fn(() => ({
-    event: vi.fn(),
-    fire: vi.fn(),
-    dispose: vi.fn(),
-  })),
-  extensions: {
-    getExtension: vi.fn(),
   },
 }));
 
@@ -307,6 +269,27 @@ describe('activate', () => {
       await activate(context);
 
       expect(showInformationMessageMock).not.toHaveBeenCalled();
+    });
+
+    it('should register gemini.diff.open command and handle empty or partial arguments safely', async () => {
+      const registerCommandMock = vi.mocked(vscode.commands.registerCommand);
+
+      await activate(context);
+
+      const openCommandCall = registerCommandMock.mock.calls.find(
+        (call) => call[0] === 'gemini.diff.open',
+      );
+      expect(openCommandCall).toBeDefined();
+
+      const handler = openCommandCall![1] as (args?: {
+        filePath?: string;
+        newContent?: string;
+      }) => Promise<void>;
+      expect(handler).toBeInstanceOf(Function);
+
+      // Call handler with empty or partial args to ensure it doesn't throw or crash
+      await expect(handler()).resolves.not.toThrow();
+      await expect(handler({ filePath: '/test.ts' })).resolves.not.toThrow();
     });
   });
 });

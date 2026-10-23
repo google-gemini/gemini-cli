@@ -133,21 +133,22 @@ describe('WriteFileTool', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(mockConfigInternal.isPlanMode).mockReturnValue(false);
     // Create a unique temporary directory for files created outside the root
     const rawTempDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'write-file-test-external-'),
     );
-    tempDir = fs.realpathSync(rawTempDir);
+    tempDir = resolveToRealPath(rawTempDir);
 
     const rawRootDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'gemini-cli-test-root-'),
     );
-    rootDir = fs.realpathSync(rawRootDir);
+    rootDir = resolveToRealPath(rawRootDir);
 
     const rawPlansDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'gemini-cli-test-plans-'),
     );
-    plansDir = fs.realpathSync(rawPlansDir);
+    plansDir = resolveToRealPath(rawPlansDir);
 
     const workspaceContext = new WorkspaceContext(rootDir, [plansDir]);
     const mockStorage = {
@@ -835,6 +836,40 @@ describe('WriteFileTool', () => {
       );
     });
 
+    // Root bypasses mode bits, so it never reaches the PERMISSION_DENIED branch.
+    it.skipIf(process.getuid?.() === 0)(
+      'should return PERMISSION_DENIED without modifying a read-only file',
+      async () => {
+        const filePath = path.join(rootDir, 'execute_read_only_file.txt');
+        const initialContent = 'Guarded content.';
+        fs.writeFileSync(filePath, initialContent, 'utf8');
+        fs.chmodSync(filePath, 0o444);
+        mockEnsureCorrectFileContent.mockResolvedValue('Attempted overwrite.');
+
+        try {
+          const params = {
+            file_path: filePath,
+            content: 'Attempted overwrite.',
+          };
+          const invocation = tool.build(params);
+
+          await confirmExecution(invocation);
+
+          const result = await invocation.execute({ abortSignal });
+
+          expect(result.error?.type).toBe(ToolErrorType.PERMISSION_DENIED);
+          expect(result.llmContent).toMatch(
+            /Permission denied writing to file/,
+          );
+          expect(fs.readFileSync(filePath, 'utf8')).toBe(initialContent);
+        } finally {
+          // Leave the file writable so afterEach can remove rootDir even if
+          // an assertion above failed.
+          fs.chmodSync(filePath, 0o600);
+        }
+      },
+    );
+
     it('should create directory if it does not exist', async () => {
       const dirPath = path.join(rootDir, 'new_dir_for_write');
       const filePath = path.join(dirPath, 'file_in_new_dir.txt');
@@ -1184,6 +1219,54 @@ describe('WriteFileTool', () => {
       const expectedWritePath = path.join(plansDir, 'conductor/tracks/test.md');
       expect(fs.existsSync(expectedWritePath)).toBe(true);
       expect(fs.readFileSync(expectedWritePath, 'utf8')).toBe('nested content');
+    });
+  });
+
+  describe('concurrent writes to the same file', () => {
+    it('does not report two creations of the same new file', async () => {
+      const abortSignal = new AbortController().signal;
+      const filePath = path.join(rootDir, 'concurrent_new_file.txt');
+      mockEnsureCorrectFileContent.mockImplementation(
+        async (content: string) => content,
+      );
+
+      const first = tool.build({ file_path: filePath, content: 'first' });
+      const second = tool.build({ file_path: filePath, content: 'second' });
+
+      const results = await Promise.all([
+        first.execute({ abortSignal }),
+        second.execute({ abortSignal }),
+      ]);
+
+      // Whichever call lands second must observe the file the other created,
+      // otherwise both report a creation and the second one's diff claims the
+      // file was empty beforehand.
+      const messages = results.map((r) =>
+        typeof r.llmContent === 'string' ? r.llmContent : '',
+      );
+      expect(
+        messages.filter((m) =>
+          m.startsWith('Successfully created and wrote to new file'),
+        ),
+      ).toHaveLength(1);
+      expect(
+        messages.filter((m) => m.startsWith('Successfully overwrote file')),
+      ).toHaveLength(1);
+    });
+
+    it('aborts immediately if signal is aborted while waiting for path lock', async () => {
+      const filePath = path.join(rootDir, 'abort_test.txt');
+      const first = tool.build({ file_path: filePath, content: 'first' });
+      const second = tool.build({ file_path: filePath, content: 'second' });
+
+      const controller = new AbortController();
+
+      const p1 = first.execute({ abortSignal: new AbortController().signal });
+      controller.abort();
+      const p2 = second.execute({ abortSignal: controller.signal });
+
+      await expect(p2).rejects.toThrow('Write aborted');
+      await p1;
     });
   });
 });

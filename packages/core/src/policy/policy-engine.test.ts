@@ -1479,7 +1479,10 @@ describe('PolicyEngine', () => {
         },
       ];
 
-      engine = new PolicyEngine({ rules });
+      engine = new PolicyEngine({
+        rules,
+        sandboxManager: new NoopSandboxManager({ workspace: '/safe/path' }),
+      });
 
       // Compound command. The decomposition will call check() for "echo hello"
       // which should match our specific high-priority rule IF dir_path is preserved.
@@ -1492,6 +1495,73 @@ describe('PolicyEngine', () => {
       );
 
       expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should force ASK_USER when dir_path escapes workspace boundary even if rule allows it', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ALLOW,
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        sandboxManager: new NoopSandboxManager({ workspace: '/safe/path' }),
+      });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'pwd', dir_path: '/outside/path' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should preserve ALLOW in YOLO mode even when dir_path escapes workspace boundary', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ALLOW,
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.YOLO,
+        sandboxManager: new NoopSandboxManager({ workspace: '/safe/path' }),
+      });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'pwd', dir_path: '/outside/path' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should force ASK_USER in default decision path when dir_path escapes workspace boundary', async () => {
+      engine = new PolicyEngine({
+        rules: [],
+        defaultDecision: PolicyDecision.ALLOW,
+        sandboxManager: new NoopSandboxManager({ workspace: '/safe/path' }),
+      });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'pwd', dir_path: '/outside/path' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
     });
 
     it('should upgrade ASK_USER to ALLOW if all sub-commands are allowed', async () => {
@@ -1529,6 +1599,238 @@ describe('PolicyEngine', () => {
       );
 
       expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should upgrade catch-all ASK_USER to ALLOW for compound commands/loops when all decomposed sub-commands match explicit ALLOW rules', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"git status"/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"ls"/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+        {
+          // Catch-all ASK_USER for shell
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ASK_USER,
+          priority: 10,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'git status && ls' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should upgrade catch-all ASK_USER to ALLOW for for-loops when all inner commands match ALLOW rules', async () => {
+      vi.mocked(parseCommandDetails).mockReturnValueOnce({
+        details: [
+          { name: 'echo', text: 'echo "$repo"', startIndex: 10 },
+          { name: 'git', text: 'git -C "$repo" log', startIndex: 30 },
+        ],
+        hasError: false,
+      });
+
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"echo/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"git/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+        {
+          // Catch-all ASK_USER for shell
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ASK_USER,
+          priority: 10,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: {
+            command:
+              'for repo in a b; do echo "$repo"; git -C "$repo" log; done',
+          },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should NOT upgrade compound command when a sub-command lacks an explicit argsPattern ALLOW rule', async () => {
+      vi.mocked(parseCommandDetails).mockReturnValueOnce({
+        details: [
+          { name: 'ls', text: 'ls', startIndex: 0 },
+          { name: 'pwd', text: 'pwd', startIndex: 6 },
+        ],
+        hasError: false,
+      });
+
+      const mockSandboxManager = {
+        enabled: true,
+        prepareCommand: vi.fn(),
+        isDangerousCommand: vi.fn().mockReturnValue(false),
+        isKnownSafeCommand: vi
+          .fn()
+          .mockImplementation((args) => args[0] === 'ls' || args[0] === 'pwd'),
+        parseDenials: vi.fn().mockReturnValue(undefined),
+        getWorkspace: vi.fn().mockReturnValue('/safe/path'),
+      } as unknown as SandboxManager;
+
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"ls"/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+        {
+          // Catch-all ASK_USER for shell
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ASK_USER,
+          priority: 10,
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        sandboxManager: mockSandboxManager,
+      });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'ls && pwd' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should NOT upgrade compound command to ALLOW when dir_path escapes workspace', async () => {
+      const mockSandboxManager = {
+        enabled: true,
+        prepareCommand: vi.fn(),
+        isDangerousCommand: vi.fn().mockReturnValue(false),
+        isKnownSafeCommand: vi.fn().mockReturnValue(true),
+        parseDenials: vi.fn().mockReturnValue(undefined),
+        getWorkspace: vi.fn().mockReturnValue('/safe/path'),
+      } as unknown as SandboxManager;
+
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ALLOW,
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        sandboxManager: mockSandboxManager,
+      });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'pwd && ls', dir_path: '/outside/path' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should NOT upgrade compound command to ALLOW when Git is invoked in untrusted workspace', async () => {
+      const isTrustedMock = vi.fn().mockReturnValue(false);
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ALLOW,
+        },
+      ];
+
+      const engine = new PolicyEngine({
+        rules,
+        isTrustedFolder: isTrustedMock,
+      });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo "hello" && git status' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should NOT upgrade compound command to ALLOW when a sub-command is dangerous', async () => {
+      const mockSandboxManager = {
+        enabled: true,
+        prepareCommand: vi.fn(),
+        isDangerousCommand: vi
+          .fn()
+          .mockImplementation((args) => args[0] === 'rm'),
+        isKnownSafeCommand: vi.fn().mockReturnValue(false),
+        parseDenials: vi.fn().mockReturnValue(undefined),
+        getWorkspace: vi.fn().mockReturnValue('/safe/path'),
+      } as unknown as SandboxManager;
+
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"echo/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ASK_USER,
+          priority: 10,
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        sandboxManager: mockSandboxManager,
+      });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo hello && rm -rf /' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
     });
 
     it('should NOT upgrade Git commands to ALLOW in untrusted workspace', async () => {
@@ -1895,13 +2197,14 @@ describe('PolicyEngine', () => {
       expect(result.decision).toBe(PolicyDecision.ASK_USER);
     });
 
-    it('should allow redirected shell commands in AUTO_EDIT mode if individual commands are allowed', async () => {
+    it('should allow redirected shell commands in AUTO_EDIT mode if allowRedirection is true', async () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'run_shell_command',
           argsPattern: /"command":"echo\b/,
           decision: PolicyDecision.ALLOW,
           priority: 20,
+          allowRedirection: true,
         },
       ];
 
@@ -1920,6 +2223,88 @@ describe('PolicyEngine', () => {
       );
 
       expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should downgrade restricted argsPattern shell command with redirection in AUTO_EDIT mode', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"echo\b/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        sandboxManager: new LocalSandboxManager(),
+      });
+      engine.setApprovalMode(ApprovalMode.AUTO_EDIT);
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo hello > file.txt' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should downgrade restricted argsPattern shell command with redirection in YOLO mode', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"echo\b/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.YOLO,
+        sandboxManager: new NoopSandboxManager(),
+      });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo hello > file.txt' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should return DENY for restricted argsPattern shell command with redirection in nonInteractive YOLO mode', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"echo\b/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.YOLO,
+        nonInteractive: true,
+        sandboxManager: new NoopSandboxManager(),
+      });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo hello > file.txt' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.DENY);
     });
 
     it('should allow compound commands with safe operators (&&, ||) if individual commands are allowed', async () => {
@@ -4060,6 +4445,126 @@ describe('PolicyEngine', () => {
       expect((await engine.check(call, undefined)).decision).toBe(
         PolicyDecision.ALLOW,
       );
+    });
+  });
+
+  describe('Build File Protection', () => {
+    it('should allow regular files in AUTO_EDIT mode but require ASK_USER for build files', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'replace',
+          decision: PolicyDecision.ALLOW,
+          modes: [ApprovalMode.AUTO_EDIT],
+        },
+        {
+          toolName: 'write_file',
+          decision: PolicyDecision.ALLOW,
+          modes: [ApprovalMode.AUTO_EDIT],
+        },
+      ];
+      const engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.AUTO_EDIT,
+      });
+
+      // Regular source file should be ALLOWed
+      const regularCheck = await engine.check(
+        {
+          name: 'replace',
+          args: { file_path: 'src/index.ts', instruction: 'edit' },
+        },
+        undefined,
+      );
+      expect(regularCheck.decision).toBe(PolicyDecision.ALLOW);
+
+      // Bazel BUILD file should require ASK_USER
+      const buildCheck = await engine.check(
+        {
+          name: 'replace',
+          args: { file_path: 'pkg/BUILD', instruction: 'edit' },
+        },
+        undefined,
+      );
+      expect(buildCheck.decision).toBe(PolicyDecision.ASK_USER);
+      expect(buildCheck.rule?.source).toBe('Build File Protection');
+
+      // WORKSPACE file should require ASK_USER
+      const workspaceCheck = await engine.check(
+        {
+          name: 'replace',
+          args: { file_path: 'WORKSPACE', instruction: 'edit' },
+        },
+        undefined,
+      );
+      expect(workspaceCheck.decision).toBe(PolicyDecision.ASK_USER);
+
+      // package.json should require ASK_USER
+      const packageJsonCheck = await engine.check(
+        {
+          name: 'write_file',
+          args: { file_path: 'package.json', content: '{}' },
+        },
+        undefined,
+      );
+      expect(packageJsonCheck.decision).toBe(PolicyDecision.ASK_USER);
+
+      // Makefile should require ASK_USER
+      const makefileCheck = await engine.check(
+        {
+          name: 'write_file',
+          args: { file_path: 'Makefile', content: 'all:\n\techo hi' },
+        },
+        undefined,
+      );
+      expect(makefileCheck.decision).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should require ASK_USER for build files even in YOLO mode', async () => {
+      const engine = new PolicyEngine({
+        approvalMode: ApprovalMode.YOLO,
+      });
+
+      // Regular file should be ALLOWed in YOLO mode
+      const regularCheck = await engine.check(
+        {
+          name: 'replace',
+          args: { file_path: 'src/main.py', instruction: 'edit' },
+        },
+        undefined,
+      );
+      expect(regularCheck.decision).toBe(PolicyDecision.ALLOW);
+
+      // BUILD.bazel must still require ASK_USER
+      const buildCheck = await engine.check(
+        {
+          name: 'replace',
+          args: { file_path: 'BUILD.bazel', instruction: 'edit' },
+        },
+        undefined,
+      );
+      expect(buildCheck.decision).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should return DENY for build files in nonInteractive mode when otherwise ALLOWed', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'replace',
+          decision: PolicyDecision.ALLOW,
+        },
+      ];
+      const engine = new PolicyEngine({
+        rules,
+        nonInteractive: true,
+      });
+
+      const buildCheck = await engine.check(
+        {
+          name: 'replace',
+          args: { file_path: 'BUILD', instruction: 'edit' },
+        },
+        undefined,
+      );
+      expect(buildCheck.decision).toBe(PolicyDecision.DENY);
     });
   });
 });

@@ -119,6 +119,101 @@ describe('macOS Seatbelt container runtime isolation', () => {
   });
 });
 
+describe('macOS Seatbelt Gemini configuration isolation', () => {
+  describe.each(ALL_PROFILES)('%s', (profile) => {
+    const rules = readRules(profile);
+
+    it('does not allow writes to HOME_DIR/.gemini', () => {
+      const allowWriteMatch = rules.match(/\(allow file-write\*[\s\S]*?\n\)/);
+      expect(allowWriteMatch).not.toBeNull();
+      expect(allowWriteMatch![0]).not.toContain(
+        '(subpath (string-append (param "HOME_DIR") "/.gemini"))',
+      );
+    });
+
+    it('denies writing to Gemini configuration directory and sensitive files', () => {
+      expect(rules).toContain('(deny file-write*');
+      expect(rules).toContain(
+        '(subpath (string-append (param "HOME_DIR") "/.gemini"))',
+      );
+      expect(rules).toContain('(regex #"/trustedFolders\\.json$")');
+      expect(rules).toContain('(regex #"/policy_integrity\\.json$")');
+    });
+
+    it('denies reading sensitive credential and environment files', () => {
+      expect(rules).toContain(
+        '(literal (string-append (param "HOME_DIR") "/.gemini/oauth_creds.json"))',
+      );
+      expect(rules).toContain(
+        '(literal (string-append (param "HOME_DIR") "/.gemini/gemini-credentials.json"))',
+      );
+      expect(rules).toContain(
+        '(literal (string-append (param "HOME_DIR") "/.gemini/mcp-oauth-tokens.json"))',
+      );
+      expect(rules).toContain(
+        '(literal (string-append (param "HOME_DIR") "/.gemini/a2a-oauth-tokens.json"))',
+      );
+      expect(rules).toContain(
+        '(literal (string-append (param "HOME_DIR") "/.gemini/google_accounts.json"))',
+      );
+      expect(rules).toContain(
+        '(literal (string-append (param "HOME_DIR") "/.gemini/trusted_hooks.json"))',
+      );
+      expect(rules).toContain(
+        '(literal (string-append (param "HOME_DIR") "/.gemini/trustedFolders.json"))',
+      );
+      expect(rules).toContain(
+        '(literal (string-append (param "HOME_DIR") "/.gemini/policy_integrity.json"))',
+      );
+      expect(rules).toContain('(regex #"/google_accounts\\.json$")');
+      expect(rules).toContain('(regex #"/trusted_hooks\\.json$")');
+      expect(rules).toContain('(regex #"/trustedFolders\\.json$")');
+      expect(rules).toContain('(regex #"/policy_integrity\\.json$")');
+    });
+  });
+});
+
+const RESTRICTIVE_AND_STRICT_PROFILES = [
+  'sandbox-macos-restrictive-open.sb',
+  'sandbox-macos-restrictive-proxied.sb',
+  'sandbox-macos-strict-open.sb',
+  'sandbox-macos-strict-proxied.sb',
+];
+
+describe('macOS Seatbelt non-sensitive configuration read access', () => {
+  describe.each(RESTRICTIVE_AND_STRICT_PROFILES)('%s', (profile) => {
+    const rules = readRules(profile);
+
+    it('allows reading settings.json and keybindings.json configuration files', () => {
+      expect(rules).toContain(
+        '(literal (string-append (param "HOME_DIR") "/.gemini/settings.json"))',
+      );
+      expect(rules).toContain(
+        '(literal (string-append (param "HOME_DIR") "/.gemini/keybindings.json"))',
+      );
+    });
+  });
+});
+
+const STRICT_PROFILES = [
+  'sandbox-macos-strict-open.sb',
+  'sandbox-macos-strict-proxied.sb',
+];
+
+describe('macOS Seatbelt strict profile scoped read access', () => {
+  describe.each(STRICT_PROFILES)('%s', (profile) => {
+    const rules = readRules(profile);
+
+    it('does not allow broad read access to ~/.gemini subpath', () => {
+      const allowReadMatch = rules.match(/\(allow file-read\*[\s\S]*?\n\)/);
+      expect(allowReadMatch).not.toBeNull();
+      expect(allowReadMatch![0]).not.toContain(
+        '(subpath (string-append (param "HOME_DIR") "/.gemini"))',
+      );
+    });
+  });
+});
+
 describe('BUILTIN_SEATBELT_PROFILE_CONTENTS consistency', () => {
   const profileKeyMap: Record<string, string> = {
     'sandbox-macos-permissive-open.sb': 'permissive-open',
@@ -140,6 +235,67 @@ describe('BUILTIN_SEATBELT_PROFILE_CONTENTS consistency', () => {
         expect(embeddedContent).toContain(
           '(xpc-service-name-prefix "com.docker.")',
         );
+      });
+
+      it('contains Gemini config isolation and credential denial rules in embedded content', () => {
+        const embeddedContent = BUILTIN_SEATBELT_PROFILE_CONTENTS[key];
+        expect(embeddedContent).toBeDefined();
+        expect(embeddedContent).toContain('(deny file-write*');
+        expect(embeddedContent).toContain(
+          '(subpath (string-append (param "HOME_DIR") "/.gemini"))',
+        );
+        expect(embeddedContent).toContain('(regex #"/trustedFolders\\.json$")');
+        expect(embeddedContent).toContain(
+          '(regex #"/policy_integrity\\.json$")',
+        );
+        expect(embeddedContent).toContain(
+          '(literal (string-append (param "HOME_DIR") "/.gemini/oauth_creds.json"))',
+        );
+        expect(embeddedContent).toContain(
+          '(literal (string-append (param "HOME_DIR") "/.gemini/google_accounts.json"))',
+        );
+        expect(embeddedContent).toContain(
+          '(literal (string-append (param "HOME_DIR") "/.gemini/trusted_hooks.json"))',
+        );
+        expect(embeddedContent).toContain(
+          '(literal (string-append (param "HOME_DIR") "/.gemini/trustedFolders.json"))',
+        );
+        expect(embeddedContent).toContain(
+          '(literal (string-append (param "HOME_DIR") "/.gemini/policy_integrity.json"))',
+        );
+      });
+
+      it('contains settings and keybindings read rules in embedded content for restrictive and strict profiles', () => {
+        if (
+          [
+            'restrictive-open',
+            'restrictive-proxied',
+            'strict-open',
+            'strict-proxied',
+          ].includes(key)
+        ) {
+          const embeddedContent = BUILTIN_SEATBELT_PROFILE_CONTENTS[key];
+          expect(embeddedContent).toBeDefined();
+          expect(embeddedContent).toContain(
+            '(literal (string-append (param "HOME_DIR") "/.gemini/settings.json"))',
+          );
+          expect(embeddedContent).toContain(
+            '(literal (string-append (param "HOME_DIR") "/.gemini/keybindings.json"))',
+          );
+        }
+      });
+
+      it('does not contain broad .gemini subpath read rule in embedded strict content', () => {
+        if (['strict-open', 'strict-proxied'].includes(key)) {
+          const embeddedContent = BUILTIN_SEATBELT_PROFILE_CONTENTS[key];
+          const allowReadMatch = embeddedContent.match(
+            /\(allow file-read\*[\s\S]*?\n\)/,
+          );
+          expect(allowReadMatch).not.toBeNull();
+          expect(allowReadMatch![0]).not.toContain(
+            '(subpath (string-append (param "HOME_DIR") "/.gemini"))',
+          );
+        }
       });
     },
   );

@@ -27,6 +27,7 @@ import { SCROLL_TO_ITEM_END } from '../shared/VirtualizedList.js';
 import { ACTIVE_SHELL_MAX_LINES } from '../../constants.js';
 import { calculateToolContentMaxLines } from '../../utils/toolLayoutUtils.js';
 import { SubagentProgressDisplay } from './SubagentProgressDisplay.js';
+import { isLockFile } from '../../utils/fileUtils.js';
 
 export interface ToolResultDisplayProps {
   resultDisplay: string | object | undefined;
@@ -41,6 +42,18 @@ export interface ToolResultDisplayProps {
 interface FileDiffResult {
   fileDiff: string;
   fileName: string;
+  isBuildFile?: boolean;
+}
+
+function isFileDiffResult(value: unknown): value is FileDiffResult {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'fileDiff' in value &&
+    typeof value.fileDiff === 'string' &&
+    'fileName' in value &&
+    typeof value.fileName === 'string'
+  );
 }
 
 export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
@@ -61,8 +74,14 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
     maxLinesLimit: maxLines,
   });
 
-  const combinedPaddingAndBorderWidth = 4;
-  const childWidth = terminalWidth - combinedPaddingAndBorderWidth;
+  const totalContainerWidth = terminalWidth || 0;
+  const borderSpace = 4;
+  const scrollbarBuffer = isAlternateBuffer ? 1 : 0;
+  const childWidth = Math.max(0, totalContainerWidth - borderSpace);
+  const safeContentWidth = Math.max(
+    0,
+    totalContainerWidth - borderSpace - scrollbarBuffer,
+  );
 
   const keyExtractor = React.useCallback(
     (_: AnsiLine, index: number) => index.toString(),
@@ -99,64 +118,65 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
     if (formattedJSON) {
       // Render pretty-printed JSON
       content = (
-        <Text wrap="wrap" color={theme.text.primary}>
-          {formattedJSON}
-        </Text>
+        <Box width={safeContentWidth} flexDirection="column">
+          <Text wrap="wrap" color={theme.text.primary}>
+            {formattedJSON}
+          </Text>
+        </Box>
       );
     } else if (isSubagentProgress(contentData)) {
       content = (
         <SubagentProgressDisplay
           progress={contentData}
-          terminalWidth={childWidth}
+          terminalWidth={safeContentWidth}
         />
       );
     } else if (typeof contentData === 'string' && renderOutputAsMarkdown) {
       content = (
         <MarkdownDisplay
           text={contentData}
-          terminalWidth={childWidth}
+          terminalWidth={safeContentWidth}
           renderMarkdown={renderMarkdown}
           isPending={false}
         />
       );
     } else if (typeof contentData === 'string' && !renderOutputAsMarkdown) {
       content = (
-        <Text wrap="wrap" color={theme.text.primary}>
-          {contentData}
-        </Text>
+        <Box width={safeContentWidth} flexDirection="column">
+          <Text wrap="wrap" color={theme.text.primary}>
+            {contentData}
+          </Text>
+        </Box>
       );
     } else if (isStructuredToolResult(contentData)) {
       if (renderOutputAsMarkdown) {
         content = (
           <MarkdownDisplay
             text={contentData.summary}
-            terminalWidth={childWidth}
+            terminalWidth={safeContentWidth}
             renderMarkdown={renderMarkdown}
             isPending={false}
           />
         );
       } else {
         content = (
-          <Text wrap="wrap" color={theme.text.primary}>
-            {contentData.summary}
-          </Text>
+          <Box width={safeContentWidth} flexDirection="column">
+            <Text wrap="wrap" color={theme.text.primary}>
+              {contentData.summary}
+            </Text>
+          </Box>
         );
       }
-    } else if (
-      typeof contentData === 'object' &&
-      contentData !== null &&
-      'fileDiff' in contentData
-    ) {
+    } else if (isFileDiffResult(contentData)) {
       content = (
         <DiffRenderer
-          diffContent={
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            (contentData as FileDiffResult).fileDiff
+          diffContent={contentData.fileDiff}
+          filename={contentData.fileName}
+          disableTruncation={
+            contentData.isBuildFile && !isLockFile(contentData.fileName)
           }
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          filename={(contentData as FileDiffResult).fileName}
           availableTerminalHeight={availableHeight}
-          terminalWidth={childWidth}
+          terminalWidth={safeContentWidth}
         />
       );
     } else if (Array.isArray(contentData)) {
@@ -171,7 +191,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
           availableTerminalHeight={
             isAlternateBuffer ? undefined : availableHeight
           }
-          width={childWidth}
+          width={safeContentWidth}
           maxLines={isAlternateBuffer ? undefined : maxLines}
           disableTruncation={shouldDisableTruncation}
         />
@@ -179,9 +199,11 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
     } else if (typeof contentData === 'object' && contentData !== null) {
       // Render as JSON for other non-null objects
       content = (
-        <Text wrap="wrap" color={theme.text.primary}>
-          {JSON.stringify(contentData, null, 2)}
-        </Text>
+        <Box width={safeContentWidth} flexDirection="column">
+          <Text wrap="wrap" color={theme.text.primary}>
+            {JSON.stringify(contentData, null, 2)}
+          </Text>
+        </Box>
       );
     } else {
       content = null;
