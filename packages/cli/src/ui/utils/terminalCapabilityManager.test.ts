@@ -235,6 +235,118 @@ describe('TerminalCapabilityManager', () => {
     expect(manager.isKittyProtocolEnabled()).toBe(true);
   });
 
+  describe('ambiguous-width character detection', () => {
+    const DA1 = '\x1b[?62c';
+
+    it('should default to narrow before detection runs', () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      expect(manager.areAmbiguousCharactersWide()).toBe(false);
+    });
+
+    it('should detect wide rendering when the cursor lands on column 3', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      const promise = manager.detectCapabilities();
+
+      // Cursor Position Report after printing one glyph at column 1.
+      stdin.emit('data', Buffer.from('\x1b[1;3R'));
+      stdin.emit('data', Buffer.from(DA1));
+
+      await promise;
+      expect(manager.areAmbiguousCharactersWide()).toBe(true);
+    });
+
+    it('should detect narrow rendering when the cursor lands on column 2', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      const promise = manager.detectCapabilities();
+
+      stdin.emit('data', Buffer.from('\x1b[24;2R'));
+      stdin.emit('data', Buffer.from(DA1));
+
+      await promise;
+      expect(manager.areAmbiguousCharactersWide()).toBe(false);
+    });
+
+    it('should stay narrow when the terminal does not report a cursor position', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      const promise = manager.detectCapabilities();
+
+      stdin.emit('data', Buffer.from(DA1));
+
+      await promise;
+      expect(manager.areAmbiguousCharactersWide()).toBe(false);
+    });
+
+    it('should stay narrow when detection times out', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      const promise = manager.detectCapabilities();
+
+      await vi.advanceTimersByTimeAsync(1000);
+      await promise;
+      expect(manager.areAmbiguousCharactersWide()).toBe(false);
+    });
+
+    it('should ignore cursor columns that cannot come from the probe', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      const promise = manager.detectCapabilities();
+
+      // e.g. a report produced by something other than our one-glyph probe.
+      stdin.emit('data', Buffer.from('\x1b[12;40R'));
+      stdin.emit('data', Buffer.from(DA1));
+
+      await promise;
+      expect(manager.areAmbiguousCharactersWide()).toBe(false);
+    });
+
+    it('should handle a cursor position report split across chunks', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      const promise = manager.detectCapabilities();
+
+      stdin.emit('data', Buffer.from('\x1b[1;'));
+      stdin.emit('data', Buffer.from('3R'));
+      stdin.emit('data', Buffer.from(DA1));
+
+      await promise;
+      expect(manager.areAmbiguousCharactersWide()).toBe(true);
+    });
+
+    it('should detect wide rendering alongside the other responses', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      const promise = manager.detectCapabilities();
+
+      stdin.emit('data', Buffer.from('\x1b[?1u'));
+      stdin.emit('data', Buffer.from('\x1b]11;rgb:0000/0000/0000\x1b\\'));
+      stdin.emit('data', Buffer.from('\x1bP>|WezTerm 20240203\x1b\\'));
+      stdin.emit('data', Buffer.from('\x1b[>4;2m'));
+      stdin.emit('data', Buffer.from('\x1b[1;3R'));
+      stdin.emit('data', Buffer.from(DA1));
+
+      await promise;
+      expect(manager.areAmbiguousCharactersWide()).toBe(true);
+      expect(manager.getTerminalName()).toBe('WezTerm 20240203');
+      expect(manager.getTerminalBackgroundColor()).toBe('#000000');
+    });
+
+    it('should print the probe glyph hidden, before the DA1 sentinel, and clear the line', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      const promise = manager.detectCapabilities();
+      stdin.emit('data', Buffer.from(DA1));
+      await promise;
+
+      const written = vi.mocked(fs.writeSync).mock.calls[0][1];
+      const probe = '\r\u2500\x1b[6n';
+      const hidden = '\x1b[8m';
+      const da1Query = '\x1b[c';
+      const clearLine = '\x1b[2K\r';
+
+      expect(written).toContain(probe);
+      expect(written.indexOf(hidden)).toBeLessThan(written.indexOf(probe));
+      expect(written.indexOf(probe)).toBeLessThan(written.indexOf(da1Query));
+      expect(written.indexOf(da1Query)).toBeLessThan(
+        written.indexOf(clearLine),
+      );
+    });
+  });
+
   describe('modifyOtherKeys detection', () => {
     it('should detect modifyOtherKeys support (level 2)', async () => {
       const manager = TerminalCapabilityManager.getInstance();

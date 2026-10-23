@@ -86,6 +86,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     })),
     enableMouseEvents: vi.fn(),
     disableMouseEvents: vi.fn(),
+    disableLineWrapping: vi.fn(),
     FileDiscoveryService: vi.fn().mockImplementation(() => ({
       initialize: vi.fn(),
     })),
@@ -253,10 +254,12 @@ import { useKeypress, type Key } from './hooks/useKeypress.js';
 import * as useKeypressModule from './hooks/useKeypress.js';
 import { useSuspend } from './hooks/useSuspend.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
+import { terminalCapabilityManager } from './utils/terminalCapabilityManager.js';
 import {
   writeToStdout,
   enableMouseEvents,
   disableMouseEvents,
+  disableLineWrapping,
 } from '@google/gemini-cli-core';
 import { type ExtensionManager } from '../config/extension-manager.js';
 import {
@@ -3046,6 +3049,47 @@ describe('AppContainer State Management', () => {
       expect(mocks.mockRerender).toHaveBeenCalledTimes(1);
       unmount!();
     });
+
+    it.each([
+      { ambiguousWide: true, expectDisable: true },
+      { ambiguousWide: false, expectDisable: false },
+    ])(
+      'turns auto-wrap back off after ExternalEditorClosed in inline mode when ambiguousWide=$ambiguousWide',
+      async ({ ambiguousWide, expectDisable }) => {
+        vi.spyOn(mockConfig, 'getUseTerminalBuffer').mockReturnValue(false);
+        vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(false);
+        vi.spyOn(mockConfig, 'getScreenReader').mockReturnValue(false);
+        const ambiguousSpy = vi
+          .spyOn(terminalCapabilityManager, 'areAmbiguousCharactersWide')
+          .mockReturnValue(ambiguousWide);
+
+        let unmount: () => void;
+        await act(async () => {
+          const result = await renderAppContainer();
+          unmount = result.unmount;
+        });
+        await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+        const handler = mockCoreEvents.on.mock.calls.find(
+          (call: unknown[]) => call[0] === CoreEvent.ExternalEditorClosed,
+        )?.[1];
+        expect(handler).toBeDefined();
+
+        vi.mocked(disableLineWrapping).mockClear();
+        act(() => {
+          handler();
+        });
+
+        if (expectDisable) {
+          expect(disableLineWrapping).toHaveBeenCalledTimes(1);
+        } else {
+          expect(disableLineWrapping).not.toHaveBeenCalled();
+        }
+
+        ambiguousSpy.mockRestore();
+        unmount!();
+      },
+    );
 
     it('updates currentModel when ModelChanged event is received', async () => {
       // Arrange: Mock initial model

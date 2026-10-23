@@ -79,3 +79,19 @@ export function shouldEnterAlternateScreen(
 ): boolean {
   return useAlternateBuffer && !isScreenReader;
 }
+
+/**
+ * Whether terminal auto-wrap (DECAWM) should be turned off while the UI runs.
+ *
+ * It must be off in the alternate buffer. It is also turned off when the
+ * terminal renders East Asian Ambiguous-width characters (box-drawing borders)
+ * in two cells: Ink places the right border glyph in the last column, so a
+ * two-cell glyph there would soft-wrap the row and leave stale copies of the
+ * previous frame in scrollback on every render.
+ */
+export function shouldDisableLineWrapping(
+  useAlternateBuffer: boolean,
+  ambiguousCharactersWide: boolean,
+): boolean {
+  return useAlternateBuffer || ambiguousCharactersWide;
+}

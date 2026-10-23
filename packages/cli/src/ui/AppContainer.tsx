@@ -77,6 +77,7 @@ import {
   enterAlternateScreen,
   enableMouseEvents,
   disableLineWrapping,
+  shouldDisableLineWrapping,
   shouldEnterAlternateScreen,
   startupProfiler,
   SessionStartSource,
@@ -861,9 +862,18 @@ export const AppContainer = (props: AppContainerProps) => {
       // enter it again to be safe.
       enterAlternateScreen();
       enableMouseEvents();
+    }
+    // External programs (editors, the manual OAuth flow) commonly restore
+    // auto-wrap; turn it off again wherever we rely on it being off.
+    if (
+      shouldDisableLineWrapping(
+        shouldUseAlternateScreen,
+        terminalCapabilityManager.areAmbiguousCharactersWide(),
+      )
+    ) {
       disableLineWrapping();
-      app.rerender();
-    } else if (config.getUseTerminalBuffer()) {
+    }
+    if (shouldUseAlternateScreen || config.getUseTerminalBuffer()) {
       app.rerender();
     }
     terminalCapabilityManager.enableSupportedModes();

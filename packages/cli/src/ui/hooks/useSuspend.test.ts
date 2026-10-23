@@ -50,6 +50,7 @@ vi.mock('../utils/terminalCapabilityManager.js', () => ({
   cleanupTerminalOnExit: vi.fn(),
   terminalCapabilityManager: {
     enableSupportedModes: vi.fn(),
+    areAmbiguousCharactersWide: vi.fn(() => false),
   },
 }));
 
@@ -154,6 +155,42 @@ describe('useSuspend', () => {
     expect(enterAlternateScreen).not.toHaveBeenCalled();
     expect(enableLineWrapping).not.toHaveBeenCalled();
     expect(disableLineWrapping).not.toHaveBeenCalled();
+    expect(enableMouseEvents).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('restores auto-wrap for the shell on suspend and disables it again on resume when the terminal renders ambiguous-width characters as wide', async () => {
+    vi.mocked(
+      terminalCapabilityManager.areAmbiguousCharactersWide,
+    ).mockReturnValue(true);
+    const handleWarning = vi.fn();
+    const setRawMode = vi.fn();
+
+    const { result, unmount } = await renderHook(() =>
+      useSuspend({
+        handleWarning,
+        setRawMode,
+        shouldUseAlternateScreen: false,
+      }),
+    );
+
+    act(() => {
+      result.current.handleSuspend();
+      result.current.handleSuspend();
+    });
+
+    expect(enableLineWrapping).toHaveBeenCalledTimes(1);
+    expect(disableLineWrapping).not.toHaveBeenCalled();
+    expect(exitAlternateScreen).not.toHaveBeenCalled();
+
+    act(() => {
+      process.emit('SIGCONT');
+      vi.runAllTimers();
+    });
+
+    expect(disableLineWrapping).toHaveBeenCalledTimes(1);
+    expect(enterAlternateScreen).not.toHaveBeenCalled();
     expect(enableMouseEvents).not.toHaveBeenCalled();
 
     unmount();

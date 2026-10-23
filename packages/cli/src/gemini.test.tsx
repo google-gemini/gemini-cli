@@ -50,6 +50,7 @@ import {
   coreEvents,
   AuthType,
   ExitCodes,
+  disableLineWrapping,
 } from '@google/gemini-cli-core';
 import { act } from 'react';
 import { type InitializationResult } from './core/initializer.js';
@@ -194,6 +195,7 @@ vi.mock('./ui/utils/terminalCapabilityManager.js', () => ({
   terminalCapabilityManager: {
     detectCapabilities: vi.fn(),
     getTerminalBackgroundColor: vi.fn(),
+    areAmbiguousCharactersWide: vi.fn(() => false),
   },
 }));
 
@@ -1884,6 +1886,47 @@ describe('startInteractiveUI', () => {
       expect(writeSpy).not.toHaveBeenCalledWith('\x1b[?7l');
     }
     writeSpy.mockRestore();
+  });
+
+  it.each([
+    {
+      ambiguousWide: true,
+      shouldDisable: true,
+      name: 'should disable line wrapping in inline mode when the terminal renders ambiguous-width characters as wide',
+    },
+    {
+      ambiguousWide: false,
+      shouldDisable: false,
+      name: 'should keep line wrapping in inline mode for a standard terminal',
+    },
+  ])('$name', async ({ ambiguousWide, shouldDisable }) => {
+    vi.mocked(disableLineWrapping).mockClear();
+    vi.mocked(
+      terminalCapabilityManager.areAmbiguousCharactersWide,
+    ).mockReturnValue(ambiguousWide);
+    const inlineModeConfig = createMockConfig({
+      getProjectRoot: () => '/root',
+      getScreenReader: () => false,
+      getDebugMode: () => false,
+      getUseAlternateBuffer: () => false,
+    });
+
+    await startTestInteractiveUI(
+      inlineModeConfig,
+      mockSettings,
+      mockStartupWarnings,
+      mockWorkspaceRoot,
+      undefined,
+      mockInitializationResult,
+    );
+
+    // In inline mode only the CLI itself can turn auto-wrap off (Ink does so
+    // on its own when it enters the alternate buffer).
+    if (shouldDisable) {
+      expect(disableLineWrapping).toHaveBeenCalledTimes(1);
+    } else {
+      expect(disableLineWrapping).not.toHaveBeenCalled();
+    }
   });
 
   it('should not delete session on exit when resumedSessionData is provided', async () => {
