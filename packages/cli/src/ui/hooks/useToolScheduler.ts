@@ -150,11 +150,27 @@ export function useToolScheduler(
         // unless they specifically required user interaction.
         const filteredToolCalls = isRoot
           ? event.toolCalls
-          : event.toolCalls.filter(
-              (tc) =>
+          : event.toolCalls.filter((tc) => {
+              const prev = prevCalls.find(
+                (p) => p.request.callId === tc.request.callId,
+              );
+              const wasAwaiting =
+                prev?.status === CoreToolCallStatus.AwaitingApproval ||
+                // eslint-disable-next-line no-restricted-syntax
+                (prev != null && Reflect.get(prev, '_wasAwaiting') === true);
+              if (
                 tc.status === CoreToolCallStatus.AwaitingApproval ||
-                prevCallIds.has(tc.request.callId),
-            );
+                wasAwaiting
+              ) {
+                // eslint-disable-next-line no-restricted-syntax
+                Reflect.set(tc, '_wasAwaiting', true);
+              }
+              return (
+                tc.status === CoreToolCallStatus.AwaitingApproval ||
+                tc.status === CoreToolCallStatus.Executing ||
+                (prevCallIds.has(tc.request.callId) && wasAwaiting)
+              );
+            });
 
         // If this is a subagent and we have no tools to show and weren't showing any,
         // we can skip the update entirely to avoid unnecessary re-renders.
