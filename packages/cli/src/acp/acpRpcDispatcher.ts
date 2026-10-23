@@ -16,7 +16,13 @@ import { SettingScope, type LoadedSettings } from '../config/settings.js';
 import type { CliArgs } from '../config/config.js';
 import { getAcpErrorMessage } from './acpErrors.js';
 import { AcpSessionManager, type AuthDetails } from './acpSessionManager.js';
-import { hasMeta } from './acpUtils.js';
+import {
+  hasMeta,
+  buildSteeringCapability,
+  readSteeringOptIn,
+  STEER_METHOD,
+  SteerRequestSchema,
+} from './acpUtils.js';
 
 export class GeminiAgent {
   private apiKey: string | undefined;
@@ -43,6 +49,9 @@ export class GeminiAgent {
     if (args.clientCapabilities) {
       this.sessionManager.setClientCapabilities(args.clientCapabilities);
     }
+    const steeringEnabled =
+      readSteeringOptIn(args.clientCapabilities) ||
+      this.context.config.isModelSteeringEnabled();
 
     const authMethods = [
       {
@@ -99,6 +108,7 @@ export class GeminiAgent {
           http: true,
           sse: true,
         },
+        _meta: buildSteeringCapability(steeringEnabled),
       },
     };
   }
@@ -232,5 +242,39 @@ export class GeminiAgent {
       );
     }
     return session.setModel(params.modelId);
+  }
+
+  async extMethod(
+    method: string,
+    params: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    switch (method) {
+      case STEER_METHOD: {
+        const result = SteerRequestSchema.safeParse(params);
+        if (!result.success) {
+          throw new acp.RequestError(
+            -32602,
+            `Invalid steering request: ${result.error.message}`,
+          );
+        }
+        const session = this.sessionManager.getSession(result.data.sessionId);
+        if (!session) {
+          throw new acp.RequestError(
+            -32602,
+            `Session not found: ${result.data.sessionId}`,
+          );
+        }
+        return session.steer(result.data.content.map((block) => block.text));
+      }
+      default:
+        throw acp.RequestError.methodNotFound(method);
+    }
+  }
+
+  async extNotification(
+    _method: string,
+    _params: Record<string, unknown>,
+  ): Promise<void> {
+    // Unknown extension notifications are ignored, as the ACP spec advises.
   }
 }

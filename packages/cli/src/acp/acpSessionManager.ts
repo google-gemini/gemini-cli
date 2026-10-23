@@ -21,7 +21,11 @@ import { SessionSelector } from '../utils/sessionUtils.js';
 import { Session } from './acpSession.js';
 import { AcpFileSystemService } from './acpFileSystemService.js';
 import { getAcpErrorMessage } from './acpErrors.js';
-import { buildAvailableModels, buildAvailableModes } from './acpUtils.js';
+import {
+  buildAvailableModels,
+  buildAvailableModes,
+  readSteeringOptIn,
+} from './acpUtils.js';
 import { loadCliConfig, type CliArgs } from '../config/config.js';
 import { startAutoMemoryIfEnabled } from '../utils/autoMemory.js';
 
@@ -151,6 +155,7 @@ export class AcpSessionManager {
         config,
         this.connection,
         this.settings,
+        readSteeringOptIn(this.clientCapabilities),
       );
       this.sessions.set(sessionId, session);
 
@@ -260,6 +265,7 @@ export class AcpSessionManager {
         config,
         this.connection,
         this.settings,
+        readSteeringOptIn(this.clientCapabilities),
       );
 
       this.sessions.set(sessionId, session);
