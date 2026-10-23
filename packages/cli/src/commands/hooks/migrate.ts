@@ -24,7 +24,7 @@ const EVENT_MAPPING: Record<string, string> = {
   PostToolUse: 'AfterTool',
   UserPromptSubmit: 'BeforeAgent',
   Stop: 'AfterAgent',
-  SubAgentStop: 'AfterAgent', // Gemini doesn't have sub-agents, map to AfterAgent
+  SubagentStop: 'AfterAgent', // Gemini doesn't have sub-agents, map to AfterAgent
   SessionStart: 'SessionStart',
   SessionEnd: 'SessionEnd',
   PreCompact: 'PreCompress',
@@ -118,7 +118,7 @@ function migrateClaudeHooks(claudeConfig: unknown): Record<string, unknown> {
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const config = claudeConfig as Record<string, unknown>;
-  const geminiHooks: Record<string, unknown> = {};
+  const geminiHooks: Record<string, unknown[]> = {};
 
   // Check if there's a hooks section
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -167,7 +167,12 @@ function migrateClaudeHooks(claudeConfig: unknown): Record<string, unknown> {
       return migratedDef;
     });
 
-    geminiHooks[geminiEventName] = migratedDefinitions;
+    // Several Claude events can map to the same Gemini event (e.g. Stop and
+    // SubagentStop both map to AfterAgent), so append instead of overwriting.
+    geminiHooks[geminiEventName] = [
+      ...(geminiHooks[geminiEventName] ?? []),
+      ...migratedDefinitions,
+    ];
   }
 
   return geminiHooks;
