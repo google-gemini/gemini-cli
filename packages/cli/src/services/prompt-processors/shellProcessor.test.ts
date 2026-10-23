@@ -637,6 +637,55 @@ describe('ShellProcessor', () => {
       expect(result).toEqual([{ text: 'Command: match found' }]);
     });
 
+    it('should insert $ replacement patterns in raw args literally', async () => {
+      const dollarArgs = "$& $` $' $$";
+      context.invocation!.args = dollarArgs;
+      const processor = new ShellProcessor('test-command');
+
+      const withoutInjection = await processor.process(
+        createPromptPipelineContent('Before {{args}} after'),
+        context,
+      );
+      expect(withoutInjection).toEqual([
+        { text: `Before ${dollarArgs} after` },
+      ]);
+
+      mockShellExecute.mockReturnValue({
+        result: Promise.resolve({ ...SUCCESS_RESULT, output: 'ok' }),
+      });
+      const withInjection = await processor.process(
+        createPromptPipelineContent('A {{args}} !{echo hi} B {{args}}'),
+        context,
+      );
+      expect(withInjection).toEqual([
+        { text: `A ${dollarArgs} ok B ${dollarArgs}` },
+      ]);
+    });
+
+    it('should insert $ replacement patterns in escaped args literally', async () => {
+      const dollarArgs = "$& $` $' $$";
+      context.invocation!.args = dollarArgs;
+      const processor = new ShellProcessor('test-command');
+      mockShellExecute.mockReturnValue({
+        result: Promise.resolve({ ...SUCCESS_RESULT, output: 'ok' }),
+      });
+
+      await processor.process(
+        createPromptPipelineContent('!{echo {{args}}}'),
+        context,
+      );
+
+      const expectedEscapedArgs = getExpectedEscapedArgForPlatform(dollarArgs);
+      expect(mockShellExecute).toHaveBeenCalledWith(
+        `echo ${expectedEscapedArgs}`,
+        expect.any(String),
+        expect.any(Function),
+        expect.any(Object),
+        false,
+        expect.any(Object),
+      );
+    });
+
     it('should handle both raw (outside) and escaped (inside) injection simultaneously', async () => {
       const processor = new ShellProcessor('test-command');
       const prompt: PromptPipelineContent = createPromptPipelineContent(

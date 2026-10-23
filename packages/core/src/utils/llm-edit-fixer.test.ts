@@ -156,6 +156,71 @@ describe('FixLLMEditWithInstruction', () => {
     );
   });
 
+  it('should insert $ replacement patterns in the inputs literally', async () => {
+    mockGenerateJson.mockResolvedValue(mockApiResponse);
+
+    await promptIdContext.run('test-prompt-id-dollar-patterns', async () => {
+      await FixLLMEditWithInstruction(
+        'Rename $& to $1',
+        "const price = '$$5'; const tail = $';",
+        "const price = '$$6'; const head = $`;",
+        'Search string not found: $&',
+        'function f() { return "$&$`$\'$$"; }',
+        mockBaseLlmClient,
+        abortSignal,
+      );
+    });
+
+    const userPromptContent =
+      mockGenerateJson.mock.calls[0][0].contents[0].parts[0].text;
+
+    expect(userPromptContent).toContain(
+      '<instruction>\nRename $& to $1\n</instruction>',
+    );
+    expect(userPromptContent).toContain(
+      "<search>\nconst price = '$$5'; const tail = $';\n</search>",
+    );
+    expect(userPromptContent).toContain(
+      "<replace>\nconst price = '$$6'; const head = $`;\n</replace>",
+    );
+    expect(userPromptContent).toContain(
+      '<error>\nSearch string not found: $&\n</error>',
+    );
+    expect(userPromptContent).toContain(
+      '<file_content>\nfunction f() { return "$&$`$\'$$"; }\n</file_content>',
+    );
+  });
+
+  it('should not substitute placeholders that appear inside the inputs', async () => {
+    mockGenerateJson.mockResolvedValue(mockApiResponse);
+
+    await promptIdContext.run('test-prompt-id-placeholder-input', async () => {
+      await FixLLMEditWithInstruction(
+        'Replace {{old_string}} with {{new_string}}',
+        'const tpl = "{{error}}";',
+        'const tpl = "{{current_content}}";',
+        'not found',
+        'const tpl = "{{error}}";',
+        mockBaseLlmClient,
+        abortSignal,
+      );
+    });
+
+    const userPromptContent =
+      mockGenerateJson.mock.calls[0][0].contents[0].parts[0].text;
+
+    expect(userPromptContent).toContain(
+      '<instruction>\nReplace {{old_string}} with {{new_string}}\n</instruction>',
+    );
+    expect(userPromptContent).toContain(
+      '<search>\nconst tpl = "{{error}}";\n</search>',
+    );
+    expect(userPromptContent).toContain(
+      '<replace>\nconst tpl = "{{current_content}}";\n</replace>',
+    );
+    expect(userPromptContent).toContain('<error>\nnot found\n</error>');
+  });
+
   it('should return a cached result on subsequent identical calls', async () => {
     mockGenerateJson.mockResolvedValue(mockApiResponse);
     const testPromptId = 'test-prompt-id-caching';

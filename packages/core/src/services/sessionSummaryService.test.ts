@@ -85,6 +85,26 @@ describe('SessionSummaryService', () => {
       );
     });
 
+    it('should insert $ replacement patterns in messages literally', async () => {
+      const messages: MessageRecord[] = [
+        {
+          id: '1',
+          timestamp: '2025-12-03T00:00:00Z',
+          type: 'user',
+          content: [{ text: "Why does s.replace('x', '$&') print x?" }],
+        },
+      ];
+
+      await service.generateSummary({ messages });
+
+      const promptText =
+        mockGenerateContent.mock.calls[0][0].contents[0].parts[0].text;
+      expect(promptText).toContain(
+        "User: Why does s.replace('x', '$&') print x?",
+      );
+      expect(promptText).not.toContain('{{conversation}}');
+    });
+
     it('should return null for empty messages array', async () => {
       const summary = await service.generateSummary({ messages: [] });
 
