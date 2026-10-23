@@ -10,10 +10,134 @@ import {
   RetryableQuotaError,
   TerminalQuotaError,
   ValidationRequiredError,
+  isQuotaExhaustedError,
 } from './googleQuotaErrors.js';
 import * as errorParser from './googleErrors.js';
 import type { GoogleApiError } from './googleErrors.js';
 import { ModelNotFoundError } from './httpErrors.js';
+
+describe('isQuotaExhaustedError', () => {
+  it('accepts hard quota exhaustion even when the next reset is hours away', () => {
+    expect(
+      isQuotaExhaustedError(
+        new TerminalQuotaError(
+          'Quota exhausted',
+          { code: 429, message: 'Quota exhausted', details: [] },
+          3600,
+          'QUOTA_EXHAUSTED',
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  it.each([
+    'RATE_LIMIT_EXCEEDED',
+    'MODEL_CAPACITY_EXHAUSTED',
+    'MODEL_CAPACITY_EXCEEDED',
+    'INSUFFICIENT_G1_CREDITS_BALANCE',
+  ])('preserves existing handling for %s', (reason) => {
+    expect(
+      isQuotaExhaustedError(
+        new TerminalQuotaError(
+          'Unavailable',
+          { code: 429, message: 'Unavailable', details: [] },
+          undefined,
+          reason,
+        ),
+      ),
+    ).toBe(false);
+  });
+
+  it('excludes nonterminal rate limits and model-not-found errors', () => {
+    expect(
+      isQuotaExhaustedError(new RetryableQuotaError('Retry in 60 seconds')),
+    ).toBe(false);
+    expect(
+      isQuotaExhaustedError(new ModelNotFoundError('Not found', 404)),
+    ).toBe(false);
+  });
+
+  it('does not treat a generic 503 with a long retry delay as exhausted model quota', () => {
+    const error = classifyGoogleError({
+      error: {
+        code: 503,
+        message: 'Service unavailable',
+        details: [
+          {
+            '@type': 'type.googleapis.com/google.rpc.RetryInfo',
+            retryDelay: '600s',
+          },
+        ],
+      },
+    });
+    expect(error).toBeInstanceOf(TerminalQuotaError);
+    expect(isQuotaExhaustedError(error)).toBe(false);
+  });
+
+  it('does not treat per-minute quota with a long retry delay as permanent exhaustion', () => {
+    const error = classifyGoogleError({
+      error: {
+        code: 429,
+        message: 'Too many requests',
+        details: [
+          {
+            '@type': 'type.googleapis.com/google.rpc.QuotaFailure',
+            violations: [{ quotaId: 'GenerateRequestsPerMinutePerProject' }],
+          },
+          {
+            '@type': 'type.googleapis.com/google.rpc.RetryInfo',
+            retryDelay: '600s',
+          },
+        ],
+      },
+    });
+    expect(error).toBeInstanceOf(TerminalQuotaError);
+    expect(isQuotaExhaustedError(error)).toBe(false);
+  });
+
+  it('excludes per-minute ErrorInfo metadata even when a long delay is classified as terminal', () => {
+    const error = classifyGoogleError({
+      error: {
+        code: 429,
+        message: 'Too many requests',
+        details: [
+          {
+            '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+            reason: 'RESOURCE_EXHAUSTED',
+            domain: 'generativelanguage.googleapis.com',
+            metadata: { quota_limit: 'RequestsPerMinute_PerProject_PerUser' },
+          },
+          {
+            '@type': 'type.googleapis.com/google.rpc.RetryInfo',
+            retryDelay: '600s',
+          },
+        ],
+      },
+    });
+
+    expect(error).toBeInstanceOf(TerminalQuotaError);
+    expect(isQuotaExhaustedError(error)).toBe(false);
+  });
+
+  it('recognizes rate-limit evidence preserved only in the underlying error details', () => {
+    const error = new TerminalQuotaError(
+      'Too many requests',
+      {
+        code: 429,
+        message: 'Too many requests',
+        details: [
+          {
+            '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+            reason: 'RATE_LIMIT_EXCEEDED',
+            domain: 'other.googleapis.com',
+          },
+        ],
+      },
+      600,
+    );
+    expect(isQuotaExhaustedError(error)).toBe(false);
+  });
+});
 
 describe('classifyGoogleError', () => {
   afterEach(() => {
