@@ -117,7 +117,7 @@ function parseDurationInSeconds(duration: string): number | null {
  * If the server suggests waiting longer than this, the user is effectively locked out,
  * so we trigger the fallback/credits flow instead of silently waiting.
  */
-const MAX_RETRYABLE_DELAY_SECONDS = 300; // 5 minutes
+export const MAX_RETRYABLE_DELAY_SECONDS = 300; // 5 minutes
 
 /**
  * Valid Cloud Code API domains for VALIDATION_REQUIRED errors.

@@ -8,8 +8,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import { FakeContentGenerator } from '../core/fakeContentGenerator.js';
 import { Config } from '../config/config.js';
-import { RetryableQuotaError } from '../utils/googleQuotaErrors.js';
 import {
+  RetryableQuotaError,
+  TerminalQuotaError,
+} from '../utils/googleQuotaErrors.js';
+import {
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
@@ -590,5 +595,91 @@ describe('Auto Routing Fallback Integration', () => {
     // Verify session ID has been rotated
     expect(config.getSessionId()).not.toBe(originalSessionId);
     expect(config.getSessionId()).toBeDefined();
+  });
+
+  it('should automatically fallback utility models and mark failed model terminal in non-interactive/ACP mode', async () => {
+    config = new Config({
+      sessionId: 'test-session-acp',
+      targetDir: '/test',
+      debugMode: false,
+      cwd: '/test',
+      model: PREVIEW_GEMINI_MODEL_AUTO,
+      interactive: false,
+    });
+
+    client = new BaseLlmClient(
+      fakeGenerator,
+      config,
+      AuthType.LOGIN_WITH_GOOGLE,
+    );
+
+    const mockGoogleApiError = {
+      code: 429,
+      message:
+        'You have exhausted your capacity on this model. Your quota will reset after 14h31m12s.',
+      details: [],
+    };
+
+    const attemptedModels: string[] = [];
+
+    vi.spyOn(fakeGenerator, 'generateContent').mockImplementation(
+      async (params) => {
+        const modelId = normalizeModelId(params.model ?? '');
+        attemptedModels.push(modelId);
+        if (modelId === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
+          throw new TerminalQuotaError(
+            mockGoogleApiError.message,
+            mockGoogleApiError,
+            52272,
+          );
+        }
+        return {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'Fallback classifier success' }],
+              },
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      },
+    );
+
+    const result1 = await client.generateContent({
+      modelConfigKey: { model: 'classifier', isChatModel: false },
+      contents: [{ role: 'user', parts: [{ text: 'classify this' }] }],
+      abortSignal: new AbortController().signal,
+      promptId: 'test-prompt-acp-1',
+      role: LlmRole.UTILITY_TOOL,
+    });
+
+    expect(result1.candidates?.[0]?.content?.parts?.[0]?.text).toBe(
+      'Fallback classifier success',
+    );
+    expect(attemptedModels).toEqual([
+      DEFAULT_GEMINI_FLASH_LITE_MODEL,
+      DEFAULT_GEMINI_FLASH_MODEL,
+    ]);
+    expect(
+      config
+        .getModelAvailabilityService()
+        .snapshot(DEFAULT_GEMINI_FLASH_LITE_MODEL).available,
+    ).toBe(false);
+
+    // Subsequent utility call in the same session should skip the exhausted model immediately
+    attemptedModels.length = 0;
+    const result2 = await client.generateContent({
+      modelConfigKey: { model: 'classifier', isChatModel: false },
+      contents: [{ role: 'user', parts: [{ text: 'classify again' }] }],
+      abortSignal: new AbortController().signal,
+      promptId: 'test-prompt-acp-2',
+      role: LlmRole.UTILITY_TOOL,
+    });
+
+    expect(result2.candidates?.[0]?.content?.parts?.[0]?.text).toBe(
+      'Fallback classifier success',
+    );
+    expect(attemptedModels).toEqual([DEFAULT_GEMINI_FLASH_MODEL]);
   });
 });

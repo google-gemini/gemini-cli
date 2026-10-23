@@ -321,9 +321,11 @@ export class BaseLlmClient {
 
     try {
       const apiCall = () => {
-        // Ensure we use the current active model
+        // Ensure we use the current active model or fallback override
         // in case a fallback occurred in a previous attempt.
         const activeModel = this.config.getActiveModel();
+        const fallbackOverride =
+          this.config.getFallbackOverride?.(currentModel);
         if (activeModel !== initialActiveModel) {
           initialActiveModel = activeModel;
           // Re-resolve config if model changed during retry
@@ -331,6 +333,14 @@ export class BaseLlmClient {
             this.config.modelConfigService.getResolvedConfig({
               ...modelConfigKey,
               model: activeModel,
+            });
+          currentModel = resolvedModel;
+          currentGenerateContentConfig = generateContentConfig;
+        } else if (fallbackOverride && fallbackOverride !== currentModel) {
+          const { model: resolvedModel, generateContentConfig } =
+            this.config.modelConfigService.getResolvedConfig({
+              ...modelConfigKey,
+              model: fallbackOverride,
             });
           currentModel = resolvedModel;
           currentGenerateContentConfig = generateContentConfig;
@@ -358,10 +368,8 @@ export class BaseLlmClient {
         maxAttempts:
           availabilityMaxAttempts ?? maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
         getAvailabilityContext,
-        onPersistent429: this.config.isInteractive()
-          ? (authType, error) =>
-              handleFallback(this.config, currentModel, authType, error)
-          : undefined,
+        onPersistent429: (authType, error) =>
+          handleFallback(this.config, currentModel, authType, error),
         authType:
           this.authType ?? this.config.getContentGeneratorConfig()?.authType,
         retryFetchErrors: this.config.getRetryFetchErrors(),
@@ -379,6 +387,7 @@ export class BaseLlmClient {
             delayMs,
             error: errorType,
             model: modelName,
+            sessionId: this.config.getSessionId?.(),
           });
 
           logNetworkRetryAttempt(

@@ -1198,6 +1198,7 @@ export class GeminiClient {
             delayMs,
             error: error instanceof Error ? error.message : String(error),
             model: getDisplayString(currentAttemptModel),
+            sessionId: this.config.getSessionId?.(),
           });
         },
       });

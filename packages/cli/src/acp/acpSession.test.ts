@@ -30,6 +30,7 @@ import {
   MessageBusType,
   type ToolConfirmationRequest,
   DiscoveredMCPTool,
+  coreEvents,
 } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../config/settings.js';
 import { type Part, FinishReason } from '@google/genai';
@@ -191,7 +192,8 @@ describe('Session', () => {
     }));
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await session.dispose();
     vi.restoreAllMocks();
   });
 
@@ -1490,6 +1492,67 @@ describe('Session', () => {
         .fn()
         .mockRejectedValue(new Error('Disposal failed'));
       await expect(session.dispose()).resolves.toBeUndefined();
+    });
+  });
+
+  describe('Retry Progress Notifications', () => {
+    it('should forward CoreEvent.RetryAttempt for the current session as agent_thought_chunk with retry metadata', () => {
+      coreEvents.emitRetryAttempt({
+        attempt: 2,
+        maxAttempts: 3,
+        delayMs: 4200,
+        error: '429',
+        model: 'gemini-3.1-flash-lite-preview',
+        sessionId: 'session-1',
+      });
+
+      expect(mockConnection.sessionUpdate).toHaveBeenCalledWith({
+        sessionId: 'session-1',
+        update: {
+          sessionUpdate: 'agent_thought_chunk',
+          content: {
+            type: 'text',
+            text: 'Retrying model request for gemini-3.1-flash-lite-preview after 429 (attempt 2/3, waiting 4s)...',
+          },
+          _meta: {
+            retry: {
+              attempt: 2,
+              maxAttempts: 3,
+              delayMs: 4200,
+              error: '429',
+              model: 'gemini-3.1-flash-lite-preview',
+            },
+          },
+        },
+      });
+    });
+
+    it('should ignore CoreEvent.RetryAttempt emitted for another session', () => {
+      coreEvents.emitRetryAttempt({
+        attempt: 1,
+        maxAttempts: 3,
+        delayMs: 1000,
+        error: '429',
+        model: 'gemini-3-pro-preview',
+        sessionId: 'other-session',
+      });
+
+      expect(mockConnection.sessionUpdate).not.toHaveBeenCalled();
+    });
+
+    it('should stop forwarding CoreEvent.RetryAttempt after session.dispose()', async () => {
+      await session.dispose();
+
+      coreEvents.emitRetryAttempt({
+        attempt: 1,
+        maxAttempts: 3,
+        delayMs: 1000,
+        error: '429',
+        model: 'gemini-3-pro-preview',
+        sessionId: 'session-1',
+      });
+
+      expect(mockConnection.sessionUpdate).not.toHaveBeenCalled();
     });
   });
 });
