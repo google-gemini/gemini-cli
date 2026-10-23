@@ -37,6 +37,7 @@ import {
   RECITATION_BLOCKED_MESSAGE,
   OTHER_BLOCKED_MESSAGE,
   TRUE_EMPTY_RESPONSE_MESSAGE,
+  getErrorMessage,
 } from '@google/gemini-cli-core';
 
 import type { Content, Part } from '@google/genai';
@@ -415,7 +416,10 @@ export async function runNonInteractive(
             }
             warnings.push(message);
           } else if (event.type === GeminiEventType.Error) {
-            throw event.value.error;
+            const error = event.value.error;
+            throw error instanceof Error
+              ? error
+              : new Error(getErrorMessage(error));
           } else if (event.type === GeminiEventType.AgentExecutionStopped) {
             const stopMessage = `Agent execution stopped: ${event.value.systemMessage?.trim() || event.value.reason}`;
             if (config.getOutputFormat() === OutputFormat.TEXT) {
