@@ -10,7 +10,7 @@ description: Guidance for creating, running, fixing, and promoting behavioral ev
 Behavioral evaluations (evals) are tests that validate the **agent's decision-making** (e.g., tool choice) rather than pure functionality. They are critical for verifying prompt changes, debugging steerability, and preventing regressions.
 
 > [!NOTE]
-> **Single Source of Truth**: For core concepts, policies, running tests, and general best practices, always refer to **[evals/README.md](file:///Users/abhipatel/code/gemini-cli/docs/evals/README.md)**.
+> **Single Source of Truth**: For core concepts, policies, running tests, and general best practices, always refer to **[evals/README.md](../../../evals/README.md)**.
 
 ---
 
@@ -43,7 +43,7 @@ Audit agent decisions using `rig.setBreakpoint()` (AppRig only) or index verific
 
 ### 3. Verify
 Run single tests locally with Vitest. Confirm stability locally before relying on CI workflows.
-*   *See **[evals/README.md](file:///Users/abhipatel/code/gemini-cli/docs/evals/README.md)** for running commands.*
+*   *See **[evals/README.md](../../../evals/README.md)** for running commands.*
 
 ---
 
