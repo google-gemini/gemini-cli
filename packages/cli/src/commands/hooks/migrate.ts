@@ -63,6 +63,7 @@ function transformMatcher(matcher: string | undefined): string | undefined {
 }
 
 const MS_PER_SECOND = 1000;
+const MAX_TIMEOUT_MS = 2147483647; // Max 32-bit signed integer for Node.js setTimeout
 
 /**
  * Migrate a Claude Code hook configuration to Gemini format
@@ -99,8 +100,8 @@ function migrateClaudeHook(claudeHook: unknown): unknown {
   const timeout = hook['timeout'];
   if (typeof timeout === 'number' && Number.isFinite(timeout) && timeout > 0) {
     const ms = Math.round(timeout * MS_PER_SECOND);
-    if (Number.isFinite(ms) && ms > 0) {
-      migrated['timeout'] = ms;
+    if (ms > 0) {
+      migrated['timeout'] = Math.min(ms, MAX_TIMEOUT_MS);
     }
   }
 

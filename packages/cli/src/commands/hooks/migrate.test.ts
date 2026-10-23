@@ -338,6 +338,38 @@ describe('migrate command', () => {
     expect(migratedHooks.BeforeTool[0].hooks[2].timeout).toBe(1);
   });
 
+  it('should cap large timeout values at Node.js maximum 32-bit signed integer', async () => {
+    const claudeSettings = {
+      hooks: {
+        PreToolUse: [
+          {
+            hooks: [
+              {
+                type: 'command',
+                command: 'echo "exceeds-32bit-int"',
+                timeout: 3000000,
+              },
+              {
+                type: 'command',
+                command: 'echo "max-double"',
+                timeout: Number.MAX_VALUE,
+              },
+            ],
+          },
+        ],
+      },
+    };
+
+    mockedFs.existsSync.mockReturnValue(true);
+    mockedFs.readFileSync.mockReturnValue(JSON.stringify(claudeSettings));
+
+    await handleMigrateFromClaude();
+
+    const migratedHooks = mockSetValue.mock.calls[0][2];
+    expect(migratedHooks.BeforeTool[0].hooks[0].timeout).toBe(2147483647);
+    expect(migratedHooks.BeforeTool[0].hooks[1].timeout).toBe(2147483647);
+  });
+
   it('should omit invalid, non-positive, or missing timeout values', async () => {
     const claudeSettings = {
       hooks: {
@@ -365,8 +397,8 @@ describe('migrate command', () => {
               },
               {
                 type: 'command',
-                command: 'echo "overflow"',
-                timeout: Number.MAX_VALUE,
+                command: 'echo "null"',
+                timeout: null,
               },
               {
                 type: 'command',
@@ -390,14 +422,14 @@ describe('migrate command', () => {
       zeroTimeout,
       subMsZeroTimeout,
       negativeTimeout,
-      overflowTimeout,
+      nullTimeout,
       stringTimeout,
     ] = migratedHooks.BeforeTool[0].hooks;
     expect(missingTimeout).not.toHaveProperty('timeout');
     expect(zeroTimeout).not.toHaveProperty('timeout');
     expect(subMsZeroTimeout).not.toHaveProperty('timeout');
     expect(negativeTimeout).not.toHaveProperty('timeout');
-    expect(overflowTimeout).not.toHaveProperty('timeout');
+    expect(nullTimeout).not.toHaveProperty('timeout');
     expect(stringTimeout).not.toHaveProperty('timeout');
   });
 
