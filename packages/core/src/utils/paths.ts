@@ -607,9 +607,25 @@ export function isTrustedSystemPath(filePath: string): boolean {
       // 1P internal hermetic execution paths
       '/google/bin',
       '/google/src/cloud',
-    ].map((p) => normalizePath(p));
+    ];
 
-    return trustedPrefixes.some(
+    const isAndroidOrTermux =
+      platform === 'android' || !!process.env['TERMUX_VERSION'];
+
+    if (isAndroidOrTermux) {
+      trustedPrefixes.push(
+        '/data/data/com.termux/files/usr/bin',
+        '/data/data/com.termux/files/usr/bin/applets',
+      );
+      const prefixEnv = process.env['PREFIX'];
+      if (prefixEnv) {
+        trustedPrefixes.push(path.join(prefixEnv, 'bin'));
+      }
+    }
+
+    const normalizedPrefixes = trustedPrefixes.map((p) => normalizePath(p));
+
+    return normalizedPrefixes.some(
       (prefix) => normPath === prefix || normPath.startsWith(prefix + '/'),
     );
   }
