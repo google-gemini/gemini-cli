@@ -1420,6 +1420,8 @@ function validateName(name: string) {
   }
 }
 
+const GITHUB_REPO_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9-_]*\/[a-zA-Z0-9_.-]+$/;
+
 export async function inferInstallMetadata(
   source: string,
   args: {
@@ -1433,7 +1435,6 @@ export async function inferInstallMetadata(
     source.startsWith('https://') ||
     source.startsWith('git@') ||
     source.startsWith('sso://') ||
-    source.startsWith('github:') ||
     source.startsWith('gitlab:') ||
     source.startsWith('ssh://')
   ) {
@@ -1444,12 +1445,40 @@ export async function inferInstallMetadata(
       autoUpdate: args.autoUpdate,
       allowPreRelease: args.allowPreRelease,
     };
-  } else {
+  }
+
+  if (source.startsWith('github:')) {
+    const repoPath = source.slice('github:'.length);
+    return {
+      source: `https://github.com/${repoPath}`,
+      type: 'git',
+      ref: args.ref,
+      autoUpdate: args.autoUpdate,
+      allowPreRelease: args.allowPreRelease,
+    };
+  }
+
+  if (source.startsWith('github.com/')) {
+    return {
+      source: `https://${source}`,
+      type: 'git',
+      ref: args.ref,
+      autoUpdate: args.autoUpdate,
+      allowPreRelease: args.allowPreRelease,
+    };
+  }
+
+  if (GITHUB_REPO_PATTERN.test(source)) {
     if (args.ref || args.autoUpdate) {
-      throw new Error(
-        '--ref and --auto-update are not applicable for local extensions.',
-      );
+      return {
+        source: `https://github.com/${source}`,
+        type: 'git',
+        ref: args.ref,
+        autoUpdate: args.autoUpdate,
+        allowPreRelease: args.allowPreRelease,
+      };
     }
+
     try {
       await stat(source);
       return {
@@ -1457,8 +1486,29 @@ export async function inferInstallMetadata(
         type: 'local',
       };
     } catch {
-      throw new Error('Install source not found.');
+      return {
+        source: `https://github.com/${source}`,
+        type: 'git',
+        ref: args.ref,
+        autoUpdate: args.autoUpdate,
+        allowPreRelease: args.allowPreRelease,
+      };
     }
+  }
+
+  if (args.ref || args.autoUpdate) {
+    throw new Error(
+      '--ref and --auto-update are not applicable for local extensions.',
+    );
+  }
+  try {
+    await stat(source);
+    return {
+      source,
+      type: 'local',
+    };
+  } catch {
+    throw new Error('Install source not found.');
   }
 }
 
