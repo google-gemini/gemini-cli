@@ -389,10 +389,12 @@ describe('useStaticHistoryStartIndex', () => {
     const { result, rerender } = await renderStartIndexHook();
     rerender(resizedProps);
 
+    // Resumed and rewound sessions assign sequential ids starting from 1,
+    // overlapping the previous session's ids.
     rerender({
       ...resizedProps,
       historyRemountKey: 1,
-      history: createConversation(300, 90, 5000),
+      history: createConversation(300, 90, 1),
     });
     expect(result.current).toBe(0);
   });

@@ -172,9 +172,9 @@ export function getResizeRefreshHistoryStartIndex(
 /**
  * Returns true when `next` only appended items to `previous`.
  *
- * History updates either append items (existing items keep their ids and
- * positions) or replace the whole list through `clearItems`/`loadHistory`, so
- * comparing the ids at the boundaries of `previous` is sufficient.
+ * Appending through `addItem` keeps existing item references and ids in place,
+ * whereas replacing or resuming a session creates a new list (often with
+ * sequential ids starting at 1).
  */
 function isAppendOnlyContinuation(
   previous: readonly HistoryItem[],
@@ -183,10 +183,12 @@ function isAppendOnlyContinuation(
   if (previous.length === 0 || next.length < previous.length) {
     return false;
   }
-  return (
-    next[0].id === previous[0].id &&
-    next[previous.length - 1].id === previous[previous.length - 1].id
-  );
+  for (let i = 0; i < previous.length; i++) {
+    if (next[i] !== previous[i] || next[i].id !== previous[i].id) {
+      return false;
+    }
+  }
+  return true;
 }
 
 interface StaticHistoryWindow {
