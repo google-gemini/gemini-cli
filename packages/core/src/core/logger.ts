@@ -294,6 +294,25 @@ export class Logger {
     return path.join(this.geminiDir, `checkpoint-${encodedTag}.json`);
   }
 
+  private _legacyCheckpointPath(tag: string): string | null {
+    if (!this.geminiDir) {
+      return null;
+    }
+    const fileName = `checkpoint-${tag}.json`;
+    // Legacy checkpoint filenames are always flat inside geminiDir.
+    // Reject tags with path separators or traversal segments so the raw
+    // fallback never resolves outside geminiDir.
+    if (
+      path.basename(fileName) !== fileName ||
+      tag.includes('/') ||
+      tag.includes('\\') ||
+      tag.includes('\0')
+    ) {
+      return null;
+    }
+    return path.join(this.geminiDir, fileName);
+  }
+
   private async _getCheckpointPath(tag: string): Promise<string> {
     // 1. Check for the new encoded path first.
     const newPath = this._checkpointPath(tag);
@@ -310,15 +329,17 @@ export class Logger {
     }
 
     // 2. Fallback for backward compatibility: check for the old raw path.
-    const oldPath = path.join(this.geminiDir!, `checkpoint-${tag}.json`);
-    try {
-      await fs.access(oldPath);
-      return oldPath; // Found it, use the old path.
-    } catch (error) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const nodeError = error as NodeJS.ErrnoException;
-      if (nodeError.code !== 'ENOENT') {
-        throw error; // A real error occurred, rethrow it.
+    const oldPath = this._legacyCheckpointPath(tag);
+    if (oldPath && oldPath !== newPath) {
+      try {
+        await fs.access(oldPath);
+        return oldPath; // Found it, use the old path.
+      } catch (error) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const nodeError = error as NodeJS.ErrnoException;
+        if (nodeError.code !== 'ENOENT') {
+          throw error; // A real error occurred, rethrow it.
+        }
       }
     }
 
@@ -419,8 +440,8 @@ export class Logger {
     }
 
     // 2. Attempt to delete the old raw path for backward compatibility.
-    const oldPath = path.join(this.geminiDir, `checkpoint-${tag}.json`);
-    if (newPath !== oldPath) {
+    const oldPath = this._legacyCheckpointPath(tag);
+    if (oldPath && newPath !== oldPath) {
       try {
         await fs.unlink(oldPath);
         deletedSomething = true;
