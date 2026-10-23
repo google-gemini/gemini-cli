@@ -417,9 +417,14 @@ export async function runNonInteractive(
             warnings.push(message);
           } else if (event.type === GeminiEventType.Error) {
             const error = event.value.error;
-            throw error instanceof Error
-              ? error
-              : new Error(getErrorMessage(error));
+            if (error instanceof Error) {
+              throw error;
+            }
+            const wrappedError = new Error(getErrorMessage(error));
+            if (error && typeof error === 'object') {
+              Object.assign(wrappedError, error);
+            }
+            throw wrappedError;
           } else if (event.type === GeminiEventType.AgentExecutionStopped) {
             const stopMessage = `Agent execution stopped: ${event.value.systemMessage?.trim() || event.value.reason}`;
             if (config.getOutputFormat() === OutputFormat.TEXT) {

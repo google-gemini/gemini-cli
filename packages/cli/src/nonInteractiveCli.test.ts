@@ -594,7 +594,10 @@ describe('runNonInteractive', () => {
     }
 
     expect(thrown).toBeInstanceOf(Error);
-    expect(thrown).toMatchObject({ message: structuredError.message });
+    expect(thrown).toMatchObject({
+      message: structuredError.message,
+      status: structuredError.status,
+    });
     expect(thrown).not.toEqual(structuredError);
   });
 
