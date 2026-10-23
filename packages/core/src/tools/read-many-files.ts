@@ -20,6 +20,7 @@ import { getErrorMessage } from '../utils/errors.js';
 import * as fsPromises from 'node:fs/promises';
 import * as path from 'node:path';
 import { glob, escape } from 'glob';
+import picomatch from 'picomatch';
 import { buildParamArgsPattern } from '../policy/utils.js';
 import {
   detectFileType,
@@ -117,6 +118,49 @@ type FileProcessingResult =
  */
 function getDefaultExcludes(config?: Config): string[] {
   return config?.getFileExclusions().getReadManyFilesExcludes() ?? [];
+}
+
+/**
+ * Returns true if an asset file (image/pdf/audio) was explicitly requested:
+ * some include pattern must actually match the file, and that pattern's last
+ * segment must name the file's extension or name (e.g. `*.png`, `logo.png`),
+ * rather than being a broad wildcard like `**` or `*`.
+ */
+function isAssetExplicitlyRequested(
+  include: string[],
+  filePath: string,
+  workspaceDirs: readonly string[],
+): boolean {
+  const fileName = path.basename(filePath).toLowerCase();
+  const fileExtension = path.extname(fileName);
+  const fileNameWithoutExtension = fileName.slice(
+    0,
+    fileName.length - fileExtension.length,
+  );
+
+  return include.some((pattern) => {
+    const normalizedPattern = pattern.replace(/\\/g, '/');
+    const lastSegment = normalizedPattern
+      .slice(normalizedPattern.lastIndexOf('/') + 1)
+      .toLowerCase();
+    const namesFile =
+      (fileExtension !== '' && lastSegment.includes(fileExtension)) ||
+      (fileNameWithoutExtension !== '' &&
+        lastSegment.includes(fileNameWithoutExtension));
+    if (!namesFile) {
+      return false;
+    }
+
+    const isMatch = picomatch(normalizedPattern, { nocase: true, dot: true });
+    return workspaceDirs.some((dir) => {
+      const relativePath = path.relative(dir, filePath).replace(/\\/g, '/');
+      // Literal paths (e.g. containing `[`) are matched as-is during discovery.
+      return (
+        relativePath.toLowerCase() === normalizedPattern.toLowerCase() ||
+        isMatch(relativePath)
+      );
+    });
+  });
 }
 
 const DEFAULT_OUTPUT_SEPARATOR_FORMAT = '--- {filePath} ---';
@@ -298,15 +342,10 @@ ${finalExclusionPatternsForDescription
             fileType === 'pdf' ||
             fileType === 'audio'
           ) {
-            const fileExtension = path.extname(filePath).toLowerCase();
-            const fileNameWithoutExtension = path.basename(
+            const requestedExplicitly = isAssetExplicitlyRequested(
+              include,
               filePath,
-              fileExtension,
-            );
-            const requestedExplicitly = include.some(
-              (pattern: string) =>
-                pattern.toLowerCase().includes(fileExtension) ||
-                pattern.includes(fileNameWithoutExtension),
+              this.config.getWorkspaceContext().getDirectories(),
             );
 
             if (!requestedExplicitly) {
