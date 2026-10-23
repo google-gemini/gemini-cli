@@ -377,6 +377,26 @@ const SETTINGS_SCHEMA = {
           'Maximum number of attempts for requests to the main chat model. Cannot exceed 10.',
         showInDialog: true,
       },
+      requestHeadersTimeoutMs: {
+        type: 'number',
+        label: 'Request Headers Timeout (ms)',
+        category: 'General',
+        requiresRestart: true,
+        default: undefined as number | undefined,
+        description:
+          'How long to wait, in milliseconds, for the model API to start responding before the request is aborted and retried. Defaults to 60000 (60 seconds). Raise this for long-thinking models.',
+        showInDialog: false,
+      },
+      requestBodyTimeoutMs: {
+        type: 'number',
+        label: 'Request Body Timeout (ms)',
+        category: 'General',
+        requiresRestart: true,
+        default: undefined as number | undefined,
+        description:
+          'How long a streaming model API response may stay silent, in milliseconds, before it is aborted and retried. Defaults to 300000 (5 minutes). Raise this if long tool calls are dropped with UND_ERR_BODY_TIMEOUT.',
+        showInDialog: false,
+      },
       debugKeystrokeLogging: {
         type: 'boolean',
         label: 'Debug Keystroke Logging',

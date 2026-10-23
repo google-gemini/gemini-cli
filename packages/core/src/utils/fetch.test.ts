@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { updateGlobalFetchTimeouts } from './fetch.js';
+import { getGlobalFetchTimeouts, updateGlobalFetchTimeouts } from './fetch.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as dnsPromises from 'node:dns/promises';
 import type { LookupAddress, LookupAllOptions } from 'node:dns';
@@ -42,6 +42,7 @@ const {
   setGlobalProxy,
   createSafeProxyAgent,
   createSafeAgent,
+  MAX_FETCH_TIMEOUT_MS,
 } = await import('./fetch.js');
 interface ErrorWithCode extends Error {
   code?: string;
@@ -64,7 +65,7 @@ describe('fetch utils', () => {
       return [{ address: '93.184.216.34', family: 4 }];
     });
     vi.unstubAllEnvs();
-    updateGlobalFetchTimeouts(60000);
+    updateGlobalFetchTimeouts(60000, 300000);
   });
 
   afterEach(() => {
@@ -258,6 +259,80 @@ describe('fetch utils', () => {
           dispatcher: expect.any(Object),
         }),
       );
+    });
+  });
+
+  describe('updateGlobalFetchTimeouts', () => {
+    it('should keep the body timeout when only the headers timeout is given', () => {
+      updateGlobalFetchTimeouts(90000);
+
+      expect(getGlobalFetchTimeouts()).toEqual({
+        headersTimeoutMs: 90000,
+        bodyTimeoutMs: 300000,
+      });
+    });
+
+    it('should update both the headers and body timeouts', () => {
+      updateGlobalFetchTimeouts(900000, 1200000);
+
+      expect(getGlobalFetchTimeouts()).toEqual({
+        headersTimeoutMs: 900000,
+        bodyTimeoutMs: 1200000,
+      });
+      expect(setGlobalDispatcher).toHaveBeenCalled();
+    });
+
+    it('should apply the body timeout to the proxy dispatcher', () => {
+      setGlobalProxy('http://proxy.example.com');
+      updateGlobalFetchTimeouts(900000, 1200000);
+
+      expect(EnvHttpProxyAgent).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          headersTimeout: 900000,
+          bodyTimeout: 1200000,
+        }),
+      );
+    });
+
+    it('should apply the body timeout to the safe agent', () => {
+      updateGlobalFetchTimeouts(900000, 1200000);
+
+      expect(Agent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          headersTimeout: 900000,
+          bodyTimeout: 1200000,
+          connect: expect.anything(),
+        }),
+      );
+    });
+
+    it('should reject invalid timeouts without changing the current values', () => {
+      expect(() => updateGlobalFetchTimeouts(0)).toThrow(RangeError);
+      expect(() => updateGlobalFetchTimeouts(60000, 0)).toThrow(RangeError);
+      expect(() => updateGlobalFetchTimeouts(60000, Infinity)).toThrow(
+        RangeError,
+      );
+      expect(() => updateGlobalFetchTimeouts(2_147_483_648)).toThrow(
+        RangeError,
+      );
+      expect(() => updateGlobalFetchTimeouts(60000, 2_147_483_648)).toThrow(
+        RangeError,
+      );
+      expect(getGlobalFetchTimeouts()).toEqual({
+        headersTimeoutMs: 60000,
+        bodyTimeoutMs: 300000,
+      });
+    });
+  });
+
+  describe('MAX_FETCH_TIMEOUT_MS', () => {
+    it('should accept timeouts up to the Node.js timer limit', () => {
+      updateGlobalFetchTimeouts(MAX_FETCH_TIMEOUT_MS, MAX_FETCH_TIMEOUT_MS);
+
+      expect(getGlobalFetchTimeouts()).toEqual({
+        headersTimeoutMs: 2_147_483_647,
+        bodyTimeoutMs: 2_147_483_647,
+      });
     });
   });
 

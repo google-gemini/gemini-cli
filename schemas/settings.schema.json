@@ -192,6 +192,18 @@
           "default": 10,
           "type": "number"
         },
+        "requestHeadersTimeoutMs": {
+          "title": "Request Headers Timeout (ms)",
+          "description": "How long to wait, in milliseconds, for the model API to start responding before the request is aborted and retried. Defaults to 60000 (60 seconds). Raise this for long-thinking models.",
+          "markdownDescription": "How long to wait, in milliseconds, for the model API to start responding before the request is aborted and retried. Defaults to 60000 (60 seconds). Raise this for long-thinking models.\n\n- Category: `General`\n- Requires restart: `yes`",
+          "type": "number"
+        },
+        "requestBodyTimeoutMs": {
+          "title": "Request Body Timeout (ms)",
+          "description": "How long a streaming model API response may stay silent, in milliseconds, before it is aborted and retried. Defaults to 300000 (5 minutes). Raise this if long tool calls are dropped with UND_ERR_BODY_TIMEOUT.",
+          "markdownDescription": "How long a streaming model API response may stay silent, in milliseconds, before it is aborted and retried. Defaults to 300000 (5 minutes). Raise this if long tool calls are dropped with UND_ERR_BODY_TIMEOUT.\n\n- Category: `General`\n- Requires restart: `yes`",
+          "type": "number"
+        },
         "debugKeystrokeLogging": {
           "title": "Debug Keystroke Logging",
           "description": "Enable debug logging of keystrokes to the console.",

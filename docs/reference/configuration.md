@@ -206,6 +206,23 @@ their corresponding top-level category object in your `settings.json` file.
     model. Cannot exceed 10.
   - **Default:** `10`
 
+- **`general.requestHeadersTimeoutMs`** (number):
+
+  - **Description:** How long to wait, in milliseconds, for the model API to
+    start responding before the request is aborted and retried. Defaults to
+    60000 (60 seconds). Raise this for long-thinking models.
+  - **Default:** `undefined`
+  - **Requires restart:** Yes
+
+- **`general.requestBodyTimeoutMs`** (number):
+
+  - **Description:** How long a streaming model API response may stay silent, in
+    milliseconds, before it is aborted and retried. Defaults to 300000 (5
+    minutes). Raise this if long tool calls are dropped with
+    UND_ERR_BODY_TIMEOUT.
+  - **Default:** `undefined`
+  - **Requires restart:** Yes
+
 - **`general.debugKeystrokeLogging`** (boolean):
 
   - **Description:** Enable debug logging of keystrokes to the console.
