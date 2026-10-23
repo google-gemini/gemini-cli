@@ -26,6 +26,7 @@ import {
   ResourceListChangedNotificationSchema,
   ToolListChangedNotificationSchema,
   ProgressNotificationSchema,
+  type Tool as McpTool,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { DiscoveredMCPTool } from './mcp-tool.js';
 
@@ -38,8 +39,10 @@ import {
   McpClient,
   populateMcpServerCommand,
   discoverPrompts,
+  discoverTools,
   type McpContext,
 } from './mcp-client.js';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { McpComplianceTransport } from './mcp-compliance-transport.js';
 import type { ToolRegistry } from './tool-registry.js';
 import type { ResourceRegistry } from '../resources/resource-registry.js';
@@ -47,7 +50,6 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { cleanupTmpDir } from '@google/gemini-cli-test-utils';
-import { coreEvents } from '../utils/events.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
 
 interface TestableTransport {
@@ -122,6 +124,196 @@ describe('mcp-client', () => {
     await cleanupTmpDir(testWorkspace);
     workspaceContext = null as unknown as WorkspaceContext;
     vi.restoreAllMocks();
+  });
+
+  describe('paginated tool discovery', () => {
+    const tool = (name: string): McpTool => ({
+      name,
+      inputSchema: { type: 'object', properties: {} },
+    });
+
+    const firstTool = tool('firstTool');
+    const secondTool = tool('secondTool');
+
+    it.each([
+      {
+        name: 'a single page',
+        pages: [{ tools: [firstTool, secondTool] }],
+        cursors: [undefined],
+      },
+      {
+        name: 'multiple pages',
+        pages: [
+          { tools: [firstTool], nextCursor: 'page-two' },
+          { tools: [secondTool] },
+        ],
+        cursors: [undefined, 'page-two'],
+      },
+      {
+        name: 'an empty first page',
+        pages: [
+          { tools: [], nextCursor: 'page-two' },
+          { tools: [firstTool, secondTool] },
+        ],
+        cursors: [undefined, 'page-two'],
+      },
+      {
+        name: 'an empty intermediate page',
+        pages: [
+          { tools: [firstTool], nextCursor: 'page-two' },
+          { tools: [], nextCursor: 'page-three' },
+          { tools: [secondTool] },
+        ],
+        cursors: [undefined, 'page-two', 'page-three'],
+      },
+      {
+        name: 'an empty-string cursor',
+        pages: [
+          { tools: [firstTool], nextCursor: '' },
+          { tools: [secondTool] },
+        ],
+        cursors: [undefined, ''],
+      },
+    ])('discovers all tools with $name', async ({ pages, cursors }) => {
+      const listTools = vi.fn();
+      for (const page of pages) listTools.mockResolvedValueOnce(page);
+      const sdkClient = {
+        getServerCapabilities: () => ({ tools: {} }),
+        listTools,
+      } as unknown as ClientLib.Client;
+      const options = { timeout: 2000, signal: new AbortController().signal };
+
+      const tools = await discoverTools(
+        'test-server',
+        {},
+        sdkClient,
+        MOCK_CONTEXT,
+        createMockMessageBus(),
+        options,
+      );
+
+      expect(tools.map((discovered) => discovered.serverToolName)).toEqual([
+        'firstTool',
+        'secondTool',
+      ]);
+      expect(listTools.mock.calls).toEqual(
+        cursors.map((cursor) => [
+          cursor === undefined ? {} : { cursor },
+          options,
+        ]),
+      );
+    });
+
+    it('applies include and exclude filters to every page', async () => {
+      const sdkClient = {
+        getServerCapabilities: () => ({ tools: {} }),
+        listTools: vi
+          .fn()
+          .mockResolvedValueOnce({
+            tools: [firstTool],
+            nextCursor: 'page-two',
+          })
+          .mockResolvedValueOnce({ tools: [secondTool, tool('unlisted')] }),
+      } as unknown as ClientLib.Client;
+
+      const tools = await discoverTools(
+        'test-server',
+        {
+          includeTools: ['firstTool', 'secondTool'],
+          excludeTools: ['firstTool'],
+        },
+        sdkClient,
+        MOCK_CONTEXT,
+        createMockMessageBus(),
+      );
+
+      expect(tools.map((discovered) => discovered.serverToolName)).toEqual([
+        'secondTool',
+      ]);
+    });
+
+    it.each(['before discovery', 'between pages', 'on the final page'])(
+      'stops when cancelled %s',
+      async (when) => {
+        const controller = new AbortController();
+        const reason = new Error('Discovery cancelled');
+        const listTools = vi.fn().mockImplementation(async () => {
+          controller.abort(reason);
+          return {
+            tools: [firstTool],
+            nextCursor: when === 'on the final page' ? undefined : 'page-two',
+          };
+        });
+        if (when === 'before discovery') controller.abort(reason);
+        const sdkClient = {
+          getServerCapabilities: () => ({ tools: {} }),
+          listTools,
+        } as unknown as ClientLib.Client;
+
+        await expect(
+          discoverTools(
+            'test-server',
+            {},
+            sdkClient,
+            MOCK_CONTEXT,
+            createMockMessageBus(),
+            { signal: controller.signal },
+          ),
+        ).rejects.toBe(reason);
+        expect(listTools).toHaveBeenCalledTimes(
+          when === 'before discovery' ? 0 : 1,
+        );
+      },
+    );
+
+    it.each([
+      ['same-cursor', 'same-cursor'],
+      ['first-cursor', 'second-cursor', 'first-cursor'],
+    ])('rejects a pagination cursor cycle %j', async (...cursors) => {
+      const listTools = vi
+        .fn()
+        .mockRejectedValue(new Error('Unexpected additional page request'));
+      for (const cursor of cursors) {
+        listTools.mockResolvedValueOnce({ tools: [], nextCursor: cursor });
+      }
+      const sdkClient = {
+        getServerCapabilities: () => ({ tools: {} }),
+        listTools,
+      } as unknown as ClientLib.Client;
+
+      await expect(
+        discoverTools(
+          'test-server',
+          {},
+          sdkClient,
+          MOCK_CONTEXT,
+          createMockMessageBus(),
+        ),
+      ).rejects.toThrow('Repeated pagination cursor');
+      expect(listTools).toHaveBeenCalledTimes(cursors.length);
+    });
+
+    it('still accepts a server without tools/list on the first page', async () => {
+      const sdkClient = {
+        getServerCapabilities: () => ({ tools: {} }),
+        listTools: vi
+          .fn()
+          .mockRejectedValue(
+            new McpError(ErrorCode.MethodNotFound, 'No tools'),
+          ),
+      } as unknown as ClientLib.Client;
+
+      await expect(
+        discoverTools(
+          'test-server',
+          {},
+          sdkClient,
+          MOCK_CONTEXT,
+          createMockMessageBus(),
+        ),
+      ).resolves.toEqual([]);
+      expect(MOCK_CONTEXT.emitMcpDiagnostic).not.toHaveBeenCalled();
+    });
   });
 
   describe('McpClient', () => {
@@ -1427,7 +1619,7 @@ describe('mcp-client', () => {
       expect(toolUpdateCall).toBeDefined();
     });
 
-    it('should refresh tools and notify manager when notification is received', async () => {
+    it('should publish every refreshed tool page before notifying the manager', async () => {
       // Setup mocks
       const mockedClient = {
         connect: vi.fn(),
@@ -1435,14 +1627,25 @@ describe('mcp-client', () => {
           .fn()
           .mockReturnValue({ tools: { listChanged: true } }),
         setNotificationHandler: vi.fn(),
-        listTools: vi.fn().mockResolvedValue({
-          tools: [
-            {
-              name: 'newTool',
-              inputSchema: { type: 'object', properties: {} },
-            },
-          ],
-        }),
+        listTools: vi
+          .fn()
+          .mockResolvedValueOnce({
+            tools: [
+              {
+                name: 'newTool',
+                inputSchema: { type: 'object', properties: {} },
+              },
+            ],
+            nextCursor: 'page-two',
+          })
+          .mockResolvedValueOnce({
+            tools: [
+              {
+                name: 'laterTool',
+                inputSchema: { type: 'object', properties: {} },
+              },
+            ],
+          }),
         listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
         listResources: vi.fn().mockResolvedValue({ resources: [] }),
         request: vi.fn().mockResolvedValue({}),
@@ -1507,10 +1710,16 @@ describe('mcp-client', () => {
       );
 
       // It should fetch new tools (listTools called inside discoverTools)
-      expect(mockedClient.listTools).toHaveBeenCalled();
+      expect(mockedClient.listTools).toHaveBeenCalledTimes(2);
 
       // It should register the new tool
-      expect(mockedToolRegistry.registerTool).toHaveBeenCalled();
+      expect(mockedToolRegistry.registerTool).toHaveBeenCalledTimes(2);
+      expect(mockedToolRegistry.registerTool).toHaveBeenCalledWith(
+        expect.objectContaining({ serverToolName: 'newTool' }),
+      );
+      expect(mockedToolRegistry.registerTool).toHaveBeenCalledWith(
+        expect.objectContaining({ serverToolName: 'laterTool' }),
+      );
 
       // It should notify the manager
       expect(onContextUpdatedSpy).toHaveBeenCalled();
@@ -1524,68 +1733,98 @@ describe('mcp-client', () => {
       );
     });
 
-    it('should handle errors during tool refresh gracefully', async () => {
-      const mockedClient = {
-        connect: vi.fn(),
-        getServerCapabilities: vi
-          .fn()
-          .mockReturnValue({ tools: { listChanged: true } }),
-        setNotificationHandler: vi.fn(),
-        // Simulate error during discovery
-        listTools: vi.fn().mockRejectedValue(new Error('Network blip')),
-        request: vi.fn().mockResolvedValue({}),
-        registerCapabilities: vi.fn().mockResolvedValue({}),
-        setRequestHandler: vi.fn().mockResolvedValue({}),
-      };
+    it.each([
+      { failingPage: 'first', error: new Error('Network blip') },
+      { failingPage: 'later', error: new Error('Network blip') },
+      {
+        failingPage: 'later',
+        error: new McpError(ErrorCode.MethodNotFound, 'tools/list unavailable'),
+      },
+    ])(
+      'should preserve existing tools when the $failingPage refresh page fails with $error',
+      async ({ failingPage, error }) => {
+        vi.useFakeTimers();
+        const mockedClient = {
+          connect: vi.fn(),
+          getServerCapabilities: vi
+            .fn()
+            .mockReturnValue({ tools: { listChanged: true } }),
+          setNotificationHandler: vi.fn(),
+          // Simulate error during discovery
+          listTools: vi.fn().mockRejectedValue(error),
+          request: vi.fn().mockResolvedValue({}),
+          registerCapabilities: vi.fn().mockResolvedValue({}),
+          setRequestHandler: vi.fn().mockResolvedValue({}),
+        };
+        if (failingPage === 'later') {
+          mockedClient.listTools.mockResolvedValueOnce({
+            tools: [
+              {
+                name: 'newTool',
+                inputSchema: { type: 'object', properties: {} },
+              },
+            ],
+            nextCursor: 'page-two',
+          });
+        }
 
-      vi.mocked(ClientLib.Client).mockReturnValue(
-        mockedClient as unknown as ClientLib.Client,
-      );
-      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
-        {} as SdkClientStdioLib.StdioClientTransport,
-      );
-
-      const mockedToolRegistry = {
-        removeMcpToolsByServer: vi.fn(),
-        getToolsByServer: vi.fn().mockReturnValue([]),
-        getMessageBus: vi.fn().mockReturnValue(undefined),
-      } as unknown as ToolRegistry;
-
-      const client = new McpClient(
-        'test-server',
-        { command: 'test-command' },
-        workspaceContext,
-        MOCK_CONTEXT,
-        false,
-        '0.0.1',
-      );
-
-      await client.connect();
-      // INJECTED REGISTRIES
-      (client as any).registeredRegistries?.add({
-        toolRegistry: mockedToolRegistry,
-        promptRegistry: {} as PromptRegistry,
-        resourceRegistry: {} as ResourceRegistry,
-      });
-
-      const toolUpdateCall =
-        mockedClient.setNotificationHandler.mock.calls.find(
-          (call) => call[0] === ToolListChangedNotificationSchema,
+        vi.mocked(ClientLib.Client).mockReturnValue(
+          mockedClient as unknown as ClientLib.Client,
         );
-      const notificationCallback = toolUpdateCall![1];
+        vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+          {} as SdkClientStdioLib.StdioClientTransport,
+        );
 
-      // Trigger notification - should fail internally but catch the error
-      await notificationCallback();
+        const mockedToolRegistry = {
+          removeMcpToolsByServer: vi.fn(),
+          getToolsByServer: vi.fn().mockReturnValue([]),
+          getMessageBus: vi.fn().mockReturnValue(undefined),
+        } as unknown as ToolRegistry;
 
-      // Should NOT try to remove tools because discovery failed (atomic refresh)
-      expect(mockedToolRegistry.removeMcpToolsByServer).not.toHaveBeenCalled();
+        const client = new McpClient(
+          'test-server',
+          { command: 'test-command' },
+          workspaceContext,
+          MOCK_CONTEXT,
+          false,
+          '0.0.1',
+        );
 
-      // Should NOT emit success feedback
-      expect(coreEvents.emitFeedback).not.toHaveBeenCalledWith(
-        'info',
-        expect.stringContaining('Tools updated'),
-      );
-    });
+        await client.connect();
+        // INJECTED REGISTRIES
+        (client as any).registeredRegistries?.add({
+          toolRegistry: mockedToolRegistry,
+          promptRegistry: {} as PromptRegistry,
+          resourceRegistry: {} as ResourceRegistry,
+        });
+
+        const toolUpdateCall =
+          mockedClient.setNotificationHandler.mock.calls.find(
+            (call) => call[0] === ToolListChangedNotificationSchema,
+          );
+        const notificationCallback = toolUpdateCall![1];
+
+        // Trigger notification - should fail internally but catch the error
+        await notificationCallback();
+
+        // Should NOT try to remove tools because discovery failed (atomic refresh)
+        expect(
+          mockedToolRegistry.removeMcpToolsByServer,
+        ).not.toHaveBeenCalled();
+        expect(mockedClient.listTools).toHaveBeenCalledTimes(
+          failingPage === 'later' ? 2 : 1,
+        );
+
+        // Should NOT emit success feedback
+        expect(MOCK_CONTEXT.emitMcpDiagnostic).not.toHaveBeenCalledWith(
+          'info',
+          expect.stringContaining('Tools updated'),
+          undefined,
+          'test-server',
+        );
+        expect(vi.getTimerCount()).toBe(0);
+      },
+    );
 
     it('should handle concurrent updates from multiple servers', async () => {
       const createMockSdkClient = (toolName: string) => ({

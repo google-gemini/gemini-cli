@@ -36,7 +36,8 @@ The discovery process is orchestrated by `discoverMcpTools()`, which:
    `mcpServers` configuration
 2. **Establishes connections** using appropriate transport mechanisms (Stdio,
    SSE, or Streamable HTTP)
-3. **Fetches tool definitions** from each server using the MCP protocol
+3. **Fetches tool definitions** from every page of each server's `tools/list`
+   response before updating the tool registry
 4. **Sanitizes and validates** tool schemas for compatibility with the Gemini
    API
 5. **Registers tools** in the global tool registry with conflict resolution

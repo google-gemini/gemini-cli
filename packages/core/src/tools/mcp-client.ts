@@ -1318,13 +1318,34 @@ export async function discoverTools(
     progressReporter?: McpProgressReporter;
   },
 ): Promise<DiscoveredMCPTool[]> {
+  let cursor: string | undefined;
   try {
     // Only request tools if the server supports them.
     if (mcpClient.getServerCapabilities()?.tools == null) return [];
 
-    const response = await mcpClient.listTools({}, options);
+    const toolDefinitions: McpTool[] = [];
+    const seenCursors = new Set<string>();
+    do {
+      options?.signal?.throwIfAborted();
+      const response = await mcpClient.listTools(
+        cursor === undefined ? {} : { cursor },
+        options,
+      );
+      options?.signal?.throwIfAborted();
+      toolDefinitions.push(...response.tools);
+      cursor = response.nextCursor;
+      if (cursor !== undefined) {
+        if (seenCursors.has(cursor)) {
+          throw new Error(
+            `Repeated pagination cursor while discovering tools from ${mcpServerName}`,
+          );
+        }
+        seenCursors.add(cursor);
+      }
+    } while (cursor !== undefined);
+
     const discoveredTools: DiscoveredMCPTool[] = [];
-    for (const toolDef of response.tools) {
+    for (const toolDef of toolDefinitions) {
       try {
         if (!isEnabled(toolDef, mcpServerName, mcpServerConfig)) {
           continue;
@@ -1412,7 +1433,7 @@ export async function discoverTools(
     }
     return discoveredTools;
   } catch (error) {
-    if (!isMcpMethodNotFoundError(error)) {
+    if (!isMcpMethodNotFoundError(error) || cursor !== undefined) {
       cliConfig.emitMcpDiagnostic(
         'error',
         `Error discovering tools from ${mcpServerName}: ${getErrorMessage(
