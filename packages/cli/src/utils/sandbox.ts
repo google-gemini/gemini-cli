@@ -42,6 +42,8 @@ import {
   BUILTIN_SEATBELT_PROFILES,
   isSensitiveHostPath,
   sanitizeSettingsForSandbox,
+  isRootlessPodman,
+  sandboxFlagsSetUserns,
 } from './sandboxUtils.js';
 import { BUILTIN_SEATBELT_PROFILE_CONTENTS } from './sandboxBuiltinProfiles.js';
 import { IdeBridge, resolveIdeBridgeUpstream } from './ideBridge.js';
@@ -497,13 +499,14 @@ export async function start_sandbox(
     }
 
     // add custom flags from SANDBOX_FLAGS
-    if (process.env['SANDBOX_FLAGS']) {
-      const flags = parse(process.env['SANDBOX_FLAGS'], process.env).filter(
-        (f): f is string => typeof f === 'string',
-      );
-
-      args.push(...flags);
-    }
+    const customFlags = (
+      process.env['SANDBOX_FLAGS']
+        ? parse(process.env['SANDBOX_FLAGS'], process.env).filter(
+            (f): f is string => typeof f === 'string',
+          )
+        : []
+    ) as string[];
+    args.push(...customFlags);
 
     // add TTY only if stdin is TTY as well, i.e. for piped input don't init TTY in container
     if (process.stdin.isTTY) {
@@ -935,6 +938,26 @@ export async function start_sandbox(
       // For the user-creation logic to work, the container must start as root.
       // The entrypoint script then handles dropping privileges to the correct user.
       args.push('--user', 'root');
+
+      // Rootless Podman runs the container inside a user namespace: container
+      // UID 0 maps to the host user, and any user created above UID 0 lands in
+      // the host's subuid range. With the useradd flow below, the process that
+      // writes into the bind-mounted workspace would end up owning files as a
+      // subuid the host user cannot modify, which surfaces as EACCES (e.g.
+      // node-gyp failing to remove its build directory). --userns=keep-id maps
+      // the host user's UID/GID into the container unchanged, so the mounted
+      // workspace stays owned by the host user. Docker and rootful Podman are
+      // unaffected. Users can still override this via SANDBOX_FLAGS.
+      if (
+        command === 'podman' &&
+        !sandboxFlagsSetUserns(customFlags) &&
+        (await isRootlessPodman())
+      ) {
+        debugLogger.log(
+          'rootless podman detected: adding --userns=keep-id so the sandbox user matches the host user',
+        );
+        args.push('--userns=keep-id');
+      }
 
       const uid = (await execAsync('id -u')).stdout.trim();
       const gid = (await execAsync('id -g')).stdout.trim();

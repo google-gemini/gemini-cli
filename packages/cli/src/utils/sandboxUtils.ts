@@ -8,6 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
 import { quote } from 'shell-quote';
 import {
   debugLogger,
@@ -357,6 +358,65 @@ export async function shouldUseCurrentUserInSandbox(): Promise<boolean> {
     }
   }
   return false; // Default to false if no other condition is met
+}
+
+/**
+ * Returns true when the given SANDBOX_FLAGS tokens already configure a
+ * --userns option, in which case the CLI must not add its own user-namespace
+ * settings.
+ */
+export function sandboxFlagsSetUserns(flags: readonly string[]): boolean {
+  return flags.some(
+    (flag) => flag === '--userns' || flag.startsWith('--userns='),
+  );
+}
+
+/**
+ * Parses the output of `podman info --format '{{.Host.Security.Rootless}}'`.
+ */
+export function parsePodmanRootlessInfo(output: string): boolean {
+  return output.trim().toLowerCase() === 'true';
+}
+
+/**
+ * Timeout for the `podman info` probe so an unresponsive container daemon
+ * cannot hang the CLI indefinitely.
+ */
+const PODMAN_INFO_TIMEOUT_MS = 5_000;
+
+function execFileAsync(command: string, args: string[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(
+      command,
+      args,
+      { timeout: PODMAN_INFO_TIMEOUT_MS },
+      (err, stdout) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(stdout);
+        }
+      },
+    );
+  });
+}
+
+/**
+ * Detects whether the local Podman service runs rootless. When detection
+ * fails (e.g. podman is not installed) or the probe times out, returns
+ * false so the sandbox behavior stays unchanged.
+ */
+export async function isRootlessPodman(): Promise<boolean> {
+  try {
+    const stdout = await execFileAsync('podman', [
+      'info',
+      '--format',
+      '{{.Host.Security.Rootless}}',
+    ]);
+    return parsePodmanRootlessInfo(stdout);
+  } catch {
+    return false;
+  }
 }
 
 export function parseImageName(image: string): string {

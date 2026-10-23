@@ -9,6 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
 import { resolveToRealPath, homedir } from '@google/gemini-cli-core';
 import {
   getContainerPath,
@@ -21,11 +22,15 @@ import {
   isCredentialOrSensitivePath,
   prepareIsolatedSettingsDir,
   SENSITIVE_SETTINGS_FILENAMES,
+  isRootlessPodman,
+  parsePodmanRootlessInfo,
+  sandboxFlagsSetUserns,
 } from './sandboxUtils.js';
 
 vi.mock('node:os');
 vi.mock('node:fs');
 vi.mock('node:fs/promises');
+vi.mock('node:child_process');
 vi.mock('@google/gemini-cli-core', () => ({
   debugLogger: {
     log: vi.fn(),
@@ -762,4 +767,114 @@ describe('sandboxUtils', () => {
       expect(fs.cpSync).not.toHaveBeenCalled();
     });
   });
+  describe('sandboxFlagsSetUserns', () => {
+    it('should detect --userns with a separate value', () => {
+      expect(
+        sandboxFlagsSetUserns(['--network', 'host', '--userns', 'keep-id']),
+      ).toBe(true);
+    });
+
+    it('should detect the --userns=value form', () => {
+      expect(sandboxFlagsSetUserns(['--userns=keep-id'])).toBe(true);
+      expect(sandboxFlagsSetUserns(['--userns=auto'])).toBe(true);
+    });
+
+    it('should not be confused by unrelated flags', () => {
+      expect(
+        sandboxFlagsSetUserns(['--user', '1000:1000', '--network', 'host']),
+      ).toBe(false);
+      expect(sandboxFlagsSetUserns(['--user=root'])).toBe(false);
+    });
+
+    it('should return false when no flags are set', () => {
+      expect(sandboxFlagsSetUserns([])).toBe(false);
+    });
+  });
+
+  describe('parsePodmanRootlessInfo', () => {
+    it('should parse rootless output', () => {
+      expect(parsePodmanRootlessInfo('true')).toBe(true);
+      expect(parsePodmanRootlessInfo('true\n')).toBe(true);
+    });
+
+    it('should parse rootful output', () => {
+      expect(parsePodmanRootlessInfo('false')).toBe(false);
+      expect(parsePodmanRootlessInfo('')).toBe(false);
+    });
+
+    it('should be case-insensitive and trim whitespace', () => {
+      expect(parsePodmanRootlessInfo('  True  ')).toBe(true);
+      expect(parsePodmanRootlessInfo('FALSE')).toBe(false);
+    });
+  });
+
+  describe('isRootlessPodman', () => {
+    it('should return true when podman reports a rootless service', async () => {
+      vi.mocked(execFile).mockImplementation(
+        ((_cmd: string, _args: string[], _options: unknown, cb: unknown) => {
+          (
+            cb as (err: Error | null, stdout: string, stderr: string) => void
+          )(null, 'true\n', '');
+        }) as unknown as typeof execFile,
+      );
+      expect(await isRootlessPodman()).toBe(true);
+    });
+
+    it('should return false when podman reports a rootful service', async () => {
+      vi.mocked(execFile).mockImplementation(
+        ((_cmd: string, _args: string[], _options: unknown, cb: unknown) => {
+          (
+            cb as (err: Error | null, stdout: string, stderr: string) => void
+          )(null, 'false', '');
+        }) as unknown as typeof execFile,
+      );
+      expect(await isRootlessPodman()).toBe(false);
+    });
+
+    it('should return false when podman info fails', async () => {
+      vi.mocked(execFile).mockImplementation(
+        ((_cmd: string, _args: string[], _options: unknown, cb: unknown) => {
+          (
+            cb as (err: Error | null, stdout: string, stderr: string) => void
+          )(new Error('podman not found'), '', '');
+        }) as unknown as typeof execFile,
+      );
+      expect(await isRootlessPodman()).toBe(false);
+    });
+
+    it('should query podman info for the rootless status', async () => {
+      vi.mocked(execFile).mockImplementation(
+        ((_cmd: string, _args: string[], _options: unknown, cb: unknown) => {
+          (
+            cb as (err: Error | null, stdout: string, stderr: string) => void
+          )(null, 'true', '');
+        }) as unknown as typeof execFile,
+      );
+      await isRootlessPodman();
+      expect(execFile).toHaveBeenCalledWith(
+        'podman',
+        ['info', '--format', '{{.Host.Security.Rootless}}'],
+        expect.objectContaining({ timeout: expect.any(Number) }),
+        expect.any(Function),
+      );
+    });
+
+    it('should return false when the podman info probe times out', async () => {
+      vi.mocked(execFile).mockImplementation(
+        ((_cmd: string, _args: string[], _options: unknown, cb: unknown) => {
+          const err = new Error('Command timed out') as Error & {
+            killed: boolean;
+            signal: string | null;
+          };
+          err.killed = true;
+          err.signal = 'SIGTERM';
+          (
+            cb as (err: Error | null, stdout: string, stderr: string) => void
+          )(err, '', '');
+        }) as unknown as typeof execFile,
+      );
+      expect(await isRootlessPodman()).toBe(false);
+    });
+  });
+
 });
