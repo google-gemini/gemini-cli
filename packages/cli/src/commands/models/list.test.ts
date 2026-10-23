@@ -275,9 +275,7 @@ describe('models list command', () => {
       const stderrSpy = vi
         .spyOn(process.stderr, 'write')
         .mockImplementation(() => true);
-      mockLoadCliConfig.mockRejectedValueOnce(
-        new Error('Config load failure'),
-      );
+      mockLoadCliConfig.mockRejectedValueOnce(new Error('Config load failure'));
 
       if (typeof listCommand.handler === 'function') {
         await listCommand.handler({

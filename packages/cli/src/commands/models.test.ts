@@ -45,7 +45,9 @@ describe('modelsCommand', () => {
   it('should have a safe empty handler', () => {
     if (typeof modelsCommand.handler === 'function') {
       expect(
-        modelsCommand.handler({} as Parameters<typeof modelsCommand.handler>[0]),
+        modelsCommand.handler(
+          {} as Parameters<typeof modelsCommand.handler>[0],
+        ),
       ).toBeUndefined();
     }
   });
