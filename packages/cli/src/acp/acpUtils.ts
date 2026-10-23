@@ -11,6 +11,7 @@ import {
   Kind,
   ApprovalMode,
   GEMINI_MODEL_ALIAS_AUTO,
+  GEMINI_4_ARGON_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
@@ -315,6 +316,10 @@ export function buildAvailableModels(
     {
       value: DEFAULT_GEMINI_FLASH_LITE_MODEL,
       title: getDisplayString(DEFAULT_GEMINI_FLASH_LITE_MODEL),
+    },
+    {
+      value: GEMINI_4_ARGON_MODEL,
+      title: getDisplayString(GEMINI_4_ARGON_MODEL),
     },
   ];
 
