@@ -277,6 +277,47 @@ describe('useSessionResume', () => {
       expect(result.current.loadHistoryForResume).toBe(initialCallback);
     });
 
+    it('should not restore directories if resumeChat fails', async () => {
+      mockGeminiClient.resumeChat.mockRejectedValueOnce(
+        new Error('Network error during resume'),
+      );
+
+      const mockAddDirectories = vi.fn();
+      const mockWorkspaceContext = {
+        addDirectories: mockAddDirectories,
+      };
+      const configWithWorkspace = {
+        ...mockConfig,
+        getWorkspaceContext: vi.fn().mockReturnValue(mockWorkspaceContext),
+      };
+
+      const { result } = await renderHook(() =>
+        useSessionResume({
+          ...getDefaultProps(),
+          config: configWithWorkspace as unknown as Config,
+        }),
+      );
+
+      const resumedData: ResumedSessionData = {
+        conversation: {
+          sessionId: 'test-123',
+          projectHash: 'project-123',
+          startTime: '2025-01-01T00:00:00Z',
+          lastUpdated: '2025-01-01T01:00:00Z',
+          messages: [] as MessageRecord[],
+          directories: ['/restored/dir1'],
+        },
+        filePath: '/path/to/session.json',
+      };
+
+      await act(async () => {
+        await result.current.loadHistoryForResume([], [], resumedData);
+      });
+
+      expect(mockGeminiClient.resumeChat).toHaveBeenCalled();
+      expect(mockAddDirectories).not.toHaveBeenCalled();
+    });
+
     it('should update callback when config changes', async () => {
       const { result, rerender } = await renderHook(
         ({ config }: { config: Config }) =>
