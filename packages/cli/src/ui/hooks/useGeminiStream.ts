@@ -1544,24 +1544,18 @@ export const useGeminiStream = (
     (estimatedRequestTokenCount: number, remainingTokenCount: number) => {
       onCancelSubmit(true);
 
-      const limit = tokenLimit(config.getModel());
-
-      const isMoreThan25PercentUsed =
-        limit > 0 && remainingTokenCount < limit * 0.75;
-
-      let text = `Sending this message (${estimatedRequestTokenCount} tokens) might exceed the context window limit (${remainingTokenCount.toLocaleString()} tokens left).`;
-
-      if (isMoreThan25PercentUsed) {
-        text +=
-          ' Please try reducing the size of your message or use the `/compress` command to compress the chat history.';
-      }
+      const text =
+        `This message was not sent: it needs ${estimatedRequestTokenCount.toLocaleString()} tokens but only ` +
+        `${remainingTokenCount.toLocaleString()} remain in the context window. ` +
+        'Try narrowing the request (for example a more specific search), use the `/compress' +
+        '` command to compress the chat history, or start a new session.';
 
       addItem({
         type: 'info',
         text,
       });
     },
-    [addItem, onCancelSubmit, config],
+    [addItem, onCancelSubmit],
   );
 
   const handleChatModelEvent = useCallback(
