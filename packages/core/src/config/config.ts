@@ -3445,6 +3445,12 @@ export class Config implements McpContext, AgentLoopContext {
       return null;
     }
 
+    const blockedSegment =
+      this.getWorkspaceContext().getBlockedPathSegment?.(absolutePath) ?? null;
+    if (blockedSegment) {
+      return `Path access blocked: Path "${absolutePath}" contains blocked segment "${blockedSegment}"`;
+    }
+
     const workspaceDirs = this.getWorkspaceContext().getDirectories();
     const projectTempDir = this.storage.getProjectTempDir();
     return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
