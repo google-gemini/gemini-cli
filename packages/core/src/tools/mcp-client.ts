@@ -21,7 +21,7 @@ import {
   StreamableHTTPClientTransport,
   type StreamableHTTPClientTransportOptions,
 } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { EnvHttpProxyAgent } from 'undici';
+import { EnvHttpProxyAgent, fetch as undiciFetch } from 'undici';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import {
   ListResourcesResultSchema,
@@ -2226,8 +2226,9 @@ export async function connectToMcpServer(
 /**
  * Helper function to create the appropriate transport based on config
  * This handles the logic for httpUrl/url/type consistently
+ * Exported for testing the HTTP fetch adapter with real transports.
  */
-function createUrlTransport(
+export function createUrlTransport(
   mcpServerName: string,
   mcpServerConfig: MCPServerConfig,
   transportOptions:
@@ -2252,15 +2253,29 @@ function createUrlTransport(
   const httpOptions: StreamableHTTPClientTransportOptions = {
     ...transportOptions,
     fetch: async (url, init) => {
-      // If we have an explicit NO_PROXY, we use a proxy-aware dispatcher.
-      // We use the global fetch but pass a custom dispatcher in the init options.
-      // This avoids manual response reconstruction and dangerous type casts.
-      const res = noProxy
-        ? await globalThis.fetch(url, {
-            ...init,
-            dispatcher: agent,
-          } as RequestInit)
-        : await baseFetch(url, init);
+      let res: Response;
+      if (noProxy && !transportOptions.fetch) {
+        // Keep fetch and its dispatcher on the same Undici version. Node 26's
+        // built-in fetch uses a different dispatcher response-header contract.
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const options = {
+          ...init,
+          dispatcher: agent,
+        } as import('undici').RequestInit;
+        const response = await undiciFetch(url, options);
+        res = new Response(
+          // Both implementations use Node's Web Streams; keep the body streaming.
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          response.body as ReadableStream<Uint8Array> | null,
+          {
+            status: response.status,
+            statusText: response.statusText,
+            headers: [...response.headers.entries()],
+          },
+        );
+      } else {
+        res = await baseFetch(url, init);
+      }
 
       return init?.method === 'GET' && res.status === 404
         ? new Response(null, { status: 405, statusText: 'Method Not Allowed' })
