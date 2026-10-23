@@ -109,6 +109,25 @@ describe('formatters', () => {
     it('should handle negative durations', () => {
       expect(formatDuration(-100)).toBe('0s');
     });
+
+    describe('at unit boundaries', () => {
+      it.each([
+        // Values that round to 1000ms are shown in seconds.
+        { input: 999.4, expected: '999ms' },
+        { input: 999.5, expected: '1.0s' },
+        { input: 1000, expected: '1.0s' },
+        // Values that round to 60.0s are shown in minutes.
+        { input: 59949, expected: '59.9s' },
+        { input: 59950, expected: '1m' },
+        { input: 59999, expected: '1m' },
+        { input: 60000, expected: '1m' },
+        // Values that round to 60m are shown in hours.
+        { input: 3599499, expected: '59m 59s' },
+        { input: 3599500, expected: '1h' },
+      ])('should format $input as $expected', ({ input, expected }) => {
+        expect(formatDuration(input)).toBe(expected);
+      });
+    });
   });
 
   describe('formatTimeAgo', () => {

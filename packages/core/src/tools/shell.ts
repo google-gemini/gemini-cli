@@ -49,10 +49,15 @@ import { PARAM_ADDITIONAL_PERMISSIONS } from './definitions/base-declarations.js
 import { ApprovalMode } from '../policy/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import {
+  acknowledgeUntrustedFlags,
   extractUntrustedContext,
   findUntrustedFlags,
+  getUnacknowledgedUntrustedFlags,
   isBuildOrTestCommand,
+  isRemoteContentCommand,
   getModifiedBuildFiles,
+  resetModifiedBuildFiles,
+  REMOTE_SHELL_OUTPUT_SOURCE,
 } from '../utils/untrustedContextTracker.js';
 import { getShellDefinition } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
@@ -269,11 +274,38 @@ export class ShellToolInvocation extends BaseToolInvocation<
     return this.getContextualDetails().trim();
   }
 
+  /**
+   * Returns flags or arguments of the command that were sourced from untrusted
+   * context, excluding workspace-local paths and flags already approved for
+   * the same root commands in this session.
+   */
+  private getUntrustedFlags(command: string): string[] {
+    const untrustedContext = extractUntrustedContext(this.getHistory());
+    if (untrustedContext.untrustedTexts.length === 0) {
+      return [];
+    }
+    const config = this.context.config;
+    const targetDir = config.getTargetDir();
+    const workspaceContext = config.getWorkspaceContext();
+    const untrustedFlags = findUntrustedFlags(command, untrustedContext, {
+      cwd: this.params.dir_path
+        ? path.resolve(targetDir, this.params.dir_path)
+        : targetDir,
+      isPathWithinWorkspace: (absolutePath) =>
+        workspaceContext.isPathWithinWorkspace(absolutePath),
+    });
+    let roots: string[] = [];
+    try {
+      roots = getCommandRoots(command);
+    } catch {
+      roots = [command.trim().split(/\s+/)[0] || 'shell'];
+    }
+    return getUnacknowledgedUntrustedFlags(untrustedFlags, roots, config);
+  }
+
   hasTaintedOrBuildFileRisk(): boolean {
     const command = stripShellWrapper(this.params.command);
-    const history = this.getHistory();
-    const untrustedContext = extractUntrustedContext(history);
-    const untrustedFlags = findUntrustedFlags(command, untrustedContext);
+    const untrustedFlags = this.getUntrustedFlags(command);
     const modifiedBuildFiles = getModifiedBuildFiles(this.context.config);
     const isBuildCmd = isBuildOrTestCommand(command);
 
@@ -452,12 +484,15 @@ export class ShellToolInvocation extends BaseToolInvocation<
         .join(', ');
     }
 
-    const rootCommands = [...new Set(getCommandRoots(command))];
+    let rootCommands: string[] = [];
+    try {
+      rootCommands = [...new Set(getCommandRoots(command))];
+    } catch {
+      rootCommands = [command.trim().split(/\s+/)[0] || 'shell'];
+    }
     const rootCommand = rootCommands[0] || 'shell';
 
-    const history = this.getHistory();
-    const untrustedContext = extractUntrustedContext(history);
-    const untrustedFlags = findUntrustedFlags(command, untrustedContext);
+    const untrustedFlags = this.getUntrustedFlags(command);
     const modifiedBuildFiles = getModifiedBuildFiles(this.context.config);
     const isBuildCmd = isBuildOrTestCommand(command);
 
@@ -511,8 +546,24 @@ export class ShellToolInvocation extends BaseToolInvocation<
         isBuildCmd && modifiedBuildFiles.length > 0
           ? modifiedBuildFiles
           : undefined,
-      onConfirm: async (_outcome: ToolConfirmationOutcome) => {
+      onConfirm: async (outcome: ToolConfirmationOutcome) => {
         // Policy updates are now handled centrally by the scheduler
+        if (
+          outcome === ToolConfirmationOutcome.Cancel ||
+          outcome === ToolConfirmationOutcome.ModifyWithEditor
+        ) {
+          return;
+        }
+        // Remember approved flags and the reviewed build file state for the
+        // rest of the session so identical follow-up commands do not prompt.
+        acknowledgeUntrustedFlags(
+          untrustedFlags,
+          rootCommands,
+          this.context.config,
+        );
+        if (isBuildCmd && modifiedBuildFiles.length > 0) {
+          resetModifiedBuildFiles(this.context.config);
+        }
       },
     };
     return confirmationDetails;
@@ -1110,6 +1161,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
       const summarizeConfig =
         this.context.config.getSummarizeToolOutputConfig();
+      const outputSource = isRemoteContentCommand(strippedCommand)
+        ? REMOTE_SHELL_OUTPUT_SOURCE
+        : undefined;
       const executionError = result.error
         ? {
             error: {
@@ -1127,7 +1181,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
           signal,
         );
         return {
-          llmContent: wrapUntrusted(summary),
+          llmContent: wrapUntrusted(summary, outputSource),
           returnDisplay,
           ...executionError,
         };
@@ -1140,7 +1194,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
           : undefined;
 
       return {
-        llmContent: wrapUntrusted(llmContent),
+        llmContent: wrapUntrusted(llmContent, outputSource),
         display: {
           name: 'Shell',
           description: this.getDescription(),

@@ -177,11 +177,14 @@ export function sanitizeOutput(output: string): string {
 
 /**
  * Wraps text in <untrusted_context> tags to mitigate prompt injection.
+ * When provided, `source` is recorded as a `source` attribute on the tag.
  */
-export function wrapUntrusted(text: string): string {
+export function wrapUntrusted(text: string, source?: string): string {
   const escaped = text.replaceAll(
     '</untrusted_context>',
     '&lt;/untrusted_context&gt;',
   );
-  return `<untrusted_context>\n${escaped}\n</untrusted_context>`;
+  const normalizedSource = source ? source.replace(/[^\w-]/g, '') : '';
+  const attributes = normalizedSource ? ` source="${normalizedSource}"` : '';
+  return `<untrusted_context${attributes}>\n${escaped}\n</untrusted_context>`;
 }
