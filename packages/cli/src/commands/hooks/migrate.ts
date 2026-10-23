@@ -62,6 +62,8 @@ function transformMatcher(matcher: string | undefined): string | undefined {
   return transformed;
 }
 
+const MS_PER_SECOND = 1000;
+
 /**
  * Migrate a Claude Code hook configuration to Gemini format
  */
@@ -93,10 +95,10 @@ function migrateClaudeHook(claudeHook: unknown): unknown {
     migrated['type'] = 'command';
   }
 
-  // Map timeout field (Claude uses seconds, Gemini uses seconds)
-  // eslint-disable-next-line no-restricted-syntax
-  if ('timeout' in hook && typeof hook['timeout'] === 'number') {
-    migrated['timeout'] = hook['timeout'];
+  // Map timeout field (Claude uses seconds, Gemini uses milliseconds)
+  const timeout = hook['timeout'];
+  if (typeof timeout === 'number' && Number.isFinite(timeout) && timeout > 0) {
+    migrated['timeout'] = Math.round(timeout * MS_PER_SECOND);
   }
 
   return migrated;
