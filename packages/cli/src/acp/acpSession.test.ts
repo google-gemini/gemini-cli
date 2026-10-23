@@ -30,6 +30,7 @@ import {
   MessageBusType,
   type ToolConfirmationRequest,
   DiscoveredMCPTool,
+  SHELL_TOOL_NAME,
 } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../config/settings.js';
 import { type Part, FinishReason } from '@google/genai';
@@ -154,6 +155,10 @@ describe('Session', () => {
       waitForMcpInit: vi.fn(),
       getDisableAlwaysAllow: vi.fn().mockReturnValue(false),
       getMaxSessionTurns: vi.fn().mockReturnValue(-1),
+      isContextManagementEnabled: vi.fn().mockReturnValue(false),
+      getTruncateToolOutputThreshold: vi.fn().mockReturnValue(40_000),
+      getUsageStatisticsEnabled: vi.fn().mockReturnValue(false),
+      storage: { getProjectTempDir: vi.fn().mockReturnValue('/tmp/project') },
       geminiClient: {
         sendMessageStream: mockSendMessageStream,
         getChat: vi.fn().mockReturnValue(mockChat),
@@ -494,6 +499,54 @@ describe('Session', () => {
         },
       },
     });
+  });
+
+  it('should truncate a large shell output before sending it to the model', async () => {
+    mockConfig.getTruncateToolOutputThreshold.mockReturnValue(1_000);
+    const hugeOutput = 'x'.repeat(100_000);
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Run shell',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(null),
+      execute: vi.fn().mockResolvedValue({ llmContent: hugeOutput }),
+    });
+
+    mockSendMessageStream
+      .mockReturnValueOnce(
+        createMockStream([
+          {
+            type: GeminiEventType.ToolCallRequest,
+            value: {
+              callId: 'call-1',
+              name: SHELL_TOOL_NAME,
+              args: {},
+              isClientInitiated: false,
+              prompt_id: 'prompt-1',
+            },
+          },
+        ]),
+      )
+      .mockReturnValueOnce(
+        createMockStream([{ type: GeminiEventType.Content, value: '' }]),
+      );
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Run it' }],
+    });
+
+    // The second request carries the function response: the head and tail
+    // of the output and where the rest is, not the whole output.
+    const sent = JSON.stringify(mockSendMessageStream.mock.calls[1][0]);
+    expect(sent).toContain('Output too large');
+    expect(sent).not.toContain('"error"');
+    expect(sent).not.toContain(hugeOutput);
+    expect(sent.length).toBeLessThan(10_000);
+
+    const recorded = mockChat.recordCompletedToolCalls.mock.calls[0][1][0];
+    expect(recorded.response.error).toBeUndefined();
+    expect(recorded.response.outputFile).toEqual(expect.any(String));
+    expect(sent).toContain(recorded.response.outputFile);
   });
 
   it('should handle tool call permission request', async () => {

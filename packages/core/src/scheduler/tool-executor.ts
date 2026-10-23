@@ -16,6 +16,7 @@ import {
   type Config,
   type AgentLoopContext,
   type ToolLiveOutput,
+  type AnyDeclarativeTool,
 } from '../index.js';
 import { isAbortError } from '../utils/errors.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
@@ -199,8 +200,15 @@ export class ToolExecutor {
     );
   }
 
-  private async truncateOutputIfNeeded(
-    call: ToolCall,
+  /**
+   * Truncates a tool's output before it is sent to the model, as configured
+   * (`tools.truncateToolOutputThreshold`), saving the full output to a file.
+   * Public so that callers that execute tools without the scheduler (the ACP
+   * session) apply the same truncation.
+   */
+  async truncateOutputIfNeeded(
+    request: ToolCallRequestInfo,
+    tool: AnyDeclarativeTool | undefined,
     content: PartListUnion,
   ): Promise<{ truncatedContent: PartListUnion; outputFile?: string }> {
     if (this.config.isContextManagementEnabled()) {
@@ -209,11 +217,11 @@ export class ToolExecutor {
         this.context.geminiClient,
         this.context.promptId,
       );
-      return distiller.distill(call.request.name, call.request.callId, content);
+      return distiller.distill(request.name, request.callId, content);
     }
 
-    const toolName = call.request.name;
-    const callId = call.request.callId;
+    const toolName = request.name;
+    const callId = request.callId;
     let outputFile: string | undefined;
 
     if (typeof content === 'string' && toolName === SHELL_TOOL_NAME) {
@@ -237,7 +245,7 @@ export class ToolExecutor {
 
         logToolOutputTruncated(
           this.config,
-          new ToolOutputTruncatedEvent(call.request.prompt_id, {
+          new ToolOutputTruncatedEvent(request.prompt_id, {
             toolName,
             originalContentLength,
             truncatedContentLength: truncatedContent.length,
@@ -261,8 +269,7 @@ export class ToolExecutor {
     } else if (
       Array.isArray(content) &&
       content.length === 1 &&
-      'tool' in call &&
-      call.tool instanceof DiscoveredMCPTool
+      tool instanceof DiscoveredMCPTool
     ) {
       const firstPart = content[0];
       if (typeof firstPart === 'object' && typeof firstPart.text === 'string') {
@@ -304,7 +311,7 @@ export class ToolExecutor {
 
           logToolOutputTruncated(
             this.config,
-            new ToolOutputTruncatedEvent(call.request.prompt_id, {
+            new ToolOutputTruncatedEvent(request.prompt_id, {
               toolName,
               originalContentLength,
               truncatedContentLength: truncatedText.length,
@@ -426,7 +433,11 @@ export class ToolExecutor {
       // Attempt to truncate and save output if we have content, even in cancellation case
       // This is to handle cases where the tool may have produced output before cancellation
       const { truncatedContent: output, outputFile: truncatedOutputFile } =
-        await this.truncateOutputIfNeeded(call, toolResult?.llmContent);
+        await this.truncateOutputIfNeeded(
+          call.request,
+          call.tool,
+          toolResult?.llmContent,
+        );
 
       outputFile = truncatedOutputFile;
       responseParts = convertToFunctionResponse(
@@ -482,7 +493,11 @@ export class ToolExecutor {
     toolResult: ToolResult,
   ): Promise<SuccessfulToolCall> {
     const { truncatedContent: content, outputFile } =
-      await this.truncateOutputIfNeeded(call, toolResult.llmContent);
+      await this.truncateOutputIfNeeded(
+        call.request,
+        'tool' in call ? call.tool : undefined,
+        toolResult.llmContent,
+      );
 
     const toolName = call.request.originalRequestName || call.request.name;
     const callId = call.request.callId;
