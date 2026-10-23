@@ -77,6 +77,11 @@ export function useSessionResume({
         });
         refreshStaticRef.current(); // Force Static component to re-render with the updated history.
 
+        // Give the history to the Gemini client. Directories are restored
+        // only after the resume succeeds, so a failed resume leaves the
+        // workspace context untouched (#29864).
+        await config.getGeminiClient()?.resumeChat(clientHistory, resumedData);
+
         // Restore directories from the resumed session
         if (
           resumedData.conversation.directories &&
@@ -84,12 +89,10 @@ export function useSessionResume({
         ) {
           const workspaceContext = config.getWorkspaceContext();
           // Add back any directories that were saved in the session
-          // but filter out ones that no longer exist
+          // but filter out ones that no longer exist (addDirectories skips
+          // unreadable ones and reports them as failures)
           workspaceContext.addDirectories(resumedData.conversation.directories);
         }
-
-        // Give the history to the Gemini client.
-        await config.getGeminiClient()?.resumeChat(clientHistory, resumedData);
       } catch (error) {
         coreEvents.emitFeedback(
           'error',

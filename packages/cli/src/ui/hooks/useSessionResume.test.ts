@@ -262,6 +262,50 @@ describe('useSessionResume', () => {
 
       expect(mockAddDirectories).not.toHaveBeenCalled();
     });
+
+    it('should leave the workspace untouched when resumeChat fails', async () => {
+      const mockAddDirectories = vi.fn();
+      const mockWorkspaceContext = {
+        addDirectories: mockAddDirectories,
+      };
+      const configWithWorkspace = {
+        ...mockConfig,
+        getWorkspaceContext: vi.fn().mockReturnValue(mockWorkspaceContext),
+      };
+      const failingClient = {
+        resumeChat: vi.fn().mockRejectedValue(new Error('boom')),
+      };
+      configWithWorkspace.getGeminiClient =
+        vi.fn().mockReturnValue(failingClient);
+
+      const { result } = await renderHook(() =>
+        useSessionResume({
+          ...getDefaultProps(),
+          config: configWithWorkspace as unknown as Config,
+        }),
+      );
+
+      const resumedData: ResumedSessionData = {
+        conversation: {
+          sessionId: 'test-123',
+          projectHash: 'project-123',
+          startTime: '2025-01-01T00:00:00Z',
+          lastUpdated: '2025-01-01T01:00:00Z',
+          messages: [] as MessageRecord[],
+          directories: ['/restored/dir1', '/restored/dir2'],
+        },
+        filePath: '/path/to/session.json',
+      };
+
+      await act(async () => {
+        await result.current.loadHistoryForResume([], [], resumedData);
+      });
+
+      // A failed resume restores nothing: the directories that were saved
+      // with the session stay out of the current workspace context (#29864).
+      expect(failingClient.resumeChat).toHaveBeenCalled();
+      expect(mockAddDirectories).not.toHaveBeenCalled();
+    });
   });
 
   describe('callback stability', () => {
