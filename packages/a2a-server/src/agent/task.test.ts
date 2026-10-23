@@ -19,6 +19,7 @@ import {
 import { createMockConfig } from '../utils/testing_utils.js';
 import type { ExecutionEventBus, RequestContext } from '@a2a-js/sdk/server';
 import { CoderAgentEvent } from '../types.js';
+import { logger } from '../utils/logger.js';
 
 const mockProcessRestorableToolCalls = vi.hoisted(() => vi.fn());
 
@@ -210,6 +211,90 @@ describe('Task', () => {
         expect.anything(),
         expect.anything(),
       );
+    });
+
+    it('should swallow cancellation/abort errors from scheduler without triggering unhandledRejection', async () => {
+      // @ts-expect-error - Calling private constructor for test purposes.
+      const task = new Task(
+        'task-id',
+        'context-id',
+        mockConfig as Config,
+        mockEventBus,
+      );
+
+      const abortController = new AbortController();
+      abortController.abort();
+
+      const loggerErrorSpy = vi
+        .spyOn(logger, 'error')
+        .mockImplementation(() => logger);
+      const unhandledRejections: unknown[] = [];
+      const onUnhandled = (err: unknown) => unhandledRejections.push(err);
+      process.on('unhandledRejection', onUnhandled);
+
+      try {
+        vi.spyOn(task.scheduler, 'schedule').mockRejectedValue(
+          new Error('Tool call cancelled while in queue.'),
+        );
+
+        const requests: ToolCallRequestInfo[] = [
+          {
+            callId: '1',
+            name: 'run_shell_command',
+            args: { command: 'ls' },
+            isClientInitiated: false,
+            prompt_id: 'prompt-id-1',
+          },
+        ];
+
+        await task.scheduleToolCalls(requests, abortController.signal);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+
+        expect(unhandledRejections).toHaveLength(0);
+        expect(loggerErrorSpy).not.toHaveBeenCalled();
+      } finally {
+        process.off('unhandledRejection', onUnhandled);
+        loggerErrorSpy.mockRestore();
+      }
+    });
+
+    it('should log unexpected errors from scheduler with logger.error', async () => {
+      // @ts-expect-error - Calling private constructor for test purposes.
+      const task = new Task(
+        'task-id',
+        'context-id',
+        mockConfig as Config,
+        mockEventBus,
+      );
+
+      const loggerErrorSpy = vi
+        .spyOn(logger, 'error')
+        .mockImplementation(() => logger);
+      const abortController = new AbortController();
+      const unexpectedError = new Error('Unexpected scheduler failure');
+
+      vi.spyOn(task.scheduler, 'schedule').mockRejectedValue(unexpectedError);
+
+      const requests: ToolCallRequestInfo[] = [
+        {
+          callId: '1',
+          name: 'run_shell_command',
+          args: { command: 'ls' },
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-1',
+        },
+      ];
+
+      await task.scheduleToolCalls(requests, abortController.signal);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '[Task] Unexpected error while scheduling tool calls:',
+        ),
+        unexpectedError,
+      );
+      loggerErrorSpy.mockRestore();
     });
   });
 

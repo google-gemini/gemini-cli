@@ -15,6 +15,7 @@ import {
   getAllMCPServerStatuses,
   MCPServerStatus,
   isNodeError,
+  isAbortError,
   getErrorMessage,
   parseAndFormatApiError,
   safeLiteralReplace,
@@ -852,7 +853,24 @@ export class Task {
     }
 
     // Fire and forget so we don't block the executor loop before waitForPendingTools can be called
-    void this.scheduler.schedule(updatedRequests, abortSignal);
+    void this.scheduler
+      .schedule(updatedRequests, abortSignal)
+      .catch((error: unknown) => {
+        if (
+          abortSignal.aborted ||
+          isAbortError(error) ||
+          (error instanceof Error &&
+            (error.message.includes('cancelled') ||
+              error.message.includes('Operation cancelled')))
+        ) {
+          // Expected cancellation or abort; silently swallow to avoid unhandled rejection crash
+          return;
+        }
+        logger.error(
+          '[Task] Unexpected error while scheduling tool calls:',
+          error,
+        );
+      });
   }
 
   async acceptAgentMessage(event: ServerGeminiStreamEvent): Promise<void> {
