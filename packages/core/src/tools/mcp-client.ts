@@ -98,6 +98,14 @@ import {
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
+/**
+ * Default timeout for the `tools/list` discovery request. Discovery should
+ * fail fast, so it uses the MCP SDK's request default (also used by
+ * `prompts/list` and `resources/list`) rather than the 10-minute tool-call
+ * default. An explicit per-server `timeout` still takes precedence.
+ */
+export const MCP_DISCOVERY_TIMEOUT_MSEC = 60 * 1000; // default to 1 minute
+
 export type DiscoveredMCPPrompt = Prompt & {
   serverName: string;
   invoke: (params: Record<string, unknown>) => Promise<GetPromptResult>;
@@ -342,9 +350,8 @@ export class McpClient implements McpProgressReporter {
       cliConfig,
       messageBus,
       {
-        ...(options ?? {
-          timeout: this.serverConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
-        }),
+        timeout: this.serverConfig.timeout ?? MCP_DISCOVERY_TIMEOUT_MSEC,
+        ...options,
         progressReporter: this,
       },
     );
@@ -1253,7 +1260,7 @@ export async function connectAndDiscover(
       mcpClient,
       cliConfig,
       toolRegistry.messageBus,
-      { timeout: mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC },
+      { timeout: mcpServerConfig.timeout ?? MCP_DISCOVERY_TIMEOUT_MSEC },
     );
 
     // If we have neither prompts nor tools, it's a failed discovery
