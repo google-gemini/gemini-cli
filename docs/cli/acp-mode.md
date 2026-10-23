@@ -91,6 +91,85 @@ to control Gemini CLI.
   example, to `auto-approve`).
 - `unstable_setSessionModel`: Changes the model for the current session.
 
+### Gemini CLI extensions
+
+Gemini CLI adds the following
+[ACP extensions](https://agentclientprotocol.com/protocol/extensibility). They
+are advertised under `agentCapabilities._meta["geminicli.com"]` in the
+`initialize` response. A client that doesn't use them needs no changes.
+
+#### Steering a running turn
+
+A client can add a user message to a running `session/prompt` turn without
+cancelling it, like [model steering](./model-steering.md) in the terminal. The
+initialize response advertises it as follows:
+
+```json
+{
+  "agentCapabilities": {
+    "_meta": {
+      "geminicli.com": {
+        "steering": {
+          "version": 1,
+          "content": ["text"],
+          "maxPending": 20,
+          "maxChars": 8000,
+          "enabled": true
+        }
+      }
+    }
+  }
+}
+```
+
+Steering is enabled for a connection when the client opts in with
+`clientCapabilities._meta["geminicli.com"].steering: true` in its `initialize`
+request, or when the user has `experimental.modelSteering` turned on. `enabled`
+tells the client which applies.
+
+To steer, send the `_geminicli.com/session/steer` request while a
+`session/prompt` is running:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 7,
+  "method": "_geminicli.com/session/steer",
+  "params": {
+    "sessionId": "…",
+    "content": [{ "type": "text", "text": "Use the existing Logger class." }]
+  }
+}
+```
+
+The result is one of the following:
+
+- `{ "status": "queued", "steerId": "st_1", "pending": 1 }`: the message will
+  reach the model in this turn, or be returned as undelivered (see below).
+- `{ "status": "no_active_turn" }`: no prompt is running and nothing was stored.
+  Send the message as a normal `session/prompt` instead.
+
+Gemini CLI adds queued messages to the next request to the model: in front of
+the results of the tool calls that are running, or as one more request if the
+model was about to finish. A running tool is not interrupted; use
+`session/cancel` for that. When a message is added, Gemini CLI sends a
+`user_message_chunk` update with the user's text and
+`_meta["geminicli.com"].steering = { "steerId": "st_1", "state": "delivered" }`.
+
+If the turn ends before a queued message reaches the model (for example, it is
+cancelled, a new `session/prompt` replaces it, or it hits the turn limit), the
+`session/prompt` response lists the message in
+`_meta["geminicli.com"].undeliveredSteering` as `[{ "steerId", "text" }]`. If
+the turn fails with an error, each undelivered message is instead sent as a
+`user_message_chunk` update with `state: "undelivered"` before the error. The
+client can put these messages back in its input box.
+
+The request fails with `-32602` for an unknown session, empty text, a non-text
+content block, text over `maxChars`, more than `maxPending` queued messages, or
+text that starts with `/` or `$` (send commands as a prompt). It fails with
+`-32000` when steering is not enabled, and with `-32601` on versions of Gemini
+CLI without steering.
+
 ### File system proxy
 
 ACP includes a proxied file system service. This means that when the agent needs

@@ -40,6 +40,7 @@ import {
   resolveAtCommandPath,
   type ResolvedAtCommandPath,
   tokenLimit,
+  formatUserHintsForModel,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import type { Part, FunctionCall } from '@google/genai';
@@ -54,6 +55,12 @@ import {
   toAcpToolKind,
   buildAvailableModes,
   RequestPermissionResponseSchema,
+  GEMINI_ACP_META_KEY,
+  STEERING_MAX_CHARS,
+  STEERING_MAX_PENDING,
+  parseUserHints,
+  steeringMeta,
+  type SteerResponse,
 } from './acpUtils.js';
 import { z } from 'zod';
 import { getAcpErrorMessage } from './acpErrors.js';
@@ -63,8 +70,23 @@ const StructuredErrorSchema = z.object({
   message: z.string().optional(),
 });
 
+interface SteeringItem {
+  id: string;
+  text: string;
+}
+
+/** Steering queued for one `session/prompt` call. */
+interface SteeringTurn {
+  signal: AbortSignal;
+  /** True only while the model loop can still deliver queued steering. */
+  accepting: boolean;
+  queue: SteeringItem[];
+}
+
 export class Session {
   private pendingPrompt: AbortController | null = null;
+  private steeringTurn: SteeringTurn | null = null;
+  private steerCounter = 0;
   private commandHandler = new CommandHandler();
   private callIdCounter = 0;
   private readonly disposeController = new AbortController();
@@ -79,6 +101,7 @@ export class Session {
     private readonly context: AgentLoopContext,
     private readonly connection: acp.AgentSideConnection,
     private readonly settings: LoadedSettings,
+    private readonly clientSteeringOptIn = false,
   ) {
     coreEvents.on(
       CoreEvent.ApprovalModeChanged,
@@ -251,7 +274,17 @@ export class Session {
       const contentString = partListUnionToString(msg.content);
 
       if (msg.type === 'user') {
-        if (contentString.trim()) {
+        const hints = parseUserHints(contentString);
+        if (hints) {
+          // Replay steering as the user's own words, not the wrapped prompt.
+          for (const hint of hints) {
+            await this.sendUpdate({
+              sessionUpdate: 'user_message_chunk',
+              content: { type: 'text', text: hint },
+              _meta: steeringMeta('delivered'),
+            });
+          }
+        } else if (contentString.trim()) {
           await this.sendUpdate({
             sessionUpdate: 'user_message_chunk',
             content: { type: 'text', text: contentString },
@@ -316,11 +349,138 @@ export class Session {
     }
   }
 
+  isSteeringEnabled(): boolean {
+    return (
+      this.clientSteeringOptIn || this.context.config.isModelSteeringEnabled()
+    );
+  }
+
+  /**
+   * Queues a user message for the running prompt turn. It is added to the
+   * next model request, or listed as undelivered in the prompt response.
+   */
+  steer(texts: string[]): SteerResponse {
+    if (!this.isSteeringEnabled()) {
+      throw new acp.RequestError(
+        -32000,
+        'Steering is not enabled for this session',
+      );
+    }
+    const text = texts.join('\n').trim();
+    if (!text) {
+      throw new acp.RequestError(-32602, 'Steering text is empty');
+    }
+    if (text.startsWith('/') || text.startsWith('$')) {
+      throw new acp.RequestError(
+        -32602,
+        'Commands cannot be sent as steering; send them as a prompt',
+      );
+    }
+    if (text.length > STEERING_MAX_CHARS) {
+      throw new acp.RequestError(
+        -32602,
+        `Steering text exceeds ${STEERING_MAX_CHARS} characters`,
+      );
+    }
+
+    const turn = this.steeringTurn;
+    if (!turn || !turn.accepting || turn.signal.aborted) {
+      return { status: 'no_active_turn' };
+    }
+    if (turn.queue.length >= STEERING_MAX_PENDING) {
+      throw new acp.RequestError(
+        -32602,
+        `Too many pending steering messages (max ${STEERING_MAX_PENDING})`,
+      );
+    }
+
+    const steerId = `st_${++this.steerCounter}`;
+    turn.queue.push({ id: steerId, text });
+    // Lets running subagents see the message too, as in the terminal UI.
+    // This is a no-op unless experimental.modelSteering is on.
+    this.context.config.injectionService.addInjection(text, 'user_steering');
+    return { status: 'queued', steerId, pending: turn.queue.length };
+  }
+
   async prompt(params: acp.PromptRequest): Promise<acp.PromptResponse> {
     this.pendingPrompt?.abort();
     const pendingSend = new AbortController();
     this.pendingPrompt = pendingSend;
 
+    const steering: SteeringTurn = {
+      signal: pendingSend.signal,
+      accepting: false,
+      queue: [],
+    };
+    this.steeringTurn = steering;
+
+    let response: acp.PromptResponse;
+    try {
+      response = await this.#runPrompt(params, pendingSend, steering);
+    } catch (error) {
+      const undelivered = this.#endSteeringTurn(steering);
+      for (const item of undelivered) {
+        try {
+          await this.sendUpdate({
+            sessionUpdate: 'user_message_chunk',
+            content: { type: 'text', text: item.text },
+            _meta: steeringMeta('undelivered', item.id),
+          });
+        } catch (sendError) {
+          debugLogger.warn(
+            `Failed to report undelivered steering: ${sendError}`,
+          );
+        }
+      }
+      throw error;
+    }
+
+    const undelivered = this.#endSteeringTurn(steering);
+    if (undelivered.length === 0) {
+      return response;
+    }
+    return {
+      ...response,
+      _meta: {
+        ...response._meta,
+        [GEMINI_ACP_META_KEY]: {
+          undeliveredSteering: undelivered.map(({ id, text }) => ({
+            steerId: id,
+            text,
+          })),
+        },
+      },
+    };
+  }
+
+  #endSteeringTurn(steering: SteeringTurn): SteeringItem[] {
+    steering.accepting = false;
+    if (this.steeringTurn === steering) {
+      this.steeringTurn = null;
+    }
+    return steering.queue.splice(0);
+  }
+
+  /**
+   * Confirms delivery to the client and returns the text part to add to the
+   * next model request.
+   */
+  async #deliverSteering(items: SteeringItem[]): Promise<Part> {
+    for (const item of items) {
+      await this.sendUpdate({
+        sessionUpdate: 'user_message_chunk',
+        content: { type: 'text', text: item.text },
+        _meta: steeringMeta('delivered', item.id),
+      });
+    }
+    return { text: formatUserHintsForModel(items.map((i) => i.text)) ?? '' };
+  }
+
+  async #runPrompt(
+    params: acp.PromptRequest,
+    pendingSend: AbortController,
+    steering: SteeringTurn,
+  ): Promise<acp.PromptResponse> {
     await this.context.config.waitForMcpInit();
 
     const promptId = Math.random().toString(16).slice(2);
@@ -412,6 +572,7 @@ export class Session {
     let turnCount = 0;
     const maxTurns = this.context.config.getMaxSessionTurns();
 
+    steering.accepting = true;
     while (true) {
       turnCount++;
       if (maxTurns >= 0 && turnCount > maxTurns) {
@@ -420,6 +581,15 @@ export class Session {
 
       if (pendingSend.signal.aborted) {
         return { stopReason: 'cancelled' };
+      }
+
+      const pendingSteering = steering.queue.splice(0);
+      if (pendingSteering.length > 0) {
+        // Steering goes in front of the tool results, as in the terminal UI.
+        currentParts = [
+          await this.#deliverSteering(pendingSteering),
+          ...currentParts,
+        ];
       }
 
       const toolCallRequests: ToolCallRequestInfo[] = [];
@@ -588,7 +758,14 @@ export class Session {
       }
 
       if (toolCallRequests.length === 0) {
-        break;
+        // The model is done, but the user steered meanwhile: send the steering
+        // as one more request in this turn instead of ending it.
+        if (steering.queue.length === 0 || pendingSend.signal.aborted) {
+          steering.accepting = false;
+          break;
+        }
+        currentParts = [];
+        continue;
       }
 
       const toolResponseParts: Part[] = [];
