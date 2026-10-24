@@ -75,9 +75,8 @@ When Gemini CLI asks the client for permission to run an MCP tool via
 contains `server_name` (the configured name under which the MCP server was
 registered) and `tool_name` (the tool's own name as declared by that server).
 Clients can compare the server name with the servers they supplied instead of
-parsing the tool call title. Clients may also pre-authorise a client-supplied
-MCP server in `session/new` by passing `_meta: { trust: true }` on the server
-entry.
+parsing the tool call title. These fields identify the server; they are not a
+trust grant.
 
 ## Capabilities and supported methods
 

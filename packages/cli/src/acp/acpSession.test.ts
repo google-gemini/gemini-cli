@@ -1129,6 +1129,23 @@ describe('Session', () => {
       const request = await requestToolPermission();
       expect(request.toolCall).not.toHaveProperty('_meta');
     });
+
+    it('falls back to generic_server when serverName is whitespace-only', async () => {
+      const request = await requestToolPermission('   ');
+      expect(request.toolCall._meta).toEqual({
+        'gemini-cli': {
+          mcp: { server_name: 'generic_server', tool_name: 'list_items' },
+        },
+      });
+      expect(request.options).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            optionId: 'proceed_always_server',
+            name: 'Allow all "generic_server" server tools for this session',
+          }),
+        ]),
+      );
+    });
   });
 
   it('should include both diff and explanation in request_permission content for edit tools', async () => {

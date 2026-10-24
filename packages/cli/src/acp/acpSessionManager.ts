@@ -386,11 +386,6 @@ export class AcpSessionManager {
     const mergedMcpServers = { ...currentSettings.merged.mcpServers };
 
     for (const server of mcpServers) {
-      const trust =
-        typeof server._meta?.['trust'] === 'boolean'
-          ? server._meta['trust']
-          : undefined;
-
       if (
         'type' in server &&
         (server.type === 'sse' || server.type === 'http')
@@ -407,10 +402,6 @@ export class AcpSessionManager {
           server.type === 'sse' ? server.url : undefined, // url (sse)
           server.type === 'http' ? server.url : undefined, // httpUrl
           headers,
-          undefined, // tcp
-          server.type, // type
-          undefined, // timeout
-          trust, // trust
         );
       } else if ('command' in server) {
         // Stdio MCP server
@@ -423,13 +414,6 @@ export class AcpSessionManager {
           server.args,
           env,
           cwd,
-          undefined, // url
-          undefined, // httpUrl
-          undefined, // headers
-          undefined, // tcp
-          undefined, // type
-          undefined, // timeout
-          trust, // trust
         );
       }
     }

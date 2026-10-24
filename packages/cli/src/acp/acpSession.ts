@@ -761,8 +761,11 @@ export class Session {
               _meta: {
                 'gemini-cli': {
                   mcp: {
-                    server_name: confirmationDetails.serverName,
-                    tool_name: confirmationDetails.toolName,
+                    server_name:
+                      confirmationDetails.serverName?.trim() ||
+                      'generic_server',
+                    tool_name:
+                      confirmationDetails.toolName?.trim() || 'generic_tool',
                   },
                 },
               },
