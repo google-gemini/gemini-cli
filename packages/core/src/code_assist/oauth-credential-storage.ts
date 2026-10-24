@@ -68,12 +68,7 @@ export class OAuthCredentialStorage {
 
     const existing = await this.storage.getCredentials(MAIN_ACCOUNT_KEY);
     const mergedRefreshToken =
-      credentials.refresh_token ?? existing?.token?.refreshToken;
-    const mergedScope = credentials.scope ?? existing?.token?.scope;
-    const mergedTokenType =
-      credentials.token_type ?? existing?.token?.tokenType;
-    const mergedExpiresAt =
-      credentials.expiry_date ?? existing?.token?.expiresAt;
+      credentials.refresh_token || existing?.token.refreshToken;
 
     // Convert Google Credentials to OAuthCredentials format
     const mcpCredentials: OAuthCredentials = {
@@ -81,9 +76,9 @@ export class OAuthCredentialStorage {
       token: {
         accessToken: credentials.access_token,
         refreshToken: mergedRefreshToken || undefined,
-        tokenType: mergedTokenType || 'Bearer',
-        scope: mergedScope || undefined,
-        expiresAt: mergedExpiresAt || undefined,
+        tokenType: credentials.token_type || 'Bearer',
+        scope: credentials.scope || undefined,
+        expiresAt: credentials.expiry_date || undefined,
       },
       updatedAt: Date.now(),
     };

@@ -11,7 +11,6 @@ import { useUIState } from '../../contexts/UIStateContext.js';
 import { theme } from '../../semantic-colors.js';
 import { interpolateColor, resolveColor } from '../../themes/color-utils.js';
 import { supportsTrueColor } from '@google/gemini-cli-core';
-import { safeRepeat } from '../../utils/borderStyles.js';
 
 export interface HalfLinePaddedBoxProps {
   /**
@@ -71,11 +70,9 @@ const HalfLinePaddedBoxInternal: React.FC<HalfLinePaddedBoxProps> = ({
 
   const noTrueColor = !supportsTrueColor();
 
-  const safeWidth = Math.max(0, Math.floor(terminalWidth || 0));
-
   if (noTrueColor) {
     return (
-      <Box width={safeWidth} backgroundColor={backgroundColor} paddingY={1}>
+      <Box width={terminalWidth} backgroundColor={backgroundColor} paddingY={1}>
         {children}
       </Box>
     );
@@ -83,25 +80,25 @@ const HalfLinePaddedBoxInternal: React.FC<HalfLinePaddedBoxProps> = ({
 
   return (
     <Box
-      width={safeWidth}
+      width={terminalWidth}
       flexDirection="column"
       alignItems="stretch"
       minHeight={1}
       flexShrink={0}
     >
-      <Box width={safeWidth} flexDirection="row">
-        <Text color={backgroundColor}>{safeRepeat('▄', safeWidth)}</Text>
+      <Box width={terminalWidth} flexDirection="row">
+        <Text color={backgroundColor}>{'▄'.repeat(terminalWidth)}</Text>
       </Box>
       <Box
-        width={safeWidth}
+        width={terminalWidth}
         flexDirection="column"
         alignItems="stretch"
         backgroundColor={backgroundColor}
       >
         {children}
       </Box>
-      <Box width={safeWidth} flexDirection="row">
-        <Text color={backgroundColor}>{safeRepeat('▀', safeWidth)}</Text>
+      <Box width={terminalWidth} flexDirection="row">
+        <Text color={backgroundColor}>{'▀'.repeat(terminalWidth)}</Text>
       </Box>
     </Box>
   );

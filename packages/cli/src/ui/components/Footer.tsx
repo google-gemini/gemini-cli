@@ -370,10 +370,7 @@ export const Footer: React.FC = () => {
           id,
           header,
           () => (
-            <MemoryUsageDisplay
-              color={itemColor}
-              isActive={!copyModeEnabled && uiState.constrainHeight}
-            />
+            <MemoryUsageDisplay color={itemColor} isActive={!copyModeEnabled} />
           ),
           10,
         );

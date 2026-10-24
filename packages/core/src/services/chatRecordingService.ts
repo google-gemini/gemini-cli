@@ -27,7 +27,6 @@ import { partListUnionToString } from '../core/geminiRequest.js';
 import { isIgnoredUserContent } from '../utils/sessionUtils.js';
 import {
   SESSION_FILE_PREFIX,
-  MAX_HISTORY_MESSAGES,
   type TokensSummary,
   type ToolCallRecord,
   type ConversationRecordExtra,
@@ -36,8 +35,6 @@ import {
   type ResumedSessionData,
   type LoadConversationOptions,
   type RewindRecord,
-  type MessagePatch,
-  type MessagePatchRecord,
   type MetadataUpdateRecord,
   type PartialMetadataRecord,
 } from './chatRecordingTypes.js';
@@ -80,12 +77,8 @@ function isRewindRecord(record: unknown): record is RewindRecord {
   return isStringProperty(record, '$rewindTo');
 }
 
-function isMessagePatchRecord(record: unknown): record is MessagePatchRecord {
-  return isObjectProperty(record, '$patch');
-}
-
 function isMessageRecord(record: unknown): record is MessageRecord {
-  return isStringProperty(record, 'id') && !hasProperty(record, '$patch');
+  return isStringProperty(record, 'id');
 }
 
 function isMetadataUpdateRecord(
@@ -105,112 +98,6 @@ function isPartialMetadataRecord(
 
 function isTextPart(part: unknown): part is { text: string } {
   return isStringProperty(part, 'text');
-}
-
-function isRecordObject(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
-interface ContentFingerprint {
-  digest: string;
-}
-
-interface MessageMeta {
-  id: string;
-  type: MessageRecord['type'];
-  isResumable: boolean;
-  contentFp: ContentFingerprint;
-}
-
-interface ToolCallMeta {
-  id: string;
-  messageId: string;
-  resultFp: ContentFingerprint;
-}
-
-function computeContentDigest(value: PartListUnion | null | undefined): string {
-  let h1 = 0xdeadbeef;
-  let h2 = 0x41c6ce57;
-  let totalLen = 0;
-
-  const mix = (code: number): void => {
-    h1 = Math.imul(h1 ^ code, 2654435761);
-    h2 = Math.imul(h2 ^ code, 1597334677);
-    totalLen++;
-  };
-
-  const mixString = (str: string): void => {
-    const len = str.length;
-    mix(len);
-    totalLen += len;
-    for (let i = 0; i < len; i++) {
-      const ch = str.charCodeAt(i);
-      h1 = Math.imul(h1 ^ ch, 2654435761);
-      h2 = Math.imul(h2 ^ ch, 1597334677);
-    }
-  };
-
-  const visit = (val: unknown): void => {
-    if (val === null || val === undefined) {
-      mix(0);
-      return;
-    }
-    if (typeof val === 'string') {
-      mix(1);
-      mixString(val);
-    } else if (typeof val === 'number') {
-      mix(2);
-      mixString(String(val));
-    } else if (typeof val === 'boolean') {
-      mix(3);
-      mix(val ? 1 : 0);
-    } else if (Array.isArray(val)) {
-      mix(4);
-      mix(val.length);
-      for (let i = 0; i < val.length; i++) {
-        visit(val[i]);
-      }
-    } else if (isRecordObject(val)) {
-      mix(5);
-      const keys = Object.keys(val).sort();
-      mix(keys.length);
-      for (let i = 0; i < keys.length; i++) {
-        const k = keys[i];
-        mixString(k);
-        visit(val[k]);
-      }
-    }
-  };
-
-  visit(value ?? []);
-
-  h1 =
-    Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^
-    Math.imul(h2 ^ (h2 >>> 13), 3266489909);
-  h2 =
-    Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^
-    Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-  return `${totalLen}:${h1 >>> 0}:${h2 >>> 0}`;
-}
-
-function createFingerprint(
-  value: PartListUnion | null | undefined,
-): ContentFingerprint {
-  return {
-    digest: computeContentDigest(value),
-  };
-}
-
-function updateFingerprintIfChanged(
-  fp: ContentFingerprint,
-  nextValue: PartListUnion | null | undefined,
-): boolean {
-  const nextDigest = computeContentDigest(nextValue);
-  if (nextDigest === fp.digest) {
-    return false;
-  }
-  fp.digest = nextDigest;
-  return true;
 }
 
 /**
@@ -238,319 +125,228 @@ export function isResumableMessageRecord(message: MessageRecord): boolean {
 }
 
 export function hasResumableConversationContent(
-  messages?: readonly MessageRecord[],
+  messages: readonly MessageRecord[],
 ): boolean {
-  return (
-    messages?.some((message) => isResumableMessageRecord(message)) ?? false
-  );
+  return messages.some((message) => isResumableMessageRecord(message));
 }
 
-type LoadedConversationResult = ConversationRecord & {
-  messageCount?: number;
-  userMessageCount?: number;
-  firstUserMessage?: string;
-  hasResumableContent?: boolean;
-  memoryScratchpadIsStale?: boolean;
-};
+export async function loadConversationRecord(
+  filePath: string,
+  options?: LoadConversationOptions,
+): Promise<
+  | (ConversationRecord & {
+      messageCount?: number;
+      userMessageCount?: number;
+      firstUserMessage?: string;
+      hasResumableContent?: boolean;
+      memoryScratchpadIsStale?: boolean;
+    })
+  | null
+> {
+  if (!fs.existsSync(filePath)) {
+    return null;
+  }
 
-function createJsonlRecordAccumulator(options?: LoadConversationOptions) {
-  let metadata: Partial<ConversationRecord> = {};
-  const messagesMap = new Map<string, MessageRecord>();
-  const messageIds: string[] = [];
-  const messageKinds = new Map<
-    string,
-    { isUser: boolean; isResumable: boolean }
-  >();
-  let isTrackingMemoryScratchpadFreshness = false;
-  let memoryScratchpadIsStale = false;
-  let firstUserMessageStr: string | undefined;
+  try {
+    const fileStream = fs.createReadStream(filePath);
+    const rl = readline.createInterface({
+      input: fileStream,
+      crlfDelay: Infinity,
+    });
 
-  const applySinglePatch = (patch: MessagePatch) => {
-    if (options?.metadataOnly) {
-      if ('content' in patch && patch.content !== undefined) {
-        const kind = messageKinds.get(patch.id);
-        if (kind) {
-          const contentStr = partListUnionToString(patch.content).trim();
-          if (kind.isUser) {
-            kind.isResumable = !isIgnoredUserContent(contentStr);
-          } else if (contentStr.length > 0) {
-            kind.isResumable = true;
-          }
-        }
-      }
-      return;
-    }
+    let metadata: Partial<ConversationRecord> = {};
+    const messagesMap = new Map<string, MessageRecord>();
+    const messageIds: string[] = [];
+    const messageKinds = new Map<
+      string,
+      { isUser: boolean; isResumable: boolean }
+    >();
+    let isTrackingMemoryScratchpadFreshness = false;
+    let memoryScratchpadIsStale = false;
+    let firstUserMessageStr: string | undefined;
 
-    const existing = messagesMap.get(patch.id);
-    if (!existing) return;
-
-    if ('content' in patch && patch.content !== undefined) {
-      existing.content = patch.content;
-    }
-    if (
-      Array.isArray(patch.toolCalls) &&
-      existing.type === 'gemini' &&
-      existing.toolCalls
-    ) {
-      for (const tcPatch of patch.toolCalls) {
-        const tc = existing.toolCalls.find((t) => t.id === tcPatch.id);
-        if (tc && 'result' in tcPatch) {
-          tc.result = tcPatch.result;
-        }
-      }
-    }
-  };
-
-  const processLine = (line: string) => {
-    if (!line.trim()) return;
-    try {
-      const record = JSON.parse(line) as unknown;
-      if (isRewindRecord(record)) {
-        if (isTrackingMemoryScratchpadFreshness) {
-          memoryScratchpadIsStale = true;
-        }
-        const rewindId = record.$rewindTo;
-        if (options?.metadataOnly) {
-          const idx = messageIds.indexOf(rewindId);
-          if (idx !== -1) {
-            const removedIds = messageIds.splice(idx);
-            for (const removedId of removedIds) {
-              messageKinds.delete(removedId);
-            }
-          } else {
-            messageIds.length = 0;
-            messageKinds.clear();
+    for await (const line of rl) {
+      if (!line.trim()) continue;
+      try {
+        const record = JSON.parse(line) as unknown;
+        if (isRewindRecord(record)) {
+          if (isTrackingMemoryScratchpadFreshness) {
+            memoryScratchpadIsStale = true;
           }
-        } else {
-          let found = false;
-          const idsToDelete: string[] = [];
-          for (const [id] of messagesMap) {
-            if (id === rewindId) found = true;
-            if (found) idsToDelete.push(id);
-          }
-          if (found) {
-            for (const id of idsToDelete) {
-              messagesMap.delete(id);
-            }
-          } else {
-            messagesMap.clear();
-          }
-        }
-      } else if (isMessagePatchRecord(record)) {
-        if (isTrackingMemoryScratchpadFreshness) {
-          memoryScratchpadIsStale = true;
-        }
-        const patchObj = record.$patch;
-        if (isStringProperty(patchObj, 'id')) {
-          applySinglePatch(patchObj as MessagePatch);
-        }
-        if (
-          hasProperty(patchObj, 'updates') &&
-          Array.isArray(patchObj.updates)
-        ) {
-          for (const update of patchObj.updates) {
-            if (isStringProperty(update, 'id')) {
-              applySinglePatch(update as MessagePatch);
-            }
-          }
-        }
-        if (
-          hasProperty(patchObj, 'removeIds') &&
-          Array.isArray(patchObj.removeIds)
-        ) {
-          for (const remId of patchObj.removeIds) {
-            if (typeof remId !== 'string') continue;
-            if (options?.metadataOnly) {
-              const idx = messageIds.indexOf(remId);
-              if (idx !== -1) {
-                messageIds.splice(idx, 1);
+          const rewindId = record.$rewindTo;
+          if (options?.metadataOnly) {
+            const idx = messageIds.indexOf(rewindId);
+            if (idx !== -1) {
+              const removedIds = messageIds.splice(idx);
+              for (const removedId of removedIds) {
+                messageKinds.delete(removedId);
               }
-              messageKinds.delete(remId);
             } else {
-              messagesMap.delete(remId);
+              messageIds.length = 0;
+              messageKinds.clear();
             }
-          }
-        }
-        if (
-          hasProperty(patchObj, 'orderIds') &&
-          Array.isArray(patchObj.orderIds)
-        ) {
-          if (options?.metadataOnly) {
-            const orderSet = new Set<string>();
-            const orderedIds: string[] = [];
-            for (const id of patchObj.orderIds) {
-              if (typeof id === 'string' && messageKinds.has(id)) {
-                orderSet.add(id);
-                orderedIds.push(id);
-              }
-            }
-            const prefixIds = messageIds.filter((id) => !orderSet.has(id));
-            messageIds.length = 0;
-            messageIds.push(...prefixIds, ...orderedIds);
           } else {
-            const orderSet = new Set<string>();
-            const orderedEntries: Array<[string, MessageRecord]> = [];
-            for (const id of patchObj.orderIds) {
-              if (typeof id === 'string') {
-                const msg = messagesMap.get(id);
-                if (msg) {
-                  orderSet.add(id);
-                  orderedEntries.push([id, msg]);
-                }
+            let found = false;
+            const idsToDelete: string[] = [];
+            for (const [id] of messagesMap) {
+              if (id === rewindId) found = true;
+              if (found) idsToDelete.push(id);
+            }
+            if (found) {
+              for (const id of idsToDelete) {
+                messagesMap.delete(id);
               }
-            }
-            const prefixEntries: Array<[string, MessageRecord]> = [];
-            for (const [id, msg] of messagesMap) {
-              if (!orderSet.has(id)) {
-                prefixEntries.push([id, msg]);
-              }
-            }
-            messagesMap.clear();
-            for (const [id, msg] of prefixEntries) {
-              messagesMap.set(id, msg);
-            }
-            for (const [id, msg] of orderedEntries) {
-              messagesMap.set(id, msg);
+            } else {
+              messagesMap.clear();
             }
           }
-        }
-      } else if (isMessageRecord(record)) {
-        if (isTrackingMemoryScratchpadFreshness) {
-          memoryScratchpadIsStale = true;
-        }
-        const id = record.id;
-        const isUser = hasProperty(record, 'type') && record.type === 'user';
-        const isResumable = isResumableMessageRecord(record);
-        if (options?.metadataOnly) {
-          if (!messageKinds.has(id)) {
-            messageIds.push(id);
+        } else if (isMessageRecord(record)) {
+          if (isTrackingMemoryScratchpadFreshness) {
+            memoryScratchpadIsStale = true;
           }
-          messageKinds.set(id, { isUser, isResumable });
-        }
-        if (
-          !firstUserMessageStr &&
-          isUser &&
-          hasProperty(record, 'content') &&
-          record['content'] &&
-          isResumable
-        ) {
-          const rawContent = record['content'];
-          if (Array.isArray(rawContent)) {
-            firstUserMessageStr = rawContent
-              .map((p: unknown) => (isTextPart(p) ? p['text'] : ''))
-              .join('');
-          } else if (typeof rawContent === 'string') {
-            firstUserMessageStr = rawContent;
-          }
-        }
-
-        if (!options?.metadataOnly) {
-          messagesMap.set(id, record);
-          if (options?.maxMessages && messagesMap.size > options.maxMessages) {
-            const firstKey = messagesMap.keys().next().value;
-            if (typeof firstKey === 'string') messagesMap.delete(firstKey);
-          }
-        }
-      } else if (isMetadataUpdateRecord(record)) {
-        if (hasProperty(record.$set, 'memoryScratchpad')) {
-          isTrackingMemoryScratchpadFreshness = Boolean(
-            record.$set.memoryScratchpad,
-          );
-          memoryScratchpadIsStale = false;
-        }
-        if (
-          hasProperty(record.$set, 'messages') &&
-          Array.isArray(record.$set.messages)
-        ) {
-          messagesMap.clear();
+          const id = record.id;
+          const isUser = hasProperty(record, 'type') && record.type === 'user';
+          const isResumable = isResumableMessageRecord(record);
+          // Track message count and first user message
           if (options?.metadataOnly) {
-            messageIds.length = 0;
-            messageKinds.clear();
+            messageIds.push(id);
+            messageKinds.set(id, { isUser, isResumable });
           }
-          for (const msg of record.$set.messages) {
-            if (isMessageRecord(msg)) {
-              const id = msg.id;
-              const isUser = msg.type === 'user';
-              const isResumable = isResumableMessageRecord(msg);
+          if (
+            !firstUserMessageStr &&
+            isUser &&
+            hasProperty(record, 'content') &&
+            record['content'] &&
+            isResumable
+          ) {
+            // Basic extraction of first user message for display
+            const rawContent = record['content'];
+            if (Array.isArray(rawContent)) {
+              firstUserMessageStr = rawContent
+                .map((p: unknown) => (isTextPart(p) ? p['text'] : ''))
+                .join('');
+            } else if (typeof rawContent === 'string') {
+              firstUserMessageStr = rawContent;
+            }
+          }
 
-              if (options?.metadataOnly) {
-                messageIds.push(id);
-                messageKinds.set(id, {
-                  isUser,
-                  isResumable,
-                });
-              } else {
-                messagesMap.set(id, msg);
-              }
+          if (!options?.metadataOnly) {
+            messagesMap.set(id, record);
+            if (
+              options?.maxMessages &&
+              messagesMap.size > options.maxMessages
+            ) {
+              const firstKey = messagesMap.keys().next().value;
+              if (typeof firstKey === 'string') messagesMap.delete(firstKey);
+            }
+          }
+        } else if (isMetadataUpdateRecord(record)) {
+          if (hasProperty(record.$set, 'memoryScratchpad')) {
+            isTrackingMemoryScratchpadFreshness = Boolean(
+              record.$set.memoryScratchpad,
+            );
+            memoryScratchpadIsStale = false;
+          }
+          if (
+            hasProperty(record.$set, 'messages') &&
+            Array.isArray(record.$set.messages)
+          ) {
+            // Checkpoint: clear and rebuild from the provided messages array
+            messagesMap.clear();
+            if (options?.metadataOnly) {
+              messageIds.length = 0;
+              messageKinds.clear();
+            }
+            for (const msg of record.$set.messages) {
+              if (isMessageRecord(msg)) {
+                const id = msg.id;
+                const isUser = msg.type === 'user';
+                const isResumable = isResumableMessageRecord(msg);
 
-              if (
-                !firstUserMessageStr &&
-                isUser &&
-                isResumable &&
-                msg.content &&
-                (Array.isArray(msg.content) || typeof msg.content === 'string')
-              ) {
-                if (Array.isArray(msg.content)) {
-                  firstUserMessageStr = msg.content
-                    .map((p: unknown) => (isTextPart(p) ? p.text : ''))
-                    .join('');
+                if (options?.metadataOnly) {
+                  messageIds.push(id);
+                  messageKinds.set(id, {
+                    isUser,
+                    isResumable,
+                  });
                 } else {
-                  firstUserMessageStr = msg.content;
+                  messagesMap.set(id, msg);
+                }
+
+                if (
+                  !firstUserMessageStr &&
+                  isUser &&
+                  isResumable &&
+                  msg.content &&
+                  (Array.isArray(msg.content) ||
+                    typeof msg.content === 'string')
+                ) {
+                  if (Array.isArray(msg.content)) {
+                    firstUserMessageStr = msg.content
+                      .map((p: unknown) => (isTextPart(p) ? p.text : ''))
+                      .join('');
+                  } else {
+                    firstUserMessageStr = msg.content;
+                  }
+                }
+              }
+            }
+          }
+          // Metadata update
+          metadata = {
+            ...metadata,
+            ...record.$set,
+          };
+        } else if (isPartialMetadataRecord(record)) {
+          // Initial metadata line (or entire legacy record if on one line)
+          metadata = { ...metadata, ...record };
+          if (
+            hasProperty(record, 'messages') &&
+            Array.isArray(record.messages)
+          ) {
+            for (const msg of record.messages) {
+              if (isMessageRecord(msg)) {
+                const id = msg.id;
+                const isUser = msg.type === 'user';
+                const isResumable = isResumableMessageRecord(msg);
+
+                if (options?.metadataOnly) {
+                  messageIds.push(id);
+                  messageKinds.set(id, {
+                    isUser,
+                    isResumable,
+                  });
+                } else {
+                  messagesMap.set(id, msg);
+                }
+
+                if (
+                  !firstUserMessageStr &&
+                  isUser &&
+                  isResumable &&
+                  msg.content &&
+                  (Array.isArray(msg.content) ||
+                    typeof msg.content === 'string')
+                ) {
+                  if (Array.isArray(msg.content)) {
+                    firstUserMessageStr = msg.content
+                      .map((p: unknown) => (isTextPart(p) ? p.text : ''))
+                      .join('');
+                  } else {
+                    firstUserMessageStr = msg.content;
+                  }
                 }
               }
             }
           }
         }
-        metadata = {
-          ...metadata,
-          ...record.$set,
-        };
-      } else if (isPartialMetadataRecord(record)) {
-        metadata = { ...metadata, ...record };
-        if (hasProperty(record, 'messages') && Array.isArray(record.messages)) {
-          for (const msg of record.messages) {
-            if (isMessageRecord(msg)) {
-              const id = msg.id;
-              const isUser = msg.type === 'user';
-              const isResumable = isResumableMessageRecord(msg);
-
-              if (options?.metadataOnly) {
-                messageIds.push(id);
-                messageKinds.set(id, {
-                  isUser,
-                  isResumable,
-                });
-              } else {
-                messagesMap.set(id, msg);
-              }
-
-              if (
-                !firstUserMessageStr &&
-                isUser &&
-                isResumable &&
-                msg.content &&
-                (Array.isArray(msg.content) || typeof msg.content === 'string')
-              ) {
-                if (Array.isArray(msg.content)) {
-                  firstUserMessageStr = msg.content
-                    .map((p: unknown) => (isTextPart(p) ? p.text : ''))
-                    .join('');
-                } else {
-                  firstUserMessageStr = msg.content;
-                }
-              }
-            }
-          }
-        }
+      } catch {
+        // ignore parse errors on individual lines
       }
-    } catch {
-      // ignore parse errors on individual lines
     }
-  };
 
-  const finalize = (): LoadedConversationResult | null => {
     if (!metadata.sessionId || !metadata.projectHash) {
-      return null;
+      return await parseLegacyRecordFallback(filePath, options);
     }
 
     const loadedMessages = Array.from(messagesMap.values());
@@ -597,70 +393,6 @@ function createJsonlRecordAccumulator(options?: LoadConversationOptions) {
       firstUserMessage: fallbackFirstUserMessage,
       hasResumableContent,
     };
-  };
-
-  return { processLine, finalize };
-}
-
-function loadConversationRecordSync(
-  filePath: string,
-  options?: LoadConversationOptions,
-): LoadedConversationResult | null {
-  if (!fs.existsSync(filePath)) {
-    return null;
-  }
-
-  try {
-    const content = fs.readFileSync(filePath, 'utf8');
-    const accumulator = createJsonlRecordAccumulator(options);
-    let start = 0;
-    while (start < content.length) {
-      const nl = content.indexOf('\n', start);
-      const line = nl === -1 ? content.slice(start) : content.slice(start, nl);
-      accumulator.processLine(line);
-      if (nl === -1) break;
-      start = nl + 1;
-    }
-
-    const result = accumulator.finalize();
-    if (result) {
-      return result;
-    }
-    return parseLegacyContentFallback(content, options);
-  } catch (error) {
-    debugLogger.error(
-      'Error loading conversation record synchronously:',
-      error,
-    );
-    return null;
-  }
-}
-
-export async function loadConversationRecord(
-  filePath: string,
-  options?: LoadConversationOptions,
-): Promise<LoadedConversationResult | null> {
-  if (!fs.existsSync(filePath)) {
-    return null;
-  }
-
-  try {
-    const fileStream = fs.createReadStream(filePath);
-    const rl = readline.createInterface({
-      input: fileStream,
-      crlfDelay: Infinity,
-    });
-
-    const accumulator = createJsonlRecordAccumulator(options);
-    for await (const line of rl) {
-      accumulator.processLine(line);
-    }
-
-    const result = accumulator.finalize();
-    if (result) {
-      return result;
-    }
-    return await parseLegacyRecordFallback(filePath, options);
   } catch (error) {
     debugLogger.error('Error loading conversation record from JSONL:', error);
     return null;
@@ -676,14 +408,6 @@ export class ChatRecordingService {
   private queuedThoughts: Array<ThoughtSummary & { timestamp: string }> = [];
   private queuedTokens: TokensSummary | null = null;
   private context: AgentLoopContext;
-  private isResumedSession = false;
-  private initializationPromise: Promise<void> | null = null;
-  private messageOrder: string[] = [];
-  private messageMetaMap = new Map<string, MessageMeta>();
-  private toolCallMetaMap = new Map<string, ToolCallMeta>();
-  private hasEvictedMessages = false;
-  private fullConversationCache: WeakRef<ConversationRecord> | null = null;
-  private isCacheDirty = true;
 
   constructor(context: AgentLoopContext) {
     this.context = context;
@@ -691,24 +415,7 @@ export class ChatRecordingService {
     this.projectHash = getProjectHash(context.config.getProjectRoot());
   }
 
-  getIsResumedSession(): boolean {
-    return this.isResumedSession;
-  }
-
-  setIsResumedSession(isResumed: boolean): void {
-    this.isResumedSession = isResumed;
-  }
-
   async initialize(
-    resumedSessionData?: ResumedSessionData,
-    kind?: 'main' | 'subagent',
-  ): Promise<void> {
-    this.isResumedSession = Boolean(resumedSessionData);
-    this.initializationPromise = this.doInitialize(resumedSessionData, kind);
-    return this.initializationPromise;
-  }
-
-  private async doInitialize(
     resumedSessionData?: ResumedSessionData,
     kind?: 'main' | 'subagent',
   ): Promise<void> {
@@ -723,10 +430,7 @@ export class ChatRecordingService {
           this.conversationFile,
         );
         if (loadedRecord) {
-          this.cachedConversation = {
-            ...loadedRecord,
-            messages: loadedRecord.messages ?? [],
-          };
+          this.cachedConversation = loadedRecord;
           this.projectHash = this.cachedConversation.projectHash;
 
           if (this.conversationFile.endsWith('.json')) {
@@ -755,25 +459,10 @@ export class ChatRecordingService {
             }
           }
 
-          this.rebuildIndexAndWindow(this.cachedConversation.messages);
-
           // Update the session ID in the existing file
           this.updateMetadata({ sessionId: this.sessionId });
         } else {
-          // The file could not be reloaded (missing, corrupt metadata, or an
-          // I/O error). Fall back to the in-memory conversation we were handed
-          // rather than failing the caller, and rewrite a clean file from it.
-          debugLogger.warn(
-            'Failed to reload resumed session data from file; falling back ' +
-              'to the in-memory conversation.',
-          );
-          this.cachedConversation = {
-            ...resumedSessionData.conversation,
-            messages: [...(resumedSessionData.conversation.messages ?? [])],
-          };
-          this.projectHash = this.cachedConversation.projectHash;
-          this.rewriteConversationFile(this.cachedConversation);
-          this.rebuildIndexAndWindow(this.cachedConversation.messages);
+          throw new Error('Failed to load resumed session data from file');
         }
       } else {
         // Create new session
@@ -813,12 +502,10 @@ export class ChatRecordingService {
         if (this.kind === 'subagent') {
           filename = `${safeSessionId}.jsonl`;
         } else {
-          const shortId = safeSessionId.slice(0, 8);
-          filename = `${SESSION_FILE_PREFIX}${timestamp}-${shortId}.jsonl`;
-          let collisionIndex = 1;
-          while (fs.existsSync(path.join(chatsDir, filename))) {
-            filename = `${SESSION_FILE_PREFIX}${timestamp}-${collisionIndex++}-${shortId}.jsonl`;
-          }
+          filename = `${SESSION_FILE_PREFIX}${timestamp}-${safeSessionId.slice(
+            0,
+            8,
+          )}.jsonl`;
         }
         this.conversationFile = path.join(chatsDir, filename);
 
@@ -831,46 +518,20 @@ export class ChatRecordingService {
               ]
             : undefined;
 
-        let fileAlreadyExisted = false;
-        if (fs.existsSync(this.conversationFile)) {
-          fileAlreadyExisted = true;
-          const loadedRecord = await loadConversationRecord(
-            this.conversationFile,
-          );
-          if (loadedRecord) {
-            this.cachedConversation = {
-              ...loadedRecord,
-              messages: loadedRecord.messages ?? [],
-            };
-            this.projectHash = this.cachedConversation.projectHash;
-            if (
-              loadedRecord.hasResumableContent ||
-              hasResumableConversationContent(this.cachedConversation.messages)
-            ) {
-              this.isResumedSession = true;
-            }
-          }
-        }
+        const initialMetadata = {
+          sessionId: this.sessionId,
+          projectHash: this.projectHash,
+          startTime: new Date().toISOString(),
+          lastUpdated: new Date().toISOString(),
+          kind: this.kind,
+          directories,
+        };
 
-        if (!fileAlreadyExisted || !this.cachedConversation) {
-          const initialMetadata = {
-            sessionId: this.sessionId,
-            projectHash: this.projectHash,
-            startTime: new Date().toISOString(),
-            lastUpdated: new Date().toISOString(),
-            kind: this.kind,
-            directories,
-          };
-
-          this.appendRecord(initialMetadata);
-          this.cachedConversation = {
-            ...initialMetadata,
-            messages: [],
-          };
-          this.rebuildIndexAndWindow([]);
-        } else {
-          this.rebuildIndexAndWindow(this.cachedConversation.messages);
-        }
+        this.appendRecord(initialMetadata);
+        this.cachedConversation = {
+          ...initialMetadata,
+          messages: [],
+        };
       }
 
       this.queuedThoughts = [];
@@ -886,63 +547,8 @@ export class ChatRecordingService {
     }
   }
 
-  private indexMessage(msg: MessageRecord): void {
-    if (!this.messageMetaMap.has(msg.id)) {
-      this.messageOrder.push(msg.id);
-    }
-    this.messageMetaMap.set(msg.id, {
-      id: msg.id,
-      type: msg.type,
-      isResumable: isResumableMessageRecord(msg),
-      contentFp: createFingerprint(msg.content),
-    });
-    if (msg.type === 'gemini' && msg.toolCalls) {
-      for (const tc of msg.toolCalls) {
-        this.toolCallMetaMap.set(tc.id, {
-          id: tc.id,
-          messageId: msg.id,
-          resultFp: createFingerprint(tc.result),
-        });
-      }
-    }
-  }
-
-  private trimCachedMessages(): void {
-    if (!this.cachedConversation) return;
-    const msgs = this.cachedConversation.messages;
-    if (msgs.length > MAX_HISTORY_MESSAGES) {
-      const excess = msgs.length - MAX_HISTORY_MESSAGES;
-      msgs.splice(0, excess);
-    }
-    this.hasEvictedMessages = msgs.length < this.messageOrder.length;
-  }
-
-  private rebuildIndexAndWindow(messages?: readonly MessageRecord[]): void {
-    const safeMessages = messages ?? [];
-    this.messageOrder = [];
-    this.messageMetaMap.clear();
-    this.toolCallMetaMap.clear();
-
-    for (const msg of safeMessages) {
-      this.indexMessage(msg);
-    }
-
-    if (this.cachedConversation) {
-      this.cachedConversation.messages =
-        safeMessages.length > MAX_HISTORY_MESSAGES
-          ? safeMessages.slice(-MAX_HISTORY_MESSAGES)
-          : [...safeMessages];
-      this.hasEvictedMessages =
-        this.cachedConversation.messages.length < this.messageOrder.length;
-    } else {
-      this.hasEvictedMessages = false;
-    }
-  }
-
   private appendRecord(record: unknown): void {
     if (!this.conversationFile) return;
-    this.isCacheDirty = true;
-    this.fullConversationCache = null;
     try {
       const line = JSON.stringify(record) + '\n';
       fs.mkdirSync(path.dirname(this.conversationFile), { recursive: true });
@@ -957,78 +563,7 @@ export class ChatRecordingService {
     }
   }
 
-  /**
-   * Rewrites the session file from an in-memory record. Any existing
-   * (unreadable) file is preserved alongside rather than destroyed, and the
-   * new file is written atomically (temp file + rename).
-   */
-  private rewriteConversationFile(conversation: ConversationRecord): void {
-    if (!this.conversationFile) return;
-    this.isCacheDirty = true;
-    this.fullConversationCache = null;
-
-    // Normalize legacy `.json` paths to the `.jsonl` format we write.
-    if (this.conversationFile.endsWith('.json')) {
-      this.conversationFile = this.conversationFile + 'l';
-    }
-
-    const { messages, memoryScratchpad, ...metadata } = conversation;
-    const lines: string[] = [JSON.stringify(metadata)];
-    for (const msg of messages) {
-      lines.push(JSON.stringify(msg));
-    }
-    if (memoryScratchpad) {
-      lines.push(JSON.stringify({ $set: { memoryScratchpad } }));
-    }
-    const content = lines.join('\n') + '\n';
-
-    try {
-      fs.mkdirSync(path.dirname(this.conversationFile), { recursive: true });
-
-      // The existing file was unreadable, but it may have been only
-      // transiently so (a lock or I/O blip) rather than truly corrupt. Keep
-      // its bytes rather than destroying them.
-      if (fs.existsSync(this.conversationFile)) {
-        const backup = `${this.conversationFile}.unreadable-${Date.now()}`;
-        try {
-          fs.renameSync(this.conversationFile, backup);
-          debugLogger.warn(
-            `Preserved the unreadable session file at ${backup}.`,
-          );
-        } catch (backupError) {
-          debugLogger.error(
-            'Failed to preserve the unreadable session file.',
-            backupError,
-          );
-        }
-      }
-
-      const tempFile = `${this.conversationFile}.tmp-${process.pid}`;
-      try {
-        fs.writeFileSync(tempFile, content);
-        fs.renameSync(tempFile, this.conversationFile);
-      } catch (error) {
-        // The rename did not complete, so the temp file would be left behind.
-        try {
-          fs.unlinkSync(tempFile);
-        } catch {
-          // Ignore cleanup errors so the original failure still surfaces.
-        }
-        throw error;
-      }
-    } catch (error) {
-      if (isNodeError(error) && error.code === 'ENOSPC') {
-        this.conversationFile = null;
-        debugLogger.warn(ENOSPC_WARNING_MESSAGE);
-      } else {
-        throw error;
-      }
-    }
-  }
-
-  private updateMetadata(
-    updates: Partial<Omit<ConversationRecord, 'messages'>>,
-  ): void {
+  private updateMetadata(updates: Partial<ConversationRecord>): void {
     if (!this.cachedConversation) return;
     Object.assign(this.cachedConversation, updates);
     this.appendRecord({ $set: updates });
@@ -1040,10 +575,7 @@ export class ChatRecordingService {
     // We append the full message to the log
     this.appendRecord(msg);
 
-    // Update lightweight session index
-    this.indexMessage(msg);
-
-    // Now update bounded in-memory window
+    // Now update memory
     const index = this.cachedConversation.messages.findIndex(
       (m) => m.id === msg.id,
     );
@@ -1052,7 +584,6 @@ export class ChatRecordingService {
     } else {
       this.cachedConversation.messages.push(msg);
     }
-    this.trimCachedMessages();
   }
 
   private getLastMessage(
@@ -1255,26 +786,7 @@ export class ChatRecordingService {
   }
 
   getConversation(): ConversationRecord | null {
-    if (!this.conversationFile || !this.cachedConversation) return null;
-    if (!this.hasEvictedMessages) {
-      return this.cachedConversation;
-    }
-    const cachedFull = !this.isCacheDirty
-      ? this.fullConversationCache?.deref()
-      : undefined;
-    if (cachedFull) {
-      return cachedFull;
-    }
-    const loaded = loadConversationRecordSync(this.conversationFile);
-    if (loaded) {
-      const fullRecord: ConversationRecord = {
-        ...this.cachedConversation,
-        messages: loaded.messages,
-      };
-      this.fullConversationCache = new WeakRef(fullRecord);
-      this.isCacheDirty = false;
-      return fullRecord;
-    }
+    if (!this.conversationFile) return null;
     return this.cachedConversation;
   }
 
@@ -1325,46 +837,12 @@ export class ChatRecordingService {
    * session with a real user prompt, model response, or tool activity.
    */
   async deleteCurrentSessionIfNotResumableAsync(): Promise<void> {
-    if (this.initializationPromise) {
-      try {
-        await this.initializationPromise;
-      } catch {
-        // Ignore initialization error during exit cleanup
-      }
-    }
-
-    if (this.isResumedSession) {
+    if (!this.conversationFile || !this.cachedConversation) {
       return;
     }
 
-    if (!this.conversationFile) {
+    if (hasResumableConversationContent(this.cachedConversation.messages)) {
       return;
-    }
-
-    if (
-      (this.cachedConversation &&
-        hasResumableConversationContent(
-          this.cachedConversation.messages ?? [],
-        )) ||
-      Array.from(this.messageMetaMap.values()).some((m) => m.isResumable)
-    ) {
-      return;
-    }
-
-    // Check file content on disk in case in-memory cache was uninitialized or incomplete
-    if (fs.existsSync(this.conversationFile)) {
-      try {
-        const fileRecord = await loadConversationRecord(this.conversationFile);
-        if (
-          fileRecord &&
-          (fileRecord.hasResumableContent ||
-            hasResumableConversationContent(fileRecord.messages ?? []))
-        ) {
-          return;
-        }
-      } catch {
-        // Ignore read errors and proceed
-      }
     }
 
     await this.deleteCurrentSessionAsync();
@@ -1377,152 +855,86 @@ export class ChatRecordingService {
   rewindTo(messageId: string): ConversationRecord | null {
     if (!this.conversationFile || !this.cachedConversation) return null;
 
-    const orderIndex = this.messageOrder.indexOf(messageId);
-    if (orderIndex === -1) {
+    const messageIndex = this.cachedConversation.messages.findIndex(
+      (m) => m.id === messageId,
+    );
+
+    if (messageIndex === -1) {
       debugLogger.error(
         'Message to rewind to not found in conversation history',
       );
-      return this.getConversation();
-    }
-
-    let rewoundMessages: MessageRecord[];
-    if (!this.hasEvictedMessages) {
-      const messageIndex = this.cachedConversation.messages.findIndex(
-        (m) => m.id === messageId,
-      );
-      rewoundMessages =
-        messageIndex !== -1
-          ? this.cachedConversation.messages.slice(0, messageIndex)
-          : [];
-    } else if (orderIndex === 0) {
-      rewoundMessages = [];
-    } else {
-      const fullConversation = loadConversationRecordSync(
-        this.conversationFile,
-      );
-      const allMessages =
-        fullConversation?.messages ?? this.cachedConversation.messages;
-      const messageIndex = allMessages.findIndex((m) => m.id === messageId);
-      rewoundMessages =
-        messageIndex !== -1 ? allMessages.slice(0, messageIndex) : [];
-    }
-
-    this.appendRecord({ $rewindTo: messageId });
-    this.rebuildIndexAndWindow(rewoundMessages);
-
-    if (!this.hasEvictedMessages) {
       return this.cachedConversation;
     }
-    return {
-      ...this.cachedConversation,
-      messages: rewoundMessages,
-    };
+
+    this.cachedConversation.messages = this.cachedConversation.messages.slice(
+      0,
+      messageIndex,
+    );
+    this.appendRecord({ $rewindTo: messageId });
+    return this.cachedConversation;
   }
 
   updateMessagesFromHistory(history: readonly HistoryTurn[]): void {
     if (!this.conversationFile || !this.cachedConversation) return;
 
     try {
-      const previousMessageOrder = [...this.messageOrder];
-      let anyChange = false;
-      let newMessagesAdded = false;
-      const patchesByMsgId = new Map<string, MessagePatch>();
-
-      const getOrCreatePatch = (id: string): MessagePatch => {
-        let patch = patchesByMsgId.get(id);
-        if (!patch) {
-          patch = { id };
-          patchesByMsgId.set(id, patch);
-        }
-        return patch;
-      };
+      let updated = false;
 
       // 1. Sync content and IDs
-      for (const turn of history) {
-        const turnParts = turn.content.parts || [];
-        const existingMeta = this.messageMetaMap.get(turn.id);
+      const newMessages: MessageRecord[] = history.map((turn) => {
+        const existing = this.cachedConversation?.messages.find(
+          (m) => m.id === turn.id,
+        );
 
-        if (existingMeta) {
-          const contentChanged = updateFingerprintIfChanged(
-            existingMeta.contentFp,
-            turnParts,
-          );
-          if (contentChanged) {
-            anyChange = true;
-            const cachedIdx = this.cachedConversation.messages.findIndex(
-              (m) => m.id === turn.id,
-            );
-            if (cachedIdx !== -1) {
-              this.cachedConversation.messages[cachedIdx] = {
-                ...this.cachedConversation.messages[cachedIdx],
-                content: turnParts,
-              };
-            }
-            const patch = getOrCreatePatch(turn.id);
-            patch.content = turnParts;
-            const contentStr = partListUnionToString(turnParts).trim();
-            if (existingMeta.type === 'user') {
-              existingMeta.isResumable = !isIgnoredUserContent(contentStr);
-            } else if (
-              existingMeta.type === 'gemini' &&
-              contentStr.length > 0
-            ) {
-              existingMeta.isResumable = true;
-            }
+        if (existing) {
+          // If content parts have changed (e.g. masking), update them
+          if (
+            JSON.stringify(existing.content) !==
+            JSON.stringify(turn.content.parts)
+          ) {
+            updated = true;
           }
-        } else {
-          anyChange = true;
-          newMessagesAdded = true;
-          const newMsg = this.newMessage(
-            turn.content.role === 'user' ? 'user' : 'gemini',
-            turnParts,
-            undefined,
-            turn.id,
-          );
-          this.appendRecord(newMsg);
-          this.indexMessage(newMsg);
-          this.cachedConversation.messages.push(newMsg);
+          return {
+            ...existing,
+            content: turn.content.parts || [],
+          };
         }
-      }
+
+        // It's a new (possibly synthetic) turn like a summary
+        updated = true;
+        return this.newMessage(
+          turn.content.role === 'user' ? 'user' : 'gemini',
+          turn.content.parts || [],
+          undefined,
+          turn.id,
+        );
+      });
 
       // 2. Specialized 'Masking Sync' for tool call results
       // If a user turn in history contains a functionResponse, we update the
       // corresponding ToolCallRecord in the preceding gemini message.
       for (const turn of history) {
         if (turn.content.role !== 'user') continue;
-        const turnParts = turn.content.parts || [];
-        for (const part of turnParts) {
+        for (const part of turn.content.parts || []) {
           if (part.functionResponse) {
             const callId = part.functionResponse.id;
-            if (!callId) continue;
-            const tcMeta = this.toolCallMetaMap.get(callId);
-            if (tcMeta) {
-              if (updateFingerprintIfChanged(tcMeta.resultFp, turnParts)) {
-                anyChange = true;
-                const geminiMsg = this.cachedConversation.messages.find(
-                  (m) => m.id === tcMeta.messageId && m.type === 'gemini',
-                );
+            // Find the gemini message that contains this tool call
+            const geminiMsg = newMessages.find(
+              (m) =>
+                m.type === 'gemini' &&
+                m.toolCalls?.some((tc) => tc.id === callId),
+            );
+            if (geminiMsg && geminiMsg.type === 'gemini') {
+              const tc = geminiMsg.toolCalls!.find((tc) => tc.id === callId);
+              if (tc) {
+                // If the history version is different (e.g. masked), sync it into the record
+                // We sync the entire parts array of the user turn to ensure sibling parts are preserved
                 if (
-                  geminiMsg &&
-                  geminiMsg.type === 'gemini' &&
-                  geminiMsg.toolCalls
+                  JSON.stringify(tc.result) !==
+                  JSON.stringify(turn.content.parts)
                 ) {
-                  const tc = geminiMsg.toolCalls.find((t) => t.id === callId);
-                  if (tc) {
-                    tc.result = turnParts;
-                  }
-                }
-                const patch = getOrCreatePatch(tcMeta.messageId);
-                if (!patch.toolCalls) {
-                  patch.toolCalls = [];
-                }
-                const existingTcPatch = patch.toolCalls.find(
-                  (t) => t.id === callId,
-                );
-                if (existingTcPatch) {
-                  existingTcPatch.result = turnParts;
-                } else {
-                  patch.toolCalls.push({ id: callId, result: turnParts });
+                  tc.result = turn.content.parts || [];
+                  updated = true;
                 }
               }
             }
@@ -1530,107 +942,13 @@ export class ChatRecordingService {
         }
       }
 
-      // 3. Reconcile removals, rollbacks, and ordering
-      const historyIds = history.map((t) => t.id);
-      const historyIdSet = new Set(historyIds);
-      const removedIds = previousMessageOrder.filter(
-        (id) => !historyIdSet.has(id),
-      );
-
-      if (removedIds.length > 0) {
-        const removedSet = new Set(removedIds);
-        for (const remId of removedIds) {
-          this.messageMetaMap.delete(remId);
-        }
-        for (const [tcId, tcMeta] of this.toolCallMetaMap) {
-          if (removedSet.has(tcMeta.messageId)) {
-            this.toolCallMetaMap.delete(tcId);
-          }
-        }
-      }
-
-      const remainingOrder = this.messageOrder.filter((id) =>
-        historyIdSet.has(id),
-      );
-      const orderChanged =
-        remainingOrder.length !== historyIds.length ||
-        remainingOrder.some((id, idx) => id !== historyIds[idx]);
-
-      const isPureTailRollback =
-        removedIds.length > 0 &&
-        !newMessagesAdded &&
-        patchesByMsgId.size === 0 &&
-        !orderChanged &&
-        previousMessageOrder.length === historyIds.length + removedIds.length &&
-        previousMessageOrder
-          .slice(historyIds.length)
-          .every((id, idx) => id === removedIds[idx]);
-
-      if (isPureTailRollback) {
-        this.appendRecord({ $rewindTo: removedIds[0] });
-        anyChange = true;
-      } else if (
-        patchesByMsgId.size > 0 ||
-        removedIds.length > 0 ||
-        orderChanged
-      ) {
-        const patchPayload: MessagePatchRecord['$patch'] = {};
-        if (patchesByMsgId.size > 0) {
-          patchPayload.updates = Array.from(patchesByMsgId.values());
-        }
-        if (removedIds.length > 0) {
-          patchPayload.removeIds = removedIds;
-        }
-        if (orderChanged) {
-          patchPayload.orderIds = historyIds;
-        }
-        this.appendRecord({ $patch: patchPayload });
-        anyChange = true;
-      }
-
-      let reloadedFromDisk = false;
       if (
-        this.hasEvictedMessages &&
-        this.conversationFile &&
-        (removedIds.length > 0 || orderChanged)
+        updated ||
+        newMessages.length !== this.cachedConversation.messages.length
       ) {
-        const fullConversation = loadConversationRecordSync(
-          this.conversationFile,
-        );
-        if (fullConversation) {
-          const msgMap = new Map(
-            fullConversation.messages.map((m) => [m.id, m]),
-          );
-          this.cachedConversation.messages = historyIds
-            .map((id) => msgMap.get(id))
-            .filter((m): m is MessageRecord => m !== undefined);
-          reloadedFromDisk = true;
-        }
-      }
-
-      if (!reloadedFromDisk) {
-        if (removedIds.length > 0) {
-          const removedSet = new Set(removedIds);
-          this.cachedConversation.messages =
-            this.cachedConversation.messages.filter(
-              (m) => !removedSet.has(m.id),
-            );
-        }
-        if (orderChanged) {
-          const cachedById = new Map(
-            this.cachedConversation.messages.map((m) => [m.id, m]),
-          );
-          this.cachedConversation.messages = historyIds
-            .map((id) => cachedById.get(id))
-            .filter((m): m is MessageRecord => m !== undefined);
-        }
-      }
-
-      this.messageOrder = historyIds;
-      this.trimCachedMessages();
-
-      if (anyChange) {
+        this.cachedConversation.messages = newMessages;
         this.updateMetadata({
+          messages: newMessages,
           lastUpdated: new Date().toISOString(),
         });
       }
@@ -1644,11 +962,20 @@ export class ChatRecordingService {
   }
 }
 
-function parseLegacyContentFallback(
-  fileContent: string,
+async function parseLegacyRecordFallback(
+  filePath: string,
   options?: LoadConversationOptions,
-): LoadedConversationResult | null {
+): Promise<
+  | (ConversationRecord & {
+      messageCount?: number;
+      userMessageCount?: number;
+      firstUserMessage?: string;
+      hasResumableContent?: boolean;
+    })
+  | null
+> {
   try {
+    const fileContent = await fs.promises.readFile(filePath, 'utf8');
     const parsed = JSON.parse(fileContent) as unknown;
 
     const isLegacyRecord = (val: unknown): val is ConversationRecord =>
@@ -1696,16 +1023,4 @@ function parseLegacyContentFallback(
     // ignore legacy fallback parse error
   }
   return null;
-}
-
-async function parseLegacyRecordFallback(
-  filePath: string,
-  options?: LoadConversationOptions,
-): Promise<LoadedConversationResult | null> {
-  try {
-    const fileContent = await fs.promises.readFile(filePath, 'utf8');
-    return parseLegacyContentFallback(fileContent, options);
-  } catch {
-    return null;
-  }
 }

@@ -33,25 +33,6 @@ export type ConnectionConfig = {
   stdio?: StdioConfig;
 };
 
-/**
- * Whether this CLI is running inside a Gemini CLI sandbox (the sandbox
- * launcher sets `SANDBOX` for every sandbox type).
- */
-export function isRunningInSandbox(): boolean {
-  return !!process.env['SANDBOX'];
-}
-
-/**
- * Guidance for a failed companion connection. Inside a sandbox, `/ide install`
- * cannot reach the IDE on the host and the connection is bridged by the
- * sandbox launcher, so the advice differs.
- */
-export function getConnectionFailureAdvice(): string {
-  return isRunningInSandbox()
-    ? 'Gemini CLI is running inside a sandbox: make sure the extension is installed and running in your IDE, then restart Gemini CLI so the sandbox can bridge the connection.'
-    : 'Please ensure the extension is running. To install the extension, run /ide install.';
-}
-
 export function validateWorkspacePath(
   ideWorkspacePath: string | undefined,
   cwd: string,
@@ -59,7 +40,7 @@ export function validateWorkspacePath(
   if (ideWorkspacePath === undefined) {
     return {
       isValid: false,
-      error: `Failed to connect to IDE companion extension. ${getConnectionFailureAdvice()}`,
+      error: `Failed to connect to IDE companion extension. Please ensure the extension is running. To install the extension, run /ide install.`,
     };
   }
 
@@ -128,26 +109,6 @@ export function getStdioConfigFromEnv(): StdioConfig | undefined {
 
 const IDE_SERVER_FILE_REGEX = /^gemini-ide-server-(\d+)-\d+\.json$/;
 
-async function verifyAndReadFile(
-  filePath: string,
-): Promise<string | undefined> {
-  let handle: fs.promises.FileHandle | undefined;
-  try {
-    handle = await fs.promises.open(filePath, 'r');
-    const stat = await handle.stat();
-    if (process.getuid && stat.uid !== process.getuid()) {
-      return undefined;
-    }
-    return await handle.readFile('utf8');
-  } catch {
-    return undefined;
-  } finally {
-    if (handle) {
-      await handle.close();
-    }
-  }
-}
-
 export async function getConnectionConfigFromFile(
   pid: number,
 ): Promise<
@@ -161,10 +122,7 @@ export async function getConnectionConfigFromFile(
       'ide',
       `gemini-ide-server-${pid}.json`,
     );
-    const portFileContents = await verifyAndReadFile(portFile);
-    if (!portFileContents) {
-      throw new Error('Verification failed or file not found');
-    }
+    const portFileContents = await fs.promises.readFile(portFile, 'utf8');
     const parsed: unknown = JSON.parse(portFileContents);
     type ConfigType = ConnectionConfig & {
       workspacePath?: string;
@@ -206,21 +164,23 @@ export async function getConnectionConfigFromFile(
 
   sortConnectionFiles(matchingFiles, pid);
 
-  const fileContents = await Promise.all(
-    matchingFiles.map((file) =>
-      verifyAndReadFile(path.join(portFileDir, file)),
-    ),
-  );
-
+  let fileContents: string[];
+  try {
+    fileContents = await Promise.all(
+      matchingFiles.map((file) =>
+        fs.promises.readFile(path.join(portFileDir, file), 'utf8'),
+      ),
+    );
+  } catch (e) {
+    logger.debug('Failed to read IDE connection config file(s):', e);
+    return undefined;
+  }
   const parsedContents = fileContents.map(
     (
       content,
     ):
       | (ConnectionConfig & { workspacePath?: string; ideInfo?: IdeInfo })
       | undefined => {
-      if (!content) {
-        return undefined;
-      }
       try {
         const parsed: unknown = JSON.parse(content);
         type ConfigType = ConnectionConfig & {
@@ -259,31 +219,6 @@ export async function getConnectionConfigFromFile(
   );
 
   if (validWorkspaces.length === 0) {
-    // If no workspace matches the current CWD, but we found and parsed
-    // valid connection config file(s), return the best-sorted config.
-    // This lets downstream connection logic raise a helpful, detailed
-    // "Directory mismatch" warning instead of a generic connection error.
-    let fileIndex = -1;
-    const portFromEnv = getPortFromEnv();
-    if (portFromEnv) {
-      fileIndex = parsedContents.findIndex(
-        (content) =>
-          !!content &&
-          content.port !== undefined &&
-          String(content.port) === portFromEnv,
-      );
-    }
-    if (fileIndex === -1) {
-      fileIndex = parsedContents.findIndex((content) => !!content);
-    }
-
-    if (fileIndex !== -1) {
-      const selected = parsedContents[fileIndex]!;
-      logger.debug(
-        `Selected best mismatched IDE connection file: ${matchingFiles[fileIndex]}`,
-      );
-      return selected;
-    }
     return undefined;
   }
 
@@ -299,8 +234,7 @@ export async function getConnectionConfigFromFile(
   const portFromEnv = getPortFromEnv();
   if (portFromEnv) {
     const matchingPortIndex = validWorkspaces.findIndex(
-      (content) =>
-        content.port !== undefined && String(content.port) === portFromEnv,
+      (content) => String(content.port) === portFromEnv,
     );
     if (matchingPortIndex !== -1) {
       const selected = validWorkspaces[matchingPortIndex];

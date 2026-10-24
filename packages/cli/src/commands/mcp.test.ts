@@ -17,7 +17,7 @@ describe('mcp command', () => {
   });
 
   it('should show help when no subcommand is provided', async () => {
-    const yargsInstance = yargs().locale('en');
+    const yargsInstance = yargs();
     (mcpCommand.builder as (y: Argv) => Argv)(yargsInstance);
 
     const parser = yargsInstance.command(mcpCommand).help();

@@ -20,9 +20,7 @@ import { normalizeModelId } from '../utils/modelUtils.js';
 export class ModelMappingContentGenerator implements ContentGenerator {
   constructor(
     private readonly wrapped: ContentGenerator,
-    private readonly mappings:
-      | Record<string, string>
-      | (() => Record<string, string>),
+    private readonly mappings: Record<string, string>,
   ) {}
 
   getWrapped(): ContentGenerator {
@@ -43,15 +41,13 @@ export class ModelMappingContentGenerator implements ContentGenerator {
 
   private mapModel<T extends { model?: string }>(req: T): T {
     if (req.model) {
-      const activeMappings =
-        typeof this.mappings === 'function' ? this.mappings() : this.mappings;
       const normalizedModel = normalizeModelId(req.model);
-      if (activeMappings[normalizedModel]) {
+      if (this.mappings[normalizedModel]) {
         return {
           ...req,
           model: req.model.startsWith('models/')
-            ? `models/${activeMappings[normalizedModel]}`
-            : activeMappings[normalizedModel],
+            ? `models/${this.mappings[normalizedModel]}`
+            : this.mappings[normalizedModel],
         };
       }
     }

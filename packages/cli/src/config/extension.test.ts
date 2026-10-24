@@ -58,7 +58,6 @@ const mockGit = {
   checkout: vi.fn(),
   listRemote: vi.fn(),
   revparse: vi.fn(),
-  env: vi.fn(() => mockGit),
   // Not a part of the actual API, but we need to use this to do the correct
   // file system interactions.
   path: vi.fn(),
@@ -251,20 +250,23 @@ describe('extension tests', () => {
       expect(extensions[0].name).toBe('test-extension');
     });
 
-    it('should skip loading the context file if a context file path is outside the extension directory and log a warning', async () => {
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    it('should skip the extension if a context file path is outside the extension directory and log an error', async () => {
+      const consoleSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
       createExtension({
         extensionsDir: userExtensionsDir,
-        name: 'boundary-extension',
+        name: 'traversal-extension',
         version: '1.0.0',
         contextFileName: '../secret.txt',
       });
 
       const extensions = await extensionManager.loadExtensions();
-      expect(extensions).toHaveLength(1);
-      expect(extensions[0].contextFiles).toHaveLength(0);
+      expect(extensions).toHaveLength(0);
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Invalid contextFileName: "../secret.txt"'),
+        expect.stringContaining(
+          'traversal-extension: Invalid context file path: "../secret.txt"',
+        ),
       );
       consoleSpy.mockRestore();
     });
@@ -853,146 +855,6 @@ name = "yolo-checker"
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining(
           'This extension is not allowed by the "allowedExtensions" security setting',
-        ),
-      );
-      consoleSpy.mockRestore();
-    });
-
-    it('should skip directories with missing or misconfigured install metadata and still load the other extensions if the allowlist is set.', async () => {
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      createExtension({
-        extensionsDir: userExtensionsDir,
-        name: 'my-ext',
-        version: '1.0.0',
-        installMetadata: {
-          type: 'git',
-          source: 'http://allowed.com/foo/bar',
-        },
-      });
-      // Left behind when an install is interrupted before the metadata file
-      // is written.
-      const interruptedDir = path.join(userExtensionsDir, 'interrupted-ext');
-      fs.mkdirSync(interruptedDir);
-      // Metadata that cannot be parsed counts as missing.
-      const corruptDir = path.join(userExtensionsDir, 'corrupt-ext');
-      fs.mkdirSync(corruptDir);
-      fs.writeFileSync(path.join(corruptDir, INSTALL_METADATA_FILENAME), '{');
-      // Metadata that parses but has a source that is not a string is
-      // misconfigured too.
-      const wrongTypeDir = path.join(userExtensionsDir, 'wrong-type-ext');
-      fs.mkdirSync(wrongTypeDir);
-      fs.writeFileSync(
-        path.join(wrongTypeDir, INSTALL_METADATA_FILENAME),
-        JSON.stringify({ type: 'git', source: 5 }),
-      );
-      const extensionAllowlistSetting = createTestMergedSettings({
-        security: { allowedExtensions: ['allowed\\.com'] },
-      });
-      extensionManager = new ExtensionManager({
-        workspaceDir: tempWorkspaceDir,
-        requestConsent: mockRequestConsent,
-        requestSetting: mockPromptForSettings,
-        settings: extensionAllowlistSetting,
-        integrityManager: mockIntegrityManager,
-      });
-      const extensions = await extensionManager.loadExtensions();
-
-      expect(extensions.map((e) => e.name)).toEqual(['my-ext']);
-      for (const dir of [interruptedDir, corruptDir, wrongTypeDir]) {
-        expect(consoleSpy).toHaveBeenCalledWith(
-          expect.stringContaining(
-            `Failed to load extension ${dir}. The ${INSTALL_METADATA_FILENAME} file is missing or misconfigured.`,
-          ),
-        );
-      }
-      consoleSpy.mockRestore();
-    });
-
-    it('should not fail the whole load and log a warning if an allowlist pattern is not a valid regex.', async () => {
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      createExtension({
-        extensionsDir: userExtensionsDir,
-        name: 'my-ext',
-        version: '1.0.0',
-        installMetadata: {
-          type: 'git',
-          source: 'http://allowed.com/foo/bar',
-        },
-      });
-      const extensionAllowlistSetting = createTestMergedSettings({
-        security: { allowedExtensions: ['('] },
-      });
-      extensionManager = new ExtensionManager({
-        workspaceDir: tempWorkspaceDir,
-        requestConsent: mockRequestConsent,
-        requestSetting: mockPromptForSettings,
-        settings: extensionAllowlistSetting,
-        integrityManager: mockIntegrityManager,
-      });
-
-      await expect(extensionManager.loadExtensions()).resolves.toEqual([]);
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining(
-          'Invalid regex pattern in allowedExtensions setting',
-        ),
-      );
-      consoleSpy.mockRestore();
-    });
-
-    it('should load an extension matched by a valid allowlist pattern listed before an invalid one.', async () => {
-      createExtension({
-        extensionsDir: userExtensionsDir,
-        name: 'my-ext',
-        version: '1.0.0',
-        installMetadata: {
-          type: 'git',
-          source: 'http://allowed.com/foo/bar',
-        },
-      });
-      const extensionAllowlistSetting = createTestMergedSettings({
-        security: { allowedExtensions: ['allowed\\.com', '('] },
-      });
-      extensionManager = new ExtensionManager({
-        workspaceDir: tempWorkspaceDir,
-        requestConsent: mockRequestConsent,
-        requestSetting: mockPromptForSettings,
-        settings: extensionAllowlistSetting,
-        integrityManager: mockIntegrityManager,
-      });
-      const extensions = await extensionManager.loadExtensions();
-
-      expect(extensions.map((e) => e.name)).toEqual(['my-ext']);
-    });
-
-    it('should load an extension matched by a valid allowlist pattern listed after an invalid one.', async () => {
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      createExtension({
-        extensionsDir: userExtensionsDir,
-        name: 'my-ext',
-        version: '1.0.0',
-        installMetadata: {
-          type: 'git',
-          source: 'http://allowed.com/foo/bar',
-        },
-      });
-      const extensionAllowlistSetting = createTestMergedSettings({
-        security: { allowedExtensions: ['(', 'allowed\\.com'] },
-      });
-      extensionManager = new ExtensionManager({
-        workspaceDir: tempWorkspaceDir,
-        requestConsent: mockRequestConsent,
-        requestSetting: mockPromptForSettings,
-        settings: extensionAllowlistSetting,
-        integrityManager: mockIntegrityManager,
-      });
-      const extensions = await extensionManager.loadExtensions();
-
-      expect(extensions.map((e) => e.name)).toEqual(['my-ext']);
-      // The invalid entry is still reported, but it does not stop the
-      // patterns listed after it from being evaluated.
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining(
-          'Invalid regex pattern in allowedExtensions setting',
         ),
       );
       consoleSpy.mockRestore();
@@ -1682,11 +1544,7 @@ name = "yolo-checker"
         `Installing extension "my-local-extension".
 This extension will run the following MCP servers:
   * test-server (local): node dobadthing \\u001b[12D\\u001b[K server.js
-    Description: a local mcp server
-    Config signature: 2e78d87d1e8ad2180a3b7c7cadf540ccd376375312fa9d94371b1b4ea486d992
   * test-server-2 (remote): https://google.com
-    Description: a remote mcp server
-    Config signature: 08fe6539fb2663eceb2f28aeca2ee49ced91a937780986616f989b496f7c8e83
 
 ${INSTALL_WARNING_MESSAGE}`,
       );

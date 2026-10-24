@@ -233,15 +233,14 @@ export class ContextManager {
 
     let foundPending = false;
     for (const turn of hardenedFullHistory) {
-      const isPendingId =
-        pendingIds.has(turn.id) ||
-        (turn.id.startsWith('turn_') && pendingIds.has(turn.id.substring(5)));
-
-      const isStartupContext =
-        (turn.id === envContextId || turn.id === `turn_${envContextId}`) &&
-        turn !== hardenedFullHistory[hardenedFullHistory.length - 1];
-
-      if (!foundPending && isPendingId && !isStartupContext) {
+      if (
+        !foundPending &&
+        (pendingIds.has(turn.id) ||
+          (turn.id.startsWith('turn_') &&
+            pendingIds.has(turn.id.substring(5)))) &&
+        turn.id !== envContextId &&
+        turn.id !== `turn_${envContextId}`
+      ) {
         foundPending = true;
       }
 

@@ -5,9 +5,8 @@
  */
 
 import { Box, Static } from 'ink';
-import { CoreToolCallStatus } from '@google/gemini-cli-core';
 import { HistoryItemDisplay } from './HistoryItemDisplay.js';
-import { UIStateContext, useUIState } from '../contexts/UIStateContext.js';
+import { useUIState } from '../contexts/UIStateContext.js';
 import { useAppContext } from '../contexts/AppContext.js';
 import { AppHeader } from './AppHeader.js';
 
@@ -23,60 +22,9 @@ import { MAX_GEMINI_MESSAGE_LINES } from '../constants.js';
 import { useConfirmingTool } from '../hooks/useConfirmingTool.js';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
 import { appEvents, AppEvent } from '../../utils/events.js';
-import type { HistoryItem } from '../types.js';
 
 const MemoizedHistoryItemDisplay = memo(HistoryItemDisplay);
 const MemoizedAppHeader = memo(AppHeader);
-
-const ToolConfirmationQueueWithBudget = ({
-  confirmingTool,
-  budget,
-}: {
-  confirmingTool: Parameters<typeof ToolConfirmationQueue>[0]['confirmingTool'];
-  budget: number | undefined;
-}) => {
-  const uiState = useUIState();
-  const overriddenUiState = useMemo(
-    () => ({
-      ...uiState,
-      availableTerminalHeight: budget,
-    }),
-    [uiState, budget],
-  );
-
-  return (
-    <UIStateContext.Provider value={overriddenUiState}>
-      <ToolConfirmationQueue
-        key="confirmation-queue"
-        confirmingTool={confirmingTool}
-      />
-    </UIStateContext.Provider>
-  );
-};
-
-const STATIC_HISTORY_ITEM_TYPES: ReadonlySet<HistoryItem['type']> = new Set([
-  'user',
-  'user_shell',
-  'gemini',
-  'gemini_content',
-  'info',
-  'warning',
-  'error',
-  'hint',
-  'thinking',
-  'about',
-  'help',
-  'stats',
-  'model_stats',
-  'tool_stats',
-  'model',
-  'quit',
-  'extensions_list',
-  'tools_list',
-  'skills_list',
-  'agents_list',
-  'chat_list',
-]);
 
 // Limit Gemini messages to a very high number of lines to mitigate performance
 // issues in the worst case if we somehow get an enormous response from Gemini.
@@ -91,23 +39,14 @@ export const MainContent = () => {
   const isAlternateBuffer = config.getUseAlternateBuffer();
 
   const confirmingTool = useConfirmingTool();
-  const showConfirmationQueue = Boolean(confirmingTool);
+  const showConfirmationQueue = confirmingTool !== null;
   const confirmingToolCallId = confirmingTool?.tool.callId;
 
   const scrollableListRef = useRef<VirtualizedListRef<unknown>>(null);
 
   useEffect(() => {
-    if (showConfirmationQueue && scrollableListRef.current) {
-      const scrollState = scrollableListRef.current.getScrollState?.();
-      const isAtBottom = scrollState
-        ? scrollState.scrollHeight -
-            scrollState.innerHeight -
-            scrollState.scrollTop <=
-          1
-        : true;
-      if (isAtBottom) {
-        scrollableListRef.current.scrollToEnd();
-      }
+    if (showConfirmationQueue) {
+      scrollableListRef.current?.scrollToEnd();
     }
   }, [showConfirmationQueue, confirmingToolCallId]);
 
@@ -212,75 +151,10 @@ export const MainContent = () => {
     [historyItems, lastUserPromptIndex],
   );
 
-  const pendingItems = useMemo(() => {
-    const hasConfirmationQueue = Boolean(
-      showConfirmationQueue && confirmingTool,
-    );
-    const isVisiblePendingItem = (item: (typeof pendingHistoryItems)[number]) =>
-      item.type !== 'tool_group' ||
-      item.tools.some((t) => t.status !== CoreToolCallStatus.AwaitingApproval);
-    const visiblePendingCount =
-      pendingHistoryItems.filter(isVisiblePendingItem).length;
-    const shouldPartitionHeight =
-      !isAlternateBufferOrTerminalBuffer &&
-      hasConfirmationQueue &&
-      visiblePendingCount > 0;
-    const pendingCount = Math.max(1, visiblePendingCount);
-
-    const rawPendingBudget =
-      availableTerminalHeight !== undefined
-        ? shouldPartitionHeight
-          ? Math.floor(availableTerminalHeight * 0.4)
-          : availableTerminalHeight
-        : undefined;
-
-    // In alternate buffer mode, we bypass partitioning the height because the list is
-    // scrollable and virtualized, allowing each item to use the full budget.
-    // Otherwise, we distribute the height budget among pending items using the
-    // Largest Remainder Method so all available space is utilized without overflowing.
-    const basePendingItemHeight =
-      rawPendingBudget !== undefined
-        ? Math.floor(rawPendingBudget / pendingCount)
-        : undefined;
-    const pendingHeightRemainder =
-      rawPendingBudget !== undefined ? rawPendingBudget % pendingCount : 0;
-    const perPendingItemHeights =
-      rawPendingBudget !== undefined && basePendingItemHeight !== undefined
-        ? Array.from({ length: pendingCount }, (_, index) =>
-            isAlternateBufferOrTerminalBuffer
-              ? rawPendingBudget
-              : Math.max(
-                  basePendingItemHeight +
-                    (index < pendingHeightRemainder ? 1 : 0),
-                  1,
-                ),
-          )
-        : undefined;
-    const totalAllocatedPendingHeight =
-      perPendingItemHeights !== undefined
-        ? perPendingItemHeights.reduce((sum, height) => sum + height, 0)
-        : 0;
-
-    // Calculate confirmationQueueBudget by subtracting the actual allocated pending height
-    // from availableTerminalHeight to prevent terminal overflows.
-    // We enforce a minimum height of 1 when partitioning to prevent overflows on small terminals.
-    const confirmationQueueBudget =
-      availableTerminalHeight !== undefined
-        ? shouldPartitionHeight
-          ? Math.max(availableTerminalHeight - totalAllocatedPendingHeight, 1)
-          : availableTerminalHeight
-        : undefined;
-
-    let visiblePendingIndex = 0;
-
-    return (
+  const pendingItems = useMemo(
+    () => (
       <Box flexDirection="column" key="pending-items-group">
         {pendingHistoryItems.map((item, i) => {
-          const isVisible = isVisiblePendingItem(item);
-          const itemHeightIndex = isVisible
-            ? visiblePendingIndex++
-            : Math.min(visiblePendingIndex, pendingCount - 1);
-          const perPendingItemHeight = perPendingItemHeights?.[itemHeightIndex];
           const prevType =
             i === 0
               ? uiState.history.at(-1)?.type
@@ -297,7 +171,7 @@ export const MainContent = () => {
             <HistoryItemDisplay
               key={`pending-${i}`}
               availableTerminalHeight={
-                uiState.constrainHeight ? perPendingItemHeight : undefined
+                uiState.constrainHeight ? availableTerminalHeight : undefined
               }
               terminalWidth={mainAreaWidth}
               item={{ ...item, id: -(i + 1) }}
@@ -310,23 +184,23 @@ export const MainContent = () => {
           );
         })}
         {showConfirmationQueue && confirmingTool && (
-          <ToolConfirmationQueueWithBudget
+          <ToolConfirmationQueue
+            key="confirmation-queue"
             confirmingTool={confirmingTool}
-            budget={confirmationQueueBudget}
           />
         )}
       </Box>
-    );
-  }, [
-    pendingHistoryItems,
-    isAlternateBufferOrTerminalBuffer,
-    uiState.constrainHeight,
-    availableTerminalHeight,
-    mainAreaWidth,
-    showConfirmationQueue,
-    confirmingTool,
-    uiState.history,
-  ]);
+    ),
+    [
+      pendingHistoryItems,
+      uiState.constrainHeight,
+      availableTerminalHeight,
+      mainAreaWidth,
+      showConfirmationQueue,
+      confirmingTool,
+      uiState.history,
+    ],
+  );
 
   const virtualizedData = useMemo(
     () => [
@@ -364,36 +238,19 @@ export const MainContent = () => {
 
   const keyExtractor = useCallback(
     (item: (typeof virtualizedData)[number], _index: number) => {
-      if (item.type === 'header') {
-        return `header-${showHeaderDetails}-${uiState.bannerVisible}-${uiState.bannerData?.defaultText ?? ''}-${uiState.bannerData?.warningText ?? ''}-${uiState.updateInfo?.isUpdating}-${uiState.historyRemountKey}`;
-      }
-      if (item.type === 'history') {
-        return `${item.item.id}-${uiState.renderMarkdown}-${uiState.historyRemountKey}`;
-      }
+      if (item.type === 'header') return 'header';
+      if (item.type === 'history') return item.item.id.toString();
       return 'pending';
     },
-    [
-      showHeaderDetails,
-      uiState.bannerVisible,
-      uiState.bannerData?.defaultText,
-      uiState.bannerData?.warningText,
-      uiState.renderMarkdown,
-      uiState.historyRemountKey,
-      uiState.updateInfo?.isUpdating,
-    ],
+    [],
   );
 
+  // TODO(jacobr): we should return true for all messages that are not
+  // interactive. Gemini messages and Tool results that are not scrollable,
+  // collapsible, or clickable should also be tagged as static in the future.
   const isStaticItem = useCallback(
-    (item: (typeof virtualizedData)[number]) => {
-      if (item.type === 'header') {
-        return !uiState.updateInfo?.isUpdating;
-      }
-      if (item.type === 'history') {
-        return STATIC_HISTORY_ITEM_TYPES.has(item.item.type);
-      }
-      return false;
-    },
-    [uiState.updateInfo?.isUpdating],
+    (item: (typeof virtualizedData)[number]) => item.type === 'header',
+    [],
   );
 
   const scrollableList = useMemo(() => {

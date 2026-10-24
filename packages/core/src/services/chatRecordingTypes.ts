@@ -124,33 +124,8 @@ export interface RewindRecord {
   $rewindTo: string;
 }
 
-export interface ToolCallPatch {
-  id: string;
-  result?: PartListUnion | null;
-}
-
-export interface MessagePatch {
-  id: string;
-  content?: PartListUnion;
-  toolCalls?: ToolCallPatch[];
-}
-
-export interface MessagePatchRecord {
-  $patch: {
-    id?: string;
-    content?: PartListUnion;
-    toolCalls?: ToolCallPatch[];
-    updates?: MessagePatch[];
-    removeIds?: string[];
-    orderIds?: string[];
-  };
-}
-
 export interface MetadataUpdateRecord {
-  $set: Partial<Omit<ConversationRecord, 'messages'>> & {
-    /** @deprecated Legacy full-history checkpoint; use append-only MessageRecord and MessagePatchRecord instead. */
-    messages?: MessageRecord[];
-  };
+  $set: Partial<ConversationRecord>;
 }
 
 export interface PartialMetadataRecord {

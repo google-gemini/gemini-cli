@@ -28,17 +28,15 @@ enum GoogleApiType {
 export class TerminalQuotaError extends Error {
   retryDelayMs?: number;
   reason?: string;
-  status?: number;
 
   constructor(
     message: string,
-    override readonly cause?: GoogleApiError,
+    override readonly cause: GoogleApiError,
     retryDelaySeconds?: number,
     reason?: string,
   ) {
     super(message);
     this.name = 'TerminalQuotaError';
-    this.status = cause?.code;
     this.retryDelayMs = retryDelaySeconds
       ? retryDelaySeconds * 1000
       : undefined;
@@ -55,16 +53,14 @@ export class TerminalQuotaError extends Error {
  */
 export class RetryableQuotaError extends Error {
   retryDelayMs?: number;
-  status?: number;
 
   constructor(
     message: string,
-    override readonly cause?: GoogleApiError,
+    override readonly cause: GoogleApiError,
     retryDelaySeconds?: number,
   ) {
     super(message);
     this.name = 'RetryableQuotaError';
-    this.status = cause?.code;
     this.retryDelayMs = retryDelaySeconds
       ? retryDelaySeconds * 1000
       : undefined;
@@ -191,12 +187,7 @@ function classifyValidationRequiredError(
 
   // Fallback to ErrorInfo metadata if Help detail not found
   if (!validationLink) {
-    validationLink =
-      errorInfo.metadata?.['validation_link'] ??
-      errorInfo.metadata?.['validation_url'];
-  }
-  if (!learnMoreUrl) {
-    learnMoreUrl = errorInfo.metadata?.['validation_learn_more_url'];
+    validationLink = errorInfo.metadata?.['validation_link'];
   }
 
   return new ValidationRequiredError(
@@ -226,20 +217,6 @@ function classifyValidationRequiredError(
  * @returns A classified error or the original `unknown` error.
  */
 export function classifyGoogleError(error: unknown): unknown {
-  if (
-    error instanceof TerminalQuotaError ||
-    error instanceof RetryableQuotaError ||
-    error instanceof ValidationRequiredError ||
-    (typeof error === 'object' &&
-      error !== null &&
-      'name' in error &&
-      (error.name === 'TerminalQuotaError' ||
-        error.name === 'RetryableQuotaError' ||
-        error.name === 'ValidationRequiredError'))
-  ) {
-    return error;
-  }
-
   const googleApiError = parseGoogleApiError(error);
   const status = googleApiError?.code ?? getErrorStatus(error);
   const errorMessage = googleApiError?.message || extractErrorMessage(error);
@@ -294,23 +271,16 @@ export function classifyGoogleError(error: unknown): unknown {
         return new RetryableQuotaError(errorMessage, cause, retryDelaySeconds);
       }
     } else if (status === 429 || status === 499 || status === 503) {
-      const cause = googleApiError ?? {
-        code: status,
-        message: errorMessage,
-        details: [],
-      };
-
-      // If the error message indicates capacity exhaustion, classify as TerminalQuotaError
-      if (
-        /exhausted your capacity|capacity exceeded|MODEL_CAPACITY_EXHAUSTED/i.test(
-          errorMessage,
-        )
-      ) {
-        return new TerminalQuotaError(errorMessage, cause);
-      }
-
-      // Fallback: assume it is a temporary rate limit and retry.
-      return new RetryableQuotaError(errorMessage, cause);
+      // Fallback: If it is a 429, 499, or 503 but doesn't have a specific "retry in" message,
+      // assume it is a temporary rate limit and retry.
+      return new RetryableQuotaError(
+        errorMessage,
+        googleApiError ?? {
+          code: status,
+          message: errorMessage,
+          details: [],
+        },
+      );
     }
 
     return error; // Not a retryable error we can handle with structured details or a parsable retry message.
@@ -350,19 +320,6 @@ export function classifyGoogleError(error: unknown): unknown {
   }
 
   if (errorInfo) {
-    // Always treat capacity exhaustion as terminal error to trigger immediate model fallback
-    if (
-      errorInfo.reason === 'MODEL_CAPACITY_EXHAUSTED' ||
-      errorInfo.reason === 'MODEL_CAPACITY_EXCEEDED'
-    ) {
-      return new TerminalQuotaError(
-        googleApiError.message,
-        googleApiError,
-        delaySeconds,
-        errorInfo.reason,
-      );
-    }
-
     // INSUFFICIENT_G1_CREDITS_BALANCE is always terminal, regardless of domain
     if (errorInfo.reason === 'INSUFFICIENT_G1_CREDITS_BALANCE') {
       return new TerminalQuotaError(
@@ -377,15 +334,7 @@ export function classifyGoogleError(error: unknown): unknown {
     if (errorInfo.domain) {
       if (isCloudCodeDomain(errorInfo.domain)) {
         if (errorInfo.reason === 'RATE_LIMIT_EXCEEDED') {
-          if (delaySeconds === undefined) {
-            return new TerminalQuotaError(
-              googleApiError.message,
-              googleApiError,
-              undefined,
-              errorInfo.reason,
-            );
-          }
-          const effectiveDelay = delaySeconds;
+          const effectiveDelay = delaySeconds ?? 10;
           if (effectiveDelay > MAX_RETRYABLE_DELAY_SECONDS) {
             return new TerminalQuotaError(
               googleApiError.message,
@@ -451,15 +400,6 @@ export function classifyGoogleError(error: unknown): unknown {
         60,
       );
     }
-  }
-
-  // If the error message indicates capacity exhaustion, classify as TerminalQuotaError
-  if (
-    /exhausted your capacity|capacity exceeded|MODEL_CAPACITY_EXHAUSTED/i.test(
-      errorMessage,
-    )
-  ) {
-    return new TerminalQuotaError(errorMessage, googleApiError);
   }
 
   // If we reached this point, the status is 429, 499, or 503 and we have details,

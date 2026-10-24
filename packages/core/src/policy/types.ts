@@ -327,11 +327,6 @@ export interface PolicyEngineConfig {
    * The sandbox manager instance.
    */
   sandboxManager?: SandboxManager;
-
-  /**
-   * Callback or boolean indicating whether the current workspace is trusted.
-   */
-  isTrustedFolder?: () => boolean;
 }
 
 export interface PolicySettings {

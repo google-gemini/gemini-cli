@@ -229,14 +229,6 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
       for (const relativePath of filteredPaths) {
         const fullPath = path.resolve(this.config.getTargetDir(), relativePath);
 
-        const validationError = this.config.validatePathAccess(
-          fullPath,
-          'read',
-        );
-        if (validationError) {
-          continue;
-        }
-
         if (this.shouldIgnore(path.basename(fullPath), this.params.ignore)) {
           continue;
         }

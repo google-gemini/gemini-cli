@@ -49,12 +49,6 @@ class TestIssuesStore(unittest.TestCase):
         self.transaction.update.assert_called_once()
         args, _ = self.transaction.update.call_args
         self.assertEqual(args[1]["status"], "NEEDS_HUMAN")
-        self.assertEqual(
-            args[1]["error"],
-            "Max triage attempts (2) exceeded due to prior worker crash or timeout",
-        )
-        self.assertIsNone(args[1]["lock.holder"])
-        self.assertIsNone(args[1]["lock.expires_at"])
 
     def test_acquire_lock_active_lock_by_other_holder(self):
         """acquire lock when active lock held by another worker should skip"""
@@ -137,7 +131,6 @@ class TestIssuesStore(unittest.TestCase):
         updates = args[1]
         self.assertEqual(updates["status"], "TRIAGED")
         self.assertEqual(updates["workable_spec"], workable_spec)
-        self.assertIsNone(updates["error"])
         self.assertIsNone(updates["lock.holder"])
         self.assertIsNone(updates["lock.expires_at"])
 
@@ -165,16 +158,13 @@ class TestIssuesStore(unittest.TestCase):
             "triage_attempts": 2,
         }
         
-        action = self.store.release_lock(
-            "owner", "repo", 123, self.lock_holder, success=False, error="LLM failed"
-        )
+        action = self.store.release_lock("owner", "repo", 123, self.lock_holder, success=False)
         
         self.assertEqual(action, ReleaseAction.COMPLETE)
         self.transaction.update.assert_called_once()
         args, _ = self.transaction.update.call_args
         updates = args[1]
         self.assertEqual(updates["status"], "NEEDS_HUMAN")
-        self.assertEqual(updates["error"], "LLM failed")
 
 if __name__ == "__main__":
     unittest.main()

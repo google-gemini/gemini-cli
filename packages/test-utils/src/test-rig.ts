@@ -416,16 +416,30 @@ export class TestRig {
 
   private _cleanDir(dir: string) {
     if (fs.existsSync(dir)) {
-      try {
-        fs.rmSync(dir, {
-          recursive: true,
-          force: true,
-          maxRetries: 10,
-          retryDelay: 50,
-        });
-      } catch (err) {
-        console.error(`Failed to clean directory ${dir} after retries:`, err);
-        throw err;
+      for (let i = 0; i < 10; i++) {
+        try {
+          fs.rmSync(dir, { recursive: true, force: true });
+          return;
+        } catch (err) {
+          if (i === 9) {
+            console.error(
+              `Failed to clean directory ${dir} after 10 attempts:`,
+              err,
+            );
+            throw err;
+          }
+          const delay = Math.min(Math.pow(2, i) * 1000, 10000); // Max 10s delay
+          try {
+            const sharedBuffer = new Int32Array(new SharedArrayBuffer(4));
+            Atomics.wait(sharedBuffer, 0, 0, delay);
+          } catch {
+            // Fallback for environments where SharedArrayBuffer might be restricted
+            const start = Date.now();
+            while (Date.now() - start < delay) {
+              /* busy wait */
+            }
+          }
+        }
       }
     }
   }
@@ -673,7 +687,6 @@ export class TestRig {
         key !== 'GEMINI_CLI_TEST_VAR' &&
         key !== 'GEMINI_CLI_INTEGRATION_TEST' &&
         key !== 'GOOGLE_GEMINI_BASE_URL' &&
-        key !== 'GEMINI_FORCE_FILE_STORAGE' &&
         !key.startsWith('GEMINI_CLI_ACTIVITY_LOG')
       ) {
         delete cleanEnv[key];
@@ -684,7 +697,6 @@ export class TestRig {
       ...cleanEnv,
       GEMINI_CLI_HOME: this.homeDir!,
       GEMINI_PTY_INFO: 'child_process',
-      GEMINI_FORCE_FILE_STORAGE: 'true',
       ...extraEnv,
     };
   }

@@ -9,7 +9,6 @@
 .gemini/
 .idea
 .integration-tests/
-**/.vscode-test/
 *.iml
 *.tsbuildinfo
 *.vsix
