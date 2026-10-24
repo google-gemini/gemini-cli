@@ -586,6 +586,16 @@ const SETTINGS_SCHEMA = {
           'Update the terminal window title with current status icons (Ready: ◇, Action Required: ✋, Working: ✦)',
         showInDialog: true,
       },
+      programStatus: {
+        type: 'boolean',
+        label: 'Program Status',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Report interactive session status to the terminal using OSC 7501 so tab titles can show working, blocked, done, error, or idle.',
+        showInDialog: true,
+      },
       showHomeDirectoryWarning: {
         type: 'boolean',
         label: 'Show Home Directory Warning',

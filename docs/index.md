@@ -56,6 +56,8 @@ Technical documentation for each capability of Gemini CLI.
   tasks.
 - **[Checkpointing](./cli/checkpointing.md):** Automatic session snapshots.
 - **[Headless mode](./cli/headless.md):** Programmatic and scripting interface.
+- **[Notifications](./cli/notifications.md):** Terminal notifications and
+  program status.
 - **[Hooks](./hooks/index.md):** Customize Gemini CLI behavior with scripts.
 - **[IDE integration](./ide-integration/index.md):** Integrate Gemini CLI with
   your favorite IDE.

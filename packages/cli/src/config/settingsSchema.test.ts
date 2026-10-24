@@ -96,6 +96,14 @@ describe('SettingsSchema', () => {
       ]);
     });
 
+    it('should have programStatus boolean property enabled by default', () => {
+      const definition = getSettingsSchema().ui?.properties?.programStatus;
+      expect(definition).toBeDefined();
+      expect(definition?.type).toBe('boolean');
+      expect(definition?.default).toBe(true);
+      expect(definition?.showInDialog).toBe(true);
+    });
+
     it('should have errorVerbosity enum property', () => {
       const definition = getSettingsSchema().ui?.properties?.errorVerbosity;
       expect(definition).toBeDefined();
