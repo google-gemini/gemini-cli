@@ -186,6 +186,7 @@ export const TRACKER_UPDATE_TASK_TOOL_NAME = 'tracker_update_task';
 export const TRACKER_GET_TASK_TOOL_NAME = 'tracker_get_task';
 export const TRACKER_LIST_TASKS_TOOL_NAME = 'tracker_list_tasks';
 export const TRACKER_ADD_DEPENDENCY_TOOL_NAME = 'tracker_add_dependency';
+export const TRACKER_DELETE_TASK_TOOL_NAME = 'tracker_delete_task';
 export const TRACKER_VISUALIZE_TOOL_NAME = 'tracker_visualize';
 
 export const AGENT_TOOL_NAME = 'invoke_agent';
@@ -264,6 +265,7 @@ export const ALL_BUILTIN_TOOL_NAMES = [
   TRACKER_GET_TASK_TOOL_NAME,
   TRACKER_LIST_TASKS_TOOL_NAME,
   TRACKER_ADD_DEPENDENCY_TOOL_NAME,
+  TRACKER_DELETE_TASK_TOOL_NAME,
   TRACKER_VISUALIZE_TOOL_NAME,
   GET_INTERNAL_DOCS_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
