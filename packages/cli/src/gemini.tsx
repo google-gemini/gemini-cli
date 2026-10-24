@@ -98,7 +98,6 @@ import { createPolicyUpdater } from './config/policy.js';
 
 import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { runDeferredCommand } from './deferred.js';
-import { handleList as handleListModels } from './commands/models/list.js';
 import { cleanupBackgroundLogs } from './utils/logCleanup.js';
 import { SlashCommandConflictHandler } from './services/SlashCommandConflictHandler.js';
 
@@ -171,150 +170,34 @@ export function getNodeMemoryArgs(isDebugMode: boolean): string[] {
   return args;
 }
 
-const UNEXPECTED_ERROR_PREFIX = `=========================================
-This is an unexpected error. Please file a bug report using the /bug tool.`;
-
 export function setupUnhandledRejectionHandler() {
   let unhandledRejectionOccurred = false;
-  const hasUnhandled = process
-    .listeners('unhandledRejection')
-    .some(
-      (l) =>
-        Object.getOwnPropertyDescriptor(l, 'geminiListener')?.value === true,
-    );
-  if (!hasUnhandled) {
-    const geminiUnhandledRejectionListener = (
-      reason: unknown,
-      _promise: Promise<unknown>,
-    ) => {
-      // AbortError is expected when the user cancels a request (e.g. pressing ESC).
-      // It may surface as an unhandled rejection due to async timing in the
-      // streaming pipeline, but it is not a bug.
-      if (reason instanceof Error && reason.name === 'AbortError') {
-        debugLogger.log(`Suppressed unhandled AbortError: ${reason.message}`);
-        return;
-      }
+  process.on('unhandledRejection', (reason, _promise) => {
+    // AbortError is expected when the user cancels a request (e.g. pressing ESC).
+    // It may surface as an unhandled rejection due to async timing in the
+    // streaming pipeline, but it is not a bug.
+    if (reason instanceof Error && reason.name === 'AbortError') {
+      debugLogger.log(`Suppressed unhandled AbortError: ${reason.message}`);
+      return;
+    }
 
-      const errorMessage = `${UNEXPECTED_ERROR_PREFIX}
+    const errorMessage = `=========================================
+This is an unexpected error. Please file a bug report using the /bug tool.
 CRITICAL: Unhandled Promise Rejection!
 =========================================
 Reason: ${reason}${
-        reason instanceof Error && reason.stack
-          ? `
+      reason instanceof Error && reason.stack
+        ? `
 Stack trace:
 ${reason.stack}`
-          : ''
-      }`;
-      debugLogger.error(errorMessage);
-      if (!unhandledRejectionOccurred) {
-        unhandledRejectionOccurred = true;
-        appEvents.emit(AppEvent.OpenDebugConsole);
-      }
-    };
-    Object.assign(geminiUnhandledRejectionListener, { geminiListener: true });
-    process.on('unhandledRejection', geminiUnhandledRejectionListener);
-  }
-
-  let isHandlingUncaughtException = false;
-  const hasUncaught = process
-    .listeners('uncaughtException')
-    .some(
-      (l) =>
-        Object.getOwnPropertyDescriptor(l, 'geminiListener')?.value === true,
-    );
-  if (!hasUncaught) {
-    const geminiUncaughtExceptionListener = (error: unknown) => {
-      if (error instanceof Error) {
-        // Suppress known race condition error in node-pty on Windows and Linux
-        const message = error.message || '';
-        const isPtyResizeError =
-          message === 'Cannot resize a pty that has already exited';
-        const isEbadfError =
-          message.includes('EBADF') ||
-          ('code' in error && (error as { code?: unknown }).code === 'EBADF');
-        const isFromNodePty =
-          error.stack?.includes('node-pty') ||
-          error.stack?.includes('PtyResize');
-
-        if ((isPtyResizeError || isEbadfError) && isFromNodePty) {
-          return;
-        }
-
-        // AbortError is expected when the user cancels a request (e.g. pressing ESC).
-        // It can propagate as an uncaught exception from event listeners, but it is not a bug.
-        if (error.name === 'AbortError') {
-          debugLogger.log(`Suppressed uncaught AbortError: ${error.message}`);
-          return;
-        }
-      }
-
-      // Set exit code synchronously before any async operations to ensure
-      // the process exits with a failure code if the event loop empties prematurely.
-      process.exitCode = 1;
-      if (isHandlingUncaughtException) {
-        process.exit(1);
-      }
-      isHandlingUncaughtException = true;
-
-      // Prevent signals from triggering concurrent cleanup paths
-      process.removeAllListeners('SIGINT');
-      process.removeAllListeners('SIGTERM');
-      process.removeAllListeners('SIGHUP');
-
-      let errorDetails: string;
-      if (error instanceof Error) {
-        errorDetails = error.message;
-      } else {
-        try {
-          errorDetails =
-            typeof error === 'object' && error !== null
-              ? JSON.stringify(error)
-              : String(error);
-        } catch {
-          errorDetails = '[Unserializable Object]';
-        }
-      }
-
-      const stackDetails =
-        error instanceof Error && error.stack
-          ? `\nStack trace:\n${error.stack}`
-          : '';
-
-      const errorMessage = `${UNEXPECTED_ERROR_PREFIX}
-CRITICAL: Uncaught Exception!
-=========================================
-Error: ${errorDetails}${stackDetails}`;
-      debugLogger.error(errorMessage);
-
-      // For general uncaught exceptions, write to stderr and exit
-      process.stderr.write(errorMessage + '\n');
-
-      // Do not unref the timeout. Keeping it active ensures the event loop
-      // stays alive to allow the async cleanup to run, even if other active
-      // handles temporarily drop to zero.
-      const cleanupTimeout = setTimeout(() => {
-        process.stderr.write('Cleanup timed out, forcing exit...\n');
-        process.exit(1);
-      }, 5000);
-
-      // Run async cleanup
-      void (async () => {
-        try {
-          await runExitCleanup();
-        } catch (cleanupError) {
-          debugLogger.error(
-            'Error during uncaught exception cleanup:',
-            cleanupError,
-          );
-        } finally {
-          clearTimeout(cleanupTimeout);
-          process.exit(1);
-        }
-      })();
-    };
-    Object.assign(geminiUncaughtExceptionListener, { geminiListener: true });
-    process.on('uncaughtException', geminiUncaughtExceptionListener);
-  }
+        : ''
+    }`;
+    debugLogger.error(errorMessage);
+    if (!unhandledRejectionOccurred) {
+      unhandledRejectionOccurred = true;
+      appEvents.emit(AppEvent.OpenDebugConsole);
+    }
+  });
 }
 
 export async function resolveSessionId(
@@ -681,22 +564,6 @@ export async function main() {
 
   // Run deferred command now that we have admin settings.
   await runDeferredCommand(settings.merged);
-
-  if (argv.listModels) {
-    const outputFormat = argv.outputFormat === 'json' ? 'json' : 'text';
-    try {
-      await handleListModels({ outputFormat, loadedSettings: settings, argv });
-      await runExitCleanup();
-      process.exit(ExitCodes.SUCCESS);
-    } catch (error) {
-      debugLogger.error('Failed to list models:', error);
-      process.stderr.write(
-        `Error: ${error instanceof Error ? error.message : String(error)}\n`,
-      );
-      await runExitCleanup();
-      process.exit(ExitCodes.FATAL_INPUT_ERROR);
-    }
-  }
 
   // hop into sandbox if we are outside and sandboxing is enabled
   if (!process.env['SANDBOX'] && !argv.isCommand) {

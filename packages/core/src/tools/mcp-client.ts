@@ -57,10 +57,7 @@ import { pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import type { McpAuthProvider } from '../mcp/auth-provider.js';
 import { MCPOAuthTokenStorage } from '../mcp/oauth-token-storage.js';
-import {
-  MCPOAuthProvider,
-  type MCPOAuthConfig,
-} from '../mcp/oauth-provider.js';
+import { MCPOAuthProvider } from '../mcp/oauth-provider.js';
 import { DynamicStoredOAuthProvider } from '../mcp/stored-token-provider.js';
 import { OAuthUtils } from '../mcp/oauth-utils.js';
 
@@ -87,7 +84,6 @@ import { validateMcpPolicyToolNames } from '../policy/toml-loader.js';
 import {
   sanitizeEnvironment,
   type EnvironmentSanitizationConfig,
-  isDangerousExecutionEnvironmentVariable,
 } from '../services/environmentSanitization.js';
 import { expandEnvVars } from '../utils/envExpansion.js';
 
@@ -922,24 +918,17 @@ async function handleAutomaticOAuth(
     debugLogger.log(`🔐 '${mcpServerName}' requires OAuth authentication`);
 
     const serverUrl = mcpServerConfig.httpUrl || mcpServerConfig.url;
-    const discoveryOptions = {
-      allowPrivateNetwork: mcpServerConfig.oauth?.allowPrivateNetwork,
-    };
 
     // Try to discover OAuth config from the WWW-Authenticate header first
     let oauthConfig = await OAuthUtils.discoverOAuthFromWWWAuthenticate(
       wwwAuthenticate,
       serverUrl,
-      discoveryOptions,
     );
 
     if (!oauthConfig && hasNetworkTransport(mcpServerConfig)) {
       // Fallback: try to discover OAuth config from the base URL
       const baseUrl = OAuthUtils.extractBaseUrl(serverUrl!);
-      oauthConfig = await OAuthUtils.discoverOAuthConfig(
-        baseUrl,
-        discoveryOptions,
-      );
+      oauthConfig = await OAuthUtils.discoverOAuthConfig(baseUrl);
     }
 
     if (!oauthConfig) {
@@ -955,16 +944,12 @@ async function handleAutomaticOAuth(
     // OAuth configuration discovered - proceed with authentication
 
     // Create OAuth configuration for authentication
-    const oauthAuthConfig: MCPOAuthConfig = {
+    const oauthAuthConfig = {
       enabled: true,
       authorizationUrl: oauthConfig.authorizationUrl,
       issuer: oauthConfig.issuer,
       tokenUrl: oauthConfig.tokenUrl,
       scopes: oauthConfig.scopes || [],
-      authorizationResponseIssParameterSupported:
-        mcpServerConfig.oauth?.authorizationResponseIssParameterSupported ??
-        oauthConfig.authorizationResponseIssParameterSupported,
-      allowPrivateNetwork: mcpServerConfig.oauth?.allowPrivateNetwork,
     };
 
     // Perform OAuth authentication
@@ -1667,19 +1652,15 @@ export function hasNetworkTransport(config: MCPServerConfig): boolean {
  * @param serverName The name of the MCP server
  * @returns The valid access token, or null if no token is stored
  */
-async function getStoredOAuthToken(
-  serverName: string,
-  oauthConfig?: MCPOAuthConfig,
-): Promise<string | null> {
+async function getStoredOAuthToken(serverName: string): Promise<string | null> {
   const tokenStorage = new MCPOAuthTokenStorage();
   const credentials = await tokenStorage.getCredentials(serverName);
   if (!credentials) return null;
 
   const authProvider = new MCPOAuthProvider(tokenStorage);
   return authProvider.getValidToken(serverName, {
-    ...oauthConfig,
     // Pass client ID if available
-    clientId: oauthConfig?.clientId ?? credentials.clientId,
+    clientId: credentials.clientId,
   });
 }
 
@@ -1735,12 +1716,8 @@ async function connectWithSSETransport(
 async function showAuthRequiredMessage(
   serverName: string,
   cliConfig: McpContext,
-  oauthConfig?: MCPOAuthConfig,
 ): Promise<never> {
-  const hasRejectedToken = !!(await getStoredOAuthToken(
-    serverName,
-    oauthConfig,
-  ));
+  const hasRejectedToken = !!(await getStoredOAuthToken(serverName));
 
   const message = hasRejectedToken
     ? `MCP server '${serverName}' rejected stored OAuth token. Please re-authenticate using: /mcp auth ${serverName}`
@@ -1972,7 +1949,7 @@ export async function connectToMcpServer(
         await connectWithSSETransport(
           mcpClient,
           mcpServerConfig,
-          await getStoredOAuthToken(mcpServerName, mcpServerConfig.oauth),
+          await getStoredOAuthToken(mcpServerName),
         );
 
         debugLogger.log(
@@ -2010,11 +1987,7 @@ export async function connectToMcpServer(
       const shouldTriggerOAuth = mcpServerConfig.oauth?.enabled;
 
       if (!shouldTriggerOAuth) {
-        await showAuthRequiredMessage(
-          mcpServerName,
-          cliConfig,
-          mcpServerConfig.oauth,
-        );
+        await showAuthRequiredMessage(mcpServerName, cliConfig);
       }
 
       // Try to extract www-authenticate header from the error
@@ -2084,10 +2057,7 @@ export async function connectToMcpServer(
         );
         if (oauthSuccess) {
           // Retry connection with OAuth token
-          const accessToken = await getStoredOAuthToken(
-            mcpServerName,
-            mcpServerConfig.oauth,
-          );
+          const accessToken = await getStoredOAuthToken(mcpServerName);
           if (!accessToken) {
             throw new Error(
               `Failed to get OAuth token for server '${mcpServerName}'`,
@@ -2114,11 +2084,7 @@ export async function connectToMcpServer(
         const shouldTryDiscovery = mcpServerConfig.oauth?.enabled;
 
         if (!shouldTryDiscovery) {
-          await showAuthRequiredMessage(
-            mcpServerName,
-            cliConfig,
-            mcpServerConfig.oauth,
-          );
+          await showAuthRequiredMessage(mcpServerName, cliConfig);
         }
 
         // For SSE/HTTP servers, try to discover OAuth configuration from the base URL
@@ -2131,32 +2097,21 @@ export async function connectToMcpServer(
             mcpServerConfig.httpUrl || mcpServerConfig.url!,
           );
           const baseUrl = `${serverUrl.protocol}//${serverUrl.host}`;
-          const discoveryOptions = {
-            allowPrivateNetwork: mcpServerConfig.oauth?.allowPrivateNetwork,
-          };
 
           // Try to discover OAuth configuration from the base URL
-          const oauthConfig = await OAuthUtils.discoverOAuthConfig(
-            baseUrl,
-            discoveryOptions,
-          );
+          const oauthConfig = await OAuthUtils.discoverOAuthConfig(baseUrl);
           if (oauthConfig) {
             debugLogger.log(
               `Discovered OAuth configuration from base URL for server '${mcpServerName}'`,
             );
 
             // Create OAuth configuration for authentication
-            const oauthAuthConfig: MCPOAuthConfig = {
+            const oauthAuthConfig = {
               enabled: true,
               authorizationUrl: oauthConfig.authorizationUrl,
               issuer: oauthConfig.issuer,
               tokenUrl: oauthConfig.tokenUrl,
               scopes: oauthConfig.scopes || [],
-              authorizationResponseIssParameterSupported:
-                mcpServerConfig.oauth
-                  ?.authorizationResponseIssParameterSupported ??
-                oauthConfig.authorizationResponseIssParameterSupported,
-              allowPrivateNetwork: mcpServerConfig.oauth?.allowPrivateNetwork,
             };
 
             // Perform OAuth authentication
@@ -2176,10 +2131,7 @@ export async function connectToMcpServer(
             );
 
             // Retry connection with OAuth token
-            const accessToken = await getStoredOAuthToken(
-              mcpServerName,
-              mcpServerConfig.oauth,
-            );
+            const accessToken = await getStoredOAuthToken(mcpServerName);
             if (!accessToken) {
               throw new Error(
                 `Failed to get OAuth token for server '${mcpServerName}'`,
@@ -2408,16 +2360,7 @@ export async function createTransport(
     // Expand and merge explicit environment variables from the MCP configuration.
     if (mcpServerConfig.env) {
       for (const [key, value] of Object.entries(mcpServerConfig.env)) {
-        if (value === undefined) {
-          continue;
-        }
-        if (isDangerousExecutionEnvironmentVariable(key)) {
-          debugLogger.warn(
-            `Blocked dangerous environment variable override for MCP server '${mcpServerName}': ${key}`,
-          );
-          continue;
-        }
-        finalEnv[key] = expandEnvVars(value, sanitizedEnv);
+        finalEnv[key] = expandEnvVars(value, expansionEnv);
       }
     }
 
@@ -2471,13 +2414,7 @@ function getExtensionEnvironment(
   const env: Record<string, string> = {};
   if (extension?.resolvedSettings) {
     for (const setting of extension.resolvedSettings) {
-      if (setting.value !== undefined && typeof setting.envVar === 'string') {
-        if (isDangerousExecutionEnvironmentVariable(setting.envVar)) {
-          debugLogger.warn(
-            `Blocked restricted environment variable override in extension settings: ${setting.envVar}`,
-          );
-          continue;
-        }
+      if (setting.value !== undefined) {
         env[setting.envVar] = setting.value;
       }
     }

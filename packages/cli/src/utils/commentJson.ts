@@ -5,7 +5,6 @@
  */
 
 import * as fs from 'node:fs';
-import * as path from 'node:path';
 import { parse, stringify } from 'comment-json';
 import { coreEvents } from '@google/gemini-cli-core';
 
@@ -14,37 +13,6 @@ import { coreEvents } from '@google/gemini-cli-core';
  */
 type CommentedRecord = Record<string | symbol, unknown>;
 
-function isDangerousKey(key: string): boolean {
-  return key === '__proto__' || key === 'constructor' || key === 'prototype';
-}
-
-let tempCounter = 0;
-
-function writeAtomicSync(filePath: string, content: string): void {
-  const dir = path.dirname(filePath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  const tempPath = path.join(
-    dir,
-    `.${path.basename(filePath)}.${process.pid}.${Date.now()}.${tempCounter++}.tmp`,
-  );
-  try {
-    fs.writeFileSync(tempPath, content, 'utf-8');
-    fs.renameSync(tempPath, filePath);
-  } catch {
-    try {
-      if (fs.existsSync(tempPath)) {
-        fs.unlinkSync(tempPath);
-      }
-    } catch {
-      // ignore
-    }
-    // Fallback to direct write if rename fails
-    fs.writeFileSync(filePath, content, 'utf-8');
-  }
-}
-
 /**
  * Updates a JSON file while preserving comments and formatting.
  */
@@ -52,44 +20,18 @@ export function updateSettingsFilePreservingFormat(
   filePath: string,
   updates: Record<string, unknown>,
 ): void {
-  const dirPath = path.dirname(filePath);
-  if (!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath, { recursive: true });
-  }
-
   if (!fs.existsSync(filePath)) {
-    writeAtomicSync(filePath, JSON.stringify(updates, null, 2));
+    fs.writeFileSync(filePath, JSON.stringify(updates, null, 2), 'utf-8');
     return;
   }
 
+  const originalContent = fs.readFileSync(filePath, 'utf-8');
+
   let parsed: Record<string, unknown>;
   try {
-    const originalContent = fs.readFileSync(filePath, 'utf-8');
-    if (!originalContent.trim()) {
-      parsed = {};
-    } else {
-      const rawParsed: unknown = parse(originalContent);
-      if (
-        typeof rawParsed !== 'object' ||
-        rawParsed === null ||
-        Array.isArray(rawParsed)
-      ) {
-        parsed = {};
-      } else {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        parsed = rawParsed as Record<string, unknown>;
-      }
-    }
-  } catch (error: unknown) {
-    if (
-      error &&
-      typeof error === 'object' &&
-      'code' in error &&
-      error.code === 'ENOENT'
-    ) {
-      writeAtomicSync(filePath, JSON.stringify(updates, null, 2));
-      return;
-    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    parsed = parse(originalContent) as Record<string, unknown>;
+  } catch (error) {
     coreEvents.emitFeedback(
       'error',
       'Error parsing settings file. Please check the JSON syntax.',
@@ -101,7 +43,7 @@ export function updateSettingsFilePreservingFormat(
   const updatedStructure = applyUpdates(parsed, updates);
   const updatedContent = stringify(updatedStructure, null, 2);
 
-  writeAtomicSync(filePath, updatedContent);
+  fs.writeFileSync(filePath, updatedContent, 'utf-8');
 }
 
 /**
@@ -116,9 +58,6 @@ function preserveCommentsOnPropertyDeletion(
   container: Record<string, unknown>,
   propName: string,
 ): void {
-  if (isDangerousKey(propName)) {
-    return;
-  }
   const target = container as CommentedRecord;
   const beforeSym = Symbol.for(`before:${propName}`);
   const afterSym = Symbol.for(`after:${propName}`);
@@ -178,9 +117,6 @@ function applyKeyDiff(
   desired: Record<string, unknown>,
 ): void {
   for (const existingKey of Object.getOwnPropertyNames(base)) {
-    if (isDangerousKey(existingKey)) {
-      continue;
-    }
     if (!Object.prototype.hasOwnProperty.call(desired, existingKey)) {
       preserveCommentsOnPropertyDeletion(base, existingKey);
       delete base[existingKey];
@@ -188,9 +124,6 @@ function applyKeyDiff(
   }
 
   for (const nextKey of Object.getOwnPropertyNames(desired)) {
-    if (isDangerousKey(nextKey)) {
-      continue;
-    }
     const nextVal = desired[nextKey];
     const baseVal = base[nextKey];
 

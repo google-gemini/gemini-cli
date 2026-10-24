@@ -101,18 +101,8 @@ export const CloudFreePrivacyNotice = ({
   }
 
   const items = [
-    {
-      label:
-        'Yes, grant permission to use my data for product improvement (Opt-in)',
-      value: true,
-      key: 'true',
-    },
-    {
-      label:
-        'No, deny permission to use my data for product improvement (Opt-out)',
-      value: false,
-      key: 'false',
-    },
+    { label: 'Yes', value: true, key: 'true' },
+    { label: 'No', value: false, key: 'false' },
   ];
 
   return (
@@ -147,28 +137,12 @@ export const CloudFreePrivacyNotice = ({
         machine-learning technologies.
       </Text>
       <Newline />
-      <Text color={theme.text.primary}>
-        If you don&apos;t want this data used to improve Google&apos;s products
-        and services, you can opt out by selecting &quot;No, deny permission to
-        use my data for product improvement (Opt-out)&quot; below. Otherwise,
-        you can opt in by selecting &quot;Yes, grant permission to use my data
-        for product improvement (Opt-in)&quot;.
-      </Text>
-      <Newline />
       <Box flexDirection="column">
         <Text color={theme.text.primary}>
-          Allow Google to use this data to develop and improve our products and
-          services?
+          Allow Google to use this data to develop and improve our products?
         </Text>
         <RadioButtonSelect
           items={items}
-          renderItem={(item, { titleColor }) => (
-            <Box flexDirection="column">
-              <Text color={titleColor} wrap="wrap">
-                {item.label}
-              </Text>
-            </Box>
-          )}
           initialIndex={privacyState.dataCollectionOptIn ? 0 : 1}
           onSelect={(value) => {
             // eslint-disable-next-line @typescript-eslint/no-floating-promises

@@ -7,7 +7,6 @@ from google.cloud import firestore
 from triage_orchestrator import process_issue_triage
 from utils.validator import validate_triage_result
 from utils.egress import send_label_action, send_comment_action
-from utils.events import publish_issue_ready_for_code
 from db.issues_store import IssuesStore, ClaimAction, ReleaseAction
 
 FEATURE_CLOSED_COMMENT = (
@@ -23,10 +22,6 @@ QUALITY_CLOSED_COMMENT = (
     "not contain a discernible description or actionable bug report for "
     "our team to investigate. If you believe this was closed in error, "
     "please feel free to open a new issue with complete reproduction details."
-)
-
-NEEDS_INFO_FOOTER = (
-    "\n\nPlease reply with the requested details and mention `@caretaker-agent`."
 )
 
 
@@ -89,14 +84,12 @@ def main() -> None:
         sys.exit(0)
         
     print(f"[WORKER] Starting triage for issue #{issue_number}...")
-    target_cwd = os.environ.get("TARGET_CWD", "/opt/gemini-cli")
     try:
-        success, raw_output = process_issue_triage(payload, target_cwd)
+        success, raw_output = process_issue_triage(payload)
     except Exception as e:
         print(f"[WORKER] Triage process failed with exception: {e}")
-        success, raw_output = False, f"Exception during triage execution: {e}"
+        success, raw_output = False, ""
     
-    error_message = None
     if success:
         try:
             triage_result = json.loads(raw_output)
@@ -129,7 +122,6 @@ def main() -> None:
                     triage_result.get("triage_metadata", {})
                     .get("comment", "")
                     .strip()
-                    + NEEDS_INFO_FOOTER
                 )
                 send_comment_action(owner, repo, issue_number, comment_body)
                 store.release_lock(
@@ -152,9 +144,6 @@ def main() -> None:
                 send_label_action(
                     owner, repo, issue_number, [f"effort/{effort.lower()}"]
                 )
-                publish_issue_ready_for_code(
-                    owner, repo, issue_number, workable_spec
-                )
                 store.release_lock(
                     owner,
                     repo,
@@ -169,15 +158,13 @@ def main() -> None:
                 
         except Exception as e:
             print(f"[WORKER] Validation failed: {e}")
-            success, error_message = False, f"Validation Error: {e}"
-    else:
-        error_message = raw_output
+            success = False
     
     # If an exception happens in json.loads or validate_triage_result 
     # If LLM inference itself fails inside process_issue_triage
     if not success:
         release_action = store.release_lock(
-            owner, repo, issue_number, lock_holder, success=False, error=error_message
+            owner, repo, issue_number, lock_holder, success=False
         )
         sys.exit(1 if release_action == ReleaseAction.RETRY else 0)
 

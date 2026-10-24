@@ -71,14 +71,17 @@ export class WindowsSandboxManager implements SandboxManager {
     this.helperPath = path.resolve(__dirname, WindowsSandboxManager.HELPER_EXE);
   }
 
-  isKnownSafeCommand(args: string[], cwd?: string): boolean {
-    const effectiveCwd = cwd ?? this.options.workspace;
-    return isKnownSafeCommand(args, effectiveCwd, this.options.workspace);
+  isKnownSafeCommand(args: string[]): boolean {
+    const toolName = args[0]?.toLowerCase();
+    const approvedTools = this.options.modeConfig?.approvedTools ?? [];
+    if (toolName && approvedTools.some((t) => t.toLowerCase() === toolName)) {
+      return true;
+    }
+    return isKnownSafeCommand(args);
   }
 
-  isDangerousCommand(args: string[], cwd?: string): boolean {
-    const effectiveCwd = cwd ?? this.options.workspace;
-    return isDangerousCommand(args, effectiveCwd, this.options.workspace);
+  isDangerousCommand(args: string[]): boolean {
+    return isDangerousCommand(args);
   }
 
   parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined {
@@ -352,8 +355,6 @@ export class WindowsSandboxManager implements SandboxManager {
           command,
           args,
           this.options.modeConfig?.approvedTools,
-          req.cwd,
-          this.options.workspace,
         )
       : false;
 

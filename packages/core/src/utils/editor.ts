@@ -396,39 +396,6 @@ export function getDiffCommand(
 }
 
 /**
- * Quotes an argument for invocation via cmd.exe on Windows.
- * Wraps in double quotes and escapes special characters to preserve
- * argument boundaries across shell parsing.
- */
-export function quoteCmdArg(arg: string): string {
-  if (/[\r\n\0]/.test(arg)) {
-    throw new Error('Invalid argument: newlines are not allowed');
-  }
-  if (arg.includes('"')) {
-    throw new Error(
-      'Invalid argument: double quotes are not allowed on Windows',
-    );
-  }
-  if (!arg) {
-    return '""';
-  }
-  if (/^[a-zA-Z0-9\-_.:/\\]+$/.test(arg)) {
-    return arg;
-  }
-  let result = '"' + arg;
-  let backslashCount = 0;
-  for (let i = arg.length - 1; i >= 0; i--) {
-    if (arg[i] === '\\') {
-      backslashCount++;
-    } else {
-      break;
-    }
-  }
-  result += '\\'.repeat(backslashCount) + '"';
-  return result;
-}
-
-/**
  * Opens a diff tool to compare two files.
  * Terminal-based editors by default blocks parent process until the editor exits.
  * GUI-based editors require args such as "--wait" to block parent process.
@@ -473,22 +440,10 @@ export async function openDiff(
   }
 
   return new Promise<void>((resolve, reject) => {
-    const isWindows = process.platform === 'win32';
-    let childProcess: ReturnType<typeof spawn>;
-    try {
-      const spawnArgs = isWindows
-        ? diffCommand.args.map(quoteCmdArg)
-        : diffCommand.args;
-
-      childProcess = spawn(diffCommand.command, spawnArgs, {
-        stdio: 'inherit',
-        shell: isWindows,
-      });
-    } catch (error) {
-      coreEvents.emit(CoreEvent.ExternalEditorClosed);
-      reject(error);
-      return;
-    }
+    const childProcess = spawn(diffCommand.command, diffCommand.args, {
+      stdio: 'inherit',
+      shell: process.platform === 'win32',
+    });
 
     // Guard against both 'error' and 'close' firing for a single failure,
     // which would emit ExternalEditorClosed twice and attempt to settle

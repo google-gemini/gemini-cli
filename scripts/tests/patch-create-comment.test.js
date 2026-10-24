@@ -18,8 +18,6 @@ function runPatchCreateComment(args, env = {}) {
   );
   const fullEnv = {
     ...process.env,
-    LC_ALL: 'en_US.UTF-8',
-    LANG: 'en_US.UTF-8',
     ...env,
   };
 

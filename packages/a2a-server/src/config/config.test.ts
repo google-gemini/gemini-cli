@@ -6,8 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as path from 'node:path';
-import { loadConfig, setIsTrusted, setTargetDir } from './config.js';
-import * as settingsModule from './settings.js';
+import { loadConfig } from './config.js';
 import type { Settings } from './settings.js';
 import {
   type ExtensionLoader,
@@ -23,8 +22,6 @@ import {
   ApprovalMode,
   PRIORITY_YOLO_ALLOW_ALL,
   createPolicyEngineConfig,
-  tmpdir,
-  checkPathTrust,
 } from '@google/gemini-cli-core';
 import type { AgentSettings } from '../types.js';
 
@@ -88,7 +85,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     coreEvents: {
       emitAdminSettingsChanged: vi.fn(),
     },
-    checkPathTrust: vi.fn(() => ({ isTrusted: false })),
   };
 });
 
@@ -249,13 +245,11 @@ describe('loadConfig', () => {
     ]);
   });
 
-  it('should set customIgnoreFilePaths when settings.context.fileFiltering.customIgnoreFilePaths is present', async () => {
+  it('should set customIgnoreFilePaths when settings.fileFiltering.customIgnoreFilePaths is present', async () => {
     const testPath = '/settings/ignore';
     const settings: Settings = {
-      context: {
-        fileFiltering: {
-          customIgnoreFilePaths: [testPath],
-        },
+      fileFiltering: {
+        customIgnoreFilePaths: [testPath],
       },
     };
     const config = await loadConfig(settings, mockExtensionLoader, taskId);
@@ -270,10 +264,8 @@ describe('loadConfig', () => {
     const settingsPath = '/settings/ignore';
     vi.stubEnv('CUSTOM_IGNORE_FILE_PATHS', envPath);
     const settings: Settings = {
-      context: {
-        fileFiltering: {
-          customIgnoreFilePaths: [settingsPath],
-        },
+      fileFiltering: {
+        customIgnoreFilePaths: [settingsPath],
       },
     };
     const config = await loadConfig(settings, mockExtensionLoader, taskId);
@@ -313,7 +305,7 @@ describe('loadConfig', () => {
         adminPolicyPaths: ['/path/to/admin/policy'],
       };
 
-      await loadConfig(settings, mockExtensionLoader, taskId, true);
+      await loadConfig(settings, mockExtensionLoader, taskId);
 
       expect(createPolicyEngineConfig).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -340,7 +332,7 @@ describe('loadConfig', () => {
           allowed: ['shell', 'fetch'],
         },
       };
-      await loadConfig(settings, mockExtensionLoader, taskId, true);
+      await loadConfig(settings, mockExtensionLoader, taskId);
       expect(Config).toHaveBeenCalledWith(
         expect.objectContaining({
           allowedTools: ['shell', 'fetch'],
@@ -553,283 +545,31 @@ describe('loadConfig', () => {
 
 describe('setIsTrusted', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    // Ensure GEMINI_CLI_TRUST_WORKSPACE and GEMINI_FOLDER_TRUST are not set by default in tests to prevent leakage
-    vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', '');
-    vi.stubEnv('GEMINI_FOLDER_TRUST', '');
+    vi.resetModules();
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  it('should return agentSettings.isTrusted if defined, ignoring env vars', () => {
-    vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', 'false');
+  it('should return true when GEMINI_FOLDER_TRUST env var is true', async () => {
+    vi.stubEnv('GEMINI_FOLDER_TRUST', 'true');
+    const { setIsTrusted } = await import('./config.js');
+    expect(setIsTrusted(undefined)).toBe(true);
+    expect(setIsTrusted({ isTrusted: false } as AgentSettings)).toBe(true);
+  });
+
+  it('should return false when GEMINI_FOLDER_TRUST env var is false', async () => {
     vi.stubEnv('GEMINI_FOLDER_TRUST', 'false');
+    const { setIsTrusted } = await import('./config.js');
+    expect(setIsTrusted(undefined)).toBe(false);
+    expect(setIsTrusted({ isTrusted: true } as AgentSettings)).toBe(false);
+  });
+
+  it('should fallback to agentSettings.isTrusted if env var is undefined', async () => {
+    const { setIsTrusted } = await import('./config.js');
     expect(setIsTrusted({ isTrusted: true } as AgentSettings)).toBe(true);
-
-    vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', 'true');
-    vi.stubEnv('GEMINI_FOLDER_TRUST', 'true');
     expect(setIsTrusted({ isTrusted: false } as AgentSettings)).toBe(false);
-  });
-
-  it('should return true when GEMINI_CLI_TRUST_WORKSPACE env var is true and agentSettings.isTrusted is undefined', () => {
-    vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', 'true');
-    expect(setIsTrusted(undefined)).toBe(true);
-    expect(setIsTrusted({} as AgentSettings)).toBe(true);
-  });
-
-  it('should return false when GEMINI_CLI_TRUST_WORKSPACE env var is false and agentSettings.isTrusted is undefined', () => {
-    vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', 'false');
     expect(setIsTrusted(undefined)).toBe(false);
-    expect(setIsTrusted({} as AgentSettings)).toBe(false);
-  });
-
-  it('should return true when GEMINI_FOLDER_TRUST env var (from GCA IDE) is true and GEMINI_CLI_TRUST_WORKSPACE is unset', () => {
-    vi.stubEnv('GEMINI_FOLDER_TRUST', 'true');
-    expect(setIsTrusted(undefined)).toBe(true);
-    expect(setIsTrusted({ isTrusted: undefined } as AgentSettings)).toBe(true);
-  });
-
-  it('should return false when GEMINI_FOLDER_TRUST env var (from GCA IDE) is false and GEMINI_CLI_TRUST_WORKSPACE is unset', () => {
-    vi.stubEnv('GEMINI_FOLDER_TRUST', 'false');
-    expect(setIsTrusted(undefined)).toBe(false);
-    expect(setIsTrusted({ isTrusted: undefined } as AgentSettings)).toBe(false);
-  });
-
-  it('should prioritize GEMINI_CLI_TRUST_WORKSPACE over GEMINI_FOLDER_TRUST when both are set', () => {
-    vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', 'false');
-    vi.stubEnv('GEMINI_FOLDER_TRUST', 'true');
-    expect(setIsTrusted(undefined)).toBe(false);
-
-    vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', 'true');
-    vi.stubEnv('GEMINI_FOLDER_TRUST', 'false');
-    expect(setIsTrusted(undefined)).toBe(true);
-  });
-
-  it('should fallback to false if agentSettings.isTrusted and env var are undefined and no workspaceRoot is provided', () => {
-    expect(setIsTrusted(undefined)).toBe(false);
-    expect(setIsTrusted({} as AgentSettings)).toBe(false);
-  });
-
-  it('should respect V2 security.folderTrust.enabled when checking workspace trust', () => {
-    vi.spyOn(settingsModule, 'loadSettings').mockReturnValue({
-      security: { folderTrust: { enabled: false } },
-    });
-    vi.mocked(checkPathTrust).mockReturnValueOnce({
-      isTrusted: true,
-      source: 'file',
-    });
-
-    expect(setIsTrusted(undefined, '/tmp/workspace')).toBe(true);
-    expect(checkPathTrust).toHaveBeenCalledWith(
-      expect.objectContaining({
-        path: '/tmp/workspace',
-        isFolderTrustEnabled: false,
-      }),
-    );
-  });
-});
-
-describe('GCA IDE integration environment variables contract (AgentProcess.ts)', () => {
-  const mockSettings = {} as Settings;
-  const mockExtensionLoader = {} as ExtensionLoader;
-  const taskId = 'test-gca-env-contract';
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', '');
-    vi.stubEnv('GEMINI_FOLDER_TRUST', '');
-    vi.stubEnv('GEMINI_YOLO_MODE', '');
-    vi.stubEnv('CHECKPOINTING', '');
-    vi.stubEnv('DEBUG', '');
-    vi.stubEnv('CUSTOM_IGNORE_FILE_PATHS', '');
-    vi.stubEnv('CODER_AGENT_WORKSPACE_PATH', '');
-    vi.stubEnv('CODER_AGENT_ALLOWED_ROOT', '');
-    vi.stubEnv('GEMINI_API_KEY', 'test-gca-key');
-  });
-
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
-
-  it('should honor all environment variables injected by GCA AgentProcess when spawning a2a-server', async () => {
-    const gcaWorkspaceDir = path.join(tmpdir(), 'gca-contract-workspace');
-
-    vi.stubEnv('GEMINI_FOLDER_TRUST', 'true');
-    vi.stubEnv('GEMINI_YOLO_MODE', 'true');
-    vi.stubEnv('DEBUG', 'true');
-    vi.stubEnv('CHECKPOINTING', 'false');
-    vi.stubEnv('CUSTOM_IGNORE_FILE_PATHS', '/gca/.aiexclude');
-    vi.stubEnv('CODER_AGENT_WORKSPACE_PATH', gcaWorkspaceDir);
-    vi.stubEnv('CODER_AGENT_ALLOWED_ROOT', tmpdir());
-
-    const resolvedTargetDir = await setTargetDir(undefined);
-    expect(resolvedTargetDir).toContain('gca-contract-workspace');
-
-    const trusted = setIsTrusted({ isTrusted: undefined } as AgentSettings);
-    expect(trusted).toBe(true);
-
-    await loadConfig(
-      mockSettings,
-      mockExtensionLoader,
-      taskId,
-      trusted,
-      resolvedTargetDir,
-    );
-
-    expect(Config).toHaveBeenCalledWith(
-      expect.objectContaining({
-        folderTrust: true,
-        trustedFolder: true,
-        approvalMode: ApprovalMode.YOLO,
-        debugMode: true,
-        checkpointing: false,
-        targetDir: resolvedTargetDir,
-        cwd: resolvedTargetDir,
-        fileFiltering: expect.objectContaining({
-          customIgnoreFilePaths: ['/gca/.aiexclude'],
-        }),
-      }),
-    );
-  });
-});
-
-describe('loadConfig V1 and V2 settings compatibility', () => {
-  const mockExtensionLoader = {} as ExtensionLoader;
-  const taskId = 'test-task-v2';
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.stubEnv('GEMINI_API_KEY', 'test-key');
-  });
-
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
-
-  it('should read V2 nested settings (security.folderTrust.enabled, general.checkpointing.enabled, ui.showMemoryUsage, context.fileFiltering, logging.level)', async () => {
-    const { logger } = await import('../utils/logger.js');
-    const v2Settings: Settings = {
-      security: { folderTrust: { enabled: true } },
-      general: { checkpointing: { enabled: false } },
-      ui: { showMemoryUsage: true },
-      context: {
-        fileFiltering: {
-          respectGitIgnore: false,
-          respectGeminiIgnore: true,
-          enableRecursiveFileSearch: true,
-          customIgnoreFilePaths: ['/v2/ignore'],
-        },
-      },
-      logging: { level: 'debug' },
-      telemetry: { enabled: false },
-    };
-
-    await loadConfig(v2Settings, mockExtensionLoader, taskId, true);
-
-    expect(logger.level).toBe('debug');
-    expect(Config).toHaveBeenCalledWith(
-      expect.objectContaining({
-        folderTrust: true,
-        checkpointing: false,
-        showMemoryUsage: true,
-        telemetry: expect.objectContaining({ enabled: false }),
-        fileFiltering: expect.objectContaining({
-          respectGitIgnore: false,
-          respectGeminiIgnore: true,
-          enableRecursiveFileSearch: true,
-          customIgnoreFilePaths: ['/v2/ignore'],
-        }),
-      }),
-    );
-  });
-
-  it('should not support unmigrated V1 flat settings directly in loadConfig', async () => {
-    const { validateSettings } = await import('./settings.js');
-    const rawV1Settings = {
-      folderTrust: true,
-      checkpointing: { enabled: false },
-      showMemoryUsage: true,
-      fileFiltering: {
-        respectGitIgnore: true,
-        customIgnoreFilePaths: ['/v1/ignore'],
-      },
-      logLevel: 'warn',
-      telemetryDisabled: true,
-      coreTools: ['read_file'],
-      excludeTools: ['shell'],
-      allowedTools: ['fetch'],
-    };
-
-    // V1 settings fail V2 schema validation when not migrated
-    expect(validateSettings(rawV1Settings).success).toBe(false);
-
-    await loadConfig(
-      rawV1Settings as unknown as Settings,
-      mockExtensionLoader,
-      taskId,
-      true,
-    );
-
-    // Unmigrated V1 flat properties are ignored by loadConfig
-    expect(Config).toHaveBeenCalledWith(
-      expect.objectContaining({
-        folderTrust: false,
-        checkpointing: undefined,
-        showMemoryUsage: false,
-        coreTools: undefined,
-        excludeTools: undefined,
-        allowedTools: undefined,
-        telemetry: expect.objectContaining({ enabled: undefined }),
-        fileFiltering: expect.objectContaining({
-          respectGitIgnore: undefined,
-          customIgnoreFilePaths: [],
-        }),
-      }),
-    );
-  });
-
-  it('should succeed when V1 flat settings are migrated via migrateDeprecatedSettings and passed to loadConfig', async () => {
-    const { logger } = await import('../utils/logger.js');
-    const { migrateDeprecatedSettings, validateSettings } = await import(
-      './settings.js'
-    );
-    const rawV1Settings = {
-      folderTrust: true,
-      checkpointing: { enabled: false },
-      showMemoryUsage: true,
-      fileFiltering: {
-        respectGitIgnore: true,
-        customIgnoreFilePaths: ['/v1/ignore'],
-      },
-      logLevel: 'warn',
-      telemetryDisabled: true,
-      coreTools: ['read_file'],
-      excludeTools: ['shell'],
-      allowedTools: ['fetch'],
-    };
-
-    const migratedSettings = migrateDeprecatedSettings(rawV1Settings);
-    expect(validateSettings(migratedSettings).success).toBe(true);
-
-    await loadConfig(migratedSettings, mockExtensionLoader, taskId, true);
-
-    expect(logger.level).toBe('warn');
-    expect(Config).toHaveBeenCalledWith(
-      expect.objectContaining({
-        folderTrust: true,
-        checkpointing: false,
-        showMemoryUsage: true,
-        coreTools: ['read_file'],
-        excludeTools: ['shell'],
-        allowedTools: ['fetch'],
-        telemetry: expect.objectContaining({ enabled: false }),
-        fileFiltering: expect.objectContaining({
-          respectGitIgnore: true,
-          customIgnoreFilePaths: ['/v1/ignore'],
-        }),
-      }),
-    );
   });
 });

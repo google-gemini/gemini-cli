@@ -301,11 +301,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       )
     : undefined;
 
-  const safeTerminalWidth = Math.max(0, Math.floor(terminalWidth || 0));
-  const contentWidth = Math.max(
-    0,
-    safeTerminalWidth - TOOL_MESSAGE_HORIZONTAL_MARGIN,
-  );
+  const contentWidth = terminalWidth - TOOL_MESSAGE_HORIZONTAL_MARGIN;
 
   // If all tools are filtered out (e.g., in-progress AskUser tools, low-verbosity
   // internal errors, plan-mode hidden write/edit), we should not emit standalone
@@ -330,8 +326,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       Ink to render the border of the box incorrectly and span multiple lines and even
       cause tearing.
     */
-      width={safeTerminalWidth}
-      minWidth={0}
+      width={terminalWidth}
       paddingRight={TOOL_MESSAGE_HORIZONTAL_MARGIN}
       marginBottom={0}
     >
@@ -340,7 +335,6 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         borderBottomOverride === true && (
           <Box
             width={contentWidth}
-            minWidth={0}
             borderLeft={true}
             borderRight={true}
             borderTop={false}
@@ -403,7 +397,6 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
               key={group[0].callId}
               flexDirection="column"
               width={contentWidth}
-              minWidth={0}
             >
               <SubagentGroupDisplay
                 toolCalls={group}
@@ -417,7 +410,6 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
               {showClosingBorder && (
                 <Box
                   width={contentWidth}
-                  minWidth={0}
                   borderLeft={true}
                   borderRight={true}
                   borderTop={false}
@@ -447,12 +439,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
         return (
           <Fragment key={tool.callId}>
-            <Box
-              flexDirection="column"
-              minHeight={1}
-              width={contentWidth}
-              minWidth={0}
-            >
+            <Box flexDirection="column" minHeight={1} width={contentWidth}>
               {isCompact ? (
                 <DenseToolMessage {...commonProps} />
               ) : isTopicToolCall ? (

@@ -97,7 +97,6 @@ export * from './utils/path-validator.js';
 export * from './utils/atCommandUtils.js';
 export * from './utils/retry.js';
 export * from './utils/shell-utils.js';
-export * from './utils/security.js';
 export {
   PolicyDecision,
   ApprovalMode,
@@ -167,13 +166,6 @@ export {
 } from './ide/detect-ide.js';
 export * from './ide/constants.js';
 export * from './ide/types.js';
-export {
-  createProxyAwareFetch,
-  getConnectionConfigFromFile,
-  getPortFromEnv,
-  type ConnectionConfig,
-} from './ide/ide-connection-utils.js';
-export { getIdeProcessInfo } from './ide/process-utils.js';
 
 // Export Shell Execution Service
 export * from './services/shellExecutionService.js';
@@ -268,14 +260,8 @@ export type { MCPOAuthConfig } from './mcp/oauth-provider.js';
 export type {
   OAuthAuthorizationServerMetadata,
   OAuthProtectedResourceMetadata,
-  OAuthUrlValidationOptions,
 } from './mcp/oauth-utils.js';
-export {
-  OAuthUtils,
-  OAuthSecurityError,
-  isLoopbackUrl,
-  validateOAuthEndpointUrl,
-} from './mcp/oauth-utils.js';
+export { OAuthUtils } from './mcp/oauth-utils.js';
 
 // Export telemetry functions
 export * from './telemetry/index.js';

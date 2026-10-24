@@ -22,7 +22,6 @@ import {
   CoreEvent,
   CoreToolCallStatus,
   JsonStreamEventType,
-  TRUE_EMPTY_RESPONSE_MESSAGE,
 } from '@google/gemini-cli-core';
 import type { Part } from '@google/genai';
 import { runNonInteractive } from './nonInteractiveCliAgentSession.js';
@@ -79,7 +78,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     ChatRecordingService: MockChatRecordingService,
     uiTelemetryService: {
       getMetrics: vi.fn(),
-      recordSemanticValidationError: vi.fn(),
     },
     LegacyAgentSession: original.LegacyAgentSession,
     geminiPartsToContentParts: original.geminiPartsToContentParts,
@@ -201,7 +199,6 @@ describe('runNonInteractive', () => {
       getRawOutput: vi.fn().mockReturnValue(false),
       getAcceptRawOutputRisk: vi.fn().mockReturnValue(false),
       getAgentSessionNoninteractiveEnabled: vi.fn().mockReturnValue(false),
-      getUsageStatisticsEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     mockSettings = {
@@ -841,18 +838,9 @@ describe('runNonInteractive', () => {
       },
     ];
 
-    // Third call handles the auto-nudge recovery (when no response is received after tools)
-    const thirdCallEvents: ServerGeminiStreamEvent[] = [
-      {
-        type: GeminiEventType.Finished,
-        value: { reason: undefined, usageMetadata: { totalTokenCount: 1 } },
-      },
-    ];
-
     mockGeminiClient.sendMessageStream
       .mockReturnValueOnce(createStreamFromEvents(firstCallEvents))
-      .mockReturnValueOnce(createStreamFromEvents(secondCallEvents))
-      .mockReturnValueOnce(createStreamFromEvents(thirdCallEvents));
+      .mockReturnValueOnce(createStreamFromEvents(secondCallEvents));
 
     vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
     vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
@@ -866,7 +854,7 @@ describe('runNonInteractive', () => {
       prompt_id: 'prompt-id-tool-only',
     });
 
-    expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(3);
+    expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(2);
     expect(mockSchedulerSchedule).toHaveBeenCalledWith(
       [expect.objectContaining({ name: 'testTool' })],
       expect.any(AbortSignal),
@@ -1248,7 +1236,7 @@ describe('runNonInteractive', () => {
       keypressHandler('\u0003', { ctrl: true, name: 'c' });
     }
 
-    await expect(runPromise).rejects.toThrow('process.exit(130) called');
+    await expect(runPromise).rejects.toThrow('Operation cancelled.');
 
     expect(
       processStderrSpy.mock.calls.some(
@@ -1271,123 +1259,6 @@ describe('runNonInteractive', () => {
     }
     // Spies are automatically restored by vi.restoreAllMocks() in afterEach,
     // but we can also do it manually if needed.
-  });
-
-  it('should register SIGINT and SIGTERM listeners and abort on signal in non-TTY mode', async () => {
-    const originalIsTTY = process.stdin.isTTY;
-    Object.defineProperty(process.stdin, 'isTTY', {
-      value: false,
-      configurable: true,
-    });
-
-    try {
-      const processOnSpy = vi.spyOn(process, 'on');
-      const processOffSpy = vi.spyOn(process, 'off');
-
-      mockGeminiClient.sendMessageStream.mockImplementation(
-        (_messages, signal: AbortSignal) =>
-          (async function* () {
-            yield { type: GeminiEventType.Content, value: 'Thinking...' };
-            await new Promise((_resolve, reject) => {
-              signal.addEventListener('abort', () => {
-                reject(new Error('Aborted'));
-              });
-            });
-          })(),
-      );
-
-      const runPromise = runNonInteractive({
-        config: mockConfig,
-        settings: mockSettings,
-        input: 'Long running query in non-TTY',
-        prompt_id: 'prompt-id-cancel-nontty',
-      });
-
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
-      const sigintCall = processOnSpy.mock.calls.find(
-        (call) => call[0] === 'SIGINT',
-      );
-      const sigtermCall = processOnSpy.mock.calls.find(
-        (call) => call[0] === 'SIGTERM',
-      );
-      expect(sigintCall).toBeDefined();
-      expect(sigtermCall).toBeDefined();
-
-      const sigintHandler = sigintCall?.[1] as (() => void) | undefined;
-      sigintHandler?.();
-
-      await expect(runPromise).rejects.toThrow('process.exit(130) called');
-
-      expect(processOffSpy).toHaveBeenCalledWith(
-        'SIGINT',
-        expect.any(Function),
-      );
-      expect(processOffSpy).toHaveBeenCalledWith(
-        'SIGTERM',
-        expect.any(Function),
-      );
-    } finally {
-      Object.defineProperty(process.stdin, 'isTTY', {
-        value: originalIsTTY,
-        configurable: true,
-      });
-    }
-  });
-
-  it('should immediately force exit with code 130 on repeated interrupt signal', async () => {
-    const originalIsTTY = process.stdin.isTTY;
-    Object.defineProperty(process.stdin, 'isTTY', {
-      value: false,
-      configurable: true,
-    });
-
-    try {
-      const processOnSpy = vi.spyOn(process, 'on');
-
-      mockGeminiClient.sendMessageStream.mockImplementation(
-        (_messages, signal: AbortSignal) =>
-          (async function* () {
-            yield { type: GeminiEventType.Content, value: 'Thinking...' };
-            await new Promise((_resolve, reject) => {
-              signal.addEventListener('abort', () => {
-                reject(new Error('Aborted'));
-              });
-            });
-          })(),
-      );
-
-      const runPromise = runNonInteractive({
-        config: mockConfig,
-        settings: mockSettings,
-        input: 'Test repeated signal in agent session',
-        prompt_id: 'prompt-repeated-signal-agent',
-      });
-
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
-      const sigintCall = processOnSpy.mock.calls.find(
-        (call) => call[0] === 'SIGINT',
-      );
-      const sigintHandler = sigintCall?.[1] as (() => void) | undefined;
-
-      // First signal initiates cancellation
-      sigintHandler?.();
-
-      // Second signal triggers immediate force exit
-      expect(() => sigintHandler?.()).toThrow('process.exit(130) called');
-
-      try {
-        await runPromise;
-      } catch {
-        // Expected
-      }
-    } finally {
-      Object.defineProperty(process.stdin, 'isTTY', {
-        value: originalIsTTY,
-        configurable: true,
-      });
-    }
   });
 
   it('should honor cancellation that happens before session.send()', async () => {
@@ -1434,7 +1305,7 @@ describe('runNonInteractive', () => {
         input: 'Cancelled query',
         prompt_id: 'prompt-id-pre-send-cancel',
       }),
-    ).rejects.toThrow('process.exit(130) called');
+    ).rejects.toThrow('Operation cancelled.');
 
     expect(sendSpy).not.toHaveBeenCalled();
     expect(stdinOnSpy).toHaveBeenCalled();
@@ -2585,126 +2456,6 @@ describe('runNonInteractive', () => {
 
       const output = JSON.parse(getWrittenOutput());
       expect(output.warnings).toBeUndefined();
-    });
-
-    it('should handle InvalidStream event gracefully in TEXT mode', async () => {
-      const events: ServerGeminiStreamEvent[] = [
-        {
-          type: GeminiEventType.InvalidStream,
-          value: {
-            type: 'NO_RESPONSE_TEXT',
-            message: 'Empty response',
-          },
-        },
-      ];
-      mockGeminiClient.sendMessageStream.mockReturnValue(
-        createStreamFromEvents(events),
-      );
-
-      await runNonInteractive({
-        config: mockConfig,
-        settings: mockSettings,
-        input: 'test invalid stream',
-        prompt_id: 'prompt-id-invalid',
-      });
-
-      expect(processStderrSpy).toHaveBeenCalledWith(
-        `[ERROR] ${TRUE_EMPTY_RESPONSE_MESSAGE}\n`,
-      );
-      expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
-    });
-
-    it('should handle InvalidStream event gracefully in STREAM_JSON mode', async () => {
-      vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
-        MOCK_SESSION_METRICS,
-      );
-      vi.spyOn(mockConfig, 'getOutputFormat').mockReturnValue(
-        OutputFormat.STREAM_JSON,
-      );
-      const events: ServerGeminiStreamEvent[] = [
-        {
-          type: GeminiEventType.InvalidStream,
-          value: {
-            type: 'NO_RESPONSE_TEXT',
-            message: 'Empty response',
-          },
-        },
-      ];
-      mockGeminiClient.sendMessageStream.mockReturnValue(
-        createStreamFromEvents(events),
-      );
-
-      await runNonInteractive({
-        config: mockConfig,
-        settings: mockSettings,
-        input: 'test invalid stream',
-        prompt_id: 'prompt-id-invalid',
-      });
-
-      const output = getWrittenOutput();
-      expect(output).toContain('"type":"error"');
-      expect(output).toContain('"severity":"error"');
-      expect(output).toContain(TRUE_EMPTY_RESPONSE_MESSAGE);
-      expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
-    });
-
-    it('should handle InvalidStream event gracefully in JSON mode', async () => {
-      vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
-        MOCK_SESSION_METRICS,
-      );
-      vi.spyOn(mockConfig, 'getOutputFormat').mockReturnValue(
-        OutputFormat.JSON,
-      );
-      const events: ServerGeminiStreamEvent[] = [
-        {
-          type: GeminiEventType.InvalidStream,
-          value: {
-            type: 'NO_RESPONSE_TEXT',
-            message: 'Empty response',
-          },
-        },
-      ];
-      mockGeminiClient.sendMessageStream.mockReturnValue(
-        createStreamFromEvents(events),
-      );
-
-      await runNonInteractive({
-        config: mockConfig,
-        settings: mockSettings,
-        input: 'test invalid stream',
-        prompt_id: 'prompt-id-invalid',
-      });
-
-      const output = getWrittenOutput();
-      expect(output).toContain('"error": {');
-      expect(output).toContain('"type": "INVALID_STREAM"');
-      expect(output).toContain(TRUE_EMPTY_RESPONSE_MESSAGE);
-      expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
-    });
-
-    it('should handle non-NO_RESPONSE_TEXT InvalidStream event gracefully and use message from eventValue', async () => {
-      const events: ServerGeminiStreamEvent[] = [
-        {
-          type: GeminiEventType.InvalidStream,
-          value: {
-            type: 'MALFORMED_FUNCTION_CALL',
-            message: 'Malformed call',
-          },
-        },
-      ];
-      mockGeminiClient.sendMessageStream.mockReturnValue(
-        createStreamFromEvents(events),
-      );
-
-      await runNonInteractive({
-        config: mockConfig,
-        settings: mockSettings,
-        input: 'test invalid stream',
-        prompt_id: 'prompt-id-invalid',
-      });
-
-      expect(processStderrSpy).toHaveBeenCalledWith('[ERROR] Malformed call\n');
-      expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
     });
   });
 

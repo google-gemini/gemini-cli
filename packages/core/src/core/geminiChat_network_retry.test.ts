@@ -98,7 +98,7 @@ describe('GeminiChat Network Retries', () => {
       getTelemetryLogPromptsEnabled: () => true,
       getTelemetryTracesEnabled: () => false,
       getUsageStatisticsEnabled: () => true,
-      hasLatestFlashGAAccess: vi.fn().mockReturnValue(false),
+      hasGemini35FlashGAAccess: vi.fn().mockReturnValue(false),
       getDebugMode: () => false,
       getContentGeneratorConfig: vi.fn().mockReturnValue({
         authType: 'oauth-personal',

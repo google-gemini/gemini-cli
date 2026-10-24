@@ -137,7 +137,6 @@ export interface ColorizeCodeOptions {
   disableColor?: boolean;
   returnLines?: boolean;
   paddingX?: number;
-  disableTruncation?: boolean;
 }
 
 /**
@@ -163,7 +162,6 @@ export function colorizeCode({
   disableColor = false,
   returnLines = false,
   paddingX = 0,
-  disableTruncation = false,
 }: ColorizeCodeOptions): React.ReactNode | React.ReactNode[] {
   const codeToHighlight = code.replace(/\n$/, '');
   const activeTheme = theme || themeManager.getActiveTheme();
@@ -173,12 +171,8 @@ export function colorizeCode({
 
   // We force MaxSizedBox if availableHeight is provided, even if alternate buffer is enabled,
   // because this might be rendered in a constrained UI box (like tool confirmation).
-  const effectiveAvailableHeight = disableTruncation
-    ? undefined
-    : availableHeight;
   const useMaxSizedBox =
-    (!settings.merged.ui.useAlternateBuffer ||
-      effectiveAvailableHeight !== undefined) &&
+    (!settings.merged.ui.useAlternateBuffer || availableHeight !== undefined) &&
     !returnLines;
 
   let hiddenLinesCount = 0;
@@ -186,14 +180,10 @@ export function colorizeCode({
 
   try {
     // Optimization to avoid highlighting lines that cannot possibly be displayed.
-    if (
-      !disableTruncation &&
-      effectiveAvailableHeight !== undefined &&
-      useMaxSizedBox
-    ) {
-      const height = Math.max(effectiveAvailableHeight, MINIMUM_MAX_HEIGHT);
-      if (finalLines.length > height) {
-        const sliceIndex = finalLines.length - height;
+    if (availableHeight !== undefined && useMaxSizedBox) {
+      availableHeight = Math.max(availableHeight, MINIMUM_MAX_HEIGHT);
+      if (finalLines.length > availableHeight) {
+        const sliceIndex = finalLines.length - availableHeight;
         hiddenLinesCount = sliceIndex;
         finalLines = finalLines.slice(sliceIndex);
       }
@@ -239,9 +229,9 @@ export function colorizeCode({
       return (
         <MaxSizedBox
           paddingX={paddingX}
-          maxHeight={disableTruncation ? undefined : availableHeight}
+          maxHeight={availableHeight}
           maxWidth={maxWidth}
-          additionalHiddenLinesCount={disableTruncation ? 0 : hiddenLinesCount}
+          additionalHiddenLinesCount={hiddenLinesCount}
           overflowDirection="top"
         >
           {renderedLines}

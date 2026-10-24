@@ -39,11 +39,7 @@ decision = "allow"
 priority = 15
 modes = ["autoEdit"]
 
-[[safety_checker]]
-toolName = "replace"
-priority = 15
-modes = ["autoEdit"]
-[safety_checker.checker]
+[rule.safety_checker]
 type = "in-process"
 name = "allowed-path"
 required_context = ["environment"]
@@ -72,11 +68,7 @@ decision = "allow"
 priority = 15
 modes = ["autoEdit"]
 
-[[safety_checker]]
-toolName = "write_file"
-priority = 15
-modes = ["autoEdit"]
-[safety_checker.checker]
+[rule.safety_checker]
 type = "in-process"
 name = "allowed-path"
 required_context = ["environment"]

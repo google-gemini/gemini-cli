@@ -19,13 +19,7 @@ vi.mock('../utils/paths.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../utils/paths.js')>();
   return {
     ...actual,
-    resolveToRealPath: vi.fn((p) => {
-      try {
-        return fs.realpathSync(p);
-      } catch {
-        return p;
-      }
-    }),
+    resolveToRealPath: vi.fn((p) => p),
     isSubpath: (parent: string, child: string) => child.startsWith(parent),
   };
 });

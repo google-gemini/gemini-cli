@@ -11,7 +11,7 @@ import os
 import json
 import base64
 
-from main import main, NEEDS_INFO_FOOTER
+from main import main
 from db.issues_store import ClaimAction, ReleaseAction
 
 VALID_SPEC = {
@@ -44,8 +44,7 @@ class TestMainExecutionLoop(unittest.TestCase):
             "ISSUE_DETAILS": encoded,
             "WORKFLOW_EXECUTION_ID": "exec-123",
             "PROJECT_ID": "test-project",
-            "EGRESS_TOPIC_ID": "test-topic",
-            "READY_FOR_CODE_TOPIC_ID": "test-ready-topic"
+            "EGRESS_TOPIC_ID": "test-topic"
         })
         self.env_patcher.start()
 
@@ -130,7 +129,7 @@ class TestMainExecutionLoop(unittest.TestCase):
 
         self.assertEqual(ctx.exception.code, 0)
         mock_send_comment.assert_called_once_with(
-            "owner", "repo", 42, "Please provide logs." + NEEDS_INFO_FOOTER
+            "owner", "repo", 42, "Please provide logs."
         )
         self.mock_store.release_lock.assert_called_once_with(
             "owner", "repo", 42, "exec-123", success=True, status="NEEDS_INFO"
@@ -138,14 +137,8 @@ class TestMainExecutionLoop(unittest.TestCase):
 
     @patch("main.process_issue_triage")
     @patch("main.send_label_action")
-    @patch("main.publish_issue_ready_for_code")
-    def test_main_ok_quality_flow(
-        self, mock_publish_event, mock_send_label, mock_triage
-    ):
-        """
-        OK quality issues dispatch effort label, release TRIAGED spec,
-        and publish ready-for-code event.
-        """
+    def test_main_ok_quality_flow(self, mock_send_label, mock_triage):
+        """OK quality issues dispatch effort label and release TRIAGED spec."""
         self.mock_store.acquire_lock.return_value = ClaimAction.PROCEED
         output = json.dumps({
             "triage_metadata": {"quality": "OK", "effort_estimate": "SMALL"},
@@ -169,9 +162,6 @@ class TestMainExecutionLoop(unittest.TestCase):
             status="TRIAGED",
             workable_spec=VALID_SPEC,
         )
-        mock_publish_event.assert_called_once_with(
-            "owner", "repo", 42, VALID_SPEC
-        )
 
     @patch("main.process_issue_triage")
     def test_main_failure_triggers_retry_release(self, mock_triage):
@@ -185,7 +175,7 @@ class TestMainExecutionLoop(unittest.TestCase):
 
         self.assertEqual(ctx.exception.code, 1)
         self.mock_store.release_lock.assert_called_once_with(
-            "owner", "repo", 42, "exec-123", success=False, error="LLM failed"
+            "owner", "repo", 42, "exec-123", success=False
         )
 
 

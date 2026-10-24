@@ -86,7 +86,6 @@ export const DialogManager = ({
         message={quotaState.proQuotaRequest.message}
         isTerminalQuotaError={quotaState.proQuotaRequest.isTerminalQuotaError}
         isModelNotFoundError={!!quotaState.proQuotaRequest.isModelNotFoundError}
-        isCapacityExceeded={!!quotaState.proQuotaRequest.isCapacityExceeded}
         authType={quotaState.proQuotaRequest.authType}
         tierName={config?.getUserTierName()}
         onChoice={uiActions.handleProQuotaChoice}

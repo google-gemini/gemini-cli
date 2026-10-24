@@ -33,8 +33,8 @@ export class GeminiAgent {
     this.sessionManager = new AcpSessionManager(settings, argv, connection);
   }
 
-  async dispose(): Promise<void> {
-    await this.sessionManager.dispose();
+  dispose(): void {
+    this.sessionManager.dispose();
   }
 
   async initialize(

@@ -19,7 +19,6 @@ import {
 import { theme } from '../semantic-colors.js';
 import { parseMarkdownToANSI } from './markdownParsingUtils.js';
 import { stripUnsafeCharacters } from './textUtils.js';
-import { safeRepeat } from './borderStyles.js';
 
 interface TableRendererProps {
   headers: string[];
@@ -237,7 +236,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
         ) : (
           <Text>{content.text}</Text>
         )}
-        {safeRepeat(' ', paddingNeeded)}
+        {' '.repeat(paddingNeeded)}
       </Text>
     );
   };
@@ -252,7 +251,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
 
     const char = chars[type];
     const borderParts = adjustedWidths.map((w) =>
-      safeRepeat(char.horizontal, w),
+      char.horizontal.repeat(Math.max(0, w || 0)),
     );
     const border = char.left + borderParts.join(char.middle) + char.right;
 

@@ -267,20 +267,14 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     );
   }
 
-  private async isBlockedHost(urlStr: string): Promise<boolean> {
+  private isBlockedHost(urlStr: string): boolean {
     try {
       const url = new URL(urlStr);
       const hostname = url.hostname.toLowerCase();
-      if (
-        hostname === 'localhost' ||
-        hostname === '127.0.0.1' ||
-        hostname.endsWith('.localhost') ||
-        hostname.endsWith('.local') ||
-        hostname.endsWith('.internal')
-      ) {
+      if (hostname === 'localhost' || hostname === '127.0.0.1') {
         return true;
       }
-      return await isPrivateIp(urlStr);
+      return isPrivateIp(urlStr);
     } catch {
       return true;
     }
@@ -291,7 +285,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     signal: AbortSignal,
   ): Promise<string> {
     const url = convertGithubUrlToRaw(urlStr);
-    if (await this.isBlockedHost(url)) {
+    if (this.isBlockedHost(url)) {
       debugLogger.warn(`[WebFetchTool] Blocked access to host: ${url}`);
       throw new Error(
         `Access to blocked or private host ${url} is not allowed.`,
@@ -356,16 +350,16 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     return textContent;
   }
 
-  private async filterAndValidateUrls(urls: string[]): Promise<{
+  private filterAndValidateUrls(urls: string[]): {
     toFetch: string[];
     skipped: string[];
-  }> {
+  } {
     const uniqueUrls = [...new Set(urls.map(normalizeUrl))];
     const toFetch: string[] = [];
     const skipped: string[] = [];
 
     for (const url of uniqueUrls) {
-      if (await this.isBlockedHost(url)) {
+      if (this.isBlockedHost(url)) {
         debugLogger.warn(
           `[WebFetchTool] Skipped private or local host: ${url}`,
         );
@@ -621,7 +615,7 @@ ${aggregatedContent}
     // Convert GitHub blob URL to raw URL
     url = convertGithubUrlToRaw(url);
 
-    if (await this.isBlockedHost(url)) {
+    if (this.isBlockedHost(url)) {
       const errorMessage = `Access to blocked or private host ${url} is not allowed.`;
       debugLogger.warn(
         `[WebFetchTool] Blocked experimental fetch to host: ${url}`,
@@ -775,7 +769,7 @@ Response: ${rawResponseText}`;
     const userPrompt = this.params.prompt!;
     const { validUrls } = parsePrompt(userPrompt);
 
-    const { toFetch, skipped } = await this.filterAndValidateUrls(validUrls);
+    const { toFetch, skipped } = this.filterAndValidateUrls(validUrls);
 
     // If everything was skipped, fail early
     if (toFetch.length === 0 && skipped.length > 0) {

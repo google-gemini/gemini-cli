@@ -62,13 +62,6 @@ vi.mock('fs', async (importOriginal) => {
     pathMod.join(MOCK_CWD2, 'settings', 'path3'),
   ]);
 
-  const mockedRealpath = vi.fn((p) => p);
-  Object.defineProperty(mockedRealpath, 'native', {
-    value: (p: Parameters<typeof actualFs.realpathSync>[0]) =>
-      mockedRealpath(p),
-    writable: true,
-  });
-
   return {
     ...actualFs,
     mkdirSync: vi.fn((p) => {
@@ -82,7 +75,7 @@ vi.mock('fs', async (importOriginal) => {
       }
       return actualFs.statSync(p as unknown as string);
     }),
-    realpathSync: mockedRealpath,
+    realpathSync: vi.fn((p) => p),
   };
 });
 

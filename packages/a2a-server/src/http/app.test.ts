@@ -131,7 +131,6 @@ describe('E2E Tests', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
-    vi.unstubAllEnvs();
   });
 
   it('should create a new task and stream status updates (text-content) via POST /', async () => {
@@ -417,235 +416,6 @@ describe('E2E Tests', () => {
     // The scheduler now waits for approval, so no more events are sent.
     assertUniqueFinalEventIsLast(events);
     expect(events.length).toBe(8);
-  });
-
-  it('should continue to the next sequential edit tool call when the first is rejected', async () => {
-    const coreMod = await import('@google/gemini-cli-core');
-    const originalGetMessageBus = config?.getMessageBus;
-
-    sendMessageStreamSpy.mockImplementationOnce(async function* () {
-      yield* [
-        {
-          type: GeminiEventType.ToolCallRequest,
-          value: {
-            callId: 'write-call-1',
-            name: 'write_file',
-            args: { file_path: '/tmp/file1.txt', content: 'one' },
-          },
-        },
-        {
-          type: GeminiEventType.ToolCallRequest,
-          value: {
-            callId: 'write-call-2',
-            name: 'write_file',
-            args: { file_path: '/tmp/file2.txt', content: 'two' },
-          },
-        },
-      ];
-    });
-    sendMessageStreamSpy.mockImplementation(async function* () {
-      yield* [{ type: 'content', value: 'Completed batch.' }];
-    });
-
-    const mockWriteTool = new MockTool({
-      name: 'write_file',
-      displayName: 'Write File',
-      shouldConfirmExecute: vi.fn(
-        async () =>
-          ({
-            type: 'edit',
-            title: 'Confirm write_file',
-            fileName: 'file.txt',
-            fileDiff: 'diff',
-            filePath: '/tmp/file.txt',
-            originalContent: '',
-            newContent: 'content',
-          }) as unknown as ToolCallConfirmationDetails,
-      ),
-      execute: vi.fn().mockResolvedValue({
-        llmContent: 'File written successfully.',
-        returnDisplay: 'File written successfully.',
-      }),
-    });
-
-    getToolRegistrySpy.mockReturnValue({
-      getAllTools: vi.fn().mockReturnValue([mockWriteTool]),
-      getToolsByServer: vi.fn().mockReturnValue([]),
-      getAllToolNames: vi.fn().mockReturnValue(['write_file']),
-      getTool: vi.fn().mockImplementation((name: string) => {
-        if (name === 'write_file') return mockWriteTool;
-        return undefined;
-      }),
-    });
-
-    const configMod = await import('../config/config.js');
-    vi.mocked(configMod.loadConfig).mockImplementationOnce(async () => {
-      const mockConfig = createMockConfig({
-        getToolRegistry: getToolRegistrySpy,
-        getApprovalMode: getApprovalModeSpy,
-        getShellExecutionConfig: getShellExecutionConfigSpy,
-        getExtensions: getExtensionsSpy,
-      }) as Config;
-      const realBus = new coreMod.MessageBus(mockConfig.getPolicyEngine());
-      mockConfig.getMessageBus = vi.fn().mockReturnValue(realBus);
-      config = mockConfig;
-      return config;
-    });
-
-    const agent = request.agent(app);
-
-    // 1. Initial prompt schedules write-call-1 and write-call-2.
-    // write-call-1 transitions to awaiting_approval while write-call-2 stays queued.
-    const res1 = await agent
-      .post('/')
-      .send(
-        createStreamMessageRequest('create two files', 'a2a-seq-edit-msg-1'),
-      )
-      .set('Content-Type', 'application/json')
-      .expect(200);
-
-    const events1 = streamToSSEEvents(res1.text);
-    assertTaskCreationAndWorkingStatus(events1);
-    assertUniqueFinalEventIsLast(events1);
-
-    const taskId = (events1[0].result as { id: string }).id;
-
-    // Verify write-call-1 is awaiting_approval in stream 1
-    const awaitingCall1 = events1.find((e) => {
-      const update = e.result as TaskStatusUpdateEvent;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const part = update.status?.message?.parts?.[0] as any;
-      return (
-        part?.data?.request?.callId === 'write-call-1' &&
-        part?.data?.status === 'awaiting_approval'
-      );
-    });
-    expect(awaitingCall1).toBeDefined();
-
-    // 2. Reject write-call-1 (outcome: 'cancel')
-    const res2 = await agent
-      .post('/')
-      .send({
-        jsonrpc: '2.0',
-        id: '2',
-        method: 'message/stream',
-        params: {
-          message: {
-            kind: 'message',
-            role: 'user',
-            taskId,
-            parts: [
-              {
-                kind: 'data',
-                data: {
-                  callId: 'write-call-1',
-                  outcome: 'cancel',
-                },
-              },
-            ],
-            messageId: 'a2a-seq-edit-msg-2',
-          },
-          metadata: {
-            coderAgent: {
-              kind: 'agent-settings',
-              workspacePath: '/tmp',
-            },
-          },
-        },
-      })
-      .set('Content-Type', 'application/json')
-      .expect(200);
-
-    const events2 = streamToSSEEvents(res2.text);
-    assertUniqueFinalEventIsLast(events2);
-
-    // Verify write-call-1 was cancelled, and write-call-2 was NOT auto-cancelled,
-    // instead transitioning to awaiting_approval!
-    const cancelledCall1 = events2.find((e) => {
-      const update = e.result as TaskStatusUpdateEvent;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const part = update.status?.message?.parts?.[0] as any;
-      return (
-        part?.data?.request?.callId === 'write-call-1' &&
-        part?.data?.status === 'cancelled'
-      );
-    });
-    expect(cancelledCall1).toBeDefined();
-
-    const cancelledCall2 = events2.find((e) => {
-      const update = e.result as TaskStatusUpdateEvent;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const part = update.status?.message?.parts?.[0] as any;
-      return (
-        part?.data?.request?.callId === 'write-call-2' &&
-        part?.data?.status === 'cancelled'
-      );
-    });
-    expect(cancelledCall2).toBeUndefined();
-
-    const awaitingCall2 = events2.find((e) => {
-      const update = e.result as TaskStatusUpdateEvent;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const part = update.status?.message?.parts?.[0] as any;
-      return (
-        part?.data?.request?.callId === 'write-call-2' &&
-        part?.data?.status === 'awaiting_approval'
-      );
-    });
-    expect(awaitingCall2).toBeDefined();
-
-    // 3. Approve write-call-2 (outcome: 'proceed_once')
-    const res3 = await agent
-      .post('/')
-      .send({
-        jsonrpc: '2.0',
-        id: '3',
-        method: 'message/stream',
-        params: {
-          message: {
-            kind: 'message',
-            role: 'user',
-            taskId,
-            parts: [
-              {
-                kind: 'data',
-                data: {
-                  callId: 'write-call-2',
-                  outcome: 'proceed_once',
-                },
-              },
-            ],
-            messageId: 'a2a-seq-edit-msg-3',
-          },
-          metadata: {
-            coderAgent: {
-              kind: 'agent-settings',
-              workspacePath: '/tmp',
-            },
-          },
-        },
-      })
-      .set('Content-Type', 'application/json')
-      .expect(200);
-
-    const events3 = streamToSSEEvents(res3.text);
-    assertUniqueFinalEventIsLast(events3);
-
-    const successCall2 = events3.find((e) => {
-      const update = e.result as TaskStatusUpdateEvent;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const part = update.status?.message?.parts?.[0] as any;
-      return (
-        part?.data?.request?.callId === 'write-call-2' &&
-        part?.data?.status === 'success'
-      );
-    });
-    expect(successCall2).toBeDefined();
-    expect(mockWriteTool.execute).toHaveBeenCalledTimes(1);
-
-    if (originalGetMessageBus && config) {
-      config.getMessageBus = originalGetMessageBus;
-    }
   });
 
   it('should handle multiple tool calls sequentially in YOLO mode', async () => {
@@ -1267,13 +1037,6 @@ describe('E2E Tests', () => {
       expect(getExtensionsSpy).not.toHaveBeenCalled();
     });
 
-    it('should return 400 when request body is empty', async () => {
-      const agent = request.agent(app);
-      const res = await agent.post('/executeCommand').expect(400);
-      expect(res.body.error).toBe('Invalid "command" field.');
-      expect(getExtensionsSpy).not.toHaveBeenCalled();
-    });
-
     it('should return 400 if args is not an array', async () => {
       const agent = request.agent(app);
       const res = await agent
@@ -1296,7 +1059,7 @@ describe('E2E Tests', () => {
       };
       vi.spyOn(commandRegistry, 'get').mockReturnValue(mockCommand);
 
-      vi.stubEnv('CODER_AGENT_WORKSPACE_PATH', '');
+      delete process.env['CODER_AGENT_WORKSPACE_PATH'];
       const response = await request(app)
         .post('/executeCommand')
         .send({ command: 'test-command', args: [] });
@@ -1316,7 +1079,7 @@ describe('E2E Tests', () => {
       };
       vi.spyOn(commandRegistry, 'get').mockReturnValue(mockWorkspaceCommand);
 
-      vi.stubEnv('CODER_AGENT_WORKSPACE_PATH', '');
+      delete process.env['CODER_AGENT_WORKSPACE_PATH'];
       const response = await request(app)
         .post('/executeCommand')
         .send({ command: 'workspace-command', args: [] });
@@ -1338,7 +1101,7 @@ describe('E2E Tests', () => {
       };
       vi.spyOn(commandRegistry, 'get').mockReturnValue(mockWorkspaceCommand);
 
-      vi.stubEnv('CODER_AGENT_WORKSPACE_PATH', '/tmp/test-workspace');
+      process.env['CODER_AGENT_WORKSPACE_PATH'] = '/tmp/test-workspace';
       const response = await request(app)
         .post('/executeCommand')
         .send({ command: 'workspace-command', args: [] });
@@ -1497,109 +1260,6 @@ describe('E2E Tests', () => {
 
       listenSpy.mockRestore();
       exitSpy.mockRestore();
-    });
-  });
-
-  describe('createApp V2 settings compatibility', () => {
-    it('should read V2 security.folderTrust.enabled from loadSettings during app initialization', async () => {
-      const settingsMod = await import('../config/settings.js');
-      const coreMod = await import('@google/gemini-cli-core');
-      const configMod = await import('../config/config.js');
-
-      const loadSettingsSpy = vi
-        .spyOn(settingsMod, 'loadSettings')
-        .mockReturnValue({
-          security: {
-            folderTrust: {
-              enabled: false,
-            },
-          },
-          logging: {
-            level: 'debug',
-          },
-        });
-      const checkPathTrustSpy = vi
-        .spyOn(coreMod, 'checkPathTrust')
-        .mockReturnValue({ isTrusted: true, source: 'file' });
-
-      await createApp();
-
-      expect(loadSettingsSpy).toHaveBeenCalled();
-      expect(checkPathTrustSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          isFolderTrustEnabled: false,
-        }),
-      );
-      expect(configMod.loadConfig).toHaveBeenCalledWith(
-        expect.objectContaining({
-          security: {
-            folderTrust: {
-              enabled: false,
-            },
-          },
-        }),
-        expect.anything(),
-        'a2a-server',
-        true,
-        expect.any(String),
-      );
-
-      loadSettingsSpy.mockRestore();
-      checkPathTrustSpy.mockRestore();
-    });
-
-    it('should mount express.json() before A2AExpressApp.setupRoutes so SDK routes receive parsed req.body', async () => {
-      const sdkExpressMod = await import('@a2a-js/sdk/server/express');
-      const originalSetupRoutes =
-        sdkExpressMod.A2AExpressApp.prototype.setupRoutes;
-
-      const setupRoutesSpy = vi
-        .spyOn(sdkExpressMod.A2AExpressApp.prototype, 'setupRoutes')
-        .mockImplementation(function (
-          this: InstanceType<typeof sdkExpressMod.A2AExpressApp>,
-          expressApp,
-          baseUrl,
-          middlewares,
-          agentCardPath,
-        ) {
-          expressApp.post('/__sdk_route_body_probe', (req, res) => {
-            res.status(200).json({ parsedBody: req.body ?? null });
-          });
-          return originalSetupRoutes.call(
-            this,
-            expressApp,
-            baseUrl,
-            middlewares,
-            agentCardPath,
-          );
-        });
-
-      try {
-        const testApp = await createApp();
-        const payload = {
-          jsonrpc: '2.0',
-          id: 1,
-          method: 'message/send',
-          params: {
-            message: {
-              kind: 'message',
-              role: 'user',
-              parts: [{ kind: 'text', text: 'hello' }],
-              messageId: 'probe-msg-1',
-            },
-          },
-        };
-
-        const res = await request(testApp)
-          .post('/__sdk_route_body_probe')
-          .set('Content-Type', 'application/json')
-          .send(payload)
-          .expect(200);
-
-        expect(res.body).toEqual({ parsedBody: payload });
-      } finally {
-        setupRoutesSpy.mockRestore();
-      }
     });
   });
 });

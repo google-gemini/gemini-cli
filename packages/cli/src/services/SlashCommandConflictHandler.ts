@@ -37,33 +37,14 @@ export class SlashCommandConflictHandler {
       clearTimeout(this.flushTimeout);
       this.flushTimeout = null;
     }
-    this.pendingConflicts = [];
-    this.notifiedConflicts.clear();
-  }
-
-  private getConflictKey(c: SlashCommandConflict): string {
-    const sourceId =
-      c.loserExtensionName || c.loserMcpServerName || c.loserKind;
-    return `${c.name}:${sourceId}:${c.renamedTo}`;
   }
 
   private handleConflicts(payload: SlashCommandConflictsPayload) {
-    const currentConflictKeys = new Set(
-      payload.conflicts.map((c) => this.getConflictKey(c)),
-    );
-    for (const key of this.notifiedConflicts) {
-      if (!currentConflictKeys.has(key)) {
-        this.notifiedConflicts.delete(key);
-      }
-    }
-
-    this.pendingConflicts = this.pendingConflicts.filter((c) =>
-      currentConflictKeys.has(this.getConflictKey(c)),
-    );
-
     const newConflicts = payload.conflicts.filter((c) => {
       // Use a unique key to prevent duplicate notifications for the same conflict
-      const key = this.getConflictKey(c);
+      const sourceId =
+        c.loserExtensionName || c.loserMcpServerName || c.loserKind;
+      const key = `${c.name}:${sourceId}:${c.renamedTo}`;
       if (this.notifiedConflicts.has(key)) {
         return false;
       }
@@ -74,9 +55,6 @@ export class SlashCommandConflictHandler {
     if (newConflicts.length > 0) {
       this.pendingConflicts.push(...newConflicts);
       this.scheduleFlush();
-    } else if (this.pendingConflicts.length === 0 && this.flushTimeout) {
-      clearTimeout(this.flushTimeout);
-      this.flushTimeout = null;
     }
   }
 

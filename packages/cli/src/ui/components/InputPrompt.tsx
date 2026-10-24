@@ -38,9 +38,9 @@ import {
   cpLen,
   toCodePoints,
   cpIndexToOffset,
-  getCachedStringWidth,
 } from '../utils/textUtils.js';
 import chalk from 'chalk';
+import stringWidth from 'string-width';
 import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
 import {
@@ -630,7 +630,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       if (!visualLine) return;
 
       // Even if we click past the end of the line, we might want to collapse an expanded paste
-      const isPastEndOfLine = relX >= getCachedStringWidth(visualLine);
+      const isPastEndOfLine = relX >= stringWidth(visualLine);
 
       const logicalPos = isPastEndOfLine
         ? null
@@ -684,10 +684,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleInput = useCallback(
     (key: Key) => {
-      if (!focus) {
-        return false;
-      }
-
       if (handleVoiceInput(key)) return true;
 
       // Determine if this keypress is a history navigation command
@@ -735,6 +731,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         if (key.name !== 'tab') {
           setForceShowShellSuggestions(false);
         }
+      }
+
+      // TODO(jacobr): this special case is likely not needed anymore.
+      // We should probably stop supporting paste if the InputPrompt is not
+      // focused.
+      /// We want to handle paste even when not focused to support drag and drop.
+      if (!focus && key.name !== 'paste') {
+        return false;
       }
 
       // Handle escape to close shortcuts panel first, before letting it bubble
@@ -1341,12 +1345,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return false;
       }
 
-      // If we're generating and user presses Ctrl+C (QUIT), do not swallow it as
-      // CLEAR_INPUT in the text buffer; let it propagate to cancel ongoing operations.
-      if (isGenerating && keyMatchers[Command.QUIT](key)) {
-        return false;
-      }
-
       // Fall back to the text buffer's default input handling for all other keys
       const handled = buffer.handleInput(key);
 
@@ -1422,7 +1420,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     ],
   );
   useKeypress(handleInput, {
-    isActive: focus && !isEmbeddedShellFocused && !copyModeEnabled,
+    isActive: !isEmbeddedShellFocused && !copyModeEnabled,
     priority: true,
   });
 
@@ -1431,7 +1429,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const getGhostTextLines = useCallback(() => {
     if (
-      inputWidth <= 0 ||
       !completion.promptCompletion.text ||
       !buffer.text ||
       !completion.promptCompletion.text.startsWith(buffer.text)
@@ -1450,7 +1447,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     const cursorCol = buffer.cursor[1];
 
     const textBeforeCursor = cpSlice(currentLogicalLine, 0, cursorCol);
-    const usedWidth = getCachedStringWidth(textBeforeCursor);
+    const usedWidth = stringWidth(textBeforeCursor);
     const remainingWidth = Math.max(0, inputWidth - usedWidth);
 
     const ghostTextLinesRaw = ghostSuffix.split('\n');
@@ -1459,7 +1456,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     let inlineGhost = '';
     let remainingFirstLine = '';
 
-    if (getCachedStringWidth(firstLineRaw) <= remainingWidth) {
+    if (stringWidth(firstLineRaw) <= remainingWidth) {
       inlineGhost = firstLineRaw;
     } else {
       const words = firstLineRaw.split(' ');
@@ -1467,7 +1464,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       let wordIdx = 0;
       for (const word of words) {
         const prospectiveLine = currentLine ? `${currentLine} ${word}` : word;
-        if (getCachedStringWidth(prospectiveLine) > remainingWidth) {
+        if (stringWidth(prospectiveLine) > remainingWidth) {
           break;
         }
         currentLine = prospectiveLine;
@@ -1495,7 +1492,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
         for (const word of words) {
           const prospectiveLine = currentLine ? `${currentLine} ${word}` : word;
-          const prospectiveWidth = getCachedStringWidth(prospectiveLine);
+          const prospectiveWidth = stringWidth(prospectiveLine);
 
           if (prospectiveWidth > inputWidth) {
             if (currentLine) {
@@ -1503,24 +1500,20 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             }
 
             let wordToProcess = word;
-            while (getCachedStringWidth(wordToProcess) > inputWidth) {
+            while (stringWidth(wordToProcess) > inputWidth) {
               let part = '';
               const wordCP = toCodePoints(wordToProcess);
               let partWidth = 0;
               let splitIndex = 0;
               for (let i = 0; i < wordCP.length; i++) {
                 const char = wordCP[i];
-                const charWidth = getCachedStringWidth(char);
+                const charWidth = stringWidth(char);
                 if (partWidth + charWidth > inputWidth) {
                   break;
                 }
                 part += char;
                 partWidth += charWidth;
                 splitIndex = i + 1;
-              }
-              if (splitIndex === 0) {
-                part = wordCP[0];
-                splitIndex = 1;
               }
               additionalLines.push(part);
               wordToProcess = cpSlice(wordToProcess, splitIndex);
@@ -1570,10 +1563,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const renderItem = useCallback(
     ({ item }: { item: ScrollableItem; index: number }) => {
       if (item.type === 'ghostLine') {
-        const padding = Math.max(
-          0,
-          inputWidth - getCachedStringWidth(item.ghostLine),
-        );
+        const padding = Math.max(0, inputWidth - stringWidth(item.ghostLine));
         return (
           <Box height={1}>
             <Text color={theme.text.secondary}>
@@ -1855,20 +1845,24 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             )}{' '}
           </Text>
           <Box flexGrow={1} flexDirection="column" ref={innerBoxRef}>
-            {buffer.text.length === 0 && effectivePlaceholder ? (
-              showCursor ? (
-                <Text
-                  terminalCursorFocus={showCursor}
-                  terminalCursorPosition={0}
-                >
-                  {chalk.inverse(cpSlice(effectivePlaceholder, 0, 1))}
-                  <Text color={theme.text.secondary}>
-                    {cpSlice(effectivePlaceholder, 1)}
+            {buffer.text.length === 0 ? (
+              effectivePlaceholder ? (
+                showCursor ? (
+                  <Text
+                    terminalCursorFocus={showCursor}
+                    terminalCursorPosition={0}
+                  >
+                    {chalk.inverse(effectivePlaceholder.slice(0, 1))}
+                    <Text color={theme.text.secondary}>
+                      {effectivePlaceholder.slice(1)}
+                    </Text>
                   </Text>
-                </Text>
-              ) : (
-                <Text color={theme.text.secondary}>{effectivePlaceholder}</Text>
-              )
+                ) : (
+                  <Text color={theme.text.secondary}>
+                    {effectivePlaceholder}
+                  </Text>
+                )
+              ) : null
             ) : (
               <Box
                 flexDirection="column"

@@ -10,13 +10,7 @@ import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
 import type { OAuthToken } from './token-storage/types.js';
 import { MCPOAuthTokenStorage } from './oauth-token-storage.js';
 import { getErrorMessage, FatalCancellationError } from '../utils/errors.js';
-import {
-  OAuthUtils,
-  ResourceMismatchError,
-  OAuthSecurityError,
-  isLoopbackUrl,
-  validateOAuthEndpointUrl,
-} from './oauth-utils.js';
+import { OAuthUtils, ResourceMismatchError } from './oauth-utils.js';
 import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getConsentForOauth } from '../utils/authConsent.js';
@@ -27,7 +21,7 @@ import {
   buildAuthorizationUrl,
   exchangeCodeForToken,
   refreshAccessToken as refreshAccessTokenShared,
-  getRedirectUri,
+  REDIRECT_PATH,
   type OAuthFlowConfig,
   type OAuthTokenResponse,
 } from '../utils/oauth-flow.js';
@@ -53,8 +47,6 @@ export interface MCPOAuthConfig {
   redirectUri?: string;
   tokenParamName?: string; // For SSE connections, specifies the query parameter name for the token
   registrationUrl?: string;
-  authorizationResponseIssParameterSupported?: boolean;
-  allowPrivateNetwork?: boolean;
 }
 
 /**
@@ -106,20 +98,9 @@ export class MCPOAuthProvider {
     registrationUrl: string,
     config: MCPOAuthConfig,
     redirectPort: number,
-    mcpServerUrl?: string,
   ): Promise<OAuthClientRegistrationResponse> {
-    const allowLoopback = mcpServerUrl
-      ? isLoopbackUrl(mcpServerUrl)
-      : isLoopbackUrl(registrationUrl);
-    const validatedRegistrationUrl = await validateOAuthEndpointUrl(
-      registrationUrl,
-      {
-        allowLoopback,
-        allowPrivateNetwork: config.allowPrivateNetwork,
-      },
-    );
-
-    const redirectUri = getRedirectUri(config, redirectPort);
+    const redirectUri =
+      config.redirectUri || `http://localhost:${redirectPort}${REDIRECT_PATH}`;
 
     const registrationRequest: OAuthClientRegistrationRequest = {
       client_name: 'Gemini CLI MCP Client',
@@ -130,7 +111,7 @@ export class MCPOAuthProvider {
       scope: config.scopes?.join(' ') || '',
     };
 
-    const response = await fetch(validatedRegistrationUrl, {
+    const response = await fetch(registrationUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -157,25 +138,19 @@ export class MCPOAuthProvider {
    */
   private async discoverOAuthFromMCPServer(
     mcpServerUrl: string,
-    options?: { allowPrivateNetwork?: boolean },
   ): Promise<MCPOAuthConfig | null> {
     // Use the full URL with path preserved for OAuth discovery
-    return OAuthUtils.discoverOAuthConfig(mcpServerUrl, options);
+    return OAuthUtils.discoverOAuthConfig(mcpServerUrl);
   }
 
   private async discoverAuthServerMetadataForRegistration(
     issuer: string,
-    mcpServerUrl?: string,
-    options?: { allowPrivateNetwork?: boolean },
   ): Promise<{
     issuerUrl: string;
     metadata: NonNullable<
       Awaited<ReturnType<typeof OAuthUtils.discoverAuthorizationServerMetadata>>
     >;
   }> {
-    const allowLoopback = mcpServerUrl
-      ? isLoopbackUrl(mcpServerUrl)
-      : isLoopbackUrl(issuer);
     const authUrl = new URL(issuer);
 
     // Preserve path components for issuers with path-based discovery (e.g., Keycloak)
@@ -223,19 +198,12 @@ export class MCPOAuthProvider {
       Awaited<ReturnType<typeof OAuthUtils.discoverAuthorizationServerMetadata>>
     > | null = null;
 
-    for (const issuerCandidate of attemptedIssuers) {
-      debugLogger.debug(`   Trying issuer URL: ${issuerCandidate}`);
-      const metadata = await OAuthUtils.discoverAuthorizationServerMetadata(
-        issuerCandidate,
-        {
-          allowLoopback,
-          ...(options?.allowPrivateNetwork !== undefined
-            ? { allowPrivateNetwork: options.allowPrivateNetwork }
-            : {}),
-        },
-      );
+    for (const issuer of attemptedIssuers) {
+      debugLogger.debug(`   Trying issuer URL: ${issuer}`);
+      const metadata =
+        await OAuthUtils.discoverAuthorizationServerMetadata(issuer);
       if (metadata) {
-        selectedIssuer = issuerCandidate;
+        selectedIssuer = issuer;
         discoveredMetadata = metadata;
         break;
       }
@@ -299,7 +267,6 @@ export class MCPOAuthProvider {
       refreshToken,
       tokenUrl,
       this.buildResourceParam(mcpServerUrl),
-      { allowPrivateNetwork: config.allowPrivateNetwork },
     );
   }
 
@@ -346,7 +313,6 @@ export class MCPOAuthProvider {
               await OAuthUtils.discoverOAuthFromWWWAuthenticate(
                 wwwAuthenticate,
                 mcpServerUrl,
-                { allowPrivateNetwork: config.allowPrivateNetwork },
               );
             if (discoveredConfig) {
               // Merge discovered config with existing config, preserving clientId and clientSecret
@@ -356,9 +322,6 @@ export class MCPOAuthProvider {
                 issuer: discoveredConfig.issuer,
                 tokenUrl: discoveredConfig.tokenUrl,
                 scopes: config.scopes || discoveredConfig.scopes || [],
-                authorizationResponseIssParameterSupported:
-                  config.authorizationResponseIssParameterSupported ??
-                  discoveredConfig.authorizationResponseIssParameterSupported,
                 // Preserve existing client credentials
                 clientId: config.clientId,
                 clientSecret: config.clientSecret,
@@ -368,10 +331,7 @@ export class MCPOAuthProvider {
         }
       } catch (error) {
         // Re-throw security validation errors
-        if (
-          error instanceof ResourceMismatchError ||
-          error instanceof OAuthSecurityError
-        ) {
+        if (error instanceof ResourceMismatchError) {
           throw error;
         }
 
@@ -382,10 +342,8 @@ export class MCPOAuthProvider {
 
       // If we still don't have OAuth config, try the standard discovery
       if (!config.authorizationUrl) {
-        const discoveredConfig = await this.discoverOAuthFromMCPServer(
-          mcpServerUrl,
-          { allowPrivateNetwork: config.allowPrivateNetwork },
-        );
+        const discoveredConfig =
+          await this.discoverOAuthFromMCPServer(mcpServerUrl);
         if (discoveredConfig) {
           // Merge discovered config with existing config, preserving clientId and clientSecret
           config = {
@@ -395,9 +353,6 @@ export class MCPOAuthProvider {
             issuer: discoveredConfig.issuer,
             scopes: config.scopes || discoveredConfig.scopes || [],
             registrationUrl: discoveredConfig.registrationUrl,
-            authorizationResponseIssParameterSupported:
-              config.authorizationResponseIssParameterSupported ??
-              discoveredConfig.authorizationResponseIssParameterSupported,
             // Preserve existing client credentials
             clientId: config.clientId,
             clientSecret: config.clientSecret,
@@ -410,26 +365,6 @@ export class MCPOAuthProvider {
       }
     }
 
-    // Validate authorization and token endpoint URLs before starting the local callback server
-    const allowLoopback = mcpServerUrl
-      ? isLoopbackUrl(mcpServerUrl)
-      : (config.authorizationUrl
-          ? isLoopbackUrl(config.authorizationUrl)
-          : false) ||
-        (config.tokenUrl ? isLoopbackUrl(config.tokenUrl) : false);
-    if (config.authorizationUrl) {
-      await validateOAuthEndpointUrl(config.authorizationUrl, {
-        allowLoopback,
-        allowPrivateNetwork: config.allowPrivateNetwork,
-      });
-    }
-    if (config.tokenUrl) {
-      await validateOAuthEndpointUrl(config.tokenUrl, {
-        allowLoopback,
-        allowPrivateNetwork: config.allowPrivateNetwork,
-      });
-    }
-
     // Generate PKCE parameters
     const pkceParams = generatePKCEParams();
 
@@ -437,115 +372,87 @@ export class MCPOAuthProvider {
     const preferredPort = getPortFromUrl(config.redirectUri);
 
     // Start callback server first to allocate port
-    // Pass config.issuer for RFC 9207 Authorization Server Issuer Identification / Mix-Up defense
-    debugLogger.debug(
-      `Starting callback server for "${serverName}" (expected issuer: ${config.issuer || 'none'})...`,
-    );
-    // RFC 9207: discovered metadata (or an explicit user setting) provides an
-    // explicit boolean. When the issuer was configured explicitly without
-    // discovery metadata, the "iss" parameter remains required by default.
-    const requireIssInResponse =
-      config.authorizationResponseIssParameterSupported ??
-      Boolean(config.issuer);
-    const callbackServer = startCallbackServer(
-      pkceParams.state,
-      preferredPort,
-      config.issuer,
-      requireIssInResponse,
-    );
-    callbackServer.response.catch(() => {});
+    // This ensures we only create one server and eliminates race conditions
+    const callbackServer = startCallbackServer(pkceParams.state, preferredPort);
 
-    let code: string;
-    let redirectPort: number;
-    let flowConfig: OAuthFlowConfig;
-    let resource: string | undefined;
+    // Wait for server to start and get the allocated port
+    // We need this port for client registration and auth URL building
+    const redirectPort = await callbackServer.port;
+    debugLogger.debug(`Callback server listening on port ${redirectPort}`);
 
-    try {
-      // Wait for server to start and get the allocated port
-      // We need this port for client registration and auth URL building
-      redirectPort = await callbackServer.port;
-      debugLogger.debug(`Callback server listening on port ${redirectPort}`);
+    // If no client ID is provided, try dynamic client registration
+    if (!config.clientId) {
+      let registrationUrl = config.registrationUrl;
 
-      // If no client ID is provided, try dynamic client registration
-      if (!config.clientId) {
-        let registrationUrl = config.registrationUrl;
-
-        // If no registration URL was previously discovered, try to discover it
-        if (!registrationUrl) {
-          // Use the issuer to discover registration endpoint
-          if (!config.issuer) {
-            throw new Error(
-              'Cannot perform dynamic registration without issuer',
-            );
-          }
-
-          debugLogger.debug('→ Attempting dynamic client registration...');
-          const { metadata: authServerMetadata } =
-            await this.discoverAuthServerMetadataForRegistration(
-              config.issuer,
-              mcpServerUrl,
-              { allowPrivateNetwork: config.allowPrivateNetwork },
-            );
-          registrationUrl = authServerMetadata.registration_endpoint;
+      // If no registration URL was previously discovered, try to discover it
+      if (!registrationUrl) {
+        // Use the issuer to discover registration endpoint
+        if (!config.issuer) {
+          throw new Error('Cannot perform dynamic registration without issuer');
         }
 
-        // Register client if registration endpoint is available
-        if (registrationUrl) {
-          const clientRegistration = await this.registerClient(
-            registrationUrl,
-            config,
-            redirectPort,
-            mcpServerUrl,
-          );
-
-          config.clientId = clientRegistration.client_id;
-          if (clientRegistration.client_secret) {
-            config.clientSecret = clientRegistration.client_secret;
-          }
-
-          debugLogger.debug('✓ Dynamic client registration successful');
-        } else {
-          throw new Error(
-            'No client ID provided and dynamic registration not supported',
-          );
-        }
+        debugLogger.debug('→ Attempting dynamic client registration...');
+        const { metadata: authServerMetadata } =
+          await this.discoverAuthServerMetadataForRegistration(config.issuer);
+        registrationUrl = authServerMetadata.registration_endpoint;
       }
 
-      // Validate configuration
-      if (!config.clientId || !config.authorizationUrl || !config.tokenUrl) {
+      // Register client if registration endpoint is available
+      if (registrationUrl) {
+        const clientRegistration = await this.registerClient(
+          registrationUrl,
+          config,
+          redirectPort,
+        );
+
+        config.clientId = clientRegistration.client_id;
+        if (clientRegistration.client_secret) {
+          config.clientSecret = clientRegistration.client_secret;
+        }
+
+        debugLogger.debug('✓ Dynamic client registration successful');
+      } else {
         throw new Error(
-          'Missing required OAuth configuration after discovery and registration',
+          'No client ID provided and dynamic registration not supported',
         );
       }
+    }
 
-      // Build flow config for shared utilities
-      flowConfig = {
-        clientId: config.clientId,
-        clientSecret: config.clientSecret,
-        authorizationUrl: config.authorizationUrl,
-        tokenUrl: config.tokenUrl,
-        scopes: config.scopes,
-        audiences: config.audiences,
-        redirectUri: config.redirectUri,
-      };
-
-      // Build authorization URL
-      resource = this.buildResourceParam(mcpServerUrl);
-      const authUrl = buildAuthorizationUrl(
-        flowConfig,
-        pkceParams,
-        redirectPort,
-        resource,
+    // Validate configuration
+    if (!config.clientId || !config.authorizationUrl || !config.tokenUrl) {
+      throw new Error(
+        'Missing required OAuth configuration after discovery and registration',
       );
+    }
 
-      const userConsent = await getConsentForOauth(
-        `Authentication required for MCP Server: '${serverName}.'`,
-      );
-      if (!userConsent) {
-        throw new FatalCancellationError('Authentication cancelled by user.');
-      }
+    // Build flow config for shared utilities
+    const flowConfig: OAuthFlowConfig = {
+      clientId: config.clientId,
+      clientSecret: config.clientSecret,
+      authorizationUrl: config.authorizationUrl,
+      tokenUrl: config.tokenUrl,
+      scopes: config.scopes,
+      audiences: config.audiences,
+      redirectUri: config.redirectUri,
+    };
 
-      displayMessage(`→ Opening your browser for OAuth sign-in...
+    // Build authorization URL
+    const resource = this.buildResourceParam(mcpServerUrl);
+    const authUrl = buildAuthorizationUrl(
+      flowConfig,
+      pkceParams,
+      redirectPort,
+      resource,
+    );
+
+    const userConsent = await getConsentForOauth(
+      `Authentication required for MCP Server: '${serverName}.'`,
+    );
+    if (!userConsent) {
+      throw new FatalCancellationError('Authentication cancelled by user.');
+    }
+
+    displayMessage(`→ Opening your browser for OAuth sign-in...
 
 If the browser does not open, copy and paste this URL into your browser:
 ${authUrl}
@@ -553,22 +460,18 @@ ${authUrl}
 💡 TIP: Triple-click to select the entire URL, then copy and paste it into your browser.
 ⚠️  Make sure to copy the COMPLETE URL - it may wrap across multiple lines.`);
 
-      // Open browser securely (callback server is already running)
-      try {
-        await openBrowserSecurely(authUrl);
-      } catch (error) {
-        debugLogger.warn(
-          'Failed to open browser automatically:',
-          getErrorMessage(error),
-        );
-      }
-
-      // Wait for callback
-      ({ code } = await callbackServer.response);
+    // Open browser securely (callback server is already running)
+    try {
+      await openBrowserSecurely(authUrl);
     } catch (error) {
-      callbackServer.cancel?.(error instanceof Error ? error : undefined);
-      throw error;
+      debugLogger.warn(
+        'Failed to open browser automatically:',
+        getErrorMessage(error),
+      );
     }
+
+    // Wait for callback
+    const { code } = await callbackServer.response;
 
     debugLogger.debug(
       '✓ Authorization code received, exchanging for tokens...',
@@ -581,7 +484,6 @@ ${authUrl}
       pkceParams.codeVerifier,
       redirectPort,
       resource,
-      { allowPrivateNetwork: config.allowPrivateNetwork },
     );
 
     // Convert to our token format
@@ -666,18 +568,15 @@ ${authUrl}
       return token.accessToken;
     }
 
-    // Try to refresh if we have a refresh token. Fall back to the client ID
-    // persisted during dynamic client registration when the static config
-    // does not provide one.
-    const clientId = config.clientId ?? credentials.clientId;
-    if (token.refreshToken && clientId && credentials.tokenUrl) {
+    // Try to refresh if we have a refresh token
+    if (token.refreshToken && config.clientId && credentials.tokenUrl) {
       try {
         debugLogger.log(
           `Refreshing expired token for MCP server: ${serverName}`,
         );
 
         const newTokenResponse = await this.refreshAccessToken(
-          { ...config, clientId },
+          config,
           token.refreshToken,
           credentials.tokenUrl,
           credentials.mcpServerUrl,
@@ -698,7 +597,7 @@ ${authUrl}
         await this.tokenStorage.saveToken(
           serverName,
           newToken,
-          clientId,
+          config.clientId,
           credentials.tokenUrl,
           credentials.mcpServerUrl,
         );
@@ -737,7 +636,7 @@ ${authUrl}
       if (current.refreshToken && clientId && credentials.tokenUrl) {
         try {
           const newTokenResponse = await this.refreshAccessToken(
-            { ...config, clientId },
+            config,
             current.refreshToken,
             credentials.tokenUrl,
             credentials.mcpServerUrl,

@@ -17,29 +17,25 @@ vi.mock('../hooks/useConsoleMessages.js', () => ({
   useConsoleMessages: vi.fn(),
 }));
 
-const mockScrollableListProps = vi.hoisted(() => vi.fn());
-
 vi.mock('./shared/ScrollableList.js', () => ({
-  ScrollableList: (props: {
+  ScrollableList: ({
+    data,
+    renderItem,
+  }: {
     data: unknown[];
     renderItem: (props: { item: unknown }) => React.ReactNode;
-    containerHeight?: number;
-  }) => {
-    mockScrollableListProps(props);
-    return (
-      <Box flexDirection="column">
-        {props.data.map((item: unknown, index: number) => (
-          <Box key={index}>{props.renderItem({ item })}</Box>
-        ))}
-      </Box>
-    );
-  },
+  }) => (
+    <Box flexDirection="column">
+      {data.map((item: unknown, index: number) => (
+        <Box key={index}>{renderItem({ item })}</Box>
+      ))}
+    </Box>
+  ),
 }));
 
 describe('DetailedMessagesDisplay', () => {
   beforeEach(() => {
     vi.mocked(useConsoleMessages).mockReturnValue([]);
-    mockScrollableListProps.mockClear();
   });
   it('renders nothing when messages are empty', async () => {
     const { lastFrame, unmount } = await renderWithProviders(
@@ -120,27 +116,6 @@ describe('DetailedMessagesDisplay', () => {
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();
-    unmount();
-  });
-
-  it('passes containerHeight minus border and header overhead to ScrollableList', async () => {
-    const messages: ConsoleMessageItem[] = [
-      { type: 'log', content: 'Log message', count: 1 },
-    ];
-    vi.mocked(useConsoleMessages).mockReturnValue(messages);
-
-    const { unmount } = await renderWithProviders(
-      <DetailedMessagesDisplay maxHeight={20} width={80} hasFocus={true} />,
-      {
-        settings: createMockSettings({ ui: { errorVerbosity: 'full' } }),
-      },
-    );
-
-    expect(mockScrollableListProps).toHaveBeenCalledWith(
-      expect.objectContaining({
-        containerHeight: 16,
-      }),
-    );
     unmount();
   });
 });

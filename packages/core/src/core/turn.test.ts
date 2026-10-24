@@ -254,15 +254,7 @@ describe('Turn', () => {
         events.push(event);
       }
 
-      expect(events).toEqual([
-        {
-          type: GeminiEventType.InvalidStream,
-          value: {
-            type: 'NO_FINISH_REASON',
-            message: 'Test invalid stream',
-          },
-        },
-      ]);
+      expect(events).toEqual([{ type: GeminiEventType.InvalidStream }]);
       expect(turn.getDebugResponses().length).toBe(0);
       expect(reportError).not.toHaveBeenCalled(); // Should not report as error
     });

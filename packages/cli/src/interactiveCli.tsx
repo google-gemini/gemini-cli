@@ -5,11 +5,10 @@
  */
 
 import React from 'react';
-import { render, setStringWidthFunction } from 'ink';
+import { render } from 'ink';
 import { basename } from 'node:path';
 import { AppContainer } from './ui/AppContainer.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
-import { getCachedStringWidth } from './ui/utils/textUtils.js';
 import {
   registerCleanup,
   removeCleanup,
@@ -21,7 +20,6 @@ import {
   type ResumedSessionData,
   coreEvents,
   createWorkingStdio,
-  isTmux,
   disableMouseEvents,
   enableMouseEvents,
   disableLineWrapping,
@@ -64,7 +62,6 @@ export async function startInteractiveUI(
   initializationResult: InitializationResult,
 ) {
   initializeConsoleStore();
-  setStringWidthFunction(getCachedStringWidth);
   // Never enter Ink alternate buffer mode when screen reader mode is enabled
   // as there is no benefit of alternate buffer mode when using a screen reader
   // and the Ink alternate buffer mode requires line wrapping harmful to
@@ -97,9 +94,7 @@ export async function startInteractiveUI(
   });
   consolePatcher.patch();
 
-  const { stdout: inkStdout, stderr: inkStderr } = createWorkingStdio({
-    synchronizedOutput: process.platform !== 'win32' || isTmux(),
-  });
+  const { stdout: inkStdout, stderr: inkStderr } = createWorkingStdio();
 
   const isShpool = !!process.env['SHPOOL_SESSION_NAME'];
 
@@ -169,7 +164,7 @@ export async function startInteractiveUI(
         config.getUseRenderProcess() && config.getUseTerminalBuffer(),
       incrementalRendering:
         settings.merged.ui.incrementalRendering !== false &&
-        (useAlternateBuffer || config.getUseTerminalBuffer()) &&
+        useAlternateBuffer &&
         !isShpool,
       debugRainbow: settings.merged.ui.debugRainbow === true,
     },
@@ -200,9 +195,6 @@ export async function startInteractiveUI(
 
   const cleanupUnmount = () => instance.unmount();
   const cleanupNonResumableCurrentSession = async () => {
-    if (resumedSessionData) {
-      return;
-    }
     try {
       await config
         .getGeminiClient()

@@ -10,7 +10,7 @@
  */
 
 import { GeminiEventType } from '../core/turn.js';
-import type { Part, FinishReason } from '@google/genai';
+import type { Part } from '@google/genai';
 import type { GeminiClient } from '../core/client.js';
 import type { Config } from '../config/config.js';
 import type { ToolCallRequestInfo } from '../scheduler/types.js';
@@ -179,7 +179,6 @@ export class LegacyAgentProtocol implements AgentProtocol {
     let currentDisplayContent = initialDisplayContent;
     let turnCount = 0;
     const maxTurns = this._config.getMaxSessionTurns();
-    let isAfterToolResponse = false;
 
     while (true) {
       turnCount++;
@@ -193,9 +192,6 @@ export class LegacyAgentProtocol implements AgentProtocol {
       }
 
       const toolCallRequests: ToolCallRequestInfo[] = [];
-      let finishedReason: FinishReason | undefined = undefined;
-      let hasVisibleText = false;
-
       const responseStream = this._client.sendMessageStream(
         currentParts,
         this._abortController.signal,
@@ -215,12 +211,6 @@ export class LegacyAgentProtocol implements AgentProtocol {
           toolCallRequests.push(event.value);
         }
 
-        if (event.type === GeminiEventType.Content) {
-          if (typeof event.value === 'string' && event.value.trim() !== '') {
-            hasVisibleText = true;
-          }
-        }
-
         this._emit(translateEvent(event, this._translationState));
 
         switch (event.type) {
@@ -230,14 +220,15 @@ export class LegacyAgentProtocol implements AgentProtocol {
             this._finishStream('failed');
             return;
           case GeminiEventType.Finished:
-            finishedReason = event.value.reason;
+            if (toolCallRequests.length === 0) {
+              this._finishStream(mapFinishReason(event.value.reason));
+              return;
+            }
             break;
           case GeminiEventType.AgentExecutionStopped:
+          case GeminiEventType.UserCancelled:
           case GeminiEventType.MaxSessionTurns:
             this._clearActiveStream();
-            return;
-          case GeminiEventType.UserCancelled:
-            this._finishStream('aborted');
             return;
           default:
             break;
@@ -250,20 +241,7 @@ export class LegacyAgentProtocol implements AgentProtocol {
       }
 
       if (toolCallRequests.length === 0) {
-        if (isAfterToolResponse && !hasVisibleText) {
-          const nudgeMessage =
-            '[System: You successfully executed a tool but returned an empty response. Please analyze the tool output and explain your progress or final answer.]';
-
-          currentParts = [{ text: nudgeMessage }];
-          isAfterToolResponse = false;
-          continue;
-        }
-
-        if (finishedReason !== undefined) {
-          this._finishStream(mapFinishReason(finishedReason));
-        } else {
-          this._finishStream('completed');
-        }
+        this._finishStream('completed');
         return;
       }
 
@@ -341,7 +319,6 @@ export class LegacyAgentProtocol implements AgentProtocol {
       }
 
       currentParts = toolResponseParts;
-      isAfterToolResponse = completedToolCalls.length > 0;
     }
   }
 

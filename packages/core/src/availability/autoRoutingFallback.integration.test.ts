@@ -13,15 +13,12 @@ import {
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
-  resetModelsForTesting,
 } from '../config/models.js';
 import fs from 'node:fs';
 import { AuthType } from '../core/contentGenerator.js';
 import type { FallbackIntent } from '../fallback/types.js';
 import { LlmRole } from '../telemetry/types.js';
 import type { GenerateContentResponse } from '@google/genai';
-import { normalizeModelId } from '../utils/modelUtils.js';
-import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 
 vi.mock('node:fs');
 
@@ -31,7 +28,6 @@ describe('Auto Routing Fallback Integration', () => {
   let client: BaseLlmClient;
 
   beforeEach(() => {
-    resetModelsForTesting();
     vi.useFakeTimers();
     vi.spyOn(Config.prototype, 'getHasAccessToPreviewModel').mockReturnValue(
       true,
@@ -72,7 +68,6 @@ describe('Auto Routing Fallback Integration', () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
-    resetModelsForTesting();
   });
 
   it('should fallback to Flash after 3 tries and try 10 times for Flash in auto mode', async () => {
@@ -106,15 +101,14 @@ describe('Auto Routing Fallback Integration', () => {
     // Spy on generateContent to simulate failures
     vi.spyOn(fakeGenerator, 'generateContent').mockImplementation(
       async (params) => {
-        const modelId = normalizeModelId(params.model ?? '');
-        if (modelId === PREVIEW_GEMINI_MODEL) {
+        if (params.model === PREVIEW_GEMINI_MODEL) {
           attemptsPro++;
           throw new RetryableQuotaError(
             'Quota exceeded for Pro',
             mockGoogleApiError,
             0,
           );
-        } else if (modelId === PREVIEW_GEMINI_FLASH_MODEL) {
+        } else if (params.model === PREVIEW_GEMINI_FLASH_MODEL) {
           attemptsFlash++;
           throw new RetryableQuotaError(
             'Quota exceeded for Flash',
@@ -129,7 +123,7 @@ describe('Auto Routing Fallback Integration', () => {
     // Set a fallback handler that approves the switch (simulating user or auto approval)
     config.setFallbackModelHandler(
       async (failed, _fallback, _error): Promise<FallbackIntent | null> => {
-        if (normalizeModelId(failed) === PREVIEW_GEMINI_FLASH_MODEL) {
+        if (failed === PREVIEW_GEMINI_FLASH_MODEL) {
           return 'stop'; // Stop retrying after Flash fails
         }
         return 'retry_always'; // Trigger fallback to Flash
@@ -185,8 +179,7 @@ describe('Auto Routing Fallback Integration', () => {
     // Spy on generateContent to simulate failures
     vi.spyOn(fakeGenerator, 'generateContent').mockImplementation(
       async (params) => {
-        const modelId = normalizeModelId(params.model ?? '');
-        if (modelId === normalizeModelId(PREVIEW_GEMINI_MODEL)) {
+        if (params.model === PREVIEW_GEMINI_MODEL) {
           attemptsPro++;
           throw new RetryableQuotaError(
             'Quota exceeded for Pro',
@@ -225,94 +218,10 @@ describe('Auto Routing Fallback Integration', () => {
     // Verify handler was called once after 10 attempts to prompt user
     expect(handler).toHaveBeenCalledTimes(1);
     expect(handler).toHaveBeenCalledWith(
-      'gemini-3-pro-preview',
-      'gemini-3-flash-preview',
+      PREVIEW_GEMINI_MODEL,
+      PREVIEW_GEMINI_FLASH_MODEL,
       expect.any(RetryableQuotaError),
     );
-  });
-
-  it('should fallback to gemini-3.8-flash when hasLatestFlashGAAccess is enabled', async () => {
-    config = new Config({
-      sessionId: 'test-session-latest-flash',
-      targetDir: '/test',
-      debugMode: false,
-      cwd: '/test',
-      model: PREVIEW_GEMINI_MODEL_AUTO,
-    });
-
-    vi.spyOn(config, 'isInteractive').mockReturnValue(true);
-    config.setExperiments({
-      flags: {
-        [ExperimentFlags.LATEST_FLASH_GA_LAUNCHED]: {
-          boolValue: true,
-        },
-      },
-      experimentIds: [],
-    });
-
-    client = new BaseLlmClient(
-      fakeGenerator,
-      config,
-      AuthType.LOGIN_WITH_GOOGLE,
-    );
-
-    let attemptsPro = 0;
-    let attemptsFlash = 0;
-
-    const mockGoogleApiError = {
-      code: 429,
-      message: 'Quota exceeded',
-      details: [],
-    };
-
-    vi.spyOn(fakeGenerator, 'generateContent').mockImplementation(
-      async (params) => {
-        const modelId = normalizeModelId(params.model ?? '');
-        if (modelId === PREVIEW_GEMINI_MODEL) {
-          attemptsPro++;
-          throw new RetryableQuotaError(
-            'Quota exceeded for Pro',
-            mockGoogleApiError,
-            0,
-          );
-        } else if (modelId === 'gemini-3.8-flash') {
-          attemptsFlash++;
-          return {
-            candidates: [
-              {
-                content: {
-                  role: 'model',
-                  parts: [{ text: 'Latest flash success' }],
-                },
-              },
-            ],
-          } as unknown as GenerateContentResponse;
-        }
-        throw new Error(`Unexpected model: ${params.model}`);
-      },
-    );
-
-    config.setFallbackModelHandler(
-      async (_failed, _fallback, _error): Promise<FallbackIntent | null> =>
-        'retry_always',
-    );
-
-    const promise = client.generateContent({
-      modelConfigKey: { model: PREVIEW_GEMINI_MODEL, isChatModel: true },
-      contents: [{ role: 'user', parts: [{ text: 'test query' }] }],
-      abortSignal: new AbortController().signal,
-      promptId: 'test-prompt',
-      role: LlmRole.UTILITY_TOOL,
-    });
-
-    await vi.runAllTimersAsync();
-    const result = await promise;
-
-    expect(result.candidates?.[0]?.content?.parts?.[0]?.text).toBe(
-      'Latest flash success',
-    );
-    expect(attemptsPro).toBe(3);
-    expect(attemptsFlash).toBe(1);
   });
 
   it('should fallback to Flash after 3 tries in experimental dynamic mode', async () => {
@@ -352,15 +261,14 @@ describe('Auto Routing Fallback Integration', () => {
     // Spy on generateContent to simulate failures
     vi.spyOn(fakeGenerator, 'generateContent').mockImplementation(
       async (params) => {
-        const modelId = normalizeModelId(params.model ?? '');
-        if (modelId === PREVIEW_GEMINI_MODEL) {
+        if (params.model === PREVIEW_GEMINI_MODEL) {
           attemptsPro++;
           throw new RetryableQuotaError(
             'Quota exceeded for Pro',
             mockGoogleApiError,
             0,
           );
-        } else if (modelId === PREVIEW_GEMINI_FLASH_MODEL) {
+        } else if (params.model === PREVIEW_GEMINI_FLASH_MODEL) {
           attemptsFlash++;
           throw new RetryableQuotaError(
             'Quota exceeded for Flash',
@@ -375,7 +283,7 @@ describe('Auto Routing Fallback Integration', () => {
     // Set a fallback handler that approves the switch
     configDynamic.setFallbackModelHandler(
       async (failed, _fallback, _error): Promise<FallbackIntent | null> => {
-        if (normalizeModelId(failed) === PREVIEW_GEMINI_FLASH_MODEL) {
+        if (failed === PREVIEW_GEMINI_FLASH_MODEL) {
           return 'stop';
         }
         return 'retry_always';
@@ -431,15 +339,14 @@ describe('Auto Routing Fallback Integration', () => {
     // Turn 1: Pro fails, Flash succeeds
     vi.spyOn(fakeGenerator, 'generateContent').mockImplementation(
       async (params) => {
-        const modelId = normalizeModelId(params.model ?? '');
-        if (modelId === PREVIEW_GEMINI_MODEL) {
+        if (params.model === PREVIEW_GEMINI_MODEL) {
           attemptsPro++;
           throw new RetryableQuotaError(
             'Quota exceeded for Pro',
             mockGoogleApiError,
             0,
           );
-        } else if (modelId === PREVIEW_GEMINI_FLASH_MODEL) {
+        } else if (params.model === PREVIEW_GEMINI_FLASH_MODEL) {
           attemptsFlash++;
           return {
             candidates: [
@@ -483,8 +390,7 @@ describe('Auto Routing Fallback Integration', () => {
     // Let's make it succeed this time to verify it works!
     vi.spyOn(fakeGenerator, 'generateContent').mockImplementation(
       async (params) => {
-        const modelId = normalizeModelId(params.model ?? '');
-        if (modelId === PREVIEW_GEMINI_MODEL) {
+        if (params.model === PREVIEW_GEMINI_MODEL) {
           return {
             candidates: [
               { content: { role: 'model', parts: [{ text: 'Pro success' }] } },
@@ -539,15 +445,14 @@ describe('Auto Routing Fallback Integration', () => {
 
     vi.spyOn(fakeGenerator, 'generateContent').mockImplementation(
       async (params) => {
-        const modelId = normalizeModelId(params.model ?? '');
-        if (modelId === PREVIEW_GEMINI_MODEL) {
+        if (params.model === PREVIEW_GEMINI_MODEL) {
           attemptsPro++;
           throw new RetryableQuotaError(
             'Quota exceeded for Pro',
             mockGoogleApiError,
             0,
           );
-        } else if (modelId === PREVIEW_GEMINI_FLASH_MODEL) {
+        } else if (params.model === PREVIEW_GEMINI_FLASH_MODEL) {
           attemptsFlash++;
           return {
             candidates: [
