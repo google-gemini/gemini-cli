@@ -105,6 +105,35 @@ export function normalizeUrl(urlStr: string): string {
   }
 }
 
+// Closing brackets whose unbalanced occurrences are stripped from URL tokens.
+const CLOSING_BRACKETS: Record<string, string> = {
+  ')': '(',
+  ']': '[',
+  '}': '{',
+};
+
+/**
+ * Strips characters that prose commonly appends to a URL but that are never
+ * meaningful as the last character of one: sentence punctuation (`.`, `,`,
+ * `;`, `:`) and closing brackets that have no matching opener (so
+ * `https://example.com/wiki/Foo_(bar)` stays intact). `?` and `!` are kept
+ * because they can be meaningful query/path characters.
+ */
+export function cleanUrlToken(token: string): string {
+  let url = token;
+  let previous: string | undefined;
+  while (url !== previous) {
+    previous = url;
+    url = url.replace(/[.,;:]+$/, '');
+    const last = url.slice(-1);
+    const opener = CLOSING_BRACKETS[last];
+    if (opener && url.split(last).length - 1 > url.split(opener).length - 1) {
+      url = url.slice(0, -1);
+    }
+  }
+  return url;
+}
+
 /**
  * Parses a prompt to extract valid URLs and identify malformed ones.
  */
@@ -122,8 +151,9 @@ export function parsePrompt(text: string): {
     // Heuristic to check if the url appears to contain URL-like chars.
     if (token.includes('://')) {
       try {
-        // Validate with new URL()
-        const url = new URL(token);
+        // Models often append sentence punctuation or unbalanced closing
+        // brackets to a URL; validate the cleaned token instead.
+        const url = new URL(cleanUrlToken(token));
 
         // Allowlist protocols
         if (['http:', 'https:'].includes(url.protocol)) {
