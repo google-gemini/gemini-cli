@@ -216,6 +216,36 @@ describe('parsePrompt', () => {
     expect(validUrls).toEqual(['https://en.wikipedia.org/wiki/Foo_(bar)']);
   });
 
+  it('should strip adversarially long runs of trailing brackets', () => {
+    const suffix = ')'.repeat(100_000);
+    const { validUrls, errors } = parsePrompt(
+      `Check https://example.com/page${suffix}`,
+    );
+
+    expect(errors).toHaveLength(0);
+    expect(validUrls).toEqual(['https://example.com/page']);
+  });
+
+  it('should strip long runs of trailing sentence punctuation', () => {
+    const suffix = '.,;:'.repeat(10_000);
+    const { validUrls, errors } = parsePrompt(
+      `Read https://example.com/a${suffix}`,
+    );
+
+    expect(errors).toHaveLength(0);
+    expect(validUrls).toEqual(['https://example.com/a']);
+  });
+
+  it('should strip long interleaved runs of punctuation and brackets', () => {
+    const suffix = ').'.repeat(5_000);
+    const { validUrls, errors } = parsePrompt(
+      `Read https://example.com/a${suffix}`,
+    );
+
+    expect(errors).toHaveLength(0);
+    expect(validUrls).toEqual(['https://example.com/a']);
+  });
+
   it('should extract URLs from a comma-separated list', () => {
     const prompt =
       'Check https://example.com/, https://example.com/what-we-bake/, ' +

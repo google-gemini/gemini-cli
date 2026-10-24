@@ -111,6 +111,13 @@ const CLOSING_BRACKETS: Record<string, string> = {
   ']': '[',
   '}': '{',
 };
+const OPENING_BRACKETS: Record<string, string> = {
+  '(': ')',
+  '[': ']',
+  '{': '}',
+};
+// Sentence punctuation that prose may append directly after a URL.
+const SENTENCE_PUNCTUATION = new Set(['.', ',', ';', ':']);
 
 /**
  * Strips characters that prose commonly appends to a URL but that are never
@@ -118,20 +125,36 @@ const CLOSING_BRACKETS: Record<string, string> = {
  * `;`, `:`) and closing brackets that have no matching opener (so
  * `https://example.com/wiki/Foo_(bar)` stays intact). `?` and `!` are kept
  * because they can be meaningful query/path characters.
+ *
+ * Runs in O(n): one pass counts unmatched closing brackets per type, then a
+ * single scan from the end strips punctuation and unmatched closers, so
+ * adversarially long tokens cannot trigger quadratic work.
  */
 export function cleanUrlToken(token: string): string {
-  let url = token;
-  let previous: string | undefined;
-  while (url !== previous) {
-    previous = url;
-    url = url.replace(/[.,;:]+$/, '');
-    const last = url.slice(-1);
-    const opener = CLOSING_BRACKETS[last];
-    if (opener && url.split(last).length - 1 > url.split(opener).length - 1) {
-      url = url.slice(0, -1);
+  const unmatchedClosers = new Map<string, number>();
+  for (const char of token) {
+    if (CLOSING_BRACKETS[char]) {
+      unmatchedClosers.set(char, (unmatchedClosers.get(char) ?? 0) + 1);
+    } else if (OPENING_BRACKETS[char]) {
+      const closer = OPENING_BRACKETS[char];
+      unmatchedClosers.set(closer, (unmatchedClosers.get(closer) ?? 0) - 1);
     }
   }
-  return url;
+
+  let end = token.length;
+  while (end > 0) {
+    const char = token[end - 1];
+    const opener = CLOSING_BRACKETS[char];
+    if (SENTENCE_PUNCTUATION.has(char)) {
+      end--;
+    } else if (opener && (unmatchedClosers.get(char) ?? 0) > 0) {
+      unmatchedClosers.set(char, (unmatchedClosers.get(char) ?? 0) - 1);
+      end--;
+    } else {
+      break;
+    }
+  }
+  return token.slice(0, end);
 }
 
 /**
