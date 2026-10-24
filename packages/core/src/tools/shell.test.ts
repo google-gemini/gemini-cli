@@ -2016,7 +2016,7 @@ EOF`;
       });
       expect(result.returnDisplay).not.toContain('Blocked');
     });
-    it('should allow PowerShell commands with escaped quotes and parentheses', async () => {
+    it('should handle PowerShell quote forms without allowing unsafe backslash escapes', async () => {
       mockPlatform.mockReturnValue('win32');
       mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
         pid: 12345,
@@ -2033,22 +2033,32 @@ EOF`;
         }),
       }));
       const tool = new ShellTool(mockConfig, createMockMessageBus());
-      const testCommands = [
-        'echo "a \\" b (c)"',
-        'git commit -m "fix(core): \\"(detail)\\""',
-        'git commit -m "fix: \\"quote (detail)"',
-        'git log --format="%h \\" (%an)"',
-        'echo "hello \\" (world)"',
+      const safeCommands = [
         'echo "test `"quoted`" (foo)"',
         'echo "test ""quoted"" (foo)"',
         "echo 'test ''quoted'' (foo)'",
       ];
-      for (const command of testCommands) {
+      for (const command of safeCommands) {
         const invocation = tool.build({ command });
         const result = await invocation.execute({
           abortSignal: new AbortController().signal,
         });
         expect(result.returnDisplay).not.toContain('Blocked');
+      }
+
+      const unsafeCommands = [
+        'echo "a \\" b (c)"',
+        'git commit -m "fix(core): \\"(detail)\\""',
+        'git commit -m "fix: \\"quote (detail)"',
+        'git log --format="%h \\" (%an)"',
+        'echo "hello \\" (world)"',
+      ];
+      for (const command of unsafeCommands) {
+        const invocation = tool.build({ command });
+        const result = await invocation.execute({
+          abortSignal: new AbortController().signal,
+        });
+        expect(result.returnDisplay).toContain('Blocked');
       }
     });
   });
