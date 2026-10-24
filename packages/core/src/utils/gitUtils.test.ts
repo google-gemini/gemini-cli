@@ -147,6 +147,32 @@ describe('gitUtils', () => {
       );
     });
 
+    it('should use batch mode for TortoiseGitPlink configured through GIT_SSH', () => {
+      const safeEnv = getSafeGitEnv({
+        GIT_SSH: 'C:/Program Files/TortoiseGit/bin/TortoiseGitPlink.exe',
+      });
+      expect(safeEnv['GIT_SSH_COMMAND']).toBe(
+        '"C:/Program Files/TortoiseGit/bin/TortoiseGitPlink.exe" -batch',
+      );
+    });
+
+    it('should preserve arguments for a quoted TortoiseGitPlink command', () => {
+      const safeEnv = getSafeGitEnv({
+        GIT_SSH_COMMAND:
+          '"C:\\Program Files\\TortoiseGit\\bin\\TortoiseGitPlink.exe" -i key.ppk',
+      });
+      expect(safeEnv['GIT_SSH_COMMAND']).toBe(
+        '"C:\\Program Files\\TortoiseGit\\bin\\TortoiseGitPlink.exe" -batch -i key.ppk',
+      );
+    });
+
+    it('should not duplicate an existing TortoiseGitPlink batch option', () => {
+      const command = 'TortoiseGitPlink.exe -batch -i key.ppk';
+      expect(
+        getSafeGitEnv({ GIT_SSH_COMMAND: command })['GIT_SSH_COMMAND'],
+      ).toBe(command);
+    });
+
     it('should not configure diff.external to an empty string', () => {
       const safeEnv = getSafeGitEnv({});
       const count = parseInt(safeEnv['GIT_CONFIG_COUNT'] || '0', 10);

@@ -59,3 +59,8 @@ gemini extensions install https://github.com/gemini-cli-extensions/workspace
 
 For more advanced installation options, see the
 [Extension reference](reference.md#install-an-extension).
+
+For SSH-based repositories on Windows, Gemini CLI supports Plink and
+TortoiseGitPlink clients configured through `GIT_SSH` or `GIT_SSH_COMMAND`.
+These clients run in batch mode, so configure your SSH credentials before
+installing or updating an extension.
