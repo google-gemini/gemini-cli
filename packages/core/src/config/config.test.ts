@@ -1085,6 +1085,21 @@ describe('Server Config (config.ts)', () => {
     expect(config.getUserMemory()).toBe('');
   });
 
+  it('Config constructor should store appendSystemPrompt when provided', () => {
+    const config = new Config({
+      ...baseParams,
+      appendSystemPrompt: 'extra system instructions',
+    });
+
+    expect(config.getAppendSystemPrompt()).toBe('extra system instructions');
+  });
+
+  it('Config constructor should default appendSystemPrompt to undefined if not provided', () => {
+    const config = new Config(baseParams);
+
+    expect(config.getAppendSystemPrompt()).toBeUndefined();
+  });
+
   it('Config constructor should call setGeminiMdFilename with contextFileName if provided', () => {
     const contextFileName = 'CUSTOM_AGENTS.md';
     const paramsWithContextFile: ConfigParameters = {

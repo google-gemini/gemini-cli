@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { homedir } from '../utils/paths.js';
@@ -56,6 +57,75 @@ export function resolvePathFromEnv(envVar?: string): ResolvedPath {
     value: path.resolve(customPath),
     isDisabled: false,
   };
+}
+
+/**
+ * Resolves ~ and relative paths the same way GEMINI_SYSTEM_MD does, treating
+ * the value as a file path (not a true/false switch).
+ */
+export function resolveAppendSystemPromptPath(filePath: string): string {
+  const resolution = resolvePathFromEnv(filePath);
+  if (resolution.value && !resolution.isSwitch && !resolution.isDisabled) {
+    return resolution.value;
+  }
+  return path.resolve(filePath.trim());
+}
+
+/**
+ * Reads an append-system-prompt file. Throws a clear error if the file cannot
+ * be read.
+ */
+export function readAppendSystemPromptFile(filePath: string): string {
+  const resolvedPath = resolveAppendSystemPromptPath(filePath);
+  try {
+    return fs.readFileSync(resolvedPath, 'utf8');
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `unable to read append system prompt file '${resolvedPath}': ${reason}`,
+    );
+  }
+}
+
+/**
+ * Combines append-system-prompt sources in documented order:
+ * GEMINI_APPEND_SYSTEM_MD file, --append-system-prompt-file, then
+ * --append-system-prompt. Each non-empty part is separated by a blank line.
+ */
+export function collectAppendSystemPrompt(options: {
+  envPath?: string;
+  filePath?: string;
+  text?: string;
+}): string | undefined {
+  const parts: string[] = [];
+  for (const filePath of [options.envPath, options.filePath]) {
+    const trimmed = filePath?.trim();
+    if (!trimmed) {
+      continue;
+    }
+    const content = readAppendSystemPromptFile(trimmed).trim();
+    if (content) {
+      parts.push(content);
+    }
+  }
+  const text = options.text?.trim();
+  if (text) {
+    parts.push(text);
+  }
+  return parts.length > 0 ? parts.join('\n\n') : undefined;
+}
+
+/**
+ * Wraps launch-scoped extra instructions in a delimited section.
+ */
+export function renderAppendedSystemPrompt(text: string): string {
+  return `# Additional System Instructions
+
+The following instructions were appended at launch and supplement the system prompt above. They do not replace Core Mandates regarding safety, security, and agent integrity.
+
+<appended_system_instructions>
+${text.trim()}
+</appended_system_instructions>`;
 }
 
 /**

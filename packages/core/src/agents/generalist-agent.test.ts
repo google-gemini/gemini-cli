@@ -86,4 +86,37 @@ describe('GeneralistAgent', () => {
       'large-scale investigation and batch planning',
     );
   });
+
+  it('inherits appended system prompt text from the main config', () => {
+    const config = makeFakeConfig({
+      appendSystemPrompt: 'GENERALIST_APPEND_MARKER',
+    });
+    const mockToolRegistry = {
+      getAllToolNames: () => ['tool1'],
+    } as unknown as ToolRegistry;
+    vi.spyOn(config, 'getToolRegistry').mockReturnValue(mockToolRegistry);
+    Object.defineProperty(config, 'toolRegistry', {
+      get: () => mockToolRegistry,
+    });
+    Object.defineProperty(config, 'config', {
+      get() {
+        return this;
+      },
+    });
+    vi.spyOn(config, 'getAgentRegistry').mockReturnValue({
+      getDirectoryContext: () => 'mock directory context',
+      getAllAgentNames: () => [],
+      getAllDefinitions: () => [],
+      getDefinition: () => undefined,
+    } as unknown as AgentRegistry);
+
+    const agent = GeneralistAgent(config);
+
+    expect(agent.promptConfig.systemPrompt).toContain(
+      'GENERALIST_APPEND_MARKER',
+    );
+    expect(agent.promptConfig.systemPrompt).toContain(
+      '# Additional System Instructions',
+    );
+  });
 });

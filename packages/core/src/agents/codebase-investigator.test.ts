@@ -77,4 +77,17 @@ describe('CodebaseInvestigatorAgent', () => {
     const agent = CodebaseInvestigatorAgent(config);
     expect(agent.promptConfig.systemPrompt).toContain('`ls -R`');
   });
+
+  it('does not inherit appended system prompt text from the main config', () => {
+    const configWithAppend = makeFakeConfig({
+      appendSystemPrompt: 'INVESTIGATOR_APPEND_MARKER',
+    });
+    const agent = CodebaseInvestigatorAgent(configWithAppend);
+    expect(agent.promptConfig.systemPrompt).not.toContain(
+      'INVESTIGATOR_APPEND_MARKER',
+    );
+    expect(agent.promptConfig.systemPrompt).not.toContain(
+      '# Additional System Instructions',
+    );
+  });
 });

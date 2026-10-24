@@ -16,6 +16,7 @@ import {
   resolvePathFromEnv,
   applySubstitutions,
   isSectionEnabled,
+  renderAppendedSystemPrompt,
   type ResolvedPath,
 } from './utils.js';
 import { CodebaseInvestigatorAgent } from '../agents/codebase-investigator.js';
@@ -262,14 +263,29 @@ export class PromptProvider {
       basePrompt = getCoreSystemPrompt(options);
     }
 
+    const appendText = context.config.getAppendSystemPrompt?.()?.trim();
+    const promptWithAppend = appendText
+      ? `${basePrompt.trim()}\n\n${renderAppendedSystemPrompt(appendText)}`
+      : basePrompt;
+
     // --- Finalization (Shell) ---
-    const finalPrompt = activeSnippets.renderFinalShell(
+    // GEMINI_WRITE_SYSTEM_MD writes the base prompt only (stock or
+    // GEMINI_SYSTEM_MD override), not launch-scoped appended text.
+    const writePrompt = activeSnippets.renderFinalShell(
       basePrompt,
       userMemory,
       contextFilenames,
     );
+    const finalPrompt = appendText
+      ? activeSnippets.renderFinalShell(
+          promptWithAppend,
+          userMemory,
+          contextFilenames,
+        )
+      : writePrompt;
 
     // Sanitize erratic newlines from composition
+    const sanitizedWritePrompt = writePrompt.replace(/\n{3,}/g, '\n\n');
     let sanitizedPrompt = finalPrompt.replace(/\n{3,}/g, '\n\n');
 
     // Context Reinjection (Active Topic)
@@ -285,7 +301,7 @@ export class PromptProvider {
 
     // Write back to file if requested
     this.maybeWriteSystemMd(
-      sanitizedPrompt,
+      sanitizedWritePrompt,
       systemMdResolution,
       path.resolve(path.join(GEMINI_DIR, 'system.md')),
     );
