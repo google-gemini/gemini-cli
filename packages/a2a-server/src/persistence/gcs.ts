@@ -15,7 +15,11 @@ import type { Task as SDKTask } from '@a2a-js/sdk';
 import type { TaskStore } from '@a2a-js/sdk/server';
 import { logger } from '../utils/logger.js';
 import { setTargetDir } from '../config/config.js';
-import { getPersistedState, type PersistedTaskMetadata } from '../types.js';
+import {
+  getContextIdFromMetadata,
+  getPersistedState,
+  type PersistedTaskMetadata,
+} from '../types.js';
 import { v4 as uuidv4 } from 'uuid';
 
 type ObjectType = 'metadata' | 'workspace';
@@ -246,8 +250,8 @@ export class GCSTaskStore implements TaskStore {
       }
       const [compressedMetadata] = await metadataFile.download();
       const jsonData = gunzipSync(compressedMetadata).toString();
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const loadedMetadata = JSON.parse(jsonData);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const loadedMetadata = JSON.parse(jsonData) as PersistedTaskMetadata;
       logger.info(`Task ${taskId} metadata loaded from GCS.`);
 
       const persistedState = getPersistedState(loadedMetadata);
@@ -283,14 +287,12 @@ export class GCSTaskStore implements TaskStore {
 
       return {
         id: taskId,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        contextId: loadedMetadata._contextId || uuidv4(),
+        contextId: getContextIdFromMetadata(loadedMetadata) || uuidv4(),
         kind: 'task',
         status: {
           state: persistedState._taskState,
           timestamp: new Date().toISOString(),
         },
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         metadata: loadedMetadata,
         history: [],
         artifacts: [],
