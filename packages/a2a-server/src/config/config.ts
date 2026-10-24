@@ -31,10 +31,11 @@ import {
   type ConfigParameters,
   type ExtensionLoader,
   resolveToRealPath,
+  checkPathTrust,
 } from '@google/gemini-cli-core';
 
 import { logger } from '../utils/logger.js';
-import type { Settings } from './settings.js';
+import { type Settings, loadSettings } from './settings.js';
 import { type AgentSettings, CoderAgentEvent } from '../types.js';
 
 export const envStorage = new AsyncLocalStorage<TaskEnv>();
@@ -265,12 +266,12 @@ export async function loadConfig(
   const getEnvLocal = (key: string) => envVars[key];
 
   const folderTrust =
-    settings.folderTrust === true ||
+    settings.security?.folderTrust?.enabled === true ||
     getEnvLocal('GEMINI_FOLDER_TRUST') === 'true';
 
   let checkpointing = getEnvLocal('CHECKPOINTING')
     ? getEnvLocal('CHECKPOINTING') === 'true'
-    : settings.checkpointing?.enabled;
+    : settings.general?.checkpointing?.enabled;
 
   if (checkpointing) {
     if (!(await GitService.verifyGitAvailability())) {
@@ -286,8 +287,49 @@ export async function loadConfig(
       ? ApprovalMode.YOLO
       : ApprovalMode.DEFAULT;
 
+  if (!trusted) {
+    if (settings.mcpServers) {
+      logger.warn(
+        '[Configuration] Untrusted workspace detected. Stripping repository mcpServers definitions to prevent unintended command execution.',
+      );
+    }
+    if (settings.policyPaths) {
+      logger.warn(
+        '[Configuration] Untrusted workspace detected. Stripping repository policyPaths definitions to prevent unintended policy override.',
+      );
+    }
+    if (settings.adminPolicyPaths) {
+      logger.warn(
+        '[Configuration] Untrusted workspace detected. Stripping repository adminPolicyPaths definitions to prevent unintended admin policy override.',
+      );
+    }
+    if (settings.tools) {
+      logger.warn(
+        '[Configuration] Untrusted workspace detected. Stripping repository tools definitions to prevent unintended tool enablement.',
+      );
+    }
+    if (settings.telemetry) {
+      logger.warn(
+        '[Configuration] Untrusted workspace detected. Stripping repository telemetry definitions to prevent unintended data routing.',
+      );
+    }
+    settings = {
+      ...settings,
+      mcpServers: undefined,
+      policyPaths: undefined,
+      adminPolicyPaths: undefined,
+      tools: undefined,
+      telemetry: undefined,
+    };
+  }
+
+  if (settings.logging?.level) {
+    logger.level = settings.logging.level;
+  }
+  const safeMcpServers = settings.mcpServers;
+
   const policySettings: PolicySettings = {
-    mcpServers: settings.mcpServers,
+    mcpServers: safeMcpServers,
     tools: {
       core: settings.tools?.core,
       exclude: settings.tools?.exclude,
@@ -304,6 +346,8 @@ export async function loadConfig(
     true,
   );
 
+  const resolvedFileFiltering = settings.context?.fileFiltering;
+
   const configParams: ConfigParameters = {
     sessionId: taskId,
     clientName: 'a2a-server',
@@ -318,10 +362,10 @@ export async function loadConfig(
     coreTools: settings.tools?.core || undefined,
     excludeTools: settings.tools?.exclude || undefined,
     allowedTools: settings.tools?.allowed || undefined,
-    showMemoryUsage: settings.showMemoryUsage || false,
+    showMemoryUsage: settings.ui?.showMemoryUsage || false,
     approvalMode,
     policyEngineConfig,
-    mcpServers: settings.mcpServers,
+    mcpServers: safeMcpServers,
     cwd: workspaceDir,
     telemetry: {
       enabled: settings.telemetry?.enabled,
@@ -334,12 +378,12 @@ export async function loadConfig(
     },
     // Git-aware file filtering settings
     fileFiltering: {
-      respectGitIgnore: settings.fileFiltering?.respectGitIgnore,
-      respectGeminiIgnore: settings.fileFiltering?.respectGeminiIgnore,
+      respectGitIgnore: resolvedFileFiltering?.respectGitIgnore,
+      respectGeminiIgnore: resolvedFileFiltering?.respectGeminiIgnore,
       enableRecursiveFileSearch:
-        settings.fileFiltering?.enableRecursiveFileSearch,
+        resolvedFileFiltering?.enableRecursiveFileSearch,
       customIgnoreFilePaths: [
-        ...(settings.fileFiltering?.customIgnoreFilePaths || []),
+        ...(resolvedFileFiltering?.customIgnoreFilePaths || []),
         ...(getEnvLocal('CUSTOM_IGNORE_FILE_PATHS')
           ? getEnvLocal('CUSTOM_IGNORE_FILE_PATHS').split(path.delimiter)
           : []),
@@ -407,12 +451,33 @@ export async function loadConfig(
 
 export function setIsTrusted(
   agentSettings: AgentSettings | undefined,
+  workspaceRoot?: string,
 ): boolean {
+  if (agentSettings?.isTrusted !== undefined) {
+    return agentSettings.isTrusted;
+  }
+  const cliTrustEnv = getEnv('GEMINI_CLI_TRUST_WORKSPACE');
+  if (cliTrustEnv !== undefined && cliTrustEnv !== '') {
+    return cliTrustEnv === 'true';
+  }
+  // GEMINI_FOLDER_TRUST is set by the Gemini Code Assist (GCA) IDE extension
+  // (AgentProcess.ts) to propagate the IDE's workspace trust state
+  // (vscode.workspace.isTrusted). Do not remove this check without updating GCA.
   const folderTrustEnv = getEnv('GEMINI_FOLDER_TRUST');
-  if (folderTrustEnv !== undefined) {
+  if (folderTrustEnv !== undefined && folderTrustEnv !== '') {
     return folderTrustEnv === 'true';
   }
-  return !!agentSettings?.isTrusted;
+  if (workspaceRoot) {
+    const initialSettings = loadSettings(workspaceRoot, false);
+    const { isTrusted } = checkPathTrust({
+      path: workspaceRoot,
+      isFolderTrustEnabled:
+        initialSettings.security?.folderTrust?.enabled ?? true,
+      isHeadless: isHeadlessMode(),
+    });
+    return isTrusted ?? false;
+  }
+  return false;
 }
 
 export async function setTargetDir(

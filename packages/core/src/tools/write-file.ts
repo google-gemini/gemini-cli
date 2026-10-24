@@ -34,6 +34,7 @@ import {
   resolveDefensiveToolPath,
   resolveToRealPath,
 } from '../utils/paths.js';
+import { resolveActiveWorkspaceDir } from '../utils/pathCorrector.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import { ensureCorrectFileContent } from '../utils/editCorrector.js';
 import { detectLineEnding } from '../utils/textUtils.js';
@@ -62,6 +63,9 @@ import {
   resolveModel,
 } from '../config/models.js';
 import { discoverJitContext, appendJitContext } from './jit-context.js';
+import { isBuildFile } from '../utils/buildFileUtils.js';
+import { recordModifiedBuildFile } from '../utils/untrustedContextTracker.js';
+import { withPathLock } from '../utils/pathMutex.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -143,14 +147,10 @@ export async function getCorrectedFileContent(
       };
     }
   } else {
-    const sanitizedPath = resolveDefensiveToolPath(
-      filePath,
-      config.getTargetDir(),
-    );
+    const targetDir = resolveActiveWorkspaceDir(config, filePath);
+    const sanitizedPath = resolveDefensiveToolPath(filePath, targetDir);
     try {
-      resolvedPath = resolveToRealPath(
-        path.resolve(config.getTargetDir(), sanitizedPath),
-      );
+      resolvedPath = resolveToRealPath(path.resolve(targetDir, sanitizedPath));
     } catch (err) {
       return {
         originalContent: '',
@@ -266,19 +266,20 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         this.resolvedPath = this.params.file_path.replace(/\0/g, '');
       }
     } else {
+      const targetDir = resolveActiveWorkspaceDir(
+        this.config,
+        this.params.file_path,
+      );
       const sanitizedPath = resolveDefensiveToolPath(
         this.params.file_path,
-        this.config.getTargetDir(),
+        targetDir,
       );
       try {
         this.resolvedPath = resolveToRealPath(
-          path.resolve(this.config.getTargetDir(), sanitizedPath),
+          path.resolve(targetDir, sanitizedPath),
         );
       } catch {
-        this.resolvedPath = path.resolve(
-          this.config.getTargetDir(),
-          sanitizedPath,
-        );
+        this.resolvedPath = path.resolve(targetDir, sanitizedPath);
       }
     }
   }
@@ -298,7 +299,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
   override getDescription(): string {
     const relativePath = makeRelative(
       this.resolvedPath,
-      this.config.getTargetDir(),
+      resolveActiveWorkspaceDir(this.config, this.params.file_path),
     );
     return `Writing to ${shortenPath(relativePath)}`;
   }
@@ -321,7 +322,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
     const { originalContent, correctedContent } = correctedContentResult;
     const relativePath = makeRelative(
       this.resolvedPath,
-      this.config.getTargetDir(),
+      resolveActiveWorkspaceDir(this.config, this.params.file_path),
     );
     const fileName = path.basename(this.resolvedPath);
 
@@ -360,6 +361,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         }
       },
       ideConfirmation,
+      isBuildFile: isBuildFile(this.resolvedPath),
     };
     return confirmationDetails;
   }
@@ -379,6 +381,44 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       };
     }
 
+    // Serialize against other writers of this path, so that the existence
+    // check and content read that produce the diff cannot be interleaved with
+    // another write to the same file.
+    let lockKey = path.resolve(this.config.getTargetDir(), this.resolvedPath);
+    try {
+      lockKey = resolveToRealPath(lockKey);
+    } catch {
+      try {
+        const dir = path.dirname(lockKey);
+        const base = path.basename(lockKey);
+        lockKey = path.join(resolveToRealPath(dir), base);
+      } catch {
+        // Keep unresolved lockKey
+      }
+    }
+    try {
+      return await withPathLock(
+        lockKey,
+        () => this.applyWrite(abortSignal),
+        abortSignal,
+      );
+    } catch (err) {
+      if (err instanceof Error && err.message === 'Aborted') {
+        throw new Error('Write aborted');
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Writes the file.
+   *
+   * Must be called while holding the path lock for `this.resolvedPath`.
+   */
+  private async applyWrite(abortSignal: AbortSignal): Promise<ToolResult> {
+    if (abortSignal.aborted) {
+      throw new Error('Write aborted');
+    }
     const { content, ai_proposed_content, modified_by_user } = this.params;
     const correctedContentResult = await getCorrectedFileContent(
       this.config,
@@ -435,6 +475,10 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       await this.config
         .getFileSystemService()
         .writeTextFile(this.resolvedPath, finalContent);
+
+      if (isBuildFile(this.resolvedPath)) {
+        recordModifiedBuildFile(this.resolvedPath, this.config);
+      }
 
       // Generate diff for display result
       const fileName = path.basename(this.resolvedPath);
@@ -508,6 +552,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         newContent: correctedContentResult.correctedContent,
         diffStat,
         isNewFile,
+        isBuildFile: isBuildFile(this.resolvedPath),
       };
 
       // Discover JIT subdirectory context for the written file path
@@ -628,13 +673,11 @@ export class WriteFileTool
         return err instanceof Error ? err.message : String(err);
       }
     } else {
-      const sanitizedPath = resolveDefensiveToolPath(
-        filePath,
-        this.config.getTargetDir(),
-      );
+      const targetDir = resolveActiveWorkspaceDir(this.config, filePath);
+      const sanitizedPath = resolveDefensiveToolPath(filePath, targetDir);
       try {
         resolvedPath = resolveToRealPath(
-          path.resolve(this.config.getTargetDir(), sanitizedPath),
+          path.resolve(targetDir, sanitizedPath),
         );
       } catch (err) {
         return err instanceof Error ? err.message : String(err);

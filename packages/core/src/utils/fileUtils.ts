@@ -15,6 +15,7 @@ import { ToolErrorType } from '../tools/tool-error.js';
 import { BINARY_EXTENSIONS } from './ignorePatterns.js';
 import { createRequire as createModuleRequire } from 'node:module';
 import { debugLogger } from './debugLogger.js';
+import { resolveToRealPath } from './paths.js';
 
 import {
   DEFAULT_MAX_LINES_TEXT_FILE,
@@ -123,8 +124,12 @@ export function detectBOM(buf: Buffer): BOMInfo | null {
  * (Node has 'utf16le' but not 'utf16be'.)
  */
 function decodeUTF16BE(buf: Buffer): string {
-  if (buf.length === 0) return '';
-  const swapped = Buffer.from(buf); // swap16 mutates in place, so copy
+  // Ignore a partial trailing code unit (swap16 throws on an odd length),
+  // matching how Node's utf16le decoder and decodeUTF32 treat partial units.
+  const usable = buf.length - (buf.length % 2);
+  if (usable === 0) return '';
+  // swap16 mutates in place, so copy
+  const swapped = Buffer.from(buf.subarray(0, usable));
   swapped.swap16();
   return swapped.toString('utf16le');
 }
@@ -160,22 +165,11 @@ function decodeUTF32(buf: Buffer, littleEndian: boolean): string {
 }
 
 /**
- * Read a file as text, honoring BOM encodings (UTF‑8/16/32) and stripping the BOM.
- * Falls back to utf8 when no BOM is present.
+ * Decode a buffer that starts with a detected BOM: skips the BOM and decodes
+ * the remaining bytes according to the BOM's encoding.
  */
-export async function readFileWithEncoding(filePath: string): Promise<string> {
-  // Read the file once; detect BOM and decode from the single buffer.
-  const full = await fs.promises.readFile(filePath);
-  if (full.length === 0) return '';
-
-  const bom = detectBOM(full);
-  if (!bom) {
-    // No BOM → treat as UTF‑8
-    return full.toString('utf8');
-  }
-
-  // Strip BOM and decode per encoding
-  const content = full.subarray(bom.bomLength);
+function decodeBOMContent(buffer: Buffer, bom: BOMInfo): string {
+  const content = buffer.subarray(bom.bomLength);
   switch (bom.encoding) {
     case 'utf8':
       return content.toString('utf8');
@@ -191,6 +185,95 @@ export async function readFileWithEncoding(filePath: string): Promise<string> {
       // Defensive fallback; should be unreachable
       return content.toString('utf8');
   }
+}
+
+/**
+ * Reads a file as a Buffer while verifying device and inode (dev + ino) before,
+ * during (via fstat on the opened file descriptor), and after reading to ensure
+ * file consistency.
+ */
+export async function readSecureFileBuffer(
+  filePath: string,
+  expectedStats?: fs.Stats,
+): Promise<Buffer> {
+  const initialStats = expectedStats ?? (await fs.promises.stat(filePath));
+  let fileHandle: fs.promises.FileHandle | undefined;
+
+  try {
+    if (typeof fs.promises.open === 'function') {
+      try {
+        fileHandle = await fs.promises.open(filePath, 'r');
+      } catch {
+        // If opening file descriptor failed or is mocked without stat, continue to readFile
+      }
+      if (fileHandle && typeof fileHandle.stat === 'function') {
+        const handleStats = await fileHandle.stat();
+        if (
+          initialStats.dev !== undefined &&
+          initialStats.ino !== undefined &&
+          handleStats &&
+          handleStats.dev !== undefined &&
+          handleStats.ino !== undefined &&
+          (initialStats.dev !== handleStats.dev ||
+            initialStats.ino !== handleStats.ino)
+        ) {
+          throw new Error(
+            `File device or inode changed during read: ${filePath}`,
+          );
+        }
+      }
+    }
+
+    const contentBuffer = fileHandle
+      ? await fileHandle.readFile()
+      : await fs.promises.readFile(filePath);
+
+    // Verify post-read stats to ensure file consistency during or right after reading
+    let postStats: fs.Stats | undefined;
+    try {
+      postStats = await fs.promises.stat(filePath);
+    } catch {
+      // If post-stat failed due to file removal, ignore here
+    }
+    if (
+      postStats &&
+      initialStats.dev !== undefined &&
+      initialStats.ino !== undefined &&
+      postStats.dev !== undefined &&
+      postStats.ino !== undefined &&
+      (initialStats.dev !== postStats.dev || initialStats.ino !== postStats.ino)
+    ) {
+      throw new Error(`File device or inode changed during read: ${filePath}`);
+    }
+
+    return contentBuffer;
+  } finally {
+    if (fileHandle) {
+      await fileHandle.close().catch(() => {});
+    }
+  }
+}
+
+/**
+ * Read a file as text, honoring BOM encodings (UTF‑8/16/32) and stripping the BOM.
+ * Falls back to utf8 when no BOM is present.
+ */
+export async function readFileWithEncoding(
+  filePath: string,
+  expectedStats?: fs.Stats,
+): Promise<string> {
+  // Read the file once securely; detect BOM and decode from the single buffer.
+  const full = await readSecureFileBuffer(filePath, expectedStats);
+  if (full.length === 0) return '';
+
+  const bom = detectBOM(full);
+  if (!bom) {
+    // No BOM → treat as UTF‑8
+    return full.toString('utf8');
+  }
+
+  // Strip BOM and decode per encoding
+  return decodeBOMContent(full, bom);
 }
 
 /**
@@ -269,6 +352,21 @@ function getSupportedAudioMimeTypeForFile(
   return extensionMimeType;
 }
 
+export function canonicalizeMacosPath(p: string): string {
+  if (process.platform === 'darwin') {
+    if (p === '/var' || p.startsWith('/var/')) {
+      return '/private' + p;
+    }
+    if (p === '/tmp' || p.startsWith('/tmp/')) {
+      return '/private' + p;
+    }
+    if (p === '/etc' || p.startsWith('/etc/')) {
+      return '/private' + p;
+    }
+  }
+  return p;
+}
+
 /**
  * Checks if a path is within a given root directory.
  * @param pathToCheck The absolute path to check.
@@ -279,8 +377,12 @@ export function isWithinRoot(
   pathToCheck: string,
   rootDirectory: string,
 ): boolean {
-  const normalizedPathToCheck = path.resolve(pathToCheck);
-  const normalizedRootDirectory = path.resolve(rootDirectory);
+  const normalizedPathToCheck = canonicalizeMacosPath(
+    path.resolve(pathToCheck),
+  );
+  const normalizedRootDirectory = canonicalizeMacosPath(
+    path.resolve(rootDirectory),
+  );
 
   // Ensure the rootDirectory path ends with a separator for correct startsWith comparison,
   // unless it's the root path itself (e.g., '/' or 'C:\').
@@ -290,10 +392,33 @@ export function isWithinRoot(
       ? normalizedRootDirectory
       : normalizedRootDirectory + path.sep;
 
-  return (
+  if (
     normalizedPathToCheck === normalizedRootDirectory ||
     normalizedPathToCheck.startsWith(rootWithSeparator)
-  );
+  ) {
+    return true;
+  }
+
+  // Cross-platform check for macOS /private symlink aliases
+  if (process.platform === 'darwin') {
+    try {
+      const realPathToCheck = resolveToRealPath(normalizedPathToCheck);
+      const realRootDirectory = resolveToRealPath(normalizedRootDirectory);
+      const realRootWithSeparator =
+        realRootDirectory === path.sep || realRootDirectory.endsWith(path.sep)
+          ? realRootDirectory
+          : realRootDirectory + path.sep;
+
+      return (
+        realPathToCheck === realRootDirectory ||
+        realPathToCheck.startsWith(realRootWithSeparator)
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
 }
 
 /**
@@ -332,7 +457,7 @@ export async function isEmpty(filePath: string): Promise<boolean> {
 
       const bom = detectBOM(buffer);
       const content = bom
-        ? buffer.subarray(bom.bomLength).toString('utf8')
+        ? decodeBOMContent(buffer, bom)
         : buffer.toString('utf8');
 
       return content.trim().length === 0;
@@ -505,7 +630,7 @@ export async function processSingleFileContent(
             returnDisplay: `Skipped large SVG file (>1MB): ${relativePathForDisplay}`,
           };
         }
-        const content = await readFileWithEncoding(filePath);
+        const content = await readFileWithEncoding(filePath, stats);
         return {
           llmContent: content,
           returnDisplay: `Read SVG as text: ${relativePathForDisplay}`,
@@ -513,7 +638,7 @@ export async function processSingleFileContent(
       }
       case 'text': {
         // Use BOM-aware reader to avoid leaving a BOM character in content and to support UTF-16/32 transparently
-        const content = await readFileWithEncoding(filePath);
+        const content = await readFileWithEncoding(filePath, stats);
         const lines = content.split(/\r?\n/);
         const originalLineCount = lines.length;
 
@@ -584,7 +709,7 @@ export async function processSingleFileContent(
             errorType: ToolErrorType.READ_CONTENT_FAILURE,
           };
         }
-        const contentBuffer = await fs.promises.readFile(filePath);
+        const contentBuffer = await readSecureFileBuffer(filePath, stats);
         const base64Data = contentBuffer.toString('base64');
         return {
           llmContent: {
@@ -601,7 +726,7 @@ export async function processSingleFileContent(
       case 'video': {
         const mimeType =
           getSpecificMimeType(filePath) ?? 'application/octet-stream';
-        const contentBuffer = await fs.promises.readFile(filePath);
+        const contentBuffer = await readSecureFileBuffer(filePath, stats);
         const base64Data = contentBuffer.toString('base64');
         return {
           llmContent: {
@@ -663,7 +788,7 @@ export function formatTruncatedToolOutput(
   outputFile: string,
   maxChars: number,
 ): string {
-  if (contentStr.length <= maxChars) return contentStr;
+  if (maxChars <= 0 || contentStr.length <= maxChars) return contentStr;
 
   const headChars = Math.floor(maxChars * 0.2);
   const tailChars = maxChars - headChars;

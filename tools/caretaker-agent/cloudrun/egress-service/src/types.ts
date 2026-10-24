@@ -39,11 +39,20 @@ export interface PatchEgressEvent {
   };
 }
 
+export interface ReactionEgressEvent {
+  action: 'REACTION';
+  payload: BaseEgressPayload & {
+    commentId: number;
+    reaction: 'eyes';
+  };
+}
+
 export type EgressEvent =
   | CommentEgressEvent
   | LabelEgressEvent
   | UnlabelEgressEvent
-  | PatchEgressEvent;
+  | PatchEgressEvent
+  | ReactionEgressEvent;
 
 export interface PubSubMessage {
   data?: string;
@@ -112,6 +121,8 @@ export function isEgressEvent(obj: unknown): obj is EgressEvent {
     case 'LABEL':
     case 'UNLABEL':
       return Array.isArray(payload.labels);
+    case 'REACTION':
+      return typeof payload.commentId === 'number';
     case 'PATCH':
       // Note: PATCH action is not yet implemented in handleEgressEvent, so return true
       // to let base validation pass until patch payload fields are defined.

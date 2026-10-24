@@ -16,6 +16,7 @@ import * as crypto from 'node:crypto';
 import type * as net from 'node:net';
 import { URL } from 'node:url';
 import { debugLogger } from './debugLogger.js';
+import { validateOAuthEndpointUrl, isLoopbackUrl } from '../mcp/oauth-utils.js';
 
 /**
  * Configuration for an OAuth 2.0 Authorization Code flow.
@@ -54,6 +55,7 @@ export interface PKCEParams {
 export interface OAuthAuthorizationResponse {
   code: string;
   state: string;
+  iss?: string;
 }
 
 /**
@@ -69,6 +71,46 @@ export interface OAuthTokenResponse {
 
 /** The path the local callback server listens on. */
 export const REDIRECT_PATH = '/oauth/callback';
+
+/**
+ * Helper to determine the redirect URI, taking Google Cloud Workstations proxy into account.
+ */
+export function getRedirectUri(
+  config: { redirectUri?: string },
+  redirectPort: number,
+): string {
+  if (
+    process.env['GOOGLE_CLOUD_WORKSTATIONS'] === 'true' &&
+    process.env['WEB_HOST']
+  ) {
+    if (config.redirectUri) {
+      try {
+        const parsed = new URL(config.redirectUri);
+        if (
+          parsed.hostname === 'localhost' ||
+          parsed.hostname === '127.0.0.1' ||
+          parsed.hostname === '[::1]'
+        ) {
+          const port = String(redirectPort);
+          parsed.protocol = 'https:';
+          parsed.hostname = `${port}-${process.env['WEB_HOST']}`;
+          parsed.port = '';
+          return parsed.toString();
+        }
+      } catch {
+        // Fall back to returning config.redirectUri as-is if parsing fails
+      }
+      return config.redirectUri;
+    }
+
+    return `https://${redirectPort}-${process.env['WEB_HOST']}${REDIRECT_PATH}`;
+  }
+
+  if (config.redirectUri) {
+    return config.redirectUri;
+  }
+  return `http://localhost:${redirectPort}${REDIRECT_PATH}`;
+}
 
 const HTTP_OK = 200;
 
@@ -95,19 +137,68 @@ export function generatePKCEParams(): PKCEParams {
 }
 
 /**
+ * Compares two OAuth issuer URLs per RFC 8414 / RFC 9207.
+ * Normalizes trailing slashes and origins to ensure consistent matching,
+ * while rejecting userinfo (preventing OAuth mix-up attacks) and preserving
+ * query parameters and fragments.
+ */
+export function areIssuersEqual(issuerA: string, issuerB: string): boolean {
+  if (issuerA === issuerB && !issuerA.includes('@')) return true;
+
+  const normalize = (iss: string): string | null => {
+    try {
+      const u = new URL(iss);
+
+      // RFC 8414 & RFC 9207: Valid OAuth issuers MUST NOT contain userinfo.
+      // Discarding or accepting userinfo can enable URL confusion / mix-up attacks
+      // (e.g., https://attacker.com@github.com/login/oauth).
+      if (u.username || u.password) {
+        return null;
+      }
+
+      // Normalize trailing slashes on pathname (e.g., "/oauth/" -> "/oauth")
+      const normalizedPath = u.pathname.replace(/\/+$/, '');
+
+      // Reconstruct canonical URL:
+      // - u.protocol and u.host handle lowercasing and default port removal (:443)
+      // - normalizedPath handles trailing slash equivalence
+      // - u.search and u.hash are preserved so different tenants/queries never collide
+      return `${u.protocol}//${u.host}${normalizedPath}${u.search}${u.hash}`;
+    } catch {
+      // Fallback for non-standard / relative strings
+      return iss.replace(/\/+$/, '');
+    }
+  };
+
+  const normA = normalize(issuerA);
+  const normB = normalize(issuerB);
+
+  if (normA === null || normB === null) {
+    return false;
+  }
+
+  return normA === normB;
+}
+
+/**
  * Start a local HTTP server to handle OAuth callback.
  * The server will listen on the specified port (or port 0 for OS assignment).
  *
  * @param expectedState The state parameter to validate
  * @param port Optional preferred port to listen on
+ * @param expectedIssuer Optional expected authorization server issuer for RFC 9207 validation
+ * @param requireIssInResponse Whether the "iss" parameter must be present when expectedIssuer is provided (RFC 9207). Defaults to true when omitted; pass false when the authorization server metadata does not advertise authorization_response_iss_parameter_supported
  * @returns Object containing the port (available immediately) and a promise for the auth response
  */
 export function startCallbackServer(
   expectedState: string,
   port?: number,
+  expectedIssuer?: string,
+  requireIssInResponse?: boolean,
 ): {
   port: Promise<number>;
   response: Promise<OAuthAuthorizationResponse>;
+  cancel?: (reason?: Error) => void;
 } {
   let portResolve: (port: number) => void;
   let portReject: (error: Error) => void;
@@ -117,6 +208,14 @@ export function startCallbackServer(
   });
 
   let timeoutId: NodeJS.Timeout | undefined;
+  const abortController = new AbortController();
+
+  const clearCallbackTimeout = () => {
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId);
+      timeoutId = undefined;
+    }
+  };
 
   const responsePromise = new Promise<OAuthAuthorizationResponse>(
     (resolve, reject) => {
@@ -136,8 +235,10 @@ export function startCallbackServer(
             const code = url.searchParams.get('code');
             const state = url.searchParams.get('state');
             const error = url.searchParams.get('error');
+            const iss = url.searchParams.get('iss') || undefined;
 
             if (error) {
+              debugLogger.warn(`OAuth callback received error: ${error}`);
               res.writeHead(HTTP_OK, { 'Content-Type': 'text/html' });
               res.end(`
               <html>
@@ -149,23 +250,92 @@ export function startCallbackServer(
                 </body>
               </html>
             `);
+              clearCallbackTimeout();
               server.close();
               reject(new Error(`OAuth error: ${error}`));
               return;
             }
 
             if (!code || !state) {
+              debugLogger.warn(
+                'OAuth callback rejected: Missing code or state parameter.',
+              );
               res.writeHead(400);
               res.end('Missing code or state parameter');
               return;
             }
 
             if (state !== expectedState) {
+              debugLogger.error(
+                `OAuth callback state mismatch: received state "${state}", expected "${expectedState}". Possible CSRF attack.`,
+              );
               res.writeHead(400);
               res.end('Invalid state parameter');
+              clearCallbackTimeout();
               server.close();
               reject(new Error('State mismatch - possible CSRF attack'));
               return;
+            }
+
+            // RFC 9207 Authorization Server Issuer Identification check
+            if (expectedIssuer) {
+              // "iss" is required unless the caller explicitly indicates the
+              // authorization server does not provide it in the response.
+              const requireIss = requireIssInResponse ?? true;
+              if (requireIss && !iss) {
+                debugLogger.error(
+                  'OAuth callback rejected: Missing required "iss" parameter for the expected authorization server (RFC 9207).',
+                );
+                res.writeHead(400, { 'Content-Type': 'text/html' });
+                res.end(`
+                <html>
+                  <body>
+                    <h1>Authentication Failed</h1>
+                    <p>Error: Missing issuer parameter in response.</p>
+                    <p>You can close this window.</p>
+                  </body>
+                </html>
+              `);
+                server.close();
+                reject(
+                  new Error(
+                    'Missing "iss" parameter in authorization response per RFC 9207',
+                  ),
+                );
+                return;
+              }
+
+              if (iss && !areIssuersEqual(iss, expectedIssuer)) {
+                debugLogger.error(
+                  'OAuth callback rejected: Issuer mismatch between authorization response and expected authorization server. Possible IdP mix-up attack (RFC 9207).',
+                );
+                res.writeHead(400, { 'Content-Type': 'text/html' });
+                res.end(`
+                <html>
+                  <body>
+                    <h1>Authentication Failed</h1>
+                    <p>Error: Issuer mismatch - possible OAuth mix-up attack.</p>
+                    <p>You can close this window.</p>
+                  </body>
+                </html>
+              `);
+                server.close();
+                reject(
+                  new Error(
+                    'Issuer mismatch in authorization response - possible OAuth mix-up attack',
+                  ),
+                );
+                return;
+              }
+              if (iss) {
+                debugLogger.debug(
+                  '✓ OAuth callback issuer validated successfully.',
+                );
+              }
+            } else if (iss) {
+              debugLogger.debug(
+                'OAuth callback received "iss" parameter (no expected issuer was configured).',
+              );
             }
 
             // Send success response to browser
@@ -180,9 +350,11 @@ export function startCallbackServer(
             </html>
           `);
 
+            clearCallbackTimeout();
             server.close();
-            resolve({ code, state });
+            resolve({ code, state, iss });
           } catch (error) {
+            clearCallbackTimeout();
             server.close();
             reject(error);
           }
@@ -190,6 +362,7 @@ export function startCallbackServer(
       );
 
       server.on('error', (error) => {
+        clearCallbackTimeout();
         portReject(error);
         reject(error);
       });
@@ -223,7 +396,6 @@ export function startCallbackServer(
         portResolve(serverPort); // Resolve port promise immediately
       });
 
-      const abortController = new AbortController();
       timeoutId = setTimeout(
         () => {
           abortController.abort(new Error('OAuth callback timeout'));
@@ -233,12 +405,16 @@ export function startCallbackServer(
       timeoutId.unref();
 
       const onAbort = () => {
-        server.close();
+        clearCallbackTimeout();
+        if (server.listening) {
+          server.close();
+        }
         reject(abortController.signal.reason);
       };
       abortController.signal.addEventListener('abort', onAbort, { once: true });
 
       server.on('close', () => {
+        clearCallbackTimeout();
         abortController.signal.removeEventListener('abort', onAbort);
       });
     },
@@ -247,6 +423,11 @@ export function startCallbackServer(
   return {
     port: portPromise,
     response: responsePromise,
+    cancel: (reason?: Error) => {
+      if (!abortController.signal.aborted) {
+        abortController.abort(reason ?? new Error('OAuth callback cancelled'));
+      }
+    },
   };
 }
 
@@ -291,8 +472,7 @@ export function buildAuthorizationUrl(
   redirectPort: number,
   resource?: string,
 ): string {
-  const redirectUri =
-    config.redirectUri || `http://localhost:${redirectPort}${REDIRECT_PATH}`;
+  const redirectUri = getRedirectUri(config, redirectPort);
 
   const params = new URLSearchParams({
     client_id: config.clientId,
@@ -445,9 +625,9 @@ export async function exchangeCodeForToken(
   codeVerifier: string,
   redirectPort: number,
   resource?: string,
+  options?: { allowPrivateNetwork?: boolean },
 ): Promise<OAuthTokenResponse> {
-  const redirectUri =
-    config.redirectUri || `http://localhost:${redirectPort}${REDIRECT_PATH}`;
+  const redirectUri = getRedirectUri(config, redirectPort);
 
   const params = new URLSearchParams({
     grant_type: 'authorization_code',
@@ -469,7 +649,15 @@ export async function exchangeCodeForToken(
     params.append('resource', resource);
   }
 
-  const response = await fetch(config.tokenUrl, {
+  const allowLoopback = resource
+    ? isLoopbackUrl(resource)
+    : isLoopbackUrl(config.tokenUrl);
+  const validatedTokenUrl = await validateOAuthEndpointUrl(config.tokenUrl, {
+    allowLoopback,
+    allowPrivateNetwork: options?.allowPrivateNetwork,
+  });
+
+  const response = await fetch(validatedTokenUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -499,6 +687,7 @@ export async function refreshAccessToken(
   refreshToken: string,
   tokenUrl: string,
   resource?: string,
+  options?: { allowPrivateNetwork?: boolean },
 ): Promise<OAuthTokenResponse> {
   const params = new URLSearchParams({
     grant_type: 'refresh_token',
@@ -522,7 +711,15 @@ export async function refreshAccessToken(
     params.append('resource', resource);
   }
 
-  const response = await fetch(tokenUrl, {
+  const allowLoopback = resource
+    ? isLoopbackUrl(resource)
+    : isLoopbackUrl(tokenUrl);
+  const validatedTokenUrl = await validateOAuthEndpointUrl(tokenUrl, {
+    allowLoopback,
+    allowPrivateNetwork: options?.allowPrivateNetwork,
+  });
+
+  const response = await fetch(validatedTokenUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',

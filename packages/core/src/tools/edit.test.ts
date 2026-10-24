@@ -63,7 +63,7 @@ import {
   getMockMessageBusInstance,
 } from '../test-utils/mock-message-bus.js';
 import path from 'node:path';
-import { isSubpath } from '../utils/paths.js';
+import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import { ApprovalMode } from '../policy/types.js';
@@ -72,6 +72,7 @@ import { type Content, type Part, type SchemaUnion } from '@google/genai';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
+import { ideContextStore } from '../ide/ideContext.js';
 
 describe('EditTool', () => {
   let tool: EditTool;
@@ -87,7 +88,7 @@ describe('EditTool', () => {
     const rawTempDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'edit-tool-test-'),
     );
-    tempDir = fs.realpathSync(rawTempDir);
+    tempDir = resolveToRealPath(rawTempDir);
     rootDir = path.join(tempDir, 'root');
     fs.mkdirSync(rootDir);
 
@@ -817,10 +818,8 @@ function doIt() {
       const result = await invocation.execute({
         abortSignal: new AbortController().signal,
       });
-      expect(result.llmContent).toMatch(/0 occurrences found for old_string/);
-      expect(result.returnDisplay).toMatch(
-        /Failed to edit, could not find the string to replace./,
-      );
+      expect(result.llmContent).toMatch(/Could not find an exact match/);
+      expect(result.returnDisplay).toMatch(/Could not find an exact match/);
       expect(mockFixLLMEditWithInstruction).toHaveBeenCalled();
     });
 
@@ -1369,6 +1368,30 @@ function doIt() {
 
       expect(mockFixLLMEditWithInstruction).not.toHaveBeenCalled();
     });
+
+    it('fails fast without calling FixLLMEditWithInstruction when old_string is empty', async () => {
+      const filePath = path.join(rootDir, 'empty_old_string_test.txt');
+      fs.writeFileSync(filePath, 'Some content.', 'utf8');
+
+      // Enable LLM correction for this test
+      (mockConfig.getDisableLLMCorrection as Mock).mockReturnValue(false);
+
+      const params = {
+        file_path: filePath,
+        instruction: 'Replace empty text',
+        old_string: '   ',
+        new_string: 'replacement',
+      };
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(mockFixLLMEditWithInstruction).not.toHaveBeenCalled();
+      expect(result.error?.type).toBe(ToolErrorType.INVALID_TOOL_PARAMS);
+      expect(result.error?.message).toContain('ReadFile');
+    });
   });
 
   describe('JIT context discovery', () => {
@@ -1472,6 +1495,174 @@ function doIt() {
       expect(fs.readFileSync(planFilePath, 'utf8')).toBe('some new content');
 
       fs.rmSync(plansDir, { recursive: true, force: true });
+    });
+  });
+
+  describe('concurrent edits to the same file', () => {
+    it('applies both edits rather than losing one', async () => {
+      const filePath = path.join(rootDir, 'shared.txt');
+      fs.writeFileSync(filePath, 'alpha\nbeta\n', 'utf8');
+
+      const first = tool.build({
+        file_path: filePath,
+        instruction: 'Uppercase alpha',
+        old_string: 'alpha',
+        new_string: 'ALPHA',
+      });
+      const second = tool.build({
+        file_path: filePath,
+        instruction: 'Uppercase beta',
+        old_string: 'beta',
+        new_string: 'BETA',
+      });
+
+      const signal = new AbortController().signal;
+      const results = await Promise.all([
+        first.execute({ abortSignal: signal }),
+        second.execute({ abortSignal: signal }),
+      ]);
+
+      for (const result of results) {
+        expect(result.error).toBeUndefined();
+      }
+
+      // Both tool calls reported success, so neither edit may be missing.
+      const finalContent = fs.readFileSync(filePath, 'utf8');
+      expect(finalContent).toContain('ALPHA');
+      expect(finalContent).toContain('BETA');
+    });
+
+    it('serializes concurrent edits with different path spellings (relative vs absolute)', async () => {
+      const fileName = 'spelling.txt';
+      const absolutePath = path.join(rootDir, fileName);
+      const relativePath = `./${fileName}`;
+      fs.writeFileSync(absolutePath, 'line1\nline2\n', 'utf8');
+
+      const first = tool.build({
+        file_path: absolutePath,
+        instruction: 'Uppercase line1',
+        old_string: 'line1',
+        new_string: 'LINE1',
+      });
+      const second = tool.build({
+        file_path: relativePath,
+        instruction: 'Uppercase line2',
+        old_string: 'line2',
+        new_string: 'LINE2',
+      });
+
+      const signal = new AbortController().signal;
+      const results = await Promise.all([
+        first.execute({ abortSignal: signal }),
+        second.execute({ abortSignal: signal }),
+      ]);
+
+      for (const result of results) {
+        expect(result.error).toBeUndefined();
+      }
+
+      const finalContent = fs.readFileSync(absolutePath, 'utf8');
+      expect(finalContent).toContain('LINE1');
+      expect(finalContent).toContain('LINE2');
+    });
+
+    it('aborts immediately if signal is aborted while waiting for path lock', async () => {
+      const filePath = path.join(rootDir, 'abort_test.txt');
+      fs.writeFileSync(filePath, 'original content', 'utf8');
+
+      const first = tool.build({
+        file_path: filePath,
+        instruction: 'Change to first',
+        old_string: 'original',
+        new_string: 'FIRST',
+      });
+      const second = tool.build({
+        file_path: filePath,
+        instruction: 'Change to second',
+        old_string: 'original',
+        new_string: 'SECOND',
+      });
+
+      const controller = new AbortController();
+
+      const p1 = first.execute({ abortSignal: new AbortController().signal });
+      controller.abort();
+      const p2 = second.execute({ abortSignal: controller.signal });
+
+      await expect(p2).rejects.toThrow('Edit aborted');
+      await p1;
+    });
+  });
+
+  describe('multi-root IDE workspace relative path resolution (b/503364786 / #25527)', () => {
+    afterEach(() => {
+      ideContextStore.clear();
+    });
+
+    it('should create a new file in the active IDE workspace directory (mmm-tools/FLUX) rather than targetDir (data-model-core/mmm)', async () => {
+      const mmmRepoDir = path.join(
+        tempDir,
+        'repogit',
+        'data-model-core',
+        'mmm',
+      );
+      const fluxRepoDir = path.join(tempDir, 'repogit', 'mmm-tools', 'FLUX');
+      fs.mkdirSync(path.join(mmmRepoDir, 'tests'), { recursive: true });
+      fs.mkdirSync(path.join(fluxRepoDir, 'src'), { recursive: true });
+
+      // Even if a file with the same relative path already exists in data-model-core/mmm,
+      // creating a new file while active in mmm-tools/FLUX should target mmm-tools/FLUX
+      const existingMmmFile = path.join(
+        mmmRepoDir,
+        'tests',
+        'gemini_test_repo_parent.txt',
+      );
+      fs.writeFileSync(existingMmmFile, 'existing mmm content', 'utf8');
+
+      vi.spyOn(mockConfig, 'getTargetDir').mockReturnValue(mmmRepoDir);
+      vi.spyOn(mockConfig, 'getWorkspaceContext').mockReturnValue(
+        createMockWorkspaceContext(mmmRepoDir, [fluxRepoDir]),
+      );
+      vi.spyOn(mockConfig, 'getIdeMode').mockReturnValue(true);
+
+      const activeFluxFile = path.join(fluxRepoDir, 'src', 'index.ts');
+      fs.writeFileSync(activeFluxFile, '// active file in FLUX\n', 'utf8');
+      ideContextStore.set({
+        workspaceState: {
+          openFiles: [
+            {
+              path: activeFluxFile,
+              timestamp: Date.now(),
+              isActive: true,
+            },
+          ],
+        },
+      });
+
+      const invocation = tool.build({
+        file_path: 'tests/gemini_test_repo_parent.txt',
+        instruction: 'Create test file in FLUX',
+        old_string: '',
+        new_string: 'new flux content',
+      });
+
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(result.error).toBeUndefined();
+      const expectedFluxFile = path.join(
+        fluxRepoDir,
+        'tests',
+        'gemini_test_repo_parent.txt',
+      );
+      expect(fs.existsSync(expectedFluxFile)).toBe(true);
+      expect(fs.readFileSync(expectedFluxFile, 'utf8')).toBe(
+        'new flux content',
+      );
+      expect(fs.readFileSync(existingMmmFile, 'utf8')).toBe(
+        'existing mmm content',
+      );
     });
   });
 });

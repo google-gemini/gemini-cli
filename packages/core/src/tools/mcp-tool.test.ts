@@ -189,29 +189,80 @@ describe('DiscoveredMCPTool', () => {
       undefined,
     );
 
-    it('should return command as title if it exists', () => {
+    it('should return command as title if command is the sole functional parameter', () => {
       const invocation = commandTool.build({ command: 'ls -la' });
       expect(invocation.getDisplayTitle?.()).toBe('ls -la');
+      expect(invocation.getDescription()).toBe('ls -la');
+      expect(invocation.getExplanation?.()).toBe('');
     });
 
-    it('should return displayName if command does not exist', () => {
+    it('should return strictly command for getDisplayTitle and clean signature for getDescription when multiple functional parameters exist', () => {
+      const invocation = commandTool.build({
+        command: 'date',
+        projectPath: '/path/to/project',
+      });
+      expect(invocation.getDisplayTitle?.()).toBe('date');
+      expect(invocation.getDescription()).toBe(
+        `${serverToolName}(command: date, projectPath: /path/to/project)`,
+      );
+      expect(invocation.getExplanation?.()).toBe(
+        '[projectPath: /path/to/project]',
+      );
+    });
+
+    it('should segregate conversational parameters into getExplanation and exclude them from title', () => {
+      const invocation = commandTool.build({
+        command: 'date',
+        projectPath: '/path/to/project',
+        description: 'I will now run date to check the system clock',
+      });
+      expect(invocation.getDisplayTitle?.()).toBe('date');
+      expect(invocation.getDescription()).toBe(
+        `${serverToolName}(command: date, projectPath: /path/to/project)`,
+      );
+      expect(invocation.getDescription()).not.toContain('{');
+      expect(invocation.getDescription()).not.toContain('I will now run');
+      expect(invocation.getExplanation?.()).toBe(
+        '[projectPath: /path/to/project] I will now run date to check the system clock',
+      );
+    });
+
+    it('should return function signature if command does not exist', () => {
       const invocation = tool.build({ param: 'testValue' });
-      expect(invocation.getDisplayTitle?.()).toBe(tool.displayName);
+      expect(invocation.getDisplayTitle?.()).toBe(
+        `${serverToolName}(param: testValue)`,
+      );
     });
 
-    it('should return stringified json for getExplanation', () => {
-      const params = { command: 'ls -la', path: '/' };
+    it('should return fallback displayName when no functional parameters exist', () => {
+      const noParamTool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        serverToolName,
+        baseDescription,
+        { type: 'object', properties: {} },
+        createMockMessageBus(),
+      );
+      const invocation = noParamTool.build({});
+      expect(invocation.getDisplayTitle?.()).toBe(noParamTool.displayName);
+    });
+
+    it('should truncate long conversational explanations for getExplanation', () => {
+      const longString = 'a'.repeat(600);
+      const params = { command: 'echo', description: longString };
       const invocation = commandTool.build(params);
-      expect(invocation.getExplanation?.()).toBe(safeJsonStringify(params));
+      const explanation = invocation.getExplanation?.() ?? '';
+      expect(explanation).toHaveLength(503);
+      expect(explanation.endsWith('...')).toBe(true);
     });
 
-    it('should truncate and summarize long json payloads for getExplanation', () => {
+    it('should truncate and summarize long contextual payloads for getExplanation (PR #23179 compatibility)', () => {
       const longString = 'a'.repeat(600);
       const params = { command: 'echo', text: longString, other: 'value' };
       const invocation = commandTool.build(params);
       const explanation = invocation.getExplanation?.() ?? '';
-      expect(explanation).toMatch(
-        /^\[Payload omitted due to length with parameters: command, text, other\]$/,
+      expect(explanation).toBe(
+        '[Payload omitted due to length with parameters: command, text, other]',
       );
     });
   });
@@ -1053,11 +1104,13 @@ describe('DiscoveredMCPTool', () => {
   });
 
   describe('DiscoveredMCPToolInvocation', () => {
-    it('should return the stringified params from getDescription', () => {
+    it('should return clean function signature from getDescription', () => {
       const params = { param: 'testValue', param2: 'anotherOne' };
       const invocation = tool.build(params);
       const description = invocation.getDescription();
-      expect(description).toBe('{"param":"testValue","param2":"anotherOne"}');
+      expect(description).toBe(
+        `${serverToolName}(param: testValue, param2: anotherOne)`,
+      );
     });
 
     it('should wrap text output in <untrusted_context> tags', async () => {

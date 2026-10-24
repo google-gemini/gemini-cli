@@ -31,7 +31,7 @@ import {
   resolveToRealPath,
 } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
-import { isGitRepository } from '../utils/gitUtils.js';
+import { isGitRepository, getSafeGitEnv } from '../utils/gitUtils.js';
 import type { Config } from '../config/config.js';
 import type { FileExclusions } from '../utils/ignorePatterns.js';
 import { ToolErrorType } from './tool-error.js';
@@ -462,6 +462,7 @@ class GrepToolInvocation extends BaseToolInvocation<
             signal: options.signal,
             allowedExitCodes: [0, 1],
             sandboxManager: this.config.sandboxManager,
+            env: getSafeGitEnv(),
           });
 
           const results: GrepMatch[] = [];

@@ -7,7 +7,7 @@
       "@google/gemini-cli": ["../packages/cli/index.ts"]
     }
   },
-  "include": ["**/*.ts"],
+  "include": ["**/*.ts", "../scripts/utils/tool-log-formatter.ts"],
   "exclude": ["logs"],
   "references": [{ "path": "../packages/core" }, { "path": "../packages/cli" }]
 }

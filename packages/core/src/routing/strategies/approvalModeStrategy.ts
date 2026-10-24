@@ -54,7 +54,8 @@ export class ApprovalModeStrategy implements RoutingStrategy {
         config.getUseCustomToolModel(),
         config.getHasAccessToPreviewModel(),
       ]);
-    const useGemini3_5Flash = config.hasGemini35FlashGAAccess?.() ?? false;
+    const useLatestFlash = config.hasLatestFlashGAAccess?.() ?? false;
+    const useLatestFlashLite = config.hasLatestFlashLiteGAAccess?.() ?? false;
 
     // 1. Planning Phase: If ApprovalMode === PLAN, explicitly route to the Pro model.
     if (approvalMode === ApprovalMode.PLAN) {
@@ -65,7 +66,8 @@ export class ApprovalModeStrategy implements RoutingStrategy {
         useCustomToolModel,
         hasAccessToPreview,
         config,
-        useGemini3_5Flash,
+        useLatestFlash,
+        useLatestFlashLite,
       );
       return {
         model: proModel,
@@ -84,7 +86,8 @@ export class ApprovalModeStrategy implements RoutingStrategy {
         useCustomToolModel,
         hasAccessToPreview,
         config,
-        useGemini3_5Flash,
+        useLatestFlash,
+        useLatestFlashLite,
       );
       return {
         model: flashModel,

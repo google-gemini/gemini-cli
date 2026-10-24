@@ -184,7 +184,8 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
         config.getGemini31Launched(),
         config.getUseCustomToolModel(),
       ]);
-      const useGemini3_5Flash = config.hasGemini35FlashGAAccess?.() ?? false;
+      const useLatestFlash = config.hasLatestFlashGAAccess?.() ?? false;
+      const useLatestFlashLite = config.hasLatestFlashLiteGAAccess?.() ?? false;
       const selectedModel = normalizeModelId(
         resolveClassifierModel(
           normalizeModelId(model),
@@ -193,7 +194,8 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
           useCustomToolModel,
           config.getHasAccessToPreviewModel?.() ?? true,
           config,
-          useGemini3_5Flash,
+          useLatestFlash,
+          useLatestFlashLite,
         ),
       );
 

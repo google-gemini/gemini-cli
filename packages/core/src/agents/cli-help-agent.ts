@@ -49,7 +49,24 @@ export const CliHelpAgent = (
     schema: CliHelpReportSchema,
   },
 
-  processOutput: (output) => JSON.stringify(output, null, 2),
+  processOutput: (output) => {
+    if (!output) {
+      return '';
+    }
+    const answer = output.answer?.trim() ?? '';
+    const uniqueSources = Array.from(
+      new Set(
+        (output.sources ?? [])
+          .map((s) => s?.trim())
+          .filter((s) => s && s.length > 0),
+      ),
+    );
+
+    if (uniqueSources.length > 0) {
+      return `${answer}\n\n**Sources:**\n${uniqueSources.map((s) => `- ${s}`).join('\n')}`;
+    }
+    return answer;
+  },
 
   modelConfig: {
     model: GEMINI_MODEL_ALIAS_FLASH,

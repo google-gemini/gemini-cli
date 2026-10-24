@@ -17,8 +17,6 @@ import {
   SimpleExtensionLoader,
   type ToolCallRequestInfo,
   type Config,
-  checkPathTrust,
-  isHeadlessMode,
   resolveToRealPath,
 } from '@google/gemini-cli-core';
 import { v4 as uuidv4 } from 'uuid';
@@ -37,6 +35,7 @@ import {
 import {
   loadConfig,
   setTargetDir,
+  setIsTrusted,
   envStorage,
   cwdSymbol,
   loadEnvironment,
@@ -102,13 +101,13 @@ class TaskWrapper {
 export class CoderAgentExecutor implements AgentExecutor {
   private tasks: Map<string, TaskWrapper> = new Map();
   // Track tasks with an active execution loop.
-  private executingTasks = new Set<string>();
+  private executingTasks = new Map<string, AbortController>();
   private activeAbortControllers = new Map<string, Set<AbortController>>();
   // Track tasks currently initializing to prevent race conditions.
   private initializingTasks = new Set<string>();
   private initializationPromises = new Map<string, Promise<TaskWrapper>>();
-  // Track explicitly canceled task IDs to handle cancellation during initialization.
-  private explicitlyCanceledTasks = new Set<string>();
+  // Track explicitly canceled abort controllers to handle cancellation during initialization.
+  private explicitlyCanceledTasks = new Set<AbortController>();
 
   constructor(private taskStore?: TaskStore) {}
 
@@ -134,29 +133,28 @@ export class CoderAgentExecutor implements AgentExecutor {
     fn: (isTrusted: boolean, workspaceRoot: string) => Promise<T>,
   ): Promise<T> {
     const workspaceRoot = await setTargetDir(agentSettings);
-    const initialSettings = loadSettings(workspaceRoot, false);
-    const { isTrusted } = checkPathTrust({
-      path: workspaceRoot,
-      isFolderTrustEnabled: initialSettings.folderTrust ?? true,
-      isHeadless: isHeadlessMode(),
-    });
+    const isTrusted = setIsTrusted(agentSettings, workspaceRoot);
 
     const envVars: TaskEnv = { ...process.env };
+    envVars['GEMINI_CLI_TRUST_WORKSPACE'] = isTrusted ? 'true' : 'false';
     envVars[cwdSymbol] = workspaceRoot;
 
     return envStorage.run(envVars, async () => {
-      const loadedEnv = await loadEnvironment(
-        isTrusted ?? false,
-        workspaceRoot,
-      );
+      const loadedEnv = await loadEnvironment(isTrusted, workspaceRoot);
       Object.assign(envVars, loadedEnv);
-      return fn(isTrusted ?? false, workspaceRoot);
+      return fn(isTrusted, workspaceRoot);
     });
   }
 
-  private cleanupAndEvictTask(taskId: string) {
+  private cleanupAndEvictTask(taskId: string, expectedWrapper?: TaskWrapper) {
     const wrapper = this.tasks.get(taskId);
     if (wrapper) {
+      if (expectedWrapper && wrapper !== expectedWrapper) {
+        logger.info(
+          `[CoderAgentExecutor] cleanupAndEvictTask: wrapper mismatch for task ${taskId}. Skipping eviction.`,
+        );
+        return;
+      }
       wrapper.task.dispose();
       this.tasks.delete(taskId);
     }
@@ -185,7 +183,9 @@ export class CoderAgentExecutor implements AgentExecutor {
         workspacePath: validateWorkspacePath(
           persistedState._agentSettings?.workspacePath,
         ),
-        isTrusted: false,
+        // Strip client/persisted isTrusted so setIsTrusted() evaluates
+        // server-side trust (GEMINI_CLI_TRUST_WORKSPACE / GEMINI_FOLDER_TRUST / checkPathTrust).
+        isTrusted: undefined,
       };
     } catch (error) {
       logger.error(
@@ -286,12 +286,12 @@ export class CoderAgentExecutor implements AgentExecutor {
 
     const abortControllers = this.activeAbortControllers.get(taskId);
     if (abortControllers && abortControllers.size > 0) {
-      this.explicitlyCanceledTasks.add(taskId);
       logger.info(
         `[CoderAgentExecutor] Aborting ${abortControllers.size} active execution loop(s) for task ${taskId}.`,
       );
       // Abort first to ensure loops are stopped.
       for (const controller of Array.from(abortControllers)) {
+        this.explicitlyCanceledTasks.add(controller);
         controller.abort();
       }
 
@@ -307,6 +307,7 @@ export class CoderAgentExecutor implements AgentExecutor {
           undefined,
           true,
         );
+        this.cleanupAndEvictTask(taskId, wrapper);
         try {
           await this.taskStore?.save(wrapper.toSDKTask());
           logger.info(
@@ -318,7 +319,6 @@ export class CoderAgentExecutor implements AgentExecutor {
             saveError,
           );
         }
-        this.cleanupAndEvictTask(taskId);
       }
       return;
     }
@@ -402,11 +402,11 @@ export class CoderAgentExecutor implements AgentExecutor {
       logger.info(
         `[CoderAgentExecutor] Task ${taskId} cancellation processed. Saving state.`,
       );
+      // Cleanup listener subscriptions and evict synchronously before async save
+      this.cleanupAndEvictTask(taskId, wrapper);
+
       await this.taskStore?.save(wrapper.toSDKTask());
       logger.info(`[CoderAgentExecutor] Task ${taskId} state CANCELED saved.`);
-
-      // Cleanup listener subscriptions to avoid memory leaks.
-      this.cleanupAndEvictTask(taskId);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
@@ -465,7 +465,8 @@ export class CoderAgentExecutor implements AgentExecutor {
           workspacePath: validateWorkspacePath(
             persistedState?._agentSettings?.workspacePath,
           ),
-          isTrusted: false,
+          // Strip persisted isTrusted so setIsTrusted() evaluates server-side trust.
+          isTrusted: undefined,
         };
       } else {
         const rawAgentSettings = getAgentSettingsFromMetadata(
@@ -475,7 +476,8 @@ export class CoderAgentExecutor implements AgentExecutor {
           kind: CoderAgentEvent.StateAgentSettingsEvent,
           ...(rawAgentSettings || {}),
           workspacePath: validateWorkspacePath(rawAgentSettings?.workspacePath),
-          isTrusted: false,
+          // Strip client-supplied isTrusted so setIsTrusted() evaluates server-side trust.
+          isTrusted: undefined,
         };
       }
     } catch (error) {
@@ -497,9 +499,20 @@ export class CoderAgentExecutor implements AgentExecutor {
         logger.info(
           `[CoderAgentExecutor] userMessage: ${JSON.stringify(userMessage)}`,
         );
-        eventBus.on('event', (event: AgentExecutionEvent) =>
-          logger.info('[EventBus event]: ', event),
-        );
+        let cleanupSocketListeners: () => void;
+
+        const onEvent = (event: AgentExecutionEvent) => {
+          logger.info('[EventBus event]: ', event);
+          if ('final' in event && event.final) {
+            cleanupSocketListeners();
+          }
+        };
+
+        cleanupSocketListeners = () => {
+          eventBus.off('event', onEvent);
+        };
+
+        eventBus.on('event', onEvent);
 
         const store = requestStorage.getStore();
         if (!store) {
@@ -532,13 +545,17 @@ export class CoderAgentExecutor implements AgentExecutor {
               }
               socket.removeListener('end', onSocketEnd);
             };
+            const removeEndListener = () =>
+              socket.removeListener('end', onSocketEnd);
+            cleanupSocketListeners = () => {
+              socket.removeListener('end', onSocketEnd);
+              socket.removeListener('close', removeEndListener);
+              abortSignal.removeEventListener('abort', removeEndListener);
+              eventBus.off('event', onEvent);
+            };
             socket.on('end', onSocketEnd);
-            socket.once('close', () =>
-              socket.removeListener('end', onSocketEnd),
-            );
-            abortSignal.addEventListener('abort', () =>
-              socket.removeListener('end', onSocketEnd),
-            );
+            socket.once('close', removeEndListener);
+            abortSignal.addEventListener('abort', removeEndListener);
             logger.info(
               `[CoderAgentExecutor] Socket close handler set up for task ${taskId}.`,
             );
@@ -646,17 +663,18 @@ export class CoderAgentExecutor implements AgentExecutor {
           if (
             ['canceled', 'failed', 'completed'].includes(currentTask.taskState)
           ) {
-            logger.warn(
-              `[CoderAgentExecutor] Attempted to execute task ${taskId} which is already in state ${currentTask.taskState}. Ignoring.`,
+            logger.info(
+              `[CoderAgentExecutor] Re-activating task ${taskId} from terminal state ${currentTask.taskState}.`,
             );
-            return;
+            currentTask.taskState = 'submitted';
           }
 
           if (abortSignal.aborted) {
             logger.warn(
               `[CoderAgentExecutor] Task ${taskId} was aborted during initialization.`,
             );
-            const isExplicitCancel = this.explicitlyCanceledTasks.has(taskId);
+            const isExplicitCancel =
+              this.explicitlyCanceledTasks.has(abortController);
             const finalState = isExplicitCancel ? 'canceled' : 'input-required';
             const message = isExplicitCancel
               ? 'Task canceled by user request.'
@@ -677,12 +695,13 @@ export class CoderAgentExecutor implements AgentExecutor {
               );
             }
             if (isExplicitCancel) {
-              this.cleanupAndEvictTask(taskId);
+              this.cleanupAndEvictTask(taskId, wrapper);
             }
             return;
           }
 
-          if (this.executingTasks.has(taskId)) {
+          const activeController = this.executingTasks.get(taskId);
+          if (activeController && !activeController.signal.aborted) {
             logger.info(
               `[CoderAgentExecutor] Task ${taskId} has a pending execution. Processing message and yielding.`,
             );
@@ -711,8 +730,9 @@ export class CoderAgentExecutor implements AgentExecutor {
 
           proceedToMainLoop = true;
         } finally {
-          this.explicitlyCanceledTasks.delete(taskId);
+          this.explicitlyCanceledTasks.delete(abortController);
           if (!proceedToMainLoop) {
+            cleanupSocketListeners?.();
             const controllers = this.activeAbortControllers.get(taskId);
             if (controllers) {
               controllers.delete(abortController);
@@ -728,7 +748,7 @@ export class CoderAgentExecutor implements AgentExecutor {
           logger.info(
             `[CoderAgentExecutor] Starting main execution for message ${userMessage.messageId} for task ${taskId}.`,
           );
-          this.executingTasks.add(taskId);
+          this.executingTasks.set(taskId, abortController);
 
           let agentTurnActive = true;
           logger.info(
@@ -885,6 +905,7 @@ export class CoderAgentExecutor implements AgentExecutor {
             }
           }
         } finally {
+          cleanupSocketListeners?.();
           if (isPrimaryExecution) {
             const controllers = this.activeAbortControllers.get(taskId);
             if (controllers) {
@@ -893,7 +914,16 @@ export class CoderAgentExecutor implements AgentExecutor {
                 this.activeAbortControllers.delete(taskId);
               }
             }
-            this.executingTasks.delete(taskId);
+            if (this.executingTasks.get(taskId) === abortController) {
+              this.executingTasks.delete(taskId);
+            }
+            if (
+              ['canceled', 'failed', 'completed'].includes(
+                currentTask.taskState,
+              )
+            ) {
+              this.cleanupAndEvictTask(taskId, wrapper);
+            }
             logger.info(
               `[CoderAgentExecutor] Saving final state for task ${taskId}.`,
             );
@@ -905,14 +935,6 @@ export class CoderAgentExecutor implements AgentExecutor {
                 `[CoderAgentExecutor] Failed to save task ${taskId} state in finally block:`,
                 saveError,
               );
-            }
-
-            if (
-              ['canceled', 'failed', 'completed'].includes(
-                currentTask.taskState,
-              )
-            ) {
-              this.cleanupAndEvictTask(taskId);
             }
           }
         }

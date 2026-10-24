@@ -49,6 +49,12 @@ import {
 import { GeminiClient } from '../core/client.js';
 import { GitService } from '../services/gitService.js';
 import { ShellTool } from '../tools/shell.js';
+import {
+  acknowledgeUntrustedFlags,
+  getModifiedBuildFiles,
+  getUnacknowledgedUntrustedFlags,
+  recordModifiedBuildFile,
+} from '../utils/untrustedContextTracker.js';
 import { AgentTool } from '../agents/agent-tool.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { GrepTool } from '../tools/grep.js';
@@ -70,6 +76,8 @@ import {
   PREVIEW_GEMINI_MODEL_AUTO,
   PREVIEW_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  resetModelsForTesting,
 } from './models.js';
 import { Storage } from './storage.js';
 import type { AgentLoopContext } from './agent-loop-context.js';
@@ -80,13 +88,18 @@ import {
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
+  const mockedRealpath = vi.fn((path) => path);
+  Object.defineProperty(mockedRealpath, 'native', {
+    value: (p: fs.PathLike) => mockedRealpath(p),
+    writable: true,
+  });
   return {
     ...actual,
     existsSync: vi.fn().mockReturnValue(true),
     statSync: vi.fn().mockReturnValue({
       isDirectory: vi.fn().mockReturnValue(true),
     }),
-    realpathSync: vi.fn((path) => path),
+    realpathSync: mockedRealpath,
   };
 });
 
@@ -237,6 +250,7 @@ vi.mock('../utils/events.js', async (importOriginal) => {
 
 vi.mock('../utils/fetch.js', () => ({
   setGlobalProxy: mockSetGlobalProxy,
+  updateGlobalFetchTimeouts: vi.fn(),
 }));
 
 vi.mock('../context/memoryContextManager.js', () => ({
@@ -273,6 +287,7 @@ vi.mock('../code_assist/experiments/experiments.js');
 
 afterEach(() => {
   vi.clearAllMocks();
+  resetModelsForTesting();
 });
 
 describe('Server Config (config.ts)', () => {
@@ -823,6 +838,55 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
+  describe('AgentLoopContext spread safety', () => {
+    it('preserves AgentLoopContext properties when cloned with spread operator', async () => {
+      const config = new Config({
+        ...baseParams,
+        checkpointing: false,
+      });
+      await config.initialize();
+
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
+      const spreadContext = { ...config };
+
+      expect(spreadContext.config).toBeDefined();
+      expect(spreadContext.promptId).toBeDefined();
+      expect(spreadContext.toolRegistry).toBeDefined();
+      expect(spreadContext.promptRegistry).toBeDefined();
+      expect(spreadContext.resourceRegistry).toBeDefined();
+      expect(spreadContext.messageBus).toBeDefined();
+      expect(spreadContext.geminiClient).toBeDefined();
+      expect(spreadContext.sandboxManager).toBeDefined();
+
+      expect(spreadContext.config).toBe(config);
+      expect(spreadContext.promptId).toBe(config.promptId);
+      expect(spreadContext.toolRegistry).toBe(config.toolRegistry);
+      expect(spreadContext.promptRegistry).toBe(config.promptRegistry);
+      expect(spreadContext.resourceRegistry).toBe(config.resourceRegistry);
+      expect(spreadContext.messageBus).toBe(config.messageBus);
+      expect(spreadContext.geminiClient).toBe(config.geminiClient);
+      expect(spreadContext.sandboxManager).toBe(config.sandboxManager);
+    });
+
+    it('preserves updated promptId when sessionId is rotated or updated', async () => {
+      const config = new Config({
+        ...baseParams,
+        checkpointing: false,
+      });
+      await config.initialize();
+
+      config.setSessionId('new-session-id-123');
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
+      const spreadContext = { ...config };
+      expect(spreadContext.promptId).toBe('new-session-id-123');
+
+      config.rotateSessionId('rotated-session-id-456');
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
+      const spreadContextRotated = { ...config };
+      expect(spreadContextRotated.promptId).toBe('rotated-session-id-456');
+    });
+  });
+
   describe('refreshAuth', () => {
     it('should refresh auth and update config', async () => {
       const config = new Config(baseParams);
@@ -1326,6 +1390,32 @@ describe('Server Config (config.ts)', () => {
       delete paramsWithoutTelemetry.telemetry;
       const config = new Config(paramsWithoutTelemetry);
       expect(config.getTelemetryOtlpProtocol()).toBe('grpc');
+    });
+
+    it('should return provided OTLP headers', () => {
+      const headers = { Authorization: 'Bearer token123' };
+      const params: ConfigParameters = {
+        ...baseParams,
+        telemetry: { enabled: true, otlpHeaders: headers },
+      };
+      const config = new Config(params);
+      expect(config.getTelemetryOtlpHeaders()).toEqual(headers);
+    });
+
+    it('should return empty object for OTLP headers if not provided', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        telemetry: { enabled: true },
+      };
+      const config = new Config(params);
+      expect(config.getTelemetryOtlpHeaders()).toEqual({});
+    });
+
+    it('should return empty object for OTLP headers if telemetry object is not provided', () => {
+      const paramsWithoutTelemetry: ConfigParameters = { ...baseParams };
+      delete paramsWithoutTelemetry.telemetry;
+      const config = new Config(paramsWithoutTelemetry);
+      expect(config.getTelemetryOtlpHeaders()).toEqual({});
     });
   });
 
@@ -1971,6 +2061,22 @@ describe('Server Config (config.ts)', () => {
 
     expect(config.getSessionId()).toBe('session-two');
     expect(config.getApprovedPlanPath()).toBeUndefined();
+  });
+
+  it('clears tracked build file edits and approved command flags when starting a new session', () => {
+    const config = new Config({
+      ...baseParams,
+      sessionId: 'session-one',
+    });
+    recordModifiedBuildFile('/tmp/session-one/package.json', config);
+    acknowledgeUntrustedFlags(['-k'], ['pytest'], config);
+
+    config.resetNewSessionState('session-two');
+
+    expect(getModifiedBuildFiles(config)).toEqual([]);
+    expect(getUnacknowledgedUntrustedFlags(['-k'], ['pytest'], config)).toEqual(
+      ['-k'],
+    );
   });
 
   it('performs a comprehensive reset of all session-scoped state when sessionId changes', async () => {
@@ -3198,6 +3304,24 @@ describe('Config Quota & Preview Model Access', () => {
       expect(config.getHasAccessToPreviewModel()).toBe(false);
     });
 
+    it('should reverse-map gemini-3-flash back to gemini-3.5-flash in modelQuotas', async () => {
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
+        buckets: [
+          {
+            modelId: 'gemini-3-flash',
+            remainingAmount: '90',
+            remainingFraction: 0.9,
+          },
+        ],
+      });
+
+      config.setModel('gemini-3.5-flash');
+      await config.refreshUserQuota();
+
+      expect(config.getQuotaRemaining()).toBe(90);
+      expect(config.getQuotaLimit()).toBe(100);
+    });
+
     it('should calculate pooled quota correctly for auto models', async () => {
       mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
         buckets: [
@@ -3207,7 +3331,7 @@ describe('Config Quota & Preview Model Access', () => {
             remainingFraction: 0.2,
           },
           {
-            modelId: 'gemini-2.5-flash',
+            modelId: 'gemini-3.5-flash',
             remainingAmount: '80',
             remainingFraction: 0.8,
           },
@@ -4134,7 +4258,9 @@ describe('Plans Directory Initialization', () => {
 
     const plansDir = config.storage.getPlansDir();
     // Should NOT create the directory eagerly
-    expect(fs.promises.mkdir).not.toHaveBeenCalled();
+    expect(fs.promises.mkdir).not.toHaveBeenCalledWith(plansDir, {
+      recursive: true,
+    });
     // Should check if it exists
     expect(fs.promises.access).toHaveBeenCalledWith(plansDir);
 
@@ -4152,7 +4278,9 @@ describe('Plans Directory Initialization', () => {
     await config.initialize();
 
     const plansDir = config.storage.getPlansDir();
-    expect(fs.promises.mkdir).not.toHaveBeenCalled();
+    expect(fs.promises.mkdir).not.toHaveBeenCalledWith(plansDir, {
+      recursive: true,
+    });
     expect(fs.promises.access).toHaveBeenCalledWith(plansDir);
 
     const context = config.getWorkspaceContext();
@@ -4348,7 +4476,7 @@ describe('ADKSettings', () => {
   });
 });
 
-describe('hasGemini35FlashGAAccess model setting', () => {
+describe('hasLatestFlashGAAccess model setting', () => {
   const baseParams: ConfigParameters = {
     sessionId: 'test',
     targetDir: '.',
@@ -4357,47 +4485,170 @@ describe('hasGemini35FlashGAAccess model setting', () => {
     cwd: '.',
   };
 
-  it('should set DEFAULT_GEMINI_FLASH_MODEL to gemini-3.5-flash and PREVIEW_GEMINI_FLASH_MODEL to gemini-3-flash-preview if hasGemini35FlashGAAccess returns true and authType is USE_GEMINI', () => {
+  it('should set DEFAULT_GEMINI_FLASH_MODEL to gemini-3.8-flash and PREVIEW_GEMINI_FLASH_MODEL to gemini-3-flash-preview if hasLatestFlashGAAccess returns true and authType is USE_GEMINI', () => {
     const config = new Config(baseParams);
     config['contentGeneratorConfig'] = { authType: AuthType.USE_GEMINI };
 
-    // Set experiment to return true for GEMINI_3_5_FLASH_GA_LAUNCHED
+    // Set experiment to return true for LATEST_FLASH_GA_LAUNCHED
     config.setExperiments({
       experimentIds: [],
       flags: {
-        [ExperimentFlags.GEMINI_3_5_FLASH_GA_LAUNCHED]: {
+        [ExperimentFlags.LATEST_FLASH_GA_LAUNCHED]: {
           boolValue: true,
         },
       },
     });
 
     // Call the method
-    const result = config.hasGemini35FlashGAAccess();
+    const result = config.hasLatestFlashGAAccess();
     expect(result).toBe(true);
+
+    expect(DEFAULT_GEMINI_FLASH_MODEL).toBe('gemini-3.8-flash');
+    expect(PREVIEW_GEMINI_FLASH_MODEL).toBe('gemini-3-flash-preview');
+  });
+
+  it('should set DEFAULT_GEMINI_FLASH_MODEL and PREVIEW_GEMINI_FLASH_MODEL to gemini-3.8-flash if hasLatestFlashGAAccess returns true and authType is not USE_GEMINI', () => {
+    const config = new Config(baseParams);
+    config['contentGeneratorConfig'] = { authType: AuthType.LOGIN_WITH_GOOGLE };
+
+    // Set experiment to return true for LATEST_FLASH_GA_LAUNCHED
+    config.setExperiments({
+      experimentIds: [],
+      flags: {
+        [ExperimentFlags.LATEST_FLASH_GA_LAUNCHED]: {
+          boolValue: true,
+        },
+      },
+    });
+
+    // Call the method
+    const result = config.hasLatestFlashGAAccess();
+    expect(result).toBe(true);
+
+    expect(DEFAULT_GEMINI_FLASH_MODEL).toBe('gemini-3.8-flash');
+    expect(PREVIEW_GEMINI_FLASH_MODEL).toBe('gemini-3.8-flash');
+  });
+
+  it.each([AuthType.USE_GEMINI, AuthType.USE_VERTEX_AI, AuthType.GATEWAY])(
+    'should return true even if experiment flag is false when authType is %s',
+    (authType) => {
+      const config = new Config(baseParams);
+      config['contentGeneratorConfig'] = { authType };
+
+      config.setExperiments({
+        experimentIds: [],
+        flags: {
+          [ExperimentFlags.LATEST_FLASH_GA_LAUNCHED]: {
+            boolValue: false,
+          },
+        },
+      });
+
+      const result = config.hasLatestFlashGAAccess();
+      expect(result).toBe(true);
+
+      if (authType === AuthType.USE_GEMINI) {
+        expect(DEFAULT_GEMINI_FLASH_MODEL).toBe('gemini-3.8-flash');
+        expect(PREVIEW_GEMINI_FLASH_MODEL).toBe('gemini-3-flash-preview');
+      } else {
+        expect(DEFAULT_GEMINI_FLASH_MODEL).toBe('gemini-3.8-flash');
+        expect(PREVIEW_GEMINI_FLASH_MODEL).toBe('gemini-3.8-flash');
+      }
+    },
+  );
+
+  it('should return false if experiment flag is false when authType is not in launch list (e.g. LOGIN_WITH_GOOGLE)', () => {
+    const config = new Config(baseParams);
+    config['contentGeneratorConfig'] = { authType: AuthType.LOGIN_WITH_GOOGLE };
+
+    config.setExperiments({
+      experimentIds: [],
+      flags: {
+        [ExperimentFlags.LATEST_FLASH_GA_LAUNCHED]: {
+          boolValue: false,
+        },
+      },
+    });
+
+    const result = config.hasLatestFlashGAAccess();
+    expect(result).toBe(false);
 
     expect(DEFAULT_GEMINI_FLASH_MODEL).toBe('gemini-3.5-flash');
     expect(PREVIEW_GEMINI_FLASH_MODEL).toBe('gemini-3-flash-preview');
   });
+});
 
-  it('should set DEFAULT_GEMINI_FLASH_MODEL and PREVIEW_GEMINI_FLASH_MODEL to gemini-3.5-flash if hasGemini35FlashGAAccess returns true and authType is not USE_GEMINI', () => {
+describe('hasLatestFlashLiteGAAccess model setting', () => {
+  const baseParams: ConfigParameters = {
+    sessionId: 'test',
+    targetDir: '.',
+    debugMode: false,
+    model: 'test-model',
+    cwd: '.',
+  };
+
+  beforeEach(() => {
+    resetModelsForTesting();
+  });
+
+  afterEach(() => {
+    resetModelsForTesting();
+  });
+
+  it.each([AuthType.USE_GEMINI, AuthType.USE_VERTEX_AI, AuthType.GATEWAY])(
+    'should return true and set DEFAULT_GEMINI_FLASH_LITE_MODEL even if experiment flag is false when authType is %s',
+    (authType) => {
+      const config = new Config(baseParams);
+      config['contentGeneratorConfig'] = { authType };
+
+      config.setExperiments({
+        experimentIds: [],
+        flags: {
+          [ExperimentFlags.LATEST_FLASH_LITE_GA_LAUNCHED]: {
+            boolValue: false,
+          },
+        },
+      });
+
+      const result = config.hasLatestFlashLiteGAAccess();
+      expect(result).toBe(true);
+      expect(DEFAULT_GEMINI_FLASH_LITE_MODEL).toBe('gemini-3.5-flash-lite');
+    },
+  );
+
+  it('should return true and set DEFAULT_GEMINI_FLASH_LITE_MODEL if experiment flag is true for other auth types', () => {
     const config = new Config(baseParams);
     config['contentGeneratorConfig'] = { authType: AuthType.LOGIN_WITH_GOOGLE };
 
-    // Set experiment to return true for GEMINI_3_5_FLASH_GA_LAUNCHED
     config.setExperiments({
       experimentIds: [],
       flags: {
-        [ExperimentFlags.GEMINI_3_5_FLASH_GA_LAUNCHED]: {
+        [ExperimentFlags.LATEST_FLASH_LITE_GA_LAUNCHED]: {
           boolValue: true,
         },
       },
     });
 
-    // Call the method
-    const result = config.hasGemini35FlashGAAccess();
+    const result = config.hasLatestFlashLiteGAAccess();
     expect(result).toBe(true);
+    expect(DEFAULT_GEMINI_FLASH_LITE_MODEL).toBe('gemini-3.5-flash-lite');
+  });
 
-    expect(DEFAULT_GEMINI_FLASH_MODEL).toBe('gemini-3.5-flash');
-    expect(PREVIEW_GEMINI_FLASH_MODEL).toBe('gemini-3.5-flash');
+  it('should return false and keep base model if experiment flag is false for other auth types', () => {
+    const config = new Config(baseParams);
+    config['contentGeneratorConfig'] = { authType: AuthType.LOGIN_WITH_GOOGLE };
+
+    config.setExperiments({
+      experimentIds: [],
+      flags: {
+        [ExperimentFlags.LATEST_FLASH_LITE_GA_LAUNCHED]: {
+          boolValue: false,
+        },
+      },
+    });
+
+    const result = config.hasLatestFlashLiteGAAccess();
+    expect(result).toBe(false);
+    expect(DEFAULT_GEMINI_FLASH_LITE_MODEL).toBe('gemini-3.1-flash-lite');
   });
 });

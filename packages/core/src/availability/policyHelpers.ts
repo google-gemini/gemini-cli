@@ -23,6 +23,7 @@ import {
 import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
   PREVIEW_GEMINI_MODEL_AUTO,
   isAutoModel,
   isGemini3Model,
@@ -54,7 +55,8 @@ export function resolvePolicyChain(
   const useGemini31 = config.getGemini31LaunchedSync?.() ?? false;
   const useCustomToolModel = config.getUseCustomToolModelSync?.() ?? false;
   const hasAccessToPreview = config.getHasAccessToPreviewModel?.() ?? false;
-  const useGemini3_5Flash = config.hasGemini35FlashGAAccess?.() ?? false;
+  const useLatestFlash = config.hasLatestFlashGAAccess?.() ?? false;
+  const useLatestFlashLite = config.hasLatestFlashLiteGAAccess?.() ?? false;
 
   // Capture the original family intent before any normalization or early downgrade.
   const isOriginallyGemini3 = isGemini3Model(modelFromConfig, config);
@@ -66,7 +68,8 @@ export function resolvePolicyChain(
       useCustomToolModel,
       hasAccessToPreview,
       config,
-      useGemini3_5Flash,
+      useLatestFlash,
+      useLatestFlashLite,
     ),
   );
   const isAutoPreferred = normalizedPreferredModel
@@ -84,7 +87,8 @@ export function resolvePolicyChain(
     const context = {
       useGemini3_1: useGemini31,
       useCustomTools: useCustomToolModel,
-      useGemini3_5Flash,
+      useLatestFlash,
+      useLatestFlashLite,
     };
 
     if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
@@ -105,6 +109,7 @@ export function resolvePolicyChain(
         const isAutoSelection = isAutoPreferred || isAutoConfigured;
         const previewEnabled =
           hasAccessToPreview &&
+          configuredModel !== DEFAULT_GEMINI_MODEL_AUTO &&
           (isGemini3Model(resolvedModel, config) ||
             normalizedPreferredModel === PREVIEW_GEMINI_MODEL_AUTO ||
             configuredModel === PREVIEW_GEMINI_MODEL_AUTO);
@@ -130,16 +135,18 @@ export function resolvePolicyChain(
       const isAutoSelection = isAutoPreferred || isAutoConfigured;
       if (hasAccessToPreview) {
         const previewEnabled =
-          isOriginallyGemini3 ||
-          normalizedPreferredModel === PREVIEW_GEMINI_MODEL_AUTO ||
-          configuredModel === PREVIEW_GEMINI_MODEL_AUTO;
+          configuredModel !== DEFAULT_GEMINI_MODEL_AUTO &&
+          (isOriginallyGemini3 ||
+            normalizedPreferredModel === PREVIEW_GEMINI_MODEL_AUTO ||
+            configuredModel === PREVIEW_GEMINI_MODEL_AUTO);
         chain = getModelPolicyChain({
           previewEnabled,
           isAutoSelection,
           userTier: config.getUserTier(),
           useGemini31,
           useCustomToolModel,
-          useGemini3_5Flash,
+          useLatestFlash,
+          useLatestFlashLite,
         });
       } else {
         // User requested Gemini 3 but has no access. Proactively downgrade
@@ -150,7 +157,8 @@ export function resolvePolicyChain(
           userTier: config.getUserTier(),
           useGemini31,
           useCustomToolModel,
-          useGemini3_5Flash,
+          useLatestFlash,
+          useLatestFlashLite,
         });
       }
     } else {
@@ -265,10 +273,10 @@ export function selectModelForAvailability(
 ): ModelSelectionResult {
   const chain = resolvePolicyChain(config, requestedModel);
   const selection = config
-    .getModelAvailabilityService()
-    .selectFirstAvailable(chain.map((p) => p.model));
+    .getModelAvailabilityService?.()
+    ?.selectFirstAvailable(chain.map((p) => p.model));
 
-  if (selection.selectedModel) return selection;
+  if (selection?.selectedModel) return selection;
 
   const backupModel =
     chain.find((p) => p.isLastResort)?.model ?? DEFAULT_GEMINI_MODEL;

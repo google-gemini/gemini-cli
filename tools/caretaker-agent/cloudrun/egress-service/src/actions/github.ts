@@ -104,6 +104,22 @@ export async function handleEgressEvent(event: EgressEvent): Promise<void> {
       }
       break;
 
+    case 'REACTION': {
+      if (typeof payload.commentId !== 'number') {
+        throw new Error('Missing or invalid commentId for REACTION action');
+      }
+      console.log(
+        `[EGRESS_GITHUB] Adding reaction '${payload.reaction}' to comment ${payload.commentId} on ${owner}/${repo}#${issueNumber}...`,
+      );
+      await octokit.rest.reactions.createForIssueComment({
+        owner,
+        repo,
+        comment_id: payload.commentId,
+        content: payload.reaction,
+      });
+      break;
+    }
+
     case 'PATCH':
       throw new Error('PATCH action is not yet implemented');
 

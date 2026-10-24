@@ -3,6 +3,8 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { parse as shellParse } from 'shell-quote';
 import {
@@ -11,7 +13,11 @@ import {
   splitCommands,
   stripShellWrapper,
 } from '../../utils/shell-utils.js';
-import { isTrustedSystemPath, resolveToRealPath } from '../../utils/paths.js';
+import {
+  isSubpath,
+  isTrustedSystemPath,
+  resolveToRealPath,
+} from '../../utils/paths.js';
 
 function isRipgrepCommand(cmd: string): boolean {
   const cmdBasename = path.basename(cmd);
@@ -44,6 +50,8 @@ export async function isStrictlyApproved(
   command: string,
   args: string[],
   approvedTools?: string[],
+  cwd?: string,
+  workspaceRoot?: string,
 ): Promise<boolean> {
   const tools = approvedTools ?? [];
 
@@ -58,7 +66,10 @@ export async function isStrictlyApproved(
   if (pipelineCommands.length === 0) {
     // For simple commands, we check the root command.
     // If it's explicitly approved OR it's a known safe POSIX command, we allow it.
-    return tools.includes(command) || isKnownSafeCommand([command, ...args]);
+    return (
+      tools.includes(command) ||
+      isKnownSafeCommand([command, ...args], cwd, workspaceRoot)
+    );
   }
 
   // Check every segment of the pipeline
@@ -71,8 +82,71 @@ export async function isStrictlyApproved(
 
     const root = parsedArgs[0];
     // The segment is approved if the root tool is in the allowlist OR if the whole segment is safe.
-    return tools.includes(root) || isKnownSafeCommand(parsedArgs);
+    return (
+      tools.includes(root) || isKnownSafeCommand(parsedArgs, cwd, workspaceRoot)
+    );
   });
+}
+
+/**
+ * Checks whether an argument provided to a file-reading command points outside the workspace
+ * or resolves via symbolic link to a target outside the workspace.
+ */
+function isPathEscapingWorkspace(
+  arg: string,
+  workspaceRoot: string,
+  cwd: string,
+): boolean {
+  if (!arg || typeof arg !== 'string') return false;
+
+  // Unresolved shell variables or backticks cannot be statically verified
+  if (arg.includes('$') || arg.includes('`')) {
+    return true;
+  }
+
+  let target: string;
+  if (arg === '~' || arg.startsWith('~/') || arg.startsWith('~\\')) {
+    const homeDir = os.homedir();
+    target = path.resolve(homeDir, arg.slice(2));
+    if (!isSubpath(workspaceRoot, target)) {
+      return true;
+    }
+  } else if (arg.startsWith('~')) {
+    return true;
+  } else if (path.isAbsolute(arg)) {
+    target = path.resolve(arg);
+    if (!isSubpath(workspaceRoot, target)) {
+      return true;
+    }
+  } else {
+    target = path.resolve(cwd, arg);
+    if (!isSubpath(workspaceRoot, target)) {
+      return true;
+    }
+  }
+
+  // Check if target or any parent directory resolves through a symlink to outside the workspace
+  let curr = target;
+  while (
+    curr &&
+    isSubpath(workspaceRoot, curr) &&
+    curr !== path.dirname(curr)
+  ) {
+    try {
+      const stat = fs.lstatSync(curr, { throwIfNoEntry: false });
+      if (stat?.isSymbolicLink()) {
+        const real = fs.realpathSync(curr);
+        if (!isSubpath(workspaceRoot, real)) {
+          return true;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    curr = path.dirname(curr);
+  }
+
+  return false;
 }
 
 /**
@@ -86,9 +160,15 @@ export async function isStrictlyApproved(
  * (like subshells or redirection) are used.
  *
  * @param args - The command and its arguments (e.g., ['ls', '-la'])
+ * @param cwd - Optional working directory for resolving relative paths
+ * @param workspaceRoot - Optional workspace root directory
  * @returns true if the command is considered safe, false otherwise.
  */
-export function isKnownSafeCommand(args: string[]): boolean {
+export function isKnownSafeCommand(
+  args: string[],
+  cwd?: string,
+  workspaceRoot?: string,
+): boolean {
   if (!args || args.length === 0) {
     return false;
   }
@@ -96,7 +176,7 @@ export function isKnownSafeCommand(args: string[]): boolean {
   // Normalize zsh to bash
   const normalizedArgs = args.map((a) => (a === 'zsh' ? 'bash' : a));
 
-  if (isSafeToCallWithExec(normalizedArgs)) {
+  if (isSafeToCallWithExec(normalizedArgs, cwd, workspaceRoot)) {
     return true;
   }
 
@@ -125,7 +205,7 @@ export function isKnownSafeCommand(args: string[]): boolean {
         const parsed = shellParse(trimmed).map(extractStringFromParseEntry);
         if (parsed.length === 0) return true;
 
-        return isSafeToCallWithExec(parsed);
+        return isSafeToCallWithExec(parsed, cwd, workspaceRoot);
       });
     } catch {
       return false;
@@ -139,14 +219,46 @@ export function isKnownSafeCommand(args: string[]): boolean {
  * Core validation logic that checks a single command and its arguments
  * against an allowlist of known safe operations. It performs deep validation
  * for specific tools like `base64`, `find`, `rg`, `git`, and `sed` to ensure
- * unsafe flags (like `--output`, `-exec`, or mutating options) are not used.
+ * unsafe flags (like `--output`, `-exec`, or mutating options) are not used,
+ * and ensures all path arguments remain strictly within the workspace.
  *
  * @param args - The command and its arguments.
+ * @param cwd - Optional working directory for relative path resolution.
+ * @param workspaceRoot - Optional workspace boundary.
  * @returns true if the command is strictly read-only and safe.
  */
-function isSafeToCallWithExec(args: string[]): boolean {
+function isSafeToCallWithExec(
+  args: string[],
+  cwd?: string,
+  workspaceRoot?: string,
+): boolean {
   if (!args || args.length === 0) return false;
   const cmd = args[0];
+
+  let effectiveWorkspace = workspaceRoot
+    ? path.resolve(workspaceRoot)
+    : cwd
+      ? path.resolve(cwd)
+      : process.cwd();
+  try {
+    effectiveWorkspace = resolveToRealPath(effectiveWorkspace);
+  } catch {
+    // Keep resolved path on failure
+  }
+
+  let effectiveCwd = cwd ? path.resolve(cwd) : effectiveWorkspace;
+  try {
+    effectiveCwd = resolveToRealPath(effectiveCwd);
+  } catch {
+    // Keep resolved path on failure
+  }
+
+  if (
+    effectiveCwd !== effectiveWorkspace &&
+    !isSubpath(effectiveWorkspace, effectiveCwd)
+  ) {
+    return false;
+  }
 
   const safeCommands = new Set([
     '__read',
@@ -180,19 +292,169 @@ function isSafeToCallWithExec(args: string[]): boolean {
   ]);
 
   if (safeCommands.has(cmd)) {
+    if (cmd === 'cd') {
+      let hasPath = false;
+      for (let i = 1; i < args.length; i++) {
+        const arg = args[i];
+        if (arg.startsWith('-')) {
+          continue;
+        }
+        hasPath = true;
+        if (isPathEscapingWorkspace(arg, effectiveWorkspace, effectiveCwd)) {
+          return false;
+        }
+      }
+      if (!hasPath) {
+        if (isPathEscapingWorkspace('~', effectiveWorkspace, effectiveCwd)) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    const fileReadingCommands = new Set([
+      'cat',
+      'head',
+      'tail',
+      'tac',
+      'nl',
+      'stat',
+      'wc',
+      'cut',
+      'paste',
+      'rev',
+      'uniq',
+      'numfmt',
+      'ls',
+      '__read',
+    ]);
+
+    if (fileReadingCommands.has(cmd)) {
+      let passedDoubleDash = false;
+      for (let i = 1; i < args.length; i++) {
+        const arg = args[i];
+        if (!passedDoubleDash) {
+          if (arg === '--') {
+            passedDoubleDash = true;
+            continue;
+          }
+          if (arg === '-') {
+            continue;
+          }
+          if (arg.startsWith('-')) {
+            if (arg.includes('=')) {
+              const val = arg.slice(arg.indexOf('=') + 1);
+              if (
+                isPathEscapingWorkspace(val, effectiveWorkspace, effectiveCwd)
+              ) {
+                return false;
+              }
+              continue;
+            }
+
+            try {
+              const stat = fs.lstatSync(path.resolve(effectiveCwd, arg), {
+                throwIfNoEntry: false,
+              });
+              if (!stat) {
+                continue;
+              }
+            } catch {
+              continue;
+            }
+          }
+        }
+        if (isPathEscapingWorkspace(arg, effectiveWorkspace, effectiveCwd)) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    if (cmd === 'grep') {
+      let passedDoubleDash = false;
+      for (let i = 1; i < args.length; i++) {
+        const arg = args[i];
+        if (!passedDoubleDash) {
+          if (arg === '--') {
+            passedDoubleDash = true;
+            continue;
+          }
+          if (arg === '-') {
+            continue;
+          }
+          if (arg.startsWith('-f') || arg.startsWith('--file')) {
+            let fileArg: string | undefined;
+            if (arg.startsWith('--file=')) {
+              fileArg = arg.slice(7);
+            } else if (arg === '--file') {
+              fileArg = args[++i];
+            } else {
+              fileArg = arg.length > 2 ? arg.slice(2) : args[++i];
+            }
+            if (
+              fileArg &&
+              isPathEscapingWorkspace(fileArg, effectiveWorkspace, effectiveCwd)
+            ) {
+              return false;
+            }
+            continue;
+          }
+          if (arg.startsWith('-')) {
+            if (arg.includes('=')) {
+              const val = arg.slice(arg.indexOf('=') + 1);
+              if (
+                isPathEscapingWorkspace(val, effectiveWorkspace, effectiveCwd)
+              ) {
+                return false;
+              }
+              continue;
+            }
+
+            try {
+              const stat = fs.lstatSync(path.resolve(effectiveCwd, arg), {
+                throwIfNoEntry: false,
+              });
+              if (!stat) {
+                continue;
+              }
+            } catch {
+              continue;
+            }
+          }
+        }
+        if (isPathEscapingWorkspace(arg, effectiveWorkspace, effectiveCwd)) {
+          return false;
+        }
+      }
+      return true;
+    }
+
     return true;
   }
 
   if (cmd === 'base64') {
     const unsafeOptions = new Set(['-o', '--output']);
-    return !args
-      .slice(1)
-      .some(
-        (arg) =>
-          unsafeOptions.has(arg) ||
-          arg.startsWith('--output=') ||
-          (arg.startsWith('-o') && arg !== '-o'),
-      );
+    if (
+      args
+        .slice(1)
+        .some(
+          (arg) =>
+            unsafeOptions.has(arg) ||
+            arg.startsWith('--output=') ||
+            (arg.startsWith('-o') && arg !== '-o'),
+        )
+    ) {
+      return false;
+    }
+    for (let i = 1; i < args.length; i++) {
+      const arg = args[i];
+      if (arg.startsWith('-')) continue;
+      if (isPathEscapingWorkspace(arg, effectiveWorkspace, effectiveCwd)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   if (cmd === 'find') {
@@ -207,7 +469,17 @@ function isSafeToCallWithExec(args: string[]): boolean {
       '-fprint0',
       '-fprintf',
     ]);
-    return !args.some((arg) => unsafeOptions.has(arg));
+    if (args.some((arg) => unsafeOptions.has(arg))) {
+      return false;
+    }
+    for (let i = 1; i < args.length; i++) {
+      const arg = args[i];
+      if (arg.startsWith('-')) continue;
+      if (isPathEscapingWorkspace(arg, effectiveWorkspace, effectiveCwd)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   if (isRipgrepCommand(cmd)) {
@@ -216,13 +488,68 @@ function isSafeToCallWithExec(args: string[]): boolean {
     const unsafeWithArgs = new Set(['--pre', '--hostname-bin']);
     const unsafeWithoutArgs = new Set(['--search-zip', '-z']);
 
-    return !args.some((arg) => {
-      if (unsafeWithoutArgs.has(arg)) return true;
+    for (let i = 1; i < args.length; i++) {
+      const arg = args[i];
+      if (unsafeWithoutArgs.has(arg)) return false;
       for (const opt of unsafeWithArgs) {
-        if (arg === opt || arg.startsWith(opt + '=')) return true;
+        if (arg === opt || arg.startsWith(opt + '=')) return false;
       }
-      return false;
-    });
+    }
+
+    let passedDoubleDash = false;
+    for (let i = 1; i < args.length; i++) {
+      const arg = args[i];
+      if (!passedDoubleDash) {
+        if (arg === '--') {
+          passedDoubleDash = true;
+          continue;
+        }
+        if (arg.startsWith('-f') || arg.startsWith('--file')) {
+          let fileArg: string | undefined;
+          if (arg.startsWith('--file=')) {
+            fileArg = arg.slice(7);
+          } else if (arg === '--file') {
+            fileArg = args[++i];
+          } else {
+            fileArg = arg.length > 2 ? arg.slice(2) : args[++i];
+          }
+          if (
+            fileArg &&
+            isPathEscapingWorkspace(fileArg, effectiveWorkspace, effectiveCwd)
+          ) {
+            return false;
+          }
+          continue;
+        }
+        if (arg.startsWith('-')) {
+          if (arg.includes('=')) {
+            const val = arg.slice(arg.indexOf('=') + 1);
+            if (
+              isPathEscapingWorkspace(val, effectiveWorkspace, effectiveCwd)
+            ) {
+              return false;
+            }
+            continue;
+          }
+
+          try {
+            const stat = fs.lstatSync(path.resolve(effectiveCwd, arg), {
+              throwIfNoEntry: false,
+            });
+            if (!stat) {
+              continue;
+            }
+          } catch {
+            continue;
+          }
+        }
+      }
+      if (isPathEscapingWorkspace(arg, effectiveWorkspace, effectiveCwd)) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   if (cmd === 'git') {
@@ -260,6 +587,13 @@ function isSafeToCallWithExec(args: string[]): boolean {
   if (cmd === 'sed') {
     // Special-case sed -n {N|M,N}p
     if (args.length <= 4 && args[1] === '-n' && isValidSedNArg(args[2])) {
+      if (args[3]) {
+        if (
+          isPathEscapingWorkspace(args[3], effectiveWorkspace, effectiveCwd)
+        ) {
+          return false;
+        }
+      }
       return true;
     }
     return false;
@@ -444,12 +778,28 @@ function isValidSedNArg(arg: string | undefined): boolean {
  * @param args - The command and its arguments.
  * @returns true if the command is identified as dangerous, false otherwise.
  */
-export function isDangerousCommand(args: string[]): boolean {
+export function isDangerousCommand(
+  args: string[],
+  _cwd?: string,
+  _workspaceRoot?: string,
+): boolean {
   if (!args || args.length === 0) {
     return false;
   }
 
   const cmd = args[0];
+
+  if (cmd === 'ln') {
+    const isSymbolic = args.some(
+      (arg) =>
+        arg === '-s' ||
+        arg === '--symbolic' ||
+        (arg.startsWith('-') && !arg.startsWith('--') && arg.includes('s')),
+    );
+    if (isSymbolic) {
+      return true;
+    }
+  }
 
   if (cmd === 'rm') {
     return args[1] === '-f' || args[1] === '-rf' || args[1] === '-fr';

@@ -336,4 +336,16 @@ describe('GeminiAgent - RPC Dispatcher', () => {
       }),
     ).rejects.toThrow('Session not found: unknown');
   });
+
+  it('should delegate dispose to sessionManager', async () => {
+    const disposeMock = vi.fn().mockResolvedValue(undefined);
+    (agent as unknown as { sessionManager: { dispose: Mock } }).sessionManager =
+      {
+        dispose: disposeMock,
+      };
+
+    await agent.dispose();
+
+    expect(disposeMock).toHaveBeenCalledTimes(1);
+  });
 });

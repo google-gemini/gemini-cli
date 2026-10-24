@@ -49,6 +49,7 @@ describe('Trust Utility (Core)', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     fs.rmSync(tempDir, { recursive: true, force: true });
     vi.restoreAllMocks();
   });
@@ -148,6 +149,24 @@ describe('Trust Utility (Core)', () => {
         isFolderTrustEnabled: false,
       });
       expect(result).toEqual({ isTrusted: true, source: undefined });
+    });
+
+    it('should return untrusted from environment when GEMINI_RESTRICTED_MODE is true', () => {
+      vi.stubEnv('GEMINI_RESTRICTED_MODE', 'true');
+      const result = checkPathTrust({
+        path: '/any',
+        isFolderTrustEnabled: false,
+      });
+      expect(result).toEqual({ isTrusted: false, source: 'env' });
+    });
+
+    it('should return trusted from environment when GEMINI_CLI_TRUST_WORKSPACE is true', () => {
+      vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', 'true');
+      const result = checkPathTrust({
+        path: '/any',
+        isFolderTrustEnabled: false,
+      });
+      expect(result).toEqual({ isTrusted: true, source: 'env' });
     });
 
     it('should return IDE trust if available', () => {

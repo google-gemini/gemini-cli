@@ -601,6 +601,90 @@ describe('LegacyAgentSession', () => {
       expect(streamEnd?.reason).toBe('failed');
       expect(sendMock).toHaveBeenCalledTimes(1);
     });
+
+    it('nudges the model if it returns an empty response after a tool execution', async () => {
+      const sendMock = deps.client.sendMessageStream as ReturnType<
+        typeof vi.fn
+      >;
+
+      // First turn: model requests a tool
+      sendMock.mockReturnValueOnce(
+        makeStream([
+          {
+            type: GeminiEventType.ToolCallRequest,
+            value: makeToolRequest('call-1', 'read_file'),
+          },
+          {
+            type: GeminiEventType.Finished,
+            value: { reason: FinishReason.STOP, usageMetadata: undefined },
+          },
+        ]),
+      );
+
+      // Second turn: model goes silent (returns empty text response, no tool calls)
+      sendMock.mockReturnValueOnce(
+        makeStream([
+          {
+            type: GeminiEventType.Finished,
+            value: { reason: FinishReason.STOP, usageMetadata: undefined },
+          },
+        ]),
+      );
+
+      // Third turn (retry after nudge): model finally provides final answer
+      sendMock.mockReturnValueOnce(
+        makeStream([
+          { type: GeminiEventType.Content, value: 'Analysis completed.' },
+          {
+            type: GeminiEventType.Finished,
+            value: { reason: FinishReason.STOP, usageMetadata: undefined },
+          },
+        ]),
+      );
+
+      const scheduleMock = deps.scheduler.schedule as ReturnType<typeof vi.fn>;
+      scheduleMock.mockResolvedValueOnce([
+        makeCompletedToolCall('call-1', 'read_file', 'file contents'),
+      ]);
+
+      const session = new LegacyAgentSession(deps);
+      await session.send(makeMessageSend('read a file'));
+      const events = await collectEvents(session);
+
+      const types = events.map((e) => e.type);
+      expect(types).toContain('tool_request');
+      expect(types).toContain('tool_response');
+      expect(types).toContain('agent_end');
+
+      // The nudged turn should have called sendMessageStream a third time!
+      expect(sendMock).toHaveBeenCalledTimes(3);
+
+      // Verify that the third call received the correct system nudge message
+      expect(sendMock).toHaveBeenLastCalledWith(
+        [
+          {
+            text: '[System: You successfully executed a tool but returned an empty response. Please analyze the tool output and explain your progress or final answer.]',
+          },
+        ],
+        expect.any(AbortSignal),
+        expect.any(String),
+        undefined,
+        undefined,
+      );
+
+      const messages = events.filter(
+        (e): e is AgentEvent<'message'> =>
+          e.type === 'message' && e.role === 'agent',
+      );
+      expect(
+        messages.some(
+          (m) =>
+            m.content[0] &&
+            'text' in m.content[0] &&
+            m.content[0].text === 'Analysis completed.',
+        ),
+      ).toBe(true);
+    });
   });
 
   describe('stream - terminal events', () => {
