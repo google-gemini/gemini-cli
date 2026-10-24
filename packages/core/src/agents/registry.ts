@@ -160,6 +160,7 @@ export class AgentRegistry {
   private async loadAgents(errors?: string[]): Promise<void> {
     this.agents.clear();
     this.allDefinitions.clear();
+    this.loadBuiltInAgents();
 
     // Clear old dynamic rules before reloading
     this.config.getPolicyEngine()?.removeRulesBySource(DYNAMIC_RULE_SOURCE);
@@ -168,71 +169,66 @@ export class AgentRegistry {
       return;
     }
 
-    this.loadBuiltInAgents();
-
     // Load project-level agents: .gemini/agents/ (relative to Project Root)
-    // Skip if the workspace is the user's home directory to avoid loading global agents twice
-    if (!this.config.storage.isWorkspaceHomeDir()) {
-      const folderTrustEnabled = this.config.getFolderTrust();
-      const isTrustedFolder = this.config.isTrustedFolder();
+    const folderTrustEnabled = this.config.getFolderTrust();
+    const isTrustedFolder = this.config.isTrustedFolder();
 
-      if (!folderTrustEnabled || isTrustedFolder) {
-        const projectAgentsDir = this.config.storage.getProjectAgentsDir();
-        const projectAgents = await loadAgentsFromDirectory(projectAgentsDir);
-        for (const error of projectAgents.errors) {
-          const msg = `Agent loading error: ${error.message}`;
-          errors?.push(msg);
-          coreEvents.emitFeedback('error', msg);
-        }
-
-        const ackService = this.config.getAcknowledgedAgentsService();
-        const projectRoot = this.config.getProjectRoot();
-        const unacknowledgedAgents: AgentDefinition[] = [];
-        const agentsToRegister: AgentDefinition[] = [];
-
-        for (const agent of projectAgents.agents) {
-          this.ensureRemoteAgentHash(agent);
-
-          if (!agent.metadata?.hash) {
-            agentsToRegister.push(agent);
-            continue;
-          }
-
-          const isAcknowledged = await ackService.isAcknowledged(
-            projectRoot,
-            agent.name,
-            agent.metadata.hash,
-          );
-
-          if (isAcknowledged) {
-            agentsToRegister.push(agent);
-          } else {
-            unacknowledgedAgents.push(agent);
-          }
-        }
-
-        if (unacknowledgedAgents.length > 0) {
-          coreEvents.emitAgentsDiscovered(unacknowledgedAgents);
-        }
-
-        await Promise.allSettled(
-          agentsToRegister.map(async (agent) => {
-            try {
-              await this.registerAgent(agent, errors);
-            } catch (e) {
-              const msg = `Error registering project agent "${agent.name}": ${e instanceof Error ? e.message : String(e)}`;
-              debugLogger.warn(`[AgentRegistry] ${msg}`, e);
-              errors?.push(msg);
-              coreEvents.emitFeedback('error', msg);
-            }
-          }),
-        );
-      } else {
-        coreEvents.emitFeedback(
-          'info',
-          'Skipping project agents due to untrusted folder. To enable, ensure that the project root is trusted.',
-        );
+    if (!folderTrustEnabled || isTrustedFolder) {
+      const projectAgentsDir = this.config.storage.getProjectAgentsDir();
+      const projectAgents = await loadAgentsFromDirectory(projectAgentsDir);
+      for (const error of projectAgents.errors) {
+        const msg = `Agent loading error: ${error.message}`;
+        errors?.push(msg);
+        coreEvents.emitFeedback('error', msg);
       }
+
+      const ackService = this.config.getAcknowledgedAgentsService();
+      const projectRoot = this.config.getProjectRoot();
+      const unacknowledgedAgents: AgentDefinition[] = [];
+      const agentsToRegister: AgentDefinition[] = [];
+
+      for (const agent of projectAgents.agents) {
+        this.ensureRemoteAgentHash(agent);
+
+        if (!agent.metadata?.hash) {
+          agentsToRegister.push(agent);
+          continue;
+        }
+
+        const isAcknowledged = await ackService.isAcknowledged(
+          projectRoot,
+          agent.name,
+          agent.metadata.hash,
+        );
+
+        if (isAcknowledged) {
+          agentsToRegister.push(agent);
+        } else {
+          unacknowledgedAgents.push(agent);
+        }
+      }
+
+      if (unacknowledgedAgents.length > 0) {
+        coreEvents.emitAgentsDiscovered(unacknowledgedAgents);
+      }
+
+      await Promise.allSettled(
+        agentsToRegister.map(async (agent) => {
+          try {
+            await this.registerAgent(agent, errors);
+          } catch (e) {
+            const msg = `Error registering project agent "${agent.name}": ${e instanceof Error ? e.message : String(e)}`;
+            debugLogger.warn(`[AgentRegistry] ${msg}`, e);
+            errors?.push(msg);
+            coreEvents.emitFeedback('error', msg);
+          }
+        }),
+      );
+    } else {
+      coreEvents.emitFeedback(
+        'info',
+        'Skipping project agents due to untrusted folder. To enable, ensure that the project root is trusted.',
+      );
     }
 
     // Load user-level agents: ~/.gemini/agents/
@@ -321,9 +317,6 @@ export class AgentRegistry {
   private async refreshAgents(
     scope: AgentDefinition['kind'] | 'all' = 'all',
   ): Promise<void> {
-    if (!this.config.isAgentsEnabled()) {
-      return;
-    }
     this.loadBuiltInAgents();
     await Promise.allSettled(
       Array.from(this.agents.values()).map(async (agent) => {

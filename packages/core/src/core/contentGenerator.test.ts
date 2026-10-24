@@ -19,6 +19,7 @@ import { HttpsProxyAgent } from 'https-proxy-agent';
 import type { Config } from '../config/config.js';
 import { LoggingContentGenerator } from './loggingContentGenerator.js';
 import { ModelMappingContentGenerator } from './modelMappingContentGenerator.js';
+import { CCPA_AI_MODEL_MAPPINGS } from '../config/models.js';
 import { loadApiKey } from './apiKeyCredentialStorage.js';
 import { FakeContentGenerator } from './fakeContentGenerator.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
@@ -154,7 +155,7 @@ describe('createContentGenerator', () => {
     expect(createCodeAssistContentGenerator).toHaveBeenCalled();
     expect(generator).toEqual(
       new LoggingContentGenerator(
-        new ModelMappingContentGenerator(mockGenerator, expect.any(Function)),
+        new ModelMappingContentGenerator(mockGenerator, CCPA_AI_MODEL_MAPPINGS),
         mockConfig,
       ),
     );
@@ -174,7 +175,7 @@ describe('createContentGenerator', () => {
     expect(createCodeAssistContentGenerator).toHaveBeenCalled();
     expect(generator).toEqual(
       new LoggingContentGenerator(
-        new ModelMappingContentGenerator(mockGenerator, expect.any(Function)),
+        new ModelMappingContentGenerator(mockGenerator, CCPA_AI_MODEL_MAPPINGS),
         mockConfig,
       ),
     );
@@ -218,13 +219,7 @@ describe('createContentGenerator', () => {
       }),
     });
     expect(generator).toEqual(
-      new LoggingContentGenerator(
-        new ModelMappingContentGenerator(
-          mockGenerator.models,
-          expect.any(Function),
-        ),
-        mockConfig,
-      ),
+      new LoggingContentGenerator(mockGenerator.models, mockConfig),
     );
   });
 
@@ -837,13 +832,7 @@ describe('createContentGenerator', () => {
       }),
     });
     expect(generator).toEqual(
-      new LoggingContentGenerator(
-        new ModelMappingContentGenerator(
-          mockGenerator.models,
-          expect.any(Function),
-        ),
-        mockConfig,
-      ),
+      new LoggingContentGenerator(mockGenerator.models, mockConfig),
     );
   });
 

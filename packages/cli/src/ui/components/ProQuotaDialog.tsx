@@ -17,7 +17,6 @@ interface ProQuotaDialogProps {
   message: string;
   isTerminalQuotaError: boolean;
   isModelNotFoundError?: boolean;
-  isCapacityExceeded?: boolean;
   authType?: AuthType;
   tierName?: string;
   onChoice: (
@@ -31,7 +30,6 @@ export function ProQuotaDialog({
   message,
   isTerminalQuotaError,
   isModelNotFoundError,
-  isCapacityExceeded,
   authType,
   tierName,
   onChoice,
@@ -44,24 +42,6 @@ export function ProQuotaDialog({
         label: 'Keep trying',
         value: 'retry_once' as const,
         key: 'retry_once',
-      },
-      {
-        label: 'Stop',
-        value: 'retry_later' as const,
-        key: 'retry_later',
-      },
-    ];
-  } else if (isCapacityExceeded) {
-    items = [
-      {
-        label: 'Keep trying',
-        value: 'retry_once' as const,
-        key: 'retry_once',
-      },
-      {
-        label: `Switch to ${fallbackModel}`,
-        value: 'retry_always' as const,
-        key: 'retry_always',
       },
       {
         label: 'Stop',
@@ -95,7 +75,7 @@ export function ProQuotaDialog({
       },
     ];
   } else {
-    // capacity error or generic fallback
+    // capacity error
     items = [
       {
         label: 'Keep trying',

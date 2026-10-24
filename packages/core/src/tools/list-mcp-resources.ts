@@ -16,7 +16,6 @@ import { LIST_MCP_RESOURCES_TOOL_NAME } from './tool-names.js';
 import { LIST_MCP_RESOURCES_DEFINITION } from './definitions/coreTools.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { ToolErrorType } from './tool-error.js';
-import { wrapUntrusted } from '../utils/textUtils.js';
 
 export interface ListMcpResourcesParams {
   serverName?: string;
@@ -117,7 +116,7 @@ class ListMcpResourcesToolInvocation extends BaseToolInvocation<
     }
 
     return {
-      llmContent: wrapUntrusted(content),
+      llmContent: content,
       returnDisplay: `Listed ${resources.length} resources.`,
     };
   }

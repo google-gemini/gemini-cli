@@ -220,107 +220,6 @@ const SHELL_WIDTH_FRACTION = 0.89;
  */
 const SHELL_HEIGHT_PADDING = 10;
 
-const ENTER_SYNCHRONIZED_OUTPUT = '\x1b[?2026h';
-const EXIT_SYNCHRONIZED_OUTPUT = '\x1b[?2026l';
-
-/**
- * Erases only the visible viewport and moves the cursor to the top-left corner.
- *
- * This intentionally avoids `ansiEscapes.clearTerminal`, which also emits
- * `\x1b[3J` (Erase Saved Lines) and causes terminal emulators to purge their
- * native scrollback history, wiping out earlier turns of the conversation.
- */
-const CLEAR_VIEWPORT = ansiEscapes.eraseScreen + ansiEscapes.cursorTo(0, 0);
-
-const RESIZE_DEBOUNCE_MS = 100;
-const RESIZE_CORK_SAFETY_TIMEOUT_MS = 1000;
-
-/**
- * Internal representation of a single buffered write entry in Node.js's `_writableState.buffered` queue.
- * Used to calculate the exact byte length of discarded corked writes and invoke their completion callbacks.
- */
-interface WritableBufferEntry {
-  chunk?: string | Buffer | Uint8Array;
-  encoding?: BufferEncoding;
-  callback?: (err?: Error | null) => void;
-}
-
-/**
- * Internal representation of Node.js Writable stream state.
- * This is used to access and discard stale buffered writes during rapid terminal resizes.
- * Since Node.js does not expose a public API to clear or discard corked/buffered writes,
- * accessing the internal `_writableState` is necessary to prevent terminal output lag
- * and rendering glitches during resize events.
- */
-interface WritableBufferState {
-  corked?: number;
-  length?: number;
-  buffered?: WritableBufferEntry[];
-  bufferedIndex?: number;
-  allBuffers?: boolean;
-  allNoop?: boolean;
-  writelen?: number;
-}
-
-/**
- * Local interface for resizable terminal streams.
- * Node.js WriteStream uses the internal `_refreshSize` method to update its `columns` and `rows`
- * properties when a resize occurs, and stores corked buffer state on `_writableState`. Since there
- * is no public API to force-refresh the stream's dimensions immediately or discard corked writes,
- * we define this local interface to ensure layout and buffer calculations use up-to-date state.
- */
-interface ResizableWriteStream extends NodeJS.WriteStream {
-  _writableState?: WritableBufferState;
-  _refreshSize?: () => void;
-}
-
-function discardCorkedStdoutBuffer(stream: NodeJS.WriteStream): void {
-  try {
-    const state = (stream as ResizableWriteStream)._writableState;
-    if (state && (state.corked ?? 0) > 0 && Array.isArray(state.buffered)) {
-      const startIndex = state.bufferedIndex ?? 0;
-      const entries = state.buffered.slice(startIndex);
-
-      let discardedLength = 0;
-      for (const entry of entries) {
-        if (entry?.chunk) {
-          if (typeof entry.chunk === 'string') {
-            discardedLength += Buffer.byteLength(
-              entry.chunk,
-              entry.encoding ?? 'utf8',
-            );
-          } else if (
-            'length' in entry.chunk &&
-            typeof entry.chunk.length === 'number'
-          ) {
-            discardedLength += entry.chunk.length;
-          }
-        }
-      }
-
-      state.buffered.length = startIndex;
-      state.length = Math.max(0, (state.length ?? 0) - discardedLength);
-      if ('allBuffers' in state) state.allBuffers = true;
-      if ('allNoop' in state) state.allNoop = true;
-
-      for (const entry of entries) {
-        if (entry && typeof entry.callback === 'function') {
-          entry.callback(null);
-        }
-      }
-    }
-  } catch (error) {
-    debugLogger.warn('Failed to discard corked stdout buffer safely:', error);
-  }
-}
-
-function refreshStdoutSize(stream: NodeJS.WriteStream): void {
-  const resizableStream = stream as ResizableWriteStream;
-  if (typeof resizableStream._refreshSize === 'function') {
-    resizableStream._refreshSize();
-  }
-}
-
 export const AppContainer = (props: AppContainerProps) => {
   const isHelpDismissKey = useIsHelpDismissKey();
   const keyMatchers = useKeyMatchers();
@@ -436,8 +335,6 @@ export const AppContainer = (props: AppContainerProps) => {
   const overflowingIdsSize = overflowState?.overflowingIds.size ?? 0;
   const hasOverflowState = overflowingIdsSize > 0 || !constrainHeight;
 
-  const prevOverflowingIdsSizeRef = useRef(0);
-
   /**
    * Manages the visibility and x-second timer for the expansion hint.
    *
@@ -450,13 +347,9 @@ export const AppContainer = (props: AppContainerProps) => {
    * to avoid noise, but the user can still trigger it manually with Ctrl+O.
    */
   useEffect(() => {
-    if (
-      overflowingIdsSize > prevOverflowingIdsSizeRef.current &&
-      hasOverflowState
-    ) {
+    if (hasOverflowState) {
       triggerExpandHint(true);
     }
-    prevOverflowingIdsSizeRef.current = overflowingIdsSize;
   }, [hasOverflowState, overflowingIdsSize, triggerExpandHint]);
 
   const [defaultBannerText, setDefaultBannerText] = useState('');
@@ -750,105 +643,12 @@ export const AppContainer = (props: AppContainerProps) => {
     addItem: historyManager.addItem,
   });
 
-  const isStdoutCorkedRef = useRef(false);
-  const isRefreshingStaticRef = useRef(false);
-  const resizeCorkSafetyTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const resizeDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const lastStdoutColumnsRef = useRef<number>(
-    stdout.columns ?? process.stdout.columns ?? terminalWidth,
-  );
-  const lastRefreshedColumnsRef = useRef<number>(terminalWidth);
-  const terminalWidthRef = useRef<number>(terminalWidth);
-  terminalWidthRef.current = terminalWidth;
-
-  const clearResizeCorkSafetyTimer = useCallback(() => {
-    if (resizeCorkSafetyTimerRef.current) {
-      clearTimeout(resizeCorkSafetyTimerRef.current);
-      resizeCorkSafetyTimerRef.current = null;
-    }
-  }, []);
-
-  const clearResizeDebounceTimer = useCallback(() => {
-    if (resizeDebounceTimerRef.current) {
-      clearTimeout(resizeDebounceTimerRef.current);
-      resizeDebounceTimerRef.current = null;
-    }
-  }, []);
-
-  const corkStdout = useCallback(() => {
-    if (!isStdoutCorkedRef.current && typeof stdout.cork === 'function') {
-      stdout.cork();
-      isStdoutCorkedRef.current = true;
-    }
-  }, [stdout]);
-
-  const uncorkStdout = useCallback(() => {
-    clearResizeCorkSafetyTimer();
-    if (isStdoutCorkedRef.current && typeof stdout.uncork === 'function') {
-      isStdoutCorkedRef.current = false;
-      stdout.uncork();
-    }
-  }, [stdout, clearResizeCorkSafetyTimer]);
-
   const refreshStatic = useCallback(() => {
     if (!isAlternateBuffer && !config.getUseTerminalBuffer()) {
-      clearResizeDebounceTimer();
-      refreshStdoutSize(stdout);
-      if (
-        typeof stdout.prependListener === 'function' &&
-        stdout.columns !== undefined &&
-        stdout.columns !== terminalWidthRef.current
-      ) {
-        corkStdout();
-        clearResizeCorkSafetyTimer();
-        resizeCorkSafetyTimerRef.current = setTimeout(() => {
-          discardCorkedStdoutBuffer(stdout);
-          uncorkStdout();
-        }, RESIZE_CORK_SAFETY_TIMEOUT_MS);
-        return;
-      }
-      clearResizeCorkSafetyTimer();
-      lastRefreshedColumnsRef.current = terminalWidthRef.current;
-      if (typeof stdout.cork === 'function') {
-        corkStdout();
-        discardCorkedStdoutBuffer(stdout);
-        isRefreshingStaticRef.current = true;
-        stdout.write(ENTER_SYNCHRONIZED_OUTPUT);
-      }
-      // Only clear the viewport so the terminal's scrollback is preserved.
-      stdout.write(CLEAR_VIEWPORT);
-    }
-    if (!isAlternateBuffer || config.getUseTerminalBuffer()) {
+      stdout.write(ansiEscapes.clearTerminal);
       setHistoryRemountKey((prev) => prev + 1);
     }
-  }, [
-    setHistoryRemountKey,
-    isAlternateBuffer,
-    stdout,
-    config,
-    clearResizeDebounceTimer,
-    clearResizeCorkSafetyTimer,
-    corkStdout,
-    uncorkStdout,
-  ]);
-
-  useLayoutEffect(() => {
-    if (isRefreshingStaticRef.current) {
-      isRefreshingStaticRef.current = false;
-      refreshStdoutSize(stdout);
-      if (
-        stdout.columns !== undefined &&
-        stdout.columns !== lastRefreshedColumnsRef.current
-      ) {
-        discardCorkedStdoutBuffer(stdout);
-        stdout.write(EXIT_SYNCHRONIZED_OUTPUT);
-        uncorkStdout();
-        return;
-      }
-      stdout.write(EXIT_SYNCHRONIZED_OUTPUT);
-      uncorkStdout();
-    }
-  }, [historyRemountKey, stdout, uncorkStdout]);
+  }, [setHistoryRemountKey, isAlternateBuffer, stdout, config]);
 
   const shouldUseAlternateScreen = shouldEnterAlternateScreen(
     isAlternateBuffer,
@@ -863,12 +663,10 @@ export const AppContainer = (props: AppContainerProps) => {
       enableMouseEvents();
       disableLineWrapping();
       app.rerender();
-    } else if (config.getUseTerminalBuffer()) {
-      app.rerender();
     }
     terminalCapabilityManager.enableSupportedModes();
     refreshStatic();
-  }, [refreshStatic, shouldUseAlternateScreen, app, config]);
+  }, [refreshStatic, shouldUseAlternateScreen, app]);
 
   const [editorError, setEditorError] = useState<string | null>(null);
   const {
@@ -943,10 +741,6 @@ export const AppContainer = (props: AppContainerProps) => {
     }
   }, [authState, authContext, setAuthState]);
 
-  const handleShowAuthSelection = useCallback(() => {
-    setAuthState(AuthState.Updating);
-  }, [setAuthState]);
-
   const {
     proQuotaRequest,
     handleProQuotaChoice,
@@ -964,7 +758,7 @@ export const AppContainer = (props: AppContainerProps) => {
     paidTier,
     settings,
     setModelSwitchedFromQuotaError,
-    onShowAuthSelection: handleShowAuthSelection,
+    onShowAuthSelection: () => setAuthState(AuthState.Updating),
     errorVerbosity: settings.merged.ui.errorVerbosity,
   });
 
@@ -1162,30 +956,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     revealCleanUiDetailsTemporarily,
   } = useVisibilityToggle();
 
-  const cancelPromiseRef = useRef<Promise<void> | null>(null);
-
-  const awaitCancelPromise = useCallback(async () => {
-    if (!cancelPromiseRef.current) {
-      return;
-    }
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
-    try {
-      await Promise.race([
-        cancelPromiseRef.current,
-        new Promise<void>((resolve) => {
-          timeoutId = setTimeout(resolve, 1000);
-        }),
-      ]);
-    } catch (error) {
-      debugLogger.warn(`Error awaiting cancellation: ${error}`);
-    } finally {
-      if (timeoutId !== undefined) {
-        clearTimeout(timeoutId);
-      }
-      cancelPromiseRef.current = null;
-    }
-  }, []);
-
   const slashCommandActions = useMemo(
     () => ({
       openAuthDialog: () => setAuthState(AuthState.Updating),
@@ -1202,7 +972,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
         closeThemeDialog();
         setQuittingMessages(messages);
         setTimeout(async () => {
-          await awaitCancelPromise();
           await runExitCleanup();
           process.exit(0);
         }, 100);
@@ -1238,7 +1007,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       openVoiceModelDialog,
       openAgentConfigDialog,
       setQuittingMessages,
-      awaitCancelPromise,
       setDebugMessage,
       setShowPrivacyNotice,
       setCorgiMode,
@@ -1414,7 +1182,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     ? // eslint-disable-next-line react-hooks/rules-of-hooks
       useAgentStream({
         agent: streamAgent,
-        config,
         addItem: historyManager.addItem,
         onCancelSubmit,
         isShellFocused: embeddedShellFocused,
@@ -1869,18 +1636,15 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const [renderMarkdown, setRenderMarkdown] = useState<boolean>(true);
 
   const handleExitRepeat = useCallback(
-    async (count: number) => {
+    (count: number) => {
       if (count > 2) {
         recordExitFail(config);
       }
       if (count > 1) {
-        if (cancelPromiseRef.current) {
-          await awaitCancelPromise();
-        }
-        await handleSlashCommand('/quit', undefined, undefined, false);
+        void handleSlashCommand('/quit', undefined, undefined, false);
       }
     },
-    [config, handleSlashCommand, awaitCancelPromise],
+    [config, handleSlashCommand],
   );
 
   const { pressCount: ctrlCPressCount, handlePress: handleCtrlCPress } =
@@ -1922,8 +1686,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     needsRestart: ideNeedsRestart,
     restartReason: ideTrustRestartReason,
   } = useIdeTrustListener();
-  const prevWidthRef = useRef<number>(terminalWidth);
-
   useIncludeDirsTrust(config, isTrustedFolder, historyManager, setCustomDialog);
 
   const tabFocusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1987,78 +1749,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }, [ideNeedsRestart]);
 
   useEffect(() => {
-    if (
-      isAlternateBuffer ||
-      config.getUseTerminalBuffer() ||
-      typeof stdout.prependListener !== 'function'
-    ) {
-      return;
-    }
-
-    const handleResizeStart = () => {
-      const currentColumns = stdout.columns ?? process.stdout.columns;
-      if (
-        currentColumns !== undefined &&
-        currentColumns !== lastStdoutColumnsRef.current
-      ) {
-        lastStdoutColumnsRef.current = currentColumns;
-        corkStdout();
-        clearResizeCorkSafetyTimer();
-        resizeCorkSafetyTimerRef.current = setTimeout(() => {
-          discardCorkedStdoutBuffer(stdout);
-          uncorkStdout();
-        }, RESIZE_CORK_SAFETY_TIMEOUT_MS);
-      }
-    };
-
-    stdout.prependListener('resize', handleResizeStart);
-    return () => {
-      stdout.off('resize', handleResizeStart);
-      clearResizeDebounceTimer();
-      if (isRefreshingStaticRef.current) {
-        isRefreshingStaticRef.current = false;
-        stdout.write(EXIT_SYNCHRONIZED_OUTPUT);
-      }
-      uncorkStdout();
-    };
-  }, [
-    stdout,
-    isAlternateBuffer,
-    config,
-    corkStdout,
-    uncorkStdout,
-    clearResizeDebounceTimer,
-    clearResizeCorkSafetyTimer,
-  ]);
-
-  useEffect(() => {
-    if (prevWidthRef.current === terminalWidth) {
-      return;
-    }
-    prevWidthRef.current = terminalWidth;
-
-    if (isAlternateBuffer || config.getUseTerminalBuffer()) {
-      clearResizeDebounceTimer();
-      return;
-    }
-
-    clearResizeDebounceTimer();
-    resizeDebounceTimerRef.current = setTimeout(() => {
-      refreshStatic();
-    }, RESIZE_DEBOUNCE_MS);
-
-    return () => {
-      clearResizeDebounceTimer();
-    };
-  }, [
-    terminalWidth,
-    refreshStatic,
-    clearResizeDebounceTimer,
-    isAlternateBuffer,
-    config,
-  ]);
-
-  useEffect(() => {
     const unsubscribe = ideContextStore.subscribe(setIdeContextState);
     setIdeContextState(ideContextStore.get());
     return unsubscribe;
@@ -2067,6 +1757,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   useEffect(() => {
     const openDebugConsole = () => {
       setShowErrorDetails(true);
+      setConstrainHeight(false);
     };
     appEvents.on(AppEvent.OpenDebugConsole, openDebugConsole);
 
@@ -2092,43 +1783,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     },
     [handleSlashCommand, settings],
   );
-
-  const isAwaitingLoginRestart = authState === AuthState.AwaitingLoginRestart;
-  const loginRestartMessage =
-    settings.merged.security.auth.selectedType === AuthType.USE_VERTEX_AI
-      ? 'Authenticating to Vertex AI in Cloud Shell requires a restart to apply project settings.'
-      : undefined;
-
-  const dialogsVisible =
-    shouldShowIdePrompt ||
-    isFolderTrustDialogOpen ||
-    isPolicyUpdateDialogOpen ||
-    adminSettingsChanged ||
-    !!commandConfirmationRequest ||
-    !!authConsentRequest ||
-    !!permissionConfirmationRequest ||
-    !!customDialog ||
-    confirmUpdateExtensionRequests.length > 0 ||
-    !!loopDetectionConfirmationRequest ||
-    isThemeDialogOpen ||
-    isSettingsDialogOpen ||
-    isModelDialogOpen ||
-    isVoiceModelDialogOpen ||
-    isAgentConfigDialogOpen ||
-    isPermissionsDialogOpen ||
-    isAuthenticating ||
-    isAuthDialogOpen ||
-    isEditorDialogOpen ||
-    showPrivacyNotice ||
-    showIdeRestartPrompt ||
-    !!proQuotaRequest ||
-    !!validationRequest ||
-    !!overageMenuRequest ||
-    !!emptyWalletRequest ||
-    isSessionBrowserOpen ||
-    authState === AuthState.AwaitingApiKeyInput ||
-    isAwaitingLoginRestart ||
-    !!newAgents;
 
   const handleGlobalKeypress = useCallback(
     (key: Key): boolean => {
@@ -2158,10 +1812,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       if (keyMatchers[Command.QUIT](key)) {
         // If the user presses Ctrl+C, we want to cancel any ongoing requests.
         // This should happen regardless of the count.
-        const cancelPromise = cancelOngoingRequest?.();
-        if (cancelPromise) {
-          cancelPromiseRef.current = cancelPromise;
-        }
+        void cancelOngoingRequest?.();
 
         handleCtrlCPress();
         return true;
@@ -2224,11 +1875,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
         }
       };
 
-      if (
-        !constrainHeight &&
-        (keyMatchers[Command.SHOW_MORE_LINES](key) ||
-          (keyMatchers[Command.ESCAPE](key) && !dialogsVisible))
-      ) {
+      let enteringConstrainHeightMode = false;
+      if (!constrainHeight) {
+        enteringConstrainHeightMode = true;
         setConstrainHeight(true);
         if (keyMatchers[Command.SHOW_MORE_LINES](key)) {
           toggleLastTurnTools();
@@ -2236,7 +1885,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
         if (!isAlternateBuffer) {
           refreshStatic();
         }
-        return true;
       }
 
       if (keyMatchers[Command.SHOW_ERROR_DETAILS](key)) {
@@ -2275,16 +1923,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleSlashCommand('/ide status');
         return true;
-      } else if (keyMatchers[Command.SHOW_MORE_LINES](key)) {
+      } else if (
+        keyMatchers[Command.SHOW_MORE_LINES](key) &&
+        !enteringConstrainHeightMode
+      ) {
         setConstrainHeight(false);
         toggleLastTurnTools();
-        if (
-          !isAlternateBuffer &&
-          !config.getUseTerminalBuffer() &&
-          getLastTurnToolCallIds(historyManager.history, []).length > 0
-        ) {
-          refreshStatic();
-        }
+        refreshStatic();
         return true;
       } else if (
         (keyMatchers[Command.FOCUS_SHELL_INPUT](key) ||
@@ -2396,7 +2041,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       startRecording,
       stopRecording,
       mouseMode,
-      dialogsVisible,
     ],
   );
 
@@ -2525,6 +2169,43 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const nightly = props.version.includes('nightly');
 
+  const isAwaitingLoginRestart = authState === AuthState.AwaitingLoginRestart;
+  const loginRestartMessage =
+    settings.merged.security.auth.selectedType === AuthType.USE_VERTEX_AI
+      ? 'Authenticating to Vertex AI in Cloud Shell requires a restart to apply project settings.'
+      : undefined;
+
+  const dialogsVisible =
+    shouldShowIdePrompt ||
+    isFolderTrustDialogOpen ||
+    isPolicyUpdateDialogOpen ||
+    adminSettingsChanged ||
+    !!commandConfirmationRequest ||
+    !!authConsentRequest ||
+    !!permissionConfirmationRequest ||
+    !!customDialog ||
+    confirmUpdateExtensionRequests.length > 0 ||
+    !!loopDetectionConfirmationRequest ||
+    isThemeDialogOpen ||
+    isSettingsDialogOpen ||
+    isModelDialogOpen ||
+    isVoiceModelDialogOpen ||
+    isAgentConfigDialogOpen ||
+    isPermissionsDialogOpen ||
+    isAuthenticating ||
+    isAuthDialogOpen ||
+    isEditorDialogOpen ||
+    showPrivacyNotice ||
+    showIdeRestartPrompt ||
+    !!proQuotaRequest ||
+    !!validationRequest ||
+    !!overageMenuRequest ||
+    !!emptyWalletRequest ||
+    isSessionBrowserOpen ||
+    authState === AuthState.AwaitingApiKeyInput ||
+    isAwaitingLoginRestart ||
+    !!newAgents;
+
   const hasPendingToolConfirmation = useMemo(
     () => isToolAwaitingConfirmation(pendingHistoryItems),
     [pendingHistoryItems],
@@ -2577,24 +2258,17 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const maxLength = terminalWidth - estimatedStatusLength - 5;
 
-  const {
-    elapsedTime,
-    currentLoadingPhrase,
-    statusPhrase,
-    currentTip,
-    currentWittyPhrase,
-  } = useLoadingIndicator({
-    streamingState,
-    shouldShowFocusHint,
-    retryStatus,
-    showTips: showStatusTips,
-    showWit: showStatusWit,
-    customWittyPhrases: settings.merged.ui.customWittyPhrases,
-    errorVerbosity: settings.merged.ui.errorVerbosity,
-    maxLength,
-    pauseUpdates:
-      !constrainHeight && !isAlternateBuffer && !config.getUseTerminalBuffer(),
-  });
+  const { elapsedTime, currentLoadingPhrase, currentTip, currentWittyPhrase } =
+    useLoadingIndicator({
+      streamingState,
+      shouldShowFocusHint,
+      retryStatus,
+      showTips: showStatusTips,
+      showWit: showStatusWit,
+      customWittyPhrases: settings.merged.ui.customWittyPhrases,
+      errorVerbosity: settings.merged.ui.errorVerbosity,
+      maxLength,
+    });
 
   const allowPlanMode =
     config.isPlanEnabled() &&
@@ -2817,7 +2491,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isFocused,
       elapsedTime,
       currentLoadingPhrase,
-      statusPhrase,
       currentTip,
       currentWittyPhrase,
       historyRemountKey,
@@ -2931,7 +2604,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isFocused,
       elapsedTime,
       currentLoadingPhrase,
-      statusPhrase,
       currentTip,
       currentWittyPhrase,
       historyRemountKey,

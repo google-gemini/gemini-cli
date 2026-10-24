@@ -16,8 +16,6 @@ import {
   DEFAULT_GEMINI_MODEL_AUTO,
   PREVIEW_GEMINI_MODEL_AUTO,
   GEMINI_MODEL_ALIAS_AUTO,
-  LATEST_GEMINI_FLASH_MODEL,
-  resetModelsForTesting,
 } from '../../config/models.js';
 import { AuthType } from '../../core/contentGenerator.js';
 import { ApprovalMode } from '../../policy/types.js';
@@ -31,7 +29,6 @@ describe('ApprovalModeStrategy', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    resetModelsForTesting();
 
     strategy = new ApprovalModeStrategy();
     mockContext = {
@@ -55,8 +52,6 @@ describe('ApprovalModeStrategy', () => {
       getContentGeneratorConfig: vi.fn().mockReturnValue({
         authType: AuthType.LOGIN_WITH_GOOGLE,
       }),
-      hasLatestFlashGAAccess: vi.fn().mockReturnValue(false),
-      hasLatestFlashLiteGAAccess: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     mockBaseLlmClient = {} as BaseLlmClient;
@@ -248,9 +243,9 @@ describe('ApprovalModeStrategy', () => {
     expect(decision?.model).toBe(PREVIEW_GEMINI_FLASH_MODEL);
   });
 
-  it('should route to LATEST_GEMINI_FLASH_MODEL when hasLatestFlashGAAccess is true and plan is approved', async () => {
+  it('should route to DEFAULT_GEMINI_FLASH_MODEL when hasGemini35FlashGAAccess is true and plan is approved', async () => {
     vi.mocked(mockConfig.getModel).mockReturnValue(GEMINI_MODEL_ALIAS_AUTO);
-    vi.mocked(mockConfig.hasLatestFlashGAAccess).mockReturnValue(true);
+    mockConfig.hasGemini35FlashGAAccess = vi.fn().mockReturnValue(true);
 
     vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.DEFAULT);
     vi.mocked(mockConfig.getApprovedPlanPath).mockReturnValue(
@@ -263,6 +258,6 @@ describe('ApprovalModeStrategy', () => {
       mockBaseLlmClient,
     );
 
-    expect(decision?.model).toBe(LATEST_GEMINI_FLASH_MODEL);
+    expect(decision?.model).toBe(DEFAULT_GEMINI_FLASH_MODEL);
   });
 });

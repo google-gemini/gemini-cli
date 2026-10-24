@@ -54,7 +54,7 @@ describe('worktree utilities', () => {
       expect(execa).toHaveBeenCalledWith(
         'git',
         ['rev-parse', '--git-common-dir'],
-        { cwd: projectRoot, env: expect.anything() },
+        { cwd: projectRoot },
       );
     });
 
@@ -94,7 +94,7 @@ describe('worktree utilities', () => {
       expect(execa).toHaveBeenCalledWith(
         'git',
         ['worktree', 'add', expectedPath, '-b', `worktree-${worktreeName}`],
-        { cwd: projectRoot, env: expect.anything() },
+        { cwd: projectRoot },
       );
     });
 
@@ -136,7 +136,6 @@ describe('worktree utilities', () => {
       expect(hasChanges).toBe(true);
       expect(execa).toHaveBeenCalledWith('git', ['status', '--porcelain'], {
         cwd: expectedPath,
-        env: expect.anything(),
       });
     });
 
@@ -196,19 +195,19 @@ describe('worktree utilities', () => {
         1,
         'git',
         ['-C', expectedPath, 'branch', '--show-current'],
-        { cwd: projectRoot, env: expect.anything() },
+        { cwd: projectRoot },
       );
       expect(execa).toHaveBeenNthCalledWith(
         2,
         'git',
         ['worktree', 'remove', expectedPath, '--force'],
-        { cwd: projectRoot, env: expect.anything() },
+        { cwd: projectRoot },
       );
       expect(execa).toHaveBeenNthCalledWith(
         3,
         'git',
         ['branch', '-D', `worktree-${worktreeName}`],
-        { cwd: projectRoot, env: expect.anything() },
+        { cwd: projectRoot },
       );
     });
 
@@ -225,7 +224,7 @@ describe('worktree utilities', () => {
         2,
         'git',
         ['worktree', 'remove', expectedPath, '--force'],
-        { cwd: projectRoot, env: expect.anything() },
+        { cwd: projectRoot },
       );
     });
   });
@@ -249,7 +248,6 @@ describe('WorktreeService', () => {
 
       expect(execa).toHaveBeenCalledWith('git', ['rev-parse', 'HEAD'], {
         cwd: projectRoot,
-        env: expect.anything(),
       });
       expect(info.name).toBe('feature-x');
       expect(info.baseSha).toBe('current-sha');

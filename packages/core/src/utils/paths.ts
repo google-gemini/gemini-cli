@@ -368,15 +368,6 @@ export function isSubpath(parentPath: string, childPath: string): boolean {
   let p = pathModule.resolve(parentPath);
   let c = pathModule.resolve(childPath);
 
-  if (isWindows && (p.includes('~') || c.includes('~'))) {
-    try {
-      p = resolveToRealPath(p);
-      c = resolveToRealPath(c);
-    } catch {
-      // Ignore resolution errors if any
-    }
-  }
-
   // On Windows, path.relative is case-insensitive.
   // On POSIX (including Darwin), path.relative is case-sensitive.
   // We want it to be case-insensitive on Darwin to match user expectation and sandbox policy.
@@ -411,29 +402,10 @@ export function assertValidPathString(p: unknown): asserts p is string {
 }
 
 /**
- * Strips Windows extended-length path prefixes (\\?\ and \\?\UNC\) from a path.
- * Converts \\?\UNC\server\share to \\server\share, and \\?\C:\path to C:\path.
- */
-export function stripExtendedLengthPrefix(p: string): string {
-  if (typeof p !== 'string') return p;
-  if (
-    /^\\\\[?][\\/](?:UNC|unc)[\\/]/.test(p) ||
-    /^\/\/[?][\\/](?:UNC|unc)[\\/]/.test(p)
-  ) {
-    return '\\\\' + p.slice(8);
-  }
-  if (/^\\\\[?][\\/]/.test(p) || /^\/\/[?][\\/]/.test(p)) {
-    return p.slice(4);
-  }
-  return p;
-}
-
-/**
  * Resolves a path to its real path, sanitizing it first.
  * - Removes 'file://' protocol if present.
  * - Decodes URI components (e.g. %20 -> space).
  * - Resolves symbolic links using fs.realpathSync.
- * - Strips Windows extended-length path prefixes (\\?\ and \\?\UNC\).
  *
  * @param pathStr The path string to resolve.
  * @returns The resolved real path.
@@ -452,8 +424,7 @@ export function resolveToRealPath(pathStr: string): string {
     // Ignore error (e.g. malformed URI), keep path from previous step
   }
 
-  const result = robustRealpath(path.resolve(resolvedPath));
-  return stripExtendedLengthPrefix(result);
+  return robustRealpath(path.resolve(resolvedPath));
 }
 
 function robustRealpath(p: string, visited = new Set<string>()): string {
@@ -463,20 +434,7 @@ function robustRealpath(p: string, visited = new Set<string>()): string {
   }
   visited.add(key);
   try {
-    const realpathFn =
-      process.platform === 'win32' && fs.realpathSync.native
-        ? fs.realpathSync.native
-        : fs.realpathSync;
-    let resolved = realpathFn(p);
-    if (process.platform === 'win32' && typeof resolved === 'string') {
-      const upper = resolved.toUpperCase();
-      if (upper.startsWith('\\\\?\\UNC\\')) {
-        resolved = '\\\\' + resolved.slice(8);
-      } else if (upper.startsWith('\\\\?\\')) {
-        resolved = resolved.slice(4);
-      }
-    }
-    return resolved;
+    return fs.realpathSync(p);
   } catch (e: unknown) {
     if (
       e &&
@@ -664,62 +622,4 @@ export function resolveDefensiveToolPath(
 
   // Fallback: return the original path
   return cleanPath;
-}
-
-/**
- * Trims trailing spaces and dots from a string without using regular expressions
- * to completely eliminate any potential ReDoS (Regular Expression Denial of Service) risk.
- */
-export function trimTrailingSpacesAndDots(str: string): string {
-  let end = str.length - 1;
-  while (end >= 0 && (str[end] === ' ' || str[end] === '.')) {
-    end--;
-  }
-  return str.slice(0, end + 1);
-}
-
-const GIT_SFN_REGEX = /^(git|gi[0-9a-f]{4})~\d+$/;
-const ENV_SFN_REGEX = /^(env|en[0-9a-f]{4})~\d+(\..+)?$/i;
-const NODE_MODULES_SFN_REGEX = /^(node_m|no[0-9a-f]{4})~\d+$/;
-const GHA_CREDS_SFN_REGEX = /^(gha-cr|gh[0-9a-f]{4})~\d+\.jso(n)?$/;
-
-const SAFE_ENV_TEMPLATES = new Set([
-  '.env.example',
-  '.env.sample',
-  '.env.template',
-  '.env.dist',
-]);
-
-/**
- * Checks if a path string contains any blocked segments (.git, .env, node_modules, gha-creds-*.json)
- * including case-insensitive matches and NTFS 8.3 short names.
- */
-export function hasBlockedPathSegment(p: string): boolean {
-  // Split by both forward and backward slashes to be platform-agnostic
-  const segments = p.split(/[/\\]/);
-  for (const segment of segments) {
-    const clean = trimTrailingSpacesAndDots(
-      segment.split(':')[0],
-    ).toLowerCase();
-    const isEnvFile =
-      clean === '.env' ||
-      (clean.startsWith('.env.') && !SAFE_ENV_TEMPLATES.has(clean));
-    if (
-      clean === '.git' ||
-      isEnvFile ||
-      clean === 'node_modules' ||
-      GIT_SFN_REGEX.test(clean) ||
-      ENV_SFN_REGEX.test(clean) ||
-      NODE_MODULES_SFN_REGEX.test(clean)
-    ) {
-      return true;
-    }
-    if (
-      (clean.startsWith('gha-creds-') && clean.endsWith('.json')) ||
-      GHA_CREDS_SFN_REGEX.test(clean)
-    ) {
-      return true;
-    }
-  }
-  return false;
 }

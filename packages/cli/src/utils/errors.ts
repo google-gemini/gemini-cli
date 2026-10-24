@@ -243,18 +243,3 @@ export function handleMaxTurnsExceededError(config: Config): never {
     process.exit(maxTurnsError.exitCode);
   }
 }
-
-/**
- * Type guard to check if an error is a FatalCancellationError.
- */
-export function isFatalCancellationError(
-  error: unknown,
-): error is FatalCancellationError {
-  return (
-    error instanceof FatalCancellationError ||
-    (typeof error === 'object' &&
-      error !== null &&
-      'name' in error &&
-      error.name === 'FatalCancellationError')
-  );
-}

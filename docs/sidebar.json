@@ -217,10 +217,6 @@
       {
         "label": "Development",
         "items": [
-          {
-            "label": "Behavioral evaluations",
-            "slug": "docs/behavioral-evals"
-          },
           { "label": "Contribution guide", "slug": "docs/contributing" },
           { "label": "Integration testing", "slug": "docs/integration-tests" },
           {

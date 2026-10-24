@@ -39,7 +39,6 @@ import {
   type ToolConfirmationRequest,
   resolveAtCommandPath,
   type ResolvedAtCommandPath,
-  tokenLimit,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import type { Part, FunctionCall } from '@google/genai';
@@ -188,19 +187,12 @@ export class Session {
     }
   };
 
-  async dispose(): Promise<void> {
+  dispose(): void {
     coreEvents.off(
       CoreEvent.ApprovalModeChanged,
       this.handleApprovalModeChanged,
     );
     this.disposeController.abort();
-    if (this.context.config?.dispose) {
-      try {
-        await this.context.config.dispose();
-      } catch (err) {
-        debugLogger.error(`Error disposing config: ${err}`);
-      }
-    }
   }
 
   async cancelPendingPrompt(): Promise<void> {
@@ -357,11 +349,6 @@ export class Session {
       if (handled) {
         return {
           stopReason: 'end_turn',
-          usage: {
-            inputTokens: 0,
-            outputTokens: 0,
-            totalTokens: 0,
-          },
           _meta: {
             quota: {
               token_count: { input_tokens: 0, output_tokens: 0 },
@@ -374,39 +361,7 @@ export class Session {
 
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
-    let totalCachedTokens = 0;
-    let totalThoughtTokens = 0;
     const modelUsageMap = new Map<string, { input: number; output: number }>();
-
-    const buildPromptResponse = (
-      stopReason: acp.StopReason,
-    ): acp.PromptResponse => ({
-      stopReason,
-      usage: {
-        inputTokens: totalInputTokens,
-        outputTokens: totalOutputTokens,
-        cachedReadTokens: totalCachedTokens || undefined,
-        thoughtTokens: totalThoughtTokens || undefined,
-        totalTokens: totalInputTokens + totalOutputTokens,
-      },
-      _meta: {
-        quota: {
-          token_count: {
-            input_tokens: totalInputTokens,
-            output_tokens: totalOutputTokens,
-          },
-          model_usage: Array.from(modelUsageMap.entries()).map(
-            ([modelName, counts]) => ({
-              model: modelName,
-              token_count: {
-                input_tokens: counts.input,
-                output_tokens: counts.output,
-              },
-            }),
-          ),
-        },
-      },
-    });
 
     let currentParts: Part[] = parts;
     let turnCount = 0;
@@ -415,7 +370,26 @@ export class Session {
     while (true) {
       turnCount++;
       if (maxTurns >= 0 && turnCount > maxTurns) {
-        return buildPromptResponse('max_turn_requests');
+        return {
+          stopReason: 'max_turn_requests',
+          _meta: {
+            quota: {
+              token_count: {
+                input_tokens: totalInputTokens,
+                output_tokens: totalOutputTokens,
+              },
+              model_usage: Array.from(modelUsageMap.entries()).map(
+                ([modelName, counts]) => ({
+                  model: modelName,
+                  token_count: {
+                    input_tokens: counts.input,
+                    output_tokens: counts.output,
+                  },
+                }),
+              ),
+            },
+          },
+        };
       }
 
       if (pendingSend.signal.aborted) {
@@ -427,8 +401,6 @@ export class Session {
       let turnModelId = this.context.config.getModel();
       let turnInputTokens = 0;
       let turnOutputTokens = 0;
-      let turnCachedTokens = 0;
-      let turnThoughtTokens = 0;
 
       try {
         const responseStream = this.context.geminiClient.sendMessageStream(
@@ -475,18 +447,6 @@ export class Session {
                 turnInputTokens = usage.promptTokenCount ?? turnInputTokens;
                 turnOutputTokens =
                   usage.candidatesTokenCount ?? turnOutputTokens;
-                turnCachedTokens =
-                  usage.cachedContentTokenCount ?? turnCachedTokens;
-                turnThoughtTokens =
-                  usage.thoughtsTokenCount ?? turnThoughtTokens;
-
-                await this.sendUpdate({
-                  sessionUpdate: 'usage_update',
-                  used: turnInputTokens + turnOutputTokens,
-                  size: tokenLimit(
-                    turnModelId || this.context.config.getModel(),
-                  ),
-                });
               }
               break;
             }
@@ -550,16 +510,30 @@ export class Session {
             (error.type === 'NO_RESPONSE_TEXT' ||
               error.type === 'NO_FINISH_REASON' ||
               error.type === 'MALFORMED_FUNCTION_CALL' ||
-              error.type === 'UNEXPECTED_TOOL_CALL' ||
-              error.type === 'MAX_TOKENS_EXCEEDED' ||
-              error.type === 'SAFETY_BLOCKED' ||
-              error.type === 'RECITATION_BLOCKED' ||
-              error.type === 'OTHER_BLOCKED' ||
-              error.type === 'THINKING_ONLY_RESPONSE'))
+              error.type === 'UNEXPECTED_TOOL_CALL'))
         ) {
           // The stream ended with an empty response or malformed tool call.
           // Treat this as a graceful end to the model's turn rather than a crash.
-          return buildPromptResponse('end_turn');
+          return {
+            stopReason: 'end_turn',
+            _meta: {
+              quota: {
+                token_count: {
+                  input_tokens: totalInputTokens,
+                  output_tokens: totalOutputTokens,
+                },
+                model_usage: Array.from(modelUsageMap.entries()).map(
+                  ([modelName, counts]) => ({
+                    model: modelName,
+                    token_count: {
+                      input_tokens: counts.input,
+                      output_tokens: counts.output,
+                    },
+                  }),
+                ),
+              },
+            },
+          };
         }
 
         throw new acp.RequestError(
@@ -570,8 +544,6 @@ export class Session {
 
       totalInputTokens += turnInputTokens;
       totalOutputTokens += turnOutputTokens;
-      totalCachedTokens += turnCachedTokens;
-      totalThoughtTokens += turnThoughtTokens;
 
       if (turnInputTokens > 0 || turnOutputTokens > 0) {
         const existing = modelUsageMap.get(turnModelId) ?? {
@@ -584,7 +556,26 @@ export class Session {
       }
 
       if (stopReason !== 'end_turn') {
-        return buildPromptResponse(stopReason);
+        return {
+          stopReason,
+          _meta: {
+            quota: {
+              token_count: {
+                input_tokens: totalInputTokens,
+                output_tokens: totalOutputTokens,
+              },
+              model_usage: Array.from(modelUsageMap.entries()).map(
+                ([modelName, counts]) => ({
+                  model: modelName,
+                  token_count: {
+                    input_tokens: counts.input,
+                    output_tokens: counts.output,
+                  },
+                }),
+              ),
+            },
+          },
+        };
       }
 
       if (toolCallRequests.length === 0) {
@@ -606,7 +597,28 @@ export class Session {
       currentParts = toolResponseParts;
     }
 
-    return buildPromptResponse('end_turn');
+    const modelUsageArray = Array.from(modelUsageMap.entries()).map(
+      ([modelName, counts]) => ({
+        model: modelName,
+        token_count: {
+          input_tokens: counts.input,
+          output_tokens: counts.output,
+        },
+      }),
+    );
+
+    return {
+      stopReason: 'end_turn',
+      _meta: {
+        quota: {
+          token_count: {
+            input_tokens: totalInputTokens,
+            output_tokens: totalOutputTokens,
+          },
+          model_usage: modelUsageArray,
+        },
+      },
+    };
   }
 
   private async handleCommand(
@@ -726,22 +738,12 @@ export class Session {
           });
         }
 
-        if (explanation) {
+        if (content.length === 0 && explanation) {
           content.push({
             type: 'content',
             content: { type: 'text', text: explanation },
           });
         }
-
-        await this.sendUpdate({
-          sessionUpdate: 'tool_call',
-          toolCallId: callId,
-          status: 'pending',
-          title: displayTitle,
-          content,
-          locations: invocation.toolLocations(),
-          kind: toAcpToolKind(tool.kind),
-        });
 
         const params: acp.RequestPermissionRequest = {
           sessionId: this.id,
@@ -784,24 +786,10 @@ export class Session {
         );
 
         switch (outcome) {
-          case ToolConfirmationOutcome.Cancel: {
-            const cancelError = new Error(
-              `Tool "${fc.name}" was canceled by the user.`,
+          case ToolConfirmationOutcome.Cancel:
+            return errorResponse(
+              new Error(`Tool "${fc.name}" was canceled by the user.`),
             );
-            await this.sendUpdate({
-              sessionUpdate: 'tool_call_update',
-              toolCallId: callId,
-              status: 'failed',
-              content: [
-                {
-                  type: 'content',
-                  content: { type: 'text', text: cancelError.message },
-                },
-              ],
-              kind: toAcpToolKind(tool.kind),
-            });
-            return errorResponse(cancelError);
-          }
           case ToolConfirmationOutcome.ProceedOnce:
           case ToolConfirmationOutcome.ProceedAlways:
           case ToolConfirmationOutcome.ProceedAlwaysAndSave:
@@ -1037,7 +1025,6 @@ export class Session {
       let currentPathSpec = pathName;
       let resolvedSuccessfully = false;
       let readDirectly = false;
-      let isDirectory = false;
 
       const result = await resolveAtCommandPath(
         pathName,
@@ -1228,10 +1215,18 @@ export class Session {
             const stats = resolved
               ? resolved.stats
               : await fs.stat(absolutePath);
-            isDirectory = stats.isDirectory();
-            this.debug(
-              `Path ${pathName} resolved to ${isDirectory ? 'directory' : 'file'}: ${currentPathSpec}`,
-            );
+            if (stats.isDirectory()) {
+              currentPathSpec = pathName.endsWith('/')
+                ? `${pathName}**`
+                : `${pathName}/**`;
+              this.debug(
+                `Path ${pathName} resolved to directory, using glob: ${currentPathSpec}`,
+              );
+            } else {
+              this.debug(
+                `Path ${pathName} resolved to file: ${currentPathSpec}`,
+              );
+            }
             resolvedSuccessfully = true;
           }
         } else {
@@ -1304,11 +1299,11 @@ export class Session {
         }
       }
       if (resolvedSuccessfully) {
-        if (!readDirectly && !isDirectory) {
+        if (!readDirectly) {
           pathSpecsToRead.push(currentPathSpec);
-          contentLabelsForDisplay.push(pathName);
         }
         atPathToResolvedSpecMap.set(pathName, currentPathSpec);
+        contentLabelsForDisplay.push(pathName);
       }
     }
 
@@ -1372,10 +1367,8 @@ export class Session {
       embeddedContext.length === 0 &&
       directContents.length === 0
     ) {
-      if (atPathToResolvedSpecMap.size === 0) {
-        // Fallback for lone "@" or completely invalid @-commands resulting in empty initialQueryText
-        debugLogger.warn('No valid file paths found in @ commands to read.');
-      }
+      // Fallback for lone "@" or completely invalid @-commands resulting in empty initialQueryText
+      debugLogger.warn('No valid file paths found in @ commands to read.');
       return [{ text: initialQueryText }];
     }
 
@@ -1389,16 +1382,11 @@ export class Session {
       try {
         const invocation = readManyFilesTool.build(toolArgs);
 
-        const displayTitle =
-          typeof invocation.getDisplayTitle === 'function'
-            ? invocation.getDisplayTitle()
-            : invocation.getDescription();
-
         await this.sendUpdate({
           sessionUpdate: 'tool_call',
           toolCallId: callId,
           status: 'in_progress',
-          title: displayTitle,
+          title: invocation.getDescription(),
           content: [],
           locations: invocation.toolLocations(),
           kind: toAcpToolKind(readManyFilesTool.kind),
@@ -1416,7 +1404,7 @@ export class Session {
           sessionUpdate: 'tool_call_update',
           toolCallId: callId,
           status: 'completed',
-          title: displayTitle,
+          title: invocation.getDescription(),
           content: content ? [content] : [],
           locations: invocation.toolLocations(),
           kind: toAcpToolKind(readManyFilesTool.kind),

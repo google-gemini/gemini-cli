@@ -7,8 +7,6 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { isNodeError } from '../utils/errors.js';
-import { withPathLock } from '../utils/pathMutex.js';
-import { resolveToRealPath } from '../utils/paths.js';
 import { spawnAsync } from '../utils/shell-utils.js';
 import {
   simpleGit,
@@ -22,7 +20,6 @@ import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
 } from './environmentSanitization.js';
-import { getSafeGitEnv } from '../utils/gitUtils.js';
 
 export const SHADOW_REPO_AUTHOR_NAME = 'Gemini CLI';
 export const SHADOW_REPO_AUTHOR_EMAIL = 'gemini-cli@google.com';
@@ -94,7 +91,7 @@ export class GitService {
 
   static async verifyGitAvailability(): Promise<boolean> {
     try {
-      await spawnAsync('git', ['--version'], { env: getSafeGitEnv() });
+      await spawnAsync('git', ['--version']);
       return true;
     } catch {
       return false;
@@ -105,13 +102,11 @@ export class GitService {
     const gitConfigPath = path.join(repoDir, '.gitconfig');
     const systemConfigPath = path.join(repoDir, '.gitconfig_system_empty');
     return {
-      ...getSafeGitEnv(
-        sanitizeEnvironment(
-          process.env,
-          getSecureSanitizationConfig({
-            enableEnvironmentVariableRedaction: true,
-          }),
-        ),
+      ...sanitizeEnvironment(
+        process.env,
+        getSecureSanitizationConfig({
+          enableEnvironmentVariableRedaction: true,
+        }),
       ),
       // Prevent git from using the user's global git config.
       GIT_CONFIG_GLOBAL: gitConfigPath,
@@ -196,34 +191,23 @@ export class GitService {
   }
 
   async createFileSnapshot(message: string): Promise<string> {
-    // `add('.')` stages the entire working tree, so two snapshots running at
-    // once fold each other's files into whichever commit lands first. Serialize
-    // stage -> status -> commit per shadow repository.
-    let realProjectRoot = this.projectRoot;
     try {
-      realProjectRoot = resolveToRealPath(this.projectRoot);
-    } catch {
-      // Keep unresolved
-    }
-    return withPathLock(`git-snapshot:${realProjectRoot}`, async () => {
-      try {
-        const repo = this.shadowGitRepository;
-        await repo.add('.');
-        const status = await repo.status();
-        if (status.isClean()) {
-          // If no changes are staged, return the current HEAD commit hash
-          return await this.getCurrentCommitHash();
-        }
-        const commitResult = await repo.commit(message, {
-          '--no-verify': null,
-        });
-        return commitResult.commit;
-      } catch (error) {
-        throw new Error(
-          `Failed to create checkpoint snapshot: ${error instanceof Error ? error.message : 'Unknown error'}. Checkpointing may not be working properly.`,
-        );
+      const repo = this.shadowGitRepository;
+      await repo.add('.');
+      const status = await repo.status();
+      if (status.isClean()) {
+        // If no changes are staged, return the current HEAD commit hash
+        return await this.getCurrentCommitHash();
       }
-    });
+      const commitResult = await repo.commit(message, {
+        '--no-verify': null,
+      });
+      return commitResult.commit;
+    } catch (error) {
+      throw new Error(
+        `Failed to create checkpoint snapshot: ${error instanceof Error ? error.message : 'Unknown error'}. Checkpointing may not be working properly.`,
+      );
+    }
   }
 
   async restoreProjectFromSnapshot(commitHash: string): Promise<void> {

@@ -75,9 +75,6 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
   const isShell = isShellTool(tool.name);
   const isEdit = tool.confirmationDetails?.type === 'edit';
 
-  const safeMainAreaWidth = Math.max(0, Math.floor(mainAreaWidth || 0));
-  const safeContentWidth = Math.max(0, safeMainAreaWidth - 4);
-
   if (isShell || isEdit) {
     // Use the new simplified layout for Shell and Edit tools
     const borderColor = theme.border.default;
@@ -90,8 +87,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
     return (
       <Box
         flexDirection="column"
-        width={safeMainAreaWidth}
-        minWidth={0}
+        width={mainAreaWidth}
         flexShrink={0}
         borderStyle="round"
         borderColor={borderColor}
@@ -126,7 +122,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
             confirmationDetails={tool.confirmationDetails}
             config={config}
             getPreferredEditor={getPreferredEditor}
-            terminalWidth={safeContentWidth} // Adjust for parent border/padding
+            terminalWidth={mainAreaWidth - 4} // Adjust for parent border/padding
             availableTerminalHeight={availableContentHeight}
             toolName={tool.name}
             isFocused={true}
@@ -148,19 +144,14 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
     : undefined;
 
   return (
-    <Box
-      flexDirection="column"
-      width={safeMainAreaWidth}
-      minWidth={0}
-      flexShrink={0}
-    >
+    <Box flexDirection="column" width={mainAreaWidth} flexShrink={0}>
       <StickyHeader
-        width={safeMainAreaWidth}
+        width={mainAreaWidth}
         isFirst={true}
         borderColor={borderColor}
         borderDimColor={false}
       >
-        <Box flexDirection="column" width={safeContentWidth} minWidth={0}>
+        <Box flexDirection="column" width={mainAreaWidth - 4}>
           {/* Header */}
           <Box
             marginBottom={hideToolIdentity ? 0 : 1}
@@ -191,8 +182,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
       </StickyHeader>
 
       <Box
-        width={safeMainAreaWidth}
-        minWidth={0}
+        width={mainAreaWidth}
         borderStyle="round"
         borderColor={borderColor}
         borderTop={false}
@@ -207,7 +197,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
           confirmationDetails={tool.confirmationDetails}
           config={config}
           getPreferredEditor={getPreferredEditor}
-          terminalWidth={safeContentWidth} // Adjust for parent border/padding
+          terminalWidth={mainAreaWidth - 4} // Adjust for parent border/padding
           availableTerminalHeight={availableContentHeight}
           toolName={tool.name}
           isFocused={true}
@@ -215,8 +205,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
       </Box>
       <Box
         height={1}
-        width={safeMainAreaWidth}
-        minWidth={0}
+        width={mainAreaWidth}
         borderLeft={true}
         borderRight={true}
         borderTop={false}

@@ -142,16 +142,7 @@ export const ToolActionsProvider: React.FC<ToolActionsProviderProps> = (
       ) {
         const cliOutcome =
           outcome === ToolConfirmationOutcome.Cancel ? 'rejected' : 'accepted';
-        if (ideClient) {
-          void ideClient
-            .resolveDiffFromCli(details.filePath, cliOutcome)
-            ?.catch((error: unknown) => {
-              debugLogger.error(
-                `Failed to resolve diff from CLI for ${details.filePath}:`,
-                error,
-              );
-            });
-        }
+        await ideClient?.resolveDiffFromCli(details.filePath, cliOutcome);
       }
 
       // 2. Dispatch via Event Bus

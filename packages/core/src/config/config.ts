@@ -39,10 +39,6 @@ import { GlobTool } from '../tools/glob.js';
 import { ActivateSkillTool } from '../tools/activate-skill.js';
 import { EditTool } from '../tools/edit.js';
 import { ShellTool } from '../tools/shell.js';
-import {
-  resetAcknowledgedUntrustedFlags,
-  resetModifiedBuildFiles,
-} from '../utils/untrustedContextTracker.js';
 import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
 import {
@@ -91,16 +87,10 @@ import {
   PREVIEW_GEMINI_FLASH_MODEL,
   resolveModel,
   setFlashModels,
-  BASE_GEMINI_FLASH_MODEL,
-  LATEST_GEMINI_FLASH_MODEL,
-  LEGACY_CCPA_FLASH_MODEL,
-  BASE_GEMINI_FLASH_LITE_MODEL,
-  LATEST_GEMINI_FLASH_LITE_MODEL,
-  setFlashLiteModel,
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
-import { checkPathTrust } from '../utils/trust.js';
+import { ideContextStore } from '../ide/ideContext.js';
 import { WriteTodosTool } from '../tools/write-todos.js';
 import {
   StandardFileSystemService,
@@ -226,7 +216,6 @@ export interface TelemetrySettings {
   target?: TelemetryTarget;
   otlpEndpoint?: string;
   otlpProtocol?: 'grpc' | 'http';
-  otlpHeaders?: Record<string, string>;
   logPrompts?: boolean;
   outfile?: string;
   useCollector?: boolean;
@@ -760,11 +749,7 @@ export interface ConfigParameters {
 }
 
 export class Config implements McpContext, AgentLoopContext {
-  readonly config: Config = this;
-  promptId: string;
-  toolRegistry!: ToolRegistry;
-  promptRegistry!: PromptRegistry;
-  resourceRegistry!: ResourceRegistry;
+  private _toolRegistry!: ToolRegistry;
   private mcpClientManager?: McpClientManager;
   private readonly a2aClientManager?: A2AClientManager;
   private allowedMcpServers: string[];
@@ -772,6 +757,8 @@ export class Config implements McpContext, AgentLoopContext {
   private allowedEnvironmentVariables: string[];
   private blockedEnvironmentVariables: string[];
   private readonly enableEnvironmentVariableRedaction: boolean;
+  private _promptRegistry!: PromptRegistry;
+  private _resourceRegistry!: ResourceRegistry;
   private agentRegistry!: AgentRegistry;
   private readonly acknowledgedAgentsService: AcknowledgedAgentsService;
   private skillManager!: SkillManager;
@@ -817,8 +804,8 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly accessibility: AccessibilitySettings;
   private readonly telemetrySettings: TelemetrySettings;
   private readonly usageStatisticsEnabled: boolean;
-  geminiClient!: GeminiClient;
-  sandboxManager: SandboxManager;
+  private _geminiClient!: GeminiClient;
+  private _sandboxManager: SandboxManager;
   private readonly _sandboxPolicyManager: SandboxPolicyManager;
   private baseLlmClient!: BaseLlmClient;
   private localLiteRtLmClient?: LocalLiteRtLmClient;
@@ -923,7 +910,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly eventEmitter?: EventEmitter;
   private readonly useWriteTodos: boolean;
   private readonly workspacePoliciesDir: string | undefined;
-  readonly messageBus: MessageBus;
+  private readonly _messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
   private policyUpdateConfirmationRequest:
     | PolicyUpdateConfirmationRequest
@@ -1001,7 +988,6 @@ export class Config implements McpContext, AgentLoopContext {
 
   constructor(params: ConfigParameters) {
     this._sessionId = params.sessionId;
-    this.promptId = params.sessionId;
     this.clientName = params.clientName;
     this._clientVersion = params.clientVersion ?? 'unknown';
     this.approvedPlanPath = undefined;
@@ -1042,7 +1028,7 @@ export class Config implements McpContext, AgentLoopContext {
       params.policyEngineConfig?.approvalMode ??
       'default';
 
-    this.sandboxManager = createSandboxManager(
+    this._sandboxManager = createSandboxManager(
       this.sandbox,
       {
         workspace: this.targetDir,
@@ -1057,11 +1043,11 @@ export class Config implements McpContext, AgentLoopContext {
     );
 
     if (
-      !(this.sandboxManager instanceof NoopSandboxManager) &&
+      !(this._sandboxManager instanceof NoopSandboxManager) &&
       this.sandbox?.enabled
     ) {
       this.fileSystemService = new SandboxedFileSystemService(
-        this.sandboxManager,
+        this._sandboxManager,
         params.targetDir,
       );
     } else {
@@ -1101,7 +1087,6 @@ export class Config implements McpContext, AgentLoopContext {
       target: params.telemetry?.target ?? DEFAULT_TELEMETRY_TARGET,
       otlpEndpoint: params.telemetry?.otlpEndpoint ?? DEFAULT_OTLP_ENDPOINT,
       otlpProtocol: params.telemetry?.otlpProtocol,
-      otlpHeaders: params.telemetry?.otlpHeaders,
       logPrompts: params.telemetry?.logPrompts ?? true,
       outfile: params.telemetry?.outfile,
       useCollector: params.telemetry?.useCollector,
@@ -1296,7 +1281,7 @@ export class Config implements McpContext, AgentLoopContext {
       showColor: params.shellExecutionConfig?.showColor ?? false,
       pager: params.shellExecutionConfig?.pager ?? 'cat',
       sanitizationConfig: this.sanitizationConfig,
-      sandboxManager: this.sandboxManager,
+      sandboxManager: this._sandboxManager,
       sandboxConfig: this.sandbox,
       backgroundCompletionBehavior: this.shellBackgroundCompletionBehavior,
     };
@@ -1352,8 +1337,7 @@ export class Config implements McpContext, AgentLoopContext {
         ...params.policyEngineConfig,
         approvalMode: engineApprovalMode,
         disableAlwaysAllow: this.disableAlwaysAllow,
-        sandboxManager: this.sandboxManager,
-        isTrustedFolder: () => this.isTrustedFolder(),
+        sandboxManager: this._sandboxManager,
       },
       checkerRunner,
     );
@@ -1364,7 +1348,7 @@ export class Config implements McpContext, AgentLoopContext {
       ConsecaSafetyChecker.getInstance().setContext(this);
     }
 
-    this.messageBus = new MessageBus(this.policyEngine, this.debugMode);
+    this._messageBus = new MessageBus(this.policyEngine, this.debugMode);
     this.acknowledgedAgentsService = new AcknowledgedAgentsService();
     this.skillManager = new SkillManager();
     this.outputSettings = {
@@ -1434,9 +1418,13 @@ export class Config implements McpContext, AgentLoopContext {
         );
       }
     }
-    this.geminiClient = new GeminiClient(this);
+    this._geminiClient = new GeminiClient(this);
     this.a2aClientManager = new A2AClientManager(this);
     this.modelRouterService = new ModelRouterService(this);
+  }
+
+  get config(): Config {
+    return this;
   }
 
   isInitialized(): boolean {
@@ -1503,15 +1491,15 @@ export class Config implements McpContext, AgentLoopContext {
     if (this.getCheckpointingEnabled()) {
       await this.getGitService();
     }
-    this.promptRegistry = new PromptRegistry();
-    this.resourceRegistry = new ResourceRegistry();
+    this._promptRegistry = new PromptRegistry();
+    this._resourceRegistry = new ResourceRegistry();
 
     this.agentRegistry = new AgentRegistry(this);
     await this.agentRegistry.initialize();
 
     coreEvents.on(CoreEvent.AgentsRefreshed, this.onAgentsRefreshed);
 
-    this.toolRegistry = await this.createToolRegistry();
+    this._toolRegistry = await this.createToolRegistry();
     discoverToolsHandle?.end();
     this.mcpClientManager = new McpClientManager(
       this.clientVersion,
@@ -1519,7 +1507,7 @@ export class Config implements McpContext, AgentLoopContext {
       this.eventEmitter,
     );
     this.mcpClientManager.setMainRegistries({
-      toolRegistry: this.toolRegistry,
+      toolRegistry: this._toolRegistry,
       promptRegistry: this.promptRegistry,
       resourceRegistry: this.resourceRegistry,
     });
@@ -1569,7 +1557,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.memoryContextManager = new MemoryContextManager(this);
     await this.memoryContextManager.refresh();
 
-    await this.geminiClient.initialize();
+    await this._geminiClient.initialize();
     this.initialized = true;
   }
 
@@ -1595,7 +1583,7 @@ export class Config implements McpContext, AgentLoopContext {
       authMethod !== AuthType.USE_GEMINI
     ) {
       // Restore the conversation history to the new client
-      this.geminiClient.stripThoughtsFromHistory();
+      this._geminiClient.stripThoughtsFromHistory();
     }
 
     // Reset availability status when switching auth (e.g. from limited key to OAuth)
@@ -1746,41 +1734,48 @@ export class Config implements McpContext, AgentLoopContext {
     return this.localLiteRtLmClient;
   }
 
-  /** @internal Backing field alias for backwards-compatibility */
-  get _toolRegistry(): ToolRegistry {
-    return this.toolRegistry;
-  }
-  set _toolRegistry(value: ToolRegistry) {
-    this.toolRegistry = value;
+  get promptId(): string {
+    return this._sessionId;
   }
 
-  /** @internal Backing field alias for backwards-compatibility */
-  get _promptRegistry(): PromptRegistry {
-    return this.promptRegistry;
-  }
-  set _promptRegistry(registry: PromptRegistry) {
-    this.promptRegistry = registry;
-  }
-
-  /** @internal Backing field alias for backwards-compatibility */
-  get _resourceRegistry(): ResourceRegistry {
-    return this.resourceRegistry;
-  }
-  set _resourceRegistry(registry: ResourceRegistry) {
-    this.resourceRegistry = registry;
+  /**
+   * @deprecated Do not access directly on Config.
+   * Use the injected AgentLoopContext instead.
+   */
+  get toolRegistry(): ToolRegistry {
+    return this._toolRegistry;
   }
 
-  /** @internal Backing field alias for backwards-compatibility */
-  get _messageBus(): MessageBus {
-    return this.messageBus;
+  /**
+   * @deprecated Do not access directly on Config.
+   * Use the injected AgentLoopContext instead.
+   */
+  get promptRegistry(): PromptRegistry {
+    return this._promptRegistry;
   }
 
-  /** @internal Backing field alias for backwards-compatibility */
-  get _geminiClient(): GeminiClient {
-    return this.geminiClient;
+  /**
+   * @deprecated Do not access directly on Config.
+   * Use the injected AgentLoopContext instead.
+   */
+  get resourceRegistry(): ResourceRegistry {
+    return this._resourceRegistry;
   }
-  set _geminiClient(client: GeminiClient) {
-    this.geminiClient = client;
+
+  /**
+   * @deprecated Do not access directly on Config.
+   * Use the injected AgentLoopContext instead.
+   */
+  get messageBus(): MessageBus {
+    return this._messageBus;
+  }
+
+  /**
+   * @deprecated Do not access directly on Config.
+   * Use the injected AgentLoopContext instead.
+   */
+  get geminiClient(): GeminiClient {
+    return this._geminiClient;
   }
 
   private async getSandboxForbiddenPaths(): Promise<string[]> {
@@ -1797,7 +1792,7 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   private refreshSandboxManager(): void {
-    this.sandboxManager = createSandboxManager(
+    this._sandboxManager = createSandboxManager(
       this.sandbox,
       {
         workspace: this.targetDir,
@@ -1810,19 +1805,15 @@ export class Config implements McpContext, AgentLoopContext {
       },
       this.getApprovalMode(),
     );
-    this.shellExecutionConfig.sandboxManager = this.sandboxManager;
+    this.shellExecutionConfig.sandboxManager = this._sandboxManager;
   }
 
   get sandboxPolicyManager() {
     return this._sandboxPolicyManager;
   }
 
-  /** @internal Backing field alias for backwards-compatibility */
-  get _sandboxManager(): SandboxManager {
-    return this.sandboxManager;
-  }
-  set _sandboxManager(manager: SandboxManager) {
-    this.sandboxManager = manager;
+  get sandboxManager(): SandboxManager {
+    return this._sandboxManager;
   }
 
   getSessionId(): string {
@@ -1843,7 +1834,6 @@ export class Config implements McpContext, AgentLoopContext {
       : undefined;
 
     this._sessionId = sessionId;
-    this.promptId = sessionId;
     this.storage.setSessionId(sessionId);
     this.trackerService = undefined;
     this.fallbackOverrides.clear();
@@ -1851,8 +1841,6 @@ export class Config implements McpContext, AgentLoopContext {
     this.approvedPlanPath = undefined;
     this.topicState.reset();
     this.skillManager.reset();
-    resetModifiedBuildFiles(this);
-    resetAcknowledgedUntrustedFlags(this);
     this.latestApiRequest = undefined;
     this.lastModeSwitchTime = performance.now();
     this.compressionTruncationCounter = 0;
@@ -1875,7 +1863,6 @@ export class Config implements McpContext, AgentLoopContext {
 
   rotateSessionId(sessionId: string): void {
     this._sessionId = sessionId;
-    this.promptId = sessionId;
   }
 
   resetNewSessionState(sessionId: string): void {
@@ -1951,9 +1938,6 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   activateFallbackMode(model: string, failedModel?: string): void {
-    debugLogger.log(
-      `Model fallback activated: switching from ${failedModel ?? 'unknown'} to ${model}`,
-    );
     if (this.getActiveModel() !== model) {
       this.setModel(model, true);
     }
@@ -2078,8 +2062,7 @@ export class Config implements McpContext, AgentLoopContext {
       this.getUseCustomToolModelSync(),
       this.getHasAccessToPreviewModel(),
       this,
-      this.hasLatestFlashGAAccess(),
-      this.hasLatestFlashLiteGAAccess(),
+      this.hasGemini35FlashGAAccess(),
     );
 
     const isPreview = isPreviewModel(primaryModel, this);
@@ -2119,8 +2102,7 @@ export class Config implements McpContext, AgentLoopContext {
       this.getUseCustomToolModelSync(),
       this.getHasAccessToPreviewModel(),
       this,
-      this.hasLatestFlashGAAccess(),
-      this.hasLatestFlashLiteGAAccess(),
+      this.hasGemini35FlashGAAccess(),
     );
     return this.modelQuotas.get(primaryModel)?.remaining;
   }
@@ -2136,8 +2118,7 @@ export class Config implements McpContext, AgentLoopContext {
       this.getUseCustomToolModelSync(),
       this.getHasAccessToPreviewModel(),
       this,
-      this.hasLatestFlashGAAccess(),
-      this.hasLatestFlashLiteGAAccess(),
+      this.hasGemini35FlashGAAccess(),
     );
     return this.modelQuotas.get(primaryModel)?.limit;
   }
@@ -2153,8 +2134,7 @@ export class Config implements McpContext, AgentLoopContext {
       this.getUseCustomToolModelSync(),
       this.getHasAccessToPreviewModel(),
       this,
-      this.hasLatestFlashGAAccess(),
-      this.hasLatestFlashLiteGAAccess(),
+      this.hasGemini35FlashGAAccess(),
     );
     return this.modelQuotas.get(primaryModel)?.resetTime;
   }
@@ -2279,7 +2259,7 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getPromptRegistry(): PromptRegistry {
-    return this.promptRegistry;
+    return this._promptRegistry;
   }
 
   getSkillManager(): SkillManager {
@@ -2287,7 +2267,7 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getResourceRegistry(): ResourceRegistry {
-    return this.resourceRegistry;
+    return this._resourceRegistry;
   }
 
   getDebugMode(): boolean {
@@ -2337,24 +2317,6 @@ export class Config implements McpContext, AgentLoopContext {
             continue;
           }
 
-          let modelId = bucket.modelId;
-          if (
-            modelId === LEGACY_CCPA_FLASH_MODEL ||
-            modelId === BASE_GEMINI_FLASH_MODEL ||
-            modelId === LATEST_GEMINI_FLASH_MODEL
-          ) {
-            modelId = this.hasLatestFlashGAAccess()
-              ? LATEST_GEMINI_FLASH_MODEL
-              : BASE_GEMINI_FLASH_MODEL;
-          } else if (
-            modelId === BASE_GEMINI_FLASH_LITE_MODEL ||
-            modelId === LATEST_GEMINI_FLASH_LITE_MODEL
-          ) {
-            modelId = this.hasLatestFlashLiteGAAccess()
-              ? LATEST_GEMINI_FLASH_LITE_MODEL
-              : BASE_GEMINI_FLASH_LITE_MODEL;
-          }
-
           let remaining: number;
           let limit: number;
 
@@ -2363,7 +2325,7 @@ export class Config implements McpContext, AgentLoopContext {
             limit =
               bucket.remainingFraction > 0
                 ? Math.round(remaining / bucket.remainingFraction)
-                : (this.modelQuotas.get(modelId)?.limit ?? 0);
+                : (this.modelQuotas.get(bucket.modelId)?.limit ?? 0);
           } else {
             // Server only sent remainingFraction — use a normalized scale.
             limit = 100;
@@ -2371,7 +2333,7 @@ export class Config implements McpContext, AgentLoopContext {
           }
 
           if (!isNaN(remaining) && Number.isFinite(limit) && limit > 0) {
-            this.modelQuotas.set(modelId, {
+            this.modelQuotas.set(bucket.modelId, {
               remaining,
               limit,
               resetTime: bucket.resetTime,
@@ -2586,9 +2548,9 @@ export class Config implements McpContext, AgentLoopContext {
    */
   async refreshMcpContext(): Promise<void> {
     await this.memoryContextManager?.refresh();
-    if (this.geminiClient?.isInitialized()) {
-      await this.geminiClient.setTools();
-      this.geminiClient.updateSystemInstruction();
+    if (this._geminiClient?.isInitialized()) {
+      await this._geminiClient.setTools();
+      this._geminiClient.updateSystemInstruction();
     }
   }
 
@@ -2840,9 +2802,9 @@ export class Config implements McpContext, AgentLoopContext {
         currentMode === ApprovalMode.YOLO || mode === ApprovalMode.YOLO;
 
       if (isPlanModeTransition || isYoloModeTransition) {
-        if (this.geminiClient?.isInitialized()) {
-          this.geminiClient.clearCurrentSequenceModel();
-          this.geminiClient.setTools().catch((err) => {
+        if (this._geminiClient?.isInitialized()) {
+          this._geminiClient.clearCurrentSequenceModel();
+          this._geminiClient.setTools().catch((err) => {
             debugLogger.error('Failed to update tools', err);
           });
         }
@@ -2928,10 +2890,6 @@ export class Config implements McpContext, AgentLoopContext {
 
   getTelemetryOtlpProtocol(): 'grpc' | 'http' {
     return this.telemetrySettings.otlpProtocol ?? 'grpc';
-  }
-
-  getTelemetryOtlpHeaders(): Record<string, string> {
-    return this.telemetrySettings.otlpHeaders ?? {};
   }
 
   getTelemetryTarget(): TelemetryTarget {
@@ -3191,24 +3149,13 @@ export class Config implements McpContext, AgentLoopContext {
    * 'false' for untrusted.
    */
   isTrustedFolder(): boolean {
-    const { isTrusted, source } = checkPathTrust({
-      path: this.targetDir,
-      isFolderTrustEnabled: this.folderTrust,
-    });
-
-    if (isTrusted === false) {
-      return false;
+    const context = ideContextStore.get();
+    if (context?.workspaceState?.isTrusted !== undefined) {
+      return context.workspaceState.isTrusted;
     }
 
-    if (source === 'env') {
-      return isTrusted;
-    }
-
-    if (this.trustedFolder !== undefined) {
-      return this.trustedFolder;
-    }
-
-    return isTrusted ?? false;
+    // Default to untrusted if folder trust is enabled and no explicit value is set.
+    return this.folderTrust ? (this.trustedFolder ?? false) : true;
   }
 
   setIdeMode(value: boolean): void {
@@ -3603,55 +3550,34 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   /**
-   * Returns whether the latest Flash GA model (currently Gemini 3.8 Flash) has been launched.
+   * Returns whether Gemini 3.5 Flash GA has been launched.
+   *
+   * Note: This method should only be called after startup, once experiments have been loaded.
    */
-  hasLatestFlashGAAccess(): boolean {
+  hasGemini35FlashGAAccess(): boolean {
     const authType = this.contentGeneratorConfig?.authType;
     const hasAccess = (() => {
       if (this.isGemini31LaunchedForAuthType(authType)) {
         return true;
       }
       return (
-        this.experiments?.flags[ExperimentFlags.LATEST_FLASH_GA_LAUNCHED]
+        this.experiments?.flags[ExperimentFlags.GEMINI_3_5_FLASH_GA_LAUNCHED]
           ?.boolValue ?? false
       );
     })();
-
+    // Used to set default flash models based on access
+    // TODO: Remove once the experiment for 3_5 flash rollut can be cleaned up.
     if (hasAccess) {
+      // Gemini API key users should have the ability to manually select the
+      // old preview flash model.
       if (authType === AuthType.USE_GEMINI) {
-        setFlashModels('gemini-3-flash-preview', LATEST_GEMINI_FLASH_MODEL);
+        setFlashModels('gemini-3-flash-preview', 'gemini-3.5-flash');
       } else {
-        setFlashModels(LATEST_GEMINI_FLASH_MODEL, LATEST_GEMINI_FLASH_MODEL);
+        setFlashModels('gemini-3.5-flash', 'gemini-3.5-flash');
       }
     } else {
-      setFlashModels('gemini-3-flash-preview', BASE_GEMINI_FLASH_MODEL);
+      setFlashModels('gemini-3-flash-preview', 'gemini-2.5-flash');
     }
-    return hasAccess;
-  }
-
-  /** @deprecated Use hasLatestFlashGAAccess() */
-  hasGemini35FlashGAAccess(): boolean {
-    return this.hasLatestFlashGAAccess();
-  }
-
-  /**
-   * Returns whether the latest Flash Lite GA model (currently Gemini 3.5 Flash Lite) has been launched.
-   */
-  hasLatestFlashLiteGAAccess(): boolean {
-    const authType = this.contentGeneratorConfig?.authType;
-    const hasAccess = (() => {
-      if (this.isGemini31LaunchedForAuthType(authType)) {
-        return true;
-      }
-      return (
-        this.experiments?.flags[ExperimentFlags.LATEST_FLASH_LITE_GA_LAUNCHED]
-          ?.boolValue ?? false
-      );
-    })();
-
-    setFlashLiteModel(
-      hasAccess ? LATEST_GEMINI_FLASH_LITE_MODEL : BASE_GEMINI_FLASH_LITE_MODEL,
-    );
     return hasAccess;
   }
 
@@ -4227,8 +4153,6 @@ export class Config implements McpContext, AgentLoopContext {
       compact: false,
     });
     debugLogger.debug('Experiments loaded', summaryString);
-    this.hasLatestFlashGAAccess();
-    this.hasLatestFlashLiteGAAccess();
   }
 
   private onAgentsRefreshed = async () => {
@@ -4251,7 +4175,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.logCurrentModeDuration(this.getApprovalMode());
     coreEvents.off(CoreEvent.AgentsRefreshed, this.onAgentsRefreshed);
     this.agentRegistry?.dispose();
-    this.geminiClient?.dispose();
+    this._geminiClient?.dispose();
     if (this.mcpClientManager) {
       await this.mcpClientManager.stop();
     }

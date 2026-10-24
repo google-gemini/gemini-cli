@@ -18,7 +18,6 @@ import {
   AuthType,
   clearCachedCredentialFile,
   type Config,
-  debugLogger,
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { AuthState } from '../types.js';
@@ -130,25 +129,7 @@ export function AuthDialog({
         } else {
           setAuthContext({});
         }
-
-        const currentAuthType = settings.merged.security?.auth?.selectedType;
-        if (
-          authType === AuthType.LOGIN_WITH_GOOGLE ||
-          currentAuthType === AuthType.LOGIN_WITH_GOOGLE
-        ) {
-          try {
-            await clearCachedCredentialFile();
-          } catch (error) {
-            debugLogger.error('Failed to clear cached credentials:', error);
-            onAuthError(
-              'Failed to clear cached credentials: ' +
-                (error instanceof Error ? error.message : String(error)),
-            );
-            if (authType === AuthType.LOGIN_WITH_GOOGLE) {
-              return;
-            }
-          }
-        }
+        await clearCachedCredentialFile();
 
         settings.setValue(scope, 'security.auth.selectedType', authType);
         if (
@@ -156,12 +137,7 @@ export function AuthDialog({
           config.isBrowserLaunchSuppressed()
         ) {
           setExiting(true);
-          setTimeout(() => {
-            void relaunchApp({ overrideAuthType: authType }).catch((err) => {
-              debugLogger.error('Failed to trigger supervisor relaunch:', err);
-              process.exit(1);
-            });
-          }, 100);
+          setTimeout(relaunchApp, 100);
           return;
         }
 
@@ -175,7 +151,7 @@ export function AuthDialog({
       }
       setAuthState(AuthState.Unauthenticated);
     },
-    [settings, config, setAuthState, exiting, setAuthContext, onAuthError],
+    [settings, config, setAuthState, exiting, setAuthContext],
   );
 
   const handleAuthSelect = async (authMethod: AuthType) => {
@@ -186,12 +162,8 @@ export function AuthDialog({
     if (error) {
       onAuthError(error);
     } else {
-      onAuthError(null);
-      try {
-        await onSelect(authMethod, SettingScope.User);
-      } catch (e) {
-        onAuthError(e instanceof Error ? e.message : String(e));
-      }
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      onSelect(authMethod, SettingScope.User);
     }
   };
 

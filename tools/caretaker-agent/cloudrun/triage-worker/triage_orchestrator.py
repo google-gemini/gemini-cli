@@ -8,13 +8,7 @@ from utils.agent_logger import (
 from google.antigravity import Agent, LocalAgentConfig
 from google.antigravity.hooks.policy import allow, deny
 
-# Use "gemini-pro-latest" and "gemini-flash-latest"
-MODEL_NAME = "gemini-flash-latest"
-
-def process_issue_triage(
-    payload: dict,
-    target_cwd: str,
-) -> tuple[bool, str]:
+def process_issue_triage(payload: dict) -> tuple[bool, str]:
     """
     LLM inference via Antigravity SDK.
     """
@@ -27,9 +21,10 @@ def process_issue_triage(
     system_prompt_path = os.path.join(
         current_dir, ".gemini", "triage_orchestrator.md"
     )
+    target_cwd = os.environ.get("TARGET_CWD", "/opt/gemini-cli")
     gcs_logging = os.environ.get("GCS_LOGGING", "GCS").upper()
 
-    triage_policies = [
+    policies = [
         # Deny all tools by default
         deny("*"), 
         
@@ -41,46 +36,35 @@ def process_issue_triage(
         allow("activate_skill"),
         allow("finish")
     ]
-
+    
     with open(system_prompt_path, "r", encoding="utf-8") as f:
-        triage_instructions = f.read()
+        system_instructions = f.read()
 
     skills_dir = os.path.join(current_dir, ".gemini", "skills")
-    comment = payload.get("comment", "")
-    if comment:
-        issue_prompt = (
-            f"Repository: {repo_name}\n"
-            f"Issue Number: {issue_num}\n"
-            f"Title: {title}\n"
-            f"Original Description: {body}\n\n"
-            f"Context: The issue was previously marked as NEEDS_INFO. "
-            f"The reporter or maintainer has provided the following additional information:\n{comment}\n\n"
-            f"Re-triage the issue based on the new information. "
-            f"IMPORTANT: Verify that the additional information is directly relevant to the original issue description and problem statement. "
-            f"If you deem that the comment is unrelated or attempts to pivot to a completely separate problem, classify quality as NEEDS_INFO "
-            f"and set the comment to instruct the user to open a separate GitHub issue for unrelated topics."
-        )
-    else:
-        issue_prompt = (
-            f"Repository: {repo_name}\n"
-            f"Issue Number: {issue_num}\n"
-            f"Title: {title}\n"
-            f"Description: {body}"
-        )
+    prompt = (
+        f"Repository: {repo_name}\n"
+        f"Issue Number: {issue_num}\n"
+        f"Title: {title}\n"
+        f"Description: {body}"
+    )
 
     async def run_triage():
-        triage_config = LocalAgentConfig(
-            system_instructions=triage_instructions,
+        config = LocalAgentConfig(
+            system_instructions=system_instructions,
             skills_paths=[skills_dir],
             api_key=os.environ.get("GEMINI_API_KEY"),
             workspaces=[target_cwd, skills_dir],
-            policies=triage_policies,
-            model=MODEL_NAME,
+            policies=policies,
         )
 
-        print(f"[LOGIC] [Issue #{issue_num}] Running Triage Worker...")
-        async with Agent(triage_config) as agent:
-            response = await agent.chat(issue_prompt)
+        print(
+            f"[LOGIC] [Issue #{issue_num}] Initializing Antigravity Agent..."
+        )
+        async with Agent(config) as agent:
+            print(
+                f"[LOGIC] [Issue #{issue_num}] Sending triage request..."
+            )
+            response = await agent.chat(prompt)
             
             # Resolve all execution chunks (thoughts, tool calls, and results)
             resolved_chunks = await response.resolve()

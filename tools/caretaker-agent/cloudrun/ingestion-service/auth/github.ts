@@ -7,7 +7,7 @@
 import * as crypto from 'node:crypto';
 
 /**
- * Subset of the GitHub Webhook Payload for issues and issue_comment events.
+ * Subset of the GitHub Webhook Payload for issues events.
  * @see https://docs.github.com/en/webhooks/webhook-events-and-payloads#issues
  */
 export interface GitHubWebhookPayload {
@@ -16,14 +16,6 @@ export interface GitHubWebhookPayload {
     body?: string | null; // Can be null if description is empty
     number: number;
     title?: string;
-    user?: {
-      login?: string;
-    };
-  };
-  comment?: {
-    id: number;
-    body: string;
-    author_association: string;
   };
   repository: {
     /** Expected format: "owner/repo" (e.g. "google-gemini/gemini-cli") */
@@ -31,7 +23,6 @@ export interface GitHubWebhookPayload {
   };
   sender?: {
     login?: string;
-    type?: string;
   };
 }
 
@@ -118,18 +109,7 @@ export function isGitHubWebhookPayload(
     return false;
   }
 
-  // 3. Validate 'comment' (if present for issue_comment events)
-  if (o.comment) {
-    if (
-      typeof o.comment.id !== 'number' ||
-      typeof o.comment.body !== 'string' ||
-      typeof o.comment.author_association !== 'string'
-    ) {
-      return false;
-    }
-  }
-
-  // 4. Validate 'repository'
+  // 3. Validate 'repository'
   if (typeof o.repository !== 'object' || o.repository === null) {
     return false;
   }
@@ -140,7 +120,7 @@ export function isGitHubWebhookPayload(
     return false;
   }
 
-  // 5. Validate 'sender' (optional)
+  // 4. Validate 'sender' (optional)
   if (o.sender !== undefined) {
     if (typeof o.sender !== 'object' || o.sender === null) {
       return false;

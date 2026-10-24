@@ -55,7 +55,10 @@ export class DynamicStoredOAuthProvider implements OAuthClientProvider {
       return this.cachedToken;
     }
 
-    const oauthConfig = this.serverConfig.oauth ?? {};
+    const oauthConfig =
+      this.serverConfig.oauth?.enabled && this.serverConfig.oauth
+        ? this.serverConfig.oauth
+        : {};
 
     const tokenMeta = await this.oauthProvider.getValidTokenWithMetadata(
       this.serverName,

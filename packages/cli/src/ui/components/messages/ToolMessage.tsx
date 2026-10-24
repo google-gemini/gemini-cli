@@ -87,15 +87,13 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
     resultDisplay,
   );
 
-  const safeTerminalWidth = Math.max(0, Math.floor(terminalWidth || 0));
-
   return (
     // It is crucial we don't replace this <> with a Box because otherwise the
     // sticky header inside it would be sticky to that box rather than to the
     // parent component of this ToolMessage.
     <>
       <StickyHeader
-        width={safeTerminalWidth}
+        width={terminalWidth}
         isFirst={isFirst}
         borderColor={borderColor}
         borderDimColor={borderDimColor}
@@ -121,8 +119,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         {emphasis === 'high' && <TrailingIndicator />}
       </StickyHeader>
       <Box
-        width={safeTerminalWidth}
-        minWidth={0}
+        width={terminalWidth}
         borderStyle="round"
         borderColor={borderColor}
         borderDimColor={borderDimColor}
@@ -144,7 +141,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         <ToolResultDisplay
           resultDisplay={resultDisplay}
           availableTerminalHeight={availableTerminalHeight}
-          terminalWidth={safeTerminalWidth}
+          terminalWidth={terminalWidth}
           renderOutputAsMarkdown={renderOutputAsMarkdown}
           hasFocus={isThisShellFocused}
           maxLines={

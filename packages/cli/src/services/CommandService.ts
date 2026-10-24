@@ -49,7 +49,7 @@ export class CommandService {
     const { finalCommands, conflicts } =
       SlashCommandResolver.resolve(allCommands);
 
-    if (!signal.aborted) {
+    if (conflicts.length > 0) {
       this.emitConflictEvents(conflicts);
     }
 

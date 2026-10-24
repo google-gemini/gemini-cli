@@ -12,7 +12,6 @@ import {
   resolveDefensiveToolPath,
   resolveToRealPath,
 } from '../utils/paths.js';
-import { resolveActiveWorkspaceDir } from '../utils/pathCorrector.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
@@ -80,27 +79,26 @@ class ReadFileToolInvocation extends BaseToolInvocation<
     _toolDisplayName?: string,
   ) {
     super(params, messageBus, _toolName, _toolDisplayName);
-    const targetDir = resolveActiveWorkspaceDir(
-      this.config,
-      this.params.file_path,
-    );
     const sanitizedPath = resolveDefensiveToolPath(
       this.params.file_path,
-      targetDir,
+      this.config.getTargetDir(),
     );
     try {
       this.resolvedPath = resolveToRealPath(
-        path.resolve(targetDir, sanitizedPath),
+        path.resolve(this.config.getTargetDir(), sanitizedPath),
       );
     } catch {
-      this.resolvedPath = path.resolve(targetDir, sanitizedPath);
+      this.resolvedPath = path.resolve(
+        this.config.getTargetDir(),
+        sanitizedPath,
+      );
     }
   }
 
   getDescription(): string {
     const relativePath = makeRelative(
       this.resolvedPath,
-      resolveActiveWorkspaceDir(this.config, this.params.file_path),
+      this.config.getTargetDir(),
     );
     return shortenPath(relativePath);
   }
@@ -123,25 +121,8 @@ class ReadFileToolInvocation extends BaseToolInvocation<
   }
 
   async execute(_options: ExecuteOptions): Promise<ToolResult> {
-    const targetDir = resolveActiveWorkspaceDir(
-      this.config,
-      this.params.file_path,
-    );
-    const sanitizedPath = resolveDefensiveToolPath(
-      this.params.file_path,
-      targetDir,
-    );
-    let targetPathToRead = this.resolvedPath;
-    try {
-      targetPathToRead = resolveToRealPath(
-        path.resolve(targetDir, sanitizedPath),
-      );
-    } catch {
-      targetPathToRead = path.resolve(targetDir, sanitizedPath);
-    }
-
     const validationError = this.config.validatePathAccess(
-      targetPathToRead,
+      this.resolvedPath,
       'read',
     );
     if (validationError) {
@@ -156,8 +137,8 @@ class ReadFileToolInvocation extends BaseToolInvocation<
     }
 
     const result = await processSingleFileContent(
-      targetPathToRead,
-      targetDir,
+      this.resolvedPath,
+      this.config.getTargetDir(),
       this.config.getFileSystemService(),
       this.params.start_line,
       this.params.end_line,
@@ -182,9 +163,7 @@ class ReadFileToolInvocation extends BaseToolInvocation<
       llmContent = `
 IMPORTANT: The file content has been truncated.
 Status: Showing lines ${start}-${end} of ${total} total lines.
-Action: To read more of the file, you can use the 'start_line' and 'end_line' parameters in a subsequent 'read_file' call. For example, to read the next section of the file, use start_line: ${
-        end + 1
-      }.
+Action: To read more of the file, you can use the 'start_line' and 'end_line' parameters in a subsequent 'read_file' call. For example, to read the next section of the file, use start_line: ${end + 1}.
 
 --- FILE CONTENT (truncated) ---
 ${result.llmContent}`;
@@ -196,9 +175,9 @@ ${result.llmContent}`;
       typeof result.llmContent === 'string'
         ? result.llmContent.split('\n').length
         : undefined;
-    const mimetype = getSpecificMimeType(targetPathToRead);
+    const mimetype = getSpecificMimeType(this.resolvedPath);
     const programming_language = getProgrammingLanguage({
-      file_path: targetPathToRead,
+      file_path: this.resolvedPath,
     });
     logFileOperation(
       this.config,
@@ -207,13 +186,13 @@ ${result.llmContent}`;
         FileOperation.READ,
         lines,
         mimetype,
-        path.extname(targetPathToRead),
+        path.extname(this.resolvedPath),
         programming_language,
       ),
     );
 
     // Discover JIT subdirectory context for the accessed file path
-    const jitContext = await discoverJitContext(this.config, targetPathToRead);
+    const jitContext = await discoverJitContext(this.config, this.resolvedPath);
     if (jitContext) {
       if (typeof llmContent === 'string') {
         llmContent = appendJitContext(llmContent, jitContext);
@@ -278,12 +257,16 @@ export class ReadFileTool extends BaseDeclarativeTool<
       return "The 'file_path' parameter must be non-empty.";
     }
 
-    const targetDir = resolveActiveWorkspaceDir(this.config, params.file_path);
-    const sanitizedPath = resolveDefensiveToolPath(params.file_path, targetDir);
+    const sanitizedPath = resolveDefensiveToolPath(
+      params.file_path,
+      this.config.getTargetDir(),
+    );
 
     let resolvedPath: string;
     try {
-      resolvedPath = resolveToRealPath(path.resolve(targetDir, sanitizedPath));
+      resolvedPath = resolveToRealPath(
+        path.resolve(this.config.getTargetDir(), sanitizedPath),
+      );
     } catch (err) {
       return `Failed to resolve path: ${err instanceof Error ? err.message : String(err)}`;
     }
@@ -306,10 +289,6 @@ export class ReadFileTool extends BaseDeclarativeTool<
 
     const fileFilteringOptions = this.config.getFileFilteringOptions();
     if (
-      this.fileDiscoveryService.shouldIgnoreFile(
-        sanitizedPath,
-        fileFilteringOptions,
-      ) ||
       this.fileDiscoveryService.shouldIgnoreFile(
         resolvedPath,
         fileFilteringOptions,

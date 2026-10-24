@@ -35,23 +35,11 @@ export const useFolderTrust = (
   const [isRestarting, setIsRestarting] = useState(false);
   const startupMessageSent = useRef(false);
 
-  const onTrustChangeRef = useRef(onTrustChange);
-  const addItemRef = useRef(addItem);
-  const settingsRef = useRef(settings);
-
-  useEffect(() => {
-    onTrustChangeRef.current = onTrustChange;
-    addItemRef.current = addItem;
-    settingsRef.current = settings;
-  }, [onTrustChange, addItem, settings]);
-
   const folderTrust = settings.merged.security.folderTrust.enabled ?? true;
 
   useEffect(() => {
     let isMounted = true;
-    const { isTrusted: trusted } = isWorkspaceTrusted(
-      settingsRef.current.merged,
-    );
+    const { isTrusted: trusted } = isWorkspaceTrusted(settings.merged);
 
     if (trusted === undefined || trusted === false) {
       void FolderTrustDiscoveryService.discover(process.cwd())
@@ -68,7 +56,7 @@ export const useFolderTrust = (
 
     const showUntrustedMessage = () => {
       if (trusted === false && !startupMessageSent.current) {
-        addItemRef.current(
+        addItem(
           {
             type: MessageType.INFO,
             text: 'This folder is untrusted, project settings, hooks, MCPs, and GEMINI.md files will not be applied for this folder.\nUse the `/permissions` command to change the trust level.',
@@ -79,17 +67,24 @@ export const useFolderTrust = (
       }
     };
 
-    if (isMounted) {
+    if (isHeadlessMode()) {
+      if (isMounted) {
+        setIsTrusted(trusted);
+        setIsFolderTrustDialogOpen(false);
+        onTrustChange(true);
+        showUntrustedMessage();
+      }
+    } else if (isMounted) {
       setIsTrusted(trusted);
-      setIsFolderTrustDialogOpen(!isHeadlessMode() && trusted === undefined);
-      onTrustChangeRef.current(trusted);
+      setIsFolderTrustDialogOpen(trusted === undefined);
+      onTrustChange(trusted);
       showUntrustedMessage();
     }
 
     return () => {
       isMounted = false;
     };
-  }, [folderTrust]);
+  }, [folderTrust, onTrustChange, settings.merged, addItem]);
 
   const handleFolderTrustSelect = useCallback(
     async (choice: FolderTrustChoice) => {
@@ -123,7 +118,7 @@ export const useFolderTrust = (
         trustLevel === TrustLevel.TRUST_FOLDER ||
         trustLevel === TrustLevel.TRUST_PARENT;
 
-      onTrustChangeRef.current(currentIsTrusted);
+      onTrustChange(currentIsTrusted);
       setIsTrusted(currentIsTrusted);
 
       const wasTrusted = isTrusted ?? false;
@@ -135,7 +130,7 @@ export const useFolderTrust = (
         setIsFolderTrustDialogOpen(false);
       }
     },
-    [isTrusted],
+    [onTrustChange, isTrusted],
   );
 
   return {

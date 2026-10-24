@@ -41,8 +41,7 @@ export class OverrideStrategy implements RoutingStrategy {
         false,
         config.getHasAccessToPreviewModel?.() ?? true,
         config,
-        config.hasLatestFlashGAAccess?.() ?? false,
-        config.hasLatestFlashLiteGAAccess?.() ?? false,
+        config.hasGemini35FlashGAAccess?.() ?? false,
       ),
       metadata: {
         source: this.name,

@@ -18,14 +18,10 @@ import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 import { spawn } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
-import {
-  DiscoveredMCPTool,
-  formatToolDescription,
-  formatToolDisplayTitle,
-  extractToolExplanation,
-} from './mcp-tool.js';
+import { DiscoveredMCPTool } from './mcp-tool.js';
 import { parse } from 'shell-quote';
 import { ToolErrorType } from './tool-error.js';
+import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
@@ -59,19 +55,7 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
   }
 
   getDescription(): string {
-    return formatToolDescription(this.originalToolName, undefined, this.params);
-  }
-
-  override getDisplayTitle(): string {
-    return formatToolDisplayTitle(
-      this.originalToolName,
-      undefined,
-      this.params,
-    );
-  }
-
-  override getExplanation(): string {
-    return extractToolExplanation(this.params);
+    return safeJsonStringify(this.params);
   }
 
   async execute({

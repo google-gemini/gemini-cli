@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Box, Text } from 'ink';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { theme } from '../semantic-colors.js';
@@ -36,9 +36,6 @@ export function ValidationDialog({
   const keyMatchers = useKeyMatchers();
   const [state, setState] = useState<DialogState>('choosing');
   const [errorMessage, setErrorMessage] = useState<string>('');
-  const onChoiceRef = useRef(onChoice);
-  onChoiceRef.current = onChoice;
-  const hasCompletedRef = useRef(false);
 
   const items = [
     {
@@ -57,7 +54,7 @@ export function ValidationDialog({
   useKeypress(
     (key) => {
       if (keyMatchers[Command.ESCAPE](key) || keyMatchers[Command.QUIT](key)) {
-        onChoiceRef.current('cancel');
+        onChoice('cancel');
         return true;
       } else if (state === 'waiting' && keyMatchers[Command.RETURN](key)) {
         // User confirmed verification is complete - transition to 'complete' state
@@ -69,20 +66,16 @@ export function ValidationDialog({
     { isActive: state !== 'complete' },
   );
 
-  // When state becomes 'complete', show success message briefly then proceed.
-  // Use onChoiceRef so parent re-renders do not reset the 500ms timer.
+  // When state becomes 'complete', show success message briefly then proceed
   useEffect(() => {
-    if (state === 'complete' && !hasCompletedRef.current) {
+    if (state === 'complete') {
       const timer = setTimeout(() => {
-        if (!hasCompletedRef.current) {
-          hasCompletedRef.current = true;
-          onChoiceRef.current('verify');
-        }
+        onChoice('verify');
       }, 500);
       return () => clearTimeout(timer);
     }
     return undefined;
-  }, [state]);
+  }, [state, onChoice]);
 
   const handleSelect = useCallback(
     async (choice: ValidationIntent) => {

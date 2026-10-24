@@ -1,4 +1,0 @@
-google-cloud-firestore>=2.15.0
-google-antigravity>=0.1.0
-python-dotenv
-requests

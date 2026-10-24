@@ -4,8 +4,7 @@
     "outDir": "dist",
     "jsx": "react-jsx",
     "lib": ["DOM", "DOM.Iterable", "ES2023"],
-    "types": ["node", "vitest/globals"],
-    "composite": true
+    "types": ["node", "vitest/globals"]
   },
   "include": [
     "index.ts",

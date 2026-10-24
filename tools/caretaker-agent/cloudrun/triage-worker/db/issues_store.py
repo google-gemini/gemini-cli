@@ -72,10 +72,7 @@ class IssuesStore:
 
         if attempts >= 2:
             transaction.update(doc_ref, {
-                "status": "NEEDS_HUMAN",
-                "error": "Max triage attempts (2) exceeded due to prior worker crash or timeout",
-                "lock.holder": None,
-                "lock.expires_at": None,
+                "status": "NEEDS_HUMAN", 
                 "updated_at": firestore.SERVER_TIMESTAMP
             })
             return ClaimAction.NEEDS_HUMAN
@@ -155,7 +152,6 @@ class IssuesStore:
         success: bool,
         workable_spec: dict = None,
         status: str = None,
-        error: str = None,
     ) -> ReleaseAction:
         """Internal transactional handler to release processing lock."""
         snapshot = doc_ref.get(transaction=transaction)
@@ -177,7 +173,6 @@ class IssuesStore:
         if success:
             updates["status"] = status
             updates["workable_spec"] = workable_spec or {}
-            updates["error"] = None
             transaction.update(doc_ref, updates)
             return ReleaseAction.COMPLETE
         
@@ -189,7 +184,6 @@ class IssuesStore:
             return ReleaseAction.RETRY
         
         updates["status"] = "NEEDS_HUMAN"
-        updates["error"] = error or "Max triage attempts (2) exceeded."
         transaction.update(doc_ref, updates)
         return ReleaseAction.COMPLETE
 
@@ -202,7 +196,6 @@ class IssuesStore:
         success: bool,
         workable_spec: dict = None,
         status: str = None,
-        error: str = None,
     ) -> ReleaseAction:
         """
         Releases the processing lock for an issue and updates its final status.
@@ -218,8 +211,6 @@ class IssuesStore:
               is TRIAGED.
             status: Target issue status (TRIAGED, NEEDS_INFO, AUTO_CLOSE,
               or NEEDS_HUMAN).
-            error: Error string or failure details to store when status
-              transitions to NEEDS_HUMAN.
 
         Returns:
             ReleaseAction indicating COMPLETE or RETRY.
@@ -227,5 +218,5 @@ class IssuesStore:
         doc_ref = self._get_issue_ref(owner, repo, issue_number)
         transaction = self.db.transaction()
         return self._release_lock_tx(
-            transaction, doc_ref, lock_holder, success, workable_spec, status, error
+            transaction, doc_ref, lock_holder, success, workable_spec, status
         )

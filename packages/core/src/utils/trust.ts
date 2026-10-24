@@ -21,11 +21,10 @@ export enum TrustLevel {
   DO_NOT_TRUST = 'DO_NOT_TRUST',
 }
 
-export type TrustResult =
-  | { isTrusted: boolean; source: 'env' }
-  | { isTrusted: boolean; source: 'ide' }
-  | { isTrusted: boolean; source: 'file' }
-  | { isTrusted: boolean | undefined; source: undefined };
+export interface TrustResult {
+  isTrusted: boolean | undefined;
+  source: 'ide' | 'file' | 'env' | undefined;
+}
 
 export interface TrustOptions {
   path: string;
@@ -45,12 +44,6 @@ export function isTrustLevel(value: unknown): value is TrustLevel {
  * IDE context, and local configuration file.
  */
 export function checkPathTrust(options: TrustOptions): TrustResult {
-  if (
-    process.env['GEMINI_RESTRICTED_MODE'] === 'true' ||
-    process.env['GEMINI_CLI_TRUST_WORKSPACE'] === 'false'
-  ) {
-    return { isTrusted: false, source: 'env' };
-  }
   if (process.env['GEMINI_CLI_TRUST_WORKSPACE'] === 'true') {
     return { isTrusted: true, source: 'env' };
   }
@@ -76,10 +69,10 @@ export function checkPathTrust(options: TrustOptions): TrustResult {
   }
 
   const isTrusted = folders.isPathTrusted(options.path);
-  if (isTrusted !== undefined) {
-    return { isTrusted, source: 'file' };
-  }
-  return { isTrusted: undefined, source: undefined };
+  return {
+    isTrusted,
+    source: isTrusted !== undefined ? 'file' : undefined,
+  };
 }
 
 export interface TrustRule {

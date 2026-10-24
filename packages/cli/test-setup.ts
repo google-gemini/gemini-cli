@@ -56,9 +56,6 @@ let errorSpy: vi.SpyInstance;
 let debugSpy: vi.SpyInstance;
 
 beforeEach(() => {
-  // Unset TMUX environment variable to ensure consistent spinner and terminal behavior in tests unless explicitly stubbed
-  vi.stubEnv('TMUX', '');
-
   // Reset themeManager state to ensure test isolation
   themeManager.resetForTesting();
 
