@@ -22,7 +22,7 @@ import {
   SettingScope,
   type LoadedSettings,
 } from '../../config/settings.js';
-import { FatalConfigError } from '@google/gemini-cli-core';
+import { exitCli } from '../utils.js';
 
 // Mock dependencies
 const emitConsoleLog = vi.hoisted(() => vi.fn());
@@ -45,12 +45,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     },
     debugLogger,
     getErrorMessage: vi.fn((error: { message: string }) => error.message),
-    FatalConfigError: class extends Error {
-      constructor(message: string) {
-        super(message);
-        this.name = 'FatalConfigError';
-      }
-    },
   };
 });
 
@@ -77,6 +71,7 @@ vi.mock('../../config/mcp/mcpServerEnablement.js', () => ({
 describe('extensions enable command', () => {
   const mockLoadSettings = vi.mocked(loadSettings);
   const mockExtensionManager = vi.mocked(ExtensionManager);
+  const mockExitCli = vi.mocked(exitCli);
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -102,14 +97,12 @@ describe('extensions enable command', () => {
   describe('handleEnable', () => {
     it.each([
       {
-        name: 'my-extension',
         scope: undefined,
         expectedScope: SettingScope.User,
         expectedLog:
           'Extension "my-extension" successfully enabled in all scopes.',
       },
       {
-        name: 'my-extension',
         scope: 'workspace',
         expectedScope: SettingScope.Workspace,
         expectedLog:
@@ -117,9 +110,9 @@ describe('extensions enable command', () => {
       },
     ])(
       'should enable an extension in the $expectedScope scope when scope is $scope',
-      async ({ name, scope, expectedScope, expectedLog }) => {
+      async ({ scope, expectedScope, expectedLog }) => {
         const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
-        await handleEnable({ name, scope });
+        await handleEnable({ names: ['my-extension'], scope });
 
         expect(mockExtensionManager).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -131,25 +124,88 @@ describe('extensions enable command', () => {
         ).toHaveBeenCalled();
         expect(
           mockExtensionManager.prototype.enableExtension,
-        ).toHaveBeenCalledWith(name, expectedScope);
+        ).toHaveBeenCalledWith('my-extension', expectedScope);
         expect(emitConsoleLog).toHaveBeenCalledWith('log', expectedLog);
         mockCwd.mockRestore();
       },
     );
 
-    it('should throw FatalConfigError when extension enabling fails', async () => {
+    it('should enable multiple extensions when given a list of names', async () => {
+      const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+      await handleEnable({ names: ['ext-a', 'ext-b'] });
+
+      expect(
+        mockExtensionManager.prototype.enableExtension,
+      ).toHaveBeenCalledWith('ext-a', SettingScope.User);
+      expect(
+        mockExtensionManager.prototype.enableExtension,
+      ).toHaveBeenCalledWith('ext-b', SettingScope.User);
+      mockCwd.mockRestore();
+    });
+
+    it('should dedupe duplicate names', async () => {
+      const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+      await handleEnable({ names: ['ext-a', 'ext-a'] });
+
+      expect(
+        mockExtensionManager.prototype.enableExtension,
+      ).toHaveBeenCalledTimes(1);
+      expect(
+        mockExtensionManager.prototype.enableExtension,
+      ).toHaveBeenCalledWith('ext-a', SettingScope.User);
+      mockCwd.mockRestore();
+    });
+
+    it('should enable every installed extension when --all is set', async () => {
+      const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+      mockExtensionManager.prototype.getExtensions = vi.fn().mockReturnValue([
+        { name: 'ext-a', mcpServers: undefined },
+        { name: 'ext-b', mcpServers: undefined },
+      ]);
+
+      await handleEnable({ all: true });
+
+      expect(
+        mockExtensionManager.prototype.enableExtension,
+      ).toHaveBeenCalledWith('ext-a', SettingScope.User);
+      expect(
+        mockExtensionManager.prototype.enableExtension,
+      ).toHaveBeenCalledWith('ext-b', SettingScope.User);
+      mockCwd.mockRestore();
+    });
+
+    it('should log a message and return when --all is set with no installed extensions', async () => {
+      const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+      mockExtensionManager.prototype.getExtensions = vi
+        .fn()
+        .mockReturnValue([]);
+
+      await handleEnable({ all: true });
+
+      expect(emitConsoleLog).toHaveBeenCalledWith(
+        'log',
+        'No extensions currently installed.',
+      );
+      expect(
+        mockExtensionManager.prototype.enableExtension,
+      ).not.toHaveBeenCalled();
+      mockCwd.mockRestore();
+    });
+
+    it('should log each error and call exitCli(1) when enabling fails', async () => {
       const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
       const error = new Error('Enable failed');
       (
         mockExtensionManager.prototype.enableExtension as Mock
-      ).mockImplementation(() => {
-        throw error;
-      });
+      ).mockRejectedValue(error);
 
-      const promise = handleEnable({ name: 'my-extension' });
-      await expect(promise).rejects.toThrow(FatalConfigError);
-      await expect(promise).rejects.toThrow('Enable failed');
+      await handleEnable({ names: ['my-extension'] });
 
+      expect(emitConsoleLog).toHaveBeenCalledWith(
+        'error',
+        'Failed to enable "my-extension": Enable failed',
+      );
+      expect(mockExitCli).toHaveBeenCalledWith(1);
       mockCwd.mockRestore();
     });
 
@@ -164,7 +220,7 @@ describe('extensions enable command', () => {
           { name: 'my-extension', mcpServers: { 'test-server': {} } },
         ]);
 
-      await handleEnable({ name: 'my-extension' });
+      await handleEnable({ names: ['my-extension'] });
 
       expect(mockEnablementInstance.autoEnableServers).toHaveBeenCalledWith([
         'test-server',
@@ -173,6 +229,24 @@ describe('extensions enable command', () => {
         'log',
         expect.stringContaining("MCP server 'test-server' was disabled"),
       );
+      mockCwd.mockRestore();
+    });
+
+    it('should batch MCP servers across multiple enabled extensions into one call', async () => {
+      const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+      mockEnablementInstance.autoEnableServers.mockResolvedValue([]);
+      mockExtensionManager.prototype.getExtensions = vi.fn().mockReturnValue([
+        { name: 'ext-a', mcpServers: { 'server-a': {} } },
+        { name: 'ext-b', mcpServers: { 'server-b': {} } },
+      ]);
+
+      await handleEnable({ names: ['ext-a', 'ext-b'] });
+
+      expect(mockEnablementInstance.autoEnableServers).toHaveBeenCalledTimes(1);
+      expect(mockEnablementInstance.autoEnableServers).toHaveBeenCalledWith([
+        'server-a',
+        'server-b',
+      ]);
       mockCwd.mockRestore();
     });
 
@@ -185,7 +259,7 @@ describe('extensions enable command', () => {
           { name: 'my-extension', mcpServers: { 'test-server': {} } },
         ]);
 
-      await handleEnable({ name: 'my-extension' });
+      await handleEnable({ names: ['my-extension'] });
 
       expect(mockEnablementInstance.autoEnableServers).toHaveBeenCalledWith([
         'test-server',
@@ -202,8 +276,8 @@ describe('extensions enable command', () => {
     const command = enableCommand;
 
     it('should have correct command and describe', () => {
-      expect(command.command).toBe('enable [--scope] <name>');
-      expect(command.describe).toBe('Enables an extension.');
+      expect(command.command).toBe('enable [names..]');
+      expect(command.describe).toBe('Enables one or more extensions.');
     });
 
     describe('builder', () => {
@@ -226,16 +300,32 @@ describe('extensions enable command', () => {
         (command.builder as (yargs: Argv) => Argv)(
           yargsMock as unknown as Argv,
         );
-        expect(yargsMock.positional).toHaveBeenCalledWith('name', {
-          describe: 'The name of the extension to enable.',
-          type: 'string',
-        });
-        expect(yargsMock.option).toHaveBeenCalledWith('scope', {
-          describe:
-            'The scope to enable the extension in. If not set, will be enabled in all scopes.',
-          type: 'string',
-        });
+        expect(yargsMock.positional).toHaveBeenCalledWith(
+          'names',
+          expect.objectContaining({
+            type: 'string',
+            array: true,
+          }),
+        );
+        expect(yargsMock.option).toHaveBeenCalledWith(
+          'all',
+          expect.objectContaining({ type: 'boolean' }),
+        );
+        expect(yargsMock.option).toHaveBeenCalledWith(
+          'scope',
+          expect.objectContaining({ type: 'string' }),
+        );
         expect(yargsMock.check).toHaveBeenCalled();
+      });
+
+      it('check function should throw when neither names nor --all is provided', () => {
+        (command.builder as (yargs: Argv) => Argv)(
+          yargsMock as unknown as Argv,
+        );
+        const checkCallback = yargsMock.check.mock.calls[0][0];
+        expect(() => checkCallback({})).toThrow(
+          /at least one extension name to enable/,
+        );
       });
 
       it('check function should throw for invalid scope', () => {
@@ -248,7 +338,7 @@ describe('extensions enable command', () => {
         )
           .map((s) => s.toLowerCase())
           .join(', ')}.`;
-        expect(() => checkCallback({ scope: 'invalid' })).toThrow(
+        expect(() => checkCallback({ all: true, scope: 'invalid' })).toThrow(
           expectedError,
         );
       });
@@ -257,12 +347,14 @@ describe('extensions enable command', () => {
     it('handler should call handleEnable', async () => {
       const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
       interface TestArgv {
-        name: string;
+        names: string[];
+        all: boolean;
         scope: string;
         [key: string]: unknown;
       }
       const argv: TestArgv = {
-        name: 'test-ext',
+        names: ['test-ext'],
+        all: false,
         scope: 'workspace',
         _: [],
         $0: '',
@@ -274,6 +366,37 @@ describe('extensions enable command', () => {
       expect(
         mockExtensionManager.prototype.enableExtension,
       ).toHaveBeenCalledWith('test-ext', SettingScope.Workspace);
+      mockCwd.mockRestore();
+    });
+
+    it('handler should normalize a scalar string positional to a single-element array', async () => {
+      // Regression: yargs may pass `names` as a bare string when only one
+      // positional is provided. The handler must wrap it in an array, not let
+      // it be iterated character-by-character.
+      const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+      interface TestArgv {
+        names: string;
+        all: boolean;
+        scope: string;
+        [key: string]: unknown;
+      }
+      const argv: TestArgv = {
+        names: 'conductor',
+        all: false,
+        scope: 'user',
+        _: [],
+        $0: '',
+      };
+      await (command.handler as unknown as (args: TestArgv) => Promise<void>)(
+        argv,
+      );
+
+      expect(
+        mockExtensionManager.prototype.enableExtension,
+      ).toHaveBeenCalledTimes(1);
+      expect(
+        mockExtensionManager.prototype.enableExtension,
+      ).toHaveBeenCalledWith('conductor', SettingScope.User);
       mockCwd.mockRestore();
     });
   });
