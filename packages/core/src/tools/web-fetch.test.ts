@@ -262,6 +262,28 @@ describe('parsePrompt', () => {
   });
 
   it.each([
+    ['https://example.com/a.)', 'https://example.com/a'],
+    ['https://example.com/a,)', 'https://example.com/a'],
+    ['https://example.com/a),.', 'https://example.com/a'],
+    ['https://example.com/a.),', 'https://example.com/a'],
+    ['https://example.com/a)].', 'https://example.com/a'],
+    ['https://example.com/a]).', 'https://example.com/a'],
+    ['https://example.com/a:);', 'https://example.com/a'],
+    ['https://example.com/(a)).', 'https://example.com/(a)'],
+    ['https://example.com/a?)', 'https://example.com/a?'],
+    ['https://example.com/a!).', 'https://example.com/a!'],
+    ['https://example.com/a?q=(b),', 'https://example.com/a?q=(b)'],
+  ])(
+    'should strip punctuation mixed with closing brackets from %s',
+    (url, expected) => {
+      expect(parsePrompt(`Check ${url}`)).toEqual({
+        validUrls: [expected],
+        errors: [],
+      });
+    },
+  );
+
+  it.each([
     {
       name: 'URLs wrapped in punctuation',
       prompt: 'Read (https://example.com)',
