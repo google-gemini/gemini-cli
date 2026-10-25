@@ -14,9 +14,11 @@ import {
   type UseProgramStatusParams,
 } from './useProgramStatus.js';
 import { USER_CANCELLED_MESSAGE } from '../../utils/programStatus.js';
+import * as confirmingTool from '../utils/confirmingTool.js';
 
 const writeToStdout = vi.hoisted(() => vi.fn());
 const registerSyncCleanup = vi.hoisted(() => vi.fn());
+const removeSyncCleanup = vi.hoisted(() => vi.fn());
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -30,6 +32,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 
 vi.mock('../../utils/cleanup.js', () => ({
   registerSyncCleanup,
+  removeSyncCleanup,
 }));
 
 function baseParams(
@@ -60,6 +63,10 @@ function baseParams(
 }
 
 describe('resolveProgramStatusBlockedKind', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('returns auth for auth dialogs', () => {
     expect(
       resolveProgramStatusBlockedKind(baseParams({ isAuthDialogOpen: true })),
@@ -126,6 +133,29 @@ describe('resolveProgramStatusBlockedKind', () => {
               ],
             } as never,
           ],
+        }),
+      ),
+    ).toBe('permission');
+  });
+
+  it('does not throw when the confirming tool is missing', () => {
+    vi.spyOn(confirmingTool, 'getConfirmingToolState').mockReturnValue({
+      tool: undefined as never,
+      index: 1,
+      total: 1,
+    });
+
+    expect(() =>
+      resolveProgramStatusBlockedKind(
+        baseParams({
+          streamingState: StreamingState.WaitingForConfirmation,
+        }),
+      ),
+    ).not.toThrow();
+    expect(
+      resolveProgramStatusBlockedKind(
+        baseParams({
+          streamingState: StreamingState.WaitingForConfirmation,
         }),
       ),
     ).toBe('permission');
@@ -246,5 +276,28 @@ describe('useProgramStatus', () => {
       '\x1b]7501;state=idle:app=gemini\x1b\\',
       '\x1b]7501;state=clear\x1b\\',
     ]);
+  });
+
+  it('registers sync cleanup once even when active toggles', async () => {
+    const { rerender, unmount } = await renderHook(
+      (props: UseProgramStatusParams) => useProgramStatus(props),
+      { initialProps: baseParams({ enabled: false }) },
+    );
+
+    expect(registerSyncCleanup).toHaveBeenCalledTimes(1);
+    expect(writeToStdout).not.toHaveBeenCalled();
+
+    rerender(baseParams({ enabled: true }));
+    rerender(baseParams({ enabled: false }));
+    rerender(baseParams({ enabled: true }));
+    rerender(baseParams({ enabled: false }));
+
+    expect(registerSyncCleanup).toHaveBeenCalledTimes(1);
+    expect(removeSyncCleanup).not.toHaveBeenCalled();
+
+    const registered = registerSyncCleanup.mock.calls[0]?.[0] as () => void;
+    unmount();
+    expect(removeSyncCleanup).toHaveBeenCalledTimes(1);
+    expect(removeSyncCleanup).toHaveBeenCalledWith(registered);
   });
 });

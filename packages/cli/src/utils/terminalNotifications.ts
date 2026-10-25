@@ -8,6 +8,7 @@ import { debugLogger, writeToStdout } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../config/settings.js';
 import { sanitizeForDisplay } from '../ui/utils/textUtils.js';
 import { TerminalCapabilityManager } from '../ui/utils/terminalCapabilityManager.js';
+import { wrapOscForMultiplexer } from './oscPassthrough.js';
 
 export const MAX_NOTIFICATION_TITLE_CHARS = 48;
 export const MAX_NOTIFICATION_SUBTITLE_CHARS = 64;
@@ -99,17 +100,6 @@ export function getNotificationMethod(
   }
 }
 
-function wrapWithPassthrough(sequence: string): string {
-  const capabilityManager = TerminalCapabilityManager.getInstance();
-  if (capabilityManager.isTmux()) {
-    // eslint-disable-next-line no-control-regex
-    return `\x1bPtmux;${sequence.replace(/\x1b/g, '\x1b\x1b')}\x1b\\`;
-  } else if (capabilityManager.isScreen()) {
-    return `\x1bP${sequence}\x1b\\`;
-  }
-  return sequence;
-}
-
 function emitOsc9Notification(content: RunEventNotificationContent): void {
   const sanitized = sanitizeNotificationContent(content);
   const pieces = [sanitized.title, sanitized.subtitle, sanitized.body].filter(
@@ -117,7 +107,7 @@ function emitOsc9Notification(content: RunEventNotificationContent): void {
   );
   const combined = pieces.join(OSC_TEXT_SEPARATOR);
 
-  writeToStdout(wrapWithPassthrough(`${OSC9_PREFIX}${combined}${BEL}`));
+  writeToStdout(wrapOscForMultiplexer(`${OSC9_PREFIX}${combined}${BEL}`));
 }
 
 function emitOsc777Notification(content: RunEventNotificationContent): void {
@@ -130,7 +120,7 @@ function emitOsc777Notification(content: RunEventNotificationContent): void {
   const safeBody = body.replace(/;/g, ':');
 
   writeToStdout(
-    wrapWithPassthrough(`${OSC777_PREFIX}${safeTitle};${safeBody}${BEL}`),
+    wrapOscForMultiplexer(`${OSC777_PREFIX}${safeTitle};${safeBody}${BEL}`),
   );
 }
 

@@ -16,8 +16,10 @@ import {
   getProgramStatusBlockedKind,
   inferTurnOutcome,
   mapAppStateToProgramStatus,
+  MAX_MSG_DECODED_BYTES,
   PROGRAM_STATUS_APP,
   shouldEmitProgramStatus,
+  truncateProgramStatusMsgUtf8,
   USER_CANCELLED_MESSAGE,
 } from './programStatus.js';
 import { wrapForTmux, wrapOscForMultiplexer } from './oscPassthrough.js';
@@ -330,6 +332,38 @@ describe('formatProgramStatusSequence', () => {
       Buffer.from('Apply 3 changes?', 'utf8').toString('base64'),
     );
     expect(encoded).toMatch(/^[A-Za-z0-9+/=]+$/);
+  });
+
+  it('truncates multi-byte text on grapheme boundaries within the byte limit', () => {
+    const cjk = '中'; // 3 UTF-8 bytes; 2048 % 3 === 2, so a raw byte slice would split
+    const encoded = encodeProgramStatusMsg(cjk.repeat(1000));
+    const raw = Buffer.from(encoded, 'base64');
+    const decoded = raw.toString('utf8');
+
+    expect(raw.length).toBeLessThanOrEqual(MAX_MSG_DECODED_BYTES);
+    expect(raw.length).toBe(Math.floor(MAX_MSG_DECODED_BYTES / 3) * 3);
+    expect(decoded).not.toContain('\uFFFD');
+    expect(decoded).toBe(cjk.repeat(Math.floor(MAX_MSG_DECODED_BYTES / 3)));
+    expect(Buffer.from(decoded, 'utf8').equals(raw)).toBe(true);
+  });
+
+  it('drops a grapheme that would exceed the byte limit instead of splitting it', () => {
+    const family = '👨‍👩‍👧‍👦';
+    const familyBytes = Buffer.byteLength(family, 'utf8');
+    const filler = 'a'.repeat(MAX_MSG_DECODED_BYTES - familyBytes + 1);
+    const truncated = truncateProgramStatusMsgUtf8(
+      filler + family,
+      MAX_MSG_DECODED_BYTES,
+    );
+
+    expect(Buffer.byteLength(truncated, 'utf8')).toBeLessThanOrEqual(
+      MAX_MSG_DECODED_BYTES,
+    );
+    expect(truncated).toBe(filler);
+    expect(truncated).not.toContain('\uFFFD');
+
+    const encoded = encodeProgramStatusMsg(filler + family);
+    expect(Buffer.from(encoded, 'base64').toString('utf8')).toBe(filler);
   });
 });
 

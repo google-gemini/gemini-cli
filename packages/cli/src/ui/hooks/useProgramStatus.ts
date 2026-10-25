@@ -13,7 +13,7 @@ import {
   type PermissionConfirmationRequest,
 } from '../types.js';
 import { getConfirmingToolState } from '../utils/confirmingTool.js';
-import { registerSyncCleanup } from '../../utils/cleanup.js';
+import { registerSyncCleanup, removeSyncCleanup } from '../../utils/cleanup.js';
 import {
   createProgramStatusWriter,
   getProgramStatusBlockedKind,
@@ -75,7 +75,7 @@ export function resolveProgramStatusBlockedKind({
   | 'isFolderTrustDialogOpen'
 >): ProgramStatusBlockedKind | undefined {
   const confirming = getConfirmingToolState(pendingHistoryItems);
-  const isAskUser = confirming?.tool.confirmationDetails?.type === 'ask_user';
+  const isAskUser = confirming?.tool?.confirmationDetails?.type === 'ask_user';
 
   return getProgramStatusBlockedKind({
     authRequired:
@@ -127,6 +127,21 @@ export function useProgramStatus({
   const writerRef = useRef(createProgramStatusWriter());
   const previousStreamingRef = useRef<StreamingState | null>(null);
   const lastTurnOutcomeRef = useRef<TurnOutcome | null>(null);
+  const activeRef = useRef(active);
+  activeRef.current = active;
+
+  useEffect(() => {
+    const writer = writerRef.current;
+    const onExit = () => {
+      if (activeRef.current) {
+        writer.close();
+      }
+    };
+    registerSyncCleanup(onExit);
+    return () => {
+      removeSyncCleanup(onExit);
+    };
+  }, []);
 
   useEffect(() => {
     if (!active) {
@@ -134,10 +149,6 @@ export function useProgramStatus({
     }
 
     const writer = writerRef.current;
-    registerSyncCleanup(() => {
-      writer.close();
-    });
-
     return () => {
       writer.close();
     };

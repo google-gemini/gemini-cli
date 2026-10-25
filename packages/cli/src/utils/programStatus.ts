@@ -10,10 +10,13 @@ import { wrapOscForMultiplexer } from './oscPassthrough.js';
 
 export const PROGRAM_STATUS_APP = 'gemini';
 export const USER_CANCELLED_MESSAGE = 'User cancelled the request.';
+export const MAX_MSG_DECODED_BYTES = 2048;
 
 const OSC_7501_PREFIX = '\x1b]7501;';
 const ST = '\x1b\\';
-const MAX_MSG_DECODED_BYTES = 2048;
+const graphemeSegmenter = new Intl.Segmenter(undefined, {
+  granularity: 'grapheme',
+});
 
 export type ProgramStatusState =
   | 'idle'
@@ -188,17 +191,40 @@ export function sanitizeProgramStatusMsg(text: string): string {
   return sanitized.trim();
 }
 
+/** Truncate to `maxBytes` of UTF-8 without splitting a grapheme cluster. */
+export function truncateProgramStatusMsgUtf8(
+  text: string,
+  maxBytes: number = MAX_MSG_DECODED_BYTES,
+): string {
+  if (maxBytes <= 0 || text.length === 0) {
+    return '';
+  }
+  if (Buffer.byteLength(text, 'utf8') <= maxBytes) {
+    return text;
+  }
+
+  let accumulatedBytes = 0;
+  let truncated = '';
+  for (const { segment } of graphemeSegmenter.segment(text)) {
+    const segmentBytes = Buffer.byteLength(segment, 'utf8');
+    if (accumulatedBytes + segmentBytes > maxBytes) {
+      break;
+    }
+    accumulatedBytes += segmentBytes;
+    truncated += segment;
+  }
+  return truncated;
+}
+
 export function encodeProgramStatusMsg(text: string): string {
   const sanitized = sanitizeProgramStatusMsg(text);
   if (!sanitized) {
     return '';
   }
-  const raw = Buffer.from(sanitized, 'utf8');
-  const truncated =
-    raw.length <= MAX_MSG_DECODED_BYTES
-      ? raw
-      : raw.subarray(0, MAX_MSG_DECODED_BYTES);
-  return truncated.toString('base64');
+  return Buffer.from(
+    truncateProgramStatusMsgUtf8(sanitized, MAX_MSG_DECODED_BYTES),
+    'utf8',
+  ).toString('base64');
 }
 
 export interface ProgramStatusWriter {
