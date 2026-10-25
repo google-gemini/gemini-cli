@@ -80,6 +80,10 @@ Gemini CLI takes action.
       CLI will refine the strategy and update the plan.
     - **Cancel:** You can cancel your plan with `Esc`.
 
+Before you can approve a plan, its file must be readable and contain
+non-whitespace text. Gemini CLI reports read failures separately from empty-plan
+errors.
+
 For more complex or specialized planning tasks, you can
 [customize the planning workflow with skills](#custom-planning-with-skills).
 
