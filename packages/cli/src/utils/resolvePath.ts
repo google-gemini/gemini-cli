@@ -14,7 +14,11 @@ export function resolvePath(p: string): string {
   let expandedPath = p;
   if (p.toLowerCase().startsWith('%userprofile%')) {
     expandedPath = homedir() + p.substring('%userprofile%'.length);
-  } else if (p === '~' || p.startsWith('~/')) {
+  } else if (
+    p === '~' ||
+    p.startsWith('~/') ||
+    (process.platform === 'win32' && p.startsWith('~\\'))
+  ) {
     expandedPath = homedir() + p.substring(1);
   }
   return path.normalize(expandedPath);
