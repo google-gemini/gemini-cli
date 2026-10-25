@@ -260,8 +260,11 @@ gemini
   Create your own reusable commands.
 - [**Context Files (GEMINI.md)**](https://www.geminicli.com/docs/cli/gemini-md) -
   Provide persistent context to Gemini CLI.
-- [**Checkpointing**](https://www.geminicli.com/docs/cli/checkpointing) - Save
-  and resume conversations.
+- [**Checkpointing**](https://www.geminicli.com/docs/cli/checkpointing) -
+  Restore project files and conversation state to a checkpoint before a tool
+  change.
+- [**Session Management**](https://www.geminicli.com/docs/cli/session-management) -
+  Save and resume conversations.
 - [**Token Caching**](https://www.geminicli.com/docs/cli/token-caching) -
   Optimize token usage.
 
@@ -306,12 +309,13 @@ gemini
 ### Using MCP Servers
 
 Configure MCP servers in `~/.gemini/settings.json` to extend Gemini CLI with
-custom tools:
+custom tools. After connecting the relevant servers, ask Gemini CLI to use their
+tools in natural language:
 
 ```text
-> @github List my open pull requests
-> @slack Send a summary of today's commits to #dev channel
-> @database Run a query to find inactive users
+> Use the GitHub tools to list my open pull requests.
+> Use the Slack tools to send a summary of today's commits to #dev.
+> Use the database tools to find inactive users.
 ```
 
 See the
