@@ -242,6 +242,33 @@ describe('handleAtCommand', () => {
     );
   });
 
+  it.each([
+    '    print("hello")\n',
+    '\n\n  leading and trailing whitespace  \n\n',
+    ' \t\n',
+    '',
+  ])(
+    'should preserve referenced file content exactly (%j)',
+    async (fileContent) => {
+      const filePath = await createTestFile(
+        path.join(testRootDir, 'whitespace.txt'),
+        fileContent,
+      );
+
+      const result = await handleAtCommand({
+        query: `@${filePath}`,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 125,
+        signal: abortController.signal,
+      });
+
+      expect(result.error).toBeUndefined();
+      expect(result.processedQuery).toContainEqual({ text: fileContent });
+    },
+  );
+
   it('should resolve a valid directory path without eagerly reading all files', async () => {
     const fileContent = 'This is the file content.';
     const filePath = await createTestFile(
