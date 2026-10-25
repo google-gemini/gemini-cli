@@ -120,6 +120,10 @@ including complex TUIs, will be rendered correctly.
 
 ## Important notes
 
+Cancelling a pending `read_background_output` request interrupts its optional
+delay instead of waiting for the delay to finish. This cancels the output read,
+not the background process itself.
+
 - **Security:** Be cautious when executing commands, especially those
   constructed from user input, to prevent security vulnerabilities.
 - **Error handling:** Check the `Stderr`, `Error`, and `Exit Code` fields to
