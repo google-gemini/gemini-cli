@@ -80,6 +80,15 @@ describe('planUtils', () => {
       expect(result).toContain('Plan file is empty');
     });
 
+    it('should accept a plan whose content follows a large whitespace prefix', async () => {
+      const planPath = path.join(plansDir, 'prefixed.md');
+      fs.writeFileSync(
+        planPath,
+        '\n'.repeat(8192) + '# My Plan\nImplement the fix.',
+      );
+      expect(await validatePlanContent(planPath)).toBeNull();
+    });
+
     it('should return error for whitespace-only content in a UTF-16 file with a BOM', async () => {
       const planPath = path.join(plansDir, 'utf16-empty.md');
       fs.writeFileSync(
@@ -109,9 +118,8 @@ describe('planUtils', () => {
     it('should return error for unreadable file', async () => {
       const planPath = path.join(plansDir, 'ghost.md');
       const result = await validatePlanContent(planPath);
-      // Since isEmpty treats unreadable files as empty (defensive),
-      // we expect the "Plan file is empty" message.
-      expect(result).toContain('Plan file is empty');
+      expect(result).toContain('Failed to read plan file:');
+      expect(result).not.toContain('Plan file is empty');
     });
   });
 });
