@@ -6,7 +6,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import {
   mkdirSync,
   rmSync,
@@ -16,6 +16,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const ACTIONLINT_VERSION = '1.7.7';
 const SHELLCHECK_VERSION = '0.11.0';
@@ -116,7 +117,7 @@ const yamllintInstaller = isWindows
  * @typedef {{
  *   check: string;
  *   installer: string;
- *   run: string;
+ *   run?: string;
  * }}
  */
 
@@ -154,7 +155,6 @@ const LINTERS = {
   yamllint: {
     check: yamllintCheck,
     installer: yamllintInstaller,
-    run: "git ls-files | grep -E '\\.(yaml|yml)' | xargs yamllint --format github",
   },
 };
 
@@ -227,7 +227,27 @@ export function runShellcheck() {
 
 export function runYamllint() {
   console.log('\nRunning yamllint...');
-  if (!runCommand(LINTERS.yamllint.run)) {
+  try {
+    const files = execFileSync(
+      'git',
+      ['ls-files', '-z', '--', '*.yaml', '*.yml'],
+      { encoding: 'utf8' },
+    )
+      .split('\0')
+      .filter(Boolean);
+
+    if (files.length === 0) {
+      return;
+    }
+
+    // YAML files contain Unicode, including on Windows with a legacy code page.
+    execFileSync(
+      pythonVenvPythonPath,
+      ['-X', 'utf8', '-m', 'yamllint', '--format', 'github', '--', ...files],
+      { stdio: 'inherit' },
+    );
+  } catch (error) {
+    console.error('Error running yamllint:', error.message);
     process.exit(1);
   }
 }
@@ -515,4 +535,9 @@ function main() {
   }
 }
 
-main();
+if (
+  process.argv[1] &&
+  pathToFileURL(process.argv[1]).href === import.meta.url
+) {
+  main();
+}
