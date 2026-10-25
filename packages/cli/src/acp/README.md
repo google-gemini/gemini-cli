@@ -66,7 +66,10 @@ source ~/.nvm/nvm.sh && nvm use default && npm test -w @google/gemini-cli -- src
 ### Adding New Features
 
 - **New RPC Method**: Add the method to `GeminiAgent` in `acpRpcDispatcher.ts`
-  and register it in the `AgentSideConnection` setup if necessary.
+  and register it in the `AgentSideConnection` setup if necessary. Methods that
+  aren't in the ACP spec are extensions: give them a `_geminicli.com/` name and
+  handle them in `GeminiAgent.extMethod`, which the SDK calls for any unknown
+  method.
 - **Session State**: If a feature requires storing state across turns within a
   session, add it to the `Session` class in `acpSession.ts`.
 - **Protocol Helpers**: Add any new mapping or serialization logic to
