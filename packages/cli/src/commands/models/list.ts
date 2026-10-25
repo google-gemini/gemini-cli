@@ -76,10 +76,10 @@ export function getModelListings(
 
   return (availableModels ?? []).map((m) => {
     const inputTokens = tokenLimit(m.modelId) ?? DEFAULT_TOKEN_LIMIT;
-    const outputTokens =
-      m.modelId === 'gemini-2.5-pro' || m.modelId === 'gemini-2.5-flash'
-        ? 65_536
-        : undefined;
+    const isGemini25ProOrFlash =
+      /^gemini-2\.5-(?:pro|flash)(?:-|$)/.test(m.modelId) &&
+      !/^gemini-2\.5-flash-lite(?:-|$)/.test(m.modelId);
+    const outputTokens = isGemini25ProOrFlash ? 65_536 : undefined;
     return {
       modelId: m.modelId,
       id: m.modelId,

@@ -132,6 +132,24 @@ describe('models list command', () => {
       expect(listings[0].contextLimits.outputTokens).toBeUndefined();
     });
 
+    it.each([
+      ['gemini-2.5-pro-001', 65_536],
+      ['gemini-2.5-flash-latest', 65_536],
+      ['gemini-2.5-flash-lite', undefined],
+    ])('should report the output limit for %s', (modelId, outputTokens) => {
+      mockBuildAvailableModels.mockReturnValue({
+        availableModels: [{ modelId, name: modelId, description: '' }],
+        currentModelId: modelId,
+      });
+
+      const listings = getModelListings(
+        {} as unknown as Config,
+        { merged: {} } as unknown as LoadedSettings,
+      );
+
+      expect(listings[0].contextLimits.outputTokens).toBe(outputTokens);
+    });
+
     it('should fall back to modelId when name is undefined', () => {
       mockBuildAvailableModels.mockReturnValue({
         availableModels: [
