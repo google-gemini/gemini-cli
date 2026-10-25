@@ -4,7 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  vi,
+  type MockInstance,
+} from 'vitest';
 import os from 'node:os';
 import path from 'node:path';
 import { ShellExecutionService } from '../services/shellExecutionService.js';
@@ -337,7 +345,7 @@ describe('Background Tools', () => {
   describe('read cancellation', () => {
     const pid = 987655;
     let fixtureDir: string;
-    let logAccess: ReturnType<typeof vi.spyOn>;
+    let logAccess: MockInstance<typeof fs.promises.access>;
 
     beforeEach(() => {
       vi.useFakeTimers();
