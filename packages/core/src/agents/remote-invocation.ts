@@ -129,6 +129,11 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
 
   async execute(options: ExecuteOptions): Promise<ToolResult> {
     const { abortSignal: _signal, updateOutput } = options;
+    const stateKey = JSON.stringify([
+      this.context.config.getSessionId(),
+      this.definition.name,
+      getRemoteAgentTargetUrl(this.definition),
+    ]);
     // 1. Ensure the agent is loaded (cached by manager)
     // We assume the user has provided an access token via some mechanism (TODO),
     // or we rely on ADC.
@@ -151,9 +156,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         });
       }
 
-      const priorState = RemoteAgentInvocation.sessionState.get(
-        this.definition.name,
-      );
+      const priorState = RemoteAgentInvocation.sessionState.get(stateKey);
       if (priorState) {
         this.contextId = priorState.contextId;
         this.taskId = priorState.taskId;
@@ -265,7 +268,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
       };
     } finally {
       // Persist state even on partial failures or aborts to maintain conversational continuity.
-      RemoteAgentInvocation.sessionState.set(this.definition.name, {
+      RemoteAgentInvocation.sessionState.set(stateKey, {
         contextId: this.contextId,
         taskId: this.taskId,
       });

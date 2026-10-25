@@ -41,28 +41,31 @@ export interface SubagentInvocationOptions {
  * which wraps the A2A client streaming behind the AgentProtocol interface.
  *
  * Cross-invocation A2A session state (contextId/taskId) is persisted via a
- * static map keyed by a composite of agent name and target URL. This ensures
- * agents with the same name but different endpoints maintain independent state.
+ * static map scoped to the parent session, agent name, and target URL.
  */
 export class RemoteSessionInvocation extends BaseToolInvocation<
   RemoteAgentInputs,
   ToolResult
 > {
   // Persist A2A conversation state across ephemeral invocation instances.
-  // Keyed by composite of name + target URL so agents with the same name
-  // but different endpoints don't share state.
+  // Different parent sessions and endpoints must not share conversation state.
   private static readonly sessionState = new Map<
     string,
     { contextId?: string; taskId?: string }
   >();
 
   /**
-   * Builds a composite key for the sessionState map.
-   * Format: `name::targetUrl` (or just `name` if no URL can be derived).
+   * Builds an unambiguous key for the parent session, agent, and endpoint.
    */
-  private static sessionKey(definition: RemoteAgentDefinition): string {
-    const url = getRemoteAgentTargetUrl(definition);
-    return url ? `${definition.name}::${url}` : definition.name;
+  private static sessionKey(
+    definition: RemoteAgentDefinition,
+    sessionId: string,
+  ): string {
+    return JSON.stringify([
+      sessionId,
+      definition.name,
+      getRemoteAgentTargetUrl(definition),
+    ]);
   }
 
   private readonly _onAgentEvent?: (event: AgentEvent) => void;
@@ -120,7 +123,10 @@ export class RemoteSessionInvocation extends BaseToolInvocation<
     const emptyActivity: SubagentActivityItem[] = [];
 
     // Seed session with prior A2A conversation state
-    const stateKey = RemoteSessionInvocation.sessionKey(this.definition);
+    const stateKey = RemoteSessionInvocation.sessionKey(
+      this.definition,
+      this.context.config.getSessionId(),
+    );
     const priorState = RemoteSessionInvocation.sessionState.get(stateKey);
     const session = new RemoteSubagentSession(
       this.definition,

@@ -83,6 +83,7 @@ describe('RemoteAgentInvocation', () => {
     };
 
     const mockConfig = {
+      getSessionId: vi.fn().mockReturnValue('test-session'),
       getA2AClientManager: vi.fn().mockReturnValue(mockClientManager),
       injectionService: {
         getLatestInjectionIndex: vi.fn().mockReturnValue(0),
@@ -305,6 +306,56 @@ describe('RemoteAgentInvocation', () => {
 
       expect(mockClientManager.loadAgent).not.toHaveBeenCalled();
     });
+
+    it.each(['parent session', 'endpoint'])(
+      'should isolate conversation state when the %s changes',
+      async (changedScope) => {
+        mockClientManager.getClient.mockReturnValue(mockClient);
+        mockClientManager.sendMessageStream.mockImplementation(
+          async function* () {
+            yield {
+              kind: 'message',
+              messageId: 'msg-a',
+              role: 'agent',
+              parts: [{ kind: 'text', text: 'response' }],
+              contextId: 'ctx-a',
+              taskId: 'task-a',
+            };
+          },
+        );
+        await new RemoteAgentInvocation(
+          mockDefinition,
+          mockContext,
+          { query: 'first' },
+          mockMessageBus,
+        ).execute({ abortSignal: new AbortController().signal });
+
+        const secondDefinition = { ...mockDefinition };
+        if (changedScope === 'parent session') {
+          vi.mocked(mockContext.config.getSessionId).mockReturnValue(
+            'other-session',
+          );
+        } else {
+          secondDefinition.agentCardUrl = 'http://other-endpoint/card';
+        }
+        await new RemoteAgentInvocation(
+          secondDefinition,
+          mockContext,
+          { query: 'second' },
+          mockMessageBus,
+        ).execute({ abortSignal: new AbortController().signal });
+
+        expect(mockClientManager.sendMessageStream).toHaveBeenLastCalledWith(
+          'test-agent',
+          'second',
+          {
+            contextId: undefined,
+            taskId: undefined,
+            signal: expect.any(Object),
+          },
+        );
+      },
+    );
 
     it('should persist contextId and taskId across invocations', async () => {
       mockClientManager.getClient.mockReturnValue(mockClient);
