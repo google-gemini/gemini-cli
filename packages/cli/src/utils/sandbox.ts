@@ -43,7 +43,7 @@ import {
   isSensitiveHostPath,
   sanitizeSettingsForSandbox,
   isRootlessPodman,
-  sandboxFlagsSetUserns,
+  shouldAddKeepidUserns,
 } from './sandboxUtils.js';
 import { BUILTIN_SEATBELT_PROFILE_CONTENTS } from './sandboxBuiltinProfiles.js';
 
@@ -407,6 +407,11 @@ export async function start_sandbox(
 
     debugLogger.log(`hopping into sandbox (command: ${command}) ...`);
 
+    // Start the rootless-podman probe early so its ~1s cost overlaps with
+    // argument construction below instead of blocking at the end.
+    const rootlessPodmanProbe =
+      command === 'podman' ? isRootlessPodman() : undefined;
+
     // determine full path for gemini-cli to distinguish linked vs installed setting
     const gcPath = process.argv[1] ? fs.realpathSync(process.argv[1]) : '';
 
@@ -483,13 +488,11 @@ export async function start_sandbox(
     }
 
     // add custom flags from SANDBOX_FLAGS
-    const customFlags = (
-      process.env['SANDBOX_FLAGS']
-        ? parse(process.env['SANDBOX_FLAGS'], process.env).filter(
-            (f): f is string => typeof f === 'string',
-          )
-        : []
-    ) as string[];
+    const customFlags = process.env['SANDBOX_FLAGS']
+      ? parse(process.env['SANDBOX_FLAGS'], process.env).filter(
+          (f): f is string => typeof f === 'string',
+        )
+      : [];
     args.push(...customFlags);
 
     // add TTY only if stdin is TTY as well, i.e. for piped input don't init TTY in container
@@ -887,9 +890,11 @@ export async function start_sandbox(
       // workspace stays owned by the host user. Docker and rootful Podman are
       // unaffected. Users can still override this via SANDBOX_FLAGS.
       if (
-        command === 'podman' &&
-        !sandboxFlagsSetUserns(customFlags) &&
-        (await isRootlessPodman())
+        shouldAddKeepidUserns(
+          command,
+          customFlags,
+          (await rootlessPodmanProbe) === true,
+        )
       ) {
         debugLogger.log(
           'rootless podman detected: adding --userns=keep-id so the sandbox user matches the host user',

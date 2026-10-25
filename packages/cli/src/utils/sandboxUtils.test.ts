@@ -25,6 +25,7 @@ import {
   isRootlessPodman,
   parsePodmanRootlessInfo,
   sandboxFlagsSetUserns,
+  shouldAddKeepidUserns,
 } from './sandboxUtils.js';
 
 vi.mock('node:os');
@@ -854,7 +855,7 @@ describe('sandboxUtils', () => {
       expect(execFile).toHaveBeenCalledWith(
         'podman',
         ['info', '--format', '{{.Host.Security.Rootless}}'],
-        expect.objectContaining({ timeout: expect.any(Number) }),
+        expect.objectContaining({ timeout: 5000 }),
         expect.any(Function),
       );
     });
@@ -874,6 +875,38 @@ describe('sandboxUtils', () => {
         }) as unknown as typeof execFile,
       );
       expect(await isRootlessPodman()).toBe(false);
+    });
+  });
+
+  describe('shouldAddKeepidUserns', () => {
+    it('should add keep-id for rootless podman on Linux without user-provided userns flags', () => {
+      vi.mocked(os.platform).mockReturnValue('linux');
+      expect(shouldAddKeepidUserns('podman', [], true)).toBe(true);
+    });
+
+    it('should not add keep-id for docker', () => {
+      vi.mocked(os.platform).mockReturnValue('linux');
+      expect(shouldAddKeepidUserns('docker', [], true)).toBe(false);
+    });
+
+    it('should not add keep-id for rootful podman', () => {
+      vi.mocked(os.platform).mockReturnValue('linux');
+      expect(shouldAddKeepidUserns('podman', [], false)).toBe(false);
+    });
+
+    it('should not add keep-id when SANDBOX_FLAGS already sets --userns', () => {
+      vi.mocked(os.platform).mockReturnValue('linux');
+      expect(shouldAddKeepidUserns('podman', ['--userns=host'], true)).toBe(
+        false,
+      );
+      expect(shouldAddKeepidUserns('podman', ['--userns', 'auto'], true)).toBe(
+        false,
+      );
+    });
+
+    it('should not add keep-id on non-Linux platforms', () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      expect(shouldAddKeepidUserns('podman', [], true)).toBe(false);
     });
   });
 

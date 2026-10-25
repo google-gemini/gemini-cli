@@ -311,6 +311,13 @@ export function getContainerPath(hostPath: string): string {
   return withForwardSlashes;
 }
 
+/**
+ * Determines whether the sandbox container should run as the current host user.
+ * Note: on rootless Podman, returning false here does NOT avoid EACCES on
+ * bind-mounted workspaces by itself (the container user still maps to a
+ * subuid); the keep-id fix in shouldAddKeepidUserns only applies when this
+ * returns true. See #29338.
+ */
 export async function shouldUseCurrentUserInSandbox(): Promise<boolean> {
   const envVar = process.env['SANDBOX_SET_UID_GID']?.toLowerCase().trim();
 
@@ -368,6 +375,29 @@ export async function shouldUseCurrentUserInSandbox(): Promise<boolean> {
 export function sandboxFlagsSetUserns(flags: readonly string[]): boolean {
   return flags.some(
     (flag) => flag === '--userns' || flag.startsWith('--userns='),
+  );
+}
+
+/**
+ * Decides whether the sandbox command line should include `--userns=keep-id`.
+ * Only applies to rootless Podman on Linux hosts (the configuration where the
+ * UID/GID user-mapping flow otherwise writes bind-mounted files as subuids,
+ * causing EACCES). Users can still override the user namespace via
+ * SANDBOX_FLAGS. Note: setting SANDBOX_SET_UID_GID=false skips the mapping flow
+ * entirely, so keep-id is not added on that path either; on rootless Podman
+ * that configuration can still produce EACCES because the container's default
+ * user writes files as a subuid outside the host user's range.
+ */
+export function shouldAddKeepidUserns(
+  command: string,
+  customFlags: readonly string[],
+  rootlessPodman: boolean,
+): boolean {
+  return (
+    os.platform() === 'linux' &&
+    command === 'podman' &&
+    rootlessPodman &&
+    !sandboxFlagsSetUserns(customFlags)
   );
 }
 
