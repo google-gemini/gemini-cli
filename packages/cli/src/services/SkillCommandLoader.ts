@@ -11,6 +11,13 @@ import { type ICommandLoader } from './types.js';
 /**
  * Loads Agent Skills as slash commands.
  */
+export function getSkillPostSubmitPrompt(
+  skillName: string,
+  args?: string,
+): string {
+  const task = args?.trim() || '';
+  return task || `Use the skill ${skillName}`;
+}
 export class SkillCommandLoader implements ICommandLoader {
   constructor(private config: Config | null) {}
 
@@ -46,10 +53,7 @@ export class SkillCommandLoader implements ICommandLoader {
           type: 'tool',
           toolName: ACTIVATE_SKILL_TOOL_NAME,
           toolArgs: { name: skill.name },
-          postSubmitPrompt:
-            args.trim().length > 0
-              ? args.trim()
-              : `Use the skill ${skill.name}`,
+          postSubmitPrompt: getSkillPostSubmitPrompt(skill.name, args),
         }),
       };
     });
