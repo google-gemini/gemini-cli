@@ -120,10 +120,6 @@ including complex TUIs, will be rendered correctly.
 
 ## Important notes
 
-Cancelling a pending `read_background_output` request interrupts its optional
-delay instead of waiting for the delay to finish. This cancels the output read,
-not the background process itself.
-
 - **Security:** Be cautious when executing commands, especially those
   constructed from user input, to prevent security vulnerabilities.
 - **Error handling:** Check the `Stderr`, `Error`, and `Exit Code` fields to
@@ -132,6 +128,9 @@ not the background process itself.
   the tool will return immediately and the process will continue to run in the
   background. The `Background PIDs` field will contain the process ID of the
   background process.
+- **Cancelling output reads:** Cancelling a pending `read_background_output`
+  request interrupts its optional delay instead of waiting for it to finish.
+  This cancels the read, not the background process itself.
 
 ## Environment variables
 
