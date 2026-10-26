@@ -1248,7 +1248,7 @@ describe('runNonInteractive', () => {
       keypressHandler('\u0003', { ctrl: true, name: 'c' });
     }
 
-    await expect(runPromise).rejects.toThrow('Operation cancelled.');
+    await expect(runPromise).rejects.toThrow('process.exit(130) called');
 
     expect(
       processStderrSpy.mock.calls.some(
@@ -1271,6 +1271,123 @@ describe('runNonInteractive', () => {
     }
     // Spies are automatically restored by vi.restoreAllMocks() in afterEach,
     // but we can also do it manually if needed.
+  });
+
+  it('should register SIGINT and SIGTERM listeners and abort on signal in non-TTY mode', async () => {
+    const originalIsTTY = process.stdin.isTTY;
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: false,
+      configurable: true,
+    });
+
+    try {
+      const processOnSpy = vi.spyOn(process, 'on');
+      const processOffSpy = vi.spyOn(process, 'off');
+
+      mockGeminiClient.sendMessageStream.mockImplementation(
+        (_messages, signal: AbortSignal) =>
+          (async function* () {
+            yield { type: GeminiEventType.Content, value: 'Thinking...' };
+            await new Promise((_resolve, reject) => {
+              signal.addEventListener('abort', () => {
+                reject(new Error('Aborted'));
+              });
+            });
+          })(),
+      );
+
+      const runPromise = runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'Long running query in non-TTY',
+        prompt_id: 'prompt-id-cancel-nontty',
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const sigintCall = processOnSpy.mock.calls.find(
+        (call) => call[0] === 'SIGINT',
+      );
+      const sigtermCall = processOnSpy.mock.calls.find(
+        (call) => call[0] === 'SIGTERM',
+      );
+      expect(sigintCall).toBeDefined();
+      expect(sigtermCall).toBeDefined();
+
+      const sigintHandler = sigintCall?.[1] as (() => void) | undefined;
+      sigintHandler?.();
+
+      await expect(runPromise).rejects.toThrow('process.exit(130) called');
+
+      expect(processOffSpy).toHaveBeenCalledWith(
+        'SIGINT',
+        expect.any(Function),
+      );
+      expect(processOffSpy).toHaveBeenCalledWith(
+        'SIGTERM',
+        expect.any(Function),
+      );
+    } finally {
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: originalIsTTY,
+        configurable: true,
+      });
+    }
+  });
+
+  it('should immediately force exit with code 130 on repeated interrupt signal', async () => {
+    const originalIsTTY = process.stdin.isTTY;
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: false,
+      configurable: true,
+    });
+
+    try {
+      const processOnSpy = vi.spyOn(process, 'on');
+
+      mockGeminiClient.sendMessageStream.mockImplementation(
+        (_messages, signal: AbortSignal) =>
+          (async function* () {
+            yield { type: GeminiEventType.Content, value: 'Thinking...' };
+            await new Promise((_resolve, reject) => {
+              signal.addEventListener('abort', () => {
+                reject(new Error('Aborted'));
+              });
+            });
+          })(),
+      );
+
+      const runPromise = runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'Test repeated signal in agent session',
+        prompt_id: 'prompt-repeated-signal-agent',
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const sigintCall = processOnSpy.mock.calls.find(
+        (call) => call[0] === 'SIGINT',
+      );
+      const sigintHandler = sigintCall?.[1] as (() => void) | undefined;
+
+      // First signal initiates cancellation
+      sigintHandler?.();
+
+      // Second signal triggers immediate force exit
+      expect(() => sigintHandler?.()).toThrow('process.exit(130) called');
+
+      try {
+        await runPromise;
+      } catch {
+        // Expected
+      }
+    } finally {
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: originalIsTTY,
+        configurable: true,
+      });
+    }
   });
 
   it('should honor cancellation that happens before session.send()', async () => {
@@ -1317,7 +1434,7 @@ describe('runNonInteractive', () => {
         input: 'Cancelled query',
         prompt_id: 'prompt-id-pre-send-cancel',
       }),
-    ).rejects.toThrow('Operation cancelled.');
+    ).rejects.toThrow('process.exit(130) called');
 
     expect(sendSpy).not.toHaveBeenCalled();
     expect(stdinOnSpy).toHaveBeenCalled();

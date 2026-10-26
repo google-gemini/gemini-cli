@@ -20,6 +20,15 @@ const syncCleanupFunctions: Array<() => void> = [];
 let configForTelemetry: Config | null = null;
 let isShuttingDown = false;
 
+export enum CleanupState {
+  IDLE = 'IDLE',
+  RUNNING = 'RUNNING',
+  COMPLETED = 'COMPLETED',
+}
+
+let cleanupState = CleanupState.IDLE;
+let cleanupPromise: Promise<void> | null = null;
+
 export function registerCleanup(fn: (() => void) | (() => Promise<void>)) {
   cleanupFunctions.push(fn);
 }
@@ -51,6 +60,8 @@ export function resetCleanupForTesting() {
   syncCleanupFunctions.length = 0;
   configForTelemetry = null;
   isShuttingDown = false;
+  cleanupState = CleanupState.IDLE;
+  cleanupPromise = null;
 }
 
 export function runSyncCleanup() {
@@ -72,45 +83,66 @@ export function registerTelemetryConfig(config: Config) {
   configForTelemetry = config;
 }
 
-export async function runExitCleanup() {
-  // drain stdin to prevent printing garbage on exit
-  // https://github.com/google-gemini/gemini-cli/issues/16801
-  await drainStdin();
-
-  runSyncCleanup();
-  for (const fn of cleanupFunctions) {
+export async function runExitCleanup(): Promise<void> {
+  if (cleanupState === CleanupState.COMPLETED) {
+    return;
+  }
+  if (cleanupState === CleanupState.RUNNING && cleanupPromise) {
+    await cleanupPromise;
+    return;
+  }
+  cleanupState = CleanupState.RUNNING;
+  cleanupPromise = (async () => {
     try {
-      await fn();
-    } catch {
-      // Ignore errors during cleanup.
-    }
-  }
-  cleanupFunctions.length = 0; // Clear the array
+      // drain stdin to prevent printing garbage on exit
+      // https://github.com/google-gemini/gemini-cli/issues/16801
+      try {
+        await drainStdin();
+      } catch {
+        // Ignore errors during stdin draining to ensure cleanup continues.
+      }
 
-  // Close persistent browser sessions before disposing config
-  try {
-    await resetBrowserSession();
-  } catch {
-    // Ignore errors during browser cleanup
-  }
+      runSyncCleanup();
+      for (const fn of cleanupFunctions) {
+        try {
+          await fn();
+        } catch {
+          // Ignore errors during cleanup.
+        }
+      }
+      cleanupFunctions.length = 0; // Clear the array
 
-  if (configForTelemetry) {
-    try {
-      await configForTelemetry.dispose();
-    } catch {
-      // Ignore errors during disposal
-    }
-  }
+      // Close persistent browser sessions before disposing config
+      try {
+        await resetBrowserSession();
+      } catch {
+        // Ignore errors during browser cleanup
+      }
 
-  // IMPORTANT: Shutdown telemetry AFTER all other cleanup functions have run
-  // This ensures SessionEnd hooks and other telemetry are properly flushed
-  if (configForTelemetry && isTelemetrySdkInitialized()) {
-    try {
-      await shutdownTelemetry(configForTelemetry);
-    } catch {
-      // Ignore errors during telemetry shutdown
+      if (configForTelemetry) {
+        try {
+          await configForTelemetry.dispose();
+        } catch {
+          // Ignore errors during disposal
+        }
+      }
+
+      // IMPORTANT: Shutdown telemetry AFTER all other cleanup functions have run
+      // This ensures SessionEnd hooks and other telemetry are properly flushed
+      if (configForTelemetry && isTelemetrySdkInitialized()) {
+        try {
+          await shutdownTelemetry(configForTelemetry);
+        } catch {
+          // Ignore errors during telemetry shutdown
+        }
+      }
+    } finally {
+      cleanupState = CleanupState.COMPLETED;
+      cleanupPromise = null;
     }
-  }
+  })();
+
+  await cleanupPromise;
 }
 
 async function drainStdin() {
@@ -132,14 +164,16 @@ async function drainStdin() {
  *
  * @see https://github.com/google-gemini/gemini-cli/issues/15874
  */
-async function gracefulShutdown(_reason: string) {
+async function gracefulShutdown(reason: string) {
   if (isShuttingDown) {
     return;
   }
   isShuttingDown = true;
 
   await runExitCleanup();
-  process.exit(ExitCodes.SUCCESS);
+  const exitCode =
+    reason === 'SIGINT' ? 130 : reason === 'SIGTERM' ? 143 : ExitCodes.SUCCESS;
+  process.exit(exitCode);
 }
 
 export function setupSignalHandlers() {

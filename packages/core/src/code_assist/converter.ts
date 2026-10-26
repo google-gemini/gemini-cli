@@ -318,9 +318,34 @@ export function fromGenerateContentResponseUsage(
   if (!metadata) {
     return undefined;
   }
+  const promptTokenCount = metadata.promptTokenCount;
+  const candidatesTokenCount = metadata.candidatesTokenCount;
+  const thoughtsTokenCount = metadata.thoughtsTokenCount;
+  const toolUsePromptTokenCount = metadata.toolUsePromptTokenCount;
+  const cachedContentTokenCount = metadata.cachedContentTokenCount;
+
+  const hasComponentCounts =
+    promptTokenCount !== undefined ||
+    candidatesTokenCount !== undefined ||
+    thoughtsTokenCount !== undefined ||
+    toolUsePromptTokenCount !== undefined;
+  const computedTotal = hasComponentCounts
+    ? (promptTokenCount ?? 0) +
+      (candidatesTokenCount ?? 0) +
+      (toolUsePromptTokenCount ?? 0) +
+      (thoughtsTokenCount ?? 0)
+    : undefined;
+  const totalTokenCount =
+    computedTotal !== undefined
+      ? Math.max(computedTotal, metadata.totalTokenCount ?? 0)
+      : metadata.totalTokenCount;
+
   return {
-    promptTokenCount: metadata.promptTokenCount,
-    candidatesTokenCount: metadata.candidatesTokenCount,
-    totalTokenCount: metadata.totalTokenCount,
+    promptTokenCount,
+    candidatesTokenCount,
+    totalTokenCount,
+    ...(thoughtsTokenCount !== undefined && { thoughtsTokenCount }),
+    ...(toolUsePromptTokenCount !== undefined && { toolUsePromptTokenCount }),
+    ...(cachedContentTokenCount !== undefined && { cachedContentTokenCount }),
   };
 }
