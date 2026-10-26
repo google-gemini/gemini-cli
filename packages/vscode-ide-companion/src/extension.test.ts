@@ -32,6 +32,24 @@ vi.mock('vscode', () => ({
       appendLine: vi.fn(),
     })),
   },
+  commands: {
+    ...vscodeMock.commands,
+    registerCommand: vi.fn((command: string) => ({
+      dispose: vi.fn(),
+      tag: `registerCommand:${command}`,
+    })),
+  },
+  workspace: {
+    ...vscodeMock.workspace,
+    onDidChangeWorkspaceFolders: vi.fn(() => ({
+      dispose: vi.fn(),
+      tag: 'onDidChangeWorkspaceFolders',
+    })),
+    onDidGrantWorkspaceTrust: vi.fn(() => ({
+      dispose: vi.fn(),
+      tag: 'onDidGrantWorkspaceTrust',
+    })),
+  },
 }));
 
 describe('activate', () => {
@@ -91,6 +109,16 @@ describe('activate', () => {
   it('should register a handler for onDidGrantWorkspaceTrust', async () => {
     await activate(context);
     expect(vscode.workspace.onDidGrantWorkspaceTrust).toHaveBeenCalled();
+  });
+
+  it('subscribes gemini.diff.accept and the workspace folder listener', async () => {
+    await activate(context);
+
+    const tags = context.subscriptions.map(
+      (subscription) => (subscription as { tag?: string } | undefined)?.tag,
+    );
+    expect(tags).toContain('registerCommand:gemini.diff.accept');
+    expect(tags).toContain('onDidChangeWorkspaceFolders');
   });
 
   it('should launch the Gemini CLI when the user clicks the button', async () => {
