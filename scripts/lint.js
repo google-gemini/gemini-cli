@@ -13,10 +13,11 @@ import {
   readFileSync,
   existsSync,
   lstatSync,
+  realpathSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 const ACTIONLINT_VERSION = '1.7.7';
 const SHELLCHECK_VERSION = '0.11.0';
@@ -535,9 +536,26 @@ function main() {
   }
 }
 
-if (
-  process.argv[1] &&
-  pathToFileURL(process.argv[1]).href === import.meta.url
-) {
+/**
+ * Returns true when this file is the script Node was asked to run, so tests can
+ * import it without running every linter. Node resolves the main module's
+ * `import.meta.url` through symlinks and junctions but leaves argv[1] as typed,
+ * so both sides are compared as real paths; otherwise lint would silently pass
+ * in a checkout opened through a link.
+ */
+export function isMainModule(argvPath = process.argv[1]) {
+  if (!argvPath) {
+    return false;
+  }
+  try {
+    return (
+      realpathSync(argvPath) === realpathSync(fileURLToPath(import.meta.url))
+    );
+  } catch {
+    return false;
+  }
+}
+
+if (isMainModule()) {
   main();
 }
