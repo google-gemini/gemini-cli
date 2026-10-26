@@ -484,7 +484,7 @@ export function classifyGoogleError(error: unknown): unknown {
 
 /** True when the API text is a project spending cap, not a short rate limit. */
 export function isSpendingCapMessage(message: string): boolean {
-  return /spending cap|spend cap/i.test(message);
+  return /\b(spending|spend)\s+cap\b/i.test(message);
 }
 
 function extractErrorMessage(error: unknown): string {

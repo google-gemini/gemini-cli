@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   classifyGoogleError,
+  isSpendingCapMessage,
   RetryableQuotaError,
   TerminalQuotaError,
   ValidationRequiredError,
@@ -143,6 +144,19 @@ describe('classifyGoogleError', () => {
       expect(result.message).toBe(message);
       expect(result.status).toBe(400);
     }
+  });
+
+  it('should not match false-positive substrings like "spend capacity" in isSpendingCapMessage', () => {
+    expect(
+      isSpendingCapMessage(
+        'Your project has exceeded its monthly spending cap.',
+      ),
+    ).toBe(true);
+    expect(isSpendingCapMessage('Manage your project spend cap.')).toBe(true);
+    expect(isSpendingCapMessage('Unable to spend capacity on model.')).toBe(
+      false,
+    );
+    expect(isSpendingCapMessage('Spending capital limit reached.')).toBe(false);
   });
 
   it('should return TerminalQuotaError for MODEL_CAPACITY_EXHAUSTED when no retry delay is specified', () => {
