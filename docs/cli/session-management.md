@@ -81,6 +81,9 @@ following actions:
 - **Select:** Press **Enter** to resume the selected session.
 - **Esc:** Press **Esc** to exit the Session Browser.
 
+Session previews preserve your prompt text, including non-English scripts,
+accented characters, and emoji.
+
 ### Manual chat checkpoints
 
 For named branch points inside a session, use chat checkpoints:

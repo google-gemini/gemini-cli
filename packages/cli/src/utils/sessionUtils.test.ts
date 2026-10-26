@@ -1026,6 +1026,35 @@ describe('SessionSelector', () => {
 });
 
 describe('extractFirstUserMessage', () => {
+  it.each([
+    '修复登录问题',
+    'Corrige la conexión',
+    'إصلاح تسجيل الدخول',
+    'Fix 🐛',
+  ])('preserves Unicode in a session preview: %s', (content) => {
+    const messages: MessageRecord[] = [
+      {
+        type: 'user',
+        content,
+        id: 'message-unicode',
+        timestamp: '2024-01-01T10:00:00.000Z',
+      },
+    ];
+    expect(extractFirstUserMessage(messages)).toBe(content);
+  });
+
+  it('removes terminal escape sequences without corrupting Unicode text', () => {
+    const messages: MessageRecord[] = [
+      {
+        type: 'user',
+        content: '\u001b[31m修复登录问题\u001b[0m\u0007\n  résumé',
+        id: 'message-control-codes',
+        timestamp: '2024-01-01T10:00:00.000Z',
+      },
+    ];
+    expect(extractFirstUserMessage(messages)).toBe('修复登录问题 résumé');
+  });
+
   it('should extract first non-resume user message', () => {
     const messages = [
       {
