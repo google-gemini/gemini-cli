@@ -248,17 +248,15 @@ vi.mock('./useStateAndRef.js', async () => {
         return [state, ref, setStateInternal];
       }
 
-      let val = initial;
-      const ref = { current: val };
+      const ref = React.useRef(initial);
       const setVal = vi.fn((updater) => {
         if (typeof updater === 'function') {
-          val = updater(val);
+          ref.current = updater(ref.current);
         } else {
-          val = updater;
+          ref.current = updater;
         }
-        ref.current = val;
       });
-      return [val, ref, setVal];
+      return [ref.current, ref, setVal];
     }),
   };
 });
@@ -2344,6 +2342,232 @@ describe('useGeminiStream', () => {
       });
 
       // The final state should be idle
+      expect(result.current.streamingState).toBe(StreamingState.Idle);
+    });
+
+    it('should not auto-nudge or schedule follow-up tools when cancelled during a continuation stream', async () => {
+      // Simulate real GeminiClient.sendMessageStream behavior when aborted:
+      // Turn 1 (initial user prompt): requests SearchText tools
+      // Turn 2 (continuation with SearchText results): waits for model, then when signal aborts, yields UserCancelled and ends
+      // Turn 3 (erroneous auto-nudge after cancellation): model emits Shell tool calls (git status, git worktree list)
+      let turnNumber = 0;
+      mockSendMessageStream.mockImplementation(
+        (_query: PartListUnion, signal: AbortSignal) => {
+          turnNumber += 1;
+          const currentTurn = turnNumber;
+          return (async function* () {
+            if (currentTurn === 1) {
+              yield {
+                type: ServerGeminiEventType.ToolCallRequest,
+                value: {
+                  callId: 'search-1',
+                  name: 'grep_search',
+                  args: { pattern: '@tools', dir_path: 'docs' },
+                  isClientInitiated: false,
+                  prompt_id: 'prompt-1',
+                },
+              };
+              yield {
+                type: ServerGeminiEventType.ToolCallRequest,
+                value: {
+                  callId: 'search-2',
+                  name: 'grep_search',
+                  args: { pattern: 'tools', dir_path: 'packages/cli/src' },
+                  isClientInitiated: false,
+                  prompt_id: 'prompt-1',
+                },
+              };
+              return;
+            }
+
+            if (currentTurn === 2) {
+              // Wait until the user presses Escape (which aborts `signal`)
+              await new Promise<void>((resolve) => {
+                if (signal.aborted) {
+                  resolve();
+                  return;
+                }
+                signal.addEventListener('abort', () => resolve(), {
+                  once: true,
+                });
+              });
+              // Real Turn.run yields UserCancelled and terminates when signal is aborted
+              yield { type: ServerGeminiEventType.UserCancelled };
+              return;
+            }
+
+            // Turn 3+: if auto-nudge erroneously fires after cancellation, model schedules Shell git status / git worktree list
+            yield {
+              type: ServerGeminiEventType.ToolCallRequest,
+              value: {
+                callId: 'shell-1',
+                name: 'run_shell_command',
+                args: { command: 'git status' },
+                isClientInitiated: false,
+                prompt_id: 'prompt-1',
+              },
+            };
+            yield {
+              type: ServerGeminiEventType.ToolCallRequest,
+              value: {
+                callId: 'shell-2',
+                name: 'run_shell_command',
+                args: { command: 'git worktree list' },
+                isClientInitiated: false,
+                prompt_id: 'prompt-1',
+              },
+            };
+          })();
+        },
+      );
+
+      handleAtCommandSpy.mockResolvedValue({
+        processedQuery: [
+          {
+            text: 'explain @tools',
+          },
+        ],
+      });
+
+      const { result } = await renderTestHook();
+
+      // 1. User submits `explain @tools/`
+      await act(async () => {
+        await result.current.submitQuery('explain @tools/');
+      });
+
+      expect(mockScheduleToolCalls).toHaveBeenCalledTimes(1);
+
+      // 2. The two SearchText tools complete and trigger continuation turn (Turn 2)
+      const completedSearchTools: TrackedCompletedToolCall[] = [
+        {
+          request: {
+            callId: 'search-1',
+            name: 'grep_search',
+            args: { pattern: '@tools', dir_path: 'docs' },
+            isClientInitiated: false,
+            prompt_id: 'prompt-1',
+          },
+          status: CoreToolCallStatus.Success,
+          responseSubmittedToGemini: false,
+          response: {
+            callId: 'search-1',
+            responseParts: [{ text: 'No matches found' }],
+            resultDisplay: 'No matches found',
+            error: undefined,
+            errorType: undefined,
+          },
+          tool: {
+            name: 'grep_search',
+            displayName: 'SearchText',
+          } as any,
+          invocation: {
+            getDescription: () => "'@tools' within docs",
+          } as any,
+        },
+        {
+          request: {
+            callId: 'search-2',
+            name: 'grep_search',
+            args: { pattern: 'tools', dir_path: 'packages/cli/src' },
+            isClientInitiated: false,
+            prompt_id: 'prompt-1',
+          },
+          status: CoreToolCallStatus.Success,
+          responseSubmittedToGemini: false,
+          response: {
+            callId: 'search-2',
+            responseParts: [{ text: 'Found 100 matches (limited)' }],
+            resultDisplay: 'Found 100 matches (limited)',
+            error: undefined,
+            errorType: undefined,
+          },
+          tool: {
+            name: 'grep_search',
+            displayName: 'SearchText',
+          } as any,
+          invocation: {
+            getDescription: () => "'tools' in *.ts* within packages/cli/src",
+          } as any,
+        },
+      ];
+
+      await act(async () => {
+        if (capturedOnComplete) {
+          void capturedOnComplete(completedSearchTools);
+        }
+      });
+
+      await waitFor(() => {
+        expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+        expect(result.current.streamingState).toBe(StreamingState.Responding);
+      });
+
+      // 3. User presses Escape while Turn 2 continuation stream is in flight
+      simulateEscapeKeyPress();
+
+      // Let microtasks settle
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      });
+
+      // Verify "Request cancelled." was added to history
+      expect(mockAddItem).toHaveBeenCalledWith({
+        type: MessageType.INFO,
+        text: 'Request cancelled.',
+      });
+
+      // Assert that cancellation actually stopped execution:
+      // Turn 3 (auto-nudge) must NOT have been sent, and Shell tools must NOT have been scheduled!
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+      expect(mockScheduleToolCalls).toHaveBeenCalledTimes(1);
+      expect(result.current.streamingState).toBe(StreamingState.Idle);
+    });
+
+    it('should not schedule queued tool calls when stream is cancelled after yielding ToolCallRequest', async () => {
+      mockSendMessageStream.mockImplementation(
+        (_query: PartListUnion, signal: AbortSignal) =>
+          (async function* () {
+            yield {
+              type: ServerGeminiEventType.ToolCallRequest,
+              value: {
+                callId: 'queued-shell-1',
+                name: 'run_shell_command',
+                args: { command: 'git status' },
+                isClientInitiated: false,
+                prompt_id: 'prompt-cancel-after-tool-req',
+              },
+            };
+            await new Promise<void>((resolve) => {
+              if (signal.aborted) {
+                resolve();
+                return;
+              }
+              signal.addEventListener('abort', () => resolve(), {
+                once: true,
+              });
+            });
+            yield { type: ServerGeminiEventType.UserCancelled };
+          })(),
+      );
+
+      const { result } = await renderTestHook();
+
+      await act(async () => {
+        void result.current.submitQuery('run git status');
+      });
+
+      await waitFor(() => {
+        expect(result.current.streamingState).toBe(StreamingState.Responding);
+      });
+
+      simulateEscapeKeyPress();
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      });
+
+      expect(mockScheduleToolCalls).not.toHaveBeenCalled();
       expect(result.current.streamingState).toBe(StreamingState.Idle);
     });
   });

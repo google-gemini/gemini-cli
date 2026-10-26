@@ -233,9 +233,11 @@ export class LegacyAgentProtocol implements AgentProtocol {
             finishedReason = event.value.reason;
             break;
           case GeminiEventType.AgentExecutionStopped:
-          case GeminiEventType.UserCancelled:
           case GeminiEventType.MaxSessionTurns:
             this._clearActiveStream();
+            return;
+          case GeminiEventType.UserCancelled:
+            this._finishStream('aborted');
             return;
           default:
             break;
