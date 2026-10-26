@@ -57,6 +57,30 @@ describe('textUtils', () => {
       expect(() => getCachedStringWidth(charWithAnsi)).not.toThrow();
       expect(typeof getCachedStringWidth(charWithAnsi)).toBe('number');
     });
+
+    it('should count Thai SARA AM (U+0E33) as 1 column when standalone or combined', () => {
+      expect(getCachedStringWidth('\u0E33')).toBe(1);
+      expect(getCachedStringWidth('ก')).toBe(1);
+      expect(getCachedStringWidth('กำ')).toBe(2);
+      expect(getCachedStringWidth('น้ำ')).toBe(2);
+      expect(getCachedStringWidth('\u0E01\u0E33\u0E49')).toBe(2);
+      expect(getCachedStringWidth('ำำ')).toBe(2);
+      expect(getCachedStringWidth('กำำ')).toBe(3);
+      expect(getCachedStringWidth('กำลังพิมพ์')).toBe(7);
+      expect(getCachedStringWidth('\u001b[31mกำ\u001b[39m')).toBe(2);
+    });
+
+    it('should count Lao SARA AM (U+0EB3) as 1 column when standalone or combined', () => {
+      expect(getCachedStringWidth('\u0EB3')).toBe(1);
+      expect(getCachedStringWidth('ຫຳ')).toBe(2);
+      expect(getCachedStringWidth('ນ້ຳ')).toBe(2);
+    });
+
+    it('should keep zero-width Thai combining marks at 0 width', () => {
+      expect(getCachedStringWidth('กิ')).toBe(1);
+      expect(getCachedStringWidth('ก้')).toBe(1);
+      expect(getCachedStringWidth('กิ่ง')).toBe(2);
+    });
   });
 
   describe('stripUnsafeCharacters', () => {

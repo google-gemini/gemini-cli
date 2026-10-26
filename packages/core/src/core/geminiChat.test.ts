@@ -3876,8 +3876,10 @@ describe('GeminiChat', () => {
 
       const newContents = chat.ensureActiveLoopHasThoughtSignatures(history);
 
-      // Outside active loop - unchanged
-      expect(newContents[1]?.parts?.[0]).not.toHaveProperty('thoughtSignature');
+      // Model turns across history get a synthetic signature on their first function call
+      expect(newContents[1]?.parts?.[0]?.thoughtSignature).toBe(
+        SYNTHETIC_THOUGHT_SIGNATURE,
+      );
 
       // Inside active loop, first model turn
       // First function call gets a signature
@@ -3928,7 +3930,7 @@ describe('GeminiChat', () => {
       );
     });
 
-    it('should not modify contents if there is no user text message', () => {
+    it('should add thoughtSignature even if there is no user text message', () => {
       const chat = new GeminiChat(mockConfig, '', [], []);
       const history: Content[] = [
         {
@@ -3941,22 +3943,134 @@ describe('GeminiChat', () => {
         },
       ];
       const newContents = chat.ensureActiveLoopHasThoughtSignatures(history);
-      expect(newContents).toEqual(history);
-      expect(newContents[1]?.parts?.[0]).not.toHaveProperty('thoughtSignature');
+      expect(newContents[1]?.parts?.[0]?.thoughtSignature).toBe(
+        SYNTHETIC_THOUGHT_SIGNATURE,
+      );
     });
 
     it('should handle an empty history', () => {
       const chat = new GeminiChat(mockConfig, '', []);
       const history: Content[] = [];
       const newContents = chat.ensureActiveLoopHasThoughtSignatures(history);
-      expect(newContents).toEqual([]);
+      expect(newContents).toBe(history);
     });
 
     it('should handle history with only a user message', () => {
       const chat = new GeminiChat(mockConfig, '', []);
       const history: Content[] = [{ role: 'user', parts: [{ text: 'Hello' }] }];
       const newContents = chat.ensureActiveLoopHasThoughtSignatures(history);
-      expect(newContents).toEqual(history);
+      expect(newContents).toBe(history);
+    });
+
+    it('should return the original array reference without cloning if all model function calls are already signed or none exist', () => {
+      const chat = new GeminiChat(mockConfig, '', []);
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+        { role: 'model', parts: [{ text: 'Hi' }] },
+        {
+          role: 'model',
+          parts: [
+            {
+              functionCall: { name: 'signed_tool', args: {} },
+              thoughtSignature: 'existing-signature',
+            },
+          ],
+        },
+      ];
+      const result = chat.ensureActiveLoopHasThoughtSignatures(history);
+      expect(result).toBe(history);
+    });
+
+    it('reproduction: should ensure historical model turns outside the active loop have thoughtSignature on first functionCall', () => {
+      const chat = new GeminiChat(mockConfig, '', [], []);
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'Old search prompt' }] },
+        {
+          role: 'model',
+          parts: [
+            { functionCall: { name: 'default_api:grep_search', args: {} } },
+          ],
+        },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'default_api:grep_search',
+                response: { result: 'found 5 matches' },
+              },
+            },
+          ],
+        },
+        { role: 'model', parts: [{ text: 'I found 5 matches.' }] },
+        { role: 'user', parts: [{ text: 'Now replace the first occurrence' }] },
+      ];
+
+      const newContents = chat.ensureActiveLoopHasThoughtSignatures(history);
+
+      // Model turn 1 (default_api:grep_search) is outside the active loop (which starts at index 4),
+      // but the Gemini API still validates all function calls in history.
+      expect(newContents[1]?.parts?.[0]?.thoughtSignature).toBe(
+        SYNTHETIC_THOUGHT_SIGNATURE,
+      );
+    });
+
+    it('reproduction: should send thoughtSignature for historical model tool calls when sending a new prompt in sendMessageStream', async () => {
+      const initialHistory: Content[] = [
+        { role: 'user', parts: [{ text: 'Search for files' }] },
+        {
+          role: 'model',
+          parts: [
+            { functionCall: { name: 'default_api:grep_search', args: {} } },
+          ],
+        },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'default_api:grep_search',
+                response: { result: 'found files' },
+              },
+            },
+          ],
+        },
+        { role: 'model', parts: [{ text: 'I found the files.' }] },
+      ];
+      chat.setHistory(initialHistory);
+
+      let capturedContents: Content[] = [];
+      vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
+        async (req) => {
+          capturedContents = req.contents as Content[];
+          return (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: { role: 'model', parts: [{ text: 'done' }] },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })();
+        },
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-2.5-pro' },
+        'Now edit the file',
+        'prompt-historical-tool',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      // Check capturedContents at position 1 (default_api:grep_search):
+      expect(capturedContents[1]?.parts?.[0]?.thoughtSignature).toBe(
+        SYNTHETIC_THOUGHT_SIGNATURE,
+      );
     });
   });
 
@@ -5482,6 +5596,7 @@ describe('GeminiChat', () => {
                 name: 'read_file',
                 args: { path: 'foo.ts' },
               },
+              thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE,
             },
           ],
         },

@@ -5,10 +5,11 @@
  */
 
 import React from 'react';
-import { render } from 'ink';
+import { render, setStringWidthFunction } from 'ink';
 import { basename } from 'node:path';
 import { AppContainer } from './ui/AppContainer.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
+import { getCachedStringWidth } from './ui/utils/textUtils.js';
 import {
   registerCleanup,
   removeCleanup,
@@ -63,6 +64,7 @@ export async function startInteractiveUI(
   initializationResult: InitializationResult,
 ) {
   initializeConsoleStore();
+  setStringWidthFunction(getCachedStringWidth);
   // Never enter Ink alternate buffer mode when screen reader mode is enabled
   // as there is no benefit of alternate buffer mode when using a screen reader
   // and the Ink alternate buffer mode requires line wrapping harmful to

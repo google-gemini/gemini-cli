@@ -95,6 +95,8 @@ export class Task {
     candidatesTokenCount?: number;
     totalTokenCount?: number;
     cachedContentTokenCount?: number;
+    thoughtsTokenCount?: number;
+    toolUsePromptTokenCount?: number;
   };
   private get isYoloMatch(): boolean {
     return (
@@ -319,6 +321,7 @@ export class Task {
 
     if (final && this.usageMetadata) {
       metadata.usageMetadata = this.usageMetadata;
+      this.usageMetadata = undefined;
     }
 
     return {
@@ -921,14 +924,66 @@ export class Task {
         if (
           event.value &&
           typeof event.value === 'object' &&
-          'usageMetadata' in event.value
+          'usageMetadata' in event.value &&
+          event.value.usageMetadata
         ) {
-          this.usageMetadata = event.value
-            .usageMetadata as typeof this.usageMetadata;
+          const incoming = event.value.usageMetadata as NonNullable<
+            typeof this.usageMetadata
+          >;
+          const prev = this.usageMetadata;
+          const sumOptional = (a?: number, b?: number): number | undefined =>
+            a !== undefined || b !== undefined
+              ? (a ?? 0) + (b ?? 0)
+              : undefined;
+
+          const promptTokenCount =
+            incoming.promptTokenCount ?? prev?.promptTokenCount;
+          const candidatesTokenCount = sumOptional(
+            prev?.candidatesTokenCount,
+            incoming.candidatesTokenCount,
+          );
+          const thoughtsTokenCount = sumOptional(
+            prev?.thoughtsTokenCount,
+            incoming.thoughtsTokenCount,
+          );
+          const toolUsePromptTokenCount = sumOptional(
+            prev?.toolUsePromptTokenCount,
+            incoming.toolUsePromptTokenCount,
+          );
+          const cachedContentTokenCount =
+            incoming.cachedContentTokenCount ?? prev?.cachedContentTokenCount;
+
+          const hasComponentCounts =
+            promptTokenCount !== undefined ||
+            candidatesTokenCount !== undefined ||
+            thoughtsTokenCount !== undefined ||
+            toolUsePromptTokenCount !== undefined;
+          const computedTotal = hasComponentCounts
+            ? (promptTokenCount ?? 0) +
+              (candidatesTokenCount ?? 0) +
+              (toolUsePromptTokenCount ?? 0) +
+              (thoughtsTokenCount ?? 0)
+            : undefined;
+          const totalTokenCount =
+            computedTotal !== undefined
+              ? Math.max(computedTotal, incoming.totalTokenCount ?? 0)
+              : (incoming.totalTokenCount ?? prev?.totalTokenCount);
+
+          this.usageMetadata = {
+            ...(promptTokenCount !== undefined && { promptTokenCount }),
+            ...(candidatesTokenCount !== undefined && { candidatesTokenCount }),
+            ...(totalTokenCount !== undefined && { totalTokenCount }),
+            ...(cachedContentTokenCount !== undefined && {
+              cachedContentTokenCount,
+            }),
+            ...(thoughtsTokenCount !== undefined && { thoughtsTokenCount }),
+            ...(toolUsePromptTokenCount !== undefined && {
+              toolUsePromptTokenCount,
+            }),
+          };
         }
         break;
       case GeminiEventType.ModelInfo:
-        this.usageMetadata = undefined;
         this.modelInfo = event.value;
         break;
       case GeminiEventType.Retry:
