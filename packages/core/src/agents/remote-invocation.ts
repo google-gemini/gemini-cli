@@ -27,7 +27,12 @@ import type {
   A2AClientManager,
   SendMessageResult,
 } from './a2a-client-manager.js';
-import { extractIdsFromResponse, A2AResultReassembler } from './a2aUtils.js';
+import {
+  extractIdsFromResponse,
+  A2AResultReassembler,
+  RemoteConversationStateMap,
+  remoteConversationKey,
+} from './a2aUtils.js';
 import type { AuthenticationHandler } from '@a2a-js/sdk/client';
 import { debugLogger } from '../utils/debugLogger.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
@@ -44,10 +49,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
   ToolResult
 > {
   // Persist state across ephemeral invocation instances.
-  private static readonly sessionState = new Map<
-    string,
-    { contextId?: string; taskId?: string }
-  >();
+  private static readonly sessionState = new RemoteConversationStateMap();
   // State for the ongoing conversation with the remote agent
   private contextId: string | undefined;
   private taskId: string | undefined;
@@ -129,11 +131,10 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
 
   async execute(options: ExecuteOptions): Promise<ToolResult> {
     const { abortSignal: _signal, updateOutput } = options;
-    const stateKey = JSON.stringify([
+    const stateKey = remoteConversationKey(
       this.context.config.getSessionId(),
-      this.definition.name,
-      getRemoteAgentTargetUrl(this.definition),
-    ]);
+      this.definition,
+    );
     // 1. Ensure the agent is loaded (cached by manager)
     // We assume the user has provided an access token via some mechanism (TODO),
     // or we rely on ADC.

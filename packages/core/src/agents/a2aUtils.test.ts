@@ -12,6 +12,8 @@ import {
   A2AResultReassembler,
   AUTH_REQUIRED_MSG,
   normalizeAgentCard,
+  RemoteConversationStateMap,
+  remoteConversationKey,
 } from './a2aUtils.js';
 import type { SendMessageResult } from './a2a-client-manager.js';
 import type {
@@ -607,5 +609,41 @@ describe('a2aUtils', () => {
 
       expect(reassembler.toString()).toBe('First message');
     });
+  });
+});
+
+describe('remoteConversationKey', () => {
+  it('distinguishes parent sessions, agent names and endpoints', () => {
+    const keys = new Set([
+      remoteConversationKey('s1', { name: 'agent', agentCardUrl: 'https://a' }),
+      remoteConversationKey('s2', { name: 'agent', agentCardUrl: 'https://a' }),
+      remoteConversationKey('s1', { name: 'other', agentCardUrl: 'https://a' }),
+      remoteConversationKey('s1', { name: 'agent', agentCardUrl: 'https://b' }),
+      remoteConversationKey('s1', { name: 'agent' }),
+    ]);
+    expect(keys.size).toBe(5);
+  });
+
+  it('cannot be confused by delimiters inside the parts', () => {
+    expect(
+      remoteConversationKey('a::b', { name: 'c', agentCardUrl: 'https://d' }),
+    ).not.toBe(
+      remoteConversationKey('a', { name: 'b::c', agentCardUrl: 'https://d' }),
+    );
+  });
+});
+
+describe('RemoteConversationStateMap', () => {
+  it('evicts the least recently stored conversation beyond its capacity', () => {
+    const map = new RemoteConversationStateMap(2);
+    map.set('a', { contextId: 'ctx-a' });
+    map.set('b', { contextId: 'ctx-b' });
+    // Storing 'a' again marks it as the most recent conversation.
+    map.set('a', { contextId: 'ctx-a2' });
+    map.set('c', { contextId: 'ctx-c' });
+
+    expect([...map.keys()]).toEqual(['a', 'c']);
+    expect(map.get('a')).toEqual({ contextId: 'ctx-a2' });
+    expect(map.has('b')).toBe(false);
   });
 });

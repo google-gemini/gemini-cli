@@ -19,8 +19,11 @@ import {
   type SubagentProgress,
   type SubagentActivityItem,
   SubagentState,
-  getRemoteAgentTargetUrl,
 } from './types.js';
+import {
+  RemoteConversationStateMap,
+  remoteConversationKey,
+} from './a2aUtils.js';
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { A2AAgentError } from './a2a-errors.js';
@@ -49,24 +52,7 @@ export class RemoteSessionInvocation extends BaseToolInvocation<
 > {
   // Persist A2A conversation state across ephemeral invocation instances.
   // Different parent sessions and endpoints must not share conversation state.
-  private static readonly sessionState = new Map<
-    string,
-    { contextId?: string; taskId?: string }
-  >();
-
-  /**
-   * Builds an unambiguous key for the parent session, agent, and endpoint.
-   */
-  private static sessionKey(
-    definition: RemoteAgentDefinition,
-    sessionId: string,
-  ): string {
-    return JSON.stringify([
-      sessionId,
-      definition.name,
-      getRemoteAgentTargetUrl(definition),
-    ]);
-  }
+  private static readonly sessionState = new RemoteConversationStateMap();
 
   private readonly _onAgentEvent?: (event: AgentEvent) => void;
 
@@ -123,9 +109,9 @@ export class RemoteSessionInvocation extends BaseToolInvocation<
     const emptyActivity: SubagentActivityItem[] = [];
 
     // Seed session with prior A2A conversation state
-    const stateKey = RemoteSessionInvocation.sessionKey(
-      this.definition,
+    const stateKey = remoteConversationKey(
       this.context.config.getSessionId(),
+      this.definition,
     );
     const priorState = RemoteSessionInvocation.sessionState.get(stateKey);
     const session = new RemoteSubagentSession(
