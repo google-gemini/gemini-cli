@@ -14,7 +14,8 @@ import {
   escapePath,
   Storage,
 } from '@google/gemini-cli-core';
-
+import bmp from 'bmp-js';
+import { PNG } from 'pngjs';
 /**
  * Supported image file extensions based on Gemini API.
  * See: https://ai.google.dev/gemini-api/docs/image-understanding
@@ -42,10 +43,19 @@ function getUserLinuxClipboardTool(): typeof linuxClipboardTool {
 
   let toolName: 'wl-paste' | 'xclip' | null = null;
   const displayServer = process.env['XDG_SESSION_TYPE'];
-
-  if (displayServer === 'wayland') toolName = 'wl-paste';
-  else if (displayServer === 'x11') toolName = 'xclip';
-  else return null;
+  if (
+    displayServer === 'wayland' ||
+    (!displayServer && process.env['WAYLAND_DISPLAY'])
+  ) {
+    toolName = 'wl-paste';
+  } else if (
+    displayServer === 'x11' ||
+    (!displayServer && process.env['DISPLAY'])
+  ) {
+    toolName = 'xclip';
+  } else {
+    return null;
+  }
 
   try {
     // output is piped to stdio: 'ignore' to suppress the path printing to console
@@ -206,23 +216,79 @@ export async function clipboardHasImage(): Promise<boolean> {
  * Saves clipboard content to a file using wl-paste (Wayland).
  */
 async function saveFileWithWlPaste(tempFilePath: string) {
-  const success = await saveFromCommand(
-    'wl-paste',
-    ['--no-newline', '--type', 'image/png'],
-    tempFilePath,
-  );
-  if (success) {
-    return true;
-  }
-  // Cleanup on failure
   try {
-    await fs.unlink(tempFilePath);
-  } catch {
-    /* ignore */
-  }
-  return false;
-}
+    const { stdout } = await spawnAsync('wl-paste', ['--list-types']);
+    const types = stdout.split(/\r?\n/).map((type) => type.trim());
+    if (types.includes('image/png')) {
+      const success = await saveFromCommand(
+        'wl-paste',
+        ['--no-newline', '--type', 'image/png'],
+        tempFilePath,
+      );
 
+      if (success) return true;
+
+      await fs.unlink(tempFilePath).catch(() => undefined);
+    }
+
+    if (!types.includes('image/bmp')) {
+      return false;
+    }
+
+    const tempBmpPath = `${tempFilePath}.bmp`;
+
+    try {
+      const success = await saveFromCommand(
+        'wl-paste',
+        ['--no-newline', '--type', 'image/bmp'],
+        tempBmpPath,
+      );
+
+      if (!success) return false;
+
+      const bmpBuffer = await fs.readFile(tempBmpPath);
+      // bmp-js exposes `compress` at runtime, but its public typings omit it.
+      interface DecodedBmp extends ReturnType<typeof bmp.decode> {
+        compress: number;
+      }
+
+      const decoded: DecodedBmp = bmp.decode(bmpBuffer);
+
+      const png = new PNG({
+        width: decoded.width,
+        height: decoded.height,
+      });
+
+      const bmpData = decoded.data;
+      const hasMeaningfulAlpha =
+        typeof decoded.compress === 'number' && decoded.compress !== 0;
+      const limit = Math.min(bmpData.length, png.data.length);
+
+      for (let i = 0; i < limit; i += 4) {
+        const a = hasMeaningfulAlpha ? bmpData[i] : 255;
+        const b = bmpData[i + 1];
+        const g = bmpData[i + 2];
+        const r = bmpData[i + 3];
+
+        png.data[i] = r;
+        png.data[i + 1] = g;
+        png.data[i + 2] = b;
+        png.data[i + 3] = a;
+      }
+
+      const pngBuffer = PNG.sync.write(png);
+      await fs.writeFile(tempFilePath, Uint8Array.from(pngBuffer));
+
+      return true;
+    } finally {
+      await fs.unlink(tempBmpPath).catch(() => undefined);
+    }
+  } catch (error) {
+    debugLogger.warn('Failed to save clipboard image with wl-paste:', error);
+    await fs.unlink(tempFilePath).catch(() => undefined);
+    return false;
+  }
+}
 /**
  * Saves clipboard content to a file using xclip (X11).
  */
