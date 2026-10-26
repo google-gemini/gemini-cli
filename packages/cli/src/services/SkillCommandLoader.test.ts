@@ -167,5 +167,20 @@ describe('SkillCommandLoader', () => {
         'hello world',
       );
     });
+    it('trims whitespace from the skill name', () => {
+      expect(getSkillPostSubmitPrompt('  code-review  ')).toBe(
+        'Use the skill code-review',
+      );
+    });
+
+    it('uses generic_tool when the skill name is empty', () => {
+      expect(getSkillPostSubmitPrompt('')).toBe('Use the skill generic_tool');
+    });
+
+    it('uses generic_tool when the skill name contains only whitespace', () => {
+      expect(getSkillPostSubmitPrompt('   ')).toBe(
+        'Use the skill generic_tool',
+      );
+    });
   });
 });
