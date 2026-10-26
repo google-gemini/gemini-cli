@@ -63,4 +63,24 @@ describe('getDiffContextSnippet', () => {
 
     expect(snippet).toBe('...\n4\n6\n...');
   });
+
+  it('should normalize CRLF line endings before diffing so unchanged lines are not treated as changed', () => {
+    const original = Array.from({ length: 20 }, (_, i) => `line ${i + 1}`).join(
+      '\n',
+    );
+    const modified = Array.from({ length: 20 }, (_, i) =>
+      i + 1 === 10 ? 'line 10 modified' : `line ${i + 1}`,
+    ).join('\r\n');
+
+    const snippet = getDiffContextSnippet(original, modified, 1);
+
+    expect(snippet).toBe('...\nline 9\nline 10 modified\nline 11\n...');
+
+    const reverseSnippet = getDiffContextSnippet(
+      original.replace(/\n/g, '\r\n'),
+      modified.replace(/\r\n/g, '\n'),
+      1,
+    );
+    expect(reverseSnippet).toBe('...\nline 9\nline 10 modified\nline 11\n...');
+  });
 });

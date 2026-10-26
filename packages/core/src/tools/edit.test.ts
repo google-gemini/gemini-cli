@@ -873,6 +873,32 @@ function doIt() {
       expect(finalContent).toBe(newContent);
     });
 
+    it('should return a compact diff context snippet instead of the entire file when editing a CRLF file', async () => {
+      const initialLines = Array.from(
+        { length: 25 },
+        (_, i) => `line ${i + 1}`,
+      );
+      const initialContent = initialLines.join('\r\n') + '\r\n';
+      fs.writeFileSync(filePath, initialContent, 'utf8');
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Update line 13',
+        old_string: 'line 13',
+        new_string: 'line 13 updated',
+      };
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(result.llmContent).toContain('...\nline 8\n');
+      expect(result.llmContent).toContain('line 13 updated');
+      expect(result.llmContent).not.toContain('line 1\n');
+      expect(result.llmContent).not.toContain('line 25');
+    });
+
     it('should create a new file with CRLF line endings if new_string has them', async () => {
       const newContentWithCRLF = 'new line one\r\nnew line two\r\n';
       const params: EditToolParams = {
