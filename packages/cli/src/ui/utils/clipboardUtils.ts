@@ -227,6 +227,8 @@ async function saveFileWithWlPaste(tempFilePath: string) {
       );
 
       if (success) return true;
+
+      await fs.unlink(tempFilePath).catch(() => undefined);
     }
 
     if (!types.includes('image/bmp')) {
@@ -245,7 +247,12 @@ async function saveFileWithWlPaste(tempFilePath: string) {
       if (!success) return false;
 
       const bmpBuffer = await fs.readFile(tempBmpPath);
-      const decoded = bmp.decode(bmpBuffer);
+      // bmp-js exposes `compress` at runtime, but its public typings omit it.
+      interface DecodedBmp extends ReturnType<typeof bmp.decode> {
+        compress: number;
+      }
+
+      const decoded: DecodedBmp = bmp.decode(bmpBuffer);
 
       const png = new PNG({
         width: decoded.width,
@@ -253,7 +260,8 @@ async function saveFileWithWlPaste(tempFilePath: string) {
       });
 
       const bmpData = decoded.data;
-      const hasMeaningfulAlpha = decoded.compress !== 0;
+      const hasMeaningfulAlpha =
+        typeof decoded.compress === 'number' && decoded.compress !== 0;
       const limit = Math.min(bmpData.length, png.data.length);
 
       for (let i = 0; i < limit; i += 4) {
