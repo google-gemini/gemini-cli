@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { useState, useEffect, act } from 'react';
-import { Text } from 'ink';
+import { Box, Text } from 'ink';
 import { renderHook, render } from './render.js';
 import { waitFor } from './async.js';
 
@@ -39,6 +39,42 @@ describe('render', () => {
     const { unmount } = await render(<TestComponent />);
     unmount();
     expect(cleanupMock).toHaveBeenCalled();
+  });
+
+  it('should render and rerender Thai SARA AM inside a full-width bordered Box without wrapping or duplicating lines', async () => {
+    const { lastFrame, rerender, waitUntilReady, unmount } = await render(
+      <Box borderStyle="round" width={20}>
+        <Text>กำลังพิมพ์</Text>
+      </Box>,
+      20,
+    );
+    await waitUntilReady();
+    expect(lastFrame()).toBe(
+      [
+        '╭──────────────────╮',
+        '│กำลังพิมพ์           │',
+        '╰──────────────────╯',
+        '',
+      ].join('\n'),
+    );
+
+    await act(async () =>
+      rerender(
+        <Box borderStyle="round" width={20}>
+          <Text>กำลังพิมพ์ข้อความ</Text>
+        </Box>,
+      ),
+    );
+    await waitUntilReady();
+    expect(lastFrame()).toBe(
+      [
+        '╭──────────────────╮',
+        '│กำลังพิมพ์ข้อความ     │',
+        '╰──────────────────╯',
+        '',
+      ].join('\n'),
+    );
+    unmount();
   });
 });
 

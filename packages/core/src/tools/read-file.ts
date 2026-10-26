@@ -12,6 +12,7 @@ import {
   resolveDefensiveToolPath,
   resolveToRealPath,
 } from '../utils/paths.js';
+import { resolveActiveWorkspaceDir } from '../utils/pathCorrector.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
@@ -79,26 +80,27 @@ class ReadFileToolInvocation extends BaseToolInvocation<
     _toolDisplayName?: string,
   ) {
     super(params, messageBus, _toolName, _toolDisplayName);
+    const targetDir = resolveActiveWorkspaceDir(
+      this.config,
+      this.params.file_path,
+    );
     const sanitizedPath = resolveDefensiveToolPath(
       this.params.file_path,
-      this.config.getTargetDir(),
+      targetDir,
     );
     try {
       this.resolvedPath = resolveToRealPath(
-        path.resolve(this.config.getTargetDir(), sanitizedPath),
+        path.resolve(targetDir, sanitizedPath),
       );
     } catch {
-      this.resolvedPath = path.resolve(
-        this.config.getTargetDir(),
-        sanitizedPath,
-      );
+      this.resolvedPath = path.resolve(targetDir, sanitizedPath);
     }
   }
 
   getDescription(): string {
     const relativePath = makeRelative(
       this.resolvedPath,
-      this.config.getTargetDir(),
+      resolveActiveWorkspaceDir(this.config, this.params.file_path),
     );
     return shortenPath(relativePath);
   }
@@ -121,20 +123,21 @@ class ReadFileToolInvocation extends BaseToolInvocation<
   }
 
   async execute(_options: ExecuteOptions): Promise<ToolResult> {
+    const targetDir = resolveActiveWorkspaceDir(
+      this.config,
+      this.params.file_path,
+    );
     const sanitizedPath = resolveDefensiveToolPath(
       this.params.file_path,
-      this.config.getTargetDir(),
+      targetDir,
     );
     let targetPathToRead = this.resolvedPath;
     try {
       targetPathToRead = resolveToRealPath(
-        path.resolve(this.config.getTargetDir(), sanitizedPath),
+        path.resolve(targetDir, sanitizedPath),
       );
     } catch {
-      targetPathToRead = path.resolve(
-        this.config.getTargetDir(),
-        sanitizedPath,
-      );
+      targetPathToRead = path.resolve(targetDir, sanitizedPath);
     }
 
     const validationError = this.config.validatePathAccess(
@@ -154,7 +157,7 @@ class ReadFileToolInvocation extends BaseToolInvocation<
 
     const result = await processSingleFileContent(
       targetPathToRead,
-      this.config.getTargetDir(),
+      targetDir,
       this.config.getFileSystemService(),
       this.params.start_line,
       this.params.end_line,
@@ -275,16 +278,12 @@ export class ReadFileTool extends BaseDeclarativeTool<
       return "The 'file_path' parameter must be non-empty.";
     }
 
-    const sanitizedPath = resolveDefensiveToolPath(
-      params.file_path,
-      this.config.getTargetDir(),
-    );
+    const targetDir = resolveActiveWorkspaceDir(this.config, params.file_path);
+    const sanitizedPath = resolveDefensiveToolPath(params.file_path, targetDir);
 
     let resolvedPath: string;
     try {
-      resolvedPath = resolveToRealPath(
-        path.resolve(this.config.getTargetDir(), sanitizedPath),
-      );
+      resolvedPath = resolveToRealPath(path.resolve(targetDir, sanitizedPath));
     } catch (err) {
       return `Failed to resolve path: ${err instanceof Error ? err.message : String(err)}`;
     }

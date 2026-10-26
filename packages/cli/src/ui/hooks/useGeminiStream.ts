@@ -939,6 +939,7 @@ export const useGeminiStream = (
             seenCallIds.add(req.callId);
             synthesizedCalls.push(createCancelledToolCall(req));
           }
+          pendingToolCallRequestsRef.current = [];
 
           const clientHistory = client?.getHistory?.() ?? [];
           const lastTurn = clientHistory.at(-1);
@@ -1669,6 +1670,7 @@ export const useGeminiStream = (
     ): Promise<StreamProcessingStatus> => {
       let geminiMessageBuffer = '';
       const toolCallRequests: ToolCallRequestInfo[] = [];
+      let hasTerminalEvent = false;
       for await (const event of stream) {
         if (
           event.type !== ServerGeminiEventType.Thought &&
@@ -1696,11 +1698,14 @@ export const useGeminiStream = (
             break;
           case ServerGeminiEventType.UserCancelled:
             handleUserCancelledEvent(userMessageTimestamp);
-            break;
+            pendingToolCallRequestsRef.current = [];
+            return StreamProcessingStatus.UserCancelled;
           case ServerGeminiEventType.Error:
+            hasTerminalEvent = true;
             handleErrorEvent(event.value, userMessageTimestamp);
             break;
           case ServerGeminiEventType.AgentExecutionStopped:
+            hasTerminalEvent = true;
             handleAgentExecutionStoppedEvent(
               event.value.reason,
               userMessageTimestamp,
@@ -1709,6 +1714,7 @@ export const useGeminiStream = (
             );
             break;
           case ServerGeminiEventType.AgentExecutionBlocked:
+            hasTerminalEvent = true;
             handleAgentExecutionBlockedEvent(
               event.value.reason,
               userMessageTimestamp,
@@ -1724,9 +1730,11 @@ export const useGeminiStream = (
             // do nothing
             break;
           case ServerGeminiEventType.MaxSessionTurns:
+            hasTerminalEvent = true;
             handleMaxSessionTurnsEvent();
             break;
           case ServerGeminiEventType.ContextWindowWillOverflow:
+            hasTerminalEvent = true;
             handleContextWindowWillOverflowEvent(
               event.value.estimatedRequestTokenCount,
               event.value.remainingTokenCount,
@@ -1750,6 +1758,7 @@ export const useGeminiStream = (
             // Handled transparently by the backend stream retries.
             break;
           case ServerGeminiEventType.InvalidStream:
+            hasTerminalEvent = true;
             handleInvalidStreamEvent(event.value, userMessageTimestamp);
             break;
           default: {
@@ -1758,6 +1767,10 @@ export const useGeminiStream = (
             return unreachable;
           }
         }
+      }
+      if (signal.aborted || turnCancelledRef.current) {
+        pendingToolCallRequestsRef.current = [];
+        return StreamProcessingStatus.UserCancelled;
       }
       if (toolCallRequests.length > 0) {
         if (pendingHistoryItemRef.current) {
@@ -1781,6 +1794,8 @@ export const useGeminiStream = (
         if (
           isContinuation &&
           !hasVisibleText &&
+          !hasTerminalEvent &&
+          !loopDetectedRef.current &&
           autoNudgeAttemptCountRef.current < MAX_AUTO_NUDGE_ATTEMPTS
         ) {
           autoNudgeAttemptCountRef.current += 1;
@@ -1877,7 +1892,15 @@ export const useGeminiStream = (
               prompt_id!,
             );
 
-            if (!shouldProceed || queryToSend === null) {
+            if (
+              !shouldProceed ||
+              queryToSend === null ||
+              turnCancelledRef.current ||
+              abortSignal.aborted
+            ) {
+              if (turnCancelledRef.current || abortSignal.aborted) {
+                pendingToolCallRequestsRef.current = [];
+              }
               return;
             }
 
@@ -1966,6 +1989,7 @@ export const useGeminiStream = (
                 });
               }
             } catch (error: unknown) {
+              pendingToolCallRequestsRef.current = [];
               spanMetadata.error = error;
               if (error instanceof UnauthorizedError) {
                 onAuthError('Session expired or is unauthorized.');
@@ -2132,6 +2156,7 @@ export const useGeminiStream = (
 
       if (turnCancelledRef.current) {
         setIsResponding(false);
+        pendingToolCallRequestsRef.current = [];
         const geminiTools = completedAndReadyToSubmitTools.filter(
           (t) => !t.request.isClientInitiated,
         );
@@ -2292,6 +2317,18 @@ export const useGeminiStream = (
       // steering hint is deliberately left unconsumed so it rides along with
       // the next query the user actually submits.
       if (modelSwitchedFromQuotaError) {
+        if (geminiClient && responsesToSend.length > 0) {
+          await geminiClient.addHistory({
+            role: 'user',
+            parts: responsesToSend,
+          });
+        }
+        return;
+      }
+
+      if (turnCancelledRef.current) {
+        setIsResponding(false);
+        pendingToolCallRequestsRef.current = [];
         if (geminiClient && responsesToSend.length > 0) {
           await geminiClient.addHistory({
             role: 'user',
