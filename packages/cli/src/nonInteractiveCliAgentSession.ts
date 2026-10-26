@@ -54,8 +54,14 @@ import stripAnsi from 'strip-ansi';
 import { handleSlashCommand } from './nonInteractiveCliCommands.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { handleAtCommand } from './ui/hooks/atCommandProcessor.js';
-import { handleError, handleToolError } from './utils/errors.js';
+import {
+  handleError,
+  handleToolError,
+  handleCancellationError,
+  isFatalCancellationError,
+} from './utils/errors.js';
 import { TextOutput } from './ui/utils/textOutput.js';
+import { runExitCleanup } from './utils/cleanup.js';
 
 interface RunNonInteractiveParams {
   config: Config;
@@ -123,13 +129,46 @@ export async function runNonInteractive({
     let isAborting = false;
     let cancelMessageTimer: NodeJS.Timeout | null = null;
 
-    // Setup stdin listener for Ctrl+C detection
+    // Setup stdin listener for Ctrl+C detection and process signal handlers
     let stdinWasRaw = false;
     let rl: readline.Interface | null = null;
+    let keypressHandler:
+      | ((str: string, key: { name?: string; ctrl?: boolean }) => void)
+      | null = null;
 
-    const setupStdinCancellation = () => {
+    const handleStdoutError = (err: NodeJS.ErrnoException) => {
+      if (err.code === 'EPIPE') {
+        // Exit gracefully if the pipe is closed.
+        cleanupCancellation();
+        consolePatcher.cleanup();
+        process.exit(0);
+      }
+      throw err;
+    };
+
+    const triggerAbort = () => {
+      // If already aborting, force exit immediately on repeated signal
+      if (isAborting) {
+        process.exit(130);
+      }
+
+      isAborting = true;
+
+      // Only show message if cancellation takes longer than 200ms
+      // This reduces verbosity for fast cancellations
+      cancelMessageTimer = setTimeout(() => {
+        process.stderr.write('\nCancelling...\n');
+      }, 200);
+
+      abortController.abort();
+    };
+
+    const setupCancellation = () => {
+      process.on('SIGINT', triggerAbort);
+      process.on('SIGTERM', triggerAbort);
+
       // Only setup if stdin is a TTY (user can interact)
-      if (!process.stdin.isTTY) {
+      if (!process.stdin?.isTTY) {
         return;
       }
 
@@ -148,33 +187,24 @@ export async function runNonInteractive({
       readline.emitKeypressEvents(process.stdin, rl);
 
       // Listen for Ctrl+C
-      const keypressHandler = (
+      keypressHandler = (
         str: string,
         key: { name?: string; ctrl?: boolean },
       ) => {
         // Detect Ctrl+C: either ctrl+c key combo or raw character code 3
         if ((key && key.ctrl && key.name === 'c') || str === '\u0003') {
-          // Only handle once
-          if (isAborting) {
-            return;
-          }
-
-          isAborting = true;
-
-          // Only show message if cancellation takes longer than 200ms
-          // This reduces verbosity for fast cancellations
-          cancelMessageTimer = setTimeout(() => {
-            process.stderr.write('\nCancelling...\n');
-          }, 200);
-
-          abortController.abort();
+          triggerAbort();
         }
       };
 
       process.stdin.on('keypress', keypressHandler);
     };
 
-    const cleanupStdinCancellation = () => {
+    const cleanupCancellation = () => {
+      process.off('SIGINT', triggerAbort);
+      process.off('SIGTERM', triggerAbort);
+      process.stdout.off('error', handleStdoutError);
+
       // Clear any pending cancel message timer
       if (cancelMessageTimer) {
         clearTimeout(cancelMessageTimer);
@@ -188,10 +218,13 @@ export async function runNonInteractive({
       }
 
       // Remove keypress listener
-      process.stdin.removeAllListeners('keypress');
+      if (keypressHandler && process.stdin) {
+        process.stdin.off('keypress', keypressHandler);
+        keypressHandler = null;
+      }
 
       // Restore stdin to original state
-      if (process.stdin.isTTY) {
+      if (process.stdin?.isTTY) {
         process.stdin.setRawMode(stdinWasRaw);
         process.stdin.pause();
       }
@@ -213,21 +246,14 @@ export async function runNonInteractive({
         );
       }
 
-      // Setup stdin cancellation listener
-      setupStdinCancellation();
+      // Setup cancellation listeners
+      setupCancellation();
 
       coreEvents.on(CoreEvent.UserFeedback, handleUserFeedback);
       coreEvents.drainBacklogs();
 
       // Handle EPIPE errors when the output is piped to a command that closes early.
-      process.stdout.on('error', (err: NodeJS.ErrnoException) => {
-        if (err.code === 'EPIPE') {
-          // Exit gracefully if the pipe is closed.
-          cleanupStdinCancellation();
-          consolePatcher.cleanup();
-          process.exit(0);
-        }
-      });
+      process.stdout.on('error', handleStdoutError);
 
       const geminiClient = config.getGeminiClient();
       scheduler = new Scheduler({
@@ -691,13 +717,22 @@ export async function runNonInteractive({
     } catch (error) {
       errorToHandle = error;
     } finally {
-      // Cleanup stdin cancellation before other cleanup
-      cleanupStdinCancellation();
+      // Cleanup cancellation listeners before other cleanup
+      cleanupCancellation();
       abortController.signal.removeEventListener('abort', abortSession);
 
       scheduler?.dispose();
       consolePatcher.cleanup();
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
+
+      await runExitCleanup();
+    }
+
+    if (
+      abortController.signal.aborted ||
+      isFatalCancellationError(errorToHandle)
+    ) {
+      handleCancellationError(config);
     }
 
     if (errorToHandle) {

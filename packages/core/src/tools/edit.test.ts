@@ -72,6 +72,7 @@ import { type Content, type Part, type SchemaUnion } from '@google/genai';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
+import { ideContextStore } from '../ide/ideContext.js';
 
 describe('EditTool', () => {
   let tool: EditTool;
@@ -1590,6 +1591,78 @@ function doIt() {
 
       await expect(p2).rejects.toThrow('Edit aborted');
       await p1;
+    });
+  });
+
+  describe('multi-root IDE workspace relative path resolution (b/503364786 / #25527)', () => {
+    afterEach(() => {
+      ideContextStore.clear();
+    });
+
+    it('should create a new file in the active IDE workspace directory (mmm-tools/FLUX) rather than targetDir (data-model-core/mmm)', async () => {
+      const mmmRepoDir = path.join(
+        tempDir,
+        'repogit',
+        'data-model-core',
+        'mmm',
+      );
+      const fluxRepoDir = path.join(tempDir, 'repogit', 'mmm-tools', 'FLUX');
+      fs.mkdirSync(path.join(mmmRepoDir, 'tests'), { recursive: true });
+      fs.mkdirSync(path.join(fluxRepoDir, 'src'), { recursive: true });
+
+      // Even if a file with the same relative path already exists in data-model-core/mmm,
+      // creating a new file while active in mmm-tools/FLUX should target mmm-tools/FLUX
+      const existingMmmFile = path.join(
+        mmmRepoDir,
+        'tests',
+        'gemini_test_repo_parent.txt',
+      );
+      fs.writeFileSync(existingMmmFile, 'existing mmm content', 'utf8');
+
+      vi.spyOn(mockConfig, 'getTargetDir').mockReturnValue(mmmRepoDir);
+      vi.spyOn(mockConfig, 'getWorkspaceContext').mockReturnValue(
+        createMockWorkspaceContext(mmmRepoDir, [fluxRepoDir]),
+      );
+      vi.spyOn(mockConfig, 'getIdeMode').mockReturnValue(true);
+
+      const activeFluxFile = path.join(fluxRepoDir, 'src', 'index.ts');
+      fs.writeFileSync(activeFluxFile, '// active file in FLUX\n', 'utf8');
+      ideContextStore.set({
+        workspaceState: {
+          openFiles: [
+            {
+              path: activeFluxFile,
+              timestamp: Date.now(),
+              isActive: true,
+            },
+          ],
+        },
+      });
+
+      const invocation = tool.build({
+        file_path: 'tests/gemini_test_repo_parent.txt',
+        instruction: 'Create test file in FLUX',
+        old_string: '',
+        new_string: 'new flux content',
+      });
+
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(result.error).toBeUndefined();
+      const expectedFluxFile = path.join(
+        fluxRepoDir,
+        'tests',
+        'gemini_test_repo_parent.txt',
+      );
+      expect(fs.existsSync(expectedFluxFile)).toBe(true);
+      expect(fs.readFileSync(expectedFluxFile, 'utf8')).toBe(
+        'new flux content',
+      );
+      expect(fs.readFileSync(existingMmmFile, 'utf8')).toBe(
+        'existing mmm content',
+      );
     });
   });
 });

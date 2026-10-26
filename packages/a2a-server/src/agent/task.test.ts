@@ -354,6 +354,165 @@ describe('Task', () => {
       );
     });
 
+    it('should preserve thoughts, toolUsePrompt, and cachedContent tokens and compute totalTokenCount = prompt + candidates + toolUsePrompt + thoughts', async () => {
+      const mockConfig = createMockConfig();
+      const mockEventBus: ExecutionEventBus = {
+        publish: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+        once: vi.fn(),
+        removeAllListeners: vi.fn(),
+        finished: vi.fn(),
+      };
+
+      // @ts-expect-error - Calling private constructor for test purposes.
+      const task = new Task(
+        'task-id',
+        'context-id',
+        mockConfig as Config,
+        mockEventBus,
+      );
+
+      await task.acceptAgentMessage({
+        type: GeminiEventType.Finished,
+        value: {
+          reason: 'STOP',
+          usageMetadata: {
+            promptTokenCount: 400,
+            candidatesTokenCount: 300,
+            thoughtsTokenCount: 700,
+            toolUsePromptTokenCount: 100,
+            cachedContentTokenCount: 50,
+            totalTokenCount: 700, // Incomplete upstream total (prompt + candidates only)
+          },
+        },
+      } as unknown as Parameters<Task['acceptAgentMessage']>[0]);
+
+      expect(task.usageMetadata).toEqual({
+        promptTokenCount: 400,
+        candidatesTokenCount: 300,
+        thoughtsTokenCount: 700,
+        toolUsePromptTokenCount: 100,
+        cachedContentTokenCount: 50,
+        totalTokenCount: 1500,
+      });
+
+      // First final status update consumes usageMetadata
+      task.setTaskStateAndPublishUpdate(
+        'input-required',
+        { kind: CoderAgentEvent.StateChangeEvent },
+        undefined,
+        undefined,
+        true,
+      );
+
+      expect(mockEventBus.publish).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          final: true,
+          metadata: expect.objectContaining({
+            usageMetadata: {
+              promptTokenCount: 400,
+              candidatesTokenCount: 300,
+              thoughtsTokenCount: 700,
+              toolUsePromptTokenCount: 100,
+              cachedContentTokenCount: 50,
+              totalTokenCount: 1500,
+            },
+          }),
+        }),
+      );
+      expect(task.usageMetadata).toBeUndefined();
+
+      // Second final status update without a new LLM turn must not re-emit stale usageMetadata
+      task.setTaskStateAndPublishUpdate(
+        'input-required',
+        { kind: CoderAgentEvent.StateChangeEvent },
+        undefined,
+        undefined,
+        true,
+      );
+
+      const secondFinalCall = vi.mocked(mockEventBus.publish).mock.calls[1][0];
+      expect(secondFinalCall).toMatchObject({
+        final: true,
+      });
+      expect(
+        (secondFinalCall as { metadata?: { usageMetadata?: unknown } }).metadata
+          ?.usageMetadata,
+      ).toBeUndefined();
+    });
+
+    it('should use latest promptTokenCount for context window and accumulate output/thought/tool tokens across un-emitted sub-turns', async () => {
+      const mockConfig = createMockConfig();
+      const mockEventBus: ExecutionEventBus = {
+        publish: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+        once: vi.fn(),
+        removeAllListeners: vi.fn(),
+        finished: vi.fn(),
+      };
+
+      // @ts-expect-error - Calling private constructor for test purposes.
+      const task = new Task(
+        'task-id',
+        'context-id',
+        mockConfig as Config,
+        mockEventBus,
+      );
+
+      // Sub-turn 1 (e.g. model calls auto-executed tool)
+      await task.acceptAgentMessage({
+        type: GeminiEventType.ModelInfo,
+        value: 'gemini-2.5-pro',
+      });
+      await task.acceptAgentMessage({
+        type: GeminiEventType.Finished,
+        value: {
+          reason: 'STOP',
+          usageMetadata: {
+            promptTokenCount: 1000,
+            candidatesTokenCount: 50,
+            thoughtsTokenCount: 40,
+            toolUsePromptTokenCount: 10,
+            cachedContentTokenCount: 200,
+            totalTokenCount: 1100,
+          },
+        },
+      } as unknown as Parameters<Task['acceptAgentMessage']>[0]);
+
+      // Sub-turn 2 (sendCompletedToolsToLlm resends context + tool output before final: true)
+      await task.acceptAgentMessage({
+        type: GeminiEventType.ModelInfo,
+        value: 'gemini-2.5-pro',
+      });
+      await task.acceptAgentMessage({
+        type: GeminiEventType.Finished,
+        value: {
+          reason: 'STOP',
+          usageMetadata: {
+            promptTokenCount: 1050,
+            candidatesTokenCount: 60,
+            thoughtsTokenCount: 30,
+            toolUsePromptTokenCount: 15,
+            cachedContentTokenCount: 500,
+            totalTokenCount: 1155,
+          },
+        },
+      } as unknown as Parameters<Task['acceptAgentMessage']>[0]);
+
+      // promptTokenCount and cachedContentTokenCount reflect latest sub-turn context window (1050, not 2050)
+      // candidates, thoughts, and toolUsePrompt accumulate across the sub-turns
+      expect(task.usageMetadata).toEqual({
+        promptTokenCount: 1050,
+        candidatesTokenCount: 110,
+        thoughtsTokenCount: 70,
+        toolUsePromptTokenCount: 25,
+        cachedContentTokenCount: 500,
+        totalTokenCount: 1255,
+      });
+    });
+
     it('should update modelInfo and reflect it in metadata and status updates', async () => {
       const mockConfig = createMockConfig();
       const mockEventBus: ExecutionEventBus = {

@@ -2679,6 +2679,7 @@ describe('Settings Loading and Merging', () => {
     });
 
     afterEach(() => {
+      vi.unstubAllEnvs();
       vi.restoreAllMocks();
     });
 
@@ -2736,6 +2737,7 @@ describe('Settings Loading and Merging', () => {
         SettingScope.User,
         'general',
         expect.objectContaining({ enableAutoUpdate: false }),
+        expect.objectContaining({ enableAutoUpdate: false }),
       );
     });
 
@@ -2763,12 +2765,14 @@ describe('Settings Loading and Merging', () => {
         SettingScope.User,
         'general',
         expect.objectContaining({ defaultApprovalMode: 'plan' }),
+        expect.objectContaining({ defaultApprovalMode: 'plan' }),
       );
 
       // Verify removal
       expect(setValueSpy).toHaveBeenCalledWith(
         SettingScope.User,
         'tools',
+        expect.not.objectContaining({ approvalMode: 'plan' }),
         expect.not.objectContaining({ approvalMode: 'plan' }),
       );
     });
@@ -2809,10 +2813,12 @@ describe('Settings Loading and Merging', () => {
         SettingScope.User,
         'general',
         expect.objectContaining({ enableAutoUpdate: true }),
+        expect.objectContaining({ enableAutoUpdate: true }),
       );
       expect(setValueSpy).toHaveBeenCalledWith(
         SettingScope.User,
         'general',
+        expect.objectContaining({ enableAutoUpdateNotification: false }),
         expect.objectContaining({ enableAutoUpdateNotification: false }),
       );
 
@@ -2820,6 +2826,9 @@ describe('Settings Loading and Merging', () => {
       expect(setValueSpy).toHaveBeenCalledWith(
         SettingScope.User,
         'context',
+        expect.objectContaining({
+          fileFiltering: expect.objectContaining({ enableFuzzySearch: true }),
+        }),
         expect.objectContaining({
           fileFiltering: expect.objectContaining({ enableFuzzySearch: true }),
         }),
@@ -2834,12 +2843,20 @@ describe('Settings Loading and Merging', () => {
             enableLoadingPhrases: false,
           }),
         }),
+        expect.objectContaining({
+          accessibility: expect.objectContaining({
+            enableLoadingPhrases: false,
+          }),
+        }),
       );
 
       // Check that enableLoadingPhrases: false was further migrated to loadingPhrases: 'off'
       expect(setValueSpy).toHaveBeenCalledWith(
         SettingScope.User,
         'ui',
+        expect.objectContaining({
+          loadingPhrases: 'off',
+        }),
         expect.objectContaining({
           loadingPhrases: 'off',
         }),
@@ -2863,6 +2880,9 @@ describe('Settings Loading and Merging', () => {
       expect(setValueSpy).toHaveBeenCalledWith(
         SettingScope.User,
         'ui',
+        expect.objectContaining({
+          loadingPhrases: 'off',
+        }),
         expect.objectContaining({
           loadingPhrases: 'off',
         }),
@@ -2937,14 +2957,28 @@ describe('Settings Loading and Merging', () => {
       migrateDeprecatedSettings(loadedSettings);
 
       // Should remove disableAutoUpdate and trust enableAutoUpdate: true
-      expect(setValueSpy).toHaveBeenCalledWith(SettingScope.User, 'general', {
-        enableAutoUpdate: true,
-      });
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'general',
+        {
+          enableAutoUpdate: true,
+        },
+        {
+          enableAutoUpdate: true,
+        },
+      );
 
       // Should remove disableFuzzySearch and trust enableFuzzySearch: false
-      expect(setValueSpy).toHaveBeenCalledWith(SettingScope.User, 'context', {
-        fileFiltering: { enableFuzzySearch: false },
-      });
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'context',
+        {
+          fileFiltering: { enableFuzzySearch: false },
+        },
+        {
+          fileFiltering: { enableFuzzySearch: false },
+        },
+      );
     });
 
     it('should preserve deprecated settings when removeDeprecated is explicitly false', () => {
@@ -3176,6 +3210,308 @@ describe('Settings Loading and Merging', () => {
         },
         cli_help: {
           enabled: false,
+        },
+      });
+    });
+
+    it('should preserve ${VAR} placeholders in ui and ui.accessibility during migration while keeping runtime settings expanded', () => {
+      vi.stubEnv('TEST_THEME_NAME', 'GitHub');
+      vi.stubEnv('TEST_AUTO_THEME', 'true');
+      vi.stubEnv('TEST_SCREEN_READER', 'true');
+
+      const userSettingsContent = {
+        ui: {
+          theme: '${TEST_THEME_NAME:-Default}',
+          autoThemeSwitching: '${TEST_AUTO_THEME:-false}',
+          accessibility: {
+            disableLoadingPhrases: true,
+            screenReader: '${TEST_SCREEN_READER:-false}',
+          },
+        },
+      };
+
+      mockFsExistsSync.mockImplementation(
+        (p: fs.PathLike) =>
+          normalizePath(p) === normalizePath(USER_SETTINGS_PATH),
+      );
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (normalizePath(p) === normalizePath(USER_SETTINGS_PATH))
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.errors).toEqual([]);
+
+      // Runtime settings must remain expanded and coerced
+      expect(settings.merged.ui.theme).toBe('GitHub');
+      expect(settings.merged.ui.autoThemeSwitching).toBe(true);
+      expect(settings.merged.ui.accessibility.screenReader).toBe(true);
+      expect(settings.merged.ui.accessibility.enableLoadingPhrases).toBe(false);
+      expect(settings.merged.ui.loadingPhrases).toBe('off');
+      expect(settings.user.settings.ui?.accessibility).not.toHaveProperty(
+        'disableLoadingPhrases',
+      );
+
+      // Persisted originalSettings and file writes must preserve raw ${VAR} placeholders
+      const expectedOriginalUi = {
+        theme: '${TEST_THEME_NAME:-Default}',
+        autoThemeSwitching: '${TEST_AUTO_THEME:-false}',
+        loadingPhrases: 'off',
+        accessibility: {
+          enableLoadingPhrases: false,
+          screenReader: '${TEST_SCREEN_READER:-false}',
+        },
+      };
+      expect(settings.user.originalSettings.ui).toEqual(expectedOriginalUi);
+
+      const mockUpdate = vi.mocked(updateSettingsFilePreservingFormat);
+      const userWriteCalls = mockUpdate.mock.calls.filter(
+        ([filePath]) =>
+          normalizePath(filePath) === normalizePath(USER_SETTINGS_PATH),
+      );
+      expect(userWriteCalls.length).toBeGreaterThan(0);
+      expect(userWriteCalls[userWriteCalls.length - 1]?.[1]).toEqual({
+        ui: expectedOriginalUi,
+      });
+    });
+
+    it('should preserve ${VAR} placeholders in general and context.fileFiltering migrations, including when both deprecated and new keys exist', () => {
+      vi.stubEnv('TEST_VIM_MODE', 'true');
+      vi.stubEnv('TEST_PREFERRED_EDITOR', 'vim');
+      vi.stubEnv('TEST_AUTO_UPDATE_NAG', 'false');
+      vi.stubEnv('TEST_CONTEXT_FILE', 'AGENTS.md');
+      vi.stubEnv('TEST_RESPECT_GITIGNORE', 'false');
+
+      const userSettingsContent = {
+        general: {
+          vimMode: '${TEST_VIM_MODE:-false}',
+          preferredEditor: '${TEST_PREFERRED_EDITOR:-vscode}',
+          disableAutoUpdate: true,
+          disableUpdateNag: false,
+          enableAutoUpdateNotification: '${TEST_AUTO_UPDATE_NAG:-true}',
+        },
+        context: {
+          fileName: '${TEST_CONTEXT_FILE:-GEMINI.md}',
+          fileFiltering: {
+            disableFuzzySearch: true,
+            respectGitIgnore: '${TEST_RESPECT_GITIGNORE:-true}',
+          },
+        },
+      };
+
+      mockFsExistsSync.mockImplementation(
+        (p: fs.PathLike) =>
+          normalizePath(p) === normalizePath(USER_SETTINGS_PATH),
+      );
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (normalizePath(p) === normalizePath(USER_SETTINGS_PATH))
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.errors).toEqual([]);
+
+      // Runtime settings must remain expanded and coerced
+      expect(settings.merged.general.vimMode).toBe(true);
+      expect(settings.merged.general.preferredEditor).toBe('vim');
+      expect(settings.merged.general.enableAutoUpdate).toBe(false);
+      expect(settings.merged.general.enableAutoUpdateNotification).toBe(false);
+      expect(settings.merged.context.fileName).toBe('AGENTS.md');
+      expect(settings.merged.context.fileFiltering.enableFuzzySearch).toBe(
+        false,
+      );
+      expect(settings.merged.context.fileFiltering.respectGitIgnore).toBe(
+        false,
+      );
+
+      // Persisted originalSettings must retain raw ${VAR} placeholders (including on enableAutoUpdateNotification)
+      expect(settings.user.originalSettings).toEqual({
+        general: {
+          vimMode: '${TEST_VIM_MODE:-false}',
+          preferredEditor: '${TEST_PREFERRED_EDITOR:-vscode}',
+          enableAutoUpdate: false,
+          enableAutoUpdateNotification: '${TEST_AUTO_UPDATE_NAG:-true}',
+        },
+        context: {
+          fileName: '${TEST_CONTEXT_FILE:-GEMINI.md}',
+          fileFiltering: {
+            enableFuzzySearch: false,
+            respectGitIgnore: '${TEST_RESPECT_GITIGNORE:-true}',
+          },
+        },
+      });
+    });
+
+    it('should preserve ${VAR} placeholders across tools.approvalMode -> general.defaultApprovalMode cross-subtree migration', () => {
+      vi.stubEnv('TEST_VIM_MODE', 'true');
+      vi.stubEnv('TEST_APPROVAL_MODE', 'auto_edit');
+      vi.stubEnv('TEST_USE_RIPGREP', 'false');
+
+      const userSettingsContent = {
+        general: {
+          vimMode: '${TEST_VIM_MODE:-false}',
+        },
+        tools: {
+          approvalMode: '${TEST_APPROVAL_MODE:-default}',
+          useRipgrep: '${TEST_USE_RIPGREP:-true}',
+        },
+      };
+
+      mockFsExistsSync.mockImplementation(
+        (p: fs.PathLike) =>
+          normalizePath(p) === normalizePath(USER_SETTINGS_PATH),
+      );
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (normalizePath(p) === normalizePath(USER_SETTINGS_PATH))
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.errors).toEqual([]);
+
+      // Runtime settings must use expanded values
+      expect(settings.merged.general.vimMode).toBe(true);
+      expect(settings.merged.general.defaultApprovalMode).toBe('auto_edit');
+      expect(settings.merged.tools.useRipgrep).toBe(false);
+      expect(settings.user.settings.tools).not.toHaveProperty('approvalMode');
+
+      // Persisted originalSettings must keep raw ${VAR} placeholders in both subtrees and on the migrated value
+      expect(settings.user.originalSettings).toEqual({
+        general: {
+          vimMode: '${TEST_VIM_MODE:-false}',
+          defaultApprovalMode: '${TEST_APPROVAL_MODE:-default}',
+        },
+        tools: {
+          useRipgrep: '${TEST_USE_RIPGREP:-true}',
+        },
+      });
+    });
+
+    it('should preserve ${VAR} placeholders across experimental settings migrations into agents.overrides and general.plan', () => {
+      vi.stubEnv('TEST_PLAN_DIR', '.gemini/plans');
+      vi.stubEnv('TEST_PLAN_MODEL_ROUTING', 'false');
+      vi.stubEnv('TEST_AUTO_MEMORY', 'true');
+      vi.stubEnv('TEST_CI_MODEL', 'gemini-2.5-pro');
+      vi.stubEnv('TEST_OTHER_MODEL', 'gemini-2.5-flash');
+
+      const userSettingsContent = {
+        general: {
+          plan: {
+            directory: '${TEST_PLAN_DIR:-plans}',
+            modelRouting: '${TEST_PLAN_MODEL_ROUTING:-true}',
+          },
+        },
+        agents: {
+          overrides: {
+            generalist: {
+              modelConfig: {
+                model: '${TEST_OTHER_MODEL:-default-model}',
+              },
+            },
+          },
+        },
+        experimental: {
+          autoMemory: '${TEST_AUTO_MEMORY:-false}',
+          plan: false,
+          codebaseInvestigatorSettings: {
+            enabled: true,
+            maxNumTurns: 12,
+            model: '${TEST_CI_MODEL:-gemini-1.5-pro}',
+          },
+          cliHelpAgentSettings: {
+            enabled: false,
+          },
+        },
+      };
+
+      mockFsExistsSync.mockImplementation(
+        (p: fs.PathLike) =>
+          normalizePath(p) === normalizePath(USER_SETTINGS_PATH),
+      );
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (normalizePath(p) === normalizePath(USER_SETTINGS_PATH))
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.errors).toEqual([]);
+
+      // Runtime settings must use expanded and coerced values
+      expect(settings.merged.general.plan.directory).toBe('.gemini/plans');
+      expect(settings.merged.general.plan.modelRouting).toBe(false);
+      expect(settings.merged.general.plan.enabled).toBe(false);
+      expect(settings.merged.experimental.autoMemory).toBe(true);
+      expect(settings.user.settings.agents?.overrides).toMatchObject({
+        generalist: {
+          modelConfig: {
+            model: 'gemini-2.5-flash',
+          },
+        },
+        codebase_investigator: {
+          enabled: true,
+          runConfig: {
+            maxTurns: 12,
+          },
+          modelConfig: {
+            model: 'gemini-2.5-pro',
+          },
+        },
+        cli_help: {
+          enabled: false,
+        },
+      });
+      expect(settings.user.settings.experimental).toEqual({
+        autoMemory: true,
+      });
+
+      // Persisted originalSettings must retain raw ${VAR} placeholders everywhere
+      expect(settings.user.originalSettings).toEqual({
+        general: {
+          plan: {
+            directory: '${TEST_PLAN_DIR:-plans}',
+            modelRouting: '${TEST_PLAN_MODEL_ROUTING:-true}',
+            enabled: false,
+          },
+        },
+        agents: {
+          overrides: {
+            generalist: {
+              modelConfig: {
+                model: '${TEST_OTHER_MODEL:-default-model}',
+              },
+            },
+            codebase_investigator: {
+              enabled: true,
+              runConfig: {
+                maxTurns: 12,
+              },
+              modelConfig: {
+                model: '${TEST_CI_MODEL:-gemini-1.5-pro}',
+              },
+            },
+            cli_help: {
+              enabled: false,
+            },
+          },
+        },
+        experimental: {
+          autoMemory: '${TEST_AUTO_MEMORY:-false}',
         },
       });
     });
@@ -4139,6 +4475,25 @@ describe('LoadedSettings Isolation and Serializability', () => {
       expect(userSettings.settings.mcpServers).not.toBe(
         userSettings.originalSettings.mcpServers,
       );
+    });
+
+    it('should support distinct runtime value and persisted originalValue while isolating references', () => {
+      const runtimeUi = {
+        autoThemeSwitching: true,
+        loadingPhrases: 'off',
+      };
+      const originalUi = {
+        autoThemeSwitching: '${AUTO_THEME:-false}',
+        loadingPhrases: 'off',
+      };
+
+      loadedSettings.setValue(SettingScope.User, 'ui', runtimeUi, originalUi);
+
+      const userSettings = loadedSettings.forScope(SettingScope.User);
+      expect(userSettings.settings.ui).toEqual(runtimeUi);
+      expect(userSettings.originalSettings.ui).toEqual(originalUi);
+      expect(userSettings.settings.ui).not.toBe(runtimeUi);
+      expect(userSettings.originalSettings.ui).not.toBe(originalUi);
     });
   });
 

@@ -173,6 +173,14 @@ const stringWidthCache = new LRUCache<string, number>(
   LRU_BUFFER_PERF_CACHE_LIMIT,
 );
 
+// Thai SARA AM (U+0E33) and Lao SARA AM (U+0EB3) have General_Category=Lo
+// (spacing letters that occupy 1 terminal column via wcwidth), but their
+// Grapheme_Cluster_Break=SpacingMark property causes Intl.Segmenter in
+// string-width to merge them with a preceding base character and ignore their
+// width. Replacing them with a 1-column ASCII space ensures each SARA AM is
+// measured as its own column.
+const SARA_AM_REGEX = /[\u0E33\u0EB3]/g;
+
 /**
  * Cached version of stringWidth function for better performance
  */
@@ -193,7 +201,7 @@ export const getCachedStringWidth = (str: string): number => {
 
   let width: number;
   try {
-    width = stringWidth(str);
+    width = stringWidth(str.replace(SARA_AM_REGEX, ' '));
   } catch {
     // Fallback for characters that cause string-width to crash (e.g. U+0602)
     // See: https://github.com/google-gemini/gemini-cli/issues/16418

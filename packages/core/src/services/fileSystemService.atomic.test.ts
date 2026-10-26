@@ -113,4 +113,48 @@ describe('StandardFileSystemService atomicity', () => {
     const lstat = await fsp.lstat(symlinkPath);
     expect(lstat.isSymbolicLink()).toBe(true);
   });
+
+  // Root bypasses mode bits, so the write succeeds for it just as a plain
+  // fs.writeFile would.
+  it.skipIf(process.getuid?.() === 0)(
+    'refuses to overwrite a read-only file',
+    async () => {
+      const filePath = path.join(dir, 'locked.txt');
+      await fsp.writeFile(filePath, 'original');
+      await fsp.chmod(filePath, 0o444);
+
+      try {
+        // A rename only consults the directory's permissions, so the check
+        // has to come from writeTextFile itself, and it must surface the same
+        // code a plain write would on every platform.
+        await expect(
+          service.writeTextFile(filePath, 'replaced'),
+        ).rejects.toMatchObject({ code: 'EACCES' });
+
+        await expect(fsp.readFile(filePath, 'utf-8')).resolves.toBe('original');
+        // The refusal must happen before a temp file is created.
+        await expect(fsp.readdir(dir)).resolves.toEqual(['locked.txt']);
+      } finally {
+        // Leave the file writable so afterEach can remove the directory even
+        // if an assertion above failed.
+        await fsp.chmod(filePath, 0o600);
+      }
+    },
+  );
+
+  it('keeps every hard link pointing at the new content', async () => {
+    const linkA = path.join(dir, 'a.txt');
+    const linkB = path.join(dir, 'b.txt');
+    await fsp.writeFile(linkA, 'shared');
+    await fsp.link(linkA, linkB);
+
+    await service.writeTextFile(linkA, 'edited');
+
+    // A rename would give a.txt a new inode and leave b.txt on the old one.
+    await expect(fsp.readFile(linkA, 'utf-8')).resolves.toBe('edited');
+    await expect(fsp.readFile(linkB, 'utf-8')).resolves.toBe('edited');
+    const stats = await fsp.stat(linkA);
+    expect(stats.nlink).toBe(2);
+    await expect(fsp.readdir(dir)).resolves.toEqual(['a.txt', 'b.txt']);
+  });
 });

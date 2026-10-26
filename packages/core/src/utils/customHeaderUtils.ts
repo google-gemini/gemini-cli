@@ -15,9 +15,9 @@ export function parseCustomHeaders(
     return headers;
   }
 
-  // Split the string on commas that are followed by a header key (key:),
+  // Split the string on commas that are followed by a valid RFC 9110 header key (token:),
   // but ignore commas that are part of a header value (including values with colons or commas)
-  for (const entry of envValue.split(/,(?=\s*[^,:]+:)/)) {
+  for (const entry of envValue.split(/,(?=\s*[\w!#$%&'*+.^`|~-]+\s*:)/)) {
     const trimmedEntry = entry.trim();
     if (!trimmedEntry) {
       continue;

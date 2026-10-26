@@ -211,6 +211,14 @@ export interface SettingsFile {
   readOnly?: boolean;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return isRecord(value) ? value : undefined;
+}
+
 function setNestedProperty(
   obj: Record<string, unknown>,
   path: string,
@@ -482,7 +490,12 @@ export class LoadedSettings {
     return !settingsFile.readOnly;
   }
 
-  setValue(scope: LoadableSettingScope, key: string, value: unknown): void {
+  setValue(
+    scope: LoadableSettingScope,
+    key: string,
+    value: unknown,
+    originalValue: unknown = value,
+  ): void {
     const settingsFile = this.forScope(scope);
 
     if (scope === SettingScope.Workspace && !this.isPersistable(settingsFile)) {
@@ -504,11 +517,11 @@ export class LoadedSettings {
 
     if (this.isPersistable(settingsFile)) {
       // Use a fresh clone for originalSettings to ensure total independence
-      setNestedProperty(
-        settingsFile.originalSettings,
-        key,
-        structuredClone(valueToSet),
-      );
+      const originalValueToSet =
+        typeof originalValue === 'object' && originalValue !== null
+          ? structuredClone(originalValue)
+          : originalValue;
+      setNestedProperty(settingsFile.originalSettings, key, originalValueToSet);
       saveSettings(settingsFile);
     }
 
@@ -803,10 +816,6 @@ export function loadSettings(
 interface RawSettingsFile {
   rawSettings: Settings;
   rawJson?: string;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function getParentRecord(
@@ -1186,10 +1195,12 @@ export function migrateDeprecatedSettings(
   const systemWarnings: Map<LoadableSettingScope, string[]> = new Map();
 
   /**
-   * Helper to migrate a boolean setting and track it if it's deprecated.
+   * Helper to migrate a boolean setting in both runtime (`settings`) and
+   * persisted (`originalSettings`) records while preserving sibling placeholders.
    */
   const migrateBoolean = (
     settings: Record<string, unknown>,
+    originalSettings: Record<string, unknown>,
     oldKey: string,
     newKey: string,
     prefix: string,
@@ -1204,16 +1215,22 @@ export function migrateDeprecatedSettings(
         foundDeprecated.push(prefix ? `${prefix}.${oldKey}` : oldKey);
       }
       if (typeof newValue === 'boolean') {
-        // Both exist, trust the new one
+        // Both exist, trust the new one (preserving any raw placeholder on newKey)
+        if (!(newKey in originalSettings)) {
+          originalSettings[newKey] = newValue;
+        }
         if (removeDeprecated) {
           delete settings[oldKey];
+          delete originalSettings[oldKey];
           modified = true;
         }
       } else {
         // Only old exists, migrate to new (inverted)
         settings[newKey] = !oldValue;
+        originalSettings[newKey] = !oldValue;
         if (removeDeprecated) {
           delete settings[oldKey];
+          delete originalSettings[oldKey];
         }
         modified = true;
       }
@@ -1224,19 +1241,20 @@ export function migrateDeprecatedSettings(
   const processScope = (scope: LoadableSettingScope) => {
     const settingsFile = loadedSettings.forScope(scope);
     const settings = settingsFile.settings;
+    const originalSettings = settingsFile.originalSettings;
     const foundDeprecated: string[] = [];
 
     // Migrate general settings
-    const generalSettings = settings.general as
-      | Record<string, unknown>
-      | undefined;
+    const generalSettings = asRecord(settings.general);
     if (generalSettings) {
       const newGeneral = { ...generalSettings };
+      const newOriginalGeneral = { ...asRecord(originalSettings.general) };
       let modified = false;
 
       modified =
         migrateBoolean(
           newGeneral,
+          newOriginalGeneral,
           'disableAutoUpdate',
           'enableAutoUpdate',
           'general',
@@ -1245,6 +1263,7 @@ export function migrateDeprecatedSettings(
       modified =
         migrateBoolean(
           newGeneral,
+          newOriginalGeneral,
           'disableUpdateNag',
           'enableAutoUpdateNotification',
           'general',
@@ -1252,7 +1271,12 @@ export function migrateDeprecatedSettings(
         ) || modified;
 
       if (modified) {
-        loadedSettings.setValue(scope, 'general', newGeneral);
+        loadedSettings.setValue(
+          scope,
+          'general',
+          newGeneral,
+          newOriginalGeneral,
+        );
         if (!settingsFile.readOnly) {
           anyModified = true;
         }
@@ -1260,19 +1284,22 @@ export function migrateDeprecatedSettings(
     }
 
     // Migrate ui settings
-    const uiSettings = settings.ui as Record<string, unknown> | undefined;
+    const uiSettings = asRecord(settings.ui);
     if (uiSettings) {
       const newUi = { ...uiSettings };
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const accessibilitySettings = newUi['accessibility'] as
-        | Record<string, unknown>
-        | undefined;
+      const originalUi = asRecord(originalSettings.ui);
+      const newOriginalUi = { ...originalUi };
+      const accessibilitySettings = asRecord(newUi['accessibility']);
 
       if (accessibilitySettings) {
         const newAccessibility = { ...accessibilitySettings };
+        const newOriginalAccessibility = {
+          ...asRecord(originalUi?.['accessibility']),
+        };
         if (
           migrateBoolean(
             newAccessibility,
+            newOriginalAccessibility,
             'disableLoadingPhrases',
             'enableLoadingPhrases',
             'ui.accessibility',
@@ -1280,7 +1307,8 @@ export function migrateDeprecatedSettings(
           )
         ) {
           newUi['accessibility'] = newAccessibility;
-          loadedSettings.setValue(scope, 'ui', newUi);
+          newOriginalUi['accessibility'] = newOriginalAccessibility;
+          loadedSettings.setValue(scope, 'ui', newUi, newOriginalUi);
           if (!settingsFile.readOnly) {
             anyModified = true;
           }
@@ -1294,7 +1322,8 @@ export function migrateDeprecatedSettings(
         ) {
           if (!enableLP) {
             newUi['loadingPhrases'] = 'off';
-            loadedSettings.setValue(scope, 'ui', newUi);
+            newOriginalUi['loadingPhrases'] = 'off';
+            loadedSettings.setValue(scope, 'ui', newUi, newOriginalUi);
             if (!settingsFile.readOnly) {
               anyModified = true;
             }
@@ -1305,21 +1334,22 @@ export function migrateDeprecatedSettings(
     }
 
     // Migrate context settings
-    const contextSettings = settings.context as
-      | Record<string, unknown>
-      | undefined;
+    const contextSettings = asRecord(settings.context);
     if (contextSettings) {
       const newContext = { ...contextSettings };
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const fileFilteringSettings = newContext['fileFiltering'] as
-        | Record<string, unknown>
-        | undefined;
+      const originalContext = asRecord(originalSettings.context);
+      const newOriginalContext = { ...originalContext };
+      const fileFilteringSettings = asRecord(newContext['fileFiltering']);
 
       if (fileFilteringSettings) {
         const newFileFiltering = { ...fileFilteringSettings };
+        const newOriginalFileFiltering = {
+          ...asRecord(originalContext?.['fileFiltering']),
+        };
         if (
           migrateBoolean(
             newFileFiltering,
+            newOriginalFileFiltering,
             'disableFuzzySearch',
             'enableFuzzySearch',
             'context.fileFiltering',
@@ -1327,7 +1357,13 @@ export function migrateDeprecatedSettings(
           )
         ) {
           newContext['fileFiltering'] = newFileFiltering;
-          loadedSettings.setValue(scope, 'context', newContext);
+          newOriginalContext['fileFiltering'] = newOriginalFileFiltering;
+          loadedSettings.setValue(
+            scope,
+            'context',
+            newContext,
+            newOriginalContext,
+          );
           if (!settingsFile.readOnly) {
             anyModified = true;
           }
@@ -1336,19 +1372,26 @@ export function migrateDeprecatedSettings(
     }
 
     // Migrate tools settings
-    const toolsSettings = settings.tools as Record<string, unknown> | undefined;
+    const toolsSettings = asRecord(settings.tools);
     if (toolsSettings) {
       if (toolsSettings['approvalMode'] !== undefined) {
         foundDeprecated.push('tools.approvalMode');
 
-        const generalSettings =
-          (settings.general as Record<string, unknown> | undefined) || {};
-        const newGeneral = { ...generalSettings };
+        const originalTools = asRecord(originalSettings.tools);
+        const newGeneral = { ...asRecord(settings.general) };
+        const newOriginalGeneral = { ...asRecord(originalSettings.general) };
 
         // Only set defaultApprovalMode if it's not already set
         if (newGeneral['defaultApprovalMode'] === undefined) {
           newGeneral['defaultApprovalMode'] = toolsSettings['approvalMode'];
-          loadedSettings.setValue(scope, 'general', newGeneral);
+          newOriginalGeneral['defaultApprovalMode'] =
+            originalTools?.['approvalMode'] ?? toolsSettings['approvalMode'];
+          loadedSettings.setValue(
+            scope,
+            'general',
+            newGeneral,
+            newOriginalGeneral,
+          );
           if (!settingsFile.readOnly) {
             anyModified = true;
           }
@@ -1356,8 +1399,10 @@ export function migrateDeprecatedSettings(
 
         if (removeDeprecated) {
           const newTools = { ...toolsSettings };
+          const newOriginalTools = { ...originalTools };
           delete newTools['approvalMode'];
-          loadedSettings.setValue(scope, 'tools', newTools);
+          delete newOriginalTools['approvalMode'];
+          loadedSettings.setValue(scope, 'tools', newTools, newOriginalTools);
           if (!settingsFile.readOnly) {
             anyModified = true;
           }
@@ -1367,7 +1412,7 @@ export function migrateDeprecatedSettings(
 
     // Migrate experimental agent settings
     const experimentalModified = migrateExperimentalSettings(
-      settings,
+      settingsFile,
       loadedSettings,
       scope,
       removeDeprecated,
@@ -1451,130 +1496,187 @@ export function saveModelChange(
 }
 
 function migrateExperimentalSettings(
-  settings: Settings,
+  settingsFile: SettingsFile,
   loadedSettings: LoadedSettings,
   scope: LoadableSettingScope,
   removeDeprecated: boolean,
   foundDeprecated?: string[],
 ): boolean {
-  const experimentalSettings = settings.experimental as
-    | Record<string, unknown>
-    | undefined;
+  const settings = settingsFile.settings;
+  const originalSettings = settingsFile.originalSettings;
+  const experimentalSettings = asRecord(settings.experimental);
 
   if (experimentalSettings) {
-    const agentsSettings = {
-      ...(settings.agents as Record<string, unknown> | undefined),
-    };
-    const agentsOverrides = {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      ...((agentsSettings['overrides'] as Record<string, unknown>) || {}),
+    const originalExperimental = asRecord(originalSettings.experimental);
+    const agentsSettings = { ...asRecord(settings.agents) };
+    const agentsOverrides = { ...asRecord(agentsSettings['overrides']) };
+    const originalAgentsSettings = { ...asRecord(originalSettings.agents) };
+    const originalAgentsOverrides = {
+      ...asRecord(originalAgentsSettings['overrides']),
     };
     let modified = false;
+    let agentsModified = false;
+    let anyWritten = false;
 
     const migrateExperimental = <T = Record<string, unknown>>(
       oldKey: string,
-      migrateFn: (oldValue: T) => void,
+      migrateFn: (oldValue: T, rawOldValue: unknown) => void,
     ) => {
       const old = experimentalSettings[oldKey];
       if (old !== undefined) {
         foundDeprecated?.push(`experimental.${oldKey}`);
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        migrateFn(old as T);
+        migrateFn(old as T, originalExperimental?.[oldKey]);
         modified = true;
       }
     };
 
     // Migrate codebaseInvestigatorSettings -> agents.overrides.codebase_investigator
-    migrateExperimental('codebaseInvestigatorSettings', (old) => {
+    migrateExperimental('codebaseInvestigatorSettings', (old, rawOldValue) => {
+      const oldObj = asRecord(old);
+      if (!oldObj) return;
+      const rawOld = asRecord(rawOldValue);
+
       const override = {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        ...(agentsOverrides['codebase_investigator'] as
-          | Record<string, unknown>
-          | undefined),
+        ...asRecord(agentsOverrides['codebase_investigator']),
+      };
+      const origOverride = {
+        ...asRecord(originalAgentsOverrides['codebase_investigator']),
       };
 
-      if (old['enabled'] !== undefined) override['enabled'] = old['enabled'];
+      if (oldObj['enabled'] !== undefined) {
+        override['enabled'] = oldObj['enabled'];
+        origOverride['enabled'] = rawOld?.['enabled'] ?? oldObj['enabled'];
+      }
 
-      const runConfig = {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        ...(override['runConfig'] as Record<string, unknown> | undefined),
-      };
-      if (old['maxNumTurns'] !== undefined)
-        runConfig['maxTurns'] = old['maxNumTurns'];
-      if (old['maxTimeMinutes'] !== undefined)
-        runConfig['maxTimeMinutes'] = old['maxTimeMinutes'];
-      if (Object.keys(runConfig).length > 0) override['runConfig'] = runConfig;
+      const runConfig = { ...asRecord(override['runConfig']) };
+      const origRunConfig = { ...asRecord(origOverride['runConfig']) };
+      if (oldObj['maxNumTurns'] !== undefined) {
+        runConfig['maxTurns'] = oldObj['maxNumTurns'];
+        origRunConfig['maxTurns'] =
+          rawOld?.['maxNumTurns'] ?? oldObj['maxNumTurns'];
+      }
+      if (oldObj['maxTimeMinutes'] !== undefined) {
+        runConfig['maxTimeMinutes'] = oldObj['maxTimeMinutes'];
+        origRunConfig['maxTimeMinutes'] =
+          rawOld?.['maxTimeMinutes'] ?? oldObj['maxTimeMinutes'];
+      }
+      if (Object.keys(runConfig).length > 0) {
+        override['runConfig'] = runConfig;
+        origOverride['runConfig'] = origRunConfig;
+      }
 
-      if (old['model'] !== undefined || old['thinkingBudget'] !== undefined) {
-        const modelConfig = {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          ...(override['modelConfig'] as Record<string, unknown> | undefined),
-        };
-        if (old['model'] !== undefined) modelConfig['model'] = old['model'];
-        if (old['thinkingBudget'] !== undefined) {
+      if (
+        oldObj['model'] !== undefined ||
+        oldObj['thinkingBudget'] !== undefined
+      ) {
+        const modelConfig = { ...asRecord(override['modelConfig']) };
+        const origModelConfig = { ...asRecord(origOverride['modelConfig']) };
+        if (oldObj['model'] !== undefined) {
+          modelConfig['model'] = oldObj['model'];
+          origModelConfig['model'] = rawOld?.['model'] ?? oldObj['model'];
+        }
+        if (oldObj['thinkingBudget'] !== undefined) {
           const generateContentConfig = {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            ...(modelConfig['generateContentConfig'] as
-              | Record<string, unknown>
-              | undefined),
+            ...asRecord(modelConfig['generateContentConfig']),
+          };
+          const origGenerateContentConfig = {
+            ...asRecord(origModelConfig['generateContentConfig']),
           };
           const thinkingConfig = {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            ...(generateContentConfig['thinkingConfig'] as
-              | Record<string, unknown>
-              | undefined),
+            ...asRecord(generateContentConfig['thinkingConfig']),
           };
-          thinkingConfig['thinkingBudget'] = old['thinkingBudget'];
+          const origThinkingConfig = {
+            ...asRecord(origGenerateContentConfig['thinkingConfig']),
+          };
+          thinkingConfig['thinkingBudget'] = oldObj['thinkingBudget'];
+          origThinkingConfig['thinkingBudget'] =
+            rawOld?.['thinkingBudget'] ?? oldObj['thinkingBudget'];
           generateContentConfig['thinkingConfig'] = thinkingConfig;
+          origGenerateContentConfig['thinkingConfig'] = origThinkingConfig;
           modelConfig['generateContentConfig'] = generateContentConfig;
+          origModelConfig['generateContentConfig'] = origGenerateContentConfig;
         }
         override['modelConfig'] = modelConfig;
+        origOverride['modelConfig'] = origModelConfig;
       }
 
       agentsOverrides['codebase_investigator'] = override;
+      originalAgentsOverrides['codebase_investigator'] = origOverride;
+      agentsModified = true;
     });
 
     // Migrate cliHelpAgentSettings -> agents.overrides.cli_help
-    migrateExperimental('cliHelpAgentSettings', (old) => {
-      const override = {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        ...(agentsOverrides['cli_help'] as Record<string, unknown> | undefined),
-      };
-      if (old['enabled'] !== undefined) override['enabled'] = old['enabled'];
+    migrateExperimental('cliHelpAgentSettings', (old, rawOldValue) => {
+      const oldObj = asRecord(old);
+      if (!oldObj) return;
+      const rawOld = asRecord(rawOldValue);
+
+      const override = { ...asRecord(agentsOverrides['cli_help']) };
+      const origOverride = { ...asRecord(originalAgentsOverrides['cli_help']) };
+      if (oldObj['enabled'] !== undefined) {
+        override['enabled'] = oldObj['enabled'];
+        origOverride['enabled'] = rawOld?.['enabled'] ?? oldObj['enabled'];
+      }
       agentsOverrides['cli_help'] = override;
+      originalAgentsOverrides['cli_help'] = origOverride;
+      agentsModified = true;
     });
 
     // Migrate experimental.plan -> general.plan.enabled
-    migrateExperimental<boolean>('plan', (planValue) => {
-      const generalSettings =
-        (settings.general as Record<string, unknown> | undefined) || {};
-      const newGeneral = { ...generalSettings };
-      const planSettings =
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        (newGeneral['plan'] as Record<string, unknown> | undefined) || {};
-      const newPlan = { ...planSettings };
+    migrateExperimental<boolean>('plan', (planValue, rawPlanValue) => {
+      const newGeneral = { ...asRecord(settings.general) };
+      const newPlan = { ...asRecord(newGeneral['plan']) };
+      const originalGeneral = asRecord(originalSettings.general);
+      const newOriginalGeneral = { ...originalGeneral };
+      const newOriginalPlan = { ...asRecord(originalGeneral?.['plan']) };
 
       if (newPlan['enabled'] === undefined) {
         newPlan['enabled'] = planValue;
         newGeneral['plan'] = newPlan;
-        loadedSettings.setValue(scope, 'general', newGeneral);
-        modified = true;
+        newOriginalPlan['enabled'] = rawPlanValue ?? planValue;
+        newOriginalGeneral['plan'] = newOriginalPlan;
+        loadedSettings.setValue(
+          scope,
+          'general',
+          newGeneral,
+          newOriginalGeneral,
+        );
+        anyWritten = true;
       }
     });
 
-    if (modified) {
+    if (agentsModified) {
       agentsSettings['overrides'] = agentsOverrides;
-      loadedSettings.setValue(scope, 'agents', agentsSettings);
-
-      if (removeDeprecated) {
-        const newExperimental = { ...experimentalSettings };
-        delete newExperimental['codebaseInvestigatorSettings'];
-        delete newExperimental['cliHelpAgentSettings'];
-        delete newExperimental['plan'];
-        loadedSettings.setValue(scope, 'experimental', newExperimental);
-      }
-      return true;
+      originalAgentsSettings['overrides'] = originalAgentsOverrides;
+      loadedSettings.setValue(
+        scope,
+        'agents',
+        agentsSettings,
+        originalAgentsSettings,
+      );
+      anyWritten = true;
     }
+
+    if (modified && removeDeprecated) {
+      const newExperimental = { ...experimentalSettings };
+      const newOriginalExperimental = { ...originalExperimental };
+      delete newExperimental['codebaseInvestigatorSettings'];
+      delete newExperimental['cliHelpAgentSettings'];
+      delete newExperimental['plan'];
+      delete newOriginalExperimental['codebaseInvestigatorSettings'];
+      delete newOriginalExperimental['cliHelpAgentSettings'];
+      delete newOriginalExperimental['plan'];
+      loadedSettings.setValue(
+        scope,
+        'experimental',
+        newExperimental,
+        newOriginalExperimental,
+      );
+      anyWritten = true;
+    }
+
+    return anyWritten;
   }
   return false;
 }
