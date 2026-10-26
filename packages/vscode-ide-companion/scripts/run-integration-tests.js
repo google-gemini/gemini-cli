@@ -7,6 +7,7 @@
 import * as path from 'node:path';
 import { runTests } from '@vscode/test-electron';
 import { fileURLToPath } from 'node:url';
+import { downloadVSCodeWithRetry } from './download-vscode.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,8 +26,14 @@ async function main() {
       '../dist/integration-tests/run-test.cjs',
     );
 
-    // Download VS Code, unzip it and run the integration test
+    // Download VS Code separately so transient network failures can be
+    // retried without ever re-running the tests themselves.
+    const vscodeExecutablePath = await downloadVSCodeWithRetry({
+      extensionDevelopmentPath,
+    });
+
     await runTests({
+      vscodeExecutablePath,
       extensionDevelopmentPath,
       extensionTestsPath,
       launchArgs: ['--disable-extensions'],
