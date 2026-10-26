@@ -940,6 +940,40 @@ describe('normalizePath', () => {
       expect(isTrustedSystemPath('/Library/rg')).toBe(false);
     });
 
+    it('should allow Termux system paths on Android or when TERMUX_VERSION is set', () => {
+      mockPlatform('android');
+      expect(
+        isTrustedSystemPath('/data/data/com.termux/files/usr/bin/rg'),
+      ).toBe(true);
+      expect(
+        isTrustedSystemPath(
+          '/data/data/com.termux/files/usr/bin/applets/busybox',
+        ),
+      ).toBe(true);
+
+      // On standard linux, without TERMUX_VERSION, it is rejected even if PREFIX is set
+      mockPlatform('linux');
+      vi.stubEnv('PREFIX', '/custom/termux/prefix/usr');
+      expect(isTrustedSystemPath('/custom/termux/prefix/usr/bin/rg')).toBe(
+        false,
+      );
+      vi.unstubAllEnvs();
+
+      // With TERMUX_VERSION set on linux, it is allowed
+      mockPlatform('linux');
+      vi.stubEnv('TERMUX_VERSION', '0.118.0');
+      expect(
+        isTrustedSystemPath('/data/data/com.termux/files/usr/bin/rg'),
+      ).toBe(true);
+
+      // Custom PREFIX support when TERMUX_VERSION is set
+      vi.stubEnv('PREFIX', '/custom/termux/prefix/usr');
+      expect(isTrustedSystemPath('/custom/termux/prefix/usr/bin/rg')).toBe(
+        true,
+      );
+      vi.unstubAllEnvs();
+    });
+
     it('should allow 1P internal hermetic execution paths', () => {
       mockPlatform('linux');
 

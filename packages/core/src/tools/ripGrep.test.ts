@@ -1960,5 +1960,59 @@ describe('resolveRipgrepPath', () => {
         expect(resolvedPath).toBeNull();
       });
     });
+
+    describe('on Android / Termux', () => {
+      beforeEach(() => {
+        vi.spyOn(os, 'platform').mockReturnValue('android');
+        vi.spyOn(os, 'arch').mockReturnValue('arm64');
+        vi.stubGlobal(
+          'process',
+          Object.create(process, {
+            platform: {
+              get: () => 'android',
+            },
+          }),
+        );
+      });
+
+      it('should skip bundled binaries and resolve system ripgrep in Termux', async () => {
+        vi.mocked(fileExists).mockResolvedValue(true);
+        const termuxRg = '/data/data/com.termux/files/usr/bin/rg';
+        vi.mocked(resolveExecutable).mockReturnValue(termuxRg);
+        vi.mocked(resolveToRealPath).mockReturnValue(termuxRg);
+
+        const resolvedPath = await resolveRipgrepPath();
+        expect(resolvedPath).toBe(termuxRg);
+        expect(resolveExecutable).toHaveBeenCalledWith('rg');
+      });
+
+      it('should return null when system ripgrep is not installed on Termux', async () => {
+        vi.mocked(fileExists).mockResolvedValue(true);
+        vi.mocked(resolveExecutable).mockReturnValue(undefined);
+
+        const resolvedPath = await resolveRipgrepPath();
+        expect(resolvedPath).toBeNull();
+      });
+
+      it('should skip bundled binaries when TERMUX_VERSION is set on Linux', async () => {
+        vi.spyOn(os, 'platform').mockReturnValue('linux');
+        vi.stubGlobal(
+          'process',
+          Object.create(process, {
+            platform: {
+              get: () => 'linux',
+            },
+          }),
+        );
+        vi.stubEnv('TERMUX_VERSION', '0.118.0');
+        vi.mocked(fileExists).mockResolvedValue(true);
+        const termuxRg = '/data/data/com.termux/files/usr/bin/rg';
+        vi.mocked(resolveExecutable).mockReturnValue(termuxRg);
+        vi.mocked(resolveToRealPath).mockReturnValue(termuxRg);
+
+        const resolvedPath = await resolveRipgrepPath();
+        expect(resolvedPath).toBe(termuxRg);
+      });
+    });
   });
 });

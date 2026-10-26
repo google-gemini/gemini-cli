@@ -69,9 +69,14 @@ export async function resolveRipgrepPath(): Promise<string | null> {
       path.resolve(__dirname, '../../vendor/ripgrep', binName),
     ];
 
-    for (const candidate of candidatePaths) {
-      if (await fileExists(candidate)) {
-        return candidate;
+    const isAndroidOrTermux =
+      platform === 'android' || !!process.env['TERMUX_VERSION'];
+
+    if (!isAndroidOrTermux) {
+      for (const candidate of candidatePaths) {
+        if (await fileExists(candidate)) {
+          return candidate;
+        }
       }
     }
 
