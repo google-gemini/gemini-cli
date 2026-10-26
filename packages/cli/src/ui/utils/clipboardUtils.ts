@@ -233,7 +233,7 @@ async function saveFileWithWlPaste(tempFilePath: string) {
       return false;
     }
 
-    const tempBmpPath = tempFilePath.replace(/\.png$/, '.bmp');
+    const tempBmpPath = `${tempFilePath}.bmp`;
 
     try {
       const success = await saveFromCommand(
