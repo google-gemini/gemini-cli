@@ -14,7 +14,8 @@ import {
   escapePath,
   Storage,
 } from '@google/gemini-cli-core';
-
+import bmp from 'bmp-js';
+import { PNG } from 'pngjs';
 /**
  * Supported image file extensions based on Gemini API.
  * See: https://ai.google.dev/gemini-api/docs/image-understanding
@@ -42,10 +43,19 @@ function getUserLinuxClipboardTool(): typeof linuxClipboardTool {
 
   let toolName: 'wl-paste' | 'xclip' | null = null;
   const displayServer = process.env['XDG_SESSION_TYPE'];
-
-  if (displayServer === 'wayland') toolName = 'wl-paste';
-  else if (displayServer === 'x11') toolName = 'xclip';
-  else return null;
+  if (
+    displayServer === 'wayland' ||
+    (!displayServer && process.env['WAYLAND_DISPLAY'])
+  ) {
+    toolName = 'wl-paste';
+  } else if (
+    displayServer === 'x11' ||
+    (!displayServer && process.env['DISPLAY'])
+  ) {
+    toolName = 'xclip';
+  } else {
+    return null;
+  }
 
   try {
     // output is piped to stdio: 'ignore' to suppress the path printing to console
@@ -206,23 +216,71 @@ export async function clipboardHasImage(): Promise<boolean> {
  * Saves clipboard content to a file using wl-paste (Wayland).
  */
 async function saveFileWithWlPaste(tempFilePath: string) {
-  const success = await saveFromCommand(
-    'wl-paste',
-    ['--no-newline', '--type', 'image/png'],
-    tempFilePath,
-  );
-  if (success) {
-    return true;
-  }
-  // Cleanup on failure
   try {
-    await fs.unlink(tempFilePath);
-  } catch {
-    /* ignore */
-  }
-  return false;
-}
+    const { stdout } = await spawnAsync('wl-paste', ['--list-types']);
+    const types = stdout.split(/\r?\n/).map((type) => type.trim());
+    if (types.includes('image/png')) {
+      const success = await saveFromCommand(
+        'wl-paste',
+        ['--no-newline', '--type', 'image/png'],
+        tempFilePath,
+      );
 
+      if (success) return true;
+    }
+
+    if (!types.includes('image/bmp')) {
+      return false;
+    }
+
+    const tempBmpPath = tempFilePath.replace(/\.png$/, '.bmp');
+
+    try {
+      const success = await saveFromCommand(
+        'wl-paste',
+        ['--no-newline', '--type', 'image/bmp'],
+        tempBmpPath,
+      );
+
+      if (!success) return false;
+
+      const bmpBuffer = await fs.readFile(tempBmpPath);
+      const decoded = bmp.decode(bmpBuffer);
+
+      const png = new PNG({
+        width: decoded.width,
+        height: decoded.height,
+      });
+
+      const rgba = Buffer.from(decoded.data);
+      const hasMeaningfulAlpha = decoded.compress !== 0;
+
+      for (let i = 0; i < rgba.length; i += 4) {
+        const a = hasMeaningfulAlpha ? rgba[i] : 255;
+        const b = rgba[i + 1];
+        const g = rgba[i + 2];
+        const r = rgba[i + 3];
+
+        rgba[i] = r;
+        rgba[i + 1] = g;
+        rgba[i + 2] = b;
+        rgba[i + 3] = a;
+      }
+      png.data = rgba;
+
+      const pngBuffer = PNG.sync.write(png);
+      await fs.writeFile(tempFilePath, pngBuffer);
+
+      return true;
+    } finally {
+      await fs.unlink(tempBmpPath).catch(() => undefined);
+    }
+  } catch (error) {
+    debugLogger.warn('Failed to save clipboard image with wl-paste:', error);
+    await fs.unlink(tempFilePath).catch(() => undefined);
+    return false;
+  }
+}
 /**
  * Saves clipboard content to a file using xclip (X11).
  */

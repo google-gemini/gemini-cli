@@ -25,6 +25,7 @@ import { spawn, execSync, type ChildProcess } from 'node:child_process';
 import EventEmitter from 'node:events';
 import { Stream } from 'node:stream';
 import * as path from 'node:path';
+import { PNG } from 'pngjs';
 
 // Mock dependencies BEFORE imports
 vi.mock('node:fs/promises');
@@ -108,6 +109,22 @@ describe('clipboardUtils', () => {
   });
 
   describe('clipboardHasImage (Linux)', () => {
+    it('should detect images when XDG_SESSION_TYPE is unset but Wayland is available', async () => {
+      mockPlatform('linux');
+      delete process.env['XDG_SESSION_TYPE'];
+      process.env['WAYLAND_DISPLAY'] = 'wayland-0';
+
+      vi.mocked(execSync).mockReturnValue(Buffer.from(''));
+      vi.mocked(spawnAsync).mockResolvedValueOnce({
+        stdout: 'image/bmp',
+        stderr: '',
+      });
+
+      const result = await clipboardUtils.clipboardHasImage();
+
+      expect(result).toBe(true);
+      expect(spawnAsync).toHaveBeenCalledWith('wl-paste', ['--list-types']);
+    });
     it('should return true when wl-paste shows image type (Wayland)', async () => {
       mockPlatform('linux');
       process.env['XDG_SESSION_TYPE'] = 'wayland';
@@ -240,6 +257,10 @@ describe('clipboardUtils', () => {
 
     it('should save image using wl-paste if detected', async () => {
       await primeClipboardTool('wayland');
+      vi.mocked(spawnAsync).mockResolvedValueOnce({
+        stdout: 'image/png',
+        stderr: '',
+      });
 
       // Mock fs.stat to return size > 0
       vi.mocked(fs.stat).mockResolvedValue(MOCK_FILE_STATS);
@@ -273,9 +294,86 @@ describe('clipboardUtils', () => {
       expect(spawn).toHaveBeenCalledWith('wl-paste', expect.any(Array));
       expect(fs.mkdir).toHaveBeenCalledWith(mockTempDir, { recursive: true });
     });
+    it('should convert BMP clipboard images to PNG', async () => {
+      await primeClipboardTool('wayland');
+
+      vi.mocked(spawnAsync).mockResolvedValue({
+        stdout: 'image/bmp',
+        stderr: '',
+      });
+      vi.mocked(fs.stat).mockResolvedValue(MOCK_FILE_STATS);
+
+      vi.mocked(fs.stat).mockResolvedValue(MOCK_FILE_STATS);
+
+      const bmpFixture = Buffer.alloc(58);
+
+      bmpFixture.write('BM');
+      bmpFixture.writeUInt32LE(58, 2);
+      bmpFixture.writeUInt32LE(54, 10);
+      bmpFixture.writeUInt32LE(40, 14);
+      bmpFixture.writeInt32LE(1, 18);
+      bmpFixture.writeInt32LE(1, 22);
+      bmpFixture.writeUInt16LE(1, 26);
+      bmpFixture.writeUInt16LE(32, 28);
+      bmpFixture.writeUInt32LE(4, 34);
+
+      // One opaque pixel: B, G, R, A
+      bmpFixture[54] = 20;
+      bmpFixture[55] = 40;
+      bmpFixture[56] = 255;
+      bmpFixture[57] = 255;
+
+      vi.mocked(fs.readFile).mockResolvedValue(bmpFixture);
+
+      const mockChild = createMockChildProcess(true, 0);
+      vi.mocked(spawn).mockReturnValue(mockChild as unknown as ChildProcess);
+
+      const mockStream = new EventEmitter() as EventEmitter & {
+        writableFinished: boolean;
+      };
+      mockStream.writableFinished = false;
+
+      vi.mocked(createWriteStream).mockReturnValue(
+        mockStream as unknown as WriteStream,
+      );
+
+      const promise = clipboardUtils.saveClipboardImage(mockTargetDir);
+
+      mockStream.writableFinished = true;
+      mockStream.emit('finish');
+
+      const result = await promise;
+
+      expect(spawn).toHaveBeenCalledWith('wl-paste', [
+        '--no-newline',
+        '--type',
+        'image/bmp',
+      ]);
+      expect(result).not.toBeNull();
+      expect(result).toMatch(/clipboard-\d+\.png$/);
+      const writeFileCall = vi
+        .mocked(fs.writeFile)
+        .mock.calls.find(
+          ([filePath]) =>
+            typeof filePath === 'string' && filePath.endsWith('.png'),
+        );
+
+      expect(writeFileCall).toBeDefined();
+
+      const pngBuffer = writeFileCall![1] as Buffer;
+      const decodedPng = PNG.sync.read(pngBuffer);
+
+      expect(decodedPng.width).toBe(1);
+      expect(decodedPng.height).toBe(1);
+      expect([...decodedPng.data]).toEqual([255, 40, 20, 255]);
+    });
 
     it('should return null if wl-paste fails', async () => {
       await primeClipboardTool('wayland');
+      vi.mocked(spawnAsync).mockResolvedValueOnce({
+        stdout: 'image/png',
+        stderr: '',
+      });
 
       // Mock fs.stat to return size > 0
       vi.mocked(fs.stat).mockResolvedValue(MOCK_FILE_STATS);
@@ -336,11 +434,12 @@ describe('clipboardUtils', () => {
     });
 
     it('should return null if tool is not yet detected', async () => {
-      // Unset session type to ensure no tool is detected automatically
       delete process.env['XDG_SESSION_TYPE'];
+      delete process.env['WAYLAND_DISPLAY'];
+      delete process.env['DISPLAY'];
 
-      // Don't prime the tool
       const result = await clipboardUtils.saveClipboardImage(mockTargetDir);
+
       expect(result).toBe(null);
       expect(spawn).not.toHaveBeenCalled();
     });
