@@ -61,6 +61,8 @@ describe('NumericalClassifierStrategy', () => {
       getModel: vi.fn().mockReturnValue(PREVIEW_GEMINI_MODEL_AUTO),
       getSessionId: vi.fn().mockReturnValue('control-group-id'), // Default to Control Group (Hash 71 >= 50)
       getNumericalRoutingEnabled: vi.fn().mockResolvedValue(true),
+      hasCustomNumericalRoutingRules: vi.fn().mockReturnValue(false),
+      getNumericalRoutingRules: vi.fn().mockReturnValue([]),
       getResolvedClassifierThreshold: vi.fn().mockResolvedValue(90),
       getClassifierThreshold: vi.fn().mockResolvedValue(undefined),
       getGemini31Launched: vi.fn().mockResolvedValue(false),
@@ -211,6 +213,431 @@ describe('NumericalClassifierStrategy', () => {
           latencyMs: expect.any(Number),
           reasoning: expect.stringContaining('Score: 95 / Threshold: 90'),
         },
+      });
+    });
+  });
+
+  describe('Custom Numerical Routing Rules', () => {
+    describe('Range Boundaries', () => {
+      beforeEach(() => {
+        vi.mocked(mockConfig.hasCustomNumericalRoutingRules).mockReturnValue(
+          true,
+        );
+        vi.mocked(mockConfig.getNumericalRoutingRules).mockReturnValue([
+          { maxScore: 10, model: 'local-gemma' },
+          { maxScore: 30, model: 'gemini-2.5-flash' },
+          { maxScore: 80, model: 'gemini-3-flash-preview' },
+          { maxScore: 100, model: 'gemini-3-pro-preview' },
+        ]);
+      });
+
+      it('routes lower bound score (1) to the first band', async () => {
+        vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue({
+          complexity_reasoning: 'Minimal complexity',
+          complexity_score: 1,
+        });
+
+        const decision = await strategy.route(
+          mockContext,
+          mockConfig,
+          mockBaseLlmClient,
+          mockLocalLiteRtLmClient,
+        );
+
+        expect(decision).toEqual({
+          model: 'local-gemma',
+          metadata: {
+            source: 'NumericalClassifier (Custom)',
+            latencyMs: expect.any(Number),
+            reasoning:
+              '[Score: 1 / Max score: 10 / Model: local-gemma] Minimal complexity',
+          },
+        });
+      });
+
+      it('routes exact upper boundary of first band (10) to the first band', async () => {
+        vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue({
+          complexity_reasoning: 'Simple task',
+          complexity_score: 10,
+        });
+
+        const decision = await strategy.route(
+          mockContext,
+          mockConfig,
+          mockBaseLlmClient,
+          mockLocalLiteRtLmClient,
+        );
+
+        expect(decision?.model).toBe('local-gemma');
+        expect(decision?.metadata.source).toBe('NumericalClassifier (Custom)');
+        expect(decision?.metadata.reasoning).toContain(
+          '[Score: 10 / Max score: 10 / Model: local-gemma]',
+        );
+      });
+
+      it('routes just above boundary (11) to the second band', async () => {
+        vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue({
+          complexity_reasoning: 'Slightly more than trivial',
+          complexity_score: 11,
+        });
+
+        const decision = await strategy.route(
+          mockContext,
+          mockConfig,
+          mockBaseLlmClient,
+          mockLocalLiteRtLmClient,
+        );
+
+        expect(decision?.model).toBe('gemini-2.5-flash');
+        expect(decision?.metadata.reasoning).toContain(
+          '[Score: 11 / Max score: 30 / Model: gemini-2.5-flash]',
+        );
+      });
+
+      it('routes exact boundary (30) to the second band', async () => {
+        vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue({
+          complexity_reasoning: 'Moderate task',
+          complexity_score: 30,
+        });
+
+        const decision = await strategy.route(
+          mockContext,
+          mockConfig,
+          mockBaseLlmClient,
+          mockLocalLiteRtLmClient,
+        );
+
+        expect(decision?.model).toBe('gemini-2.5-flash');
+        expect(decision?.metadata.reasoning).toContain(
+          '[Score: 30 / Max score: 30 / Model: gemini-2.5-flash]',
+        );
+      });
+
+      it('routes exact boundary (80) to the third band', async () => {
+        vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue({
+          complexity_reasoning: 'High complexity task',
+          complexity_score: 80,
+        });
+
+        const decision = await strategy.route(
+          mockContext,
+          mockConfig,
+          mockBaseLlmClient,
+          mockLocalLiteRtLmClient,
+        );
+
+        expect(decision?.model).toBe('gemini-3-flash-preview');
+        expect(decision?.metadata.reasoning).toContain(
+          '[Score: 80 / Max score: 80 / Model: gemini-3-flash-preview]',
+        );
+      });
+
+      it('routes just above boundary (81) to the fourth band', async () => {
+        vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue({
+          complexity_reasoning: 'Very complex task',
+          complexity_score: 81,
+        });
+
+        const decision = await strategy.route(
+          mockContext,
+          mockConfig,
+          mockBaseLlmClient,
+          mockLocalLiteRtLmClient,
+        );
+
+        expect(decision?.model).toBe('gemini-3-pro-preview');
+        expect(decision?.metadata.reasoning).toContain(
+          '[Score: 81 / Max score: 100 / Model: gemini-3-pro-preview]',
+        );
+      });
+
+      it('routes maximum score (100) to the fourth band', async () => {
+        vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue({
+          complexity_reasoning: 'Maximum complexity',
+          complexity_score: 100,
+        });
+
+        const decision = await strategy.route(
+          mockContext,
+          mockConfig,
+          mockBaseLlmClient,
+          mockLocalLiteRtLmClient,
+        );
+
+        expect(decision?.model).toBe('gemini-3-pro-preview');
+        expect(decision?.metadata.reasoning).toContain(
+          '[Score: 100 / Max score: 100 / Model: gemini-3-pro-preview]',
+        );
+      });
+    });
+
+    describe('Unordered Rules', () => {
+      it('correctly sorts rules by maxScore ascending before matching', async () => {
+        vi.mocked(mockConfig.hasCustomNumericalRoutingRules).mockReturnValue(
+          true,
+        );
+        vi.mocked(mockConfig.getNumericalRoutingRules).mockReturnValue([
+          { maxScore: 80, model: 'gemini-3-flash-preview' },
+          { maxScore: 10, model: 'local-gemma' },
+          { maxScore: 30, model: 'gemini-2.5-flash' },
+          { maxScore: 100, model: 'gemini-3-pro-preview' },
+        ]);
+
+        vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue({
+          complexity_reasoning: 'Task with score 25',
+          complexity_score: 25,
+        });
+
+        const decision = await strategy.route(
+          mockContext,
+          mockConfig,
+          mockBaseLlmClient,
+          mockLocalLiteRtLmClient,
+        );
+
+        expect(decision?.model).toBe('gemini-2.5-flash');
+        expect(decision?.metadata.reasoning).toContain(
+          '[Score: 25 / Max score: 30 / Model: gemini-2.5-flash]',
+        );
+      });
+    });
+
+    describe('Fallback Behavior', () => {
+      it('falls back to the final band model when score exceeds all configured max scores', async () => {
+        vi.mocked(mockConfig.hasCustomNumericalRoutingRules).mockReturnValue(
+          true,
+        );
+        vi.mocked(mockConfig.getNumericalRoutingRules).mockReturnValue([
+          { maxScore: 10, model: 'gemini-2.5-flash-lite' },
+          { maxScore: 50, model: 'gemini-2.5-flash' },
+        ]);
+
+        vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue({
+          complexity_reasoning: 'Score above all rules',
+          complexity_score: 75,
+        });
+
+        const decision = await strategy.route(
+          mockContext,
+          mockConfig,
+          mockBaseLlmClient,
+          mockLocalLiteRtLmClient,
+        );
+
+        expect(decision?.model).toBe('gemini-2.5-flash');
+        expect(decision?.metadata.source).toBe('NumericalClassifier (Custom)');
+        expect(decision?.metadata.reasoning).toContain(
+          '[Score: 75 / Above final max score: 50 / Model: gemini-2.5-flash]',
+        );
+      });
+
+      it('falls back to default Flash/Pro threshold routing when custom rules array is empty', async () => {
+        vi.mocked(mockConfig.hasCustomNumericalRoutingRules).mockReturnValue(
+          true,
+        );
+        vi.mocked(mockConfig.getNumericalRoutingRules).mockReturnValue([]);
+        vi.mocked(mockConfig.getResolvedClassifierThreshold).mockResolvedValue(
+          90,
+        );
+
+        vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue({
+          complexity_reasoning: 'Standard task',
+          complexity_score: 50,
+        });
+
+        const decision = await strategy.route(
+          mockContext,
+          mockConfig,
+          mockBaseLlmClient,
+          mockLocalLiteRtLmClient,
+        );
+
+        expect(decision?.model).toBe(PREVIEW_GEMINI_FLASH_MODEL);
+        expect(decision?.metadata.source).toBe('NumericalClassifier (Default)');
+        expect(decision?.metadata.reasoning).toContain(
+          '[Score: 50 / Threshold: 90]',
+        );
+      });
+
+      it('filters out invalid rules and uses remaining valid rules', async () => {
+        vi.mocked(mockConfig.hasCustomNumericalRoutingRules).mockReturnValue(
+          true,
+        );
+        vi.mocked(mockConfig.getNumericalRoutingRules).mockReturnValue([
+          { maxScore: NaN, model: 'invalid-model' },
+          { maxScore: -10, model: 'negative-score-model' },
+          { maxScore: 150, model: 'out-of-range-model' },
+          { maxScore: 20, model: '' },
+          { maxScore: 40, model: 'gemini-2.5-flash' },
+        ]);
+
+        vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue({
+          complexity_reasoning: 'Valid rule match',
+          complexity_score: 35,
+        });
+
+        const decision = await strategy.route(
+          mockContext,
+          mockConfig,
+          mockBaseLlmClient,
+          mockLocalLiteRtLmClient,
+        );
+
+        expect(decision?.model).toBe('gemini-2.5-flash');
+        expect(decision?.metadata.source).toBe('NumericalClassifier (Custom)');
+        expect(decision?.metadata.reasoning).toContain(
+          '[Score: 35 / Max score: 40 / Model: gemini-2.5-flash]',
+        );
+      });
+
+      it('falls back to default Flash/Pro routing when all configured rules are invalid', async () => {
+        vi.mocked(mockConfig.hasCustomNumericalRoutingRules).mockReturnValue(
+          true,
+        );
+        vi.mocked(mockConfig.getNumericalRoutingRules).mockReturnValue([
+          { maxScore: NaN, model: 'invalid' },
+          { maxScore: 0, model: 'zero-max-score' },
+          { maxScore: 50, model: '   ' },
+        ]);
+        vi.mocked(mockConfig.getResolvedClassifierThreshold).mockResolvedValue(
+          90,
+        );
+
+        vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue({
+          complexity_reasoning: 'Fall back to default',
+          complexity_score: 95,
+        });
+
+        const decision = await strategy.route(
+          mockContext,
+          mockConfig,
+          mockBaseLlmClient,
+          mockLocalLiteRtLmClient,
+        );
+
+        expect(decision?.model).toBe(PREVIEW_GEMINI_MODEL);
+        expect(decision?.metadata.source).toBe('NumericalClassifier (Default)');
+        expect(decision?.metadata.reasoning).toContain(
+          '[Score: 95 / Threshold: 90]',
+        );
+      });
+
+      it('bypasses (returns null) when selected custom model is unavailable in ModelAvailabilityService', async () => {
+        vi.mocked(mockConfig.hasCustomNumericalRoutingRules).mockReturnValue(
+          true,
+        );
+        vi.mocked(mockConfig.getNumericalRoutingRules).mockReturnValue([
+          { maxScore: 50, model: 'unavailable-model' },
+        ]);
+
+        const availabilityService = new ModelAvailabilityService();
+        vi.spyOn(availabilityService, 'snapshot').mockReturnValue({
+          available: false,
+          reason: 'quota',
+        });
+        vi.mocked(mockConfig.getModelAvailabilityService).mockReturnValue(
+          availabilityService,
+        );
+
+        vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue({
+          complexity_reasoning: 'Task with unavailable model',
+          complexity_score: 30,
+        });
+
+        const decision = await strategy.route(
+          mockContext,
+          mockConfig,
+          mockBaseLlmClient,
+          mockLocalLiteRtLmClient,
+        );
+
+        expect(decision).toBeNull();
+      });
+    });
+
+    describe('Model Resolution and Aliases', () => {
+      beforeEach(() => {
+        vi.mocked(mockConfig.hasCustomNumericalRoutingRules).mockReturnValue(
+          true,
+        );
+      });
+
+      it('resolves model aliases like "flash" and "pro"', async () => {
+        vi.mocked(mockConfig.getNumericalRoutingRules).mockReturnValue([
+          { maxScore: 40, model: 'flash' },
+          { maxScore: 100, model: 'pro' },
+        ]);
+
+        vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue({
+          complexity_reasoning: 'Alias test flash',
+          complexity_score: 20,
+        });
+
+        const decisionFlash = await strategy.route(
+          mockContext,
+          mockConfig,
+          mockBaseLlmClient,
+          mockLocalLiteRtLmClient,
+        );
+
+        expect(decisionFlash?.model).toBe(PREVIEW_GEMINI_FLASH_MODEL);
+
+        vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue({
+          complexity_reasoning: 'Alias test pro',
+          complexity_score: 80,
+        });
+
+        const decisionPro = await strategy.route(
+          mockContext,
+          mockConfig,
+          mockBaseLlmClient,
+          mockLocalLiteRtLmClient,
+        );
+
+        expect(decisionPro?.model).toBe(PREVIEW_GEMINI_MODEL);
+      });
+
+      it('normalizes model identifiers with models/ prefix', async () => {
+        vi.mocked(mockConfig.getNumericalRoutingRules).mockReturnValue([
+          { maxScore: 100, model: 'models/gemini-2.5-flash' },
+        ]);
+
+        vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue({
+          complexity_reasoning: 'Models prefix test',
+          complexity_score: 50,
+        });
+
+        const decision = await strategy.route(
+          mockContext,
+          mockConfig,
+          mockBaseLlmClient,
+          mockLocalLiteRtLmClient,
+        );
+
+        expect(decision?.model).toBe('gemini-2.5-flash');
+      });
+
+      it('applies custom rules even when requestedModel is not Gemini 3', async () => {
+        vi.mocked(mockConfig.getModel).mockReturnValue('gemini-2.5-flash');
+        vi.mocked(mockConfig.getNumericalRoutingRules).mockReturnValue([
+          { maxScore: 50, model: 'gemini-2.5-flash-lite' },
+          { maxScore: 100, model: 'gemini-2.5-pro' },
+        ]);
+
+        vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue({
+          complexity_reasoning: 'Non-gemini-3 base model test',
+          complexity_score: 80,
+        });
+
+        const decision = await strategy.route(
+          { ...mockContext, requestedModel: 'gemini-2.5-flash' },
+          mockConfig,
+          mockBaseLlmClient,
+          mockLocalLiteRtLmClient,
+        );
+
+        expect(decision?.model).toBe('gemini-2.5-pro');
+        expect(decision?.metadata.source).toBe('NumericalClassifier (Custom)');
       });
     });
   });
