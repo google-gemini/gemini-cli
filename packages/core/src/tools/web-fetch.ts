@@ -105,6 +105,58 @@ export function normalizeUrl(urlStr: string): string {
   }
 }
 
+// Closing brackets whose unbalanced occurrences are stripped from URL tokens.
+const CLOSING_BRACKETS: Record<string, string> = {
+  ')': '(',
+  ']': '[',
+  '}': '{',
+};
+const OPENING_BRACKETS: Record<string, string> = {
+  '(': ')',
+  '[': ']',
+  '{': '}',
+};
+// Sentence punctuation that prose may append directly after a URL.
+const SENTENCE_PUNCTUATION = new Set(['.', ',', ';', ':']);
+
+/**
+ * Strips characters that prose commonly appends to a URL but that are never
+ * meaningful as the last character of one: sentence punctuation (`.`, `,`,
+ * `;`, `:`) and closing brackets that have no matching opener (so
+ * `https://example.com/wiki/Foo_(bar)` stays intact). `?` and `!` are kept
+ * because they can be meaningful query/path characters.
+ *
+ * Runs in O(n): one pass counts unmatched closing brackets per type, then a
+ * single scan from the end strips punctuation and unmatched closers, so
+ * adversarially long tokens cannot trigger quadratic work.
+ */
+export function cleanUrlToken(token: string): string {
+  const unmatchedClosers = new Map<string, number>();
+  for (const char of token) {
+    if (CLOSING_BRACKETS[char]) {
+      unmatchedClosers.set(char, (unmatchedClosers.get(char) ?? 0) + 1);
+    } else if (OPENING_BRACKETS[char]) {
+      const closer = OPENING_BRACKETS[char];
+      unmatchedClosers.set(closer, (unmatchedClosers.get(closer) ?? 0) - 1);
+    }
+  }
+
+  let end = token.length;
+  while (end > 0) {
+    const char = token[end - 1];
+    const opener = CLOSING_BRACKETS[char];
+    if (SENTENCE_PUNCTUATION.has(char)) {
+      end--;
+    } else if (opener && (unmatchedClosers.get(char) ?? 0) > 0) {
+      unmatchedClosers.set(char, (unmatchedClosers.get(char) ?? 0) - 1);
+      end--;
+    } else {
+      break;
+    }
+  }
+  return token.slice(0, end);
+}
+
 /**
  * Parses a prompt to extract valid URLs and identify malformed ones.
  */
@@ -122,8 +174,9 @@ export function parsePrompt(text: string): {
     // Heuristic to check if the url appears to contain URL-like chars.
     if (token.includes('://')) {
       try {
-        // Validate with new URL()
-        const url = new URL(token);
+        // Models often append sentence punctuation or unbalanced closing
+        // brackets to a URL; validate the cleaned token instead.
+        const url = new URL(cleanUrlToken(token));
 
         // Allowlist protocols
         if (['http:', 'https:'].includes(url.protocol)) {
