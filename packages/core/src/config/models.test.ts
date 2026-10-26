@@ -395,6 +395,14 @@ describe('getDisplayString', () => {
 describe('supportsMultimodalFunctionResponse', () => {
   it('should return true for gemini-3 model', () => {
     expect(supportsMultimodalFunctionResponse('gemini-3-pro')).toBe(true);
+    expect(supportsMultimodalFunctionResponse('gemini-3.8-flash')).toBe(true);
+    expect(supportsMultimodalFunctionResponse('gemini-3.5-flash')).toBe(true);
+    expect(supportsMultimodalFunctionResponse('gemini-3.1-pro-preview')).toBe(
+      true,
+    );
+    expect(supportsMultimodalFunctionResponse('gemini-3.1-flash-lite')).toBe(
+      true,
+    );
   });
 
   it('should return false for gemini-2 models', () => {

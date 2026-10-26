@@ -5998,6 +5998,14 @@ describe('GeminiChat', () => {
                 name: 'tool',
                 response: { ok: true },
                 willContinue: true,
+                parts: [
+                  {
+                    inlineData: {
+                      mimeType: 'image/png',
+                      data: 'base64data',
+                    },
+                  },
+                ],
               },
             },
           ],
@@ -6015,6 +6023,14 @@ describe('GeminiChat', () => {
         name: 'tool',
         response: { ok: true },
         willContinue: true,
+        parts: [
+          {
+            inlineData: {
+              mimeType: 'image/png',
+              data: 'base64data',
+            },
+          },
+        ],
       });
     });
   });
