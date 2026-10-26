@@ -10,6 +10,7 @@ import {
   RetryableQuotaError,
   ValidationRequiredError,
   classifyGoogleError,
+  MAX_RETRYABLE_DELAY_SECONDS,
 } from './googleQuotaErrors.js';
 import { delay, createAbortError } from './delay.js';
 import { debugLogger } from './debugLogger.js';
@@ -344,6 +345,22 @@ export async function retryWithBackoff<T>(
       let classifiedError = classifyGoogleError(error);
 
       const errorCode = getErrorStatus(error);
+      const maxQuotaDelayMs =
+        options?.maxDelayMs !== undefined
+          ? Math.min(options.maxDelayMs, MAX_RETRYABLE_DELAY_SECONDS * 1000)
+          : MAX_RETRYABLE_DELAY_SECONDS * 1000;
+
+      if (
+        classifiedError instanceof RetryableQuotaError &&
+        classifiedError.retryDelayMs !== undefined &&
+        classifiedError.retryDelayMs > maxQuotaDelayMs
+      ) {
+        classifiedError = new TerminalQuotaError(
+          classifiedError.message,
+          classifiedError.cause,
+          classifiedError.retryDelayMs / 1000,
+        );
+      }
 
       if (
         classifiedError instanceof TerminalQuotaError ||
@@ -355,9 +372,16 @@ export async function retryWithBackoff<T>(
           classifiedError instanceof TerminalQuotaError &&
           (classifiedError.reason === 'MODEL_CAPACITY_EXHAUSTED' ||
             classifiedError.reason === 'MODEL_CAPACITY_EXCEEDED' ||
-            /exhausted your capacity|capacity exceeded|MODEL_CAPACITY_EXHAUSTED/i.test(
-              classifiedError.message,
-            ));
+            (!classifiedError.reason &&
+              /exhausted your capacity|capacity exceeded|MODEL_CAPACITY_EXHAUSTED/i.test(
+                classifiedError.message,
+              ) &&
+              !/quota will reset|daily quota|QUOTA_EXHAUSTED/i.test(
+                classifiedError.message,
+              ))) &&
+          (classifiedError.retryDelayMs === undefined ||
+            (classifiedError.retryDelayMs <= maxDelayMs &&
+              classifiedError.retryDelayMs <= maxQuotaDelayMs));
 
         let useSilentRetry = false;
         let silentDelayMs: number | undefined;

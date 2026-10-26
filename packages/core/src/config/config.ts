@@ -1934,7 +1934,11 @@ export class Config implements McpContext, AgentLoopContext {
     return this.disableLoopDetection ?? false;
   }
 
-  setModel(newModel: string, isTemporary: boolean = true): void {
+  setModel(
+    newModel: string,
+    isTemporary: boolean = true,
+    resetAvailability: boolean = true,
+  ): void {
     if (this.model !== newModel || this._activeModel !== newModel) {
       this.model = newModel;
       // When the user explicitly sets a model, that becomes the active model.
@@ -1947,15 +1951,21 @@ export class Config implements McpContext, AgentLoopContext {
     if (this.onModelChange && !isTemporary) {
       this.onModelChange(newModel);
     }
-    this.modelAvailabilityService.reset();
+    if (resetAvailability) {
+      this.modelAvailabilityService.reset();
+    }
   }
 
   activateFallbackMode(model: string, failedModel?: string): void {
     debugLogger.log(
       `Model fallback activated: switching from ${failedModel ?? 'unknown'} to ${model}`,
     );
-    if (this.getActiveModel() !== model) {
-      this.setModel(model, true);
+    const isActiveModelFallback =
+      !failedModel ||
+      failedModel === this.getActiveModel() ||
+      failedModel === this.model;
+    if (isActiveModelFallback && this.getActiveModel() !== model) {
+      this.setModel(model, true, false);
     }
     if (failedModel) {
       // Chained fallback mitigation: If we already have overrides that point to the model
