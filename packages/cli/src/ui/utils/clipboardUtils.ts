@@ -252,24 +252,24 @@ async function saveFileWithWlPaste(tempFilePath: string) {
         height: decoded.height,
       });
 
-      const rgba = Buffer.from(decoded.data);
+      const bmpData = decoded.data;
       const hasMeaningfulAlpha = decoded.compress !== 0;
+      const limit = Math.min(bmpData.length, png.data.length);
 
-      for (let i = 0; i < rgba.length; i += 4) {
-        const a = hasMeaningfulAlpha ? rgba[i] : 255;
-        const b = rgba[i + 1];
-        const g = rgba[i + 2];
-        const r = rgba[i + 3];
+      for (let i = 0; i < limit; i += 4) {
+        const a = hasMeaningfulAlpha ? bmpData[i] : 255;
+        const b = bmpData[i + 1];
+        const g = bmpData[i + 2];
+        const r = bmpData[i + 3];
 
-        rgba[i] = r;
-        rgba[i + 1] = g;
-        rgba[i + 2] = b;
-        rgba[i + 3] = a;
+        png.data[i] = r;
+        png.data[i + 1] = g;
+        png.data[i + 2] = b;
+        png.data[i + 3] = a;
       }
-      png.data = rgba;
 
       const pngBuffer = PNG.sync.write(png);
-      await fs.writeFile(tempFilePath, pngBuffer);
+      await fs.writeFile(tempFilePath, Uint8Array.from(pngBuffer));
 
       return true;
     } finally {

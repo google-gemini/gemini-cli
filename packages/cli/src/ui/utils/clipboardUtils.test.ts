@@ -105,14 +105,15 @@ describe('clipboardUtils', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
   describe('clipboardHasImage (Linux)', () => {
     it('should detect images when XDG_SESSION_TYPE is unset but Wayland is available', async () => {
       mockPlatform('linux');
-      delete process.env['XDG_SESSION_TYPE'];
-      process.env['WAYLAND_DISPLAY'] = 'wayland-0';
+      vi.stubEnv('XDG_SESSION_TYPE', '');
+      vi.stubEnv('WAYLAND_DISPLAY', 'wayland-0');
 
       vi.mocked(execSync).mockReturnValue(Buffer.from(''));
       vi.mocked(spawnAsync).mockResolvedValueOnce({
@@ -360,7 +361,7 @@ describe('clipboardUtils', () => {
 
       expect(writeFileCall).toBeDefined();
 
-      const pngBuffer = writeFileCall![1] as Buffer;
+      const pngBuffer = Buffer.from(writeFileCall![1] as Uint8Array);
       const decodedPng = PNG.sync.read(pngBuffer);
 
       expect(decodedPng.width).toBe(1);
@@ -434,9 +435,9 @@ describe('clipboardUtils', () => {
     });
 
     it('should return null if tool is not yet detected', async () => {
-      delete process.env['XDG_SESSION_TYPE'];
-      delete process.env['WAYLAND_DISPLAY'];
-      delete process.env['DISPLAY'];
+      vi.stubEnv('XDG_SESSION_TYPE', '');
+      vi.stubEnv('WAYLAND_DISPLAY', '');
+      vi.stubEnv('DISPLAY', '');
 
       const result = await clipboardUtils.saveClipboardImage(mockTargetDir);
 
