@@ -133,27 +133,30 @@ export function toPermissionOptions(
           });
         }
         break;
-      case 'mcp':
+      case 'mcp': {
+        const serverName = confirmation.serverName?.trim() || 'generic_server';
+        const toolName = confirmation.toolName?.trim() || 'generic_tool';
         options.push(
           {
             optionId: ToolConfirmationOutcome.ProceedAlwaysServer,
-            name: 'Allow all server tools for this session',
+            name: `Allow all "${serverName}" server tools for this session`,
             kind: 'allow_always',
           },
           {
             optionId: ToolConfirmationOutcome.ProceedAlwaysTool,
-            name: 'Allow tool for this session',
+            name: `Allow tool "${toolName}" for this session`,
             kind: 'allow_always',
           },
         );
         if (enablePermanentToolApproval) {
           options.push({
             optionId: ToolConfirmationOutcome.ProceedAlwaysAndSave,
-            name: 'Allow tool for all future sessions',
+            name: `Allow tool "${toolName}" for all future sessions`,
             kind: 'allow_always',
           });
         }
         break;
+      }
       case 'info':
         options.push({
           optionId: ToolConfirmationOutcome.ProceedAlways,
