@@ -41,6 +41,30 @@ describe('textUtils', () => {
       expect(sanitizeForDisplay(longInput, 20)).toBe('a'.repeat(17) + '...');
     });
 
+    it('should not split surrogate pairs when truncating', () => {
+      // In UTF-16 code units, the cut point (maxLength - 3 = 97) falls between
+      // the emoji's high and low surrogates.
+      const input = 'a'.repeat(96) + '😀' + 'b'.repeat(50);
+      const result = sanitizeForDisplay(input, 100);
+
+      expect(result).toBe('a'.repeat(96) + '😀' + '...');
+      // The `u` flag is required: without it, this character class would also
+      // match both halves of a correctly paired surrogate such as the emoji.
+      expect(/[\uD800-\uDFFF]/u.test(result)).toBe(false);
+    });
+
+    it('should measure maxLength in code points rather than UTF-16 code units', () => {
+      const result = sanitizeForDisplay('😀'.repeat(50), 20);
+
+      expect(result).toBe('😀'.repeat(17) + '...');
+      expect(/[\uD800-\uDFFF]/u.test(result)).toBe(false);
+    });
+
+    it('should return only the ellipsis when maxLength is shorter than it', () => {
+      expect(sanitizeForDisplay('abcdef', 2)).toBe('...');
+      expect(sanitizeForDisplay('😀😀😀😀', 1)).toBe('...');
+    });
+
     it('should handle empty or null input', () => {
       expect(sanitizeForDisplay('')).toBe('');
       expect(sanitizeForDisplay(null as unknown as string)).toBe('');
