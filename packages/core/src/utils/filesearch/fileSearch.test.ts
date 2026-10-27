@@ -900,6 +900,10 @@ describe('FileSearch', () => {
     // Searching for "/pack" should match "package.json"
     const packResults = await fileSearch.search('/pack');
     expect(packResults).toContain('package.json');
+
+    // Searching with null byte should sanitize and match correctly
+    const nullByteResults = await fileSearch.search('pack\0age.json');
+    expect(nullByteResults).toContain('package.json');
   });
 
   describe('DirectoryFileSearch', () => {
@@ -1058,6 +1062,35 @@ describe('FileSearch', () => {
       const searchPattern = escapePath('file with (special) chars.txt');
       const results = await fileSearch.search(searchPattern);
       expect(results).toEqual(['file with (special) chars.txt']);
+    });
+
+    it('should sanitize null bytes and prevent path traversal outside project root in DirectoryFileSearch', async () => {
+      tmpDir = await createTmpDir({
+        'package.json': '',
+      });
+
+      const fileSearch = FileSearchFactory.create({
+        projectRoot: tmpDir,
+        fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+          respectGitIgnore: false,
+          respectGeminiIgnore: false,
+        }),
+        ignoreDirs: [],
+        cache: false,
+        cacheTtl: 0,
+        enableRecursiveFileSearch: false,
+        enableFuzzySearch: true,
+      });
+
+      await fileSearch.initialize();
+
+      // Null byte sanitization
+      const nullByteResults = await fileSearch.search('pack\0age.json');
+      expect(nullByteResults).toEqual(['package.json']);
+
+      // Path traversal prevention
+      const traversalResults = await fileSearch.search('../../etc');
+      expect(traversalResults).toEqual([]);
     });
   });
 });

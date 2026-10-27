@@ -10,7 +10,7 @@ import { loadIgnoreRules, type Ignore } from './ignore.js';
 import { ResultCache } from './result-cache.js';
 import { crawl } from './crawler.js';
 import { AsyncFzf } from 'fzf';
-import { unescapePath } from '../paths.js';
+import { unescapePath, resolveToRealPath, isSubpath } from '../paths.js';
 import type { FileDiscoveryService } from '../../services/fileDiscoveryService.js';
 import { FileWatcher, type FileWatcherEvent } from './fileWatcher.js';
 import { debugLogger } from '../debugLogger.js';
@@ -268,7 +268,7 @@ class RecursiveFileSearch implements FileSearch {
       throw new Error('Engine not initialized. Call initialize() first.');
     }
 
-    pattern = unescapePath(pattern);
+    pattern = unescapePath(pattern).replace(/\0/g, '');
     pattern = pattern.replace(/^(\.[/\\]|[/\\])+/, '') || '*';
 
     let filteredCandidates: string[];
@@ -378,12 +378,23 @@ class DirectoryFileSearch implements FileSearch {
     if (!this.ignore) {
       throw new Error('Engine not initialized. Call initialize() first.');
     }
-    pattern = unescapePath(pattern);
+    pattern = unescapePath(pattern).replace(/\0/g, '');
     pattern = pattern.replace(/^(\.[/\\]|[/\\])+/, '') || '*';
 
     const dir = pattern.endsWith('/') ? pattern : path.dirname(pattern);
+    const targetDir = path.join(this.options.projectRoot, dir);
+    try {
+      const realTargetDir = resolveToRealPath(targetDir);
+      const realProjectRoot = resolveToRealPath(this.options.projectRoot);
+      if (!isSubpath(realProjectRoot, realTargetDir)) {
+        return [];
+      }
+    } catch {
+      return [];
+    }
+
     const results = await crawl({
-      crawlDirectory: path.join(this.options.projectRoot, dir),
+      crawlDirectory: targetDir,
       cwd: this.options.projectRoot,
       maxDepth: 0,
       ignore: this.ignore,
