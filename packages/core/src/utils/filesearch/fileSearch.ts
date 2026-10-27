@@ -53,6 +53,21 @@ const byMatchPosFromEnd = (
   return distA - distB;
 };
 
+/**
+ * Normalizes a user-supplied search pattern:
+ * - Unescapes escaped characters (e.g. spaces).
+ * - Strips null bytes (\0) to prevent filesystem issues.
+ * - Converts backslashes to forward slashes on Windows.
+ * - Strips leading relative/root prefixes (./, /) and defaults empty pattern to '*'.
+ */
+function normalizeSearchPattern(pattern: string): string {
+  let normalized = unescapePath(pattern).replace(/\0/g, '');
+  if (process.platform === 'win32') {
+    normalized = normalized.replace(/\\/g, '/');
+  }
+  return normalized.replace(/^(\.[/\\]|[/\\])+/, '') || '*';
+}
+
 export interface FileSearchOptions {
   projectRoot: string;
   ignoreDirs: string[];
@@ -268,11 +283,7 @@ class RecursiveFileSearch implements FileSearch {
       throw new Error('Engine not initialized. Call initialize() first.');
     }
 
-    pattern = unescapePath(pattern).replace(/\0/g, '');
-    if (process.platform === 'win32') {
-      pattern = pattern.replace(/\\/g, '/');
-    }
-    pattern = pattern.replace(/^(\.[/\\]|[/\\])+/, '') || '*';
+    pattern = normalizeSearchPattern(pattern);
 
     let filteredCandidates: string[];
     const { files: candidates, isExactMatch } =
@@ -364,6 +375,7 @@ class RecursiveFileSearch implements FileSearch {
 
 class DirectoryFileSearch implements FileSearch {
   private ignore: Ignore | undefined;
+  private realProjectRoot: string | undefined;
 
   constructor(private readonly options: FileSearchOptions) {}
 
@@ -372,27 +384,27 @@ class DirectoryFileSearch implements FileSearch {
       this.options.fileDiscoveryService,
       this.options.ignoreDirs,
     );
+    try {
+      this.realProjectRoot = resolveToRealPath(this.options.projectRoot);
+    } catch {
+      this.realProjectRoot = path.resolve(this.options.projectRoot);
+    }
   }
 
   async search(
     pattern: string,
     options: SearchOptions = {},
   ): Promise<string[]> {
-    if (!this.ignore) {
+    if (!this.ignore || !this.realProjectRoot) {
       throw new Error('Engine not initialized. Call initialize() first.');
     }
-    pattern = unescapePath(pattern).replace(/\0/g, '');
-    if (process.platform === 'win32') {
-      pattern = pattern.replace(/\\/g, '/');
-    }
-    pattern = pattern.replace(/^(\.[/\\]|[/\\])+/, '') || '*';
+    pattern = normalizeSearchPattern(pattern);
 
     const dir = pattern.endsWith('/') ? pattern : path.dirname(pattern);
     const targetDir = path.join(this.options.projectRoot, dir);
     try {
       const realTargetDir = resolveToRealPath(targetDir);
-      const realProjectRoot = resolveToRealPath(this.options.projectRoot);
-      if (!isSubpath(realProjectRoot, realTargetDir)) {
+      if (!isSubpath(this.realProjectRoot, realTargetDir)) {
         return [];
       }
     } catch {
