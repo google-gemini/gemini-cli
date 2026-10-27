@@ -1223,6 +1223,64 @@ describe('WriteFileTool', () => {
     });
   });
 
+  describe('cancellation', () => {
+    it.each([
+      { fileExists: true, cancelDuring: 'read' },
+      { fileExists: false, cancelDuring: 'read' },
+      { fileExists: true, cancelDuring: 'directory access' },
+      { fileExists: false, cancelDuring: 'directory access' },
+    ])(
+      'does not write after cancellation during $cancelDuring (existing file: $fileExists)',
+      async ({ fileExists, cancelDuring }) => {
+        const filePath = path.join(rootDir, 'cancelled.json');
+        const originalContent = '{"value":"original"}';
+        if (fileExists) {
+          fs.writeFileSync(filePath, originalContent, 'utf8');
+        }
+        const controller = new AbortController();
+        const readTextFile = fsService.readTextFile.bind(fsService);
+        const access = fs.promises.access.bind(fs.promises);
+        const abortSpy =
+          cancelDuring === 'read'
+            ? vi
+                .spyOn(fsService, 'readTextFile')
+                .mockImplementationOnce(async (target) => {
+                  try {
+                    return await readTextFile(target);
+                  } finally {
+                    controller.abort();
+                  }
+                })
+            : vi
+                .spyOn(fs.promises, 'access')
+                .mockImplementationOnce(async (target) => {
+                  await access(target);
+                  controller.abort();
+                });
+
+        try {
+          const result = await tool
+            .build({
+              file_path: filePath,
+              content: '{"value":"replacement"}',
+            })
+            .execute({ abortSignal: controller.signal })
+            .catch((error: unknown) => error);
+
+          expect(controller.signal.aborted).toBe(true);
+          if (fileExists) {
+            expect(fs.readFileSync(filePath, 'utf8')).toBe(originalContent);
+          } else {
+            expect(fs.existsSync(filePath)).toBe(false);
+          }
+          expect(result).toEqual(new Error('Write aborted'));
+        } finally {
+          abortSpy.mockRestore();
+        }
+      },
+    );
+  });
+
   describe('concurrent writes to the same file', () => {
     it('does not report two creations of the same new file', async () => {
       const abortSignal = new AbortController().signal;
