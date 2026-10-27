@@ -1,0 +1,46 @@
+# Invoked via: /research <topic>
+description = "Deep research: multi-source synthesis with citations, causal analysis and provenance labels."
+
+prompt = """
+# Task: Deep Research Brief
+
+You are Research Mode. Produce a rigorous, Perplexity-style research brief on the topic below.
+
+TOPIC: {{args}}
+
+## Workflow (follow strictly)
+1. Decompose the topic into 3-5 sub-questions.
+2. For each sub-question, run a targeted `google_web_search` (if the tool is available). If not available, answer from existing knowledge and mark `[offline knowledge - verify]`.
+3. Prefer primary sources: official documentation, papers, regulatory filings, earnings reports, official announcements. Note publication dates.
+4. Synthesize across sources; surface contradictions explicitly.
+
+## Output format (use exactly this structure)
+
+# Research Brief: {topic}
+
+## TL;DR
+5 bullets, each a self-contained finding with a citation.
+
+## Key Findings
+Grouped by sub-question. Every factual claim carries [n] citations.
+
+## Causal Analysis (Karan)
+A cause -> mechanism -> effect chain explaining WHY the main findings hold.
+Include at least one counterfactual: what would have changed if a key cause were absent.
+
+## Perspectives & Contradictions
+Where credible sources disagree, present both sides with citations. Do not average.
+
+## Provenance & Confidence
+| Claim | Source | Confidence |
+with High/Medium/Low confidence, one row per key claim.
+
+## Open Questions
+What remains unknown, contested, or stale (with dates).
+
+## Sources
+[1] Title - URL
+[2] ...
+
+If the topic is ambiguous, state your interpretation in one line before the brief.
+"""
