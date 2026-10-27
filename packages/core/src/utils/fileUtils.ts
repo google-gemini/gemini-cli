@@ -392,9 +392,20 @@ export function isWithinRoot(
       ? normalizedRootDirectory
       : normalizedRootDirectory + path.sep;
 
+  const isWindows = process.platform === 'win32';
+  const pathForComparison = isWindows
+    ? normalizedPathToCheck.toLowerCase()
+    : normalizedPathToCheck;
+  const rootForComparison = isWindows
+    ? normalizedRootDirectory.toLowerCase()
+    : normalizedRootDirectory;
+  const rootWithSeparatorForComparison = isWindows
+    ? rootWithSeparator.toLowerCase()
+    : rootWithSeparator;
+
   if (
-    normalizedPathToCheck === normalizedRootDirectory ||
-    normalizedPathToCheck.startsWith(rootWithSeparator)
+    pathForComparison === rootForComparison ||
+    pathForComparison.startsWith(rootWithSeparatorForComparison)
   ) {
     return true;
   }
