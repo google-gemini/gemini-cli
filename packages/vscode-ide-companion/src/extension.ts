@@ -163,6 +163,7 @@ export async function activate(context: vscode.ExtensionContext) {
         }
       },
     ),
+    diffManager,
   );
 
   ideServer = new IDEServer(log, diffManager);

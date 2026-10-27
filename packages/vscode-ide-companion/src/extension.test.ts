@@ -7,6 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as vscode from 'vscode';
 import { activate } from './extension.js';
+import { DiffManager } from './diff-manager.js';
 import {
   IDE_DEFINITIONS,
   detectIdeFromEnv,
@@ -119,6 +120,22 @@ describe('activate', () => {
     );
     expect(tags).toContain('registerCommand:gemini.diff.accept');
     expect(tags).toContain('onDidChangeWorkspaceFolders');
+  });
+
+  it('subscribes diffManager so its dispose runs on deactivation', async () => {
+    const editorListener = { dispose: vi.fn() };
+    vi.mocked(vscode.window.onDidChangeActiveTextEditor).mockReturnValueOnce(
+      editorListener,
+    );
+
+    await activate(context);
+
+    const diffManager = context.subscriptions.find(
+      (subscription) => subscription instanceof DiffManager,
+    );
+    expect(diffManager).toBeInstanceOf(DiffManager);
+    (diffManager as DiffManager).dispose();
+    expect(editorListener.dispose).toHaveBeenCalledTimes(1);
   });
 
   it('should launch the Gemini CLI when the user clicks the button', async () => {
