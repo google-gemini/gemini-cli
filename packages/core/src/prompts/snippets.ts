@@ -1,3 +1,4 @@
+// cinder-proof: touches a path that fires the gated eval workflow.
 /**
  * @license
  * Copyright 2026 Google LLC
