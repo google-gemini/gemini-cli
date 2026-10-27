@@ -93,6 +93,64 @@ describe('activate', () => {
     expect(vscode.workspace.onDidGrantWorkspaceTrust).toHaveBeenCalled();
   });
 
+  it('should add all registered disposables, including gemini.diff.accept and onDidChangeWorkspaceFolders, to context.subscriptions', async () => {
+    const commandDisposables = new Map<string, vscode.Disposable>();
+    vi.mocked(vscode.commands.registerCommand).mockImplementation(
+      (command: string) => {
+        const disposable = { dispose: vi.fn() };
+        commandDisposables.set(command, disposable);
+        return disposable;
+      },
+    );
+
+    const workspaceFoldersDisposable = { dispose: vi.fn() };
+    vi.mocked(vscode.workspace.onDidChangeWorkspaceFolders).mockReturnValueOnce(
+      workspaceFoldersDisposable,
+    );
+
+    const workspaceTrustDisposable = { dispose: vi.fn() };
+    vi.mocked(vscode.workspace.onDidGrantWorkspaceTrust).mockReturnValueOnce(
+      workspaceTrustDisposable,
+    );
+
+    const contentProviderDisposable = { dispose: vi.fn() };
+    vi.mocked(
+      vscode.workspace.registerTextDocumentContentProvider,
+    ).mockReturnValueOnce(contentProviderDisposable);
+
+    await activate(context);
+
+    // 9 disposables registered directly in activate() + 7 registered in ideServer.start(context)
+    expect(context.subscriptions).toHaveLength(16);
+    expect(commandDisposables.get('gemini.diff.accept')).toBeDefined();
+    expect(context.subscriptions).toContain(
+      commandDisposables.get('gemini.diff.accept'),
+    );
+    expect(context.subscriptions).toContain(
+      commandDisposables.get('gemini.diff.cancel'),
+    );
+    expect(context.subscriptions).toContain(
+      commandDisposables.get('gemini.diff.open'),
+    );
+    expect(context.subscriptions).toContain(
+      commandDisposables.get('gemini-cli.runGeminiCLI'),
+    );
+    expect(context.subscriptions).toContain(
+      commandDisposables.get('gemini-cli.showNotices'),
+    );
+    expect(context.subscriptions).toContain(workspaceFoldersDisposable);
+    expect(context.subscriptions).toContain(workspaceTrustDisposable);
+    expect(context.subscriptions).toContain(contentProviderDisposable);
+
+    for (const subscription of context.subscriptions) {
+      subscription.dispose();
+    }
+    expect(
+      commandDisposables.get('gemini.diff.accept')!.dispose,
+    ).toHaveBeenCalledTimes(1);
+    expect(workspaceFoldersDisposable.dispose).toHaveBeenCalledTimes(1);
+  });
+
   it('should launch the Gemini CLI when the user clicks the button', async () => {
     const showInformationMessageMock = vi
       .mocked(vscode.window.showInformationMessage)
