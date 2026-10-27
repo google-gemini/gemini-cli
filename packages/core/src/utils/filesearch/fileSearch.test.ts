@@ -864,6 +864,44 @@ describe('FileSearch', () => {
     ]);
   });
 
+  it('should find root files and directories when searching with a leading slash pattern in RecursiveFileSearch (Issue #29453)', async () => {
+    tmpDir = await createTmpDir({
+      'package.json': '',
+      'README.md': '',
+      src: {
+        'index.ts': '',
+      },
+    });
+
+    const fileSearch = FileSearchFactory.create({
+      projectRoot: tmpDir,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+      }),
+      ignoreDirs: [],
+      cache: false,
+      cacheTtl: 0,
+      enableRecursiveFileSearch: true,
+      enableFuzzySearch: true,
+    });
+
+    await fileSearch.initialize();
+
+    // Searching for "/" should include root files and top-level directories
+    const rootResults = await fileSearch.search('/');
+    expect(rootResults).toContain('package.json');
+    expect(rootResults).toContain('README.md');
+
+    // Searching for "/src" should match "src/"
+    const srcResults = await fileSearch.search('/src');
+    expect(srcResults).toContain('src/');
+
+    // Searching for "/pack" should match "package.json"
+    const packResults = await fileSearch.search('/pack');
+    expect(packResults).toContain('package.json');
+  });
+
   describe('DirectoryFileSearch', () => {
     it('should search for files in the current directory', async () => {
       tmpDir = await createTmpDir({
@@ -968,6 +1006,34 @@ describe('FileSearch', () => {
       await fileSearch.initialize();
       const results = await fileSearch.search('*');
       expect(results).toEqual(['.gitignore', 'file2.ts']);
+    });
+
+    it('should find files when searching with a leading slash pattern in DirectoryFileSearch (Issue #29453)', async () => {
+      tmpDir = await createTmpDir({
+        'package.json': '',
+        'README.md': '',
+        src: {
+          'index.ts': '',
+        },
+      });
+
+      const fileSearch = FileSearchFactory.create({
+        projectRoot: tmpDir,
+        fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+          respectGitIgnore: false,
+          respectGeminiIgnore: false,
+        }),
+        ignoreDirs: [],
+        cache: false,
+        cacheTtl: 0,
+        enableRecursiveFileSearch: false,
+        enableFuzzySearch: true,
+      });
+
+      await fileSearch.initialize();
+      const results = await fileSearch.search('/');
+      expect(results).toContain('package.json');
+      expect(results).toContain('README.md');
     });
   });
 });

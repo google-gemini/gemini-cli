@@ -268,7 +268,8 @@ class RecursiveFileSearch implements FileSearch {
       throw new Error('Engine not initialized. Call initialize() first.');
     }
 
-    pattern = unescapePath(pattern) || '*';
+    pattern = unescapePath(pattern);
+    pattern = pattern.replace(/^(\.[/\\]|[/\\])+/, '') || '*';
 
     let filteredCandidates: string[];
     const { files: candidates, isExactMatch } =
@@ -377,7 +378,7 @@ class DirectoryFileSearch implements FileSearch {
     if (!this.ignore) {
       throw new Error('Engine not initialized. Call initialize() first.');
     }
-    pattern = pattern || '*';
+    pattern = pattern.replace(/^(\.[/\\]|[/\\])+/, '') || '*';
 
     const dir = pattern.endsWith('/') ? pattern : path.dirname(pattern);
     const results = await crawl({
