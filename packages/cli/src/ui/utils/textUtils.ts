@@ -164,10 +164,16 @@ export function sanitizeForDisplay(str: string, maxLength?: number): string {
 }
 
 /**
- * Normalizes escaped newline characters (e.g., "\\n") into actual newline characters.
+ * Normalizes unescaped newline sequences (e.g., "\\n", "\\r\\n") into actual
+ * newline characters while preserving escaped backslashes ("\\\\n"), Windows
+ * drive paths (e.g., "C:\\new_folder", "D:\\notes"), inline/fenced code blocks
+ * (e.g., "`\\n`"), and standalone quoted escape tokens (e.g., '"\\n"').
  */
 export function normalizeEscapedNewlines(value: string): string {
-  return value.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n');
+  return value.replace(
+    /((`+)(?:\\`(?=(?:\\`|[^\n`])*?\2(?=(?:[^\n`]*\2[^\n`]*\2)*[^\n`]*$))|[\s\S])*?\2|"(?:\\r\\n|\\n)"|'(?:\\r\\n|\\n)'|[A-Za-z]:(?:(?!(?:\\r\\n|\\n)(?:[A-Z\s\\]|$))\\[a-zA-Z0-9_.-]+)+|\\\\)|\\r\\n|\\n/gm,
+    (_match, preserved: string | undefined) => preserved ?? '\n',
+  );
 }
 
 const stringWidthCache = new LRUCache<string, number>(

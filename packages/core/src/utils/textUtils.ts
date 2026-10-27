@@ -188,3 +188,16 @@ export function wrapUntrusted(text: string, source?: string): string {
   const attributes = normalizedSource ? ` source="${normalizedSource}"` : '';
   return `<untrusted_context${attributes}>\n${escaped}\n</untrusted_context>`;
 }
+
+/**
+ * Normalizes unescaped newline sequences (e.g., "\\n", "\\r\\n") into actual
+ * newline characters while preserving escaped backslashes ("\\\\n"), Windows
+ * drive paths (e.g., "C:\\new_folder", "D:\\notes"), inline/fenced code blocks
+ * (e.g., "`\\n`"), and standalone quoted escape tokens (e.g., '"\\n"').
+ */
+export function normalizeEscapedNewlines(value: string): string {
+  return value.replace(
+    /((`+)(?:\\`(?=(?:\\`|[^\n`])*?\2(?=(?:[^\n`]*\2[^\n`]*\2)*[^\n`]*$))|[\s\S])*?\2|"(?:\\r\\n|\\n)"|'(?:\\r\\n|\\n)'|[A-Za-z]:(?:(?!(?:\\r\\n|\\n)(?:[A-Z\s\\]|$))\\[a-zA-Z0-9_.-]+)+|\\\\)|\\r\\n|\\n/gm,
+    (_match, preserved: string | undefined) => preserved ?? '\n',
+  );
+}
