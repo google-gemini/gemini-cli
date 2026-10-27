@@ -1035,5 +1035,29 @@ describe('FileSearch', () => {
       expect(results).toContain('package.json');
       expect(results).toContain('README.md');
     });
+
+    it('should handle escaped file paths with special characters in DirectoryFileSearch', async () => {
+      tmpDir = await createTmpDir({
+        'file with (special) chars.txt': '',
+      });
+
+      const fileSearch = FileSearchFactory.create({
+        projectRoot: tmpDir,
+        fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+          respectGitIgnore: false,
+          respectGeminiIgnore: false,
+        }),
+        ignoreDirs: [],
+        cache: false,
+        cacheTtl: 0,
+        enableRecursiveFileSearch: false,
+        enableFuzzySearch: true,
+      });
+
+      await fileSearch.initialize();
+      const searchPattern = escapePath('file with (special) chars.txt');
+      const results = await fileSearch.search(searchPattern);
+      expect(results).toEqual(['file with (special) chars.txt']);
+    });
   });
 });

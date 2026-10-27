@@ -378,6 +378,7 @@ class DirectoryFileSearch implements FileSearch {
     if (!this.ignore) {
       throw new Error('Engine not initialized. Call initialize() first.');
     }
+    pattern = unescapePath(pattern);
     pattern = pattern.replace(/^(\.[/\\]|[/\\])+/, '') || '*';
 
     const dir = pattern.endsWith('/') ? pattern : path.dirname(pattern);
