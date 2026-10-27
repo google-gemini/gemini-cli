@@ -84,6 +84,76 @@ async function validateExtension(args: ValidateArgs) {
     );
   }
 
+  if (extensionConfig.mcpServers) {
+    if (
+      typeof extensionConfig.mcpServers !== 'object' ||
+      extensionConfig.mcpServers === null ||
+      Array.isArray(extensionConfig.mcpServers)
+    ) {
+      errors.push('The "mcpServers" field must be an object.');
+    } else {
+      for (const [serverName, serverConfig] of Object.entries(
+        extensionConfig.mcpServers,
+      )) {
+        if (
+          typeof serverConfig !== 'object' ||
+          serverConfig === null ||
+          Array.isArray(serverConfig)
+        ) {
+          errors.push(
+            `MCP server configuration for "${serverName}" must be an object.`,
+          );
+          continue;
+        }
+
+        const hasCommand =
+          typeof serverConfig.command === 'string' &&
+          serverConfig.command.trim().length > 0;
+        const hasUrl =
+          typeof serverConfig.url === 'string' &&
+          serverConfig.url.trim().length > 0;
+        const hasHttpUrl =
+          typeof serverConfig.httpUrl === 'string' &&
+          serverConfig.httpUrl.trim().length > 0;
+        const hasTcp =
+          typeof serverConfig.tcp === 'string' &&
+          serverConfig.tcp.trim().length > 0;
+
+        if (!hasCommand && !hasUrl && !hasHttpUrl && !hasTcp) {
+          errors.push(
+            `MCP server "${serverName}" must specify a transport (e.g., "command", "url", or "httpUrl").`,
+          );
+        }
+
+        if (hasHttpUrl) {
+          warnings.push(
+            `MCP server "${serverName}" uses deprecated "httpUrl". Consider using "url" with "type": "http" instead.`,
+          );
+        }
+
+        if (hasUrl) {
+          try {
+            new URL(serverConfig.url);
+          } catch {
+            errors.push(
+              `MCP server "${serverName}" specifies an invalid URL: "${serverConfig.url}".`,
+            );
+          }
+        }
+
+        if (hasHttpUrl) {
+          try {
+            new URL(serverConfig.httpUrl);
+          } catch {
+            errors.push(
+              `MCP server "${serverName}" specifies an invalid httpUrl: "${serverConfig.httpUrl}".`,
+            );
+          }
+        }
+      }
+    }
+  }
+
   if (warnings.length > 0) {
     debugLogger.warn('Validation warnings:');
     for (const warning of warnings) {
