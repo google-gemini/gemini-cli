@@ -904,6 +904,17 @@ describe('FileSearch', () => {
     // Searching with null byte should sanitize and match correctly
     const nullByteResults = await fileSearch.search('pack\0age.json');
     expect(nullByteResults).toContain('package.json');
+
+    // Searching with backslashes on Windows should normalize to forward slashes
+    const platformSpy = vi
+      .spyOn(process, 'platform', 'get')
+      .mockReturnValue('win32');
+    try {
+      const backslashResults = await fileSearch.search('\\src\\index.ts');
+      expect(backslashResults).toContain('src/index.ts');
+    } finally {
+      platformSpy.mockRestore();
+    }
   });
 
   describe('DirectoryFileSearch', () => {
@@ -1091,6 +1102,39 @@ describe('FileSearch', () => {
       // Path traversal prevention
       const traversalResults = await fileSearch.search('../../etc');
       expect(traversalResults).toEqual([]);
+    });
+
+    it('should normalize backslashes on Windows in DirectoryFileSearch', async () => {
+      tmpDir = await createTmpDir({
+        src: {
+          'index.ts': '',
+        },
+      });
+
+      const fileSearch = FileSearchFactory.create({
+        projectRoot: tmpDir,
+        fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+          respectGitIgnore: false,
+          respectGeminiIgnore: false,
+        }),
+        ignoreDirs: [],
+        cache: false,
+        cacheTtl: 0,
+        enableRecursiveFileSearch: false,
+        enableFuzzySearch: true,
+      });
+
+      await fileSearch.initialize();
+
+      const platformSpy = vi
+        .spyOn(process, 'platform', 'get')
+        .mockReturnValue('win32');
+      try {
+        const results = await fileSearch.search('\\src\\');
+        expect(results).toContain('src/index.ts');
+      } finally {
+        platformSpy.mockRestore();
+      }
     });
   });
 });
