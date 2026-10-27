@@ -664,13 +664,14 @@ export function supportsMultimodalFunctionResponse(
   model: string,
   config?: ModelCapabilityContext,
 ): boolean {
+  const resolved = resolveModel(model, false, false, true, config);
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     return (
-      config.modelConfigService.getModelDefinition(model)?.features
+      config.modelConfigService.getModelDefinition(resolved)?.features
         ?.multimodalToolUse === true
     );
   }
-  return /^gemini-3(\.|-|$)/.test(model);
+  return /^gemini-3(\.|-|$)/.test(resolved);
 }
 
 /**
