@@ -995,9 +995,13 @@ describe('normalizePath', () => {
       // Malicious package name prefixing com.termux
       vi.stubEnv('PREFIX', '/data/data/com.termux.malicious/files/usr');
       expect(
-        isTrustedSystemPath(
-          '/data/data/com.termux.malicious/files/usr/bin/rg',
-        ),
+        isTrustedSystemPath('/data/data/com.termux.malicious/files/usr/bin/rg'),
+      ).toBe(false);
+
+      // Termux path outside /files/usr (e.g. home directory)
+      vi.stubEnv('PREFIX', '/data/data/com.termux/files/home');
+      expect(
+        isTrustedSystemPath('/data/data/com.termux/files/home/bin/rg'),
       ).toBe(false);
 
       // Falls back to safe default

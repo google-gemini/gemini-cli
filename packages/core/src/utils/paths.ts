@@ -600,7 +600,9 @@ export function isTrustedSystemPath(filePath: string): boolean {
     if (envPrefix && path.posix.isAbsolute(envPrefix)) {
       const resolvedPrefix = path.posix.normalize(envPrefix);
       if (
-        /^\/data\/(?:data|user\/\d+)\/com\.termux(?:\/|$)/.test(resolvedPrefix)
+        /^\/data\/(?:data|user\/\d+)\/com\.termux\/files\/usr(?:\/|$)/.test(
+          resolvedPrefix,
+        )
       ) {
         termuxPrefix = resolvedPrefix;
       }
