@@ -189,6 +189,24 @@ export function wrapUntrusted(text: string, source?: string): string {
   return `<untrusted_context${attributes}>\n${escaped}\n</untrusted_context>`;
 }
 
+const NON_CODE_ESCAPED_NEWLINE_REGEX =
+  /("(?:\\r\\n|\\n)"|'(?:\\r\\n|\\n)'|[A-Za-z]:(?:(?!(?:\\r\\n|\\n)(?:[A-Z\s\\]|$))\\[a-zA-Z0-9_.-]+)+|\\\\)|\\r\\n|\\n/g;
+
+function normalizeNonCodeSegment(segment: string): string {
+  return segment.replace(
+    NON_CODE_ESCAPED_NEWLINE_REGEX,
+    (_match, preserved: string | undefined) => preserved ?? '\n',
+  );
+}
+
+interface BacktickRun {
+  start: number;
+  end: number;
+  len: number;
+  line: number;
+  escaped: boolean;
+}
+
 /**
  * Normalizes unescaped newline sequences (e.g., "\\n", "\\r\\n") into actual
  * newline characters while preserving escaped backslashes ("\\\\n"), Windows
@@ -196,8 +214,97 @@ export function wrapUntrusted(text: string, source?: string): string {
  * (e.g., "`\\n`"), and standalone quoted escape tokens (e.g., '"\\n"').
  */
 export function normalizeEscapedNewlines(value: string): string {
-  return value.replace(
-    /((`+)(?:\\`(?=(?:\\`|[^\n`])*?\2(?=(?:[^\n`]*\2[^\n`]*\2)*[^\n`]*$))|[\s\S])*?\2|"(?:\\r\\n|\\n)"|'(?:\\r\\n|\\n)'|[A-Za-z]:(?:(?!(?:\\r\\n|\\n)(?:[A-Z\s\\]|$))\\[a-zA-Z0-9_.-]+)+|\\\\)|\\r\\n|\\n/gm,
-    (_match, preserved: string | undefined) => preserved ?? '\n',
-  );
+  if (!value.includes('\\n')) {
+    return value;
+  }
+  if (!value.includes('`')) {
+    return normalizeNonCodeSegment(value);
+  }
+
+  const runs: BacktickRun[] = [];
+  const unescapedSingleTickCountByLine = new Map<number, number>();
+  let line = 0;
+  let i = 0;
+
+  while (i < value.length) {
+    const ch = value.charCodeAt(i);
+    if (ch === 10 /* \n */) {
+      line++;
+      i++;
+      continue;
+    }
+    if (ch === 96 /* ` */) {
+      let end = i + 1;
+      while (end < value.length && value.charCodeAt(end) === 96) {
+        end++;
+      }
+      let backslashes = 0;
+      while (
+        i - 1 - backslashes >= 0 &&
+        value.charCodeAt(i - 1 - backslashes) === 92 /* \ */
+      ) {
+        backslashes++;
+      }
+      const len = end - i;
+      const escaped = backslashes % 2 === 1;
+      if (len === 1 && !escaped) {
+        unescapedSingleTickCountByLine.set(
+          line,
+          (unescapedSingleTickCountByLine.get(line) ?? 0) + 1,
+        );
+      }
+      runs.push({ start: i, end, len, line, escaped });
+      i = end;
+      continue;
+    }
+    i++;
+  }
+
+  const isIgnoredSingleTick = (run: BacktickRun): boolean => {
+    if (run.len !== 1 || !run.escaped) {
+      return false;
+    }
+    const unescapedCount = unescapedSingleTickCountByLine.get(run.line) ?? 0;
+    return unescapedCount > 0 && unescapedCount % 2 === 0;
+  };
+
+  const maxRunIndexByLen = new Map<number, number>();
+  for (let idx = 0; idx < runs.length; idx++) {
+    if (!isIgnoredSingleTick(runs[idx])) {
+      maxRunIndexByLen.set(runs[idx].len, idx);
+    }
+  }
+
+  let lastIndex = 0;
+  let result = '';
+  let r = 0;
+
+  while (r < runs.length) {
+    const openRun = runs[r];
+    if (
+      isIgnoredSingleTick(openRun) ||
+      (maxRunIndexByLen.get(openRun.len) ?? -1) <= r
+    ) {
+      r++;
+      continue;
+    }
+
+    let closeIdx = r + 1;
+    while (
+      closeIdx < runs.length &&
+      (runs[closeIdx].len !== openRun.len ||
+        isIgnoredSingleTick(runs[closeIdx]))
+    ) {
+      closeIdx++;
+    }
+
+    const closeRun = runs[closeIdx];
+    result += normalizeNonCodeSegment(value.slice(lastIndex, openRun.start));
+    result += value.slice(openRun.start, closeRun.end);
+    lastIndex = closeRun.end;
+    r = closeIdx + 1;
+  }
+
+  result += normalizeNonCodeSegment(value.slice(lastIndex));
+  return result;
 }

@@ -430,6 +430,12 @@ describe('normalizeEscapedNewlines', () => {
     expect(
       normalizeEscapedNewlines('`' + '\\\\a'.repeat(500) + '\\nNext'),
     ).toBe('`' + '\\\\a'.repeat(500) + '\nNext');
+    expect(normalizeEscapedNewlines('`'.repeat(2000) + '\\nNext')).toBe(
+      '`'.repeat(2000) + '\nNext',
+    );
+    expect(normalizeEscapedNewlines('`' + '``a'.repeat(1000) + '\\nNext')).toBe(
+      '`' + '``a'.repeat(1000) + '\nNext',
+    );
   });
 
   it('preserves standalone quoted "\\n" and \'\\n\' escape tokens', () => {
