@@ -12,6 +12,7 @@ import { useAppContext } from '../contexts/AppContext.js';
 import { AppHeader } from './AppHeader.js';
 
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+import { useStaticHistoryStartIndex } from '../hooks/useStaticHistoryStartIndex.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import {
   SCROLL_TO_ITEM_END,
@@ -202,15 +203,14 @@ export const MainContent = () => {
     ],
   );
 
-  const staticHistoryItems = useMemo(
-    () => historyItems.slice(0, lastUserPromptIndex + 1),
-    [historyItems, lastUserPromptIndex],
-  );
-
-  const lastResponseHistoryItems = useMemo(
-    () => historyItems.slice(lastUserPromptIndex + 1),
-    [historyItems, lastUserPromptIndex],
-  );
+  const staticHistoryStartIndex = useStaticHistoryStartIndex({
+    history: uiState.history,
+    historyRemountKey: uiState.historyRemountKey,
+    terminalWidth: uiState.terminalWidth,
+    terminalHeight: uiState.terminalHeight,
+    contentWidth: mainAreaWidth,
+    enabled: !isAlternateBufferOrTerminalBuffer,
+  });
 
   const pendingItems = useMemo(() => {
     const hasConfirmationQueue = Boolean(
@@ -453,9 +453,12 @@ export const MainContent = () => {
       <Static
         key={uiState.historyRemountKey}
         items={[
-          <AppHeader key="app-header" version={version} />,
-          ...staticHistoryItems,
-          ...lastResponseHistoryItems,
+          // A remount after a width change re-prints only the latest history;
+          // earlier items, including the header, stay in the scrollback.
+          ...(staticHistoryStartIndex === 0
+            ? [<AppHeader key="app-header" version={version} />]
+            : []),
+          ...historyItems.slice(staticHistoryStartIndex),
         ]}
       >
         {(item) => item}

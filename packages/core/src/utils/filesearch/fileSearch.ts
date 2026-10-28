@@ -10,7 +10,7 @@ import { loadIgnoreRules, type Ignore } from './ignore.js';
 import { ResultCache } from './result-cache.js';
 import { crawl } from './crawler.js';
 import { AsyncFzf } from 'fzf';
-import { unescapePath } from '../paths.js';
+import { unescapePath, resolveToRealPath, isSubpath } from '../paths.js';
 import type { FileDiscoveryService } from '../../services/fileDiscoveryService.js';
 import { FileWatcher, type FileWatcherEvent } from './fileWatcher.js';
 import { debugLogger } from '../debugLogger.js';
@@ -52,6 +52,21 @@ const byMatchPosFromEnd = (
   const distB = b.item.length - maxPosB;
   return distA - distB;
 };
+
+/**
+ * Normalizes a user-supplied search pattern:
+ * - Unescapes escaped characters (e.g. spaces).
+ * - Strips null bytes (\0) to prevent filesystem issues.
+ * - Converts backslashes to forward slashes on Windows.
+ * - Strips leading relative/root prefixes (./, /) and defaults empty pattern to '*'.
+ */
+function normalizeSearchPattern(pattern: string): string {
+  let normalized = unescapePath(pattern).replace(/\0/g, '');
+  if (process.platform === 'win32') {
+    normalized = normalized.replace(/\\/g, '/');
+  }
+  return normalized.replace(/^(\.[/\\]|[/\\])+/, '') || '*';
+}
 
 export interface FileSearchOptions {
   projectRoot: string;
@@ -268,7 +283,7 @@ class RecursiveFileSearch implements FileSearch {
       throw new Error('Engine not initialized. Call initialize() first.');
     }
 
-    pattern = unescapePath(pattern) || '*';
+    pattern = normalizeSearchPattern(pattern);
 
     let filteredCandidates: string[];
     const { files: candidates, isExactMatch } =
@@ -360,6 +375,7 @@ class RecursiveFileSearch implements FileSearch {
 
 class DirectoryFileSearch implements FileSearch {
   private ignore: Ignore | undefined;
+  private realProjectRoot: string | undefined;
 
   constructor(private readonly options: FileSearchOptions) {}
 
@@ -368,20 +384,35 @@ class DirectoryFileSearch implements FileSearch {
       this.options.fileDiscoveryService,
       this.options.ignoreDirs,
     );
+    try {
+      this.realProjectRoot = resolveToRealPath(this.options.projectRoot);
+    } catch {
+      this.realProjectRoot = path.resolve(this.options.projectRoot);
+    }
   }
 
   async search(
     pattern: string,
     options: SearchOptions = {},
   ): Promise<string[]> {
-    if (!this.ignore) {
+    if (!this.ignore || !this.realProjectRoot) {
       throw new Error('Engine not initialized. Call initialize() first.');
     }
-    pattern = pattern || '*';
+    pattern = normalizeSearchPattern(pattern);
 
     const dir = pattern.endsWith('/') ? pattern : path.dirname(pattern);
+    const targetDir = path.join(this.options.projectRoot, dir);
+    try {
+      const realTargetDir = resolveToRealPath(targetDir);
+      if (!isSubpath(this.realProjectRoot, realTargetDir)) {
+        return [];
+      }
+    } catch {
+      return [];
+    }
+
     const results = await crawl({
-      crawlDirectory: path.join(this.options.projectRoot, dir),
+      crawlDirectory: targetDir,
       cwd: this.options.projectRoot,
       maxDepth: 0,
       ignore: this.ignore,
