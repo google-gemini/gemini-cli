@@ -230,10 +230,23 @@ const EXIT_SYNCHRONIZED_OUTPUT = '\x1b[?2026l';
  * This intentionally avoids `ansiEscapes.clearTerminal`, which also emits
  * `\x1b[3J` (Erase Saved Lines) and causes terminal emulators to purge their
  * native scrollback history, wiping out earlier turns of the conversation.
+ *
+ * The viewport is erased in place (cursor home, then erase down) rather than
+ * with `\x1b[2J` (Erase in Display), which some terminal emulators (for
+ * example VTE-based ones) implement by moving the visible screen into the
+ * scrollback, leaving stale frames there on every refresh.
  */
-const CLEAR_VIEWPORT = ansiEscapes.eraseScreen + ansiEscapes.cursorTo(0, 0);
+const CLEAR_VIEWPORT = ansiEscapes.cursorTo(0, 0) + ansiEscapes.eraseDown;
 
-const RESIZE_DEBOUNCE_MS = 100;
+/**
+ * Delay after the last terminal width change before the static history is
+ * re-printed. Terminal emulators re-wrap previously printed rows while the
+ * window is resized and can push them into scrollback, so every intermediate
+ * refresh during a drag can leave a partial copy behind. A delay that spans
+ * the pauses of a quick back-and-forth drag produces a single refresh once
+ * resizing settles.
+ */
+const RESIZE_DEBOUNCE_MS = 300;
 const RESIZE_CORK_SAFETY_TIMEOUT_MS = 1000;
 
 /**
