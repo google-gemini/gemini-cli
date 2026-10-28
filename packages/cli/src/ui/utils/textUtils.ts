@@ -164,12 +164,61 @@ export function sanitizeForDisplay(str: string, maxLength?: number): string {
 }
 
 const NON_CODE_ESCAPED_NEWLINE_REGEX =
-  /("(?:\\r\\n|\\n)"|'(?:\\r\\n|\\n)'|[A-Za-z]:(?:(?!(?:\\r\\n|\\n)(?:[A-Z\s\\]|$))\\[a-zA-Z0-9_.-]+)+|\\\\)|\\r\\n|\\n/g;
+  /("(?:\\r\\n|\\n)"|'(?:\\r\\n|\\n)'|\\\\)|\\r\\n|\\n/g;
+
+function isWindowsDrivePathSegment(
+  segment: string,
+  offset: number,
+  matchLen: number,
+): boolean {
+  if (offset < 2 || offset + matchLen >= segment.length) {
+    return false;
+  }
+  const nextCode = segment.charCodeAt(offset + matchLen);
+  const isLowerOrDigitOrPathPunct =
+    (nextCode >= 97 && nextCode <= 122) ||
+    (nextCode >= 48 && nextCode <= 57) ||
+    nextCode === 95 ||
+    nextCode === 46 ||
+    nextCode === 45;
+  if (!isLowerOrDigitOrPathPunct) {
+    return false;
+  }
+  let p = offset;
+  while (p > 0) {
+    const c = segment.charCodeAt(p - 1);
+    const isPathChar =
+      (c >= 65 && c <= 90) ||
+      (c >= 97 && c <= 122) ||
+      (c >= 48 && c <= 57) ||
+      c === 95 ||
+      c === 46 ||
+      c === 45 ||
+      c === 92;
+    if (!isPathChar) {
+      break;
+    }
+    p--;
+  }
+  if (p < 2 || segment.charCodeAt(p - 1) !== 58 /* : */) {
+    return false;
+  }
+  const drive = segment.charCodeAt(p - 2);
+  return (drive >= 65 && drive <= 90) || (drive >= 97 && drive <= 122);
+}
 
 function normalizeNonCodeSegment(segment: string): string {
   return segment.replace(
     NON_CODE_ESCAPED_NEWLINE_REGEX,
-    (_match, preserved: string | undefined) => preserved ?? '\n',
+    (match, preserved: string | undefined, offset: number) => {
+      if (preserved !== undefined) {
+        return preserved;
+      }
+      if (isWindowsDrivePathSegment(segment, offset, match.length)) {
+        return match;
+      }
+      return '\n';
+    },
   );
 }
 
