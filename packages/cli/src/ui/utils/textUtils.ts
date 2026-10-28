@@ -156,8 +156,11 @@ export function sanitizeForDisplay(str: string, maxLength?: number): string {
 
   let sanitized = stripUnsafeCharacters(str).replace(/\s+/g, ' ');
 
-  if (maxLength && sanitized.length > maxLength) {
-    sanitized = sanitized.substring(0, maxLength - 3) + '...';
+  // Measure and truncate by code points so surrogate pairs (e.g. emoji) are
+  // never split. The end index is clamped because, unlike substring(),
+  // cpSlice() treats a negative end as an offset from the end of the string.
+  if (maxLength && cpLen(sanitized) > maxLength) {
+    sanitized = cpSlice(sanitized, 0, Math.max(0, maxLength - 3)) + '...';
   }
 
   return sanitized;
