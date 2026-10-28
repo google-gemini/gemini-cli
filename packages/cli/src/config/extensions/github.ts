@@ -95,6 +95,10 @@ export function tryParseGithubUrl(source: string): GithubRepoInfo | null {
       // It's another provider's SSH URL (e.g., gitlab), so not a GitHub repo.
       return null;
     }
+  } else if (source.startsWith('github:')) {
+    source = source.slice('github:'.length);
+  } else if (source.startsWith('github.com/')) {
+    source = source.slice('github.com/'.length);
   }
   // Default to a github repo path, so `source` can be just an org/repo
   let parsedUrl: URL;
