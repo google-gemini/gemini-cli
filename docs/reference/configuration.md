@@ -94,6 +94,15 @@ their corresponding top-level category object in your `settings.json` file.
 
 <!-- SETTINGS-AUTOGEN:START -->
 
+#### `routing`
+
+- **`routing.numericalRules`** (array):
+  - **Description:** Score bands matched in ascending maxScore order. Each
+    maxScore is inclusive. Scores above all configured bands use the model in
+    the final band.
+  - **Default:** `[]`
+  - **Requires restart:** Yes
+
 #### `policyPaths`
 
 - **`policyPaths`** (array):

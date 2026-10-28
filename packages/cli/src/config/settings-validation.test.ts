@@ -538,6 +538,92 @@ describe('settings-validation', () => {
         expect(formatted).toContain('...and 1 more errors.');
       }
     });
+
+    it('should accept valid routing.numericalRules configuration', () => {
+      const validSettings = {
+        routing: {
+          numericalRules: [
+            { maxScore: 10, model: 'local-gemma' },
+            { maxScore: 30, model: 'gemini-2.5-flash' },
+            { maxScore: 80, model: 'gemini-3-flash-preview' },
+            { maxScore: 100, model: 'gemini-3-pro-preview' },
+          ],
+        },
+      };
+
+      const result = validateSettings(validSettings);
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept empty routing.numericalRules array', () => {
+      const validSettings = {
+        routing: {
+          numericalRules: [],
+        },
+      };
+
+      const result = validateSettings(validSettings);
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject routing when it is not an object', () => {
+      const invalidSettings = {
+        routing: 'invalid-string',
+      };
+
+      const result = validateSettings(invalidSettings);
+      expect(result.success).toBe(false);
+      expect(result.error?.issues[0]?.path).toEqual(['routing']);
+    });
+
+    it('should reject routing.numericalRules when it is not an array', () => {
+      const invalidSettings = {
+        routing: {
+          numericalRules: 'not-an-array',
+        },
+      };
+
+      const result = validateSettings(invalidSettings);
+      expect(result.success).toBe(false);
+      expect(result.error?.issues[0]?.path).toEqual([
+        'routing',
+        'numericalRules',
+      ]);
+    });
+
+    it('should reject routing.numericalRules when maxScore is not a number', () => {
+      const invalidSettings = {
+        routing: {
+          numericalRules: [{ maxScore: 'not-a-number', model: 'flash' }],
+        },
+      };
+
+      const result = validateSettings(invalidSettings);
+      expect(result.success).toBe(false);
+      expect(result.error?.issues[0]?.path).toEqual([
+        'routing',
+        'numericalRules',
+        0,
+        'maxScore',
+      ]);
+    });
+
+    it('should reject routing.numericalRules when model is not a string', () => {
+      const invalidSettings = {
+        routing: {
+          numericalRules: [{ maxScore: 50, model: 12345 }],
+        },
+      };
+
+      const result = validateSettings(invalidSettings);
+      expect(result.success).toBe(false);
+      expect(result.error?.issues[0]?.path).toEqual([
+        'routing',
+        'numericalRules',
+        0,
+        'model',
+      ]);
+    });
   });
 
   describe('settingsZodSchema', () => {

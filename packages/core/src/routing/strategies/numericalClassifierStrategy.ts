@@ -12,7 +12,11 @@ import type {
   RoutingDecision,
   RoutingStrategy,
 } from '../routingStrategy.js';
-import { resolveClassifierModel, isGemini3Model } from '../../config/models.js';
+import {
+  resolveClassifierModel,
+  resolveModel,
+  isGemini3Model,
+} from '../../config/models.js';
 import { createUserContent, Type } from '@google/genai';
 import type { Config } from '../../config/config.js';
 import {
@@ -114,7 +118,25 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
         return null;
       }
 
-      if (!isGemini3Model(model, config)) {
+      const hasCustomRules = config.hasCustomNumericalRoutingRules?.() ?? false;
+      const routingRules = config.getNumericalRoutingRules?.() ?? [];
+
+      const validRules = hasCustomRules
+        ? [...routingRules]
+            .filter(
+              (rule) =>
+                Number.isFinite(rule.maxScore) &&
+                rule.maxScore >= 1 &&
+                rule.maxScore <= 100 &&
+                typeof rule.model === 'string' &&
+                rule.model.trim().length > 0,
+            )
+            .sort((a, b) => a.maxScore - b.maxScore)
+        : [];
+
+      const hasActiveCustomRules = validRules.length > 0;
+
+      if (!hasActiveCustomRules && !isGemini3Model(model, config)) {
         return null;
       }
 
@@ -178,26 +200,62 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
       const routerResponse = ClassifierResponseSchema.parse(jsonResponse);
       const score = routerResponse.complexity_score;
 
-      const { threshold, groupLabel, modelAlias } =
-        await this.getRoutingDecision(score, config);
       const [useGemini3_1, useCustomToolModel] = await Promise.all([
         config.getGemini31Launched(),
         config.getUseCustomToolModel(),
       ]);
       const useLatestFlash = config.hasLatestFlashGAAccess?.() ?? false;
       const useLatestFlashLite = config.hasLatestFlashLiteGAAccess?.() ?? false;
-      const selectedModel = normalizeModelId(
-        resolveClassifierModel(
-          normalizeModelId(model),
+
+      let selectedModel: string;
+      let groupLabel: string;
+      let reasonPrefix: string;
+
+      if (hasActiveCustomRules) {
+        const configuredRule = validRules.find(
+          (rule) => score <= rule.maxScore,
+        );
+        const selectedRule = configuredRule ?? validRules.at(-1)!;
+
+        selectedModel = normalizeModelId(
+          resolveModel(
+            selectedRule.model.trim(),
+            useGemini3_1,
+            useCustomToolModel,
+            config.getHasAccessToPreviewModel?.() ?? true,
+            config,
+            useLatestFlash,
+            useLatestFlashLite,
+          ),
+        );
+
+        groupLabel = 'Custom';
+        reasonPrefix = configuredRule
+          ? `[Score: ${score} / Max score: ${selectedRule.maxScore} / Model: ${selectedRule.model}]`
+          : `[Score: ${score} / Above final max score: ${selectedRule.maxScore} / Model: ${selectedRule.model}]`;
+      } else {
+        const {
+          threshold,
+          groupLabel: defaultGroupLabel,
           modelAlias,
-          useGemini3_1,
-          useCustomToolModel,
-          config.getHasAccessToPreviewModel?.() ?? true,
-          config,
-          useLatestFlash,
-          useLatestFlashLite,
-        ),
-      );
+        } = await this.getRoutingDecision(score, config);
+        groupLabel = defaultGroupLabel;
+
+        selectedModel = normalizeModelId(
+          resolveClassifierModel(
+            normalizeModelId(model),
+            modelAlias,
+            useGemini3_1,
+            useCustomToolModel,
+            config.getHasAccessToPreviewModel?.() ?? true,
+            config,
+            useLatestFlash,
+            useLatestFlashLite,
+          ),
+        );
+
+        reasonPrefix = `[Score: ${score} / Threshold: ${threshold}]`;
+      }
 
       const service = config.getModelAvailabilityService();
       const snapshot = service.snapshot(selectedModel);
@@ -216,7 +274,7 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
         metadata: {
           source: `NumericalClassifier (${groupLabel})`,
           latencyMs,
-          reasoning: `[Score: ${score} / Threshold: ${threshold}] ${routerResponse.complexity_reasoning}`,
+          reasoning: `${reasonPrefix} ${routerResponse.complexity_reasoning}`,
         },
       };
     } catch (error) {

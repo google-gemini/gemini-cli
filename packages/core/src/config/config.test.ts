@@ -697,6 +697,40 @@ describe('Server Config (config.ts)', () => {
       });
     });
 
+    describe('numericalRoutingRules', () => {
+      it('should return empty rules and hasCustomNumericalRoutingRules false when not configured', () => {
+        const config = new Config(baseParams);
+        expect(config.hasCustomNumericalRoutingRules()).toBe(false);
+        expect(config.getNumericalRoutingRules()).toEqual([]);
+      });
+
+      it('should return configured rules and hasCustomNumericalRoutingRules true', () => {
+        const rules = [
+          { maxScore: 20, model: 'gemini-2.5-flash' },
+          { maxScore: 80, model: 'gemini-3-pro' },
+        ];
+        const config = new Config({
+          ...baseParams,
+          routing: {
+            numericalRules: rules,
+          },
+        });
+        expect(config.hasCustomNumericalRoutingRules()).toBe(true);
+        expect(config.getNumericalRoutingRules()).toEqual(rules);
+      });
+
+      it('should return false for hasCustomNumericalRoutingRules when numericalRules is empty', () => {
+        const config = new Config({
+          ...baseParams,
+          routing: {
+            numericalRules: [],
+          },
+        });
+        expect(config.hasCustomNumericalRoutingRules()).toBe(false);
+        expect(config.getNumericalRoutingRules()).toEqual([]);
+      });
+    });
+
     describe('getGemini31LaunchedSync', () => {
       it.each([AuthType.USE_GEMINI, AuthType.USE_VERTEX_AI, AuthType.GATEWAY])(
         'should return true for %s',
