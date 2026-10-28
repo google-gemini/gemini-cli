@@ -80,7 +80,9 @@ export const useLoadingIndicator = ({
       prevRetryStatus !== null &&
       retryStatus.attempt === prevRetryStatus.attempt &&
       retryStatus.delayMs === prevRetryStatus.delayMs &&
-      retryStatus.model === prevRetryStatus.model);
+      retryStatus.model === prevRetryStatus.model &&
+      retryStatus.status === prevRetryStatus.status &&
+      retryStatus.error === prevRetryStatus.error);
 
   if (!isSameRetry) {
     setPrevRetryStatus(retryStatus);
@@ -89,12 +91,13 @@ export const useLoadingIndicator = ({
     );
   }
 
+  const isRateLimit = isRateLimitRetry(retryStatus);
   const attempt = retryStatus?.attempt ?? 0;
   const delayMs = retryStatus?.delayMs ?? 0;
   const model = retryStatus?.model ?? '';
 
   useEffect(() => {
-    if (!isTimerActive || attempt === 0) {
+    if (!isTimerActive || attempt === 0 || !isRateLimit) {
       return;
     }
 
@@ -110,7 +113,7 @@ export const useLoadingIndicator = ({
     return () => {
       clearInterval(intervalId);
     };
-  }, [attempt, delayMs, model, isTimerActive]);
+  }, [attempt, delayMs, model, isTimerActive, isRateLimit]);
 
   useEffect(() => {
     if (
@@ -134,7 +137,6 @@ export const useLoadingIndicator = ({
     prevStreamingStateRef.current = streamingState;
   }, [streamingState, elapsedTimeFromTimer]);
 
-  const isRateLimit = isRateLimitRetry(retryStatus);
   const remainingSeconds = countdownSeconds ?? 0;
 
   const retryPhrase =
