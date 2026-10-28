@@ -116,8 +116,9 @@ async function validateExtension(args: ValidateArgs) {
           typeof serverConfig.httpUrl === 'string' &&
           serverConfig.httpUrl.trim().length > 0;
         const hasTcp =
-          typeof serverConfig.tcp === 'string' &&
-          serverConfig.tcp.trim().length > 0;
+          (typeof serverConfig.tcp === 'string' &&
+            serverConfig.tcp.trim().length > 0) ||
+          typeof serverConfig.tcp === 'number';
 
         if (!hasCommand && !hasUrl && !hasHttpUrl && !hasTcp) {
           errors.push(
@@ -133,7 +134,7 @@ async function validateExtension(args: ValidateArgs) {
 
         const errorPrefix = `MCP server "${serverName}" specifies an invalid `;
         if (hasUrl && serverConfig.url) {
-          const hasPlaceholder = serverConfig.url.includes('${');
+          const hasPlaceholder = serverConfig.url.includes('$');
           if (!hasPlaceholder) {
             try {
               new URL(serverConfig.url);
@@ -144,7 +145,7 @@ async function validateExtension(args: ValidateArgs) {
         }
 
         if (hasHttpUrl && serverConfig.httpUrl) {
-          const hasPlaceholder = serverConfig.httpUrl.includes('${');
+          const hasPlaceholder = serverConfig.httpUrl.includes('$');
           if (!hasPlaceholder) {
             try {
               new URL(serverConfig.httpUrl);
