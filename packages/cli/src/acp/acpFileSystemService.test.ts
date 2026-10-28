@@ -233,4 +233,73 @@ describe('AcpFileSystemService', () => {
       });
     });
   });
+
+  describe('Windows path casing', () => {
+    beforeEach(() => {
+      vi.stubGlobal(
+        'process',
+        Object.create(process, {
+          platform: { get: () => 'win32' },
+        }),
+      );
+      vi.mocked(os.homedir).mockReturnValue('C:\\Users\\user');
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('should use ACP connection when in-root file path differs in drive/folder casing on Windows', async () => {
+      service = new AcpFileSystemService(
+        mockConnection,
+        'session-1',
+        { readTextFile: true, writeTextFile: true },
+        mockFallback,
+        'c:\\Users\\user\\project',
+      );
+      mockConnection.readTextFile.mockResolvedValue({ content: 'ide-content' });
+
+      const readResult = await service.readTextFile(
+        'C:\\Users\\user\\project\\src\\index.ts',
+      );
+      expect(readResult).toBe('ide-content');
+      expect(mockConnection.readTextFile).toHaveBeenCalledWith({
+        path: 'C:\\Users\\user\\project\\src\\index.ts',
+        sessionId: 'session-1',
+      });
+      expect(mockFallback.readTextFile).not.toHaveBeenCalled();
+
+      await service.writeTextFile(
+        'C:\\USERS\\user\\project\\src\\index.ts',
+        'updated',
+      );
+      expect(mockConnection.writeTextFile).toHaveBeenCalledWith({
+        path: 'C:\\USERS\\user\\project\\src\\index.ts',
+        content: 'updated',
+        sessionId: 'session-1',
+      });
+      expect(mockFallback.writeTextFile).not.toHaveBeenCalled();
+    });
+
+    it('should use fallback for global .gemini files on Windows even when homedir casing differs', async () => {
+      service = new AcpFileSystemService(
+        mockConnection,
+        'session-1',
+        { readTextFile: true, writeTextFile: true },
+        mockFallback,
+        'c:\\Users\\user',
+      );
+      mockFallback.readTextFile.mockResolvedValue('native-settings');
+
+      const result = await service.readTextFile(
+        'c:\\Users\\user\\.gemini\\settings.json',
+      );
+
+      expect(result).toBe('native-settings');
+      expect(mockFallback.readTextFile).toHaveBeenCalledWith(
+        'c:\\Users\\user\\.gemini\\settings.json',
+      );
+      expect(mockConnection.readTextFile).not.toHaveBeenCalled();
+    });
+  });
 });
