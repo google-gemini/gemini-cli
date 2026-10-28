@@ -97,7 +97,12 @@ export const useLoadingIndicator = ({
   const model = retryStatus?.model ?? '';
 
   useEffect(() => {
-    if (!isTimerActive || !isRateLimit) {
+    if (
+      !isTimerActive ||
+      !isRateLimit ||
+      countdownSeconds === null ||
+      countdownSeconds <= 1
+    ) {
       return;
     }
 
@@ -113,7 +118,7 @@ export const useLoadingIndicator = ({
     return () => {
       clearInterval(intervalId);
     };
-  }, [attempt, delayMs, model, isTimerActive, isRateLimit]);
+  }, [attempt, delayMs, model, isTimerActive, isRateLimit, countdownSeconds]);
 
   useEffect(() => {
     if (
