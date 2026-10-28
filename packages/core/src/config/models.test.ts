@@ -243,7 +243,6 @@ describe('isPreviewModel', () => {
       }
     }
     expect(isPreviewModel(PREVIEW_GEMINI_MODEL_AUTO)).toBe(true);
-    expect(isPreviewModel(GEMINI_MODEL_ALIAS_AUTO)).toBe(true);
   });
 
   it('should return false if a preview model is retired (set to none)', () => {
@@ -255,6 +254,7 @@ describe('isPreviewModel', () => {
 
   it('should return false for non-preview models', () => {
     expect(isPreviewModel(DEFAULT_GEMINI_MODEL)).toBe(false);
+    expect(isPreviewModel(GEMINI_MODEL_ALIAS_AUTO)).toBe(false);
     expect(isPreviewModel('gemini-1.5-pro')).toBe(false);
   });
 });
