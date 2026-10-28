@@ -123,25 +123,28 @@ const _ExpandableText: React.FC<ExpandableTextProps> = ({
     const finalMatchIndex = matchedCharacterIndex - start;
     const slicedLabel = labelCharacters.slice(start, end);
 
-    before = slicedLabel.slice(0, finalMatchIndex).join('');
+    const beforeChars = slicedLabel.slice(0, finalMatchIndex);
     match = slicedLabel
       .slice(finalMatchIndex, finalMatchIndex + matchCharactersLength)
       .join('');
-    after = slicedLabel.slice(finalMatchIndex + matchCharactersLength).join('');
+    const afterChars = slicedLabel.slice(finalMatchIndex + matchCharactersLength);
 
     if (start > 0) {
-      const beforeCharacters = Array.from(before);
       before =
-        beforeCharacters.length >= 3
-          ? '...' + beforeCharacters.slice(3).join('')
+        beforeChars.length >= 3
+          ? '...' + beforeChars.slice(3).join('')
           : '...';
+    } else {
+      before = beforeChars.join('');
     }
+
     if (end < labelCharacters.length) {
-      const afterCharacters = Array.from(after);
       after =
-        afterCharacters.length >= 3
-          ? afterCharacters.slice(0, -3).join('') + '...'
+        afterChars.length >= 3
+          ? afterChars.slice(0, -3).join('') + '...'
           : '...';
+    } else {
+      after = afterChars.join('');
     }
   }
 
