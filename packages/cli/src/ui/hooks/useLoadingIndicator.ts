@@ -70,18 +70,29 @@ export const useLoadingIndicator = ({
   const [retainedElapsedTime, setRetainedElapsedTime] = useState(0);
   const prevStreamingStateRef = useRef<StreamingState | null>(null);
 
+  const [prevRetryStatus, setPrevRetryStatus] =
+    useState<RetryAttemptPayload | null>(null);
   const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null);
-  const prevRetryStatusRef = useRef<RetryAttemptPayload | null>(null);
+
+  const isSameRetry =
+    retryStatus === prevRetryStatus ||
+    (retryStatus !== null &&
+      prevRetryStatus !== null &&
+      retryStatus.attempt === prevRetryStatus.attempt &&
+      retryStatus.delayMs === prevRetryStatus.delayMs &&
+      retryStatus.model === prevRetryStatus.model);
+
+  if (!isSameRetry) {
+    setPrevRetryStatus(retryStatus);
+    setCountdownSeconds(
+      retryStatus ? Math.max(1, Math.round(retryStatus.delayMs / 1000)) : null,
+    );
+  }
 
   useEffect(() => {
-    prevRetryStatusRef.current = retryStatus;
     if (!isTimerActive || !retryStatus) {
-      setCountdownSeconds(null);
       return;
     }
-
-    const initialSeconds = Math.max(1, Math.round(retryStatus.delayMs / 1000));
-    setCountdownSeconds(initialSeconds);
 
     const intervalId = setInterval(() => {
       setCountdownSeconds((prev) => {
@@ -120,13 +131,7 @@ export const useLoadingIndicator = ({
   }, [streamingState, elapsedTimeFromTimer]);
 
   const isRateLimit = isRateLimitRetry(retryStatus);
-  const remainingSeconds =
-    retryStatus && prevRetryStatusRef.current !== retryStatus
-      ? Math.max(1, Math.round(retryStatus.delayMs / 1000))
-      : (countdownSeconds ??
-        (retryStatus
-          ? Math.max(1, Math.round(retryStatus.delayMs / 1000))
-          : 0));
+  const remainingSeconds = countdownSeconds ?? 0;
 
   const retryPhrase =
     streamingState === StreamingState.Responding && retryStatus

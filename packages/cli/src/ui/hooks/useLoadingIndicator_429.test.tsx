@@ -7,7 +7,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act } from 'react';
 import { render } from '../../test-utils/render.js';
-import { useLoadingIndicator, isRateLimitRetry } from './useLoadingIndicator.js';
+import {
+  useLoadingIndicator,
+  isRateLimitRetry,
+} from './useLoadingIndicator.js';
 import { StreamingState } from '../types.js';
 import type { RetryAttemptPayload } from '@google/gemini-cli-core';
 
@@ -308,19 +311,25 @@ describe('useLoadingIndicator - 429 Rate Limit and Cool-Down Countdown UX', () =
       rateLimitRetryStatus,
       'low',
       StreamingState.Responding,
-      true, // pauseUpdates is true
+      false,
     );
 
     expect(result.current.currentLoadingPhrase).toMatch(/8s/);
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(3000);
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+    expect(result.current.currentLoadingPhrase).toMatch(/6s/);
+
+    await act(async () => {
+      await rerender({ pauseUpdates: true });
     });
 
-    // Still paused at 8s
-    expect(result.current.currentLoadingPhrase).toMatch(/8s/);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000);
+    });
+    expect(result.current.currentLoadingPhrase).toMatch(/6s/);
 
-    // Resume
     await act(async () => {
       await rerender({ pauseUpdates: false });
     });
@@ -328,8 +337,7 @@ describe('useLoadingIndicator - 429 Rate Limit and Cool-Down Countdown UX', () =
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2000);
     });
-
-    expect(result.current.currentLoadingPhrase).toMatch(/6s/);
+    expect(result.current.currentLoadingPhrase).toMatch(/4s/);
   });
 
   describe('isRateLimitRetry detection helper', () => {
