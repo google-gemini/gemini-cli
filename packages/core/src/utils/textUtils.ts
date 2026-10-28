@@ -201,14 +201,39 @@ function isWindowsDrivePathSegment(
     return false;
   }
   const nextCode = segment.charCodeAt(offset + matchLen);
-  const isLowerOrDigitOrPathPunct =
+  const isAlphaOrDigitOrPathPunct =
+    (nextCode >= 65 && nextCode <= 90) ||
     (nextCode >= 97 && nextCode <= 122) ||
     (nextCode >= 48 && nextCode <= 57) ||
     nextCode === 95 ||
     nextCode === 46 ||
     nextCode === 45;
-  if (!isLowerOrDigitOrPathPunct) {
+  if (!isAlphaOrDigitOrPathPunct) {
     return false;
+  }
+  if (
+    nextCode >= 65 &&
+    nextCode <= 90 &&
+    segment.charCodeAt(offset - 1) !== 58 /* : */
+  ) {
+    let q = offset + matchLen + 1;
+    while (q < segment.length) {
+      const ch = segment.charCodeAt(q);
+      const isWordChar =
+        (ch >= 65 && ch <= 90) ||
+        (ch >= 97 && ch <= 122) ||
+        (ch >= 48 && ch <= 57) ||
+        ch === 95 ||
+        ch === 45;
+      if (!isWordChar) {
+        break;
+      }
+      q++;
+    }
+    const following = q < segment.length ? segment.charCodeAt(q) : -1;
+    if (following !== 92 /* \ */ && following !== 46 /* . */) {
+      return false;
+    }
   }
   let p = offset;
   while (p > 0) {

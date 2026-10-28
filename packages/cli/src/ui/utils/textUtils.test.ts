@@ -713,6 +713,11 @@ describe('textUtils', () => {
       ).toBe(
         'Path C:\\new_folder and D:\\notes\\next and E:\\nav and F:\\node_modules\nNext',
       );
+      expect(
+        normalizeEscapedNewlines(
+          'Check C:\\nExt\\file.txt and D:\\dir\\nExt.txt\\nDone',
+        ),
+      ).toBe('Check C:\\nExt\\file.txt and D:\\dir\\nExt.txt\nDone');
     });
 
     it('should preserve \\n inside inline and fenced code spans including escaped backticks', () => {

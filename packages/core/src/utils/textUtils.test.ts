@@ -394,6 +394,11 @@ describe('normalizeEscapedNewlines', () => {
     ).toBe(
       'Path C:\\new_folder and D:\\notes\\next and E:\\nav and F:\\node_modules\nNext line',
     );
+    expect(
+      normalizeEscapedNewlines(
+        'Check C:\\nExt\\file.txt and D:\\dir\\nExt.txt\\nDone',
+      ),
+    ).toBe('Check C:\\nExt\\file.txt and D:\\dir\\nExt.txt\nDone');
   });
 
   it('preserves \\n inside inline and fenced markdown code blocks including escaped backticks', () => {
