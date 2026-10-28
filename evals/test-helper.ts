@@ -225,7 +225,7 @@ export async function internalEvalTest(evalCase: EvalCase) {
   });
 }
 
-function getApiErrorCode(message: string): '500' | '503' | undefined {
+function getApiErrorCode(message: string): '429' | '500' | '503' | undefined {
   if (
     message.includes('status: UNAVAILABLE') ||
     message.includes('code: 503') ||
@@ -239,6 +239,15 @@ function getApiErrorCode(message: string): '500' | '503' | undefined {
     message.includes('Internal error encountered')
   ) {
     return '500';
+  }
+  if (
+    message.includes('status: RESOURCE_EXHAUSTED') ||
+    message.includes('code: 429') ||
+    message.includes('Too Many Requests') ||
+    message.includes('Rate limit exceeded') ||
+    message.includes('You exceeded your current quota')
+  ) {
+    return '429';
   }
   return undefined;
 }
@@ -254,7 +263,7 @@ function logReliabilityEvent(
   testName: string,
   attempt: number,
   status: 'RETRY' | 'SKIP',
-  errorCode: '500' | '503',
+  errorCode: '429' | '500' | '503',
   errorMessage: string,
 ) {
   const reliabilityLog = {
@@ -337,6 +346,10 @@ export async function prepareWorkspace(
     fs.writeFileSync(ackPath, JSON.stringify(acknowledgedAgents, null, 2));
   }
 
+  if (!fs.existsSync(path.join(projectRoot, '.gitignore'))) {
+    fs.writeFileSync(path.join(projectRoot, '.gitignore'), 'node_modules/\n');
+  }
+
   const execOptions = { cwd: testDir, stdio: 'ignore' as const };
   execSync('git init --initial-branch=main', execOptions);
   execSync('git config user.email "test@example.com"', execOptions);
@@ -407,7 +420,8 @@ export function symlinkNodeModules(testDir: string) {
     fs.existsSync(rootNodeModules) &&
     !fs.existsSync(testNodeModules)
   ) {
-    fs.symlinkSync(rootNodeModules, testNodeModules, 'dir');
+    const type = process.platform === 'win32' ? 'junction' : 'dir';
+    fs.symlinkSync(rootNodeModules, testNodeModules, type);
   }
 }
 
