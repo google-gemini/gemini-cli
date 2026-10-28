@@ -112,7 +112,7 @@ describe('useLoadingIndicator - 429 Rate Limit and Cool-Down Countdown UX', () =
 
     // Initial T=0s
     expect(result.current.statusPhrase).toBe(
-      'Rate limit reached. Cooling down... Retrying in 5s (Attempt 1/3)',
+      'Rate limit reached. Cooling down... Retrying in 5s (Attempt 2/3)',
     );
 
     // T=1s
@@ -120,7 +120,7 @@ describe('useLoadingIndicator - 429 Rate Limit and Cool-Down Countdown UX', () =
       await vi.advanceTimersByTimeAsync(1000);
     });
     expect(result.current.statusPhrase).toBe(
-      'Rate limit reached. Cooling down... Retrying in 4s (Attempt 1/3)',
+      'Rate limit reached. Cooling down... Retrying in 4s (Attempt 2/3)',
     );
 
     // T=2s
@@ -128,7 +128,7 @@ describe('useLoadingIndicator - 429 Rate Limit and Cool-Down Countdown UX', () =
       await vi.advanceTimersByTimeAsync(1000);
     });
     expect(result.current.statusPhrase).toBe(
-      'Rate limit reached. Cooling down... Retrying in 3s (Attempt 1/3)',
+      'Rate limit reached. Cooling down... Retrying in 3s (Attempt 2/3)',
     );
 
     // T=3s
@@ -136,7 +136,7 @@ describe('useLoadingIndicator - 429 Rate Limit and Cool-Down Countdown UX', () =
       await vi.advanceTimersByTimeAsync(1000);
     });
     expect(result.current.statusPhrase).toBe(
-      'Rate limit reached. Cooling down... Retrying in 2s (Attempt 1/3)',
+      'Rate limit reached. Cooling down... Retrying in 2s (Attempt 2/3)',
     );
 
     // T=4s
@@ -144,7 +144,7 @@ describe('useLoadingIndicator - 429 Rate Limit and Cool-Down Countdown UX', () =
       await vi.advanceTimersByTimeAsync(1000);
     });
     expect(result.current.statusPhrase).toBe(
-      'Rate limit reached. Cooling down... Retrying in 1s (Attempt 1/3)',
+      'Rate limit reached. Cooling down... Retrying in 1s (Attempt 2/3)',
     );
   });
 
@@ -164,14 +164,14 @@ describe('useLoadingIndicator - 429 Rate Limit and Cool-Down Countdown UX', () =
     );
 
     expect(result.current.currentLoadingPhrase).toBe(
-      'Rate limit reached. Cooling down... Retrying in 4s (Attempt 1/3)',
+      'Rate limit reached. Cooling down... Retrying in 4s (Attempt 2/3)',
     );
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2000);
     });
     expect(result.current.currentLoadingPhrase).toBe(
-      'Rate limit reached. Cooling down... Retrying in 2s (Attempt 1/3)',
+      'Rate limit reached. Cooling down... Retrying in 2s (Attempt 2/3)',
     );
   });
 
@@ -191,14 +191,14 @@ describe('useLoadingIndicator - 429 Rate Limit and Cool-Down Countdown UX', () =
     );
 
     expect(result.current.currentLoadingPhrase).toBe(
-      'Rate limit reached. Cooling down... Retrying in 3s (Attempt 1/3)',
+      'Rate limit reached. Cooling down... Retrying in 3s (Attempt 2/3)',
     );
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2000);
     });
     expect(result.current.currentLoadingPhrase).toBe(
-      'Rate limit reached. Cooling down... Retrying in 1s (Attempt 1/3)',
+      'Rate limit reached. Cooling down... Retrying in 1s (Attempt 2/3)',
     );
 
     // Attempt 2 arrives with a larger backoff of 6s
@@ -216,14 +216,14 @@ describe('useLoadingIndicator - 429 Rate Limit and Cool-Down Countdown UX', () =
     });
 
     expect(result.current.currentLoadingPhrase).toBe(
-      'Rate limit reached. Cooling down... Retrying in 6s (Attempt 2/3)',
+      'Rate limit reached. Cooling down... Retrying in 6s (Attempt 3/3)',
     );
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2000);
     });
     expect(result.current.currentLoadingPhrase).toBe(
-      'Rate limit reached. Cooling down... Retrying in 4s (Attempt 2/3)',
+      'Rate limit reached. Cooling down... Retrying in 4s (Attempt 3/3)',
     );
   });
 
@@ -282,7 +282,7 @@ describe('useLoadingIndicator - 429 Rate Limit and Cool-Down Countdown UX', () =
     );
 
     expect(result.current.statusPhrase).toBe(
-      'Rate limit reached. Cooling down... Retrying in 10s (Attempt 1/3)',
+      'Rate limit reached. Cooling down... Retrying in 10s (Attempt 2/3)',
     );
 
     // User aborts: streamingState becomes Idle, retryStatus is cleared

@@ -89,8 +89,12 @@ export const useLoadingIndicator = ({
     );
   }
 
+  const attempt = retryStatus?.attempt ?? 0;
+  const delayMs = retryStatus?.delayMs ?? 0;
+  const model = retryStatus?.model ?? '';
+
   useEffect(() => {
-    if (!isTimerActive || !retryStatus) {
+    if (!isTimerActive || attempt === 0) {
       return;
     }
 
@@ -106,7 +110,7 @@ export const useLoadingIndicator = ({
     return () => {
       clearInterval(intervalId);
     };
-  }, [retryStatus, isTimerActive]);
+  }, [attempt, delayMs, model, isTimerActive]);
 
   useEffect(() => {
     if (
@@ -136,7 +140,7 @@ export const useLoadingIndicator = ({
   const retryPhrase =
     streamingState === StreamingState.Responding && retryStatus
       ? isRateLimit
-        ? `Rate limit reached. Cooling down... Retrying in ${remainingSeconds}s (Attempt ${retryStatus.attempt}/${retryStatus.maxAttempts})`
+        ? `Rate limit reached. Cooling down... Retrying in ${remainingSeconds}s (Attempt ${(retryStatus?.attempt ?? 0) + 1}/${retryStatus?.maxAttempts ?? 0})`
         : errorVerbosity === 'low'
           ? retryStatus.attempt >= LOW_VERBOSITY_RETRY_HINT_ATTEMPT_THRESHOLD
             ? "This is taking a bit longer, we're still on it."
