@@ -30,6 +30,7 @@ import {
   getRetryErrorType,
 } from '../utils/retry.js';
 import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
+import { getErrorStatus } from '../utils/httpErrors.js';
 import {
   resolveModel,
   supportsModernFeatures,
@@ -787,6 +788,7 @@ export class GeminiChat {
                   delayMs,
                   error: errorType,
                   model,
+                  status: getErrorStatus(error),
                 });
                 await new Promise((res) => setTimeout(res, delayMs));
                 continue;
@@ -1225,6 +1227,7 @@ export class GeminiChat {
           delayMs,
           error: error instanceof Error ? error.message : String(error),
           model: lastModelToUse,
+          status: getErrorStatus(error),
         });
       },
     });
