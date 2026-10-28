@@ -197,7 +197,7 @@ function isWindowsDrivePathSegment(
   offset: number,
   matchLen: number,
 ): boolean {
-  if (matchLen !== 2 || offset < 2 || offset + matchLen >= segment.length) {
+  if (offset < 2 || offset + matchLen >= segment.length) {
     return false;
   }
   const nextCode = segment.charCodeAt(offset + matchLen);
@@ -238,13 +238,12 @@ function isWindowsDrivePathSegment(
   let p = offset;
   while (p > 0) {
     const c = segment.charCodeAt(p - 1);
-    if (c === 92 /* \ */) {
-      if (p - 1 === offset - 1) {
-        return false;
-      }
-      if (p + 1 === offset && segment.charCodeAt(p) === 110 /* n */) {
-        return false;
-      }
+    if (
+      c === 92 /* \ */ &&
+      p + 1 === offset &&
+      segment.charCodeAt(p) === 110 /* n */
+    ) {
+      return false;
     }
     const isPathChar =
       (c >= 65 && c <= 90) ||
@@ -263,22 +262,22 @@ function isWindowsDrivePathSegment(
     return false;
   }
   const drive = segment.charCodeAt(p - 2);
-  const isDriveLetter =
-    (drive >= 65 && drive <= 90) || (drive >= 97 && drive <= 122);
-  if (!isDriveLetter) {
+  if (!((drive >= 65 && drive <= 90) || (drive >= 97 && drive <= 122))) {
     return false;
   }
   if (p >= 3) {
-    const prev = segment.charCodeAt(p - 3);
-    const isWordOrSlashOrColon =
-      (prev >= 65 && prev <= 90) ||
-      (prev >= 97 && prev <= 122) ||
-      (prev >= 48 && prev <= 57) ||
-      prev === 95 ||
-      prev === 92 ||
-      prev === 47 ||
-      prev === 58;
-    if (isWordOrSlashOrColon) {
+    const beforeDrive = segment.charCodeAt(p - 3);
+    const isWordOrPathPrefix =
+      (beforeDrive >= 65 && beforeDrive <= 90) ||
+      (beforeDrive >= 97 && beforeDrive <= 122) ||
+      (beforeDrive >= 48 && beforeDrive <= 57) ||
+      beforeDrive === 95 ||
+      beforeDrive === 46 ||
+      beforeDrive === 45 ||
+      beforeDrive === 92 ||
+      beforeDrive === 47 ||
+      beforeDrive === 58;
+    if (isWordOrPathPrefix) {
       return false;
     }
   }
@@ -304,7 +303,6 @@ interface BacktickRun {
   start: number;
   end: number;
   len: number;
-  line: number;
   escaped: boolean;
 }
 
@@ -323,18 +321,10 @@ export function normalizeEscapedNewlines(value: string): string {
   }
 
   const runs: BacktickRun[] = [];
-  const unescapedSingleTickCountByLine = new Map<number, number>();
-  let line = 0;
   let i = 0;
 
   while (i < value.length) {
-    const ch = value.charCodeAt(i);
-    if (ch === 10 /* \n */) {
-      line++;
-      i++;
-      continue;
-    }
-    if (ch === 96 /* ` */) {
+    if (value.charCodeAt(i) === 96 /* ` */) {
       let end = i + 1;
       while (end < value.length && value.charCodeAt(end) === 96) {
         end++;
@@ -348,26 +338,15 @@ export function normalizeEscapedNewlines(value: string): string {
       }
       const len = end - i;
       const escaped = backslashes % 2 === 1;
-      if (len === 1 && !escaped) {
-        unescapedSingleTickCountByLine.set(
-          line,
-          (unescapedSingleTickCountByLine.get(line) ?? 0) + 1,
-        );
-      }
-      runs.push({ start: i, end, len, line, escaped });
+      runs.push({ start: i, end, len, escaped });
       i = end;
       continue;
     }
     i++;
   }
 
-  const isIgnoredSingleTick = (run: BacktickRun): boolean => {
-    if (run.len !== 1 || !run.escaped) {
-      return false;
-    }
-    const unescapedCount = unescapedSingleTickCountByLine.get(run.line) ?? 0;
-    return unescapedCount > 0 && unescapedCount % 2 === 0;
-  };
+  const isIgnoredSingleTick = (run: BacktickRun): boolean =>
+    run.len === 1 && run.escaped;
 
   const maxRunIndexByLen = new Map<number, number>();
   for (let idx = 0; idx < runs.length; idx++) {

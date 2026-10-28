@@ -394,6 +394,17 @@ describe('normalizeEscapedNewlines', () => {
     ).toBe(
       'Path C:\\new_folder and D:\\notes\\next and E:\\nav and F:\\node_modules\nNext line',
     );
+    expect(
+      normalizeEscapedNewlines(
+        'Check C:\\nExt\\file.txt and D:\\dir\\nExt.txt\\nNext line',
+      ),
+    ).toBe('Check C:\\nExt\\file.txt and D:\\dir\\nExt.txt\nNext line');
+    expect(normalizeEscapedNewlines('Note:\\nnext line')).toBe(
+      'Note:\nnext line',
+    );
+    expect(normalizeEscapedNewlines('C:\\new_folder\\n\\nnext line')).toBe(
+      'C:\\new_folder\n\nnext line',
+    );
   });
 
   it('preserves \\n inside inline and fenced markdown code blocks including escaped backticks', () => {
@@ -401,13 +412,15 @@ describe('normalizeEscapedNewlines', () => {
       'Use `\\n` for newlines',
     );
     expect(
-      normalizeEscapedNewlines('Use `\\` or `\\n` for escaping\\nNext line'),
-    ).toBe('Use `\\` or `\\n` for escaping\nNext line');
+      normalizeEscapedNewlines('Use `\\\\` or `\\n` for escaping\\nNext line'),
+    ).toBe('Use `\\\\` or `\\n` for escaping\nNext line');
     expect(
       normalizeEscapedNewlines(
-        'Use `C:\\` and `D:\\` and `E:\\` and `F:\\` and `\\n`\\nNext line',
+        'Use `C:\\\\` and `D:\\\\` and `E:\\\\` and `F:\\\\` and `\\n`\\nNext line',
       ),
-    ).toBe('Use `C:\\` and `D:\\` and `E:\\` and `F:\\` and `\\n`\nNext line');
+    ).toBe(
+      'Use `C:\\\\` and `D:\\\\` and `E:\\\\` and `F:\\\\` and `\\n`\nNext line',
+    );
     expect(
       normalizeEscapedNewlines('Check `fmt.Printf("hello\\n")`\\nNext line'),
     ).toBe('Check `fmt.Printf("hello\\n")`\nNext line');
@@ -417,6 +430,9 @@ describe('normalizeEscapedNewlines', () => {
     expect(
       normalizeEscapedNewlines('Code `a \\` b` and `\\n`\\nNext line'),
     ).toBe('Code `a \\` b` and `\\n`\nNext line');
+    expect(
+      normalizeEscapedNewlines('Escaped \\` one \\n and \\` two\\nNext line'),
+    ).toBe('Escaped \\` one \n and \\` two\nNext line');
     expect(
       normalizeEscapedNewlines('```js\nconst s = "a\\nb";\n```\\nDone'),
     ).toBe('```js\nconst s = "a\\nb";\n```\nDone');
@@ -430,6 +446,12 @@ describe('normalizeEscapedNewlines', () => {
     expect(
       normalizeEscapedNewlines('`' + '\\\\a'.repeat(500) + '\\nNext'),
     ).toBe('`' + '\\\\a'.repeat(500) + '\nNext');
+    expect(normalizeEscapedNewlines('`'.repeat(2000) + '\\nNext')).toBe(
+      '`'.repeat(2000) + '\nNext',
+    );
+    expect(normalizeEscapedNewlines('`' + '``a'.repeat(1000) + '\\nNext')).toBe(
+      '`' + '``a'.repeat(1000) + '\nNext',
+    );
   });
 
   it('preserves standalone quoted "\\n" and \'\\n\' escape tokens', () => {

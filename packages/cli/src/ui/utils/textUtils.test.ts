@@ -725,13 +725,15 @@ describe('textUtils', () => {
         'Checking `\\n` handling',
       );
       expect(
-        normalizeEscapedNewlines('Use `\\` or `\\n` for escaping\\nNext'),
-      ).toBe('Use `\\` or `\\n` for escaping\nNext');
+        normalizeEscapedNewlines('Use `\\\\` or `\\n` for escaping\\nNext'),
+      ).toBe('Use `\\\\` or `\\n` for escaping\nNext');
       expect(
         normalizeEscapedNewlines(
-          'Use `C:\\` and `D:\\` and `E:\\` and `F:\\` and `\\n`\\nNext',
+          'Use `C:\\\\` and `D:\\\\` and `E:\\\\` and `F:\\\\` and `\\n`\\nNext',
         ),
-      ).toBe('Use `C:\\` and `D:\\` and `E:\\` and `F:\\` and `\\n`\nNext');
+      ).toBe(
+        'Use `C:\\\\` and `D:\\\\` and `E:\\\\` and `F:\\\\` and `\\n`\nNext',
+      );
       expect(
         normalizeEscapedNewlines(
           'Thought: use `str.replace(/\\n/g, "\\n")`\\nNext',
@@ -743,6 +745,9 @@ describe('textUtils', () => {
       expect(normalizeEscapedNewlines('Code `a \\` b` and `\\n`\\nNext')).toBe(
         'Code `a \\` b` and `\\n`\nNext',
       );
+      expect(
+        normalizeEscapedNewlines('Escaped \\` one \\n and \\` two\\nNext'),
+      ).toBe('Escaped \\` one \n and \\` two\nNext');
       expect(
         normalizeEscapedNewlines(
           '```js\nconst a = `hello`;\nconst b = `world`;\nconst c = "line1\\nline2";\n```\\nOutside',
