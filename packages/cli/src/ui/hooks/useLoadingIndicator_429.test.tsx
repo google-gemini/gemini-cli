@@ -20,9 +20,10 @@ describe('useLoadingIndicator - 429 Rate Limit and Cool-Down Countdown UX', () =
   });
 
   afterEach(() => {
+    act(() => {
+      vi.runOnlyPendingTimers();
+    });
     vi.useRealTimers();
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    act(() => vi.runOnlyPendingTimers);
     vi.restoreAllMocks();
   });
 

@@ -97,7 +97,7 @@ export const useLoadingIndicator = ({
   const model = retryStatus?.model ?? '';
 
   useEffect(() => {
-    if (!isTimerActive || attempt === 0 || !isRateLimit) {
+    if (!isTimerActive || !isRateLimit) {
       return;
     }
 
