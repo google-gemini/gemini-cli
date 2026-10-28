@@ -131,25 +131,25 @@ async function validateExtension(args: ValidateArgs) {
           );
         }
 
-      const errorPrefix = "MCP server \"" + serverName + "\" specifies an invalid ";
-        if (hasUrl) {
+        const errorPrefix = `MCP server "${serverName}" specifies an invalid `;
+        if (hasUrl && serverConfig.url) {
           const hasPlaceholder = serverConfig.url.includes('${');
           if (!hasPlaceholder) {
             try {
               new URL(serverConfig.url);
             } catch {
-              errors.push(errorPrefix + "URL: \"" + serverConfig.url + "\".");
+              errors.push(`${errorPrefix}URL: "${serverConfig.url}".`);
             }
           }
         }
 
-        if (hasHttpUrl) {
+        if (hasHttpUrl && serverConfig.httpUrl) {
           const hasPlaceholder = serverConfig.httpUrl.includes('${');
           if (!hasPlaceholder) {
             try {
               new URL(serverConfig.httpUrl);
             } catch {
-              errors.push(errorPrefix + "httpUrl: \"" + serverConfig.httpUrl + "\".");
+              errors.push(`${errorPrefix}httpUrl: "${serverConfig.httpUrl}".`);
             }
           }
         }
