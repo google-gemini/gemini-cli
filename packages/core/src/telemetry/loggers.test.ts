@@ -2019,6 +2019,57 @@ describe('loggers', () => {
         JSON.stringify({ command: 'echo visible' }, null, 2),
       );
     });
+
+    it('should preserve skill_name in metadata when logPrompts is disabled and filter out unsafe keys', () => {
+      const mockConfigNoPrompts = {
+        getSessionId: () => 'test-session-id',
+        getTargetDir: () => 'target-dir',
+        getUsageStatisticsEnabled: () => true,
+        getTelemetryEnabled: () => true,
+        getTelemetryLogPromptsEnabled: () => false,
+        getTelemetryTracesEnabled: () => false,
+        isInteractive: () => false,
+        getExperiments: () => undefined,
+        getExperimentsAsync: async () => undefined,
+        getContentGeneratorConfig: () => undefined,
+      } as unknown as Config;
+
+      const call: CompletedToolCall = {
+        status: CoreToolCallStatus.Success,
+        request: {
+          name: 'activate_skill',
+          args: { name: 'test-skill' },
+          callId: 'call-skill-1',
+          isClientInitiated: false,
+          prompt_id: 'prompt-skill-1',
+        },
+        response: {
+          callId: 'call-skill-1',
+          responseParts: [],
+          resultDisplay: undefined,
+          error: undefined,
+          errorType: undefined,
+          contentLength: undefined,
+          data: {
+            skill_name: 'test-skill',
+            unsafe_custom_prompt: 'sensitive content that should be stripped',
+          },
+        },
+        tool: undefined as unknown as AnyDeclarativeTool,
+        invocation: {} as AnyToolInvocation,
+        durationMs: 50,
+      };
+      const event = new ToolCallEvent(call);
+      logToolCall(mockConfigNoPrompts, event);
+
+      const emitted = mockLogger.emit.mock.calls[0][0] as {
+        attributes: Record<string, unknown>;
+      };
+      expect(emitted.attributes['function_args']).toBeUndefined();
+      expect(emitted.attributes['metadata']).toBe(
+        JSON.stringify({ skill_name: 'test-skill' }, null, 2),
+      );
+    });
   });
 
   describe('logMalformedJsonResponse', () => {

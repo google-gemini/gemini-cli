@@ -150,6 +150,9 @@ ${folderStructure}`,
   </available_resources>
 </activated_skill>`,
       returnDisplay: `Skill **${skillName}** activated. Resources loaded from \`${path.dirname(skill.location)}\`:\n\n${folderStructure}`,
+      data: {
+        skill_name: skillName,
+      },
     };
   }
 }
