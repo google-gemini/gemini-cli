@@ -440,7 +440,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     auto: {
       displayName: 'Auto',
       tier: 'auto',
-      isPreview: true,
+      isPreview: false,
       isVisible: true,
       features: { thinking: true, multimodalToolUse: false },
     },

@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { DEFAULT_MODEL_CONFIGS } from '../config/defaultModelConfigs.js';
 import {
   ModelConfigService,
   type ModelConfigAlias,
@@ -1118,6 +1119,15 @@ describe('ModelConfigService', () => {
   });
 
   describe('getAvailableModelOptions', () => {
+    it('should include auto in DEFAULT_MODEL_CONFIGS when hasAccessToPreview is false', () => {
+      const service = new ModelConfigService(DEFAULT_MODEL_CONFIGS);
+      const options = service.getAvailableModelOptions({
+        hasAccessToPreview: false,
+      });
+
+      expect(options.map((o) => o.modelId)).toContain('auto');
+    });
+
     it('should filter out Pro models when hasAccessToProModel is false', () => {
       const config: ModelConfigServiceConfig = {
         modelDefinitions: {
