@@ -18,6 +18,7 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   GEMINI_MODEL_ALIAS_AUTO,
+  GEMINI_4_ARGON_MODEL,
   GEMMA_4_31B_IT_MODEL,
   GEMMA_4_26B_A4B_IT_MODEL,
   ModelSlashCommandEvent,
@@ -88,6 +89,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     }
 
     const manualModels = [
+      GEMINI_4_ARGON_MODEL,
       DEFAULT_GEMINI_MODEL,
       DEFAULT_GEMINI_FLASH_MODEL,
       DEFAULT_GEMINI_FLASH_LITE_MODEL,
@@ -236,6 +238,11 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         value: DEFAULT_GEMINI_FLASH_MODEL,
         title: getDisplayString(DEFAULT_GEMINI_FLASH_MODEL),
         key: DEFAULT_GEMINI_FLASH_MODEL,
+      },
+      {
+        value: GEMINI_4_ARGON_MODEL,
+        title: getDisplayString(GEMINI_4_ARGON_MODEL),
+        key: GEMINI_4_ARGON_MODEL,
       },
     ];
 

@@ -104,6 +104,8 @@ export function resetModelsForTesting() {
 /** @deprecated Gemini 3.1 Flash Lite is now GA. Use DEFAULT_GEMINI_FLASH_LITE_MODEL. */
 export const PREVIEW_GEMINI_FLASH_LITE_MODEL = 'none';
 
+export const GEMINI_4_ARGON_MODEL = 'gemini-4-argon';
+
 export const GEMMA_4_31B_IT_MODEL = 'gemma-4-31b-it';
 export const GEMMA_4_26B_A4B_IT_MODEL = 'gemma-4-26b-a4b-it';
 
@@ -124,6 +126,7 @@ export const VALID_GEMINI_MODELS = new Set([
   BASE_GEMINI_FLASH_LITE_MODEL,
   LATEST_GEMINI_FLASH_LITE_MODEL,
 
+  GEMINI_4_ARGON_MODEL,
   GEMMA_4_31B_IT_MODEL,
   GEMMA_4_26B_A4B_IT_MODEL,
 ]);
@@ -497,6 +500,8 @@ export function getDisplayString(
       return 'Auto (Gemini 3)';
     case DEFAULT_GEMINI_MODEL_AUTO:
       return 'Auto (Gemini 2.5)';
+    case GEMINI_4_ARGON_MODEL:
+      return GEMINI_4_ARGON_MODEL;
     case GEMMA_4_31B_IT_MODEL:
       return GEMMA_4_31B_IT_MODEL;
     case GEMMA_4_26B_A4B_IT_MODEL:
@@ -559,7 +564,7 @@ export function isProModel(
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     return config.modelConfigService.getModelDefinition(model)?.tier === 'pro';
   }
-  return model.toLowerCase().includes('pro');
+  return model === GEMINI_4_ARGON_MODEL || model.toLowerCase().includes('pro');
 }
 
 /**
@@ -584,6 +589,29 @@ export function isGemini3Model(
 
   const resolved = resolveModel(model);
   return /^gemini-3(\.|-|$)/.test(resolved);
+}
+
+/**
+ * Checks if the model is a Gemini 4 model.
+ *
+ * @param model The model name to check.
+ * @param config Optional config object for dynamic model configuration.
+ * @returns True if the model is a Gemini 4 model.
+ */
+export function isGemini4Model(
+  model: string,
+  config?: ModelCapabilityContext,
+): boolean {
+  if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
+    const resolved = resolveModel(model, false, false, true, config);
+    return (
+      config.modelConfigService.getModelDefinition(resolved)?.family ===
+      'gemini-4'
+    );
+  }
+
+  const resolved = resolveModel(model);
+  return /^gemini-4(\.|-|$)/.test(resolved);
 }
 
 /**
@@ -628,7 +656,7 @@ export function isCustomModel(
  * @returns True if the model supports modern features like thoughts.
  */
 export function supportsModernFeatures(model: string): boolean {
-  if (isGemini3Model(model)) return true;
+  if (isGemini3Model(model) || isGemini4Model(model)) return true;
   return isCustomModel(model);
 }
 
@@ -670,7 +698,7 @@ export function supportsMultimodalFunctionResponse(
         ?.multimodalToolUse === true
     );
   }
-  return model.startsWith('gemini-3-');
+  return model.startsWith('gemini-3-') || isGemini4Model(model, config);
 }
 
 /**
