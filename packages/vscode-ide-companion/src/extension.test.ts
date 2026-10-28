@@ -7,6 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as vscode from 'vscode';
 import { activate } from './extension.js';
+import { DiffManager } from './diff-manager.js';
 import {
   IDE_DEFINITIONS,
   detectIdeFromEnv,
@@ -30,6 +31,24 @@ vi.mock('vscode', () => ({
     ...vscodeMock.window,
     createOutputChannel: vi.fn(() => ({
       appendLine: vi.fn(),
+    })),
+  },
+  commands: {
+    ...vscodeMock.commands,
+    registerCommand: vi.fn((command: string) => ({
+      dispose: vi.fn(),
+      tag: `registerCommand:${command}`,
+    })),
+  },
+  workspace: {
+    ...vscodeMock.workspace,
+    onDidChangeWorkspaceFolders: vi.fn(() => ({
+      dispose: vi.fn(),
+      tag: 'onDidChangeWorkspaceFolders',
+    })),
+    onDidGrantWorkspaceTrust: vi.fn(() => ({
+      dispose: vi.fn(),
+      tag: 'onDidGrantWorkspaceTrust',
     })),
   },
 }));
@@ -91,6 +110,32 @@ describe('activate', () => {
   it('should register a handler for onDidGrantWorkspaceTrust', async () => {
     await activate(context);
     expect(vscode.workspace.onDidGrantWorkspaceTrust).toHaveBeenCalled();
+  });
+
+  it('subscribes gemini.diff.accept and the workspace folder listener', async () => {
+    await activate(context);
+
+    const tags = context.subscriptions.map(
+      (subscription) => (subscription as { tag?: string } | undefined)?.tag,
+    );
+    expect(tags).toContain('registerCommand:gemini.diff.accept');
+    expect(tags).toContain('onDidChangeWorkspaceFolders');
+  });
+
+  it('subscribes diffManager so its dispose runs on deactivation', async () => {
+    const editorListener = { dispose: vi.fn() };
+    vi.mocked(vscode.window.onDidChangeActiveTextEditor).mockReturnValueOnce(
+      editorListener,
+    );
+
+    await activate(context);
+
+    const diffManager = context.subscriptions.find(
+      (subscription) => subscription instanceof DiffManager,
+    );
+    expect(diffManager).toBeInstanceOf(DiffManager);
+    (diffManager as DiffManager).dispose();
+    expect(editorListener.dispose).toHaveBeenCalledTimes(1);
   });
 
   it('should launch the Gemini CLI when the user clicks the button', async () => {
