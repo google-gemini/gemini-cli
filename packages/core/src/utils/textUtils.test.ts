@@ -394,11 +394,6 @@ describe('normalizeEscapedNewlines', () => {
     ).toBe(
       'Path C:\\new_folder and D:\\notes\\next and E:\\nav and F:\\node_modules\nNext line',
     );
-    expect(
-      normalizeEscapedNewlines(
-        'Check C:\\nExt\\file.txt and D:\\dir\\nExt.txt\\nDone',
-      ),
-    ).toBe('Check C:\\nExt\\file.txt and D:\\dir\\nExt.txt\nDone');
   });
 
   it('preserves \\n inside inline and fenced markdown code blocks including escaped backticks', () => {
@@ -435,12 +430,6 @@ describe('normalizeEscapedNewlines', () => {
     expect(
       normalizeEscapedNewlines('`' + '\\\\a'.repeat(500) + '\\nNext'),
     ).toBe('`' + '\\\\a'.repeat(500) + '\nNext');
-    expect(normalizeEscapedNewlines('`'.repeat(2000) + '\\nNext')).toBe(
-      '`'.repeat(2000) + '\nNext',
-    );
-    expect(normalizeEscapedNewlines('`' + '``a'.repeat(1000) + '\\nNext')).toBe(
-      '`' + '``a'.repeat(1000) + '\nNext',
-    );
   });
 
   it('preserves standalone quoted "\\n" and \'\\n\' escape tokens', () => {

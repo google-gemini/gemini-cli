@@ -197,7 +197,7 @@ function isWindowsDrivePathSegment(
   offset: number,
   matchLen: number,
 ): boolean {
-  if (offset < 2 || offset + matchLen >= segment.length) {
+  if (matchLen !== 2 || offset < 2 || offset + matchLen >= segment.length) {
     return false;
   }
   const nextCode = segment.charCodeAt(offset + matchLen);
@@ -238,6 +238,14 @@ function isWindowsDrivePathSegment(
   let p = offset;
   while (p > 0) {
     const c = segment.charCodeAt(p - 1);
+    if (c === 92 /* \ */) {
+      if (p - 1 === offset - 1) {
+        return false;
+      }
+      if (p + 1 === offset && segment.charCodeAt(p) === 110 /* n */) {
+        return false;
+      }
+    }
     const isPathChar =
       (c >= 65 && c <= 90) ||
       (c >= 97 && c <= 122) ||
@@ -255,7 +263,26 @@ function isWindowsDrivePathSegment(
     return false;
   }
   const drive = segment.charCodeAt(p - 2);
-  return (drive >= 65 && drive <= 90) || (drive >= 97 && drive <= 122);
+  const isDriveLetter =
+    (drive >= 65 && drive <= 90) || (drive >= 97 && drive <= 122);
+  if (!isDriveLetter) {
+    return false;
+  }
+  if (p >= 3) {
+    const prev = segment.charCodeAt(p - 3);
+    const isWordOrSlashOrColon =
+      (prev >= 65 && prev <= 90) ||
+      (prev >= 97 && prev <= 122) ||
+      (prev >= 48 && prev <= 57) ||
+      prev === 95 ||
+      prev === 92 ||
+      prev === 47 ||
+      prev === 58;
+    if (isWordOrSlashOrColon) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function normalizeNonCodeSegment(segment: string): string {
