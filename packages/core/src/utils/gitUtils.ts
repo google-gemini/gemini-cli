@@ -39,7 +39,7 @@ export function getSafeGitEnv(
     ? execMatch[1] || execMatch[2] || execMatch[3] || ''
     : '';
   const execName = executable.split(/[/\\]/).pop() || '';
-  const isPlink = /^(?:tortoise)?plink(?:\.exe)?$/i.test(execName);
+  const isPlink = /^(?:tortoisegit|tortoise)?plink(?:\.exe)?$/i.test(execName);
   const batchFlag = isPlink ? '-batch' : '-o BatchMode=yes';
   const hasBatchFlag = isPlink
     ? /(?:^|\s)-batch(?:\s|$)/.test(baseSshCommand)
