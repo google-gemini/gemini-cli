@@ -376,6 +376,23 @@ describe('GitService', () => {
       expect(content).toBe('');
     });
 
+    it('should reject symlink pointing outside repository in fallback info/exclude', async () => {
+      const externalSecret = path.join(testRootDir, 'secret_outside.txt');
+      await fs.writeFile(externalSecret, 'sensitive data');
+
+      const infoDir = path.join(projectRoot, '.git', 'info');
+      await fs.mkdir(infoDir, { recursive: true });
+      const symlinkExclude = path.join(infoDir, 'exclude');
+      await fs.symlink(externalSecret, symlinkExclude);
+
+      const service = new GitService(projectRoot, storage);
+      await service.setupShadowGitRepository();
+
+      const hiddenExcludePath = path.join(repoDir, '.git', 'info', 'exclude');
+      const content = await fs.readFile(hiddenExcludePath, 'utf-8');
+      expect(content).toBe('');
+    });
+
     it('should handle missing info/exclude gracefully', async () => {
       const service = new GitService(projectRoot, storage);
       await service.setupShadowGitRepository();

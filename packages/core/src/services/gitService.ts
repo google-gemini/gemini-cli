@@ -313,12 +313,16 @@ export class GitService {
     }
 
     if (!projectInfoExcludePath) {
-      projectInfoExcludePath = path.resolve(
+      const fallbackPath = path.resolve(
         this.projectRoot,
         '.git',
         'info',
         'exclude',
       );
+      const resolved = safeResolve(fallbackPath);
+      if (isSafeGitSubpath(resolved)) {
+        projectInfoExcludePath = resolved;
+      }
     }
 
     let userExcludeContent = '';
