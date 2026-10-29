@@ -7,7 +7,7 @@ its capabilities by delegating tasks to remote services.
 Gemini CLI can connect to any compliant A2A agent. You can find samples of A2A
 agents in the following repositories:
 
-- [ADK Samples (Python)](https://github.com/google/adk-samples/tree/main/python)
+- [ADK Samples (Python)](https://github.com/google/adk-python/tree/main/contributing/samples/a2a)
 - [ADK Python Contributing Samples](https://github.com/google/adk-python/tree/main/contributing/samples)
 
 ## Proxy support
