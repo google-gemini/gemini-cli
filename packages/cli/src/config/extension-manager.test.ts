@@ -1212,9 +1212,9 @@ describe('ExtensionManager', () => {
       // leak) the other's, as a lock shared across extensions would.
       for (const name of ['ext-alpha', 'ext-beta']) {
         const destination = path.join(userExtensionsDir, name);
-        expect(vi.mocked(lock)).toHaveBeenCalledWith(
+        expect(vi.mocked(lock)).toHaveBeenCalledWith( 
           destination,
-          expect.objectContaining({ lockfilePath: `${destination}.lock` }),
+          expect.objectContaining({ realpath: false }),
         );
       }
       expect(lockDirsIn(userExtensionsDir)).toEqual([]);
