@@ -130,6 +130,7 @@ describe('ShellTool', () => {
       getAllowedTools: vi.fn().mockReturnValue([]),
       getApprovalMode: vi.fn().mockReturnValue('strict'),
       getAllowCommandSubstitution: vi.fn().mockReturnValue(false),
+      isYoloModeDisabled: vi.fn().mockReturnValue(false),
       getCoreTools: vi.fn().mockReturnValue([]),
       getExcludeTools: vi.fn().mockReturnValue(new Set([])),
       getDebugMode: vi.fn().mockReturnValue(false),
@@ -1839,6 +1840,17 @@ EOF`;
         abortSignal: new AbortController().signal,
       });
       expect(result.returnDisplay).not.toContain('Blocked');
+    });
+
+    it('should block command substitution in YOLO mode when YOLO is disabled', async () => {
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.YOLO);
+      vi.mocked(mockConfig.isYoloModeDisabled).mockReturnValue(true);
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({ command: 'echo $(whoami)' });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).toContain('Blocked');
     });
 
     it('should allow normal commands without substitution', async () => {

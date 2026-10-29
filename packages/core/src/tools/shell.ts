@@ -582,9 +582,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
     // allowed when the user explicitly opts in via the
     // `security.allowCommandSubstitution` setting, or automatically in YOLO
     // mode where the user has explicitly opted into unsupervised execution.
+    // The explicit `isYoloModeDisabled()` check guards against programs
+    // setting the approval mode to YOLO when it was disabled by an
+    // administrator or when the folder is untrusted.
     const shouldAllowSubstitution =
       this.context.config.getAllowCommandSubstitution() ||
-      this.context.config.getApprovalMode() === ApprovalMode.YOLO;
+      (this.context.config.getApprovalMode() === ApprovalMode.YOLO &&
+        !this.context.config.isYoloModeDisabled());
 
     if (
       detectCommandSubstitution(strippedCommand) &&
