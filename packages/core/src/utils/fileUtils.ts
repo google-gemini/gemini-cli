@@ -213,13 +213,20 @@ export async function readSecureFileBuffer(
           initialStats.ino !== undefined &&
           handleStats &&
           handleStats.dev !== undefined &&
-          handleStats.ino !== undefined &&
-          (initialStats.dev !== handleStats.dev ||
-            initialStats.ino !== handleStats.ino)
+          handleStats.ino !== undefined
         ) {
-          throw new Error(
-            `File device or inode changed during read: ${filePath}`,
-          );
+          // Work around upstream libuv 1.49.x-1.50.0 issue on Windows (Node 22.12-22.16)
+          // where path-based stat() reports dev: 0 while fstat() reports the volume serial number.
+          const isWin32ZeroDev =
+            process.platform === 'win32' &&
+            (initialStats.dev === 0 || handleStats.dev === 0);
+          const devChanged =
+            !isWin32ZeroDev && initialStats.dev !== handleStats.dev;
+          if (devChanged || initialStats.ino !== handleStats.ino) {
+            throw new Error(
+              `File device or inode changed during read: ${filePath}`,
+            );
+          }
         }
       }
     }
