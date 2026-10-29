@@ -650,7 +650,7 @@ describe('Session', () => {
     it.each(['proceed_once', 'cancelled', 'policy_denied'] as const)(
       'checks the modified input before execution (%s)',
       async (outcome) => {
-        toolArgs.required = 'keep';
+        toolArgs['required'] = 'keep';
         vi.mocked(hooks.fireBeforeToolEvent).mockResolvedValue(
           new BeforeToolHookOutput({
             hookSpecificOutput: { tool_input: { foo: 'updated' } },
@@ -662,15 +662,17 @@ describe('Session', () => {
             ? vi.fn().mockRejectedValue(new Error('Denied by policy'))
             : vi.fn().mockResolvedValue(confirmation);
         mockTool.build.mockImplementation((params: Record<string, unknown>) => {
-          if (params.required !== 'keep') {
+          if (params['required'] !== 'keep') {
             throw new Error('Missing required argument');
           }
           return {
             params,
-            getDescription: () => String(params.foo),
+            getDescription: () => String(params['foo']),
             toolLocations: () => [],
             shouldConfirmExecute:
-              params.foo === 'updated' ? confirmModified : shouldConfirmExecute,
+              params['foo'] === 'updated'
+                ? confirmModified
+                : shouldConfirmExecute,
             execute,
           };
         });
