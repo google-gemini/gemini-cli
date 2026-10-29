@@ -307,7 +307,6 @@ function isWorkspaceLocalPath(
 ): boolean {
   if (
     !options?.cwd ||
-    !options.isPathWithinWorkspace ||
     token.startsWith('http://') ||
     token.startsWith('https://') ||
     EXECUTABLE_SCRIPT_REGEX.test(token) ||
@@ -318,7 +317,7 @@ function isWorkspaceLocalPath(
   try {
     const absolutePath = path.resolve(options.cwd, token);
     return (
-      options.isPathWithinWorkspace(absolutePath) ||
+      (options.isPathWithinWorkspace?.(absolutePath) ?? false) ||
       (options.projectTempDir !== undefined &&
         isSubpath(options.projectTempDir, absolutePath))
     );

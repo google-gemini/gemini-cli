@@ -293,7 +293,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
         : targetDir,
       isPathWithinWorkspace: (absolutePath) =>
         workspaceContext.isPathWithinWorkspace(absolutePath),
-      projectTempDir: config.storage.getProjectTempDir(),
+      projectTempDir: config.storage?.getProjectTempDir(),
     });
     let roots: string[] = [];
     try {

@@ -592,6 +592,13 @@ done`;
             projectTempDir,
           }),
         ).toEqual([]);
+        // The project temp directory is honored without a workspace scope.
+        expect(
+          findUntrustedFlags(`python3 ${tempScript}`, untrustedContext, {
+            cwd: workspaceRoot,
+            projectTempDir,
+          }),
+        ).toEqual([]);
         // Without the project temp directory the same path is still reported.
         expect(
           findUntrustedFlags(
