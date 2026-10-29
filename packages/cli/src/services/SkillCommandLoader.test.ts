@@ -5,7 +5,10 @@
  */
 
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { SkillCommandLoader } from './SkillCommandLoader.js';
+import {
+  SkillCommandLoader,
+  getSkillPostSubmitPrompt,
+} from './SkillCommandLoader.js';
 import { CommandKind } from '../ui/commands/types.js';
 import { ACTIVATE_SKILL_TOOL_NAME } from '@google/gemini-cli-core';
 
@@ -133,5 +136,51 @@ describe('SkillCommandLoader', () => {
     const commands = await loader.loadCommands(new AbortController().signal);
 
     expect(commands[0].extensionName).toBe('ext1');
+  });
+  describe('getSkillPostSubmitPrompt', () => {
+    it('uses the provided task', () => {
+      expect(getSkillPostSubmitPrompt('test-skill', 'hello world')).toBe(
+        'hello world',
+      );
+    });
+
+    it('uses the default prompt for empty arguments', () => {
+      expect(getSkillPostSubmitPrompt('test-skill', '')).toBe(
+        'Use the skill test-skill',
+      );
+    });
+
+    it('uses the default prompt for undefined arguments', () => {
+      expect(getSkillPostSubmitPrompt('test-skill', undefined)).toBe(
+        'Use the skill test-skill',
+      );
+    });
+
+    it('uses the default prompt for whitespace-only arguments', () => {
+      expect(getSkillPostSubmitPrompt('test-skill', '   ')).toBe(
+        'Use the skill test-skill',
+      );
+    });
+
+    it('trims whitespace around a provided task', () => {
+      expect(getSkillPostSubmitPrompt('test-skill', '  hello world  ')).toBe(
+        'hello world',
+      );
+    });
+    it('trims whitespace from the skill name', () => {
+      expect(getSkillPostSubmitPrompt('  code-review  ')).toBe(
+        'Use the skill code-review',
+      );
+    });
+
+    it('uses generic_tool when the skill name is empty', () => {
+      expect(getSkillPostSubmitPrompt('')).toBe('Use the skill generic_tool');
+    });
+
+    it('uses generic_tool when the skill name contains only whitespace', () => {
+      expect(getSkillPostSubmitPrompt('   ')).toBe(
+        'Use the skill generic_tool',
+      );
+    });
   });
 });
