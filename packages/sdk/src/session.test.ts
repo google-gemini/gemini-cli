@@ -22,7 +22,11 @@ const mockToolRegistry = {
   unregisterTool: vi.fn(),
   clone: vi.fn(),
 };
-mockToolRegistry.clone.mockImplementation(() => ({ ...mockToolRegistry }));
+mockToolRegistry.clone.mockImplementation(function (
+  this: typeof mockToolRegistry,
+) {
+  return { ...this };
+});
 
 // Mutable mock config so individual tests can spy on setUserMemory etc.
 const mockConfig = {
