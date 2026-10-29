@@ -344,6 +344,7 @@ describe('CoderAgentExecutor', () => {
     );
     const task = wrapper.task as unknown as {
       acceptUserMessage: Mock;
+      acceptAgentMessage: Mock;
       scheduleToolCalls: Mock;
     };
     task.acceptUserMessage.mockReturnValue(
@@ -394,6 +395,9 @@ describe('CoderAgentExecutor', () => {
     expect(requests).toEqual([
       expect.objectContaining({ callId: 'retried-call' }),
     ]);
+    // The retry is a control event: forwarding it would hand a stream signal
+    // to the message handler.
+    expect(task.acceptAgentMessage).not.toHaveBeenCalledWith({ type: 'retry' });
   });
 
   it('cancelTask should abort the active execution loop', async () => {
