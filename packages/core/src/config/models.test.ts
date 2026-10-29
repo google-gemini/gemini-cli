@@ -345,6 +345,12 @@ describe('isGemini3Model', () => {
   it('should return false for arbitrary strings', () => {
     expect(isGemini3Model('gpt-4')).toBe(false);
   });
+
+  it('should fall back to prefix check when dynamic config has no model definition for a gemini-3 variant', () => {
+    expect(isGemini3Model('gemini-3-flash', dynamicConfig)).toBe(true);
+    expect(isGemini3Model('gemini-3.0-pro', dynamicConfig)).toBe(true);
+    expect(isGemini3Model('gemini-2.5-pro', dynamicConfig)).toBe(false);
+  });
 });
 
 describe('getDisplayString', () => {
@@ -563,6 +569,14 @@ describe('isGemini2Model', () => {
 
   it('should return false for arbitrary strings', () => {
     expect(isGemini2Model('gpt-4')).toBe(false);
+  });
+
+  it('should return true for aliases that resolve to Gemini 2 and hyphenated variants', () => {
+    expect(isGemini2Model(DEFAULT_GEMINI_MODEL_AUTO)).toBe(true);
+    expect(isGemini2Model('gemini-2-flash')).toBe(true);
+    expect(isGemini2Model('gemini-2.5-pro', dynamicConfig)).toBe(true);
+    expect(isGemini2Model(DEFAULT_GEMINI_MODEL_AUTO, dynamicConfig)).toBe(true);
+    expect(isGemini2Model('gemini-3-pro-preview', dynamicConfig)).toBe(false);
   });
 });
 
