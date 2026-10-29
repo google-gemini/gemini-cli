@@ -781,6 +781,7 @@ export class CoderAgentExecutor implements AgentExecutor {
                 // Tool calls streamed by the failed attempt are not in
                 // history; drop them so they are not executed twice.
                 toolCallRequests.length = 0;
+                continue;
               }
               if (event.type === GeminiEventType.ToolCallRequest) {
                 toolCallRequests.push(event.value);
