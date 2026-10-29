@@ -125,6 +125,49 @@ for a full list of supported names.
 You can define multiple custom themes by adding more entries to the
 `customThemes` object.
 
+### Loading named themes from `theme.json`
+
+Gemini CLI also reads named custom themes from `~/.gemini/theme.json`. This
+keeps theme definitions separate from behavioral preferences in `settings.json`,
+which is useful when a palette generator such as Wallust, Pywal, or Matugen
+updates your colors automatically.
+
+`theme.json` contains a map of theme names to custom theme definitions, using
+the same structure as `ui.customThemes`:
+
+```json
+{
+  "custom-wallust": {
+    "type": "custom",
+    "name": "custom-wallust",
+    "background": {
+      "primary": "#181818"
+    },
+    "text": {
+      "primary": "#f0f0f0",
+      "secondary": "#a0a0a0"
+    }
+  }
+}
+```
+
+Select the theme by name in `settings.json`:
+
+```json
+{
+  "ui": {
+    "theme": "custom-wallust"
+  }
+}
+```
+
+If a theme with the same name is defined in both files, the definition in
+`settings.json` takes precedence. Themes in `theme.json` are read when Gemini
+CLI starts; restart Gemini CLI after updating the file.
+
+Only `~/.gemini/theme.json` is read. XDG configuration paths such as
+`~/.config/gemini/theme.json` are not supported.
+
 ### Loading themes from a file
 
 In addition to defining custom themes in `settings.json`, you can also load a

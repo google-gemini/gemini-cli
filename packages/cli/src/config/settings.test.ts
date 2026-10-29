@@ -261,6 +261,214 @@ describe('Settings Loading and Merging', () => {
       },
     );
 
+    it('should load named custom themes from theme.json without persisting them', () => {
+      const themesPath = Storage.getUserThemesPath();
+      const externalTheme = {
+        type: 'custom',
+        name: 'custom-wallust',
+        background: { primary: '#181818' },
+        text: { primary: '#f0f0f0' },
+      };
+
+      (mockFsExistsSync as Mock).mockImplementation((pathLike: fs.PathLike) => {
+        const normalized = normalizePath(pathLike);
+        return (
+          normalized === normalizePath(USER_SETTINGS_PATH) ||
+          normalized === normalizePath(themesPath)
+        );
+      });
+      (fs.readFileSync as Mock).mockImplementation(
+        (pathDesc: fs.PathOrFileDescriptor) => {
+          const normalized = normalizePath(pathDesc);
+          if (normalized === normalizePath(USER_SETTINGS_PATH)) {
+            return JSON.stringify({ ui: { theme: 'custom-wallust' } });
+          }
+          if (normalized === normalizePath(themesPath)) {
+            return JSON.stringify({ 'custom-wallust': externalTheme });
+          }
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged.ui.theme).toBe('custom-wallust');
+      expect(settings.merged.ui.customThemes?.['custom-wallust']).toEqual(
+        externalTheme,
+      );
+      expect(settings.user.settings.ui?.customThemes).toBeUndefined();
+      expect(settings.user.originalSettings.ui?.customThemes).toBeUndefined();
+
+      settings.setValue(SettingScope.User, 'ui.theme', 'custom-wallust');
+
+      expect(updateSettingsFilePreservingFormat).toHaveBeenLastCalledWith(
+        USER_SETTINGS_PATH,
+        { ui: { theme: 'custom-wallust' } },
+      );
+    });
+
+    it('should prefer inline customThemes over theme.json for duplicate names', () => {
+      const themesPath = Storage.getUserThemesPath();
+      const externalTheme = {
+        type: 'custom',
+        name: 'custom-wallust',
+        background: { primary: '#111111' },
+        text: { primary: '#eeeeee' },
+      };
+      const inlineTheme = {
+        type: 'custom',
+        name: 'custom-wallust',
+        background: { primary: '#222222' },
+      };
+
+      (mockFsExistsSync as Mock).mockImplementation((pathLike: fs.PathLike) => {
+        const normalized = normalizePath(pathLike);
+        return (
+          normalized === normalizePath(USER_SETTINGS_PATH) ||
+          normalized === normalizePath(themesPath)
+        );
+      });
+      (fs.readFileSync as Mock).mockImplementation(
+        (pathDesc: fs.PathOrFileDescriptor) => {
+          const normalized = normalizePath(pathDesc);
+          if (normalized === normalizePath(USER_SETTINGS_PATH)) {
+            return JSON.stringify({
+              ui: {
+                theme: 'custom-wallust',
+                customThemes: { 'custom-wallust': inlineTheme },
+              },
+            });
+          }
+          if (normalized === normalizePath(themesPath)) {
+            return JSON.stringify({ 'custom-wallust': externalTheme });
+          }
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged.ui.customThemes?.['custom-wallust']).toEqual(
+        inlineTheme,
+      );
+    });
+
+    it('should ignore a missing theme.json', () => {
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.errors).toHaveLength(0);
+      expect(settings.merged.ui.customThemes).toEqual({});
+    });
+
+    it('should warn and continue when theme.json contains malformed JSON', () => {
+      const themesPath = Storage.getUserThemesPath();
+
+      (mockFsExistsSync as Mock).mockImplementation(
+        (pathLike: fs.PathLike) =>
+          normalizePath(pathLike) === normalizePath(themesPath),
+      );
+      (fs.readFileSync as Mock).mockImplementation(
+        (pathDesc: fs.PathOrFileDescriptor) => {
+          if (normalizePath(pathDesc) === normalizePath(themesPath)) {
+            return '{ invalid json';
+          }
+          return '{}';
+        },
+      );
+
+      let settings: LoadedSettings | undefined;
+      expect(() => {
+        settings = loadSettings(MOCK_WORKSPACE_DIR);
+      }).not.toThrow();
+
+      expect(settings?.errors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: themesPath,
+            severity: 'warning',
+          }),
+        ]),
+      );
+      expect(settings?.merged.ui.customThemes).toEqual({});
+    });
+
+    it('should load valid themes and warn about invalid entries in theme.json', () => {
+      const themesPath = Storage.getUserThemesPath();
+      const validTheme = {
+        type: 'custom',
+        name: 'valid-theme',
+        background: { primary: '#000000' },
+      };
+
+      (mockFsExistsSync as Mock).mockImplementation(
+        (pathLike: fs.PathLike) =>
+          normalizePath(pathLike) === normalizePath(themesPath),
+      );
+      (fs.readFileSync as Mock).mockImplementation(
+        (pathDesc: fs.PathOrFileDescriptor) => {
+          if (normalizePath(pathDesc) === normalizePath(themesPath)) {
+            return JSON.stringify({
+              'invalid-theme': { type: 'custom' },
+              'valid-theme': validTheme,
+            });
+          }
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged.ui.customThemes?.['valid-theme']).toEqual(
+        validTheme,
+      );
+      expect(
+        settings.merged.ui.customThemes?.['invalid-theme'],
+      ).toBeUndefined();
+      expect(settings.errors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: themesPath,
+            severity: 'warning',
+          }),
+        ]),
+      );
+    });
+
+    it('should keep built-in theme selection when theme.json is present', () => {
+      const themesPath = Storage.getUserThemesPath();
+
+      (mockFsExistsSync as Mock).mockImplementation((pathLike: fs.PathLike) => {
+        const normalized = normalizePath(pathLike);
+        return (
+          normalized === normalizePath(USER_SETTINGS_PATH) ||
+          normalized === normalizePath(themesPath)
+        );
+      });
+      (fs.readFileSync as Mock).mockImplementation(
+        (pathDesc: fs.PathOrFileDescriptor) => {
+          const normalized = normalizePath(pathDesc);
+          if (normalized === normalizePath(USER_SETTINGS_PATH)) {
+            return JSON.stringify({ ui: { theme: 'Ayu' } });
+          }
+          if (normalized === normalizePath(themesPath)) {
+            return JSON.stringify({
+              'custom-wallust': {
+                type: 'custom',
+                name: 'custom-wallust',
+                background: { primary: '#181818' },
+              },
+            });
+          }
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged.ui.theme).toBe('Ayu');
+      expect(settings.merged.ui.customThemes?.['custom-wallust']).toBeDefined();
+    });
+
     it('should unconditionally override selectedType when GEMINI_CLI_AUTH_OVERRIDE is present and delete it from process.env', () => {
       (mockFsExistsSync as Mock).mockImplementation(
         (pathLike: fs.PathLike) =>
@@ -1865,7 +2073,7 @@ describe('Settings Loading and Merging', () => {
         const settings1 = loadSettings(MOCK_WORKSPACE_DIR);
         const settings2 = loadSettings(MOCK_WORKSPACE_DIR);
 
-        expect(mockedRead).toHaveBeenCalledTimes(5); // system, systemDefaults, user, workspace, and potentially an env file
+        expect(mockedRead).toHaveBeenCalledTimes(6); // system, systemDefaults, user, workspace, theme, and potentially an env file
         expect(settings1).toBe(settings2);
       });
 
@@ -1881,7 +2089,7 @@ describe('Settings Loading and Merging', () => {
         const settings1 = loadSettings(workspace1);
         const settings2 = loadSettings(workspace2);
 
-        expect(mockedRead).toHaveBeenCalledTimes(10); // 5 for each workspace
+        expect(mockedRead).toHaveBeenCalledTimes(12); // 6 for each workspace
         expect(settings1).not.toBe(settings2);
       });
 
@@ -1892,12 +2100,12 @@ describe('Settings Loading and Merging', () => {
         (mockFsExistsSync as Mock).mockReturnValue(true);
 
         const settings1 = loadSettings(MOCK_WORKSPACE_DIR);
-        expect(mockedRead).toHaveBeenCalledTimes(5);
+        expect(mockedRead).toHaveBeenCalledTimes(6);
 
         saveSettings(settings1.user);
 
         const settings2 = loadSettings(MOCK_WORKSPACE_DIR);
-        expect(mockedRead).toHaveBeenCalledTimes(10); // Should have re-read from disk
+        expect(mockedRead).toHaveBeenCalledTimes(12); // Should have re-read from disk
         expect(settings1).not.toBe(settings2);
       });
 
@@ -1913,7 +2121,7 @@ describe('Settings Loading and Merging', () => {
         const settings1W1 = loadSettings(workspace1);
         const settings1W2 = loadSettings(workspace2);
 
-        expect(mockedRead).toHaveBeenCalledTimes(10);
+        expect(mockedRead).toHaveBeenCalledTimes(12);
 
         // Save settings for workspace 1
         saveSettings(settings1W1.workspace);
@@ -1921,8 +2129,8 @@ describe('Settings Loading and Merging', () => {
         const settings2W1 = loadSettings(workspace1);
         const settings2W2 = loadSettings(workspace2);
 
-        // Both workspace caches should have been cleared and re-read from disk (+10 reads)
-        expect(mockedRead).toHaveBeenCalledTimes(20);
+        // Both workspace caches should have been cleared and re-read from disk (+12 reads)
+        expect(mockedRead).toHaveBeenCalledTimes(24);
         expect(settings1W1).not.toBe(settings2W1);
         expect(settings1W2).not.toBe(settings2W2);
       });

@@ -91,6 +91,13 @@ describe('Storage – getGlobalSettingsPath', () => {
   });
 });
 
+describe('Storage – getUserThemesPath', () => {
+  it('returns path to ~/.gemini/theme.json', () => {
+    const expected = path.join(os.homedir(), GEMINI_DIR, 'theme.json');
+    expect(Storage.getUserThemesPath()).toBe(expected);
+  });
+});
+
 describe('Storage - Security', () => {
   it('falls back to tmp for gemini but returns empty for agents if the home directory cannot be determined', () => {
     vi.mocked(homedir).mockReturnValue('');
