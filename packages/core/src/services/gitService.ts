@@ -8,7 +8,7 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { isNodeError } from '../utils/errors.js';
 import { withPathLock } from '../utils/pathMutex.js';
-import { resolveToRealPath } from '../utils/paths.js';
+import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import { spawnAsync } from '../utils/shell-utils.js';
 import {
   simpleGit,
@@ -192,13 +192,28 @@ export class GitService {
       await repo.commit('Initial commit', { '--allow-empty': null });
     }
 
+    let realProjectRoot = this.projectRoot;
+    try {
+      realProjectRoot = resolveToRealPath(this.projectRoot);
+    } catch {
+      // Keep unresolved if resolve fails
+    }
+
+    const safeResolve = (p: string) => {
+      try {
+        return resolveToRealPath(p);
+      } catch {
+        return path.resolve(p);
+      }
+    };
+
     let gitCommonDir: string | undefined;
     let gitDir: string | undefined;
     try {
       const { stdout } = await spawnAsync(
         'git',
         ['rev-parse', '--path-format=absolute', '--git-common-dir'],
-        { cwd: this.projectRoot, env: getSafeGitEnv() },
+        { cwd: realProjectRoot, env: getSafeGitEnv() },
       );
       const trimmed = stdout.trim();
       if (
@@ -207,7 +222,7 @@ export class GitService {
         !trimmed.includes('\n') &&
         !trimmed.includes('\r')
       ) {
-        gitCommonDir = path.resolve(this.projectRoot, trimmed);
+        gitCommonDir = safeResolve(path.resolve(realProjectRoot, trimmed));
       }
     } catch {
       // rev-parse might fail if not a git repository
@@ -217,7 +232,7 @@ export class GitService {
       const { stdout } = await spawnAsync(
         'git',
         ['rev-parse', '--absolute-git-dir'],
-        { cwd: this.projectRoot, env: getSafeGitEnv() },
+        { cwd: realProjectRoot, env: getSafeGitEnv() },
       );
       const trimmed = stdout.trim();
       if (
@@ -226,32 +241,23 @@ export class GitService {
         !trimmed.includes('\n') &&
         !trimmed.includes('\r')
       ) {
-        gitDir = path.resolve(this.projectRoot, trimmed);
+        gitDir = safeResolve(path.resolve(realProjectRoot, trimmed));
       }
     } catch {
       // rev-parse might fail if not a git repository
     }
 
-    const isSubpath = (parent: string, child: string) => {
-      const relative = path.relative(parent, child);
-      return (
-        Boolean(relative) &&
-        !relative.startsWith('..') &&
-        !path.isAbsolute(relative)
-      );
-    };
-
     const isSafeGitSubpath = (candidatePath: string) =>
       (gitCommonDir && isSubpath(gitCommonDir, candidatePath)) ||
       (gitDir && isSubpath(gitDir, candidatePath)) ||
-      isSubpath(this.projectRoot, candidatePath);
+      isSubpath(realProjectRoot, candidatePath);
 
     let projectInfoExcludePath: string | undefined;
     try {
       const { stdout } = await spawnAsync(
         'git',
         ['rev-parse', '--path-format=absolute', '--git-path', 'info/exclude'],
-        { cwd: this.projectRoot, env: getSafeGitEnv() },
+        { cwd: realProjectRoot, env: getSafeGitEnv() },
       );
       const trimmed = stdout.trim();
       if (
@@ -260,7 +266,7 @@ export class GitService {
         !trimmed.includes('\n') &&
         !trimmed.includes('\r')
       ) {
-        const resolved = path.resolve(this.projectRoot, trimmed);
+        const resolved = safeResolve(path.resolve(realProjectRoot, trimmed));
         if (isSafeGitSubpath(resolved)) {
           projectInfoExcludePath = resolved;
         }
@@ -270,7 +276,7 @@ export class GitService {
         const { stdout } = await spawnAsync(
           'git',
           ['rev-parse', '--git-path', 'info/exclude'],
-          { cwd: this.projectRoot, env: getSafeGitEnv() },
+          { cwd: realProjectRoot, env: getSafeGitEnv() },
         );
         const trimmed = stdout.trim();
         if (
@@ -279,7 +285,7 @@ export class GitService {
           !trimmed.includes('\n') &&
           !trimmed.includes('\r')
         ) {
-          const resolved = path.resolve(this.projectRoot, trimmed);
+          const resolved = safeResolve(path.resolve(realProjectRoot, trimmed));
           if (isSafeGitSubpath(resolved)) {
             projectInfoExcludePath = resolved;
           }
