@@ -3214,6 +3214,13 @@
           "default": false,
           "type": "boolean"
         },
+        "allowCommandSubstitution": {
+          "title": "Allow Command Substitution",
+          "description": "Allow shell commands to use command substitution (: $(), backticks, <() or >()). Defaults to false for safety. When YOLO mode is enabled, command substitution is allowed by default.",
+          "markdownDescription": "Allow shell commands to use command substitution (: $(), backticks, <() or >()). Defaults to false for safety. When YOLO mode is enabled, command substitution is allowed by default.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "enablePermanentToolApproval": {
           "title": "Allow Permanent Tool Approval",
           "description": "Enable the \"Allow for all future sessions\" option in tool confirmation dialogs.",

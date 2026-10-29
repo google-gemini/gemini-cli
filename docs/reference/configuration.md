@@ -1954,6 +1954,14 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`security.allowCommandSubstitution`** (boolean):
+
+  - **Description:** Allow shell commands to use command substitution (: $(),
+    backticks, <() or >()). Defaults to false for safety. When YOLO mode is
+    enabled, command substitution is allowed by default.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`security.enablePermanentToolApproval`** (boolean):
 
   - **Description:** Enable the "Allow for all future sessions" option in tool

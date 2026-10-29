@@ -702,6 +702,7 @@ export interface ConfigParameters {
   maxAttempts?: number;
   enableShellOutputEfficiency?: boolean;
   shellToolInactivityTimeout?: number;
+  allowCommandSubstitution?: boolean;
   fakeResponses?: string;
   fakeResponsesNonStrict?: string;
   recordResponses?: string;
@@ -900,6 +901,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly directWebFetch: boolean;
   private readonly useRipgrep: boolean;
   private readonly enableInteractiveShell: boolean;
+  private readonly allowCommandSubstitution: boolean;
   private readonly shellBackgroundCompletionBehavior:
     | 'inject'
     | 'notify'
@@ -1281,6 +1283,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.useTerminalBuffer = params.useTerminalBuffer ?? false;
     this.useRenderProcess = params.useRenderProcess ?? true;
     this.enableInteractiveShell = params.enableInteractiveShell ?? false;
+    this.allowCommandSubstitution = params.allowCommandSubstitution ?? false;
 
     const requestedBehavior = params.shellBackgroundCompletionBehavior;
     if (requestedBehavior === 'inject' || requestedBehavior === 'notify') {
@@ -3798,6 +3801,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getEnableInteractiveShell(): boolean {
     return this.enableInteractiveShell;
+  }
+
+  getAllowCommandSubstitution(): boolean {
+    return this.allowCommandSubstitution;
   }
 
   getShellBackgroundCompletionBehavior(): 'inject' | 'notify' | 'silent' {

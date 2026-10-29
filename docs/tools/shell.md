@@ -227,6 +227,28 @@ settings:
   `["git", "npm test"]`).
 - **`tools.exclude`**: A blocklist of command prefixes.
 
+### Command substitution
+
+By default, commands that use shell command substitution (`$()`, backticks,
+`<()` or `>()`) are blocked as a security measure, and you are asked to run them
+as separate plain commands.
+
+If you accept the associated risks, you can allow command substitution by
+setting `security.allowCommandSubstitution` to `true` in your `settings.json`:
+
+```json
+{
+  "security": {
+    "allowCommandSubstitution": true
+  }
+}
+```
+
+When YOLO mode (`--yolo`) is enabled, command substitution is allowed by
+default, since YOLO mode already opts into running commands without
+confirmation. Block messages always mention the setting so the model can adapt
+its approach instead of wasting the turn.
+
 ## Use cases
 
 - Running build scripts and test suites.

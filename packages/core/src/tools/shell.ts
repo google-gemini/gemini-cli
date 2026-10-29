@@ -578,13 +578,27 @@ export class ShellToolInvocation extends BaseToolInvocation<
     } = options;
     const strippedCommand = stripShellWrapper(this.params.command);
 
-    if (detectCommandSubstitution(strippedCommand)) {
+    // Command substitution is blocked by default as a security measure. It is
+    // allowed when the user explicitly opts in via the
+    // `security.allowCommandSubstitution` setting, or automatically in YOLO
+    // mode where the user has explicitly opted into unsupervised execution.
+    const shouldAllowSubstitution =
+      this.context.config.getAllowCommandSubstitution() ||
+      this.context.config.getApprovalMode() === ApprovalMode.YOLO;
+
+    if (
+      detectCommandSubstitution(strippedCommand) &&
+      !shouldAllowSubstitution
+    ) {
       return {
         llmContent:
           'Command injection detected: command substitution syntax ' +
           '($(), backticks, <() or >()) found in command arguments. ' +
           'On PowerShell, @() array subexpressions and $() subexpressions are also blocked. ' +
-          'This is a security risk and the command was blocked.',
+          'This is a security risk and the command was blocked. ' +
+          'If the task requires it, suggest the user enable the ' +
+          '"security.allowCommandSubstitution" setting, or rewrite the request ' +
+          'as separate plain commands without command substitution.',
         returnDisplay:
           'Blocked: command substitution detected in shell command.',
       };
