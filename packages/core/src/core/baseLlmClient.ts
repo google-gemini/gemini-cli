@@ -28,6 +28,7 @@ import {
   NetworkRetryAttemptEvent,
 } from '../telemetry/types.js';
 import { retryWithBackoff, getRetryErrorType } from '../utils/retry.js';
+import { getErrorStatus } from '../utils/httpErrors.js';
 import { coreEvents } from '../utils/events.js';
 import { getDisplayString } from '../config/models.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
@@ -379,6 +380,7 @@ export class BaseLlmClient {
             delayMs,
             error: errorType,
             model: modelName,
+            status: getErrorStatus(error),
           });
 
           logNetworkRetryAttempt(
