@@ -20,6 +20,7 @@ import {
   homedir,
   AuthType,
   type AdminControlsSettings,
+  type CustomTheme,
   createCache,
   isFileAndDirectorySecureSync,
   createPathSecurityCache,
@@ -323,6 +324,7 @@ export class LoadedSettings {
     workspace: SettingsFile,
     isTrusted: boolean,
     errors: SettingsError[] = [],
+    externalCustomThemes: Record<string, CustomTheme> = {},
   ) {
     this.system = system;
     this.systemDefaults = systemDefaults;
@@ -333,6 +335,7 @@ export class LoadedSettings {
       ? workspace
       : this.createEmptyWorkspace(workspace);
     this.errors = errors;
+    this._externalCustomThemes = structuredClone(externalCustomThemes);
     this._merged = this.computeMergedSettings();
     this._snapshot = this.computeSnapshot();
   }
@@ -348,6 +351,7 @@ export class LoadedSettings {
   private _merged: MergedSettings;
   private _snapshot: LoadedSettingsSnapshot;
   private _remoteAdminSettings: Partial<Settings> | undefined;
+  private readonly _externalCustomThemes: Record<string, CustomTheme>;
 
   get merged(): MergedSettings {
     return this._merged;
@@ -431,6 +435,14 @@ export class LoadedSettings {
         this._remoteAdminSettings?.admin ?? {},
       ) as MergedSettings['admin'];
     }
+
+    if (Object.keys(this._externalCustomThemes).length > 0) {
+      merged.ui.customThemes = {
+        ...this._externalCustomThemes,
+        ...merged.ui.customThemes,
+      };
+    }
+
     return merged;
   }
 
@@ -823,6 +835,82 @@ function getParentRecord(
   return isRecord(current) ? current : undefined;
 }
 
+function loadCustomThemesFromFile(
+  filePath: string,
+  settingsErrors: SettingsError[],
+): Record<string, CustomTheme> {
+  const themes: Record<string, CustomTheme> = {};
+
+  try {
+    if (!fs.existsSync(filePath)) {
+      return themes;
+    }
+
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const parsed: unknown = JSON.parse(stripJsonComments(content));
+
+    if (!isRecord(parsed)) {
+      settingsErrors.push({
+        message: 'Theme file is not a valid JSON object.',
+        path: filePath,
+        severity: 'warning',
+      });
+      return themes;
+    }
+
+    for (const [name, definition] of Object.entries(parsed)) {
+      if (
+        name === '__proto__' ||
+        name === 'constructor' ||
+        name === 'prototype'
+      ) {
+        continue;
+      }
+
+      const validationResult = validateSettings({
+        ui: { customThemes: { [name]: definition } },
+      });
+
+      if (!validationResult.success) {
+        if (validationResult.error) {
+          settingsErrors.push({
+            message: formatValidationError(validationResult.error, filePath),
+            path: filePath,
+            severity: 'warning',
+          });
+        }
+        continue;
+      }
+
+      const validatedSettings = validationResult.data;
+      if (!isRecord(validatedSettings)) {
+        continue;
+      }
+      const validatedUi = validatedSettings['ui'];
+      if (!isRecord(validatedUi)) {
+        continue;
+      }
+      const validatedThemes = validatedUi['customThemes'];
+      if (!isRecord(validatedThemes)) {
+        continue;
+      }
+      const theme = validatedThemes[name];
+      if (isRecord(theme)) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        themes[name] = theme as unknown as CustomTheme;
+      }
+    }
+  } catch (error: unknown) {
+    settingsErrors.push({
+      message: getErrorMessage(error),
+      path: filePath,
+      severity: 'warning',
+    });
+  }
+
+  return themes;
+}
+
 /**
  * When a settings object fails full-schema validation (for example, during the
  * preliminary pre-`.env` pass when a typed field still holds an unexpanded
@@ -934,6 +1022,7 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
   const settingsErrors: SettingsError[] = [];
   const systemSettingsPath = getSystemSettingsPath();
   const systemDefaultsPath = getSystemDefaultsPath();
+  const userThemesPath = Storage.getUserThemesPath();
 
   const storage = new Storage(workspaceDir);
   const workspaceSettingsPath = storage.getWorkspaceSettingsPath();
@@ -1007,6 +1096,11 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
   if (!storage.isWorkspaceHomeDir()) {
     workspaceResult = load(workspaceSettingsPath);
   }
+
+  const externalCustomThemes = loadCustomThemesFromFile(
+    userThemesPath,
+    settingsErrors,
+  );
 
   // Support environment variable override from relaunch supervisor across exit code 199
   const envAuthOverride = process.env['GEMINI_CLI_AUTH_OVERRIDE'];
@@ -1163,6 +1257,7 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
     },
     isTrusted,
     settingsErrors,
+    externalCustomThemes,
   );
 
   // Automatically migrate deprecated settings when loading.
