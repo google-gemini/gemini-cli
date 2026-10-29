@@ -1116,9 +1116,31 @@ describe('ModelConfigService', () => {
         }),
       ).toBe('gemini-2.5-flash');
     });
+
+    it('should preserve explicit gemini-2.5-flash in DEFAULT_MODEL_CONFIGS when useLatestFlash or useGemini3_5Flash is true', () => {
+      const service = new ModelConfigService(DEFAULT_MODEL_CONFIGS);
+
+      expect(
+        service.resolveModelId('gemini-2.5-flash', { useLatestFlash: true }),
+      ).toBe('gemini-2.5-flash');
+      expect(
+        service.resolveModelId('gemini-2.5-flash', {
+          useGemini3_5Flash: true,
+        }),
+      ).toBe('gemini-2.5-flash');
+    });
   });
 
   describe('getAvailableModelOptions', () => {
+    it('should preserve gemini-2.5-flash in DEFAULT_MODEL_CONFIGS when useLatestFlash is true', () => {
+      const service = new ModelConfigService(DEFAULT_MODEL_CONFIGS);
+      const options = service.getAvailableModelOptions({
+        useLatestFlash: true,
+        hasAccessToPreview: true,
+      });
+
+      expect(options.map((o) => o.modelId)).toContain('gemini-2.5-flash');
+    });
     it('should include auto in DEFAULT_MODEL_CONFIGS when hasAccessToPreview is false', () => {
       const service = new ModelConfigService(DEFAULT_MODEL_CONFIGS);
       const options = service.getAvailableModelOptions({

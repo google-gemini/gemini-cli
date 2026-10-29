@@ -219,6 +219,12 @@ describe('policyHelpers', () => {
         hasAccess: false,
       },
       { name: 'Concrete Model (2.5 Pro)', model: 'gemini-2.5-pro' },
+      { name: 'Concrete Model (2.5 Flash)', model: 'gemini-2.5-flash' },
+      {
+        name: 'Concrete Model (2.5 Flash, Latest Flash Enabled)',
+        model: 'gemini-2.5-flash',
+        useLatestFlash: true,
+      },
       { name: 'Explicit Gemini 3', model: 'gemini-3-pro-preview' },
       { name: 'Custom Model', model: 'my-custom-model' },
       {
@@ -229,13 +235,22 @@ describe('policyHelpers', () => {
     ];
 
     testCases.forEach(
-      ({ name, model, useGemini31, hasAccess, authType, wrapsAround }) => {
+      ({
+        name,
+        model,
+        useGemini31,
+        useLatestFlash,
+        hasAccess,
+        authType,
+        wrapsAround,
+      }) => {
         it(`achieves parity for: ${name}`, () => {
           const createBaseConfig = (dynamic: boolean) =>
             createMockConfig({
               getExperimentalDynamicModelConfiguration: () => dynamic,
               getModel: () => model,
               getGemini31LaunchedSync: () => useGemini31 ?? false,
+              hasLatestFlashGAAccess: () => useLatestFlash ?? false,
               getHasAccessToPreviewModel: () => hasAccess ?? true,
               getContentGeneratorConfig: () => ({ authType }),
               getReleaseChannel: () => 'preview',
