@@ -132,6 +132,29 @@ describe('SessionSummaryService', () => {
       const messageCount = (promptText.match(/Message \d+/g) || []).length;
       expect(messageCount).toBe(10);
     });
+
+    it('should preserve $ replacement patterns literally in conversation text', async () => {
+      const dollarMessage =
+        "Run echo $'\\n' && price=$$100 && match=$& && prefix=$`suffix";
+      const messages: MessageRecord[] = [
+        {
+          id: '1',
+          timestamp: '2025-12-03T00:00:00Z',
+          type: 'user',
+          content: [{ text: dollarMessage }],
+        },
+      ];
+
+      await service.generateSummary({ messages });
+
+      expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+      const callArgs = mockGenerateContent.mock.calls[0][0];
+      const promptText = callArgs.contents[0].parts[0].text;
+
+      expect(promptText).toContain(`User: ${dollarMessage}`);
+      expect(promptText).not.toContain('{{conversation}}');
+      expect(promptText.match(/Summary \(max 80 chars\):/g)).toHaveLength(1);
+    });
   });
 
   describe('Message Type Filtering', () => {
