@@ -101,12 +101,12 @@ describe('models list command', () => {
         description: 'Automatic model selection',
         contextLimits: {
           inputTokens: 1_048_576,
-          outputTokens: 8192,
+          outputTokens: undefined,
         },
       });
       expect(listings[1].modelId).toBe('gemini-2.5-pro');
       expect(listings[1].contextLimits.inputTokens).toBe(1_048_576);
-      expect(listings[1].contextLimits.outputTokens).toBe(8192);
+      expect(listings[1].contextLimits.outputTokens).toBe(65_536);
     });
 
     it('should fall back to DEFAULT_TOKEN_LIMIT for unknown or custom models', () => {
@@ -129,7 +129,25 @@ describe('models list command', () => {
       expect(listings).toHaveLength(1);
       expect(listings[0].modelId).toBe('custom-new-model');
       expect(listings[0].contextLimits.inputTokens).toBe(1_048_576);
-      expect(listings[0].contextLimits.outputTokens).toBe(8192);
+      expect(listings[0].contextLimits.outputTokens).toBeUndefined();
+    });
+
+    it.each([
+      ['gemini-2.5-pro-001', 65_536],
+      ['gemini-2.5-flash-latest', 65_536],
+      ['gemini-2.5-flash-lite', undefined],
+    ])('should report the output limit for %s', (modelId, outputTokens) => {
+      mockBuildAvailableModels.mockReturnValue({
+        availableModels: [{ modelId, name: modelId, description: '' }],
+        currentModelId: modelId,
+      });
+
+      const listings = getModelListings(
+        {} as unknown as Config,
+        { merged: {} } as unknown as LoadedSettings,
+      );
+
+      expect(listings[0].contextLimits.outputTokens).toBe(outputTokens);
     });
 
     it('should fall back to modelId when name is undefined', () => {
@@ -184,7 +202,7 @@ describe('models list command', () => {
       expect(output).toContain('Automatic model selection');
       expect(output).toContain('gemini-2.5-pro (Gemini 2.5 Pro)');
       expect(output).toContain('1,048,576 input tokens');
-      expect(output).toContain('8,192 output tokens');
+      expect(output).toContain('65,536 output tokens');
     });
 
     it('should output models in JSON format when outputFormat is json', async () => {
@@ -202,7 +220,7 @@ describe('models list command', () => {
       expect(parsed[0].id).toBe('auto');
       expect(parsed[0].displayName).toBe('Auto');
       expect(parsed[0].contextLimits.inputTokens).toBe(1_048_576);
-      expect(parsed[0].contextLimits.outputTokens).toBe(8192);
+      expect(parsed[0].contextLimits.outputTokens).toBeUndefined();
     });
 
     it('should pass custom argv and initialize storage when handleList is called', async () => {
