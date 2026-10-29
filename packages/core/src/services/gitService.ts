@@ -139,9 +139,30 @@ export class GitService {
 
     await fs.mkdir(repoDir, { recursive: true });
 
+    let coreExcludesPath: string | undefined;
+    try {
+      const { stdout } = await spawnAsync(
+        'git',
+        ['config', '--global', '--path', '--get', 'core.excludesFile'],
+        { env: getSafeGitEnv() },
+      );
+      const trimmed = stdout.trim();
+      if (trimmed) {
+        coreExcludesPath = trimmed;
+      }
+    } catch {
+      // core.excludesFile is not set or failed to read.
+    }
+
     // We don't want to inherit the user's name, email, or gpg signing
     // preferences for the shadow repository, so we create a dedicated gitconfig.
-    const gitConfigContent = `[user]\n  name = ${SHADOW_REPO_AUTHOR_NAME}\n  email = ${SHADOW_REPO_AUTHOR_EMAIL}\n[commit]\n  gpgsign = false\n`;
+    let gitConfigContent = `[user]\n  name = ${SHADOW_REPO_AUTHOR_NAME}\n  email = ${SHADOW_REPO_AUTHOR_EMAIL}\n[commit]\n  gpgsign = false\n`;
+    if (coreExcludesPath) {
+      const sanitizedPath = coreExcludesPath
+        .replace(/\\/g, '/')
+        .replace(/"/g, '\\"');
+      gitConfigContent += `[core]\n  excludesFile = "${sanitizedPath}"\n`;
+    }
     await fs.writeFile(gitConfigPath, gitConfigContent);
 
     const shadowRepoEnv = this.getShadowRepoEnv(repoDir);
@@ -165,6 +186,54 @@ export class GitService {
 
       await repo.commit('Initial commit', { '--allow-empty': null });
     }
+
+    let projectInfoExcludePath: string | undefined;
+    try {
+      const { stdout } = await spawnAsync(
+        'git',
+        ['rev-parse', '--path-format=absolute', '--git-path', 'info/exclude'],
+        { cwd: this.projectRoot, env: getSafeGitEnv() },
+      );
+      const trimmed = stdout.trim();
+      if (trimmed) {
+        projectInfoExcludePath = path.resolve(this.projectRoot, trimmed);
+      }
+    } catch {
+      try {
+        const { stdout } = await spawnAsync(
+          'git',
+          ['rev-parse', '--git-path', 'info/exclude'],
+          { cwd: this.projectRoot, env: getSafeGitEnv() },
+        );
+        const trimmed = stdout.trim();
+        if (trimmed) {
+          projectInfoExcludePath = path.resolve(this.projectRoot, trimmed);
+        }
+      } catch {
+        projectInfoExcludePath = path.resolve(
+          this.projectRoot,
+          '.git',
+          'info',
+          'exclude',
+        );
+      }
+    }
+
+    let userExcludeContent = '';
+    if (projectInfoExcludePath) {
+      try {
+        userExcludeContent = await fs.readFile(projectInfoExcludePath, 'utf-8');
+      } catch (error) {
+        if (isNodeError(error) && error.code !== 'ENOENT') {
+          throw error;
+        }
+      }
+    }
+
+    const shadowInfoDir = path.join(repoDir, '.git', 'info');
+    await fs.mkdir(shadowInfoDir, { recursive: true });
+    const shadowInfoExcludePath = path.join(shadowInfoDir, 'exclude');
+    await fs.writeFile(shadowInfoExcludePath, userExcludeContent);
 
     const userGitIgnorePath = path.join(this.projectRoot, '.gitignore');
     const shadowGitIgnorePath = path.join(repoDir, '.gitignore');
