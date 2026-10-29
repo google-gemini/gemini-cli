@@ -23,9 +23,9 @@ const mockToolRegistry = {
   clone: vi.fn(),
 };
 mockToolRegistry.clone.mockImplementation(function (
-  this: typeof mockToolRegistry,
+  this: typeof mockToolRegistry | undefined,
 ) {
-  return { ...this };
+  return { ...(this ?? mockToolRegistry) };
 });
 
 // Mutable mock config so individual tests can spy on setUserMemory etc.

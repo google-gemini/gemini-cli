@@ -24,9 +24,7 @@ concurrency:
     ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/') }}
 
 permissions:
-  checks: 'write'
   contents: 'read'
-  statuses: 'write'
 
 defaults:
   run:
@@ -34,7 +32,10 @@ defaults:
 
 jobs:
   merge_queue_skipper:
-    permissions: 'read-all'
+    permissions:
+      checks: 'read'
+      contents: 'read'
+      pull-requests: 'read'
     name: 'Merge Queue Skipper'
     runs-on: 'gemini-cli-ubuntu-16-core'
     if: "github.repository == 'google-gemini/gemini-cli'"
