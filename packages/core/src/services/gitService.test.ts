@@ -271,68 +271,30 @@ describe('GitService', () => {
       );
     });
 
-    it('should sanitize backslashes to forward slashes in core.excludesFile on Windows', async () => {
-      const originalPlatform = process.platform;
-      try {
-        Object.defineProperty(process, 'platform', { value: 'win32' });
-        (spawnAsync as Mock).mockImplementation(
-          async (_cmd: string, args: string[]) => {
-            if (args[0] === 'config') {
-              return {
-                stdout: 'C:\\Users\\User\\.gitignore_global\n',
-                stderr: '',
-              };
-            }
-            if (args[0] === '--version') {
-              return { stdout: 'git version 2.0.0', stderr: '' };
-            }
-            throw new Error('Command failed');
-          },
-        );
+    it('should escape backslashes and quotes in core.excludesFile for gitconfig', async () => {
+      (spawnAsync as Mock).mockImplementation(
+        async (_cmd: string, args: string[]) => {
+          if (args[0] === 'config') {
+            return {
+              stdout: 'C:\\Users\\User\\path"with"quotes\\.gitignore_global\n',
+              stderr: '',
+            };
+          }
+          if (args[0] === '--version') {
+            return { stdout: 'git version 2.0.0', stderr: '' };
+          }
+          throw new Error('Command failed');
+        },
+      );
 
-        const service = new GitService(projectRoot, storage);
-        await service.setupShadowGitRepository();
+      const service = new GitService(projectRoot, storage);
+      await service.setupShadowGitRepository();
 
-        const gitConfigPath = path.join(repoDir, '.gitconfig');
-        const content = await fs.readFile(gitConfigPath, 'utf-8');
-        expect(content).toContain(
-          '[core]\n  excludesFile = "C:/Users/User/.gitignore_global"',
-        );
-      } finally {
-        Object.defineProperty(process, 'platform', { value: originalPlatform });
-      }
-    });
-
-    it('should escape backslashes in core.excludesFile on non-Windows platforms', async () => {
-      const originalPlatform = process.platform;
-      try {
-        Object.defineProperty(process, 'platform', { value: 'linux' });
-        (spawnAsync as Mock).mockImplementation(
-          async (_cmd: string, args: string[]) => {
-            if (args[0] === 'config') {
-              return {
-                stdout: '/path/with\\slash/.gitignore_global\n',
-                stderr: '',
-              };
-            }
-            if (args[0] === '--version') {
-              return { stdout: 'git version 2.0.0', stderr: '' };
-            }
-            throw new Error('Command failed');
-          },
-        );
-
-        const service = new GitService(projectRoot, storage);
-        await service.setupShadowGitRepository();
-
-        const gitConfigPath = path.join(repoDir, '.gitconfig');
-        const content = await fs.readFile(gitConfigPath, 'utf-8');
-        expect(content).toContain(
-          '[core]\n  excludesFile = "/path/with\\\\slash/.gitignore_global"',
-        );
-      } finally {
-        Object.defineProperty(process, 'platform', { value: originalPlatform });
-      }
+      const gitConfigPath = path.join(repoDir, '.gitconfig');
+      const content = await fs.readFile(gitConfigPath, 'utf-8');
+      expect(content).toContain(
+        '[core]\n  excludesFile = "C:\\\\Users\\\\User\\\\path\\"with\\"quotes\\\\.gitignore_global"',
+      );
     });
 
     it('should copy .git/info/exclude from projectRoot if it exists', async () => {
