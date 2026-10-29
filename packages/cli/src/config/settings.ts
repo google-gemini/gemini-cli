@@ -437,9 +437,12 @@ export class LoadedSettings {
     }
 
     if (Object.keys(this._externalCustomThemes).length > 0) {
-      merged.ui.customThemes = {
-        ...this._externalCustomThemes,
-        ...merged.ui.customThemes,
+      merged.ui = {
+        ...merged.ui,
+        customThemes: {
+          ...this._externalCustomThemes,
+          ...merged.ui?.customThemes,
+        },
       };
     }
 
