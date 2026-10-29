@@ -6,6 +6,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
+import { lock } from 'proper-lockfile';
 import { getMissingSettings } from './extensionSettings.js';
 import type { ExtensionConfig } from '../extension.js';
 import {
@@ -41,6 +42,9 @@ vi.mock('node:fs', async (importOriginal) => {
     },
   };
 });
+
+// proper-lockfile works on the real filesystem, which is faked in this file.
+vi.mock('proper-lockfile');
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -150,6 +154,7 @@ describe('extensionUpdates', () => {
       mode: 0o755,
     } as unknown as fs.Stats);
     vi.mocked(fs.promises.chmod).mockResolvedValue(undefined);
+    vi.mocked(lock).mockResolvedValue(vi.fn().mockResolvedValue(undefined));
     vi.mocked(isWorkspaceTrusted).mockReturnValue({
       isTrusted: true,
       source: 'file',
@@ -299,10 +304,20 @@ describe('extensionUpdates', () => {
       } as unknown as GeminiCLIExtension);
 
       const storeSpy = vi.spyOn(manager, 'storeExtensionIntegrity');
+      const releaseLock = vi.fn().mockResolvedValue(undefined);
+      vi.mocked(lock).mockResolvedValueOnce(releaseLock);
 
       await manager.installOrUpdateExtension(installMetadata, previousConfig);
 
       expect(storeSpy).toHaveBeenCalledWith('test-ext', installMetadata);
+      // The update ran under the extension's install lock, and released it.
+      expect(lock).toHaveBeenCalledWith(
+        '/mock/extensions/test-ext',
+        expect.objectContaining({
+          lockfilePath: '/mock/extensions/test-ext.lock',
+        }),
+      );
+      expect(releaseLock).toHaveBeenCalledOnce();
     });
   });
 });

@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { lock } from 'proper-lockfile';
 import {
   ExtensionManager,
   resolveContextFilePaths,
@@ -15,7 +16,10 @@ import {
 } from './extension-manager.js';
 import { createTestMergedSettings, type MergedSettings } from './settings.js';
 import { createExtension } from '../test-utils/createExtension.js';
-import { EXTENSIONS_DIRECTORY_NAME } from './extensions/variables.js';
+import {
+  EXTENSIONS_DIRECTORY_NAME,
+  INSTALL_METADATA_FILENAME,
+} from './extensions/variables.js';
 import { themeManager } from '../ui/themes/theme-manager.js';
 import {
   TrustLevel,
@@ -23,6 +27,7 @@ import {
   isWorkspaceTrusted,
 } from './trustedFolders.js';
 import {
+  debugLogger,
   getRealPath,
   type CustomTheme,
   IntegrityDataStatus,
@@ -44,6 +49,17 @@ vi.mock('node:fs', async (importOriginal) => {
         actual.promises.rm(...args),
       ),
     },
+  };
+});
+
+// Real locking stays in place; wrapping it lets a test override single calls.
+vi.mock('proper-lockfile', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('proper-lockfile')>();
+  return {
+    ...actual,
+    lock: vi.fn((...args: Parameters<typeof actual.lock>) =>
+      actual.lock(...args),
+    ),
   };
 });
 
@@ -1057,6 +1073,216 @@ describe('ExtensionManager', () => {
       expect(
         vi.mocked(fs.promises.rm).mock.calls.length,
       ).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  describe('concurrent installs', () => {
+    const lockDirsIn = (dir: string) =>
+      fs.readdirSync(dir).filter((entry) => entry.endsWith('.lock'));
+
+    /** Creates an extension source whose `<marker>.txt` identifies its files. */
+    const createSource = (name: string, version: string, marker: string) => {
+      const sourceDir = fs.mkdtempSync(
+        path.join(tempHomeDir, `${marker}-source-`),
+      );
+      fs.writeFileSync(
+        path.join(sourceDir, 'gemini-extension.json'),
+        JSON.stringify({ name, version }),
+      );
+      fs.writeFileSync(path.join(sourceDir, `${marker}.txt`), marker);
+      return sourceDir;
+    };
+
+    /**
+     * Returns a consent callback that holds every caller until `count` callers
+     * are waiting. Install consent is requested right before the destination
+     * existence check, so this lines concurrent installs up on the
+     * check-then-write window.
+     */
+    const createConsentBarrier = (count: number) => {
+      let waiting = 0;
+      let releaseAll: () => void = () => {};
+      const allWaiting = new Promise<void>((resolve) => {
+        releaseAll = resolve;
+      });
+      return async () => {
+        waiting++;
+        if (waiting === count) {
+          releaseAll();
+        }
+        await allWaiting;
+        return true;
+      };
+    };
+
+    it('lets only one of two concurrent installs of the same extension write to its directory', async () => {
+      const sourceA = createSource('race-ext', '1.0.0', 'from-a');
+      const sourceB = createSource('race-ext', '2.0.0', 'from-b');
+      const consent = createConsentBarrier(2);
+      await extensionManager.loadExtensions();
+
+      const results = await Promise.allSettled([
+        extensionManager.installOrUpdateExtension(
+          { type: 'local', source: sourceA },
+          undefined,
+          consent,
+        ),
+        extensionManager.installOrUpdateExtension(
+          { type: 'local', source: sourceB },
+          undefined,
+          consent,
+        ),
+      ]);
+
+      const installed = results.flatMap((result) =>
+        result.status === 'fulfilled' ? [result.value] : [],
+      );
+      const failures = results.flatMap((result) =>
+        result.status === 'rejected' ? [result.reason] : [],
+      );
+      expect(installed).toHaveLength(1);
+      expect(failures).toHaveLength(1);
+
+      // The directory holds the winner's files only: nothing from the loser.
+      const [winner] = installed;
+      const winnerIsA = winner.version === '1.0.0';
+      const destination = path.join(userExtensionsDir, 'race-ext');
+      const files = fs.readdirSync(destination);
+      expect(files).toContain(winnerIsA ? 'from-a.txt' : 'from-b.txt');
+      expect(files).not.toContain(winnerIsA ? 'from-b.txt' : 'from-a.txt');
+      expect(
+        JSON.parse(
+          fs.readFileSync(
+            path.join(destination, 'gemini-extension.json'),
+            'utf-8',
+          ),
+        ),
+      ).toMatchObject({ version: winner.version });
+      expect(
+        JSON.parse(
+          fs.readFileSync(
+            path.join(destination, INSTALL_METADATA_FILENAME),
+            'utf-8',
+          ),
+        ),
+      ).toMatchObject({ source: winnerIsA ? sourceA : sourceB });
+
+      // The loser waited for the lock, then found the winner's directory.
+      expect(failures[0]).toMatchObject({
+        message: expect.stringContaining(
+          'Cannot install extension "race-ext" because a directory with that name already exists.',
+        ),
+      });
+      expect(
+        extensionManager.getExtensions().filter((e) => e.name === 'race-ext'),
+      ).toHaveLength(1);
+      expect(lockDirsIn(userExtensionsDir)).toEqual([]);
+    });
+
+    it('installs different extensions concurrently without leaking install locks', async () => {
+      const sourceA = createSource('ext-alpha', '1.0.0', 'alpha');
+      const sourceB = createSource('ext-beta', '1.0.0', 'beta');
+      const consent = createConsentBarrier(2);
+      await extensionManager.loadExtensions();
+
+      const installed = await Promise.all([
+        extensionManager.installOrUpdateExtension(
+          { type: 'local', source: sourceA },
+          undefined,
+          consent,
+        ),
+        extensionManager.installOrUpdateExtension(
+          { type: 'local', source: sourceB },
+          undefined,
+          consent,
+        ),
+      ]);
+
+      expect(installed.map((e) => e.name).sort()).toEqual([
+        'ext-alpha',
+        'ext-beta',
+      ]);
+      expect(
+        fs.readdirSync(path.join(userExtensionsDir, 'ext-alpha')),
+      ).toContain('alpha.txt');
+      expect(
+        fs.readdirSync(path.join(userExtensionsDir, 'ext-beta')),
+      ).toContain('beta.txt');
+      // Each extension gets its own lock, so releasing one cannot release (and
+      // leak) the other's, as a lock shared across extensions would.
+      for (const name of ['ext-alpha', 'ext-beta']) {
+        const destination = path.join(userExtensionsDir, name);
+        expect(vi.mocked(lock)).toHaveBeenCalledWith(
+          destination,
+          expect.objectContaining({ lockfilePath: `${destination}.lock` }),
+        );
+      }
+      expect(lockDirsIn(userExtensionsDir)).toEqual([]);
+    });
+
+    it('fails closed with a friendly error when another install holds the lock', async () => {
+      const source = createSource('busy-ext', '1.0.0', 'busy');
+      const destination = path.join(userExtensionsDir, 'busy-ext');
+      const { lock: realLock } =
+        await vi.importActual<typeof import('proper-lockfile')>(
+          'proper-lockfile',
+        );
+      // Simulate another process holding this extension's lock for longer
+      // than the retry budget, while any other lock keeps working.
+      vi.mocked(lock).mockImplementation((file, options) =>
+        file === destination
+          ? Promise.reject(
+              Object.assign(new Error('Lock file is already being held'), {
+                code: 'ELOCKED',
+              }),
+            )
+          : realLock(file, options),
+      );
+      await extensionManager.loadExtensions();
+
+      try {
+        await expect(
+          extensionManager.installOrUpdateExtension({
+            type: 'local',
+            source,
+          }),
+        ).rejects.toThrow(
+          'Cannot install extension "busy-ext" because another installation or update of it is already in progress.',
+        );
+      } finally {
+        vi.mocked(lock).mockImplementation(realLock);
+      }
+      expect(vi.mocked(lock)).toHaveBeenCalledWith(
+        destination,
+        expect.objectContaining({ realpath: false }),
+      );
+      expect(fs.existsSync(destination)).toBe(false);
+    });
+
+    it('never parses install lock artifacts as extensions', async () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'real-ext',
+        version: '1.0.0',
+      });
+      // Lock artifacts left by an install in progress, or by a killed one.
+      const lockDir = path.join(userExtensionsDir, 'other-ext.lock');
+      fs.mkdirSync(lockDir);
+      fs.writeFileSync(path.join(userExtensionsDir, 'stray-file.lock'), '');
+      const errorSpy = vi.spyOn(debugLogger, 'error');
+
+      try {
+        const extensions = await extensionManager.loadExtensions();
+        expect(extensions.map((e) => e.name)).toEqual(['real-ext']);
+        await expect(
+          extensionManager.loadExtension(lockDir),
+        ).resolves.toBeNull();
+        expect(errorSpy).not.toHaveBeenCalledWith(
+          expect.stringContaining('other-ext.lock'),
+        );
+      } finally {
+        errorSpy.mockRestore();
+      }
     });
   });
 });
