@@ -243,7 +243,6 @@ describe('isPreviewModel', () => {
       }
     }
     expect(isPreviewModel(PREVIEW_GEMINI_MODEL_AUTO)).toBe(true);
-    expect(isPreviewModel(GEMINI_MODEL_ALIAS_AUTO)).toBe(true);
   });
 
   it('should return false if a preview model is retired (set to none)', () => {
@@ -255,6 +254,7 @@ describe('isPreviewModel', () => {
 
   it('should return false for non-preview models', () => {
     expect(isPreviewModel(DEFAULT_GEMINI_MODEL)).toBe(false);
+    expect(isPreviewModel(GEMINI_MODEL_ALIAS_AUTO)).toBe(false);
     expect(isPreviewModel('gemini-1.5-pro')).toBe(false);
   });
 });
@@ -395,6 +395,41 @@ describe('getDisplayString', () => {
 describe('supportsMultimodalFunctionResponse', () => {
   it('should return true for gemini-3 model', () => {
     expect(supportsMultimodalFunctionResponse('gemini-3-pro')).toBe(true);
+    expect(supportsMultimodalFunctionResponse('gemini-3.8-flash')).toBe(true);
+    expect(supportsMultimodalFunctionResponse('gemini-3.5-flash')).toBe(true);
+    expect(supportsMultimodalFunctionResponse('gemini-3.1-pro-preview')).toBe(
+      true,
+    );
+    expect(supportsMultimodalFunctionResponse('gemini-3.1-flash-lite')).toBe(
+      true,
+    );
+  });
+
+  it('should return true for model aliases that resolve to gemini-3', () => {
+    expect(supportsMultimodalFunctionResponse(GEMINI_MODEL_ALIAS_PRO)).toBe(
+      true,
+    );
+    expect(supportsMultimodalFunctionResponse(GEMINI_MODEL_ALIAS_FLASH)).toBe(
+      true,
+    );
+    expect(supportsMultimodalFunctionResponse(GEMINI_MODEL_ALIAS_AUTO)).toBe(
+      true,
+    );
+    expect(
+      supportsMultimodalFunctionResponse(GEMINI_MODEL_ALIAS_PRO, dynamicConfig),
+    ).toBe(true);
+    expect(
+      supportsMultimodalFunctionResponse(
+        GEMINI_MODEL_ALIAS_FLASH,
+        dynamicConfig,
+      ),
+    ).toBe(true);
+    expect(
+      supportsMultimodalFunctionResponse(
+        GEMINI_MODEL_ALIAS_AUTO,
+        dynamicConfig,
+      ),
+    ).toBe(true);
   });
 
   it('should return false for gemini-2 models', () => {

@@ -18,6 +18,30 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.66.0 - 2026-10-27
+
+- **Terminal UI Rendering & Flicker Prevention:** Implemented synchronized
+  output mode and isolated spinner rendering, eliminated buffer flickering, and
+  preserved terminal scrollback during viewport refreshes
+  ([#29725](https://github.com/google-gemini/gemini-cli/pull/29725) by
+  @diegogodinezr,
+  [#29695](https://github.com/google-gemini/gemini-cli/pull/29695) by
+  @ugorla-dev).
+- **Tool Scheduling & Process Lifecycle:** Emitted tool call groups directly
+  from the scheduler and forwarded process termination signals from bootstrap
+  parent to child processes
+  ([#29736](https://github.com/google-gemini/gemini-cli/pull/29736) by
+  @jesussamuel-byte,
+  [#29790](https://github.com/google-gemini/gemini-cli/pull/29790) by
+  @villahernandez-coder).
+- **Environment & MCP OAuth Security:** Supported opt-in private network
+  endpoints for MCP OAuth flows and preserved user-level git configuration while
+  suppressing interactive prompts
+  ([#29844](https://github.com/google-gemini/gemini-cli/pull/29844) by
+  @luisfelipe-alt,
+  [#29832](https://github.com/google-gemini/gemini-cli/pull/29832) by
+  @jesussamuel-byte).
+
 ## Announcements: v0.65.0 - 2026-10-20
 
 - **Custom Telemetry Headers:** Added support for configuring custom OTLP

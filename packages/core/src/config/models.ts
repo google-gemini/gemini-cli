@@ -540,7 +540,6 @@ export function isPreviewModel(
     model === PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL ||
     model === PREVIEW_GEMINI_FLASH_MODEL ||
     model === PREVIEW_GEMINI_MODEL_AUTO ||
-    model === GEMINI_MODEL_ALIAS_AUTO ||
     model === PREVIEW_GEMINI_FLASH_LITE_MODEL
   );
 }
@@ -664,13 +663,14 @@ export function supportsMultimodalFunctionResponse(
   model: string,
   config?: ModelCapabilityContext,
 ): boolean {
+  const resolved = resolveModel(model, false, false, true, config);
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     return (
-      config.modelConfigService.getModelDefinition(model)?.features
+      config.modelConfigService.getModelDefinition(resolved)?.features
         ?.multimodalToolUse === true
     );
   }
-  return model.startsWith('gemini-3-');
+  return /^gemini-3(\.|-|$)/.test(resolved);
 }
 
 /**

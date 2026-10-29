@@ -64,8 +64,15 @@ vi.mock('../contexts/ConfigContext.js', () => ({
 vi.mock('../components/LoadingIndicator.js', () => ({
   LoadingIndicator: () => <Text>LoadingIndicator</Text>,
 }));
+const mainContentMock = vi.hoisted(() => ({ lineCount: 1 }));
 vi.mock('../components/MainContent.js', () => ({
-  MainContent: () => <Text>MainContent</Text>,
+  MainContent: () => (
+    <Text>
+      {Array.from({ length: mainContentMock.lineCount }, (_, index) =>
+        index === 0 ? 'MainContent' : `MainContent line ${index}`,
+      ).join('\n')}
+    </Text>
+  ),
 }));
 vi.mock('../components/Notifications.js', () => ({
   Notifications: () => <Text>Notifications</Text>,
@@ -105,6 +112,9 @@ describe('<DefaultAppLayout />', () => {
     mockUIState.backgroundTasks = new Map();
     mockUIState.activeBackgroundTaskPid = null;
     mockUIState.streamingState = StreamingState.Idle;
+    mockUIState.constrainHeight = false;
+    mockUIState.terminalHeight = 24;
+    mainContentMock.lineCount = 1;
   });
 
   it('renders BackgroundTaskDisplay when shells exist and active', async () => {
@@ -137,5 +147,39 @@ describe('<DefaultAppLayout />', () => {
     const { lastFrame, unmount } = await render(<DefaultAppLayout />);
     expect(lastFrame()).toMatchSnapshot();
     unmount();
+  });
+
+  describe('inline height cap', () => {
+    it('keeps the inline layout shorter than the terminal and the input visible when content overflows', async () => {
+      mockUIState.constrainHeight = true;
+      mockUIState.terminalHeight = 8;
+      mainContentMock.lineCount = 20;
+
+      const { lastFrame, unmount } = await render(<DefaultAppLayout />);
+      const frame = lastFrame();
+
+      // Rendering as tall as the terminal makes Ink redraw the whole terminal,
+      // so the layout stays at least one row shorter.
+      expect(frame.trimEnd().split('\n').length).toBeLessThanOrEqual(7);
+      // The top of the overflowing content is clipped; the input stays visible.
+      expect(frame).toContain('Composer');
+      expect(frame).toContain('MainContent line 19');
+      expect(frame).not.toMatch(/^MainContent$/m);
+      unmount();
+    });
+
+    it('does not cap the layout while expanded output is intentionally taller than the terminal', async () => {
+      mockUIState.constrainHeight = false;
+      mockUIState.terminalHeight = 8;
+      mainContentMock.lineCount = 20;
+
+      const { lastFrame, unmount } = await render(<DefaultAppLayout />);
+      const frame = lastFrame();
+
+      expect(frame).toMatch(/^MainContent$/m);
+      expect(frame).toContain('MainContent line 19');
+      expect(frame).toContain('Composer');
+      unmount();
+    });
   });
 });

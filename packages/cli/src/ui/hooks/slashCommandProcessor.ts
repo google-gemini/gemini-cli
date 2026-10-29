@@ -411,6 +411,7 @@ export const useSlashCommandProcessor = (
       }
 
       let hasError = false;
+      let shouldLogCompletion = true;
 
       const subcommand =
         resolvedCommandPath.length > 1
@@ -641,6 +642,7 @@ export const useSlashCommandProcessor = (
                     );
                   }
 
+                  shouldLogCompletion = false;
                   return await handleSlashCommand(
                     result.originalInvocation.raw,
                     // Pass the approved commands as a one-time grant for this execution.
@@ -673,10 +675,12 @@ export const useSlashCommandProcessor = (
                     return { type: 'handled' };
                   }
 
+                  shouldLogCompletion = false;
                   return await handleSlashCommand(
                     result.originalInvocation.raw,
                     undefined,
                     true,
+                    false, // Do not add to history again
                   );
                 }
                 case 'custom_dialog': {
@@ -727,7 +731,12 @@ export const useSlashCommandProcessor = (
         );
         return { type: 'handled' };
       } finally {
-        if (config && resolvedCommandPath[0] && !hasError) {
+        if (
+          config &&
+          resolvedCommandPath[0] &&
+          !hasError &&
+          shouldLogCompletion
+        ) {
           const event = makeSlashCommandEvent({
             command: resolvedCommandPath[0],
             subcommand,

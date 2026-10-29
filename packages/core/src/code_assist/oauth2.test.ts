@@ -972,9 +972,10 @@ describe('oauth2', () => {
 
         // Mock setTimeout to trigger timeout immediately
         const originalSetTimeout = global.setTimeout;
-        global.setTimeout = vi.fn(
-          (callback) => (callback(), {} as unknown as NodeJS.Timeout),
-        ) as unknown as typeof setTimeout;
+        global.setTimeout = vi.fn((callback) => {
+          callback();
+          return {} as unknown as NodeJS.Timeout;
+        }) as unknown as typeof setTimeout;
 
         await expect(
           getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig),

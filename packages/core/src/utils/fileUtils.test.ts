@@ -176,6 +176,65 @@ describe('fileUtils', () => {
         expect(isWithinRoot(testPath, root || defaultRoot)).toBe(expected);
       },
     );
+
+    describe('on Windows (win32)', () => {
+      const winRoot = 'C:\\Users\\user\\project';
+
+      beforeEach(() => {
+        vi.stubGlobal(
+          'process',
+          Object.create(process, { platform: { get: () => 'win32' } }),
+        );
+      });
+
+      afterEach(() => {
+        vi.unstubAllGlobals();
+      });
+
+      it.each([
+        ['c:\\Users\\user\\project\\package.json', winRoot, true],
+        [
+          'C:\\Users\\user\\project\\src\\index.ts',
+          'c:\\Users\\user\\project',
+          true,
+        ],
+        ['C:\\USERS\\user\\PROJECT\\src\\index.ts', winRoot, true],
+        ['c:\\Users\\user\\project', winRoot, true],
+        ['c:\\file.txt', 'C:\\', true],
+        [
+          '\\\\server\\share\\project\\file.txt',
+          '\\\\SERVER\\SHARE\\Project',
+          true,
+        ],
+        ['C:/Users/user/project/file.txt', 'c:\\Users\\user\\project', true],
+        ['c:\\Users\\user\\project-other\\file.txt', winRoot, false],
+        ['D:\\Users\\user\\project\\file.txt', winRoot, false],
+      ])('for %s within %s should return %s', (testPath, root, expected) => {
+        expect(isWithinRoot(testPath, root)).toBe(expected);
+      });
+    });
+
+    describe('on Linux', () => {
+      beforeEach(() => {
+        vi.stubGlobal(
+          'process',
+          Object.create(process, { platform: { get: () => 'linux' } }),
+        );
+      });
+
+      afterEach(() => {
+        vi.unstubAllGlobals();
+      });
+
+      it('should remain case-sensitive for path comparisons', () => {
+        expect(isWithinRoot('/project/root/file.txt', '/project/root')).toBe(
+          true,
+        );
+        expect(isWithinRoot('/Project/Root/file.txt', '/project/root')).toBe(
+          false,
+        );
+      });
+    });
   });
 
   describe('getRealPath', () => {

@@ -11,6 +11,7 @@ import {
 import { themeManager, DEFAULT_THEME } from '../ui/themes/theme-manager.js';
 import { pickDefaultThemeName } from '../ui/themes/theme.js';
 import { getThemeTypeFromBackgroundColor } from '../ui/themes/color-utils.js';
+import { setAmbiguousCharactersWide } from '../ui/utils/textUtils.js';
 import type { LoadedSettings } from '../config/settings.js';
 import { type Config, coreEvents, debugLogger } from '@google/gemini-cli-core';
 
@@ -26,9 +27,15 @@ export async function setupTerminalAndTheme(
 ): Promise<TerminalBackgroundColor> {
   let terminalBackground: TerminalBackgroundColor = undefined;
   if (config.isInteractive() && process.stdin.isTTY) {
-    // Detect terminal capabilities (Kitty protocol, background color) in parallel.
+    // Detect terminal capabilities (Kitty protocol, background color,
+    // ambiguous-width rendering) in parallel.
     await terminalCapabilityManager.detectCapabilities();
     terminalBackground = terminalCapabilityManager.getTerminalBackgroundColor();
+    // Keep layout measurements in sync with how this terminal actually
+    // renders box-drawing and other ambiguous-width characters.
+    setAmbiguousCharactersWide(
+      terminalCapabilityManager.areAmbiguousCharactersWide(),
+    );
   }
 
   // Load custom themes from settings

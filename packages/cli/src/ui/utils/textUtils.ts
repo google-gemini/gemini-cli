@@ -8,6 +8,7 @@ import stripAnsi from 'strip-ansi';
 import ansiRegex from 'ansi-regex';
 import { stripVTControlCharacters } from 'node:util';
 import stringWidth from 'string-width';
+import { setStringWidthFunction } from 'ink';
 import { LRUCache } from 'mnemonist';
 import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../constants.js';
 
@@ -155,8 +156,11 @@ export function sanitizeForDisplay(str: string, maxLength?: number): string {
 
   let sanitized = stripUnsafeCharacters(str).replace(/\s+/g, ' ');
 
-  if (maxLength && sanitized.length > maxLength) {
-    sanitized = sanitized.substring(0, maxLength - 3) + '...';
+  // Measure and truncate by code points so surrogate pairs (e.g. emoji) are
+  // never split. The end index is clamped because, unlike substring(),
+  // cpSlice() treats a negative end as an offset from the end of the string.
+  if (maxLength && cpLen(sanitized) > maxLength) {
+    sanitized = cpSlice(sanitized, 0, Math.max(0, maxLength - 3)) + '...';
   }
 
   return sanitized;
@@ -181,6 +185,36 @@ const stringWidthCache = new LRUCache<string, number>(
 // measured as its own column.
 const SARA_AM_REGEX = /[\u0E33\u0EB3]/g;
 
+let ambiguousCharactersWide = false;
+
+/**
+ * Configures how East Asian Ambiguous-width characters (box-drawing borders,
+ * `…`, `●`, arrows, ...) are measured.
+ *
+ * Most terminals render them in a single cell, but terminals such as
+ * Terminal.app with "Unicode East Asian Ambiguous characters are wide" (and
+ * other CJK-oriented configurations) render them in two. Measuring them as one
+ * cell there makes every bordered row wider than the terminal; the rows wrap
+ * and the incremental renderer leaves a copy of the previous frame behind on
+ * every render (see https://github.com/google-gemini/gemini-cli/issues/24181).
+ *
+ * Ink measures through `getCachedStringWidth` as well, so this re-registers it
+ * to drop Ink's own per-character width cache along with ours.
+ */
+export function setAmbiguousCharactersWide(wide: boolean): void {
+  if (wide === ambiguousCharactersWide) {
+    return;
+  }
+  ambiguousCharactersWide = wide;
+  stringWidthCache.clear();
+  setStringWidthFunction(getCachedStringWidth);
+}
+
+/** Whether ambiguous-width characters are currently measured as two cells. */
+export function areAmbiguousCharactersWide(): boolean {
+  return ambiguousCharactersWide;
+}
+
 /**
  * Cached version of stringWidth function for better performance
  */
@@ -201,7 +235,9 @@ export const getCachedStringWidth = (str: string): number => {
 
   let width: number;
   try {
-    width = stringWidth(str.replace(SARA_AM_REGEX, ' '));
+    width = stringWidth(str.replace(SARA_AM_REGEX, ' '), {
+      ambiguousIsNarrow: !ambiguousCharactersWide,
+    });
   } catch {
     // Fallback for characters that cause string-width to crash (e.g. U+0602)
     // See: https://github.com/google-gemini/gemini-cli/issues/16418

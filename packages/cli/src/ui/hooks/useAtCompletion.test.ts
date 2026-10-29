@@ -151,6 +151,29 @@ describe('useAtCompletion', () => {
       ]);
     });
 
+    it('should support autocomplete when pattern starts with a leading slash like @/ (Issue #29453)', async () => {
+      const structure: FileSystemStructure = {
+        'package.json': '',
+        'README.md': '',
+        src: {
+          'index.ts': '',
+        },
+      };
+      testRootDir = await createTmpDir(structure);
+
+      const { result } = await renderHook(() =>
+        useTestHarnessForAtCompletion(true, '/', mockConfig, testRootDir),
+      );
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBeGreaterThan(0);
+      });
+
+      expect(result.current.suggestions.map((s) => s.value)).toEqual(
+        expect.arrayContaining(['package.json', 'README.md', 'src/']),
+      );
+    });
+
     it('should perform a case-insensitive search by lowercasing the pattern', async () => {
       testRootDir = await createTmpDir({ 'cRaZycAsE.txt': '' });
 
@@ -251,6 +274,73 @@ describe('useAtCompletion', () => {
       await waitFor(() => {
         expect(result.current.isLoadingSuggestions).toBe(false);
       });
+    });
+
+    it('should resolve @/ autocomplete suggestions when an async action takes time before completion is used', async () => {
+      const structure: FileSystemStructure = {
+        'package.json': '',
+        'README.md': '',
+        src: {
+          'index.ts': '',
+        },
+      };
+      testRootDir = await createTmpDir(structure);
+
+      const realFileSearch = FileSearchFactory.create({
+        projectRoot: testRootDir,
+        ignoreDirs: [],
+        fileDiscoveryService: new FileDiscoveryService(testRootDir, {
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+        }),
+        cache: false,
+        cacheTtl: 0,
+        enableRecursiveFileSearch: true,
+        enableFuzzySearch: true,
+      });
+
+      let resolveAsyncAction: () => void = () => {};
+      const asyncActionPromise = new Promise<void>((resolve) => {
+        resolveAsyncAction = resolve;
+      });
+
+      // Simulate an async action taking time during initialization
+      const mockFileSearch: FileSearch = {
+        initialize: vi.fn().mockImplementation(async () => {
+          await asyncActionPromise;
+          await realFileSearch.initialize();
+        }),
+        search: vi
+          .fn()
+          .mockImplementation(async (pattern, options) =>
+            realFileSearch.search(pattern, options),
+          ),
+      };
+      vi.spyOn(FileSearchFactory, 'create').mockReturnValue(mockFileSearch);
+
+      // User triggers autocomplete with '@/' while async action is in flight
+      const { result } = await renderHook(() =>
+        useTestHarnessForAtCompletion(true, '/', mockConfig, testRootDir),
+      );
+
+      // Verify that autocomplete indicates loading while async action is pending
+      expect(result.current.isLoadingSuggestions).toBe(true);
+      expect(result.current.suggestions).toEqual([]);
+
+      // Complete the async action
+      await act(async () => {
+        resolveAsyncAction();
+      });
+
+      // Verify that suggestions for '@/' resolve properly once the async action completes
+      await waitFor(() => {
+        expect(result.current.isLoadingSuggestions).toBe(false);
+        expect(result.current.suggestions.length).toBeGreaterThan(0);
+      });
+
+      expect(result.current.suggestions.map((s) => s.value)).toEqual(
+        expect.arrayContaining(['package.json', 'README.md', 'src/']),
+      );
     });
 
     it('should NOT show a loading indicator for subsequent searches that complete under 200ms', async () => {
