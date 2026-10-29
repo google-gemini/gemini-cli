@@ -1212,7 +1212,7 @@ describe('ExtensionManager', () => {
       // leak) the other's, as a lock shared across extensions would.
       for (const name of ['ext-alpha', 'ext-beta']) {
         const destination = path.join(userExtensionsDir, name);
-        expect(vi.mocked(lock)).toHaveBeenCalledWith( 
+        expect(vi.mocked(lock)).toHaveBeenCalledWith(
           destination,
           expect.objectContaining({ realpath: false }),
         );
@@ -1256,6 +1256,8 @@ describe('ExtensionManager', () => {
         destination,
         expect.objectContaining({ realpath: false }),
       );
+      // Nothing, not even an empty directory, is created before the lock is
+      // held; otherwise the re-check under the lock would reject every install.
       expect(fs.existsSync(destination)).toBe(false);
     });
 

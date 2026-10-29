@@ -89,7 +89,8 @@ import { removeDirectoryWithRetry } from '../utils/retry.js';
 
 /**
  * Suffix of the lock directory that guards an extension's install directory
- * while it is being installed or updated (`<extensionsDir>/<name>.lock`).
+ * while it is being installed or updated: proper-lockfile locks
+ * `<extensionsDir>/<name>` by creating `<extensionsDir>/<name>.lock`.
  * Extension names cannot contain dots (see `validateName`), so lock artifacts
  * can never collide with, or be mistaken for, an extension.
  */
@@ -1353,13 +1354,20 @@ async function acquireExtensionInstallLock(
   destinationPath: string,
   extensionName: string,
 ): Promise<() => Promise<void>> {
-  // Ensure the destination directory exists first so proper-lockfile can stat it
-  await fs.promises.mkdir(destinationPath, { recursive: true });
+  // Only the parent (the extensions directory) has to exist, because the lock
+  // is the `<destinationPath>.lock` directory created next to it. Do not create
+  // `destinationPath` itself here: the existence re-check that runs once the
+  // lock is held would mistake it for a concurrent install.
+  await fs.promises.mkdir(path.dirname(destinationPath), { recursive: true });
   try {
     return await lock(destinationPath, {
+      // `destinationPath` usually does not exist yet. With `realpath: false`,
+      // proper-lockfile neither resolves nor stats it; it only creates and
+      // checks the `<destinationPath>.lock` directory.
       realpath: false,
       stale: INSTALL_LOCK_STALE_MS,
       retries: INSTALL_LOCK_RETRIES,
+      // The default handler throws from a timer, which would crash the CLI.
       onCompromised: (error) => {
         debugLogger.warn(
           `Lost the install lock for extension "${extensionName}": ${getErrorMessage(error)}`,
