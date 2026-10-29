@@ -819,7 +819,17 @@ export class GeminiChat {
                 caughtError.name === 'FatalCancellationError'));
           const originalLength = this.promptOriginalHistoryLength;
           const originalTokenCount = this.promptOriginalTokenCount;
-          if (isAborted && originalLength !== undefined) {
+          // Full rollback applies only to an abort of the prompt's first
+          // request, where nothing has run yet. An aborted continuation (a
+          // function-response send) keeps the originating prompt and the
+          // completed tool rounds — tools may already have changed files —
+          // and the trailing unanswered tool response is closed with a
+          // synthetic interrupted model turn on the next send.
+          if (
+            isAborted &&
+            originalLength !== undefined &&
+            !isOriginalFunctionResponse
+          ) {
             this.agentHistory.rollback(originalLength);
             this.chatRecordingService.updateMessagesFromHistory(
               this.agentHistory.get(),

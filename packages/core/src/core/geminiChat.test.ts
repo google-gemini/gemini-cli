@@ -1705,7 +1705,7 @@ describe('GeminiChat', () => {
       expect(chat.agentHistory.length).toBe(initialHistoryLength);
     });
 
-    it('should roll back the entire multi-turn request including function responses when a continuation stream is aborted/cancelled', async () => {
+    it('should keep the prompt and completed tool rounds when a continuation stream is aborted/cancelled', async () => {
       const initialHistoryLength = chat.agentHistory.length;
       const abortController = new AbortController();
 
@@ -1784,8 +1784,71 @@ describe('GeminiChat', () => {
         })(),
       ).rejects.toThrow();
 
-      // Verify history has been rolled back entirely to initialHistoryLength (before the original prompt started)!
-      expect(chat.agentHistory.length).toBe(initialHistoryLength);
+      // The originating user prompt, the completed first model response and
+      // the tool response stay in history; only the interrupted model
+      // response is never added. (Previously the entire multi-turn request
+      // was rolled back, erasing tools that may already have changed files.)
+      expect(chat.agentHistory.length).toBe(initialHistoryLength + 3);
+      const turnsAfterAbort = chat.getHistoryTurns();
+      expect(turnsAfterAbort[initialHistoryLength].content.role).toBe('user');
+      expect(turnsAfterAbort[initialHistoryLength + 1].content.role).toBe(
+        'model',
+      );
+      expect(turnsAfterAbort[initialHistoryLength + 2].content.parts).toEqual([
+        {
+          functionResponse: {
+            id: 'call_id_1',
+            name: 'my_tool',
+            response: { result: 'success' },
+          },
+        },
+      ]);
+
+      // 3. A follow-up prompt closes the trailing tool response with a
+      // synthetic interrupted model turn before recording the new message.
+      const streamThird = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'model after follow-up' }],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        streamThird,
+      );
+
+      const s3 = await chat.sendMessageStream(
+        { model: 'gemini-2.0-flash' },
+        'continue with the task',
+        'prompt-id-follow-up',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of s3) {
+        // consume the stream
+      }
+
+      const finalTurns = chat.getHistoryTurns();
+      expect(finalTurns.map((t) => t.content.role)).toEqual([
+        'user',
+        'model',
+        'user',
+        'model',
+        'user',
+        'model',
+      ]);
+      expect(finalTurns[initialHistoryLength + 3].content.parts).toEqual([
+        { text: INTERRUPTED_RESPONSE_PLACEHOLDER },
+      ]);
+      expect(finalTurns[initialHistoryLength + 4].content.parts).toEqual([
+        { text: 'continue with the task' },
+      ]);
     });
 
     it('should roll back the un-responded user turn from history when an ApiError is thrown', async () => {
