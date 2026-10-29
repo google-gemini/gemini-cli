@@ -175,9 +175,10 @@ export const GEMINI_3_SET: CoreToolSet = {
         },
         [GREP_PARAM_TOTAL_MAX_MATCHES]: {
           description:
-            'Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 100 if omitted.',
+            'Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 100 if omitted. Must be at most 5000; larger values are rejected, so narrow your search instead of requesting more.',
           type: 'integer',
           minimum: 1,
+          maximum: 5000,
         },
       },
       required: [PARAM_PATTERN],
@@ -256,9 +257,10 @@ export const GEMINI_3_SET: CoreToolSet = {
         },
         [GREP_PARAM_TOTAL_MAX_MATCHES]: {
           description:
-            'Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 100 if omitted.',
+            'Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 100 if omitted. Must be at most 5000; larger values are rejected, so narrow your search instead of requesting more.',
           type: 'integer',
           minimum: 1,
+          maximum: 5000,
         },
       },
       required: [PARAM_PATTERN],

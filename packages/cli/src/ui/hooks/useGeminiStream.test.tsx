@@ -3420,21 +3420,21 @@ describe('useGeminiStream', () => {
 
       it.each([
         {
-          name: 'without suggestion when remaining tokens are > 75% of limit',
+          name: 'states the message was not sent and gives actionable guidance',
           requestTokens: 20,
           remainingTokens: 80,
           expectedMessage:
-            'Sending this message (20 tokens) might exceed the context window limit (80 tokens left).',
+            'This message was not sent: it needs 20 tokens but only 80 remain in the context window. Try narrowing the request (for example a more specific search), use the `/compress` command to compress the chat history, or start a new session.',
         },
         {
-          name: 'with suggestion when remaining tokens are < 75% of limit',
-          requestTokens: 30,
-          remainingTokens: 70,
+          name: 'formats large token counts with separators',
+          requestTokens: 41740251,
+          remainingTokens: 904878,
           expectedMessage:
-            'Sending this message (30 tokens) might exceed the context window limit (70 tokens left). Please try reducing the size of your message or use the `/compress` command to compress the chat history.',
+            'This message was not sent: it needs 41,740,251 tokens but only 904,878 remain in the context window. Try narrowing the request (for example a more specific search), use the `/compress` command to compress the chat history, or start a new session.',
         },
       ])(
-        'should add message $name',
+        'should add message that $name',
         async ({ requestTokens, remainingTokens, expectedMessage }) => {
           mockSendMessageStream.mockReturnValue(
             (async function* () {
