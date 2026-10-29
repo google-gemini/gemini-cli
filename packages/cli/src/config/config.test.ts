@@ -2209,6 +2209,42 @@ describe('loadCliConfig context management', () => {
     const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.isContextManagementEnabled()).toBe(true);
   });
+
+  it.each([false, true])(
+    'passes configured context management limits to core when the experimental flag is %s',
+    async (enabled) => {
+      process.argv = ['node', 'script.js'];
+      const argv = await parseArguments(createTestMergedSettings());
+      const settings = createTestMergedSettings({
+        experimental: { contextManagement: enabled },
+        contextManagement: {
+          historyWindow: { maxTokens: 200_000 },
+          messageLimits: { normalMaxTokens: 5_000 },
+          tools: {
+            distillation: { maxOutputTokens: 15_000 },
+            outputMasking: {
+              protectionThresholdTokens: 400_000,
+              protectLatestTurn: false,
+            },
+          },
+        },
+      } as unknown as Settings);
+
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      const contextManagement = config.getContextManagementConfig();
+      expect(contextManagement.enabled).toBe(enabled);
+      expect(contextManagement.historyWindow.maxTokens).toBe(200_000);
+      expect(contextManagement.historyWindow.retainedTokens).toBe(40_000);
+      expect(contextManagement.messageLimits.normalMaxTokens).toBe(5_000);
+      expect(contextManagement.tools.distillation.maxOutputTokens).toBe(15_000);
+      expect(
+        contextManagement.tools.outputMasking.protectionThresholdTokens,
+      ).toBe(400_000);
+      expect(contextManagement.tools.outputMasking.protectLatestTurn).toBe(
+        false,
+      );
+    },
+  );
 });
 
 describe('screenReader configuration', () => {
