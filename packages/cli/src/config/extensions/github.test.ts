@@ -140,6 +140,18 @@ describe('github.ts', () => {
     });
 
     it.each([
+      // `.git` inside the repo name must be preserved.
+      ['https://github.com/someuser/blog.github.io', 'blog.github.io'],
+      ['https://github.com/someuser/my.git.repo', 'my.git.repo'],
+      // Only a trailing `.git` suffix is stripped, case-insensitively.
+      ['https://github.com/someuser/tool.git', 'tool'],
+      ['https://github.com/someuser/tool.GIT', 'tool'],
+      ['https://github.com/someuser/blog.github.io.git', 'blog.github.io'],
+    ])('should strip only a trailing .git suffix: %s -> %s', (url, repo) => {
+      expect(tryParseGithubUrl(url)).toEqual({ owner: 'someuser', repo });
+    });
+
+    it.each([
       'https://gitlab.com/owner/repo',
       'https://my-git-host.com/owner/group/repo',
       'git@gitlab.com:some-group/some-project/some-repo.git',

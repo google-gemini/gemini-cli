@@ -209,7 +209,7 @@ export async function getCorrectedFileContent(
 
     const aggressiveUnescape =
       !isGemini3Model(resolvedModel, config) &&
-      !isGemini2Model(resolvedModel) &&
+      !isGemini2Model(resolvedModel, config) &&
       !isCustomModel(resolvedModel, config);
 
     correctedContent = await ensureCorrectFileContent(

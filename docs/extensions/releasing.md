@@ -29,6 +29,38 @@ To have your extension automatically discovered and listed:
 Our system crawls tagged repositories daily. Once you tag your repository, your
 extension will appear in the gallery if it passes validation.
 
+### Troubleshooting gallery indexing
+
+If your extension doesn't appear in the gallery after 24 to 48 hours despite
+meeting the listing requirements, GitHub Code Search may not have indexed your
+repository's manifest file yet.
+
+The gallery crawler relies on GitHub Code Search to discover
+`gemini-extension.json` files across public repositories. Newly created or
+recently pushed repositories are often indexed lazily by GitHub.
+
+To check whether GitHub has indexed your repository's manifest, run the
+following command using the GitHub CLI:
+
+```bash
+gh api 'search/code?q=repo:<owner>/<repo>+filename:gemini-extension.json' --jq .total_count
+```
+
+If the count is `0`, or if you don't use the GitHub CLI, trigger indexing
+manually in your web browser:
+
+1.  Sign in to GitHub.
+2.  Navigate to
+    `https://github.com/search?q=repo%3A<owner>%2F<repo>+gemini-extension.json&type=code`
+    (replace `<owner>/<repo>` with your repository path).
+3.  If GitHub displays "This repository's code is being indexed right now", wait
+    15 to 30 minutes for indexing to finish.
+4.  Re-run the search until `gemini-extension.json` appears in the search
+    results.
+
+Once GitHub indexes the manifest file, the crawler will discover and index your
+extension during its next scheduled cycle.
+
 ## Release through a Git repository
 
 Releasing through Git is the most flexible option. Create a public Git

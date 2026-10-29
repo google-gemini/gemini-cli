@@ -377,20 +377,32 @@ export function isWithinRoot(
   pathToCheck: string,
   rootDirectory: string,
 ): boolean {
-  const normalizedPathToCheck = canonicalizeMacosPath(
-    path.resolve(pathToCheck),
+  const isWindows = process.platform === 'win32';
+  const pathModule = isWindows ? path.win32 : path;
+
+  const resolvedPathToCheck = canonicalizeMacosPath(
+    pathModule.resolve(pathToCheck),
   );
-  const normalizedRootDirectory = canonicalizeMacosPath(
-    path.resolve(rootDirectory),
+  const resolvedRootDirectory = canonicalizeMacosPath(
+    pathModule.resolve(rootDirectory),
   );
+
+  // Windows (NTFS/Win32) treats paths case-insensitively, so normalize casing
+  // before prefix comparison while preserving case sensitivity on Linux/macOS.
+  const normalizedPathToCheck = isWindows
+    ? resolvedPathToCheck.toLowerCase()
+    : resolvedPathToCheck;
+  const normalizedRootDirectory = isWindows
+    ? resolvedRootDirectory.toLowerCase()
+    : resolvedRootDirectory;
 
   // Ensure the rootDirectory path ends with a separator for correct startsWith comparison,
   // unless it's the root path itself (e.g., '/' or 'C:\').
   const rootWithSeparator =
-    normalizedRootDirectory === path.sep ||
-    normalizedRootDirectory.endsWith(path.sep)
+    normalizedRootDirectory === pathModule.sep ||
+    normalizedRootDirectory.endsWith(pathModule.sep)
       ? normalizedRootDirectory
-      : normalizedRootDirectory + path.sep;
+      : normalizedRootDirectory + pathModule.sep;
 
   if (
     normalizedPathToCheck === normalizedRootDirectory ||

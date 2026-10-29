@@ -17,6 +17,7 @@ import {
   sanitizeForDisplay,
   setAmbiguousCharactersWide,
   areAmbiguousCharactersWide,
+  normalizeEscapedNewlines,
 } from './textUtils.js';
 
 vi.mock('ink', async (importOriginal) => {
@@ -39,6 +40,30 @@ describe('textUtils', () => {
     it('should truncate long strings', () => {
       const longInput = 'a'.repeat(50);
       expect(sanitizeForDisplay(longInput, 20)).toBe('a'.repeat(17) + '...');
+    });
+
+    it('should not split surrogate pairs when truncating', () => {
+      // In UTF-16 code units, the cut point (maxLength - 3 = 97) falls between
+      // the emoji's high and low surrogates.
+      const input = 'a'.repeat(96) + '😀' + 'b'.repeat(50);
+      const result = sanitizeForDisplay(input, 100);
+
+      expect(result).toBe('a'.repeat(96) + '😀' + '...');
+      // The `u` flag is required: without it, this character class would also
+      // match both halves of a correctly paired surrogate such as the emoji.
+      expect(/[\uD800-\uDFFF]/u.test(result)).toBe(false);
+    });
+
+    it('should measure maxLength in code points rather than UTF-16 code units', () => {
+      const result = sanitizeForDisplay('😀'.repeat(50), 20);
+
+      expect(result).toBe('😀'.repeat(17) + '...');
+      expect(/[\uD800-\uDFFF]/u.test(result)).toBe(false);
+    });
+
+    it('should return only the ellipsis when maxLength is shorter than it', () => {
+      expect(sanitizeForDisplay('abcdef', 2)).toBe('...');
+      expect(sanitizeForDisplay('😀😀😀😀', 1)).toBe('...');
     });
 
     it('should handle empty or null input', () => {
@@ -662,6 +687,89 @@ describe('textUtils', () => {
         expect(sanitized.g).toBe(null);
         expect(sanitized.h()).toBe('\u001b[35mpurple\u001b[0m');
       });
+    });
+  });
+
+  describe('normalizeEscapedNewlines', () => {
+    it('should convert unescaped \\n and \\r\\n into newline characters', () => {
+      expect(normalizeEscapedNewlines('line1\\nline2')).toBe('line1\nline2');
+      expect(normalizeEscapedNewlines('line1\\r\\nline2')).toBe('line1\nline2');
+      expect(normalizeEscapedNewlines('\\n\\nSome more text')).toBe(
+        '\n\nSome more text',
+      );
+    });
+
+    it('should preserve double-escaped backslashes before n (\\\\n) and Windows drive paths across drives', () => {
+      expect(normalizeEscapedNewlines('C:\\\\new_folder')).toBe(
+        'C:\\\\new_folder',
+      );
+      expect(normalizeEscapedNewlines('literal \\\\n sequence')).toBe(
+        'literal \\\\n sequence',
+      );
+      expect(
+        normalizeEscapedNewlines(
+          'Path C:\\new_folder and D:\\notes\\next and E:\\nav and F:\\node_modules\\nNext',
+        ),
+      ).toBe(
+        'Path C:\\new_folder and D:\\notes\\next and E:\\nav and F:\\node_modules\nNext',
+      );
+      expect(
+        normalizeEscapedNewlines(
+          'Check C:\\nExt\\file.txt and D:\\dir\\nExt.txt\\nDone',
+        ),
+      ).toBe('Check C:\\nExt\\file.txt and D:\\dir\\nExt.txt\nDone');
+    });
+
+    it('should preserve \\n inside inline and fenced code spans including escaped backticks', () => {
+      expect(normalizeEscapedNewlines('Checking `\\n` handling')).toBe(
+        'Checking `\\n` handling',
+      );
+      expect(
+        normalizeEscapedNewlines('Use `\\\\` or `\\n` for escaping\\nNext'),
+      ).toBe('Use `\\\\` or `\\n` for escaping\nNext');
+      expect(
+        normalizeEscapedNewlines(
+          'Use `C:\\\\` and `D:\\\\` and `E:\\\\` and `F:\\\\` and `\\n`\\nNext',
+        ),
+      ).toBe(
+        'Use `C:\\\\` and `D:\\\\` and `E:\\\\` and `F:\\\\` and `\\n`\nNext',
+      );
+      expect(
+        normalizeEscapedNewlines(
+          'Thought: use `str.replace(/\\n/g, "\\n")`\\nNext',
+        ),
+      ).toBe('Thought: use `str.replace(/\\n/g, "\\n")`\nNext');
+      expect(normalizeEscapedNewlines('Code `a \\` b \\n c`\\nNext')).toBe(
+        'Code `a \\` b \\n c`\nNext',
+      );
+      expect(normalizeEscapedNewlines('Code `a \\` b` and `\\n`\\nNext')).toBe(
+        'Code `a \\` b` and `\\n`\nNext',
+      );
+      expect(
+        normalizeEscapedNewlines('Escaped \\` one \\n and \\` two\\nNext'),
+      ).toBe('Escaped \\` one \n and \\` two\nNext');
+      expect(
+        normalizeEscapedNewlines(
+          '```js\nconst a = `hello`;\nconst b = `world`;\nconst c = "line1\\nline2";\n```\\nOutside',
+        ),
+      ).toBe(
+        '```js\nconst a = `hello`;\nconst b = `world`;\nconst c = "line1\\nline2";\n```\nOutside',
+      );
+      expect(
+        normalizeEscapedNewlines('`' + '\\\\a'.repeat(500) + '\\nNext'),
+      ).toBe('`' + '\\\\a'.repeat(500) + '\nNext');
+      expect(normalizeEscapedNewlines('`'.repeat(2000) + '\\nNext')).toBe(
+        '`'.repeat(2000) + '\nNext',
+      );
+      expect(
+        normalizeEscapedNewlines('`' + '``a'.repeat(1000) + '\\nNext'),
+      ).toBe('`' + '``a'.repeat(1000) + '\nNext');
+    });
+
+    it('should preserve standalone quoted "\\n" and \'\\n\' tokens', () => {
+      expect(
+        normalizeEscapedNewlines('Investigating "\\n" and \'\\n\' escaping'),
+      ).toBe('Investigating "\\n" and \'\\n\' escaping');
     });
   });
 });
