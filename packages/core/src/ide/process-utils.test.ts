@@ -64,18 +64,17 @@ describe('getIdeProcessInfo', () => {
       );
     });
 
-    it('should use GEMINI_CLI_IDE_PID and fetch command on Windows', async () => {
+    it('should use GEMINI_CLI_IDE_PID and fetch command on Windows via single-PID CIM query', async () => {
       (os.platform as Mock).mockReturnValue('win32');
       vi.stubEnv('GEMINI_CLI_IDE_PID', '54321');
-      const processes = [
-        {
+      mockedExec.mockResolvedValueOnce({
+        stdout: JSON.stringify({
           ProcessId: 54321,
           ParentProcessId: 0,
           Name: 'Code.exe',
           CommandLine: 'C:\\Program Files\\VSCode\\Code.exe',
-        },
-      ];
-      mockedExec.mockResolvedValueOnce({ stdout: JSON.stringify(processes) });
+        }),
+      });
 
       const result = await getIdeProcessInfo();
 
@@ -83,36 +82,32 @@ describe('getIdeProcessInfo', () => {
         pid: 54321,
         command: 'C:\\Program Files\\VSCode\\Code.exe',
       });
+      expect(mockedExec).toHaveBeenCalledTimes(1);
       expect(mockedExec).toHaveBeenCalledWith(
         expect.stringContaining(
-          'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,CommandLine',
+          "Get-CimInstance Win32_Process -Filter 'ProcessId=54321'",
         ),
+        { timeout: 3000 },
+      );
+      expect(mockedExec).not.toHaveBeenCalledWith(
+        expect.stringContaining('ps '),
         expect.anything(),
       );
     });
 
-    it('should fall back to single-PID CIM query on Windows when snapshot fails for GEMINI_CLI_IDE_PID', async () => {
+    it('should handle failure gracefully when single-PID CIM query fails for GEMINI_CLI_IDE_PID on Windows', async () => {
       (os.platform as Mock).mockReturnValue('win32');
       vi.stubEnv('GEMINI_CLI_IDE_PID', '54321');
-      mockedExec
-        .mockRejectedValueOnce(new Error('Snapshot timed out'))
-        .mockResolvedValueOnce({
-          stdout: JSON.stringify({
-            ProcessId: 54321,
-            ParentProcessId: 0,
-            Name: 'Code.exe',
-            CommandLine: 'C:\\Program Files\\VSCode\\Code.exe',
-          }),
-        });
+      mockedExec.mockRejectedValueOnce(new Error('CIM query failed'));
 
       const result = await getIdeProcessInfo();
 
       expect(result).toEqual({
         pid: 54321,
-        command: 'C:\\Program Files\\VSCode\\Code.exe',
+        command: '',
       });
-      expect(mockedExec).toHaveBeenNthCalledWith(
-        2,
+      expect(mockedExec).toHaveBeenCalledTimes(1);
+      expect(mockedExec).toHaveBeenCalledWith(
         expect.stringContaining(
           "Get-CimInstance Win32_Process -Filter 'ProcessId=54321'",
         ),
