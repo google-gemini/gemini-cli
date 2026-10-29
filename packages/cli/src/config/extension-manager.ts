@@ -1353,16 +1353,13 @@ async function acquireExtensionInstallLock(
   destinationPath: string,
   extensionName: string,
 ): Promise<() => Promise<void>> {
-  // The lock directory is created next to `destinationPath`, so its parent must
-  // exist (it may have been removed while consent was being requested).
-  await fs.promises.mkdir(path.dirname(destinationPath), { recursive: true });
+  // Ensure the destination directory exists first so proper-lockfile can stat it
+  await fs.promises.mkdir(destinationPath, { recursive: true });
   try {
     return await lock(destinationPath, {
-      // `destinationPath` usually does not exist yet, so it cannot be resolved.
       realpath: false,
       stale: INSTALL_LOCK_STALE_MS,
       retries: INSTALL_LOCK_RETRIES,
-      // The default handler throws from a timer, which would crash the CLI.
       onCompromised: (error) => {
         debugLogger.warn(
           `Lost the install lock for extension "${extensionName}": ${getErrorMessage(error)}`,
