@@ -22,6 +22,7 @@ import {
   shortenPath,
   makeRelative,
   resolveToRealPath,
+  toPathKey,
 } from '../utils/paths.js';
 import { type Config } from '../config/config.js';
 import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/constants.js';
@@ -239,19 +240,21 @@ class GlobToolInvocation extends BaseToolInvocation<
       const filteredAbsolutePaths = new Set(
         filteredPaths
           .map((p) => path.resolve(realTargetDir, p))
-          .filter((p) => !this.config.validatePathAccess(p, 'read')),
+          .filter((p) => !this.config.validatePathAccess(p, 'read'))
+          .map((p) => toPathKey(p)),
       );
 
       const seenCanonicalPaths = new Set<string>();
       const filteredEntries = allEntries.filter((entry) => {
         const canonicalPath = resolvedPathMap.get(entry) ?? entry.fullpath();
+        const pathKey = toPathKey(canonicalPath);
         if (
-          !filteredAbsolutePaths.has(canonicalPath) ||
-          seenCanonicalPaths.has(canonicalPath)
+          !filteredAbsolutePaths.has(pathKey) ||
+          seenCanonicalPaths.has(pathKey)
         ) {
           return false;
         }
-        seenCanonicalPaths.add(canonicalPath);
+        seenCanonicalPaths.add(pathKey);
         return true;
       });
 

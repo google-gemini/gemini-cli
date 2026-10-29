@@ -545,6 +545,39 @@ describe('GlobTool', () => {
           await fs.rm(outsideDir, { recursive: true, force: true });
         }
       }, 30000);
+
+      it('should resolve files inside symlinked directories to their canonical paths', async () => {
+        const linkedSubDir = path.join(tempRootDir, 'linked-sub');
+        await fs.symlink(path.join(tempRootDir, 'sub'), linkedSubDir, 'dir');
+
+        // Matching via pattern containing the symlinked directory name
+        const patternInvocation = globTool.build({
+          pattern: 'linked-sub/*.md',
+        });
+        const patternResult = await patternInvocation.execute({ abortSignal });
+        expect(patternResult.llmContent).toContain('Found 2 file(s)');
+        expect(patternResult.llmContent).toContain(
+          path.join(tempRootDir, 'sub', 'fileC.md'),
+        );
+        expect(patternResult.llmContent).toContain(
+          path.join(tempRootDir, 'sub', 'FileD.MD'),
+        );
+        expect(patternResult.llmContent).not.toContain(linkedSubDir);
+
+        // Matching via dir_path pointing to the symlinked directory
+        const dirPathInvocation = globTool.build({
+          pattern: '*.md',
+          dir_path: 'linked-sub',
+        });
+        const dirPathResult = await dirPathInvocation.execute({ abortSignal });
+        expect(dirPathResult.llmContent).toContain('Found 2 file(s)');
+        expect(dirPathResult.llmContent).toContain(
+          path.join(tempRootDir, 'sub', 'fileC.md'),
+        );
+        expect(dirPathResult.llmContent).toContain(
+          path.join(tempRootDir, 'sub', 'FileD.MD'),
+        );
+      }, 30000);
     },
   );
 });
