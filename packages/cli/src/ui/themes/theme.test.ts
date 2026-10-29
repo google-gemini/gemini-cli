@@ -84,6 +84,29 @@ describe('createCustomTheme', () => {
     // Interpolate between #000000 and #cccccc -> #525252
     expect(theme.colors.DarkGray).toBe('#525252');
   });
+
+  it('should apply ui.active and ui.focus overrides to semantic and focus colors', () => {
+    const customTheme: CustomTheme = {
+      type: 'custom',
+      name: 'FocusActiveTheme',
+      background: {
+        primary: '#000000',
+      },
+      status: {
+        success: '#00ff00',
+      },
+      ui: {
+        active: '#3399ff',
+        focus: '#ff00ff',
+      },
+    };
+    const theme = createCustomTheme(customTheme);
+    expect(theme.semanticColors.ui.active).toBe('#3399ff');
+    expect(theme.semanticColors.ui.focus).toBe('#ff00ff');
+    expect(theme.colors.FocusColor).toBe('#ff00ff');
+    // FocusBackground should interpolate between #000000 and ui.focus (#ff00ff) at 0.2 -> #330033
+    expect(theme.semanticColors.background.focus).toBe('#330033');
+  });
 });
 
 describe('validateCustomTheme', () => {

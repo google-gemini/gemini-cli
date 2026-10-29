@@ -428,7 +428,10 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
     ),
     FocusBackground: interpolateColor(
       customTheme.background?.primary ?? customTheme.Background ?? '',
-      customTheme.status?.success ?? customTheme.AccentGreen ?? '#3CA84B', // Fallback to a default green if not found
+      customTheme.ui?.focus ??
+        customTheme.status?.success ??
+        customTheme.AccentGreen ??
+        '#3CA84B', // Fallback to a default green if not found
       DEFAULT_SELECTION_OPACITY,
     ),
     FocusColor: customTheme.ui?.focus ?? customTheme.AccentGreen,
