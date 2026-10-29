@@ -192,6 +192,60 @@ export class GitService {
       await repo.commit('Initial commit', { '--allow-empty': null });
     }
 
+    let gitCommonDir: string | undefined;
+    let gitDir: string | undefined;
+    try {
+      const { stdout } = await spawnAsync(
+        'git',
+        ['rev-parse', '--path-format=absolute', '--git-common-dir'],
+        { cwd: this.projectRoot, env: getSafeGitEnv() },
+      );
+      const trimmed = stdout.trim();
+      if (
+        trimmed &&
+        !trimmed.includes('\0') &&
+        !trimmed.includes('\n') &&
+        !trimmed.includes('\r')
+      ) {
+        gitCommonDir = path.resolve(this.projectRoot, trimmed);
+      }
+    } catch {
+      // rev-parse might fail if not a git repository
+    }
+
+    try {
+      const { stdout } = await spawnAsync(
+        'git',
+        ['rev-parse', '--absolute-git-dir'],
+        { cwd: this.projectRoot, env: getSafeGitEnv() },
+      );
+      const trimmed = stdout.trim();
+      if (
+        trimmed &&
+        !trimmed.includes('\0') &&
+        !trimmed.includes('\n') &&
+        !trimmed.includes('\r')
+      ) {
+        gitDir = path.resolve(this.projectRoot, trimmed);
+      }
+    } catch {
+      // rev-parse might fail if not a git repository
+    }
+
+    const isSubpath = (parent: string, child: string) => {
+      const relative = path.relative(parent, child);
+      return (
+        Boolean(relative) &&
+        !relative.startsWith('..') &&
+        !path.isAbsolute(relative)
+      );
+    };
+
+    const isSafeGitSubpath = (candidatePath: string) =>
+      (gitCommonDir && isSubpath(gitCommonDir, candidatePath)) ||
+      (gitDir && isSubpath(gitDir, candidatePath)) ||
+      isSubpath(this.projectRoot, candidatePath);
+
     let projectInfoExcludePath: string | undefined;
     try {
       const { stdout } = await spawnAsync(
@@ -206,7 +260,10 @@ export class GitService {
         !trimmed.includes('\n') &&
         !trimmed.includes('\r')
       ) {
-        projectInfoExcludePath = path.resolve(this.projectRoot, trimmed);
+        const resolved = path.resolve(this.projectRoot, trimmed);
+        if (isSafeGitSubpath(resolved)) {
+          projectInfoExcludePath = resolved;
+        }
       }
     } catch {
       try {
@@ -222,16 +279,23 @@ export class GitService {
           !trimmed.includes('\n') &&
           !trimmed.includes('\r')
         ) {
-          projectInfoExcludePath = path.resolve(this.projectRoot, trimmed);
+          const resolved = path.resolve(this.projectRoot, trimmed);
+          if (isSafeGitSubpath(resolved)) {
+            projectInfoExcludePath = resolved;
+          }
         }
       } catch {
-        projectInfoExcludePath = path.resolve(
-          this.projectRoot,
-          '.git',
-          'info',
-          'exclude',
-        );
+        // Fallback handled below
       }
+    }
+
+    if (!projectInfoExcludePath) {
+      projectInfoExcludePath = path.resolve(
+        this.projectRoot,
+        '.git',
+        'info',
+        'exclude',
+      );
     }
 
     let userExcludeContent = '';

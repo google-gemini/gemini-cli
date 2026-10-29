@@ -317,18 +317,20 @@ describe('GitService', () => {
     });
 
     it('should resolve info/exclude via git rev-parse for linked worktrees', async () => {
-      const commonExcludeDir = path.join(
-        testRootDir,
-        'main_repo',
-        '.git',
-        'info',
-      );
+      const commonDir = path.join(testRootDir, 'main_repo', '.git');
+      const commonExcludeDir = path.join(commonDir, 'info');
       await fs.mkdir(commonExcludeDir, { recursive: true });
       const commonExcludePath = path.join(commonExcludeDir, 'exclude');
       await fs.writeFile(commonExcludePath, 'worktree_ignore.txt');
 
       (spawnAsync as Mock).mockImplementation(
         async (_cmd: string, args: string[]) => {
+          if (args[0] === 'rev-parse' && args.includes('--git-common-dir')) {
+            return {
+              stdout: `${commonDir}\n`,
+              stderr: '',
+            };
+          }
           if (args[0] === 'rev-parse' && args.includes('info/exclude')) {
             return {
               stdout: `${commonExcludePath}\n`,
@@ -348,6 +350,30 @@ describe('GitService', () => {
       const hiddenExcludePath = path.join(repoDir, '.git', 'info', 'exclude');
       const copiedContent = await fs.readFile(hiddenExcludePath, 'utf-8');
       expect(copiedContent).toBe('worktree_ignore.txt');
+    });
+
+    it('should reject path traversal in rev-parse info/exclude output', async () => {
+      (spawnAsync as Mock).mockImplementation(
+        async (_cmd: string, args: string[]) => {
+          if (args[0] === 'rev-parse' && args.includes('info/exclude')) {
+            return {
+              stdout: '../../../../etc/passwd\n',
+              stderr: '',
+            };
+          }
+          if (args[0] === '--version') {
+            return { stdout: 'git version 2.0.0', stderr: '' };
+          }
+          throw new Error('Command failed');
+        },
+      );
+
+      const service = new GitService(projectRoot, storage);
+      await service.setupShadowGitRepository();
+
+      const hiddenExcludePath = path.join(repoDir, '.git', 'info', 'exclude');
+      const content = await fs.readFile(hiddenExcludePath, 'utf-8');
+      expect(content).toBe('');
     });
 
     it('should handle missing info/exclude gracefully', async () => {
