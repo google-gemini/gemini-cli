@@ -225,7 +225,24 @@ export class GitService {
         gitCommonDir = safeResolve(path.resolve(realProjectRoot, trimmed));
       }
     } catch {
-      // rev-parse might fail if not a git repository
+      try {
+        const { stdout } = await spawnAsync(
+          'git',
+          ['rev-parse', '--git-common-dir'],
+          { cwd: realProjectRoot, env: getSafeGitEnv() },
+        );
+        const trimmed = stdout.trim();
+        if (
+          trimmed &&
+          !trimmed.includes('\0') &&
+          !trimmed.includes('\n') &&
+          !trimmed.includes('\r')
+        ) {
+          gitCommonDir = safeResolve(path.resolve(realProjectRoot, trimmed));
+        }
+      } catch {
+        // rev-parse might fail if not a git repository
+      }
     }
 
     try {
@@ -309,7 +326,11 @@ export class GitService {
       try {
         userExcludeContent = await fs.readFile(projectInfoExcludePath, 'utf-8');
       } catch (error) {
-        if (isNodeError(error) && error.code !== 'ENOENT') {
+        if (
+          isNodeError(error) &&
+          error.code !== 'ENOENT' &&
+          error.code !== 'ENOTDIR'
+        ) {
           throw error;
         }
       }

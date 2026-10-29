@@ -385,6 +385,61 @@ describe('GitService', () => {
       expect(content).toBe('');
     });
 
+    it('should fall back to git rev-parse --git-common-dir without path-format on older Git', async () => {
+      const commonDir = path.join(testRootDir, 'main_repo', '.git');
+      const commonExcludeDir = path.join(commonDir, 'info');
+      await fs.mkdir(commonExcludeDir, { recursive: true });
+      const commonExcludePath = path.join(commonExcludeDir, 'exclude');
+      await fs.writeFile(commonExcludePath, 'older_git_ignore.txt');
+
+      (spawnAsync as Mock).mockImplementation(
+        async (_cmd: string, args: string[]) => {
+          if (
+            args[0] === 'rev-parse' &&
+            args.includes('--path-format=absolute')
+          ) {
+            throw new Error('unknown option --path-format=absolute');
+          }
+          if (args[0] === 'rev-parse' && args.includes('--git-common-dir')) {
+            return {
+              stdout: `${commonDir}\n`,
+              stderr: '',
+            };
+          }
+          if (args[0] === 'rev-parse' && args.includes('info/exclude')) {
+            return {
+              stdout: `${commonExcludePath}\n`,
+              stderr: '',
+            };
+          }
+          if (args[0] === '--version') {
+            return { stdout: 'git version 2.0.0', stderr: '' };
+          }
+          throw new Error('Command failed');
+        },
+      );
+
+      const service = new GitService(projectRoot, storage);
+      await service.setupShadowGitRepository();
+
+      const hiddenExcludePath = path.join(repoDir, '.git', 'info', 'exclude');
+      const copiedContent = await fs.readFile(hiddenExcludePath, 'utf-8');
+      expect(copiedContent).toBe('older_git_ignore.txt');
+    });
+
+    it('should ignore ENOTDIR error when reading project info/exclude (e.g. .git is a file)', async () => {
+      // Create .git as a file to simulate submodule or worktree with failed rev-parse
+      const dotGitFile = path.join(projectRoot, '.git');
+      await fs.writeFile(dotGitFile, 'gitdir: /some/path');
+
+      const service = new GitService(projectRoot, storage);
+      await service.setupShadowGitRepository();
+
+      const hiddenExcludePath = path.join(repoDir, '.git', 'info', 'exclude');
+      const content = await fs.readFile(hiddenExcludePath, 'utf-8');
+      expect(content).toBe('');
+    });
+
     it('should reject core.excludesFile containing null bytes or newlines', async () => {
       (spawnAsync as Mock).mockImplementation(
         async (_cmd: string, args: string[]) => {
