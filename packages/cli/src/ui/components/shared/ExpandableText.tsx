@@ -127,13 +127,13 @@ const _ExpandableText: React.FC<ExpandableTextProps> = ({
     match = slicedLabel
       .slice(finalMatchIndex, finalMatchIndex + matchCharactersLength)
       .join('');
-    const afterChars = slicedLabel.slice(finalMatchIndex + matchCharactersLength);
+    const afterChars = slicedLabel.slice(
+      finalMatchIndex + matchCharactersLength,
+    );
 
     if (start > 0) {
       before =
-        beforeChars.length >= 3
-          ? '...' + beforeChars.slice(3).join('')
-          : '...';
+        beforeChars.length >= 3 ? '...' + beforeChars.slice(3).join('') : '...';
     } else {
       before = beforeChars.join('');
     }
