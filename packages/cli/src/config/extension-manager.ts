@@ -1360,7 +1360,6 @@ async function acquireExtensionInstallLock(
     return await lock(destinationPath, {
       // `destinationPath` usually does not exist yet, so it cannot be resolved.
       realpath: false,
-      lockfilePath: `${destinationPath}${INSTALL_LOCK_SUFFIX}`,
       stale: INSTALL_LOCK_STALE_MS,
       retries: INSTALL_LOCK_RETRIES,
       // The default handler throws from a timer, which would crash the CLI.
