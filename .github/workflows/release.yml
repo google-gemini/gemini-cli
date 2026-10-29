@@ -1,0 +1,38 @@
+name: Publish npm Packages via OSS Exit Gate
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 20
+      - uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed
+        with:
+          workload_identity_provider: 'projects/305452601764/locations/global/workloadIdentityPools/builders/providers/github'
+      - uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f
+      - name: Stage npm packages to OSS Exit Gate and upload manifest
+        run: |
+          cat << 'EOF' > .npmrc
+          registry=https://us-npm.pkg.dev/oss-exit-gate-prod/gemini-cli--npm/
+          //us-npm.pkg.dev/oss-exit-gate-prod/gemini-cli--npm/:always-auth=true
+          EOF
+          npx --yes --registry=https://registry.npmjs.org/ google-artifactregistry-auth --repo-config=.npmrc --credential-config="$HOME/.npmrc"
+          npm publish --registry="https://us-npm.pkg.dev/oss-exit-gate-prod/gemini-cli--npm/"
+          echo '{"publish_all": true}' > manifest.json
+          gcloud storage cp manifest.json \
+            "gs://oss-exit-gate-prod-projects-bucket/gemini-cli/npm/manifests/manifest-${{ github.run_id }}-${{ github.run_attempt }}.json"
