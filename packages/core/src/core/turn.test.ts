@@ -744,6 +744,47 @@ describe('Turn', () => {
       ]);
     });
 
+    it('should drop pending tool calls from a failed attempt when a retry occurs', async () => {
+      const mockResponseStream = (async function* () {
+        yield {
+          type: StreamEventType.CHUNK,
+          value: {
+            functionCalls: [
+              { id: 'failed-call', name: 'tool1', args: { attempt: 1 } },
+            ],
+          } as unknown as GenerateContentResponse,
+        };
+        yield { type: StreamEventType.RETRY };
+        yield {
+          type: StreamEventType.CHUNK,
+          value: {
+            functionCalls: [
+              { id: 'retried-call', name: 'tool1', args: { attempt: 2 } },
+            ],
+          } as unknown as GenerateContentResponse,
+        };
+      })();
+      mockSendMessageStream.mockResolvedValue(mockResponseStream);
+
+      const events = [];
+      for await (const event of turn.run(
+        { model: 'gemini' },
+        [],
+        new AbortController().signal,
+      )) {
+        events.push(event);
+      }
+
+      expect(events.map((event) => event.type)).toEqual([
+        GeminiEventType.ToolCallRequest,
+        GeminiEventType.Retry,
+        GeminiEventType.ToolCallRequest,
+      ]);
+      // Only the calls of the attempt that entered history stay pending.
+      expect(turn.pendingToolCalls).toHaveLength(1);
+      expect(turn.pendingToolCalls[0].callId).toBe('tool1__retried-call');
+    });
+
     it.each([
       {
         description: 'should yield content events with traceId',

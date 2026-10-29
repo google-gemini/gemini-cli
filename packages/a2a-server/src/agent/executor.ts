@@ -777,6 +777,11 @@ export class CoderAgentExecutor implements AgentExecutor {
                 );
                 throw new Error('Execution aborted');
               }
+              if (event.type === GeminiEventType.Retry) {
+                // Tool calls streamed by the failed attempt are not in
+                // history; drop them so they are not executed twice.
+                toolCallRequests.length = 0;
+              }
               if (event.type === GeminiEventType.ToolCallRequest) {
                 toolCallRequests.push(event.value);
                 continue;
