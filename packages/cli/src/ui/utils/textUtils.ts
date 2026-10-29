@@ -166,12 +166,7 @@ export function sanitizeForDisplay(str: string, maxLength?: number): string {
   return sanitized;
 }
 
-/**
- * Normalizes escaped newline characters (e.g., "\\n") into actual newline characters.
- */
-export function normalizeEscapedNewlines(value: string): string {
-  return value.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n');
-}
+export { normalizeEscapedNewlines } from '@google/gemini-cli-core';
 
 const stringWidthCache = new LRUCache<string, number>(
   LRU_BUFFER_PERF_CACHE_LIMIT,

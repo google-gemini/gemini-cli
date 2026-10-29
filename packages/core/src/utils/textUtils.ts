@@ -188,3 +188,203 @@ export function wrapUntrusted(text: string, source?: string): string {
   const attributes = normalizedSource ? ` source="${normalizedSource}"` : '';
   return `<untrusted_context${attributes}>\n${escaped}\n</untrusted_context>`;
 }
+
+const NON_CODE_ESCAPED_NEWLINE_REGEX =
+  /("(?:\\r\\n|\\n)"|'(?:\\r\\n|\\n)'|\\\\)|\\r\\n|\\n/g;
+
+function isWindowsDrivePathSegment(
+  segment: string,
+  offset: number,
+  matchLen: number,
+): boolean {
+  if (offset < 2 || offset + matchLen >= segment.length) {
+    return false;
+  }
+  const nextCode = segment.charCodeAt(offset + matchLen);
+  const isAlphaOrDigitOrPathPunct =
+    (nextCode >= 65 && nextCode <= 90) ||
+    (nextCode >= 97 && nextCode <= 122) ||
+    (nextCode >= 48 && nextCode <= 57) ||
+    nextCode === 95 ||
+    nextCode === 46 ||
+    nextCode === 45;
+  if (!isAlphaOrDigitOrPathPunct) {
+    return false;
+  }
+  if (
+    nextCode >= 65 &&
+    nextCode <= 90 &&
+    segment.charCodeAt(offset - 1) !== 58 /* : */
+  ) {
+    let q = offset + matchLen + 1;
+    while (q < segment.length) {
+      const ch = segment.charCodeAt(q);
+      const isWordChar =
+        (ch >= 65 && ch <= 90) ||
+        (ch >= 97 && ch <= 122) ||
+        (ch >= 48 && ch <= 57) ||
+        ch === 95 ||
+        ch === 45;
+      if (!isWordChar) {
+        break;
+      }
+      q++;
+    }
+    const following = q < segment.length ? segment.charCodeAt(q) : -1;
+    if (following !== 92 /* \ */ && following !== 46 /* . */) {
+      return false;
+    }
+  }
+  let p = offset;
+  while (p > 0) {
+    const c = segment.charCodeAt(p - 1);
+    if (
+      c === 92 /* \ */ &&
+      p + 1 === offset &&
+      segment.charCodeAt(p) === 110 /* n */
+    ) {
+      return false;
+    }
+    const isPathChar =
+      (c >= 65 && c <= 90) ||
+      (c >= 97 && c <= 122) ||
+      (c >= 48 && c <= 57) ||
+      c === 95 ||
+      c === 46 ||
+      c === 45 ||
+      c === 92;
+    if (!isPathChar) {
+      break;
+    }
+    p--;
+  }
+  if (p < 2 || segment.charCodeAt(p - 1) !== 58 /* : */) {
+    return false;
+  }
+  const drive = segment.charCodeAt(p - 2);
+  if (!((drive >= 65 && drive <= 90) || (drive >= 97 && drive <= 122))) {
+    return false;
+  }
+  if (p >= 3) {
+    const beforeDrive = segment.charCodeAt(p - 3);
+    const isWordOrPathPrefix =
+      (beforeDrive >= 65 && beforeDrive <= 90) ||
+      (beforeDrive >= 97 && beforeDrive <= 122) ||
+      (beforeDrive >= 48 && beforeDrive <= 57) ||
+      beforeDrive === 95 ||
+      beforeDrive === 46 ||
+      beforeDrive === 45 ||
+      beforeDrive === 92 ||
+      beforeDrive === 47 ||
+      beforeDrive === 58;
+    if (isWordOrPathPrefix) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function normalizeNonCodeSegment(segment: string): string {
+  return segment.replace(
+    NON_CODE_ESCAPED_NEWLINE_REGEX,
+    (match, preserved: string | undefined, offset: number) => {
+      if (preserved !== undefined) {
+        return preserved;
+      }
+      if (isWindowsDrivePathSegment(segment, offset, match.length)) {
+        return match;
+      }
+      return '\n';
+    },
+  );
+}
+
+interface BacktickRun {
+  start: number;
+  end: number;
+  len: number;
+  escaped: boolean;
+}
+
+/**
+ * Normalizes unescaped newline sequences (e.g., "\\n", "\\r\\n") into actual
+ * newline characters while preserving escaped backslashes ("\\\\n"), Windows
+ * drive paths (e.g., "C:\\new_folder", "D:\\notes"), inline/fenced code blocks
+ * (e.g., "`\\n`"), and standalone quoted escape tokens (e.g., '"\\n"').
+ */
+export function normalizeEscapedNewlines(value: string): string {
+  if (!value.includes('\\n')) {
+    return value;
+  }
+  if (!value.includes('`')) {
+    return normalizeNonCodeSegment(value);
+  }
+
+  const runs: BacktickRun[] = [];
+  let i = 0;
+
+  while (i < value.length) {
+    if (value.charCodeAt(i) === 96 /* ` */) {
+      let end = i + 1;
+      while (end < value.length && value.charCodeAt(end) === 96) {
+        end++;
+      }
+      let backslashes = 0;
+      while (
+        i - 1 - backslashes >= 0 &&
+        value.charCodeAt(i - 1 - backslashes) === 92 /* \ */
+      ) {
+        backslashes++;
+      }
+      const len = end - i;
+      const escaped = backslashes % 2 === 1;
+      runs.push({ start: i, end, len, escaped });
+      i = end;
+      continue;
+    }
+    i++;
+  }
+
+  const isIgnoredSingleTick = (run: BacktickRun): boolean =>
+    run.len === 1 && run.escaped;
+
+  const maxRunIndexByLen = new Map<number, number>();
+  for (let idx = 0; idx < runs.length; idx++) {
+    if (!isIgnoredSingleTick(runs[idx])) {
+      maxRunIndexByLen.set(runs[idx].len, idx);
+    }
+  }
+
+  let lastIndex = 0;
+  let result = '';
+  let r = 0;
+
+  while (r < runs.length) {
+    const openRun = runs[r];
+    if (
+      isIgnoredSingleTick(openRun) ||
+      (maxRunIndexByLen.get(openRun.len) ?? -1) <= r
+    ) {
+      r++;
+      continue;
+    }
+
+    let closeIdx = r + 1;
+    while (
+      closeIdx < runs.length &&
+      (runs[closeIdx].len !== openRun.len ||
+        isIgnoredSingleTick(runs[closeIdx]))
+    ) {
+      closeIdx++;
+    }
+
+    const closeRun = runs[closeIdx];
+    result += normalizeNonCodeSegment(value.slice(lastIndex, openRun.start));
+    result += value.slice(openRun.start, closeRun.end);
+    lastIndex = closeRun.end;
+    r = closeIdx + 1;
+  }
+
+  result += normalizeNonCodeSegment(value.slice(lastIndex));
+  return result;
+}
