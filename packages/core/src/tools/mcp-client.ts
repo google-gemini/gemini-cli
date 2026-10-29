@@ -1322,94 +1322,102 @@ export async function discoverTools(
     // Only request tools if the server supports them.
     if (mcpClient.getServerCapabilities()?.tools == null) return [];
 
-    const response = await mcpClient.listTools({}, options);
     const discoveredTools: DiscoveredMCPTool[] = [];
-    for (const toolDef of response.tools) {
-      try {
-        if (!isEnabled(toolDef, mcpServerName, mcpServerConfig)) {
-          continue;
-        }
-
-        if (toolDef.inputSchema) {
-          try {
-            const transform = (obj: unknown): unknown => {
-              if (obj === null || typeof obj !== 'object') return obj;
-              if (Array.isArray(obj)) return obj.map(transform);
-
-              const res = { ...obj } as Record<string, unknown>;
-
-              if (Array.isArray(res['type']) && res['type'].length === 2) {
-                const nIdx = res['type'].indexOf('null');
-                if (nIdx !== -1 && typeof res['type'][1 - nIdx] === 'string') {
-                  res['type'] = res['type'][1 - nIdx];
-                  res['nullable'] = true;
-                }
-              }
-
-              for (const k in res) {
-                if (Object.prototype.hasOwnProperty.call(res, k)) {
-                  res[k] = transform(res[k]);
-                }
-              }
-              return res;
-            };
-
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            toolDef.inputSchema = transform(toolDef.inputSchema) as {
-              type: 'object';
-              properties?: Record<string, object>;
-              required?: string[];
-            };
-          } catch (error) {
-            cliConfig.emitMcpDiagnostic(
-              'error',
-              `Failed to parse adjusted inputSchema for tool '${toolDef.name}' from server '${mcpServerName}'. Using original schema. Error: ${error instanceof Error ? error.message : String(error)}`,
-              error,
-              mcpServerName,
-            );
+    let cursor: string | undefined;
+    do {
+      const response = await mcpClient.listTools(
+        cursor ? { cursor } : {},
+        options,
+      );
+      for (const toolDef of response.tools) {
+        try {
+          if (!isEnabled(toolDef, mcpServerName, mcpServerConfig)) {
+            continue;
           }
+
+          if (toolDef.inputSchema) {
+            try {
+              const transform = (obj: unknown): unknown => {
+                if (obj === null || typeof obj !== 'object') return obj;
+                if (Array.isArray(obj)) return obj.map(transform);
+
+                const res = { ...obj } as Record<string, unknown>;
+
+                if (Array.isArray(res['type']) && res['type'].length === 2) {
+                  const nIdx = res['type'].indexOf('null');
+                  if (nIdx !== -1 && typeof res['type'][1 - nIdx] === 'string') {
+                    res['type'] = res['type'][1 - nIdx];
+                    res['nullable'] = true;
+                  }
+                }
+
+                for (const k in res) {
+                  if (Object.prototype.hasOwnProperty.call(res, k)) {
+                    res[k] = transform(res[k]);
+                  }
+                }
+                return res;
+              };
+
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              toolDef.inputSchema = transform(toolDef.inputSchema) as {
+                type: 'object';
+                properties?: Record<string, object>;
+                required?: string[];
+              };
+            } catch (error) {
+              cliConfig.emitMcpDiagnostic(
+                'error',
+                `Failed to parse adjusted inputSchema for tool '${toolDef.name}' from server '${mcpServerName}'. Using original schema. Error: ${error instanceof Error ? error.message : String(error)}`,
+                error,
+                mcpServerName,
+              );
+            }
+          }
+
+          const mcpCallableTool = new McpCallableTool(
+            mcpClient,
+            toolDef,
+            mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
+            options?.progressReporter,
+          );
+
+          // Extract annotations from the tool definition
+          const annotations = toolDef.annotations;
+          const isReadOnly = annotations?.readOnlyHint === true;
+
+          const tool = new DiscoveredMCPTool(
+            mcpCallableTool,
+            mcpServerName,
+            toolDef.name,
+            toolDef.description ?? '',
+            toolDef.inputSchema ?? { type: 'object', properties: {} },
+            messageBus,
+            mcpServerConfig.trust,
+            isReadOnly,
+            undefined,
+            cliConfig,
+            mcpServerConfig.extension?.name,
+            mcpServerConfig.extension?.id,
+            annotations as Record<string, unknown> | undefined,
+          );
+
+          discoveredTools.push(tool);
+        } catch (error) {
+          cliConfig.emitMcpDiagnostic(
+            'error',
+            `Error discovering tool: '${
+              toolDef.name
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            }' from MCP server '${mcpServerName}': ${(error as Error).message}`,
+            error,
+            mcpServerName,
+          );
         }
-
-        const mcpCallableTool = new McpCallableTool(
-          mcpClient,
-          toolDef,
-          mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
-          options?.progressReporter,
-        );
-
-        // Extract annotations from the tool definition
-        const annotations = toolDef.annotations;
-        const isReadOnly = annotations?.readOnlyHint === true;
-
-        const tool = new DiscoveredMCPTool(
-          mcpCallableTool,
-          mcpServerName,
-          toolDef.name,
-          toolDef.description ?? '',
-          toolDef.inputSchema ?? { type: 'object', properties: {} },
-          messageBus,
-          mcpServerConfig.trust,
-          isReadOnly,
-          undefined,
-          cliConfig,
-          mcpServerConfig.extension?.name,
-          mcpServerConfig.extension?.id,
-          annotations as Record<string, unknown> | undefined,
-        );
-
-        discoveredTools.push(tool);
-      } catch (error) {
-        cliConfig.emitMcpDiagnostic(
-          'error',
-          `Error discovering tool: '${
-            toolDef.name
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          }' from MCP server '${mcpServerName}': ${(error as Error).message}`,
-          error,
-          mcpServerName,
-        );
       }
-    }
+      cursor = response.nextCursor ?? undefined;
+    } while (cursor);
+
     return discoveredTools;
   } catch (error) {
     if (!isMcpMethodNotFoundError(error)) {
