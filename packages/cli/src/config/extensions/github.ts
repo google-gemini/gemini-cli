@@ -125,7 +125,9 @@ export function tryParseGithubUrl(source: string): GithubRepoInfo | null {
     );
   }
   const owner = parts[0];
-  const repo = parts[1].replace('.git', '');
+  // Only strip a trailing `.git` suffix (case-insensitive) so names that
+  // contain `.git` elsewhere, e.g. `blog.github.io`, are preserved.
+  const repo = parts[1].replace(/\.git$/i, '');
 
   return {
     owner,
