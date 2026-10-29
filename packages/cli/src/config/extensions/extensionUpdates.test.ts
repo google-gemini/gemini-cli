@@ -314,7 +314,7 @@ describe('extensionUpdates', () => {
       expect(lock).toHaveBeenCalledWith(
         '/mock/extensions/test-ext',
         expect.objectContaining({
-          lockfilePath: '/mock/extensions/test-ext.lock',
+          realpath: false,
         }),
       );
       expect(releaseLock).toHaveBeenCalledOnce();
