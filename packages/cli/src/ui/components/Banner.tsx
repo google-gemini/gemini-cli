@@ -7,6 +7,7 @@
 import { Box, Text } from 'ink';
 import { ThemedGradient } from './ThemedGradient.js';
 import { theme } from '../semantic-colors.js';
+import { normalizeEscapedNewlines } from '../utils/textUtils.js';
 import type { ReactNode } from 'react';
 
 export function getFormattedBannerContent(
@@ -14,7 +15,7 @@ export function getFormattedBannerContent(
   isWarning: boolean,
   subsequentLineColor: string,
 ): ReactNode {
-  const text = rawText.replace(/\\n/g, '\n');
+  const text = normalizeEscapedNewlines(rawText);
   const lines = text.split('\n');
 
   return lines.map((line, index) => {
