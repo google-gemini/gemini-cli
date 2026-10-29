@@ -359,6 +359,54 @@ describe('GitService', () => {
       expect(content).toBe('');
     });
 
+    it('should reject core.excludesFile containing null bytes or newlines', async () => {
+      (spawnAsync as Mock).mockImplementation(
+        async (_cmd: string, args: string[]) => {
+          if (args[0] === 'config') {
+            return {
+              stdout: '/path/to/global/.gitignore\ninjection = true\n',
+              stderr: '',
+            };
+          }
+          if (args[0] === '--version') {
+            return { stdout: 'git version 2.0.0', stderr: '' };
+          }
+          throw new Error('Command failed');
+        },
+      );
+
+      const service = new GitService(projectRoot, storage);
+      await service.setupShadowGitRepository();
+
+      const gitConfigPath = path.join(repoDir, '.gitconfig');
+      const content = await fs.readFile(gitConfigPath, 'utf-8');
+      expect(content).not.toContain('excludesFile');
+    });
+
+    it('should reject info/exclude path containing null bytes or newlines', async () => {
+      (spawnAsync as Mock).mockImplementation(
+        async (_cmd: string, args: string[]) => {
+          if (args[0] === 'rev-parse' && args.includes('info/exclude')) {
+            return {
+              stdout: '/malicious/path\0something\n',
+              stderr: '',
+            };
+          }
+          if (args[0] === '--version') {
+            return { stdout: 'git version 2.0.0', stderr: '' };
+          }
+          throw new Error('Command failed');
+        },
+      );
+
+      const service = new GitService(projectRoot, storage);
+      await service.setupShadowGitRepository();
+
+      const hiddenExcludePath = path.join(repoDir, '.git', 'info', 'exclude');
+      const content = await fs.readFile(hiddenExcludePath, 'utf-8');
+      expect(content).toBe('');
+    });
+
     it('should not create a .gitignore in shadow repo if project .gitignore does not exist', async () => {
       const service = new GitService(projectRoot, storage);
       await service.setupShadowGitRepository();

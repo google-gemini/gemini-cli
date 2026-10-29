@@ -147,7 +147,12 @@ export class GitService {
         { env: getSafeGitEnv() },
       );
       const trimmed = stdout.trim();
-      if (trimmed) {
+      if (
+        trimmed &&
+        !trimmed.includes('\0') &&
+        !trimmed.includes('\n') &&
+        !trimmed.includes('\r')
+      ) {
         coreExcludesPath = trimmed;
       }
     } catch {
@@ -195,7 +200,12 @@ export class GitService {
         { cwd: this.projectRoot, env: getSafeGitEnv() },
       );
       const trimmed = stdout.trim();
-      if (trimmed) {
+      if (
+        trimmed &&
+        !trimmed.includes('\0') &&
+        !trimmed.includes('\n') &&
+        !trimmed.includes('\r')
+      ) {
         projectInfoExcludePath = path.resolve(this.projectRoot, trimmed);
       }
     } catch {
@@ -206,7 +216,12 @@ export class GitService {
           { cwd: this.projectRoot, env: getSafeGitEnv() },
         );
         const trimmed = stdout.trim();
-        if (trimmed) {
+        if (
+          trimmed &&
+          !trimmed.includes('\0') &&
+          !trimmed.includes('\n') &&
+          !trimmed.includes('\r')
+        ) {
           projectInfoExcludePath = path.resolve(this.projectRoot, trimmed);
         }
       } catch {
