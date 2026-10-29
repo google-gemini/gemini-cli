@@ -184,6 +184,30 @@ Return the summary string which should first contain an overall summarization of
       const contents = calledWith[1];
       expect(contents[0].parts[0].text).toBe(expectedPrompt);
     });
+
+    it('should preserve $ replacement patterns literally in textToSummarize', async () => {
+      const dollarPayload =
+        "echo $'\\n' && price=$$100 && match=$& && prefix=$`suffix ";
+      const longText = dollarPayload + 'x'.repeat(2000);
+      (mockGeminiClient.generateContent as Mock).mockResolvedValue({
+        candidates: [{ content: { parts: [{ text: 'Summary.' }] } }],
+      });
+
+      await summarizeToolOutput(
+        mockConfigInstance,
+        { model: DEFAULT_GEMINI_MODEL },
+        longText,
+        mockGeminiClient,
+        abortSignal,
+      );
+
+      const calledWith = (mockGeminiClient.generateContent as Mock).mock
+        .calls[0];
+      const contents = calledWith[1];
+      const promptText = contents[0].parts[0].text;
+      expect(promptText).toContain(`"${longText}"`);
+      expect(promptText).not.toContain('{{textToSummarize}}');
+    });
   });
 
   describe('llmSummarizer', () => {
