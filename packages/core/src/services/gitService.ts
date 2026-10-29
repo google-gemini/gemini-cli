@@ -163,9 +163,11 @@ export class GitService {
     // preferences for the shadow repository, so we create a dedicated gitconfig.
     let gitConfigContent = `[user]\n  name = ${SHADOW_REPO_AUTHOR_NAME}\n  email = ${SHADOW_REPO_AUTHOR_EMAIL}\n[commit]\n  gpgsign = false\n`;
     if (coreExcludesPath) {
-      const sanitizedPath = coreExcludesPath
-        .replace(/\\/g, '/')
-        .replace(/"/g, '\\"');
+      const sanitizedPath = (
+        process.platform === 'win32'
+          ? coreExcludesPath.replace(/\\/g, '/')
+          : coreExcludesPath.replace(/\\/g, () => '\\\\')
+      ).replace(/"/g, '\\"');
       gitConfigContent += `[core]\n  excludesFile = "${sanitizedPath}"\n`;
     }
     await fs.writeFile(gitConfigPath, gitConfigContent);
