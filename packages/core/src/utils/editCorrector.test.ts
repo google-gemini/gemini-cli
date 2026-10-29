@@ -260,5 +260,33 @@ describe('editCorrector', () => {
 
       expect(result).toBe(content);
     });
+
+    it('should instruct LLM to preserve valid \\n escape sequences in string literals when LLM correction is enabled', async () => {
+      const content = 'const text = "bar\\\\nbaz";';
+      const correctedContent = 'const text = "bar\\nbaz";';
+      mockResponses.push({
+        corrected_string_escaping: correctedContent,
+      });
+
+      const result = await ensureCorrectFileContent(
+        content,
+        mockBaseLlmClientInstance,
+        abortSignal,
+        false, // disableLLMCorrection
+        false,
+      );
+
+      expect(result).toBe(correctedContent);
+      expect(mockGenerateJson).toHaveBeenCalledTimes(1);
+      const callArgs = mockGenerateJson.mock.calls[0][0];
+      const promptText = callArgs.contents[0].parts[0].text as string;
+      expect(promptText).toContain(
+        '<untrusted_context>\nconst text = "bar\\\\nbaz";\n</untrusted_context>',
+      );
+      expect(promptText).toContain(
+        'if potentially_problematic_string is "bar\\\\nbaz", the corrected_string_escaping should be "bar\\nbaz"',
+      );
+      expect(promptText).not.toContain('should be "bar\nbaz"');
+    });
   });
 });

@@ -451,6 +451,45 @@ describe('AskUserTool', () => {
         expect(details.questions[0].type).toBe(QuestionType.CHOICE);
       }
     });
+
+    it('should normalize escaped newlines while preserving code spans and escaped backslashes', async () => {
+      const questions: Question[] = [
+        {
+          question: 'First line\\nSecond line with `\\n` and "\\n" and \\\\n',
+          header: 'Newlines',
+          type: QuestionType.CHOICE,
+          options: [
+            {
+              label: 'Keep `\\n`',
+              description: 'Line 1\\r\\nLine 2 with `str.split("\\n")`',
+            },
+            {
+              label: 'Option B',
+              description: 'Path C:\\\\new_folder',
+            },
+          ],
+        },
+      ];
+
+      const invocation = tool.build({ questions });
+      const details = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+
+      expect(details).not.toBe(false);
+      if (details && details.type === 'ask_user') {
+        expect(details.questions[0].question).toBe(
+          'First line\nSecond line with `\\n` and "\\n" and \\\\n',
+        );
+        expect(details.questions[0].options?.[0].label).toBe('Keep `\\n`');
+        expect(details.questions[0].options?.[0].description).toBe(
+          'Line 1\nLine 2 with `str.split("\\n")`',
+        );
+        expect(details.questions[0].options?.[1].description).toBe(
+          'Path C:\\\\new_folder',
+        );
+      }
+    });
   });
 
   describe('execute', () => {
