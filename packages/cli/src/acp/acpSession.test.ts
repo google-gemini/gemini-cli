@@ -30,6 +30,11 @@ import {
   MessageBusType,
   type ToolConfirmationRequest,
   DiscoveredMCPTool,
+  BeforeToolHookOutput,
+  DefaultHookOutput,
+  type HookSystem,
+  CoreToolCallStatus,
+  ToolErrorType,
 } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../config/settings.js';
 import { type Part, FinishReason } from '@google/genai';
@@ -137,6 +142,7 @@ describe('Session', () => {
       getTargetDir: vi.fn().mockReturnValue('/tmp'),
       getEnableRecursiveFileSearch: vi.fn().mockReturnValue(false),
       getDebugMode: vi.fn().mockReturnValue(false),
+      getHookSystem: vi.fn(),
       getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
       setApprovalMode: vi.fn(),
       setModel: vi.fn(),
@@ -493,6 +499,371 @@ describe('Session', () => {
           },
         },
       },
+    });
+  });
+
+  describe('tool hooks', () => {
+    let hooks: Pick<HookSystem, 'fireBeforeToolEvent' | 'fireAfterToolEvent'>;
+    let execute: Mock;
+    let shouldConfirmExecute: Mock;
+    let toolArgs: Record<string, unknown>;
+    let requests: ServerGeminiStreamEvent[];
+
+    beforeEach(() => {
+      hooks = {
+        fireBeforeToolEvent: vi.fn().mockResolvedValue(undefined),
+        fireAfterToolEvent: vi.fn().mockResolvedValue(undefined),
+      };
+      mockConfig.getHookSystem.mockReturnValue(hooks as HookSystem);
+      execute = vi.fn().mockResolvedValue({ llmContent: 'Tool Result' });
+      shouldConfirmExecute = vi.fn().mockResolvedValue(null);
+      toolArgs = { foo: 'bar' };
+      mockTool.build.mockImplementation((params: Record<string, unknown>) => ({
+        params,
+        getDescription: () => 'Test Tool',
+        toolLocations: () => [],
+        shouldConfirmExecute,
+        execute,
+      }));
+      requests = [
+        {
+          type: GeminiEventType.ToolCallRequest,
+          value: {
+            callId: 'call-1',
+            name: 'test_tool',
+            args: toolArgs,
+            isClientInitiated: false,
+            prompt_id: 'prompt-1',
+          },
+        },
+      ];
+      mockSendMessageStream
+        .mockReturnValueOnce(createMockStream(requests))
+        .mockReturnValueOnce(createMockStream([]));
+    });
+
+    const prompt = () =>
+      session.prompt({
+        sessionId: 'session-1',
+        prompt: [{ type: 'text', text: 'Call tool' }],
+      });
+
+    it('does not execute a tool blocked by BeforeTool', async () => {
+      vi.mocked(hooks.fireBeforeToolEvent).mockResolvedValue(
+        new BeforeToolHookOutput({
+          decision: 'block',
+          reason: 'Blocked by policy',
+        }),
+      );
+
+      await prompt();
+
+      expect(execute).not.toHaveBeenCalled();
+      expect(hooks.fireAfterToolEvent).not.toHaveBeenCalled();
+      expect(mockSendMessageStream.mock.calls[1][0]).toEqual([
+        {
+          functionResponse: {
+            id: 'call-1',
+            name: 'test_tool',
+            response: { error: 'Tool execution blocked: Blocked by policy' },
+          },
+        },
+      ]);
+      expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          update: expect.objectContaining({
+            toolCallId: 'call-1',
+            status: 'failed',
+          }),
+        }),
+      );
+      const toolUpdates = mockConnection.sessionUpdate.mock.calls
+        .map(([notification]) => notification.update)
+        .filter(
+          (update) =>
+            update.sessionUpdate === 'tool_call' ||
+            update.sessionUpdate === 'tool_call_update',
+        );
+      expect(toolUpdates).toMatchObject([
+        { sessionUpdate: 'tool_call', toolCallId: 'call-1', status: 'pending' },
+        {
+          sessionUpdate: 'tool_call_update',
+          toolCallId: 'call-1',
+          status: 'failed',
+        },
+      ]);
+      expect(mockChat.recordCompletedToolCalls).toHaveBeenCalledWith(
+        'gemini-pro',
+        [
+          expect.objectContaining({
+            status: CoreToolCallStatus.Error,
+            response: expect.objectContaining({
+              errorType: ToolErrorType.POLICY_VIOLATION,
+            }),
+          }),
+        ],
+      );
+    });
+
+    it('passes the tool result through AfterTool', async () => {
+      vi.mocked(hooks.fireAfterToolEvent).mockResolvedValue(
+        new DefaultHookOutput({
+          hookSpecificOutput: { additionalContext: 'Hook context' },
+        }),
+      );
+
+      await prompt();
+
+      expect(hooks.fireBeforeToolEvent).toHaveBeenCalledWith(
+        'test_tool',
+        { foo: 'bar' },
+        undefined,
+        undefined,
+      );
+      expect(hooks.fireBeforeToolEvent).toHaveBeenCalledOnce();
+      expect(execute).toHaveBeenCalledOnce();
+      expect(hooks.fireAfterToolEvent).toHaveBeenCalledWith(
+        'test_tool',
+        { foo: 'bar' },
+        {
+          llmContent: 'Tool Result',
+          returnDisplay: undefined,
+          error: undefined,
+        },
+        undefined,
+        undefined,
+      );
+      expect(mockSendMessageStream.mock.calls[1][0]).toEqual([
+        {
+          functionResponse: {
+            id: 'call-1',
+            name: 'test_tool',
+            response: {
+              output:
+                'Tool Result\n\n<hook_context>Hook context</hook_context>',
+            },
+          },
+        },
+      ]);
+    });
+
+    it.each(['proceed_once', 'cancelled', 'policy_denied'] as const)(
+      'checks the modified input before execution (%s)',
+      async (outcome) => {
+        toolArgs.required = 'keep';
+        vi.mocked(hooks.fireBeforeToolEvent).mockResolvedValue(
+          new BeforeToolHookOutput({
+            hookSpecificOutput: { tool_input: { foo: 'updated' } },
+          }),
+        );
+        const confirmation = { type: 'info', onConfirm: vi.fn() };
+        const confirmModified =
+          outcome === 'policy_denied'
+            ? vi.fn().mockRejectedValue(new Error('Denied by policy'))
+            : vi.fn().mockResolvedValue(confirmation);
+        mockTool.build.mockImplementation((params: Record<string, unknown>) => {
+          if (params.required !== 'keep') {
+            throw new Error('Missing required argument');
+          }
+          return {
+            params,
+            getDescription: () => String(params.foo),
+            toolLocations: () => [],
+            shouldConfirmExecute:
+              params.foo === 'updated' ? confirmModified : shouldConfirmExecute,
+            execute,
+          };
+        });
+        mockConnection.requestPermission.mockResolvedValue({
+          outcome:
+            outcome === 'proceed_once'
+              ? { outcome: 'selected', optionId: 'proceed_once' }
+              : { outcome: 'cancelled' },
+        });
+
+        await prompt();
+
+        expect(mockTool.build).toHaveBeenCalledTimes(2);
+        expect(mockTool.build).toHaveBeenLastCalledWith({
+          foo: 'updated',
+          required: 'keep',
+        });
+        expect(shouldConfirmExecute).not.toHaveBeenCalled();
+        expect(confirmModified).toHaveBeenCalledOnce();
+        expect(execute).toHaveBeenCalledTimes(
+          outcome === 'proceed_once' ? 1 : 0,
+        );
+        if (outcome === 'proceed_once') {
+          expect(mockSendMessageStream.mock.calls[1][0]).toEqual([
+            {
+              functionResponse: {
+                id: 'call-1',
+                name: 'test_tool',
+                response: {
+                  output:
+                    'Tool Result\n\n[System] Tool input parameters were modified by a hook before execution.',
+                },
+              },
+            },
+          ]);
+        }
+        if (outcome !== 'policy_denied') {
+          expect(mockConnection.requestPermission).toHaveBeenCalledWith(
+            expect.objectContaining({
+              toolCall: expect.objectContaining({ title: 'updated' }),
+            }),
+          );
+        } else {
+          expect(mockConnection.requestPermission).not.toHaveBeenCalled();
+          expect(mockSendMessageStream.mock.calls[1][0]).toEqual([
+            {
+              functionResponse: {
+                id: 'call-1',
+                name: 'test_tool',
+                response: { error: 'Denied by policy' },
+              },
+            },
+          ]);
+        }
+      },
+    );
+
+    it('honors an explicit confirmation request from BeforeTool', async () => {
+      vi.mocked(hooks.fireBeforeToolEvent).mockResolvedValue(
+        new BeforeToolHookOutput({ decision: 'ask' }),
+      );
+      shouldConfirmExecute.mockImplementation(
+        (_signal: AbortSignal, forcedDecision?: string) =>
+          forcedDecision === 'ask_user'
+            ? { type: 'info', onConfirm: vi.fn() }
+            : null,
+      );
+      mockConnection.requestPermission.mockResolvedValue({
+        outcome: { outcome: 'cancelled' },
+      });
+
+      await prompt();
+
+      expect(shouldConfirmExecute).toHaveBeenCalledWith(
+        expect.any(AbortSignal),
+        'ask_user',
+      );
+      expect(mockConnection.requestPermission).toHaveBeenCalledOnce();
+      expect(execute).not.toHaveBeenCalled();
+    });
+
+    it('reports an AfterTool block as an error instead of returning the tool output', async () => {
+      vi.mocked(hooks.fireAfterToolEvent).mockResolvedValue(
+        new DefaultHookOutput({
+          decision: 'block',
+          reason: 'Result blocked by policy',
+        }),
+      );
+
+      await prompt();
+
+      expect(execute).toHaveBeenCalledOnce();
+      expect(mockSendMessageStream.mock.calls[1][0]).toEqual([
+        {
+          functionResponse: {
+            id: 'call-1',
+            name: 'test_tool',
+            response: { error: 'Result blocked by policy' },
+          },
+        },
+      ]);
+    });
+
+    it.each(['before', 'after'] as const)(
+      'ends the turn when the %s hook stops execution',
+      async (phase) => {
+        const output = new DefaultHookOutput({
+          continue: false,
+          stopReason: 'Stop now',
+        });
+        vi.mocked(
+          phase === 'before'
+            ? hooks.fireBeforeToolEvent
+            : hooks.fireAfterToolEvent,
+        ).mockResolvedValue(output);
+        requests.push({
+          type: GeminiEventType.ToolCallRequest,
+          value: {
+            callId: 'call-2',
+            name: 'test_tool',
+            args: {},
+            isClientInitiated: false,
+            prompt_id: 'prompt-1',
+          },
+        });
+
+        expect(await prompt()).toMatchObject({ stopReason: 'end_turn' });
+
+        expect(execute).toHaveBeenCalledTimes(phase === 'before' ? 0 : 1);
+        expect(mockSendMessageStream).toHaveBeenCalledOnce();
+        expect(mockChat.recordCompletedToolCalls).toHaveBeenCalledWith(
+          'gemini-pro',
+          [
+            expect.objectContaining({
+              status: CoreToolCallStatus.Error,
+              response: expect.objectContaining({
+                errorType: ToolErrorType.STOP_EXECUTION,
+              }),
+            }),
+          ],
+        );
+      },
+    );
+
+    it('preserves completed responses and closes skipped calls when a hook stops the turn', async () => {
+      vi.mocked(hooks.fireBeforeToolEvent)
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce(
+          new BeforeToolHookOutput({ continue: false, stopReason: 'Stop now' }),
+        );
+      for (const callId of ['call-2', 'call-3']) {
+        requests.push({
+          type: GeminiEventType.ToolCallRequest,
+          value: {
+            callId,
+            name: 'test_tool',
+            args: {},
+            isClientInitiated: false,
+            prompt_id: 'prompt-1',
+          },
+        });
+      }
+
+      await prompt();
+
+      expect(execute).toHaveBeenCalledOnce();
+      expect(mockSendMessageStream).toHaveBeenCalledOnce();
+      expect(mockChat.addHistory).toHaveBeenCalledWith({
+        role: 'user',
+        parts: [
+          {
+            functionResponse: {
+              id: 'call-1',
+              name: 'test_tool',
+              response: { output: 'Tool Result' },
+            },
+          },
+          {
+            functionResponse: {
+              id: 'call-2',
+              name: 'test_tool',
+              response: { error: 'Agent execution stopped by hook: Stop now' },
+            },
+          },
+          {
+            functionResponse: {
+              id: 'call-3',
+              name: 'test_tool',
+              response: { error: 'Agent execution stopped by hook.' },
+            },
+          },
+        ],
+      });
     });
   });
 

@@ -29,6 +29,9 @@ import {
   type ToolCallRequestInfo,
   type GeminiChat,
   type ToolResult,
+  executeToolWithHooks,
+  evaluateBeforeToolHook,
+  ToolErrorType,
   isWithinRoot,
   processSingleFileContent,
   isNodeError,
@@ -592,15 +595,32 @@ export class Session {
       }
 
       const toolResponseParts: Part[] = [];
-      for (const tReq of toolCallRequests) {
+      for (const [index, tReq] of toolCallRequests.entries()) {
         const fc: FunctionCall = {
           id: tReq.callId,
           name: tReq.name,
           args: tReq.args,
         };
 
-        const response = await this.runTool(pendingSend.signal, promptId, fc);
-        toolResponseParts.push(...response);
+        const { responseParts, stopExecution } = await this.runTool(
+          pendingSend.signal,
+          promptId,
+          fc,
+        );
+        toolResponseParts.push(...responseParts);
+        if (stopExecution) {
+          for (const skipped of toolCallRequests.slice(index + 1)) {
+            toolResponseParts.push({
+              functionResponse: {
+                id: skipped.callId,
+                name: skipped.name,
+                response: { error: 'Agent execution stopped by hook.' },
+              },
+            });
+          }
+          this.chat.addHistory({ role: 'user', parts: toolResponseParts });
+          return buildPromptResponse('end_turn');
+        }
       }
 
       currentParts = toolResponseParts;
@@ -643,13 +663,13 @@ export class Session {
     abortSignal: AbortSignal,
     promptId: string,
     fc: FunctionCall,
-  ): Promise<Part[]> {
+  ): Promise<{ responseParts: Part[]; stopExecution: boolean }> {
     const callId = fc.id ?? this.generateCallId(fc.name || 'unknown');
-    const args = fc.args ?? {};
+    let args = fc.args ?? {};
 
     const startTime = Date.now();
 
-    const errorResponse = (error: Error) => {
+    const errorResponse = (error: Error, errorType?: ToolErrorType) => {
       const durationMs = Date.now() - startTime;
       logToolCall(
         this.context.config,
@@ -667,15 +687,18 @@ export class Session {
         ),
       );
 
-      return [
-        {
-          functionResponse: {
-            id: callId,
-            name: fc.name ?? '',
-            response: { error: error.message },
+      return {
+        stopExecution: errorType === ToolErrorType.STOP_EXECUTION,
+        responseParts: [
+          {
+            functionResponse: {
+              id: callId,
+              name: fc.name ?? '',
+              response: { error: error.message },
+            },
           },
-        },
-      ];
+        ],
+      };
     };
 
     if (!fc.name) {
@@ -691,8 +714,40 @@ export class Session {
       );
     }
 
+    let toolErrorType: ToolErrorType | undefined;
     try {
-      const invocation = tool.build(args);
+      let invocation = tool.build(args);
+      const hookResult = await evaluateBeforeToolHook(
+        this.context.config,
+        tool,
+        {
+          callId,
+          name: fc.name,
+          args,
+          isClientInitiated: false,
+          prompt_id: promptId,
+        },
+        invocation,
+      );
+      if (hookResult.status === 'error') {
+        await this.sendUpdate({
+          sessionUpdate: 'tool_call',
+          toolCallId: callId,
+          status: 'pending',
+          title:
+            typeof invocation.getDisplayTitle === 'function'
+              ? invocation.getDisplayTitle()
+              : invocation.getDescription(),
+          locations: invocation.toolLocations(),
+          kind: toAcpToolKind(tool.kind),
+        });
+        toolErrorType = hookResult.errorType;
+        throw hookResult.error;
+      }
+      if (hookResult.modifiedArgs && hookResult.newInvocation) {
+        args = hookResult.modifiedArgs;
+        invocation = hookResult.newInvocation;
+      }
 
       const displayTitle =
         typeof invocation.getDisplayTitle === 'function'
@@ -704,8 +759,10 @@ export class Session {
           ? invocation.getExplanation()
           : '';
 
-      const confirmationDetails =
-        await invocation.shouldConfirmExecute(abortSignal);
+      const confirmationDetails = await invocation.shouldConfirmExecute(
+        abortSignal,
+        hookResult.hookDecision === 'ask' ? 'ask_user' : undefined,
+      );
 
       if (confirmationDetails) {
         const content: acp.ToolCallContent[] = [];
@@ -848,9 +905,34 @@ export class Session {
         });
       }
 
-      const toolResult: ToolResult = await invocation.execute({
+      const toolResult: ToolResult = await executeToolWithHooks(
+        invocation,
+        fc.name,
         abortSignal,
-      });
+        tool,
+        undefined,
+        undefined,
+        this.context.config,
+        undefined,
+        true,
+      );
+      if (toolResult.error) {
+        toolErrorType = toolResult.error.type;
+        throw new Error(toolResult.error.message);
+      }
+      if (hookResult.modifiedArgs) {
+        const notification =
+          '\n\n[System] Tool input parameters were modified by a hook before execution.';
+        toolResult.llmContent =
+          typeof toolResult.llmContent === 'string'
+            ? toolResult.llmContent + notification
+            : [
+                ...(Array.isArray(toolResult.llmContent)
+                  ? toolResult.llmContent
+                  : [toolResult.llmContent]),
+                { text: notification },
+              ];
+      }
       const content = toToolCallContent(toolResult);
 
       const updateContent: acp.ToolCallContent[] = content ? [content] : [];
@@ -909,13 +991,16 @@ export class Session {
         },
       ]);
 
-      return convertToFunctionResponse(
-        fc.name,
-        callId,
-        toolResult.llmContent,
-        this.context.config.getActiveModel(),
-        this.context.config,
-      );
+      return {
+        responseParts: convertToFunctionResponse(
+          fc.name,
+          callId,
+          toolResult.llmContent,
+          this.context.config.getActiveModel(),
+          this.context.config,
+        ),
+        stopExecution: false,
+      };
     } catch (e) {
       const error = e instanceof Error ? e : new Error(String(e));
 
@@ -953,12 +1038,12 @@ export class Session {
             ],
             resultDisplay: error.message,
             error,
-            errorType: undefined,
+            errorType: toolErrorType,
           },
         },
       ]);
 
-      return errorResponse(error);
+      return errorResponse(error, toolErrorType);
     }
   }
 
