@@ -7,7 +7,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   isValidToolName,
+  isAgentReferenceName,
   getToolAliases,
+  ALL_AGENTS_WILDCARD,
   ALL_BUILTIN_TOOL_NAMES,
   DISCOVERED_TOOL_PREFIX,
   LS_TOOL_NAME,
@@ -95,6 +97,73 @@ describe('tool-names', () => {
       expect(
         isValidToolName('mcp_server_tool*', { allowWildcards: true }),
       ).toBe(false);
+    });
+
+    describe('agent references', () => {
+      it('should reject agent names unless explicitly allowed', () => {
+        expect(isValidToolName('code-reviewer')).toBe(false);
+        expect(isValidToolName('code_reviewer')).toBe(false);
+        expect(isValidToolName(ALL_AGENTS_WILDCARD)).toBe(false);
+        expect(isValidToolName('code-reviewer', { allowWildcards: true })).toBe(
+          false,
+        );
+      });
+
+      it('should accept agent names when allowAgentNames is set', () => {
+        expect(
+          isValidToolName('code-reviewer', { allowAgentNames: true }),
+        ).toBe(true);
+        expect(
+          isValidToolName('code_reviewer', { allowAgentNames: true }),
+        ).toBe(true);
+        expect(
+          isValidToolName('codebase_investigator', { allowAgentNames: true }),
+        ).toBe(true);
+        expect(
+          isValidToolName(ALL_AGENTS_WILDCARD, { allowAgentNames: true }),
+        ).toBe(true);
+      });
+
+      it('should still reject non-slug names when allowAgentNames is set', () => {
+        expect(
+          isValidToolName('Code Reviewer', { allowAgentNames: true }),
+        ).toBe(false);
+        expect(isValidToolName('CodeReviewer', { allowAgentNames: true })).toBe(
+          false,
+        );
+        expect(
+          isValidToolName('agent_*_extra', { allowAgentNames: true }),
+        ).toBe(false);
+        expect(isValidToolName('', { allowAgentNames: true })).toBe(false);
+      });
+
+      it('should not let agent names smuggle in malformed MCP names', () => {
+        // Malformed MCP names are slug-shaped, but must stay rejected.
+        expect(isValidToolName('mcp__tool', { allowAgentNames: true })).toBe(
+          false,
+        );
+        expect(isValidToolName('mcp_server', { allowAgentNames: true })).toBe(
+          false,
+        );
+        expect(isValidToolName('mcp_server_', { allowAgentNames: true })).toBe(
+          false,
+        );
+      });
+    });
+  });
+
+  describe('isAgentReferenceName', () => {
+    it('should recognize agent-name-shaped slugs and the wildcard', () => {
+      expect(isAgentReferenceName('code-reviewer')).toBe(true);
+      expect(isAgentReferenceName('cli_help')).toBe(true);
+      expect(isAgentReferenceName(ALL_AGENTS_WILDCARD)).toBe(true);
+    });
+
+    it('should reject anything that is not a slug', () => {
+      expect(isAgentReferenceName('Code-Reviewer')).toBe(false);
+      expect(isAgentReferenceName('agent name')).toBe(false);
+      expect(isAgentReferenceName('*')).toBe(false);
+      expect(isAgentReferenceName('')).toBe(false);
     });
   });
 
