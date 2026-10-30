@@ -2063,6 +2063,40 @@ export class ShellExecutionService {
   }
 
   /**
+   * Kills all active child processes and PTYs and awaits process group termination.
+   */
+  static async cleanupAllActiveProcesses(): Promise<void> {
+    const promises: Array<Promise<void>> = [];
+
+    for (const [, entry] of this.activeChildProcesses.entries()) {
+      if (entry.process?.pid) {
+        promises.push(
+          killProcessGroup({
+            pid: entry.process.pid,
+            escalate: true,
+            isExited: () =>
+              entry.process.killed || entry.process.exitCode !== null,
+          }).catch(() => {}),
+        );
+      }
+    }
+    for (const [pid, entry] of this.activePtys.entries()) {
+      promises.push(
+        killProcessGroup({
+          pid,
+          escalate: true,
+          pty: entry.ptyProcess,
+          isExited: () => !this.isPtyActive(pid),
+        }).catch(() => {}),
+      );
+    }
+
+    await Promise.all(promises);
+    this.activeChildProcesses.clear();
+    this.activePtys.clear();
+  }
+
+  /**
    * Resets the internal state of the ShellExecutionService.
    * This is intended for use in tests to ensure isolation.
    */

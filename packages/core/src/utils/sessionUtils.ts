@@ -123,7 +123,21 @@ export function convertSessionToClientHistory(
 ): HistoryTurn[] {
   const clientHistory: HistoryTurn[] = [];
   const seenFunctionResponseIds = new Set<string>();
+  const emittedModelCallIds = new Set<string>();
   const pendingPartsToAppend = new Map<string, Part[]>();
+
+  // Map any completed tool call results by ID so an earlier Scheduled record
+  // can pick up its completed result if it was split across messages.
+  const completedResultsByCallId = new Map<string, PartListUnion>();
+  for (const message of messages) {
+    if (message.type === 'gemini' && message.toolCalls) {
+      for (const tc of message.toolCalls) {
+        if (tc.id && tc.result) {
+          completedResultsByCallId.set(tc.id, tc.result);
+        }
+      }
+    }
+  }
 
   for (let i = 0; i < messages.length; i++) {
     const msg = messages[i];
@@ -215,6 +229,34 @@ export function convertSessionToClientHistory(
       }
 
       if (modelParts.length > 0) {
+        // Skip duplicate gemini turns that only repeat already-emitted function calls without text content
+        const hasNewParts = modelParts.some(
+          (p) =>
+            !p.functionCall?.id || !emittedModelCallIds.has(p.functionCall.id),
+        );
+        const hasTextContent =
+          typeof msg.content === 'string'
+            ? msg.content.trim().length > 0
+            : Array.isArray(msg.content)
+              ? msg.content.some((p) =>
+                  typeof p === 'string'
+                    ? p.trim().length > 0
+                    : 'text' in p && typeof p.text === 'string'
+                      ? p.text.trim().length > 0
+                      : !('functionCall' in p),
+                )
+              : false;
+
+        if (!hasNewParts && !hasTextContent) {
+          continue;
+        }
+
+        for (const p of modelParts) {
+          if (p.functionCall?.id) {
+            emittedModelCallIds.add(p.functionCall.id);
+          }
+        }
+
         clientHistory.push({
           id: msg.id,
           content: {
@@ -252,27 +294,43 @@ export function convertSessionToClientHistory(
             const isAlreadyRecorded = toolCall.id
               ? recordedResponseIds.has(toolCall.id)
               : hasUntrackedFunctionResponse;
-            if (toolCall.result && !isAlreadyRecorded) {
+            const effectiveResult =
+              toolCall.result ??
+              (toolCall.id ? completedResultsByCallId.get(toolCall.id) : null);
+            if (effectiveResult && !isAlreadyRecorded) {
               let responseData: Part;
 
-              if (typeof toolCall.result === 'string') {
+              if (typeof effectiveResult === 'string') {
                 responseData = {
                   functionResponse: {
                     id: toolCall.id,
                     name: toolCall.name,
                     response: {
-                      output: toolCall.result,
+                      output: effectiveResult,
                     },
                   },
                 };
-              } else if (Array.isArray(toolCall.result)) {
-                functionResponseParts.push(...ensurePartArray(toolCall.result));
+              } else if (Array.isArray(effectiveResult)) {
+                functionResponseParts.push(...ensurePartArray(effectiveResult));
                 continue;
               } else {
-                responseData = toolCall.result;
+                responseData = effectiveResult;
               }
 
               functionResponseParts.push(responseData);
+            } else if (!isAlreadyRecorded) {
+              // Synthesize interrupted response so Gemini turn structure is valid and model knows it was interrupted
+              functionResponseParts.push({
+                functionResponse: {
+                  id: toolCall.id,
+                  name: toolCall.name,
+                  response: {
+                    output:
+                      'Command execution was interrupted or cancelled before completion. It may have executed partially or completed — check system state before running again.',
+                    error: 'Operation interrupted or cancelled.',
+                  },
+                },
+              });
             }
           }
 

@@ -237,7 +237,7 @@ describe('signal and TTY handling', () => {
 
       await sighupHandlers[0]?.();
 
-      expect(process.exit).toHaveBeenCalledWith(0);
+      expect(process.exit).toHaveBeenCalledWith(129);
     });
 
     it('should register SIGTERM handler that can trigger shutdown', () => {

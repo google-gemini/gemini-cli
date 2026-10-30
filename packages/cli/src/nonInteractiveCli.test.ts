@@ -1222,6 +1222,41 @@ describe('runNonInteractive', () => {
     }
   });
 
+  it('should register a SIGHUP listener to abort execution in non-TTY mode', async () => {
+    const originalIsTTY = process.stdin.isTTY;
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: false,
+      configurable: true,
+    });
+
+    try {
+      const processOnSpy = vi.spyOn(process, 'on');
+
+      mockGeminiClient.sendMessageStream.mockImplementation(() =>
+        (async function* () {
+          yield { type: GeminiEventType.Content, value: 'Hello' };
+        })(),
+      );
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'Test non-TTY SIGHUP registration',
+        prompt_id: 'prompt-sighup-registration',
+      });
+
+      const sighupCall = processOnSpy.mock.calls.find(
+        (call) => call[0] === 'SIGHUP',
+      );
+      expect(sighupCall).toBeDefined();
+    } finally {
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: originalIsTTY,
+        configurable: true,
+      });
+    }
+  });
+
   it('should remove SIGINT and SIGTERM listeners on cleanup', async () => {
     const originalIsTTY = process.stdin.isTTY;
     Object.defineProperty(process.stdin, 'isTTY', {
@@ -1251,6 +1286,10 @@ describe('runNonInteractive', () => {
       );
       expect(processOffSpy).toHaveBeenCalledWith(
         'SIGTERM',
+        expect.any(Function),
+      );
+      expect(processOffSpy).toHaveBeenCalledWith(
+        'SIGHUP',
         expect.any(Function),
       );
     } finally {

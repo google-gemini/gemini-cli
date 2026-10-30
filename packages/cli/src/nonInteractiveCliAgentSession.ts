@@ -146,10 +146,19 @@ export async function runNonInteractive({
       throw err;
     };
 
-    const triggerAbort = () => {
+    let abortExitCode = 130;
+    const triggerAbort = (signalName?: string) => {
+      if (signalName === 'SIGTERM') {
+        abortExitCode = 143;
+      } else if (signalName === 'SIGHUP') {
+        abortExitCode = 129;
+      } else {
+        abortExitCode = 130;
+      }
+
       // If already aborting, force exit immediately on repeated signal
       if (isAborting) {
-        process.exit(130);
+        process.exit(abortExitCode);
       }
 
       isAborting = true;
@@ -163,9 +172,14 @@ export async function runNonInteractive({
       abortController.abort();
     };
 
+    const onSigInt = () => triggerAbort('SIGINT');
+    const onSigTerm = () => triggerAbort('SIGTERM');
+    const onSigHup = () => triggerAbort('SIGHUP');
+
     const setupCancellation = () => {
-      process.on('SIGINT', triggerAbort);
-      process.on('SIGTERM', triggerAbort);
+      process.on('SIGINT', onSigInt);
+      process.on('SIGTERM', onSigTerm);
+      process.on('SIGHUP', onSigHup);
 
       // Only setup if stdin is a TTY (user can interact)
       if (!process.stdin?.isTTY) {
@@ -193,7 +207,7 @@ export async function runNonInteractive({
       ) => {
         // Detect Ctrl+C: either ctrl+c key combo or raw character code 3
         if ((key && key.ctrl && key.name === 'c') || str === '\u0003') {
-          triggerAbort();
+          triggerAbort('SIGINT');
         }
       };
 
@@ -201,8 +215,9 @@ export async function runNonInteractive({
     };
 
     const cleanupCancellation = () => {
-      process.off('SIGINT', triggerAbort);
-      process.off('SIGTERM', triggerAbort);
+      process.off('SIGINT', onSigInt);
+      process.off('SIGTERM', onSigTerm);
+      process.off('SIGHUP', onSigHup);
       process.stdout.off('error', handleStdoutError);
 
       // Clear any pending cancel message timer
@@ -732,7 +747,10 @@ export async function runNonInteractive({
       abortController.signal.aborted ||
       isFatalCancellationError(errorToHandle)
     ) {
-      handleCancellationError(config);
+      const exitCode = isFatalCancellationError(errorToHandle)
+        ? errorToHandle.exitCode
+        : abortExitCode;
+      handleCancellationError(config, exitCode);
     }
 
     if (errorToHandle) {

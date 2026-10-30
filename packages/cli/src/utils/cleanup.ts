@@ -12,6 +12,7 @@ import {
   isTelemetrySdkInitialized,
   ExitCodes,
   resetBrowserSession,
+  ShellExecutionService,
 } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
 
@@ -119,6 +120,13 @@ export async function runExitCleanup(): Promise<void> {
         // Ignore errors during browser cleanup
       }
 
+      // Terminate any active shell child processes and PTYs before exit
+      try {
+        await ShellExecutionService.cleanupAllActiveProcesses();
+      } catch {
+        // Ignore errors during shell process cleanup
+      }
+
       if (configForTelemetry) {
         try {
           await configForTelemetry.dispose();
@@ -172,7 +180,13 @@ async function gracefulShutdown(reason: string) {
 
   await runExitCleanup();
   const exitCode =
-    reason === 'SIGINT' ? 130 : reason === 'SIGTERM' ? 143 : ExitCodes.SUCCESS;
+    reason === 'SIGINT'
+      ? 130
+      : reason === 'SIGTERM'
+        ? 143
+        : reason === 'SIGHUP'
+          ? 129
+          : ExitCodes.SUCCESS;
   process.exit(exitCode);
 }
 

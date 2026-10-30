@@ -13,21 +13,20 @@ import {
   displayContentToString,
   parseThought,
   CoreToolCallStatus,
-  ToolErrorType,
   type ApprovalMode,
   Kind,
   type ThoughtSummary,
   type RetryAttemptPayload,
   type AgentEvent,
   type AgentProtocol,
-  type AnyDeclarativeTool,
-  type AnyToolInvocation,
   type CompletedToolCall,
   type Config,
   type Logger,
   type Part,
-  type ToolCallRequestInfo,
+  CANCELLED_TOOL_ERROR_MESSAGE,
+  createCancelledToolCall,
 } from '@google/gemini-cli-core';
+export { CANCELLED_TOOL_ERROR_MESSAGE, createCancelledToolCall };
 import type {
   HistoryItemWithoutId,
   LoopDetectionConfirmationRequest,
@@ -43,51 +42,6 @@ import { useSessionStats } from '../contexts/SessionContext.js';
 import { useStateAndRef } from './useStateAndRef.js';
 import { type MinimalTrackedToolCall } from './useTurnActivityMonitor.js';
 import { useKeypress } from './useKeypress.js';
-
-export const CANCELLED_TOOL_ERROR_MESSAGE =
-  '[Operation Cancelled] Reason: User cancelled operation';
-
-/**
- * Synthesizes a cancelled CompletedToolCall with a filler functionResponse part
- * so that aborted tool calls can be recorded cleanly in the session history.
- */
-export function createCancelledToolCall(
-  request: ToolCallRequestInfo,
-  tool?: AnyDeclarativeTool,
-  invocation?: AnyToolInvocation,
-): CompletedToolCall {
-  const fallbackToolName = request.name.trim() || 'generic_tool';
-  return {
-    status: CoreToolCallStatus.Cancelled,
-    request,
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    tool: (tool ?? {
-      name: fallbackToolName,
-      displayName: fallbackToolName,
-    }) as AnyDeclarativeTool,
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    invocation: (invocation ?? {
-      getDescription: () => fallbackToolName,
-    }) as AnyToolInvocation,
-    response: {
-      callId: request.callId,
-      responseParts: [
-        {
-          functionResponse: {
-            id: request.callId,
-            name: request.name,
-            response: {
-              error: CANCELLED_TOOL_ERROR_MESSAGE,
-            },
-          },
-        },
-      ],
-      resultDisplay: undefined,
-      error: new Error(CANCELLED_TOOL_ERROR_MESSAGE),
-      errorType: ToolErrorType.UNHANDLED_EXCEPTION,
-    },
-  };
-}
 
 export interface UseAgentStreamOptions {
   agent?: AgentProtocol;
