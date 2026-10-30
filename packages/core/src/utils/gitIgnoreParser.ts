@@ -87,6 +87,11 @@ export class GitIgnoreParser implements GitIgnoreFilter {
     const expandedPatterns = expandWildcardDirectoryPatterns(
       rawPatterns,
       this.extraPatterns,
+      // Git still reads dir/.gitignore under dir/**, so its negations must not be pruned
+      (dir) =>
+        this.getPatternsForDir(
+          path.join(this.projectRoot, relativeBaseDir, dir),
+        ).some((p) => p.startsWith('!')),
     );
     return expandedPatterns
       .map((p) => p.trimStart())

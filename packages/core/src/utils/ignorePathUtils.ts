@@ -128,6 +128,7 @@ function canNegationMatchInsideDir(
 export function expandWildcardDirectoryPatterns(
   rawPatterns: string[],
   extraRawPatterns?: string[],
+  dirHasNestedNegations?: (dir: string) => boolean,
 ): string[] {
   const negations = new Set<string>();
   const allPatternSources = extraRawPatterns
@@ -167,7 +168,10 @@ export function expandWildcardDirectoryPatterns(
       continue;
     }
 
-    if (!canNegationMatchInsideDir(withoutGlob, negations)) {
+    if (
+      !canNegationMatchInsideDir(withoutGlob, negations) &&
+      !dirHasNestedNegations?.(withoutGlob)
+    ) {
       // Convert 'dir/**' or '/dir/**' -> '/dir/' so single-segment patterns stay anchored
       expanded.push(`/${withoutGlob}/`);
     }
