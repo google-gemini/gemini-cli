@@ -84,7 +84,7 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
     try {
       const files = await fs.promises.readdir(this.modelsDir);
       for (const file of files) {
-        if (file.startsWith(modelName) && file.endsWith('.downloading')) {
+        if ((file === modelName + '.downloading' || file.startsWith(modelName + '.')) && file.endsWith('.downloading')) {
           await fs.promises
             .unlink(path.join(this.modelsDir, file))
             .catch(() => {});
