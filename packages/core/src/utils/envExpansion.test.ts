@@ -70,6 +70,12 @@ describe('expandEnvVars', () => {
         { ...defaultEnv, PATH: '/usr/bin' },
         '/home/morty/bin:/usr/bin',
       ],
+      [
+        'env containing the internal target key',
+        'Hello $USER',
+        { ...defaultEnv, __GCLI_EXPAND_TARGET__: 'from-env' },
+        'Hello morty',
+      ],
     ])('should handle %s', (_, input, env, expected) => {
       expect(expandEnvVars(input, env)).toBe(expected);
     });
