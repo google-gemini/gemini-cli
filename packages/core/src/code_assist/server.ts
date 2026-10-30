@@ -496,14 +496,17 @@ export class CodeAssistServer implements ContentGenerator {
 
       let bufferedLines: string[] = [];
 
+      const parseChunk: (text: string) => T = JSON.parse;
+
       function* flushBuffer(): Generator<T> {
         if (bufferedLines.length === 0) {
           return;
         }
         const chunk = bufferedLines.join('\n');
         bufferedLines = []; // Reset the buffer before yielding
+        let parsed: T;
         try {
-          yield JSON.parse(chunk);
+          parsed = parseChunk(chunk);
         } catch {
           if (server.config) {
             logInvalidChunk(
@@ -512,7 +515,9 @@ export class CodeAssistServer implements ContentGenerator {
               new InvalidChunkEvent('Malformed JSON chunk'),
             );
           }
+          return;
         }
+        yield parsed;
       }
 
       for await (const line of rl) {

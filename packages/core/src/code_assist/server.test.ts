@@ -1334,5 +1334,40 @@ data: ${jsonString}
       expect(results).toEqual([{ ok: true }]);
       expect(logInvalidChunk).not.toHaveBeenCalled();
     });
+
+    it('should propagate downstream consumer errors without logging InvalidChunkEvent', async () => {
+      const config = makeFakeConfig();
+      const mockRequest = vi.fn();
+      const client = { request: mockRequest } as unknown as OAuth2Client;
+      const server = new CodeAssistServer(
+        client,
+        'test-project',
+        {},
+        'test-session',
+        UserTierId.FREE,
+        undefined,
+        undefined,
+        config,
+      );
+
+      const { Readable } = await import('node:stream');
+      const mockStream = new Readable({
+        read() {
+          this.push('data: {"ok": true}');
+          this.push(null);
+        },
+      });
+
+      mockRequest.mockResolvedValueOnce({ data: mockStream });
+
+      const stream = await server.requestStreamingPost('testStream', {});
+      await expect(async () => {
+        for await (const _res of stream) {
+          throw new Error('Downstream consumer error');
+        }
+      }).rejects.toThrow('Downstream consumer error');
+
+      expect(logInvalidChunk).not.toHaveBeenCalled();
+    });
   });
 });
