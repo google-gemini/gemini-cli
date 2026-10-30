@@ -3601,6 +3601,42 @@ describe('loadCliConfig disableYoloMode', () => {
   });
 });
 
+describe('loadCliConfig allowCommandSubstitution', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      isTrusted: true,
+      source: undefined,
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('should default allowCommandSubstitution to false', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings();
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getAllowCommandSubstitution()).toBe(false);
+  });
+
+  it('should pass allowCommandSubstitution through to the core config', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings({
+      security: { allowCommandSubstitution: true },
+    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getAllowCommandSubstitution()).toBe(true);
+  });
+});
+
 describe('loadCliConfig secureModeEnabled', () => {
   beforeEach(() => {
     vi.resetAllMocks();

@@ -1861,6 +1861,19 @@ const SETTINGS_SCHEMA = {
           'Disable "Always allow" options in tool confirmation dialogs.',
         showInDialog: true,
       },
+      allowCommandSubstitution: {
+        type: 'boolean',
+        label: 'Allow Command Substitution',
+        category: 'Security',
+        requiresRestart: true,
+        default: false,
+        description: oneLine`
+          Allow shell commands to use command substitution (: $(), backticks,
+          <() or >()). Defaults to false for safety. When YOLO mode is enabled,
+          command substitution is allowed by default.
+        `,
+        showInDialog: true,
+      },
       enablePermanentToolApproval: {
         type: 'boolean',
         label: 'Allow Permanent Tool Approval',

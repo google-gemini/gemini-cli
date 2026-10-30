@@ -1024,6 +1024,7 @@ export async function loadCliConfig(
     approvalMode,
     disableYoloMode:
       settings.security?.disableYoloMode || settings.admin?.secureModeEnabled,
+    allowCommandSubstitution: settings.security?.allowCommandSubstitution,
     disableAlwaysAllow:
       settings.security?.disableAlwaysAllow ||
       settings.admin?.secureModeEnabled,
