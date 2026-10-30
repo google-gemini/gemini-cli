@@ -86,20 +86,25 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
     }
 
     if (fs.existsSync(tempDestination)) {
-      fs.unlinkSync(tempDestination);
+      await fs.promises.unlink(tempDestination);
     }
 
     const writer = fs.createWriteStream(tempDestination);
     let streamError: Error | null = null;
-    const finishPromise = new Promise<void>((resolve, reject) => {
-      writer.once('finish', resolve);
+    const closePromise = new Promise<void>((resolve, reject) => {
+      writer.once('close', () => {
+        if (streamError) {
+          reject(streamError);
+        } else {
+          resolve();
+        }
+      });
       writer.once('error', (err) => {
         streamError = err;
         void reader.cancel?.().catch(() => {});
-        reject(err);
       });
     });
-    finishPromise.catch(() => {});
+    closePromise.catch(() => {});
 
     try {
       try {
@@ -142,7 +147,7 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
         writer.end();
       }
 
-      await finishPromise;
+      await closePromise;
 
       if (transferred === 0 || (total > 0 && transferred !== total)) {
         throw new Error(
@@ -150,14 +155,12 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
         );
       }
 
-      fs.renameSync(tempDestination, destination);
+      await fs.promises.rename(tempDestination, destination);
     } catch (error) {
-      if (writer instanceof fs.WriteStream) {
-        await finishPromise.catch(() => {});
-      }
+      await closePromise.catch(() => {});
       if (fs.existsSync(tempDestination)) {
         try {
-          fs.unlinkSync(tempDestination);
+          await fs.promises.unlink(tempDestination);
         } catch {
           // Ignore cleanup errors
         }

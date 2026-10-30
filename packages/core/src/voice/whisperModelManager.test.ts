@@ -202,7 +202,7 @@ describe('WhisperModelManager', () => {
     expect(fs.existsSync(`${modelPath}.downloading`)).toBe(false);
   });
 
-  it('respects write stream backpressure and awaits finish before marking model as installed', async () => {
+  it('respects write stream backpressure and awaits close before marking model as installed', async () => {
     const chunk1 = new Uint8Array([1, 2, 3, 4]);
     const chunk2 = new Uint8Array([5, 6, 7, 8]);
     const response = createMockResponse({
@@ -259,12 +259,13 @@ describe('WhisperModelManager', () => {
       expect(mockWriter.end).toHaveBeenCalledTimes(1);
     });
 
-    // Should still not resolve or mark installed before 'finish' is emitted
+    // Should still not resolve or mark installed before 'close' is emitted
     expect(resolved).toBe(false);
     expect(manager.isModelInstalled(modelName)).toBe(false);
 
-    // Emit 'finish' to complete stream flush
+    // Emit 'finish' and 'close' to complete stream flush
     mockWriter.emit('finish');
+    mockWriter.emit('close');
     await downloadPromise;
 
     expect(resolved).toBe(true);
@@ -294,6 +295,7 @@ describe('WhisperModelManager', () => {
     mockWriter.end = vi.fn(() => {
       queueMicrotask(() => {
         mockWriter.emit('error', new Error('ENOSPC: no space left on device'));
+        mockWriter.emit('close');
       });
     });
     mockWriter.destroy = vi.fn();
@@ -338,6 +340,7 @@ describe('WhisperModelManager', () => {
       fs.appendFileSync(tempFilePath, Buffer.from(chunk));
       queueMicrotask(() => {
         mockWriter.emit('error', new Error('EIO: i/o error during drain'));
+        mockWriter.emit('close');
       });
       return false;
     });
