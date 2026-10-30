@@ -496,6 +496,54 @@ describe('Session', () => {
     });
   });
 
+  it('should drop tool calls from a failed attempt when the turn is retried', async () => {
+    const failedCall = {
+      callId: 'failed-call',
+      name: 'test_tool',
+      args: {},
+      isClientInitiated: false,
+      prompt_id: 'prompt-1',
+    };
+    const retriedCall = {
+      callId: 'retried-call',
+      name: 'test_tool',
+      args: {},
+      isClientInitiated: false,
+      prompt_id: 'prompt-1',
+    };
+
+    const stream1 = createMockStream([
+      { type: GeminiEventType.ToolCallRequest, value: failedCall },
+      { type: GeminiEventType.Retry },
+      { type: GeminiEventType.ToolCallRequest, value: retriedCall },
+    ]);
+    const stream2 = createMockStream([
+      { type: GeminiEventType.Content, value: 'Done' },
+    ]);
+
+    mockSendMessageStream
+      .mockReturnValueOnce(stream1)
+      .mockReturnValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    // Only the retried call is executed and answered.
+    expect(mockToolRegistry.getTool).toHaveBeenCalledTimes(1);
+    const invocation = mockTool.build.mock.results[0].value as {
+      execute: Mock;
+    };
+    expect(invocation.execute).toHaveBeenCalledTimes(1);
+    const secondRequest = mockSendMessageStream.mock.calls[1][0];
+    expect(secondRequest).toEqual([
+      expect.objectContaining({
+        functionResponse: expect.objectContaining({ id: 'retried-call' }),
+      }),
+    ]);
+  });
+
   it('should handle tool call permission request', async () => {
     const confirmationDetails = {
       type: 'info',

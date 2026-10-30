@@ -1055,6 +1055,13 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     for await (const resp of responseStream) {
       if (signal.aborted) break;
 
+      if (resp.type === StreamEventType.RETRY) {
+        // Function calls streamed by the failed attempt are not in history;
+        // drop them so they are not executed twice.
+        functionCalls.length = 0;
+        continue;
+      }
+
       if (resp.type === StreamEventType.CHUNK) {
         const chunk = resp.value;
         const parts = chunk.candidates?.[0]?.content?.parts;

@@ -2681,6 +2681,55 @@ describe('useGeminiStream', () => {
 
       expect(result.current.retryStatus).toBeNull();
     });
+
+    it('should not schedule tool calls from a failed attempt when the turn is retried', async () => {
+      mockSendMessageStream.mockImplementation(() =>
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.ToolCallRequest,
+            value: {
+              callId: 'failed-shell',
+              name: 'run_shell_command',
+              args: { command: 'git status' },
+              isClientInitiated: false,
+              prompt_id: 'prompt-retry',
+            },
+          };
+          yield { type: ServerGeminiEventType.Retry };
+          yield {
+            type: ServerGeminiEventType.ToolCallRequest,
+            value: {
+              callId: 'retried-shell',
+              name: 'run_shell_command',
+              args: { command: 'git status' },
+              isClientInitiated: false,
+              prompt_id: 'prompt-retry',
+            },
+          };
+          yield {
+            type: ServerGeminiEventType.Finished,
+            value: {
+              reason: undefined,
+              usageMetadata: { totalTokenCount: 10 },
+            },
+          };
+        })(),
+      );
+
+      const { result } = await renderTestHook();
+
+      await act(async () => {
+        void result.current.submitQuery('run git status');
+      });
+
+      await waitFor(() => {
+        expect(mockScheduleToolCalls).toHaveBeenCalledTimes(1);
+      });
+      expect(mockScheduleToolCalls).toHaveBeenCalledWith(
+        [expect.objectContaining({ callId: 'retried-shell' })],
+        expect.any(AbortSignal),
+      );
+    });
   });
 
   describe('Slash Command Handling', () => {

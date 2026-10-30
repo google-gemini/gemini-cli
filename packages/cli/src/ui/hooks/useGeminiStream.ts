@@ -1755,7 +1755,10 @@ export const useGeminiStream = (
             loopDetectedRef.current = true;
             break;
           case ServerGeminiEventType.Retry:
-            // Handled transparently by the backend stream retries.
+            // Tool calls streamed by the failed attempt are not in history;
+            // drop them so they are not executed twice.
+            toolCallRequests.length = 0;
+            pendingToolCallRequestsRef.current = [];
             break;
           case ServerGeminiEventType.InvalidStream:
             hasTerminalEvent = true;

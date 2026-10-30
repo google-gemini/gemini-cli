@@ -392,6 +392,80 @@ describe('runNonInteractive', () => {
     expect(getWrittenOutput()).toBe('Final answer\n');
   });
 
+  it('should ignore tool calls from a failed attempt when the turn is retried', async () => {
+    const failedToolCall: ServerGeminiStreamEvent = {
+      type: GeminiEventType.ToolCallRequest,
+      value: {
+        callId: 'failed-tool',
+        name: 'testTool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-retry',
+      },
+    };
+    const retriedToolCall: ServerGeminiStreamEvent = {
+      type: GeminiEventType.ToolCallRequest,
+      value: {
+        callId: 'retried-tool',
+        name: 'testTool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-retry',
+      },
+    };
+
+    mockSchedulerSchedule.mockResolvedValue([
+      {
+        status: CoreToolCallStatus.Success,
+        request: retriedToolCall.value,
+        tool: {} as AnyDeclarativeTool,
+        invocation: {} as AnyToolInvocation,
+        response: {
+          responseParts: [{ text: 'Tool response' }],
+          callId: 'retried-tool',
+          error: undefined,
+          errorType: undefined,
+          contentLength: undefined,
+        },
+      },
+    ]);
+
+    mockGeminiClient.sendMessageStream
+      .mockReturnValueOnce(
+        createStreamFromEvents([
+          failedToolCall,
+          { type: GeminiEventType.Retry },
+          retriedToolCall,
+        ]),
+      )
+      .mockReturnValueOnce(
+        createStreamFromEvents([
+          { type: GeminiEventType.Content, value: 'Final answer' },
+          {
+            type: GeminiEventType.Finished,
+            value: {
+              reason: undefined,
+              usageMetadata: { totalTokenCount: 10 },
+            },
+          },
+        ]),
+      );
+
+    await runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: 'Use a tool',
+      prompt_id: 'prompt-id-retry',
+    });
+
+    expect(mockSchedulerSchedule).toHaveBeenCalledTimes(1);
+    expect(mockSchedulerSchedule).toHaveBeenCalledWith(
+      [expect.objectContaining({ callId: 'retried-tool' })],
+      expect.any(AbortSignal),
+    );
+    expect(getWrittenOutput()).toBe('Final answer\n');
+  });
+
   it('should write a single newline between sequential text outputs from the model', async () => {
     // This test simulates a multi-turn conversation to ensure that a single newline
     // is printed between each block of text output from the model.

@@ -503,6 +503,12 @@ export class Session {
               stopReason = 'max_turn_requests';
               break;
 
+            case GeminiEventType.Retry:
+              // Tool calls streamed by the failed attempt are not in history;
+              // drop them so they are not executed twice.
+              toolCallRequests.length = 0;
+              break;
+
             case GeminiEventType.ContextWindowWillOverflow:
               stopReason = 'max_tokens';
               break;
