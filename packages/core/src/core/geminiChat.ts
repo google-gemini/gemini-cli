@@ -1062,7 +1062,9 @@ export class GeminiChat {
           useLatestFlash,
           useLatestFlashLite,
         );
-        currentGenerateContentConfig = reselectedConfig;
+        if (reselectedConfig) {
+          currentGenerateContentConfig = reselectedConfig;
+        }
         initialActiveModel = this.context.config.getActiveModel();
         lastModelToUse = modelToUse;
       }

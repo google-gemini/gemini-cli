@@ -346,7 +346,9 @@ export class BaseLlmClient {
           const { model: reselectedModel, config: reselectedConfig } =
             applyModelSelection(this.config, modelConfigKey);
           currentModel = reselectedModel;
-          currentGenerateContentConfig = reselectedConfig;
+          if (reselectedConfig) {
+            currentGenerateContentConfig = reselectedConfig;
+          }
           initialActiveModel = this.config.getActiveModel();
         }
         const finalConfig: GenerateContentConfig = {
