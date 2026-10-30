@@ -72,6 +72,8 @@ describe('Dynamic Configuration Parity', () => {
     DEFAULT_GEMINI_MODEL_AUTO,
     PREVIEW_GEMINI_MODEL,
     DEFAULT_GEMINI_MODEL,
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
     'custom-model',
   ];
 
@@ -847,6 +849,8 @@ describe('resolveModel Gemini 3.5 Flash GA', () => {
   });
 
   it.each([
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
     'gemini-3.6-flash',
     'gemini-3.7-flash',
     'gemini-3.9-flash',
@@ -857,6 +861,27 @@ describe('resolveModel Gemini 3.5 Flash GA', () => {
       expect(resolveModel(model, false, false, true, undefined, true)).toBe(
         model,
       );
+    },
+  );
+
+  it.each([
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
+    'gemini-3.6-flash',
+    'gemini-3.7-flash',
+    'gemini-3.9-flash',
+    'gemini-9.9-flash',
+  ])(
+    'should preserve the explicit versioned model %s when useGemini3_5Flash is true (dynamic)',
+    (model) => {
+      const mockDynamicConfig = {
+        getExperimentalDynamicModelConfiguration: () => true,
+        modelConfigService,
+      } as unknown as Config;
+
+      expect(
+        resolveModel(model, false, false, true, mockDynamicConfig, true),
+      ).toBe(model);
     },
   );
 

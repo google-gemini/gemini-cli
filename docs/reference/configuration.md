@@ -1191,15 +1191,7 @@ their corresponding top-level category object in your `settings.json` file.
         ]
       },
       "gemini-2.5-flash": {
-        "default": "gemini-2.5-flash",
-        "contexts": [
-          {
-            "condition": {
-              "useLatestFlash": true
-            },
-            "target": "gemini-3.8-flash"
-          }
-        ]
+        "default": "gemini-2.5-flash"
       },
       "gemini-3-pro-preview": {
         "default": "gemini-3-pro-preview",
