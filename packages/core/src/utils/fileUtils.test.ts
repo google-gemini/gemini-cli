@@ -765,6 +765,354 @@ describe('fileUtils', () => {
           openSpy.mockRestore();
         }
       });
+
+      it('should allow stat.dev = 0 vs handle.stat.dev = 12345 on win32 when ino matches', async () => {
+        const filePath = path.join(testDir, 'secure-buffer-win32-zero-dev.txt');
+        await fsPromises.writeFile(filePath, 'hello win32');
+
+        const realStats = await fsPromises.stat(filePath);
+        const platformSpy = vi
+          .spyOn(process, 'platform', 'get')
+          .mockReturnValue('win32');
+        const statSpy = vi.spyOn(fsPromises, 'stat').mockResolvedValue(
+          Object.assign(
+            Object.create(Object.getPrototypeOf(realStats)),
+            realStats,
+            {
+              dev: 0,
+              ino: realStats.ino,
+            },
+          ) as fs.Stats,
+        );
+        const openSpy = vi.spyOn(fsPromises, 'open').mockResolvedValueOnce({
+          stat: vi.fn().mockResolvedValue({
+            dev: 12345,
+            ino: realStats.ino,
+          }),
+          readFile: vi.fn().mockResolvedValue(Buffer.from('hello win32')),
+          close: vi.fn().mockResolvedValue(undefined),
+        } as unknown as fsPromises.FileHandle);
+
+        try {
+          const buffer = await readSecureFileBuffer(filePath);
+          expect(buffer.toString('utf-8')).toBe('hello win32');
+        } finally {
+          openSpy.mockRestore();
+          statSpy.mockRestore();
+          platformSpy.mockRestore();
+        }
+      });
+
+      it('should allow handle.stat.dev = 0 vs stat.dev = 12345 on win32 when ino matches', async () => {
+        const filePath = path.join(
+          testDir,
+          'secure-buffer-win32-zero-handle-dev.txt',
+        );
+        await fsPromises.writeFile(filePath, 'hello win32 reverse');
+
+        const realStats = await fsPromises.stat(filePath);
+        const platformSpy = vi
+          .spyOn(process, 'platform', 'get')
+          .mockReturnValue('win32');
+        const statSpy = vi.spyOn(fsPromises, 'stat').mockResolvedValue(
+          Object.assign(
+            Object.create(Object.getPrototypeOf(realStats)),
+            realStats,
+            {
+              dev: 12345,
+              ino: realStats.ino,
+            },
+          ) as fs.Stats,
+        );
+        const openSpy = vi.spyOn(fsPromises, 'open').mockResolvedValueOnce({
+          stat: vi.fn().mockResolvedValue({
+            dev: 0,
+            ino: realStats.ino,
+          }),
+          readFile: vi
+            .fn()
+            .mockResolvedValue(Buffer.from('hello win32 reverse')),
+          close: vi.fn().mockResolvedValue(undefined),
+        } as unknown as fsPromises.FileHandle);
+
+        try {
+          const buffer = await readSecureFileBuffer(filePath);
+          expect(buffer.toString('utf-8')).toBe('hello win32 reverse');
+        } finally {
+          openSpy.mockRestore();
+          statSpy.mockRestore();
+          platformSpy.mockRestore();
+        }
+      });
+
+      it('should abort on win32 when stat.dev = 0 if ino does not match', async () => {
+        const filePath = path.join(
+          testDir,
+          'secure-buffer-win32-ino-mismatch.txt',
+        );
+        await fsPromises.writeFile(filePath, 'hello win32');
+
+        const realStats = await fsPromises.stat(filePath);
+        const platformSpy = vi
+          .spyOn(process, 'platform', 'get')
+          .mockReturnValue('win32');
+        const statSpy = vi.spyOn(fsPromises, 'stat').mockResolvedValue(
+          Object.assign(
+            Object.create(Object.getPrototypeOf(realStats)),
+            realStats,
+            {
+              dev: 0,
+              ino: realStats.ino,
+            },
+          ) as fs.Stats,
+        );
+        const openSpy = vi.spyOn(fsPromises, 'open').mockResolvedValueOnce({
+          stat: vi.fn().mockResolvedValue({
+            dev: 12345,
+            ino: realStats.ino + 1,
+          }),
+          close: vi.fn().mockResolvedValue(undefined),
+        } as unknown as fsPromises.FileHandle);
+
+        try {
+          await expect(readSecureFileBuffer(filePath)).rejects.toThrow(
+            /File device or inode changed during read/,
+          );
+        } finally {
+          openSpy.mockRestore();
+          statSpy.mockRestore();
+          platformSpy.mockRestore();
+        }
+      });
+
+      it('should abort on win32 when both dev values are non-zero and do not match', async () => {
+        const filePath = path.join(
+          testDir,
+          'secure-buffer-win32-nonzero-dev-mismatch.txt',
+        );
+        await fsPromises.writeFile(filePath, 'hello win32');
+
+        const realStats = await fsPromises.stat(filePath);
+        const platformSpy = vi
+          .spyOn(process, 'platform', 'get')
+          .mockReturnValue('win32');
+        const statSpy = vi.spyOn(fsPromises, 'stat').mockResolvedValue(
+          Object.assign(
+            Object.create(Object.getPrototypeOf(realStats)),
+            realStats,
+            {
+              dev: 11111,
+              ino: realStats.ino,
+            },
+          ) as fs.Stats,
+        );
+        const openSpy = vi.spyOn(fsPromises, 'open').mockResolvedValueOnce({
+          stat: vi.fn().mockResolvedValue({
+            dev: 12345,
+            ino: realStats.ino,
+          }),
+          close: vi.fn().mockResolvedValue(undefined),
+        } as unknown as fsPromises.FileHandle);
+
+        try {
+          await expect(readSecureFileBuffer(filePath)).rejects.toThrow(
+            /File device or inode changed during read/,
+          );
+        } finally {
+          openSpy.mockRestore();
+          statSpy.mockRestore();
+          platformSpy.mockRestore();
+        }
+      });
+
+      it('should abort on non-win32 when stat.dev = 0 vs handle.stat.dev = 12345 even if ino matches', async () => {
+        const filePath = path.join(testDir, 'secure-buffer-linux-zero-dev.txt');
+        await fsPromises.writeFile(filePath, 'hello linux');
+
+        const realStats = await fsPromises.stat(filePath);
+        const platformSpy = vi
+          .spyOn(process, 'platform', 'get')
+          .mockReturnValue('linux');
+        const statSpy = vi.spyOn(fsPromises, 'stat').mockResolvedValue(
+          Object.assign(
+            Object.create(Object.getPrototypeOf(realStats)),
+            realStats,
+            {
+              dev: 0,
+              ino: realStats.ino,
+            },
+          ) as fs.Stats,
+        );
+        const openSpy = vi.spyOn(fsPromises, 'open').mockResolvedValueOnce({
+          stat: vi.fn().mockResolvedValue({
+            dev: 12345,
+            ino: realStats.ino,
+          }),
+          close: vi.fn().mockResolvedValue(undefined),
+        } as unknown as fsPromises.FileHandle);
+
+        try {
+          await expect(readSecureFileBuffer(filePath)).rejects.toThrow(
+            /File device or inode changed during read/,
+          );
+        } finally {
+          openSpy.mockRestore();
+          statSpy.mockRestore();
+          platformSpy.mockRestore();
+        }
+      });
+
+      it('should allow descriptor-based expectedStats.dev = 12345 vs postStats.dev = 0 on win32 when ino matches', async () => {
+        const filePath = path.join(
+          testDir,
+          'secure-buffer-win32-expected-stats-zero-post-dev.txt',
+        );
+        await fsPromises.writeFile(filePath, 'hello expected stats');
+
+        const realStats = await fsPromises.stat(filePath);
+        const expectedStats = Object.assign(
+          Object.create(Object.getPrototypeOf(realStats)),
+          realStats,
+          {
+            dev: 12345,
+            ino: realStats.ino,
+          },
+        ) as fs.Stats;
+        const platformSpy = vi
+          .spyOn(process, 'platform', 'get')
+          .mockReturnValue('win32');
+        const statSpy = vi.spyOn(fsPromises, 'stat').mockResolvedValue(
+          Object.assign(
+            Object.create(Object.getPrototypeOf(realStats)),
+            realStats,
+            {
+              dev: 0,
+              ino: realStats.ino,
+            },
+          ) as fs.Stats,
+        );
+        const openSpy = vi.spyOn(fsPromises, 'open').mockResolvedValueOnce({
+          stat: vi.fn().mockResolvedValue({
+            dev: 12345,
+            ino: realStats.ino,
+          }),
+          readFile: vi
+            .fn()
+            .mockResolvedValue(Buffer.from('hello expected stats')),
+          close: vi.fn().mockResolvedValue(undefined),
+        } as unknown as fsPromises.FileHandle);
+
+        try {
+          const buffer = await readSecureFileBuffer(filePath, expectedStats);
+          expect(buffer.toString('utf-8')).toBe('hello expected stats');
+        } finally {
+          openSpy.mockRestore();
+          statSpy.mockRestore();
+          platformSpy.mockRestore();
+        }
+      });
+
+      it('should abort on win32 when postStats.dev = 0 if postStats.ino does not match', async () => {
+        const filePath = path.join(
+          testDir,
+          'secure-buffer-win32-post-ino-mismatch.txt',
+        );
+        await fsPromises.writeFile(filePath, 'hello win32');
+
+        const realStats = await fsPromises.stat(filePath);
+        const expectedStats = Object.assign(
+          Object.create(Object.getPrototypeOf(realStats)),
+          realStats,
+          {
+            dev: 12345,
+            ino: realStats.ino,
+          },
+        ) as fs.Stats;
+        const platformSpy = vi
+          .spyOn(process, 'platform', 'get')
+          .mockReturnValue('win32');
+        const statSpy = vi.spyOn(fsPromises, 'stat').mockResolvedValue(
+          Object.assign(
+            Object.create(Object.getPrototypeOf(realStats)),
+            realStats,
+            {
+              dev: 0,
+              ino: realStats.ino + 1,
+            },
+          ) as fs.Stats,
+        );
+        const openSpy = vi.spyOn(fsPromises, 'open').mockResolvedValueOnce({
+          stat: vi.fn().mockResolvedValue({
+            dev: 12345,
+            ino: realStats.ino,
+          }),
+          readFile: vi.fn().mockResolvedValue(Buffer.from('hello win32')),
+          close: vi.fn().mockResolvedValue(undefined),
+        } as unknown as fsPromises.FileHandle);
+
+        try {
+          await expect(
+            readSecureFileBuffer(filePath, expectedStats),
+          ).rejects.toThrow(/File device or inode changed during read/);
+        } finally {
+          openSpy.mockRestore();
+          statSpy.mockRestore();
+          platformSpy.mockRestore();
+        }
+      });
+
+      it('should abort on win32 when initialStats.dev = 0 bridges two distinct non-zero dev values across handleStats and postStats', async () => {
+        const filePath = path.join(
+          testDir,
+          'secure-buffer-win32-transitive-dev-mismatch.txt',
+        );
+        await fsPromises.writeFile(filePath, 'hello win32');
+
+        const realStats = await fsPromises.stat(filePath);
+        const platformSpy = vi
+          .spyOn(process, 'platform', 'get')
+          .mockReturnValue('win32');
+        const statSpy = vi
+          .spyOn(fsPromises, 'stat')
+          .mockResolvedValueOnce(
+            Object.assign(
+              Object.create(Object.getPrototypeOf(realStats)),
+              realStats,
+              {
+                dev: 0,
+                ino: realStats.ino,
+              },
+            ) as fs.Stats,
+          )
+          .mockResolvedValueOnce(
+            Object.assign(
+              Object.create(Object.getPrototypeOf(realStats)),
+              realStats,
+              {
+                dev: 22222,
+                ino: realStats.ino,
+              },
+            ) as fs.Stats,
+          );
+        const openSpy = vi.spyOn(fsPromises, 'open').mockResolvedValueOnce({
+          stat: vi.fn().mockResolvedValue({
+            dev: 11111,
+            ino: realStats.ino,
+          }),
+          readFile: vi.fn().mockResolvedValue(Buffer.from('hello win32')),
+          close: vi.fn().mockResolvedValue(undefined),
+        } as unknown as fsPromises.FileHandle);
+
+        try {
+          await expect(readSecureFileBuffer(filePath)).rejects.toThrow(
+            /File device or inode changed during read/,
+          );
+        } finally {
+          openSpy.mockRestore();
+          statSpy.mockRestore();
+          platformSpy.mockRestore();
+        }
+      });
     });
 
     describe('isBinaryFile with BOM awareness', () => {
