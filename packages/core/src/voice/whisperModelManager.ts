@@ -128,15 +128,25 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
           if (!writeOk) {
             await new Promise<void>((resolve, reject) => {
               const onDrain = () => {
-                writer.off('error', onError);
+                cleanup();
                 resolve();
               };
               const onError = (err: Error) => {
-                writer.off('drain', onDrain);
+                cleanup();
                 reject(err);
+              };
+              const onClose = () => {
+                cleanup();
+                reject(new Error('Stream closed before drain'));
+              };
+              const cleanup = () => {
+                writer.off('drain', onDrain);
+                writer.off('error', onError);
+                writer.off('close', onClose);
               };
               writer.once('drain', onDrain);
               writer.once('error', onError);
+              writer.once('close', onClose);
             });
           }
 
