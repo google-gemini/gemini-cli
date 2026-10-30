@@ -41,8 +41,12 @@ export function tmpdir(): string {
  */
 export function tildeifyPath(path: string): string {
   const homeDir = homedir();
-  if (path.startsWith(homeDir)) {
-    return path.replace(homeDir, '~');
+  if (
+    path === homeDir ||
+    path.startsWith(homeDir + '/') ||
+    path.startsWith(homeDir + '\\')
+  ) {
+    return '~' + path.slice(homeDir.length);
   }
   return path;
 }
