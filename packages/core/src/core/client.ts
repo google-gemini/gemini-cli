@@ -790,6 +790,7 @@ export class GeminiClient {
         prompt_id,
         boundedTurns,
         displayContent,
+        request,
       );
     }
 
@@ -1305,6 +1306,7 @@ export class GeminiClient {
     prompt_id: string,
     boundedTurns: number,
     displayContent?: PartListUnion,
+    unsentRequest?: PartListUnion,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     // Clear the detection flag so the recursive turn can proceed, but the count remains 1.
     this.loopDetector.clearDetection();
@@ -1317,7 +1319,13 @@ export class GeminiClient {
       );
     }
 
-    const feedback = [{ text: feedbackText }];
+    // A loop found before the request was sent must not drop that request. It
+    // is usually the functionResponse of a tool that already ran, and without
+    // it the call is closed as "lost or interrupted".
+    const unsentParts = unsentRequest
+      ? (createUserContent(unsentRequest).parts ?? [])
+      : [];
+    const feedback = [...unsentParts, { text: feedbackText }];
 
     // Recursive call with feedback
     return this.sendMessageStream(

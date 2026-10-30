@@ -2996,6 +2996,51 @@ ${JSON.stringify(
         expect(client['loopDetector'].clearDetection).toHaveBeenCalled();
       });
 
+      it('should keep an unsent tool response when the loop is found before the request is sent', async () => {
+        // Arrange
+        vi.spyOn(client['loopDetector'], 'turnStarted')
+          .mockResolvedValueOnce({ count: 1, detail: 'Writes files forever' })
+          .mockResolvedValue({ count: 0 });
+        vi.spyOn(client['loopDetector'], 'addAndCheck').mockReturnValue({
+          count: 0,
+        });
+
+        const sendMessageStreamSpy = vi.spyOn(client, 'sendMessageStream');
+
+        mockTurnRunFn.mockImplementation(() =>
+          (async function* () {
+            yield { type: GeminiEventType.Content, value: 'Done' };
+          })(),
+        );
+
+        const toolResponse: Part = {
+          functionResponse: {
+            id: 'write_file-1',
+            name: 'write_file',
+            response: { output: 'Wrote step-29.txt' },
+          },
+        };
+
+        // Act
+        const stream = client.sendMessageStream(
+          [toolResponse],
+          new AbortController().signal,
+          'prompt-id-loop-unsent',
+        );
+        for await (const _ of stream) {
+          // consume stream
+        }
+
+        // Assert
+        expect(sendMessageStreamSpy).toHaveBeenCalledTimes(2);
+        const recoveryRequest = sendMessageStreamSpy.mock.calls[1][0] as Part[];
+        expect(recoveryRequest[0]).toEqual(toolResponse);
+        expect(recoveryRequest[1].text).toContain(
+          'System: Potential loop detected',
+        );
+        expect(recoveryRequest[1].text).toContain('Writes files forever');
+      });
+
       it('should terminate (Strike 2) after recovery fails', async () => {
         // Arrange
         vi.spyOn(client['loopDetector'], 'turnStarted').mockResolvedValue({
