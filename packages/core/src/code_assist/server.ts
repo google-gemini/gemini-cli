@@ -502,24 +502,15 @@ export class CodeAssistServer implements ContentGenerator {
         }
         const chunk = bufferedLines.join('\n');
         bufferedLines = []; // Reset the buffer before yielding
-        let parseSucceeded = false;
-        const markParsed = <V>(value: V): V => {
-          parseSucceeded = true;
-          return value;
-        };
         try {
-          yield markParsed(JSON.parse(chunk));
-        } catch (error) {
-          if (!parseSucceeded) {
-            if (server.config) {
-              logInvalidChunk(
-                server.config,
-                // Don't include the chunk content in the log for security/privacy reasons.
-                new InvalidChunkEvent('Malformed JSON chunk'),
-              );
-            }
-          } else {
-            throw error;
+          yield JSON.parse(chunk);
+        } catch {
+          if (server.config) {
+            logInvalidChunk(
+              server.config,
+              // Don't include the chunk content in the log for security/privacy reasons.
+              new InvalidChunkEvent('Malformed JSON chunk'),
+            );
           }
         }
       }
