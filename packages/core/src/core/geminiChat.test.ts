@@ -4353,15 +4353,20 @@ describe('GeminiChat', () => {
       vi.mocked(
         mockConfig.modelConfigService.getResolvedConfig,
       ).mockImplementation((key) => {
-        if (key.model === 'model-b') {
-          return makeResolvedModelConfig('model-b', { temperature: 0.8 });
+        if (key.model === 'gemini-3-flash-preview') {
+          return makeResolvedModelConfig('gemini-3-flash-preview', {
+            temperature: 0.8,
+          });
+        }
+        if (key.model === 'flash') {
+          return makeResolvedModelConfig('flash', { temperature: 0.5 });
         }
         return makeResolvedModelConfig('model-a', { temperature: 0.2 });
       });
 
       vi.mocked(mockAvailabilityService.selectFirstAvailable)
         .mockReturnValueOnce({ selectedModel: 'model-a', skipped: [] })
-        .mockReturnValueOnce({ selectedModel: 'model-b', skipped: [] });
+        .mockReturnValueOnce({ selectedModel: 'flash', skipped: [] });
       vi.mocked(mockAvailabilityService.snapshot).mockImplementation(
         (model) => ({
           available: model !== 'model-a',
@@ -4425,7 +4430,7 @@ describe('GeminiChat', () => {
       ).toHaveBeenNthCalledWith(
         2,
         expect.objectContaining({
-          model: 'model-b',
+          model: 'gemini-3-flash-preview',
           config: expect.objectContaining({ temperature: 0.8 }),
         }),
         expect.any(String),

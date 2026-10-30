@@ -1066,7 +1066,6 @@ export class GeminiChat {
           currentGenerateContentConfig = reselectedConfig;
         }
         initialActiveModel = this.context.config.getActiveModel();
-        lastModelToUse = modelToUse;
       }
 
       if (modelToUse !== lastModelToUse) {
