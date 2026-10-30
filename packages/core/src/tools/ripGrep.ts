@@ -260,9 +260,12 @@ class GrepToolInvocation extends BaseToolInvocation<
         configTimeout && configTimeout > DEFAULT_SEARCH_TIMEOUT_MS
           ? configTimeout
           : DEFAULT_SEARCH_TIMEOUT_MS;
+      let timedOut = false;
       const timeoutId = setTimeout(() => {
+        timedOut = true;
         timeoutController.abort();
       }, timeoutMs);
+      const timeoutMessage = `Operation timed out after ${timeoutMs}ms. In large repositories, consider narrowing your search scope by specifying a 'dir_path' or an 'include_pattern'.`;
 
       // Link the passed signal to our timeout controller
       const onAbort = () => timeoutController.abort();
@@ -271,6 +274,15 @@ class GrepToolInvocation extends BaseToolInvocation<
       } else {
         signal.addEventListener('abort', onAbort, { once: true });
       }
+
+      const timeoutResult: ToolResult = {
+        llmContent: timeoutMessage,
+        returnDisplay: `Error: ${timeoutMessage}`,
+        error: {
+          message: timeoutMessage,
+          type: ToolErrorType.GREP_EXECUTION_ERROR,
+        },
+      };
 
       let allMatches: GrepMatch[];
       try {
@@ -289,11 +301,41 @@ class GrepToolInvocation extends BaseToolInvocation<
           max_matches_per_file: this.params.max_matches_per_file,
           signal: timeoutController.signal,
         });
-      } catch (error) {
-        if (timeoutController.signal.aborted) {
-          throw new Error(
-            `Operation timed out after ${timeoutMs}ms. In large repositories, consider narrowing your search scope by specifying a 'dir_path' or an 'include_pattern'.`,
+
+        // The context pass below runs ripgrep a second time, so it stays inside
+        // the deadline: the timeout message promises one budget for the whole
+        // search, and a hung second pass would otherwise never surface.
+        if (!timedOut) {
+          if (!this.params.no_ignore) {
+            const uniqueFiles = Array.from(
+              new Set(allMatches.map((m) => m.filePath)),
+            );
+            const absoluteFilePaths = uniqueFiles.map((f) =>
+              path.resolve(searchDirAbs, f),
+            );
+            const allowedFiles =
+              this.fileDiscoveryService.filterFiles(absoluteFilePaths);
+            const allowedSet = new Set(allowedFiles);
+            allMatches = allMatches.filter((m) =>
+              allowedSet.has(path.resolve(searchDirAbs, m.filePath)),
+            );
+          }
+
+          const matchCount = allMatches.filter((m) => !m.isContext).length;
+          allMatches = await this.enrichWithRipgrepAutoContext(
+            allMatches,
+            matchCount,
+            totalMaxMatches,
+            searchDirAbs,
+            timeoutController.signal,
           );
+        }
+      } catch (error) {
+        // A search that fails after the deadline is still a timeout, so it is
+        // reported through the structured error instead of the generic catch
+        // that wraps execute().
+        if (timedOut) {
+          return timeoutResult;
         }
         throw error;
       } finally {
@@ -301,29 +343,14 @@ class GrepToolInvocation extends BaseToolInvocation<
         signal.removeEventListener('abort', onAbort);
       }
 
-      if (!this.params.no_ignore) {
-        const uniqueFiles = Array.from(
-          new Set(allMatches.map((m) => m.filePath)),
-        );
-        const absoluteFilePaths = uniqueFiles.map((f) =>
-          path.resolve(searchDirAbs, f),
-        );
-        const allowedFiles =
-          this.fileDiscoveryService.filterFiles(absoluteFilePaths);
-        const allowedSet = new Set(allowedFiles);
-        allMatches = allMatches.filter((m) =>
-          allowedSet.has(path.resolve(searchDirAbs, m.filePath)),
-        );
+      // When the timeout fires, execStreaming kills ripgrep and resolves with the
+      // matches it had collected so far, so a timed out search has to be detected
+      // here as well: returning the partial results (or, after the context pass,
+      // an empty list) as a successful search hides the timeout from the model,
+      // which then has no reason to narrow the search or retry.
+      if (timedOut) {
+        return timeoutResult;
       }
-
-      const matchCount = allMatches.filter((m) => !m.isContext).length;
-      allMatches = await this.enrichWithRipgrepAutoContext(
-        allMatches,
-        matchCount,
-        totalMaxMatches,
-        searchDirAbs,
-        timeoutController.signal,
-      );
 
       const searchLocationDescription = `in path "${searchDirDisplay}"`;
 
@@ -362,6 +389,12 @@ class GrepToolInvocation extends BaseToolInvocation<
     searchDirAbs: string,
     signal: AbortSignal,
   ): Promise<GrepMatch[]> {
+    // A second ripgrep pass on an already aborted signal produces no output at
+    // all, which would replace the matches collected so far with an empty list.
+    if (signal.aborted) {
+      return allMatches;
+    }
+
     if (
       matchCount >= 1 &&
       matchCount <= 3 &&
@@ -389,6 +422,12 @@ class GrepToolInvocation extends BaseToolInvocation<
         max_matches_per_file: this.params.max_matches_per_file,
         signal,
       });
+
+      // Never drop matches that the first pass found: if the context pass comes
+      // back empty (for example because it was cut short), keep them instead.
+      if (enrichedMatches.length === 0) {
+        return allMatches;
+      }
 
       if (!this.params.no_ignore) {
         const allowedFiles = this.fileDiscoveryService.filterFiles(uniqueFiles);
