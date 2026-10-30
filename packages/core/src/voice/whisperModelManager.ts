@@ -41,7 +41,15 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
 
   isModelInstalled(modelName: string): boolean {
     this.validateModelName(modelName);
-    return fs.existsSync(path.join(this.modelsDir, modelName));
+    const modelPath = path.join(this.modelsDir, modelName);
+    if (!fs.existsSync(modelPath)) {
+      return false;
+    }
+    try {
+      return fs.statSync(modelPath).size > 0;
+    } catch {
+      return false;
+    }
   }
 
   getModelPath(modelName: string): string {
@@ -57,6 +65,7 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
     }
 
     const destination = path.join(this.modelsDir, modelName);
+    const tempDestination = `${destination}.downloading`;
     const url = `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/${modelName}`;
 
     debugLogger.debug(
@@ -76,26 +85,84 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
       throw new Error('Response body is not readable');
     }
 
-    const writer = fs.createWriteStream(destination);
+    if (fs.existsSync(tempDestination)) {
+      fs.unlinkSync(tempDestination);
+    }
+
+    const writer = fs.createWriteStream(tempDestination);
+    let streamError: Error | null = null;
+    const finishPromise = new Promise<void>((resolve, reject) => {
+      writer.once('finish', resolve);
+      writer.once('error', (err) => {
+        streamError = err;
+        void reader.cancel?.().catch(() => {});
+        reject(err);
+      });
+    });
+    finishPromise.catch(() => {});
 
     try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (streamError) {
+            throw streamError;
+          }
 
-        transferred += value.length;
-        writer.write(value);
+          transferred += value.length;
+          const writeOk = writer.write(value);
+          if (streamError) {
+            throw streamError;
+          }
+          if (!writeOk) {
+            await new Promise<void>((resolve, reject) => {
+              const onDrain = () => {
+                writer.off('error', onError);
+                resolve();
+              };
+              const onError = (err: Error) => {
+                writer.off('drain', onDrain);
+                reject(err);
+              };
+              writer.once('drain', onDrain);
+              writer.once('error', onError);
+            });
+          }
 
-        const percentage = total > 0 ? transferred / total : 0;
-        this.emit('progress', {
-          modelName,
-          transferred,
-          total,
-          percentage,
-        });
+          const percentage = total > 0 ? transferred / total : 0;
+          this.emit('progress', {
+            modelName,
+            transferred,
+            total,
+            percentage,
+          });
+        }
+      } finally {
+        writer.end();
       }
-    } finally {
-      writer.end();
+
+      await finishPromise;
+
+      if (transferred === 0 || (total > 0 && transferred !== total)) {
+        throw new Error(
+          `Incomplete download for ${modelName}: expected ${total} bytes, received ${transferred} bytes`,
+        );
+      }
+
+      fs.renameSync(tempDestination, destination);
+    } catch (error) {
+      if (writer instanceof fs.WriteStream) {
+        await finishPromise.catch(() => {});
+      }
+      if (fs.existsSync(tempDestination)) {
+        try {
+          fs.unlinkSync(tempDestination);
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
+      throw error;
     }
   }
 
