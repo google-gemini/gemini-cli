@@ -1141,5 +1141,233 @@ data: ${jsonString}
         ' World',
       );
     });
+
+    it('should flush and yield final SSE event when stream ends at EOF without a trailing blank line', async () => {
+      const { server, mockRequest } = createTestServer();
+      const { Readable } = await import('node:stream');
+
+      const eofCases = [
+        {
+          chunks: ['data: {"foo": "bar"}'],
+          expected: [{ foo: 'bar' }],
+        },
+        {
+          chunks: ['data: {"foo": "bar"}\n'],
+          expected: [{ foo: 'bar' }],
+        },
+        {
+          chunks: ['data: {"foo": "bar"}\r\n'],
+          expected: [{ foo: 'bar' }],
+        },
+        {
+          chunks: ['data: {"first": 1}\n\n', 'data: {"second": 2}'],
+          expected: [{ first: 1 }, { second: 2 }],
+        },
+        {
+          chunks: ['data: {\n', 'data: "multi": true\n', 'data: }'],
+          expected: [{ multi: true }],
+        },
+        {
+          chunks: ['data: {"foo": "bar"}\n', 'id: 42'],
+          expected: [{ foo: 'bar' }],
+        },
+      ];
+
+      for (const { chunks, expected } of eofCases) {
+        const mockStream = new Readable({
+          read() {
+            for (const chunk of chunks) {
+              this.push(chunk);
+            }
+            this.push(null);
+          },
+        });
+        mockRequest.mockResolvedValueOnce({ data: mockStream });
+
+        const stream = await server.requestStreamingPost('testStream', {});
+        const results = [];
+        for await (const res of stream) {
+          results.push(res);
+        }
+        expect(results).toEqual(expected);
+      }
+    });
+
+    it('should preserve final chunk finishReason and usageMetadata in generateContentStream when stream closes without trailing blank line', async () => {
+      const { server, mockRequest } = createTestServer();
+      const { Readable } = await import('node:stream');
+
+      const firstChunk = {
+        traceId: '1',
+        response: {
+          candidates: [{ content: { parts: [{ text: 'Hello' }] }, index: 0 }],
+        },
+      };
+      const finalChunk = {
+        traceId: '2',
+        response: {
+          candidates: [
+            {
+              content: {
+                parts: [
+                  { text: ' World' },
+                  { functionCall: { name: 'replace', args: {} } },
+                ],
+              },
+              finishReason: FinishReason.STOP,
+              index: 0,
+            },
+          ],
+          usageMetadata: {
+            promptTokenCount: 10,
+            candidatesTokenCount: 5,
+            totalTokenCount: 15,
+          },
+        },
+      };
+
+      const mockStream = new Readable({
+        read() {
+          this.push(`data: ${JSON.stringify(firstChunk)}\n\n`);
+          // Close immediately after final data line without trailing blank line
+          this.push(`data: ${JSON.stringify(finalChunk)}`);
+          this.push(null);
+        },
+      });
+      mockRequest.mockResolvedValueOnce({ data: mockStream });
+      vi.spyOn(server, 'recordCodeAssistMetrics').mockResolvedValue(undefined);
+
+      const stream = await server.generateContentStream(
+        { model: 'test-model', contents: [] },
+        'user-prompt-id',
+        LlmRole.MAIN,
+      );
+
+      const results = [];
+      for await (const res of stream) {
+        results.push(res);
+      }
+
+      expect(results).toHaveLength(2);
+      expect(results[0].candidates?.[0]?.content?.parts?.[0]?.text).toBe(
+        'Hello',
+      );
+      expect(results[1].candidates?.[0]?.content?.parts?.[0]?.text).toBe(
+        ' World',
+      );
+      expect(results[1].candidates?.[0]?.finishReason).toBe(FinishReason.STOP);
+      expect(results[1].usageMetadata?.totalTokenCount).toBe(15);
+      expect(server.recordCodeAssistMetrics).toHaveBeenCalledTimes(1);
+    });
+
+    it('should log InvalidChunkEvent when buffered SSE data at EOF without trailing blank line is malformed JSON', async () => {
+      const config = makeFakeConfig();
+      const mockRequest = vi.fn();
+      const client = { request: mockRequest } as unknown as OAuth2Client;
+      const server = new CodeAssistServer(
+        client,
+        'test-project',
+        {},
+        'test-session',
+        UserTierId.FREE,
+        undefined,
+        undefined,
+        config,
+      );
+
+      const { Readable } = await import('node:stream');
+      const mockStream = new Readable({
+        read() {
+          this.push('data: { "truncated": ');
+          this.push(null);
+        },
+      });
+
+      mockRequest.mockResolvedValueOnce({ data: mockStream });
+
+      const stream = await server.requestStreamingPost('testStream', {});
+      const results = [];
+      for await (const res of stream) {
+        results.push(res);
+      }
+
+      expect(results).toHaveLength(0);
+      expect(logInvalidChunk).toHaveBeenCalledWith(
+        config,
+        expect.objectContaining({
+          error_message: 'Malformed JSON chunk',
+        }),
+      );
+    });
+
+    it('should not emit duplicate events or log errors at EOF when stream ends with non-data lines after a blank line', async () => {
+      const config = makeFakeConfig();
+      const mockRequest = vi.fn();
+      const client = { request: mockRequest } as unknown as OAuth2Client;
+      const server = new CodeAssistServer(
+        client,
+        'test-project',
+        {},
+        'test-session',
+        UserTierId.FREE,
+        undefined,
+        undefined,
+        config,
+      );
+
+      const { Readable } = await import('node:stream');
+      const mockStream = new Readable({
+        read() {
+          this.push('data: {"ok": true}\n\n: keep-alive');
+          this.push(null);
+        },
+      });
+
+      mockRequest.mockResolvedValueOnce({ data: mockStream });
+
+      const stream = await server.requestStreamingPost('testStream', {});
+      const results = [];
+      for await (const res of stream) {
+        results.push(res);
+      }
+
+      expect(results).toEqual([{ ok: true }]);
+      expect(logInvalidChunk).not.toHaveBeenCalled();
+    });
+
+    it('should propagate consumer SyntaxError without logging InvalidChunkEvent', async () => {
+      const config = makeFakeConfig();
+      const mockRequest = vi.fn();
+      const client = { request: mockRequest } as unknown as OAuth2Client;
+      const server = new CodeAssistServer(
+        client,
+        'test-project',
+        {},
+        'test-session',
+        UserTierId.FREE,
+        undefined,
+        undefined,
+        config,
+      );
+
+      const { Readable } = await import('node:stream');
+      const mockStream = new Readable({
+        read() {
+          this.push('data: {"ok": true}');
+          this.push(null);
+        },
+      });
+
+      mockRequest.mockResolvedValueOnce({ data: mockStream });
+
+      const stream = await server.requestStreamingPost('testStream', {});
+      await expect(async () => {
+        for await (const _res of stream) {
+          throw new SyntaxError('Downstream consumer syntax error');
+        }
+      }).rejects.toThrow('Downstream consumer syntax error');
+
+      expect(logInvalidChunk).not.toHaveBeenCalled();
+    });
   });
 });

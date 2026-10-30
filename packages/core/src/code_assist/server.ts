@@ -495,17 +495,22 @@ export class CodeAssistServer implements ContentGenerator {
       });
 
       let bufferedLines: string[] = [];
-      for await (const line of rl) {
-        if (line.startsWith('data: ')) {
-          bufferedLines.push(line.slice(6).trim());
-        } else if (line === '') {
-          if (bufferedLines.length === 0) {
-            continue; // no data to yield
-          }
-          const chunk = bufferedLines.join('\n');
-          try {
-            yield JSON.parse(chunk);
-          } catch {
+
+      function* flushBuffer(): Generator<T> {
+        if (bufferedLines.length === 0) {
+          return;
+        }
+        const chunk = bufferedLines.join('\n');
+        bufferedLines = []; // Reset the buffer before yielding
+        let parseSucceeded = false;
+        const markParsed = <V>(value: V): V => {
+          parseSucceeded = true;
+          return value;
+        };
+        try {
+          yield markParsed(JSON.parse(chunk));
+        } catch (error) {
+          if (!parseSucceeded) {
             if (server.config) {
               logInvalidChunk(
                 server.config,
@@ -513,11 +518,23 @@ export class CodeAssistServer implements ContentGenerator {
                 new InvalidChunkEvent('Malformed JSON chunk'),
               );
             }
+          } else {
+            throw error;
           }
-          bufferedLines = []; // Reset the buffer after yielding
+        }
+      }
+
+      for await (const line of rl) {
+        if (line.startsWith('data: ')) {
+          bufferedLines.push(line.slice(6).trim());
+        } else if (line === '') {
+          yield* flushBuffer();
         }
         // Ignore other lines like comments or id fields
       }
+
+      // Flush any remaining buffered event if the stream ended without a trailing blank line.
+      yield* flushBuffer();
     })(this);
   }
 
