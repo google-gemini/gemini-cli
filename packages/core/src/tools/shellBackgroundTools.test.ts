@@ -335,4 +335,84 @@ describe('Background Tools', () => {
 
     fs.unlinkSync(logPath);
   });
+  describe('read_background_output past the 64KB read cap', () => {
+    const readLog = async (pid: number, content: string) => {
+      const logPath = ShellExecutionService.getLogFilePath(pid);
+      const history = new Map();
+      history.set(pid, {
+        command: 'tail command',
+        status: 'running',
+        startTime: Date.now(),
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (ShellExecutionService as any).backgroundProcessHistory.set(
+        'default',
+        history,
+      );
+      fs.mkdirSync(ShellExecutionService.getLogDir(), { recursive: true });
+      fs.writeFileSync(logPath, content);
+      try {
+        const result = await readTool
+          .build({ pid })
+          .execute({ abortSignal: new AbortController().signal });
+        return String(result.llmContent);
+      } finally {
+        fs.unlinkSync(logPath);
+      }
+    };
+
+    it('keeps the tail of a single line longer than the cap', async () => {
+      const llmContent = await readLog(77001, 'a'.repeat(70_000) + '\n');
+
+      expect(llmContent).toBe(
+        'Showing the end of a line longer than the 64KB read limit (earlier output truncated):\n' +
+          'a'.repeat(65_535),
+      );
+    });
+
+    it('keeps the first line when the read starts on a line boundary', async () => {
+      const window = 'keep me\n' + 'b'.repeat(65_536 - 9) + '\n';
+      const llmContent = await readLog(77002, 'drop me\n' + window);
+
+      expect(llmContent).toContain(
+        'Showing last 2 lines (earlier output truncated to the final 64KB):\nkeep me\n',
+      );
+      expect(llmContent).not.toContain('drop me');
+    });
+
+    it('drops a partial first line and marks the output truncated', async () => {
+      const llmContent = await readLog(
+        77003,
+        'c'.repeat(70_000) + '\nlast line\n',
+      );
+
+      expect(llmContent).toBe(
+        'Showing last 1 line (earlier output truncated to the final 64KB):\nlast line',
+      );
+    });
+
+    it('does not decode a multi-byte character split by the cap', async () => {
+      // 80,001 bytes, so the 64KB window starts on the second byte of an "é"
+      const llmContent = await readLog(77004, 'é'.repeat(40_000) + '\n');
+
+      expect(llmContent).toContain('é'.repeat(32_767));
+      expect(llmContent).not.toContain('\uFFFD');
+    });
+
+    it.each(['中', '😀'])(
+      'does not decode a %s split by the cap at any byte offset',
+      async (char) => {
+        // Trailing "a"s shift where the 64KB window starts within a character
+        for (let shift = 0; shift < Buffer.byteLength(char); shift++) {
+          const llmContent = await readLog(
+            77005,
+            char.repeat(30_000) + 'a'.repeat(shift) + '\n',
+          );
+
+          expect(llmContent).toContain(char.repeat(10_000));
+          expect(llmContent).not.toContain('\uFFFD');
+        }
+      },
+    );
+  });
 });

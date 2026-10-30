@@ -175,14 +175,30 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
 
       let content = '';
       let position = 0;
+      let startsMidLine = false;
       try {
         const stats = await fileHandle.stat();
         const readSize = Math.min(stats.size, MAX_BUFFER_LOAD_CAP_BYTES);
         position = Math.max(0, stats.size - readSize);
 
-        const buffer = Buffer.alloc(readSize);
-        await fileHandle.read(buffer, 0, readSize, position);
-        content = buffer.toString('utf-8');
+        // Read one byte before the window to tell whether it starts on a line boundary
+        const lookBehind = position > 0 ? 1 : 0;
+        const buffer = Buffer.alloc(readSize + lookBehind);
+        await fileHandle.read(buffer, 0, buffer.length, position - lookBehind);
+        startsMidLine = lookBehind === 1 && buffer[0] !== 0x0a;
+
+        // Skip the continuation bytes of a UTF-8 character cut by the cap so it isn't decoded as U+FFFD
+        let start = lookBehind;
+        while (
+          startsMidLine &&
+          start < lookBehind + 3 &&
+          start < buffer.length &&
+          buffer[start] >= 0x80 &&
+          buffer[start] < 0xc0
+        ) {
+          start++;
+        }
+        content = buffer.toString('utf-8', start);
       } finally {
         await fileHandle.close();
       }
@@ -199,8 +215,9 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
         logLines.pop();
       }
 
-      // Discard first line if we started reading from middle of file to avoid partial lines
-      if (position > 0 && logLines.length > 0) {
+      // Drop a partial first line, unless it is all we have: a single line longer than the cap
+      const keepsPartialLine = startsMidLine && logLines.length === 1;
+      if (startsMidLine && logLines.length > 1) {
         logLines.shift();
       }
 
@@ -208,10 +225,18 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
       const tailLines = logLines.slice(-requestedLinesCount);
       const output = tailLines.join('\n');
 
-      const header =
-        requestedLinesCount < logLines.length
-          ? `Showing last ${requestedLinesCount} of ${logLines.length} lines:\n`
-          : 'Full Log Output:\n';
+      const capKb = MAX_BUFFER_LOAD_CAP_BYTES / 1024;
+      let header: string;
+      if (keepsPartialLine) {
+        header = `Showing the end of a line longer than the ${capKb}KB read limit (earlier output truncated):\n`;
+      } else if (position > 0) {
+        const noun = tailLines.length === 1 ? 'line' : 'lines';
+        header = `Showing last ${tailLines.length} ${noun} (earlier output truncated to the final ${capKb}KB):\n`;
+      } else if (requestedLinesCount < logLines.length) {
+        header = `Showing last ${requestedLinesCount} of ${logLines.length} lines:\n`;
+      } else {
+        header = 'Full Log Output:\n';
+      }
 
       const responseContent = header + output;
 
