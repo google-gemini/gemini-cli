@@ -181,6 +181,7 @@ import { useTimedMessage } from './hooks/useTimedMessage.js';
 import { useIsHelpDismissKey } from './utils/shortcutsHelp.js';
 import { useSuspend } from './hooks/useSuspend.js';
 import { useRunEventNotifications } from './hooks/useRunEventNotifications.js';
+import { useProgramStatus } from './hooks/useProgramStatus.js';
 import {
   isNotificationsEnabled,
   getNotificationMethod,
@@ -2645,6 +2646,28 @@ Logging in with Google... Restarting Gemini CLI to continue.
     permissionConfirmationRequest,
     hasConfirmUpdateExtensionRequests,
     hasLoopDetectionConfirmationRequest,
+  });
+
+  useProgramStatus({
+    enabled: settings.merged.ui.programStatus !== false,
+    isInteractive: config.isInteractive(),
+    stdoutIsTTY: process.stdout.isTTY === true,
+    outputFormat: config.getOutputFormat(),
+    acpMode: config.getAcpMode(),
+    streamingState,
+    initError,
+    history: historyManager.history,
+    pendingHistoryItems,
+    isAuthDialogOpen,
+    isAuthenticating,
+    isAwaitingApiKeyInput: authState === AuthState.AwaitingApiKeyInput,
+    isAwaitingLoginRestart,
+    authConsentRequest,
+    commandConfirmationRequest,
+    permissionConfirmationRequest,
+    hasConfirmUpdateExtensionRequests,
+    hasLoopDetectionConfirmationRequest,
+    isFolderTrustDialogOpen: isFolderTrustDialogOpen ?? false,
   });
 
   const isPassiveShortcutsHelpState =

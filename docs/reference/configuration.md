@@ -306,6 +306,11 @@ their corresponding top-level category object in your `settings.json` file.
     (Ready: ◇, Action Required: ✋, Working: ✦)
   - **Default:** `true`
 
+- **`ui.programStatus`** (boolean):
+  - **Description:** Report interactive session status to the terminal using OSC
+    7501 so tab titles can show working, blocked, done, error, or idle.
+  - **Default:** `true`
+
 - **`ui.showHomeDirectoryWarning`** (boolean):
 
   - **Description:** Show a warning when running Gemini CLI in the home

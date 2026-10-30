@@ -53,6 +53,33 @@ Gemini CLI sends notifications for the following events:
 - **Session complete:** Triggered when a session finishes successfully. This is
   useful for tracking the completion of automated tasks.
 
+## Program status
+
+In interactive TTY sessions, Gemini CLI reports the current session state to the
+terminal with OSC 7501 so supporting terminals can show whether a tab is
+working, waiting for input, finished, failed, or idle.
+
+Reports use the stable app name `gemini` and include:
+
+- **working:** the model is responding
+- **blocked:** waiting on a permission, a question, or authentication
+- **done** or **error:** the current turn finished
+- **idle:** waiting for the next prompt, including at startup
+
+Gemini CLI emits idle and then clear when the interactive session exits. These
+sequences are not written in headless `-p` runs, JSON or stream-JSON output,
+ACP, or when stdout is not a TTY.
+
+Program status is on by default. Turn it off in `/settings` or with:
+
+```json
+{
+  "ui": {
+    "programStatus": false
+  }
+}
+```
+
 ## Next steps
 
 - Start planning with [Plan Mode](./plan-mode.md).

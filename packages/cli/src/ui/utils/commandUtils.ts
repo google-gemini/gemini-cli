@@ -10,6 +10,7 @@ import type { SlashCommand } from '../commands/types.js';
 import fs from 'node:fs';
 import type { Writable } from 'node:stream';
 import type { Settings } from '../../config/settingsSchema.js';
+import { wrapOscForMultiplexer } from '../../utils/oscPassthrough.js';
 import { AT_COMMAND_PATH_REGEX_SOURCE } from '../hooks/atCommandProcessor.js';
 
 // Pre-compiled regex for detecting @<path> patterns consistent with parseAllAtCommands.
@@ -61,7 +62,6 @@ export const isSlashCommand = (query: string): boolean => {
 
 const ESC = '\u001B';
 const BEL = '\u0007';
-const ST = '\u001B\\';
 
 const MAX_OSC52_SEQUENCE_BYTES = 100_000;
 const OSC52_HEADER = `${ESC}]52;c;`;
@@ -71,9 +71,6 @@ const MAX_OSC52_BODY_B64_BYTES =
   Buffer.byteLength(OSC52_HEADER) -
   Buffer.byteLength(OSC52_FOOTER);
 const MAX_OSC52_DATA_BYTES = Math.floor(MAX_OSC52_BODY_B64_BYTES / 4) * 3;
-
-// Conservative chunk size for GNU screen DCS passthrough.
-const SCREEN_DCS_CHUNK_SIZE = 240;
 
 type TtyTarget = { stream: Writable; closeAfter: boolean } | null;
 
@@ -140,16 +137,6 @@ const getStdioTty = (): TtyTarget => {
   return null;
 };
 
-const inTmux = (): boolean =>
-  Boolean(
-    process.env['TMUX'] || (process.env['TERM'] ?? '').startsWith('tmux'),
-  );
-
-const inScreen = (): boolean =>
-  Boolean(
-    process.env['STY'] || (process.env['TERM'] ?? '').startsWith('screen'),
-  );
-
 const isSSH = (): boolean =>
   Boolean(
     process.env['SSH_TTY'] ||
@@ -190,20 +177,6 @@ const buildOsc52 = (text: string): string => {
   const safe = safeUtf8Truncate(raw, MAX_OSC52_DATA_BYTES);
   const b64 = safe.toString('base64');
   return `${OSC52_HEADER}${b64}${OSC52_FOOTER}`;
-};
-
-const wrapForTmux = (seq: string): string => {
-  // Double ESC bytes in payload without a control-character regex.
-  const doubledEsc = seq.split(ESC).join(ESC + ESC);
-  return `${ESC}Ptmux;${doubledEsc}${ST}`;
-};
-
-const wrapForScreen = (seq: string): string => {
-  let out = '';
-  for (let i = 0; i < seq.length; i += SCREEN_DCS_CHUNK_SIZE) {
-    out += `${ESC}P${seq.slice(i, i + SCREEN_DCS_CHUNK_SIZE)}${ST}`;
-  }
-  return out;
 };
 
 const writeAll = (stream: Writable, data: string): Promise<void> =>
@@ -264,11 +237,7 @@ export const copyToClipboard = async (
 
   if (shouldUseOsc52(tty, settings)) {
     const osc = buildOsc52(text);
-    const payload = inTmux()
-      ? wrapForTmux(osc)
-      : inScreen()
-        ? wrapForScreen(osc)
-        : osc;
+    const payload = wrapOscForMultiplexer(osc);
 
     await writeAll(tty!.stream, payload);
 

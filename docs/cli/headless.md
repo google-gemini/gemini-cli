@@ -6,7 +6,8 @@ structured text or JSON output without an interactive terminal UI.
 ## Technical reference
 
 Headless mode is triggered when the CLI is run in a non-TTY environment or when
-providing a query with the `-p` (or `--prompt`) flag.
+providing a query with the `-p` (or `--prompt`) flag. Interactive terminal
+status sequences such as OSC 7501 are not emitted in headless mode.
 
 ### Output formats
 

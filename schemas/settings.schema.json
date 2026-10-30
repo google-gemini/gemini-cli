@@ -343,6 +343,13 @@
           "default": true,
           "type": "boolean"
         },
+        "programStatus": {
+          "title": "Program Status",
+          "description": "Report interactive session status to the terminal using OSC 7501 so tab titles can show working, blocked, done, error, or idle.",
+          "markdownDescription": "Report interactive session status to the terminal using OSC 7501 so tab titles can show working, blocked, done, error, or idle.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "showHomeDirectoryWarning": {
           "title": "Show Home Directory Warning",
           "description": "Show a warning when running Gemini CLI in the home directory.",

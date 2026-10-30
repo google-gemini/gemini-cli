@@ -31,6 +31,7 @@ import {
   AuthType,
   type AgentDefinition,
   CoreToolCallStatus,
+  OutputFormat,
 } from '@google/gemini-cli-core';
 
 // Mock coreEvents
@@ -2051,6 +2052,87 @@ describe('AppContainer State Management', () => {
       expect(titleWrites[0][0]).toBe(
         `\x1b]0;${'✦  Working… (Custom Gemini Title)'.padEnd(80, ' ')}\x07`,
       );
+      unmount();
+    });
+  });
+
+  describe('Program Status', () => {
+    const originalStdoutIsTTY = process.stdout.isTTY;
+
+    const osc7501Writes = () =>
+      (writeToStdout as Mock).mock.calls
+        .map((call) => String(call[0]))
+        .filter((payload) => payload.includes(']7501;'));
+
+    beforeEach(() => {
+      (writeToStdout as Mock).mockClear();
+      vi.spyOn(mockConfig, 'isInteractive').mockReturnValue(true);
+      vi.spyOn(mockConfig, 'getAcpMode').mockReturnValue(false);
+      vi.spyOn(mockConfig, 'getOutputFormat').mockReturnValue(
+        OutputFormat.TEXT,
+      );
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: true,
+        configurable: true,
+      });
+    });
+
+    afterEach(() => {
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: originalStdoutIsTTY,
+        configurable: true,
+      });
+    });
+
+    it('emits idle on interactive startup', async () => {
+      const { unmount } = await act(async () => renderAppContainer());
+      expect(osc7501Writes()[0]).toContain('state=idle:app=gemini');
+      unmount();
+    });
+
+    it('emits working while responding', async () => {
+      mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        streamingState: 'responding',
+      });
+
+      const { unmount } = await act(async () => renderAppContainer());
+      expect(
+        osc7501Writes().some((payload) => payload.includes('state=working')),
+      ).toBe(true);
+      unmount();
+    });
+
+    it('emits blocked permission while waiting for confirmation', async () => {
+      mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        streamingState: 'waiting_for_confirmation',
+      });
+
+      const { unmount } = await act(async () => renderAppContainer());
+      expect(
+        osc7501Writes().some((payload) =>
+          payload.includes('state=blocked:kind=permission:app=gemini'),
+        ),
+      ).toBe(true);
+      unmount();
+    });
+
+    it('does not emit when ui.programStatus is false', async () => {
+      const { unmount } = await act(async () =>
+        renderAppContainer({
+          settings: createMockSettings({ ui: { programStatus: false } }),
+        }),
+      );
+      expect(osc7501Writes()).toEqual([]);
+      unmount();
+    });
+
+    it('does not emit when the session is not interactive', async () => {
+      vi.spyOn(mockConfig, 'isInteractive').mockReturnValue(false);
+
+      const { unmount } = await act(async () => renderAppContainer());
+      expect(osc7501Writes()).toEqual([]);
       unmount();
     });
   });
