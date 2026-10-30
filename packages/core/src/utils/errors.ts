@@ -121,8 +121,8 @@ export class FatalUntrustedWorkspaceError extends FatalError {
   }
 }
 export class FatalCancellationError extends FatalError {
-  constructor(message: string) {
-    super(message, 130); // Standard exit code for SIGINT
+  constructor(message: string, exitCode = 130) {
+    super(message, exitCode);
     this.name = 'FatalCancellationError';
   }
 }
