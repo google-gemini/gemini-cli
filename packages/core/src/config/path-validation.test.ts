@@ -74,4 +74,27 @@ describe('Config Path Validation', () => {
     expect(config.isPathAllowed(workspacePath)).toBe(true);
     expect(config.validatePathAccess(workspacePath, 'read')).toBeNull();
   });
+
+  it('should report a blocked-segment error instead of Path not in workspace when path inside workspace contains node_modules, .git, or .env', () => {
+    const nodeModulesPath = path.join(targetDir, 'node_modules');
+    const gitConfigPath = path.join(targetDir, '.git', 'config');
+    const envPath = path.join(targetDir, '.env');
+
+    expect(config.validatePathAccess(nodeModulesPath, 'read')).toBe(
+      `Path access blocked: Path "${nodeModulesPath}" contains blocked segment "node_modules"`,
+    );
+    expect(config.validatePathAccess(gitConfigPath, 'read')).toBe(
+      `Path access blocked: Path "${gitConfigPath}" contains blocked segment ".git"`,
+    );
+    expect(config.validatePathAccess(envPath, 'write')).toBe(
+      `Path access blocked: Path "${envPath}" contains blocked segment ".env"`,
+    );
+  });
+
+  it('should still report Path not in workspace for paths outside the workspace', () => {
+    const outsidePath = '/outside/workspace/node_modules';
+    expect(config.validatePathAccess(outsidePath, 'read')).toContain(
+      `Path not in workspace: Attempted path "${outsidePath}" resolves outside the allowed workspace directories:`,
+    );
+  });
 });

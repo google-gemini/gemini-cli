@@ -716,10 +716,10 @@ const SAFE_ENV_TEMPLATES = new Set([
 ]);
 
 /**
- * Checks if a path string contains any blocked segments (.git, .env, node_modules, gha-creds-*.json)
- * including case-insensitive matches and NTFS 8.3 short names.
+ * Returns the first blocked segment in a path string (.git, .env, node_modules, gha-creds-*.json)
+ * including case-insensitive matches and NTFS 8.3 short names, or null if none is found.
  */
-export function hasBlockedPathSegment(p: string): boolean {
+export function getBlockedPathSegment(p: string): string | null {
   // Split by both forward and backward slashes to be platform-agnostic
   const segments = p.split(/[/\\]/);
   for (const segment of segments) {
@@ -737,14 +737,22 @@ export function hasBlockedPathSegment(p: string): boolean {
       ENV_SFN_REGEX.test(clean) ||
       NODE_MODULES_SFN_REGEX.test(clean)
     ) {
-      return true;
+      return segment;
     }
     if (
       (clean.startsWith('gha-creds-') && clean.endsWith('.json')) ||
       GHA_CREDS_SFN_REGEX.test(clean)
     ) {
-      return true;
+      return segment;
     }
   }
-  return false;
+  return null;
+}
+
+/**
+ * Checks if a path string contains any blocked segments (.git, .env, node_modules, gha-creds-*.json)
+ * including case-insensitive matches and NTFS 8.3 short names.
+ */
+export function hasBlockedPathSegment(p: string): boolean {
+  return getBlockedPathSegment(p) !== null;
 }
