@@ -340,8 +340,8 @@ export class BaseLlmClient {
           currentGenerateContentConfig = generateContentConfig;
         } else if (
           !firstAttempt &&
-          this.config.getModelAvailabilityService?.()?.snapshot(currentModel)
-            .available === false
+          (this.config.getModelAvailabilityService?.()?.snapshot(currentModel)
+            ?.available ?? true) === false
         ) {
           const { model: reselectedModel, config: reselectedConfig } =
             applyModelSelection(this.config, modelConfigKey);

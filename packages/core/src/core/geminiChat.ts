@@ -1047,9 +1047,9 @@ export class GeminiChat {
         );
       } else if (
         !firstAttempt &&
-        this.context.config
+        (this.context.config
           .getModelAvailabilityService?.()
-          ?.snapshot(modelToUse).available === false
+          ?.snapshot(modelToUse)?.available ?? true) === false
       ) {
         const { model: reselectedModel, config: reselectedConfig } =
           applyModelSelection(this.context.config, modelConfigKey);

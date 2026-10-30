@@ -1154,9 +1154,9 @@ export class GeminiClient {
           currentAttemptGenerateContentConfig = generateContentConfig;
         } else if (
           !firstAttempt &&
-          this.config
+          (this.config
             .getModelAvailabilityService?.()
-            ?.snapshot(currentAttemptModel).available === false
+            ?.snapshot(currentAttemptModel)?.available ?? true) === false
         ) {
           const { model: reselectedModel, config: reselectedConfig } =
             applyModelSelection(this.config, modelConfigKey);
