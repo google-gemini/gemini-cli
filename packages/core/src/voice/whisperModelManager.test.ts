@@ -82,6 +82,17 @@ function createMockResponse({
   } as unknown as Response;
 }
 
+function getDownloadingFiles(modelPath: string): string[] {
+  const dir = path.dirname(modelPath);
+  const base = path.basename(modelPath);
+  if (!fs.existsSync(dir)) {
+    return [];
+  }
+  return fs
+    .readdirSync(dir)
+    .filter((file) => file.startsWith(base) && file.endsWith('.downloading'));
+}
+
 describe('WhisperModelManager', () => {
   let tempHomeDir: string;
 
@@ -150,7 +161,7 @@ describe('WhisperModelManager', () => {
     expect(fs.readFileSync(modelPath)).toEqual(
       Buffer.from([1, 2, 3, 4, 5, 6, 7, 8]),
     );
-    expect(fs.existsSync(`${modelPath}.downloading`)).toBe(false);
+    expect(getDownloadingFiles(modelPath)).toEqual([]);
   });
 
   it('does not leave a partial installed model or temporary file when the response stream fails mid-download', async () => {
@@ -176,7 +187,7 @@ describe('WhisperModelManager', () => {
 
     expect(manager.isModelInstalled(modelName)).toBe(false);
     expect(fs.existsSync(modelPath)).toBe(false);
-    expect(fs.existsSync(`${modelPath}.downloading`)).toBe(false);
+    expect(getDownloadingFiles(modelPath)).toEqual([]);
   });
 
   it('rejects and cleans up temporary file when stream ends before expected content-length', async () => {
@@ -199,7 +210,7 @@ describe('WhisperModelManager', () => {
 
     expect(manager.isModelInstalled(modelName)).toBe(false);
     expect(fs.existsSync(modelPath)).toBe(false);
-    expect(fs.existsSync(`${modelPath}.downloading`)).toBe(false);
+    expect(getDownloadingFiles(modelPath)).toEqual([]);
   });
 
   it('respects write stream backpressure and awaits close before marking model as installed', async () => {
@@ -316,7 +327,7 @@ describe('WhisperModelManager', () => {
 
     expect(manager.isModelInstalled(modelName)).toBe(false);
     expect(fs.existsSync(modelPath)).toBe(false);
-    expect(fs.existsSync(`${modelPath}.downloading`)).toBe(false);
+    expect(getDownloadingFiles(modelPath)).toEqual([]);
   });
 
   it('rejects and removes temporary file when write stream emits an error while waiting for drain', async () => {
@@ -363,7 +374,7 @@ describe('WhisperModelManager', () => {
 
     expect(manager.isModelInstalled(modelName)).toBe(false);
     expect(fs.existsSync(modelPath)).toBe(false);
-    expect(fs.existsSync(`${modelPath}.downloading`)).toBe(false);
+    expect(getDownloadingFiles(modelPath)).toEqual([]);
   });
 
   it('rejects and removes temporary file when response body is empty (0 bytes)', async () => {
@@ -384,15 +395,16 @@ describe('WhisperModelManager', () => {
 
     expect(manager.isModelInstalled(modelName)).toBe(false);
     expect(fs.existsSync(modelPath)).toBe(false);
-    expect(fs.existsSync(`${modelPath}.downloading`)).toBe(false);
+    expect(getDownloadingFiles(modelPath)).toEqual([]);
   });
 
-  it('removes a stale .downloading file before starting a new download', async () => {
+  it('removes stale .downloading files before starting a new download', async () => {
     const manager = new WhisperModelManager();
     const modelName = 'ggml-tiny.en.bin';
     const modelPath = manager.getModelPath(modelName);
     fs.mkdirSync(path.dirname(modelPath), { recursive: true });
     fs.writeFileSync(`${modelPath}.downloading`, Buffer.from([9, 9, 9]));
+    fs.writeFileSync(`${modelPath}.abc123.downloading`, Buffer.from([8, 8, 8]));
 
     expect(manager.isModelInstalled(modelName)).toBe(false);
 
@@ -407,16 +419,20 @@ describe('WhisperModelManager', () => {
 
     expect(manager.isModelInstalled(modelName)).toBe(true);
     expect(fs.readFileSync(modelPath)).toEqual(Buffer.from([1, 2, 3, 4]));
-    expect(fs.existsSync(`${modelPath}.downloading`)).toBe(false);
+    expect(getDownloadingFiles(modelPath)).toEqual([]);
   });
 
-  it('treats a 0-byte model file as not installed', () => {
+  it('treats a 0-byte model file or directory as not installed', () => {
     const manager = new WhisperModelManager();
     const modelName = 'ggml-tiny.en.bin';
     const modelPath = manager.getModelPath(modelName);
     fs.mkdirSync(path.dirname(modelPath), { recursive: true });
     fs.writeFileSync(modelPath, Buffer.alloc(0));
 
+    expect(manager.isModelInstalled(modelName)).toBe(false);
+
+    fs.unlinkSync(modelPath);
+    fs.mkdirSync(modelPath);
     expect(manager.isModelInstalled(modelName)).toBe(false);
   });
 

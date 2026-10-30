@@ -42,11 +42,9 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
   isModelInstalled(modelName: string): boolean {
     this.validateModelName(modelName);
     const modelPath = path.join(this.modelsDir, modelName);
-    if (!fs.existsSync(modelPath)) {
-      return false;
-    }
     try {
-      return fs.statSync(modelPath).size > 0;
+      const stat = fs.statSync(modelPath);
+      return stat.isFile() && stat.size > 0;
     } catch {
       return false;
     }
@@ -60,12 +58,10 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
   async downloadModel(modelName: string): Promise<void> {
     this.validateModelName(modelName);
 
-    if (!fs.existsSync(this.modelsDir)) {
-      fs.mkdirSync(this.modelsDir, { recursive: true });
-    }
+    await fs.promises.mkdir(this.modelsDir, { recursive: true });
 
     const destination = path.join(this.modelsDir, modelName);
-    const tempDestination = `${destination}.downloading`;
+    const tempDestination = `${destination}.${Math.random().toString(36).slice(2)}.downloading`;
     const url = `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/${modelName}`;
 
     debugLogger.debug(
@@ -85,8 +81,17 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
       throw new Error('Response body is not readable');
     }
 
-    if (fs.existsSync(tempDestination)) {
-      await fs.promises.unlink(tempDestination);
+    try {
+      const files = await fs.promises.readdir(this.modelsDir);
+      for (const file of files) {
+        if (file.startsWith(modelName) && file.endsWith('.downloading')) {
+          await fs.promises
+            .unlink(path.join(this.modelsDir, file))
+            .catch(() => {});
+        }
+      }
+    } catch {
+      // Ignore directory read errors
     }
 
     const writer = fs.createWriteStream(tempDestination);
@@ -158,13 +163,7 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
       await fs.promises.rename(tempDestination, destination);
     } catch (error) {
       await closePromise.catch(() => {});
-      if (fs.existsSync(tempDestination)) {
-        try {
-          await fs.promises.unlink(tempDestination);
-        } catch {
-          // Ignore cleanup errors
-        }
-      }
+      await fs.promises.unlink(tempDestination).catch(() => {});
       throw error;
     }
   }
