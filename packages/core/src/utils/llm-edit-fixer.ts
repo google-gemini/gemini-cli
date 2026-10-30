@@ -10,6 +10,7 @@ import { type BaseLlmClient } from '../core/baseLlmClient.js';
 import { LRUCache } from 'mnemonist';
 import { getPromptIdWithFallback } from './promptIdContext.js';
 import { debugLogger } from './debugLogger.js';
+import { safeTemplateReplace } from './textUtils.js';
 import { LlmRole } from '../telemetry/types.js';
 
 const MAX_CACHE_SIZE = 50;
@@ -41,26 +42,26 @@ You will be given:
 const EDIT_USER_PROMPT = `
 # Goal of the Original Edit
 <instruction>
-{instruction}
+{{instruction}}
 </instruction>
 
 # Failed Attempt Details
 - **Original \`search\` parameter (failed):**
 <search>
-{old_string}
+{{old_string}}
 </search>
 - **Original \`replace\` parameter:**
 <replace>
-{new_string}
+{{new_string}}
 </replace>
 - **Error Encountered:**
 <error>
-{error}
+{{error}}
 </error>
 
 # Full File Content
 <file_content>
-{current_content}
+{{current_content}}
 </file_content>
 
 # Your Task
@@ -165,11 +166,13 @@ export async function FixLLMEditWithInstruction(
   if (cachedResult) {
     return cachedResult;
   }
-  const userPrompt = EDIT_USER_PROMPT.replace('{instruction}', instruction)
-    .replace('{old_string}', old_string)
-    .replace('{new_string}', new_string)
-    .replace('{error}', error)
-    .replace('{current_content}', current_content);
+  const userPrompt = safeTemplateReplace(EDIT_USER_PROMPT, {
+    instruction,
+    old_string,
+    new_string,
+    error,
+    current_content,
+  });
 
   const contents: Content[] = [
     {
