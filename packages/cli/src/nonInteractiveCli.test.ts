@@ -567,6 +567,40 @@ describe('runNonInteractive', () => {
     ).rejects.toThrow(apiError);
   });
 
+  it('should preserve structured API errors from the message stream', async () => {
+    const structuredError = {
+      message: 'Publisher model `test-model` was not found.',
+      status: 404,
+    };
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents([
+        {
+          type: GeminiEventType.Error,
+          value: { error: structuredError },
+        },
+      ] as ServerGeminiStreamEvent[]),
+    );
+
+    let thrown: unknown;
+    try {
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'Trigger structured API error',
+        prompt_id: 'prompt-id-structured-error',
+      });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(Error);
+    expect(thrown).toMatchObject({
+      message: structuredError.message,
+      status: structuredError.status,
+    });
+    expect(thrown).not.toEqual(structuredError);
+  });
+
   it('should not exit if a tool is not found, and should send error back to model', async () => {
     const toolCallEvent: ServerGeminiStreamEvent = {
       type: GeminiEventType.ToolCallRequest,
