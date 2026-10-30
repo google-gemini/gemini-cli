@@ -382,6 +382,19 @@ describe('ShellTool', () => {
       expect(fs.existsSync(extractedTmpFile)).toBe(false);
     });
 
+    it('should skip non-numeric lines in background PID output', async () => {
+      const invocation = shellTool.build({ command: 'my-command &' });
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
+
+      fs.writeFileSync(extractedTmpFile, `garbage${os.EOL}54321${os.EOL}`);
+
+      resolveShellExecution({ exitCode: 0, output: '' });
+
+      const result = await promise;
+      expect(result.llmContent).toContain('Background PIDs: 54321');
+      expect(result.llmContent).not.toContain('NaN');
+    });
+
     it('should disable PTY execution when interactive shell is unavailable', async () => {
       (mockConfig.getEnableInteractiveShell as Mock).mockReturnValue(true);
       (mockConfig.isInteractiveShellEnabled as Mock).mockReturnValue(false);
