@@ -4340,6 +4340,98 @@ describe('GeminiChat', () => {
         LlmRole.MAIN,
       );
     });
+
+    it('re-selects fallback model on retry when retry_once marks attempted model unavailable without changing activeModel', async () => {
+      let activeModel = 'model-a';
+      vi.mocked(mockConfig.getActiveModel).mockImplementation(
+        () => activeModel,
+      );
+      vi.mocked(mockConfig.setActiveModel).mockImplementation((model) => {
+        activeModel = model;
+      });
+
+      vi.mocked(
+        mockConfig.modelConfigService.getResolvedConfig,
+      ).mockImplementation((key) => {
+        if (key.model === 'model-b') {
+          return makeResolvedModelConfig('model-b', { temperature: 0.8 });
+        }
+        return makeResolvedModelConfig('model-a', { temperature: 0.2 });
+      });
+
+      vi.mocked(mockAvailabilityService.selectFirstAvailable)
+        .mockReturnValueOnce({ selectedModel: 'model-a', skipped: [] })
+        .mockReturnValueOnce({ selectedModel: 'model-b', skipped: [] });
+      vi.mocked(mockAvailabilityService.snapshot).mockImplementation(
+        (model) => ({
+          available: model !== 'model-a',
+        }),
+      );
+
+      mockRetryWithBackoff.mockImplementation(async (apiCall) => {
+        await apiCall(); // Attempt 1 uses model-a
+        // retry_once does NOT mutate activeModel before the retry; only availability changes
+        return apiCall(); // Attempt 2 should re-select model-b
+      });
+
+      const firstResponse = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: { parts: [{ text: 'first' }], role: 'model' },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+      const secondResponse = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: { parts: [{ text: 'second' }], role: 'model' },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+      vi.mocked(mockContentGenerator.generateContentStream)
+        .mockResolvedValueOnce(firstResponse)
+        .mockResolvedValueOnce(secondResponse);
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-pro', isChatModel: true },
+        'test',
+        'prompt-retry-once-reselect',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of stream) {
+        // consume
+      }
+
+      expect(
+        mockContentGenerator.generateContentStream,
+      ).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          model: 'model-a',
+          config: expect.objectContaining({ temperature: 0.2 }),
+        }),
+        expect.any(String),
+        LlmRole.MAIN,
+      );
+      expect(
+        mockContentGenerator.generateContentStream,
+      ).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          model: 'model-b',
+          config: expect.objectContaining({ temperature: 0.8 }),
+        }),
+        expect.any(String),
+        LlmRole.MAIN,
+      );
+    });
   });
 
   describe('Hook execution control', () => {
