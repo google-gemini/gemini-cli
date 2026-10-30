@@ -8,6 +8,7 @@ import * as fs from 'node:fs/promises';
 import type { Dirent } from 'node:fs';
 import * as path from 'node:path';
 import { getErrorMessage, isNodeError } from './errors.js';
+import { resolveToRealPath } from './paths.js';
 import type {
   FileDiscoveryService,
   FilterFilesOptions,
@@ -117,13 +118,20 @@ async function readFullStructure(
           error.code === 'ENOENT' ||
           error.code === 'EPERM')
       ) {
-        debugLogger.warn(
-          `Warning: Could not read directory ${currentPath}: ${error.message}`,
-        );
-        if (currentPath === rootPath && error.code === 'ENOENT') {
-          return null; // Root directory itself not found
+        if (currentPath === rootPath) {
+          const resolvedPath = resolveToRealPath(currentPath);
+          debugLogger.warn(
+            `Warning: Could not read directory ${resolvedPath}: ${error.message}`,
+          );
+          return null;
         }
-        // For other EACCES/ENOENT/EPERM on subdirectories, just skip them.
+        // Only warn for permission errors on subdirectories; transient ENOENT
+        // on subdirectories (e.g., short-lived lock directories) is expected.
+        if (error.code !== 'ENOENT') {
+          debugLogger.warn(
+            `Warning: Could not read directory ${currentPath}: ${error.message}`,
+          );
+        }
         continue;
       }
       throw error;
