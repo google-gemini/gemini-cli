@@ -5,7 +5,10 @@
  */
 
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { SkillCommandLoader } from './SkillCommandLoader.js';
+import {
+  SkillCommandLoader,
+  getSkillPostSubmitPrompt,
+} from './SkillCommandLoader.js';
 import { CommandKind } from '../ui/commands/types.js';
 import { ACTIVATE_SKILL_TOOL_NAME } from '@google/gemini-cli-core';
 
@@ -88,7 +91,7 @@ describe('SkillCommandLoader', () => {
       type: 'tool',
       toolName: ACTIVATE_SKILL_TOOL_NAME,
       toolArgs: { name: 'test-skill' },
-      postSubmitPrompt: 'Use the skill test-skill',
+      postSubmitPrompt: getSkillPostSubmitPrompt('test-skill', ''),
     });
   });
 
@@ -133,5 +136,26 @@ describe('SkillCommandLoader', () => {
     const commands = await loader.loadCommands(new AbortController().signal);
 
     expect(commands[0].extensionName).toBe('ext1');
+  });
+});
+
+describe('getSkillPostSubmitPrompt', () => {
+  it('should pass explicit arguments through as the task', () => {
+    expect(getSkillPostSubmitPrompt('test-skill', '  fix the build  ')).toBe(
+      'fix the build',
+    );
+  });
+
+  it('should tell the model to continue the current task when no arguments are given', () => {
+    const prompt = getSkillPostSubmitPrompt('test-skill', '');
+    expect(prompt).toContain('"test-skill"');
+    expect(prompt).toContain('task in progress');
+    expect(prompt).toContain('ask me what I would like to use it for');
+  });
+
+  it('should treat whitespace-only arguments as no arguments', () => {
+    expect(getSkillPostSubmitPrompt('test-skill', '   ')).toBe(
+      getSkillPostSubmitPrompt('test-skill', ''),
+    );
   });
 });
