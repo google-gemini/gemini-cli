@@ -49,6 +49,21 @@ describe('isQuotaExhaustedError', () => {
     ).toBe(false);
   });
 
+  it.each([400, 429, 499])(
+    'excludes project spending caps classified as terminal for HTTP %s',
+    (code) => {
+      const message =
+        'Your project has exceeded its monthly spending cap. Manage it at https://ai.studio/spend.';
+      const error = classifyGoogleError({
+        error: { code, message, details: [] },
+      });
+
+      expect(error).toBeInstanceOf(TerminalQuotaError);
+      expect((error as TerminalQuotaError).message).toBe(message);
+      expect(isQuotaExhaustedError(error)).toBe(false);
+    },
+  );
+
   it('excludes nonterminal rate limits and model-not-found errors', () => {
     expect(
       isQuotaExhaustedError(new RetryableQuotaError('Retry in 60 seconds')),

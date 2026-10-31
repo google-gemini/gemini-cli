@@ -34,9 +34,13 @@ export async function handleFallback(
   authType?: string,
   error?: unknown,
 ): Promise<string | boolean | null> {
-  if (!isAutoModel(normalizeModelId(config.getModel()), config)) {
-    // Manual mode can still offer Stop, Upgrade, credits, or an explicit retry
-    // of the same model. It must never select or activate a different model.
+  const quotaExhausted = isQuotaExhaustedError(error);
+  if (
+    quotaExhausted &&
+    !isAutoModel(normalizeModelId(config.getModel()), config)
+  ) {
+    // Exhausted manual selections can offer Stop, Upgrade, credits, or an
+    // explicit retry of the same model. Transient fallback keeps its policy.
     const handler = config.getFallbackModelHandler();
     if (typeof handler !== 'function') return null;
     try {
@@ -51,7 +55,7 @@ export async function handleFallback(
       return null;
     }
   }
-  if (isQuotaExhaustedError(error)) {
+  if (quotaExhausted) {
     const quotaSelection = resolveQuotaFallbackModel(config, failedModel);
     if (quotaSelection) {
       markQuotaExhausted(config, failedModel);
@@ -70,7 +74,7 @@ export async function handleFallback(
   }
 
   const failureKind = classifyFailureKind(error);
-  const terminalReason = isQuotaExhaustedError(error) ? 'quota' : 'capacity';
+  const terminalReason = quotaExhausted ? 'quota' : 'capacity';
 
   const chain = resolvePolicyChain(config);
   const { failedPolicy, candidates } = buildFallbackPolicyContext(

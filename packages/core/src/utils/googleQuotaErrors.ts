@@ -66,7 +66,7 @@ export function isQuotaExhaustedError(
   if (error.status !== undefined && error.status >= 500) {
     return false;
   }
-  if (error.isInsufficientCredits) {
+  if (error.isInsufficientCredits || isSpendingCapMessage(error.message)) {
     return false;
   }
   if (

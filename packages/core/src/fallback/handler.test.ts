@@ -347,10 +347,21 @@ describe('handleFallback', () => {
 
         await handleFallback(policyConfig, MOCK_PRO_MODEL, AUTH_OAUTH, error);
 
-        expect(availability.markTerminal).toHaveBeenCalledWith(
-          MOCK_PRO_MODEL,
-          'capacity',
-        );
+        if (error.reason === 'MODEL_CAPACITY_EXHAUSTED') {
+          expect(availability.markRetryOncePerTurn).toHaveBeenCalledWith(
+            MOCK_PRO_MODEL,
+            3,
+          );
+          expect(availability.consumeStickyAttempt).toHaveBeenCalledWith(
+            MOCK_PRO_MODEL,
+          );
+          expect(availability.markTerminal).not.toHaveBeenCalled();
+        } else {
+          expect(availability.markTerminal).toHaveBeenCalledWith(
+            MOCK_PRO_MODEL,
+            'capacity',
+          );
+        }
         expect(availability.markTerminal).not.toHaveBeenCalledWith(
           MOCK_PRO_MODEL,
           'quota',

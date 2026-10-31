@@ -232,6 +232,66 @@ describe('Auto Routing Fallback Integration', () => {
     },
   );
 
+  it.each([
+    [DEFAULT_GEMINI_MODEL_AUTO, 400],
+    [DEFAULT_GEMINI_MODEL_AUTO, 429],
+    [DEFAULT_GEMINI_MODEL_AUTO, 499],
+    [DEFAULT_GEMINI_MODEL, 400],
+    [DEFAULT_GEMINI_MODEL, 429],
+    [DEFAULT_GEMINI_MODEL, 499],
+  ] as const)(
+    'preserves the spending-cap error and existing dialog for %s on HTTP %s',
+    async (selectedModel, code) => {
+      config = new Config({
+        sessionId: 'project-spending-cap',
+        targetDir: '/test',
+        debugMode: false,
+        cwd: '/test',
+        model: selectedModel,
+      });
+      vi.spyOn(config, 'isInteractive').mockReturnValue(true);
+      const fallbackHandler = vi.fn(
+        async (): Promise<FallbackIntent> => 'stop',
+      );
+      config.setFallbackModelHandler(fallbackHandler);
+      client = new BaseLlmClient(fakeGenerator, config, AuthType.USE_GEMINI);
+      const message =
+        'Your project has exceeded its monthly spending cap. Manage it at https://ai.studio/spend.';
+      const generate = vi
+        .spyOn(fakeGenerator, 'generateContent')
+        .mockRejectedValue({ error: { code, message, details: [] } });
+
+      await expect(
+        client.generateContent({
+          modelConfigKey: { model: DEFAULT_GEMINI_MODEL, isChatModel: true },
+          contents: [{ role: 'user', parts: [{ text: 'Continue' }] }],
+          abortSignal: new AbortController().signal,
+          promptId: 'project-spending-cap',
+          role: LlmRole.MAIN,
+        }),
+      ).rejects.toThrow(message);
+
+      expect(generate).toHaveBeenCalledTimes(1);
+      expect(generate.mock.calls[0][0].model).toBe(DEFAULT_GEMINI_MODEL);
+      expect(fallbackHandler).toHaveBeenCalledExactlyOnceWith(
+        DEFAULT_GEMINI_MODEL,
+        selectedModel === DEFAULT_GEMINI_MODEL_AUTO
+          ? BASE_GEMINI_FLASH_MODEL
+          : DEFAULT_GEMINI_MODEL,
+        expect.objectContaining({ message }),
+      );
+      expect(config.getModel()).toBe(selectedModel);
+      expect(config.getActiveModel()).toBe(DEFAULT_GEMINI_MODEL);
+      expect(
+        config.getModelAvailabilityService().snapshot(DEFAULT_GEMINI_MODEL),
+      ).toEqual({ available: true });
+      expect(
+        config.getModelAvailabilityService().snapshot(BASE_GEMINI_FLASH_MODEL),
+      ).toEqual({ available: true });
+      expect(vi.getTimerCount()).toBe(0);
+    },
+  );
+
   it('keeps per-minute ErrorInfo metadata in the existing fallback flow', async () => {
     config = new Config({
       sessionId: 'per-minute-metadata',
@@ -445,8 +505,8 @@ describe('Auto Routing Fallback Integration', () => {
     // Verify handler was called once after 10 attempts to prompt user
     expect(handler).toHaveBeenCalledTimes(1);
     expect(handler).toHaveBeenCalledWith(
-      'gemini-3-pro-preview',
-      'gemini-3-pro-preview',
+      PREVIEW_GEMINI_MODEL,
+      PREVIEW_GEMINI_FLASH_MODEL,
       expect.any(RetryableQuotaError),
     );
     expect(configNonAuto.getModel()).toBe(PREVIEW_GEMINI_MODEL);

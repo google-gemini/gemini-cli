@@ -46,9 +46,10 @@ Models with exhausted quota are skipped until you explicitly select a model
 again or start a new session. Known zero quota is skipped before sending a
 request. If no permitted model has quota, the request stops instead of waiting
 for a reset. Temporary rate limits and capacity errors retain their existing
-retry rules; cross-model fallback still requires Auto. Credit errors retain
-their existing behavior. Custom model configuration can prevent fallback when
-the replacement resolves to a model that has already exhausted its quota.
+retry and fallback choices. Automatic switching after a hard model usage limit
+requires **Auto**. Credit errors and project spending caps retain their existing
+behavior. Custom model configuration can prevent fallback when the replacement
+resolves to a model that has already exhausted its quota.
 
 ## Best practices for model selection
 
