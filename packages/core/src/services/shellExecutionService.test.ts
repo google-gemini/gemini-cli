@@ -39,6 +39,7 @@ const mockCreateWriteStream = vi.hoisted(() => vi.fn());
 const mockStatSync = vi.hoisted(() => vi.fn());
 const mockFstatSync = vi.hoisted(() => vi.fn());
 const mockCloseSync = vi.hoisted(() => vi.fn());
+const mockRealpathSync = vi.hoisted(() => vi.fn());
 const mockGetPty = vi.hoisted(() => vi.fn());
 const mockSerializeTerminalToObject = vi.hoisted(() => vi.fn());
 const mockResolveExecutable = vi.hoisted(() => vi.fn());
@@ -72,12 +73,14 @@ vi.mock('node:fs', async (importOriginal) => {
       statSync: mockStatSync,
       fstatSync: mockFstatSync,
       closeSync: mockCloseSync,
+      realpathSync: mockRealpathSync,
     },
     mkdirSync: mockMkdirSync,
     createWriteStream: mockCreateWriteStream,
     statSync: mockStatSync,
     fstatSync: mockFstatSync,
     closeSync: mockCloseSync,
+    realpathSync: mockRealpathSync,
   };
 });
 vi.mock('../utils/shell-utils.js', async (importOriginal) => {
@@ -1544,6 +1547,15 @@ describe('ShellExecutionService', () => {
           return { rdev: targetRdev, isCharacterDevice: () => true };
         }
         return { rdev: 0x1234, isCharacterDevice: () => true };
+      });
+      // Make /dev/fd realpath resolution unavailable so the rdev-only
+      // matching path runs on every machine, including hosts where
+      // /dev/ttys001 really exists (#30008).
+      mockRealpathSync.mockImplementation(() => {
+        throw Object.assign(
+          new Error('ENOENT: realpath unavailable in test'),
+          { code: 'ENOENT' },
+        );
       });
 
       const result = closeOrphanSlaveFd(10, '/dev/ttys001');
