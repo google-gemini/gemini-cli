@@ -4,6 +4,10 @@ Gemini CLI supports connecting to remote subagents using the Agent-to-Agent
 (A2A) protocol. This allows Gemini CLI to interact with other agents, expanding
 its capabilities by delegating tasks to remote services.
 
+Remote conversations are scoped to the current Gemini CLI session, agent name,
+and endpoint. Starting a different session or changing the endpoint does not
+reuse the previous conversation identifiers.
+
 Gemini CLI can connect to any compliant A2A agent. You can find samples of A2A
 agents in the following repositories:
 

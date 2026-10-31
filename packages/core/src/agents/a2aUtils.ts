@@ -16,7 +16,11 @@ import type {
   AgentInterface,
 } from '@a2a-js/sdk';
 import type { SendMessageResult } from './a2a-client-manager.js';
-import { type SubagentActivityItem, SubagentState } from './types.js';
+import {
+  type SubagentActivityItem,
+  SubagentState,
+  getRemoteAgentTargetUrl,
+} from './types.js';
 
 export const AUTH_REQUIRED_MSG = `[Authorization Required] The agent has indicated it requires authorization to proceed. Please follow the agent's instructions.`;
 
@@ -365,4 +369,55 @@ export function isTerminalState(state: TaskState | undefined): boolean {
  */
 function isObject(val: unknown): val is Record<string, unknown> {
   return typeof val === 'object' && val !== null && !Array.isArray(val);
+}
+
+/** A2A identifiers that let a remote agent continue an earlier conversation. */
+export interface RemoteConversationState {
+  contextId?: string;
+  taskId?: string;
+}
+
+/** Upper bound on remembered remote conversations per process. */
+export const MAX_REMOTE_CONVERSATIONS = 100;
+
+/**
+ * Builds an unambiguous key for a remote conversation, scoped to the parent
+ * session, agent name and endpoint so none of them can share A2A state.
+ */
+export function remoteConversationKey(
+  sessionId: string,
+  definition: Parameters<typeof getRemoteAgentTargetUrl>[0],
+): string {
+  return JSON.stringify([
+    sessionId,
+    definition.name,
+    getRemoteAgentTargetUrl(definition),
+  ]);
+}
+
+/**
+ * Remembers remote conversation state, evicting the least recently stored
+ * entry once full. Keys include the parent session ID, so without a bound a
+ * long-running process (ACP, daemon) would keep every past session's state.
+ */
+export class RemoteConversationStateMap extends Map<
+  string,
+  RemoteConversationState
+> {
+  constructor(private readonly maxEntries = MAX_REMOTE_CONVERSATIONS) {
+    super();
+  }
+
+  override set(key: string, value: RemoteConversationState): this {
+    // Re-inserting moves the key to the end, which marks it most recent.
+    this.delete(key);
+    super.set(key, value);
+    for (const oldest of this.keys()) {
+      if (this.size <= this.maxEntries) {
+        break;
+      }
+      this.delete(oldest);
+    }
+    return this;
+  }
 }
