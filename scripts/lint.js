@@ -6,16 +6,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import {
   mkdirSync,
   rmSync,
   readFileSync,
   existsSync,
   lstatSync,
+  realpathSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const ACTIONLINT_VERSION = '1.7.7';
 const SHELLCHECK_VERSION = '0.11.0';
@@ -116,7 +118,7 @@ const yamllintInstaller = isWindows
  * @typedef {{
  *   check: string;
  *   installer: string;
- *   run: string;
+ *   run?: string;
  * }}
  */
 
@@ -154,7 +156,6 @@ const LINTERS = {
   yamllint: {
     check: yamllintCheck,
     installer: yamllintInstaller,
-    run: "git ls-files | grep -E '\\.(yaml|yml)' | xargs yamllint --format github",
   },
 };
 
@@ -227,7 +228,27 @@ export function runShellcheck() {
 
 export function runYamllint() {
   console.log('\nRunning yamllint...');
-  if (!runCommand(LINTERS.yamllint.run)) {
+  try {
+    const files = execFileSync(
+      'git',
+      ['ls-files', '-z', '--', '*.yaml', '*.yml'],
+      { encoding: 'utf8' },
+    )
+      .split('\0')
+      .filter(Boolean);
+
+    if (files.length === 0) {
+      return;
+    }
+
+    // YAML files contain Unicode, including on Windows with a legacy code page.
+    execFileSync(
+      pythonVenvPythonPath,
+      ['-X', 'utf8', '-m', 'yamllint', '--format', 'github', '--', ...files],
+      { stdio: 'inherit' },
+    );
+  } catch (error) {
+    console.error('Error running yamllint:', error.message);
     process.exit(1);
   }
 }
@@ -515,4 +536,26 @@ function main() {
   }
 }
 
-main();
+/**
+ * Returns true when this file is the script Node was asked to run, so tests can
+ * import it without running every linter. Node resolves the main module's
+ * `import.meta.url` through symlinks and junctions but leaves argv[1] as typed,
+ * so both sides are compared as real paths; otherwise lint would silently pass
+ * in a checkout opened through a link.
+ */
+export function isMainModule(argvPath = process.argv[1]) {
+  if (!argvPath) {
+    return false;
+  }
+  try {
+    return (
+      realpathSync(argvPath) === realpathSync(fileURLToPath(import.meta.url))
+    );
+  } catch {
+    return false;
+  }
+}
+
+if (isMainModule()) {
+  main();
+}
