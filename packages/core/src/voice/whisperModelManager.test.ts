@@ -507,4 +507,138 @@ describe('WhisperModelManager', () => {
     );
     expect(manager.isModelInstalled(modelName)).toBe(false);
   });
+
+  it('deduplicates concurrent in-flight downloads for the same model and allows retry after failure', async () => {
+    const chunk1 = new Uint8Array([1, 2, 3, 4]);
+    const chunk2 = new Uint8Array([5, 6, 7, 8]);
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        createMockResponse({
+          contentLength: 8,
+          chunks: [chunk1, chunk2],
+          chunkDelayMs: 20,
+        }),
+      )
+      .mockResolvedValueOnce(
+        createMockResponse({
+          ok: false,
+          statusText: 'Service Unavailable',
+        }),
+      )
+      .mockResolvedValueOnce(
+        createMockResponse({
+          contentLength: 4,
+          chunks: [chunk1],
+        }),
+      );
+
+    const manager = new WhisperModelManager();
+    const modelName = 'ggml-tiny.en.bin';
+    const modelPath = manager.getModelPath(modelName);
+
+    const p1 = manager.downloadModel(modelName);
+    const p2 = manager.downloadModel(modelName);
+
+    await Promise.all([p1, p2]);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(manager.isModelInstalled(modelName)).toBe(true);
+    expect(fs.readFileSync(modelPath)).toEqual(
+      Buffer.from([1, 2, 3, 4, 5, 6, 7, 8]),
+    );
+    expect(getDownloadingFiles(modelPath)).toEqual([]);
+
+    // Subsequent download after failure cleans up in-flight state and can retry
+    const otherModel = 'ggml-base.en.bin';
+    await expect(manager.downloadModel(otherModel)).rejects.toThrow(
+      'Failed to download model: Service Unavailable',
+    );
+    await manager.downloadModel(otherModel);
+    expect(manager.isModelInstalled(otherModel)).toBe(true);
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+  });
+
+  it('calls writer.destroy instead of writer.end when reader fails mid-download', async () => {
+    const chunk1 = new Uint8Array([1, 2, 3, 4]);
+    const failureError = new Error('Connection reset by peer');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      createMockResponse({
+        contentLength: 8,
+        chunks: [chunk1],
+        failAfterChunks: 1,
+        failureError,
+      }),
+    );
+
+    const mockWriter = new EventEmitter() as EventEmitter & {
+      write: ReturnType<typeof vi.fn>;
+      end: ReturnType<typeof vi.fn>;
+      destroy: ReturnType<typeof vi.fn>;
+    };
+    let tempFilePath = '';
+
+    mockWriter.write = vi.fn((chunk: Uint8Array) => {
+      fs.appendFileSync(tempFilePath, Buffer.from(chunk));
+      return true;
+    });
+    mockWriter.end = vi.fn();
+    mockWriter.destroy = vi.fn(() => {
+      queueMicrotask(() => {
+        mockWriter.emit('close');
+      });
+    });
+
+    createWriteStreamSpy.mockImplementationOnce((filePath: fs.PathLike) => {
+      tempFilePath = String(filePath);
+      fs.writeFileSync(tempFilePath, Buffer.alloc(0));
+      return mockWriter as unknown as fs.WriteStream;
+    });
+
+    const manager = new WhisperModelManager();
+    const modelName = 'ggml-tiny.en.bin';
+    const modelPath = manager.getModelPath(modelName);
+
+    await expect(manager.downloadModel(modelName)).rejects.toThrow(
+      'Connection reset by peer',
+    );
+
+    expect(mockWriter.end).not.toHaveBeenCalled();
+    expect(mockWriter.destroy).toHaveBeenCalledWith(failureError);
+    expect(manager.isModelInstalled(modelName)).toBe(false);
+    expect(getDownloadingFiles(modelPath)).toEqual([]);
+  });
+
+  it('aborts download and cleans up temporary file when AbortSignal is triggered', async () => {
+    const chunk1 = new Uint8Array([1, 2, 3, 4]);
+    const chunk2 = new Uint8Array([5, 6, 7, 8]);
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      createMockResponse({
+        contentLength: 8,
+        chunks: [chunk1, chunk2],
+        chunkDelayMs: 30,
+      }),
+    );
+
+    const controller = new AbortController();
+    const manager = new WhisperModelManager();
+    const modelName = 'ggml-tiny.en.bin';
+    const modelPath = manager.getModelPath(modelName);
+
+    manager.once('progress', () => {
+      controller.abort(new Error('User cancelled download'));
+    });
+
+    await expect(
+      manager.downloadModel(modelName, controller.signal),
+    ).rejects.toThrow('User cancelled download');
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      expect.stringContaining(modelName),
+      expect.objectContaining({ signal: controller.signal }),
+    );
+    expect(manager.isModelInstalled(modelName)).toBe(false);
+    expect(fs.existsSync(modelPath)).toBe(false);
+    expect(getDownloadingFiles(modelPath)).toEqual([]);
+  });
 });

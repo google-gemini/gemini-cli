@@ -33,6 +33,7 @@ const ALLOWED_MODELS = [
  */
 export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents> {
   private readonly modelsDir: string;
+  private readonly inFlightDownloads = new Map<string, Promise<void>>();
 
   constructor() {
     super();
@@ -55,8 +56,28 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
     return path.join(this.modelsDir, modelName);
   }
 
-  async downloadModel(modelName: string): Promise<void> {
+  async downloadModel(modelName: string, signal?: AbortSignal): Promise<void> {
     this.validateModelName(modelName);
+
+    const existing = this.inFlightDownloads.get(modelName);
+    if (existing) {
+      return existing;
+    }
+
+    const downloadPromise = this.executeDownload(modelName, signal).finally(
+      () => {
+        this.inFlightDownloads.delete(modelName);
+      },
+    );
+    this.inFlightDownloads.set(modelName, downloadPromise);
+    return downloadPromise;
+  }
+
+  private async executeDownload(
+    modelName: string,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    signal?.throwIfAborted();
 
     await fs.promises.mkdir(this.modelsDir, { recursive: true });
 
@@ -68,7 +89,7 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
       `[WhisperModelManager] Downloading ${modelName} from ${url}`,
     );
 
-    const response = await fetch(url);
+    const response = await fetch(url, signal ? { signal } : undefined);
     if (!response.ok) {
       throw new Error(`Failed to download model: ${response.statusText}`);
     }
@@ -84,7 +105,11 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
     try {
       const files = await fs.promises.readdir(this.modelsDir);
       for (const file of files) {
-        if ((file === modelName + '.downloading' || file.startsWith(modelName + '.')) && file.endsWith('.downloading')) {
+        if (
+          (file === modelName + '.downloading' ||
+            file.startsWith(modelName + '.')) &&
+          file.endsWith('.downloading')
+        ) {
           await fs.promises
             .unlink(path.join(this.modelsDir, file))
             .catch(() => {});
@@ -111,57 +136,76 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
     });
     closePromise.catch(() => {});
 
+    const onAbort = () => {
+      const abortError =
+        signal?.reason instanceof Error
+          ? signal.reason
+          : new DOMException('The operation was aborted.', 'AbortError');
+      streamError = abortError;
+      void reader.cancel?.(abortError).catch(() => {});
+      writer.destroy(abortError);
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+
     try {
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          if (streamError) {
-            throw streamError;
-          }
+      while (true) {
+        signal?.throwIfAborted();
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (streamError) {
+          throw streamError;
+        }
+        signal?.throwIfAborted();
 
-          transferred += value.length;
-          const writeOk = writer.write(value);
-          if (streamError) {
-            throw streamError;
-          }
-          if (!writeOk) {
-            await new Promise<void>((resolve, reject) => {
-              const onDrain = () => {
-                cleanup();
-                resolve();
-              };
-              const onError = (err: Error) => {
-                cleanup();
-                reject(err);
-              };
-              const onClose = () => {
-                cleanup();
-                reject(new Error('Stream closed before drain'));
-              };
-              const cleanup = () => {
-                writer.off('drain', onDrain);
-                writer.off('error', onError);
-                writer.off('close', onClose);
-              };
-              writer.once('drain', onDrain);
-              writer.once('error', onError);
-              writer.once('close', onClose);
-            });
-          }
-
-          const percentage = total > 0 ? transferred / total : 0;
-          this.emit('progress', {
-            modelName,
-            transferred,
-            total,
-            percentage,
+        transferred += value.length;
+        const writeOk = writer.write(value);
+        if (streamError) {
+          throw streamError;
+        }
+        if (!writeOk) {
+          await new Promise<void>((resolve, reject) => {
+            const onDrain = () => {
+              cleanup();
+              resolve();
+            };
+            const onError = (err: Error) => {
+              cleanup();
+              reject(err);
+            };
+            const onClose = () => {
+              cleanup();
+              reject(new Error('Stream closed before drain'));
+            };
+            const onSignalAbort = () => {
+              cleanup();
+              reject(
+                streamError ??
+                  new DOMException('The operation was aborted.', 'AbortError'),
+              );
+            };
+            const cleanup = () => {
+              writer.off('drain', onDrain);
+              writer.off('error', onError);
+              writer.off('close', onClose);
+              signal?.removeEventListener('abort', onSignalAbort);
+            };
+            writer.once('drain', onDrain);
+            writer.once('error', onError);
+            writer.once('close', onClose);
+            signal?.addEventListener('abort', onSignalAbort, { once: true });
           });
         }
-      } finally {
-        writer.end();
+
+        const percentage = total > 0 ? transferred / total : 0;
+        this.emit('progress', {
+          modelName,
+          transferred,
+          total,
+          percentage,
+        });
       }
 
+      writer.end();
       await closePromise;
 
       if (transferred === 0 || (total > 0 && transferred !== total)) {
@@ -172,9 +216,12 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
 
       await fs.promises.rename(tempDestination, destination);
     } catch (error) {
+      writer.destroy(error instanceof Error ? error : undefined);
       await closePromise.catch(() => {});
       await fs.promises.unlink(tempDestination).catch(() => {});
       throw error;
+    } finally {
+      signal?.removeEventListener('abort', onAbort);
     }
   }
 
