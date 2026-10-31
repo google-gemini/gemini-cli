@@ -7,6 +7,7 @@
 import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
+import { TextDecoder } from 'node:util';
 import type { PartUnion } from '@google/genai';
 import { isBinaryFile as isBinaryFileCheck } from 'isbinaryfile';
 import mime from 'mime/lite';
@@ -462,39 +463,69 @@ export function getRealPath(filePath: string): string {
 
 /**
  * Checks if a file's content is empty or contains only whitespace.
- * Efficiently checks file size first, and only samples the beginning of the file.
- * Honors Unicode BOM encodings.
+ * Scans in bounded chunks until content or EOF, honoring Unicode BOM encodings.
+ * Read errors propagate so callers can distinguish unreadable files from empty ones.
  */
 export async function isEmpty(filePath: string): Promise<boolean> {
+  const fd = await fsPromises.open(filePath, 'r');
   try {
-    const stats = await fsPromises.stat(filePath);
-    if (stats.size === 0) return true;
-
-    // Sample up to 1KB to check for non-whitespace content.
-    // If a file is larger than 1KB and contains only whitespace,
-    // it's an extreme edge case we can afford to read slightly more of if needed,
-    // but for most valid plans/files, this is sufficient.
-    const fd = await fsPromises.open(filePath, 'r');
-    try {
-      const { buffer } = await fd.read({
-        buffer: Buffer.alloc(Math.min(1024, stats.size)),
-        offset: 0,
-        length: Math.min(1024, stats.size),
-        position: 0,
-      });
-
-      const bom = detectBOM(buffer);
-      const content = bom
-        ? decodeBOMContent(buffer, bom)
-        : buffer.toString('utf8');
-
-      return content.trim().length === 0;
-    } finally {
-      await fd.close();
+    // Read the whole BOM prefix even if the filesystem returns a short read.
+    const prefix = Buffer.alloc(4);
+    let prefixLength = 0;
+    while (prefixLength < prefix.length) {
+      const { bytesRead } = await fd.read(
+        prefix,
+        prefixLength,
+        prefix.length - prefixLength,
+        null,
+      );
+      if (bytesRead === 0) break;
+      prefixLength += bytesRead;
     }
-  } catch {
-    // If file is unreadable, we treat it as empty/invalid for validation purposes
-    return true;
+
+    const bom = detectBOM(prefix.subarray(0, prefixLength));
+    const encoding = bom?.encoding ?? 'utf8';
+    const decoder = encoding.startsWith('utf32')
+      ? undefined
+      : new TextDecoder(encoding.replace('utf', 'utf-'));
+    let pending = Buffer.alloc(0);
+
+    const containsContent = (chunk: Buffer): boolean => {
+      if (decoder) {
+        return decoder.decode(chunk, { stream: true }).trim().length > 0;
+      }
+
+      // TextDecoder has no UTF-32 support. Keep incomplete code units for the
+      // next chunk rather than dropping them or treating them as content.
+      const bytes = Buffer.concat([pending, chunk]);
+      const completeLength = bytes.length - (bytes.length % 4);
+      pending = bytes.subarray(completeLength);
+      return (
+        decodeUTF32(
+          bytes.subarray(0, completeLength),
+          encoding === 'utf32le',
+        ).trim().length > 0
+      );
+    };
+
+    if (containsContent(prefix.subarray(bom?.bomLength ?? 0, prefixLength))) {
+      return false;
+    }
+
+    const buffer = Buffer.alloc(4096);
+    while (true) {
+      const { bytesRead } = await fd.read(buffer, 0, buffer.length, null);
+      if (bytesRead === 0) break;
+      if (containsContent(buffer.subarray(0, bytesRead))) {
+        return false;
+      }
+    }
+
+    return decoder
+      ? decoder.decode().trim().length === 0
+      : pending.length === 0;
+  } finally {
+    await fd.close();
   }
 }
 
