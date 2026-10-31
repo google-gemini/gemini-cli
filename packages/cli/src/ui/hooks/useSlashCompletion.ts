@@ -346,7 +346,6 @@ function useCommandSuggestions(
               const autoSectionSuggestion: Suggestion = {
                 label: autoLabel,
                 value: autoLabel,
-                insertValue: canonicalParentName,
                 description: 'Browse auto-saved chats',
                 commandKind: CommandKind.BUILT_IN,
                 sectionTitle: 'auto',

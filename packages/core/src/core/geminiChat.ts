@@ -30,6 +30,7 @@ import {
   getRetryErrorType,
 } from '../utils/retry.js';
 import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
+import { getErrorStatus } from '../utils/httpErrors.js';
 import {
   resolveModel,
   supportsModernFeatures,
@@ -787,6 +788,7 @@ export class GeminiChat {
                   delayMs,
                   error: errorType,
                   model,
+                  status: getErrorStatus(error),
                 });
                 await new Promise((res) => setTimeout(res, delayMs));
                 continue;
@@ -999,34 +1001,71 @@ export class GeminiChat {
       () => lastModelToUse,
     );
     // Track initial active model to detect fallback changes
-    const initialActiveModel = this.context.config.getActiveModel();
+    let initialActiveModel = this.context.config.getActiveModel();
+    let isFirstAttempt = true;
 
     const apiCall = async () => {
+      const firstAttempt = isFirstAttempt;
+      isFirstAttempt = false;
       const useGemini3_1 =
         (await this.context.config.getGemini31Launched?.()) ?? false;
+      const useCustomToolModel =
+        (await this.context.config.getUseCustomToolModel?.()) ??
+        this.context.config.getUseCustomToolModelSync?.() ??
+        false;
       const hasAccessToPreview =
         this.context.config.getHasAccessToPreviewModel?.() ?? true;
+      const useLatestFlash =
+        this.context.config.hasLatestFlashGAAccess?.() ??
+        this.context.config.hasGemini35FlashGAAccess?.() ??
+        false;
+      const useLatestFlashLite =
+        this.context.config.hasLatestFlashLiteGAAccess?.() ?? false;
       // Default to the last used model (which respects arguments/availability selection)
       let modelToUse = resolveModel(
         lastModelToUse,
         useGemini3_1,
-        false,
+        useCustomToolModel,
         hasAccessToPreview,
         this.context.config,
-        this.context.config.hasGemini35FlashGAAccess?.() ?? false,
+        useLatestFlash,
+        useLatestFlashLite,
       );
 
       // If the active model has changed (e.g. due to a fallback updating the config),
       // we switch to the new active model.
       if (this.context.config.getActiveModel() !== initialActiveModel) {
+        initialActiveModel = this.context.config.getActiveModel();
         modelToUse = resolveModel(
-          this.context.config.getActiveModel(),
+          initialActiveModel,
           useGemini3_1,
-          false,
+          useCustomToolModel,
           hasAccessToPreview,
           this.context.config,
-          this.context.config.hasGemini35FlashGAAccess?.() ?? false,
+          useLatestFlash,
+          useLatestFlashLite,
         );
+      } else if (
+        !firstAttempt &&
+        (this.context.config
+          .getModelAvailabilityService?.()
+          ?.snapshot(modelToUse)?.available ?? true) === false
+      ) {
+        const { model: reselectedModel, config: reselectedConfig } =
+          applyModelSelection(this.context.config, modelConfigKey);
+        modelToUse = resolveModel(
+          reselectedModel,
+          useGemini3_1,
+          useCustomToolModel,
+          hasAccessToPreview,
+          this.context.config,
+          useLatestFlash,
+          useLatestFlashLite,
+        );
+        if (reselectedConfig) {
+          currentGenerateContentConfig = reselectedConfig;
+        }
+        initialActiveModel = this.context.config.getActiveModel();
       }
 
       if (modelToUse !== lastModelToUse) {
@@ -1107,10 +1146,11 @@ export class GeminiChat {
           modelToUse = resolveModel(
             beforeModelResult.modifiedModel,
             useGemini3_1,
-            false,
+            useCustomToolModel,
             hasAccessToPreview,
             this.context.config,
-            this.context.config.hasGemini35FlashGAAccess?.() ?? false,
+            useLatestFlash,
+            useLatestFlashLite,
           );
           lastModelToUse = modelToUse;
           // Re-evaluate contentsToUse based on the new model's feature support
@@ -1225,6 +1265,7 @@ export class GeminiChat {
           delayMs,
           error: error instanceof Error ? error.message : String(error),
           model: lastModelToUse,
+          status: getErrorStatus(error),
         });
       },
     });

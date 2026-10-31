@@ -151,4 +151,54 @@ describe('FallbackStrategy', () => {
     // Should check availability of the requested model from context
     expect(mockService.snapshot).toHaveBeenCalledWith(requestedModel);
   });
+
+  it('should resolve custom tool model variant when useCustomToolModel is enabled', async () => {
+    const configWithCustomTools = createMockConfig({
+      getModelAvailabilityService: vi.fn().mockReturnValue(mockService),
+      getModel: vi.fn().mockReturnValue('pro'),
+      getGemini31LaunchedSync: vi.fn().mockReturnValue(true),
+      getUseCustomToolModelSync: vi.fn().mockReturnValue(true),
+      getHasAccessToPreviewModel: vi.fn().mockReturnValue(true),
+    });
+    vi.mocked(mockService.snapshot).mockReturnValue({ available: true });
+
+    const decision = await strategy.route(
+      mockContext,
+      configWithCustomTools,
+      mockClient,
+      mockLocalLiteRtLmClient,
+    );
+
+    expect(decision).toBeNull();
+    expect(mockService.snapshot).toHaveBeenCalledWith(
+      'gemini-3.1-pro-preview-customtools',
+    );
+  });
+
+  it('should return null if fallback selection equals resolved model', async () => {
+    const configWithCustomTools = createMockConfig({
+      getModelAvailabilityService: vi.fn().mockReturnValue(mockService),
+      getModel: vi.fn().mockReturnValue('pro'),
+      getGemini31LaunchedSync: vi.fn().mockReturnValue(true),
+      getUseCustomToolModelSync: vi.fn().mockReturnValue(true),
+      getHasAccessToPreviewModel: vi.fn().mockReturnValue(true),
+    });
+    vi.mocked(mockService.snapshot).mockReturnValue({
+      available: false,
+      reason: 'retry_once_per_turn',
+    });
+    vi.mocked(selectModelForAvailability).mockReturnValue({
+      selectedModel: 'gemini-3.1-pro-preview-customtools',
+      skipped: [],
+    });
+
+    const decision = await strategy.route(
+      mockContext,
+      configWithCustomTools,
+      mockClient,
+      mockLocalLiteRtLmClient,
+    );
+
+    expect(decision).toBeNull();
+  });
 });

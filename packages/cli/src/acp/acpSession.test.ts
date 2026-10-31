@@ -1039,6 +1039,115 @@ describe('Session', () => {
     );
   });
 
+  describe('MCP permission identity', () => {
+    async function requestToolPermission(
+      serverName?: string,
+    ): Promise<acp.RequestPermissionRequest> {
+      const tool = {
+        kind: 'other',
+        build: vi.fn().mockReturnValue({
+          getDescription: () => 'list_items',
+          toolLocations: () => [],
+          shouldConfirmExecute: vi.fn().mockResolvedValue(
+            serverName === undefined
+              ? {
+                  type: 'info',
+                  title: 'Confirm tool execution',
+                  prompt: 'Run tool?',
+                  onConfirm: vi.fn(),
+                }
+              : {
+                  type: 'mcp',
+                  title: 'Confirm MCP Tool Execution',
+                  serverName,
+                  toolName: 'list_items',
+                  toolDisplayName: 'list_items',
+                  toolArgs: {},
+                  onConfirm: vi.fn(),
+                },
+          ),
+          execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
+        }),
+      };
+      mockToolRegistry.getTool.mockReturnValue(tool);
+      mockConnection.requestPermission.mockResolvedValue({
+        outcome: { outcome: 'selected', optionId: 'proceed_once' },
+      });
+      mockSendMessageStream
+        .mockReturnValueOnce(
+          createMockStream([
+            {
+              type: GeminiEventType.ToolCallRequest,
+              value: {
+                callId: 'call-mcp-1',
+                name: 'mcp_server_list_items',
+                args: {},
+                isClientInitiated: false,
+                prompt_id: 'prompt-1',
+              },
+            },
+          ]),
+        )
+        .mockReturnValueOnce(
+          createMockStream([{ type: GeminiEventType.Content, value: '' }]),
+        );
+
+      await session.prompt({
+        sessionId: 'session-1',
+        prompt: [{ type: 'text', text: 'Call tool' }],
+      });
+
+      expect(mockConnection.requestPermission).toHaveBeenCalledOnce();
+      return mockConnection.requestPermission.mock.calls[0][0];
+    }
+
+    it.each(['my-server', 'my server.name'])(
+      'includes raw MCP identity and descriptive option names for server %s',
+      async (serverName) => {
+        const request = await requestToolPermission(serverName);
+        expect(request.toolCall._meta).toEqual({
+          'gemini-cli': {
+            mcp: { server_name: serverName, tool_name: 'list_items' },
+          },
+        });
+        expect(request.options).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              optionId: 'proceed_always_server',
+              name: `Allow all "${serverName}" server tools for this session`,
+            }),
+            expect.objectContaining({
+              optionId: 'proceed_always_tool',
+              name: 'Allow tool "list_items" for this session',
+            }),
+          ]),
+        );
+      },
+    );
+
+    it('leaves non-MCP permission requests without tool metadata', async () => {
+      const request = await requestToolPermission();
+      expect(request.toolCall).not.toHaveProperty('_meta');
+    });
+
+    it('falls back to generic_server when serverName is whitespace-only', async () => {
+      const request = await requestToolPermission('   ');
+      expect(request.toolCall._meta).toEqual({
+        'gemini-cli': {
+          mcp: { server_name: 'generic_server', tool_name: 'list_items' },
+        },
+      });
+      expect(request.options).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            optionId: 'proceed_always_server',
+            name: 'Allow all "generic_server" server tools for this session',
+          }),
+        ]),
+      );
+    });
+  });
+
   it('should include both diff and explanation in request_permission content for edit tools', async () => {
     mockTool.build.mockReturnValue({
       getDescription: () => 'edit_file(file_path: test.ts)',

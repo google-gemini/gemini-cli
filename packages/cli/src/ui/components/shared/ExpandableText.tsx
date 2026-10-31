@@ -29,6 +29,7 @@ const _ExpandableText: React.FC<ExpandableTextProps> = ({
   maxWidth = MAX_WIDTH,
   maxLines,
 }) => {
+  const labelCharacters = Array.from(label);
   const hasMatch =
     matchedIndex !== undefined &&
     matchedIndex >= 0 &&
@@ -45,16 +46,17 @@ const _ExpandableText: React.FC<ExpandableTextProps> = ({
         // 1. Truncate by logical lines
         let truncated = lines.slice(0, maxLines).join('\n');
         const hasMoreLines = lines.length > maxLines;
+        const truncatedCharacters = Array.from(truncated);
 
         // 2. Truncate by characters (visual approximation) to prevent massive wrapping
-        if (truncated.length > maxWidth) {
-          truncated = truncated.slice(0, maxWidth) + '...';
+        if (truncatedCharacters.length > maxWidth) {
+          truncated = truncatedCharacters.slice(0, maxWidth).join('') + '...';
         } else if (hasMoreLines) {
           truncated += '...';
         }
         display = truncated;
-      } else if (label.length > maxWidth) {
-        display = label.slice(0, maxWidth) + '...';
+      } else if (labelCharacters.length > maxWidth) {
+        display = labelCharacters.slice(0, maxWidth).join('') + '...';
       }
     }
 
@@ -65,52 +67,84 @@ const _ExpandableText: React.FC<ExpandableTextProps> = ({
     );
   }
 
-  const matchLength = userInput.length;
+  const matchCharactersLength = Array.from(userInput).length;
+  let matchedCharacterIndex = 0;
+  let matchedUtf16Index = 0;
+  while (
+    matchedCharacterIndex < labelCharacters.length &&
+    matchedUtf16Index < matchedIndex
+  ) {
+    matchedUtf16Index += labelCharacters[matchedCharacterIndex].length;
+    matchedCharacterIndex += 1;
+  }
   let before = '';
   let match = '';
   let after = '';
 
   // Case 1: Show the full string if it's expanded or already fits
-  if (isExpanded || label.length <= maxWidth) {
-    before = label.slice(0, matchedIndex);
-    match = label.slice(matchedIndex, matchedIndex + matchLength);
-    after = label.slice(matchedIndex + matchLength);
+  if (isExpanded || labelCharacters.length <= maxWidth) {
+    before = labelCharacters.slice(0, matchedCharacterIndex).join('');
+    match = labelCharacters
+      .slice(
+        matchedCharacterIndex,
+        matchedCharacterIndex + matchCharactersLength,
+      )
+      .join('');
+    after = labelCharacters
+      .slice(matchedCharacterIndex + matchCharactersLength)
+      .join('');
   }
   // Case 2: The match itself is too long, so we only show a truncated portion of the match
-  else if (matchLength >= maxWidth) {
-    match = label.slice(matchedIndex, matchedIndex + maxWidth - 1) + '...';
+  else if (matchCharactersLength >= maxWidth) {
+    match =
+      labelCharacters
+        .slice(matchedCharacterIndex, matchedCharacterIndex + maxWidth - 1)
+        .join('') + '...';
   }
   // Case 3: Truncate the string to create a window around the match
   else {
-    const contextSpace = maxWidth - matchLength;
+    const contextSpace = maxWidth - matchCharactersLength;
     const beforeSpace = Math.floor(contextSpace / 2);
     const afterSpace = Math.ceil(contextSpace / 2);
 
-    let start = matchedIndex - beforeSpace;
-    let end = matchedIndex + matchLength + afterSpace;
+    let start = matchedCharacterIndex - beforeSpace;
+    let end = matchedCharacterIndex + matchCharactersLength + afterSpace;
 
     if (start < 0) {
       end += -start; // Slide window right
       start = 0;
     }
-    if (end > label.length) {
-      start -= end - label.length; // Slide window left
-      end = label.length;
+    if (end > labelCharacters.length) {
+      start -= end - labelCharacters.length; // Slide window left
+      end = labelCharacters.length;
     }
     start = Math.max(0, start);
 
-    const finalMatchIndex = matchedIndex - start;
-    const slicedLabel = label.slice(start, end);
+    const finalMatchIndex = matchedCharacterIndex - start;
+    const slicedLabel = labelCharacters.slice(start, end);
 
-    before = slicedLabel.slice(0, finalMatchIndex);
-    match = slicedLabel.slice(finalMatchIndex, finalMatchIndex + matchLength);
-    after = slicedLabel.slice(finalMatchIndex + matchLength);
+    const beforeChars = slicedLabel.slice(0, finalMatchIndex);
+    match = slicedLabel
+      .slice(finalMatchIndex, finalMatchIndex + matchCharactersLength)
+      .join('');
+    const afterChars = slicedLabel.slice(
+      finalMatchIndex + matchCharactersLength,
+    );
 
     if (start > 0) {
-      before = before.length >= 3 ? '...' + before.slice(3) : '...';
+      before =
+        beforeChars.length >= 3 ? '...' + beforeChars.slice(3).join('') : '...';
+    } else {
+      before = beforeChars.join('');
     }
-    if (end < label.length) {
-      after = after.length >= 3 ? after.slice(0, -3) + '...' : '...';
+
+    if (end < labelCharacters.length) {
+      after =
+        afterChars.length >= 3
+          ? afterChars.slice(0, -3).join('') + '...'
+          : '...';
+    } else {
+      after = afterChars.join('');
     }
   }
 

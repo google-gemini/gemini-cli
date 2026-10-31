@@ -20,6 +20,7 @@ import { QuestionType, type Question } from '../confirmation-bus/types.js';
 import { ASK_USER_TOOL_NAME, ASK_USER_DISPLAY_NAME } from './tool-names.js';
 import { ASK_USER_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
+import { normalizeEscapedNewlines } from '../utils/textUtils.js';
 
 export interface AskUserParams {
   questions: Question[];
@@ -93,8 +94,7 @@ export class AskUserTool extends BaseDeclarativeTool<
     toolName: string,
     toolDisplayName: string,
   ): AskUserInvocation {
-    const unescape = (str: string): string =>
-      str.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n');
+    const unescape = normalizeEscapedNewlines;
 
     const normalizedParams: AskUserParams = {
       questions: params.questions.map((q) => {
