@@ -1588,6 +1588,390 @@ describe('Session', () => {
     });
   });
 
+  describe('steering', () => {
+    let steeringSession: Session;
+    let mockAddInjection: Mock;
+
+    const toolCallStream = () =>
+      createMockStream([
+        {
+          type: GeminiEventType.ToolCallRequest,
+          value: {
+            callId: 'call-1',
+            name: 'test_tool',
+            args: {},
+            isClientInitiated: false,
+            prompt_id: 'prompt-1',
+          },
+        },
+      ]);
+
+    const textStream = (text: string) =>
+      createMockStream([{ type: GeminiEventType.Content, value: text }]);
+
+    async function* runBefore(
+      hook: () => void | Promise<void>,
+      stream: AsyncGenerator<ServerGeminiStreamEvent>,
+    ): AsyncGenerator<ServerGeminiStreamEvent> {
+      await hook();
+      yield* stream;
+    }
+
+    const steerDuringTool = (hook: () => void | Promise<void>) => {
+      mockTool.build.mockReturnValue({
+        getDescription: () => 'Test Tool',
+        toolLocations: () => [],
+        shouldConfirmExecute: vi.fn().mockResolvedValue(null),
+        execute: vi.fn().mockImplementation(async () => {
+          await hook();
+          return { llmContent: 'Tool Result' };
+        }),
+      });
+    };
+
+    const steeringUpdate = (
+      text: string,
+      state: 'delivered' | 'undelivered',
+      steerId?: string,
+    ) => ({
+      sessionId: 'session-1',
+      update: {
+        sessionUpdate: 'user_message_chunk',
+        content: { type: 'text', text },
+        _meta: {
+          'geminicli.com': {
+            steering: steerId ? { steerId, state } : { state },
+          },
+        },
+      },
+    });
+
+    const steer = (text: string) =>
+      steeringSession.steer([text]) as { status: string; steerId?: string };
+
+    beforeEach(() => {
+      mockAddInjection = vi.fn();
+      Object.assign(mockConfig, {
+        isModelSteeringEnabled: vi.fn().mockReturnValue(false),
+        injectionService: { addInjection: mockAddInjection },
+      });
+      steeringSession = new Session(
+        'session-1',
+        mockChat,
+        mockConfig,
+        mockConnection,
+        {
+          merged: {
+            security: { enablePermanentToolApproval: true },
+            mcpServers: {},
+          },
+          errors: [],
+        } as unknown as LoadedSettings,
+        true,
+      );
+    });
+
+    it('adds steering in front of the tool results and confirms delivery', async () => {
+      let result: unknown;
+      steerDuringTool(() => {
+        result = steer('Use the Logger class');
+      });
+      mockSendMessageStream
+        .mockReturnValueOnce(toolCallStream())
+        .mockReturnValueOnce(textStream('Done'));
+
+      const response = await steeringSession.prompt({
+        sessionId: 'session-1',
+        prompt: [{ type: 'text', text: 'Go' }],
+      });
+
+      expect(result).toEqual({ status: 'queued', steerId: 'st_1', pending: 1 });
+      const secondParts = mockSendMessageStream.mock.calls[1][0];
+      expect(secondParts[0].text).toContain('User steering update:');
+      expect(secondParts[0].text).toContain('Use the Logger class');
+      expect(secondParts[1].functionResponse).toBeDefined();
+      expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+        steeringUpdate('Use the Logger class', 'delivered', 'st_1'),
+      );
+      expect(response.stopReason).toBe('end_turn');
+      expect(response._meta?.['geminicli.com']).toBeUndefined();
+    });
+
+    it('delivers several messages together in order', async () => {
+      steerDuringTool(() => {
+        steer('first');
+        steer('second');
+      });
+      mockSendMessageStream
+        .mockReturnValueOnce(toolCallStream())
+        .mockReturnValueOnce(textStream('Done'));
+
+      await steeringSession.prompt({
+        sessionId: 'session-1',
+        prompt: [{ type: 'text', text: 'Go' }],
+      });
+
+      const secondParts = mockSendMessageStream.mock.calls[1][0];
+      // Joined like the terminal UI joins pending hints.
+      expect(secondParts[0].text).toContain('<user_input>\nfirst second\n');
+      const steeringCalls = mockConnection.sessionUpdate.mock.calls.filter(
+        ([n]) => n.update.sessionUpdate === 'user_message_chunk',
+      );
+      expect(steeringCalls.map(([n]) => n)).toEqual([
+        steeringUpdate('first', 'delivered', 'st_1'),
+        steeringUpdate('second', 'delivered', 'st_2'),
+      ]);
+    });
+
+    it('runs one more request when the model ends without tool calls', async () => {
+      mockSendMessageStream
+        .mockReturnValueOnce(
+          runBefore(() => {
+            steer('Also add tests');
+          }, textStream('Final answer')),
+        )
+        .mockReturnValueOnce(textStream('Adding tests'));
+
+      const response = await steeringSession.prompt({
+        sessionId: 'session-1',
+        prompt: [{ type: 'text', text: 'Go' }],
+      });
+
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+      const secondParts = mockSendMessageStream.mock.calls[1][0];
+      expect(secondParts).toHaveLength(1);
+      expect(secondParts[0].text).toContain('Also add tests');
+      expect(response.stopReason).toBe('end_turn');
+    });
+
+    it('returns no_active_turn when no prompt is running', async () => {
+      expect(steer('hello')).toEqual({ status: 'no_active_turn' });
+
+      mockSendMessageStream.mockReturnValueOnce(textStream('Hi'));
+      await steeringSession.prompt({
+        sessionId: 'session-1',
+        prompt: [{ type: 'text', text: 'Go' }],
+      });
+
+      expect(steer('hello')).toEqual({ status: 'no_active_turn' });
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(1);
+      expect(mockAddInjection).not.toHaveBeenCalled();
+    });
+
+    it('reports queued steering as undelivered when the turn is cancelled', async () => {
+      steerDuringTool(async () => {
+        steer('Stop using fs');
+        await steeringSession.cancelPendingPrompt();
+      });
+      mockSendMessageStream.mockReturnValueOnce(toolCallStream());
+
+      const response = await steeringSession.prompt({
+        sessionId: 'session-1',
+        prompt: [{ type: 'text', text: 'Go' }],
+      });
+
+      expect(response.stopReason).toBe('cancelled');
+      expect(response._meta?.['geminicli.com']).toEqual({
+        undeliveredSteering: [{ steerId: 'st_1', text: 'Stop using fs' }],
+      });
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(1);
+      expect(steer('late')).toEqual({ status: 'no_active_turn' });
+    });
+
+    it('accepts steering while a permission request is open', async () => {
+      const onConfirm = vi.fn();
+      mockTool.build.mockReturnValue({
+        getDescription: () => 'Test Tool',
+        toolLocations: () => [],
+        shouldConfirmExecute: vi
+          .fn()
+          .mockResolvedValue({ type: 'info', onConfirm }),
+        execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
+      });
+      mockConnection.requestPermission.mockImplementation(async () => {
+        expect(steer('Prefer the smaller change')).toMatchObject({
+          status: 'queued',
+        });
+        return { outcome: { outcome: 'selected', optionId: 'proceed_once' } };
+      });
+      mockSendMessageStream
+        .mockReturnValueOnce(toolCallStream())
+        .mockReturnValueOnce(textStream('Done'));
+
+      await steeringSession.prompt({
+        sessionId: 'session-1',
+        prompt: [{ type: 'text', text: 'Go' }],
+      });
+
+      expect(mockConnection.requestPermission).toHaveBeenCalledTimes(1);
+      expect(onConfirm).toHaveBeenCalled();
+      const secondParts = mockSendMessageStream.mock.calls[1][0];
+      expect(secondParts[0].text).toContain('Prefer the smaller change');
+    });
+
+    it('rejects steering when it is not enabled', () => {
+      expect(() => session.steer(['hello'])).toThrow(
+        expect.objectContaining({ code: -32000 }),
+      );
+    });
+
+    it('is enabled by experimental.modelSteering without client opt-in', () => {
+      mockConfig.isModelSteeringEnabled.mockReturnValue(true);
+      expect(session.isSteeringEnabled()).toBe(true);
+      expect(session.steer(['hello'])).toEqual({ status: 'no_active_turn' });
+    });
+
+    it.each([
+      ['empty text', ['   ']],
+      ['a slash command', ['/memory show']],
+      ['a skill command', ['$skill']],
+      ['text over the limit', ['x'.repeat(8001)]],
+    ])('rejects %s', (_name, texts) => {
+      expect(() => steeringSession.steer(texts)).toThrow(
+        expect.objectContaining({ code: -32602 }),
+      );
+    });
+
+    it('rejects steering over the pending limit', async () => {
+      let overflow: unknown;
+      steerDuringTool(() => {
+        for (let i = 0; i < 20; i++) {
+          steer(`message ${i}`);
+        }
+        try {
+          steer('one too many');
+        } catch (e) {
+          overflow = e;
+        }
+      });
+      mockSendMessageStream
+        .mockReturnValueOnce(toolCallStream())
+        .mockReturnValueOnce(textStream('Done'));
+
+      await steeringSession.prompt({
+        sessionId: 'session-1',
+        prompt: [{ type: 'text', text: 'Go' }],
+      });
+
+      expect(overflow).toMatchObject({ code: -32602 });
+    });
+
+    it('reports steering as undelivered when max turns is reached', async () => {
+      mockConfig.getMaxSessionTurns.mockReturnValue(1);
+      steerDuringTool(() => {
+        steer('Too late');
+      });
+      mockSendMessageStream.mockReturnValueOnce(toolCallStream());
+
+      const response = await steeringSession.prompt({
+        sessionId: 'session-1',
+        prompt: [{ type: 'text', text: 'Go' }],
+      });
+
+      expect(response.stopReason).toBe('max_turn_requests');
+      expect(response._meta?.['quota']).toBeDefined();
+      expect(response._meta?.['geminicli.com']).toEqual({
+        undeliveredSteering: [{ steerId: 'st_1', text: 'Too late' }],
+      });
+    });
+
+    it('reports steering to the aborted turn when a new prompt starts', async () => {
+      let secondPrompt: Promise<acp.PromptResponse> | undefined;
+      steerDuringTool(() => {
+        steer('For the old turn');
+        secondPrompt = steeringSession.prompt({
+          sessionId: 'session-1',
+          prompt: [{ type: 'text', text: 'New request' }],
+        });
+      });
+      mockSendMessageStream
+        .mockReturnValueOnce(toolCallStream())
+        .mockReturnValueOnce(textStream('New answer'));
+
+      const first = await steeringSession.prompt({
+        sessionId: 'session-1',
+        prompt: [{ type: 'text', text: 'Go' }],
+      });
+      const second = await secondPrompt!;
+
+      expect(first.stopReason).toBe('cancelled');
+      expect(first._meta?.['geminicli.com']).toEqual({
+        undeliveredSteering: [{ steerId: 'st_1', text: 'For the old turn' }],
+      });
+      expect(second.stopReason).toBe('end_turn');
+      expect(second._meta?.['geminicli.com']).toBeUndefined();
+      expect(mockSendMessageStream.mock.calls[1][0]).toEqual([
+        { text: 'New request' },
+      ]);
+    });
+
+    it('sends undelivered steering as an update before a turn fails', async () => {
+      mockSendMessageStream.mockReturnValueOnce(
+        runBefore(
+          () => {
+            steer('Never seen');
+          },
+          createMockStream([
+            {
+              type: GeminiEventType.Error,
+              value: { error: { message: 'boom', status: 500 } },
+            },
+          ]),
+        ),
+      );
+
+      await expect(
+        steeringSession.prompt({
+          sessionId: 'session-1',
+          prompt: [{ type: 'text', text: 'Go' }],
+        }),
+      ).rejects.toMatchObject({ code: 500 });
+
+      expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+        steeringUpdate('Never seen', 'undelivered', 'st_1'),
+      );
+    });
+
+    it('passes steering to the injection service for subagents', async () => {
+      steerDuringTool(() => {
+        steer('Check the tests folder');
+      });
+      mockSendMessageStream
+        .mockReturnValueOnce(toolCallStream())
+        .mockReturnValueOnce(textStream('Done'));
+
+      await steeringSession.prompt({
+        sessionId: 'session-1',
+        prompt: [{ type: 'text', text: 'Go' }],
+      });
+
+      expect(mockAddInjection).toHaveBeenCalledWith(
+        'Check the tests folder',
+        'user_steering',
+      );
+    });
+
+    it('replays stored steering as the user words on session load', async () => {
+      await steeringSession.streamHistory([
+        {
+          id: 'm1',
+          timestamp: '2026-01-01T00:00:00Z',
+          type: 'user',
+          content: [
+            {
+              text: 'User steering update:\n<user_input>\nfirst second\n</user_input>\nInternal instruction: ...',
+            },
+          ],
+        },
+      ] as unknown as Parameters<Session['streamHistory']>[0]);
+
+      expect(mockConnection.sessionUpdate).toHaveBeenCalledTimes(1);
+      expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+        steeringUpdate('first second', 'delivered'),
+      );
+    });
+  });
+
   describe('dispose', () => {
     it('should safely dispose without throwing when config.dispose is undefined', async () => {
       delete (mockConfig as { dispose?: unknown }).dispose;

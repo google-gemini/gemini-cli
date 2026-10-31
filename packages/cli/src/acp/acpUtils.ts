@@ -368,3 +368,86 @@ export function buildAvailableModels(
     currentModelId: preferredModel,
   };
 }
+
+/** Key under which Gemini CLI publishes ACP extensions in `_meta` objects. */
+export const GEMINI_ACP_META_KEY = 'geminicli.com';
+
+/** Extension method that adds a user message to a running prompt turn. */
+export const STEER_METHOD = `_${GEMINI_ACP_META_KEY}/session/steer`;
+
+export const STEERING_VERSION = 1;
+export const STEERING_MAX_PENDING = 20;
+export const STEERING_MAX_CHARS = 8000;
+
+export const SteerRequestSchema = z.object({
+  sessionId: z.string(),
+  content: z
+    .array(z.object({ type: z.literal('text'), text: z.string() }))
+    .min(1),
+  _meta: z.record(z.unknown()).optional(),
+});
+
+export type SteerResponse =
+  | { status: 'queued'; steerId: string; pending: number }
+  | { status: 'no_active_turn' };
+
+/**
+ * Returns true when the client opted in to steering with
+ * `clientCapabilities._meta["geminicli.com"].steering === true`.
+ */
+export function readSteeringOptIn(
+  capabilities: acp.ClientCapabilities | undefined,
+): boolean {
+  const meta = hasMeta(capabilities) ? capabilities._meta : undefined;
+  const ours = meta?.[GEMINI_ACP_META_KEY];
+  return (
+    typeof ours === 'object' &&
+    ours !== null &&
+    'steering' in ours &&
+    ours.steering === true
+  );
+}
+
+export function buildSteeringCapability(enabled: boolean) {
+  return {
+    [GEMINI_ACP_META_KEY]: {
+      steering: {
+        version: STEERING_VERSION,
+        content: ['text'],
+        maxPending: STEERING_MAX_PENDING,
+        maxChars: STEERING_MAX_CHARS,
+        enabled,
+      },
+    },
+  };
+}
+
+export function steeringMeta(
+  state: 'delivered' | 'undelivered',
+  steerId?: string,
+) {
+  return {
+    [GEMINI_ACP_META_KEY]: {
+      steering: steerId ? { steerId, state } : { state },
+    },
+  };
+}
+
+const STEERING_HINT_PREFIX = 'User steering update:\n<user_input>\n';
+const STEERING_HINT_SUFFIX = '\n</user_input>';
+
+/**
+ * Extracts the user's own words from text built by
+ * `buildUserSteeringHintPrompt`, or returns null if the text is not steering.
+ */
+export function parseSteeringHint(text: string): string | null {
+  if (!text.startsWith(STEERING_HINT_PREFIX)) {
+    return null;
+  }
+  const end = text.indexOf(STEERING_HINT_SUFFIX, STEERING_HINT_PREFIX.length);
+  if (end === -1) {
+    return null;
+  }
+  const hint = text.slice(STEERING_HINT_PREFIX.length, end).trim();
+  return hint.length > 0 ? hint : null;
+}
