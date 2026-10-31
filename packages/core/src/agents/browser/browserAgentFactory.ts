@@ -284,6 +284,20 @@ export async function createBrowserAgentDefinition(
       registryDefinition?.kind === 'local'
         ? registryDefinition
         : BrowserAgentDefinition(config, visionEnabled);
+    const allowedDomains =
+      config.getBrowserAgentConfig().customConfig.allowedDomains;
+    const registryPrompt = baseDefinition.promptConfig?.systemPrompt;
+    const defaultWithVision = buildBrowserSystemPrompt(true, allowedDomains);
+    const defaultWithoutVision = buildBrowserSystemPrompt(
+      false,
+      allowedDomains,
+    );
+    const systemPrompt =
+      registryPrompt &&
+      registryPrompt !== defaultWithVision &&
+      registryPrompt !== defaultWithoutVision
+        ? registryPrompt
+        : buildBrowserSystemPrompt(visionEnabled, allowedDomains);
 
     const definition: LocalAgentDefinition<typeof BrowserTaskResultSchema> = {
       ...baseDefinition,
@@ -296,10 +310,7 @@ export async function createBrowserAgentDefinition(
       },
       promptConfig: {
         ...baseDefinition.promptConfig,
-        systemPrompt: buildBrowserSystemPrompt(
-          visionEnabled,
-          config.getBrowserAgentConfig().customConfig.allowedDomains,
-        ),
+        systemPrompt,
       },
     };
 
