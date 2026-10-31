@@ -394,6 +394,13 @@ decision = "ask_user"
 priority = 100
 ```
 
+<!-- prettier-ignore -->
+> [!IMPORTANT]
+> **Matching command names vs. effects:**
+> A `deny` rule with `commandPrefix = "rm"` matches commands that begin with `rm`. It will not match commands with a path prefix like `/bin/rm`, indirect executions like `xargs rm` or `eval "rm ..."`, or different commands that achieve the same effect (such as `unlink`).
+>
+> When running the agent unattended (such as in YOLO mode or non-interactive automation without user approval), do not rely on `deny` rules to block destructive behavior. Instead, use an allowlist approach: explicitly define what is permitted with `allow` rules, and allow unmatched commands to fall through to `deny` or `ask_user`.
+
 ### Special syntax for MCP tools
 
 You can create rules that target tools from Model Context Protocol (MCP) servers
