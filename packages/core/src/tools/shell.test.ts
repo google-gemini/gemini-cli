@@ -1244,6 +1244,22 @@ EOF`;
         ).toBe(false);
       });
 
+      it('should not flag project temp paths printed by earlier shell output', async () => {
+        const projectTempDir = mockConfig.storage.getProjectTempDir();
+        const tempScript = path.join(projectTempDir, '42', 'parse_pr.py');
+        setHistory([
+          shellOutputTurn(
+            `Traceback (most recent call last):\n  File "${tempScript}", line 3`,
+          ),
+        ]);
+        const invocation = buildInvocation(`python3 ${tempScript}`);
+
+        expect(invocation.hasTaintedOrBuildFileRisk()).toBe(false);
+        expect(
+          await invocation.shouldConfirmExecute(new AbortController().signal),
+        ).toBe(false);
+      });
+
       it('should not request confirmation again for flags approved earlier in the session', async () => {
         setHistory([
           {
