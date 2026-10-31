@@ -32,6 +32,8 @@ import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import * as policyHelpers from '../availability/policyHelpers.js';
 import { createDefaultPolicy } from '../availability/policyCatalog.js';
+import { ModelConfigService } from '../services/modelConfigService.js';
+import { DEFAULT_MODEL_CONFIGS } from '../config/defaultModelConfigs.js';
 import {
   RetryableQuotaError,
   TerminalQuotaError,
@@ -68,6 +70,7 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     setModel: vi.fn(),
     activateFallbackMode: vi.fn(),
     rotateSessionId: vi.fn(),
+    modelConfigService: new ModelConfigService(DEFAULT_MODEL_CONFIGS),
     getModelAvailabilityService: vi.fn(() =>
       createAvailabilityServiceMock({
         selectedModel: FALLBACK_MODEL,
@@ -75,7 +78,7 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
       }),
     ),
     getActiveModel: vi.fn(() => MOCK_PRO_MODEL),
-    getModel: vi.fn(() => MOCK_PRO_MODEL),
+    getModel: vi.fn(() => DEFAULT_GEMINI_MODEL_AUTO),
     getUserTier: vi.fn(() => undefined),
     isInteractive: vi.fn(() => false),
     getHasAccessToPreviewModel: vi.fn(() => false),
@@ -128,6 +131,57 @@ describe('handleFallback', () => {
       vi.mocked(policyConfig.getFallbackModelHandler).mockReturnValue(
         policyHandler,
       );
+    });
+
+    it.each([
+      MOCK_PRO_MODEL,
+      'gemini-3-pro-preview',
+      DEFAULT_GEMINI_FLASH_MODEL,
+    ])('only offers same-model retries for manual %s', async (model) => {
+      vi.mocked(policyConfig.getModel).mockReturnValue(model);
+      policyHandler.mockResolvedValue('retry_always');
+      const result = await handleFallback(
+        policyConfig,
+        model,
+        AUTH_OAUTH,
+        new TerminalQuotaError(
+          'Quota exhausted',
+          { code: 429, message: 'Quota exhausted', details: [] },
+          3600,
+        ),
+      );
+      expect(result).toBe(true);
+      expect(policyHandler).toHaveBeenCalledWith(
+        model,
+        model,
+        expect.any(TerminalQuotaError),
+      );
+      expect(availability.selectFirstAvailable).not.toHaveBeenCalled();
+      expect(policyConfig.activateFallbackMode).not.toHaveBeenCalled();
+      expect(policyConfig.setActiveModel).not.toHaveBeenCalled();
+    });
+
+    it('preserves explicit credit retry for manual selection without activating a fallback', async () => {
+      vi.mocked(policyConfig.getModel).mockReturnValue(MOCK_PRO_MODEL);
+      policyHandler.mockResolvedValue('retry_with_credits');
+      const error = new TerminalQuotaError(
+        'Quota exhausted',
+        { code: 429, message: 'Quota exhausted', details: [] },
+        3600,
+      );
+
+      expect(
+        await handleFallback(policyConfig, MOCK_PRO_MODEL, AUTH_OAUTH, error),
+      ).toBe(true);
+      expect(policyHandler).toHaveBeenCalledWith(
+        MOCK_PRO_MODEL,
+        MOCK_PRO_MODEL,
+        error,
+      );
+      expect(policyConfig.setModel).not.toHaveBeenCalled();
+      expect(policyConfig.setActiveModel).not.toHaveBeenCalled();
+      expect(policyConfig.activateFallbackMode).not.toHaveBeenCalled();
+      expect(availability.selectFirstAvailable).not.toHaveBeenCalled();
     });
 
     it('uses availability selection with correct candidates when enabled', async () => {
@@ -271,6 +325,51 @@ describe('handleFallback', () => {
       expect(policyConfig.activateFallbackMode).not.toHaveBeenCalled();
     });
 
+    it.each([
+      new TerminalQuotaError(
+        'Capacity exceeded',
+        { code: 429, message: 'Capacity exceeded', details: [] },
+        undefined,
+        'MODEL_CAPACITY_EXHAUSTED',
+      ),
+      new TerminalQuotaError(
+        'Service unavailable',
+        { code: 503, message: 'Service unavailable', details: [] },
+        600,
+      ),
+    ])(
+      'does not preserve capacity or server failures as exhausted quota during ordinary fallback',
+      async (error) => {
+        vi.mocked(policyConfig.getModel).mockReturnValue(
+          DEFAULT_GEMINI_MODEL_AUTO,
+        );
+        policyHandler.mockResolvedValue('retry_always');
+
+        await handleFallback(policyConfig, MOCK_PRO_MODEL, AUTH_OAUTH, error);
+
+        if (error.reason === 'MODEL_CAPACITY_EXHAUSTED') {
+          expect(availability.markRetryOncePerTurn).toHaveBeenCalledWith(
+            MOCK_PRO_MODEL,
+            3,
+          );
+          expect(availability.consumeStickyAttempt).toHaveBeenCalledWith(
+            MOCK_PRO_MODEL,
+          );
+          expect(availability.markTerminal).not.toHaveBeenCalled();
+        } else {
+          expect(availability.markTerminal).toHaveBeenCalledWith(
+            MOCK_PRO_MODEL,
+            'capacity',
+          );
+        }
+        expect(availability.markTerminal).not.toHaveBeenCalledWith(
+          MOCK_PRO_MODEL,
+          'quota',
+        );
+        expect(policyHandler).toHaveBeenCalled();
+      },
+    );
+
     it('should catch errors from the handler, log an error, and return null', async () => {
       const handlerError = new Error('UI interaction failed');
       policyHandler.mockRejectedValue(handlerError);
@@ -288,7 +387,7 @@ describe('handleFallback', () => {
       );
     });
 
-    it('should pass TerminalQuotaError (429) correctly to the handler', async () => {
+    it('switches immediately on TerminalQuotaError without asking the UI handler', async () => {
       const mockGoogleApiError = {
         code: 429,
         message: 'mock error',
@@ -304,17 +403,21 @@ describe('handleFallback', () => {
         DEFAULT_GEMINI_MODEL_AUTO,
       );
 
-      await handleFallback(
+      const result = await handleFallback(
         policyConfig,
         MOCK_PRO_MODEL,
         AUTH_OAUTH,
         terminalError,
       );
 
-      expect(policyHandler).toHaveBeenCalledWith(
-        MOCK_PRO_MODEL,
+      expect(result).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+      expect(policyHandler).not.toHaveBeenCalled();
+      expect(policyConfig.setActiveModel).toHaveBeenCalledWith(
         DEFAULT_GEMINI_FLASH_MODEL,
-        terminalError,
+      );
+      expect(policyConfig.activateFallbackMode).not.toHaveBeenCalled();
+      expect(debugLogger.log).toHaveBeenCalledWith(
+        `Usage limit reached on ${MOCK_PRO_MODEL}. Switching to ${DEFAULT_GEMINI_FLASH_MODEL}.`,
       );
     });
 

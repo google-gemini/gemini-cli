@@ -51,6 +51,63 @@ export class TerminalQuotaError extends Error {
 }
 
 /**
+ * Hard model quota exhaustion, excluding capacity shortages, per-minute rate
+ * limits, credit errors, and server-side failures. Only errors driven by a
+ * model's exhausted usage entitlement (for example a daily limit) qualify, so
+ * transient conditions keep their existing retry rules instead of being routed
+ * to another model tier.
+ */
+export function isQuotaExhaustedError(
+  error: unknown,
+): error is TerminalQuotaError {
+  if (!(error instanceof TerminalQuotaError)) {
+    return false;
+  }
+  if (error.status !== undefined && error.status >= 500) {
+    return false;
+  }
+  if (error.isInsufficientCredits || isSpendingCapMessage(error.message)) {
+    return false;
+  }
+  if (
+    error.reason === 'RATE_LIMIT_EXCEEDED' ||
+    error.reason === 'MODEL_CAPACITY_EXHAUSTED' ||
+    error.reason === 'MODEL_CAPACITY_EXCEEDED'
+  ) {
+    return false;
+  }
+  if (
+    /exhausted your capacity|capacity exceeded|MODEL_CAPACITY_EXHAUSTED/i.test(
+      error.message,
+    )
+  ) {
+    return false;
+  }
+  if (error.cause?.details?.length) {
+    for (const detail of error.cause.details) {
+      if (
+        detail['@type'] === 'type.googleapis.com/google.rpc.ErrorInfo' &&
+        (detail.reason === 'RATE_LIMIT_EXCEEDED' ||
+          detail.metadata?.['quota_limit']?.includes('PerMinute'))
+      ) {
+        return false;
+      }
+      if (detail['@type'] === 'type.googleapis.com/google.rpc.QuotaFailure') {
+        const violations: Array<{ quotaId?: string }> = detail.violations ?? [];
+        if (
+          violations.some((violation) =>
+            violation.quotaId?.includes('PerMinute'),
+          )
+        ) {
+          return false;
+        }
+      }
+    }
+  }
+  return true;
+}
+
+/**
  * A retryable error indicating a temporary quota issue (e.g., per-minute limit).
  */
 export class RetryableQuotaError extends Error {

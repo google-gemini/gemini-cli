@@ -19,7 +19,12 @@ import {
   resolvePolicyChain,
   resolvePolicyAction,
   applyAvailabilityTransition,
+  resolveQuotaFallbackModel,
+  markQuotaExhausted,
 } from '../availability/policyHelpers.js';
+import { isQuotaExhaustedError } from '../utils/googleQuotaErrors.js';
+import { normalizeModelId } from '../utils/modelUtils.js';
+import { isAutoModel } from '../config/models.js';
 
 export const UPGRADE_URL_PAGE = 'https://goo.gle/set-up-gemini-code-assist';
 
@@ -29,7 +34,47 @@ export async function handleFallback(
   authType?: string,
   error?: unknown,
 ): Promise<string | boolean | null> {
+  const quotaExhausted = isQuotaExhaustedError(error);
+  if (
+    quotaExhausted &&
+    !isAutoModel(normalizeModelId(config.getModel()), config)
+  ) {
+    // Exhausted manual selections can offer Stop, Upgrade, credits, or an
+    // explicit retry of the same model. Transient fallback keeps its policy.
+    const handler = config.getFallbackModelHandler();
+    if (typeof handler !== 'function') return null;
+    try {
+      const intent = await handler(failedModel, failedModel, error);
+      return await processIntent(
+        config,
+        intent === 'retry_always' ? 'retry_once' : intent,
+        failedModel,
+      );
+    } catch (handlerError) {
+      debugLogger.error('Fallback handler failed:', handlerError);
+      return null;
+    }
+  }
+  if (quotaExhausted) {
+    const quotaSelection = resolveQuotaFallbackModel(config, failedModel);
+    if (quotaSelection) {
+      markQuotaExhausted(config, failedModel);
+      const selection = resolveQuotaFallbackModel(config, failedModel);
+      const fallbackModel = selection?.selectedModel;
+      if (!fallbackModel || fallbackModel === normalizeModelId(failedModel)) {
+        return null;
+      }
+      config.rotateSessionId(createSessionId());
+      config.setActiveModel(fallbackModel);
+      debugLogger.log(
+        `Usage limit reached on ${failedModel}. Switching to ${fallbackModel}.`,
+      );
+      return fallbackModel;
+    }
+  }
+
   const failureKind = classifyFailureKind(error);
+  const terminalReason = quotaExhausted ? 'quota' : 'capacity';
 
   const chain = resolvePolicyChain(config);
   const { failedPolicy, candidates } = buildFallbackPolicyContext(
@@ -51,7 +96,11 @@ export async function handleFallback(
       failedModel !== activeModel &&
       availability.snapshot(activeModel).available
     ) {
-      applyAvailabilityTransition(getAvailabilityContext, failureKind);
+      applyAvailabilityTransition(
+        getAvailabilityContext,
+        failureKind,
+        terminalReason,
+      );
       return processIntent(config, 'retry_always', activeModel, failedModel);
     }
     fallbackModel = failedModel;
@@ -62,7 +111,11 @@ export async function handleFallback(
 
     const lastResortPolicy = candidates.find((policy) => policy.isLastResort);
     const selectedFallbackModel =
-      selection.selectedModel ?? lastResortPolicy?.model;
+      selection.selectedModel ??
+      (lastResortPolicy &&
+      availability.snapshot(lastResortPolicy.model).reason !== 'quota'
+        ? lastResortPolicy.model
+        : undefined);
     const selectedPolicy = candidates.find(
       (policy) => policy.model === selectedFallbackModel,
     );
@@ -84,7 +137,11 @@ export async function handleFallback(
       action === 'silent' ||
       (fallbackModel === activeModel && failedModel !== activeModel)
     ) {
-      applyAvailabilityTransition(getAvailabilityContext, failureKind);
+      applyAvailabilityTransition(
+        getAvailabilityContext,
+        failureKind,
+        terminalReason,
+      );
       // For standard auto-routing (silent), we only update the active model, so don't pass failedModel.
       // For utility bypass, we want a hard runtime override, so pass failedModel.
       const overrideFailedModel =
@@ -125,7 +182,11 @@ export async function handleFallback(
     // We DO NOT apply any transition if the user chose 'stop' or 'retry_later',
     // allowing them to try again later with the same model state.
     if (intent === 'retry_always') {
-      applyAvailabilityTransition(getAvailabilityContext, failureKind);
+      applyAvailabilityTransition(
+        getAvailabilityContext,
+        failureKind,
+        terminalReason,
+      );
     } else if (intent === 'retry_once' && fallbackModel !== failedModel) {
       const targetModel = failedPolicy?.model ?? failedModel;
       availability.markRetryOncePerTurn(targetModel, failedPolicy?.maxAttempts);

@@ -1231,7 +1231,32 @@ export class GeminiChat {
     const onPersistent429Callback = async (
       authType?: string,
       error?: unknown,
-    ) => handleFallback(this.context.config, lastModelToUse, authType, error);
+    ) => {
+      const fallback = await handleFallback(
+        this.context.config,
+        lastModelToUse,
+        authType,
+        error,
+      );
+      if (typeof fallback === 'string') {
+        const resolved =
+          this.context.config.modelConfigService.getResolvedConfig({
+            ...modelConfigKey,
+            model: fallback,
+          });
+        if (
+          resolved.model === lastModelToUse ||
+          this.context.config
+            .getModelAvailabilityService()
+            .snapshot(resolved.model).reason === 'quota'
+        ) {
+          return null;
+        }
+        lastModelToUse = resolved.model;
+        currentGenerateContentConfig = resolved.generateContentConfig;
+      }
+      return fallback;
+    };
 
     const onValidationRequiredCallback = async (
       validationError: ValidationRequiredError,

@@ -10,16 +10,24 @@ import {
   buildFallbackPolicyContext,
   applyModelSelection,
   applyAvailabilityTransition,
+  markQuotaExhausted,
+  resolveQuotaFallbackModel,
+  selectModelForAvailability,
 } from './policyHelpers.js';
+import { ModelAvailabilityService } from './modelAvailabilityService.js';
 import { createDefaultPolicy, SILENT_ACTIONS } from './policyCatalog.js';
 import type { RetryAvailabilityContext } from './modelPolicy.js';
 import type { Config } from '../config/config.js';
+import type { BucketInfo } from '../code_assist/types.js';
 import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   BASE_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
+  LEGACY_CCPA_FLASH_MODEL,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
+  PREVIEW_GEMINI_FLASH_MODEL,
   resetModelsForTesting,
 } from '../config/models.js';
 import { AuthType } from '../core/contentGenerator.js';
@@ -504,4 +512,369 @@ describe('policyHelpers', () => {
       );
     });
   });
+});
+
+function fixture(
+  selected: string,
+  buckets: BucketInfo[] = [],
+  overrides: Partial<Config> = {},
+) {
+  const availability = new ModelAvailabilityService();
+  let active = selected;
+  const config = {
+    getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
+    getActiveModel: () => active,
+    setActiveModel: vi.fn((model: string) => {
+      active = model;
+    }),
+    getModelAvailabilityService: () => availability,
+    getUserTier: () => undefined,
+    getContentGeneratorConfig: () => ({ authType: 'oauth-personal' }),
+    getHasAccessToPreviewModel: () => false,
+    getGemini31LaunchedSync: () => false,
+    getUseCustomToolModelSync: () => false,
+    hasLatestFlashGAAccess: () => false,
+    hasLatestFlashLiteGAAccess: () => false,
+    getProModelNoAccessSync: () => false,
+    getLastRetrievedQuota: () => ({ buckets }),
+    modelConfigService: new ModelConfigService(DEFAULT_MODEL_CONFIGS),
+    ...overrides,
+  } as unknown as Config;
+  return { config, availability };
+}
+
+describe('hard quota model selection', () => {
+  it.each(['auto', 'auto-gemini-2.5', 'auto-gemini-3'])(
+    'keeps quota fallback enabled for the %s selection',
+    (selection) => {
+      const { config } = fixture(BASE_GEMINI_FLASH_MODEL, [], {
+        getModel: () => selection,
+      });
+      markQuotaExhausted(config, BASE_GEMINI_FLASH_MODEL);
+
+      expect(
+        resolveQuotaFallbackModel(config, BASE_GEMINI_FLASH_MODEL)
+          ?.selectedModel,
+      ).toBe(DEFAULT_GEMINI_MODEL);
+      expect(config.getModel()).toBe(selection);
+    },
+  );
+
+  it.each([
+    'gemini-3-pro-preview',
+    BASE_GEMINI_FLASH_MODEL,
+    'custom-model',
+    'flash',
+    'pro',
+  ])(
+    'keeps manually selected %s even when other models have quota',
+    (model) => {
+      const { config } = fixture(
+        model,
+        [
+          { modelId: model, remainingFraction: 0 },
+          { modelId: DEFAULT_GEMINI_MODEL, remainingFraction: 0.5 },
+        ],
+        { getModel: () => model },
+      );
+      markQuotaExhausted(config, model);
+
+      expect(resolveQuotaFallbackModel(config, model)).toBeUndefined();
+      expect(selectModelForAvailability(config, model).selectedModel).toBe(
+        model,
+      );
+      expect(config.setActiveModel).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([false, true])(
+    'routes Auto Flash to Pro with dynamic configuration=%s',
+    (dynamic) => {
+      const { config } = fixture(BASE_GEMINI_FLASH_MODEL, [], {
+        getExperimentalDynamicModelConfiguration: () => dynamic,
+      });
+      markQuotaExhausted(config, BASE_GEMINI_FLASH_MODEL);
+
+      expect(
+        resolveQuotaFallbackModel(config, BASE_GEMINI_FLASH_MODEL)
+          ?.selectedModel,
+      ).toBe(DEFAULT_GEMINI_MODEL);
+      expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL_AUTO);
+    },
+  );
+
+  it('routes Auto Pro to Flash after its quota is exhausted', () => {
+    const { config } = fixture(DEFAULT_GEMINI_MODEL);
+    markQuotaExhausted(config, DEFAULT_GEMINI_MODEL);
+
+    expect(
+      resolveQuotaFallbackModel(config, DEFAULT_GEMINI_MODEL)?.selectedModel,
+    ).toBe(BASE_GEMINI_FLASH_MODEL);
+  });
+
+  it.each([false, true])(
+    'keeps stable Auto within its policy despite preview access, dynamic=%s',
+    (dynamic) => {
+      for (const [requested, expected] of [
+        [DEFAULT_GEMINI_MODEL, BASE_GEMINI_FLASH_MODEL],
+        [BASE_GEMINI_FLASH_MODEL, DEFAULT_GEMINI_MODEL],
+      ]) {
+        const { config } = fixture(requested, [], {
+          getExperimentalDynamicModelConfiguration: () => dynamic,
+          getHasAccessToPreviewModel: () => true,
+          getGemini31LaunchedSync: () => true,
+        });
+        markQuotaExhausted(config, requested);
+
+        expect(
+          resolveQuotaFallbackModel(config, requested)?.selectedModel,
+        ).toBe(expected);
+        markQuotaExhausted(config, expected);
+        expect(
+          resolveQuotaFallbackModel(config, requested)?.selectedModel,
+        ).toBeNull();
+      }
+    },
+  );
+
+  it('does not introduce models excluded by a custom Auto chain', () => {
+    const { config } = fixture(DEFAULT_GEMINI_MODEL, [], {
+      getModel: () => 'auto',
+      getExperimentalDynamicModelConfiguration: () => true,
+      modelConfigService: new ModelConfigService({
+        ...DEFAULT_MODEL_CONFIGS,
+        modelChains: {
+          ...DEFAULT_MODEL_CONFIGS.modelChains,
+          auto: [createDefaultPolicy(DEFAULT_GEMINI_MODEL)],
+        },
+      }),
+    });
+    markQuotaExhausted(config, DEFAULT_GEMINI_MODEL);
+
+    expect(
+      resolveQuotaFallbackModel(config, DEFAULT_GEMINI_MODEL)?.selectedModel,
+    ).toBeNull();
+  });
+
+  it.each([
+    [BASE_GEMINI_FLASH_MODEL, DEFAULT_GEMINI_MODEL],
+    [LEGACY_CCPA_FLASH_MODEL, DEFAULT_GEMINI_MODEL],
+    [DEFAULT_GEMINI_MODEL, LEGACY_CCPA_FLASH_MODEL],
+  ])(
+    'retains the backend-alias custom Auto chain from %s to %s',
+    (requested, expected) => {
+      const { config } = fixture(requested, [], {
+        getModel: () => 'auto',
+        getExperimentalDynamicModelConfiguration: () => true,
+        modelConfigService: new ModelConfigService({
+          ...DEFAULT_MODEL_CONFIGS,
+          modelChains: {
+            ...DEFAULT_MODEL_CONFIGS.modelChains,
+            auto: [
+              createDefaultPolicy(DEFAULT_GEMINI_MODEL),
+              createDefaultPolicy(LEGACY_CCPA_FLASH_MODEL),
+            ],
+          },
+        }),
+      });
+      markQuotaExhausted(config, requested);
+
+      expect(resolveQuotaFallbackModel(config, requested)?.selectedModel).toBe(
+        expected,
+      );
+      markQuotaExhausted(config, expected);
+      expect(
+        resolveQuotaFallbackModel(config, requested)?.selectedModel,
+      ).toBeNull();
+    },
+  );
+
+  it('uses the order and models of a custom Auto chain', () => {
+    const { config } = fixture(DEFAULT_GEMINI_MODEL, [], {
+      getModel: () => 'auto',
+      getHasAccessToPreviewModel: () => true,
+      getExperimentalDynamicModelConfiguration: () => true,
+      modelConfigService: new ModelConfigService({
+        ...DEFAULT_MODEL_CONFIGS,
+        modelChains: {
+          ...DEFAULT_MODEL_CONFIGS.modelChains,
+          auto: [
+            createDefaultPolicy(DEFAULT_GEMINI_MODEL),
+            createDefaultPolicy(BASE_GEMINI_FLASH_MODEL),
+            createDefaultPolicy(PREVIEW_GEMINI_FLASH_MODEL),
+          ],
+        },
+      }),
+    });
+    markQuotaExhausted(config, DEFAULT_GEMINI_MODEL);
+
+    expect(
+      resolveQuotaFallbackModel(config, DEFAULT_GEMINI_MODEL)?.selectedModel,
+    ).toBe(BASE_GEMINI_FLASH_MODEL);
+    markQuotaExhausted(config, BASE_GEMINI_FLASH_MODEL);
+    expect(
+      resolveQuotaFallbackModel(config, DEFAULT_GEMINI_MODEL)?.selectedModel,
+    ).toBe(PREVIEW_GEMINI_FLASH_MODEL);
+    markQuotaExhausted(config, PREVIEW_GEMINI_FLASH_MODEL);
+    expect(
+      resolveQuotaFallbackModel(config, DEFAULT_GEMINI_MODEL)?.selectedModel,
+    ).toBeNull();
+  });
+
+  it('does not discover unsupported models from advertised quota buckets', () => {
+    const { config } = fixture(BASE_GEMINI_FLASH_MODEL, [
+      { modelId: 'custom-model', remainingFraction: 0.5 },
+      { modelId: 'gemini-future-pro', remainingAmount: '10' },
+    ]);
+    markQuotaExhausted(config, BASE_GEMINI_FLASH_MODEL);
+    markQuotaExhausted(config, DEFAULT_GEMINI_MODEL);
+
+    expect(
+      resolveQuotaFallbackModel(config, BASE_GEMINI_FLASH_MODEL)?.selectedModel,
+    ).toBeNull();
+  });
+
+  it('skips advertised zero quota, including the legacy Code Assist Flash bucket', () => {
+    const { config } = fixture(DEFAULT_GEMINI_MODEL, [
+      { modelId: LEGACY_CCPA_FLASH_MODEL, remainingAmount: '0' },
+    ]);
+    markQuotaExhausted(config, DEFAULT_GEMINI_MODEL);
+
+    expect(
+      resolveQuotaFallbackModel(config, DEFAULT_GEMINI_MODEL)?.selectedModel,
+    ).toBeNull();
+  });
+
+  it('skips an initially selected zero-quota model without waiting for a request failure', () => {
+    const { config } = fixture(DEFAULT_GEMINI_MODEL, [
+      { modelId: DEFAULT_GEMINI_MODEL, remainingFraction: 0 },
+    ]);
+
+    expect(
+      applyModelSelection(config, {
+        model: DEFAULT_GEMINI_MODEL,
+        isChatModel: true,
+      }).model,
+    ).toBe(BASE_GEMINI_FLASH_MODEL);
+    expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL_AUTO);
+  });
+
+  it('does not enable quota routing for a capacity failure because an unrelated bucket is empty', () => {
+    const { config, availability } = fixture(
+      DEFAULT_GEMINI_MODEL,
+      [{ modelId: BASE_GEMINI_FLASH_MODEL, remainingFraction: 0 }],
+      { getModel: () => DEFAULT_GEMINI_MODEL },
+    );
+    availability.markTerminal(DEFAULT_GEMINI_MODEL, 'capacity');
+
+    expect(
+      selectModelForAvailability(config, DEFAULT_GEMINI_MODEL).selectedModel,
+    ).toBe(DEFAULT_GEMINI_MODEL);
+  });
+
+  it.each(['auto', 'flash'])(
+    'resolves the %s alias before checking failed quota health',
+    (alias) => {
+      const { config } = fixture(alias);
+      markQuotaExhausted(config, DEFAULT_GEMINI_MODEL);
+      markQuotaExhausted(config, BASE_GEMINI_FLASH_MODEL);
+
+      expect(
+        selectModelForAvailability(config, alias).selectedModel,
+      ).toBeNull();
+    },
+  );
+
+  it('keeps the configured Auto chain when a request uses a backend Flash alias', () => {
+    const { config } = fixture(LEGACY_CCPA_FLASH_MODEL);
+    markQuotaExhausted(config, LEGACY_CCPA_FLASH_MODEL);
+
+    expect(
+      resolveQuotaFallbackModel(config, LEGACY_CCPA_FLASH_MODEL)?.selectedModel,
+    ).toBe(DEFAULT_GEMINI_MODEL);
+  });
+
+  it('does not retry the same Code Assist Flash backend under another ID', () => {
+    const { config, availability } = fixture(LEGACY_CCPA_FLASH_MODEL);
+    markQuotaExhausted(config, LEGACY_CCPA_FLASH_MODEL);
+    markQuotaExhausted(config, DEFAULT_GEMINI_MODEL);
+
+    expect(availability.snapshot(BASE_GEMINI_FLASH_MODEL)).toEqual({
+      available: false,
+      reason: 'quota',
+    });
+    expect(
+      resolveQuotaFallbackModel(config, DEFAULT_GEMINI_MODEL)?.selectedModel,
+    ).toBeNull();
+    availability.resetTurn();
+    expect(availability.snapshot(LEGACY_CCPA_FLASH_MODEL).available).toBe(
+      false,
+    );
+  });
+
+  it('keeps distinct API-key backend IDs separate', () => {
+    const { config, availability } = fixture(BASE_GEMINI_FLASH_MODEL, [], {
+      getContentGeneratorConfig: () => ({ authType: AuthType.USE_GEMINI }),
+    });
+    markQuotaExhausted(config, BASE_GEMINI_FLASH_MODEL);
+
+    expect(availability.snapshot(LEGACY_CCPA_FLASH_MODEL).available).toBe(true);
+  });
+
+  it('skips a nominal fallback whose runtime override resolves back to an exhausted model', () => {
+    const { config } = fixture(DEFAULT_GEMINI_MODEL);
+    config.modelConfigService.registerRuntimeModelOverride({
+      match: { model: BASE_GEMINI_FLASH_MODEL },
+      modelConfig: { model: DEFAULT_GEMINI_MODEL },
+    });
+    markQuotaExhausted(config, DEFAULT_GEMINI_MODEL);
+
+    expect(
+      resolveQuotaFallbackModel(config, DEFAULT_GEMINI_MODEL)?.selectedModel,
+    ).toBeNull();
+  });
+
+  it('terminates when Pro is disallowed and the only Flash model is unavailable', () => {
+    const { config, availability } = fixture(DEFAULT_GEMINI_MODEL, [], {
+      getProModelNoAccessSync: () => true,
+    });
+    markQuotaExhausted(config, DEFAULT_GEMINI_MODEL);
+    availability.markTerminal(BASE_GEMINI_FLASH_MODEL, 'capacity');
+
+    expect(() =>
+      applyModelSelection(config, { model: DEFAULT_GEMINI_MODEL }),
+    ).toThrow('No model with available quota');
+  });
+
+  it('respects preview and Gemini 3.1 access flags when selecting the other tier', () => {
+    const { config } = fixture(PREVIEW_GEMINI_FLASH_MODEL, [], {
+      getModel: () => 'auto-gemini-3',
+      getHasAccessToPreviewModel: () => true,
+      getGemini31LaunchedSync: () => true,
+    });
+    markQuotaExhausted(config, PREVIEW_GEMINI_FLASH_MODEL);
+
+    expect(
+      resolveQuotaFallbackModel(config, PREVIEW_GEMINI_FLASH_MODEL)
+        ?.selectedModel,
+    ).toBe(PREVIEW_GEMINI_3_1_MODEL);
+    markQuotaExhausted(config, PREVIEW_GEMINI_3_1_MODEL);
+    expect(
+      resolveQuotaFallbackModel(config, PREVIEW_GEMINI_3_1_MODEL)
+        ?.selectedModel,
+    ).toBeNull();
+  });
+
+  it.each(['custom-model', 'gemini-future-pro', 'gemma-4-31b-it'])(
+    'preserves explicit selection of %s',
+    (model) => {
+      const { config } = fixture(model, [], { getModel: () => model });
+      markQuotaExhausted(config, model);
+
+      expect(resolveQuotaFallbackModel(config, model)).toBeUndefined();
+      expect(selectModelForAvailability(config, model).selectedModel).toBe(
+        model,
+      );
+    },
+  );
 });

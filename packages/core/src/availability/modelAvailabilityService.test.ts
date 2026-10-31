@@ -212,6 +212,23 @@ describe('ModelAvailabilityService', () => {
   });
 
   describe('Capacity TTL expiration', () => {
+    it('preserves only exhausted quota across automatic fallback resets', () => {
+      service.markTerminal('quota-model', 'quota');
+      service.markTerminal('capacity-model', 'capacity');
+      service.markRetryOncePerTurn('transient-model');
+
+      service.reset({ preserveQuota: true });
+
+      expect(service.snapshot('quota-model')).toEqual({
+        available: false,
+        reason: 'quota',
+      });
+      expect(service.snapshot('capacity-model').available).toBe(true);
+      expect(service.snapshot('transient-model').available).toBe(true);
+      service.reset();
+      expect(service.snapshot('quota-model').available).toBe(true);
+    });
+
     beforeEach(() => {
       vi.useFakeTimers();
     });

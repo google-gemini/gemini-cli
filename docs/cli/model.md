@@ -37,6 +37,20 @@ startup. For more details, refer to the
 Changes to these settings will be applied to all subsequent interactions with
 Gemini CLI.
 
+When a Pro or Flash model reaches a hard usage limit in **Auto** mode, Gemini
+CLI immediately retries with an available model from the other tier. **Manual**
+selections stay on the selected model and stop when its quota is exhausted;
+select **Auto** to enable quota fallback. Your selected model, authentication
+method, and project stay the same; the fallback applies to the active request.
+Models with exhausted quota are skipped until you explicitly select a model
+again or start a new session. Known zero quota is skipped before sending a
+request. If no permitted model has quota, the request stops instead of waiting
+for a reset. Temporary rate limits and capacity errors retain their existing
+retry and fallback choices. Automatic switching after a hard model usage limit
+requires **Auto**. Credit errors and project spending caps retain their existing
+behavior. Custom model configuration can prevent fallback when the replacement
+resolves to a model that has already exhausted its quota.
+
 ## Best practices for model selection
 
 - **Default to Auto.** For most users, the _Auto_ option model provides a

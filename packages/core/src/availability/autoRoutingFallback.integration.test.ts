@@ -14,6 +14,10 @@ import {
 } from '../utils/googleQuotaErrors.js';
 import {
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+  BASE_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
+  LEGACY_CCPA_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
@@ -26,6 +30,7 @@ import { LlmRole } from '../telemetry/types.js';
 import type { GenerateContentResponse } from '@google/genai';
 import { normalizeModelId } from '../utils/modelUtils.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
+import { createDefaultPolicy } from './policyCatalog.js';
 
 vi.mock('node:fs');
 
@@ -77,6 +82,276 @@ describe('Auto Routing Fallback Integration', () => {
     vi.useRealTimers();
     vi.restoreAllMocks();
     resetModelsForTesting();
+  });
+
+  it.each([
+    [DEFAULT_GEMINI_MODEL, BASE_GEMINI_FLASH_MODEL],
+    [BASE_GEMINI_FLASH_MODEL, DEFAULT_GEMINI_MODEL],
+  ])(
+    'retries stable Auto %s quota on %s immediately despite preview access',
+    async (requestedModel, expectedModel) => {
+      config = new Config({
+        sessionId: 'stable-auto-quota',
+        targetDir: '/test',
+        debugMode: false,
+        cwd: '/test',
+        model: DEFAULT_GEMINI_MODEL_AUTO,
+      });
+      vi.spyOn(config, 'getGemini31LaunchedSync').mockReturnValue(true);
+      const fallbackHandler = vi.fn();
+      config.setFallbackModelHandler(fallbackHandler);
+      client = new BaseLlmClient(
+        fakeGenerator,
+        config,
+        AuthType.LOGIN_WITH_GOOGLE,
+      );
+      const generate = vi
+        .spyOn(fakeGenerator, 'generateContent')
+        .mockRejectedValueOnce(
+          new TerminalQuotaError(
+            'Daily quota exhausted',
+            { code: 429, message: 'Daily quota exhausted', details: [] },
+            3600,
+            'QUOTA_EXHAUSTED',
+          ),
+        )
+        .mockResolvedValue({
+          candidates: [
+            { content: { role: 'model', parts: [{ text: 'Recovered' }] } },
+          ],
+        } as GenerateContentResponse);
+
+      const response = await client.generateContent({
+        modelConfigKey: { model: requestedModel, isChatModel: true },
+        contents: [{ role: 'user', parts: [{ text: 'Continue' }] }],
+        abortSignal: new AbortController().signal,
+        promptId: 'stable-auto-quota',
+        role: LlmRole.MAIN,
+      });
+
+      expect(response.candidates?.[0]?.content?.parts).toEqual([
+        { text: 'Recovered' },
+      ]);
+      expect(generate.mock.calls.map(([request]) => request.model)).toEqual([
+        requestedModel,
+        expectedModel,
+      ]);
+      expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL_AUTO);
+      expect(config.getActiveModel()).toBe(expectedModel);
+      expect(
+        config.getModelAvailabilityService().snapshot(requestedModel),
+      ).toEqual({
+        available: false,
+        reason: 'quota',
+      });
+      expect(fallbackHandler).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+    },
+  );
+
+  it.each([
+    [LEGACY_CCPA_FLASH_MODEL, DEFAULT_GEMINI_MODEL],
+    [DEFAULT_GEMINI_MODEL, LEGACY_CCPA_FLASH_MODEL],
+  ])(
+    'retains a custom Auto backend-alias chain while retrying %s on %s',
+    async (requestedModel, expectedModel) => {
+      config = new Config({
+        sessionId: 'custom-auto-quota',
+        targetDir: '/test',
+        debugMode: false,
+        cwd: '/test',
+        model: 'auto',
+        modelConfigServiceConfig: {
+          modelChains: {
+            auto: [
+              createDefaultPolicy(DEFAULT_GEMINI_MODEL),
+              createDefaultPolicy(LEGACY_CCPA_FLASH_MODEL, {
+                isLastResort: true,
+              }),
+            ],
+          },
+        },
+      });
+      vi.spyOn(config, 'getHasAccessToPreviewModel').mockReturnValue(false);
+      vi.spyOn(
+        config,
+        'getExperimentalDynamicModelConfiguration',
+      ).mockReturnValue(true);
+      // A real Code Assist config advertises the backend identity mapping.
+      vi.spyOn(config, 'getContentGeneratorConfig').mockReturnValue({
+        authType: AuthType.LOGIN_WITH_GOOGLE,
+      });
+      const fallbackHandler = vi.fn();
+      config.setFallbackModelHandler(fallbackHandler);
+      client = new BaseLlmClient(
+        fakeGenerator,
+        config,
+        AuthType.LOGIN_WITH_GOOGLE,
+      );
+      const generate = vi
+        .spyOn(fakeGenerator, 'generateContent')
+        .mockRejectedValueOnce(
+          new TerminalQuotaError(
+            'Custom Auto daily quota exhausted',
+            {
+              code: 429,
+              message: 'Custom Auto daily quota exhausted',
+              details: [],
+            },
+            3600,
+            'QUOTA_EXHAUSTED',
+          ),
+        )
+        .mockResolvedValue({
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'Custom chain recovered' }],
+              },
+            },
+          ],
+        } as GenerateContentResponse);
+
+      await client.generateContent({
+        modelConfigKey: { model: requestedModel, isChatModel: true },
+        contents: [{ role: 'user', parts: [{ text: 'Continue' }] }],
+        abortSignal: new AbortController().signal,
+        promptId: 'custom-auto-quota',
+        role: LlmRole.MAIN,
+      });
+
+      expect(generate.mock.calls.map(([request]) => request.model)).toEqual([
+        requestedModel,
+        expectedModel,
+      ]);
+      expect(config.getModel()).toBe('auto');
+      expect(config.getActiveModel()).toBe(expectedModel);
+      expect(fallbackHandler).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+    },
+  );
+
+  it.each([
+    [DEFAULT_GEMINI_MODEL_AUTO, 400],
+    [DEFAULT_GEMINI_MODEL_AUTO, 429],
+    [DEFAULT_GEMINI_MODEL_AUTO, 499],
+    [DEFAULT_GEMINI_MODEL, 400],
+    [DEFAULT_GEMINI_MODEL, 429],
+    [DEFAULT_GEMINI_MODEL, 499],
+  ] as const)(
+    'preserves the spending-cap error and existing dialog for %s on HTTP %s',
+    async (selectedModel, code) => {
+      config = new Config({
+        sessionId: 'project-spending-cap',
+        targetDir: '/test',
+        debugMode: false,
+        cwd: '/test',
+        model: selectedModel,
+      });
+      vi.spyOn(config, 'isInteractive').mockReturnValue(true);
+      const fallbackHandler = vi.fn(
+        async (): Promise<FallbackIntent> => 'stop',
+      );
+      config.setFallbackModelHandler(fallbackHandler);
+      client = new BaseLlmClient(fakeGenerator, config, AuthType.USE_GEMINI);
+      const message =
+        'Your project has exceeded its monthly spending cap. Manage it at https://ai.studio/spend.';
+      const generate = vi
+        .spyOn(fakeGenerator, 'generateContent')
+        .mockRejectedValue({ error: { code, message, details: [] } });
+
+      await expect(
+        client.generateContent({
+          modelConfigKey: { model: DEFAULT_GEMINI_MODEL, isChatModel: true },
+          contents: [{ role: 'user', parts: [{ text: 'Continue' }] }],
+          abortSignal: new AbortController().signal,
+          promptId: 'project-spending-cap',
+          role: LlmRole.MAIN,
+        }),
+      ).rejects.toThrow(message);
+
+      expect(generate).toHaveBeenCalledTimes(1);
+      expect(generate.mock.calls[0][0].model).toBe(DEFAULT_GEMINI_MODEL);
+      expect(fallbackHandler).toHaveBeenCalledExactlyOnceWith(
+        DEFAULT_GEMINI_MODEL,
+        selectedModel === DEFAULT_GEMINI_MODEL_AUTO
+          ? BASE_GEMINI_FLASH_MODEL
+          : DEFAULT_GEMINI_MODEL,
+        expect.objectContaining({ message }),
+      );
+      expect(config.getModel()).toBe(selectedModel);
+      expect(config.getActiveModel()).toBe(DEFAULT_GEMINI_MODEL);
+      expect(
+        config.getModelAvailabilityService().snapshot(DEFAULT_GEMINI_MODEL),
+      ).toEqual({ available: true });
+      expect(
+        config.getModelAvailabilityService().snapshot(BASE_GEMINI_FLASH_MODEL),
+      ).toEqual({ available: true });
+      expect(vi.getTimerCount()).toBe(0);
+    },
+  );
+
+  it('keeps per-minute ErrorInfo metadata in the existing fallback flow', async () => {
+    config = new Config({
+      sessionId: 'per-minute-metadata',
+      targetDir: '/test',
+      debugMode: false,
+      cwd: '/test',
+      model: PREVIEW_GEMINI_MODEL_AUTO,
+    });
+    vi.spyOn(config, 'isInteractive').mockReturnValue(true);
+    const fallbackHandler = vi.fn(async (): Promise<FallbackIntent> => 'stop');
+    config.setFallbackModelHandler(fallbackHandler);
+    client = new BaseLlmClient(
+      fakeGenerator,
+      config,
+      AuthType.LOGIN_WITH_GOOGLE,
+    );
+    const generate = vi
+      .spyOn(fakeGenerator, 'generateContent')
+      .mockRejectedValue({
+        error: {
+          code: 429,
+          message: 'Too many requests',
+          details: [
+            {
+              '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+              reason: 'RESOURCE_EXHAUSTED',
+              domain: 'generativelanguage.googleapis.com',
+              metadata: { quota_limit: 'RequestsPerMinute_PerProject_PerUser' },
+            },
+            {
+              '@type': 'type.googleapis.com/google.rpc.RetryInfo',
+              retryDelay: '600s',
+            },
+          ],
+        },
+      });
+
+    await expect(
+      client.generateContent({
+        modelConfigKey: { model: PREVIEW_GEMINI_MODEL, isChatModel: true },
+        contents: [{ role: 'user', parts: [{ text: 'Continue' }] }],
+        abortSignal: new AbortController().signal,
+        promptId: 'per-minute-metadata',
+        role: LlmRole.MAIN,
+      }),
+    ).rejects.toThrow('Too many requests');
+
+    expect(generate).toHaveBeenCalledTimes(1);
+    expect(fallbackHandler).toHaveBeenCalledWith(
+      PREVIEW_GEMINI_MODEL,
+      PREVIEW_GEMINI_FLASH_MODEL,
+      expect.any(TerminalQuotaError),
+    );
+    expect(config.getActiveModel()).toBe(PREVIEW_GEMINI_MODEL);
+    expect(
+      config.getModelAvailabilityService().snapshot(PREVIEW_GEMINI_MODEL),
+    ).toEqual({
+      available: true,
+    });
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it('should fallback to Flash after 3 tries and try 10 times for Flash in auto mode', async () => {
@@ -155,6 +430,7 @@ describe('Auto Routing Fallback Integration', () => {
     ]);
 
     // Verify attempts
+    expect(config.getModel()).toBe(PREVIEW_GEMINI_MODEL_AUTO);
     expect(attemptsPro).toBe(3);
     expect(attemptsFlash).toBe(10);
   });
@@ -229,10 +505,12 @@ describe('Auto Routing Fallback Integration', () => {
     // Verify handler was called once after 10 attempts to prompt user
     expect(handler).toHaveBeenCalledTimes(1);
     expect(handler).toHaveBeenCalledWith(
-      'gemini-3-pro-preview',
-      'gemini-3-flash-preview',
+      PREVIEW_GEMINI_MODEL,
+      PREVIEW_GEMINI_FLASH_MODEL,
       expect.any(RetryableQuotaError),
     );
+    expect(configNonAuto.getModel()).toBe(PREVIEW_GEMINI_MODEL);
+    expect(configNonAuto.getActiveModel()).toBe(PREVIEW_GEMINI_MODEL);
   });
 
   it('should fallback to gemini-3.8-flash when hasLatestFlashGAAccess is enabled', async () => {
@@ -400,6 +678,7 @@ describe('Auto Routing Fallback Integration', () => {
     ]);
 
     // Verify attempts
+    expect(configDynamic.getModel()).toBe(PREVIEW_GEMINI_MODEL_AUTO);
     expect(attemptsPro).toBe(3);
     expect(attemptsFlash).toBe(10);
   });

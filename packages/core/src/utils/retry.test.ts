@@ -590,6 +590,92 @@ describe('retryWithBackoff', () => {
   });
 
   describe('Flash model fallback for OAuth users', () => {
+    it('uses the quota-only callback immediately without waiting for the quota reset', async () => {
+      const error = new TerminalQuotaError(
+        'Quota exhausted',
+        { code: 429, message: 'Quota exhausted', details: [] },
+        3600,
+        'QUOTA_EXHAUSTED',
+      );
+      const fn = vi
+        .fn()
+        .mockRejectedValueOnce(error)
+        .mockResolvedValueOnce('recovered');
+      const onQuotaExhausted = vi.fn().mockResolvedValue('gemini-2.5-pro');
+      const onRetry = vi.fn();
+
+      await expect(
+        retryWithBackoff(fn, { onQuotaExhausted, onRetry }),
+      ).resolves.toBe('recovered');
+
+      expect(fn).toHaveBeenCalledTimes(2);
+      expect(onQuotaExhausted).toHaveBeenCalledOnce();
+      expect(onRetry).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it.each([
+      new RetryableQuotaError(
+        'Per-minute rate limit',
+        { code: 429, message: 'Rate limited', details: [] },
+        1,
+      ),
+      new TerminalQuotaError(
+        'Capacity exceeded',
+        { code: 429, message: 'Capacity exceeded', details: [] },
+        undefined,
+        'MODEL_CAPACITY_EXHAUSTED',
+      ),
+    ])(
+      'preserves backoff for rate limits and capacity instead of using the quota-only callback',
+      async (error) => {
+        const fn = vi
+          .fn()
+          .mockRejectedValueOnce(error)
+          .mockResolvedValueOnce('recovered');
+        const onQuotaExhausted = vi.fn();
+        const promise = retryWithBackoff(fn, {
+          maxAttempts: 2,
+          initialDelayMs: 1,
+          maxDelayMs: 1,
+          onQuotaExhausted,
+        });
+        await vi.runAllTimersAsync();
+
+        await expect(promise).resolves.toBe('recovered');
+        expect(onQuotaExhausted).not.toHaveBeenCalled();
+        expect(fn).toHaveBeenCalledTimes(2);
+      },
+    );
+
+    it.each([
+      new TerminalQuotaError(
+        'No credits',
+        { code: 429, message: 'No credits', details: [] },
+        undefined,
+        'INSUFFICIENT_G1_CREDITS_BALANCE',
+      ),
+      new TerminalQuotaError(
+        'Service unavailable',
+        { code: 503, message: 'Service unavailable', details: [] },
+        600,
+      ),
+      new ModelNotFoundError('Not found', 404),
+    ])(
+      'does not use the quota-only callback for credits, generic server failures, or missing models',
+      async (error) => {
+        const fn = vi.fn().mockRejectedValue(error);
+        const onQuotaExhausted = vi.fn();
+
+        await expect(retryWithBackoff(fn, { onQuotaExhausted })).rejects.toBe(
+          error,
+        );
+
+        expect(onQuotaExhausted).not.toHaveBeenCalled();
+        expect(fn).toHaveBeenCalledOnce();
+      },
+    );
+
     it('should trigger fallback for OAuth personal users on TerminalQuotaError', async () => {
       const fallbackCallback = vi.fn().mockResolvedValue('gemini-2.5-flash');
 
