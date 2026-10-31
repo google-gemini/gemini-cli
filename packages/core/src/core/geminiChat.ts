@@ -38,7 +38,11 @@ import {
 } from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
-import type { CompletedToolCall } from '../scheduler/types.js';
+import {
+  CoreToolCallStatus,
+  type CompletedToolCall,
+} from '../scheduler/types.js';
+import type { ToolCallRecord } from '../services/chatRecordingTypes.js';
 import { isAbortError } from '../utils/errors.js';
 import {
   logContentRetry,
@@ -1818,6 +1822,28 @@ export class GeminiChat {
       );
     }
 
+    // Persist tool calls immediately so session retains them if stopped mid-execution
+    if (hasToolCall) {
+      const initialToolCalls: ToolCallRecord[] = [];
+      let callIndex = 0;
+      for (const part of consolidatedParts) {
+        if (part.functionCall) {
+          const fc = part.functionCall;
+          const callId = fc.id ?? `call_${Date.now()}_${callIndex++}`;
+          initialToolCalls.push({
+            id: callId,
+            name: fc.name?.trim() || 'generic_tool',
+            args: isRecord(fc.args) ? fc.args : {},
+            status: CoreToolCallStatus.Scheduled,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
+      if (initialToolCalls.length > 0) {
+        this.chatRecordingService.recordToolCalls(model, initialToolCalls);
+      }
+    }
+
     this.agentHistory.push({
       id,
       content: { role: 'model', parts: consolidatedParts },
@@ -2121,4 +2147,8 @@ export function stripThoughts(history: HistoryTurn[]): HistoryTurn[] {
       };
     })
     .filter((turn) => !turn.content.parts || turn.content.parts.length > 0);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
