@@ -58,6 +58,14 @@ export function toToolCallContent(
         content: { type: 'text', text: toolResult.returnDisplay },
       };
     } else {
+      if (Array.isArray(toolResult.returnDisplay)) {
+        const text = toolResult.returnDisplay
+          .map((line) => line.map((token) => token.text).join(''))
+          .join('\n');
+        return text
+          ? { type: 'content', content: { type: 'text', text } }
+          : null;
+      }
       if ('fileName' in toolResult.returnDisplay) {
         return {
           type: 'diff',
