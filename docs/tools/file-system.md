@@ -121,6 +121,12 @@ around the `old_string` to ensure it modifies the correct location.
     If `false` (default), only succeeds if exactly one occurrence is found.
 - **Confirmation:** Requires manual user approval.
 
+## Cancellation
+
+`write_file` and `replace` check for cancellation before writing, including
+after preparing the content and parent directory. Cancellation does not undo a
+write that has already started.
+
 ## Next steps
 
 - Follow the [File management tutorial](../cli/tutorials/file-management.md) for
