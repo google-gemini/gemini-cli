@@ -4,6 +4,30 @@ Gemini CLI includes a model routing feature that automatically switches to a
 fallback model in case of a model failure. This feature is enabled by default
 and provides resilience when the primary model is unavailable.
 
+## Numerical model routing
+
+When numerical routing is enabled, Gemini CLI scores request complexity from 1
+to 100. You can map score bands to model IDs in `settings.json` using
+`routing.numericalRules`:
+
+```json
+{
+  "routing": {
+    "numericalRules": [
+      { "maxScore": 29, "model": "gemini-2.5-flash" },
+      { "maxScore": 80, "model": "gemini-3-flash-preview" },
+      { "maxScore": 100, "model": "gemini-3-pro-preview" }
+    ]
+  }
+}
+```
+
+Rules are matched in ascending `maxScore` order, regardless of their order in
+the file. `maxScore` is inclusive. Scores above every configured maximum use the
+model in the final score band. Configure a final `maxScore` of `100` to cover
+the full classifier range. The rules apply to the main request model; the local
+Gemma router remains a classifier and does not serve the main chat response.
+
 ## How it works
 
 Model routing is managed by the `ModelAvailabilityService`, which monitors model
