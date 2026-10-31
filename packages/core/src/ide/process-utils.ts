@@ -71,12 +71,17 @@ async function getProcessTableWindows(): Promise<Map<number, ProcessInfo>> {
 
     for (const p of processes) {
       if (isRawProcessInfo(p) && typeof p.ProcessId === 'number') {
+        const name = typeof p.Name === 'string' ? p.Name : '';
+        const command =
+          typeof p.CommandLine === 'string' && p.CommandLine
+            ? p.CommandLine
+            : name;
         processMap.set(p.ProcessId, {
           pid: p.ProcessId,
           parentPid:
             typeof p.ParentProcessId === 'number' ? p.ParentProcessId : 0,
-          name: typeof p.Name === 'string' ? p.Name : '',
-          command: typeof p.CommandLine === 'string' ? p.CommandLine : '',
+          name,
+          command,
         });
       }
     }
@@ -256,13 +261,22 @@ async function getIdeProcessInfoForWindows(): Promise<{
 
   if (ancestors.length >= 3) {
     const target = ancestors[ancestors.length - 3];
-    return { pid: target.pid, command: target.command };
+    return {
+      pid: target.pid,
+      command: target.command || target.name || 'unknown',
+    };
   } else if (ancestors.length > 0) {
     const target = ancestors[ancestors.length - 1];
-    return { pid: target.pid, command: target.command };
+    return {
+      pid: target.pid,
+      command: target.command || target.name || 'unknown',
+    };
   }
 
-  return { pid: myPid, command: myProc.command };
+  return {
+    pid: myPid,
+    command: myProc.command || myProc.name || 'unknown',
+  };
 }
 
 /**

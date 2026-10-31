@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { execFileSync } from 'node:child_process';
 import { GitService, Storage } from '@google/gemini-cli-core';
 
 describe('Checkpointing Integration', () => {
@@ -151,5 +152,76 @@ describe('Checkpointing Integration', () => {
 
     expect(logOutput).toBe('Gemini CLI <gemini-cli@google.com>');
     expect(logOutput).not.toContain('Global User');
+  });
+
+  it('should preserve files excluded via .git/info/exclude created after checkpoint on restore', async () => {
+    // Initialize project as a git repository with .git/info/exclude
+    execFileSync('git', ['init'], { cwd: projectRoot, env: process.env });
+    execFileSync('git', ['config', 'user.name', 'User'], {
+      cwd: projectRoot,
+      env: process.env,
+    });
+    execFileSync('git', ['config', 'user.email', 'user@example.com'], {
+      cwd: projectRoot,
+      env: process.env,
+    });
+
+    const infoExcludePath = path.join(projectRoot, '.git', 'info', 'exclude');
+    await fs.mkdir(path.dirname(infoExcludePath), { recursive: true });
+    await fs.appendFile(infoExcludePath, '\nnotes.local.md\n');
+
+    const storage = new Storage(projectRoot);
+    const gitService = new GitService(projectRoot, storage);
+    await gitService.initialize();
+
+    await fs.writeFile(path.join(projectRoot, 'tracked.txt'), 'initial');
+    const snapshotHash = await gitService.createFileSnapshot('Checkpoint 1');
+
+    // Create excluded file after checkpoint
+    const excludedFilePath = path.join(projectRoot, 'notes.local.md');
+    await fs.writeFile(
+      excludedFilePath,
+      'private notes created after checkpoint',
+    );
+
+    await gitService.restoreProjectFromSnapshot(snapshotHash);
+
+    const exists = await fs
+      .stat(excludedFilePath)
+      .then(() => true)
+      .catch(() => false);
+    expect(exists).toBe(true);
+  });
+
+  it('should preserve content of files excluded via core.excludesFile modified after checkpoint on restore', async () => {
+    const globalExcludePath = path.join(fakeHome, '.global_ignore');
+    await fs.writeFile(globalExcludePath, 'secret.env\n');
+
+    execFileSync(
+      'git',
+      ['config', '--global', 'core.excludesFile', globalExcludePath],
+      {
+        env: { ...process.env, HOME: fakeHome },
+      },
+    );
+
+    const storage = new Storage(projectRoot);
+    const gitService = new GitService(projectRoot, storage);
+    await gitService.initialize();
+
+    // Create excluded file before checkpoint
+    const excludedFilePath = path.join(projectRoot, 'secret.env');
+    await fs.writeFile(excludedFilePath, 'original secret');
+
+    await fs.writeFile(path.join(projectRoot, 'tracked.txt'), 'version 1');
+    const snapshotHash = await gitService.createFileSnapshot('Checkpoint 1');
+
+    // Modify excluded file after checkpoint
+    await fs.writeFile(excludedFilePath, 'modified secret');
+
+    await gitService.restoreProjectFromSnapshot(snapshotHash);
+
+    const content = await fs.readFile(excludedFilePath, 'utf-8');
+    expect(content).toBe('modified secret');
   });
 });

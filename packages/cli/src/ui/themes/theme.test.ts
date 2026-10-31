@@ -84,6 +84,53 @@ describe('createCustomTheme', () => {
     // Interpolate between #000000 and #cccccc -> #525252
     expect(theme.colors.DarkGray).toBe('#525252');
   });
+
+  it('should apply ui.active and ui.focus overrides to semantic and focus colors', () => {
+    const customTheme: CustomTheme = {
+      type: 'custom',
+      name: 'FocusActiveTheme',
+      background: {
+        primary: '#000000',
+      },
+      status: {
+        success: '#00ff00',
+      },
+      ui: {
+        active: '#3399ff',
+        focus: '#ff00ff',
+      },
+    };
+    const theme = createCustomTheme(customTheme);
+    expect(theme.semanticColors.ui.active).toBe('#3399ff');
+    expect(theme.semanticColors.ui.focus).toBe('#ff00ff');
+    expect(theme.colors.FocusColor).toBe('#ff00ff');
+    // FocusBackground should interpolate between #000000 and ui.focus (#ff00ff) at 0.2 -> #330033
+    expect(theme.semanticColors.background.focus).toBe('#330033');
+  });
+
+  it('should use consistent fallback chain (status.success -> AccentGreen -> #3CA84B) for FocusColor and FocusBackground when ui.focus is undefined', () => {
+    const withStatusSuccess = createCustomTheme({
+      type: 'custom',
+      name: 'StatusSuccessFallback',
+      background: { primary: '#000000' },
+      status: { success: '#00ff00' },
+      AccentGreen: '#008000',
+    });
+    expect(withStatusSuccess.colors.FocusColor).toBe('#00ff00');
+    expect(withStatusSuccess.semanticColors.ui.focus).toBe('#00ff00');
+    // Interpolate between #000000 and #00ff00 at 0.2 -> #003300
+    expect(withStatusSuccess.semanticColors.background.focus).toBe('#003300');
+
+    const withDefaultFallback = createCustomTheme({
+      type: 'custom',
+      name: 'DefaultGreenFallback',
+      background: { primary: '#000000' },
+    });
+    expect(withDefaultFallback.colors.FocusColor).toBe('#3CA84B');
+    expect(withDefaultFallback.semanticColors.ui.focus).toBe('#3CA84B');
+    // Interpolate between #000000 and #3CA84B (60, 168, 75) at 0.2 -> (12, 34, 15) -> #0c220f
+    expect(withDefaultFallback.semanticColors.background.focus).toBe('#0c220f');
+  });
 });
 
 describe('validateCustomTheme', () => {
