@@ -21,12 +21,14 @@ import type { LocalAgentDefinition } from '../types.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import type { AnyDeclarativeTool } from '../../tools/tools.js';
 import { BrowserManager } from './browserManager.js';
-import { BROWSER_AGENT_NAME } from './browserAgentDefinition.js';
 import { MCP_TOOL_PREFIX } from '../../tools/mcp-tool.js';
 import {
+  BROWSER_AGENT_NAME,
   BrowserAgentDefinition,
+  buildBrowserSystemPrompt,
   type BrowserTaskResultSchema,
 } from './browserAgentDefinition.js';
+import { supersedeStaleSnapshots } from './snapshotSuperseder.js';
 import { createMcpDeclarativeTools } from './mcpToolWrapper.js';
 import { createAnalyzeScreenshotTool } from './analyzeScreenshot.js';
 import { injectAutomationOverlay } from './automationOverlay.js';
@@ -269,23 +271,42 @@ export async function createBrowserAgentDefinition(
         allTools.map((t) => t.name).join(', '),
     );
 
-    // Create configured definition with tools
-    // BrowserAgentDefinition is a factory function - call it with config
-    const baseDefinition = BrowserAgentDefinition(
-      config,
-      !visionDisabledReason,
-    );
+    // Vision availability is only known after tool discovery. The registry
+    // definition already carries settings.json overrides (runConfig,
+    // modelConfig). Use it when present and refresh only the
+    // invocation-specific tools and vision-dependent prompt. Fall back to the
+    // built-in definition when the browser agent has not been registered.
+    const visionEnabled = !visionDisabledReason;
+    const registryDefinition = config
+      .getAgentRegistry()
+      ?.getDefinition(BROWSER_AGENT_NAME);
+    const baseDefinition =
+      registryDefinition?.kind === 'local'
+        ? registryDefinition
+        : BrowserAgentDefinition(config, visionEnabled);
+
     const definition: LocalAgentDefinition<typeof BrowserTaskResultSchema> = {
       ...baseDefinition,
+      // Registry overrides are copied onto a new object that does not forward
+      // onBeforeTurn. Keep snapshot superseding unless the registered
+      // definition supplies its own hook.
+      onBeforeTurn: baseDefinition.onBeforeTurn ?? supersedeStaleSnapshots,
       toolConfig: {
         tools: allTools,
+      },
+      promptConfig: {
+        ...baseDefinition.promptConfig,
+        systemPrompt: buildBrowserSystemPrompt(
+          visionEnabled,
+          config.getBrowserAgentConfig().customConfig.allowedDomains,
+        ),
       },
     };
 
     return {
       definition,
       browserManager,
-      visionEnabled: !visionDisabledReason,
+      visionEnabled,
       sessionMode,
     };
   } catch (error) {
