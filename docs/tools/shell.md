@@ -227,6 +227,13 @@ settings:
   `["git", "npm test"]`).
 - **`tools.exclude`**: A blocklist of command prefixes.
 
+## Background output
+
+Gemini CLI can inspect background process logs with `read_background_output`.
+Each read loads up to the final 64 KB of log content. Output indicates when
+earlier content was omitted. If a single line exceeds this limit, the tool
+returns its available tail and marks the line as partial.
+
 ## Use cases
 
 - Running build scripts and test suites.
