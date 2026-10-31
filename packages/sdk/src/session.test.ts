@@ -16,6 +16,18 @@ const mockClient = {
   updateSystemInstruction: vi.fn(),
 };
 
+const mockToolRegistry = {
+  getTool: vi.fn().mockReturnValue(null),
+  registerTool: vi.fn(),
+  unregisterTool: vi.fn(),
+  clone: vi.fn(),
+};
+mockToolRegistry.clone.mockImplementation(function (
+  this: typeof mockToolRegistry | undefined,
+) {
+  return { ...(this ?? mockToolRegistry) };
+});
+
 // Mutable mock config so individual tests can spy on setUserMemory etc.
 const mockConfig = {
   initialize: vi.fn().mockResolvedValue(undefined),
@@ -24,13 +36,9 @@ const mockConfig = {
     getSkills: vi.fn().mockReturnValue([]),
     addSkills: vi.fn(),
   }),
-  getToolRegistry: vi.fn().mockReturnValue({
-    getTool: vi.fn().mockReturnValue(null),
-    registerTool: vi.fn(),
-    unregisterTool: vi.fn(),
-  }),
-  getMessageBus: vi.fn().mockReturnValue({}),
-  getGeminiClient: vi.fn().mockReturnValue(mockClient),
+  toolRegistry: mockToolRegistry,
+  messageBus: {},
+  geminiClient: mockClient,
   getSessionId: vi.fn().mockReturnValue('mock-session-id'),
   getWorkingDir: vi.fn().mockReturnValue('/tmp'),
   setUserMemory: vi.fn(),
@@ -181,8 +189,7 @@ describe('GeminiCliSession initialize()', () => {
   });
 });
 
-// TODO(#24999): Mock uses getGeminiClient() method but session.ts expects geminiClient property.
-describe.skip('GeminiCliSession sendStream()', () => {
+describe('GeminiCliSession sendStream()', () => {
   it('auto-initializes if not yet initialized', async () => {
     const session = new GeminiCliSession(
       baseOptions,

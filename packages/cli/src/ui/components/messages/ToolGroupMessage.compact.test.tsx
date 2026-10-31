@@ -175,4 +175,49 @@ describe('ToolGroupMessage Compact Rendering', () => {
     const output = lastFrame();
     expect(output).toMatchSnapshot();
   });
+
+  it('respects precomputed hasDensePayload flag on IndividualToolCallDisplay when calculating available height', async () => {
+    const toolCalls: IndividualToolCallDisplay[] = [
+      {
+        callId: 'call1',
+        name: LS_DISPLAY_NAME,
+        status: CoreToolCallStatus.Success,
+        resultDisplay: 'file1.txt',
+        hasDensePayload: false,
+        description: 'Listing files',
+        confirmationDetails: undefined,
+        isClientInitiated: true,
+        parentCallId: undefined,
+      },
+      {
+        callId: 'call2',
+        name: READ_FILE_DISPLAY_NAME,
+        status: CoreToolCallStatus.Success,
+        resultDisplay: {
+          summary: 'read file',
+          payload: 'line 1\nline 2\nline 3\nline 4\nline 5',
+          files: ['file.txt'],
+        },
+        hasDensePayload: true,
+        description: 'Reading file',
+        confirmationDetails: undefined,
+        isClientInitiated: true,
+        parentCallId: undefined,
+      },
+    ];
+
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+      <ToolGroupMessage
+        {...defaultProps}
+        toolCalls={toolCalls}
+        availableTerminalHeight={20}
+      />,
+      { settings: compactSettings },
+    );
+
+    await waitUntilReady();
+    const output = lastFrame();
+    expect(output).toContain('read file');
+    unmount();
+  });
 });

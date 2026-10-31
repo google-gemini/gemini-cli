@@ -8,6 +8,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { stat } from 'node:fs/promises';
 import chalk from 'chalk';
+import { lock } from 'proper-lockfile';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
 import { type MergedSettings, SettingScope } from './settings.js';
 import { createHash, randomUUID } from 'node:crypto';
@@ -57,6 +58,7 @@ import {
   CoreToolCallStatus,
   loadExtensionPolicies,
   isSubpath,
+  isNodeError,
   type PolicyRule,
   type SafetyCheckerRule,
   HookType,
@@ -84,6 +86,25 @@ import type { EventEmitter } from 'node:stream';
 import { themeManager } from '../ui/themes/theme-manager.js';
 import { getFormattedSettingValue } from '../commands/extensions/utils.js';
 import { removeDirectoryWithRetry } from '../utils/retry.js';
+
+/**
+ * Suffix of the lock directory that guards an extension's install directory
+ * while it is being installed or updated: proper-lockfile locks
+ * `<extensionsDir>/<name>` by creating `<extensionsDir>/<name>.lock`.
+ * Extension names cannot contain dots (see `validateName`), so lock artifacts
+ * can never collide with, or be mistaken for, an extension.
+ */
+const INSTALL_LOCK_SUFFIX = '.lock';
+/**
+ * After this long without a refresh (e.g. its process was killed), an install
+ * lock is considered stale and may be taken over.
+ */
+const INSTALL_LOCK_STALE_MS = 15_000;
+/**
+ * Backoff while waiting for a concurrent install of the same extension to
+ * finish: 200ms, 400ms, then 500ms per retry, about 7s in total.
+ */
+const INSTALL_LOCK_RETRIES = { retries: 15, minTimeout: 200, maxTimeout: 500 };
 
 interface ExtensionManagerParams {
   enabledExtensionOverrides?: string[];
@@ -293,6 +314,7 @@ Would you like to attempt to install via "git clone" instead?`,
         throw new Error(`Unsupported install type: ${installMetadata.type}`);
       }
 
+      let releaseLock: (() => Promise<void>) | undefined;
       try {
         newExtensionConfig = await this.loadExtensionConfig(localSourcePath);
 
@@ -356,14 +378,28 @@ Would you like to attempt to install via "git clone" instead?`,
           newExtensionName,
         ).getExtensionDir();
 
-        if (
-          (!isUpdate || newExtensionName !== previousName) &&
-          fs.existsSync(destinationPath)
-        ) {
-          throw new Error(
-            `Cannot install extension "${newExtensionName}" because a directory with that name already exists. Please remove it manually.`,
-          );
-        }
+        const assertDestinationIsAvailable = () => {
+          if (
+            (!isUpdate || newExtensionName !== previousName) &&
+            fs.existsSync(destinationPath)
+          ) {
+            throw new Error(
+              `Cannot install extension "${newExtensionName}" because a directory with that name already exists. Please remove it manually.`,
+            );
+          }
+        };
+        // Fail fast, before taking the lock, in the common non-concurrent case.
+        assertDestinationIsAvailable();
+
+        // Everything from here until `finally` writes to `destinationPath`, so
+        // serialize it against concurrent installs/updates of the same
+        // extension, in this process or another one. Then check again: a
+        // concurrent install may have created the directory while we waited.
+        releaseLock = await acquireExtensionInstallLock(
+          destinationPath,
+          newExtensionName,
+        );
+        assertDestinationIsAvailable();
 
         let previousSettings: Record<string, string> | undefined;
         let wasEnabledGlobally = false;
@@ -497,6 +533,17 @@ Would you like to attempt to install via "git clone" instead?`,
           );
         }
       } finally {
+        if (releaseLock) {
+          try {
+            await releaseLock();
+          } catch (releaseError) {
+            // A failed release (e.g. after the lock was compromised) must not
+            // mask the outcome of the install itself.
+            debugLogger.warn(
+              `Failed to release the install lock for extension "${newExtensionConfig?.name}": ${getErrorMessage(releaseError)}`,
+            );
+          }
+        }
         if (tempDir) {
           try {
             await removeDirectoryWithRetry(tempDir);
@@ -712,6 +759,11 @@ Would you like to attempt to install via "git clone" instead?`,
   private async _buildExtension(
     extensionDir: string,
   ): Promise<GeminiCLIExtension | null> {
+    // Lock artifacts of an install in progress, or left behind by a killed one
+    // (see `acquireExtensionInstallLock`), are never extensions.
+    if (path.basename(extensionDir).endsWith(INSTALL_LOCK_SUFFIX)) {
+      return null;
+    }
     try {
       const stats = await fs.promises.stat(extensionDir);
       if (!stats.isDirectory()) {
@@ -1287,6 +1339,49 @@ export async function copyExtension(
 ): Promise<void> {
   await fs.promises.cp(source, destination, { recursive: true });
   await makeWritableRecursive(destination);
+}
+
+/**
+ * Acquires the lock that serializes installs and updates writing to
+ * `destinationPath`, both within this process and across CLI processes.
+ *
+ * The lock is keyed on `destinationPath` itself rather than on the shared
+ * extensions directory: proper-lockfile tracks held locks per key, and locks on
+ * different extensions (e.g. from `extensions update --all`) must not release
+ * one another.
+ */
+async function acquireExtensionInstallLock(
+  destinationPath: string,
+  extensionName: string,
+): Promise<() => Promise<void>> {
+  // Only the parent (the extensions directory) has to exist, because the lock
+  // is the `<destinationPath>.lock` directory created next to it. Do not create
+  // `destinationPath` itself here: the existence re-check that runs once the
+  // lock is held would mistake it for a concurrent install.
+  await fs.promises.mkdir(path.dirname(destinationPath), { recursive: true });
+  try {
+    return await lock(destinationPath, {
+      // `destinationPath` usually does not exist yet. With `realpath: false`,
+      // proper-lockfile neither resolves nor stats it; it only creates and
+      // checks the `<destinationPath>.lock` directory.
+      realpath: false,
+      stale: INSTALL_LOCK_STALE_MS,
+      retries: INSTALL_LOCK_RETRIES,
+      // The default handler throws from a timer, which would crash the CLI.
+      onCompromised: (error) => {
+        debugLogger.warn(
+          `Lost the install lock for extension "${extensionName}": ${getErrorMessage(error)}`,
+        );
+      },
+    });
+  } catch (error) {
+    if (isNodeError(error) && error.code === 'ELOCKED') {
+      throw new Error(
+        `Cannot install extension "${extensionName}" because another installation or update of it is already in progress. Please try again later.`,
+      );
+    }
+    throw error;
+  }
 }
 
 function getContextFileNames(config: ExtensionConfig): string[] {

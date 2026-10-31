@@ -327,6 +327,50 @@ describe('settings-validation', () => {
       expect(result.success).toBe(true);
     });
 
+    it('should accept customThemes with ui.active and ui.focus color overrides', () => {
+      const validSettings = {
+        ui: {
+          theme: 'CustomFocusTheme',
+          customThemes: {
+            CustomFocusTheme: {
+              type: 'custom',
+              name: 'CustomFocusTheme',
+              ui: {
+                comment: '#928374',
+                symbol: '#8ec07c',
+                active: '#83a598',
+                focus: '#b8bb26',
+                gradient: ['#cc241d', '#d65d0e', '#d79921'],
+              },
+            },
+          },
+        },
+      };
+
+      const result = validateSettings(validSettings);
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject unrecognized keys in customThemes.ui', () => {
+      const invalidSettings = {
+        ui: {
+          customThemes: {
+            InvalidUiTheme: {
+              type: 'custom',
+              name: 'InvalidUiTheme',
+              ui: {
+                active: '#83a598',
+                unknownKey: '#ffffff',
+              },
+            },
+          },
+        },
+      };
+
+      const result = validateSettings(invalidSettings);
+      expect(result.success).toBe(false);
+    });
+
     describe('type casting', () => {
       it('should cast "true" and "false" strings to booleans', () => {
         const settings = {
