@@ -41,15 +41,15 @@ test('ResultCache cache hit/miss', async () => {
   expect(isExactMatch2).toBe(true);
 });
 
-test('ResultCache best base query', async () => {
-  const files = ['foo.txt', 'foobar.js', 'baz.md'];
+test('ResultCache returns all candidates for a different query with a cached prefix', async () => {
+  const files = ['SrcUpper.ts', 'srcutils.ts'];
   const cache = new ResultCache(files);
 
-  // Cache a broader query
-  cache.set('foo', ['foo.txt', 'foobar.js']);
+  // Sharing a prefix does not guarantee matching semantics are compatible.
+  cache.set('Src', ['SrcUpper.ts']);
 
-  // Search for a more specific query that starts with the broader one
-  const { files: resultFiles, isExactMatch } = await cache.get('foobar');
-  expect(resultFiles).toEqual(['foo.txt', 'foobar.js']);
+  // A different query must be able to match files excluded by the cached query.
+  const { files: resultFiles, isExactMatch } = await cache.get('Src*');
+  expect(resultFiles).toEqual(files);
   expect(isExactMatch).toBe(false);
 });
