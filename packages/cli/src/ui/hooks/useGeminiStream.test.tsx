@@ -4280,6 +4280,132 @@ describe('useGeminiStream', () => {
       );
     });
 
+    it('should not schedule buffered tool calls when stream emits Error after ToolCallRequest', async () => {
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.ToolCallRequest,
+            value: {
+              callId: 'orphaned-call-1',
+              name: 'test_tool',
+              args: {},
+              isClientInitiated: false,
+              prompt_id: 'prompt-1',
+            },
+          };
+          yield {
+            type: ServerGeminiEventType.Error,
+            value: { error: { message: 'Mid-stream error' } },
+          };
+        })(),
+      );
+
+      const { result } = await renderHookWithProviders(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockConfig,
+          mockLoadedSettings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          () => {},
+          () => {},
+          80,
+          24,
+        ),
+      );
+
+      await act(async () => {
+        await result.current.submitQuery('Test query');
+      });
+
+      expect(mockScheduleToolCalls).not.toHaveBeenCalled();
+    });
+
+    it('should discard tool calls and pending history item from failed stream attempt when Retry is emitted', async () => {
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'Partial text from failed attempt',
+          };
+          yield {
+            type: ServerGeminiEventType.ToolCallRequest,
+            value: {
+              callId: 'stale-call-1',
+              name: 'stale_tool',
+              args: {},
+              isClientInitiated: false,
+              prompt_id: 'prompt-1',
+            },
+          };
+          yield {
+            type: ServerGeminiEventType.Retry,
+          };
+          yield {
+            type: ServerGeminiEventType.ToolCallRequest,
+            value: {
+              callId: 'fresh-call-2',
+              name: 'fresh_tool',
+              args: {},
+              isClientInitiated: false,
+              prompt_id: 'prompt-1',
+            },
+          };
+        })(),
+      );
+
+      const { result } = await renderHookWithProviders(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockConfig,
+          mockLoadedSettings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          () => {},
+          () => {},
+          80,
+          24,
+        ),
+      );
+
+      await act(async () => {
+        await result.current.submitQuery('Test query');
+      });
+
+      expect(mockAddItem).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: 'Partial text from failed attempt',
+        }),
+        expect.any(Number),
+      );
+      expect(mockScheduleToolCalls).toHaveBeenCalledTimes(1);
+      expect(mockScheduleToolCalls).toHaveBeenCalledWith(
+        [
+          expect.objectContaining({
+            callId: 'fresh-call-2',
+            name: 'fresh_tool',
+          }),
+        ],
+        expect.any(AbortSignal),
+      );
+    });
+
     it('should update lastOutputTime on Gemini thought and content events', async () => {
       vi.useFakeTimers();
       const startTime = 1000000;

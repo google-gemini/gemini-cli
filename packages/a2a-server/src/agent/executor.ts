@@ -781,6 +781,18 @@ export class CoderAgentExecutor implements AgentExecutor {
                 toolCallRequests.push(event.value);
                 continue;
               }
+              if (
+                event.type === GeminiEventType.Retry ||
+                event.type === GeminiEventType.Error ||
+                event.type === GeminiEventType.InvalidStream ||
+                event.type === GeminiEventType.UserCancelled ||
+                event.type === GeminiEventType.AgentExecutionStopped ||
+                event.type === GeminiEventType.ContextWindowWillOverflow ||
+                event.type === GeminiEventType.LoopDetected ||
+                event.type === GeminiEventType.MaxSessionTurns
+              ) {
+                toolCallRequests.length = 0;
+              }
               await currentTask.acceptAgentMessage(event);
             }
 

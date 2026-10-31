@@ -290,6 +290,106 @@ describe('GeminiCliSession sendStream()', () => {
     expect(mockClient.sendMessageStream).toHaveBeenCalledTimes(2);
   });
 
+  it('does not schedule tool calls when stream emits Error after ToolCallRequest', async () => {
+    const { GeminiEventType } = await import('@google/gemini-cli-core');
+
+    mockClient.sendMessageStream.mockImplementation(() =>
+      (async function* () {
+        yield {
+          type: GeminiEventType.ToolCallRequest,
+          value: {
+            callId: 'call-orphaned',
+            name: 'testTool',
+            args: { input: 'value' },
+          },
+        };
+        yield {
+          type: GeminiEventType.Error,
+          value: { error: { message: 'Mid-stream failure' } },
+        };
+      })(),
+    );
+
+    const session = new GeminiCliSession(
+      baseOptions,
+      'session-stream-error',
+      mockAgent,
+    );
+    const events = [];
+    for await (const event of session.sendStream('Use the tool')) {
+      events.push(event);
+    }
+
+    expect(events).toHaveLength(2);
+    expect(mockScheduleAgentTools).not.toHaveBeenCalled();
+    expect(mockClient.sendMessageStream).toHaveBeenCalledTimes(1);
+  });
+
+  it('discards tool calls from failed attempt when stream emits Retry', async () => {
+    const { GeminiEventType } = await import('@google/gemini-cli-core');
+
+    let callCount = 0;
+    mockClient.sendMessageStream.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        return (async function* () {
+          yield {
+            type: GeminiEventType.ToolCallRequest,
+            value: {
+              callId: 'call-stale',
+              name: 'staleTool',
+              args: {},
+            },
+          };
+          yield {
+            type: GeminiEventType.Retry,
+          };
+          yield {
+            type: GeminiEventType.ToolCallRequest,
+            value: {
+              callId: 'call-fresh',
+              name: 'freshTool',
+              args: {},
+            },
+          };
+        })();
+      }
+      return (async function* () {})();
+    });
+
+    mockScheduleAgentTools.mockResolvedValue([
+      {
+        response: {
+          responseParts: [
+            {
+              functionResponse: {
+                name: 'freshTool',
+                response: { result: 'done' },
+              },
+            },
+          ],
+        },
+      },
+    ]);
+
+    const session = new GeminiCliSession(
+      baseOptions,
+      'session-stream-retry',
+      mockAgent,
+    );
+    for await (const _event of session.sendStream('Use the tool')) {
+      // consume stream
+    }
+
+    expect(mockScheduleAgentTools).toHaveBeenCalledOnce();
+    expect(mockScheduleAgentTools.mock.calls[0][1]).toEqual([
+      expect.objectContaining({
+        callId: 'call-fresh',
+        name: 'freshTool',
+      }),
+    ]);
+  });
+
   it('calls setUserMemory and updateSystemInstruction when instructions is a function', async () => {
     const dynamicInstructions = vi
       .fn()

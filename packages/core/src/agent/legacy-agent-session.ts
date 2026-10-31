@@ -213,6 +213,12 @@ export class LegacyAgentProtocol implements AgentProtocol {
 
         if (event.type === GeminiEventType.ToolCallRequest) {
           toolCallRequests.push(event.value);
+        } else if (
+          event.type === GeminiEventType.Retry ||
+          event.type === GeminiEventType.LoopDetected
+        ) {
+          toolCallRequests.length = 0;
+          hasVisibleText = false;
         }
 
         if (event.type === GeminiEventType.Content) {

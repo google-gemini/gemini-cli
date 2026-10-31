@@ -2944,5 +2944,48 @@ describe('runNonInteractive', () => {
       expect(output).toContain('"type":"tool_result"');
       expect(output).toContain('"status":"success"');
     });
+
+    it('should discard buffered tool calls and partial JSON responseText on Retry', async () => {
+      const staleToolCall: ServerGeminiStreamEvent = {
+        type: GeminiEventType.ToolCallRequest,
+        value: {
+          callId: 'stale-tool-1',
+          name: 'staleTool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-retry',
+        },
+      };
+
+      const events: ServerGeminiStreamEvent[] = [
+        { type: GeminiEventType.Content, value: 'Stale partial response ' },
+        staleToolCall,
+        { type: GeminiEventType.Retry },
+        { type: GeminiEventType.Content, value: 'Fresh response' },
+        {
+          type: GeminiEventType.Finished,
+          value: { reason: undefined, usageMetadata: { totalTokenCount: 5 } },
+        },
+      ];
+
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(events),
+      );
+      vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
+      vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
+        MOCK_SESSION_METRICS,
+      );
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'Test retry reset',
+        prompt_id: 'prompt-id-retry',
+      });
+
+      expect(mockSchedulerSchedule).not.toHaveBeenCalled();
+      const parsed = JSON.parse(getWrittenOutput());
+      expect(parsed.response).toBe('Fresh response');
+    });
   });
 });
