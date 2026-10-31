@@ -2804,11 +2804,19 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
     expands).
   - `false`/`0` or unset: Use the built‑in prompt. See
     [System Prompt Override](../cli/system-prompt.md).
+- **`GEMINI_APPEND_SYSTEM_MD`**:
+  - Appends a Markdown file to the system prompt for this launch without
+    replacing the built‑in prompt. Treat the value as a path (relative/absolute
+    supported, `~` expands). Combined with `--append-system-prompt-file` and
+    `--append-system-prompt` in that order. See
+    [Appending instead of replacing](../cli/system-prompt.md#appending-instead-of-replacing).
 - **`GEMINI_WRITE_SYSTEM_MD`**:
   - Writes the current built‑in system prompt to a file for review.
   - `true`/`1`: Write to `./.gemini/system.md`. Otherwise treat the value as a
     path.
   - Run the CLI once with this set to generate the file.
+  - The written file is the base prompt only; it does not include text from
+    `GEMINI_APPEND_SYSTEM_MD` or the append flags.
 - **`SEATBELT_PROFILE`** (macOS specific):
   - Switches the Seatbelt (`sandbox-exec`) profile on macOS.
   - `permissive-open`: (Default) Denies operations by default, confining writes
@@ -2896,6 +2904,13 @@ for that specific session.
   - A comma-separated list of tool names that will bypass the confirmation
     dialog.
   - Example: `gemini --allowed-tools "ShellTool(git status)"`
+- **`--append-system-prompt <text>`**:
+  - Appends text to the system prompt for this session without replacing the
+    built-in prompt. See
+    [Appending instead of replacing](../cli/system-prompt.md#appending-instead-of-replacing).
+- **`--append-system-prompt-file <path>`**:
+  - Appends the contents of a file to the system prompt for this session.
+    Relative paths and `~` are resolved like `GEMINI_SYSTEM_MD`.
 - **`--approval-mode <mode>`**:
   - Sets the approval mode for tool calls. Available modes:
     - `default`: Prompt for approval on each tool call (default behavior)

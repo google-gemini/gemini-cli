@@ -17,6 +17,12 @@ export function resolvePathFromEnv(envVar?: string) {
   return resolvePathFromEnvImpl(envVar);
 }
 
+export {
+  collectAppendSystemPrompt,
+  readAppendSystemPromptFile,
+  renderAppendedSystemPrompt,
+} from '../prompts/utils.js';
+
 /**
  * Returns the core system prompt for the agent.
  */
