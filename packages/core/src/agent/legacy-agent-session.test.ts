@@ -444,6 +444,53 @@ describe('LegacyAgentSession', () => {
       expect(sendMock).toHaveBeenCalledTimes(2);
     });
 
+    it('drops tool calls streamed by a failed attempt on retry', async () => {
+      const sendMock = deps.client.sendMessageStream as ReturnType<
+        typeof vi.fn
+      >;
+      // First turn: the failed attempt streams a tool call, then the retry
+      // streams the call that actually belongs to the successful attempt.
+      sendMock.mockReturnValueOnce(
+        makeStream([
+          {
+            type: GeminiEventType.ToolCallRequest,
+            value: makeToolRequest('call-1', 'run_shell_command'),
+          },
+          { type: GeminiEventType.Retry },
+          {
+            type: GeminiEventType.ToolCallRequest,
+            value: makeToolRequest('call-2', 'read_file'),
+          },
+          {
+            type: GeminiEventType.Finished,
+            value: { reason: FinishReason.STOP, usageMetadata: undefined },
+          },
+        ]),
+      );
+      sendMock.mockReturnValueOnce(
+        makeStream([
+          { type: GeminiEventType.Content, value: 'Done!' },
+          {
+            type: GeminiEventType.Finished,
+            value: { reason: FinishReason.STOP, usageMetadata: undefined },
+          },
+        ]),
+      );
+
+      const scheduleMock = deps.scheduler.schedule as ReturnType<typeof vi.fn>;
+      scheduleMock.mockResolvedValueOnce([
+        makeCompletedToolCall('call-2', 'read_file', 'file contents'),
+      ]);
+
+      const session = new LegacyAgentSession(deps);
+      await session.send(makeMessageSend('read a file'));
+      await collectEvents(session);
+
+      expect(scheduleMock).toHaveBeenCalledTimes(1);
+      const scheduled = scheduleMock.mock.calls[0][0] as ToolCallRequestInfo[];
+      expect(scheduled.map((request) => request.callId)).toEqual(['call-2']);
+    });
+
     it('handles tool errors and sends error message in content', async () => {
       const sendMock = deps.client.sendMessageStream as ReturnType<
         typeof vi.fn
