@@ -68,6 +68,9 @@ const PRIVATE_NETWORK_REMEDIATION_HINT =
  * or loopback endpoint. The safe connector blocks private addresses, so
  * explicitly allowed endpoints keep the plain fetch.
  */
+// Reuse one agent: a fresh Agent per call would waste its connection pool.
+let sharedSafeAgent: ReturnType<typeof createSafeAgent> | undefined;
+
 export function getOAuthFetchDispatcher(options?: {
   allowLoopback?: boolean;
   allowPrivateNetwork?: boolean;
@@ -75,7 +78,8 @@ export function getOAuthFetchDispatcher(options?: {
   if (options?.allowLoopback || options?.allowPrivateNetwork) {
     return undefined;
   }
-  return createSafeAgent();
+  sharedSafeAgent ??= createSafeAgent();
+  return sharedSafeAgent;
 }
 
 /**

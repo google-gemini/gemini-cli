@@ -11,6 +11,7 @@ import ipaddr from 'ipaddr.js';
 import {
   OAuthUtils,
   OAuthSecurityError,
+  getOAuthFetchDispatcher,
   validateOAuthEndpointUrl,
   isLoopbackUrl,
   type OAuthAuthorizationServerMetadata,
@@ -829,5 +830,18 @@ describe('OAuthUtils', () => {
         ),
       ).rejects.toThrow(OAuthSecurityError);
     });
+  });
+});
+
+describe('getOAuthFetchDispatcher', () => {
+  it('returns the same agent instance across calls', () => {
+    expect(getOAuthFetchDispatcher()).toBe(getOAuthFetchDispatcher());
+  });
+
+  it('returns undefined for explicitly allowed loopback and private hosts', () => {
+    expect(getOAuthFetchDispatcher({ allowLoopback: true })).toBeUndefined();
+    expect(
+      getOAuthFetchDispatcher({ allowPrivateNetwork: true }),
+    ).toBeUndefined();
   });
 });
