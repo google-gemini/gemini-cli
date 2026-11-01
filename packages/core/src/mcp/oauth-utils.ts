@@ -10,6 +10,7 @@ import type { MCPOAuthConfig } from './oauth-provider.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
+  createSafeAgent,
   isAddressPrivate,
   isEnterprisePrivateAddress,
   isLoopbackHost,
@@ -61,6 +62,21 @@ export interface OAuthUrlValidationOptions {
 
 const PRIVATE_NETWORK_REMEDIATION_HINT =
   'Set "oauth.allowPrivateNetwork": true in settings.json for this MCP server if it is on a trusted private network.';
+
+/**
+ * Safe dispatcher for OAuth fetches, unless the caller allowed a private
+ * or loopback endpoint. The safe connector blocks private addresses, so
+ * explicitly allowed endpoints keep the plain fetch.
+ */
+export function getOAuthFetchDispatcher(options?: {
+  allowLoopback?: boolean;
+  allowPrivateNetwork?: boolean;
+}): ReturnType<typeof createSafeAgent> | undefined {
+  if (options?.allowLoopback || options?.allowPrivateNetwork) {
+    return undefined;
+  }
+  return createSafeAgent();
+}
 
 /**
  * Validates an OAuth endpoint URL against SSRF, scheme, and origin constraints per RFC 9728 Section 7.7.
@@ -278,7 +294,12 @@ export class OAuthUtils {
         allowPrivateNetwork: options?.allowPrivateNetwork,
       });
 
-      const response = await fetch(validatedUrl);
+      const dispatcher = getOAuthFetchDispatcher(options);
+      const response = dispatcher
+        ? await fetch(validatedUrl, {
+            dispatcher,
+          } as RequestInit & { dispatcher?: unknown })
+        : await fetch(validatedUrl);
       if (!response.ok) {
         return null;
       }
@@ -315,7 +336,12 @@ export class OAuthUtils {
         },
       );
 
-      const response = await fetch(validatedUrl);
+      const dispatcher = getOAuthFetchDispatcher(options);
+      const response = dispatcher
+        ? await fetch(validatedUrl, {
+            dispatcher,
+          } as RequestInit & { dispatcher?: unknown })
+        : await fetch(validatedUrl);
       if (!response.ok) {
         return null;
       }

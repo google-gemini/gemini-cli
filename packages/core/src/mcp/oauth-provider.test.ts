@@ -2483,5 +2483,98 @@ describe('MCPOAuthProvider', () => {
         allowLoopback: false,
       });
     });
+
+    it('passes a safe dispatcher for dynamic client registration to a public host', async () => {
+      const authProvider = new MCPOAuthProvider();
+      const providerWithAccess = authProvider as unknown as {
+        registerClient: (
+          registrationUrl: string,
+          config: MCPOAuthConfig,
+          redirectPort: number,
+          mcpServerUrl?: string,
+        ) => Promise<unknown>;
+      };
+
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify({
+            client_id: 'dynamic_client_id',
+            redirect_uris: ['http://localhost:7777/oauth/callback'],
+            grant_types: ['authorization_code', 'refresh_token'],
+            response_types: ['code'],
+            token_endpoint_auth_method: 'none',
+          }),
+          json: {
+            client_id: 'dynamic_client_id',
+            redirect_uris: ['http://localhost:7777/oauth/callback'],
+            grant_types: ['authorization_code', 'refresh_token'],
+            response_types: ['code'],
+            token_endpoint_auth_method: 'none',
+          },
+        }),
+      );
+
+      await providerWithAccess.registerClient(
+        'https://auth.example.com/register',
+        mockConfig,
+        7777,
+        'https://remote-mcp.example.com',
+      );
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://auth.example.com/register',
+        expect.objectContaining({
+          method: 'POST',
+          dispatcher: expect.any(Object),
+        }),
+      );
+    });
+
+    it('does not pass a dispatcher for dynamic client registration to an allowed loopback host', async () => {
+      const authProvider = new MCPOAuthProvider();
+      const providerWithAccess = authProvider as unknown as {
+        registerClient: (
+          registrationUrl: string,
+          config: MCPOAuthConfig,
+          redirectPort: number,
+          mcpServerUrl?: string,
+        ) => Promise<unknown>;
+      };
+
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify({
+            client_id: 'dynamic_client_id',
+            redirect_uris: ['http://localhost:7777/oauth/callback'],
+            grant_types: ['authorization_code', 'refresh_token'],
+            response_types: ['code'],
+            token_endpoint_auth_method: 'none',
+          }),
+          json: {
+            client_id: 'dynamic_client_id',
+            redirect_uris: ['http://localhost:7777/oauth/callback'],
+            grant_types: ['authorization_code', 'refresh_token'],
+            response_types: ['code'],
+            token_endpoint_auth_method: 'none',
+          },
+        }),
+      );
+
+      await providerWithAccess.registerClient(
+        'http://localhost:18080/register',
+        mockConfig,
+        7777,
+        'http://localhost:18080/mcp',
+      );
+
+      const init = mockFetch.mock.calls[0]?.[1] as {
+        dispatcher?: unknown;
+      };
+      expect(init).not.toHaveProperty('dispatcher');
+    });
   });
 });

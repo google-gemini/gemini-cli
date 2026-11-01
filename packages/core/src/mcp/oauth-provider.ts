@@ -14,6 +14,7 @@ import {
   OAuthUtils,
   ResourceMismatchError,
   OAuthSecurityError,
+  getOAuthFetchDispatcher,
   isLoopbackUrl,
   validateOAuthEndpointUrl,
 } from './oauth-utils.js';
@@ -130,13 +131,18 @@ export class MCPOAuthProvider {
       scope: config.scopes?.join(' ') || '',
     };
 
+    const dispatcher = getOAuthFetchDispatcher({
+      allowLoopback,
+      allowPrivateNetwork: config.allowPrivateNetwork,
+    });
     const response = await fetch(validatedRegistrationUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(registrationRequest),
-    });
+      ...(dispatcher ? { dispatcher } : {}),
+    } as RequestInit & { dispatcher?: unknown });
 
     if (!response.ok) {
       const errorText = await response.text();
