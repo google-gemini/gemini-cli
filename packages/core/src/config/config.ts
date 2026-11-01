@@ -652,6 +652,7 @@ export interface ConfigParameters {
   model: string;
   disableLoopDetection?: boolean;
   maxSessionTurns?: number;
+  requestTimeoutMs?: number;
   acpMode?: boolean;
   listSessions?: boolean;
   deleteSession?: string;
@@ -851,6 +852,7 @@ export class Config implements McpContext, AgentLoopContext {
   private _activeModel: string;
   private fallbackOverrides = new Map<string, string>();
   private readonly maxSessionTurns: number;
+  private readonly requestTimeoutMs: number | undefined;
   private readonly listSessions: boolean;
   private readonly deleteSession: string | undefined;
   private readonly listExtensions: boolean;
@@ -1254,6 +1256,7 @@ export class Config implements McpContext, AgentLoopContext {
     );
     ExecutionLifecycleService.setInjectionService(this.injectionService);
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
+    this.requestTimeoutMs = params.requestTimeoutMs;
     this.acpMode = params.acpMode ?? false;
     this.listSessions = params.listSessions ?? false;
     this.deleteSession = params.deleteSession;
@@ -3676,8 +3679,19 @@ export class Config implements McpContext, AgentLoopContext {
 
   /**
    * Returns the configured default request timeout in milliseconds.
+   *
+   * An explicit `model.requestTimeoutMs` setting wins over the experiment
+   * flag, so it also works for auth types that don't fetch experiments
+   * (e.g. Vertex AI).
    */
   getRequestTimeoutMs(): number | undefined {
+    if (
+      this.requestTimeoutMs !== undefined &&
+      Number.isFinite(this.requestTimeoutMs) &&
+      this.requestTimeoutMs > 0
+    ) {
+      return this.requestTimeoutMs;
+    }
     const flag =
       this.experiments?.flags?.[ExperimentFlags.DEFAULT_REQUEST_TIMEOUT];
     if (flag?.intValue !== undefined) {
