@@ -102,6 +102,22 @@ describe('resolveEnvVarsInString', () => {
     expect(result).toBe('Value: ');
   });
 
+  it('should use default value when environment variable is set but empty', () => {
+    vi.stubEnv('EMPTY_VAR', '');
+    const result = resolveEnvVarsInString('Value: ${EMPTY_VAR:-fallback}');
+    expect(result).toBe('Value: fallback');
+  });
+  it('should preserve empty value when no default is provided', () => {
+    vi.stubEnv('EMPTY_VAR', '');
+    expect(resolveEnvVarsInString('Value: ${EMPTY_VAR}')).toBe('Value: ');
+  });
+  it('should use default value when custom env value is empty', () => {
+    const result = resolveEnvVarsInString('Value: ${EMPTY_VAR:-fallback}', {
+      EMPTY_VAR: '',
+    });
+    expect(result).toBe('Value: fallback');
+  });
+
   it('should correctly handle default values that contain colons or dashes', () => {
     const result = resolveEnvVarsInString(
       'Value: ${MISSING_VAR:-val:-123-abc}',
