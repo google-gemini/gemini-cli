@@ -145,14 +145,20 @@ export function useToolScheduler(
 
         // For non-root schedulers, we only show tool calls that:
         // 1. Are currently awaiting approval.
-        // 2. Were previously shown (e.g., they are now executing or completed).
-        // This prevents "thinking" tools (reads/searches) from flickering in the UI
-        // unless they specifically required user interaction.
+        // 2. Are currently executing. The task tree builds its hierarchy from
+        //    the calls present in state, so dropping a first-seen executing
+        //    call would hide that piece of subagent work entirely.
+        // 3. Were previously shown (e.g., they are now completed).
+        // Calls that have not started yet (Scheduled/Validating) stay hidden
+        // until they reach one of the states above. This prevents "thinking"
+        // tools (reads/searches) from flickering in the UI unless they
+        // specifically required user interaction.
         const filteredToolCalls = isRoot
           ? event.toolCalls
           : event.toolCalls.filter(
               (tc) =>
                 tc.status === CoreToolCallStatus.AwaitingApproval ||
+                tc.status === CoreToolCallStatus.Executing ||
                 prevCallIds.has(tc.request.callId),
             );
 
