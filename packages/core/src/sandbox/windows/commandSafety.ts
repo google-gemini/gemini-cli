@@ -14,6 +14,10 @@ import {
   stripShellWrapper,
 } from '../../utils/shell-utils.js';
 import { isSubpath, resolveToRealPath } from '../../utils/paths.js';
+import {
+  isDangerousGitCommand,
+  isKnownSafeGitCommand,
+} from '../utils/commandSafety.js';
 
 /**
  * Determines if a command is strictly approved for execution on Windows.
@@ -293,15 +297,29 @@ export function isKnownSafeCommand(
     return true;
   }
 
-  // We allow git on Windows if it's read-only, using the same logic as POSIX
+  // We allow git on Windows if it's read-only, using the same logic as POSIX.
+  // Global options before the subcommand (e.g. `-C`, `--git-dir` or
+  // `--exec-path`) change which repository, config or helper programs git
+  // uses, so those invocations still require confirmation.
   if (cmd === 'git') {
-    // For simplicity in this branch, we'll allow standard git read operations
-    // In a full implementation, we'd port the sub-command validation too.
-    const sub = args[1]?.toLowerCase();
-    return ['status', 'log', 'diff', 'show', 'branch'].includes(sub);
+    return (
+      !args[1]?.startsWith('-') &&
+      !hasPowerShellEscape(args) &&
+      isKnownSafeGitCommand(args)
+    );
   }
 
   return false;
+}
+
+/**
+ * Checks if any argument contains a PowerShell escape character (backtick).
+ * PowerShell removes these before invoking native commands, so an argument
+ * like --out`put reaches the program as --output and cannot be validated
+ * from its parsed form.
+ */
+function hasPowerShellEscape(args: string[]): boolean {
+  return args.some((arg) => arg.includes('`'));
 }
 
 /**
@@ -316,6 +334,10 @@ export function isDangerousCommand(
   let cmd = args[0].toLowerCase();
   if (cmd.endsWith('.exe')) {
     cmd = cmd.slice(0, -4);
+  }
+
+  if (cmd === 'git') {
+    return hasPowerShellEscape(args) || isDangerousGitCommand(args);
   }
 
   const dangerous = new Set([

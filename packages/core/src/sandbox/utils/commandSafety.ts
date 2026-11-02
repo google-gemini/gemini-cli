@@ -553,35 +553,7 @@ function isSafeToCallWithExec(
   }
 
   if (cmd === 'git') {
-    if (gitHasConfigOverrideGlobalOption(args)) {
-      return false;
-    }
-
-    const { idx, subcommand } = findGitSubcommand(args, [
-      'status',
-      'log',
-      'diff',
-      'show',
-      'branch',
-    ]);
-    if (!subcommand) {
-      return false;
-    }
-
-    const subcommandArgs = args.slice(idx + 1);
-
-    if (['status', 'log', 'diff', 'show'].includes(subcommand)) {
-      return gitSubcommandArgsAreReadOnly(subcommandArgs);
-    }
-
-    if (subcommand === 'branch') {
-      return (
-        gitSubcommandArgsAreReadOnly(subcommandArgs) &&
-        gitBranchIsReadOnly(subcommandArgs)
-      );
-    }
-
-    return false;
+    return isKnownSafeGitCommand(args);
   }
 
   if (cmd === 'sed') {
@@ -597,6 +569,87 @@ function isSafeToCallWithExec(
       return true;
     }
     return false;
+  }
+
+  return false;
+}
+
+/**
+ * Checks if a git command only performs read-only operations (`status`, `log`,
+ * `diff`, `show`, or listing branches) without config overrides or flags that
+ * could cause mutations or execute arbitrary commands.
+ *
+ * @param args - The git command and its arguments (e.g., ['git', 'status']).
+ * @returns true if the git command is strictly read-only and safe.
+ */
+export function isKnownSafeGitCommand(args: string[]): boolean {
+  if (gitHasConfigOverrideGlobalOption(args)) {
+    return false;
+  }
+
+  const { idx, subcommand } = findGitSubcommand(args, [
+    'status',
+    'log',
+    'diff',
+    'show',
+    'branch',
+  ]);
+  if (!subcommand) {
+    return false;
+  }
+
+  const subcommandArgs = args.slice(idx + 1);
+
+  if (['status', 'log', 'diff', 'show'].includes(subcommand)) {
+    return gitSubcommandArgsAreReadOnly(subcommandArgs);
+  }
+
+  if (subcommand === 'branch') {
+    return (
+      gitSubcommandArgsAreReadOnly(subcommandArgs) &&
+      gitBranchIsReadOnly(subcommandArgs)
+    );
+  }
+
+  return false;
+}
+
+/**
+ * Checks if a git command uses config overrides, or passes flags that could
+ * cause mutations or execute arbitrary commands to an otherwise read-only
+ * subcommand (e.g., `git diff --output=<file>` or `git branch -D <name>`).
+ *
+ * @param args - The git command and its arguments.
+ * @returns true if the git command is identified as dangerous.
+ */
+export function isDangerousGitCommand(args: string[]): boolean {
+  if (gitHasConfigOverrideGlobalOption(args)) {
+    return true;
+  }
+
+  const { idx, subcommand } = findGitSubcommand(args, [
+    'status',
+    'log',
+    'diff',
+    'show',
+    'branch',
+  ]);
+  if (!subcommand) {
+    // It's a git command we don't recognize as explicitly safe.
+    return false;
+  }
+
+  const subcommandArgs = args.slice(idx + 1);
+
+  if (['status', 'log', 'diff', 'show'].includes(subcommand)) {
+    return !gitSubcommandArgsAreReadOnly(subcommandArgs);
+  }
+
+  if (subcommand === 'branch') {
+    return !(
+      gitSubcommandArgsAreReadOnly(subcommandArgs) &&
+      gitBranchIsReadOnly(subcommandArgs)
+    );
   }
 
   return false;
@@ -838,36 +891,7 @@ export function isDangerousCommand(
   }
 
   if (cmd === 'git') {
-    if (gitHasConfigOverrideGlobalOption(args)) {
-      return true;
-    }
-
-    const { idx, subcommand } = findGitSubcommand(args, [
-      'status',
-      'log',
-      'diff',
-      'show',
-      'branch',
-    ]);
-    if (!subcommand) {
-      // It's a git command we don't recognize as explicitly safe.
-      return false;
-    }
-
-    const subcommandArgs = args.slice(idx + 1);
-
-    if (['status', 'log', 'diff', 'show'].includes(subcommand)) {
-      return !gitSubcommandArgsAreReadOnly(subcommandArgs);
-    }
-
-    if (subcommand === 'branch') {
-      return !(
-        gitSubcommandArgsAreReadOnly(subcommandArgs) &&
-        gitBranchIsReadOnly(subcommandArgs)
-      );
-    }
-
-    return false;
+    return isDangerousGitCommand(args);
   }
 
   if (cmd === 'base64') {
