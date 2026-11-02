@@ -28,12 +28,18 @@ const ALLOWED_MODELS = [
   'ggml-large-v3-turbo-q8_0.bin',
 ];
 
+interface InFlightDownload {
+  promise: Promise<void>;
+  controller: AbortController;
+  activeCallers: number;
+}
+
 /**
  * Manages Whisper models (checking existence, downloading).
  */
 export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents> {
   private readonly modelsDir: string;
-  private readonly inFlightDownloads = new Map<string, Promise<void>>();
+  private readonly inFlightDownloads = new Map<string, InFlightDownload>();
 
   constructor() {
     super();
@@ -59,18 +65,66 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
   async downloadModel(modelName: string, signal?: AbortSignal): Promise<void> {
     this.validateModelName(modelName);
 
-    const existing = this.inFlightDownloads.get(modelName);
-    if (existing) {
-      return existing;
+    if (signal?.aborted) {
+      throw this.getAbortError(signal);
     }
 
-    const downloadPromise = this.executeDownload(modelName, signal).finally(
-      () => {
+    let inFlight = this.inFlightDownloads.get(modelName);
+    if (!inFlight) {
+      const controller = new AbortController();
+      const promise = this.executeDownload(
+        modelName,
+        controller.signal,
+      ).finally(() => {
         this.inFlightDownloads.delete(modelName);
-      },
-    );
-    this.inFlightDownloads.set(modelName, downloadPromise);
-    return downloadPromise;
+      });
+      promise.catch(() => {});
+      inFlight = { promise, controller, activeCallers: 0 };
+      this.inFlightDownloads.set(modelName, inFlight);
+    }
+
+    inFlight.activeCallers += 1;
+    const currentInFlight = inFlight;
+
+    if (!signal) {
+      return currentInFlight.promise;
+    }
+
+    return new Promise<void>((resolve, reject) => {
+      let settled = false;
+      const onAbort = () => {
+        if (settled) return;
+        const abortError = this.getAbortError(signal);
+        currentInFlight.activeCallers -= 1;
+        if (currentInFlight.activeCallers <= 0) {
+          currentInFlight.controller.abort(abortError);
+        } else {
+          settled = true;
+          reject(abortError);
+        }
+      };
+      signal.addEventListener('abort', onAbort, { once: true });
+      currentInFlight.promise.then(
+        () => {
+          if (settled) return;
+          settled = true;
+          signal.removeEventListener('abort', onAbort);
+          resolve();
+        },
+        (err) => {
+          if (settled) return;
+          settled = true;
+          signal.removeEventListener('abort', onAbort);
+          reject(err);
+        },
+      );
+    });
+  }
+
+  private getAbortError(signal?: AbortSignal): Error {
+    return signal?.reason instanceof Error
+      ? signal.reason
+      : new DOMException('The operation was aborted.', 'AbortError');
   }
 
   private async executeDownload(
@@ -146,16 +200,19 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
       writer.destroy(abortError);
     };
     signal?.addEventListener('abort', onAbort, { once: true });
+    if (signal?.aborted) {
+      onAbort();
+    }
 
     try {
       while (true) {
         signal?.throwIfAborted();
         const { done, value } = await reader.read();
-        if (done) break;
         if (streamError) {
           throw streamError;
         }
         signal?.throwIfAborted();
+        if (done) break;
 
         transferred += value.length;
         const writeOk = writer.write(value);

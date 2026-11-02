@@ -706,10 +706,58 @@ describe('WhisperModelManager', () => {
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining(modelName),
-      expect.objectContaining({ signal: controller.signal }),
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     expect(manager.isModelInstalled(modelName)).toBe(false);
     expect(fs.existsSync(modelPath)).toBe(false);
     expect(getDownloadingFiles(modelPath)).toEqual([]);
+  });
+
+  it('respects AbortSignal for individual callers without aborting shared download while other callers remain active', async () => {
+    const chunk1 = new Uint8Array([1, 2, 3, 4]);
+    const chunk2 = new Uint8Array([5, 6, 7, 8]);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      createMockResponse({
+        contentLength: 8,
+        chunks: [chunk1, chunk2],
+        chunkDelayMs: 30,
+      }),
+    );
+
+    const manager = new WhisperModelManager();
+    const modelName = 'ggml-tiny.en.bin';
+
+    const firstController = new AbortController();
+    const firstPromise = manager.downloadModel(
+      modelName,
+      firstController.signal,
+    );
+
+    const secondController = new AbortController();
+    const secondPromise = manager.downloadModel(
+      modelName,
+      secondController.signal,
+    );
+
+    const thirdPromise = manager.downloadModel(modelName);
+
+    // Pre-aborted signal on deduplicated call rejects immediately
+    const preAbortedController = new AbortController();
+    preAbortedController.abort(new Error('Already aborted caller'));
+    await expect(
+      manager.downloadModel(modelName, preAbortedController.signal),
+    ).rejects.toThrow('Already aborted caller');
+
+    // First caller aborting rejects only first caller while others remain active
+    firstController.abort(new Error('First caller cancelled'));
+    await expect(firstPromise).rejects.toThrow('First caller cancelled');
+
+    // Second caller aborting rejects only second caller while third caller remains active
+    secondController.abort(new Error('Second caller cancelled'));
+    await expect(secondPromise).rejects.toThrow('Second caller cancelled');
+
+    // Third caller still completes normally
+    await thirdPromise;
+    expect(manager.isModelInstalled(modelName)).toBe(true);
   });
 });
