@@ -13,10 +13,13 @@ import {
   type GeminiCLIExtension,
 } from '@google/gemini-cli-core';
 import { ExtensionUpdateState } from '../../ui/state/extensions.js';
+import * as crypto from 'node:crypto';
+import type { IncomingMessage } from 'node:http';
 import * as os from 'node:os';
 import * as https from 'node:https';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { pipeline } from 'node:stream/promises';
 import * as tar from 'tar';
 import extract from 'extract-zip';
 import { fetchJson, getGitHubToken } from './github_fetch.js';
@@ -533,35 +536,130 @@ export async function downloadFile(
     headers['Authorization'] = `token ${token}`;
   }
 
-  return new Promise((resolve, reject) => {
-    https
-      .get(url, { headers }, (res) => {
+  let tempDest: string | undefined;
+  let downloadPipeline: Promise<void> | undefined;
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      let settled = false;
+      let isRedirecting = false;
+      let responseStream: IncomingMessage | undefined;
+
+      const settleResolve = (): void => {
+        if (!settled) {
+          settled = true;
+          resolve();
+        }
+      };
+
+      const settleReject = (error: unknown): void => {
+        if (!settled) {
+          settled = true;
+          reject(
+            error instanceof Error ? error : new Error(getErrorMessage(error)),
+          );
+        }
+      };
+
+      const req = https.get(url, { headers }, (res) => {
+        res.on('error', (error) => {
+          if (!isRedirecting) {
+            settleReject(error);
+          }
+        });
+
         if (res.statusCode === 302 || res.statusCode === 301) {
           if (redirectCount >= 10) {
-            return reject(new Error('Too many redirects'));
+            res.resume?.();
+            settleReject(new Error('Too many redirects'));
+            return;
           }
 
           if (!res.headers.location) {
-            return reject(
+            res.resume?.();
+            settleReject(
               new Error('Redirect response missing Location header'),
             );
+            return;
           }
-          downloadFile(res.headers.location, dest, options, redirectCount + 1)
-            .then(resolve)
-            .catch(reject);
+
+          isRedirecting = true;
+          res.resume?.();
+          void downloadFile(
+            res.headers.location,
+            dest,
+            options,
+            redirectCount + 1,
+          ).then(settleResolve, settleReject);
           return;
         }
+
         if (res.statusCode !== 200) {
-          return reject(
+          res.resume?.();
+          settleReject(
             new Error(`Request failed with status code ${res.statusCode}`),
           );
+          return;
         }
-        const file = fs.createWriteStream(dest);
-        res.pipe(file);
-        file.on('finish', () => file.close(resolve as () => void));
-      })
-      .on('error', reject);
-  });
+
+        responseStream = res;
+        const currentTempDest = `${dest}.${crypto.randomUUID()}.tmp`;
+        tempDest = currentTempDest;
+
+        let file: fs.WriteStream;
+        try {
+          file = fs.createWriteStream(currentTempDest);
+        } catch (error) {
+          res.destroy?.();
+          settleReject(error);
+          return;
+        }
+
+        // Settle synchronously in true emission order while also keeping an
+        // error listener attached so secondary teardown errors never go unhandled.
+        file.on('error', settleReject);
+
+        downloadPipeline = pipeline(res, file);
+        void downloadPipeline.then(() => {
+          if (res.complete === false) {
+            settleReject(
+              new Error(`Response ended prematurely while downloading ${url}`),
+            );
+            return;
+          }
+          settleResolve();
+        }, settleReject);
+      });
+
+      req.on('error', (error) => {
+        if (isRedirecting) {
+          return;
+        }
+        responseStream?.destroy?.();
+        settleReject(error);
+      });
+    });
+
+    if (tempDest) {
+      await fs.promises.rename(tempDest, dest);
+    }
+  } catch (error) {
+    if (downloadPipeline) {
+      try {
+        await downloadPipeline;
+      } catch {
+        // Already captured via settleReject; wait for file handle to close before unlinking.
+      }
+    }
+    if (tempDest) {
+      try {
+        await fs.promises.unlink(tempDest);
+      } catch {
+        // Ignore cleanup errors if the temporary file was never created or already removed.
+      }
+    }
+    throw error;
+  }
 }
 
 export async function extractFile(file: string, dest: string): Promise<void> {

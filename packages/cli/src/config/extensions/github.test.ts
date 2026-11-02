@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   cloneFromGit,
   tryParseGithubUrl,
@@ -25,6 +25,8 @@ import * as extract from 'extract-zip';
 import type { ExtensionManager } from '../extension-manager.js';
 import { fetchJson } from './github_fetch.js';
 import { EventEmitter } from 'node:events';
+import type { ClientRequest, IncomingMessage } from 'node:http';
+import { PassThrough } from 'node:stream';
 import type {
   GeminiCLIExtension,
   ExtensionInstallMetadata,
@@ -63,8 +65,31 @@ vi.mock('../settings.js', () => ({
 }));
 
 describe('github.ts', () => {
+  function createMockResponse(
+    statusCode = 200,
+    headers: Record<string, string> = {},
+    complete = true,
+  ): IncomingMessage & PassThrough {
+    const stream = new PassThrough();
+    return Object.assign(stream, {
+      statusCode,
+      headers,
+      complete,
+    }) as unknown as IncomingMessage & PassThrough;
+  }
+
+  function createMockWriteStream(): fs.WriteStream {
+    return new PassThrough() as unknown as fs.WriteStream;
+  }
+
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(fs.promises.rename).mockResolvedValue(undefined);
+    vi.mocked(fs.promises.unlink).mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   describe('cloneFromGit', () => {
@@ -398,20 +423,17 @@ describe('github.ts', () => {
 
       // Mock https.get and fs.createWriteStream for downloadFile
       const mockReq = new EventEmitter();
-      const mockRes =
-        new EventEmitter() as unknown as import('node:http').IncomingMessage;
-      Object.assign(mockRes, { statusCode: 200, pipe: vi.fn() });
+      const mockRes = createMockResponse(200);
 
       vi.mocked(https.get).mockImplementation((url, options, cb) => {
         if (typeof options === 'function') {
           cb = options;
         }
         if (cb) cb(mockRes);
-        return mockReq as unknown as import('node:http').ClientRequest;
+        return mockReq as unknown as ClientRequest;
       });
 
-      const mockStream = new EventEmitter() as unknown as fs.WriteStream;
-      Object.assign(mockStream, { close: vi.fn((cb) => cb && cb()) });
+      const mockStream = createMockWriteStream();
       vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
 
       // Mock fs.promises.readdir to return empty array (no cleanup needed)
@@ -434,9 +456,8 @@ describe('github.ts', () => {
         () => vi.mocked(fs.createWriteStream).mock.calls.length > 0,
       );
 
-      // Trigger stream events to complete download
-      mockRes.emit('end');
-      mockStream.emit('finish');
+      // Complete response stream to finish pipeline
+      mockRes.end('archive-bytes');
 
       await promise;
 
@@ -460,20 +481,17 @@ describe('github.ts', () => {
 
       // Mock https.get and fs.createWriteStream for downloadFile
       const mockReq = new EventEmitter();
-      const mockRes =
-        new EventEmitter() as unknown as import('node:http').IncomingMessage;
-      Object.assign(mockRes, { statusCode: 200, pipe: vi.fn() });
+      const mockRes = createMockResponse(200);
 
       vi.mocked(https.get).mockImplementation((url, options, cb) => {
         if (typeof options === 'function') {
           cb = options;
         }
         if (cb) cb(mockRes);
-        return mockReq as unknown as import('node:http').ClientRequest;
+        return mockReq as unknown as ClientRequest;
       });
 
-      const mockStream = new EventEmitter() as unknown as fs.WriteStream;
-      Object.assign(mockStream, { close: vi.fn((cb) => cb && cb()) });
+      const mockStream = createMockWriteStream();
       vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
 
       // Mock fs.promises.readdir to return empty array
@@ -496,9 +514,8 @@ describe('github.ts', () => {
         () => vi.mocked(fs.createWriteStream).mock.calls.length > 0,
       );
 
-      // Trigger stream events to complete download
-      mockRes.emit('end');
-      mockStream.emit('finish');
+      // Complete response stream to finish pipeline
+      mockRes.end('tarball-bytes');
 
       await promise;
 
@@ -511,6 +528,58 @@ describe('github.ts', () => {
         }),
         expect.anything(),
       );
+    });
+
+    it('should return failed to download asset when download stream errors', async () => {
+      vi.mocked(fetchJson).mockResolvedValue({
+        tag_name: 'v1.0.0',
+        assets: [{ name: 'asset.tar.gz', url: 'http://asset.url' }],
+      });
+      vi.mocked(os.platform).mockReturnValue('linux');
+      vi.mocked(os.arch).mockReturnValue('x64');
+
+      const mockReq = new EventEmitter();
+      const mockRes = createMockResponse(200);
+
+      vi.mocked(https.get).mockImplementation((url, options, cb) => {
+        if (typeof options === 'function') {
+          cb = options;
+        }
+        if (cb) cb(mockRes);
+        return mockReq as unknown as ClientRequest;
+      });
+
+      const mockStream = createMockWriteStream();
+      vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
+
+      const promise = downloadFromGitHubRelease(
+        {
+          type: 'github-release',
+          source: 'owner/repo',
+          ref: 'v1.0.0',
+        } as unknown as ExtensionInstallMetadata,
+        '/dest',
+        { owner: 'owner', repo: 'repo' },
+      );
+
+      await vi.waitUntil(
+        () => vi.mocked(fs.createWriteStream).mock.calls.length > 0,
+      );
+
+      mockStream.emit('error', new Error('ENOSPC: no space left on device'));
+
+      const result = await promise;
+      expect(result).toEqual({
+        failureReason: 'failed to download asset',
+        success: false,
+        type: 'github-release',
+        tagName: 'v1.0.0',
+        errorMessage: expect.stringContaining(
+          'ENOSPC: no space left on device',
+        ),
+      });
+      expect(fs.promises.unlink).toHaveBeenCalledOnce();
+      expect(fs.promises.rename).not.toHaveBeenCalled();
     });
   });
 
@@ -533,82 +602,74 @@ describe('github.ts', () => {
   });
 
   describe('downloadFile', () => {
-    it('should download file successfully', async () => {
+    it('should download file successfully via temporary file and atomic rename', async () => {
       const mockReq = new EventEmitter();
-      const mockRes =
-        new EventEmitter() as unknown as import('node:http').IncomingMessage;
-      Object.assign(mockRes, { statusCode: 200, pipe: vi.fn() });
+      const mockRes = createMockResponse(200);
 
       vi.mocked(https.get).mockImplementation((url, options, cb) => {
         if (typeof options === 'function') {
           cb = options;
         }
         if (cb) cb(mockRes);
-        return mockReq as unknown as import('node:http').ClientRequest;
+        return mockReq as unknown as ClientRequest;
       });
 
-      const mockStream = new EventEmitter() as unknown as fs.WriteStream;
-      Object.assign(mockStream, { close: vi.fn((cb) => cb && cb()) });
+      const mockStream = createMockWriteStream();
       vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
 
       const promise = downloadFile('url', '/dest');
-      mockRes.emit('end');
-      mockStream.emit('finish');
+      mockRes.end('file-contents');
 
       await expect(promise).resolves.toBeUndefined();
+      expect(fs.createWriteStream).toHaveBeenCalledOnce();
+      const tempPath = vi.mocked(fs.createWriteStream).mock.calls[0][0];
+      expect(tempPath).toMatch(/^\/dest\..+\.tmp$/);
+      expect(fs.promises.rename).toHaveBeenCalledWith(tempPath, '/dest');
+      expect(fs.promises.unlink).not.toHaveBeenCalled();
     });
 
     it('should fail on non-200 status', async () => {
       const mockReq = new EventEmitter();
-      const mockRes =
-        new EventEmitter() as unknown as import('node:http').IncomingMessage;
-      Object.assign(mockRes, { statusCode: 404 });
+      const mockRes = createMockResponse(404);
+      const resumeSpy = vi.spyOn(mockRes, 'resume');
 
       vi.mocked(https.get).mockImplementation((url, options, cb) => {
         if (typeof options === 'function') {
           cb = options;
         }
         if (cb) cb(mockRes);
-        return mockReq as unknown as import('node:http').ClientRequest;
+        return mockReq as unknown as ClientRequest;
       });
 
       await expect(downloadFile('url', '/dest')).rejects.toThrow(
         'Request failed with status code 404',
       );
+      expect(resumeSpy).toHaveBeenCalledOnce();
+      expect(fs.createWriteStream).not.toHaveBeenCalled();
+      expect(fs.promises.unlink).not.toHaveBeenCalled();
     });
 
     it('should follow redirects', async () => {
-      const mockReq = new EventEmitter();
-      const mockResRedirect =
-        new EventEmitter() as unknown as import('node:http').IncomingMessage;
-      Object.assign(mockResRedirect, {
-        statusCode: 302,
-        headers: { location: 'new-url' },
-      });
-
-      const mockResSuccess =
-        new EventEmitter() as unknown as import('node:http').IncomingMessage;
-      Object.assign(mockResSuccess, { statusCode: 200, pipe: vi.fn() });
+      const mockResRedirect = createMockResponse(302, { location: 'new-url' });
+      const mockResSuccess = createMockResponse(200);
 
       vi.mocked(https.get)
         .mockImplementationOnce((url, options, cb) => {
           if (typeof options === 'function') cb = options;
           if (cb) cb(mockResRedirect);
-          return mockReq as unknown as import('node:http').ClientRequest;
+          return new EventEmitter() as unknown as ClientRequest;
         })
         .mockImplementationOnce((url, options, cb) => {
           if (typeof options === 'function') cb = options;
           if (cb) cb(mockResSuccess);
-          return mockReq as unknown as import('node:http').ClientRequest;
+          return new EventEmitter() as unknown as ClientRequest;
         });
 
-      const mockStream = new EventEmitter() as unknown as fs.WriteStream;
-      Object.assign(mockStream, { close: vi.fn((cb) => cb && cb()) });
+      const mockStream = createMockWriteStream();
       vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
 
       const promise = downloadFile('url', '/dest');
-      mockResSuccess.emit('end');
-      mockStream.emit('finish');
+      mockResSuccess.end('redirected-contents');
 
       await expect(promise).resolves.toBeUndefined();
       expect(https.get).toHaveBeenCalledTimes(2);
@@ -617,21 +678,15 @@ describe('github.ts', () => {
         expect.anything(),
         expect.anything(),
       );
+      expect(fs.createWriteStream).toHaveBeenCalledOnce();
+      expect(fs.promises.rename).toHaveBeenCalledOnce();
     });
 
     it('should fail after too many redirects', async () => {
-      const mockReq = new EventEmitter();
-      const mockResRedirect =
-        new EventEmitter() as unknown as import('node:http').IncomingMessage;
-      Object.assign(mockResRedirect, {
-        statusCode: 302,
-        headers: { location: 'new-url' },
-      });
-
       vi.mocked(https.get).mockImplementation((url, options, cb) => {
         if (typeof options === 'function') cb = options;
-        if (cb) cb(mockResRedirect);
-        return mockReq as unknown as import('node:http').ClientRequest;
+        if (cb) cb(createMockResponse(302, { location: 'new-url' }));
+        return new EventEmitter() as unknown as ClientRequest;
       });
 
       await expect(downloadFile('url', '/dest')).rejects.toThrow(
@@ -641,17 +696,12 @@ describe('github.ts', () => {
 
     it('should fail if redirect location is missing', async () => {
       const mockReq = new EventEmitter();
-      const mockResRedirect =
-        new EventEmitter() as unknown as import('node:http').IncomingMessage;
-      Object.assign(mockResRedirect, {
-        statusCode: 302,
-        headers: {}, // No location
-      });
+      const mockResRedirect = createMockResponse(302, {});
 
       vi.mocked(https.get).mockImplementation((url, options, cb) => {
         if (typeof options === 'function') cb = options;
         if (cb) cb(mockResRedirect);
-        return mockReq as unknown as import('node:http').ClientRequest;
+        return mockReq as unknown as ClientRequest;
       });
 
       await expect(downloadFile('url', '/dest')).rejects.toThrow(
@@ -661,25 +711,21 @@ describe('github.ts', () => {
 
     it('should pass custom headers', async () => {
       const mockReq = new EventEmitter();
-      const mockRes =
-        new EventEmitter() as unknown as import('node:http').IncomingMessage;
-      Object.assign(mockRes, { statusCode: 200, pipe: vi.fn() });
+      const mockRes = createMockResponse(200);
 
       vi.mocked(https.get).mockImplementation((url, options, cb) => {
         if (typeof options === 'function') cb = options;
         if (cb) cb(mockRes);
-        return mockReq as unknown as import('node:http').ClientRequest;
+        return mockReq as unknown as ClientRequest;
       });
 
-      const mockStream = new EventEmitter() as unknown as fs.WriteStream;
-      Object.assign(mockStream, { close: vi.fn((cb) => cb && cb()) });
+      const mockStream = createMockWriteStream();
       vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
 
       const promise = downloadFile('url', '/dest', {
         headers: { 'X-Custom': 'value' },
       });
-      mockRes.emit('end');
-      mockStream.emit('finish');
+      mockRes.end('data');
 
       await expect(promise).resolves.toBeUndefined();
       expect(https.get).toHaveBeenCalledWith(
@@ -689,6 +735,227 @@ describe('github.ts', () => {
         }),
         expect.anything(),
       );
+    });
+
+    it('should reject and remove partial temp file when response stream emits an error', async () => {
+      const mockReq = new EventEmitter();
+      const mockRes = createMockResponse(200);
+
+      vi.mocked(https.get).mockImplementation((url, options, cb) => {
+        if (typeof options === 'function') cb = options;
+        if (cb) cb(mockRes);
+        return mockReq as unknown as ClientRequest;
+      });
+
+      const mockStream = createMockWriteStream();
+      vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
+
+      const promise = downloadFile('url', '/dest');
+      mockRes.write('partial-bytes');
+      mockRes.emit('error', new Error('Mid-transfer connection reset'));
+
+      await expect(promise).rejects.toThrow('Mid-transfer connection reset');
+      const tempPath = vi.mocked(fs.createWriteStream).mock.calls[0][0];
+      expect(mockStream.destroyed).toBe(true);
+      expect(fs.promises.rename).not.toHaveBeenCalled();
+      expect(fs.promises.unlink).toHaveBeenCalledWith(tempPath);
+    });
+
+    it('should reject, tear down response stream, and remove partial temp file when write stream emits an error', async () => {
+      const mockReq = new EventEmitter();
+      const mockRes = createMockResponse(200);
+
+      vi.mocked(https.get).mockImplementation((url, options, cb) => {
+        if (typeof options === 'function') cb = options;
+        if (cb) cb(mockRes);
+        return mockReq as unknown as ClientRequest;
+      });
+
+      const mockStream = createMockWriteStream();
+      vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
+
+      const promise = downloadFile('url', '/dest');
+      mockStream.emit('error', new Error('ENOSPC: no space left on device'));
+
+      await expect(promise).rejects.toThrow('ENOSPC: no space left on device');
+      const tempPath = vi.mocked(fs.createWriteStream).mock.calls[0][0];
+      expect(mockRes.destroyed).toBe(true);
+      expect(fs.promises.rename).not.toHaveBeenCalled();
+      expect(fs.promises.unlink).toHaveBeenCalledWith(tempPath);
+    });
+
+    it('should reject and remove partial temp file when response closes prematurely before end', async () => {
+      const mockReq = new EventEmitter();
+      const mockRes = createMockResponse(200);
+
+      vi.mocked(https.get).mockImplementation((url, options, cb) => {
+        if (typeof options === 'function') cb = options;
+        if (cb) cb(mockRes);
+        return mockReq as unknown as ClientRequest;
+      });
+
+      const mockStream = createMockWriteStream();
+      vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
+
+      const promise = downloadFile('url', '/dest');
+      mockRes.write('partial-bytes');
+      mockRes.destroy();
+
+      await expect(promise).rejects.toThrow('Premature close');
+      const tempPath = vi.mocked(fs.createWriteStream).mock.calls[0][0];
+      expect(fs.promises.rename).not.toHaveBeenCalled();
+      expect(fs.promises.unlink).toHaveBeenCalledWith(tempPath);
+    });
+
+    it('should reject and remove partial temp file when response ends with complete === false', async () => {
+      const mockReq = new EventEmitter();
+      const mockRes = createMockResponse(200, {}, false);
+
+      vi.mocked(https.get).mockImplementation((url, options, cb) => {
+        if (typeof options === 'function') cb = options;
+        if (cb) cb(mockRes);
+        return mockReq as unknown as ClientRequest;
+      });
+
+      const mockStream = createMockWriteStream();
+      vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
+
+      const promise = downloadFile('url', '/dest');
+      mockRes.end('truncated-bytes');
+
+      await expect(promise).rejects.toThrow(
+        'Response ended prematurely while downloading url',
+      );
+      const tempPath = vi.mocked(fs.createWriteStream).mock.calls[0][0];
+      expect(fs.promises.rename).not.toHaveBeenCalled();
+      expect(fs.promises.unlink).toHaveBeenCalledWith(tempPath);
+    });
+
+    it('should settle once with the first error when multiple failures occur', async () => {
+      const mockReq = new EventEmitter();
+      const mockRes = createMockResponse(200);
+
+      vi.mocked(https.get).mockImplementation((url, options, cb) => {
+        if (typeof options === 'function') cb = options;
+        if (cb) cb(mockRes);
+        return mockReq as unknown as ClientRequest;
+      });
+
+      const mockStream = createMockWriteStream();
+      vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
+
+      const promise = downloadFile('url', '/dest');
+      mockStream.emit('error', new Error('First failure: EACCES'));
+      mockRes.emit('error', new Error('Second failure: socket reset'));
+      mockReq.emit('error', new Error('Third failure: request aborted'));
+
+      await expect(promise).rejects.toThrow('First failure: EACCES');
+      expect(fs.promises.unlink).toHaveBeenCalledOnce();
+    });
+
+    it('should clean up temp file if renaming to destination fails', async () => {
+      const mockReq = new EventEmitter();
+      const mockRes = createMockResponse(200);
+
+      vi.mocked(https.get).mockImplementation((url, options, cb) => {
+        if (typeof options === 'function') cb = options;
+        if (cb) cb(mockRes);
+        return mockReq as unknown as ClientRequest;
+      });
+
+      const mockStream = createMockWriteStream();
+      vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
+      vi.mocked(fs.promises.rename).mockRejectedValueOnce(
+        new Error('EISDIR: illegal operation on a directory'),
+      );
+
+      const promise = downloadFile('url', '/dest');
+      mockRes.end('complete-bytes');
+
+      await expect(promise).rejects.toThrow(
+        'EISDIR: illegal operation on a directory',
+      );
+      const tempPath = vi.mocked(fs.createWriteStream).mock.calls[0][0];
+      expect(fs.promises.unlink).toHaveBeenCalledWith(tempPath);
+    });
+
+    it('should reject, destroy response stream, and remove partial temp file when request emits an error mid-download', async () => {
+      const mockReq = new EventEmitter();
+      const mockRes = createMockResponse(200);
+
+      vi.mocked(https.get).mockImplementation((url, options, cb) => {
+        if (typeof options === 'function') cb = options;
+        if (cb) cb(mockRes);
+        return mockReq as unknown as ClientRequest;
+      });
+
+      const mockStream = createMockWriteStream();
+      vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
+
+      const promise = downloadFile('url', '/dest');
+      mockRes.write('partial-bytes');
+      mockReq.emit('error', new Error('ECONNRESET: socket hang up'));
+
+      await expect(promise).rejects.toThrow('ECONNRESET: socket hang up');
+      const tempPath = vi.mocked(fs.createWriteStream).mock.calls[0][0];
+      expect(mockRes.destroyed).toBe(true);
+      expect(fs.promises.rename).not.toHaveBeenCalled();
+      expect(fs.promises.unlink).toHaveBeenCalledWith(tempPath);
+    });
+
+    it('should ignore late errors on original request and response once a redirect has started', async () => {
+      const originalReq = new EventEmitter();
+      const mockResRedirect = createMockResponse(302, { location: 'new-url' });
+      const mockResSuccess = createMockResponse(200);
+
+      vi.mocked(https.get)
+        .mockImplementationOnce((url, options, cb) => {
+          if (typeof options === 'function') cb = options;
+          queueMicrotask(() => {
+            if (cb) cb(mockResRedirect);
+          });
+          return originalReq as unknown as ClientRequest;
+        })
+        .mockImplementationOnce((url, options, cb) => {
+          // Emit late errors on original request and drained redirect response while redirect is in flight
+          originalReq.emit('error', new Error('late original req error'));
+          mockResRedirect.emit('error', new Error('late redirect drain error'));
+          if (typeof options === 'function') cb = options;
+          queueMicrotask(() => {
+            if (cb) cb(mockResSuccess);
+            mockResSuccess.end('redirected-contents');
+          });
+          return new EventEmitter() as unknown as ClientRequest;
+        });
+
+      const mockStream = createMockWriteStream();
+      vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
+
+      await expect(downloadFile('url', '/dest')).resolves.toBeUndefined();
+      expect(fs.promises.rename).toHaveBeenCalledOnce();
+      expect(fs.promises.unlink).not.toHaveBeenCalled();
+    });
+
+    it('should reject and destroy response if createWriteStream throws synchronously', async () => {
+      const mockReq = new EventEmitter();
+      const mockRes = createMockResponse(200);
+
+      vi.mocked(https.get).mockImplementation((url, options, cb) => {
+        if (typeof options === 'function') cb = options;
+        if (cb) cb(mockRes);
+        return mockReq as unknown as ClientRequest;
+      });
+
+      vi.mocked(fs.createWriteStream).mockImplementation(() => {
+        throw new Error('ERR_INVALID_ARG_VALUE: invalid path');
+      });
+
+      await expect(downloadFile('url', '/dest')).rejects.toThrow(
+        'ERR_INVALID_ARG_VALUE: invalid path',
+      );
+      expect(mockRes.destroyed).toBe(true);
+      expect(fs.promises.rename).not.toHaveBeenCalled();
+      expect(fs.promises.unlink).toHaveBeenCalledOnce();
     });
   });
 
