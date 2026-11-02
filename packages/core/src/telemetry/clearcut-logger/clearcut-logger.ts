@@ -1146,7 +1146,7 @@ export class ClearcutLogger {
     // Flush after experiments finish loading from CCPA server
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     this.enqueueLogEventAfterExperimentsLoadAsync(
-      this.createLogEvent(EventNames.START_SESSION, data),
+      this.createLogEvent(EventNames.IDE_CONNECTION, data),
     ).then(() => {
       this.flushToClearcut().catch((error) => {
         debugLogger.debug('Error flushing to Clearcut:', error);
