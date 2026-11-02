@@ -224,6 +224,14 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
             throw streamError ?? new Error('Stream is not writable');
           }
           await new Promise<void>((resolve, reject) => {
+            if (streamError) {
+              reject(streamError);
+              return;
+            }
+            if (signal?.aborted) {
+              reject(streamError ?? this.getAbortError(signal));
+              return;
+            }
             const onDrain = () => {
               cleanup();
               resolve();
@@ -238,10 +246,7 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
             };
             const onSignalAbort = () => {
               cleanup();
-              reject(
-                streamError ??
-                  new DOMException('The operation was aborted.', 'AbortError'),
-              );
+              reject(streamError ?? this.getAbortError(signal));
             };
             const cleanup = () => {
               writer.off('drain', onDrain);
