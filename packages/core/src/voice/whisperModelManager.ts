@@ -163,6 +163,9 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
           throw streamError;
         }
         if (!writeOk) {
+          if (writer.destroyed || !writer.writable) {
+            throw streamError ?? new Error('Stream is not writable');
+          }
           await new Promise<void>((resolve, reject) => {
             const onDrain = () => {
               cleanup();

@@ -223,6 +223,8 @@ describe('WhisperModelManager', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(response);
 
     const mockWriter = new EventEmitter() as EventEmitter & {
+      writable: boolean;
+      destroyed: boolean;
       write: ReturnType<typeof vi.fn>;
       end: ReturnType<typeof vi.fn>;
       destroy: ReturnType<typeof vi.fn>;
@@ -230,6 +232,8 @@ describe('WhisperModelManager', () => {
     const writtenChunks: Uint8Array[] = [];
     let tempFilePath = '';
 
+    mockWriter.writable = true;
+    mockWriter.destroyed = false;
     mockWriter.write = vi.fn((chunk: Uint8Array) => {
       writtenChunks.push(chunk);
       fs.appendFileSync(tempFilePath, Buffer.from(chunk));
@@ -293,12 +297,16 @@ describe('WhisperModelManager', () => {
     );
 
     const mockWriter = new EventEmitter() as EventEmitter & {
+      writable: boolean;
+      destroyed: boolean;
       write: ReturnType<typeof vi.fn>;
       end: ReturnType<typeof vi.fn>;
       destroy: ReturnType<typeof vi.fn>;
     };
     let tempFilePath = '';
 
+    mockWriter.writable = true;
+    mockWriter.destroyed = false;
     mockWriter.write = vi.fn((chunk: Uint8Array) => {
       fs.appendFileSync(tempFilePath, Buffer.from(chunk));
       return true;
@@ -341,12 +349,16 @@ describe('WhisperModelManager', () => {
     );
 
     const mockWriter = new EventEmitter() as EventEmitter & {
+      writable: boolean;
+      destroyed: boolean;
       write: ReturnType<typeof vi.fn>;
       end: ReturnType<typeof vi.fn>;
       destroy: ReturnType<typeof vi.fn>;
     };
     let tempFilePath = '';
 
+    mockWriter.writable = true;
+    mockWriter.destroyed = false;
     mockWriter.write = vi.fn((chunk: Uint8Array) => {
       fs.appendFileSync(tempFilePath, Buffer.from(chunk));
       queueMicrotask(() => {
@@ -388,12 +400,16 @@ describe('WhisperModelManager', () => {
     );
 
     const mockWriter = new EventEmitter() as EventEmitter & {
+      writable: boolean;
+      destroyed: boolean;
       write: ReturnType<typeof vi.fn>;
       end: ReturnType<typeof vi.fn>;
       destroy: ReturnType<typeof vi.fn>;
     };
     let tempFilePath = '';
 
+    mockWriter.writable = true;
+    mockWriter.destroyed = false;
     mockWriter.write = vi.fn((chunk: Uint8Array) => {
       fs.appendFileSync(tempFilePath, Buffer.from(chunk));
       queueMicrotask(() => {
@@ -416,6 +432,57 @@ describe('WhisperModelManager', () => {
 
     await expect(manager.downloadModel(modelName)).rejects.toThrow(
       'Stream closed before drain',
+    );
+
+    expect(manager.isModelInstalled(modelName)).toBe(false);
+    expect(fs.existsSync(modelPath)).toBe(false);
+    expect(getDownloadingFiles(modelPath)).toEqual([]);
+  });
+
+  it('rejects immediately instead of hanging when write stream is already destroyed or not writable on backpressure', async () => {
+    const chunk1 = new Uint8Array([1, 2, 3, 4]);
+    const chunk2 = new Uint8Array([5, 6, 7, 8]);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      createMockResponse({
+        contentLength: 8,
+        chunks: [chunk1, chunk2],
+      }),
+    );
+
+    const mockWriter = new EventEmitter() as EventEmitter & {
+      writable: boolean;
+      destroyed: boolean;
+      write: ReturnType<typeof vi.fn>;
+      end: ReturnType<typeof vi.fn>;
+      destroy: ReturnType<typeof vi.fn>;
+    };
+    let tempFilePath = '';
+
+    mockWriter.writable = true;
+    mockWriter.destroyed = false;
+    mockWriter.write = vi.fn((chunk: Uint8Array) => {
+      fs.appendFileSync(tempFilePath, Buffer.from(chunk));
+      // Simulate stream closing/destroying synchronously before drain listener is attached
+      mockWriter.writable = false;
+      mockWriter.destroyed = true;
+      mockWriter.emit('close');
+      return false;
+    });
+    mockWriter.end = vi.fn();
+    mockWriter.destroy = vi.fn();
+
+    createWriteStreamSpy.mockImplementationOnce((filePath: fs.PathLike) => {
+      tempFilePath = String(filePath);
+      fs.writeFileSync(tempFilePath, Buffer.alloc(0));
+      return mockWriter as unknown as fs.WriteStream;
+    });
+
+    const manager = new WhisperModelManager();
+    const modelName = 'ggml-tiny.en.bin';
+    const modelPath = manager.getModelPath(modelName);
+
+    await expect(manager.downloadModel(modelName)).rejects.toThrow(
+      'Stream is not writable',
     );
 
     expect(manager.isModelInstalled(modelName)).toBe(false);
@@ -572,12 +639,16 @@ describe('WhisperModelManager', () => {
     );
 
     const mockWriter = new EventEmitter() as EventEmitter & {
+      writable: boolean;
+      destroyed: boolean;
       write: ReturnType<typeof vi.fn>;
       end: ReturnType<typeof vi.fn>;
       destroy: ReturnType<typeof vi.fn>;
     };
     let tempFilePath = '';
 
+    mockWriter.writable = true;
+    mockWriter.destroyed = false;
     mockWriter.write = vi.fn((chunk: Uint8Array) => {
       fs.appendFileSync(tempFilePath, Buffer.from(chunk));
       return true;
