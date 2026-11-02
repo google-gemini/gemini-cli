@@ -9,6 +9,7 @@ import {
   debugLogger,
   getErrorMessage,
   getSafeGitEnv,
+  validateUrlDestination,
   type ExtensionInstallMetadata,
   type GeminiCLIExtension,
 } from '@google/gemini-cli-core';
@@ -22,7 +23,14 @@ import * as path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import * as tar from 'tar';
 import extract from 'extract-zip';
-import { fetchJson, getGitHubToken } from './github_fetch.js';
+import {
+  fetchJson,
+  getGitHubToken,
+  isTrustedGitHubUrl,
+  lookupPublicAddress,
+  REDIRECT_STATUS_CODES,
+  REQUEST_TIMEOUT_MS,
+} from './github_fetch.js';
 import type { ExtensionConfig } from '../extension.js';
 import type { ExtensionManager } from '../extension-manager.js';
 import { EXTENSIONS_CONFIG_FILENAME } from './variables.js';
@@ -526,13 +534,25 @@ export async function downloadFile(
   options?: DownloadOptions,
   redirectCount: number = 0,
 ): Promise<void> {
+  if (!(await validateUrlDestination(url))) {
+    throw new Error(`Access to blocked or private host ${url} is not allowed.`);
+  }
+
   const headers: Record<string, string> = {
     'User-agent': 'gemini-cli',
     Accept: 'application/octet-stream',
     ...options?.headers,
   };
+  const trustedGitHubUrl = isTrustedGitHubUrl(url);
+  if (!trustedGitHubUrl) {
+    for (const key of Object.keys(headers)) {
+      if (key.toLowerCase() === 'authorization') {
+        delete headers[key];
+      }
+    }
+  }
   const token = getGitHubToken();
-  if (token) {
+  if (token && trustedGitHubUrl) {
     headers['Authorization'] = `token ${token}`;
   }
 
@@ -561,14 +581,20 @@ export async function downloadFile(
         }
       };
 
-      const req = https.get(url, { headers }, (res) => {
+      const requestOptions = {
+        headers,
+        lookup: lookupPublicAddress,
+        timeout: REQUEST_TIMEOUT_MS,
+      };
+
+      const req = https.get(url, requestOptions, (res) => {
         res.on('error', (error) => {
           if (!isRedirecting) {
             settleReject(error);
           }
         });
 
-        if (res.statusCode === 302 || res.statusCode === 301) {
+        if (res.statusCode && REDIRECT_STATUS_CODES.has(res.statusCode)) {
           if (redirectCount >= 10) {
             res.resume?.();
             settleReject(new Error('Too many redirects'));
@@ -583,14 +609,26 @@ export async function downloadFile(
             return;
           }
 
+          let redirectUrl: string;
+          try {
+            redirectUrl = new URL(res.headers.location, url).toString();
+          } catch (error) {
+            res.resume?.();
+            settleReject(
+              new Error(
+                `Invalid redirect URL from ${url} (status ${res.statusCode}): ${getErrorMessage(error)}`,
+                { cause: error },
+              ),
+            );
+            return;
+          }
+
           isRedirecting = true;
           res.resume?.();
-          void downloadFile(
-            res.headers.location,
-            dest,
-            options,
-            redirectCount + 1,
-          ).then(settleResolve, settleReject);
+          void downloadFile(redirectUrl, dest, options, redirectCount + 1).then(
+            settleResolve,
+            settleReject,
+          );
           return;
         }
 
@@ -635,8 +673,20 @@ export async function downloadFile(
         if (isRedirecting) {
           return;
         }
-        responseStream?.destroy?.();
         settleReject(error);
+        responseStream?.destroy?.();
+      });
+
+      req.on('timeout', () => {
+        if (!isRedirecting) {
+          settleReject(
+            new Error(`Request timed out after ${REQUEST_TIMEOUT_MS}ms`),
+          );
+          responseStream?.destroy?.();
+        }
+        // Always release the original socket. A redirect in flight runs on its
+        // own request, so destroying this one does not affect it.
+        req.destroy?.();
       });
     });
 

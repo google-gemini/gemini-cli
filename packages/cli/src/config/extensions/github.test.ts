@@ -27,9 +27,12 @@ import { fetchJson } from './github_fetch.js';
 import { EventEmitter } from 'node:events';
 import type { ClientRequest, IncomingMessage } from 'node:http';
 import { PassThrough } from 'node:stream';
-import type {
-  GeminiCLIExtension,
-  ExtensionInstallMetadata,
+import { promisify } from 'node:util';
+import {
+  PrivateIpError,
+  validateUrlDestination,
+  type GeminiCLIExtension,
+  type ExtensionInstallMetadata,
 } from '@google/gemini-cli-core';
 import type { ExtensionConfig } from '../extension.js';
 
@@ -38,6 +41,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
+    validateUrlDestination: vi.fn(),
     Storage: {
       getGlobalSettingsPath: vi.fn().mockReturnValue('/mock/settings.json'),
       getGlobalGeminiDir: vi.fn().mockReturnValue('/mock/.gemini'),
@@ -56,7 +60,13 @@ vi.mock('node:fs');
 vi.mock('node:https');
 vi.mock('tar');
 vi.mock('extract-zip');
-vi.mock('./github_fetch.js');
+vi.mock('./github_fetch.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./github_fetch.js')>();
+  return {
+    ...actual,
+    fetchJson: vi.fn(),
+  };
+});
 vi.mock('../extension-manager.js');
 // Mock settings.ts to avoid top-level side effects if possible, or just rely on Storage mock
 vi.mock('../settings.js', () => ({
@@ -84,11 +94,14 @@ describe('github.ts', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.stubEnv('GITHUB_TOKEN', '');
+    vi.mocked(validateUrlDestination).mockResolvedValue(true);
     vi.mocked(fs.promises.rename).mockResolvedValue(undefined);
     vi.mocked(fs.promises.unlink).mockResolvedValue(undefined);
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
@@ -602,6 +615,9 @@ describe('github.ts', () => {
   });
 
   describe('downloadFile', () => {
+    const assetUrl = 'https://example.com/asset.tar.gz';
+    const redirectedAssetUrl = 'https://example.com/redirected-asset.tar.gz';
+
     it('should download file successfully via temporary file and atomic rename', async () => {
       const mockReq = new EventEmitter();
       const mockRes = createMockResponse(200);
@@ -617,7 +633,7 @@ describe('github.ts', () => {
       const mockStream = createMockWriteStream();
       vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
 
-      const promise = downloadFile('url', '/dest');
+      const promise = downloadFile(assetUrl, '/dest');
       mockRes.end('file-contents');
 
       await expect(promise).resolves.toBeUndefined();
@@ -641,7 +657,7 @@ describe('github.ts', () => {
         return mockReq as unknown as ClientRequest;
       });
 
-      await expect(downloadFile('url', '/dest')).rejects.toThrow(
+      await expect(downloadFile(assetUrl, '/dest')).rejects.toThrow(
         'Request failed with status code 404',
       );
       expect(resumeSpy).toHaveBeenCalledOnce();
@@ -649,8 +665,48 @@ describe('github.ts', () => {
       expect(fs.promises.unlink).not.toHaveBeenCalled();
     });
 
-    it('should follow redirects', async () => {
-      const mockResRedirect = createMockResponse(302, { location: 'new-url' });
+    it.each([301, 302, 303, 307, 308])(
+      'should follow a %i redirect',
+      async (statusCode) => {
+        const mockResRedirect = createMockResponse(statusCode, {
+          location: redirectedAssetUrl,
+        });
+        const mockResSuccess = createMockResponse(200);
+
+        vi.mocked(https.get)
+          .mockImplementationOnce((url, options, cb) => {
+            if (typeof options === 'function') cb = options;
+            if (cb) cb(mockResRedirect);
+            return new EventEmitter() as unknown as ClientRequest;
+          })
+          .mockImplementationOnce((url, options, cb) => {
+            if (typeof options === 'function') cb = options;
+            if (cb) cb(mockResSuccess);
+            return new EventEmitter() as unknown as ClientRequest;
+          });
+
+        const mockStream = createMockWriteStream();
+        vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
+
+        const promise = downloadFile(assetUrl, '/dest');
+        mockResSuccess.end('redirected-contents');
+
+        await expect(promise).resolves.toBeUndefined();
+        expect(https.get).toHaveBeenCalledTimes(2);
+        expect(https.get).toHaveBeenLastCalledWith(
+          redirectedAssetUrl,
+          expect.anything(),
+          expect.anything(),
+        );
+        expect(fs.createWriteStream).toHaveBeenCalledOnce();
+        expect(fs.promises.rename).toHaveBeenCalledOnce();
+      },
+    );
+
+    it('should resolve relative redirect Location headers against the request URL', async () => {
+      const mockResRedirect = createMockResponse(302, {
+        location: '/releases/download/v1.0.0/asset.tar.gz',
+      });
       const mockResSuccess = createMockResponse(200);
 
       vi.mocked(https.get)
@@ -668,28 +724,28 @@ describe('github.ts', () => {
       const mockStream = createMockWriteStream();
       vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
 
-      const promise = downloadFile('url', '/dest');
+      const promise = downloadFile(
+        'https://github.com/owner/repo/releases/latest',
+        '/dest',
+      );
       mockResSuccess.end('redirected-contents');
 
       await expect(promise).resolves.toBeUndefined();
-      expect(https.get).toHaveBeenCalledTimes(2);
       expect(https.get).toHaveBeenLastCalledWith(
-        'new-url',
+        'https://github.com/releases/download/v1.0.0/asset.tar.gz',
         expect.anything(),
         expect.anything(),
       );
-      expect(fs.createWriteStream).toHaveBeenCalledOnce();
-      expect(fs.promises.rename).toHaveBeenCalledOnce();
     });
 
     it('should fail after too many redirects', async () => {
       vi.mocked(https.get).mockImplementation((url, options, cb) => {
         if (typeof options === 'function') cb = options;
-        if (cb) cb(createMockResponse(302, { location: 'new-url' }));
+        if (cb) cb(createMockResponse(302, { location: redirectedAssetUrl }));
         return new EventEmitter() as unknown as ClientRequest;
       });
 
-      await expect(downloadFile('url', '/dest')).rejects.toThrow(
+      await expect(downloadFile(assetUrl, '/dest')).rejects.toThrow(
         'Too many redirects',
       );
     }, 10000); // Increase timeout for this test if needed, though with mocks it should be fast
@@ -704,9 +760,183 @@ describe('github.ts', () => {
         return mockReq as unknown as ClientRequest;
       });
 
-      await expect(downloadFile('url', '/dest')).rejects.toThrow(
+      await expect(downloadFile(assetUrl, '/dest')).rejects.toThrow(
         'Redirect response missing Location header',
       );
+    });
+
+    it('should reject when URL destination validation fails (SSRF protection)', async () => {
+      vi.mocked(validateUrlDestination).mockResolvedValueOnce(false);
+
+      await expect(
+        downloadFile('http://169.254.169.254/latest/meta-data/', '/dest'),
+      ).rejects.toThrow(
+        'Access to blocked or private host http://169.254.169.254/latest/meta-data/ is not allowed.',
+      );
+      expect(https.get).not.toHaveBeenCalled();
+    });
+
+    it('should reject when redirect destination fails SSRF validation', async () => {
+      vi.mocked(validateUrlDestination)
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(false);
+
+      vi.mocked(https.get).mockImplementationOnce((url, options, cb) => {
+        if (typeof options === 'function') cb = options;
+        if (cb) {
+          cb(
+            createMockResponse(302, {
+              location: 'http://127.0.0.1:8080/internal',
+            }),
+          );
+        }
+        return new EventEmitter() as unknown as ClientRequest;
+      });
+
+      await expect(downloadFile(assetUrl, '/dest')).rejects.toThrow(
+        'Access to blocked or private host http://127.0.0.1:8080/internal is not allowed.',
+      );
+      expect(https.get).toHaveBeenCalledTimes(1);
+    });
+
+    it('should connect through a lookup that refuses private addresses', async () => {
+      const mockReq = new EventEmitter();
+      const mockRes = createMockResponse(200);
+
+      vi.mocked(https.get).mockImplementationOnce((url, options, cb) => {
+        if (typeof options === 'function') cb = options;
+        if (cb) cb(mockRes);
+        return mockReq as unknown as ClientRequest;
+      });
+
+      const mockStream = createMockWriteStream();
+      vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
+
+      const promise = downloadFile(assetUrl, '/dest');
+      mockRes.end('data');
+      await promise;
+
+      const options = vi.mocked(https.get).mock.calls[0][1];
+      if (!options || typeof options === 'function' || !options.lookup) {
+        throw new Error('https.get was called without a lookup');
+      }
+      const resolveHost = promisify(options.lookup);
+
+      await expect(resolveHost('10.0.0.5', {})).rejects.toThrow(PrivateIpError);
+      await expect(resolveHost('localhost', {})).rejects.toThrow(
+        PrivateIpError,
+      );
+      await expect(resolveHost('8.8.8.8', {})).resolves.toBe('8.8.8.8');
+    });
+
+    it('should include Authorization header only for https github.com and *.github.com URLs', async () => {
+      vi.stubEnv('GITHUB_TOKEN', 'my-secret-token');
+
+      vi.mocked(https.get).mockImplementation((url, options, cb) => {
+        if (typeof options === 'function') cb = options;
+        const mockRes = createMockResponse(200);
+        if (cb) cb(mockRes);
+        mockRes.end('data');
+        return new EventEmitter() as unknown as ClientRequest;
+      });
+      vi.mocked(fs.createWriteStream).mockImplementation(() =>
+        createMockWriteStream(),
+      );
+
+      await downloadFile(
+        'https://api.github.com/repos/owner/repo/releases/assets/1',
+        '/dest',
+      );
+      await downloadFile(
+        'https://github.com/owner/repo/releases/download/v1.0.0/asset.tar.gz',
+        '/dest',
+      );
+      await downloadFile('http://github.com/owner/repo/asset.tar.gz', '/dest');
+      await downloadFile('https://notgithub.com/asset.tar.gz', '/dest');
+
+      expect(https.get).toHaveBeenNthCalledWith(
+        1,
+        'https://api.github.com/repos/owner/repo/releases/assets/1',
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: 'token my-secret-token',
+          }),
+        }),
+        expect.anything(),
+      );
+      expect(https.get).toHaveBeenNthCalledWith(
+        2,
+        'https://github.com/owner/repo/releases/download/v1.0.0/asset.tar.gz',
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: 'token my-secret-token',
+          }),
+        }),
+        expect.anything(),
+      );
+
+      const httpGitHubOptions = vi.mocked(https.get).mock.calls[2][1];
+      const externalOptions = vi.mocked(https.get).mock.calls[3][1];
+      if (
+        !httpGitHubOptions ||
+        typeof httpGitHubOptions === 'function' ||
+        !externalOptions ||
+        typeof externalOptions === 'function'
+      ) {
+        throw new Error('Expected request options object');
+      }
+      expect(httpGitHubOptions.headers).not.toHaveProperty('Authorization');
+      expect(externalOptions.headers).not.toHaveProperty('Authorization');
+    });
+
+    it('should strip Authorization header when redirecting from GitHub to an external asset host', async () => {
+      vi.stubEnv('GITHUB_TOKEN', 'my-secret-token');
+
+      const externalS3Url =
+        'https://objects.githubusercontent.com/github-production-release-asset/asset.tar.gz';
+      const mockResRedirect = createMockResponse(302, {
+        location: externalS3Url,
+      });
+      const mockResSuccess = createMockResponse(200);
+
+      vi.mocked(https.get)
+        .mockImplementationOnce((url, options, cb) => {
+          if (typeof options === 'function') cb = options;
+          if (cb) cb(mockResRedirect);
+          return new EventEmitter() as unknown as ClientRequest;
+        })
+        .mockImplementationOnce((url, options, cb) => {
+          if (typeof options === 'function') cb = options;
+          if (cb) cb(mockResSuccess);
+          return new EventEmitter() as unknown as ClientRequest;
+        });
+
+      const mockStream = createMockWriteStream();
+      vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
+
+      const promise = downloadFile(
+        'https://api.github.com/repos/owner/repo/releases/assets/1',
+        '/dest',
+        { headers: { Authorization: 'Bearer caller-secret' } },
+      );
+      mockResSuccess.end('asset-bytes');
+      await expect(promise).resolves.toBeUndefined();
+
+      const firstOptions = vi.mocked(https.get).mock.calls[0][1];
+      const secondOptions = vi.mocked(https.get).mock.calls[1][1];
+      if (
+        !firstOptions ||
+        typeof firstOptions === 'function' ||
+        !secondOptions ||
+        typeof secondOptions === 'function'
+      ) {
+        throw new Error('Expected request options object');
+      }
+      expect(firstOptions.headers).toHaveProperty(
+        'Authorization',
+        'token my-secret-token',
+      );
+      expect(secondOptions.headers).not.toHaveProperty('Authorization');
     });
 
     it('should pass custom headers', async () => {
@@ -722,14 +952,14 @@ describe('github.ts', () => {
       const mockStream = createMockWriteStream();
       vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
 
-      const promise = downloadFile('url', '/dest', {
+      const promise = downloadFile(assetUrl, '/dest', {
         headers: { 'X-Custom': 'value' },
       });
       mockRes.end('data');
 
       await expect(promise).resolves.toBeUndefined();
       expect(https.get).toHaveBeenCalledWith(
-        'url',
+        assetUrl,
         expect.objectContaining({
           headers: expect.objectContaining({ 'X-Custom': 'value' }),
         }),
@@ -750,7 +980,10 @@ describe('github.ts', () => {
       const mockStream = createMockWriteStream();
       vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
 
-      const promise = downloadFile('url', '/dest');
+      const promise = downloadFile(assetUrl, '/dest');
+      await vi.waitUntil(
+        () => vi.mocked(fs.createWriteStream).mock.calls.length > 0,
+      );
       mockRes.write('partial-bytes');
       mockRes.emit('error', new Error('Mid-transfer connection reset'));
 
@@ -774,7 +1007,10 @@ describe('github.ts', () => {
       const mockStream = createMockWriteStream();
       vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
 
-      const promise = downloadFile('url', '/dest');
+      const promise = downloadFile(assetUrl, '/dest');
+      await vi.waitUntil(
+        () => vi.mocked(fs.createWriteStream).mock.calls.length > 0,
+      );
       mockStream.emit('error', new Error('ENOSPC: no space left on device'));
 
       await expect(promise).rejects.toThrow('ENOSPC: no space left on device');
@@ -797,7 +1033,10 @@ describe('github.ts', () => {
       const mockStream = createMockWriteStream();
       vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
 
-      const promise = downloadFile('url', '/dest');
+      const promise = downloadFile(assetUrl, '/dest');
+      await vi.waitUntil(
+        () => vi.mocked(fs.createWriteStream).mock.calls.length > 0,
+      );
       mockRes.write('partial-bytes');
       mockRes.destroy();
 
@@ -820,11 +1059,11 @@ describe('github.ts', () => {
       const mockStream = createMockWriteStream();
       vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
 
-      const promise = downloadFile('url', '/dest');
+      const promise = downloadFile(assetUrl, '/dest');
       mockRes.end('truncated-bytes');
 
       await expect(promise).rejects.toThrow(
-        'Response ended prematurely while downloading url',
+        `Response ended prematurely while downloading ${assetUrl}`,
       );
       const tempPath = vi.mocked(fs.createWriteStream).mock.calls[0][0];
       expect(fs.promises.rename).not.toHaveBeenCalled();
@@ -844,7 +1083,10 @@ describe('github.ts', () => {
       const mockStream = createMockWriteStream();
       vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
 
-      const promise = downloadFile('url', '/dest');
+      const promise = downloadFile(assetUrl, '/dest');
+      await vi.waitUntil(
+        () => vi.mocked(fs.createWriteStream).mock.calls.length > 0,
+      );
       mockStream.emit('error', new Error('First failure: EACCES'));
       mockRes.emit('error', new Error('Second failure: socket reset'));
       mockReq.emit('error', new Error('Third failure: request aborted'));
@@ -869,7 +1111,7 @@ describe('github.ts', () => {
         new Error('EISDIR: illegal operation on a directory'),
       );
 
-      const promise = downloadFile('url', '/dest');
+      const promise = downloadFile(assetUrl, '/dest');
       mockRes.end('complete-bytes');
 
       await expect(promise).rejects.toThrow(
@@ -892,7 +1134,10 @@ describe('github.ts', () => {
       const mockStream = createMockWriteStream();
       vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
 
-      const promise = downloadFile('url', '/dest');
+      const promise = downloadFile(assetUrl, '/dest');
+      await vi.waitUntil(
+        () => vi.mocked(fs.createWriteStream).mock.calls.length > 0,
+      );
       mockRes.write('partial-bytes');
       mockReq.emit('error', new Error('ECONNRESET: socket hang up'));
 
@@ -903,9 +1148,70 @@ describe('github.ts', () => {
       expect(fs.promises.unlink).toHaveBeenCalledWith(tempPath);
     });
 
-    it('should ignore late errors on original request and response once a redirect has started', async () => {
-      const originalReq = new EventEmitter();
-      const mockResRedirect = createMockResponse(302, { location: 'new-url' });
+    it('should configure a 30000ms timeout, destroy request, and reject when request times out before response', async () => {
+      const destroyMock = vi.fn();
+      vi.mocked(https.get).mockImplementationOnce((_url, options) => {
+        expect(options).toEqual(
+          expect.objectContaining({
+            timeout: 30000,
+          }),
+        );
+        const req = Object.assign(new EventEmitter(), {
+          destroy: destroyMock,
+        }) as unknown as ClientRequest;
+        queueMicrotask(() => {
+          req.emit('timeout');
+          req.emit('error', new Error('socket hang up'));
+        });
+        return req;
+      });
+
+      await expect(downloadFile(assetUrl, '/dest')).rejects.toThrow(
+        'Request timed out after 30000ms',
+      );
+      expect(destroyMock).toHaveBeenCalledOnce();
+      expect(fs.promises.unlink).not.toHaveBeenCalled();
+    });
+
+    it('should destroy response stream and remove partial temp file when request times out mid-download', async () => {
+      const destroyMock = vi.fn();
+      const mockReq = Object.assign(new EventEmitter(), {
+        destroy: destroyMock,
+      });
+      const mockRes = createMockResponse(200);
+
+      vi.mocked(https.get).mockImplementationOnce((url, options, cb) => {
+        if (typeof options === 'function') cb = options;
+        if (cb) cb(mockRes);
+        return mockReq as unknown as ClientRequest;
+      });
+
+      const mockStream = createMockWriteStream();
+      vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
+
+      const promise = downloadFile(assetUrl, '/dest');
+      await vi.waitUntil(
+        () => vi.mocked(fs.createWriteStream).mock.calls.length > 0,
+      );
+      mockRes.write('partial-bytes');
+      mockReq.emit('timeout');
+
+      await expect(promise).rejects.toThrow('Request timed out after 30000ms');
+      const tempPath = vi.mocked(fs.createWriteStream).mock.calls[0][0];
+      expect(destroyMock).toHaveBeenCalledOnce();
+      expect(mockRes.destroyed).toBe(true);
+      expect(fs.promises.rename).not.toHaveBeenCalled();
+      expect(fs.promises.unlink).toHaveBeenCalledWith(tempPath);
+    });
+
+    it('should ignore late errors and timeouts on original request and response once a redirect has started', async () => {
+      const destroyMock = vi.fn();
+      const originalReq = Object.assign(new EventEmitter(), {
+        destroy: destroyMock,
+      });
+      const mockResRedirect = createMockResponse(302, {
+        location: redirectedAssetUrl,
+      });
       const mockResSuccess = createMockResponse(200);
 
       vi.mocked(https.get)
@@ -917,7 +1223,8 @@ describe('github.ts', () => {
           return originalReq as unknown as ClientRequest;
         })
         .mockImplementationOnce((url, options, cb) => {
-          // Emit late errors on original request and drained redirect response while redirect is in flight
+          // Emit late timeout and errors on original request and drained redirect response while redirect is in flight
+          originalReq.emit('timeout');
           originalReq.emit('error', new Error('late original req error'));
           mockResRedirect.emit('error', new Error('late redirect drain error'));
           if (typeof options === 'function') cb = options;
@@ -931,7 +1238,8 @@ describe('github.ts', () => {
       const mockStream = createMockWriteStream();
       vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
 
-      await expect(downloadFile('url', '/dest')).resolves.toBeUndefined();
+      await expect(downloadFile(assetUrl, '/dest')).resolves.toBeUndefined();
+      expect(destroyMock).toHaveBeenCalledOnce();
       expect(fs.promises.rename).toHaveBeenCalledOnce();
       expect(fs.promises.unlink).not.toHaveBeenCalled();
     });
@@ -950,7 +1258,7 @@ describe('github.ts', () => {
         throw new Error('ERR_INVALID_ARG_VALUE: invalid path');
       });
 
-      await expect(downloadFile('url', '/dest')).rejects.toThrow(
+      await expect(downloadFile(assetUrl, '/dest')).rejects.toThrow(
         'ERR_INVALID_ARG_VALUE: invalid path',
       );
       expect(mockRes.destroyed).toBe(true);
