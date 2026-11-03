@@ -178,7 +178,7 @@ describe('migrate command', () => {
         PostToolUse: [{ hooks: [{ type: 'command', command: 'echo 2' }] }],
         UserPromptSubmit: [{ hooks: [{ type: 'command', command: 'echo 3' }] }],
         Stop: [{ hooks: [{ type: 'command', command: 'echo 4' }] }],
-        SubAgentStop: [{ hooks: [{ type: 'command', command: 'echo 5' }] }],
+        SubagentStop: [{ hooks: [{ type: 'command', command: 'echo 5' }] }],
         SessionStart: [{ hooks: [{ type: 'command', command: 'echo 6' }] }],
         SessionEnd: [{ hooks: [{ type: 'command', command: 'echo 7' }] }],
         PreCompact: [{ hooks: [{ type: 'command', command: 'echo 8' }] }],
@@ -197,6 +197,11 @@ describe('migrate command', () => {
     expect(migratedHooks).toHaveProperty('AfterTool');
     expect(migratedHooks).toHaveProperty('BeforeAgent');
     expect(migratedHooks).toHaveProperty('AfterAgent');
+    expect(migratedHooks['AfterAgent']).toEqual([
+      { hooks: [expect.objectContaining({ command: 'echo 4' })] },
+      { hooks: [expect.objectContaining({ command: 'echo 5' })] },
+    ]);
+    expect(migratedHooks).not.toHaveProperty('SubagentStop');
     expect(migratedHooks).toHaveProperty('SessionStart');
     expect(migratedHooks).toHaveProperty('SessionEnd');
     expect(migratedHooks).toHaveProperty('PreCompress');
