@@ -59,12 +59,17 @@ export function toToolCallContent(
       };
     } else {
       if (Array.isArray(toolResult.returnDisplay)) {
-        const text = toolResult.returnDisplay
+        const lines = toolResult.returnDisplay;
+        // Emptiness is decided by the line count, not by the joined string: a
+        // single blank line joins to '' exactly like no output at all, but for
+        // ACP clients it is still one line of output and must not disappear.
+        if (lines.length === 0) {
+          return null;
+        }
+        const text = lines
           .map((line) => line.map((token) => token.text).join(''))
           .join('\n');
-        return text
-          ? { type: 'content', content: { type: 'text', text } }
-          : null;
+        return { type: 'content', content: { type: 'text', text } };
       }
       if ('fileName' in toolResult.returnDisplay) {
         return {

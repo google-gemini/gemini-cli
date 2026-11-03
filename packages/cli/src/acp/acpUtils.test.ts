@@ -35,4 +35,22 @@ describe('toToolCallContent', () => {
   it('should ignore empty AnsiOutput', () => {
     expect(toToolCallContent(resultWith([] as AnsiOutput))).toBeNull();
   });
+
+  it('should preserve a single blank line', () => {
+    const ansiOutput = [[{ text: '' }]] as AnsiOutput;
+
+    expect(toToolCallContent(resultWith(ansiOutput))).toEqual({
+      type: 'content',
+      content: { type: 'text', text: '' },
+    });
+  });
+
+  it('should distinguish one blank line from two', () => {
+    const ansiOutput = [[{ text: '' }], [{ text: '' }]] as AnsiOutput;
+
+    expect(toToolCallContent(resultWith(ansiOutput))).toEqual({
+      type: 'content',
+      content: { type: 'text', text: '\n' },
+    });
+  });
 });
