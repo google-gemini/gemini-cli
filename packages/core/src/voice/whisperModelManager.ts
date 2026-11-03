@@ -28,11 +28,18 @@ const ALLOWED_MODELS = [
   'ggml-large-v3-turbo-q8_0.bin',
 ];
 
+interface InFlightDownload {
+  promise: Promise<void>;
+  controller: AbortController;
+  activeCallers: number;
+}
+
 /**
  * Manages Whisper models (checking existence, downloading).
  */
 export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents> {
   private readonly modelsDir: string;
+  private readonly inFlightDownloads = new Map<string, InFlightDownload>();
 
   constructor() {
     super();
@@ -41,7 +48,13 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
 
   isModelInstalled(modelName: string): boolean {
     this.validateModelName(modelName);
-    return fs.existsSync(path.join(this.modelsDir, modelName));
+    const modelPath = path.join(this.modelsDir, modelName);
+    try {
+      const stat = fs.statSync(modelPath);
+      return stat.isFile() && stat.size > 0;
+    } catch {
+      return false;
+    }
   }
 
   getModelPath(modelName: string): string {
@@ -49,21 +62,88 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
     return path.join(this.modelsDir, modelName);
   }
 
-  async downloadModel(modelName: string): Promise<void> {
+  async downloadModel(modelName: string, signal?: AbortSignal): Promise<void> {
     this.validateModelName(modelName);
 
-    if (!fs.existsSync(this.modelsDir)) {
-      fs.mkdirSync(this.modelsDir, { recursive: true });
+    if (signal?.aborted) {
+      throw this.getAbortError(signal);
     }
 
+    let inFlight = this.inFlightDownloads.get(modelName);
+    if (!inFlight) {
+      const controller = new AbortController();
+      const promise = this.executeDownload(
+        modelName,
+        controller.signal,
+      ).finally(() => {
+        this.inFlightDownloads.delete(modelName);
+      });
+      promise.catch(() => {});
+      inFlight = { promise, controller, activeCallers: 0 };
+      this.inFlightDownloads.set(modelName, inFlight);
+    }
+
+    inFlight.activeCallers += 1;
+    const currentInFlight = inFlight;
+
+    if (!signal) {
+      return currentInFlight.promise;
+    }
+
+    return new Promise<void>((resolve, reject) => {
+      let settled = false;
+      const onAbort = () => {
+        if (settled) return;
+        const abortError = this.getAbortError(signal);
+        currentInFlight.activeCallers -= 1;
+        if (currentInFlight.activeCallers <= 0) {
+          currentInFlight.controller.abort(abortError);
+        } else {
+          settled = true;
+          reject(abortError);
+        }
+      };
+      signal.addEventListener('abort', onAbort, { once: true });
+      currentInFlight.promise.then(
+        () => {
+          if (settled) return;
+          settled = true;
+          signal.removeEventListener('abort', onAbort);
+          resolve();
+        },
+        (err) => {
+          if (settled) return;
+          settled = true;
+          signal.removeEventListener('abort', onAbort);
+          reject(err);
+        },
+      );
+    });
+  }
+
+  private getAbortError(signal?: AbortSignal): Error {
+    return signal?.reason instanceof Error
+      ? signal.reason
+      : new DOMException('The operation was aborted.', 'AbortError');
+  }
+
+  private async executeDownload(
+    modelName: string,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    signal?.throwIfAborted();
+
+    await fs.promises.mkdir(this.modelsDir, { recursive: true });
+
     const destination = path.join(this.modelsDir, modelName);
+    const tempDestination = `${destination}.${Math.random().toString(36).slice(2)}.downloading`;
     const url = `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/${modelName}`;
 
     debugLogger.debug(
       `[WhisperModelManager] Downloading ${modelName} from ${url}`,
     );
 
-    const response = await fetch(url);
+    const response = await fetch(url, signal ? { signal } : undefined);
     if (!response.ok) {
       throw new Error(`Failed to download model: ${response.statusText}`);
     }
@@ -76,15 +156,110 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
       throw new Error('Response body is not readable');
     }
 
-    const writer = fs.createWriteStream(destination);
+    try {
+      const files = await fs.promises.readdir(this.modelsDir);
+      for (const file of files) {
+        if (
+          (file === modelName + '.downloading' ||
+            file.startsWith(modelName + '.')) &&
+          file.endsWith('.downloading')
+        ) {
+          await fs.promises
+            .unlink(path.join(this.modelsDir, file))
+            .catch(() => {});
+        }
+      }
+    } catch {
+      // Ignore directory read errors
+    }
+
+    const writer = fs.createWriteStream(tempDestination);
+    let streamError: Error | null = null;
+    const closePromise = new Promise<void>((resolve, reject) => {
+      writer.once('close', () => {
+        if (streamError) {
+          reject(streamError);
+        } else {
+          resolve();
+        }
+      });
+      writer.once('error', (err) => {
+        streamError = err;
+        void reader.cancel?.().catch(() => {});
+      });
+    });
+    closePromise.catch(() => {});
+
+    const onAbort = () => {
+      const abortError =
+        signal?.reason instanceof Error
+          ? signal.reason
+          : new DOMException('The operation was aborted.', 'AbortError');
+      streamError = abortError;
+      void reader.cancel?.(abortError).catch(() => {});
+      writer.destroy(abortError);
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+    if (signal?.aborted) {
+      onAbort();
+    }
 
     try {
       while (true) {
+        signal?.throwIfAborted();
         const { done, value } = await reader.read();
+        if (streamError) {
+          throw streamError;
+        }
+        signal?.throwIfAborted();
         if (done) break;
 
         transferred += value.length;
-        writer.write(value);
+        const writeOk = writer.write(value);
+        if (streamError) {
+          throw streamError;
+        }
+        if (!writeOk) {
+          if (writer.destroyed || !writer.writable) {
+            throw streamError ?? new Error('Stream is not writable');
+          }
+          await new Promise<void>((resolve, reject) => {
+            if (streamError) {
+              reject(streamError);
+              return;
+            }
+            if (signal?.aborted) {
+              reject(streamError ?? this.getAbortError(signal));
+              return;
+            }
+            const onDrain = () => {
+              cleanup();
+              resolve();
+            };
+            const onError = (err: Error) => {
+              cleanup();
+              reject(err);
+            };
+            const onClose = () => {
+              cleanup();
+              reject(new Error('Stream closed before drain'));
+            };
+            const onSignalAbort = () => {
+              cleanup();
+              reject(streamError ?? this.getAbortError(signal));
+            };
+            const cleanup = () => {
+              writer.off('drain', onDrain);
+              writer.off('error', onError);
+              writer.off('close', onClose);
+              signal?.removeEventListener('abort', onSignalAbort);
+            };
+            writer.once('drain', onDrain);
+            writer.once('error', onError);
+            writer.once('close', onClose);
+            signal?.addEventListener('abort', onSignalAbort, { once: true });
+          });
+        }
 
         const percentage = total > 0 ? transferred / total : 0;
         this.emit('progress', {
@@ -94,8 +269,24 @@ export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents>
           percentage,
         });
       }
-    } finally {
+
       writer.end();
+      await closePromise;
+
+      if (transferred === 0 || (total > 0 && transferred !== total)) {
+        throw new Error(
+          `Incomplete download for ${modelName}: expected ${total} bytes, received ${transferred} bytes`,
+        );
+      }
+
+      await fs.promises.rename(tempDestination, destination);
+    } catch (error) {
+      writer.destroy(error instanceof Error ? error : undefined);
+      await closePromise.catch(() => {});
+      await fs.promises.unlink(tempDestination).catch(() => {});
+      throw error;
+    } finally {
+      signal?.removeEventListener('abort', onAbort);
     }
   }
 

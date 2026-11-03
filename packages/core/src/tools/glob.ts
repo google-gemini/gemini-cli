@@ -22,6 +22,7 @@ import {
   shortenPath,
   makeRelative,
   resolveToRealPath,
+  toPathKey,
 } from '../utils/paths.js';
 import { type Config } from '../config/config.js';
 import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/constants.js';
@@ -212,6 +213,7 @@ class GlobToolInvocation extends BaseToolInvocation<
         // Ignore and use raw targetDir
       }
 
+      const resolvedPathMap = new Map<GlobPath, string>();
       const relativePaths = allEntries.map((p) => {
         let realFullPath = p.fullpath();
         try {
@@ -219,6 +221,7 @@ class GlobToolInvocation extends BaseToolInvocation<
         } catch {
           // Ignore and use raw fullpath
         }
+        resolvedPathMap.set(p, realFullPath);
         return path.relative(realTargetDir, realFullPath);
       });
 
@@ -235,12 +238,25 @@ class GlobToolInvocation extends BaseToolInvocation<
         });
 
       const filteredAbsolutePaths = new Set(
-        filteredPaths.map((p) => path.resolve(this.config.getTargetDir(), p)),
+        filteredPaths
+          .map((p) => path.resolve(realTargetDir, p))
+          .filter((p) => !this.config.validatePathAccess(p, 'read'))
+          .map((p) => toPathKey(p)),
       );
 
-      const filteredEntries = allEntries.filter((entry) =>
-        filteredAbsolutePaths.has(entry.fullpath()),
-      );
+      const seenCanonicalPaths = new Set<string>();
+      const filteredEntries = allEntries.filter((entry) => {
+        const canonicalPath = resolvedPathMap.get(entry) ?? entry.fullpath();
+        const pathKey = toPathKey(canonicalPath);
+        if (
+          !filteredAbsolutePaths.has(pathKey) ||
+          seenCanonicalPaths.has(pathKey)
+        ) {
+          return false;
+        }
+        seenCanonicalPaths.add(pathKey);
+        return true;
+      });
 
       if (!filteredEntries || filteredEntries.length === 0) {
         let message = `No files found matching pattern "${this.params.pattern}"`;
@@ -269,8 +285,8 @@ class GlobToolInvocation extends BaseToolInvocation<
         oneDayInMs,
       );
 
-      const sortedAbsolutePaths = sortedEntries.map((entry) =>
-        entry.fullpath(),
+      const sortedAbsolutePaths = sortedEntries.map(
+        (entry) => resolvedPathMap.get(entry) ?? entry.fullpath(),
       );
       const fileListDescription = sortedAbsolutePaths.join('\n');
       const fileCount = sortedAbsolutePaths.length;

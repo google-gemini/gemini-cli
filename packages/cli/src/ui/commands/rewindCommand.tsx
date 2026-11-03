@@ -58,11 +58,18 @@ async function rewindConversation(
     const clientHistory = convertSessionToClientHistory(conversation.messages);
 
     client.setHistory(clientHistory);
+    client.clearCurrentSequenceModel?.();
 
-    // Reset context manager as we are rewinding history
-    await context.services.agentContext?.config
-      .getMemoryContextManager()
-      ?.refresh();
+    // Reset transient model availability, active model drift, and context manager as we are rewinding history
+    const config = context.services.agentContext?.config;
+    if (config) {
+      config.getModelAvailabilityService?.()?.reset();
+      const configuredModel = config.getModel?.();
+      if (configuredModel) {
+        config.setActiveModel?.(configuredModel);
+      }
+      await config.getMemoryContextManager()?.refresh();
+    }
 
     // Update UI History
     // We generate IDs based on index for the rewind history
