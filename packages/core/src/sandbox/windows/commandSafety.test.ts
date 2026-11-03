@@ -175,6 +175,33 @@ describe('Windows commandSafety', () => {
       );
     });
 
+    it('should reject git commands with cmd.exe escapes or variable expansion', () => {
+      expect(isKnownSafeCommand(['git', 'diff', '--out^put=target.conf'])).toBe(
+        false,
+      );
+      expect(
+        isKnownSafeCommand(['git', 'diff', '--out%PATH:~0,0%put=target.conf']),
+      ).toBe(false);
+      expect(isKnownSafeCommand(['git', 'diff', '--out!X!put=t.conf'])).toBe(
+        false,
+      );
+      expect(isDangerousCommand(['git', 'diff', '--out^put=target.conf'])).toBe(
+        true,
+      );
+    });
+
+    it('should reject git diff --no-index', () => {
+      expect(
+        isKnownSafeCommand([
+          'git',
+          'diff',
+          '--no-index',
+          'C:\\Windows\\win.ini',
+          'out.txt',
+        ]),
+      ).toBe(false);
+    });
+
     it('should allow git format strings containing %', () => {
       expect(isKnownSafeCommand(['git', 'log', '--format=%H'])).toBe(true);
       expect(isKnownSafeCommand(['git', 'log', '--pretty=format:%h %s'])).toBe(

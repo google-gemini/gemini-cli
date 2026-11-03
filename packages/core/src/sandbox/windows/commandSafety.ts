@@ -298,28 +298,25 @@ export function isKnownSafeCommand(
   }
 
   // We allow git on Windows if it's read-only, using the same logic as POSIX.
-  // Global options before the subcommand (e.g. `-C`, `--git-dir` or
-  // `--exec-path`) change which repository, config or helper programs git
-  // uses, so those invocations still require confirmation.
   if (cmd === 'git') {
-    return (
-      !args[1]?.startsWith('-') &&
-      !hasPowerShellEscape(args) &&
-      isKnownSafeGitCommand(args)
-    );
+    return !hasShellEscapeOrExpansion(args) && isKnownSafeGitCommand(args);
   }
 
   return false;
 }
 
 /**
- * Checks if any argument contains a PowerShell escape character (backtick).
- * PowerShell removes these before invoking native commands, so an argument
- * like --out`put reaches the program as --output and cannot be validated
- * from its parsed form.
+ * Checks if any argument contains characters that the Windows shell rewrites
+ * before invoking native commands, so the parsed argument cannot be trusted:
+ * - PowerShell escape (backtick): --out`put reaches git as --output.
+ * - cmd.exe escape (caret): --out^put reaches git as --output. The strict
+ *   Windows sandbox runs commands through `cmd.exe /c`.
+ * - cmd.exe variable expansion: --out%PATH:~0,0%put expands to --output, and
+ *   delayed expansion (!VAR!) behaves the same when enabled. A lone `%` (as in
+ *   `--format=%H`) is not expanded and stays allowed.
  */
-function hasPowerShellEscape(args: string[]): boolean {
-  return args.some((arg) => arg.includes('`'));
+function hasShellEscapeOrExpansion(args: string[]): boolean {
+  return args.some((arg) => /[`^!]|%[^%\s]+%/.test(arg));
 }
 
 /**
@@ -337,7 +334,7 @@ export function isDangerousCommand(
   }
 
   if (cmd === 'git') {
-    return hasPowerShellEscape(args) || isDangerousGitCommand(args);
+    return hasShellEscapeOrExpansion(args) || isDangerousGitCommand(args);
   }
 
   const dangerous = new Set([

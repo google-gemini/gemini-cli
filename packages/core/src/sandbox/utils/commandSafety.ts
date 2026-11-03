@@ -594,7 +594,10 @@ export function isKnownSafeGitCommand(args: string[]): boolean {
     'show',
     'branch',
   ]);
-  if (!subcommand) {
+  // Global options before the subcommand (e.g. `-C`, `--git-dir`,
+  // `--work-tree` or `--exec-path`) change which repository, config or helper
+  // programs git uses, so only `git <subcommand> ...` is considered safe.
+  if (!subcommand || idx !== 1) {
     return false;
   }
 
@@ -623,7 +626,7 @@ export function isKnownSafeGitCommand(args: string[]): boolean {
  * @returns true if the git command is identified as dangerous.
  */
 export function isDangerousGitCommand(args: string[]): boolean {
-  if (gitHasConfigOverrideGlobalOption(args)) {
+  if (gitHasConfigOverrideGlobalOption(args) || gitHasExecPathOverride(args)) {
     return true;
   }
 
@@ -736,6 +739,27 @@ function gitHasConfigOverrideGlobalOption(args: string[]): boolean {
 }
 
 /**
+ * Checks if a git command overrides `--exec-path`, which makes git run its
+ * subcommand helpers (e.g. `git-log`) from an arbitrary directory.
+ *
+ * @param args - The git command arguments.
+ * @returns true if an exec-path override is present.
+ */
+function gitHasExecPathOverride(args: string[]): boolean {
+  const { idx } = findGitSubcommand(args, [
+    'status',
+    'log',
+    'diff',
+    'show',
+    'branch',
+  ]);
+  const globalArgs = idx === -1 ? args.slice(1) : args.slice(1, idx);
+  return globalArgs.some(
+    (arg) => arg === '--exec-path' || arg.startsWith('--exec-path='),
+  );
+}
+
+/**
  * Validates that the arguments for safe git subcommands (like `status`, `log`,
  * `diff`, `show`) do not contain flags that could cause mutations or execute
  * arbitrary commands (e.g., `--output`, `--exec`).
@@ -744,20 +768,25 @@ function gitHasConfigOverrideGlobalOption(args: string[]): boolean {
  * @returns true if the arguments only represent read-only operations.
  */
 function gitSubcommandArgsAreReadOnly(args: string[]): boolean {
-  const unsafeFlags = new Set([
+  const unsafeFlags = [
     '--output',
     '--ext-diff',
     '--textconv',
     '--exec',
     '--paginate',
-  ]);
+    // Compares arbitrary paths, including files outside the repository.
+    '--no-index',
+  ];
 
-  return !args.some(
-    (arg) =>
-      unsafeFlags.has(arg) ||
-      arg.startsWith('--output=') ||
-      arg.startsWith('--exec='),
-  );
+  return !args.some((arg) => {
+    if (!arg.startsWith('--')) {
+      return false;
+    }
+    const name = arg.split('=')[0];
+    // git accepts unambiguous prefixes of long options (e.g. `--outp=<file>`
+    // for `--output=<file>`), so reject any prefix of an unsafe flag.
+    return name.length > 2 && unsafeFlags.some((flag) => flag.startsWith(name));
+  });
 }
 
 /**
