@@ -337,13 +337,17 @@ export class ShellToolInvocation extends BaseToolInvocation<
         return {
           commandPrefix: rootCommands,
           allowRedirection,
-          ...(allowCommandSubstitution ? { allowCommandSubstitution } : {}),
+          ...(allowCommandSubstitution !== undefined
+            ? { allowCommandSubstitution }
+            : {}),
         };
       }
       return {
         commandPrefix: this.params.command,
         allowRedirection,
-        ...(allowCommandSubstitution ? { allowCommandSubstitution } : {}),
+        ...(allowCommandSubstitution !== undefined
+          ? { allowCommandSubstitution }
+          : {}),
       };
     }
     return undefined;
@@ -593,8 +597,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
     options: ExecuteOptions,
   ): Promise<boolean> {
     if (
-      options.isClientInitiated ||
-      options.isUserConfirmed ||
+      (options.isClientInitiated ?? false) ||
+      (options.isUserConfirmed ?? false) ||
       this.confirmedCommand === this.params.command
     ) {
       return true;
@@ -608,7 +612,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
     if (policyEngine) {
       const checkResult = await policyEngine.check(
         {
-          name: this._toolName || SHELL_TOOL_NAME,
+          name: this._toolName ?? SHELL_TOOL_NAME,
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           args: this.params as unknown as Record<string, unknown>,
         },

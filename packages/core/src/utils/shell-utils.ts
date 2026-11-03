@@ -657,7 +657,7 @@ function parsePowerShellCommandDetails(
       details,
       hasError: details.length === 0,
       hasRedirection: parsed.hasRedirection,
-      hasCommandSubstitution: parsed.hasCommandSubstitution,
+      hasCommandSubstitution: parsed.hasCommandSubstitution ?? false,
     };
   } catch {
     return null;

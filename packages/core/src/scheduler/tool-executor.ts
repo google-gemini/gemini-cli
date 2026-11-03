@@ -123,7 +123,7 @@ export class ToolExecutor {
               shellExecutionConfig,
               setExecutionIdCallback,
               isClientInitiated: request.isClientInitiated,
-              isUserConfirmed: request.isUserConfirmed,
+              isUserConfirmed: request.isUserConfirmed ?? false,
             },
             this.config,
             request.originalRequestName,

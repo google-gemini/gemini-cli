@@ -738,7 +738,7 @@ export class Scheduler {
       outcome = result.outcome;
       lastDetails = result.lastDetails;
       if (
-        result.confirmedByUser &&
+        (result.confirmedByUser ?? false) &&
         outcome !== ToolConfirmationOutcome.Cancel
       ) {
         toolCall.request.isUserConfirmed = true;
