@@ -597,6 +597,20 @@ describe('ShellProcessor', () => {
       expect(mockShellExecute).not.toHaveBeenCalled();
     });
 
+    it('should preserve $ replacement patterns literally in raw {{args}} without shell injections', async () => {
+      const processor = new ShellProcessor('test-command');
+      const dollarArgs = "costs $$5 and $& and $` and $' and $1";
+      context.invocation!.args = dollarArgs;
+      const prompt: PromptPipelineContent = createPromptPipelineContent(
+        'The user said: {{args}}',
+      );
+
+      const result = await processor.process(prompt, context);
+
+      expect(result).toEqual([{ text: `The user said: ${dollarArgs}` }]);
+      expect(mockShellExecute).not.toHaveBeenCalled();
+    });
+
     it('should perform raw replacement outside !{} blocks', async () => {
       const processor = new ShellProcessor('test-command');
       const prompt: PromptPipelineContent = createPromptPipelineContent(
@@ -609,6 +623,24 @@ describe('ShellProcessor', () => {
       const result = await processor.process(prompt, context);
 
       expect(result).toEqual([{ text: `Outside: ${rawArgs}. Inside: hello` }]);
+    });
+
+    it('should preserve $ replacement patterns literally in raw {{args}} outside !{} blocks', async () => {
+      const processor = new ShellProcessor('test-command');
+      const dollarArgs = "costs $$5 and $& and $` and $' and $1";
+      context.invocation!.args = dollarArgs;
+      const prompt: PromptPipelineContent = createPromptPipelineContent(
+        'Outside: {{args}}. Inside: !{echo "hello"}',
+      );
+      mockShellExecute.mockReturnValue({
+        result: Promise.resolve({ ...SUCCESS_RESULT, output: 'hello' }),
+      });
+
+      const result = await processor.process(prompt, context);
+
+      expect(result).toEqual([
+        { text: `Outside: ${dollarArgs}. Inside: hello` },
+      ]);
     });
 
     it('should perform escaped replacement inside !{} blocks', async () => {

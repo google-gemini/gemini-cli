@@ -237,6 +237,17 @@ describe('applySubstitutions', () => {
     expect(result).toBe('Skills: my-skills-content');
   });
 
+  it('should preserve $ replacement patterns literally in ${AgentSkills}', () => {
+    const dollarSkills =
+      "Cost is $$100 and match is $& and prefix is $` and suffix is $' and $1";
+    const result = applySubstitutions(
+      'Skills: ${AgentSkills}',
+      mockConfig,
+      dollarSkills,
+    );
+    expect(result).toBe(`Skills: ${dollarSkills}`);
+  });
+
   it('should replace multiple ${AgentSkills} occurrences', () => {
     const result = applySubstitutions(
       '${AgentSkills} and ${AgentSkills}',
@@ -279,6 +290,21 @@ describe('applySubstitutions', () => {
     );
     expect(result).toContain('- read_file');
     expect(result).toContain('- write_file');
+  });
+
+  it('should preserve $ replacement patterns literally in ${AvailableTools}', () => {
+    (mockConfig as unknown as { toolRegistry: ToolRegistry }).toolRegistry = {
+      getAllToolNames: vi.fn().mockReturnValue(['custom_$1_tool', 'price_$$']),
+      getAllTools: vi.fn().mockReturnValue([]),
+    } as unknown as ToolRegistry;
+
+    const result = applySubstitutions(
+      'Tools: ${AvailableTools}',
+      mockConfig,
+      '',
+    );
+    expect(result).toContain('- custom_$1_tool');
+    expect(result).toContain('- price_$$');
   });
 
   it('should show no tools message when no tools available', () => {
