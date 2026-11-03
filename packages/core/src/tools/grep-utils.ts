@@ -105,8 +105,10 @@ function formatTruncationNotice(
   }
   return (
     `\n[Output truncated: showing ${shown} of ${total} ${unit}${contextOmitted ? ' without context lines' : ''} to stay under ${MAX_GREP_OUTPUT_CHARS} characters. ` +
-    `This search is too broad to read in full. Narrow the search with a more specific pattern, ` +
-    `an 'include_pattern' or a 'dir_path', or set 'names_only' to see which files match first.]`
+    `This search is too broad to read in full. Narrow the search with a more specific pattern` +
+    (unit === 'files'
+      ? ` or an 'include_pattern' or a 'dir_path'.]`
+      : `, an 'include_pattern' or a 'dir_path', or set 'names_only' to see which files match first.]`)
   );
 }
 

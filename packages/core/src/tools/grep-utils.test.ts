@@ -144,6 +144,7 @@ describe('formatGrepResults output budget', () => {
     expect(llmContent).toContain('Found 5000 files with matches');
     expect(llmContent).toMatch(/showing \d+ of 5000 files/);
     expect(llmContent).toContain('Narrow the search');
+    expect(llmContent).not.toContain("set 'names_only'");
     expect(returnDisplay.summary).toBe('Found 5000 files (limited)');
   });
 });
