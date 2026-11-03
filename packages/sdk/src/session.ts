@@ -249,6 +249,12 @@ export class GeminiCliSession {
 
       for await (const event of stream) {
         yield event;
+        if (event.type === GeminiEventType.Retry) {
+          // Tool calls streamed by the failed attempt are not in history;
+          // drop them so they are not executed twice.
+          toolCallsToSchedule.length = 0;
+          continue;
+        }
         if (event.type === GeminiEventType.ToolCallRequest) {
           const toolCall = event.value;
           let args = toolCall.args;
