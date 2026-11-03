@@ -429,7 +429,9 @@ describe('github.ts', () => {
     it('should use correct headers for release assets', async () => {
       vi.mocked(fetchJson).mockResolvedValue({
         tag_name: 'v1.0.0',
-        assets: [{ name: 'asset.tar.gz', url: 'http://asset.url' }],
+        assets: [
+          { name: 'asset.tar.gz', url: 'https://example.com/asset.tar.gz' },
+        ],
       });
       vi.mocked(os.platform).mockReturnValue('linux');
       vi.mocked(os.arch).mockReturnValue('x64');
@@ -475,7 +477,7 @@ describe('github.ts', () => {
       await promise;
 
       expect(https.get).toHaveBeenCalledWith(
-        'http://asset.url',
+        'https://example.com/asset.tar.gz',
         expect.objectContaining({
           headers: expect.objectContaining({
             Accept: 'application/octet-stream',
@@ -489,7 +491,7 @@ describe('github.ts', () => {
       vi.mocked(fetchJson).mockResolvedValue({
         tag_name: 'v1.0.0',
         assets: [],
-        tarball_url: 'http://tarball.url',
+        tarball_url: 'https://example.com/tarball.tar.gz',
       });
 
       // Mock https.get and fs.createWriteStream for downloadFile
@@ -533,7 +535,7 @@ describe('github.ts', () => {
       await promise;
 
       expect(https.get).toHaveBeenCalledWith(
-        'http://tarball.url',
+        'https://example.com/tarball.tar.gz',
         expect.objectContaining({
           headers: expect.objectContaining({
             Accept: 'application/vnd.github+json',
@@ -546,7 +548,9 @@ describe('github.ts', () => {
     it('should return failed to download asset when download stream errors', async () => {
       vi.mocked(fetchJson).mockResolvedValue({
         tag_name: 'v1.0.0',
-        assets: [{ name: 'asset.tar.gz', url: 'http://asset.url' }],
+        assets: [
+          { name: 'asset.tar.gz', url: 'https://example.com/asset.tar.gz' },
+        ],
       });
       vi.mocked(os.platform).mockReturnValue('linux');
       vi.mocked(os.arch).mockReturnValue('x64');
@@ -765,13 +769,51 @@ describe('github.ts', () => {
       );
     });
 
+    it('should reject invalid or non-HTTPS download URLs before DNS or network requests', async () => {
+      await expect(downloadFile('not-a-valid-url', '/dest')).rejects.toThrow(
+        'Invalid download URL not-a-valid-url',
+      );
+      await expect(
+        downloadFile('http://example.com/metadata', '/dest'),
+      ).rejects.toThrow(
+        'Refusing to download from insecure protocol http: for URL http://example.com/metadata. Only HTTPS is supported.',
+      );
+      await expect(
+        downloadFile('ftp://example.com/metadata', '/dest'),
+      ).rejects.toThrow(
+        'Refusing to download from insecure protocol ftp: for URL ftp://example.com/metadata. Only HTTPS is supported.',
+      );
+      expect(validateUrlDestination).not.toHaveBeenCalled();
+      expect(https.get).not.toHaveBeenCalled();
+    });
+
+    it('should reject when a redirect downgrades from HTTPS to HTTP', async () => {
+      vi.mocked(https.get).mockImplementationOnce((url, options, cb) => {
+        if (typeof options === 'function') cb = options;
+        if (cb) {
+          cb(
+            createMockResponse(302, {
+              location: 'http://example.com/downgraded',
+            }),
+          );
+        }
+        return new EventEmitter() as unknown as ClientRequest;
+      });
+
+      await expect(downloadFile(assetUrl, '/dest')).rejects.toThrow(
+        'Refusing to download from insecure protocol http: for URL http://example.com/downgraded. Only HTTPS is supported.',
+      );
+      expect(validateUrlDestination).toHaveBeenCalledTimes(1);
+      expect(https.get).toHaveBeenCalledTimes(1);
+    });
+
     it('should reject when URL destination validation fails (SSRF protection)', async () => {
       vi.mocked(validateUrlDestination).mockResolvedValueOnce(false);
 
       await expect(
-        downloadFile('http://169.254.169.254/latest/meta-data/', '/dest'),
+        downloadFile('https://169.254.169.254/latest/meta-data/', '/dest'),
       ).rejects.toThrow(
-        'Access to blocked or private host http://169.254.169.254/latest/meta-data/ is not allowed.',
+        'Access to blocked or private host https://169.254.169.254/latest/meta-data/ is not allowed.',
       );
       expect(https.get).not.toHaveBeenCalled();
     });
@@ -786,7 +828,7 @@ describe('github.ts', () => {
         if (cb) {
           cb(
             createMockResponse(302, {
-              location: 'http://127.0.0.1:8080/internal',
+              location: 'https://127.0.0.1:8080/internal',
             }),
           );
         }
@@ -794,7 +836,7 @@ describe('github.ts', () => {
       });
 
       await expect(downloadFile(assetUrl, '/dest')).rejects.toThrow(
-        'Access to blocked or private host http://127.0.0.1:8080/internal is not allowed.',
+        'Access to blocked or private host https://127.0.0.1:8080/internal is not allowed.',
       );
       expect(https.get).toHaveBeenCalledTimes(1);
     });
@@ -851,7 +893,10 @@ describe('github.ts', () => {
         'https://github.com/owner/repo/releases/download/v1.0.0/asset.tar.gz',
         '/dest',
       );
-      await downloadFile('http://github.com/owner/repo/asset.tar.gz', '/dest');
+      await downloadFile(
+        'https://objects.githubusercontent.com/github-production-release-asset/asset.tar.gz',
+        '/dest',
+      );
       await downloadFile('https://notgithub.com/asset.tar.gz', '/dest');
 
       expect(https.get).toHaveBeenNthCalledWith(
@@ -875,17 +920,19 @@ describe('github.ts', () => {
         expect.anything(),
       );
 
-      const httpGitHubOptions = vi.mocked(https.get).mock.calls[2][1];
+      const githubusercontentOptions = vi.mocked(https.get).mock.calls[2][1];
       const externalOptions = vi.mocked(https.get).mock.calls[3][1];
       if (
-        !httpGitHubOptions ||
-        typeof httpGitHubOptions === 'function' ||
+        !githubusercontentOptions ||
+        typeof githubusercontentOptions === 'function' ||
         !externalOptions ||
         typeof externalOptions === 'function'
       ) {
         throw new Error('Expected request options object');
       }
-      expect(httpGitHubOptions.headers).not.toHaveProperty('Authorization');
+      expect(githubusercontentOptions.headers).not.toHaveProperty(
+        'Authorization',
+      );
       expect(externalOptions.headers).not.toHaveProperty('Authorization');
     });
 

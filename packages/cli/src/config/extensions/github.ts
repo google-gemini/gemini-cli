@@ -534,8 +534,25 @@ export async function downloadFile(
   options?: DownloadOptions,
   redirectCount: number = 0,
 ): Promise<void> {
-  if (!(await validateUrlDestination(url))) {
-    throw new Error(`Access to blocked or private host ${url} is not allowed.`);
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(url);
+  } catch (error) {
+    throw new Error(`Invalid download URL ${url}: ${getErrorMessage(error)}`, {
+      cause: error,
+    });
+  }
+  if (parsedUrl.protocol !== 'https:') {
+    throw new Error(
+      `Refusing to download from insecure protocol ${parsedUrl.protocol} for URL ${url}. Only HTTPS is supported.`,
+    );
+  }
+
+  const requestUrl = parsedUrl.toString();
+  if (!(await validateUrlDestination(requestUrl))) {
+    throw new Error(
+      `Access to blocked or private host ${requestUrl} is not allowed.`,
+    );
   }
 
   const headers: Record<string, string> = {
@@ -543,7 +560,7 @@ export async function downloadFile(
     Accept: 'application/octet-stream',
     ...options?.headers,
   };
-  const trustedGitHubUrl = isTrustedGitHubUrl(url);
+  const trustedGitHubUrl = isTrustedGitHubUrl(requestUrl);
   if (!trustedGitHubUrl) {
     for (const key of Object.keys(headers)) {
       if (key.toLowerCase() === 'authorization') {
@@ -587,7 +604,7 @@ export async function downloadFile(
         timeout: REQUEST_TIMEOUT_MS,
       };
 
-      const req = https.get(url, requestOptions, (res) => {
+      const req = https.get(requestUrl, requestOptions, (res) => {
         res.on('error', (error) => {
           if (!isRedirecting) {
             settleReject(error);
@@ -611,12 +628,12 @@ export async function downloadFile(
 
           let redirectUrl: string;
           try {
-            redirectUrl = new URL(res.headers.location, url).toString();
+            redirectUrl = new URL(res.headers.location, requestUrl).toString();
           } catch (error) {
             res.resume?.();
             settleReject(
               new Error(
-                `Invalid redirect URL from ${url} (status ${res.statusCode}): ${getErrorMessage(error)}`,
+                `Invalid redirect URL from ${requestUrl} (status ${res.statusCode}): ${getErrorMessage(error)}`,
                 { cause: error },
               ),
             );
@@ -661,7 +678,9 @@ export async function downloadFile(
         void downloadPipeline.then(() => {
           if (res.complete === false) {
             settleReject(
-              new Error(`Response ended prematurely while downloading ${url}`),
+              new Error(
+                `Response ended prematurely while downloading ${requestUrl}`,
+              ),
             );
             return;
           }
