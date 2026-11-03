@@ -278,6 +278,29 @@ allowRedirection = true
       expect(result.rules[0].allowRedirection).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
+
+    it('should parse and transform allowCommandSubstitution and allow_command_substitution', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "echo"
+decision = "allow"
+priority = 100
+allowCommandSubstitution = true
+
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "git"
+decision = "allow"
+priority = 100
+allow_command_substitution = false
+`);
+
+      expect(result.rules).toHaveLength(2);
+      expect(result.rules[0].allowCommandSubstitution).toBe(true);
+      expect(result.rules[1].allowCommandSubstitution).toBe(false);
+      expect(result.errors).toHaveLength(0);
+    });
     it('should parse deny_message property', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]

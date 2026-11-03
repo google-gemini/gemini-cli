@@ -247,6 +247,41 @@ describe('Shell Safety Policy', () => {
     const result = await policyEngineWithBoth.check(toolCall, undefined);
     expect(result.decision).toBe(PolicyDecision.ALLOW);
   });
+
+  it('SHOULD downgrade ALLOW to ASK_USER when allowCommandSubstitution is false even if inner command is allowed', async () => {
+    const argsPatternsEcho = buildArgsPatterns(undefined, 'echo', undefined);
+    const argsPatternsGit = buildArgsPatterns(undefined, 'git', undefined);
+
+    const policyEngineDisallowingSubst = new PolicyEngine({
+      rules: [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: new RegExp(argsPatternsEcho[0]!),
+          decision: PolicyDecision.ALLOW,
+          allowCommandSubstitution: false,
+          priority: 2,
+        },
+        {
+          toolName: 'run_shell_command',
+          argsPattern: new RegExp(argsPatternsGit[0]!),
+          decision: PolicyDecision.ALLOW,
+          priority: 2,
+        },
+      ],
+      defaultDecision: PolicyDecision.ASK_USER,
+    });
+
+    const toolCall: FunctionCall = {
+      name: 'run_shell_command',
+      args: { command: 'echo $(git log)' },
+    };
+
+    const result = await policyEngineDisallowingSubst.check(
+      toolCall,
+      undefined,
+    );
+    expect(result.decision).toBe(PolicyDecision.ASK_USER);
+  });
   it('SHOULD NOT allow command substitution with backticks `rm -rf /`', async () => {
     const toolCall: FunctionCall = {
       name: 'run_shell_command',
@@ -333,6 +368,41 @@ describe('Shell Safety Policy', () => {
 
     const result = await policyEngineWithBoth.check(toolCall, undefined);
     expect(result.decision).toBe(PolicyDecision.ALLOW);
+  });
+
+  it('SHOULD downgrade ALLOW to ASK_USER in chained subcommand when allowCommandSubstitution is false', async () => {
+    const argsPatternsEcho = buildArgsPatterns(undefined, 'echo', undefined);
+    const argsPatternsGit = buildArgsPatterns(undefined, 'git', undefined);
+
+    const policyEngineDisallowingSubst = new PolicyEngine({
+      rules: [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: new RegExp(argsPatternsEcho[0]!),
+          decision: PolicyDecision.ALLOW,
+          allowCommandSubstitution: false,
+          priority: 2,
+        },
+        {
+          toolName: 'run_shell_command',
+          argsPattern: new RegExp(argsPatternsGit[0]!),
+          decision: PolicyDecision.ALLOW,
+          priority: 2,
+        },
+      ],
+      defaultDecision: PolicyDecision.ASK_USER,
+    });
+
+    const toolCall: FunctionCall = {
+      name: 'run_shell_command',
+      args: { command: 'git log && echo $(git log)' },
+    };
+
+    const result = await policyEngineDisallowingSubst.check(
+      toolCall,
+      undefined,
+    );
+    expect(result.decision).toBe(PolicyDecision.ASK_USER);
   });
 
   it('SHOULD NOT allow generic redirection > /tmp/test', async () => {
