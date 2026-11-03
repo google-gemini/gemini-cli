@@ -93,6 +93,26 @@ describe('formatCliError', () => {
     expect(formatCliError(new Error('Network timeout'))).toBe(
       'Error: Network timeout',
     );
+    expect(
+      formatCliError({
+        message: 'Request failed with status code 404',
+        status: 404,
+      }),
+    ).toBe('Error: Request failed with status code 404');
+
+    const errWithStack = new Error('Network timeout');
+    errWithStack.stack = 'Error: Network timeout\n    at fetch (index.js:10:5)';
+    expect(formatCliError(errWithStack, { debug: true })).toBe(
+      'Error: Network timeout\n    at fetch (index.js:10:5)',
+    );
+    expect(
+      formatCliError(errWithStack, {
+        debug: true,
+        prefix: 'An unexpected critical error occurred: ',
+      }),
+    ).toBe(
+      'An unexpected critical error occurred: Error: Network timeout\n    at fetch (index.js:10:5)',
+    );
   });
 
   it('formats primitive string throws with proper prefix spacing', () => {

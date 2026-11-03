@@ -448,7 +448,10 @@ export async function runNonInteractive({
             break;
           default:
             errToThrow = Object.assign(
-              new Error(normalized.message),
+              new Error(
+                normalized.message,
+                rawError !== undefined ? { cause: rawError } : undefined,
+              ),
               name ? { name } : {},
             );
             break;

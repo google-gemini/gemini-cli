@@ -422,15 +422,20 @@ export async function runNonInteractive(
               (typeof normalized.status === 'string'
                 ? normalized.status
                 : undefined);
-            const err = Object.assign(new Error(normalized.message), {
-              ...(typeof normalized.status === 'number'
-                ? { status: normalized.status }
-                : {}),
-              ...(code !== undefined ? { code } : {}),
-              ...(normalized.details !== undefined
-                ? { details: normalized.details }
-                : {}),
-            });
+            const err = Object.assign(
+              new Error(normalized.message, {
+                cause: normalized.originalError,
+              }),
+              {
+                ...(typeof normalized.status === 'number'
+                  ? { status: normalized.status }
+                  : {}),
+                ...(code !== undefined ? { code } : {}),
+                ...(normalized.details !== undefined
+                  ? { details: normalized.details }
+                  : {}),
+              },
+            );
             throw err;
           } else if (event.type === GeminiEventType.AgentExecutionStopped) {
             const stopMessage = `Agent execution stopped: ${event.value.systemMessage?.trim() || event.value.reason}`;

@@ -54,7 +54,13 @@ function formatStatusSuffix(
   }
 
   const statusText = String(status);
-  if (message.includes(`(Status: ${statusText})`)) {
+  const lowerMessage = message.toLowerCase();
+  const lowerStatus = statusText.toLowerCase();
+  if (
+    lowerMessage.includes(`(status: ${lowerStatus})`) ||
+    lowerMessage.includes(`status code ${lowerStatus}`) ||
+    lowerMessage.includes(`http ${lowerStatus}`)
+  ) {
     return '';
   }
 
@@ -83,9 +89,15 @@ export function formatCliError(
 
   if (options.debug) {
     if (error instanceof Error && error.stack) {
+      const stackStartsWithError =
+        error.stack.startsWith('Error: ') ||
+        (error.name.endsWith('Error') &&
+          error.stack.startsWith(`${error.name}: `));
+      const stackPrefix =
+        prefix === 'Error: ' && stackStartsWithError ? '' : prefix;
       let debugOutput =
         error.stack.includes(normalized.message) && !statusSuffix
-          ? `${prefix}${error.stack}`
+          ? `${stackPrefix}${error.stack}`
           : `${prefix}${normalized.message}${statusSuffix}\n${error.stack}`;
 
       if (normalized.details !== undefined) {

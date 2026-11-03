@@ -597,6 +597,10 @@ describe('runNonInteractive', () => {
 
     expect(caughtError).toBeInstanceOf(Error);
     expect((caughtError as Error).message).toBe('Model not found');
+    expect((caughtError as Error).cause).toEqual({
+      message: 'Model not found',
+      status: 404,
+    });
     expect((caughtError as { status?: number }).status).toBe(404);
     expect(
       Object.getOwnPropertyDescriptor(caughtError, 'status'),
