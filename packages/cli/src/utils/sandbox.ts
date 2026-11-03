@@ -7,7 +7,6 @@
 import {
   exec,
   execFile,
-  execFileSync,
   execSync,
   spawn,
   spawnSync,
@@ -69,7 +68,7 @@ const PODMAN_INFO_TIMEOUT_MS = 5000;
  * Queries `{{.Host.Security.Rootless}}` first and falls back to
  * `{{.Host.ServiceIsRootless}}` if empty or unsupported.
  */
-export function isPodmanRootless(): boolean {
+export async function isPodmanRootless(): Promise<boolean> {
   const formats = [
     '{{.Host.Security.Rootless}}',
     '{{.Host.ServiceIsRootless}}',
@@ -77,13 +76,16 @@ export function isPodmanRootless(): boolean {
 
   for (const format of formats) {
     try {
-      const output = execFileSync('podman', ['info', '--format', format], {
-        encoding: 'utf-8',
-        stdio: ['ignore', 'pipe', 'ignore'],
-        timeout: PODMAN_INFO_TIMEOUT_MS,
-        killSignal: 'SIGKILL',
-      });
-      const trimmed = String(output ?? '')
+      const { stdout } = await execFileAsync(
+        'podman',
+        ['info', '--format', format],
+        {
+          encoding: 'utf-8',
+          timeout: PODMAN_INFO_TIMEOUT_MS,
+          killSignal: 'SIGKILL',
+        },
+      );
+      const trimmed = String(stdout ?? '')
         .trim()
         .toLowerCase();
       if (trimmed === 'true') {
@@ -94,11 +96,12 @@ export function isPodmanRootless(): boolean {
       }
     } catch (err) {
       // A missing podman binary or a timed-out query would fail the fallback
-      // query the same way, so stop instead of running podman again.
-      if (
-        isNodeError(err) &&
-        (err.code === 'ENOENT' || err.code === 'ETIMEDOUT')
-      ) {
+      // query the same way, so stop instead of running podman again. When
+      // execFile kills the process on timeout, the error reports
+      // `killed: true` rather than an ETIMEDOUT code.
+      const isMissingBinary = isNodeError(err) && err.code === 'ENOENT';
+      const timedOut = isRecord(err) && err['killed'] === true;
+      if (isMissingBinary || timedOut) {
         break;
       }
       // Property may be unsupported or podman execution failed; try fallback if available.
@@ -999,7 +1002,7 @@ export async function start_sandbox(
       if (
         command === 'podman' &&
         !hasUsernsFlag(customFlags) &&
-        isPodmanRootless()
+        (await isPodmanRootless())
       ) {
         args.push('--userns=keep-id');
       }

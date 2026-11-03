@@ -5,13 +5,7 @@
  */
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import {
-  spawn,
-  exec,
-  execFile,
-  execFileSync,
-  execSync,
-} from 'node:child_process';
+import { spawn, exec, execFile, execSync } from 'node:child_process';
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -31,12 +25,18 @@ import {
 import { createMockSandboxConfig } from '@google/gemini-cli-test-utils';
 import { EventEmitter } from 'node:events';
 
-const { mockedHomedir, mockedGetContainerPath, mockedExecCommands } =
-  vi.hoisted(() => ({
-    mockedHomedir: vi.fn().mockReturnValue('/home/user'),
-    mockedGetContainerPath: vi.fn().mockImplementation((p: string) => p),
-    mockedExecCommands: [] as string[],
-  }));
+const {
+  mockedHomedir,
+  mockedGetContainerPath,
+  mockedExecCommands,
+  mockedPodmanExecFile,
+} = vi.hoisted(() => ({
+  mockedHomedir: vi.fn().mockReturnValue('/home/user'),
+  mockedGetContainerPath: vi.fn().mockImplementation((p: string) => p),
+  mockedExecCommands: [] as string[],
+  // Backs promisify(execFile) calls for `podman` (see the node:util mock).
+  mockedPodmanExecFile: vi.fn(),
+}));
 
 vi.mock('./sandboxUtils.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./sandboxUtils.js')>();
@@ -74,7 +74,10 @@ vi.mock('node:util', async (importOriginal) => {
         };
       }
       if (fn === execFile) {
-        return async (file: string, args: string[]) => {
+        return async (file: string, args: string[], options?: unknown) => {
+          if (file === 'podman') {
+            return mockedPodmanExecFile(file, args, options);
+          }
           if (file === 'lxc' && args[0] === 'list') {
             const output = process.env['TEST_LXC_LIST_OUTPUT'];
             if (output === 'throw') {
@@ -2031,33 +2034,46 @@ describe('sandbox', () => {
       return (call?.[1] as string[]) ?? [];
     }
 
+    function podmanInfoResult(stdout: string) {
+      return { stdout, stderr: '' };
+    }
+
+    /** Mirrors the error execFile reports when podman exits non-zero. */
+    function podmanExitError(exitCode: number) {
+      return Object.assign(new Error('Command failed: podman info'), {
+        code: exitCode,
+        killed: false,
+        signal: null,
+      });
+    }
+
     beforeEach(() => {
       vi.stubEnv('SANDBOX_FLAGS', '');
       // Exercise the path where the sandbox runs as the host UID/GID.
       vi.stubEnv('SANDBOX_SET_UID_GID', 'true');
       vi.stubEnv('GEMINI_CLI_INTEGRATION_TEST', '');
-      vi.mocked(execFileSync).mockReset();
+      mockedPodmanExecFile.mockReset();
     });
 
     describe('isPodmanRootless', () => {
-      it('returns true when Host.Security.Rootless is true', () => {
-        vi.mocked(execFileSync).mockReturnValue('true\n');
+      it('returns true when Host.Security.Rootless is true', async () => {
+        mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('true\n'));
 
-        expect(isPodmanRootless()).toBe(true);
-        expect(execFileSync).toHaveBeenCalledTimes(1);
-        expect(execFileSync).toHaveBeenCalledWith(
+        await expect(isPodmanRootless()).resolves.toBe(true);
+        expect(mockedPodmanExecFile).toHaveBeenCalledTimes(1);
+        expect(mockedPodmanExecFile).toHaveBeenCalledWith(
           'podman',
           ['info', '--format', '{{.Host.Security.Rootless}}'],
           expect.objectContaining({ encoding: 'utf-8' }),
         );
       });
 
-      it('bounds podman info with a timeout', () => {
-        vi.mocked(execFileSync).mockReturnValue('true\n');
+      it('bounds podman info with a timeout', async () => {
+        mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('true\n'));
 
-        isPodmanRootless();
+        await isPodmanRootless();
 
-        expect(execFileSync).toHaveBeenCalledWith(
+        expect(mockedPodmanExecFile).toHaveBeenCalledWith(
           'podman',
           ['info', '--format', '{{.Host.Security.Rootless}}'],
           expect.objectContaining({
@@ -2067,26 +2083,26 @@ describe('sandbox', () => {
         );
       });
 
-      it('returns false when Host.Security.Rootless is false without calling fallback', () => {
-        vi.mocked(execFileSync).mockReturnValue('false\n');
+      it('returns false when Host.Security.Rootless is false without calling fallback', async () => {
+        mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('false\n'));
 
-        expect(isPodmanRootless()).toBe(false);
-        expect(execFileSync).toHaveBeenCalledTimes(1);
+        await expect(isPodmanRootless()).resolves.toBe(false);
+        expect(mockedPodmanExecFile).toHaveBeenCalledTimes(1);
       });
 
-      it('falls back to Host.ServiceIsRootless when Host.Security.Rootless is empty', () => {
-        vi.mocked(execFileSync)
-          .mockReturnValueOnce('\n')
-          .mockReturnValueOnce('true\n');
+      it('falls back to Host.ServiceIsRootless when Host.Security.Rootless is empty', async () => {
+        mockedPodmanExecFile
+          .mockResolvedValueOnce(podmanInfoResult('\n'))
+          .mockResolvedValueOnce(podmanInfoResult('true\n'));
 
-        expect(isPodmanRootless()).toBe(true);
-        expect(execFileSync).toHaveBeenNthCalledWith(
+        await expect(isPodmanRootless()).resolves.toBe(true);
+        expect(mockedPodmanExecFile).toHaveBeenNthCalledWith(
           1,
           'podman',
           ['info', '--format', '{{.Host.Security.Rootless}}'],
           expect.objectContaining({ encoding: 'utf-8' }),
         );
-        expect(execFileSync).toHaveBeenNthCalledWith(
+        expect(mockedPodmanExecFile).toHaveBeenNthCalledWith(
           2,
           'podman',
           ['info', '--format', '{{.Host.ServiceIsRootless}}'],
@@ -2094,53 +2110,51 @@ describe('sandbox', () => {
         );
       });
 
-      it('falls back to Host.ServiceIsRootless when Host.Security.Rootless is unsupported and throws', () => {
-        vi.mocked(execFileSync)
-          .mockImplementationOnce(() => {
-            throw new Error('template field not supported');
-          })
-          .mockReturnValueOnce('true\n');
+      it('falls back to Host.ServiceIsRootless when Host.Security.Rootless is unsupported and fails', async () => {
+        mockedPodmanExecFile
+          .mockRejectedValueOnce(podmanExitError(125))
+          .mockResolvedValueOnce(podmanInfoResult('true\n'));
 
-        expect(isPodmanRootless()).toBe(true);
-        expect(execFileSync).toHaveBeenCalledTimes(2);
+        await expect(isPodmanRootless()).resolves.toBe(true);
+        expect(mockedPodmanExecFile).toHaveBeenCalledTimes(2);
       });
 
-      it('returns false when podman info fails with an error', () => {
-        vi.mocked(execFileSync).mockImplementation(() => {
-          throw new Error('podman not found');
-        });
+      it('returns false when podman info fails with an error', async () => {
+        mockedPodmanExecFile.mockRejectedValue(podmanExitError(125));
 
-        expect(isPodmanRootless()).toBe(false);
+        await expect(isPodmanRootless()).resolves.toBe(false);
         // A generic failure may mean the property is unsupported, so the
         // fallback query is still attempted.
-        expect(execFileSync).toHaveBeenCalledTimes(2);
+        expect(mockedPodmanExecFile).toHaveBeenCalledTimes(2);
       });
 
-      it('stops without running the fallback query when podman is not installed', () => {
-        vi.mocked(execFileSync).mockImplementation(() => {
-          throw Object.assign(new Error('spawnSync podman ENOENT'), {
-            code: 'ENOENT',
-          });
-        });
+      it('stops without running the fallback query when podman is not installed', async () => {
+        mockedPodmanExecFile.mockRejectedValue(
+          Object.assign(new Error('spawn podman ENOENT'), { code: 'ENOENT' }),
+        );
 
-        expect(isPodmanRootless()).toBe(false);
-        expect(execFileSync).toHaveBeenCalledTimes(1);
+        await expect(isPodmanRootless()).resolves.toBe(false);
+        expect(mockedPodmanExecFile).toHaveBeenCalledTimes(1);
       });
 
-      it('stops without running the fallback query when podman info times out', () => {
-        vi.mocked(execFileSync).mockImplementation(() => {
-          throw Object.assign(new Error('spawnSync podman ETIMEDOUT'), {
-            code: 'ETIMEDOUT',
-          });
-        });
+      it('stops without running the fallback query when podman info times out', async () => {
+        // execFile reports a timeout by killing the process, so the error has
+        // `killed: true` and no ETIMEDOUT code.
+        mockedPodmanExecFile.mockRejectedValue(
+          Object.assign(new Error('Command failed: podman info'), {
+            code: null,
+            killed: true,
+            signal: 'SIGKILL',
+          }),
+        );
 
-        expect(isPodmanRootless()).toBe(false);
-        expect(execFileSync).toHaveBeenCalledTimes(1);
+        await expect(isPodmanRootless()).resolves.toBe(false);
+        expect(mockedPodmanExecFile).toHaveBeenCalledTimes(1);
       });
     });
 
     it('adds --userns=keep-id for rootless Podman when the sandbox runs as the host user', async () => {
-      vi.mocked(execFileSync).mockReturnValue('true\n');
+      mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('true\n'));
       const config: SandboxConfig = createMockSandboxConfig({
         command: 'podman',
         image: 'gemini-cli-sandbox',
@@ -2157,7 +2171,7 @@ describe('sandbox', () => {
       expect(args.indexOf('--userns=keep-id')).toBeLessThan(
         args.lastIndexOf('gemini-cli-sandbox'),
       );
-      expect(execFileSync).toHaveBeenCalledWith(
+      expect(mockedPodmanExecFile).toHaveBeenCalledWith(
         'podman',
         ['info', '--format', '{{.Host.Security.Rootless}}'],
         expect.objectContaining({ encoding: 'utf-8' }),
@@ -2166,7 +2180,7 @@ describe('sandbox', () => {
 
     it('does not add --userns=keep-id for integration test runs that stay as container root', async () => {
       vi.stubEnv('GEMINI_CLI_INTEGRATION_TEST', 'true');
-      vi.mocked(execFileSync).mockReturnValue('true\n');
+      mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('true\n'));
       const config: SandboxConfig = createMockSandboxConfig({
         command: 'podman',
         image: 'gemini-cli-sandbox',
@@ -2178,12 +2192,12 @@ describe('sandbox', () => {
       const args = containerArgs('podman');
       expect(args).toEqual(expect.arrayContaining(['--user', 'root']));
       expect(args).not.toContain('--userns=keep-id');
-      expect(execFileSync).not.toHaveBeenCalled();
+      expect(mockedPodmanExecFile).not.toHaveBeenCalled();
     });
 
     it('does not add --userns=keep-id when host UID/GID mapping is disabled', async () => {
       vi.stubEnv('SANDBOX_SET_UID_GID', 'false');
-      vi.mocked(execFileSync).mockReturnValue('true\n');
+      mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('true\n'));
       const config: SandboxConfig = createMockSandboxConfig({
         command: 'podman',
         image: 'gemini-cli-sandbox',
@@ -2194,11 +2208,11 @@ describe('sandbox', () => {
 
       const args = containerArgs('podman');
       expect(args).not.toContain('--userns=keep-id');
-      expect(execFileSync).not.toHaveBeenCalled();
+      expect(mockedPodmanExecFile).not.toHaveBeenCalled();
     });
 
     it('does not add --userns=keep-id when running rootful Podman', async () => {
-      vi.mocked(execFileSync).mockReturnValue('false\n');
+      mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('false\n'));
       const config: SandboxConfig = createMockSandboxConfig({
         command: 'podman',
         image: 'gemini-cli-sandbox',
@@ -2213,7 +2227,7 @@ describe('sandbox', () => {
 
     it('preserves user-supplied --userns=host in SANDBOX_FLAGS without adding --userns=keep-id', async () => {
       vi.stubEnv('SANDBOX_FLAGS', '--userns=host');
-      vi.mocked(execFileSync).mockReturnValue('true\n');
+      mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('true\n'));
       const config: SandboxConfig = createMockSandboxConfig({
         command: 'podman',
         image: 'gemini-cli-sandbox',
@@ -2225,12 +2239,12 @@ describe('sandbox', () => {
       const args = containerArgs('podman');
       expect(args).toContain('--userns=host');
       expect(args).not.toContain('--userns=keep-id');
-      expect(execFileSync).not.toHaveBeenCalled();
+      expect(mockedPodmanExecFile).not.toHaveBeenCalled();
     });
 
     it('preserves space-separated --userns keep-id in SANDBOX_FLAGS without duplicating --userns=keep-id', async () => {
       vi.stubEnv('SANDBOX_FLAGS', '--userns keep-id');
-      vi.mocked(execFileSync).mockReturnValue('true\n');
+      mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('true\n'));
       const config: SandboxConfig = createMockSandboxConfig({
         command: 'podman',
         image: 'gemini-cli-sandbox',
@@ -2248,7 +2262,7 @@ describe('sandbox', () => {
 
     it('still adds --userns=keep-id for rootless Podman when SANDBOX_FLAGS has unrelated flags', async () => {
       vi.stubEnv('SANDBOX_FLAGS', '--security-opt label=disable');
-      vi.mocked(execFileSync).mockReturnValue('true\n');
+      mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('true\n'));
       const config: SandboxConfig = createMockSandboxConfig({
         command: 'podman',
         image: 'gemini-cli-sandbox',
@@ -2268,7 +2282,7 @@ describe('sandbox', () => {
     });
 
     it('does not invoke rootless check or add --userns=keep-id when runtime is docker', async () => {
-      vi.mocked(execFileSync).mockReturnValue('true\n');
+      mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('true\n'));
       const config: SandboxConfig = createMockSandboxConfig({
         command: 'docker',
         image: 'gemini-cli-sandbox',
@@ -2278,13 +2292,13 @@ describe('sandbox', () => {
       await start_sandbox(config);
 
       const args = containerArgs('docker');
-      expect(execFileSync).not.toHaveBeenCalled();
+      expect(mockedPodmanExecFile).not.toHaveBeenCalled();
       expect(args).not.toContain('--userns=keep-id');
     });
 
     it('does not invoke rootless check or add --userns=keep-id when runtime is macOS seatbelt', async () => {
       vi.mocked(os.platform).mockReturnValue('darwin');
-      vi.mocked(execFileSync).mockReturnValue('true\n');
+      mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('true\n'));
       const config: SandboxConfig = createMockSandboxConfig({
         command: 'sandbox-exec',
         image: 'some-image',
@@ -2306,7 +2320,7 @@ describe('sandbox', () => {
       await expect(promise).resolves.toBe(0);
 
       const spawnArgs = vi.mocked(spawn).mock.calls[0]?.[1] as string[];
-      expect(execFileSync).not.toHaveBeenCalled();
+      expect(mockedPodmanExecFile).not.toHaveBeenCalled();
       expect(spawnArgs).not.toContain('--userns=keep-id');
     });
   });
