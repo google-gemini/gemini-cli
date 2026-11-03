@@ -7,6 +7,7 @@
 import {
   exec,
   execFile,
+  execFileSync,
   execSync,
   spawn,
   spawnSync,
@@ -57,6 +58,46 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
+
+/**
+ * Checks whether Podman is running in rootless mode.
+ * Queries `{{.Host.Security.Rootless}}` first and falls back to
+ * `{{.Host.ServiceIsRootless}}` if empty or unsupported.
+ */
+export function isPodmanRootless(): boolean {
+  const formats = [
+    '{{.Host.Security.Rootless}}',
+    '{{.Host.ServiceIsRootless}}',
+  ];
+
+  for (const format of formats) {
+    try {
+      const output = execFileSync('podman', ['info', '--format', format], {
+        encoding: 'utf-8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
+      const trimmed = String(output ?? '')
+        .trim()
+        .toLowerCase();
+      if (trimmed === 'true') {
+        return true;
+      }
+      if (trimmed === 'false') {
+        return false;
+      }
+    } catch {
+      // Property may be unsupported or podman execution failed; try fallback if available.
+    }
+  }
+
+  return false;
+}
+
+function hasUsernsFlag(flags: string[]): boolean {
+  return flags.some(
+    (flag) => flag === '--userns' || flag.startsWith('--userns='),
+  );
+}
 
 export async function start_sandbox(
   config: SandboxConfig,
@@ -497,12 +538,23 @@ export async function start_sandbox(
     }
 
     // add custom flags from SANDBOX_FLAGS
-    if (process.env['SANDBOX_FLAGS']) {
-      const flags = parse(process.env['SANDBOX_FLAGS'], process.env).filter(
-        (f): f is string => typeof f === 'string',
-      );
+    const customFlags = process.env['SANDBOX_FLAGS']
+      ? parse(process.env['SANDBOX_FLAGS'], process.env).filter(
+          (f): f is string => typeof f === 'string',
+        )
+      : [];
+    if (customFlags.length > 0) {
+      args.push(...customFlags);
+    }
 
-      args.push(...flags);
+    // Automatically supply --userns=keep-id for rootless Podman so container
+    // UID matches host UID 1:1 unless the user already configured --userns.
+    if (
+      command === 'podman' &&
+      !hasUsernsFlag(customFlags) &&
+      isPodmanRootless()
+    ) {
+      args.push('--userns=keep-id');
     }
 
     // add TTY only if stdin is TTY as well, i.e. for piped input don't init TTY in container

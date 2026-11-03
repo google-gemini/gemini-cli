@@ -5,12 +5,18 @@
  */
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { spawn, exec, execFile, execSync } from 'node:child_process';
+import {
+  spawn,
+  exec,
+  execFile,
+  execFileSync,
+  execSync,
+} from 'node:child_process';
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { start_sandbox } from './sandbox.js';
+import { isPodmanRootless, start_sandbox } from './sandbox.js';
 import { IdeBridge, resolveIdeBridgeUpstream } from './ideBridge.js';
 import {
   IDE_BRIDGE_HELPER_FILENAME,
@@ -1983,6 +1989,242 @@ describe('sandbox', () => {
       expect(envs.some((e) => e.startsWith('GEMINI_CLI_IDE_SERVER_'))).toBe(
         false,
       );
+    });
+  });
+
+  describe('Podman rootless user namespace mapping', () => {
+    interface MockProcessWithStdout extends EventEmitter {
+      stdout: EventEmitter;
+    }
+
+    function mockContainerRun() {
+      const imageCheck = new EventEmitter() as MockProcessWithStdout;
+      imageCheck.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          imageCheck.stdout.emit('data', Buffer.from('image-id'));
+          imageCheck.emit('close', 0);
+        }, 1);
+        return imageCheck as unknown as ReturnType<typeof spawn>;
+      });
+      const container = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      > & { exitCode: number | null; signalCode: string | null };
+      container.exitCode = null;
+      container.signalCode = null;
+      container.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return container;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => container);
+      return container;
+    }
+
+    function containerArgs(cmd = 'podman'): string[] {
+      const call = vi
+        .mocked(spawn)
+        .mock.calls.find(
+          (c) => c[0] === cmd && Array.isArray(c[1]) && c[1][0] === 'run',
+        );
+      return (call?.[1] as string[]) ?? [];
+    }
+
+    beforeEach(() => {
+      vi.stubEnv('SANDBOX_FLAGS', '');
+      vi.mocked(execFileSync).mockReset();
+    });
+
+    describe('isPodmanRootless', () => {
+      it('returns true when Host.Security.Rootless is true', () => {
+        vi.mocked(execFileSync).mockReturnValue('true\n');
+
+        expect(isPodmanRootless()).toBe(true);
+        expect(execFileSync).toHaveBeenCalledTimes(1);
+        expect(execFileSync).toHaveBeenCalledWith(
+          'podman',
+          ['info', '--format', '{{.Host.Security.Rootless}}'],
+          expect.objectContaining({ encoding: 'utf-8' }),
+        );
+      });
+
+      it('returns false when Host.Security.Rootless is false without calling fallback', () => {
+        vi.mocked(execFileSync).mockReturnValue('false\n');
+
+        expect(isPodmanRootless()).toBe(false);
+        expect(execFileSync).toHaveBeenCalledTimes(1);
+      });
+
+      it('falls back to Host.ServiceIsRootless when Host.Security.Rootless is empty', () => {
+        vi.mocked(execFileSync)
+          .mockReturnValueOnce('\n')
+          .mockReturnValueOnce('true\n');
+
+        expect(isPodmanRootless()).toBe(true);
+        expect(execFileSync).toHaveBeenNthCalledWith(
+          1,
+          'podman',
+          ['info', '--format', '{{.Host.Security.Rootless}}'],
+          expect.objectContaining({ encoding: 'utf-8' }),
+        );
+        expect(execFileSync).toHaveBeenNthCalledWith(
+          2,
+          'podman',
+          ['info', '--format', '{{.Host.ServiceIsRootless}}'],
+          expect.objectContaining({ encoding: 'utf-8' }),
+        );
+      });
+
+      it('falls back to Host.ServiceIsRootless when Host.Security.Rootless is unsupported and throws', () => {
+        vi.mocked(execFileSync)
+          .mockImplementationOnce(() => {
+            throw new Error('template field not supported');
+          })
+          .mockReturnValueOnce('true\n');
+
+        expect(isPodmanRootless()).toBe(true);
+        expect(execFileSync).toHaveBeenCalledTimes(2);
+      });
+
+      it('returns false when podman info fails with an error', () => {
+        vi.mocked(execFileSync).mockImplementation(() => {
+          throw new Error('podman not found');
+        });
+
+        expect(isPodmanRootless()).toBe(false);
+      });
+    });
+
+    it('adds --userns=keep-id when running rootless Podman', async () => {
+      vi.mocked(execFileSync).mockReturnValue('true\n');
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'podman',
+        image: 'gemini-cli-sandbox',
+      });
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      const args = containerArgs('podman');
+      expect(args).toContain('--userns=keep-id');
+      expect(execFileSync).toHaveBeenCalledWith(
+        'podman',
+        ['info', '--format', '{{.Host.Security.Rootless}}'],
+        expect.objectContaining({ encoding: 'utf-8' }),
+      );
+    });
+
+    it('does not add --userns=keep-id when running rootful Podman', async () => {
+      vi.mocked(execFileSync).mockReturnValue('false\n');
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'podman',
+        image: 'gemini-cli-sandbox',
+      });
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      const args = containerArgs('podman');
+      expect(args).not.toContain('--userns=keep-id');
+    });
+
+    it('preserves user-supplied --userns=host in SANDBOX_FLAGS without adding --userns=keep-id', async () => {
+      vi.stubEnv('SANDBOX_FLAGS', '--userns=host');
+      vi.mocked(execFileSync).mockReturnValue('true\n');
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'podman',
+        image: 'gemini-cli-sandbox',
+      });
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      const args = containerArgs('podman');
+      expect(args).toContain('--userns=host');
+      expect(args).not.toContain('--userns=keep-id');
+    });
+
+    it('preserves space-separated --userns keep-id in SANDBOX_FLAGS without duplicating --userns=keep-id', async () => {
+      vi.stubEnv('SANDBOX_FLAGS', '--userns keep-id');
+      vi.mocked(execFileSync).mockReturnValue('true\n');
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'podman',
+        image: 'gemini-cli-sandbox',
+      });
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      const args = containerArgs('podman');
+      const usernsIdx = args.indexOf('--userns');
+      expect(usernsIdx).toBeGreaterThan(-1);
+      expect(args[usernsIdx + 1]).toBe('keep-id');
+      expect(args).not.toContain('--userns=keep-id');
+    });
+
+    it('still adds --userns=keep-id for rootless Podman when SANDBOX_FLAGS has unrelated flags', async () => {
+      vi.stubEnv('SANDBOX_FLAGS', '--security-opt label=disable');
+      vi.mocked(execFileSync).mockReturnValue('true\n');
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'podman',
+        image: 'gemini-cli-sandbox',
+      });
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      const args = containerArgs('podman');
+      expect(args).toEqual(
+        expect.arrayContaining([
+          '--security-opt',
+          'label=disable',
+          '--userns=keep-id',
+        ]),
+      );
+    });
+
+    it('does not invoke rootless check or add --userns=keep-id when runtime is docker', async () => {
+      vi.mocked(execFileSync).mockReturnValue('true\n');
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      const args = containerArgs('docker');
+      expect(execFileSync).not.toHaveBeenCalled();
+      expect(args).not.toContain('--userns=keep-id');
+    });
+
+    it('does not invoke rootless check or add --userns=keep-id when runtime is macOS seatbelt', async () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      vi.mocked(execFileSync).mockReturnValue('true\n');
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'sandbox-exec',
+        image: 'some-image',
+      });
+
+      interface MockProcess extends EventEmitter {
+        stdout: EventEmitter;
+        stderr: EventEmitter;
+      }
+      const mockSpawnProcess = new EventEmitter() as MockProcess;
+      mockSpawnProcess.stdout = new EventEmitter();
+      mockSpawnProcess.stderr = new EventEmitter();
+      vi.mocked(spawn).mockReturnValue(
+        mockSpawnProcess as unknown as ReturnType<typeof spawn>,
+      );
+
+      const promise = start_sandbox(config, [], undefined, ['arg1']);
+      setTimeout(() => mockSpawnProcess.emit('close', 0), 10);
+      await expect(promise).resolves.toBe(0);
+
+      const spawnArgs = vi.mocked(spawn).mock.calls[0]?.[1] as string[];
+      expect(execFileSync).not.toHaveBeenCalled();
+      expect(spawnArgs).not.toContain('--userns=keep-id');
     });
   });
 });

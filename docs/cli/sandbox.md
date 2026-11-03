@@ -415,8 +415,12 @@ $env:SANDBOX_FLAGS="--flag1 --flag2=value"
 
 ### Linux UID/GID handling
 
-The sandbox automatically handles user permissions on Linux. Override these
-permissions with:
+Gemini CLI automatically handles user permissions in container sandboxes on
+Linux. When you run rootless Podman, Gemini CLI passes `--userns=keep-id` by
+default so container UIDs map directly to your host user ID unless you specify a
+custom `--userns` option in `SANDBOX_FLAGS`.
+
+Override the default Linux UID/GID mapping behavior with:
 
 **macOS/Linux**
 
