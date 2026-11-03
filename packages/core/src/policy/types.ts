@@ -181,8 +181,9 @@ export interface PolicyRule {
 
   /**
    * If true, explicitly allows command substitution for shell commands matched by
-   * this rule. If false, downgrades ALLOW to ASK_USER when command substitution
-   * is detected, even if inner subcommands are allowed.
+   * this rule. By default (when false or omitted), ALLOW is downgraded to
+   * ASK_USER when command substitution is detected, even if inner subcommands
+   * are allowed.
    * Only applies when decision is ALLOW.
    */
   allowCommandSubstitution?: boolean;

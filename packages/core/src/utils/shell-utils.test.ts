@@ -459,6 +459,14 @@ describe('stripShellWrapper', () => {
     expect(
       stripShellWrapper('cmd.exe /c "echo \\\\"& whoami & echo \\""'),
     ).toEqual('cmd.exe /c "echo \\\\"& whoami & echo \\""');
+    // Even backslashes before doubled quotes ("") or closing quote in cmd.exe /c and PowerShell are halved
+    expect(stripShellWrapper('cmd.exe /c "echo foo\\\\""bar"')).toEqual(
+      'echo foo\\"bar',
+    );
+    expect(stripShellWrapper('cmd.exe /c "echo C:\\\\"')).toEqual('echo C:\\');
+    expect(stripShellWrapper('powershell -Command "echo C:\\\\"')).toEqual(
+      'echo C:\\',
+    );
   });
 
   it('should not strip anything if no wrapper is present', () => {

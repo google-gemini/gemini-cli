@@ -986,7 +986,7 @@ function unwrapCmdCommandArg(rawArg: string): string | null {
           if (bsCount % 2 === 1) {
             return null;
           }
-          out += '\\'.repeat(bsCount);
+          out += '\\'.repeat(bsCount / 2);
           j = bsEnd;
           break;
         }
@@ -997,7 +997,7 @@ function unwrapCmdCommandArg(rawArg: string): string | null {
             continue;
           }
           if (bsEnd + 1 < end && rawArg[bsEnd + 1] === '"') {
-            out += '\\'.repeat(bsCount) + '"';
+            out += '\\'.repeat(bsCount / 2) + '"';
             j = bsEnd + 2;
             continue;
           }
@@ -1062,7 +1062,7 @@ function unwrapPowerShellCommandArg(rawArg: string): string | null {
           if (bsCount % 2 === 1) {
             return null;
           }
-          out += '\\'.repeat(bsCount);
+          out += '\\'.repeat(bsCount / 2);
           j = bsEnd;
           break;
         }

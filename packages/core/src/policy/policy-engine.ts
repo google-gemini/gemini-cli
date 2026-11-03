@@ -363,11 +363,26 @@ export class PolicyEngine {
   private shouldDowngradeForCommandSubstitution(
     command: string,
     allowCommandSubstitution?: boolean,
+    rule?: PolicyRule,
   ): boolean {
-    if (allowCommandSubstitution !== false) {
+    if (allowCommandSubstitution ?? false) {
       return false;
     }
-    return detectCommandSubstitution(stripShellWrapper(command));
+    if (!detectCommandSubstitution(stripShellWrapper(command))) {
+      return false;
+    }
+
+    // Require explicit allowCommandSubstitution when matching a command-prefix rule.
+    if (rule?.argsPattern !== undefined) {
+      return true;
+    }
+
+    // Do not downgrade (do not ask user) if in YOLO mode for catch-all rules.
+    if (this.approvalMode === ApprovalMode.YOLO) {
+      return false;
+    }
+
+    return true;
   }
 
   /**
@@ -548,6 +563,7 @@ export class PolicyEngine {
       this.shouldDowngradeForCommandSubstitution(
         command,
         rule?.allowCommandSubstitution,
+        rule,
       );
     if (hasTopLevelCommandSubstitutionDowngrade) {
       if (aggregateDecision === PolicyDecision.ALLOW) {
@@ -640,6 +656,7 @@ export class PolicyEngine {
               subCmd,
               subResult.rule?.allowCommandSubstitution ??
                 rule?.allowCommandSubstitution,
+              subResult.rule,
             ))
         ) {
           allSubCommandsExplicitlyAllowed = false;

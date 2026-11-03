@@ -352,10 +352,10 @@ interactive = true
 # individual command rule must permit redirection if it's used.
 allowRedirection = true
 
-# (Optional) Controls whether shell commands matched by an "allow" rule may
-# use command substitution ($(), backticks, <(), >(), or PowerShell @()).
-# Set to false to require confirmation whenever substitution syntax is present,
-# even if inner subcommands are also allowed.
+# (Optional) If true, lets shell commands use command substitution
+# ($(), backticks, <(), >(), or PowerShell @()). By default, the policy
+# engine asks for confirmation when substitution syntax is detected, even if
+# inner subcommands are also allowed.
 allowCommandSubstitution = true
 ```
 
