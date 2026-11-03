@@ -25,6 +25,7 @@ import { AboutBox } from './AboutBox.js';
 import { StatsDisplay } from './StatsDisplay.js';
 import { ModelStatsDisplay } from './ModelStatsDisplay.js';
 import { ToolStatsDisplay } from './ToolStatsDisplay.js';
+import { HeatmapComponent } from './HeatmapComponent.js';
 import { SessionSummaryDisplay } from './SessionSummaryDisplay.js';
 import { Help } from './Help.js';
 import type { SlashCommand } from '../commands/types.js';
@@ -185,6 +186,21 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         />
       )}
       {itemForDisplay.type === 'tool_stats' && <ToolStatsDisplay />}
+      {itemForDisplay.type === 'heatmap_stats' && (
+        <HeatmapComponent
+          dataset={{
+            dailyUsage: itemForDisplay.dailyUsage,
+            totalWindowTokens: itemForDisplay.totalWindowTokens,
+            totalWindowSessions: itemForDisplay.totalWindowSessions,
+            totalWindowTurns: itemForDisplay.totalWindowTurns,
+            currentStreak: itemForDisplay.currentStreak,
+            longestStreak: itemForDisplay.longestStreak,
+          }}
+          today={itemForDisplay.today}
+          selectedDate={itemForDisplay.selectedDate}
+          terminalWidth={terminalWidth}
+        />
+      )}
       {itemForDisplay.type === 'model' && (
         <ModelMessage model={itemForDisplay.model} />
       )}
