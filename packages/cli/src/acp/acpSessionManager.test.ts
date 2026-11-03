@@ -51,6 +51,14 @@ vi.mock('../utils/autoMemory.js', () => ({
     startAutoMemoryIfEnabledMock(config),
 }));
 
+vi.mock('node:crypto', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:crypto')>();
+  return {
+    ...actual,
+    randomUUID: () => 'test-session-id',
+  };
+});
+
 describe('AcpSessionManager', () => {
   let mockConfig: Mocked<Config>;
   let mockSettings: Mocked<LoadedSettings>;
@@ -133,13 +141,6 @@ describe('AcpSessionManager', () => {
     }));
 
     manager = new AcpSessionManager(mockSettings, mockArgv, mockConnection);
-    vi.mock('node:crypto', async (importOriginal) => {
-      const actual = await importOriginal<typeof import('node:crypto')>();
-      return {
-        ...actual,
-        randomUUID: () => 'test-session-id',
-      };
-    });
   });
 
   afterEach(() => {
