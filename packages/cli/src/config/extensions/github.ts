@@ -9,17 +9,28 @@ import {
   debugLogger,
   getErrorMessage,
   getSafeGitEnv,
+  validateUrlDestination,
   type ExtensionInstallMetadata,
   type GeminiCLIExtension,
 } from '@google/gemini-cli-core';
 import { ExtensionUpdateState } from '../../ui/state/extensions.js';
+import * as crypto from 'node:crypto';
+import type { IncomingMessage } from 'node:http';
 import * as os from 'node:os';
 import * as https from 'node:https';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { pipeline } from 'node:stream/promises';
 import * as tar from 'tar';
 import extract from 'extract-zip';
-import { fetchJson, getGitHubToken } from './github_fetch.js';
+import {
+  fetchJson,
+  getGitHubToken,
+  isTrustedGitHubUrl,
+  lookupPublicAddress,
+  REDIRECT_STATUS_CODES,
+  REQUEST_TIMEOUT_MS,
+} from './github_fetch.js';
 import type { ExtensionConfig } from '../extension.js';
 import type { ExtensionManager } from '../extension-manager.js';
 import { EXTENSIONS_CONFIG_FILENAME } from './variables.js';
@@ -523,45 +534,201 @@ export async function downloadFile(
   options?: DownloadOptions,
   redirectCount: number = 0,
 ): Promise<void> {
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(url);
+  } catch (error) {
+    throw new Error(`Invalid download URL ${url}: ${getErrorMessage(error)}`, {
+      cause: error,
+    });
+  }
+  if (parsedUrl.protocol !== 'https:') {
+    throw new Error(
+      `Refusing to download from insecure protocol ${parsedUrl.protocol} for URL ${url}. Only HTTPS is supported.`,
+    );
+  }
+
+  const requestUrl = parsedUrl.toString();
+  if (!(await validateUrlDestination(requestUrl))) {
+    throw new Error(
+      `Access to blocked or private host ${requestUrl} is not allowed.`,
+    );
+  }
+
   const headers: Record<string, string> = {
     'User-agent': 'gemini-cli',
     Accept: 'application/octet-stream',
     ...options?.headers,
   };
+  const trustedGitHubUrl = isTrustedGitHubUrl(requestUrl);
+  if (!trustedGitHubUrl) {
+    for (const key of Object.keys(headers)) {
+      if (key.toLowerCase() === 'authorization') {
+        delete headers[key];
+      }
+    }
+  }
   const token = getGitHubToken();
-  if (token) {
+  if (token && trustedGitHubUrl) {
     headers['Authorization'] = `token ${token}`;
   }
 
-  return new Promise((resolve, reject) => {
-    https
-      .get(url, { headers }, (res) => {
-        if (res.statusCode === 302 || res.statusCode === 301) {
+  let tempDest: string | undefined;
+  let downloadPipeline: Promise<void> | undefined;
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      let settled = false;
+      let isRedirecting = false;
+      let responseStream: IncomingMessage | undefined;
+
+      const settleResolve = (): void => {
+        if (!settled) {
+          settled = true;
+          resolve();
+        }
+      };
+
+      const settleReject = (error: unknown): void => {
+        if (!settled) {
+          settled = true;
+          reject(
+            error instanceof Error ? error : new Error(getErrorMessage(error)),
+          );
+        }
+      };
+
+      const requestOptions = {
+        headers,
+        lookup: lookupPublicAddress,
+        timeout: REQUEST_TIMEOUT_MS,
+      };
+
+      const req = https.get(requestUrl, requestOptions, (res) => {
+        res.on('error', (error) => {
+          if (!isRedirecting) {
+            settleReject(error);
+          }
+        });
+
+        if (res.statusCode && REDIRECT_STATUS_CODES.has(res.statusCode)) {
           if (redirectCount >= 10) {
-            return reject(new Error('Too many redirects'));
+            res.resume?.();
+            settleReject(new Error('Too many redirects'));
+            return;
           }
 
           if (!res.headers.location) {
-            return reject(
+            res.resume?.();
+            settleReject(
               new Error('Redirect response missing Location header'),
             );
+            return;
           }
-          downloadFile(res.headers.location, dest, options, redirectCount + 1)
-            .then(resolve)
-            .catch(reject);
+
+          let redirectUrl: string;
+          try {
+            redirectUrl = new URL(res.headers.location, requestUrl).toString();
+          } catch (error) {
+            res.resume?.();
+            settleReject(
+              new Error(
+                `Invalid redirect URL from ${requestUrl} (status ${res.statusCode}): ${getErrorMessage(error)}`,
+                { cause: error },
+              ),
+            );
+            return;
+          }
+
+          isRedirecting = true;
+          res.resume?.();
+          void downloadFile(redirectUrl, dest, options, redirectCount + 1).then(
+            settleResolve,
+            settleReject,
+          );
           return;
         }
+
         if (res.statusCode !== 200) {
-          return reject(
+          res.resume?.();
+          settleReject(
             new Error(`Request failed with status code ${res.statusCode}`),
           );
+          return;
         }
-        const file = fs.createWriteStream(dest);
-        res.pipe(file);
-        file.on('finish', () => file.close(resolve as () => void));
-      })
-      .on('error', reject);
-  });
+
+        responseStream = res;
+        const currentTempDest = `${dest}.${crypto.randomUUID()}.tmp`;
+        tempDest = currentTempDest;
+
+        let file: fs.WriteStream;
+        try {
+          file = fs.createWriteStream(currentTempDest);
+        } catch (error) {
+          res.destroy?.();
+          settleReject(error);
+          return;
+        }
+
+        // Settle synchronously in true emission order while also keeping an
+        // error listener attached so secondary teardown errors never go unhandled.
+        file.on('error', settleReject);
+
+        downloadPipeline = pipeline(res, file);
+        void downloadPipeline.then(() => {
+          if (res.complete === false) {
+            settleReject(
+              new Error(
+                `Response ended prematurely while downloading ${requestUrl}`,
+              ),
+            );
+            return;
+          }
+          settleResolve();
+        }, settleReject);
+      });
+
+      req.on('error', (error) => {
+        if (isRedirecting) {
+          return;
+        }
+        settleReject(error);
+        responseStream?.destroy?.();
+      });
+
+      req.on('timeout', () => {
+        if (!isRedirecting) {
+          settleReject(
+            new Error(`Request timed out after ${REQUEST_TIMEOUT_MS}ms`),
+          );
+          responseStream?.destroy?.();
+        }
+        // Always release the original socket. A redirect in flight runs on its
+        // own request, so destroying this one does not affect it.
+        req.destroy?.();
+      });
+    });
+
+    if (tempDest) {
+      await fs.promises.rename(tempDest, dest);
+    }
+  } catch (error) {
+    if (downloadPipeline) {
+      try {
+        await downloadPipeline;
+      } catch {
+        // Already captured via settleReject; wait for file handle to close before unlinking.
+      }
+    }
+    if (tempDest) {
+      try {
+        await fs.promises.unlink(tempDest);
+      } catch {
+        // Ignore cleanup errors if the temporary file was never created or already removed.
+      }
+    }
+    throw error;
+  }
 }
 
 export async function extractFile(file: string, dest: string): Promise<void> {
