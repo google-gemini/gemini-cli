@@ -417,33 +417,20 @@ export async function runNonInteractive(
             warnings.push(message);
           } else if (event.type === GeminiEventType.Error) {
             const normalized = normalizeError(event.value.error);
-            const err = new Error(normalized.message);
-            if (typeof normalized.status === 'number') {
-              Object.defineProperty(err, 'status', {
-                value: normalized.status,
-                enumerable: true,
-                configurable: true,
-              });
-            }
             const code =
               normalized.code ??
               (typeof normalized.status === 'string'
                 ? normalized.status
                 : undefined);
-            if (code !== undefined) {
-              Object.defineProperty(err, 'code', {
-                value: code,
-                enumerable: true,
-                configurable: true,
-              });
-            }
-            if (normalized.details !== undefined) {
-              Object.defineProperty(err, 'details', {
-                value: normalized.details,
-                enumerable: true,
-                configurable: true,
-              });
-            }
+            const err = Object.assign(new Error(normalized.message), {
+              ...(typeof normalized.status === 'number'
+                ? { status: normalized.status }
+                : {}),
+              ...(code !== undefined ? { code } : {}),
+              ...(normalized.details !== undefined
+                ? { details: normalized.details }
+                : {}),
+            });
             throw err;
           } else if (event.type === GeminiEventType.AgentExecutionStopped) {
             const stopMessage = `Agent execution stopped: ${event.value.systemMessage?.trim() || event.value.reason}`;

@@ -598,6 +598,14 @@ describe('runNonInteractive', () => {
     expect(caughtError).toBeInstanceOf(Error);
     expect((caughtError as Error).message).toBe('Model not found');
     expect((caughtError as { status?: number }).status).toBe(404);
+    expect(
+      Object.getOwnPropertyDescriptor(caughtError, 'status'),
+    ).toMatchObject({
+      value: 404,
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
   });
 
   it('preserves string-based status on code without violating numeric status contract in GeminiEventType.Error', async () => {
@@ -636,6 +644,12 @@ describe('runNonInteractive', () => {
     );
     expect((caughtError as { status?: unknown }).status).toBeUndefined();
     expect((caughtError as { code?: string }).code).toBe('PERMISSION_DENIED');
+    expect(Object.getOwnPropertyDescriptor(caughtError, 'code')).toMatchObject({
+      value: 'PERMISSION_DENIED',
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
   });
 
   it('should not exit if a tool is not found, and should send error back to model', async () => {
