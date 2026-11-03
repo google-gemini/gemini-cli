@@ -512,7 +512,11 @@ describe('ThemeManager', () => {
         (p) =>
           p.toString().replace(/\\/g, '/') === '/home/user/.gemini/theme.json',
       );
-      vi.spyOn(fs, 'realpathSync').mockReturnValue('/etc/untrusted-theme.json');
+      vi.spyOn(fs, 'realpathSync').mockImplementation((p) =>
+        p.toString().replace(/\\/g, '/') === '/home/user/.gemini/theme.json'
+          ? '/etc/untrusted-theme.json'
+          : p.toString(),
+      );
       vi.spyOn(fs, 'readFileSync').mockReturnValue(
         JSON.stringify({
           name: 'untrusted-theme',
@@ -530,6 +534,57 @@ describe('ThemeManager', () => {
         ),
       );
       warnSpy.mockRestore();
+    });
+
+    it('canonicalizes symlinked home and XDG directories to avoid false-positive security blocks', () => {
+      vi.mocked(os.homedir).mockReturnValue('/var/folders/user');
+      process.env['XDG_CONFIG_HOME'] = '/var/folders/user/.xdg';
+      vi.spyOn(fs, 'existsSync').mockImplementation((p) => {
+        const normalized = p.toString().replace(/\\/g, '/');
+        return (
+          normalized === '/var/folders/user/.gemini/theme.json' ||
+          normalized === '/var/folders/user/.xdg/gemini/theme.json' ||
+          normalized === '/var/folders/user/my-file-theme.json'
+        );
+      });
+      vi.spyOn(fs, 'realpathSync').mockImplementation((p) =>
+        p
+          .toString()
+          .replace(/\\/g, '/')
+          .replace(/^\/var\//, '/private/var/'),
+      );
+      vi.spyOn(fs, 'readFileSync').mockImplementation((p) => {
+        const normalized = p.toString().replace(/\\/g, '/');
+        if (normalized.endsWith('/.xdg/gemini/theme.json')) {
+          return JSON.stringify({
+            'xdg-symlink-theme': {
+              type: 'custom',
+              background: { primary: '#101010' },
+            },
+          });
+        }
+        if (normalized.endsWith('/my-file-theme.json')) {
+          return JSON.stringify({
+            name: 'Symlink File Theme',
+            type: 'custom',
+            background: { primary: '#303030' },
+          });
+        }
+        return JSON.stringify({
+          name: 'home-symlink-theme',
+          type: 'custom',
+          background: { primary: '#202020' },
+        });
+      });
+
+      themeManager.loadUserThemes();
+
+      expect(themeManager.findThemeByName('home-symlink-theme')).toBeDefined();
+      expect(themeManager.findThemeByName('xdg-symlink-theme')).toBeDefined();
+      expect(
+        themeManager.setActiveTheme('/var/folders/user/my-file-theme.json'),
+      ).toBe(true);
+      expect(themeManager.getActiveTheme().name).toBe('Symlink File Theme');
     });
   });
 });

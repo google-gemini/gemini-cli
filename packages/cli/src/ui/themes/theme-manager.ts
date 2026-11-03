@@ -42,7 +42,12 @@ import { ANSI } from './builtin/dark/ansi-dark.js';
 import { ANSILight } from './builtin/light/ansi-light.js';
 import { NoColorTheme } from './builtin/no-color.js';
 import process from 'node:process';
-import { debugLogger, GEMINI_DIR, homedir } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  GEMINI_DIR,
+  homedir,
+  isSubpath,
+} from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 
 const SINGLE_CUSTOM_THEME_KEYS = new Set([
@@ -76,15 +81,6 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
 
 function isStringValue(value: unknown): value is string {
   return typeof value === 'string';
-}
-
-function isWithinDirectory(targetPath: string, baseDir: string): boolean {
-  const resolvedBase = path.resolve(baseDir);
-  const resolvedTarget = path.resolve(targetPath);
-  return (
-    resolvedTarget === resolvedBase ||
-    resolvedTarget.startsWith(resolvedBase + path.sep)
-  );
 }
 
 export interface ThemeDisplay {
@@ -300,6 +296,19 @@ class ThemeManager {
     );
   }
 
+  private resolveCanonicalDirectory(dirPath: string): string {
+    const resolvedDir = path.resolve(dirPath);
+    try {
+      const canonical = this.fs.realpathSync(resolvedDir);
+      if (isStringValue(canonical) && canonical.length > 0) {
+        return path.resolve(canonical);
+      }
+    } catch {
+      // Fall back to resolvedDir when the directory does not exist on disk yet.
+    }
+    return resolvedDir;
+  }
+
   /**
    * Loads custom themes from standalone user theme.json files
    * (~/.gemini/theme.json and XDG fallback ~/.config/gemini/theme.json).
@@ -313,10 +322,10 @@ class ThemeManager {
       return;
     }
 
-    const trustedRoots = [path.resolve(homeDir)];
+    const trustedRoots = [this.resolveCanonicalDirectory(homeDir)];
     const xdgConfigHome = process.env['XDG_CONFIG_HOME']?.trim();
     if (xdgConfigHome) {
-      trustedRoots.push(path.resolve(xdgConfigHome));
+      trustedRoots.push(this.resolveCanonicalDirectory(xdgConfigHome));
     }
 
     for (const candidatePath of this.getUserThemePaths()) {
@@ -327,9 +336,7 @@ class ThemeManager {
 
         const canonicalPath = this.fs.realpathSync(candidatePath);
         if (
-          !trustedRoots.some((rootDir) =>
-            isWithinDirectory(canonicalPath, rootDir),
-          )
+          !trustedRoots.some((rootDir) => isSubpath(rootDir, canonicalPath))
         ) {
           debugLogger.warn(
             `Theme file at "${candidatePath}" resolves outside trusted configuration directories. ` +
@@ -846,8 +853,12 @@ class ThemeManager {
       }
 
       // 2. Perform security check.
-      const homeDir = path.resolve(this.homedir());
-      if (!isWithinDirectory(canonicalPath, homeDir)) {
+      const rawHome = this.homedir();
+      if (!rawHome) {
+        return undefined;
+      }
+      const canonicalHome = this.resolveCanonicalDirectory(rawHome);
+      if (!isSubpath(canonicalHome, canonicalPath)) {
         debugLogger.warn(
           `Theme file at "${themePath}" is outside your home directory. ` +
             `Only load themes from trusted sources.`,
