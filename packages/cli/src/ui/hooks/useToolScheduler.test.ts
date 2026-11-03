@@ -420,6 +420,78 @@ describe('useToolScheduler', () => {
     expect(result.current[0][0].status).toBe(CoreToolCallStatus.Executing);
   });
 
+  it('shows subagent tool calls whose first update is already a terminal state', async () => {
+    const { result } = await renderHook(() =>
+      useToolScheduler(
+        vi.fn().mockResolvedValue(undefined),
+        mockConfig,
+        () => undefined,
+      ),
+    );
+
+    // A very fast tool, or batched updates, can mean the first update the
+    // hook sees is already Success. A validation failure goes straight to
+    // Error without passing through Executing. Neither was ever shown
+    // before, but both must reach state or the subagent's work — and its
+    // failures — stay invisible.
+    const finishedCalls = [
+      {
+        status: CoreToolCallStatus.Success as const,
+        request: {
+          callId: 'call-fast',
+          name: 'test',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'p1',
+        },
+        tool: createMockTool(),
+        invocation: createMockInvocation(),
+        schedulerId: 'subagent-1',
+        response: {
+          callId: 'call-fast',
+          resultDisplay: 'OK',
+          responseParts: [],
+          error: undefined,
+          errorType: undefined,
+        },
+      },
+      {
+        status: CoreToolCallStatus.Error as const,
+        request: {
+          callId: 'call-invalid',
+          name: 'test',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'p1',
+        },
+        tool: createMockTool(),
+        invocation: createMockInvocation(),
+        schedulerId: 'subagent-1',
+        response: {
+          callId: 'call-invalid',
+          resultDisplay: 'Invalid arguments',
+          responseParts: [],
+          error: new Error('Invalid arguments'),
+          errorType: undefined,
+        },
+      },
+    ];
+
+    act(() => {
+      void mockMessageBus.publish({
+        type: MessageBusType.TOOL_CALLS_UPDATE,
+        toolCalls: finishedCalls,
+        schedulerId: 'subagent-1',
+      } as unknown as ToolCallsUpdateMessage);
+    });
+
+    expect(result.current[0]).toHaveLength(2);
+    expect(result.current[0].map((t) => t.request.callId)).toEqual([
+      'call-fast',
+      'call-invalid',
+    ]);
+  });
+
   it('keeps scheduled and validating tool calls from non-root schedulers hidden', async () => {
     const { result } = await renderHook(() =>
       useToolScheduler(

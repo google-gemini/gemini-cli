@@ -143,22 +143,22 @@ export function useToolScheduler(
         const prevCalls = prev[event.schedulerId] ?? [];
         const prevCallIds = new Set(prevCalls.map((tc) => tc.request.callId));
 
-        // For non-root schedulers, we only show tool calls that:
-        // 1. Are currently awaiting approval.
-        // 2. Are currently executing. The task tree builds its hierarchy from
-        //    the calls present in state, so dropping a first-seen executing
-        //    call would hide that piece of subagent work entirely.
-        // 3. Were previously shown (e.g., they are now completed).
-        // Calls that have not started yet (Scheduled/Validating) stay hidden
-        // until they reach one of the states above. This prevents "thinking"
-        // tools (reads/searches) from flickering in the UI unless they
-        // specifically required user interaction.
+        // For non-root schedulers, we hide only tool calls that have not
+        // started yet (Scheduled/Validating). Everything that has started
+        // is shown: the task tree builds its hierarchy from the calls
+        // present in state, so dropping a first-seen call would hide that
+        // piece of subagent work entirely. Filtering by an allowlist of
+        // statuses would also drop calls that jump straight to a terminal
+        // state — validation/policy failures (straight to Error) and very
+        // fast tools whose first observed update is already Success/Error.
+        // Keeping not-yet-started calls hidden still prevents "thinking"
+        // tools (reads/searches) from flickering in the UI.
         const filteredToolCalls = isRoot
           ? event.toolCalls
           : event.toolCalls.filter(
               (tc) =>
-                tc.status === CoreToolCallStatus.AwaitingApproval ||
-                tc.status === CoreToolCallStatus.Executing ||
+                (tc.status !== CoreToolCallStatus.Scheduled &&
+                  tc.status !== CoreToolCallStatus.Validating) ||
                 prevCallIds.has(tc.request.callId),
             );
 
