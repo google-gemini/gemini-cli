@@ -425,9 +425,14 @@ export async function runNonInteractive(
                 configurable: true,
               });
             }
-            if (normalized.code !== undefined) {
+            const code =
+              normalized.code ??
+              (typeof normalized.status === 'string'
+                ? normalized.status
+                : undefined);
+            if (code !== undefined) {
               Object.defineProperty(err, 'code', {
-                value: normalized.code,
+                value: code,
                 enumerable: true,
                 configurable: true,
               });

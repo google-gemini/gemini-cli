@@ -600,6 +600,44 @@ describe('runNonInteractive', () => {
     expect((caughtError as { status?: number }).status).toBe(404);
   });
 
+  it('preserves string-based status on code without violating numeric status contract in GeminiEventType.Error', async () => {
+    const events: ServerGeminiStreamEvent[] = [
+      {
+        type: GeminiEventType.Error,
+        value: {
+          error: {
+            error: {
+              message: 'Permission denied on resource',
+              status: 'PERMISSION_DENIED',
+            },
+          },
+        },
+      },
+    ];
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents(events),
+    );
+
+    let caughtError: unknown;
+    try {
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'Trigger string status error',
+        prompt_id: 'prompt-id-string-status',
+      });
+    } catch (err) {
+      caughtError = err;
+    }
+
+    expect(caughtError).toBeInstanceOf(Error);
+    expect((caughtError as Error).message).toBe(
+      'Permission denied on resource',
+    );
+    expect((caughtError as { status?: unknown }).status).toBeUndefined();
+    expect((caughtError as { code?: string }).code).toBe('PERMISSION_DENIED');
+  });
+
   it('should not exit if a tool is not found, and should send error back to model', async () => {
     const toolCallEvent: ServerGeminiStreamEvent = {
       type: GeminiEventType.ToolCallRequest,
