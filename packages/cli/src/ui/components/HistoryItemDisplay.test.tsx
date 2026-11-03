@@ -93,6 +93,35 @@ describe('<HistoryItemDisplay />', () => {
     },
   );
 
+  it('renders the allowlisted sign-in hyperlink through the TUI pipeline (issue #29430)', async () => {
+    // Full pipeline: HistoryItemDisplay (escapeAnsiCtrlCodes) ->
+    // InfoMessage -> RenderInline (strip + markdown parse) -> Ink.
+    // The raw Ink output must still carry the complete OSC 8 target, not
+    // the literal escaped form, so a terminal can open the full URL even
+    // when the visible label wraps.
+    const authUrl =
+      'https://accounts.google.com/o/oauth2/v2/auth?response_type=code' +
+      '&redirect_uri=http%3A%2F%2F127.0.0.1%3A34567%2Foauth2callback' +
+      '&access_type=offline&state=abc';
+    const link = `\u001b]8;;${authUrl}\u001b\\Open authentication page\u001b]8;;\u001b\\`;
+    const item: HistoryItem = {
+      ...baseItem,
+      type: MessageType.INFO,
+      text:
+        '\n\nAttempting to open authentication page in your browser.\n' +
+        `Otherwise navigate to:\n\n${link}\n\n` +
+        `Or copy this link:\n${authUrl}\n\n\n`,
+    };
+    const { lastFrame, lastFrameRaw, unmount } = await renderWithProviders(
+      <HistoryItemDisplay {...baseItem} item={item} />,
+    );
+    const raw = lastFrameRaw();
+    expect(raw).toContain(`\u001b]8;;${authUrl}\u001b\\`);
+    expect(raw).not.toContain('\\u001b]8');
+    expect(lastFrame()).toContain('Open authentication page');
+    unmount();
+  });
+
   it('renders AgentsStatus for "agents_list" type', async () => {
     const item: HistoryItem = {
       ...baseItem,

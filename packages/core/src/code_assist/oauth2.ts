@@ -107,6 +107,57 @@ export interface OauthWebLogin {
   loginCompletePromise: Promise<void>;
 }
 
+/**
+ * OSC 8 hyperlink escape sequences. An OSC 8 hyperlink carries the full URL
+ * as its target, so a terminal that supports it opens the complete URL even
+ * when the visible text wraps across lines. Terminals that do not support
+ * OSC 8 show the label text instead, which is why callers must also print
+ * the plain URL (see formatAuthUrlMessage).
+ */
+const OSC8_START = '\u001b]8;;';
+const OSC8_END = '\u001b\\';
+const OSC8_SEQUENCE = '\u001b]8';
+
+/**
+ * Wraps an auth URL in an OSC 8 hyperlink whose visible label is short, so
+ * the link target — not the wrapped visible text — is what the terminal
+ * opens. The name says what it does: it wraps a URL, it does not reformat
+ * or shorten the URL itself.
+ *
+ * Returns the URL unchanged when there is nothing safe to wrap: an empty
+ * URL, a URL that is already OSC 8-wrapped (so it is never double-wrapped),
+ * or a URL containing control characters or whitespace, which could break
+ * out of the escape sequence. In those cases the plain-URL fallback in
+ * formatAuthUrlMessage still prints the URL exactly as received.
+ */
+export function wrapAuthUrlAsHyperlink(url: string): string {
+  if (
+    !url ||
+    url.includes(OSC8_SEQUENCE) ||
+    // eslint-disable-next-line no-control-regex
+    /[\u0000-\u0020\u007f]/.test(url)
+  ) {
+    return url;
+  }
+  return `${OSC8_START}${url}${OSC8_END}Open authentication page${OSC8_START}${OSC8_END}`;
+}
+
+/**
+ * Builds the "navigate to" message printed during web login. It always
+ * contains the plain URL as a fallback line for terminals that do not
+ * support OSC 8 and for copy-paste, and the OSC 8 hyperlink above it for
+ * terminals that do. There is no conditional branch at the call site: the
+ * same message is emitted for every auth URL, and the helper decides
+ * whether wrapping is safe.
+ */
+export function formatAuthUrlMessage(authUrl: string): string {
+  return (
+    `\n\nAttempting to open authentication page in your browser.\n` +
+    `Otherwise navigate to:\n\n${wrapAuthUrlAsHyperlink(authUrl)}\n\n` +
+    `Or copy this link:\n${authUrl}\n\n\n`
+  );
+}
+
 const oauthClientPromises = new Map<AuthType, Promise<AuthClient>>();
 
 function getUseEncryptedStorageFlag() {
@@ -324,9 +375,7 @@ async function initOauthClient(
 
     coreEvents.emit(CoreEvent.UserFeedback, {
       severity: 'info',
-      message:
-        `\n\nAttempting to open authentication page in your browser.\n` +
-        `Otherwise navigate to:\n\n${webLogin.authUrl}\n\n\n`,
+      message: formatAuthUrlMessage(webLogin.authUrl),
     });
     try {
       // Attempt to open the authentication URL in the default browser.
