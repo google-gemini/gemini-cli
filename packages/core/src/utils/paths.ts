@@ -70,6 +70,20 @@ export function tildeifyPath(filePath: string): string {
     return filePath;
   }
 
+  if (process.platform === 'darwin') {
+    const normHome = trimmedHome.toLowerCase();
+    const prefix = filePath.slice(0, trimmedHome.length);
+    if (prefix.toLowerCase() === normHome) {
+      if (filePath.length === trimmedHome.length) {
+        return '~';
+      }
+      if (filePath[trimmedHome.length] === '/') {
+        return '~' + filePath.slice(trimmedHome.length);
+      }
+    }
+    return filePath;
+  }
+
   if (filePath === trimmedHome) {
     return '~';
   }

@@ -349,10 +349,32 @@ describe('tildeifyPath', () => {
       expect(tildeifyPath('/')).toBe('/');
     });
 
+    it('should remain case-sensitive on Linux', () => {
+      vi.stubEnv('GEMINI_CLI_HOME', '/Users/Al');
+      expect(tildeifyPath('/users/al/proj')).toBe('/users/al/proj');
+    });
+
     it('should leave unrelated, relative, and empty paths unchanged', () => {
       expect(tildeifyPath('/var/log/syslog')).toBe('/var/log/syslog');
       expect(tildeifyPath('relative/path')).toBe('relative/path');
       expect(tildeifyPath('')).toBe('');
+    });
+  });
+
+  describe('on Darwin', () => {
+    beforeEach(() => {
+      mockPlatform('darwin');
+      vi.stubEnv('GEMINI_CLI_HOME', '/Users/Al');
+    });
+
+    it('should match the macOS home prefix case-insensitively', () => {
+      expect(tildeifyPath('/users/al')).toBe('~');
+      expect(tildeifyPath('/users/al/Proj')).toBe('~/Proj');
+    });
+
+    it('should leave sibling directories sharing a case-insensitive prefix unchanged', () => {
+      expect(tildeifyPath('/users/albert')).toBe('/users/albert');
+      expect(tildeifyPath('/users/albert/Proj')).toBe('/users/albert/Proj');
     });
   });
 
