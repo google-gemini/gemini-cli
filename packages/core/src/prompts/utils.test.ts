@@ -339,7 +339,7 @@ describe('applySubstitutions', () => {
     expect(result).toBe(`Prefix ${dollarSubAgents} Suffix`);
   });
 
-  it('should preserve $ replacement patterns literally in ${AvailableTools}', () => {
+  it('should preserve $ replacement patterns literally in ${AvailableTools} and tool-specific variables', () => {
     (mockConfig as unknown as { toolRegistry: ToolRegistry }).toolRegistry = {
       getAllToolNames: vi
         .fn()
@@ -348,12 +348,12 @@ describe('applySubstitutions', () => {
     } as unknown as ToolRegistry;
 
     const result = applySubstitutions(
-      'Tools:\n${AvailableTools}\nEnd',
+      'Tools:\n${AvailableTools}\nSpecific: ${dollar_$$_tool_ToolName} and ${match_$&_tool_ToolName}\nEnd',
       mockConfig,
       '',
     );
     expect(result).toBe(
-      "Tools:\n- dollar_$$_tool\n- match_$&_tool\n- quote_$'_tool\nEnd",
+      "Tools:\n- dollar_$$_tool\n- match_$&_tool\n- quote_$'_tool\nSpecific: dollar_$$_tool and match_$&_tool\nEnd",
     );
   });
 });
