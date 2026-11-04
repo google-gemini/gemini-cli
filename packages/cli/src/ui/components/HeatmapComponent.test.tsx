@@ -227,4 +227,39 @@ describe('<HeatmapComponent />', () => {
     );
     renderResult.unmount();
   });
+
+  it('safely renders partially deserialized usage summaries missing modelBreakdown or numeric fields', async () => {
+    const partialEntry = {
+      date: '2026-11-03',
+      totalTokens: 500,
+    } as unknown as DailyUsageSummary;
+
+    const dataset = {
+      dailyUsage: {
+        '2026-11-03': partialEntry,
+      },
+      totalWindowTokens: 500,
+      currentStreak: 1,
+      longestStreak: 1,
+    };
+
+    const renderResult = await renderWithProviders(
+      <HeatmapComponent
+        dataset={dataset}
+        today="2026-11-03"
+        selectedDate="2026-11-03"
+        terminalWidth={80}
+      />,
+      { width: 80 },
+    );
+    await renderResult.waitUntilReady();
+
+    const frame = renderResult.lastFrame();
+    expect(frame).toContain('Breakdown for 2026-11-03');
+    expect(frame).toContain('Total Tokens: 500');
+    expect(frame).toContain('Token Split: 0 input · 0 output · 0 cached');
+    expect(frame).toContain('Activity: 0 sessions · 0 turns');
+    expect(frame).not.toContain('Models');
+    renderResult.unmount();
+  });
 });

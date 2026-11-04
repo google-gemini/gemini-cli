@@ -70,6 +70,23 @@ interface GridCell {
   isFuture: boolean;
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function toSafeCount(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.max(0, value)
+    : 0;
+}
+
+function isModelTokenEntry(
+  entry: [string, unknown],
+): entry is [string, number] {
+  const [, count] = entry;
+  return typeof count === 'number' && Number.isFinite(count);
+}
+
 function isUsageMap(
   source: HeatmapDatasetInput['dailyUsage'],
 ): source is ReadonlyMap<string, DailyUsageSummary> {
@@ -77,14 +94,19 @@ function isUsageMap(
 }
 
 function getUsageForDate(
-  source: HeatmapDatasetInput['dailyUsage'],
+  source: HeatmapDatasetInput['dailyUsage'] | undefined,
   dateKey: string,
 ): DailyUsageSummary | undefined {
-  if (isUsageMap(source)) {
-    return source.get(dateKey);
+  if (!source || typeof source !== 'object') {
+    return undefined;
   }
-  return Object.prototype.hasOwnProperty.call(source, dateKey)
-    ? source[dateKey]
+  const entry = isUsageMap(source)
+    ? source.get(dateKey)
+    : Object.prototype.hasOwnProperty.call(source, dateKey)
+      ? source[dateKey]
+      : undefined;
+  return entry && typeof entry === 'object' && !Array.isArray(entry)
+    ? entry
     : undefined;
 }
 
@@ -251,10 +273,10 @@ export const HeatmapComponent: React.FC<HeatmapComponentProps> = ({
       const daySummary = isFuture
         ? undefined
         : getUsageForDate(dataset.dailyUsage, dateKey);
-      const tokens = daySummary?.totalTokens ?? 0;
+      const tokens = toSafeCount(daySummary?.totalTokens);
       if (!isFuture) {
-        fallbackWindowSessions += daySummary?.sessions ?? 0;
-        fallbackWindowTurns += daySummary?.turns ?? 0;
+        fallbackWindowSessions += toSafeCount(daySummary?.sessions);
+        fallbackWindowTurns += toSafeCount(daySummary?.turns);
         if (tokens > 0) {
           nonZeroValues.push(tokens);
         }
@@ -264,24 +286,31 @@ export const HeatmapComponent: React.FC<HeatmapComponentProps> = ({
     weeks.push(weekCells);
   }
 
+  const windowTokens = toSafeCount(dataset.totalWindowTokens);
   const windowSessions =
-    typeof dataset.totalWindowSessions === 'number'
-      ? dataset.totalWindowSessions
+    typeof dataset.totalWindowSessions === 'number' &&
+    Number.isFinite(dataset.totalWindowSessions)
+      ? Math.max(0, dataset.totalWindowSessions)
       : fallbackWindowSessions;
   const windowTurns =
-    typeof dataset.totalWindowTurns === 'number'
-      ? dataset.totalWindowTurns
+    typeof dataset.totalWindowTurns === 'number' &&
+    Number.isFinite(dataset.totalWindowTurns)
+      ? Math.max(0, dataset.totalWindowTurns)
       : fallbackWindowTurns;
+  const currentStreak = toSafeCount(dataset.currentStreak);
+  const longestStreak = toSafeCount(dataset.longestStreak);
 
   const classifyIntensity = createIntensityClassifier(nonZeroValues);
   const monthHeaderLine = buildMonthHeaderLine(weeks);
   const selectedDaySummary = selectedDate
     ? getUsageForDate(dataset.dailyUsage, selectedDate)
     : undefined;
-  const sortedModels = selectedDaySummary
-    ? Object.entries(selectedDaySummary.modelBreakdown).sort(
-        (a, b) => b[1] - a[1] || a[0].localeCompare(b[0]),
-      )
+  const selectedTotalTokens = toSafeCount(selectedDaySummary?.totalTokens);
+  const rawModelBreakdown: unknown = selectedDaySummary?.modelBreakdown;
+  const sortedModels = isPlainObject(rawModelBreakdown)
+    ? Object.entries(rawModelBreakdown)
+        .filter(isModelTokenEntry)
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     : [];
 
   return (
@@ -348,7 +377,7 @@ export const HeatmapComponent: React.FC<HeatmapComponentProps> = ({
         <Text>
           <Text color={theme.text.link}>Total Tokens: </Text>
           <Text color={theme.text.primary}>
-            {dataset.totalWindowTokens.toLocaleString()}
+            {windowTokens.toLocaleString()}
           </Text>
           <Text color={theme.text.secondary}> · </Text>
           <Text color={theme.text.primary}>
@@ -362,12 +391,12 @@ export const HeatmapComponent: React.FC<HeatmapComponentProps> = ({
         <Text>
           <Text color={theme.text.link}>Current streak: </Text>
           <Text color={theme.text.primary}>
-            {formatCountWithNoun(dataset.currentStreak, 'day', 'days')}
+            {formatCountWithNoun(currentStreak, 'day', 'days')}
           </Text>
           <Text color={theme.text.secondary}> · </Text>
           <Text color={theme.text.link}>Longest streak: </Text>
           <Text color={theme.text.primary}>
-            {formatCountWithNoun(dataset.longestStreak, 'day', 'days')}
+            {formatCountWithNoun(longestStreak, 'day', 'days')}
           </Text>
         </Text>
       </Box>
@@ -384,7 +413,7 @@ export const HeatmapComponent: React.FC<HeatmapComponentProps> = ({
             borderColor={theme.border.default}
             marginBottom={1}
           />
-          {!selectedDaySummary || selectedDaySummary.totalTokens === 0 ? (
+          {!selectedDaySummary || selectedTotalTokens === 0 ? (
             <Text color={theme.text.secondary}>
               No token usage recorded for {selectedDate}
             </Text>
@@ -396,24 +425,38 @@ export const HeatmapComponent: React.FC<HeatmapComponentProps> = ({
               <Text>
                 <Text color={theme.text.link}>Total Tokens: </Text>
                 <Text color={theme.text.primary}>
-                  {selectedDaySummary.totalTokens.toLocaleString()}
+                  {selectedTotalTokens.toLocaleString()}
                 </Text>
               </Text>
               <Text>
                 <Text color={theme.text.link}>Token Split: </Text>
                 <Text color={theme.text.primary}>
-                  {selectedDaySummary.inputTokens.toLocaleString()} input ·{' '}
-                  {selectedDaySummary.outputTokens.toLocaleString()} output ·{' '}
-                  {selectedDaySummary.cachedTokens.toLocaleString()} cached
+                  {toSafeCount(selectedDaySummary.inputTokens).toLocaleString()}{' '}
+                  input ·{' '}
+                  {toSafeCount(
+                    selectedDaySummary.outputTokens,
+                  ).toLocaleString()}{' '}
+                  output ·{' '}
+                  {toSafeCount(
+                    selectedDaySummary.cachedTokens,
+                  ).toLocaleString()}{' '}
+                  cached
                 </Text>
               </Text>
               <Text>
                 <Text color={theme.text.link}>Activity: </Text>
                 <Text color={theme.text.primary}>
-                  {selectedDaySummary.sessions.toLocaleString()}{' '}
-                  {selectedDaySummary.sessions === 1 ? 'session' : 'sessions'} ·{' '}
-                  {selectedDaySummary.turns.toLocaleString()}{' '}
-                  {selectedDaySummary.turns === 1 ? 'turn' : 'turns'}
+                  {formatCountWithNoun(
+                    toSafeCount(selectedDaySummary.sessions),
+                    'session',
+                    'sessions',
+                  )}{' '}
+                  ·{' '}
+                  {formatCountWithNoun(
+                    toSafeCount(selectedDaySummary.turns),
+                    'turn',
+                    'turns',
+                  )}
                 </Text>
               </Text>
               {sortedModels.length > 0 && (
